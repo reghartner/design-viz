@@ -17,8 +17,9 @@ export async function cloudFolder(page){
  await page.addInitScript(()=>{
   function directory(name){return {name:name.split('/').pop() || 'Cloud scratch',async *values(){for(const e of await window.cloudFolderDisk('entries',name || '/'))yield e;},
    async getDirectoryHandle(child,opts){if(!await window.cloudFolderDisk('mkdir',name+'/'+child,opts))throw new DOMException('Missing','NotFoundError');return directory(name+'/'+child);},
-   async getFileHandle(child,opts){const file=name+'/'+child;if(!opts?.create && !await window.cloudFolderDisk('exists',file))throw new DOMException('Missing','NotFoundError');return {async getFile(){return new File([await window.cloudFolderDisk('read',file)],child);},async createWritable(){let data;return {async write(value){data=value;},async close(){await window.cloudFolderDisk('write',file,data);},async abort(){}};}};}
+   async getFileHandle(child,opts){const file=name+'/'+child;if(!opts?.create && !await window.cloudFolderDisk('exists',file))throw new DOMException('Missing','NotFoundError');return {name:child,async getFile(){return new File([await window.cloudFolderDisk('read',file)],child);},async createWritable(){let data;return {async write(value){data=value;},async close(){await window.cloudFolderDisk('write',file,data);},async abort(){}};}};}
   };}
+  window.flowviewTestDirectory=directory;
   window.showDirectoryPicker=async()=>directory('');
  });
  return {folder,session,read:async name=>JSON.parse(await readFile(path.join(session,name),'utf8')),

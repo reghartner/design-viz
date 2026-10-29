@@ -18,7 +18,7 @@ async function setup(t){
   function handle(base){return {name:path.basename(base),async *values(){for(const file of await fs.readdir(base,{withFileTypes:true}))yield {name:file.name,kind:file.isDirectory()?'directory':'file'};},
     async getDirectoryHandle(name){const next=path.join(base,name);try{await fs.stat(next);}catch(e){throw Object.assign(e,{name:'NotFoundError'});}return handle(next);},
     async getFileHandle(name){const next=path.join(base,name);let stat;try{stat=await fs.stat(next);}catch(e){throw Object.assign(e,{name:'NotFoundError'});}if(!stat.isFile())throw Object.assign(Error('Not a file'),{name:'TypeMismatchError'});return {async getFile(){const text=await fs.readFile(next,'utf8');return {size:Buffer.byteLength(text),text:async()=>text};}};}};}
-  const ctx=vm.createContext({TextEncoder});
+  const ctx=vm.createContext({TextEncoder,crypto:require('node:crypto').webcrypto});
   for(const file of ['validator.js','canon.js','../tools/canon/manifest.cjs','workbench/folder-agent.js','workbench/local-repository.js','workbench/agent-project.js'])vm.runInContext(readSource(file),ctx);
   return {root,inputs,ctx,handle:handle(root),consumer:path.join(root,'diagrams/team/consumer/consumer.spec.json')};
 }
@@ -55,10 +55,11 @@ test('missing IDs and cycles fail before folder metadata creation',async t=>{
     await assert.rejects(fs.stat(path.join(h.root,'diagrams/team/consumer/.flowview-agent')),/ENOENT/);
   }
 });
-test('nested-folder import diagnostic explains the required root grant',async t=>{
+test('unpublished imports open as repairable independent source without requiring consumer registration',async t=>{
   const h=await setup(t);h.ctx.authoredTopologyDependencies=raw=>h.ctx.FlowTopology.dependencies(raw);
   h.ctx.prepareAuthoredTopology=async()=>{throw Error('Missing authored provider middle');};
-  await assert.rejects(h.ctx.prepareLocalFolderTopology(JSON.stringify(h.inputs.consumer),{},null),/Missing authored provider middle\nChoose the repository root.*Browsers cannot read a parent/);
+  const context=await h.ctx.prepareLocalFolderTopology(JSON.stringify(h.inputs.consumer),{},null);
+  assert.equal(h.ctx.isUnresolvedLocalTopology(context),true);assert.throws(()=>h.ctx.FlowTopology.resolveSource(h.inputs.consumer,context),/missing spec/);
 });
 test('explicit registries retain their identity contract and reject escaped provider paths',async t=>{
   const h=await setup(t),{resolveLocalImports}=await import('../tools/canon/local-imports.mjs');
@@ -101,10 +102,10 @@ test('ordinary folder opening reuses approved frozen contexts and refuses missin
     assert.equal(prepared.specs.find(s=>s.page.canon.id==='base').page.sections[0].diagram.nodes.api.title,'Shared API');assert.equal(prepared.localSource,undefined,'a copied ephemeral consumer cannot inherit another registered source path');
   }
   const context=JSON.parse(JSON.stringify(found.topologyContext));context.specs=context.specs.filter(s=>s.page.canon.id!=='middle');
-  assert.throws(()=>h.ctx.prepareLocalFolderTopology(found.source,{},context),/Choose the repository root/);assert.equal(fetches,0);
+  const replacement=await h.ctx.prepareLocalFolderTopology(found.source,{},context);assert.equal(h.ctx.isUnresolvedLocalTopology(replacement),true);assert.equal(fetches,0);
   const transitive=JSON.parse(JSON.stringify(found.topologyContext));transitive.specs=transitive.specs.filter(s=>s.page.canon.id!=='base');
   const prepared=await h.ctx.prepareLocalFolderTopology(found.source,{},transitive);
-  assert.throws(()=>h.ctx.FlowTopology.resolveSource(JSON.parse(found.source),prepared),/missing spec/i);assert.equal(fetches,0);
+  assert.equal(h.ctx.isUnresolvedLocalTopology(prepared),true);assert.throws(()=>h.ctx.FlowTopology.resolveSource(JSON.parse(found.source),prepared),/missing spec/i);assert.equal(fetches,0);
 });
 test('ordinary folders without a frozen context retain deployed provider acquisition',async t=>{
   const h=await setup(t),found=await h.ctx.openFolderAgentProject(h.handle,'diagrams/team/consumer/consumer.spec.json');
@@ -163,7 +164,7 @@ test('refresh rejects malformed providers, orphan overlays, missing registration
  h.inputs.consumer.page.sections[0].diagram.topologyImports[0].nodePositions={'renamed':{x:1,y:2}};
  await assert.rejects(h.ctx.readLocalRepositoryTopology(h.handle,JSON.stringify(h.inputs.consumer),consumerPath),/consumer.*import shared.*middle.*nodePositions.*renamed/i);
  await assert.rejects(h.ctx.readLocalRepositoryTopology(h.handle,'{',consumerPath),/Repair the consumer JSON/);
- await fs.writeFile(path.join(h.root,'canon.json'),'{"version":1,"diagrams":[]}');await assert.rejects(h.ctx.readLocalRepositoryTopology(h.handle,source,consumerPath),/consumer.*no longer registered/);
+ await fs.writeFile(path.join(h.root,'canon.json'),'{"version":1,"diagrams":[]}');await assert.rejects(h.ctx.readLocalRepositoryTopology(h.handle,source,consumerPath),/consumer.*missing from canon.json/);
 });
 function observedRoot(root,onRead){
  function wrap(dir,prefix=''){return {name:dir.name,async getDirectoryHandle(name){return wrap(await dir.getDirectoryHandle(name),prefix+name+'/');},async getFileHandle(name){const handle=await dir.getFileHandle(name);return {async getFile(){const file=await handle.getFile(),text=await file.text();return {size:file.size,text:async()=>onRead(prefix+name,text)};}};}};}
@@ -197,4 +198,40 @@ test('oversize provider acquisition is rejected before reading its body',async t
 test('refresh acquisition retains structured lifetime guard failures through nested provider reads',async t=>{
   const h=await setup(t),failure=Object.assign(Error('Cloud projects use their saved snapshot'),{refreshCode:'cloud_project'});let checks=0;
   await assert.rejects(h.ctx.readLocalRepositoryTopology(h.handle,JSON.stringify(h.inputs.consumer),'diagrams/team/consumer/consumer.spec.json',()=>{if(++checks===10)throw failure;}),error=>error===failure && error.refreshCode==='cloud_project');
+});
+
+test('unregistered consumers outside the provider root resolve identically in browser and publication tools',async t=>{
+ const h=await setup(t),{resolveLocalImports}=await import('../tools/canon/local-imports.mjs');
+ const other=await fs.mkdtemp(path.join(os.tmpdir(),'flowview-independent-'));t.after(()=>fs.rm(other,{recursive:true,force:true}));
+ const raw=structuredClone(h.inputs.consumer);raw.page.canon={version:1,id:'middle',kind:'design',owner:'group:default/consumer'};raw.page.documentLinks={id:'middle'};
+ const source=' \n'+JSON.stringify(raw,null,2)+'\n',file=path.join(other,'independent.spec.json');await fs.writeFile(file,source);
+ const candidate=await h.ctx.readLocalRepositoryTopology(h.handle,source,null,undefined,'source-one');
+ assert.equal(candidate.ephemeral,true);assert.equal(candidate.id,'workbench-draft');assert.equal(candidate.localSource.path,undefined);
+ assert.equal(candidate.localSource.selectionId,'source-one');assert.equal(candidate.localSource.providers.length,2);assert.match(candidate.localSource.sha256,/^[a-f0-9]{64}$/);
+ const result=await resolveLocalImports(file,h.root),view=h.ctx.FlowTopology.resolveSource(raw,candidate);
+ const validation=require('node:child_process').spawnSync(process.execPath,[path.resolve(__dirname,'../tools/validate.js'),'--resolve-imports',h.root,file],{encoding:'utf8'});assert.equal(validation.status,0,validation.stderr || validation.stdout);
+ assert.deepEqual(JSON.parse(JSON.stringify(view)),result.resolved);assert.deepEqual(result.resolved.page.canon,raw.page.canon);assert.deepEqual(result.resolved.page.documentLinks,raw.page.documentLinks);assert.equal(await fs.readFile(file,'utf8'),source);
+ // New membership can take the auxiliary ID without taking over the consumer.
+ const manifest=JSON.parse(await fs.readFile(path.join(h.root,'canon.json'),'utf8'));manifest.diagrams.push({folder:'diagrams/workbench-draft',owner:'group:default/provider'});await fs.writeFile(path.join(h.root,'canon.json'),JSON.stringify(manifest));
+ const next=await h.ctx.readLocalRepositoryTopology(h.handle,source,null,undefined,'source-one');assert.equal(next.id,'workbench-draft-2');assert.deepEqual(JSON.parse(JSON.stringify(h.ctx.FlowTopology.resolveSource(raw,next))),result.resolved);
+});
+test('supplied source snapshots validate raw closure, paths, bounds and identity instead of trusting resolved graphs',async t=>{
+ const h=await setup(t),source=JSON.stringify(h.inputs.consumer);
+ const snapshot={version:1,manifest:await fs.readFile(path.join(h.root,'canon.json'),'utf8'),providers:await Promise.all(['base','middle'].map(async id=>({path:'diagrams/team/'+id+'/'+id+'.spec.json',source:await fs.readFile(path.join(h.root,'diagrams/team',id,id+'.spec.json'),'utf8')}))),rootLabel:'same-name',selectionId:'repo-a',capturedAt:'2026-10-29T12:00:00.000Z'};
+ const candidate=await h.ctx.readSuppliedLocalTopology(source,snapshot);assert.equal(candidate.ephemeral,true);assert.equal(candidate.specs.length,3);
+ for(const change of [v=>v.providers.pop(),v=>v.providers[0].source='{',v=>v.providers[0].path='../escaped',v=>v.providers.push(v.providers[0]),v=>v.absolutePath='/private/repo',v=>v.providers[0].source=' '.repeat(4*1024*1024+1)]){
+  const bad=structuredClone(snapshot);change(bad);await assert.rejects(h.ctx.readSuppliedLocalTopology(source,bad));
+ }
+ const orphan=structuredClone(h.inputs.consumer);orphan.page.sections[0].diagram.topologyImports[0].nodeTracking={renamed:{tickets:['T-1']}};await assert.rejects(h.ctx.readSuppliedLocalTopology(JSON.stringify(orphan),snapshot),/renamed/);
+});
+
+test('opening a new unpublished consumer remains repairable after an unrelated local or published session',async t=>{
+ const h=await setup(t);vm.runInContext(readSource('library.workbench.js'),h.ctx);
+ let fetches=0;h.ctx.connectTopologyRepository=async()=>{fetches++;throw Error('No deployed new provider');};
+ const raw={page:{title:'New independent consumer',sections:[{diagram:{topologyImports:[{spec:'never-published',export:'core',as:'new'}]}}]}};
+ for(const local of [true,false]){
+  const prior={version:1,id:'old',local,specs:[{page:{canon:{version:1,id:'old',kind:'design',owner:'group:default/old'},sections:[]}}]},before=JSON.stringify(prior);
+  const next=await h.ctx.prepareLocalFolderTopology(JSON.stringify(raw),{},prior);assert.equal(h.ctx.isUnresolvedLocalTopology(next),true);assert.equal(JSON.stringify(prior),before);
+ }
+ assert.equal(fetches,1,'only the published context can try the deployed catalog');
 });

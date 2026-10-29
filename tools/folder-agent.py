@@ -6,6 +6,7 @@ The watcher prints only new requests/results and maintains listener.json.
 It never executes instructions, source, or commands from the session files.
 """
 import argparse
+from datetime import datetime, timezone
 import base64
 import gzip
 import hashlib
@@ -447,13 +448,108 @@ def watch(folder, interval=0.25, minutes=25):
             pass
 
 
-def refresh_sources(folder):
+def local_provider_snapshot(source, repository, selection_id):
+    """Read a stable registered provider closure; the consumer may live anywhere.
+
+    Registry paths are data, never commands. Resolve symlinks under the selected
+    root and require each provider to remain inside its registered diagram folder.
+    """
+    repository = repository.resolve(strict=True)
+    raw = json.loads(source)
+    def dependencies(value):
+        page = value.get('page', value) if isinstance(value, dict) else {}
+        if not isinstance(page, dict):
+            raise ValueError('Consumer/provider must be a JSON page or diagram object.')
+        if any(key in page for key in ('nodes', 'rows', 'topologyImports', 'topologyExports')):
+            page = {'sections': [{'diagram': page}]}
+        result = []
+        def walk(items):
+            for section in items if isinstance(items, list) else []:
+                if not isinstance(section, dict):
+                    continue
+                diagram = section.get('diagram')
+                if isinstance(diagram, dict):
+                    imports = diagram.get('topologyImports', [])
+                    if not isinstance(imports, list):
+                        raise ValueError('topologyImports must be an array.')
+                    for item in imports:
+                        if isinstance(item, dict) and isinstance(item.get('spec'), str) and item['spec'] not in result:
+                            result.append(item['spec'])
+                for tab in section.get('tabs', []) if isinstance(section.get('tabs', []), list) else []:
+                    if isinstance(tab, dict):
+                        walk(tab.get('sections', tab.get('blocks')))
+        walk(page.get('blocks', page.get('sections')))
+        return result
+    def read_source(relative, diagram_folder=None):
+        target = (repository / relative).resolve(strict=True)
+        if not target.is_relative_to(repository) or (diagram_folder and not target.is_relative_to(repository / diagram_folder)):
+            raise ValueError('Local provider escapes its selected repository or diagram folder: ' + relative)
+        if not target.is_file() or target.stat().st_size > 4*1024*1024:
+            raise ValueError('Local source must be a regular file at most 4 MiB: ' + relative)
+        value = target.read_text(encoding='utf-8')
+        if len(value.encode('utf-8')) > 4*1024*1024:
+            raise ValueError('Local source exceeds 4 MiB: ' + relative)
+        return value
+    for attempt in range(2):
+        manifest = read_source('canon.json')
+        registry = json.loads(manifest)
+        if not isinstance(registry, dict) or registry.get('version') != 1 or not isinstance(registry.get('diagrams'), list):
+            raise ValueError('canon.json requires version 1 and diagrams.')
+        entries = {}
+        for item in registry['diagrams']:
+            folder = item.get('folder') if isinstance(item, dict) else None
+            if not isinstance(folder, str) or not re.fullmatch(r'diagrams/[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*', folder):
+                raise ValueError('Invalid provider folder in canon.json.')
+            ident = folder.split('/')[-1]
+            if ident in entries:
+                raise ValueError('Duplicate provider ID in canon.json: ' + ident)
+            entries[ident] = folder
+        visiting, loaded, reads = set(), {}, {'canon.json': manifest}
+        def load(ident):
+            if ident in visiting:
+                raise ValueError('Topology dependency cycle at ' + ident)
+            if ident in loaded:
+                return
+            if ident not in entries:
+                raise ValueError('Missing provider ' + ident + ' in selected canon.json.')
+            folder = entries[ident]
+            relative = folder + '/' + ident + '.spec.json'
+            value = read_source(relative, folder)
+            reads[relative] = value
+            if sum(len(text.encode('utf-8')) for text in reads.values()) > LIMIT:
+                raise ValueError('Local provider closure exceeds 8 MiB.')
+            visiting.add(ident)
+            try:
+                provider = json.loads(value)
+            except ValueError as error:
+                raise ValueError('Provider ' + ident + ' (' + relative + '): ' + str(error)) from error
+            for dependency in dependencies(provider):
+                load(dependency)
+            visiting.remove(ident)
+            loaded[ident] = {'path': relative, 'source': value}
+            if len(loaded) > 499:
+                raise ValueError('Local provider closure exceeds 499 providers.')
+        for ident in dependencies(raw):
+            load(ident)
+        if any(read_source(relative, relative.rsplit('/', 1)[0] if relative != 'canon.json' else None) != value for relative, value in reads.items()):
+            if attempt == 0:
+                continue
+            raise ValueError('Local sources changed during refresh. Finish saving the provider batch and retry.')
+        snapshot = {'version': 1, 'manifest': manifest, 'providers': list(loaded.values()),
+                    'rootLabel': repository.name, 'selectionId': selection_id,
+                    'capturedAt': datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')}
+        if len(json.dumps(snapshot).encode('utf-8')) > LIMIT - 4096:
+            raise ValueError('Local snapshot exceeds the 8 MiB bridge limit.')
+        return snapshot
+
+
+def refresh_sources(folder, source_repo=None):
     """Request one provider refresh from the already-connected consumer editor."""
     owner = identity(folder)
     wait_for_editor(folder, owner)
     def protocol_file(name):
         target = folder / name
-        if target.exists() and target.stat().st_size > (16384 if name == 'refresh-sources-result.json' else 8192):
+        if target.exists() and target.stat().st_size > (16384 if name == 'refresh-sources-result.json' else LIMIT):
             raise ValueError(f'{name} exceeds the refresh protocol size limit.')
         return pending_object(folder, name)
 
@@ -463,7 +559,23 @@ def refresh_sources(folder):
     capability = state.get('localSources')
     if not isinstance(capability, dict):
         raise ValueError('This connection does not support refresh-sources. Reconnect the consumer with a current Workbench.')
-    if capability.get('available') is not True:
+    if capability.get('code') == 'cloud_project':
+        return {**owner, 'status': 'rejected', 'code': 'cloud_project', 'message': capability.get('message'), 'currentRevision': state.get('revision'), 'localSources': capability}
+    selection = None
+    if source_repo is not None:
+        if not source_repo.is_absolute():
+            raise ValueError('--source-repo requires an absolute repository path.')
+        repository = source_repo.resolve(strict=True)
+        previous = pending_object(folder, 'local-sources-selection.json')
+        same = isinstance(previous, dict) and previous.get('path') == str(repository) and previous.get('selectionId') == capability.get('sourceSelectionId')
+        selection = {'path': str(repository), 'selectionId': previous['selectionId'] if same else uuid.uuid4().hex}
+    else:
+        previous = pending_object(folder, 'local-sources-selection.json')
+        if isinstance(previous, dict):
+            if previous.get('selectionId') != capability.get('sourceSelectionId'):
+                raise ValueError('The viewed source snapshot changed (for example after Undo). Reselect the intended repository with --source-repo; no provider files were read.')
+            selection = previous
+    if capability.get('code') == 'cloud_project' or (capability.get('available') is not True and not (selection and capability.get('acceptsSnapshot'))):
         return {**owner, 'status': 'rejected', 'code': capability.get('code', 'unavailable'),
                 'message': capability.get('message', 'Reconnect the consumer through its repository root.'),
                 'currentRevision': state.get('revision'), 'localSources': capability}
@@ -481,8 +593,15 @@ def refresh_sources(folder):
                 not (owned(result) and result.get('id') == previous.get('id'))):
             raise ValueError('A refresh is already pending for this consumer. Wait for its receipt before retrying.')
     available()
+    try:
+        snapshot = local_provider_snapshot(state['source'], Path(selection['path']), selection['selectionId']) if selection else None
+    except (OSError, ValueError) as error:
+        return {**owner, 'status': 'rejected', 'code': 'invalid_sources', 'message': str(error), 'currentRevision': revision, 'localSources': capability}
+    available()
     request = {**owner, 'version': 1, 'id': uuid.uuid4().hex, 'baseRevision': revision,
                'expiresAt': int(time.time()*1000) + ACKNOWLEDGEMENT_SECONDS*1000}
+    if snapshot is not None:
+        request['sources'] = snapshot
     write(folder, 'refresh-sources.json', request, guard=available)
     deadline = time.monotonic() + ACKNOWLEDGEMENT_SECONDS
     try:
@@ -501,6 +620,8 @@ def refresh_sources(folder):
                         result['snapshotCurrent'] != (result['revision'] == result['currentRevision'])):
                     raise ValueError('Malformed refresh receipt. Keep the files for inspection; do not blindly retry.')
                 connected_editor(folder, owner, allow_stale=True)
+                if selection and result['status'] in ('applied', 'unchanged'):
+                    write(folder, 'local-sources-selection.json', selection, guard=lambda: assert_owner(folder, owner))
                 return result
             if time.monotonic() >= deadline:
                 raise ValueError('Refresh timed out. Bring the connected consumer Workbench tab to the front, inspect its state, then retry refresh-sources.')
@@ -525,7 +646,8 @@ def main():
     watching.add_argument('--interval', type=float, default=0.25)
     watching.add_argument('--minutes', type=float, default=25)
     commands.add_parser('prepare')
-    commands.add_parser('refresh-sources', help='Refresh saved repo providers in the connected consumer; no begin/proposal needed')
+    refreshing = commands.add_parser('refresh-sources', help='Refresh saved repo providers in the connected consumer; no begin/proposal needed')
+    refreshing.add_argument('--source-repo', type=Path, help='Explicit absolute provider repository path; retained only in this helper folder')
     beginning = commands.add_parser('begin', help='Register a request from the native agent conversation')
     beginning.add_argument('--text', required=True)
     checking = commands.add_parser('preflight')
@@ -547,7 +669,7 @@ def main():
     args = parser.parse_args()
     folder = args.folder.resolve()
     if args.command == 'refresh-sources':
-        result = refresh_sources(folder)
+        result = refresh_sources(folder, args.source_repo)
         print(json.dumps(result))
         if result.get('status') not in ('applied', 'unchanged') or result.get('snapshotCurrent') is False:
             print(result.get('message', 'Refresh was not accepted.') if result.get('snapshotCurrent') is not False else 'The refresh was accepted, but the consumer changed before its receipt was saved. Inspect the current revision before continuing.', file=sys.stderr)

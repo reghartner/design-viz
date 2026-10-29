@@ -406,7 +406,7 @@ test('unchanged, stale, invalid and nonlocal refreshes preserve source, history,
  assert.equal(s.refreshLocalTopology(same,s.snapshot()),'unchanged');assert.equal(h.renders,renders);assert.equal(s.historyVersion(),version);assert.equal(s.canRedo(),true);
  const stale=s.snapshot();h.type(' {"title":"typed"}');assert.equal(s.refreshLocalTopology(localContext('After'),stale),false);h.type('{unfinished');assert.throws(()=>s.refreshLocalTopology(localContext('After'),s.snapshot()));assert.equal(h.text,'{unfinished');assert.deepEqual(plain(s.topologyContext()),old);
  h.type('{"title":"valid"}');assert.throws(()=>s.connectTopology(localContext('After'),s.snapshot()),/frozen provider cannot be replaced/);
- s.replaceProject(h.text,null,{topologyContext:{...old,local:false}});assert.throws(()=>s.refreshLocalTopology(localContext('After'),s.snapshot()),/requires the current local/);
+ s.replaceProject(h.text,null,{topologyContext:{...old,local:false}});assert.throws(()=>s.refreshLocalTopology({...localContext('After'),local:false},s.snapshot()),/validated local/);
  s.destroy();assert.equal(s.refreshLocalTopology(localContext('After'),s.snapshot()),false);
 });
 test('failed refresh rendering rolls back context and preview without publishing history or recovery',()=>{
@@ -414,4 +414,12 @@ test('failed refresh rendering rolls back context and preview without publishing
  const s=context.createBuilderSession({source:{read:()=>text,write:v=>text=v},render(){painted=s.topologyContext().specs[0].page.title;if(fail && painted==='After')return {ok:false};return {ok:true};},persistence:{read:()=>({}),preserve(){},cancel(){},save:(text,base,artifacts)=>{saved=plain(artifacts);saves++;}}});
  s.replaceProject(text,null,{topologyContext:old});const revision=s.snapshot().topologyRevision,count=saves;fail=true;
  assert.throws(()=>s.refreshLocalTopology(localContext('After'),s.snapshot()),/could not be rendered/);assert.equal(painted,'Before');assert.deepEqual(plain(s.topologyContext()),old);assert.equal(s.snapshot().topologyRevision,revision);assert.equal(s.canUndo(),false);assert.equal(saves,count);assert.deepEqual(saved.topologyContext,old);
+});
+
+test('explicit source selection initializes local context and same-content switches preserve provenance through history',()=>{
+ const h=harness(),s=h.session,one=localContext('Same');one.localSource={selectionId:'repo-one',rootLabel:'worktree'};
+ const initial=s.snapshot();assert.equal(s.refreshLocalTopology(one,initial),true);assert.equal(s.snapshot().project,initial.project);assert.equal(h.text,initial.text);
+ const two=structuredClone(one);two.localSource.selectionId='repo-two';assert.equal(s.refreshLocalTopology(two,s.snapshot()),true);
+ const rendered=h.renders;assert.equal(s.refreshLocalTopology({...two,localSource:{...two.localSource,capturedAt:'later'}},s.snapshot()),'unchanged');assert.equal(h.renders,rendered);
+ s.undo();assert.equal(s.topologyContext().localSource.selectionId,'repo-one');s.undo();assert.equal(s.topologyContext(),null);s.redo();s.redo();assert.equal(s.topologyContext().localSource.selectionId,'repo-two');
 });

@@ -36,7 +36,15 @@ export async function resolveLocalImports(file, location){
     const aliases=physicalEntries.get(physical) || [];aliases.push(entry.id);physicalEntries.set(physical,aliases);
     if(physical===target)consumer=entry;
   }
-  if(!consumer)throw Error('Spec is not a member of '+registryFile+': '+file);
+  let independent=null,authoredCanon,authoredDocumentId;
+  if(!consumer){
+    const raw=JSON.parse(await readFile(target,'utf8'));
+    independent=raw.page?raw:(raw.nodes || raw.rows || raw.topologyImports || raw.topologyExports)?{page:{sections:[{diagram:raw}]}}:{page:raw};
+    let id='workbench-draft',suffix=2;while(files.has(id))id='workbench-draft-'+suffix++;
+    consumer={id};authoredCanon=independent.page.canon;authoredDocumentId=independent.page.documentLinks?.id;
+    if(independent.page.documentLinks)delete independent.page.documentLinks.id;
+    independent.page.canon={version:1,id,kind:'design',owner:'group:default/workbench-draft'};
+  }
   const visiting=new Set(),loaded=new Map();
   async function load(id){
     if(visiting.has(id))throw Error('Topology dependency cycle at '+id);
@@ -55,13 +63,21 @@ export async function resolveLocalImports(file, location){
     for(const dependency of core.topologyDependencies(spec))await load(dependency);
     visiting.delete(id);loaded.set(id,spec);
   }
-  await load(consumer.id);
+  if(independent){
+    for(const dependency of core.topologyDependencies(independent))await load(dependency);
+    loaded.set(consumer.id,independent);
+  }else await load(consumer.id);
   const specs=Array.from(loaded.values()),resolved=core.materializeTopology(specs);
   for(let index=0;index<specs.length;index++){
     const errors=core.validate(resolved[index]).concat(core.validateSpec(resolved[index]).errors);
     if(errors.length)throw Error(specs[index].page.canon.id+': '+errors.join('\n'));
   }
-  return {version:1,id:consumer.id,local:true,specs,resolved:resolved.find(spec=>spec.page.canon.id===consumer.id)};
+  const output=resolved.find(spec=>spec.page.canon.id===consumer.id);
+  if(independent){
+    if(authoredCanon===undefined)delete output.page.canon;else output.page.canon=authoredCanon;
+    if(authoredDocumentId!==undefined)output.page.documentLinks.id=authoredDocumentId;
+  }
+  return {version:1,id:consumer.id,local:true,...(independent?{ephemeral:true}:{}),specs,resolved:output};
 }
 const invokedPath=process.argv[1]?await realpath(process.argv[1]).catch(()=>null):null;
 if(invokedPath && import.meta.url===pathToFileURL(invokedPath).href){

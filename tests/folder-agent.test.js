@@ -1042,3 +1042,11 @@ test('refresh receipt publication notices a newer revision before closing its fi
   const polling=h.client.poll();await hit;h.type('{"title":"New draft after acceptance"}');h.writeGate(null);release();await assert.rejects(polling,/Consumer changed/);
   assert.equal(h.disk.has('refresh-sources-result.json'),false);await h.client.poll();const receipt=h.disk.get('refresh-sources-result.json');assert.equal(receipt.snapshotCurrent,false);assert.equal(receipt.currentRevision,h.disk.get('state.json').revision);
 });
+
+test('provider snapshot bytes remain bound to the exact refresh envelope through acceptance and receipt retry',async()=>{
+ let calls=0,release,reached;const hit=new Promise(resolve=>reached=resolve),sources={version:1,manifest:'registry bytes',providers:[{path:'diagrams/base/base.spec.json',source:'provider bytes'}]};
+ const h=harness({refreshSources:async request=>{assert.deepEqual(JSON.parse(JSON.stringify(request.sources)),sources);await new Promise(resolve=>{release=resolve;reached();});await request.guard();calls++;return {status:'applied'};}});
+ await h.client.start();refreshRequest(h,{sources});const polling=h.client.poll();await hit;
+ h.disk.set('refresh-sources.json',{...h.disk.get('refresh-sources.json'),sources:{...sources,manifest:'swapped'}});release();await polling;
+ assert.equal(calls,0);assert.equal(h.disk.get('refresh-sources-result.json').status,'rejected');
+});

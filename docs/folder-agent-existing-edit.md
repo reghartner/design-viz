@@ -30,12 +30,11 @@ Do not preload the full workflow, contract, examples, session
 manual or helper implementation, except pilot helper inspection to verify capture
 scope. Specified edits need no new questions/worksheet.
 
-After saving authorized provider edits, use the connected consumer's helper:
-`python3 <consumer>/.flowview-agent/folder-agent.py refresh-sources`.
-No `begin`/proposal. Wait for a matching `applied`/`unchanged` receipt and current revision;
-resolve failures before retrying. Missing grants: desktop **File → Reconnect local
-sources**. Cloud snapshots never refresh from disk.
-See [repo refresh](local-repository-authoring.md).
+After a provider batch, run the consumer helper (no `begin`/proposal):
+`python3 <consumer>/.flowview-agent/folder-agent.py refresh-sources --source-repo /repo`.
+Later calls reuse that repo. Wait for the matching receipt/current revision; repair
+failures before retrying. Reconnect via this flag or desktop File source selection.
+Cloud snapshots never read disk. See [local sources](local-repository-authoring.md).
 
 ## Protocol
 

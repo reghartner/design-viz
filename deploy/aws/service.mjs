@@ -18,9 +18,20 @@ export function envelope(value){
     for(const key of ['ephemeral','local'])if(key in context && typeof context[key]!=='boolean')fail(400,'Malformed frozen provider flag.');
     if('catalogURL' in context && (typeof context.catalogURL!=='string' || bytes(context.catalogURL)>4096))fail(400,'Malformed catalog address.');
     if('localSource' in context){
-      const source=context.localSource;fields(source,['path','rootLabel','capturedAt']);
-      if(context.local!==true || typeof source.path!=='string' || bytes(source.path)>2048 || !/^diagrams\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)+[a-z0-9]+(?:-[a-z0-9]+)*\.spec\.json$/.test(source.path))fail(400,'Malformed local source path.');
-      const parts=source.path.split('/');if(parts.at(-1)!==parts.at(-2)+'.spec.json' || parts.at(-2)!==context.id)fail(400,'Local source must identify its registered diagram.');
+      const source=context.localSource;fields(source,['path','rootLabel','capturedAt','selectionId','sha256','providers']);
+      if(context.local!==true)fail(400,'Local provenance requires a local context.');
+      if('path' in source && (typeof source.path!=='string' || bytes(source.path)>2048 || !/^diagrams\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)+[a-z0-9]+(?:-[a-z0-9]+)*\.spec\.json$/.test(source.path)))fail(400,'Malformed local source path.');
+      if('path' in source){const parts=source.path.split('/');if(parts.at(-1)!==parts.at(-2)+'.spec.json' || parts.at(-2)!==context.id)fail(400,'Local source must identify its registered diagram.');}
+      else if(!source.selectionId || context.ephemeral!==true)fail(400,'Independent local source requires auxiliary consumer membership.');
+      if('selectionId' in source || 'sha256' in source || 'providers' in source){
+        if(!id(source.selectionId) || typeof source.sha256!=='string' || !/^[a-f0-9]{64}$/.test(source.sha256) || !Array.isArray(source.providers) || source.providers.length>499)fail(400,'Malformed local provider provenance.');
+        const paths=new Set();
+        for(const provider of source.providers){
+          fields(provider,['path','sha256']);
+          if(typeof provider.path!=='string' || bytes(provider.path)>2048 || !/^diagrams\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)+[a-z0-9]+(?:-[a-z0-9]+)*\.spec\.json$/.test(provider.path) || paths.has(provider.path) || typeof provider.sha256!=='string' || !/^[a-f0-9]{64}$/.test(provider.sha256))fail(400,'Malformed local provider identity.');
+          paths.add(provider.path);
+        }
+      }
       if(typeof source.rootLabel!=='string' || !source.rootLabel.trim() || bytes(source.rootLabel)>512 || /[\u0000-\u001f\u007f]/.test(source.rootLabel))fail(400,'Malformed local repository display label.');
       if(typeof source.capturedAt!=='string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(source.capturedAt) || !Number.isFinite(Date.parse(source.capturedAt)) || new Date(source.capturedAt).toISOString()!==source.capturedAt)fail(400,'Malformed local snapshot timestamp.');
     }

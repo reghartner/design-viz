@@ -106,18 +106,18 @@ function createBuilderSession(options){
     },
     refreshLocalTopology:function(context,expected){
       if(disposed || !expected || expected.text!==text() || expected.project!==project || expected.topologyRevision!==topologyRevision)return false;
-      if(!topologyContext || !topologyContext.local || !context || !context.local || context.id!==topologyContext.id)throw Error('Refresh local sources requires the current local repository snapshot.');
+      if(!context || !context.local)throw Error('Refresh local sources requires a validated local provider snapshot.');
       var raw=JSON.parse(text());resolve(raw,context);
-      function content(value){return JSON.stringify(value.specs.map(function(spec){return spec.page.canon.id===value.id?{page:{canon:spec.page.canon}}:spec;}).sort(function(a,b){return a.page.canon.id.localeCompare(b.page.canon.id);}));}
+      function content(value){if(!value)return null;return JSON.stringify([value.localSource && value.localSource.selectionId || null,value.specs.map(function(spec){return spec.page.canon.id===value.id?{page:{canon:spec.page.canon}}:spec;}).sort(function(a,b){return a.page.canon.id.localeCompare(b.page.canon.id);})]);}
       if(content(context)===content(topologyContext))return 'unchanged';
-      function capture(){return {text:text(),context:JSON.parse(JSON.stringify(topologyContext))};}
+      function capture(){var unresolved=false;try{resolve(JSON.parse(text()));}catch(error){unresolved=true;}return {text:text(),context:JSON.parse(JSON.stringify(topologyContext)),unresolved:unresolved};}
       function restore(value,message){
         var previous=capture(),outcome;
         topologyContext=JSON.parse(JSON.stringify(value.context));
         if(text()!==value.text)options.source.write(value.text);
         try{
           outcome=render('history');
-          if(outcome && outcome.ok===false)throw Error('The refreshed topology could not be rendered.');
+          if(outcome && outcome.ok===false && !value.unresolved)throw Error('The refreshed topology could not be rendered.');
         }catch(error){
           topologyContext=previous.context;if(text()!==previous.text)options.source.write(previous.text);
           try{render('history');}catch(ignored){}
@@ -136,7 +136,7 @@ function createBuilderSession(options){
       if(disposed || !expected || expected.text!==text() || expected.project!==project || expected.topologyRevision!==topologyRevision)return false;
       // Sharing the current draft keeps its project, baseline and fresh preview.
       // Validate before archival/history changes; context comes from preparation.
-      resolve(JSON.parse(text()),context);preserveDraft();
+      if(typeof isUnresolvedLocalTopology==='undefined' || !isUnresolvedLocalTopology(context))resolve(JSON.parse(text()),context);preserveDraft();
       if(JSON.stringify(context || null)!==JSON.stringify(topologyContext)){
         topologyContext=context?JSON.parse(JSON.stringify(context)):null;topologyRevision++;
       }

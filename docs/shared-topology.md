@@ -5,7 +5,7 @@ are validated against the complete approved snapshot at build time, then resolve
 in memory when a reader or editor opens them. The fetched provider closure is
 frozen for that session: no polling or automatic reconciliation. Repository
 agents refresh saved worktree providers with the connected consumer helper
-`folder-agent.py refresh-sources` (desktop **File → Refresh local sources** fallback); see [local repository authoring](local-repository-authoring.md).
+`folder-agent.py refresh-sources --source-repo /provider-repo` (desktop **File → Use local source repository…** fallback). Consumers need no Canon membership; see [local repository authoring](local-repository-authoring.md).
 Cloud-attached projects keep their saved cloud provider snapshots and cannot
 refresh from local files, even when a folder is connected.
 Reopening a diagram from the library pins the newly deployed revision; a plain

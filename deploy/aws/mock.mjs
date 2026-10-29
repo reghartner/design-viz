@@ -48,8 +48,22 @@ export async function startMock({port=0,htmlFile=path.join(repo,'workbench/flows
       res.writeHead(200,{'content-type':'text/html','cache-control':'no-store'});res.end(html);
     }catch(error){if(!res.headersSent)json(res,error.status || 500,{error:error.status?error.message:'Mock storage failed.',...(error.details || {})});else res.end();}
   });
+  const sockets=new Set();let closing;
+  server.on('connection',socket=>{
+    sockets.add(socket);socket.once('close',()=>sockets.delete(socket));
+    if(closing)socket.destroy();
+  });
+  function close(){
+    if(!closing)closing=new Promise((resolve,reject)=>{
+      server.close(error=>error?reject(error):resolve());
+      // Browsers can leave raw preconnections open before sending any HTTP.
+      // Teardown owns these sockets; stop listening before terminating them.
+      for(const socket of sockets)socket.destroy();
+    });
+    return closing;
+  }
   await new Promise(resolve=>server.listen(port,'127.0.0.1',resolve));origin='http://127.0.0.1:'+server.address().port;
-  return {origin,memory,service,close:()=>new Promise(resolve=>server.close(resolve))};
+  return {origin,memory,service,close};
 }
 if(process.argv[1] && import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href){
   const mock=await startMock({port:Number(process.env.PORT || 8787)});console.log('Flowview local mock: '+mock.origin+' (memory only; no AWS calls)');

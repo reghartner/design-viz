@@ -2,6 +2,30 @@
 (function(){
   var LIVE_SAMPLE=[["BE-67", "Build the notification service", "Riley"], ["BE-68", "Accept firmware events over HTTPS", "Riley"], ["FW-45", "Deliver firmware events", "Sam"], ["FW-46", "Integrate hardware interrupts", "Sam"], ["HW-123", "Debounce the doorbell button", "Alex"], ["HW-124", "Stabilize the hardware event signal", "Alex"], ["UX-89", "Show resident notifications", "Morgan"], ["UX-90", "Alert sound setting", "Morgan"]];
   var states=['todo','active','done','blocked','missing'];
+  var ticketStateOrder=['blocked','missing','active','todo','done'];
+  var ticketCollator=new Intl.Collator('en',{numeric:true,sensitivity:'base'});
+  function ticketText(value){return String(value == null?'':value).trim();}
+  function ticketCompareText(a,b){
+    var left=ticketText(a),right=ticketText(b);
+    return left && right?ticketCollator.compare(left,right):left? -1:right?1:0;
+  }
+  function sortedTickets(tickets,sort){
+    if(!sort)return tickets;
+    return tickets.slice().sort(function(a,b){
+      var diff=0,field=sort.field;
+      if(field==='state'){
+        var left=ticketStateOrder.indexOf(a.state),right=ticketStateOrder.indexOf(b.state);
+        diff=(left<0?ticketStateOrder.length:left)-(right<0?ticketStateOrder.length:right);
+        if(left<0 || right<0){if(left<0 && right<0)diff=0;else return diff;}
+      }else{
+        var leftText=field==='title' && a.title==='—'?'':field==='owner' && a.owner==='Unassigned'?'':a[field];
+        var rightText=field==='title' && b.title==='—'?'':field==='owner' && b.owner==='Unassigned'?'':b[field];
+        diff=ticketCompareText(leftText,rightText);
+        if(!ticketText(leftText) || !ticketText(rightText))return diff || ticketCompareText(a.key,b.key);
+      }
+      return (sort.direction==='descending'?-diff:diff) || ticketCompareText(a.key,b.key) || (a.key<b.key?-1:a.key>b.key?1:0);
+    });
+  }
   function empty(){return {};}
   function sampleHTML(sample){
     return '<div class="dv-live-head"><span class="dv-live-note">Day 12 — delivery complete</span></div>'+
@@ -58,6 +82,11 @@
         link(row,'key',item.key,item.url);el(row,'span','title','',item.title);el(row,'span','state','dv-live-state-pill'+(states.indexOf(item.state)>=0?' dv-live-'+item.state:''),item.state);el(row,'span','reason','dv-live-excluded-reason',item.reason);
       });
     }
+    host._liveSortHandler=function(field){
+      var current=host._liveTicketSort;
+      host._liveTicketSort={field:field,direction:current && current.field===field && current.direction==='ascending'?'descending':'ascending'};
+      if(api)paint(api.snapshot());
+    };
     function paint(value){
       if(!live)return;epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=doc.activeElement;
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
@@ -98,8 +127,19 @@
         el(main,'div','counts','dv-live-epic-counts',countParts.join(' · '));
         // Tickets first and tall (#765); lane data stays on step pills, row stripes and Blockers lanes (#767).
         el(body,'h3','tickets-heading','','Tickets');var scroll=el(body,'div','scroll','dv-live-tickets-scroll'),table=el(scroll,'table','table','dv-live-tickets');table.setAttribute('aria-label','Tickets');
-        var tr=el(el(table,'thead','thead',''),'tr','tr','');['Key','Title','State','Owner','Depends on','PRs'].forEach(function(label){el(tr,'th',label,'',label).setAttribute('scope','col');});
-        var tbody=el(table,'tbody','tbody','');value.tickets.forEach(function(item){
+        var tr=el(el(table,'thead','thead',''),'tr','tr',''),sort=host._liveTicketSort;
+        ['Key','Title','State','Owner','Depends on','PRs'].forEach(function(label){
+          var th=el(tr,'th',label,'');th.setAttribute('scope','col');
+          var field=label.toLowerCase();
+          if(field==='key' || field==='title' || field==='state' || field==='owner'){
+            th.setAttribute('aria-sort',sort && sort.field===field?sort.direction:'none');
+            var control=el(th,'button','sort','dv-live-sort');control.type='button';control._liveSortKey=field;
+            if(!control._liveSortClick){control._liveSortClick=function(){if(host._liveSortHandler)host._liveSortHandler(control._liveSortKey);};control.addEventListener('click',control._liveSortClick);}
+            el(control,'span','label','',label);
+            var cue=el(control,'span','cue','dv-live-sort-cue',sort && sort.field===field?(sort.direction==='ascending'?'▲':'▼'):'');cue.setAttribute('aria-hidden','true');
+          }else th.textContent=label;
+        });
+        var tbody=el(table,'tbody','tbody','');sortedTickets(value.tickets,sort).forEach(function(item){
           var row=el(tbody,'tr',item.key,'dv-live-ticket-row'+(item.tag?' dv-live-ticket-with-tag':''));row.setAttribute('data-live-ticket',item.key);if(item.laneColor)row.style.setProperty('--dv-live-lane-color',item.laneColor);else row.style.removeProperty('--dv-live-lane-color');
           // The keyed renderer keeps data rows and controls in order, with a companion row only for an informational tag.
           var keyCell=el(row,'td','key','dv-live-ticket-key');keyCell.setAttribute('tabindex','-1');link(keyCell,'link',item.key,item.url);if(item.epicLabel)el(keyCell,'div','epic','dv-live-ticket-epic',item.epicLabel);el(row,'td','title','dv-live-ticket-title',item.title);
@@ -136,7 +176,7 @@
       if(typeof liveStatusInk==='function')host.querySelectorAll('.dv-live-state-pill:not([data-live-appearance])').forEach(function(node){liveStatusInk(node,null);});
       if(focused && host.contains(focused) && doc.activeElement!==focused && focused.focus)focused.focus({preventScroll:true});
     }
-    function cleanup(){if(!live)return;live=false;host._livePanelApi=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();}
+    function cleanup(){if(!live)return;live=false;host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();}
     host._panelMotionCleanup=cleanup;
     function connect(controller){if(!live || api)return;api=controller;host._livePanelApi=api;if(offReady)offReady();paint(api.snapshot());offChange=api.onChange(paint);offDestroy=api.onDestroy(cleanup);}
     var controller=typeof liveStatusControllerFor==='function'?liveStatusControllerFor(host):null;
@@ -182,6 +222,10 @@
 .dv-live-tickets{color:var(--dtext);width:100%;min-width:580px;table-layout:auto;border-collapse:collapse;text-align:left;font-size:12px;}
 .dv-live-tickets th,.dv-live-tickets td{padding:8px;vertical-align:top;border-bottom:1px solid var(--explore-border);}
 .dv-live-tickets th{font-weight:700;}
+.dv-live-sort{display:inline-flex;align-items:center;gap:4px;border:0;border-radius:3px;padding:2px 3px;margin:-2px -3px;background:transparent;color:inherit;font:inherit;font-weight:inherit;text-align:left;cursor:pointer;}
+.dv-live-sort:hover{background:color-mix(in srgb,var(--dink) 7%,transparent);}
+.dv-live-sort:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:2px;}
+.dv-live-sort-cue{min-width:9px;font-size:9px;line-height:1;}
 .dv-live-tickets th:nth-child(1),.dv-live-tickets th:nth-child(3),.dv-live-tickets th:nth-child(6){width:1%;white-space:nowrap;}
 .dv-live-ticket-key{border-left:4px solid var(--dv-live-lane-color,transparent);white-space:nowrap;}
 .dv-live-ticket-key:focus,.dv-live-ticket-key a:focus{outline:2px solid var(--dink,currentColor);outline-offset:-2px;}

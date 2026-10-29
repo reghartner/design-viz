@@ -326,7 +326,7 @@ test('D8 panel: epic box, Depends on buttons, outside-epic rows, chains and the 
  assert.equal(epic.querySelector('.dv-live-epic-title').textContent,'Connected doorbell');assert.equal(epic.querySelector('.dv-live-epic-state').textContent,'active');
  assert.equal(epic.querySelector('.dv-live-epic-progress').textContent,'0 of 7 stories done · 5 of 7 on diagram');assert.equal(epic.querySelector('.dv-live-epic-counts').textContent,'1 blocked · 3 waiting · 2 outside epic');
  assert.ok(epic.querySelector('.dv-live-completion'),'carrier completion ring lives in the box');assert.equal(h.view.querySelector('.dv-live-head').querySelectorAll('.dv-live-epic').length,0,'never in the header or title bar');
- const table=body.querySelector('table.dv-live-tickets');assert.deepEqual(table.querySelectorAll('th').map(el=>el.textContent),['Key','Title','State','Owner','Depends on','PRs']);
+ const table=body.querySelector('table.dv-live-tickets');assert.deepEqual(table.querySelectorAll('th').map(el=>textOf(el).trim()),['Key','Title','State','Owner','Depends on','PRs']);
  const rows=table.querySelectorAll('tr[data-live-ticket]'),row=key=>rows.find(el=>el.getAttribute('data-live-ticket')===key),coverage=key=>table.querySelector('tr[data-live-coverage-for="'+key+'"]');
  assert.deepEqual(rows.map(el=>el.getAttribute('data-live-ticket')),['HW-2','GONE-1','HW-1','OUT-9','BE-1','FW-1','UX-1']);
  assert.equal(coverage('FW-1'),null,'tickets without an informational tag have no companion row');
@@ -898,7 +898,7 @@ test('E6 Tickets table orders states and keeps PRs, lane stripes and information
  const h=harness(epicFixture()),api=h.ctl.liveStatus;mountStatus(h);
  api.apply({'AA-1':{state:'done',epic:'EP-1',title:'Client work',assignee:'Alex',prs:{count:2,state:'declined'}},'BB-1':{state:'todo'},'CC-1':{state:'active',epic:'EP-1'},'DD-1':{state:'missing',epic:'EP-1'},'EE-1':{state:'blocked',epic:'EP-1'},'FF-1':{state:'blocked',epic:'EP-1'},'EX-1':{state:'active',epic:'EP-1',title:'Extra',lane:'APP'},'NO-1':{state:'blocked',epic:'OTHER-1'}});
  assert.ok(h.view.querySelector('.dv-live-panel-body'));const table=h.view.querySelector('table.dv-live-tickets');assert.ok(table);
- assert.deepEqual(table.querySelectorAll('th').map(el=>el.textContent),['Key','Title','State','Owner','Depends on','PRs']);
+ assert.deepEqual(table.querySelectorAll('th').map(el=>textOf(el).trim()),['Key','Title','State','Owner','Depends on','PRs']);
  const all=table.querySelectorAll('tbody')[0].children,rows=all.filter(el=>el.getAttribute('data-live-ticket')),coverageOf=key=>all.find(el=>el.getAttribute('data-live-coverage-for')===key);assert.deepEqual(rows.map(el=>el.getAttribute('data-live-ticket')),['EE-1','FF-1','DD-1','CC-1','EX-1','BB-1','AA-1']);
  assert.equal(all.length,9);assert.equal(all[1].getAttribute('data-live-ticket'),'FF-1');
  const aa=rows.at(-1),extra=coverageOf('EX-1');assert.equal(aa.querySelector('.dv-live-state-pill').textContent,'done');assert.match(textOf(aa),/Client work.*Alex/);assert.doesNotMatch(textOf(aa),/time unavailable|ago/);assert.match(textOf(aa),/2 declined/);

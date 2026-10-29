@@ -330,8 +330,15 @@ warnings, never errors. Strongly prefer adding the panel on every tracked page.
 ### Tickets table
 
 The Tickets table lists every story in the effective counted set: inherited
-children after exclusions, manual tickets, and needed upstream dependency stories. Rows sort by
-blocked, missing, active, todo, done, then key. Columns show Key, Title, State,
+children after exclusions, manual tickets, and needed upstream dependency stories. By default, rows sort by
+blocked, missing, active, todo, done, then key. The Key, Title, State and Owner
+headers are sort buttons: select a header for ascending order, then select it
+again for descending order. An arrow and the column's `aria-sort` show the current
+direction. Key, Title and Owner use case-insensitive natural order; empty titles
+and unassigned owners come last. State follows the default priority in ascending
+order, with unknown status last in either direction. Equal values use the key as
+a stable tie-break. The selection survives live updates while the panel is mounted
+and does not change ticket data. Columns show Key, Title, State,
 Owner (the assignee name, linked to their Confluence people page when the
 account is known), **Depends on** and PRs. Tickets with an informational
 coverage tag have a companion row under the ticket. The key uses the configured

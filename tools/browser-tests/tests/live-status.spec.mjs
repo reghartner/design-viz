@@ -103,7 +103,10 @@ test('V5 all nine skins share status backings, patterns, contrast and separate s
    const measured=await contrast(chip,'backgroundColor','color');expect(measured.alpha).toBeCloseTo(.15,2);expect(measured.ratio,skin+' '+state+' chip contrast').toBeGreaterThanOrEqual(4.5);
   }
   await expect(activeCoin.locator('circle')).toHaveCSS('stroke','rgb(22, 102, 199)');const coinContrast=await contrast(activeCoin,'fill','fill','text');expect(coinContrast.alpha).toBeCloseTo(.15,2);expect(coinContrast.ratio,skin+' coin numeral contrast').toBeGreaterThanOrEqual(4.5);
+  const edgeLabel=section.locator('text.lbl[data-dv-edge="0"]');
+  await expect(edgeLabel).toHaveCSS('opacity','1');expect((await contrast(edgeLabel,'backgroundColor','fill')).ratio,skin+' ambient edge label contrast').toBeGreaterThanOrEqual(4.5);
   await activeChip.click();await expect(activeChip).toHaveCSS('box-shadow','none');
+  await expect(edgeLabel).not.toHaveClass(/\blit\b/);await expect(edgeLabel).toHaveCSS('opacity','1');expect((await contrast(edgeLabel,'backgroundColor','fill')).ratio,skin+' inactive step edge label contrast').toBeGreaterThanOrEqual(4.5);
   expect(await activeChip.evaluate(el=>getComputedStyle(el,'::after').height)).toBe('2px');
   await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');await expect(activeChip).toBeFocused();await expect(activeChip).toHaveCSS('outline-style','solid');
   for(const pill of [root.locator('[data-live-count="active"]'),root.locator('tr[data-live-ticket="HW-123"] .dv-live-state-pill')]){await expect(pill).toHaveCSS('border-color','rgb(22, 102, 199)');const measured=await contrast(pill,'backgroundColor','color');expect(measured.alpha).toBeCloseTo(.15,2);expect(measured.ratio).toBeGreaterThanOrEqual(4.5);}
@@ -958,4 +961,17 @@ test('native status ink follows shadow-host and SVG board surfaces and restores 
   await expect(node.locator('.t1')).toHaveCSS('fill',skin==='aurora'?'rgb(255, 255, 255)':'rgb(0, 0, 0)');
   await page.evaluate(()=>window.viewer.controller.liveStatus.destroy());await expect(root.locator('[data-live-appearance]')).toHaveCount(0);
  }
+});
+
+test('marker-only Live activates nodes steps and captions across sections before provider data',async({page,server},testInfo)=>{
+ const spec={page:{title:'Coverage without a provider',sections:[{id:'gap',heading:'Remaining work',diagram:{nodes:{gap:{title:'Missing work',missingWork:true}},rows:[['gap']],steps:[{nodes:['gap']}]}} ,{id:'reuse',heading:'Existing work',diagram:{nodes:{reuse:{title:'Existing component'},tracked:{title:'Unknown ticket',tickets:['AA-1']}},rows:[['reuse','tracked']],steps:[{nodes:['reuse']},{nodes:['tracked']}]}}]}};
+ const root=await open(page,server,spec,false),section=root.locator('#section-reuse');
+ await expect(root.locator('[data-dv-node="gap"]')).toHaveAttribute('data-live-appearance','missing');
+ await expect(section.locator('[data-dv-node="reuse"]')).toHaveAttribute('data-live-appearance','unchanged');
+ await expect(section.locator('[data-dv-node="tracked"]')).not.toHaveAttribute('data-live-appearance');
+ await expect(section.locator('.coin[data-dv-step="0"]')).toHaveAttribute('data-live-appearance','unchanged');
+ const chip=section.locator('.schip[data-step-source="0"]').first();await expect(chip).toHaveAttribute('data-live-appearance','unchanged');await chip.click();
+ await expect(section.locator('.dv-live-caption')).toHaveText('NO CHANGE NEEDED');
+ await section.screenshot({path:testInfo.outputPath('marker-only-coverage.png')});
+ await section.locator('.schip[data-step-source="1"]').first().click();await expect(section.locator('.dv-live-caption')).toHaveText('AWAITING TICKET STATUS');
 });

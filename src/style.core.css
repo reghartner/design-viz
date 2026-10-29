@@ -4039,7 +4039,8 @@ body .docview .termbar[data-playback-position][hidden]{display:none;}
 .dv-live-done>.dv-live-halo{opacity:.35;}
 @keyframes dv-live-halo-pulse{0%,100%{opacity:.12;}50%{opacity:.65;}}
 :is(path.edge,path.halo)[data-live-appearance]{stroke:var(--dv-live-color)!important;}
-text.lbl[data-live-appearance]{fill:var(--dv-live-color)!important;}
+text.lbl[data-live-appearance]{fill:var(--dv-live-ink,#000)!important;}
+.docview text.lbl[data-live-appearance]:not(.comm-hidden):not(.dv-live-comm-hidden){opacity:1!important;}
 .coin[data-live-appearance]>circle{fill:var(--dv-live-backing)!important;stroke:var(--dv-live-color)!important;stroke-width:2!important;stroke-dasharray:var(--dv-live-dash,none)!important;stroke-linecap:round;}
 .coin[data-live-appearance]>text{fill:var(--dv-live-ink,#000)!important;}
 .docview .coin.dv-live-done>circle{filter:drop-shadow(0 0 3px #237d3d66)!important;}

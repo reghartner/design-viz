@@ -1636,3 +1636,22 @@ test('coverage markers survive normalization, propagate to steps, never manufact
  api.clear();assert.equal(h.view.querySelectorAll('[data-live-appearance]').length,0);api.apply({});api.destroy();assert.equal(h.view.querySelectorAll('[data-live-appearance]').length,0);
  const invalid=h.C.validate(h.C.normalize({nodes:{a:{missingWork:'yes'}},rows:[['a']]}));assert.ok(invalid.warnings.some(w=>w.includes('missingWork')));
 });
+
+test('missing work activates consistent page-wide coverage before provider evidence without changing ordinary pages',()=>{
+ const raw={page:{sections:[{id:'gap',diagram:{nodes:{gap:{missingWork:true}},rows:[['gap']],steps:[{nodes:['gap']}]}} ,{id:'reuse',diagram:{nodes:{reuse:{title:'Existing'},tracked:{tickets:['AA-1']},text:{type:'text',text:'Note'}},rows:[['reuse','tracked']],steps:[{nodes:['reuse']},{nodes:['tracked']}]}}]}};
+ const h=harness(raw),api=h.ctl.liveStatus,rec=h.ctl.sections[1],controls=stepTicketControls(h,rec);
+ function state(id){return h.view.querySelector('[data-dv-node="'+id+'"]').getAttribute('data-live-appearance');}
+ assert.equal(api.snapshot().available,true);assert.equal(api.enabled(),true);
+ assert.equal(state('gap'),'missing');assert.equal(state('reuse'),'unchanged');assert.equal(state('tracked'),null);assert.equal(state('text'),null);
+ for(const selector of ['g.coin[data-dv-step="0"]','button.schip[data-step-source="0"]'])assert.equal(rec.sectionEl.querySelector(selector).getAttribute('data-live-appearance'),'unchanged');
+ assert.equal(controls.host.querySelector('.dv-live-caption').textContent,'NO CHANGE NEEDED');
+ controls.change(1);assert.equal(controls.host.querySelector('.dv-live-caption').textContent,'AWAITING TICKET STATUS');
+ assert.deepEqual(plain(api.snapshot().counts),{todo:0,active:0,done:0,blocked:0,missing:0});
+ api.setEnabled(false);assert.equal(h.view.querySelectorAll('[data-live-appearance]').length,0);
+ api.setEnabled(true);assert.equal(state('reuse'),'unchanged');assert.equal(state('gap'),'missing');
+ api.clear();assert.equal(h.view.querySelectorAll('[data-live-appearance]').length,0);api.destroy();
+ for(const nodes of [{reuse:{}},{reuse:{},text:{type:'text',text:'Note',missingWork:true}}]){
+  const ordinary=harness({nodes,rows:[['reuse']],steps:[{nodes:['reuse']}]});const control=stepTicketControls(ordinary);
+  assert.equal(ordinary.ctl.liveStatus.snapshot().available,false);assert.equal(ordinary.view.querySelectorAll('[data-live-appearance]').length,0);assert.equal(control.host.querySelector('.dv-live-caption'),null);ordinary.ctl.liveStatus.destroy();
+ }
+});

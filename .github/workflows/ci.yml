@@ -271,6 +271,7 @@ jobs:
             LICENSE
             template/flowview.html
             workbench/flowspec.html
+            workbench/status-colors.html
             workbench/catalog.json
             workbench/diagrams.json
             workbench/library-thumbnails/

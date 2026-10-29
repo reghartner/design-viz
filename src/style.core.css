@@ -3600,7 +3600,7 @@ body.sk-blueprint .termbar.has-paths .schips{--path-label-bg:#04264F;}
 .stepmode .comm-hidden {opacity:0 !important;animation:none !important;pointer-events:none}
 .comm-segment {fill:none;stroke:var(--comm-color);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
 .comm-after,.comm-blocked .comm-before {stroke:var(--dfaint,#7e93b8);stroke-dasharray:4 6;opacity:.4}
-.comm-break {fill:none;stroke:var(--comm-color);stroke-width:3;stroke-linecap:round}
+.comm-break {fill:none;stroke:#b42338;stroke-width:3;stroke-linecap:round}
 .stepmode .comm-label {opacity:1;fill:var(--dink)}
 .comm-packet {fill:var(--comm-color) !important;filter:drop-shadow(0 0 4px var(--comm-color)) !important}
 .comm-status {display:block;font-weight:600;font-size:11px;margin-top:7px}
@@ -4043,15 +4043,15 @@ text.lbl[data-live-appearance]{fill:var(--dv-live-ink,#000)!important;}
 .docview text.lbl[data-live-appearance]:not(.comm-hidden):not(.dv-live-comm-hidden){opacity:1!important;}
 .coin[data-live-appearance]>circle{fill:var(--dv-live-backing)!important;stroke:var(--dv-live-color)!important;stroke-width:2!important;stroke-dasharray:var(--dv-live-dash,none)!important;stroke-linecap:round;}
 .coin[data-live-appearance]>text{fill:var(--dv-live-ink,#000)!important;}
-.docview .coin.dv-live-done>circle{filter:drop-shadow(0 0 3px #237d3d66)!important;}
+.docview .coin.dv-live-done>circle{filter:drop-shadow(0 0 3px color-mix(in srgb,var(--dv-live-done) 40%,transparent))!important;}
 .docview .node[data-live-appearance]>.dv-live-halo{filter:drop-shadow(0 0 6px var(--dv-live-color))!important;}
-.docview .coin.dv-live-active>circle{filter:drop-shadow(0 0 4px #1666c766)!important;animation:dv-live-coin-pulse 2.6s ease-in-out infinite!important;}
-@keyframes dv-live-coin-pulse{0%,100%{stroke-opacity:.6;filter:drop-shadow(0 0 1px #1666c733);}50%{stroke-opacity:1;filter:drop-shadow(0 0 5px #1666c788);}}
+.docview .coin.dv-live-active>circle{filter:drop-shadow(0 0 4px color-mix(in srgb,var(--dv-live-active) 40%,transparent))!important;animation:dv-live-coin-pulse 2.6s ease-in-out infinite!important;}
+@keyframes dv-live-coin-pulse{0%,100%{stroke-opacity:.6;filter:drop-shadow(0 0 1px color-mix(in srgb,var(--dv-live-active) 20%,transparent));}50%{stroke-opacity:1;filter:drop-shadow(0 0 5px color-mix(in srgb,var(--dv-live-active) 53%,transparent));}}
 :is(.schip,.dv-live-state-pill,.dv-live-count)[data-live-appearance]{position:relative;isolation:isolate;background:var(--dv-live-backing)!important;color:var(--dv-live-ink,#000)!important;border:2px var(--dv-live-border,solid) var(--dv-live-color)!important;box-shadow:none!important;}
-:is(.schip,.dv-live-state-pill,.dv-live-count)[data-live-appearance="done"]{box-shadow:0 0 6px #237d3d55!important;}
-:is(.schip,.dv-live-state-pill,.dv-live-count)[data-live-appearance="active"]::before{content:"";position:absolute;inset:-2px;border:2px solid var(--dv-live-color);border-radius:inherit;box-shadow:0 0 7px #1666c7;pointer-events:none;animation:dv-live-halo-pulse 2.6s ease-in-out infinite;}
+:is(.schip,.dv-live-state-pill,.dv-live-count)[data-live-appearance="done"]{box-shadow:0 0 6px color-mix(in srgb,var(--dv-live-done) 33%,transparent)!important;}
+:is(.schip,.dv-live-state-pill,.dv-live-count)[data-live-appearance="active"]::before{content:"";position:absolute;inset:-2px;border:2px solid var(--dv-live-color);border-radius:inherit;box-shadow:0 0 7px var(--dv-live-active);pointer-events:none;animation:dv-live-halo-pulse 2.6s ease-in-out infinite;}
 .docview .schip.step-colored[data-live-appearance][aria-current="true"]{box-shadow:none!important;}
-.docview .schip.step-colored[data-live-appearance="done"][aria-current="true"]{box-shadow:0 0 6px #237d3d55!important;}
+.docview .schip.step-colored[data-live-appearance="done"][aria-current="true"]{box-shadow:0 0 6px color-mix(in srgb,var(--dv-live-done) 33%,transparent)!important;}
 /* Keep the current-step marker inside the chip so fitted tracks do not scroll. */
 .schip[data-live-appearance][aria-current="true"]::after{content:"";position:absolute;width:12px;height:2px;left:50%;bottom:2px;transform:translateX(-50%);background:var(--dv-live-ink,#000);border-radius:1px;}
 .docview .schip.step-colored[data-live-appearance]:focus-visible{outline:2px solid var(--dv-live-ink,#000);outline-offset:3px;}

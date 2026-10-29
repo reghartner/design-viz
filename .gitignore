@@ -25,6 +25,7 @@ node_modules/
 # Portable entrypoints are built locally and in CI/deployment, never committed.
 /template/flowview.html
 /workbench/flowspec.html
+/workbench/status-colors.html
 
 # Runtime bundles are generated before tests/packaging; authored inputs stay in src/.
 /apps/backstage/src/generated/

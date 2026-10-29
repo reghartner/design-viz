@@ -913,3 +913,38 @@ glow). This state is neutral in mixed step rollups: done plus no-change stays
 done. Linked tickets without provider evidence remain unknown. Text boxes stay
 inert. Clear, disable and destroy restore authored paint. Existing ticket-gated
 availability still requires every linked ticket to be confirmed Done.
+
+## Personal status colors
+
+Open **Appearance → Status colors…** in the desktop Workbench, or open the
+built `workbench/status-colors.html` page on the same site as your viewers.
+The page previews the production renderer with local and genuinely imported
+nodes. It offers color pickers and six-digit hex fields for To do, Active,
+Done, Blocked, Missing work and Unchanged, plus PR states and check results.
+Waiting indicators inherit To do and Blocked. The broken-edge icon is always
+red (`#b42338`), including authored failures and unavailable connections; edge
+segments retain their independent status color.
+
+Edits, **Reset all**, per-color reset and JSON import change only the preview
+until **Save defaults**. Save stores explicit overrides in
+`localStorage["flowview.status-colors.v1"]`; an empty palette removes that key.
+Untouched values retain the built-in CSS defaults, including skin-specific PR
+colors. JSON export includes only overrides, with a versioned envelope:
+
+```json
+{"version":1,"colors":{"live-active":"#1666c7","pr-open":"#539a43"}}
+```
+
+Supported names are `live-todo`, `live-active`, `live-done`, `live-blocked`,
+`live-missing`, `live-unchanged`, `pr-open`, `pr-draft`, `pr-merged`, `pr-closed`,
+`checks-passing`, `checks-failing` and `checks-pending`. Imports reject unknown
+fields, unknown names and values other than `#RRGGBB` without replacing the
+preview. Storage errors are reported; the preview remains exportable.
+
+Preferences apply to updated standalone, Workbench, Forge and native viewers
+on the same origin in this browser, including open tabs and sibling native
+mounts. Each viewer scopes overrides to its own view and releases listeners on
+destroy. They do not modify the document, another site's viewer, an older
+exported runtime, or another browser. File URLs have browser-dependent storage
+isolation; use the hosted page for shared defaults, or transfer JSON to another
+hosted palette page. Preview skin changes are not saved document settings.

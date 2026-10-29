@@ -1,5 +1,5 @@
 {
-  "pages": ["template/flowview.html", "workbench/flowspec.html", "workbench/diagrams.json"],
+  "pages": ["template/flowview.html", "workbench/flowspec.html", "workbench/status-colors.html", "workbench/diagrams.json"],
   "runtime": "tools/canon/generated-runtime.cjs",
   "native": "apps/backstage/src/generated"
 }

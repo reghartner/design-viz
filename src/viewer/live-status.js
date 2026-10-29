@@ -92,7 +92,7 @@ function liveStatusClass(el,state){
    Walk transparent ancestors; use the board ground for SVG carriers. */
 function liveStatusInk(el,state){
   var doc=el.ownerDocument,win=doc && doc.defaultView;if(!win || !win.getComputedStyle)return;
-  var tint={todo:[107,114,128],active:[22,102,199],done:[35,125,61],blocked:[180,35,56],missing:[225,75,90],unchanged:[116,139,120]}[state],amount=tint ? .15 : 0;tint=tint || [0,0,0];
+  var tint=state && rgba(win.getComputedStyle(el).getPropertyValue('--dv-live-'+state)),amount=tint ? .15 : 0;tint=tint || [0,0,0];
   function rgba(raw){
     var match=/^#([0-9a-f]{6})$/i.exec(raw.trim());if(match)return [parseInt(match[1].slice(0,2),16),parseInt(match[1].slice(2,4),16),parseInt(match[1].slice(4,6),16),1];
     match=/rgba?\(([^)]+)\)/.exec(raw);if(match){var c=match[1].split(/[, /]+/).map(Number);return [c[0],c[1],c[2],c.length>3?c[3]:1];}
@@ -1073,7 +1073,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     setDemoControls:function(value){if(retired)return;demoControls=value;notify();},
     status:function(value){setStatus(value);},
     destroy:function(){
-      if(retired)return;on=false;paintLanes();retired=true;liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
+      if(retired)return;on=false;paintLanes();retired=true;releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];
@@ -1089,6 +1089,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(renderOptions && renderOptions.loadDetail===wrappedLoad)renderOptions.loadDetail=originalLoad;
     }
   };
+  var releaseColors=options.colorsPreview?function(){}:FlowStatusColors.connect(view,schedule);
   liveStatusControllers.set(view,api);
   connectPanels();
   paint();events.forEach(function(type){view.addEventListener(type,schedule);});

@@ -459,8 +459,8 @@ test('ticket availability is detected beyond earlier tracked carriers and in con
  }
 });
 
-test('missing-work only nodes and consumer overlays declare coverage and live-status capabilities',()=>{
- for(const diagram of [{nodes:{gap:{missingWork:true}},rows:[['gap']]},{topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{missingWork:true}}}]}]){
+test('missing-work nodes, later edges and consumer overlays declare coverage and live-status capabilities',()=>{
+ for(const diagram of [{edges:[{from:'a',to:'b',missingWork:true}]},{nodes:{a:{tickets:['AA-1']}},edges:[{from:'a',to:'b',tickets:['AA-2']},{from:'b',to:'a',missingWork:true}]},{topologyImports:[{edgeTracking:{'a->b':{missingWork:true}}}]},{nodes:{gap:{missingWork:true}},rows:[['gap']]},{topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{missingWork:true}}}]}]){
   const features=C.detect({page:{sections:[{diagram}]}});assert.ok(features.includes('flow.missing-work'));assert.ok(features.includes('flow.live-status'));
  }
 });

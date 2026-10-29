@@ -859,7 +859,8 @@ All story features work with `#live=demo`; pages without tickets or epics show t
 ## Delivery boards over imported Canon topology
 
 A delivery board can reference a canonical diagram and own only tracking:
-`topologyImports[].nodeTracking` maps provider node IDs to `{tickets, prs}`;
+`topologyImports[].nodeTracking` maps provider node IDs to tracking fields
+(`tickets`, `prs`, `missingWork`, `existsWhen`);
 `edgeTracking` maps provider `from->to` identities to the same shape. Add these
 references through the desktop imported-selection Inspector. Inherited references
 stay read-only; local additions can be removed, undone and redone. The maps use
@@ -885,7 +886,7 @@ blocked is solid red; missing is dashed red. Only the outline/glow animates, and
 reduced-motion and print disable that animation. Selection remains separate.
 
 In desktop **Inspect → Tracking**, **Missing work** saves `missingWork: true` on a
-node. This is authored coverage intent, not a Jira status. For example:
+node or connection. This is authored coverage intent, not a Jira status. For example:
 
 ```json
 {"title":"Audit logging","tickets":["AUDIT-42"],"missingWork":true}
@@ -894,7 +895,17 @@ node. This is authored coverage intent, not a Jira status. For example:
 The marker says additional unlinked work remains, even if AUDIT-42 is Done. Clear
 it when that work is covered. Blocked ticket evidence takes precedence over the
 marker; the marker takes precedence over active, done and todo. It participates
-in step appearance without inventing a ticket or increasing Jira counts.
+in step appearance and readiness without inventing a ticket or increasing Jira counts.
+
+A marked connection shows a broken line with the communication-break glyph and
+stops packet traffic while Live is enabled, including when every linked ticket
+is Done or no tickets/provider exist. Its label or break glyph opens the Missing
+work explanation and any attached Jira links; unlabeled breaks are keyboard
+buttons. Clearing the marker removes that live break unless blocked evidence or
+availability still requires it. Disabling/clearing Live restores the authored
+connection and any independently authored communication failure. Local,
+imported, nested and resolved-snapshot connections follow the same behavior;
+a provider-inherited marker stays read-only in authored import overlays.
 
 With Live status data applied, nodes with no linked tickets and no missing-work
 marker automatically show **No change needed** (quiet sage, solid outline, no

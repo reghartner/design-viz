@@ -335,10 +335,17 @@ for(const resolved of [false,true])test('desktop nested imported missing-work as
   else {expect(delivery(authored).topologyImports[0].nodeTracking).toEqual({'inner::api':{missingWork:true}});expect(delivery(authored).nodes[id]).toBeUndefined();}
   expect(authored.page.sections[0].tabs[0]).toEqual(raw.page.sections[0].tabs[0]);
   await select(page,'node',id);const checked=await source(page);await marker.uncheck();await history(page,checked);await select(page,'node',id);await marker.check();
+  await closeTools(page);await clickEdgeStroke(page,0);await page.locator('#editor-tab-inspect').click();const edgeBefore=await source(page);await marker.check();await history(page,edgeBefore);
+  await closeTools(page);await page.locator('#docview g.dv-live-comm-failure[data-dv-edge="0"] .comm-break').click();await page.locator('#editor-tab-inspect').click();
+  const edgeMarked=await source(page);await marker.uncheck();await history(page,edgeMarked);await closeTools(page);await clickEdgeStroke(page,0);await page.locator('#editor-tab-inspect').click();await marker.check();
+  authored=JSON.parse(await source(page));
+  if(resolved)expect(delivery(authored).edges[0].missingWork).toBe(true);else expect(delivery(authored).topologyImports[0].edgeTracking).toEqual({'inner::api->inner::store':{missingWork:true}});
+  await expect(page.locator('#docview g.dv-live-comm-failure[data-dv-edge="0"]')).toBeVisible();
   const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
   const files=await projectFiles(await pending),json=files[Object.keys(files).find(n=>n.endsWith('.spec.json'))];
   await page.locator('#file-input').setInputFiles({name:'nested-saved.spec.json',mimeType:'application/json',buffer:Buffer.from(json)});await page.reload();
   await chooseNavigation(page.locator('#docview .explore-navigation'),'Tab','Delivery');await select(page,'node',id);await expect(marker).toBeChecked();await expect(node(page,id)).toHaveAttribute('data-live-appearance','missing');
+  await expect(page.locator('#docview g.dv-live-comm-failure[data-dv-edge="0"]')).toBeVisible();
   expect(JSON.stringify([provider,middle])).toBe(providersBefore);
 });
 
@@ -382,4 +389,54 @@ for(const resolved of [false,true])test('desktop pointer clicks reveal Jira tick
     if(index===1 && gesture==='label')await page.screenshot({path:info.outputPath('imported-edge-jira-pointer.png')});
     await page.keyboard.press('Escape');await expect(pop).not.toBeVisible();
   }
+});
+
+
+for(const kind of ['imported','local','snapshot'])test('desktop '+kind+' edge Missing work assigns a broken connection and preserves history',async({page,server},info)=>{
+ const {provider,consumer}=await fixture(page,server,(provider,consumer)=>{
+  delete diagram(provider).nodes.api.tickets;diagram(provider).edges[0].tickets=['EDGE-1'];
+  if(kind==='snapshot')delete diagram(provider).edges[0].label;
+  if(kind==='local'){
+   const d=diagram(consumer);d.nodes={a:{title:'Local A'},b:{title:'Local B'}};d.rows=[['a','b']];d.edges=[{from:'a',to:'b',label:'Local delivery',tickets:['EDGE-1']}];d.steps=[{edge:'a->b'}];
+  }
+ });
+ const providerBefore=JSON.stringify(provider);
+ if(kind==='snapshot')await page.locator('#file-input').setInputFiles({name:'snapshot.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(C.materializeTopology([provider,consumer])[1],null,2))});
+ const readMarker=raw=>kind==='imported'?diagram(raw).topologyImports[0].edgeTracking?.['api->store']?.missingWork:diagram(raw).edges[0].missingWork;
+ await closeTools(page);await clickEdgeStroke(page,0);await page.locator('#editor-tab-inspect').click();
+ const marker=page.locator('#guide').getByRole('checkbox',{name:'Missing work',exact:true}),before=await source(page),broken=page.locator('#docview g.dv-live-comm-failure[data-dv-edge="0"]'),line=page.locator('#docview path.edge[data-dv-edge="0"]');
+ await expect(marker).toBeVisible();await expect(marker).toBeEnabled();await marker.check();await history(page,before);
+ expect(readMarker(JSON.parse(await source(page)))).toBe(true);await expect(broken).toBeVisible();await expect(line).toHaveCSS('visibility','hidden');
+ await closeTools(page);await broken.locator('.comm-break').click();await page.locator('#editor-tab-inspect').click();
+ const marked=await source(page);await marker.uncheck();await history(page,marked);expect(readMarker(JSON.parse(await source(page)))).toBeUndefined();await expect(broken).toHaveCount(0);
+ await closeTools(page);await clickEdgeStroke(page,0);await page.locator('#editor-tab-inspect').click();await marker.check();await expect(broken).toBeVisible();
+ await page.screenshot({path:info.outputPath('edge-missing-work-assigned.png')});
+ const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+ const files=await projectFiles(await pending),json=files[Object.keys(files).find(n=>n.endsWith('.spec.json'))],html=files[Object.keys(files).find(n=>n.endsWith('.html'))];
+ expect(readMarker(JSON.parse(json))).toBe(true);
+ await page.locator('#file-input').setInputFiles({name:'saved.spec.json',mimeType:'application/json',buffer:Buffer.from(json)});await page.reload();
+ await closeTools(page);await broken.locator('.comm-break').click();await page.locator('#editor-tab-inspect').click();await expect(marker).toBeChecked();
+ await writeFile(path.join(server.root,'edge-missing.html'),html);
+ await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>{window.__edgeMissingRefs=refs;return {'EDGE-1':{state:'done'}};}};});
+ await page.goto(server.origin+'/edge-missing.html');await expect.poll(()=>page.evaluate(()=>window.__edgeMissingRefs?.tickets)).toEqual(['EDGE-1']);
+ await expect(broken).toBeVisible();await expect(broken).toHaveAttribute('data-live-appearance','missing');await expect(line).toHaveCSS('visibility','hidden');
+ await expect(page.locator('#docview .dv-live-completion strong')).toHaveText(kind==='local'?'1/2 carriers done':'0/1 carriers done');
+ await expect(page.locator('#docview [data-live-count="done"]')).toContainText('1');
+ const packets=page.locator('#docview circle.pkt').filter({has:page.locator('mpath[href$="-e0"]')});expect(await packets.count()).toBeGreaterThan(0);for(const dot of await packets.all())await expect(dot).toHaveClass(/dv-live-packet-hidden/);
+ const label=page.locator('#docview text.lbl[data-dv-edge="0"]'),keyboard=kind==='snapshot'?broken:label;
+ for(const gesture of ['glyph','keyboard',...(kind==='snapshot'?[]:['label'])]){
+  if(gesture==='glyph')await broken.locator('.comm-break').click();else if(gesture==='label')await label.click();else {await keyboard.focus();await page.keyboard.press('Enter');}
+  const pop=page.locator('#docview .dv-live-popover');await expect(pop).toBeVisible();await expect(pop).toContainText('Missing work: additional work remains');await expect(pop.getByRole('link',{name:'EDGE-1',exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/EDGE-1');
+  await page.keyboard.press('Escape');await expect(keyboard).toBeFocused();
+ }
+ await page.screenshot({path:info.outputPath('edge-missing-work-reader.png')});
+ const live=page.locator('#docview .dv-live-toggle');await live.click();await expect(broken).toHaveCount(0);await expect(line).not.toHaveClass(/dv-live-comm-hidden/);for(const dot of await packets.all())await expect(dot).not.toHaveClass(/dv-live-packet-hidden/);
+ await live.click();await expect(broken).toBeVisible();await page.emulateMedia({media:'print'});await expect(broken).toHaveCSS('display','inline');await expect(line).toHaveCSS('visibility','hidden');await page.emulateMedia({media:'screen'});
+ expect(JSON.stringify(provider)).toBe(providerBefore);
+});
+
+test('desktop inherited edge Missing work is read only while local additions remain editable',async({page,server})=>{
+ await fixture(page,server,provider=>{diagram(provider).edges[0].missingWork=true;});await closeTools(page);await page.locator('#docview g.dv-live-comm-failure[data-dv-edge="0"] .comm-break').click();await page.locator('#editor-tab-inspect').click();
+ const marker=page.locator('#guide').getByRole('checkbox',{name:'Missing work',exact:true});await expect(marker).toBeChecked();await expect(marker).toBeDisabled();
+ const input=page.locator('#guide').getByRole('textbox',{name:'Add ticket',exact:true}),before=await source(page);await input.fill('EXTRA-1');await input.press('Enter');await history(page,before);expect(diagram(JSON.parse(await source(page))).topologyImports[0].edgeTracking).toEqual({'api->store':{tickets:['EXTRA-1']}});
 });

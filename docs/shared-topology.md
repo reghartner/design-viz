@@ -516,7 +516,8 @@ exposes desktop Inspect → Tracking:
 consumer document directly and survive Undo/Redo, save and reload. These edits
 never update the original provider. Imported structure, presentation, identities
 and provenance remain protected. Text boxes do not expose Missing work or
-availability; connections do not expose Missing work. Authored imports still
+availability. Connections expose Missing work and render as broken while Live
+is enabled. Authored imports still
 use their additive overlays and keep provider-inherited tracking read-only.
 
 The live-status provider receives the resolved, distinct ticket keys and PR URLs.

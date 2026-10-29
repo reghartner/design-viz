@@ -1094,3 +1094,28 @@ test('marker-only Live activates nodes steps and captions across sections before
  await section.screenshot({path:testInfo.outputPath('marker-only-coverage.png')});
  await section.locator('.schip[data-step-source="1"]').first().click();await expect(section.locator('.dv-live-caption')).toHaveText('AWAITING TICKET STATUS');
 });
+
+
+test('marker-only edges break before provider data and restore authored failures across Live lifecycle',async({page,server},info)=>{
+ await page.setViewportSize({width:1440,height:1000});
+ await writeFile(path.join(server.root,'edge-marker-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'edge-marker-native.html'),'<style>body{margin:0}#host{position:fixed;inset:0}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./edge-marker-native.js";window.mount=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/edge-marker-native.html');await page.waitForFunction(()=>!!window.mount);
+ const spec={page:{title:'Uncovered delivery',sections:[{id:'delivery',diagram:{view:'step',autoplay:false,nodes:{a:{title:'API'},b:{title:'Store'},c:{title:'Audit'}},rows:[['a','b','c']],edges:[{from:'a',to:'b',label:'Missing delivery',missingWork:true},{from:'b',to:'c',label:'Authored failure'}],steps:[{id:'send',edge:'a->b',failures:{'a->b':'dropped','b->c':'dropped'}}],paths:[{id:'main',label:'Main',steps:['send']},{id:'alternate',label:'Alternate',steps:['send']}],panels:[{id:'status',type:'live-status'}]}}]}};
+ await page.evaluate(spec=>{window.viewer=window.mount(document.querySelector('#host'),spec,{});},spec);
+ const root=page.locator('#host'),broken=root.locator('g.dv-live-comm-failure[data-dv-edge="0"]'),authored=root.locator('g.comm-dropped:not(.dv-live-comm-failure)'),line=root.locator('path.edge[data-dv-edge="0"]');
+ await expect(broken).toBeVisible();await expectCenteredBreak(broken);await expect(broken).toHaveAttribute('aria-label',/Missing work/);
+ await expect(root.locator('.schip[data-step-source="0"]').first()).toHaveAttribute('data-live-appearance','missing');await expect(root.locator('.dv-live-caption')).toHaveText('MISSING WORK · unlinked work remains');
+ await expect(root.locator('.dv-live-completion strong')).toHaveText('0/1 carriers done');await expect(root.locator('tr[data-live-ticket]')).toHaveCount(0);
+ await expect(authored).toHaveCount(2);await expect(authored.filter({has:page.locator('.comm-break')}).nth(1)).toBeVisible();
+ await expect(root.locator('g.comm-dropped[data-dv-edge="0"]')).toHaveClass(/dv-live-comm-suppressed/);await expect(root.locator('g.comm-dropped[data-dv-edge="1"]')).not.toHaveClass(/dv-live-comm-suppressed/);
+ await broken.locator('.comm-break').click();await expect(root.locator('.dv-live-popover')).toContainText('Missing work: additional work remains');await expect(root.locator('.dv-live-popover a')).toHaveCount(0);await page.keyboard.press('Escape');
+ await root.screenshot({path:info.outputPath('marker-only-broken-edge.png')});
+ await root.locator('.path-chip[data-dv-path="alternate"]').click();await expect(broken).toBeVisible();await expectCenteredBreak(broken);
+ for(const action of ['off','clear','destroy']){
+  await page.evaluate(action=>{const api=window.viewer.controller.liveStatus;if(action==='off')api.setEnabled(false);else api[action]();},action);
+  await expect(root.locator('.dv-live-comm-failure,.dv-live-comm-suppressed,.dv-live-comm-hidden,.dv-live-packet-hidden')).toHaveCount(0);await expect(authored).toHaveCount(2);for(const failure of await authored.all())await expect(failure).toBeVisible();await expect(line).toHaveClass(/comm-hidden/);
+  if(action!=='destroy'){await page.evaluate(()=>window.viewer.controller.liveStatus.apply({}));await page.evaluate(()=>window.viewer.controller.liveStatus.setEnabled(true));await expect(broken).toBeVisible();}
+ }
+ await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
+});

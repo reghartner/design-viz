@@ -207,9 +207,8 @@ function topologyTrackingTarget(text,raw,section,kind,id,context,index){
   return t;
 }
 function planTopologyTracking(text,raw,section,kind,id,field,ref,remove,context,index){
-  if(field!=='tickets' && field!=='prs' && field!=='existsWhen' && field!=='missingWork')return {error:'Choose tickets, pull requests or availability.'};
+  if(field!=='tickets' && field!=='prs' && field!=='existsWhen' && field!=='missingWork')return {error:'Choose tickets, pull requests, availability or Missing work.'};
   if(field==='missingWork'){
-    if(kind!=='node')return {error:'Missing work applies to nodes.'};
     var marker=topologyTrackingTarget(text,raw,section,kind,id,context,index);if(marker.error)return marker;
     if(marker.inherited.missingWork)return {error:'Missing work is inherited from the provider.'};
     if(!remove && ref!==true)return {error:'missingWork must be true.'};

@@ -2629,12 +2629,18 @@ it rather than author coordinates. This is saved geometry, not reader zoom.
 
 ### Authored missing work
 
-Ordinary diagram nodes may store `missingWork: true` to flag additional work
+Ordinary diagram nodes and connections may store `missingWork: true` to flag additional work
 without a linked ticket. This is coverage intent, not persisted Jira evidence.
 Declare `flow.missing-work` and `flow.live-status`. Desktop Inspect → Tracking
 provides the Missing work checkbox with ordinary Undo/Redo/save behavior. The
 flag overrides no-change, todo, active and done presentation, even on a ticketed
-node; blocked Jira evidence still wins. Clear the flag once the work is covered.
+node or connection; blocked Jira evidence still wins. Clear the flag once the work is covered.
+A marked connection uses the communication-break glyph and suppresses packet
+traffic while Live is enabled, even with no provider or when all its tickets are
+Done. Labels and break glyphs retain ticket popovers; unlabeled breaks provide a
+keyboard trigger. Clear/disable/destroy restores authored communication effects.
+Imported `nodeTracking` and `edgeTracking` accept the marker with inherited
+read-only intent; resolved JSON snapshots edit their consumer-owned annotation.
 An unlinked, unmarked node is automatically No change needed when live evidence
 is applied. Linked tickets awaiting evidence remain unknown. No-change is neutral
 in mixed step rollups and never creates a Jira ticket or increments its counts.

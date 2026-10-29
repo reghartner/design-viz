@@ -82,6 +82,8 @@ function deltaWarnings(value, path, warnings){
   }
 }
 function trackingWarnings(value, path, warnings){
+  if(value && Object.prototype.hasOwnProperty.call(value,'missingWork') && typeof value.missingWork!=='boolean')
+    warnings.push(path+'.missingWork: must be true or false — ignored');
   if(value && Object.prototype.hasOwnProperty.call(value,'existsWhen')){
     if(value.existsWhen!=='tickets-done')warnings.push(path+'.existsWhen: expected "tickets-done" — ignored');
     else if(isTextBoxNode(value))warnings.push(path+'.existsWhen: text boxes do not support availability — ignored');
@@ -418,8 +420,6 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     validateTextBox(n, DP+'.nodes.'+id, errors);
     deltaWarnings(n, DP + '.nodes.' + id, warnings);
     trackingWarnings(n, DP + '.nodes.' + id, warnings);
-    if (Object.prototype.hasOwnProperty.call(n, 'missingWork') && typeof n.missingWork !== 'boolean')
-      warnings.push(DP + '.nodes.' + id + '.missingWork: must be true or false — ignored');
     validateHandoff(n.handoff,n,DP+'.nodes.'+id+'.handoff',errors);
     if (Object.prototype.hasOwnProperty.call(n, 'delta') && typeof n.delta !== 'boolean')
       warnings.push(DP + '.nodes.' + id + '.delta: must be true or false — ignored');

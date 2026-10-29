@@ -583,7 +583,7 @@ function trackingControls(val,overlay){
       return ok;
     }
     var refs=trackingRefs(val),textBox=overlay?overlay.textBox:isTextBoxNode(val);
-    if(session.target && session.target.kind==='node' && !textBox){
+    if(session.target && (session.target.kind==='node' || session.target.kind==='edge') && !textBox){
       var inheritedMissing=overlay && overlay.inherited.missingWork===true;
       var missingControl=checkboxControl(inheritedMissing || val.missingWork===true,function(checked){return overlay?overlay.update('missingWork',true,!checked):commitSimple('missingWork',checked?'true':null);});
       missingControl.querySelector('input').disabled=!!inheritedMissing;

@@ -390,3 +390,28 @@ test('forgetting the browser draft hides it from the session without saving the 
   s.forgetDraft();assert.equal(s.draft(),null);assert.equal(s.isProjectOpen(),false);assert.equal(s.restoreDraft(),false);
   assert.equal(storage.get('dv-workbench-draft'),JSON.stringify({text:'saved',at:1}),'storage removal belongs to the persistence cleanup');
 });
+function localContext(title){return {version:1,id:'consumer',local:true,specs:[{page:{canon:{id:'provider'},title}},{page:{canon:{id:'consumer'},title:'Saved consumer'}}]};}
+test('local refresh is one deterministic snapshot history entry interleaved with exact source history',()=>{
+ const h=harness(),s=h.session,old=localContext('Before'),next=localContext('After');s.replaceProject(h.text,null,{topologyContext:old});
+ const initial=h.text;s.accept({text:' {"title":"Before refresh"}\n'});const edited=h.text,revision=s.snapshot().topologyRevision;
+ assert.equal(s.refreshLocalTopology(next,s.snapshot()),true);assert.equal(h.text,edited);assert.equal(s.historyType(),'topology');assert.equal(s.snapshot().topologyRevision,revision+1);
+ next.specs[0].page.title='Disk changed again';assert.equal(s.topologyContext().specs[0].page.title,'After');
+ s.accept({text:' {"title":"Later source edit"}\n'});const later=h.text;s.undo();assert.equal(h.text,edited);s.undo();assert.equal(h.text,edited);assert.deepEqual(plain(s.topologyContext()),old);assert.equal(s.snapshot().topologyRevision,revision+2);
+ s.undo();assert.equal(h.text,initial);s.redo();assert.equal(h.text,edited);s.redo();assert.equal(s.topologyContext().specs[0].page.title,'After');s.redo();assert.equal(h.text,later);
+ assert.equal(JSON.parse(h.storage.get('dv-workbench-draft')).topologyContext.specs[0].page.title,'After');
+});
+test('unchanged, stale, invalid and nonlocal refreshes preserve source, history, renders and prior frozen policy',()=>{
+ const h=harness(),s=h.session,old=localContext('Before');s.replaceProject(h.text,null,{topologyContext:old});s.accept({text:'{"title":"edit"}'});s.undo();
+ const renders=h.renders,version=s.historyVersion(),same=localContext('Before');same.specs[1].page.title='Current draft changed';same.localSource={capturedAt:'later'};
+ assert.equal(s.refreshLocalTopology(same,s.snapshot()),'unchanged');assert.equal(h.renders,renders);assert.equal(s.historyVersion(),version);assert.equal(s.canRedo(),true);
+ const stale=s.snapshot();h.type(' {"title":"typed"}');assert.equal(s.refreshLocalTopology(localContext('After'),stale),false);h.type('{unfinished');assert.throws(()=>s.refreshLocalTopology(localContext('After'),s.snapshot()));assert.equal(h.text,'{unfinished');assert.deepEqual(plain(s.topologyContext()),old);
+ h.type('{"title":"valid"}');assert.throws(()=>s.connectTopology(localContext('After'),s.snapshot()),/frozen provider cannot be replaced/);
+ s.replaceProject(h.text,null,{topologyContext:{...old,local:false}});assert.throws(()=>s.refreshLocalTopology(localContext('After'),s.snapshot()),/requires the current local/);
+ s.destroy();assert.equal(s.refreshLocalTopology(localContext('After'),s.snapshot()),false);
+});
+test('failed refresh rendering rolls back context and preview without publishing history or recovery',()=>{
+ let text='{"title":"Exact consumer"}',fail=false,painted,saved,saves=0;const old=localContext('Before');
+ const s=context.createBuilderSession({source:{read:()=>text,write:v=>text=v},render(){painted=s.topologyContext().specs[0].page.title;if(fail && painted==='After')return {ok:false};return {ok:true};},persistence:{read:()=>({}),preserve(){},cancel(){},save:(text,base,artifacts)=>{saved=plain(artifacts);saves++;}}});
+ s.replaceProject(text,null,{topologyContext:old});const revision=s.snapshot().topologyRevision,count=saves;fail=true;
+ assert.throws(()=>s.refreshLocalTopology(localContext('After'),s.snapshot()),/could not be rendered/);assert.equal(painted,'Before');assert.deepEqual(plain(s.topologyContext()),old);assert.equal(s.snapshot().topologyRevision,revision);assert.equal(s.canUndo(),false);assert.equal(saves,count);assert.deepEqual(saved.topologyContext,old);
+});

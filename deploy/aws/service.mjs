@@ -13,10 +13,17 @@ export function envelope(value){
   if(value.topologyContext!==null && (!value.topologyContext || typeof value.topologyContext!=='object' || Array.isArray(value.topologyContext)))fail(400,'Frozen topology context must be an object or null.');
   if(bytes(JSON.stringify(value.topologyContext))>LIMITS.context)fail(400,'Frozen topology context exceeds 1 MiB.');
   if(value.topologyContext){
-    const context=value.topologyContext;fields(context,['version','id','specs','catalog','catalogURL','ephemeral','local']);
+    const context=value.topologyContext;fields(context,['version','id','specs','catalog','catalogURL','ephemeral','local','localSource']);
     if(context.version!==1 || typeof context.id!=='string' || !context.id || bytes(context.id)>512 || !Array.isArray(context.specs) || context.specs.length>500 || context.specs.some(spec=>!spec || typeof spec!=='object' || Array.isArray(spec)))fail(400,'Malformed frozen provider context.');
     for(const key of ['ephemeral','local'])if(key in context && typeof context[key]!=='boolean')fail(400,'Malformed frozen provider flag.');
     if('catalogURL' in context && (typeof context.catalogURL!=='string' || bytes(context.catalogURL)>4096))fail(400,'Malformed catalog address.');
+    if('localSource' in context){
+      const source=context.localSource;fields(source,['path','rootLabel','capturedAt']);
+      if(context.local!==true || typeof source.path!=='string' || bytes(source.path)>2048 || !/^diagrams\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)+[a-z0-9]+(?:-[a-z0-9]+)*\.spec\.json$/.test(source.path))fail(400,'Malformed local source path.');
+      const parts=source.path.split('/');if(parts.at(-1)!==parts.at(-2)+'.spec.json' || parts.at(-2)!==context.id)fail(400,'Local source must identify its registered diagram.');
+      if(typeof source.rootLabel!=='string' || !source.rootLabel.trim() || bytes(source.rootLabel)>512 || /[\u0000-\u001f\u007f]/.test(source.rootLabel))fail(400,'Malformed local repository display label.');
+      if(typeof source.capturedAt!=='string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(source.capturedAt) || !Number.isFinite(Date.parse(source.capturedAt)) || new Date(source.capturedAt).toISOString()!==source.capturedAt)fail(400,'Malformed local snapshot timestamp.');
+    }
     if('catalog' in context && (!context.catalog || context.catalog.version!==3 || !Array.isArray(context.catalog.diagrams)))fail(400,'Malformed frozen catalog.');
   }
   // This closed envelope deliberately excludes agent conversations, sessions,

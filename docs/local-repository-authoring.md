@@ -56,13 +56,65 @@ root selection. The actual working destination is that diagram's nested folder,
 including its existing spec and coverage ledger.
 
 The Workbench reads registered providers through the granted root directory
-handle and freezes the complete import closure in the session. No local path is
-sent to a server, and no deployed library is used as a fallback. Authored import
+handle and freezes the complete import closure in the session. Absolute filesystem
+paths and directory handles are never sent to a server. Saving a snapshot online
+includes bounded provenance: the registered relative source path, root display
+label and snapshot time. No deployed library is used as a fallback. Authored import
 references remain in the JSON. Local presentation and imported-node positions
 remain editable, with normal Undo/Redo, autosave and browser draft recovery.
-Provider edits on disk do not alter an already-open or recovered session; reopen
-the repository root to load them. A new import outside the frozen closure also
-requires reopening the root after updating the authored source on disk.
+For an agent-connected repository consumer, save a complete batch of authorized
+provider edits in that worktree, then run the **consumer's** helper:
+
+```sh
+python3 <consumer>/.flowview-agent/folder-agent.py refresh-sources
+```
+
+No `begin`, spec/ledger proposal or confirmation is needed for this command.
+The already-open consumer must have a folder-agent connection through its granted
+repository root. A provider's helper targets that provider, not another consumer;
+a separate unconnected consumer cannot be refreshed. This command reads no paths
+from the agent and never opens a browser picker. Desktop **File → Refresh local
+sources** remains the manual fallback.
+
+Wait for the matching JSON receipt: `applied` or `unchanged`, with `currentRevision`
+and bounded `localSources` provenance. `state.json.localSources` also reports
+availability, consumer ID, relative source path and root label. Neither label nor
+ID proves an absolute worktree or branch. Busy/rejected outcomes exit nonzero;
+finish a gesture or proposal review, repair the stated error, then retry. On a
+timeout, bring the connected consumer tab to the front and inspect its state.
+A changed revision before receipt persistence is reported explicitly, never as
+proof that the original refresh remains current. No watcher or refresh on every
+filesystem save is needed.
+
+Refresh reads the current consumer draft's direct
+and transitive imports, including newly added dependencies, without replacing
+its exact text, coverage ledger, tracking, presentation or layout overlays.
+The consumer does not need to be saved or merged first. One Undo/Redo restores
+the accepted before/after provider snapshots without rereading or writing files;
+earlier consumer history remains available. No provider changes means no new
+history entry or render.
+
+Refresh validates the entire closure and verifies registry/provider bytes again
+before publishing. Invalid or missing providers, removed referenced identities,
+or orphan overlays retain the last valid preview and snapshot with an error
+naming the consumer/import/provider. Repair unfinished consumer JSON before
+refreshing. Finish canvas/inspector actions and close proposal reviews first.
+Provider edits never update the session automatically.
+
+Browser recovery retains the last accepted snapshot offline. **Reconnect local
+sources…** explicitly grants a root for the next refresh; it does not reopen the
+consumer from disk. The File panel shows the selected root label, relative
+consumer path, snapshot time and refresh result. Grant numbers distinguish
+selections only within this browser session. A matching folder name cannot prove
+that a root is the same worktree; the browser does not know its absolute path,
+Git branch, or merge status. Snapshots from before source-path provenance was
+recorded require reopening through **Choose working folder…** once.
+
+Cloud projects use their saved cloud provider snapshot. Local source refresh is
+unavailable while a cloud project is attached, even when a repository folder is
+also connected. Saving a repository project online keeps its current provider
+snapshot and provenance; it does not create a live link to files on disk or to
+other cloud projects. Cloud-to-cloud provider acquisition is separate work.
 
 Browsers cannot discover a selected folder's parent. Select the repository root
 to resolve local providers. Ordinary folders and valid empty registries remain

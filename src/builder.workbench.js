@@ -476,6 +476,79 @@ function initWorkbenchBuilder(opts){
 
   var cloudPersistence=null;
   var workingFile=null,workingView=null,workingOperation=0,workingHeartbeat=null,workingBrowser=createBuilderBrowserIO(document,window);
+  var localRepository=null,localGrantSerial=0,localRefreshOperation=0,localRefreshing=false,localRefreshMessage='',localCapabilityRevision=-1,localCapabilityContext=null;
+  var localRefreshButton=document.getElementById('local-sources-refresh'),localRefreshStatus=document.getElementById('local-sources-status');
+  function bindLocalRepository(value){
+    localRefreshOperation++;localRefreshing=false;localRefreshMessage='';
+    localRepository=value?{handle:value.handle,path:value.path,grant:++localGrantSerial}:null;
+    refreshLocalSourcesStatus();
+  }
+  function refreshLocalSourcesStatus(){
+    if(!session)return;
+    var context=session.topologyContext(),local=!!(context && context.local),source=context && context.localSource,cloud=!!(cloudPersistence && cloudPersistence.attachment());
+    if(localRefreshButton){localRefreshButton.disabled=!local || cloud || localRefreshing;localRefreshButton.textContent=localRefreshing?'Refreshing local sources…':local && !localRepository?'Reconnect local sources…':'Refresh local sources';}
+    if(localRefreshStatus){
+      var label=localRepository?(localRepository.handle.name || 'Selected repository')+' (grant '+localRepository.grant+')':source && source.rootLabel || 'Recovered repository';
+      localRefreshStatus.textContent=cloud?'This cloud project uses its saved cloud provider snapshot. Local source refresh is unavailable for cloud projects.':!local?'Local refresh is available for diagrams opened from a repository root containing canon.json.':
+        label+' · '+(localRepository?localRepository.path:source && source.path || context.id)+'. '+
+        (source && source.capturedAt?'Viewed snapshot: '+new Date(source.capturedAt).toLocaleString()+'. ':'')+(localRefreshMessage || (localRepository?'Saved providers update only when you refresh.':'The saved snapshot works offline. Reconnect explicitly selects the repository to read next; a folder name does not verify the same worktree.'));
+      localRefreshStatus.dataset.state=localRefreshing?'refreshing':localRefreshMessage.indexOf('Refresh failed:')===0?'failed':'ready';
+    }
+  }
+  function localRefreshBlocked(){return !!(interactions && interactions.busy() || inspector && inspector.busy(view) || document.querySelector('dialog[open]') || agentChat && agentChat.localRefreshBlocked && agentChat.localRefreshBlocked());}
+  function localSourcesCapability(){
+    var revision=session.snapshot().topologyRevision;
+    if(revision!==localCapabilityRevision){var frozen=session.topologyContext();localCapabilityContext=frozen?{id:frozen.id,local:frozen.local,localSource:frozen.localSource}:null;localCapabilityRevision=revision;}
+    var context=localCapabilityContext,source=context && context.localSource,code='ready',message='Refresh saved providers through this consumer’s granted repository root.';
+    if(cloudPersistence && cloudPersistence.attachment()){code='cloud_project';message='Cloud projects use their saved cloud provider snapshot; disk refresh is unavailable.';}
+    else if(!context || !context.local){code='not_local';message='Connect this consumer through its repository root containing canon.json first.';}
+    else if(!localRepository){code='reconnect_required';message='Use desktop File → Reconnect local sources to grant the consumer’s repository root, then retry.';}
+    function bounded(value,max){return typeof value==='string' && new TextEncoder().encode(value).length<=max?value:null;}
+    return {available:code==='ready',code:code,message:message,consumerId:bounded(context && context.id,512),
+      sourcePath:bounded(source && source.path,2048),rootLabel:bounded(localRepository?localRepository.handle.name || 'Selected repository':source && source.rootLabel,512)};
+  }
+  async function refreshLocalSources(request){
+    request=request || {};
+    function rejected(code,message,status){return {status:status || 'rejected',code:code,message:message,localSources:localSourcesCapability()};}
+    function failure(code,message){var error=Error(message);error.refreshCode=code;return error;}
+    if(localRefreshing)return rejected('busy','A local refresh is already running. Retry after it finishes.','busy');
+    var capability=localSourcesCapability();
+    if(!capability.available && !(request.manual && capability.code==='reconnect_required'))return rejected(capability.code,capability.message);
+    var context=session.topologyContext(),expected=session.snapshot(),binding=localRepository,originalBinding=binding,token=++localRefreshOperation,workingToken=workingOperation;
+    function check(){
+      if(request.check)request.check();
+      if(!life.alive() || token!==localRefreshOperation || workingToken!==workingOperation || opts.isActive && !opts.isActive())throw new DOMException('Local refresh cancelled.','AbortError');
+      var current=session.snapshot();
+      if(current.project!==expected.project || current.text!==expected.text || current.topologyRevision!==expected.topologyRevision || localRepository!==originalBinding)throw failure('stale','The document or repository changed during refresh. Retry with its current revision.');
+      if(cloudPersistence && cloudPersistence.attachment())throw failure('cloud_project','This cloud project uses its saved cloud provider snapshot. Local source refresh is unavailable for cloud projects.');
+      if(localRefreshBlocked())throw failure('busy','Finish the current canvas or inspector action and close the proposal review before refreshing local sources.');
+    }
+    try{
+      check();if(expected.error)throw failure('invalid_consumer','Repair the consumer JSON before refreshing local sources. '+expected.error);
+      localRefreshing=true;localRefreshMessage='Reading and validating saved providers…';refreshLocalSourcesStatus();
+      if(!binding){
+        // Only the direct desktop click may request a new filesystem grant.
+        if(!request.manual || !workingBrowser.pickDirectory)throw failure('reconnect_required','Use desktop File → Reconnect local sources to grant repository access.');
+        var directory=await workingBrowser.pickDirectory({mode:'read',id:'flowview-local-sources'});check();
+        binding={handle:directory,path:context.localSource && context.localSource.path,grant:++localGrantSerial};
+        if(!binding.path)throw failure('reconnect_required','This snapshot has no registered source path. Choose the repository with Choose working folder to reopen it.');
+      }
+      var candidate=await readLocalRepositoryTopology(binding.handle,expected.text,binding.path,check);check();
+      if(request.guard)await request.guard();check();
+      var result=session.refreshLocalTopology(candidate,expected);
+      if(result===false)throw failure('stale','The document changed during refresh. Refresh again.');
+      localRepository=binding;
+      localRefreshMessage=result==='unchanged'?'No provider changes. Last valid snapshot retained.':'Local sources refreshed. Undo restores the previous snapshot.';
+      refreshProvenance();return {status:result==='unchanged'?'unchanged':'applied',code:'ok',message:localRefreshMessage,localSources:localSourcesCapability()};
+    }catch(error){
+      var permission=error.name==='NotAllowedError' || error.name==='SecurityError';
+      if(life.alive() && token===localRefreshOperation && permission)localRepository=null;
+      if(life.alive() && token===localRefreshOperation)localRefreshMessage=error.name==='AbortError'?'Refresh cancelled. Last valid snapshot retained.':'Refresh failed: '+error.message+' Last valid snapshot retained.';
+      var code=permission?'reconnect_required':error.refreshCode || (error.name==='AbortError'?'cancelled':'invalid_sources');
+      return rejected(code,error.message+(permission?' Use desktop File → Reconnect local sources, then retry.':''),code==='busy'?'busy':'rejected');
+    }finally{if(life.alive() && token===localRefreshOperation){localRefreshing=false;refreshLocalSourcesStatus();}}
+  }
+  if(localRefreshButton)life.listen(localRefreshButton,'click',function(){refreshLocalSources({manual:true});});
   var persistence=createBuilderPersistence({storage:function(){return opts.practice?opts.practice.storage:localStorage;},
     schedule:function(fn,ms){return life.delay(fn,ms);},
     cancel:function(timer){life.cancelDelay(timer);},now:function(){return Date.now();},
@@ -498,6 +571,7 @@ function initWorkbenchBuilder(opts){
       if(redoBtn)redoBtn.disabled=!redo;
       if(historyStatus){historyStatus.textContent='';historyStatus.hidden=true;historyStatus.removeAttribute('title');}
     },
+    topologyChanged:function(){localRefreshMessage='Viewed local source snapshot restored. Undo/Redo uses saved snapshots.';refreshProvenance();},
     afterHistory:function(message){
       sourceOrigin=null;refreshProvenance();
       setSelected(null);clearMultiSelect();clearStepMarkers();
@@ -508,7 +582,7 @@ function initWorkbenchBuilder(opts){
     },
     artifacts:function(){return typeof agentLedger==='string'?{ledger:agentLedger}:null;},
     restoreArtifacts:function(entry){agentLedger=entry && typeof entry.ledger==='string'?entry.ledger:null;agentLedgerProject=session.snapshot().project;},
-    invalidateProject:function(policy){if(cloudPersistence && (!policy || !policy.preserveHistory))cloudPersistence.detach();workingOperation++;if(workingFile && (!policy || !policy.preserveHistory || workingFile.attached() && workingFile.attached().external))workingFile.clear();retireProjectUI();if(!policy || !policy.preserveHistory){agentLedger=null;agentLedgerEpoch++;}agentLedgerProject=session.snapshot().project;}
+    invalidateProject:function(policy){if(cloudPersistence && (!policy || !policy.preserveHistory))cloudPersistence.detach();workingOperation++;localRefreshOperation++;localRefreshing=false;localRefreshMessage='';if(!policy || !policy.preserveHistory)localRepository=null;if(workingFile && (!policy || !policy.preserveHistory || workingFile.attached() && workingFile.attached().external))workingFile.clear();retireProjectUI();if(!policy || !policy.preserveHistory){agentLedger=null;agentLedgerEpoch++;}agentLedgerProject=session.snapshot().project;}
   });
   /* File choices authorize a working destination; import/paste remain copies. */
   function refreshWorkingHeader(){
@@ -516,6 +590,7 @@ function initWorkbenchBuilder(opts){
     var value=workingView,label={browser:cloudPersistence && cloudPersistence.attachment()?'No local file':'Browser only',pending:'File pending',saving:'Saving file',saved:'File saved',paused:'File save paused',failed:'File save failed'}[value.state];
     el.textContent=label+(value.name?' · '+value.name:'');el.dataset.state=value.state;
     var status=document.getElementById('workbench-working-status');if(status)el.title=status.textContent+' Browser recovery is reported separately in File.';
+    refreshLocalSourcesStatus();
   }
   function workingStatus(value){
     if(!value.connected && workingHeartbeat!==null){life.cancelDelay(workingHeartbeat);workingHeartbeat=null;}
@@ -604,7 +679,7 @@ function initWorkbenchBuilder(opts){
         busy:function(){return true;},apply:function(){return {ok:false,error:'Connect an agent to review proposals.'};},validate:agentOptions.validate,
         artifactStatus:function(state,detail){workingFile.report(binding,state,detail);},
         changed:function(update){if(update.connected===false){binding.reconnectOnly=true;workingFile.report(binding,'failed',update.status || 'The folder is disconnected. Reopen it to resume file saving.');}}});
-      workingFile.attach(binding);workingFile.report(binding,'saving');
+      workingFile.attach(binding);bindLocalRepository(found.repository?{handle:found.repository,path:found.topologyContext.localSource.path}:null);workingFile.report(binding,'saving');
       try{startup=client.start(found.hasSession);await startup;}catch(ex){binding.reconnectOnly=true;throw ex;}
       if(workingFile.attached()!==binding)return;
       workingFile.report(binding,'saved');
@@ -1532,19 +1607,21 @@ function initWorkbenchBuilder(opts){
     var raw=session.snapshot().raw,imports=[];
     try{raw=session.resolve(raw);}catch(ex){}
     (typeof FlowCanon!=='undefined'?FlowCanon.sections(raw):[]).forEach(function(sec){imports.push.apply(imports,(sec.diagram.topologyProvenance || {}).imports || []);});
-    if(el && imports.length){el.textContent+=' · Referenced topology (frozen session)';el.title+=' Authored imports are preserved. Provider structure belongs in '+imports.map(function(imp){return imp.spec+' / '+imp.export;}).join(', ')+'. Reopen the source repository to load later provider changes; this session never refreshes automatically.';}
+    if(el && imports.length){var topology=session.topologyContext(),local=topology && topology.local;el.textContent+=' · Referenced topology ('+(local?'local snapshot':'frozen session')+')';el.title+=' Authored imports are preserved. Provider structure belongs in '+imports.map(function(imp){return imp.spec+' / '+imp.export;}).join(', ')+(local?'. Use File → Refresh local sources for saved provider changes.':'. Reopen the source repository to load later provider changes; this session never refreshes automatically.');}
+    refreshLocalSourcesStatus();
   }
   var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
   var agentOptions={document:document,practice:opts.practice,resolve:session.resolve,previewSkin:opts.previewSkin,
+    refreshSources:refreshLocalSources,
     releaseWorking:function(){return workingFile.clear();},
-    workingDestination:function(binding){workingFile.attach(binding);},
+    workingDestination:function(binding){workingFile.attach(binding);bindLocalRepository(binding.localRepository || null);},
     workingStatus:function(binding,state,detail){if(state==='disconnected'){if(workingFile.attached()===binding)workingFile.clear('Folder disconnected. Reopen its folder to resume autosave.');}else workingFile.report(binding,state,detail);},
     setLedger:function(text,persist){agentLedger=text || '';agentLedgerProject=session.snapshot().project;if(persist && session.isProjectOpen())session.save();},
     snapshot:function(){
       var snap=session.snapshot(),open=session.isProjectOpen() && (!opts.isActive || opts.isActive());
       var previewCurrent=snap.renderedText===snap.text;
       var ctl=opts.ctl && opts.ctl();
-      return {project:snap.project,topologyRevision:snap.topologyRevision,open:!!open,source:open?snap.text:'',ledger:agentLedgerProject===snap.project?agentLedger:null,parseError:open?snap.error || null:null,
+      return {project:snap.project,topologyRevision:snap.topologyRevision,localSources:localSourcesCapability(),open:!!open,source:open?snap.text:'',ledger:agentLedgerProject===snap.project?agentLedger:null,parseError:open?snap.error || null:null,
         previewCurrent:previewCurrent,selection:open && previewCurrent?clipboardSelection().map(function(target){
           var clean={};['kind','section','id','index','block','tab','card','pathId','field','item'].forEach(function(key){
             if(typeof target[key]==='string' || typeof target[key]==='number')clean[key]=target[key];

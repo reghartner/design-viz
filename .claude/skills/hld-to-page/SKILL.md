@@ -83,9 +83,8 @@ After the packet, route source/handoff details:
   authored inputs only; HTML/runtime outputs are ignored. An extracted kit
   includes its backend and needs no source checkout or build.
 - **Canon/topology:** `--feature topology`; keep imports/exports/providers.
-  Merge `export:["a","b"]`; nest by re-exporting IDs.
-  Display: `nodeOverrides`, `edgeOverrides.label`. Tickets/PRs: `nodeTracking`,
-  `edgeTracking`; Jira keys or HTTP(S) `/browse/KEY` URLs. [Topology](../../../docs/shared-topology.md).
+  Merge `export:["a","b"]`; nest via re-exported IDs. [Overlays](../../../docs/shared-topology.md).
+  Saved repo edits: consumer `folder-agent.py refresh-sources`; desktop File fallback. No cloud disk refresh.
 - **Optional detail:** the [workflow reference](references/authoring-workflow.md)
   preserves phases. [Recipe routing](references/recipe-routing.md) and
   [authoring details](references/authoring-details.md) cover special features.

@@ -3,7 +3,11 @@
 A provider owns reusable structure; each consumer owns its narrative. Imports
 are validated against the complete approved snapshot at build time, then resolved
 in memory when a reader or editor opens them. The fetched provider closure is
-frozen for that session: no polling, live refresh, or automatic reconciliation.
+frozen for that session: no polling or automatic reconciliation. Repository
+agents refresh saved worktree providers with the connected consumer helper
+`folder-agent.py refresh-sources` (desktop **File → Refresh local sources** fallback); see [local repository authoring](local-repository-authoring.md).
+Cloud-attached projects keep their saved cloud provider snapshots and cannot
+refresh from local files, even when a folder is connected.
 Reopening a diagram from the library pins the newly deployed revision; a plain
 reload resumes the draft with its frozen context. The picker's **Use the latest
 published library** adopts a later index only while every frozen provider keeps
@@ -409,7 +413,8 @@ for the build command and desktop folder-opening workflow.
 The earlier generated-snapshot/copy-changes-back workflow is superseded: **do not
 edit or publish a flattened snapshot as source**. Review and commit the authored consumer
 directly, preserving `topologyImports`. Provider changes require a rebuild and
-explicit reload/reopen; an already-open consumer never updates automatically.
+explicit reload/reopen, or **Refresh local sources** for a repository project;
+an already-open consumer never updates automatically.
 
 ## Executable example
 

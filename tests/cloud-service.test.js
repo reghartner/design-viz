@@ -63,3 +63,14 @@ test('frozen topology context round trips exactly and rejects agent metadata in 
  await save(f,v);assert.deepEqual([...f.snapshots.values()][0].topologyContext,context);
  await assert.rejects(save(f,{...v,topologyContext:{...context,session:{transcript:'private'}}},{operationId:'private'}),{status:400});
 });
+test('local refresh provenance round trips with exact consumer and ledger, without accepting filesystem grants',async()=>{
+ const f=await fixture(),context={version:1,id:'consumer',local:true,specs:[{page:{canon:{id:'consumer'}}},{page:{canon:{id:'base'},title:'Saved provider update'}}],localSource:{path:'diagrams/team/consumer/consumer.spec.json',rootLabel:'chosen worktree',capturedAt:'2026-10-29T12:00:00.000Z'}},v={...value(' \r\n{"page":{"title":"Unsaved draft"}}\n'),topologyContext:context};
+ const p=await save(f,v);assert.deepEqual([...f.snapshots.values()][0],v);
+ const old={...context,specs:[context.specs[0],{page:{canon:{id:'base'},title:'Earlier provider'}}]};
+ await save(f,{...v,topologyContext:old},{projectId:p.projectId,baseRevision:1,operationId:'undo-refresh'});
+ await save(f,v,{projectId:p.projectId,baseRevision:2,operationId:'redo-refresh'});assert.deepEqual([...f.snapshots.values()].at(-1),v);
+ for(const [i,patch] of [{path:'/diagrams/team/consumer/consumer.spec.json'},{path:'diagrams/../consumer/consumer.spec.json'},{path:'diagrams/team/consumer/other.spec.json'},{rootLabel:'x\nprivate'},{rootLabel:'x'.repeat(513)},{capturedAt:'tomorrow'},{capturedAt:'2026-02-30T12:00:00.000Z'},{handle:{}},{grant:4},{sessionId:'private'}].entries()){
+   await assert.rejects(save(f,{...v,topologyContext:{...context,localSource:{...context.localSource,...patch}}},{operationId:'bad-local-'+i}),{status:400});
+ }
+ await assert.rejects(save(f,{...v,topologyContext:{...context,local:false}},{operationId:'not-local'}),{status:400});
+});

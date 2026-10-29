@@ -67,6 +67,54 @@ test('V2 V3 V4 V6 V8 V9 V10 live states survive toggles, path rebuilds and detai
  await node('firmware').locator('.card').press('Enter');await expect(pop.getByRole('link',{name:'FW-45',exact:true})).toBeVisible();await expect(pop.getByRole('link',{name:'FW-46',exact:true})).toBeVisible();await expect(pop.getByRole('link',{name:'https://github.com/acme/firmware/pull/88',exact:true})).toBeVisible();await page.keyboard.press('Escape');
  await node('hardware').locator('.detail-trigger').click();await expect(root.locator('[data-dv-detail-preview] [data-dv-node="child"]')).toHaveClass(/dv-live-active/);
 });
+test('live status preserves step selection dimming across skins and Live toggles',async({page,server})=>{
+ for(const skin of ['aurora','editorial','pastel']){
+  const spec=fixture();spec.page.skin=skin;
+  const d=spec.page.sections[0].diagram;
+  d.nodes.unchanged={title:'Existing audit'};d.rows.push(['unchanged']);
+  if(skin==='aurora'){d.nodes.backend.delta=true;d.nodes.backend.deltaText='Changed delivery work';}
+  const root=await open(page,server,spec),section=root.locator('#section-delivery');
+  const node=id=>section.locator('g.node[data-dv-node="'+id+'"]');
+  const coin=index=>section.locator('g.coin[data-dv-step="'+index+'"]');
+  await expect(node('hardware')).toHaveAttribute('data-live-appearance','active');
+  await expect(node('backend')).toHaveAttribute('data-live-appearance','done');
+  await expect(node('unchanged')).toHaveAttribute('data-live-appearance','unchanged');
+  await expect(coin(0)).toHaveAttribute('data-live-appearance','blocked');
+  await section.locator('.schip[data-step-source="0"]').first().click();
+  await expect(node('hardware')).toHaveClass(/\blit\b/);
+  await expect(node('hardware')).toHaveCSS('opacity','1');
+  await expect(node('backend')).toHaveCSS('opacity','0.55');
+  await expect(node('unchanged')).toHaveCSS('opacity','0.55');
+  await expect(coin(0)).toHaveCSS('opacity','1');
+  await expect(coin(1)).toHaveCSS('opacity','0.55');
+  if(skin==='aurora'){
+   const board=section.locator('.board');
+   await board.evaluate(el=>el.style.setProperty('--dv-dim','.8'));
+   await expect(node('backend')).toHaveCSS('opacity','0.8');
+   await board.evaluate(el=>el.style.removeProperty('--dv-dim'));
+   await expect(node('backend')).toHaveCSS('opacity','0.55');
+   await section.getByRole('button',{name:'Δ only',exact:true}).click();
+   await expect(board).toHaveClass(/dv-deltaonly/);
+   await expect(node('backend')).toHaveCSS('opacity','1');
+   await expect(node('unchanged')).toHaveCSS('opacity','0.18');
+   await section.getByRole('button',{name:'Δ only',exact:true}).click();
+   await expect(node('backend')).toHaveCSS('opacity','0.55');
+  }
+  await section.locator('.schip[data-step-source="1"]').first().click();
+  await expect(node('hardware')).toHaveCSS('opacity','0.55');
+  await expect(node('backend')).toHaveCSS('opacity','1');
+  await expect(coin(0)).toHaveCSS('opacity','0.55');
+  await expect(coin(1)).toHaveCSS('opacity','1');
+  await expect(node('hardware').locator('.card')).toHaveCSS('stroke','rgb(22, 102, 199)');
+  await root.locator('.dv-live-toggle').click();
+  await expect(node('hardware')).not.toHaveAttribute('data-live-appearance');
+  await expect(node('hardware')).not.toHaveCSS('opacity','1');
+  await expect(node('backend')).toHaveCSS('opacity','1');
+  await root.locator('.dv-live-toggle').click();
+  await expect(node('hardware')).toHaveCSS('opacity','0.55');
+  await expect(coin(0)).toHaveCSS('opacity','0.55');
+ }
+});
 // Render CSS colors through the browser so color-mix and alpha are measured.
 async function contrast(locator,fillProperty,inkProperty,inkSelector){
  return locator.evaluate((el,{fillProperty,inkProperty,inkSelector})=>{

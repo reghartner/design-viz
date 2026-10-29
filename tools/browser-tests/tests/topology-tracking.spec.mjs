@@ -39,6 +39,29 @@ async function add(page,kind,label,value){
   await expect.poll(()=>source(page)).not.toBe(before);await history(page,before);
 }
 
+test('live step highlighting dims imported and local nodes equally',async({page,server})=>{
+  await fixture(page,server,(provider,consumer)=>{
+    const d=diagram(consumer);
+    d.nodes.local={title:'Local worker',tickets:['LOC-1']};
+    d.rows=[['local']];
+    d.steps=[{id:'imported',nodes:['canon::api'],text:'Imported work'},{id:'local',nodes:['local'],text:'Local work'}];
+  });
+  await page.getByLabel('Demo live status',{exact:true}).check();
+  const imported=node(page),local=node(page,'local'),section=page.locator('#docview .board').first();
+  await expect(imported).toHaveAttribute('data-live-appearance',/./);
+  await expect(local).toHaveAttribute('data-live-appearance',/./);
+  await page.locator('#docview .schip[data-step-source="0"]').first().click();
+  await expect(section).toHaveClass(/stepmode/);
+  await expect(imported).toHaveCSS('opacity','1');
+  await expect(local).toHaveCSS('opacity','0.55');
+  await page.locator('#docview .schip[data-step-source="1"]').first().click();
+  await expect(imported).toHaveCSS('opacity','0.55');
+  await expect(local).toHaveCSS('opacity','1');
+  await page.getByLabel('Demo live status',{exact:true}).uncheck();
+  await expect(imported).not.toHaveAttribute('data-live-appearance');
+  await expect(imported).not.toHaveCSS('opacity','1');
+});
+
 test('desktop imported node and edge tracking edits, history, export and reload feed a live board',async({page,server},info)=>{
   const {provider}=await fixture(page,server);
   await select(page,'node');await expect(page.locator('#guide')).toContainText('Inherited tracking (read only): CAN-1');

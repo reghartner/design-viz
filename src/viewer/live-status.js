@@ -344,17 +344,13 @@ function liveStatusEdgeBreaks(scope,diagram,map,on,availabilityOn){
   });
 }
 function liveStatusStep(diagram,step,map){
-  var states=[],nodes=stepNodes(step).slice(),keys=stepKeys(step).concat(Object.keys(stepFailures(step)));
-  (diagram.edges || []).forEach(function(edge){
-    if(keys.indexOf(edge.from+'->'+edge.to)<0)return;
-    states.push(liveStatusPresentation(edge,map) || 'unknown');nodes.push(edge.from,edge.to);
-  });
-  nodes.forEach(function(id){var node=(diagram.nodes || {})[id];if(node && !isTextBoxNode(node))states.push(liveStatusPresentation(node,map) || 'unknown');});
-  return liveStatusPresentationRollup(states);
+  return liveStatusPresentationRollup(liveStatusStepCarriers(diagram,step,true).map(function(carrier){
+    return liveStatusPresentation(carrier.value,map) || 'unknown';
+  }));
 }
 /* Carrier identities are section-local; ticket keys are deduplicated only when
-   counting work. Failed hops involve both endpoints, just like step rollups.
-   The visible step ticket list opts into direct carriers; rollups keep endpoints. */
+   counting work. Broad aggregates may include the endpoints of selected hops;
+   visible step state, captions and ticket lists use direct carriers only. */
 function liveStatusStepCarriers(diagram,step,directOnly){
   var out=[],nodes=stepNodes(step).slice(),keys=stepKeys(step).concat(Object.keys(stepFailures(step)));
   (diagram.edges || []).forEach(function(edge){
@@ -383,8 +379,8 @@ function liveStatusLanes(page,map){
   });return out;
 }
 function liveStatusCaption(diagram,step,map,waiting){
-  var keys=liveStatusStepTickets(diagram,step).filter(function(key){return map[key];}),state=liveStatusStep(diagram,step,map);
-  if(!state)return liveStatusStepTickets(diagram,step).length?'AWAITING TICKET STATUS':'';
+  var keys=liveStatusStepTickets(diagram,step,true).filter(function(key){return map[key];}),state=liveStatusStep(diagram,step,map);
+  if(!state)return liveStatusStepTickets(diagram,step,true).length?'AWAITING TICKET STATUS':'';
   if(state==='done')return 'DONE';
   if(state==='unchanged')return 'NO CHANGE NEEDED';
   if(state==='missing' && !keys.some(function(key){return map[key].state==='missing';}))return 'MISSING WORK · unlinked work remains';
@@ -395,7 +391,7 @@ function liveStatusCaption(diagram,step,map,waiting){
   var text=(state==='active'?'IN PROGRESS':'TODO')+' · '+keys.length+' tickets';
   if(state==='todo' && waiting){
     var carriers=liveStatusCarrierWaiting(diagram,map,waiting),upstream=[];
-    liveStatusStepCarriers(diagram,step).forEach(function(carrier){(carriers[carrier.id] ? carriers[carrier.id].keys : []).forEach(function(key){if(upstream.indexOf(key)<0)upstream.push(key);});});
+    liveStatusStepCarriers(diagram,step,true).forEach(function(carrier){(carriers[carrier.id] ? carriers[carrier.id].keys : []).forEach(function(key){if(upstream.indexOf(key)<0)upstream.push(key);});});
     if(upstream.length)text+=' · waiting on '+upstream.sort().join(', ');
   }
   return text;
@@ -791,7 +787,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }return null;
   }
   function focusBlocker(binding,index){
-    var d=binding.section.diagram,carriers=liveStatusStepCarriers(d,d.steps[index]);
+    var d=binding.section.diagram,carriers=liveStatusStepCarriers(d,d.steps[index],true);
     var carrier=carriers.find(function(carrier){return liveStatusBlockingKeys(carrier.value,map).length || carrier.value.missingWork===true;});if(!carrier)return;
     focusCarrier(binding,carrier.id);
   }

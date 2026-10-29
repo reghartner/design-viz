@@ -37,6 +37,7 @@ function localConsumerSpec(raw,entries){
 }
 function unresolvedLocalTopology(raw){
   var spec=localConsumerSpec(raw,[]);
+  FlowTopology.validateDeclarations([spec]);
   return {version:1,id:spec.page.canon.id,local:true,ephemeral:true,specs:[spec]};
 }
 function isUnresolvedLocalTopology(context){return !!(context && context.local && context.ephemeral && !context.localSource && context.specs.length===1);}
@@ -131,17 +132,22 @@ async function readSuppliedLocalTopology(source,snapshot,check){
   if(result.reads.size!==files.size)throw Error('Local snapshot contains unrelated provider bodies. Retry with the consumer helper.');
   return result.context;
 }
+/* Ordinary opening may defer unavailable imports so local source selection stays
+   reachable. Acquisition/integrity faults still reject before project replacement. */
+async function prepareOpenedTopology(raw,context){
+  var dependencies=authoredTopologyDependencies(raw),prepared;
+  try{
+    prepared=await prepareAuthoredTopology(raw,context);
+    if(dependencies.length)FlowTopology.resolveSource(raw,prepared);
+    return prepared;
+  }catch(error){
+    var missing=error.topologyMissingExport;
+    if(!dependencies.length || !(error.topologyUnavailable===true || missing && prepared && missing.consumer===prepared.id))throw error;
+    return unresolvedLocalTopology(raw);
+  }
+}
 async function prepareLocalFolderTopology(text,found,context){
   var raw=JSON.parse(text),local=found && found.topologyContext;
   if(local){FlowTopology.resolveSource(raw,local);return local;}
-  if(isUnresolvedLocalTopology(context))return unresolvedLocalTopology(raw);
-  if(authoredTopologyDependencies(raw).length){
-    try{
-      // Existing local contexts never fetch missing providers. A replacement
-      // consumer can still open unresolved and select its own source repository.
-      var prepared=await prepareAuthoredTopology(raw,context);
-      FlowTopology.resolveSource(raw,prepared);return prepared;
-    }catch(error){return unresolvedLocalTopology(raw);}
-  }
-  return prepareAuthoredTopology(raw,context);
+  return prepareOpenedTopology(raw,context);
 }

@@ -125,7 +125,7 @@ async function topologyFolderFixture(page,connections=false){
   }
   const catalog={version:3,diagrams:[provider,consumer].map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:1,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))},hits=[];
   await page.route('**/diagrams.json',route=>{hits.push('catalog');return route.fulfill({json:catalog});});
-  for(const spec of [provider,consumer])await page.route('**/'+spec.page.canon.id+'.json',route=>{hits.push(spec.page.canon.id);return route.fulfill({json:spec});});
+  for(const spec of [provider,consumer]){const id=spec.page.canon.id;await page.route('**/'+id+'.json',route=>{hits.push(id);return route.fulfill({json:spec});});}
   return Object.assign(h,{provider,consumer,catalog,hits});
 }
 
@@ -190,7 +190,7 @@ async function fileSurface(page,entry){
   if(entry==='welcome')await page.locator('#workspace-home').click();
   return page.locator(entry==='welcome'?'#welcome-file':'#file-input');
 }
-for(const entry of ['welcome','editor'])for(const change of ['navigation','source','new file','new error','pagehide'])test('Open file from '+entry+' retires held providers after '+change,async({page})=>{
+for(const entry of ['welcome','editor'])for(const change of ['navigation','source','new file','new error','new unresolved','pagehide'])test('Open file from '+entry+' retires held providers after '+change,async({page})=>{
   const h=await topologyFolderFixture(page);let release,reached=false;const held=new Promise(resolve=>release=resolve);
   await page.route('**/provider.json',async route=>{reached=true;await held;await route.fulfill({json:h.provider});});
   try{
@@ -205,25 +205,59 @@ for(const entry of ['welcome','editor'])for(const change of ['navigation','sourc
     if(change==='pagehide')await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));
     if(change==='new file'){expected=source.replace('Browser contract','New file');await input.setInputFiles({name:'new.spec.json',mimeType:'application/json',buffer:Buffer.from(expected)});await expect(page.locator('#src')).toHaveValue(expected);}
     if(change==='new error'){
-      raw.page.sections[0].diagram.topologyImports[0].spec='missing';await input.setInputFiles({name:'new-error.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(raw))});
-      message=page.locator(entry==='welcome'?'#welcome-file-error':'#guide .gerr');await expect(message).toContainText('Missing authored provider missing');
+      raw.page.sections[0].diagram.topologyImports={};await input.setInputFiles({name:'new-error.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(raw))});
+      message=page.locator(entry==='welcome'?'#welcome-file-error':'#guide .gerr');await expect(message).toContainText('topologyImports must be an array');
+    }
+    if(change==='new unresolved'){
+      raw.page.sections[0].diagram.topologyImports[0].spec='unpublished';expected=JSON.stringify(raw);
+      await input.setInputFiles({name:'unresolved.spec.json',mimeType:'application/json',buffer:Buffer.from(expected)});
+      await expect(page.locator('#src')).toHaveValue(expected);await expect(page.locator('#local-sources-status')).toContainText('Imports unresolved');
     }
     const received=page.waitForResponse(response=>response.url().endsWith('/provider.json'));release();await(await received).finished();
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-    await expect(page.locator('#src')).toHaveValue(expected);if(message)await expect(message).toContainText('Missing authored provider missing');
+    await expect(page.locator('#src')).toHaveValue(expected);if(message)await expect(message).toContainText('topologyImports must be an array');
     if(change==='navigation' && entry==='welcome')await expect(page.locator('#welcome-paste-screen')).toBeVisible();
-    expect((await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')))).topologyContext).toBeUndefined();expect(h.errors).toEqual([]);
+    const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
+    if(change==='new unresolved'){expect(saved.topologyContext.specs).toHaveLength(1);expect(saved.topologyContext.local).toBe(true);await expect(page.locator('#local-sources-status')).toContainText('Imports unresolved');}
+    else expect(saved.topologyContext).toBeUndefined();expect(h.errors).toEqual([]);
   }finally{release?.();await page.close();await h.cleanup();}
 });
-for(const entry of ['welcome','editor'])for(const failure of ['catalog','provider','revision'])test('Open file from '+entry+' preserves the current draft on '+failure+' failure',async({page})=>{
+for(const entry of ['welcome','editor'])for(const availability of ['no catalog','legacy catalog','missing provider','new export'])test('Open file from '+entry+' keeps '+availability+' repairable and recovers the exact previous draft',async({page})=>{
+  const h=await topologyFolderFixture(page);
+  try{
+    await fileSurface(page,'editor');await page.locator('#docview [data-dv-node="a"]').click();
+    const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Retained local');await title.press('Enter');
+    const before=await page.locator('#src').inputValue(),prior=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
+    if(entry==='welcome')await page.locator('#workspace-home').click();
+    if(availability==='no catalog')await page.route('**/diagrams.json',route=>{h.hits.push('catalog');return route.fulfill({status:404,body:''});});
+    if(availability==='legacy catalog')h.catalog.version=2;if(availability==='missing provider')h.catalog.diagrams=[];
+    const raw=structuredClone(h.consumer);delete raw.page.canon;
+    if(availability==='new export')raw.page.sections[0].diagram.topologyImports[0].export='not-yet-published';
+    raw.topologyContext={catalogURL:'https://untrusted.invalid/providers.json',specs:[h.provider]};
+    const text=' \n'+JSON.stringify(raw,null,2)+'\n';
+    await page.locator(entry==='welcome'?'#welcome-file':'#file-input').setInputFiles({name:'local-only.spec.json',mimeType:'application/json',buffer:Buffer.from(text)});
+    await expect(page.locator('#src')).toHaveValue(text);await expect(page.locator('#local-sources-status')).toContainText('Imports unresolved');
+    await expect(page.locator('#docview [data-dv-node="a"]')).toContainText('Retained local');
+    const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
+    expect(saved.topologyContext.specs).toHaveLength(1);expect(saved.topologyContext.catalogURL).toBeUndefined();
+    expect(h.hits).toEqual(availability==='new export'?['catalog','provider']:['catalog']);
+    const earlier=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')));
+    expect(earlier.some(draft=>draft.text===before && JSON.stringify(draft.ledger)===JSON.stringify(prior.ledger))).toBe(true);
+    await page.locator('#workspace-home').click();await page.locator('#welcome-earlier-drafts>summary').click();
+    await page.locator('#welcome-earlier-list').getByRole('button',{name:/^Browser contract/}).first().click();
+    await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#docview [data-dv-node="a"]')).toContainText('Retained local');expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+for(const entry of ['welcome','editor'])for(const failure of ['catalog','provider','revision','duplicate namespace'])test('Open file from '+entry+' preserves the current draft on '+failure+' failure',async({page})=>{
   const h=await topologyFolderFixture(page);
   try{
     await fileSurface(page,'editor');await page.locator('#docview [data-dv-node="a"]').click();const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Retained local');await title.press('Enter');const before=await page.locator('#src').inputValue();
     if(entry==='welcome')await page.locator('#workspace-home').click();
-    if(failure==='catalog')h.catalog.version=2;if(failure==='provider')h.catalog.diagrams=[];if(failure==='revision')h.provider.page.title='Later revision';
+    if(failure==='catalog')h.catalog.diagrams[0].revision='invalid';if(failure==='provider')delete h.provider.page;if(failure==='revision')h.provider.page.title='Later revision';
     const raw=structuredClone(h.consumer);delete raw.page.canon;raw.topologyContext={catalogURL:'https://untrusted.invalid/providers.json',specs:[h.provider]};
+    if(failure==='duplicate namespace'){h.catalog.diagrams=[];raw.page.sections[0].diagram.topologyImports.push({...raw.page.sections[0].diagram.topologyImports[0],spec:'another-provider'});}
     await page.locator(entry==='welcome'?'#welcome-file':'#file-input').setInputFiles({name:'failed.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(raw))});
-    await expect(page.locator(entry==='welcome'?'#welcome-file-error':'#guide .gerr')).toContainText(failure==='catalog'?'version 3':failure==='provider'?'Missing authored provider':'revision mismatch');
+    await expect(page.locator(entry==='welcome'?'#welcome-file-error':'#guide .gerr')).toContainText(failure==='catalog'?'Invalid source revision':failure==='provider'?'Expected a page spec':failure==='duplicate namespace'?'duplicate namespace shared':'revision mismatch');
     await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#undo-builder')).toBeEnabled();
     expect((await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')))).topologyContext).toBeUndefined();expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
@@ -305,16 +339,33 @@ for(const change of ['close','source','project','saved file'])test('folder topol
   }finally{release?.();await page.close();await h.cleanup();}
 });
 
-for(const failure of ['catalog','missing provider','provider revision'])test('folder topology '+failure+' failure leaves the draft and folder uninitialized',async({page})=>{
+for(const availability of ['legacy catalog','missing provider','new export'])test('folder topology '+availability+' opens repairable source for local selection',async({page})=>{
   const h=await topologyFolderFixture(page);
   try{
-    if(failure==='catalog')h.catalog.version=2;
-    if(failure==='missing provider')h.catalog.diagrams=h.catalog.diagrams.filter(entry=>entry.id!=='provider');
+    if(availability==='legacy catalog')h.catalog.version=2;
+    if(availability==='missing provider')h.catalog.diagrams=h.catalog.diagrams.filter(entry=>entry.id!=='provider');
+    const raw=structuredClone(h.consumer);delete raw.page.canon;
+    if(availability==='new export')raw.page.sections[0].diagram.topologyImports[0].export='not-yet-published';
+    const text=JSON.stringify(raw);await writeFile(path.join(h.folder,'story.spec.json'),text);
+    await page.locator('#welcome-agent').click();await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(text);
+    const state=await h.read('state.json');expect(state.previewCurrent).toBe(false);expect(state.localSources.acceptsSnapshot).toBe(true);
+    expect(await readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(text);
+    expect(h.hits).toEqual(availability==='new export'?['catalog','provider']:['catalog']);expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+for(const failure of ['catalog','provider','provider revision','duplicate namespace'])test('folder topology '+failure+' failure leaves the draft and folder uninitialized',async({page})=>{
+  const h=await topologyFolderFixture(page);
+  try{
+    if(failure==='catalog')h.catalog.diagrams[0].revision='invalid';
+    if(failure==='provider')delete h.provider.page;
     if(failure==='provider revision')h.provider.page.sections[0].diagram.nodes.api.title='Changed after catalog pin';
-    const raw=structuredClone(h.consumer);delete raw.page.canon;const text=JSON.stringify(raw);
+    const raw=structuredClone(h.consumer);delete raw.page.canon;
+    if(failure==='duplicate namespace'){h.catalog.diagrams=[];raw.page.sections[0].diagram.topologyImports.push({...raw.page.sections[0].diagram.topologyImports[0],spec:'another-provider'});}
+    const text=JSON.stringify(raw);
     await writeFile(path.join(h.folder,'story.spec.json'),text);await page.locator('#welcome-agent').click();const before=await page.locator('#src').inputValue();
     await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
-    await expect(page.locator('#folder-agent-status')).toContainText(failure==='catalog'?'version 3':failure==='missing provider'?'Missing authored provider':'revision mismatch');
+    await expect(page.locator('#folder-agent-status')).toContainText(failure==='catalog'?'Invalid source revision':failure==='provider'?'Expected a page spec':failure==='duplicate namespace'?'duplicate namespace shared':'revision mismatch');
     await expect(page.locator('#src')).toHaveValue(before);expect(h.writes).toEqual([]);await expect(stat(path.join(h.folder,'.flowview-agent'))).rejects.toThrow();
     expect(await readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(text);expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}

@@ -101,7 +101,16 @@ var FlowTopology = (function(){
     ['tickets','prs'].forEach(function(field){if(merged[field].length)value[field]=merged[field];});
   }
 
-  function materialize(specs){
+  function validateOverlaySelection(imp,nodes,edges,where){
+    var selectedNodes=nodes && new Set(nodes),selectedEdges=edges && new Set(edges);
+    ['nodePositions','nodeOverrides','nodeCodeRefs','edgeOverrides','nodeTracking','edgeTracking'].forEach(function(field){
+      var selected=field.startsWith('node')?selectedNodes:selectedEdges;
+      if(selected)Object.keys(imp[field] || {}).forEach(function(key){if(!selected.has(key))fail(where,field+' identity is not selected/exported: '+key);});
+    });
+  }
+
+  function materialize(specs){return materializeSources(specs,false);}
+  function materializeSources(specs,declarationsOnly){
     if(!Array.isArray(specs))fail('snapshot','expected an array of specs');
     var copies=specs.map(clone),byId=new Map(),states=new Map(),exportsById=new Map();
     copies.forEach(function(spec){
@@ -137,12 +146,16 @@ var FlowTopology = (function(){
           });
         }
         if(own(d,'topologyImports') && !Array.isArray(d.topologyImports))fail(at,'topologyImports must be an array');
+        var namespaces=new Set();
         (d.topologyImports || []).forEach(function(imp,i){
           var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges','nodePositions','nodeCodeRefs','nodeOverrides','edgeOverrides','nodeTracking','edgeTracking','presentation'],where);
           if(!validExports(imp.export))fail(where,'export must be a name or a nonempty array of unique export names');
           if(typeof imp.spec!=='string' || !imp.spec || !token(imp.as))fail(where,'requires spec, export, and a namespace as (letters, digits, dot, dash, underscore)');
+          var reference=at+' import '+imp.as+' ('+imp.spec+' export '+imp.export+')';
+          if(namespaces.has(imp.as))fail(reference,'duplicate namespace '+imp.as);namespaces.add(imp.as);
           if(own(imp,'presentation') && imp.presentation!=='baseline')fail(where,'presentation must be baseline');
           ['nodes','edges'].forEach(function(key){if(own(imp,key))list(imp[key],where+' '+key);});
+          if(own(imp,'nodes') && !imp.nodes.length)fail(reference,'select at least one exported node');
           ['nodeTracking','edgeTracking'].forEach(function(field){
             if(!own(imp,field))return;
             if(!object(imp[field]))fail(where,field+' must be an object keyed by exported identity');
@@ -170,6 +183,9 @@ var FlowTopology = (function(){
             if(!object(imp.edgeOverrides))fail(where,'edgeOverrides must be an object keyed by exported edge identity');
             Object.keys(imp.edgeOverrides).forEach(function(key){validateEdgeOverride(imp.edgeOverrides[key],where+' edgeOverrides '+key);});
           }
+          validateOverlaySelection(imp,imp.nodes,imp.edges,reference);
+          if(d.rows!=null && d.rows.some(function(row){return !Array.isArray(row) || row.some(function(slot){return typeof slot!=='string' && (!Array.isArray(slot) || slot.some(function(key){return typeof key!=='string';}));});}))fail(reference,'broken consumer row placement');
+          if(Object.keys(d.nodes || {}).some(function(key){return key.startsWith(imp.as+'::');}))fail(reference,'namespace collision with existing node '+imp.as+'::');
           if(own(imp,'position')){
             shape(imp.position,['x','y'],where+' position');
             if(!positionedFloat(imp.position))fail(where,'position requires finite x/y coordinates between -100000 and 100000');
@@ -177,6 +193,7 @@ var FlowTopology = (function(){
         });
       });
     });
+    if(declarationsOnly)return;
     function visit(id,chain){
       if(states.get(id)==='done')return;
       if(states.get(id)==='visiting')fail(chain.join(' → '),'import cycle reaches '+id);
@@ -184,14 +201,17 @@ var FlowTopology = (function(){
       var spec=byId.get(id);
       sections(spec).forEach(function(sec,si){
         var d=sec.diagram,at=id+' section '+(sec.id || si),imports=d.topologyImports || [],provenance=[],defaultPlacements=Object.create(null);
-        var namespaces=new Set();
         imports.forEach(function(imp){
           var where=at+' import '+imp.as+' ('+imp.spec+' export '+imp.export+')',prefix=imp.as+'::';
-          if(namespaces.has(imp.as))fail(where,'duplicate namespace '+imp.as);namespaces.add(imp.as);
           if(!byId.has(imp.spec))fail(where,'missing spec '+imp.spec);
           visit(imp.spec,chain.concat(where));
           var names=exportNames(imp.export),sources=names.map(function(name){
-            var source=exportsById.get(imp.spec).get(name);if(!source)fail(where,'missing export '+name);return source;
+            var source=exportsById.get(imp.spec).get(name);
+            if(!source){
+              var error=new Error('Topology '+where+': missing export '+name);
+              error.topologyMissingExport={consumer:id,provider:imp.spec,name:name};throw error;
+            }
+            return source;
           });
           var source=sources[0],provider=source.d;
           if(sources.some(function(other){return other.d!==provider;}))fail(where,'cannot merge exports from different provider sections; use separate imports and namespaces');
@@ -202,20 +222,11 @@ var FlowTopology = (function(){
             // Provider order, not checkbox order, defines deterministic geometry.
             exp[key]=exp[key].filter(function(identity){return imp[key].includes(identity);});
           });
-          if(!exp.nodes.length)fail(where,'select at least one exported node');
           var selected=new Set(exp.nodes);
-          Object.keys(imp.nodePositions || {}).forEach(function(key){
-            if(!selected.has(key))fail(where,'nodePositions identity is not selected/exported: '+key);
-          });
-          Object.keys(imp.nodeOverrides || {}).forEach(function(key){if(!selected.has(key))fail(where,'nodeOverrides identity is not selected/exported: '+key);});
-          Object.keys(imp.nodeCodeRefs || {}).forEach(function(key){if(!selected.has(key))fail(where,'nodeCodeRefs identity is not selected/exported: '+key);});
-          Object.keys(imp.edgeOverrides || {}).forEach(function(key){if(!exp.edges.includes(key))fail(where,'edgeOverrides identity is not selected/exported: '+key);});
-          Object.keys(imp.nodeTracking || {}).forEach(function(key){if(!selected.has(key))fail(where,'nodeTracking identity is not selected/exported: '+key);});
-          Object.keys(imp.edgeTracking || {}).forEach(function(key){if(!exp.edges.includes(key))fail(where,'edgeTracking identity is not selected/exported: '+key);});
+          validateOverlaySelection(imp,exp.nodes,exp.edges,where);
           if(d.nodes==null)d.nodes={};if(!object(d.nodes))fail(where,'consumer nodes must be an object');
           if(d.edges==null)d.edges=[];if(!Array.isArray(d.edges))fail(where,'consumer edges must be an array');
           if(d.rows==null || Array.isArray(d.rows) && !d.rows.length)d.rows=[[]];
-          if(!Array.isArray(d.rows) || d.rows.some(function(row){return !Array.isArray(row) || row.some(function(slot){return typeof slot!=='string' && (!Array.isArray(slot) || slot.some(function(key){return typeof key!=='string';}));});}))fail(where,'broken consumer row placement');
           // Default each block below existing content. Explicit positions are
           // absolute origins, so provider size changes never reset a saved drag.
           // Custom centers must not push subsequent automatically placed imports.
@@ -224,7 +235,6 @@ var FlowTopology = (function(){
           var parentLayout=layout(placementDiagram),bottom=0;
           Object.keys(parentLayout.pos).forEach(function(key){var p=parentLayout.pos[key];bottom=Math.max(bottom,p.cy+p.h/2);});
           var position=imp.position?clone(imp.position):{x:LEFT_X,y:bottom+80};
-          if(Object.keys(d.nodes).some(function(key){return key.startsWith(prefix);}))fail(where,'namespace collision with existing node '+prefix);
           var groups=Object.create(null),nodeIds=[],edgeIds=[];
           function group(key,seen){
             if(own(groups,key))return;
@@ -407,7 +417,7 @@ var FlowTopology = (function(){
     if(context.ephemeral){if(authoredIdentity)result.page.documentLinks.id=authoredIdentity;if(authoredCanon)result.page.canon=authoredCanon;else delete result.page.canon;}
     return mode==='wrapped'?result:mode==='diagram'?result.page.sections[0].diagram:result.page;
   }
-  return {validateTracking:validateTracking,mergeExports:mergeExports,validateNodeOverride:validateNodeOverride,validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
+  return {validateDeclarations:function(specs){materializeSources(specs,true);},validateTracking:validateTracking,mergeExports:mergeExports,validateNodeOverride:validateNodeOverride,validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
 })();
 FlowCanon.materializeTopology=FlowTopology.materialize;
 FlowCanon.topologyDependencies=FlowTopology.dependencies;

@@ -54,7 +54,11 @@ using **Open working file…**, **Choose working folder…**, or the agent conne
 The consumer can live outside the provider repository and need not be in Canon.
 Unpublished imports that cannot resolve from the deployed library remain open as
 repairable source. Select local providers to render them; no successful deployed
-lookup is required.
+lookup is required. Missing provider IDs or new consumer-requested exports, absent
+catalogs and legacy catalogs allow this repairable opening. Malformed catalogs or
+providers, published revision mismatches and invalid import declarations reject
+the open and retain the current draft. An unresolved replacement keeps the last
+valid preview marked stale and saves the previous draft in **Earlier drafts**.
 
 For an agent-connected consumer, save a complete batch of authorized provider
 edits, then run the **consumer's** generated helper with an absolute source root:

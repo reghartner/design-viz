@@ -57,7 +57,7 @@ test('missing IDs and cycles fail before folder metadata creation',async t=>{
 });
 test('unpublished imports open as repairable independent source without requiring consumer registration',async t=>{
   const h=await setup(t);h.ctx.authoredTopologyDependencies=raw=>h.ctx.FlowTopology.dependencies(raw);
-  h.ctx.prepareAuthoredTopology=async()=>{throw Error('Missing authored provider middle');};
+  h.ctx.prepareAuthoredTopology=async()=>{throw Object.assign(Error('Missing authored provider middle'),{topologyUnavailable:true});};
   const context=await h.ctx.prepareLocalFolderTopology(JSON.stringify(h.inputs.consumer),{},null);
   assert.equal(h.ctx.isUnresolvedLocalTopology(context),true);assert.throws(()=>h.ctx.FlowTopology.resolveSource(h.inputs.consumer,context),/missing spec/);
 });
@@ -90,7 +90,7 @@ test('empty registry and directory named canon.json preserve ordinary folders; m
   await assert.rejects(h.ctx.openLocalRepositoryFolder({getFileHandle:async()=>({getFile:async()=>({size:4*1024*1024+1,text:async()=>{textRead=true;return '{}';}})})}),/4 MiB registry limit/);
   assert.equal(textRead,false);
 });
-test('ordinary folder opening reuses approved frozen contexts and refuses missing local providers without network',async t=>{
+test('ordinary folder opening reuses frozen providers and defers new dependencies without hiding a broken closure',async t=>{
   const h=await setup(t),found=await h.ctx.openFolderAgentProject(h.handle,'diagrams/team/consumer/consumer.spec.json');
   vm.runInContext(readSource('library.workbench.js'),h.ctx);
   let fetches=0;h.ctx.connectTopologyRepository=async()=>{fetches++;throw Error('Unexpected network');};
@@ -104,8 +104,7 @@ test('ordinary folder opening reuses approved frozen contexts and refuses missin
   const context=JSON.parse(JSON.stringify(found.topologyContext));context.specs=context.specs.filter(s=>s.page.canon.id!=='middle');
   const replacement=await h.ctx.prepareLocalFolderTopology(found.source,{},context);assert.equal(h.ctx.isUnresolvedLocalTopology(replacement),true);assert.equal(fetches,0);
   const transitive=JSON.parse(JSON.stringify(found.topologyContext));transitive.specs=transitive.specs.filter(s=>s.page.canon.id!=='base');
-  const prepared=await h.ctx.prepareLocalFolderTopology(found.source,{},transitive);
-  assert.equal(h.ctx.isUnresolvedLocalTopology(prepared),true);assert.throws(()=>h.ctx.FlowTopology.resolveSource(JSON.parse(found.source),prepared),/missing spec/i);assert.equal(fetches,0);
+  await assert.rejects(h.ctx.prepareLocalFolderTopology(found.source,{},transitive),/missing spec/i);assert.equal(fetches,0);
 });
 test('ordinary folders without a frozen context retain deployed provider acquisition',async t=>{
   const h=await setup(t),found=await h.ctx.openFolderAgentProject(h.handle,'diagrams/team/consumer/consumer.spec.json');
@@ -227,11 +226,44 @@ test('supplied source snapshots validate raw closure, paths, bounds and identity
 
 test('opening a new unpublished consumer remains repairable after an unrelated local or published session',async t=>{
  const h=await setup(t);vm.runInContext(readSource('library.workbench.js'),h.ctx);
- let fetches=0;h.ctx.connectTopologyRepository=async()=>{fetches++;throw Error('No deployed new provider');};
+ let fetches=0;h.ctx.connectTopologyRepository=async()=>{fetches++;throw Object.assign(Error('No deployed new provider'),{topologyUnavailable:true});};
  const raw={page:{title:'New independent consumer',sections:[{diagram:{topologyImports:[{spec:'never-published',export:'core',as:'new'}]}}]}};
  for(const local of [true,false]){
   const prior={version:1,id:'old',local,specs:[{page:{canon:{version:1,id:'old',kind:'design',owner:'group:default/old'},sections:[]}}]},before=JSON.stringify(prior);
   const next=await h.ctx.prepareLocalFolderTopology(JSON.stringify(raw),{},prior);assert.equal(h.ctx.isUnresolvedLocalTopology(next),true);assert.equal(JSON.stringify(prior),before);
  }
  assert.equal(fetches,1,'only the published context can try the deployed catalog');
+});
+test('unresolved opening never trusts error wording or bypasses malformed declarations',async t=>{
+ const h=await setup(t);vm.runInContext(readSource('library.workbench.js'),h.ctx);
+ h.ctx.prepareAuthoredTopology=async()=>{throw Error('Missing authored provider middle');};
+ await assert.rejects(h.ctx.prepareLocalFolderTopology(JSON.stringify(h.inputs.consumer),{},null),/Missing authored provider middle/);
+ h.ctx.prepareAuthoredTopology=async()=>{throw h.ctx.topologyUnavailable('No catalog');};
+ const invalid=structuredClone(h.inputs.consumer);invalid.page.sections[0].diagram.topologyImports[0].export=[];
+ await assert.rejects(h.ctx.prepareLocalFolderTopology(JSON.stringify(invalid),{},null),/nonempty array/);
+ invalid.page.sections[0].diagram.topologyImports[0].export='future';invalid.page.sections[0].diagram.topologyImports[0].nodeTracking={api:{missingWork:'yes'}};
+ await assert.rejects(h.ctx.prepareLocalFolderTopology(JSON.stringify(invalid),{},null),/missingWork must be true or false/);
+ const previous=h.ctx.unresolvedLocalTopology(h.inputs.consumer);invalid.page.sections[0].diagram.topologyImports={};
+ await assert.rejects(h.ctx.prepareLocalFolderTopology(JSON.stringify(invalid),{},previous),/topologyImports must be an array/);
+});
+for(const declaration of ['duplicate namespace','empty selection','row placement','node collision'])test('unavailable providers never bypass '+declaration+' validation',async t=>{
+ const h=await setup(t);vm.runInContext(readSource('library.workbench.js'),h.ctx);
+ h.ctx.prepareAuthoredTopology=async()=>{throw h.ctx.topologyUnavailable('No catalog');};
+ const raw=structuredClone(h.inputs.consumer),d=raw.page.sections[0].diagram;
+ if(declaration==='duplicate namespace')d.topologyImports.push({...d.topologyImports[0],spec:'another-provider'});
+ if(declaration==='empty selection')d.topologyImports[0].nodes=[];
+ if(declaration==='row placement')d.rows=['broken'];
+ if(declaration==='node collision'){d.nodes={'shared::existing':{title:'Existing'}};d.rows=[['shared::existing']];}
+ const message={'duplicate namespace':/duplicate namespace shared/,'empty selection':/select at least one exported node/,'row placement':/broken consumer row placement/,'node collision':/namespace collision with existing node shared::/}[declaration];
+ assert.throws(()=>h.ctx.unresolvedLocalTopology(raw),message);
+ await assert.rejects(h.ctx.prepareLocalFolderTopology(JSON.stringify(raw),{},null),message);
+});
+test('unavailable providers cannot hide overlays outside an explicit selection',async t=>{
+ const h=await setup(t);vm.runInContext(readSource('library.workbench.js'),h.ctx);
+ h.ctx.prepareAuthoredTopology=async()=>{throw h.ctx.topologyUnavailable('No catalog');};
+ for(const [field,value] of Object.entries({nodePositions:{x:10,y:20},nodeOverrides:{title:'Unselected'},nodeCodeRefs:[],nodeTracking:{missingWork:true},edgeOverrides:{label:'Unselected'},edgeTracking:{tickets:[]}})){
+   const raw=structuredClone(h.inputs.consumer),imp=raw.page.sections[0].diagram.topologyImports[0];
+   imp.nodes=['selected'];imp.edges=[];imp[field]={unselected:value};
+   await assert.rejects(h.ctx.prepareOpenedTopology(raw,null),new RegExp(field+' identity is not selected/exported: unselected'));
+ }
 });

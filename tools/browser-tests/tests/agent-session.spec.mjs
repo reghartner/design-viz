@@ -1,3 +1,4 @@
+import {nodeGeometry,expectImportPlacement} from '../helpers/node-placement.mjs';
 import {test as base,expect,paste} from '../helpers/test.mjs';
 import {readFile,writeFile,rename,rm} from 'node:fs/promises';
 import path from 'node:path';
@@ -81,12 +82,17 @@ test('local helper automatically acquires an unloaded pinned topology provider w
   for(const spec of providers)await page.route('**/'+spec.page.canon.id+'.json',route=>{hits.push(spec.page.canon.id);return route.fulfill({json:spec});});
   // #592: a draft that never opened the picker still resolves a proposed import from this site's index.
   await page.goto(server.origin+'/workbench/flowspec.html');await paste(page,source);
-  const current=await state(server,s=>s.open && s.source===source);
+  const current=await state(server,s=>s.open && s.source===source),beforeGeometry=await nodeGeometry(page,'a'),providerBytes=JSON.stringify(providers);
   const raw=JSON.parse(source);raw.page.blocks[0].diagram.topologyImports=[{spec:'submitted',export:'public',as:'shared'}];const edited=JSON.stringify(raw,null,2);
   await propose(server,{id:'topology',baseRevision:current.revision,source:edited,topologyContext:{catalogURL:'https://untrusted.invalid/diagrams.json'}});
-  await result(server,'topology','applied');await expect(page.locator('#src')).toHaveValue(edited);
+  await result(server,'topology','applied');const accepted=await page.locator('#src').inputValue(),d=JSON.parse(accepted).page.blocks[0].diagram;
+  expect(accepted).not.toBe(edited);await expectImportPlacement(page,d.topologyImports[0],{spec:'submitted',export:'public',as:'shared'},['api'],beforeGeometry);
+  expect(d.nodes).toEqual(raw.page.blocks[0].diagram.nodes);expect(d.edges).toEqual(raw.page.blocks[0].diagram.edges);expect(JSON.stringify(providers)).toBe(providerBytes);
+  const unplaced=JSON.parse(accepted);delete unplaced.page.blocks[0].diagram.topologyImports[0].position;delete unplaced.page.blocks[0].diagram.topologyImports[0].nodePositions;expect(unplaced).toEqual(raw);
+  const frozen=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).topologyContext);expect(frozen.specs.find(spec=>spec.page.canon.id==='submitted')).toEqual(providers[1]);
+  const published=await state(server,s=>s.source===accepted);expect(published.views[0].view).toBe(current.views[0].view);
   await expect(page.locator('#docview [data-dv-node="shared::api"]')).toBeVisible();expect(hits).toEqual(['submitted']);
-  expect(edited).not.toContain('shared::api');expect(edited).not.toContain('topologyProvenance');
+  expect(accepted).not.toContain('shared::api');expect(accepted).not.toContain('topologyProvenance');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
-  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);await disconnect();
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(accepted);await disconnect();
 });

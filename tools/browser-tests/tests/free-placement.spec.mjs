@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,pastePage as paste,openInspectorGroup} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,openInspectorGroup,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const example=JSON.parse(await readFile(path.join(repo,'examples/free-placement/free-placement.spec.json'),'utf8'));
 const diagram=raw=>raw.page.blocks[0].diagram;
@@ -110,4 +110,23 @@ test('standalone, native Backstage and Forge preserve free node centers and exac
  await page.goto(server.origin+'/free-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(raw=>window.viewer=mount(document.querySelector('#host'),raw),example);await verify(page.locator('#host'));
  await page.addInitScript(raw=>{window.__bridge={callBridge:async method=>{if(method==='getContext')return {siteUrl:'https://company.atlassian.net',extension:{config:{specJson:JSON.stringify(raw)},macro:{isConfiguring:false}}};return true;}};},example);
  await page.goto(server.origin+'/forge/index.html');await verify(page.locator('#docview'));
+});
+
+test('Place optimally supports desktop multi-selection, keyboard context menu, locks and one Undo/Redo',async({page,server},info)=>{
+ const initial={page:{title:'Optimal placement',blocks:[{diagram:{nodes:{a:{title:'Client'},b:{title:'Worker'},c:{title:'Locked store',locked:true},f:{title:'Observer'}},rows:[['a','c']],floats:[{id:'b',side:'below',x:950,y:650,noSpread:true},{id:'f',side:'above'}],edges:[{from:'a',to:'b',bend:30},{from:'a',to:'f'}],steps:[{edge:'a->b',text:'Dispatch'}]}}]}};
+ await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(initial));
+ const root=page.locator('#docview'),original=await source(page),before=await Promise.all(['a','c','f'].map(id=>geometry(root,id)));
+ await node(root,'b').click();await closeTools(page);await node(root,'c').click({modifiers:['Shift']});await closeTools(page);await node(root,'b').click({button:'right'});
+ const menu=page.getByRole('menu',{name:'Object actions'}),action=menu.getByRole('menuitem',{name:'Place optimally',exact:true});await expect(action).not.toHaveAttribute('aria-disabled','true');
+ await info.attach('place-optimally-menu',{body:await page.screenshot(),contentType:'image/png'});await action.click();
+ const changed=await source(page),d=diagram(JSON.parse(changed));expect(changed).not.toBe(original);expect(d.edges).toEqual(diagram(initial).edges);expect(d.steps).toEqual(diagram(initial).steps);
+ expect(await Promise.all(['a','c','f'].map(id=>geometry(root,id)))).toEqual(before);
+ const a=await geometry(root,'a'),b=await geometry(root,'b');expect(b.x).toBeGreaterThan(a.x+a.w);expect(Math.abs(b.y-a.y)).toBeLessThan(50);
+ await info.attach('place-optimally-result',{body:await root.screenshot(),contentType:'image/png'});
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);
+ // A row node can invoke the same action entirely through the keyboard.
+ await closeTools(page);await node(root,'a').focus();await page.keyboard.press('Enter');await closeTools(page);await node(root,'a').focus();await page.keyboard.press('Shift+F10');await expect(menu).toBeVisible();
+ const buttons=menu.getByRole('menuitem');const count=await buttons.count();for(let i=0;i<count && !await action.evaluate(el=>el===document.activeElement);i++)await page.keyboard.press('ArrowDown');
+ await expect(action).toBeFocused();await page.keyboard.press('Enter');await expect(menu).toHaveCount(0);expect(diagram(await raw(page)).floats.some(f=>f.id==='a')).toBe(true);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);
 });

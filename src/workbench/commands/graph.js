@@ -43,7 +43,7 @@ function planSetNodeLocked(text,raw,sectionIdx,nodeId,locked){
   return planSetNodesLocked(text,raw,sectionIdx,[nodeId],locked);
 }
 
-function planAddNode(text, raw, sectionIdx, preset, point){
+function planAddNode(text, raw, sectionIdx, preset, point, context){
   /* preset (optional): {icon, tint, title} from NODE_PRESETS — the id stem
      follows the icon so the spec reads well (db1, antenna1, ...) */
   var got = builderDiagram(text, raw, sectionIdx);
@@ -60,22 +60,30 @@ function planAddNode(text, raw, sectionIdx, preset, point){
     placed = rows.text;
   }
   if(point && (!floatCoordinate(point.x) || !floatCoordinate(point.y)))return {error:'Choose a point within the supported canvas coordinates.'};
-  var placement=point?{id:id,side:'below',x:point.x,y:point.y,noSpread:true}:builderNewNodeFloats(d,[id])[0];
+  var placement=point?{id:id,side:'below',x:point.x,y:point.y,noSpread:true}:{id:id,side:'below',noSpread:true};
   var r1 = jsonInsertListItemOrCreate(placed, got.path, 'floats', JSON.stringify(placement));
   if (!r1) return {error: 'could not edit floats in the editor text'};
   var r2 = jsonInsertMember(r1.text, got.path.concat(['nodes']), id,
     '{"title": ' + JSON.stringify(title) + ', "sub": "what it does", "icon": ' +
     JSON.stringify(icon) + ', "tint": ' + JSON.stringify(tint) + '}');
   if (!r2) return {error: 'could not edit nodes in the editor text'};
-  return {text: r2.text, start: r2.start, end: r2.end, kind: 'node', id: id};
+  if(!point){
+    var optimal=planPlaceOptimally(r2.text,JSON.parse(r2.text),[{kind:'node',section:sectionIdx,id:id}],context);
+    if(optimal.error)return optimal;if(optimal.text)r2=optimal;
+  }
+  var range=jsonLocate(r2.text,got.path.concat(['nodes',id]));
+  return {text:r2.text,start:range && range.start,end:range && range.end,kind:'node',id:id};
 }
 
-function planAddTextBox(text,raw,sectionIdx,point){
-  var plan=planAddNode(text,raw,sectionIdx,{icon:'text',title:'Text'},point);
+function planAddTextBox(text,raw,sectionIdx,point,context){
+  var plan=planAddNode(text,raw,sectionIdx,{icon:'text',title:'Text'},point,context);
   if(plan.error)return plan;
   var next=JSON.parse(plan.text),got=builderDiagram(plan.text,next,sectionIdx);
   var edit=jsonReplaceValue(plan.text,got.path.concat(['nodes',plan.id]),JSON.stringify({type:'text',text:'Type your text',textStyle:{fontSize:24,width:280,height:80}}));
-  return edit?Object.assign({},plan,edit):{error:'Could not create the text box.'};
+  if(!edit)return {error:'Could not create the text box.'};
+  if(!point){var placement=planPlaceOptimally(edit.text,JSON.parse(edit.text),[{kind:'node',section:sectionIdx,id:plan.id}],context);if(placement.error)return placement;if(placement.text)edit=placement;}
+  var range=jsonLocate(edit.text,got.path.concat(['nodes',plan.id]));
+  return Object.assign({},plan,edit,{start:range && range.start,end:range && range.end});
 }
 function planEditTextBox(text,raw,sectionIdx,id,changes){
   var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;

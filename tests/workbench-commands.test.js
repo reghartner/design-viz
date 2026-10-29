@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const commandContext = require('./workbench-command-context.cjs');
-const commands = () => commandContext(['graph', 'document', 'narrative']);
+const commands = () => commandContext(['graph', 'document', 'narrative', 'layout']);
 const B = commands();
 const V = B;
 const plain = value => JSON.parse(JSON.stringify(value));

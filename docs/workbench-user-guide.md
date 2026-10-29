@@ -264,6 +264,16 @@ the same document: the same diagram ID, or the same title when neither has an
 ID. Undo removes the import and the pins together. A different document is
 imported exactly as written.
 
+On desktop, select one or more nodes in a section and right-click **Place
+optimally**. Keyboard users can focus a node and press **Shift+F10** or the
+**Menu key**. The action finds open space near connected nodes, moves selected
+unlocked nodes, and keeps other centers, custom routes and saved panel layouts.
+Row nodes become free nodes; imported nodes save placement overrides in the
+consumer document. The whole operation is one Undo action. Ordinary additions
+from Add, and new agent nodes without coordinates, use the same placement
+planner automatically. Agent placement appears in the paired preview and the
+accepted source; a canvas click still supplies the exact insertion point.
+
 In Explore, **Panels → Placement for Section notes** chooses **Floating** or
 **On canvas** independently of other panels and step controls. Notes retain a
 separate position and size for each placement. Select canvas notes to reveal

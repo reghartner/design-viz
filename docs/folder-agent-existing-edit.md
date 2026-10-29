@@ -82,8 +82,8 @@ Cloud snapshots never read disk. See [local sources](local-repository-authoring.
   content is not proved. Record honest N/A for unsupported internals/diagram-only
   beats. Summarize actual checks and rendered fit, occlusion and legibility
   unverified pending real Workbench human preview. No browser or installation is required.
-- Clipping/readability feedback authorizes scoped sizing; do not ask again.
-  Use the packet's `--rearrange` flow for structural rearrangement.
+- Clipping/readability feedback authorizes sizing without a question.
+  [Placement](node-placement.md): additions auto-place; `--rearrange` for structural edits.
 - Submit `propose` with your candidate pair and base revision per `CONNECT.md`;
   require full preview, explicit **Accept changes**, then matching `result.json`.
 - After acceptance, check the pair including merged edits before claiming verification.

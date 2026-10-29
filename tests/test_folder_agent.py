@@ -334,6 +334,21 @@ class FolderAgentTests(unittest.TestCase):
                                 text=True, capture_output=True, timeout=10,
                                 cwd=self.folder/'authoring')
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        # The prepared kit runs selected-node placement without the checkout,
+        # source-loader, node_modules, or a browser.
+        placed = self.folder/'authoring/placed.spec.json'
+        result = subprocess.run(['node', 'tools/place-nodes.cjs', '--section', '0',
+                                 '--node', 'b', arranged.name, placed.name],
+                                text=True, capture_output=True, timeout=10,
+                                cwd=self.folder/'authoring')
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        local = json.loads(placed.read_text())
+        self.assertEqual(local['nodes'], output['nodes'])
+        self.assertEqual(local['edges'], output['edges'])
+        self.assertEqual(local['sectionLayout'], manual_layout)
+        self.assertEqual(next(f for f in local['floats'] if f['id']=='a'),
+                         next(f for f in output['floats'] if f['id']=='a'))
+        self.assertTrue(all('x' in item and 'y' in item for item in local['floats']))
         trace = subprocess.run(['node', 'tools/trace2spec.js', str(ROOT/'examples/traces/checkout.events.json'), '--preview'],
                                text=True, capture_output=True, timeout=10, cwd=self.folder/'authoring')
         self.assertEqual(trace.returncode, 0, trace.stderr)

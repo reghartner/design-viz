@@ -413,6 +413,7 @@ function builderNodeArrangementTargets(text,raw,targets,context){
   var got=builderArrangementSource(text,raw,section,context);if(got.error)return got;
   var ids=targets.map(function(t){return t.id;});
   if(new Set(ids).size!==ids.length)return {error:'Select each node only once.'};
+  if(!got.effective.rows)got.effective=Object.assign({},got.effective,{rows:[[]]});
   var positions=layout(got.effective).pos,records=[];
   for(var i=0;i<ids.length;i++){
     var id=ids[i],record=builderArrangementOwner(got,'nodes',id);if(record.error)return record;
@@ -431,6 +432,186 @@ function builderWriteImportedPosition(d,record,position){
   if(!imp.nodePositions)imp.nodePositions={};
   Object.defineProperty(imp.nodePositions,record.relative,{value:relative,enumerable:true,writable:true,configurable:true});
 }
+/* Incremental placement is a bounded local heuristic, not a global graph
+   arranger. It never rewrites connections, panels, or named view definitions. */
+function builderOptimalNodeSize(node){
+  return isTextBoxNode(node)?textBoxSize(node):{w:150,h:nodeCardHeight(node,node && (node.sub || node.image)?58:FLOAT_H)};
+}
+function builderOptimalPositions(d,ids,positions){
+  if(ids.length>200 || Object.keys(d.nodes || {}).length>2000 || (d.edges || []).length>10000)return {error:'Place up to 200 nodes at once in a diagram with up to 2000 nodes and 10000 connections.'};
+  var moving=new Set(ids),placed=Object.create(null),occupied=[],edges=d.edges || [],result=Object.create(null),adjacent=Object.create(null);
+  edges.forEach(function(e){(adjacent[e.from] || (adjacent[e.from]=[])).push(e);if(e.to!==e.from)(adjacent[e.to] || (adjacent[e.to]=[])).push(e);});
+  Object.keys(positions).sort().forEach(function(id){if(!moving.has(id)){placed[id]=positions[id];occupied.push(positions[id]);}});
+  // Canvas rectangles use diagram coordinates. Reserve every saved view so a
+  // shared graph edit does not place a card underneath a different view's panel.
+  [d].concat(d.layouts || []).forEach(function(view){
+    var canvas=view.exploreLayout && view.exploreLayout.canvas;if(!canvas)return;
+    (canvas.panels || []).concat([canvas.prose,canvas.controls]).forEach(function(r){
+      if(r && [r.x,r.y,r.w,r.h].every(Number.isFinite) && r.w>0 && r.h>0)occupied.push({cx:r.x+r.w/2,cy:r.y+r.h/2,w:r.w,h:r.h});
+    });
+  });
+  var pending=ids.slice().sort(),gap=36;
+  function links(id){return (adjacent[id] || []).filter(function(e){return e.from===id && placed[e.to] || e.to===id && placed[e.from];});}
+  function hits(p,q){return Math.abs(p.cx-q.cx)<(p.w+q.w)/2+24 && Math.abs(p.cy-q.cy)<(p.h+q.h)/2+24;}
+  var parents=sanitizedGroupParents(d.groups);
+  function ancestry(group){var out=[];while(group){out.push(group);group=parents[group];}return out;}
+  function groupObstacles(id){
+    var own=ancestry(d.nodes[id] && d.nodes[id].group),bounds=Object.create(null);
+    Object.keys(placed).forEach(function(other){var p=placed[other];ancestry(d.nodes[other] && d.nodes[other].group).forEach(function(group){
+      if(own.indexOf(group)>=0)return;var b=bounds[group] || (bounds[group]={l:Infinity,r:-Infinity,t:Infinity,b:-Infinity});
+      b.l=Math.min(b.l,p.cx-p.w/2-14);b.r=Math.max(b.r,p.cx+p.w/2+14);b.t=Math.min(b.t,p.cy-p.h/2-34);b.b=Math.max(b.b,p.cy+p.h/2+14);
+    });});
+    return Object.keys(bounds).map(function(group){var b=bounds[group];return {cx:(b.l+b.r)/2,cy:(b.t+b.b)/2,w:b.r-b.l,h:b.b-b.t};});
+  }
+  while(pending.length){
+    // Place a frontier node first, then let it anchor the next connected node.
+    pending.sort(function(a,b){return links(b).length-links(a).length || (a<b?-1:a>b?1:0);});
+    var id=pending.shift(),size=builderOptimalNodeSize(d.nodes[id]),near=links(id),anchors=[],obstacles=occupied.concat(groupObstacles(id));
+    near.slice(0,32).forEach(function(e){
+      var incoming=e.to===id,p=placed[incoming?e.from:e.to],port=incoming?e.fromPort:e.toPort;
+      var side=port && port.side || (incoming?'right':'left'),dx=side==='right'?1:side==='left'?-1:0,dy=side==='bottom'?1:side==='top'?-1:0;
+      anchors.push({x:p.cx+dx*((p.w+size.w)/2+gap),y:p.cy+dy*((p.h+size.h)/2+gap)});
+    });
+    if(!anchors.length){
+      var group=d.nodes[id] && d.nodes[id].group;
+      Object.keys(placed).sort().forEach(function(other){if(group && d.nodes[other] && d.nodes[other].group===group && anchors.length<16){var p=placed[other];anchors.push({x:p.cx,y:p.cy+(p.h+size.h)/2+gap});}});
+    }
+    if(!anchors.length){
+      var center=occupied.length?occupied.reduce(function(a,p){return {x:a.x+p.cx,y:a.y+p.cy};},{x:0,y:0}):{x:W/2,y:42+size.h/2};
+      anchors.push(occupied.length?{x:center.x/occupied.length,y:center.y/occupied.length}:center);
+    }
+    var ideal=anchors.reduce(function(a,p){return {x:a.x+p.x/anchors.length,y:a.y+p.y/anchors.length};},{x:0,y:0}),candidates=anchors.slice();
+    // A fixed 13 by 13 search keeps dense or adversarial graphs bounded.
+    for(var x=-6;x<=6;x++)for(var y=-6;y<=6;y++)candidates.push({x:ideal.x+x*(size.w+gap),y:ideal.y+y*(size.h+gap)});
+    if(obstacles.length){
+      var left=Infinity,right=-Infinity,top=Infinity,bottom=-Infinity;
+      obstacles.forEach(function(p){left=Math.min(left,p.cx-p.w/2);right=Math.max(right,p.cx+p.w/2);top=Math.min(top,p.cy-p.h/2);bottom=Math.max(bottom,p.cy+p.h/2);});
+      candidates.push({x:right+size.w/2+gap,y:ideal.y},{x:left-size.w/2-gap,y:ideal.y},{x:ideal.x,y:bottom+size.h/2+gap},{x:ideal.x,y:top-size.h/2-gap});
+    }
+    var best=null,score=Infinity;
+    candidates.forEach(function(candidate){
+      var p={cx:Math.round(candidate.x*10)/10,cy:Math.round(candidate.y*10)/10,w:size.w,h:size.h};
+      if(!floatCoordinate(p.cx) || !floatCoordinate(p.cy) || obstacles.some(function(q){return hits(p,q);}))return;
+      var cost=anchors.reduce(function(sum,a){return sum+Math.pow(p.cx-a.x,2)+Math.pow(p.cy-a.y,2);},0)/anchors.length;
+      // Stable candidate order resolves ties; no randomness or source mutation.
+      if(cost<score){best=p;score=cost;}
+    });
+    if(!best)return {error:'No free location within the supported canvas coordinates. Move the surrounding nodes and try again.'};
+    result[id]={x:best.cx,y:best.cy};placed[id]=best;occupied.push(best);
+  }
+  return {positions:result};
+}
+function builderPinNodeCenters(d,positions,ids){
+  var members=Object.create(null);ids.forEach(function(id){members[id]=true;});
+  if(!Array.isArray(d.rows) || !d.rows.length)d.rows=[[]];
+  builderLiftAndInsert(d.rows,members,null,{liftOnly:true,allowEmpty:true});
+  if(!Array.isArray(d.floats))d.floats=[];
+  ids.forEach(function(id){
+    var p=positions[id];if(!p)return;
+    var f=d.floats.find(function(f){return f && f.id===id;});if(!f){f={id:id};d.floats.push(f);}
+    Object.assign(f,{side:'below',x:p.cx,y:p.cy,noSpread:true});delete f.dx;delete f.dy;
+  });
+}
+function planPlaceOptimally(text,raw,targets,context,preserved){
+  // Topology resolution validates its materialized document. Seed missing
+  // local slots privately before resolving; the eventual plan remains atomic.
+  if(Array.isArray(targets) && targets.length){
+    var authored=builderDiagram(text,raw,targets[0].section);
+    if(!authored.error){
+      var d=authored.d;if(targets.length>200 || Object.keys(d.nodes || {}).length>2000 || (d.edges || []).length>10000)return {error:'Place up to 200 nodes at once in a diagram with up to 2000 nodes and 10000 connections.'};
+      var slots=new Set(builderFlatRowIds(d.rows));(d.floats || []).forEach(function(f){if(f)slots.add(f.id);});
+      var missing=targets.filter(function(t){return t.kind==='node' && t.section===targets[0].section && Object.prototype.hasOwnProperty.call(d.nodes || {},t.id) && !slots.has(t.id);});
+      if(missing.length){
+        var floats=builderClone(d.floats || []);missing.forEach(function(t){if(!slots.has(t.id)){floats.push({id:t.id,side:'below',noSpread:true});slots.add(t.id);}});
+        var seeded=planSetFields(text,raw,authored.path,[['rows',JSON.stringify(d.rows || [[]])],['floats',JSON.stringify(floats)]]);
+        if(seeded.error)return seeded;text=seeded.text;raw=JSON.parse(text);
+      }
+    }
+  }
+  var got=builderNodeArrangementTargets(text,raw,targets,context);if(got.error)return got;
+  var movable=got.records.filter(function(record){return !builderNodePositionLocked(got.effective,record.id);});
+  if(!movable.length)return {noop:true};
+  var ids=movable.map(function(record){return record.id;}),before=Object.assign({},layout(got.effective).pos,preserved || {});
+  var placement=builderOptimalPositions(got.effective,ids,before);if(placement.error)return placement;
+  var copy=builderClone(got.d),local=movable.filter(function(record){return record.local;}),wanted=new Set(ids);
+  if(local.length){
+    var centers=Object.create(null);local.forEach(function(record){var p=placement.positions[record.id];centers[record.id]={cx:p.x,cy:p.y};});
+    builderPinNodeCenters(copy,centers,local.map(function(record){return record.id;}));
+    // Removing a row slot or changing the group header can re-space neighbours.
+    // Pin only the unrelated nodes that actually move, until layout is stable.
+    var stable=Object.keys(copy.nodes || {}).filter(function(id){return !wanted.has(id) && before[id];});
+    for(var pass=0;pass<=stable.length;pass++){
+      var after=layout(copy).pos,moved=stable.filter(function(id){var p=after[id],b=before[id];return !p || Math.abs(p.cx-b.cx)>.0001 || Math.abs(p.cy-b.cy)>.0001;});
+      if(!moved.length)break;
+      builderPinNodeCenters(copy,before,moved);
+    }
+  }
+  ((got.effective.topologyProvenance || {}).imports || []).forEach(function(owner){
+    var imp=(copy.topologyImports || []).find(function(imp){return imp.as===owner.as;});if(imp && !imp.position)imp.position=builderClone(owner.position);
+  });
+  for(var i=0;i<movable.length;i++)if(!movable[i].local){var result=builderWriteImportedPosition(copy,movable[i],placement.positions[movable[i].id]);if(result && result.error)return result;}
+  var pairs=['rows','floats','topologyImports'].filter(function(key){return JSON.stringify(copy[key])!==JSON.stringify(got.d[key]);}).map(function(key){return [key,copy[key]===undefined?null:JSON.stringify(copy[key])];});
+  return pairs.length?planSetFields(text,raw,got.path,pairs):{noop:true};
+}
+/* Normalize only genuinely new nodes. Existing 0,0 coordinates are authored
+   positions. An explicit row or a non-placeholder free point is also intent. */
+function normalizeWorkbenchAgentPlacement(beforeText,source,context){
+  var before=JSON.parse(beforeText),raw=JSON.parse(source);
+  if(raw && raw.nodes && !raw.page && !raw.blocks && !raw.sections && raw.rows===undefined){
+    var seeded=jsonSetField(source,[],'rows','[[]]');if(!seeded)throw Error('Could not initialize diagram placement.');source=seeded.text;raw=JSON.parse(source);
+  }
+  var prior=specSectionPaths(before),records=specSectionPaths(raw),text=source;
+  var oldSections=prior.map(function(rec){return specValueAt(before,rec.section) || {};}),newSections=records.map(function(rec){return specValueAt(raw,rec.section) || {};}),matched=Object.create(null),claimed=new Set();
+  // Reserve one-to-one identities across the whole document before considering
+  // positions. A prepended section cannot borrow a surviving section's nodes.
+  function matchBy(key){
+    records.forEach(function(rec,index){
+      if(Object.prototype.hasOwnProperty.call(matched,index))return;
+      var value=key(newSections[index],raw,rec);if(value==null)return;
+      var incoming=records.filter(function(r,i){return !Object.prototype.hasOwnProperty.call(matched,i) && key(newSections[i],raw,r)===value;});
+      var old=[];prior.forEach(function(r,i){if(!claimed.has(i) && key(oldSections[i],before,r)===value)old.push(i);});
+      if(incoming.length===1 && old.length===1){matched[index]=old[0];claimed.add(old[0]);}
+    });
+  }
+  matchBy(function(section){return section.id || null;});
+  matchBy(function(section){return !section.id && section.heading || null;});
+  matchBy(function(section,source,rec){return !section.id && section.diagram?JSON.stringify(specValueAt(source,rec.diagram)):null;});
+  records.forEach(function(rec,index){
+    if(!Object.prototype.hasOwnProperty.call(matched,index) && prior[index] && !claimed.has(index) && !newSections[index].id && !oldSections[index].id){
+      // Remaining unnamed/duplicate/renamed sections are ambiguous. Preserve
+      // identity at the same ordinal only if no surviving section claimed it.
+      matched[index]=index;claimed.add(index);
+    }
+  });
+  records.forEach(function(rec,index){
+    var d=specValueAt(raw,rec.diagram);if(!d || !d.nodes)return;
+    var previous=Object.prototype.hasOwnProperty.call(matched,index)?specValueAt(before,prior[matched[index]].diagram):null;
+    var rowIds=new Set(builderFlatRowIds(d.rows)),nodeIds=Object.keys(d.nodes);
+    // A new row-based arrangement can intentionally use automatic floats.
+    // Origin placeholders are still new per-node placement requests; explicit
+    // nonzero siblings never exempt them from normalization.
+    var authoredRows=!previous && rowIds.size>0 && nodeIds.every(function(id){return rowIds.has(id) || (d.floats || []).some(function(f){return f && f.id===id;});});
+    var ids=nodeIds.filter(function(id){
+      if(previous && Object.prototype.hasOwnProperty.call(previous.nodes || {},id) || rowIds.has(id))return false;
+      var f=(d.floats || []).find(function(f){return f && f.id===id;});
+      return !f || !authoredRows && !Object.prototype.hasOwnProperty.call(f,'x') && !Object.prototype.hasOwnProperty.call(f,'y') || f.x===0 && f.y===0;
+    });
+    if(!ids.length)return;
+    if((d.floats || []).some(function(f){return f && (Object.prototype.hasOwnProperty.call(f,'x') || Object.prototype.hasOwnProperty.call(f,'y')) && !positionedFloat(f);}))throw Error('Free placement requires finite X and Y coordinates.');
+    // Newly introduced groups and ordinary automatic floats may already have
+    // shifted old nodes in the proposed layout. Preserve their prior centers
+    // when the agent left the existing placement and group definitions intact.
+    var preserved=null;
+    if(previous && JSON.stringify(d.rows)===JSON.stringify(previous.rows) && Object.keys(previous.groups || {}).every(function(key){return JSON.stringify((d.groups || {})[key])===JSON.stringify(previous.groups[key]);}) && Object.keys(previous.nodes || {}).every(function(id){return d.nodes[id] && d.nodes[id].group===previous.nodes[id].group;}) && d.routing===previous.routing && !(d.topologyImports || []).length){
+      var oldFloats=(d.floats || []).filter(function(f){return !ids.includes(f.id);});
+      if(JSON.stringify(oldFloats)===JSON.stringify(previous.floats || []))preserved=layout(Object.assign({},previous,{rows:previous.rows || [[]]})).pos;
+    }
+    var result=planPlaceOptimally(text,JSON.parse(text),ids.map(function(id){return {kind:'node',section:index,id:id};}),context,preserved);
+    if(result.error)throw Error(result.error);if(result.text)text=result.text;
+  });
+  return text;
+}
+
 function builderSelectedFloats(text,raw,targets,context){
   if(!Array.isArray(targets) || targets.length<2)return {error:'Select at least two floating nodes.'};
   var got=builderNodeArrangementTargets(text,raw,targets,context);if(got.error)return got;

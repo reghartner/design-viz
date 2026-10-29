@@ -56,6 +56,10 @@ def folder_agent_kit(root, runtime):
     for path in sorted((root / 'tools/arrange').iterdir()):
         if path.suffix in ('.cjs', '.json'):
             files[path.relative_to(root).as_posix()] = path.read_text()
+    files['tools/place-nodes.cjs'] = (root / 'tools/place-nodes.cjs').read_text()
+    files['tools/placement-runtime.cjs'] = subprocess.run(
+        ['node', str(root / 'tools/source-loader.cjs'), '--module', 'placement', 'cjs'],
+        check=True, capture_output=True, text=True).stdout
     raw = json.dumps({'files': files}, sort_keys=True, ensure_ascii=True).encode()
     return json.dumps({'sha256': hashlib.sha256(raw).hexdigest(),
                        'gzip': base64.b64encode(gzip.compress(raw, mtime=0)).decode(),

@@ -33,7 +33,7 @@ or authorized rendered evidence supplies them. File-only kits need no browser,
 server, installation or additional agent.
 
 Topology: `tools/compose-page-layout.cjs`; graphs: `tools/auto-arrange-spec.cjs`.
-Preserve geometry; check fit.
+New nodes auto-place; selected nodes: `tools/place-nodes.cjs`.
 `section.views` share section content; each View is a page: [Views](../../../docs/tab-views.md).
 `sectionLayout` is geometry: [migration](../../../docs/section-layout-migration.md), [limits](../../../docs/auto-arrange.md).
 

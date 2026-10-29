@@ -1437,13 +1437,13 @@ function initWorkbenchBuilder(opts){
   if(diagramImportBtn)life.listen(diagramImportBtn,'click',function(){confirmAddition(function(){if(diagramImport)diagramImport.open();});});
   var addMenu=initDiagramAddMenu({document:document,src:src,pause:pausePreview,context:additionContext,
     addText:function(at){
-      var el=runInsert('node',function(text,raw,si){return planAddTextBox(text,raw,si,at && at.point);},at);
+      var el=runInsert('node',function(text,raw,si){return planAddTextBox(text,raw,si,at && at.point,session.topologyContext());},at);
       if(at){if(el)interactions.editText(el);return;}
       var board=el && el.closest('.board');if(!board)return;
       var fit=board.classList.contains('explore-board')?document.getElementById('workspace-fit-selection'):board.querySelector('[aria-label="Fit diagram"]');
       if(fit && !fit.disabled)fit.click();
     },
-    addNode:function(preset,at){var el=runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset,at && at.point);},at);if(el)interactions.editInlineText(el,true,true);},
+    addNode:function(preset,at){var el=runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset,at && at.point,session.topologyContext());},at);if(el)interactions.editInlineText(el,true,true);},
     addPanel:function(at){
       if(!panelPicker || !currentAddition(at))return;
       panelPicker.open(null,{
@@ -1666,6 +1666,7 @@ function initWorkbenchBuilder(opts){
       return interactions.busy() || inspector.busy(view) || !!document.querySelector('dialog[open]') ||
         !!(active && !(active.closest && active.closest('#editor-agent')) && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
     },
+    normalize:normalizeWorkbenchAgentPlacement,
     prepare:function(text){return prepareTopologyProposal(JSON.parse(text),session.topologyContext());},
     prepareFolder:function(text,found){return prepareLocalFolderTopology(text,found,session.topologyContext());},
     validate:function(text,context){var findings=arguments.length>1?session.validate(JSON.parse(text),context):session.validate(JSON.parse(text));return findings.errors.join('\n');},

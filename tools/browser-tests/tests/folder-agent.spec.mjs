@@ -2089,3 +2089,29 @@ test('agent change navigation restores legacy Views after reorder and reveals an
     await expect(page.locator('#src')).toHaveValue(original);await page.locator('#agent-update-discard').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('rejected');expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
+
+test('new agent nodes are placed before paired preview and exact accepted geometry persists with one Undo',async({page},info)=>{
+ const h=await setup(page);
+ try{
+  const initial={page:{title:'Automatic additions',blocks:[{heading:'Existing',diagram:{nodes:{a:{title:'Client'},b:{title:'Service'},origin:{title:'Authored origin'}},rows:[['a','b']],floats:[{id:'origin',side:'below',x:0,y:0,noSpread:true}],edges:[{from:'a',to:'b',bend:28}],steps:[{edge:'a->b',text:'Request'}]}}]}};
+  const original=JSON.stringify(initial);await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);await page.locator('#welcome-paste-form button[type=submit]').click();await connectExternal(page);
+  const request=await askAgent(page,h,'Add a cache and worker connected to the service.'),candidate=structuredClone(initial),d=candidate.page.blocks[0].diagram;
+  d.nodes.cache={title:'New cache'};d.nodes.worker={title:'New worker'};d.nodes.explicit={title:'Explicit location'};
+  d.floats.push({id:'worker',side:'below',x:0,y:0},{id:'explicit',side:'below',x:700,y:400,noSpread:true});d.edges.push({from:'b',to:'cache'},{from:'cache',to:'worker'});
+  candidate.page.blocks.unshift({heading:'New section',diagram:{nodes:{origin:{title:'New origin placeholder'},anchor:{title:'Explicit anchor'}},rows:[[]],floats:[{id:'origin',side:'below',x:0,y:0},{id:'anchor',side:'below',x:400,y:400,noSpread:true}],edges:[{from:'anchor',to:'origin'}]}});
+  await writeFile(path.join(h.session,request.candidate.spec),JSON.stringify(candidate));await writeFile(path.join(h.session,request.candidate.ledger),'# Coverage\n\nAdded cache and worker.\n');
+  h.run('propose','--request',request.id,'--revision',request.candidate.baseRevision,'--file',request.candidate.spec,'--ledger',request.candidate.ledger,'--summary','Add cache and worker');
+  await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-commit')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(original);
+  await page.locator('#agent-update-details').click();const preview=await page.locator('#agent-update-source').inputValue(),pd=JSON.parse(preview).page.blocks[1].diagram,newDiagram=JSON.parse(preview).page.blocks[0].diagram;
+  const newOrigin=newDiagram.floats.find(f=>f.id==='origin');expect(newOrigin.noSpread).toBe(true);expect(newOrigin.x!==0 || newOrigin.y!==0).toBe(true);
+  expect(newDiagram.floats.find(f=>f.id==='anchor')).toEqual(candidate.page.blocks[0].diagram.floats[1]);
+  for(const id of ['cache','worker']){const f=pd.floats.find(f=>f.id===id);expect(f.noSpread).toBe(true);expect(Number.isFinite(f.x) && Number.isFinite(f.y)).toBe(true);expect(f.x!==0 || f.y!==0).toBe(true);}
+  expect(pd.floats.find(f=>f.id==='origin')).toEqual(d.floats.find(f=>f.id==='origin'));expect(pd.floats.find(f=>f.id==='explicit')).toEqual(d.floats.find(f=>f.id==='explicit'));expect(pd.edges).toEqual(d.edges);
+  const centers=await page.locator('#agent-update-view').locator('g.node').evaluateAll(nodes=>Object.fromEntries(nodes.map(n=>{const m=n.transform.baseVal.consolidate().matrix,c=n.querySelector('.card');return [n.getAttribute('data-dv-node'),{x:m.e+Number(c.getAttribute('width'))/2,y:m.f+Number(c.getAttribute('height'))/2}];})));
+  for(const id of ['cache','worker']){const f=pd.floats.find(f=>f.id===id);expect(centers[id]).toEqual({x:f.x,y:f.y});}
+  await page.locator('#agent-update-details-close').click();await info.attach('automatic-placement-paired-preview',{body:await page.screenshot(),contentType:'image/png'});
+  await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');await expect(page.locator('#src')).toHaveValue(preview);
+  expect(await readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(preview);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(preview);expect(h.errors).toEqual([]);
+ }finally{await page.close();await h.cleanup();}
+});

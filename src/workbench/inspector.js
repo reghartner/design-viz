@@ -169,9 +169,9 @@ function commitCascade(planFor, opt){
   }
 
 function clearCustomEdgesAction(scope,after){
-    var snapshot=parseEditor(),draft=snapshot.error?{error:snapshot.error}:planClearCustomEdges(snapshot.text,snapshot.raw,scope);
+    var snapshot=parseEditor(),draft=snapshot.error?{error:snapshot.error}:planClearCustomEdges(snapshot.text,snapshot.raw,scope,session.topologyContext());
     var button=actionButton('Clear Custom Edges',function(){
-      return commitCascade(function(raw){var plan=planClearCustomEdges(session.text(),raw,scope);return plan.noop?{error:'No authored custom edge geometry is in scope.'}:plan;},after?{after:after}:undefined);
+      return commitCascade(function(raw){var plan=planClearCustomEdges(session.text(),raw,scope,session.topologyContext());return plan.noop?{error:'No authored custom edge geometry is in scope.'}:plan;},after?{after:after}:undefined);
     });
     var reason=draft.error || (draft.noop?'No authored custom edge geometry is in scope.':'');
     button.disabled=!!reason;

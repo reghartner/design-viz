@@ -243,7 +243,7 @@ test('resolved snapshot tracking edits are consumer-owned and use exact session 
  let text=JSON.stringify(snapshot,null,2),saved;
  const session=c.createBuilderSession({source:{read:()=>text,write:v=>text=v},render(){},persistence:{read:()=>({}),preserve(){},cancel(){},save:value=>saved=value}});
  session.replaceProject(text);
- for(const [path,field,value] of [[nodePath,'missingWork','true'],[nodePath,'tickets','["AA-1"]'],[nodePath,'prs','["https://github.com/example/repo/pull/1"]'],[nodePath,'existsWhen','"tickets-done"'],[edgePath,'tickets','["AA-2"]'],[edgePath,'prs','["https://github.com/example/repo/pull/2"]'],[edgePath,'existsWhen','"tickets-done"'],[nodePath,'missingWork',null]]){
+ for(const [path,field,value] of [[nodePath,'missingWork','true'],[nodePath,'tickets','["AA-1"]'],[nodePath,'prs','["https://github.com/example/repo/pull/1"]'],[nodePath,'existsWhen','"tickets-done"'],[edgePath,'missingWork','true'],[edgePath,'tickets','["AA-2"]'],[edgePath,'prs','["https://github.com/example/repo/pull/2"]'],[edgePath,'existsWhen','"tickets-done"'],[nodePath,'missingWork',null],[edgePath,'missingWork',null]]){
   const before=text,observed=session.snapshot(),plan=c.planSetField(text,observed.raw,path,field,value);
   assert.equal(session.accept(plan,{snapshot:observed}),true,plan.error);const after=text;
   assert.notEqual(before,after);session.undo();assert.equal(text,before);session.redo();assert.equal(text,after);
@@ -256,7 +256,7 @@ test('snapshot tracking permissions cannot change imported topology or smuggle i
  const f=fixtures(),before=plain(c.FlowTopology.resolveSource(f.source,f.context));
  for(const mutate of [
   d=>d.nodes['shared::api'].title='renamed',d=>d.nodes['shared::api'].type='text',d=>d.edges[1].from='local',d=>d.floats[0].x+=1,d=>d.topologyProvenance.imports[0].as='other',
-  d=>d.nodes['shared::api'].missingWork='yes',d=>d.nodes['shared::api'].existsWhen='never',d=>d.nodes['shared::api'].tickets=['invalid'],d=>d.nodes['shared::api'].prs=['javascript:alert(1)'],d=>d.edges[1].missingWork=true
+  d=>d.nodes['shared::api'].missingWork='yes',d=>d.nodes['shared::api'].existsWhen='never',d=>d.nodes['shared::api'].tickets=['invalid'],d=>d.nodes['shared::api'].prs=['javascript:alert(1)'],d=>d.edges[1].missingWork='yes'
  ]){
   const after=plain(before);d(after).nodes['shared::api'].missingWork=true;mutate(d(after));assert.ok(c.FlowTopology.editError(before,after));
  }
@@ -273,4 +273,21 @@ test('snapshot tracking and structural protection cover wrapped pages, bare page
   const after=plain(before);get(after).nodes['shared::api'].missingWork=true;assert.equal(c.FlowTopology.editError(before,after),null);
   get(after).nodes['shared::api'].title='Structure change';assert.match(c.FlowTopology.editError(before,after),/read only/);
  }
+});
+
+
+test('edge missing-work overlays retain inherited intent and preserve references and provider source',()=>{
+ const f=fixtures(),original=plain(f.context),key='shared::api->shared::store';
+ const plan=(source,remove=false)=>apply({...f,source},(t,r)=>c.planTopologyTracking(t,r,0,'edge',key,'missingWork',true,remove,f.context,1));
+ const source=plan(f.source);assert.deepEqual(d(source).topologyImports[0].edgeTracking,{'api->store':{missingWork:true}});
+ assert.equal(d(c.FlowTopology.resolveSource(source,f.context)).edges[1].missingWork,true);assert.deepEqual(f.context,original);
+ const linked=apply({...f,source},(t,r)=>c.planTopologyTracking(t,r,0,'edge',key,'tickets','AA-1',false,f.context,1));
+ const removed=plan(linked,true);assert.deepEqual(d(removed).topologyImports[0].edgeTracking,{'api->store':{tickets:['AA-1']}});
+ d(f.provider).edges[0].missingWork=true;
+ assert.match(c.planTopologyTracking(JSON.stringify(f.source),f.source,0,'edge',key,'missingWork',true,true,f.context,1).error,/inherited/);
+ assert.equal(d(c.FlowTopology.resolveSource(removed,f.context)).edges[1].missingWork,true);
+ const nested=plain(f.source);nested.page.canon.id='nested';d(nested).nodes={};d(nested).rows=[[]];d(nested).edges=[];d(nested).topologyImports=[{spec:'consumer',export:'public',as:'outer',edgeTracking:{'shared::api->shared::store':{missingWork:true}}}];
+ const middle=plain(f.source);d(middle).topologyExports={public:{nodes:['shared::api','shared::store'],edges:['shared::api->shared::store']}};
+ delete d(f.provider).edges[0].missingWork;
+ const resolved=c.FlowTopology.materialize([f.provider,middle,nested]);assert.equal(d(resolved[2]).edges[0].missingWork,true);
 });

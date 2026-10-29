@@ -1655,3 +1655,46 @@ test('missing work activates consistent page-wide coverage before provider evide
   assert.equal(ordinary.ctl.liveStatus.snapshot().available,false);assert.equal(ordinary.view.querySelectorAll('[data-live-appearance]').length,0);assert.equal(control.host.querySelector('.dv-live-caption'),null);ordinary.ctl.liveStatus.destroy();
  }
 });
+
+
+test('edge missing work activates a real communication break without provider evidence',()=>{
+ const raw={nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'Delivery',missingWork:true}],steps:[{edge:'a->b'}]};
+ const h=harness(raw),api=h.ctl.liveStatus,d=h.ctl.page.sections[0].diagram;
+ assert.equal(api.snapshot().available,true);assert.equal(api.enabled(),true);
+ assert.equal(h.view.querySelectorAll('.dv-live-comm-failure').length,1);
+ assert.equal(h.view.querySelector('path.edge').getAttribute('data-live-appearance'),'missing');
+ assert.equal(h.C.liveStatusStep(d,d.steps[0],{}),'missing');
+ assert.equal(h.C.liveStatusCaption(d,d.steps[0],{}),'MISSING WORK · unlinked work remains');
+ assert.equal(api.snapshot().readiness.ready,false);assert.equal(api.snapshot().readiness.total,1);
+ assert.deepEqual(plain(api.refs().tickets),[]);assert.deepEqual(plain(api.snapshot().counts),{todo:0,active:0,done:0,blocked:0,missing:0});
+ api.destroy();
+});
+
+
+test('edge missing work beats Done without changing Jira evidence and restores authored failures and traffic',()=>{
+ const raw={page:{tracking:{jira:{site:'https://jira.test'}},sections:[{diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',missingWork:true,tickets:['EE-1']}],steps:[{edge:'a->b'}]}}]}},original=JSON.stringify(raw);
+ const h=harness(raw),api=h.ctl.liveStatus,d=h.ctl.page.sections[0].diagram,path=h.view.querySelector('path.edge'),svg=path.parentNode;
+ h.view.querySelector('text.lbl').remove();path.setAttribute('id','edge-0');
+ const dot=svg.appendChild(new Element('circle',{'class':'pkt'})),mpath=dot.appendChild(new Element('mpath',{href:'#edge-0'}));
+ const authored=svg.appendChild(new Element('g',{'class':'comm-failure comm-dropped','data-dv-edge':'0'}));path.classList.add('comm-hidden');
+ for(const state of ['done','active','todo','unknown','missing','blocked']){
+  api.apply({'EE-1':{state}});const want=state==='blocked'?'blocked':'missing',broken=h.view.querySelector('.dv-live-comm-failure');
+  assert.equal(path.getAttribute('data-live-appearance'),want);assert.equal(broken.getAttribute('data-live-appearance'),want);assert.equal(broken.getAttribute('role'),'button');assert.equal(broken.getAttribute('tabindex'),'0');
+  assert.ok(dot.classList.contains('dv-live-packet-hidden'));assert.ok(path.classList.contains('dv-live-comm-hidden'));assert.ok(authored.classList.contains('dv-live-comm-suppressed'));
+  assert.equal(h.view.querySelectorAll('.dv-live-unavailable').length,0,'missing work is not availability');
+  assert.equal(api.snapshot().readiness.done,0);assert.equal(api.snapshot().readiness.ready,false);
+  assert.equal(h.C.liveStatusStep(d,d.steps[0],{'EE-1':{state}}),want);
+ }
+ api.apply({'EE-1':{state:'done'}});assert.equal(api.snapshot().counts.done,1);assert.equal(api.snapshot().counts.missing,0);
+ const broken=h.view.querySelector('.dv-live-comm-failure');h.view.dispatchEvent({type:'keydown',target:broken,key:'Enter',preventDefault(){},stopPropagation(){}});
+ assert.match(h.view.querySelector('.dv-live-coverage-detail').textContent,/Missing work/);assert.equal(h.view.querySelector('.dv-live-popover a').getAttribute('href'),'https://jira.test/browse/EE-1');
+ h.view.dispatchEvent({type:'navigation-mounted'});h.flush();assert.equal(h.view.querySelectorAll('.dv-live-comm-failure').length,1);
+ for(const reset of [()=>api.setEnabled(false),()=>api.clear(),()=>api.destroy()]){
+  reset();assert.equal(h.view.querySelectorAll('.dv-live-comm-failure,.dv-live-comm-hidden,.dv-live-packet-hidden,.dv-live-comm-suppressed').length,0);assert.ok(path.classList.contains('comm-hidden'));assert.equal(authored.parentNode,svg);
+  api.setEnabled(true);
+ }
+ assert.equal(JSON.stringify(raw),original);
+ const clear=harness(raw),cd=clear.ctl.page.sections[0].diagram;delete cd.edges[0].missingWork;clear.ctl.liveStatus.apply({'EE-1':{state:'done'}});
+ assert.equal(clear.view.querySelectorAll('.dv-live-comm-failure').length,0);assert.equal(clear.ctl.liveStatus.snapshot().readiness.ready,true);clear.ctl.liveStatus.destroy();
+ const invalid=h.C.validate(h.C.normalize({nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',missingWork:'yes'}]}));assert.ok(invalid.warnings.some(w=>w.includes('.edges[0].missingWork')));
+});

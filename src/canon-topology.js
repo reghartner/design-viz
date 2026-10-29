@@ -97,7 +97,7 @@ var FlowTopology = (function(){
   }
   function applyTracking(value,addition){
     if(!addition)return;
-    if(!value.from && addition.missingWork===true)value.missingWork=true;
+    if(addition.missingWork===true)value.missingWork=true;
     if(addition.existsWhen==='tickets-done')value.existsWhen=addition.existsWhen;
     var inherited=trackingStoredRefs(value),local=trackingStoredRefs(addition);
     var merged=trackingStoredRefs({tickets:inherited.tickets.concat(local.tickets),prs:inherited.prs.concat(local.prs)});
@@ -357,7 +357,7 @@ var FlowTopology = (function(){
   function snapshotTracking(value,node){
     var tracking={};if(!object(value))return tracking;
     var fields=['tickets','prs'];
-    if(!isTextBoxNode(value)){fields.push('existsWhen');if(node)fields.push('missingWork');}
+    if(!node || !isTextBoxNode(value))fields.push('existsWhen','missingWork');
     fields.forEach(function(field){if(own(value,field))tracking[field]=value[field];});return tracking;
   }
   function protectedValue(value,node){

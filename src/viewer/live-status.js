@@ -134,10 +134,15 @@ function liveStatusEvidence(value,map){
 }
 /* Presentation is distinct from provider evidence: uncovered authored intent wins,
    and missing provider evidence never claims completion or no-change. */
-function liveStatusPresentation(value,map,node){
+function liveStatusPresentation(value,map){
   var keys=trackingRefs(value).tickets,states=keys.map(function(key){return map[key] && map[key].state || 'unknown';});
-  if(node && value && value.missingWork===true)states.push('missing');
+  if(value && value.missingWork===true)states.push('missing');
   return liveStatusPresentationRollup(states.length?states:['unchanged']);
+}
+// Unmarked edges retain evidence-only paint; a marker adds authored missing
+// intent without turning an ordinary unticketed connection into a status carrier.
+function liveStatusEdgePresentation(value,map,markerOn){
+  return markerOn!==false && value && value.missingWork===true?liveStatusPresentation(value,map):liveStatusEvidence(value,map);
 }
 function liveStatusPresentationRollup(states){
   for(var i=0;i<3;i++){var state=['blocked','missing','active'][i];if(states.indexOf(state)>=0)return state;}
@@ -312,20 +317,20 @@ function liveStatusEdgeBreaks(scope,diagram,map,on,availabilityOn){
     var board={svg:svg,edgeIds:Object.create(null)},failures=Object.create(null),labels=Object.create(null);
     (diagram.edges || []).forEach(function(edge,index){
       var path=svg.querySelector('path.edge[data-dv-edge="'+index+'"]');if(!path)return;
-      var state=on?liveStatusEvidence(edge,map):null,key=edge.from+'->'+edge.to,unavailable=on && availabilityOn!==false?liveStatusAvailability(edge,map,diagram):null;
-      if(state==='blocked' || unavailable){
+      var state=on?liveStatusEdgePresentation(edge,map,availabilityOn):null,key=edge.from+'->'+edge.to,unavailable=on && availabilityOn!==false?liveStatusAvailability(edge,map,diagram):null,missing=on && availabilityOn!==false && edge.missingWork===true;
+      if(state==='blocked' || missing || unavailable){
         board.edgeIds[key]={e:edge,idx:index,pathEl:path,haloEl:svg.querySelector('path.halo[data-dv-edge="'+index+'"]')};
-        failures[key]='blocked';labels[key]=unavailable?liveStatusAvailabilityLabel(unavailable):liveStatusBlockingKeys(edge,map).join(', ');
+        failures[key]='blocked';labels[key]=[edge.missingWork===true?'Missing work: additional work remains without a linked ticket':'',unavailable?liveStatusAvailabilityLabel(unavailable):liveStatusBlockingKeys(edge,map).join(', ')].filter(Boolean).join('; ');
         svg.querySelectorAll('g.comm-failure[data-dv-edge="'+index+'"]').forEach(function(el){el.classList.add('dv-live-comm-suppressed');});
       }
-      if(state==='todo' || state==='blocked' || unavailable)svg.querySelectorAll('circle.pkt').forEach(function(dot){
+      if(state==='todo' || state==='blocked' || missing || unavailable)svg.querySelectorAll('circle.pkt').forEach(function(dot){
         var mpath=dot.querySelector('mpath');if(mpath && mpath.getAttribute('href')==='#'+path.getAttribute('id'))dot.classList.add('dv-live-packet-hidden');
       });
     });
     showCommunicationFailures(board,failures,false,{live:true,labels:labels});
     svg.querySelectorAll('g.dv-live-comm-failure').forEach(function(el){
       var edge=diagram.edges[Number(el.getAttribute('data-dv-edge'))],causes=on && availabilityOn!==false?liveStatusAvailability(edge,map,diagram):null;
-      liveStatusAvailabilityClass(el,causes);liveStatusClass(el,on?liveStatusEvidence(edge,map):null);
+      liveStatusAvailabilityClass(el,causes);liveStatusClass(el,on?liveStatusEdgePresentation(edge,map,availabilityOn):null);
     });
     // A live break is the glyph alone: the edge names its ends, and the badge,
     // popover and the group's title/aria-label carry the blocking keys. Canvas
@@ -337,9 +342,9 @@ function liveStatusStep(diagram,step,map){
   var states=[],nodes=stepNodes(step).slice(),keys=stepKeys(step).concat(Object.keys(stepFailures(step)));
   (diagram.edges || []).forEach(function(edge){
     if(keys.indexOf(edge.from+'->'+edge.to)<0)return;
-    states.push(liveStatusPresentation(edge,map,false) || 'unknown');nodes.push(edge.from,edge.to);
+    states.push(liveStatusPresentation(edge,map) || 'unknown');nodes.push(edge.from,edge.to);
   });
-  nodes.forEach(function(id){var node=(diagram.nodes || {})[id];if(node && !isTextBoxNode(node))states.push(liveStatusPresentation(node,map,true) || 'unknown');});
+  nodes.forEach(function(id){var node=(diagram.nodes || {})[id];if(node && !isTextBoxNode(node))states.push(liveStatusPresentation(node,map) || 'unknown');});
   return liveStatusPresentationRollup(states);
 }
 /* Carrier identities are section-local; ticket keys are deduplicated only when
@@ -572,7 +577,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
       connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+relative(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}}};
   }
-  function hasMissingWork(){return sources().some(function(source){return sectionRecords(source).some(function(record){return Object.values(record.section.diagram && record.section.diagram.nodes || {}).some(function(node){return !isTextBoxNode(node) && node.missingWork===true;});});});}
+  function hasMissingWork(){return sources().some(function(source){return sectionRecords(source).some(function(record){var d=record.section.diagram || {};return Object.values(d.nodes || {}).some(function(node){return !isTextBoxNode(node) && node.missingWork===true;}) || (d.edges || []).some(function(edge){return edge.missingWork===true;});});});}
   function presentationActive(){return applied || hasMissingWork();}
   function connectPanels(){liveStatusPending.slice().forEach(function(pending){if(liveStatusControllerFor(pending.host)===api)pending.connect(api);});}
   function notify(){connectPanels();var value=snapshot();listeners.slice().forEach(function(fn){fn(value);});}
@@ -596,8 +601,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     element('strong','node-link-title','Work status · '+label,pop);
     var dismiss=element('button','node-link-close','×',pop);dismiss.type='button';dismiss.setAttribute('aria-label','Close live tickets');dismiss.addEventListener('click',function(){close(true);});
     var found=trackingRefs(value);
-    if(value && value.missingWork===true)element('p','dv-live-coverage-detail','Missing work: additional work remains without a linked ticket. Clear the node’s Missing work marker when covered.',pop);
-    else if(!found.tickets.length)element('p','dv-live-coverage-detail','No change needed: this node has no linked tickets or missing-work marker.',pop);
+    if(value && value.missingWork===true)element('p','dv-live-coverage-detail','Missing work: additional work remains without a linked ticket. Clear this Missing work marker when covered.',pop);
+    else if(!found.tickets.length)element('p','dv-live-coverage-detail','No change needed: no linked tickets or missing-work marker.',pop);
     if(availability){
       element('p','dv-live-availability-detail',liveStatusAvailabilityLabel(availability),pop);
       availability.forEach(function(cause){cause.tickets.forEach(function(key){
@@ -912,7 +917,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var scope=binding.el,d=binding.section.diagram;if(!d)return;
     var waiting=on?liveStatusCarrierWaiting(d,map,ticketWaiting):{},coverageActive=presentationActive();
     scope.querySelectorAll('g.node[data-dv-node]').forEach(function(el){
-      var id=el.getAttribute('data-dv-node'),value=(d.nodes || {})[id],state=on && availabilityOn && !el.classList.contains('node-text')?(coverageActive?liveStatusPresentation(value,map,true):liveStatusCarrier(value,map)):null;
+      var id=el.getAttribute('data-dv-node'),value=(d.nodes || {})[id],state=on && availabilityOn && !el.classList.contains('node-text')?(coverageActive?liveStatusPresentation(value,map):liveStatusCarrier(value,map)):null;
       // A blocked or missing carrier keeps its own paint (solid or dotted rose): the stronger state wins
       // over the dashed waiting stroke; the popover and panel still record what it waits on.
       var unavailable=on && availabilityOn?liveStatusAvailability(value,map):null;liveStatusAvailabilityClass(el,unavailable);
@@ -926,7 +931,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       carrierTarget(card,id,value,state,binding.page.tracking,value.title || id,waits,unavailable);
     });
     scope.querySelectorAll('path.edge[data-dv-edge],path.halo[data-dv-edge],text.lbl[data-dv-edge]').forEach(function(el){
-      var index=Number(el.getAttribute('data-dv-edge')),value=(d.edges || [])[index],state=on?liveStatusEvidence(value,map):null;
+      var index=Number(el.getAttribute('data-dv-edge')),value=(d.edges || [])[index],state=on?liveStatusEdgePresentation(value,map,availabilityOn):null;
       var unavailable=on && availabilityOn?liveStatusAvailability(value,map,d):null;liveStatusAvailabilityClass(el,unavailable);
       var waits=value && waiting[value.from+'->'+value.to],painted=state==='blocked' || state==='missing'?null:waits;decorateCarrier(el,value,binding.page.tracking);liveStatusClass(el,state);liveStatusWaitingClass(el,painted);
       if((!state && !waits && !unavailable) || !el.classList.contains('edge'))return;

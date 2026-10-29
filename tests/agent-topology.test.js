@@ -218,3 +218,35 @@ test('local refresh and its Undo retire an existing proposal review and require 
  h.session.undo();assert.equal(await h.client.acceptReview(second.review.version),false);assert.equal(h.applies,0);const third=h.client.reviewSnapshot();assert.ok(third.review.version>second.review.version);assert.equal(diagram(h.session.resolve(JSON.parse(third.source),third.topologyContext)).nodes['shared::inner::api'].title,'leaf API');assert.deepEqual(h.hits,[]);
  await h.client.acceptReview(third.review.version);assert.equal(h.applies,1);
 });
+
+for(const availability of ['no catalog','offline','legacy catalog','missing provider','frozen local'])test('opening availability is tagged at acquisition: '+availability,async()=>{
+ const h=await harness(availability==='offline'?'file:///tmp/workbench.html':'https://test.invalid/flowspec.html',{missingIndex:availability==='no catalog'});
+ if(availability==='legacy catalog')h.catalog.version=2;
+ if(availability==='missing provider')h.catalog.diagrams=[];
+ const context=availability==='frozen local'?{version:1,id:'draft',local:true,ephemeral:true,specs:[]}:null;
+ await assert.rejects(h.c.prepareAuthoredTopology(JSON.parse(h.proposal.source),context),error=>error.topologyUnavailable===true);
+});
+for(const fault of ['catalog shape','catalog entry','provider JSON','provider shape','revision','unsafe URL','transitive export'])test('acquisition fault cannot authorize unresolved opening: '+fault,async()=>{
+ const h=await harness();
+ if(fault==='catalog shape')h.catalog.diagrams={};
+ if(fault==='catalog entry')h.catalog.diagrams[0].revision='bad';
+ if(fault==='provider JSON'){const fetch=h.c.fetch;h.c.fetch=async url=>url.endsWith('/leaf.json')?new Response('{invalid'):fetch(url);}
+ if(fault==='provider shape')delete h.providers[0].page.sections;
+ if(fault==='revision')h.providers[0].page.title='Changed';
+ if(fault==='unsafe URL')h.catalog.diagrams[0].specUrl='https://untrusted.invalid/source.json';
+ if(fault==='transitive export'){
+   diagram(h.providers[1]).topologyImports[0].export='unpublished';const {digest}=await import('../tools/canon/drift.mjs');h.catalog.diagrams[1].revision=digest(h.providers[1]);
+ }
+ await assert.rejects(h.c.prepareAuthoredTopology(JSON.parse(h.proposal.source),null),error=>error.topologyUnavailable!==true);
+ assert.equal(h.session.text(),h.original);assert.equal(h.session.topologyContext(),null);
+});
+test('ordinary opening defers only the consumer missing export, never provider integrity or invalid overlays',async()=>{
+ const h=await harness();vm.runInContext(readSource('workbench/local-repository.js'),h.c);
+ const raw=JSON.parse(h.proposal.source);diagram(raw).topologyImports[0].export='future';
+ const next=await h.c.prepareOpenedTopology(raw,null);assert.equal(h.c.isUnresolvedLocalTopology(next),true);assert.equal(next.specs.length,1);
+ const prepared=await h.c.prepareAuthoredTopology(raw,null);prepared.specs.find(s=>s.page.canon.id==='nested').page.sections[0].diagram.topologyImports[0].export='future';
+ await assert.rejects(h.c.prepareOpenedTopology(raw,prepared),error=>error.topologyMissingExport.consumer==='nested');
+ diagram(raw).topologyImports[0].nodePositions={api:{x:'invalid',y:2}};
+ await assert.rejects(h.c.prepareOpenedTopology(raw,null),/finite x\/y/);
+ assert.equal(h.session.text(),h.original);assert.equal(h.session.topologyContext(),null);
+});

@@ -117,8 +117,10 @@ test('empty registry preserves an ordinary folder and nested imports reuse the e
     const stream=await handle.createWritable();await stream.write(JSON.stringify(raw));await stream.close();
   });
   await filePanel(page);await page.locator('#working-folder-open').click();
-  await expect(page.locator('#guide')).toContainText('frozen local repository snapshot is missing');
-  await expect(page.locator('#src')).toHaveValue(consumer);expect(requests).toEqual([]);
+  await expect(page.locator('#local-sources-status')).toContainText('Imports unresolved');
+  await expect(page.locator('#src')).toHaveValue(await disk(page));await expect(node(page)).toBeVisible();expect(requests).toEqual([]);
+  const replacement=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));expect(replacement.topologyContext.specs).toHaveLength(1);
+  expect(await page.evaluate(text=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')).some(d=>d.text===text && d.topologyContext?.specs.length===3),consumer)).toBe(true);
   await page.evaluate(async source=>{
     const root=await navigator.storage.getDirectory();window.pickNested=false;
     for(const [name,text] of [['canon.json','{"version":1,"diagrams":[]}'],['ordinary.spec.json',source]]){

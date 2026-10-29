@@ -119,6 +119,9 @@ function canonReaderTarget(ctl){
   }
   return target;
 }
+/* Only acquisition branches can authorize opening an unresolved local draft.
+   Provider bodies and their error messages never grant this permission. */
+function topologyUnavailable(message){var error=new Error(message);error.topologyUnavailable=true;return error;}
 async function readCanonLibraryJSON(response,label){
   if(!response.ok)throw new Error(label+' unavailable ('+response.status+').');
   if(Number(response.headers.get('content-length'))>30*1024*1024)throw new Error(label+' exceeds 30 MB.');
@@ -138,7 +141,7 @@ async function readCanonLibraryJSON(response,label){
 var siteRepositoryIndex=(function(){
   var cached=null,pending=null;
   return function(options){
-    if(!/^https?:$/.test(new URL(location.href).protocol))return Promise.reject(new Error('Referenced topology needs a deployed Workbench. This offline editor has no published diagram library.'));
+    if(!/^https?:$/.test(new URL(location.href).protocol))return Promise.reject(topologyUnavailable('Referenced topology needs a deployed Workbench. This offline editor has no published diagram library.'));
     if(pending)return pending;
     if(cached && !(options && options.fresh))return Promise.resolve(cached);
     var url=new URL('diagrams.json',location.href).href,redirect=options && options.follow?'follow':'error';
@@ -148,7 +151,7 @@ var siteRepositoryIndex=(function(){
         // Only a body shaped like a diagram library counts as a read; any
         // other JSON (for example a placeholder) is "no library" and is not kept.
         var body=await readCanonLibraryJSON(response,'Repository catalog');
-        if(body && [1,2,3].includes(body.version) && Array.isArray(body.diagrams))raw=body;
+        if(body && [1,2,3].includes(body.version)){parseCanonLibrary(body);raw=body;}
       }
       return {status:response.status,redirected:!!response.redirected,raw:raw,url:url};
     })();
@@ -193,7 +196,7 @@ function createTopologyCatalogLoader(context){
     async function visit(key){
       if(visited.has(key))return;visited.add(key);
       var entry=entries.find(function(item){return item.id===key;});
-      if(!entry)throw new Error('Missing authored provider '+key+' in the frozen catalog.');
+      if(!entry)throw topologyUnavailable('Missing authored provider '+key+' in the frozen catalog.');
       var raw=await source(entry);specs.set(key,raw);
       for(var dependency of FlowTopology.dependencies(raw))await visit(dependency);
     }
@@ -219,7 +222,7 @@ async function prepareTopologyProposal(raw,context){
   if(!context)context=await connectTopologyRepository({page:{sections:[{diagram:{nodes:{},rows:[[]]}}]}});
   var missing=dependencies.filter(function(id){return !context.specs.some(function(spec){return spec.page.canon.id===id;});});
   if(!missing.length)return context;
-  if(context.local)throw new Error('The frozen local repository snapshot is missing provider '+missing.join(', ')+'. Reopen the repository root containing canon.json to load its complete import closure.');
+  if(context.local)throw topologyUnavailable('The frozen local repository snapshot is missing provider '+missing.join(', ')+'. Reopen the repository root containing canon.json to load its complete import closure.');
   var loader=createTopologyCatalogLoader(context),prepared=context;
   for(var id of missing)prepared=(await loader.load(id,prepared)).context;
   return prepared;
@@ -262,9 +265,9 @@ async function prepareAuthoredTopology(raw,context){
 async function connectTopologyRepository(raw){
   var index=await siteRepositoryIndex();
   if(index.redirected)throw new Error('This Workbench redirects its diagram library elsewhere, so referenced topology is unavailable here.');
-  if(!index.raw)throw new Error('This Workbench has no published diagram library, so referenced topology is unavailable here. Local exports still work.');
+  if(!index.raw)throw topologyUnavailable('This Workbench has no published diagram library, so referenced topology is unavailable here. Local exports still work.');
   var catalog=index.raw,catalogURL=new URL(index.url);
-  if(!catalog || catalog.version!==3)throw new Error('Referenced topology is unavailable here: this Workbench publishes a version '+(catalog && catalog.version)+' diagram library, and a version 3 authored-source repository catalog is required.');
+  if(!catalog || catalog.version!==3)throw topologyUnavailable('Referenced topology is unavailable here: this Workbench publishes a version '+(catalog && catalog.version)+' diagram library, and a version 3 authored-source repository catalog is required.');
   var entries=parseCanonLibrary(catalog),ids=new Set(entries.map(function(entry){return entry.id;})),id='workbench-draft',suffix=2;
   while(ids.has(id))id='workbench-draft-'+suffix++;
   var value=JSON.parse(JSON.stringify(raw)),spec;

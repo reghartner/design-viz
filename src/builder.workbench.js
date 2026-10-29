@@ -1534,9 +1534,7 @@ function initWorkbenchBuilder(opts){
       prepare:async function(text){
         var raw;
         try{raw=JSON.parse(text);}catch(ex){if(repairable)return null;throw new Error('JSON parse: '+ex.message);}
-        var context;
-        try{context=await prepareAuthoredTopology(raw,session.topologyContext());}
-        catch(error){if(!authoredTopologyDependencies(raw).length)throw error;context=unresolvedLocalTopology(raw);}
+        var context=await prepareOpenedTopology(raw,session.topologyContext());
         if(!isUnresolvedLocalTopology(context) && (!repairable || authoredTopologyDependencies(raw).length)){
           var findings=session.validate(raw,context);if(findings.errors.length)throw new Error(findings.errors.join('\n'));
         }

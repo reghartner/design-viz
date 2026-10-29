@@ -512,7 +512,7 @@ function builderPinNodeCenters(d,positions,ids){
     Object.assign(f,{side:'below',x:p.cx,y:p.cy,noSpread:true});delete f.dx;delete f.dy;
   });
 }
-function planPlaceOptimally(text,raw,targets,context,preserved){
+function planPlaceOptimally(text,raw,targets,context,preserved,preserveOnly){
   // Topology resolution validates its materialized document. Seed missing
   // local slots privately before resolving; the eventual plan remains atomic.
   if(Array.isArray(targets) && targets.length){
@@ -529,17 +529,19 @@ function planPlaceOptimally(text,raw,targets,context,preserved){
     }
   }
   var got=builderNodeArrangementTargets(text,raw,targets,context);if(got.error)return got;
-  var movable=got.records.filter(function(record){return !builderNodePositionLocked(got.effective,record.id);});
-  if(!movable.length)return {noop:true};
-  var ids=movable.map(function(record){return record.id;}),before=Object.assign({},layout(got.effective).pos,preserved || {});
+  var movable=preserveOnly?[]:got.records.filter(function(record){return !builderNodePositionLocked(got.effective,record.id);});
+  if(!movable.length && !preserved)return {noop:true};
+  var ids=movable.map(function(record){return record.id;}),effectivePositions=layout(got.effective).pos,before=Object.assign({},effectivePositions,preserved || {});
   var placement=builderOptimalPositions(got.effective,ids,before);if(placement.error)return placement;
   var copy=builderClone(got.d),local=movable.filter(function(record){return record.local;}),wanted=new Set(ids);
-  if(local.length){
+  if(local.length || preserved){
     var centers=Object.create(null);local.forEach(function(record){var p=placement.positions[record.id];centers[record.id]={cx:p.x,cy:p.y};});
-    builderPinNodeCenters(copy,centers,local.map(function(record){return record.id;}));
+    if(local.length)builderPinNodeCenters(copy,centers,local.map(function(record){return record.id;}));
     // Removing a row slot or changing the group header can re-space neighbours.
     // Pin only the unrelated nodes that actually move, until layout is stable.
     var stable=Object.keys(copy.nodes || {}).filter(function(id){return !wanted.has(id) && before[id];});
+    var shifted=stable.filter(function(id){var p=effectivePositions[id],b=before[id];return p && (Math.abs(p.cx-b.cx)>.0001 || Math.abs(p.cy-b.cy)>.0001);});
+    if(shifted.length)builderPinNodeCenters(copy,before,shifted);
     for(var pass=0;pass<=stable.length;pass++){
       var after=layout(copy).pos,moved=stable.filter(function(id){var p=after[id],b=before[id];return !p || Math.abs(p.cx-b.cx)>.0001 || Math.abs(p.cy-b.cy)>.0001;});
       if(!moved.length)break;
@@ -549,6 +551,19 @@ function planPlaceOptimally(text,raw,targets,context,preserved){
   ((got.effective.topologyProvenance || {}).imports || []).forEach(function(owner){
     var imp=(copy.topologyImports || []).find(function(imp){return imp.as===owner.as;});if(imp && !imp.position)imp.position=builderClone(owner.position);
   });
+  // A changed export subset can re-space an existing imported member even
+  // when its consumer placement was untouched. Preserve those old centers too.
+  var keep=Object.keys(preserved || {});
+  for(var k=0;k<keep.length;k++){
+    var id=keep[k];if(wanted.has(id))continue;
+    var record=builderArrangementOwner(got,'nodes',id),p=preserved[id];
+    if(!record.error && !record.local){
+      var current=effectivePositions[id];
+      if(current && (Math.abs(current.cx-p.cx)>.0001 || Math.abs(current.cy-p.cy)>.0001)){
+        var correction=builderWriteImportedPosition(copy,Object.assign(record,{id:id}),{x:p.cx,y:p.cy});if(correction && correction.error)return correction;
+      }
+    }
+  }
   for(var i=0;i<movable.length;i++)if(!movable[i].local){var result=builderWriteImportedPosition(copy,movable[i],placement.positions[movable[i].id]);if(result && result.error)return result;}
   var pairs=['rows','floats','topologyImports'].filter(function(key){return JSON.stringify(copy[key])!==JSON.stringify(got.d[key]);}).map(function(key){return [key,copy[key]===undefined?null:JSON.stringify(copy[key])];});
   return pairs.length?planSetFields(text,raw,got.path,pairs):{noop:true};
@@ -583,30 +598,67 @@ function normalizeWorkbenchAgentPlacement(beforeText,source,context){
       matched[index]=index;claimed.add(index);
     }
   });
+  var additions=[],needsImports=false;
+  function previousDiagram(index){return Object.prototype.hasOwnProperty.call(matched,index)?specValueAt(before,prior[matched[index]].diagram):null;}
+  // Seed every new local node before resolving the document. The resolver
+  // validates all sections together, including mixed local/import additions.
   records.forEach(function(rec,index){
-    var d=specValueAt(raw,rec.diagram);if(!d || !d.nodes)return;
-    var previous=Object.prototype.hasOwnProperty.call(matched,index)?specValueAt(before,prior[matched[index]].diagram):null;
-    var rowIds=new Set(builderFlatRowIds(d.rows)),nodeIds=Object.keys(d.nodes);
-    // A new row-based arrangement can intentionally use automatic floats.
-    // Origin placeholders are still new per-node placement requests; explicit
-    // nonzero siblings never exempt them from normalization.
+    var d=specValueAt(raw,rec.diagram);if(!d)return;
+    var previous=previousDiagram(index),rowIds=new Set(builderFlatRowIds(d.rows)),nodeIds=Object.keys(d.nodes || {});
     var authoredRows=!previous && rowIds.size>0 && nodeIds.every(function(id){return rowIds.has(id) || (d.floats || []).some(function(f){return f && f.id===id;});});
     var ids=nodeIds.filter(function(id){
       if(previous && Object.prototype.hasOwnProperty.call(previous.nodes || {},id) || rowIds.has(id))return false;
       var f=(d.floats || []).find(function(f){return f && f.id===id;});
       return !f || !authoredRows && !Object.prototype.hasOwnProperty.call(f,'x') && !Object.prototype.hasOwnProperty.call(f,'y') || f.x===0 && f.y===0;
     });
-    if(!ids.length)return;
-    if((d.floats || []).some(function(f){return f && (Object.prototype.hasOwnProperty.call(f,'x') || Object.prototype.hasOwnProperty.call(f,'y')) && !positionedFloat(f);}))throw Error('Free placement requires finite X and Y coordinates.');
-    // Newly introduced groups and ordinary automatic floats may already have
-    // shifted old nodes in the proposed layout. Preserve their prior centers
-    // when the agent left the existing placement and group definitions intact.
-    var preserved=null;
-    if(previous && JSON.stringify(d.rows)===JSON.stringify(previous.rows) && Object.keys(previous.groups || {}).every(function(key){return JSON.stringify((d.groups || {})[key])===JSON.stringify(previous.groups[key]);}) && Object.keys(previous.nodes || {}).every(function(id){return d.nodes[id] && d.nodes[id].group===previous.nodes[id].group;}) && d.routing===previous.routing && !(d.topologyImports || []).length){
-      var oldFloats=(d.floats || []).filter(function(f){return !ids.includes(f.id);});
-      if(JSON.stringify(oldFloats)===JSON.stringify(previous.floats || []))preserved=layout(Object.assign({},previous,{rows:previous.rows || [[]]})).pos;
+    additions[index]=ids;
+    if((d.topologyImports || []).length && (ids.length || JSON.stringify(d.topologyImports)!==JSON.stringify(previous && previous.topologyImports)))needsImports=true;
+    var missing=ids.filter(function(id){return !(d.floats || []).some(function(f){return f && f.id===id;});});
+    if(missing.length){
+      var floats=(d.floats || []).concat(missing.map(function(id){return {id:id,side:'below',noSpread:true};}));
+      var seeded=planSetFields(text,JSON.parse(text),rec.diagram,[['rows',JSON.stringify(d.rows || [[]])],['floats',JSON.stringify(floats)]]);
+      if(seeded.error)throw Error(seeded.error);text=seeded.text;
     }
-    var result=planPlaceOptimally(text,JSON.parse(text),ids.map(function(id){return {kind:'node',section:index,id:id};}),context,preserved);
+  });
+  var resolvedBefore=before,resolvedAfter=JSON.parse(text);
+  if(needsImports){
+    if(!context)throw Error('Open this spec from Canon to arrange imported nodes.');
+    // Both sides use the same frozen context: a provider refresh alone is not
+    // a consumer node addition, and provider source is never rewritten here.
+    resolvedBefore=FlowTopology.resolveSource(before,context);
+    resolvedAfter=FlowTopology.resolveSource(resolvedAfter,context);
+  }
+  var oldRecords=specSectionPaths(resolvedBefore),newRecords=specSectionPaths(resolvedAfter);
+  records.forEach(function(rec,index){
+    var d=specValueAt(raw,rec.diagram);if(!d)return;
+    var previous=previousDiagram(index),effective=specValueAt(resolvedAfter,newRecords[index].diagram),oldEffective=previous?specValueAt(resolvedBefore,oldRecords[matched[index]].diagram):null;
+    var ids=additions[index] || [],newImported=[],preserved={},oldPositions=oldEffective?layout(Object.assign({},oldEffective,{rows:oldEffective.rows || [[]]})).pos:{};
+    if(needsImports)(d.topologyImports || []).forEach(function(imp){
+      var oldImport=((previous || {}).topologyImports || []).find(function(old){return old.as===imp.as && old.spec===imp.spec;});
+      var owner=((effective.topologyProvenance || {}).imports || []).find(function(owner){return owner.as===imp.as;});if(!owner)return;
+      var explicitOrigin=positionedFloat(imp.position) && (imp.position.x!==0 || imp.position.y!==0) && (!oldImport || JSON.stringify(imp.position)!==JSON.stringify(oldImport.position));
+      (owner.nodes || []).forEach(function(id){
+        var relative=id.slice(imp.as.length+2),point=(imp.nodePositions || {})[relative];
+        if(oldImport && oldEffective && Object.prototype.hasOwnProperty.call(oldEffective.nodes || {},id)){
+          if(oldImport && JSON.stringify(imp.position)===JSON.stringify(oldImport.position) && JSON.stringify(point)===JSON.stringify((oldImport.nodePositions || {})[relative]))preserved[id]=oldPositions[id];
+        }else{
+          newImported.push(id);
+          if(!explicitOrigin && !(positionedFloat(point) && (point.x!==0 || point.y!==0)))ids.push(id);
+        }
+      });
+    });
+    if(!ids.length && !newImported.length)return;
+    if((d.floats || []).some(function(f){return f && (Object.prototype.hasOwnProperty.call(f,'x') || Object.prototype.hasOwnProperty.call(f,'y')) && !positionedFloat(f);}))throw Error('Free placement requires finite X and Y coordinates.');
+    // Keep authored old placements, including locks, as anchors. Explicit
+    // consumer moves remain intentional and do not get restored from before.
+    if(previous && JSON.stringify(d.rows)===JSON.stringify(previous.rows) && Object.keys(previous.groups || {}).every(function(key){return JSON.stringify((d.groups || {})[key])===JSON.stringify(previous.groups[key]);}) && Object.keys(previous.nodes || {}).every(function(id){return d.nodes && d.nodes[id] && d.nodes[id].group===previous.nodes[id].group;}) && d.routing===previous.routing){
+      var oldFloats=(d.floats || []).filter(function(f){return !ids.includes(f.id);});
+      if(JSON.stringify(oldFloats)===JSON.stringify(previous.floats || []))Object.keys(previous.nodes || {}).forEach(function(id){if(oldPositions[id])preserved[id]=oldPositions[id];});
+    }
+    // Explicit new import positions stay exact, but their group headers must
+    // not shift unrelated existing rows. Reuse the preservation-only path.
+    if(!ids.length && !Object.keys(preserved).length)return;
+    var result=planPlaceOptimally(text,JSON.parse(text),(ids.length?ids:newImported).map(function(id){return {kind:'node',section:index,id:id};}),context,Object.keys(preserved).length?preserved:null,!ids.length);
     if(result.error)throw Error(result.error);if(result.text)text=result.text;
   });
   return text;

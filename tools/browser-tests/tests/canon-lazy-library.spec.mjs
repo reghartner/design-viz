@@ -90,8 +90,10 @@ test('reference picker browses bounded exports, inserts a closed subset, and pre
   await testInfo.attach('reference-picker',{body:await page.locator('#topology-picker').screenshot(),contentType:'image/png'});
   await page.locator('#topology-add').click();await prepareEditorSurface(page);
   const after=await page.locator('#src').inputValue(),raw=JSON.parse(after),d=raw.page.blocks[0].diagram;
-  expect(d.topologyImports).toEqual([{spec:'first',export:'channels',as:'notify',nodes:['dispatch','push','sms'],edges:['dispatch->push','dispatch->sms']}]);
-  expect(d.nodes['notify::push']).toBeUndefined();expect(d.topologyProvenance).toBeUndefined();expect(d.topologyImports[0].position).toBeUndefined();
+  expect(d.topologyImports[0]).toMatchObject({spec:'first',export:'channels',as:'notify',nodes:['dispatch','push','sms'],edges:['dispatch->push','dispatch->sms']});expect(Object.keys(d.topologyImports[0].nodePositions).sort()).toEqual(['dispatch','push','sms']);
+  expect(d.nodes['notify::push']).toBeUndefined();expect(d.topologyProvenance).toBeUndefined();expect(Number.isFinite(d.topologyImports[0].position.x)).toBe(true);
+  const centers=await page.locator('#docview g.node[data-dv-node="a"]').evaluate(n=>Object.fromEntries(Array.from(n.closest('svg').querySelectorAll('g.node')).map(node=>{const m=node.transform.baseVal.consolidate().matrix,c=node.querySelector('.card');return [node.getAttribute('data-dv-node'),{x:m.e+Number(c.getAttribute('width'))/2,y:m.f+Number(c.getAttribute('height'))/2,w:Number(c.getAttribute('width')),h:Number(c.getAttribute('height'))}];})));
+  for(const id of ['dispatch','push','sms'])for(const [other,q] of Object.entries(centers)){if(other==='notify::'+id)continue;const p=centers['notify::'+id];expect(Math.abs(p.x-q.x)>=(p.w+q.w)/2+24 || Math.abs(p.y-q.y)>=(p.h+q.h)/2+24).toBe(true);}
   await expect(page.locator('#docview [data-dv-node="notify::push"]')).toBeVisible();await expect(page.locator('#docview [data-dv-node="notify::email"]')).toHaveCount(0);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(fixture.before);await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);

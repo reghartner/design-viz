@@ -68,8 +68,8 @@ function planAddNode(text, raw, sectionIdx, preset, point, context){
     JSON.stringify(icon) + ', "tint": ' + JSON.stringify(tint) + '}');
   if (!r2) return {error: 'could not edit nodes in the editor text'};
   if(!point){
-    var optimal=planPlaceOptimally(r2.text,JSON.parse(r2.text),[{kind:'node',section:sectionIdx,id:id}],context);
-    if(optimal.error)return optimal;if(optimal.text)r2=optimal;
+    try{r2={text:normalizeWorkbenchAgentPlacement(text,r2.text,context)};}
+    catch(ex){return {error:ex.message};}
   }
   var range=jsonLocate(r2.text,got.path.concat(['nodes',id]));
   return {text:r2.text,start:range && range.start,end:range && range.end,kind:'node',id:id};

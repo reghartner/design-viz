@@ -13,7 +13,7 @@ function fixtures(){
 }
 function harness(extra={}){
   const context={URL,TextEncoder,Response,location:{href:'https://test.invalid/workbench/flowspec.html'},window:{crypto:webcrypto},...extra};
-  vm.createContext(context);vm.runInContext(loader.composeSources(['canon.js','validator.js','viewer/workspace-handoff.js','library.workbench.js','workbench/source-edit.js','workbench/targets.js','workbench/commands/common.js','workbench/commands/graph.js','workbench/commands/topology.js','workbench/session.js']),context);return context;
+  vm.createContext(context);vm.runInContext(loader.composeSources(['canon.js','validator.js','viewer/workspace-handoff.js','library.workbench.js','workbench/source-edit.js','workbench/targets.js','workbench/commands/common.js','workbench/commands/graph.js','workbench/commands/layout.js','workbench/commands/topology.js','workbench/session.js']),context);return context;
 }
 const reference={spec:'provider',export:'public',as:'child',nodes:['a','b'],edges:['a->b']};
 test('subsets preserve export safety, endpoint closure, groups, protocols and provider order',()=>{
@@ -40,8 +40,11 @@ test('node-only subset and independent omission defaults remain valid',()=>{
 test('headless insertion is surgical, rejects collisions and invalid candidates, and has one Undo',()=>{
   const c=harness(),specs=fixtures(),raw=specs[1],original=JSON.stringify(raw,null,4)+'\n',context={version:1,id:'consumer',specs,catalog:{version:3,diagrams:[]}};
   const plan=c.planAddTopologyImport(original,raw,0,reference,context);assert.equal(plan.error,undefined);
-  const authored=JSON.parse(plan.text);assert.deepEqual(diagram(authored).topologyImports,[reference]);
-  delete diagram(authored).topologyImports;assert.deepEqual(authored,raw);assert.ok(plan.text.endsWith('\n'));
+  const authored=JSON.parse(plan.text);assert.deepEqual(Object.fromEntries(Object.entries(diagram(authored).topologyImports[0]).filter(([key])=>!['position','nodePositions'].includes(key))),reference);assert.ok(diagram(authored).topologyImports[0].nodePositions.a);
+  const oldPosition=c.layout(diagram(raw)).pos.local,newPosition=c.layout(diagram(c.FlowTopology.resolveSource(authored,context))).pos.local;
+  assert.deepEqual({x:newPosition.cx,y:newPosition.cy},{x:oldPosition.cx,y:oldPosition.cy});
+  delete diagram(authored).topologyImports;diagram(authored).rows=diagram(raw).rows;delete diagram(authored).floats;
+  assert.deepEqual(authored,raw);assert.ok(plan.text.endsWith('\n'));
   assert.equal(plan.id,'child::a');assert.ok(!plan.text.includes('topologyProvenance'));assert.ok(!plan.text.includes('child::a'));
   assert.match(c.planAddTopologyImport(plan.text,JSON.parse(plan.text),0,reference,context).error,/duplicate namespace/);
   assert.match(c.planAddTopologyImport(original,raw,0,{...reference,as:'not a token'},context).error,/namespace/);
@@ -107,7 +110,7 @@ test('an unsaved local consumer automatically pins repository providers once per
   assert.equal(plan.error,undefined);assert.equal(JSON.stringify(JSON.parse(plan.text)).includes('workbench-draft'),false);
   let current='',saved;const session=c.createBuilderSession({source:{read:()=>current,write:value=>current=value},persistence:{read:()=>({}),preserve(){},cancel(){},save:(value,baseline,artifacts)=>saved={value,artifacts}},render(){session.resolve(JSON.parse(current));}});
   session.replaceProject(text);const snapshot=session.snapshot();assert.equal(session.accept(plan,{snapshot,topologyContext:loaded.context}),true);
-  const authored=JSON.parse(current);assert.deepEqual(diagram(authored).topologyImports,[reference]);assert.equal(authored.page.canon,undefined);
+  const authored=JSON.parse(current);assert.deepEqual(Object.fromEntries(Object.entries(diagram(authored).topologyImports[0]).filter(([key])=>!['position','nodePositions'].includes(key))),reference);assert.ok(diagram(authored).topologyImports[0].nodePositions.a);assert.equal(authored.page.canon,undefined);
   assert.equal(saved.artifacts.topologyContext.ephemeral,true);assert.deepEqual(hits.map(url=>url.split('/').pop()),['diagrams.json','provider.json']);
   // A1: a second pin on the same page reuses the index already fetched.
   const again=await c.connectTopologyRepository(raw);assert.equal(again.ephemeral,true);assert.deepEqual(hits.map(url=>url.split('/').pop()),['diagrams.json','provider.json']);

@@ -270,7 +270,8 @@ optimally**. Keyboard users can focus a node and press **Shift+F10** or the
 unlocked nodes, and keeps other centers, custom routes and saved panel layouts.
 Row nodes become free nodes; imported nodes save placement overrides in the
 consumer document. The whole operation is one Undo action. Ordinary additions
-from Add, and new agent nodes without coordinates, use the same placement
+from Add or Referenced topology, and new local/imported agent nodes without
+coordinates, use the same placement
 planner automatically. Agent placement appears in the paired preview and the
 accepted source; a canvas click still supplies the exact insertion point.
 

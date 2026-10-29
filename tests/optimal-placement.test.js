@@ -176,3 +176,96 @@ test('new diagram origin placeholders normalize independently of explicit nonzer
  const explicit={page:{blocks:[{diagram:{nodes:{a:{},b:{}},rows:[[]],floats:[{id:'a',side:'below',x:50,y:50},{id:'b',side:'below',x:400,y:400}]}}]}};
  assert.equal(C.normalizeWorkbenchAgentPlacement(before,JSON.stringify(explicit)),JSON.stringify(explicit));
 });
+
+function importedFixture(){
+ const provider=JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/canon/topology/platform.json'),'utf8'));
+ const consumer={page:{title:'Consumer',canon:{version:1,id:'consumer',kind:'design',owner:'group:default/test'},sections:[{id:'flow',diagram:{nodes:{anchor:{title:'Anchor'},origin:{title:'Existing origin',locked:true}},rows:[[]],floats:[{id:'anchor',side:'below',x:1000,y:1000,noSpread:true},{id:'origin',side:'below',x:0,y:0,noSpread:true}],edges:[]}}]}};
+ const context={version:1,id:'consumer',specs:[provider,consumer]};
+ return {provider,consumer,context,d:spec=>spec.page.sections[0].diagram,effective:spec=>C.FlowTopology.resolveSource(spec,context).page.sections[0].diagram};
+}
+test('new imported nodes and mixed local additions share connection-aware placement before validation',()=>{
+ for(const zero of [false,true]){
+ const {provider,consumer,context,d,effective}=importedFixture(),saved=JSON.stringify(context),next=plain(consumer),oldPos=C.layout(effective(consumer)).pos;
+ d(next).topologyImports=[{spec:'platform',export:'core',as:'shared',...(zero?{position:{x:0,y:0},nodePositions:{api:{x:0,y:0},store:{x:0,y:0}}}:{})}];
+ d(next).nodes.added={title:'Local addition'};d(next).edges.push({from:'anchor',to:'shared::api'},{from:'shared::api',to:'added'});
+ const text=C.normalizeWorkbenchAgentPlacement(JSON.stringify(consumer),JSON.stringify(next),context),out=JSON.parse(text),resolved=effective(out),positions=C.layout(resolved).pos;
+ assert.ok(d(out).topologyImports[0].nodePositions.api);assert.ok(d(out).topologyImports[0].nodePositions.store);noCollision(resolved,['shared::api','shared::store','added']);
+ assert.ok(Math.hypot(positions['shared::api'].cx-positions.anchor.cx,positions['shared::api'].cy-positions.anchor.cy)<600);
+ for(const id of Object.keys(oldPos))assert.deepEqual(center(positions[id]),center(oldPos[id]),id);
+ assert.deepEqual(d(out).nodes,d(next).nodes);assert.deepEqual(d(out).edges,d(next).edges);assert.equal(JSON.stringify(context),saved);assert.equal(JSON.stringify(provider),JSON.stringify(context.specs[0]));
+ assert.equal(C.normalizeWorkbenchAgentPlacement(JSON.stringify(consumer),text,context),text);
+ }
+});
+test('expanding an import preserves existing locked members, local nodes and later imported blocks',()=>{
+ const {provider,consumer,context,d,effective}=importedFixture();provider.page.sections[0].diagram.nodes.store.locked=true;
+ d(consumer).topologyImports=[{spec:'platform',export:'core',as:'shared',nodes:['store'],edges:[]},{spec:'platform',export:'entry',as:'later'}];
+ const before=C.layout(effective(consumer)).pos,next=plain(consumer);d(next).topologyImports[0].nodes=['api','store'];d(next).edges.push({from:'anchor',to:'shared::api'});
+ const source=C.normalizeWorkbenchAgentPlacement(JSON.stringify(consumer),JSON.stringify(next),context),out=JSON.parse(source),after=C.layout(effective(out)).pos;
+ for(const id of Object.keys(before))assert.deepEqual(center(after[id]),center(before[id]),id);
+ assert.ok(d(out).topologyImports[0].nodePositions.api);assert.ok(d(out).topologyImports[0].nodePositions.store,'consumer correction retains old locked center');noCollision(effective(out),['shared::api']);
+ const manual=C.planPlaceOptimally(source,out,[{kind:'node',section:0,id:'shared::store'}],context);assert.equal(manual.noop,true);
+});
+test('new imported placeholders normalize per node while deliberate consumer points and origins stay exact',()=>{
+ const {consumer,context,d,effective}=importedFixture(),next=plain(consumer);
+ d(next).topologyImports=[{spec:'platform',export:'core',as:'shared',nodePositions:{api:{x:0,y:0},store:{x:400,y:400}}}];
+ const beforeStore=C.layout(effective(next)).pos['shared::store'],source=C.normalizeWorkbenchAgentPlacement(JSON.stringify(consumer),JSON.stringify(next),context),out=JSON.parse(source);
+ assert.deepEqual(d(out).topologyImports[0].nodePositions.store,{x:400,y:400});assert.deepEqual(center(C.layout(effective(out)).pos['shared::store']),center(beforeStore));
+ assert.notDeepEqual(d(out).topologyImports[0].nodePositions.api,{x:0,y:0});
+ const explicit=plain(next);d(explicit).topologyImports[0].position={x:600,y:700};assert.equal(C.normalizeWorkbenchAgentPlacement(JSON.stringify(consumer),JSON.stringify(explicit),context),JSON.stringify(explicit));
+ const old=plain(next),after=plain(next);d(after).nodes.new={};d(after).edges.push({from:'shared::api',to:'new'});
+ const retained=JSON.parse(C.normalizeWorkbenchAgentPlacement(JSON.stringify(old),JSON.stringify(after),context));assert.deepEqual(d(retained).topologyImports[0].nodePositions.api,{x:0,y:0});
+});
+test('nested re-exported additions use direct consumer ownership and never publish derived nodes',()=>{
+ const {consumer,context,d,effective}=importedFixture(),bridge={page:{title:'Bridge',canon:{version:1,id:'bridge',kind:'canonical',owner:'group:default/test'},sections:[{diagram:{nodes:{},rows:[[]],topologyImports:[{spec:'platform',export:'core',as:'inner'}],topologyExports:{bundle:{nodes:['inner::api','inner::store'],edges:['inner::api->inner::store']}}}}]}};
+ context.specs.push(bridge);const saved=JSON.stringify(context),next=plain(consumer);d(next).topologyImports=[{spec:'bridge',export:'bundle',as:'outer'}];d(next).edges.push({from:'anchor',to:'outer::inner::api'});
+ const out=JSON.parse(C.normalizeWorkbenchAgentPlacement(JSON.stringify(consumer),JSON.stringify(next),context)),imp=d(out).topologyImports[0];
+ assert.ok(imp.nodePositions['inner::api']);assert.ok(imp.nodePositions['inner::store']);assert.deepEqual(d(out).nodes,d(consumer).nodes);assert.equal(JSON.stringify(context),saved);noCollision(effective(out),['outer::inner::api','outer::inner::store']);
+});
+test('import-only sections normalize and missing local slots in multiple sections seed transactionally',()=>{
+ const {consumer,context,d}=importedFixture(),next=plain(consumer);d(next).nodes.added={};
+ next.page.sections.push({id:'second',diagram:{nodes:{other:{}},topologyImports:[{spec:'platform',export:'core',as:'shared'}]}});
+ next.page.sections.push({id:'only-import',diagram:{topologyImports:[{spec:'platform',export:'entry',as:'shared'}]}});
+ const out=JSON.parse(C.normalizeWorkbenchAgentPlacement(JSON.stringify(consumer),JSON.stringify(next),context));
+ assert.ok(d(out).floats.some(f=>f.id==='added'));assert.ok(out.page.sections[1].diagram.floats.some(f=>f.id==='other'));assert.ok(out.page.sections[2].diagram.topologyImports[0].nodePositions.api);
+ const saved=JSON.stringify(next);assert.throws(()=>C.normalizeWorkbenchAgentPlacement(JSON.stringify(consumer),saved),/Canon/);assert.equal(JSON.stringify(next),saved);
+});
+test('unchanged consumer imports do not turn a refreshed provider snapshot into node additions',()=>{
+ const {consumer,context,d}=importedFixture();d(consumer).topologyImports=[{spec:'platform',export:'core',as:'shared'}];const next=plain(consumer);next.page.title='Only prose';
+ const provider=context.specs[0].page.sections[0].diagram;provider.nodes.fresh={title:'Provider addition'};provider.rows[0].push('fresh');provider.topologyExports.core.nodes.push('fresh');
+ assert.equal(C.normalizeWorkbenchAgentPlacement(JSON.stringify(consumer),JSON.stringify(next),context),JSON.stringify(next));
+});
+
+test('desktop no-point local and imported additions preserve all old rendered centers and inherited locks',()=>{
+ const {provider,consumer,context,d,effective}=importedFixture();provider.page.sections[0].diagram.nodes.store.locked=true;
+ d(consumer).topologyImports=[{spec:'platform',export:'entry',as:'existing'}];const before=C.layout(effective(consumer)).pos;
+ for(const plan of [C.planAddNode(JSON.stringify(consumer),consumer,0,null,null,context),C.planAddTextBox(JSON.stringify(consumer),consumer,0,null,context),C.planAddTopologyImport(JSON.stringify(consumer),consumer,0,{spec:'platform',export:'core',as:'fresh'},context)]){
+ assert.ok(plan.text,plan.error);const out=JSON.parse(plan.text),positions=C.layout(effective(out)).pos;
+ for(const id of Object.keys(before))assert.deepEqual(center(positions[id]),center(before[id]),id);
+ if(d(out).topologyImports.length===2){
+ const unplaced=plain(consumer);d(unplaced).topologyImports.push({spec:'platform',export:'core',as:'fresh'});
+ assert.deepEqual(center(positions['fresh::store']),center(C.layout(effective(unplaced)).pos['fresh::store']),'new locked provider member retains resolved baseline');
+ noCollision(effective(out),['fresh::api']);
+ }else noCollision(effective(out),[plan.id]);
+ }
+ const explicit={spec:'platform',export:'entry',as:'explicit',position:{x:850,y:150},nodePositions:{api:{x:0,y:0}}},plan=C.planAddTopologyImport(JSON.stringify(consumer),consumer,0,explicit,context);
+ assert.deepEqual(d(JSON.parse(plan.text)).topologyImports[1],explicit);
+});
+
+
+test('new imported groups never shift existing local rows, including explicitly placed imports',()=>{
+ for(const explicit of [false,true]){
+ const {consumer,context,d,effective}=importedFixture();d(consumer).rows=[['anchor','origin']];delete d(consumer).floats;
+ const oldPos=C.layout(effective(consumer)).pos,next=plain(consumer);d(next).topologyImports=[{spec:'platform',export:'core',as:'shared',...(explicit?{position:{x:600,y:700}}:{})}];
+ const candidatePos=C.layout(effective(next)).pos,source=C.normalizeWorkbenchAgentPlacement(JSON.stringify(consumer),JSON.stringify(next),context),out=JSON.parse(source),after=C.layout(effective(out)).pos;
+ for(const id of ['anchor','origin'])assert.deepEqual(center(after[id]),center(oldPos[id]),id);
+ if(explicit)for(const id of ['shared::api','shared::store'])assert.deepEqual(center(after[id]),center(candidatePos[id]),id);
+ assert.equal(C.normalizeWorkbenchAgentPlacement(JSON.stringify(consumer),source,context),source);
+ }
+});
+
+
+test('replacing a provider under the same namespace counts its nodes as new consumer identities',()=>{
+ const {provider,consumer,context,d,effective}=importedFixture(),replacement=plain(provider);replacement.page.canon.id='replacement';context.specs.push(replacement);
+ d(consumer).topologyImports=[{spec:'platform',export:'entry',as:'shared'}];const next=plain(consumer);d(next).topologyImports[0].spec='replacement';d(next).edges.push({from:'anchor',to:'shared::api'});
+ const out=JSON.parse(C.normalizeWorkbenchAgentPlacement(JSON.stringify(consumer),JSON.stringify(next),context));assert.ok(d(out).topologyImports[0].nodePositions.api);noCollision(effective(out),['shared::api']);
+});

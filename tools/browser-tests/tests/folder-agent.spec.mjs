@@ -1827,7 +1827,7 @@ test('folder proposal loads a new pinned topology provider without a connect ste
     await page.locator('#welcome-agent').click();await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
     await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);await page.context().grantPermissions(['clipboard-read','clipboard-write']);
     await askAgent(page,h,'Import the submitted provider.');const request=await h.read('request.json'),candidate=request.candidate;
-    const raw=JSON.parse(source);raw.page.blocks[0].diagram.topologyImports=[{spec:'submitted',export:'public',as:'shared'}];const edited=JSON.stringify(raw,null,2);
+    const raw=JSON.parse(source);raw.page.blocks[0].diagram.topologyImports=[{spec:'submitted',export:'public',as:'shared',nodePositions:{api:{x:0,y:0}}}];raw.page.blocks[0].diagram.edges.push({from:'a',to:'shared::api'});const edited=JSON.stringify(raw,null,2);
     await writeFile(path.join(h.session,candidate.spec),edited);await writeFile(path.join(h.session,candidate.ledger),afterLedger);
     h.run('propose','--request',request.id,'--revision',candidate.baseRevision,'--file',candidate.spec,'--ledger',candidate.ledger,'--summary','Import approved provider');
     // The banner first announces the proposal and only later reports a blocked
@@ -1839,17 +1839,24 @@ test('folder proposal loads a new pinned topology provider without a connect ste
     await expect(page.locator('#agent-update-feedback')).toBeHidden();
     expect(await page.locator('#agent-update-feedback').inputValue()).not.toMatch(/Connect repository catalog|Referenced topology/);
     expect(hits).toEqual(['submitted']);
+    await page.locator('#agent-update-details').click();const accepted=await page.locator('#agent-update-source').inputValue(),placed=JSON.parse(accepted).page.blocks[0].diagram.topologyImports[0];
+    expect(accepted).not.toBe(edited);expect(placed.nodePositions.api).toBeDefined();
+    const geometry=await page.locator('#agent-update-view g.node').evaluateAll(nodes=>Object.fromEntries(nodes.map(n=>{const m=n.transform.baseVal.consolidate().matrix,c=n.querySelector('.card');return [n.getAttribute('data-dv-node'),{x:m.e+Number(c.getAttribute('width'))/2,y:m.f+Number(c.getAttribute('height'))/2,w:Number(c.getAttribute('width')),h:Number(c.getAttribute('height'))}];})));
+    const imported=geometry['shared::api'];expect({x:imported.x,y:imported.y}).toEqual({x:placed.position.x+placed.nodePositions.api.x,y:placed.position.y+placed.nodePositions.api.y});
+    expect(Math.hypot(imported.x-geometry.a.x,imported.y-geometry.a.y)).toBeLessThan(600);
+    for(const id of ['a','b','c']){const p=geometry[id];expect(Math.abs(imported.x-p.x)>=(imported.w+p.w)/2+24 || Math.abs(imported.y-p.y)>=(imported.h+p.h)/2+24).toBe(true);}
+    await page.locator('#agent-update-details-close').click();
     // Nothing is persisted during review: the draft never pinned a context, so none is stored yet.
     const staged=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
     expect((staged.topologyContext?.specs || []).map(spec=>spec.page.canon.id)).not.toContain('submitted');
     await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');
     const committed=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
     expect(committed.topologyContext.ephemeral).toBe(true);expect(committed.topologyContext.specs.map(spec=>spec.page.canon.id)).toContain('submitted');
-    await expect(page.locator('#src')).toHaveValue(edited);expect(edited).not.toContain('shared::api');expect(edited).not.toContain('topologyProvenance');
-    await expect.poll(()=>readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(edited);await expect.poll(()=>readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(afterLedger);
+    await expect(page.locator('#src')).toHaveValue(accepted);expect(JSON.parse(accepted).page.blocks[0].diagram.nodes['shared::api']).toBeUndefined();expect(accepted).not.toContain('topologyProvenance');
+    await expect.poll(()=>readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(accepted);await expect.poll(()=>readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(afterLedger);
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
     await expect.poll(()=>readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(beforeLedger);await expect(page.locator('#undo-builder')).toBeDisabled();
-    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);await expect.poll(()=>readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(afterLedger);
+    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(accepted);await expect.poll(()=>readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(afterLedger);
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });

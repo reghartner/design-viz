@@ -1,4 +1,8 @@
 import {test,expect,paste,closeTools} from '../helpers/test.mjs';
+import {cloudFolder} from '../helpers/cloud-folder.mjs';
+import {mkdir,writeFile,readFile} from 'node:fs/promises';
+import {spawn} from 'node:child_process';
+import path from 'node:path';
 import {source as starter} from '../fixtures/editor-spec.mjs';
 const make=(title,diagram)=>({page:{title,sections:[{id:'main',diagram}]}});
 const specs={
@@ -144,4 +148,57 @@ test('refresh retires a delayed provider read after source changes or leaving th
  await refresh(page);await expect.poll(()=>page.evaluate(()=>window.providerHeld)).toBe(true);
  await closeTools(page);await page.locator('#editor-tab-json').click();const exact=consumer+'\n';await page.locator('#src').fill(exact);await page.evaluate(()=>window.releaseProvider());await expect(page.locator('#local-sources-status')).toContainText('document or repository changed');await expect(page.locator('#src')).toHaveValue(exact);await expect(node(page)).toContainText('Local shared API');
  await page.evaluate(()=>{window.providerHeld=false;});await refresh(page);await expect.poll(()=>page.evaluate(()=>window.providerHeld)).toBe(true);await page.locator('#workspace-home').click();await page.evaluate(()=>window.releaseProvider());await expect(page.locator('#welcome-home')).toBeVisible();await expect(page.locator('#src')).toHaveValue(exact);
+});
+
+// Disk-backed native handles let the exact generated Python helper communicate
+// with the production browser poller. No browser action performs the refresh.
+async function connectedDiskRepository(page,server){
+ const disk=await cloudFolder(page),folder=path.join(disk.folder,'diagrams/team/consumer'),support=path.join(folder,'.flowview-agent');
+ await writeFile(path.join(disk.folder,'canon.json'),JSON.stringify({version:1,diagrams:Object.keys(specs).map(id=>({folder:'diagrams/team/'+id,owner:'group:default/local'}))}));
+ for(const [id,spec] of Object.entries(specs)){const dir=path.join(disk.folder,'diagrams/team',id);await mkdir(dir,{recursive:true});await writeFile(path.join(dir,id+'.spec.json'),JSON.stringify(spec,null,2));}
+ await writeFile(path.join(folder,'consumer.ledger.md'),'# Exact ledger\r\nKeep evidence.\n');
+ await page.addInitScript(()=>{
+   const picker=window.showDirectoryPicker;window.localPickerCount=0;
+   function wrap(dir){const getDir=dir.getDirectoryHandle.bind(dir),getFile=dir.getFileHandle.bind(dir);
+    dir.getDirectoryHandle=async(...args)=>wrap(await getDir(...args));
+    dir.getFileHandle=async(name,...args)=>{const handle=await getFile(name,...args),read=handle.getFile.bind(handle);handle.getFile=async()=>{
+      if(name==='base.spec.json'){
+        if(window.localPermissionLost)throw new DOMException('Provider access was revoked','NotAllowedError');
+        if(window.holdLocalProvider && !window.localProviderHeld){window.localProviderHeld=true;await new Promise(resolve=>window.releaseLocalProvider=resolve);}
+      }return read();};return handle;};return dir;}
+   window.showDirectoryPicker=async(...args)=>{window.localPickerCount++;return wrap(await picker(...args));};
+ });
+ await page.goto(server.origin+'/workbench.html');await paste(page,starter);await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
+ await page.locator('#folder-agent-file-picker').selectOption('diagrams/team/consumer/consumer.spec.json');await page.locator('#folder-agent-file-confirm').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(node(page)).toBeVisible();await page.locator('#folder-agent-guide').evaluate(el=>el.close());await closeTools(page);
+ return {...disk,support,readState:async()=>JSON.parse(await readFile(path.join(support,'state.json'),'utf8')),
+   provider:async text=>writeFile(path.join(disk.folder,'diagrams/team/base/base.spec.json'),text),
+   command:()=>new Promise((resolve,reject)=>{const proc=spawn('python3',[path.join(support,'folder-agent.py'),'refresh-sources'],{cwd:disk.folder});let stdout='',stderr='';proc.stdout.on('data',d=>stdout+=d);proc.stderr.on('data',d=>stderr+=d);proc.on('error',reject);proc.on('close',code=>resolve({code,stdout,stderr}));})};
+}
+test('agent CLI refresh updates the open consumer without begin or menu, preserves draft/overlays/ledger and exact Undo snapshots',async({page,server},info)=>{
+ const disk=await connectedDiskRepository(page,server);
+ try{
+  expect(await readFile(path.join(disk.support,'CONNECT.md'),'utf8')).toContain('refresh-sources');
+  await expect.poll(async()=>(await disk.readState()).localSources?.available).toBe(true);
+  const draft=structuredClone(specs.consumer),imp=draft.page.sections[0].diagram.topologyImports[0];Object.assign(imp,{nodeTracking:{'base::api':{tickets:['API-10']}},edgeTracking:{'base::api->base::store':{tickets:['API-11']}},nodeOverrides:{'base::api':{style:'teal'}},edgeOverrides:{'base::api->base::store':{label:'My connection'}},nodePositions:{'base::api':{x:450,y:150}}});
+  const exact=' \n'+JSON.stringify(draft,null,2)+'\n';await page.locator('#editor-tab-json').click();await page.locator('#src').fill(exact);await closeTools(page);await expect.poll(async()=>(await disk.readState()).source).toBe(exact);
+  const changed=structuredClone(specs.base);changed.page.sections[0].diagram.nodes.api.title='CLI refreshed saved provider';await disk.provider(JSON.stringify(changed));
+  const result=await disk.command();expect(result.code,result.stderr).toBe(0);const receipt=JSON.parse(result.stdout);expect(receipt.status).toBe('applied');expect(receipt.currentRevision).toBe((await disk.readState()).revision);expect(receipt.localSources.consumerId).toBe('consumer');
+  await expect(node(page)).toContainText('CLI refreshed saved provider');await expect(page.locator('#src')).toHaveValue(exact);expect((await disk.readState()).ledger).toBe('# Exact ledger\r\nKeep evidence.\n');
+  await expect(readFile(path.join(disk.support,'request.json'))).rejects.toThrow(/ENOENT/);
+  const rendered=await node(page).elementHandle(),unchanged=await disk.command();expect(unchanged.code,unchanged.stderr).toBe(0);expect(JSON.parse(unchanged.stdout).status).toBe('unchanged');expect(await rendered.evaluate(el=>el.isConnected)).toBe(true);
+  await disk.provider('{unfinished nested provider');const invalid=await disk.command();expect(invalid.code).toBe(1);expect(JSON.parse(invalid.stdout).code).toBe('invalid_sources');expect(invalid.stderr).toContain('base');await expect(node(page)).toContainText('CLI refreshed saved provider');await expect(page.locator('#src')).toHaveValue(exact);
+  await page.locator('#undo-builder').click();await expect(node(page)).toContainText('Local shared API');await expect(page.locator('#src')).toHaveValue(exact);await page.locator('#redo-builder').click();await expect(node(page)).toContainText('CLI refreshed saved provider');await expect(page.locator('#src')).toHaveValue(exact);
+  await page.screenshot({path:info.outputPath('agent-cli-refreshed-consumer.png')});
+  await expect.poll(async()=>(await disk.readState()).topologyRevision).toBe(receipt.topologyRevision+2);
+  await disk.provider(JSON.stringify(changed));await page.evaluate(()=>{window.localPermissionLost=true;});const denied=await disk.command();expect(denied.code).toBe(1);expect(JSON.parse(denied.stdout).code).toBe('reconnect_required');
+  const noGrant=await disk.command();expect(noGrant.code).toBe(1);expect(JSON.parse(noGrant.stdout).code).toBe('reconnect_required');expect(await page.evaluate(()=>window.localPickerCount)).toBe(1);await expect(node(page)).toContainText('CLI refreshed saved provider');
+ }finally{await page.close();await disk.close();}
+});
+test('agent CLI held provider read cannot publish after disconnect even when manual root remains granted',async({page,server})=>{
+ const disk=await connectedDiskRepository(page,server);
+ try{
+  const changed=structuredClone(specs.base);changed.page.sections[0].diagram.nodes.api.title='Must not appear';await disk.provider(JSON.stringify(changed));await page.evaluate(()=>{window.holdLocalProvider=true;});const command=disk.command();await expect.poll(()=>page.evaluate(()=>window.localProviderHeld)).toBe(true);
+  await page.locator('#editor-tab-agent').click();if(!await page.locator('#folder-agent-disconnect').isVisible())await page.locator('#folder-agent-pairing>summary').click();await page.locator('#folder-agent-disconnect').click();
+  await expect.poll(async()=>JSON.parse(await readFile(path.join(disk.support,'editor.json'),'utf8')).connected).toBe(false);await page.evaluate(()=>window.releaseLocalProvider());const result=await command;expect(result.code).not.toBe(0);await expect(node(page)).toContainText('Local shared API');await filePanel(page);await expect(page.locator('#local-sources-refresh')).toHaveText('Refresh local sources');await expect(page.locator('#src')).toHaveValue(consumer);
+ }finally{await page.close();await disk.close();}
 });

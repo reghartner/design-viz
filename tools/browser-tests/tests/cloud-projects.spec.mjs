@@ -1,4 +1,8 @@
 import {test as base,expect} from '@playwright/test';
+import {cloudFolder} from '../helpers/cloud-folder.mjs';
+import {mkdir,writeFile,readFile} from 'node:fs/promises';
+import {spawn} from 'node:child_process';
+import path from 'node:path';
 import {startMock} from '../../../deploy/aws/mock.mjs';
 import {source} from '../fixtures/editor-spec.mjs';
 const test=base.extend({
@@ -143,4 +147,21 @@ test('cloud attachment freezes a refreshed repo snapshot and blocks pending or s
  await page.locator('#undo-builder').click();await expect(imported).toContainText('Initial repo provider');await expect.poll(async()=>(await snapshots(cloud)).at(-1).topologyContext.specs[0].page.sections[0].diagram.nodes.api.title).toBe('Initial repo provider');
  await page.locator('#redo-builder').click();await expect(imported).toContainText('Accepted repo provider');await expect.poll(async()=>(await snapshots(cloud)).at(-1).topologyContext.specs[0].page.sections[0].diagram.nodes.api.title).toBe('Accepted repo provider');expect(new URL(page.url()).searchParams.get('cloud')).toBe(id);
  await page.reload();await expect(page.locator('#src')).toHaveValue(exact);await expect(imported).toContainText('Accepted repo provider');await page.locator('#editor-tab-file').click();await expect(page.locator('#local-sources-refresh')).toBeDisabled();await expect(page.locator('#local-sources-status')).toContainText('cloud provider snapshot');
+});
+
+test('agent refresh command rejects disk providers when the connected consumer becomes cloud attached',async({page,cloud})=>{
+ const disk=await cloudFolder(page),support=path.join(disk.folder,'diagrams/consumer/.flowview-agent');
+ try{
+  const provider={page:{title:'Provider',sections:[{id:'main',diagram:{nodes:{api:{title:'Cloud keeps this snapshot'}},rows:[['api']],topologyExports:{core:{nodes:['api'],edges:[]}}}}]}},consumer={page:{title:'Consumer',sections:[{id:'main',diagram:{topologyImports:[{spec:'provider',export:'core',as:'shared',position:{x:150,y:150}}]}}]}};
+  await writeFile(path.join(disk.folder,'canon.json'),JSON.stringify({version:1,diagrams:['consumer','provider'].map(id=>({folder:'diagrams/'+id,owner:'group:default/test'}))}));
+  for(const [id,spec] of Object.entries({provider,consumer})){const dir=path.join(disk.folder,'diagrams',id);await mkdir(dir,{recursive:true});await writeFile(path.join(dir,id+'.spec.json'),JSON.stringify(spec));}
+  await page.addInitScript(()=>{const picker=window.showDirectoryPicker;function wrap(dir){const child=dir.getDirectoryHandle.bind(dir),file=dir.getFileHandle.bind(dir);dir.getDirectoryHandle=async(...args)=>wrap(await child(...args));dir.getFileHandle=async(name,...args)=>{const handle=await file(name,...args),read=handle.getFile.bind(handle);handle.getFile=async()=>{if(name==='provider.spec.json' && window.holdCommandProvider && !window.commandProviderHeld){window.commandProviderHeld=true;await new Promise(resolve=>window.releaseCommandProvider=resolve);}return read();};return handle;};return dir;}window.showDirectoryPicker=async()=>wrap(await picker());});
+  await login(page,cloud.origin);await paste(page);await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();await page.locator('#folder-agent-file-picker').selectOption('diagrams/consumer/consumer.spec.json');await page.locator('#folder-agent-file-confirm').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-guide').evaluate(el=>el.close());await page.locator('#workspace-window-agent .workspace-window-close').click();
+  const imported=page.locator('#docview g.node[data-dv-node="shared::api"]');await expect(imported).toContainText('Cloud keeps this snapshot');const exact=await page.locator('#src').inputValue();
+  const command=()=>new Promise((resolve,reject)=>{const child=spawn('python3',[path.join(support,'folder-agent.py'),'refresh-sources']);let stdout='',stderr='';child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);child.on('error',reject);child.on('close',code=>resolve({code,stdout,stderr}));});
+  provider.page.sections[0].diagram.nodes.api.title='Disk update must not appear';await writeFile(path.join(disk.folder,'diagrams/provider/provider.spec.json'),JSON.stringify(provider));await page.evaluate(()=>{window.holdCommandProvider=true;});const pending=command();await expect.poll(()=>page.evaluate(()=>window.commandProviderHeld)).toBe(true);
+  await save(page,'Connected repo snapshot online');await page.locator('#cloud-close').click();await page.evaluate(()=>window.releaseCommandProvider());const rejected=await pending;expect(rejected.code,rejected.stderr).toBe(1);expect(JSON.parse(rejected.stdout).code).toBe('cloud_project');
+  await expect.poll(async()=>JSON.parse(await readFile(path.join(support,'state.json'),'utf8')).localSources.code).toBe('cloud_project');const unavailable=await command();expect(unavailable.code).toBe(1);expect(JSON.parse(unavailable.stdout).code).toBe('cloud_project');await expect(imported).toContainText('Cloud keeps this snapshot');await expect(page.locator('#src')).toHaveValue(exact);
+  expect((await snapshots(cloud)).at(-1).topologyContext.specs.find(spec=>spec.page.canon.id==='provider').page.sections[0].diagram.nodes.api.title).toBe('Cloud keeps this snapshot');
+ }finally{await page.close();await disk.close();}
 });

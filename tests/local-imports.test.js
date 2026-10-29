@@ -193,3 +193,8 @@ test('oversize provider acquisition is rejected before reading its body',async t
  function wrap(dir){return {name:dir.name,async getDirectoryHandle(name){return wrap(await dir.getDirectoryHandle(name));},async getFileHandle(name){if(name==='base.spec.json')return {async getFile(){return {size:4*1024*1024+1,text:async()=>{bodyRead=true;return '{}';}};}};return dir.getFileHandle(name);}};}
  await assert.rejects(h.ctx.readLocalRepositoryTopology(wrap(h.handle),JSON.stringify(h.inputs.consumer),consumerPath),/provider base.*4 MiB/);assert.equal(bodyRead,false);
 });
+
+test('refresh acquisition retains structured lifetime guard failures through nested provider reads',async t=>{
+  const h=await setup(t),failure=Object.assign(Error('Cloud projects use their saved snapshot'),{refreshCode:'cloud_project'});let checks=0;
+  await assert.rejects(h.ctx.readLocalRepositoryTopology(h.handle,JSON.stringify(h.inputs.consumer),'diagrams/team/consumer/consumer.spec.json',()=>{if(++checks===10)throw failure;}),error=>error===failure && error.refreshCode==='cloud_project');
+});

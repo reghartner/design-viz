@@ -4,17 +4,17 @@ function harness(extra={}){
   const timers=new Map();let timerId=0;
   const context={TextEncoder,TextDecoder,SyntaxError,setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id)};vm.createContext(context);
   for(const file of ['lifetime.js','agent-merge.js','agent-session.js','folder-agent.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/workbench',file),'utf8'),context);
-  const disk=new Map(),writes=[],updates=[];let time=100000,number=0,source='{"title":"before"}',ledger,project=1,busy=false,open=true,level='story',selection=[{kind:'node',id:'customer'}],views=[],failure=null,gate=null,writeGate=null;
+  const disk=new Map(),writes=[],updates=[];let time=100000,number=0,source='{"title":"before"}',ledger,project=1,topologyRevision=0,busy=false,open=true,level='story',selection=[{kind:'node',id:'customer'}],views=[],failure=null,gate=null,writeGate=null;
   const copy=value=>value===undefined?undefined:JSON.parse(JSON.stringify(value));
   // Like the directory adapter, guards learn whether this write created the file.
   const files={async read(name){if(gate)await gate(name);const value=disk.get(name);if(value instanceof Error)throw value;return copy(value)||null;},
     async readText(name){if(gate)await gate(name);return disk.has(name)?String(disk.get(name)):null;},
     async write(name,value,guard){if(writeGate)await writeGate(name);if(guard)await guard({name,created:!disk.has(name),phase:'before-write'});if(failure===name){failure=null;throw Error('Disk unavailable');}disk.set(name,copy(value));}};
-  const options={reviewMode:false,...extra,files,level:()=>level,now:()=>time,uuid:()=>`id-${++number}`,snapshot:()=>({source,ledger,project,open,selection,views}),busy:()=>busy,
+  const options={reviewMode:false,...extra,files,level:()=>level,now:()=>time,uuid:()=>`id-${++number}`,snapshot:()=>({source,ledger,project,topologyRevision,open,selection,views}),busy:()=>busy,
     apply(text){writes.push(text);source=text;return {ok:true,rendered:true};},changed:s=>updates.push(copy(s))};
   let client=context.createFolderAgentClient(options);
   const h={disk,writes,updates,files,context,client,timers,async heartbeat(){const callbacks=[...timers.values()];timers.clear();callbacks.forEach(fn=>fn());for(let n=0;n<50;n++)await Promise.resolve();},get last(){return updates.at(-1);},fresh(){return context.createFolderAgentClient(options);},
-    level:s=>level=s,notes:s=>ledger=s,selection:s=>selection=s,views:s=>views=s,type:s=>source=s,project:()=>project++,busy:b=>busy=b,open:b=>open=b,advance:n=>time+=n,fail:n=>failure=n,gate:g=>gate=g,writeGate:g=>writeGate=g,
+    level:s=>level=s,notes:s=>ledger=s,selection:s=>selection=s,views:s=>views=s,type:s=>source=s,project:()=>project++,topology:()=>topologyRevision++,busy:b=>busy=b,open:b=>open=b,advance:n=>time+=n,fail:n=>failure=n,gate:g=>gate=g,writeGate:g=>writeGate=g,
     envelope:value=>({...client.manifest(),...value}),proposal:(extra={})=>h.disk.set('proposal.json',h.envelope({id:'proposal-1',requestId:h.disk.get('request.json').id,baseRevision:h.disk.get('state.json').revision,source:'{"title":"after"}',...extra})),
     reply:(extra={})=>h.disk.set('reply.json',h.envelope({id:'reply-1',requestId:h.disk.get('request.json').id,text:'Done <script>unsafe()</script>',...extra}))};
   return h;
@@ -976,4 +976,69 @@ test('an invalid current draft cannot falsely complete an acceptance whose pair 
   await assert.rejects(h.client.acceptReview(),/Initial pair/);h.type('{ unfinished human edit');
   await assert.rejects(h.client.poll(),/must be saved/);assert.equal(pair,'{"title":"before"}');assert.equal(h.disk.has('result.json'),false);assert.equal(h.last.pending,'external-first');
   h.type('{"title":"after","human":"repaired"}');await h.client.poll();assert.equal(h.last.pending,null);assert.match(pair,/repaired/);assert.equal(h.disk.get('result.json').id,'proposal-1');
+});
+
+function refreshRequest(h,extra={}){
+  const {sessionId,connectionId}=h.client.manifest();
+  h.disk.set('refresh-sources.json',{version:1,sessionId,connectionId,id:'refresh-1',baseRevision:h.disk.get('state.json').revision,expiresAt:190000,...extra});
+}
+test('provider refresh needs no authoring request and preserves an active request',async()=>{
+  let count=0;const h=harness({refreshSources:async request=>{await request.guard();h.topology();count++;return {status:'applied',code:'ok',message:'Refreshed'};}});
+  await h.client.start();refreshRequest(h);const original=h.disk.get('state.json').source;await h.client.poll();
+  const receipt=h.disk.get('refresh-sources-result.json');assert.equal(receipt.status,'applied');assert.equal(receipt.snapshotCurrent,true);assert.equal(receipt.topologyRevision,1);
+  assert.notEqual(receipt.currentRevision,receipt.baseRevision);assert.equal(h.disk.get('state.json').source,original);assert.equal(h.disk.has('request.json'),false);
+  await h.client.poll();assert.equal(count,1);
+  await h.client.send('Ordinary authoring continues');const requestId=h.last.pending;refreshRequest(h,{id:'refresh-2'});await h.client.poll();
+  assert.equal(count,2);assert.equal(h.last.pending,requestId);assert.equal(h.writes.length,0);
+});
+test('refresh unchanged and structured cloud/reconnect failures are acknowledged without an edit',async()=>{
+  for(const outcome of [{status:'unchanged',code:'ok'},{status:'rejected',code:'cloud_project'},{status:'rejected',code:'reconnect_required'}]){
+    const h=harness({refreshSources:async()=>outcome});await h.client.start();refreshRequest(h);await h.client.poll();
+    const result=h.disk.get('refresh-sources-result.json');assert.equal(result.status,outcome.status);assert.equal(result.code,outcome.code);assert.equal(result.currentRevision,result.baseRevision);assert.equal(h.writes.length,0);
+  }
+});
+test('refresh rejects busy gestures, waiting proposals and open proposal review',async()=>{
+  for(const mode of ['gesture','proposal','review']){
+    let calls=0;const h=harness({reviewMode:true,refreshSources:async()=>{calls++;return {status:'applied'};}});await h.client.start();
+    if(mode==='gesture')h.busy(true);else {await h.client.send('Edit');h.proposal();if(mode==='review')await h.client.poll();}
+    refreshRequest(h);await h.client.poll();assert.equal(h.disk.get('refresh-sources-result.json').status,'busy',mode);assert.equal(calls,0,mode);
+  }
+});
+test('refresh envelopes reject stale, expired and injected source or path fields and ignore foreign/replayed identities',async()=>{
+  let calls=0;const h=harness({refreshSources:async()=>{calls++;return {status:'unchanged'};}});await h.client.start();
+  for(const [n,extra] of [{baseRevision:'old'},{expiresAt:99999},{source:'{}'},{path:'other/provider.json'},{withdrawn:true}].entries()){
+    refreshRequest(h,{id:'bad-'+n,...extra});await h.client.poll();assert.equal(h.disk.get('refresh-sources-result.json').status,'rejected');
+  }
+  for(const extra of [{connectionId:'old'},{sessionId:'other'},{id:'bad-0'}]){refreshRequest(h,extra);await h.client.poll();}
+  assert.equal(calls,0);
+});
+test('failed refresh receipt retries the accepted snapshot without reapplying after Undo',async()=>{
+  let calls=0;const h=harness({refreshSources:async()=>{h.topology();calls++;return {status:'applied',code:'ok'};}});await h.client.start();refreshRequest(h);
+  h.fail('refresh-sources-result.json');await assert.rejects(h.client.poll(),/Disk/);assert.equal(calls,1);h.topology();await h.client.poll();
+  const receipt=h.disk.get('refresh-sources-result.json');assert.equal(receipt.status,'applied');assert.equal(receipt.topologyRevision,1);assert.equal(receipt.snapshotCurrent,false);assert.notEqual(receipt.currentRevision,receipt.revision);
+  await h.client.poll();assert.equal(calls,1);
+});
+test('held provider acquisition cannot publish after source/project/connection changes or withdrawal',async()=>{
+  for(const action of ['source','topology','project','disconnect','destroy','owner','withdraw']){
+    let release,reached,applied=0;const hit=new Promise(r=>reached=r);
+    const h=harness({refreshSources:async request=>{await new Promise(r=>{release=r;reached();});await request.guard();applied++;return {status:'applied'};}});
+    await h.client.start();refreshRequest(h);const polling=h.client.poll();await hit;let closing;
+    if(action==='source')h.type('{"title":"Changed"}');else if(action==='topology')h.topology();else if(action==='project')h.project();
+    else if(action==='owner')h.disk.set('session.json',{...h.client.manifest(),connectionId:'another'});
+    else if(action==='withdraw')h.disk.set('refresh-sources.json',{...h.disk.get('refresh-sources.json'),withdrawn:true});
+    else closing=h.client[action]();
+    release();await polling.catch(error=>assert.match(error.message,/changed/));await closing;assert.equal(applied,0,action);
+    if(action==='disconnect'){const next=h.fresh();await next.start(true);await next.poll();assert.equal(applied,0);assert.notEqual(next.manifest().connectionId,h.client.manifest().connectionId);}
+  }
+});
+test('heartbeat remains live while provider acquisition waits',async()=>{
+  let release,reached;const hit=new Promise(r=>reached=r),h=harness({refreshSources:async request=>{await new Promise(r=>{release=r;reached();});await request.guard();return {status:'unchanged'};}});
+  await h.client.start();refreshRequest(h);const polling=h.client.poll();await hit;h.advance(10000);await h.heartbeat();assert.equal(h.disk.get('editor.json').at,110000);release();await polling;
+});
+
+test('refresh receipt publication notices a newer revision before closing its file',async()=>{
+  const h=harness({refreshSources:async()=>{h.topology();return {status:'applied'};}});await h.client.start();refreshRequest(h);
+  let release,reached;const hit=new Promise(r=>reached=r);h.writeGate(name=>name==='refresh-sources-result.json'?new Promise(r=>{release=r;reached();}):null);
+  const polling=h.client.poll();await hit;h.type('{"title":"New draft after acceptance"}');h.writeGate(null);release();await assert.rejects(polling,/Consumer changed/);
+  assert.equal(h.disk.has('refresh-sources-result.json'),false);await h.client.poll();const receipt=h.disk.get('refresh-sources-result.json');assert.equal(receipt.snapshotCurrent,false);assert.equal(receipt.currentRevision,h.disk.get('state.json').revision);
 });

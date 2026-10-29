@@ -52,6 +52,74 @@ class FolderAgentTests(unittest.TestCase):
         return subprocess.run([sys.executable, str(HELPER), '--folder', str(self.folder), *args],
                               text=True, capture_output=True, timeout=10)
 
+    def refresh_ready(self, **capability):
+        self.put('state.json', {**self.owner, 'revision': 'connection-1', 'source': '{}',
+                               'localSources': {'available': True, 'consumerId': 'team/consumer', **capability}})
+        (self.folder/'request.json').unlink(missing_ok=True)
+
+    def refresh_receipt(self, status='applied', **extra):
+        request = json.loads((self.folder/'refresh-sources.json').read_text())
+        self.put('refresh-sources-result.json', {**self.owner, 'version': 1, 'id': request['id'],
+                  'baseRevision': request['baseRevision'], 'status': status, 'code': 'ok',
+                  'revision': 'connection-2', 'currentRevision': 'connection-2', 'snapshotCurrent': True, **extra})
+
+    def test_refresh_cli_publishes_bounded_identity_request_without_begin_and_waits_for_receipt(self):
+        self.refresh_ready()
+        process = subprocess.Popen([sys.executable, str(HELPER), '--folder', str(self.folder), 'refresh-sources'],
+                                   text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.addCleanup(lambda: process.kill() if process.poll() is None else None)
+        deadline = time.monotonic()+5
+        while not (self.folder/'refresh-sources.json').exists() and time.monotonic()<deadline:
+            time.sleep(.02)
+        request = json.loads((self.folder/'refresh-sources.json').read_text())
+        self.assertEqual(set(request), {'version','sessionId','connectionId','id','baseRevision','expiresAt'})
+        self.assertEqual(request['baseRevision'], 'connection-1')
+        self.assertFalse((self.folder/'request.json').exists())
+        self.refresh_receipt()
+        output, error = process.communicate(timeout=5)
+        self.assertEqual(process.returncode, 0, error)
+        self.assertEqual(json.loads(output)['currentRevision'], 'connection-2')
+
+    def test_refresh_cli_cloud_and_missing_grant_reject_without_publishing(self):
+        for code in ('cloud_project', 'reconnect_required'):
+            self.refresh_ready(available=False, code=code, message='Reconnect the consumer' if code=='reconnect_required' else 'Cloud projects use cloud snapshots')
+            result=self.run_helper('refresh-sources')
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertEqual(json.loads(result.stdout)['code'], code)
+            self.assertFalse((self.folder/'refresh-sources.json').exists())
+
+    def test_refresh_wait_rejects_changed_ownership_withdraws_timeout_and_ignores_old_receipts(self):
+        self.refresh_ready()
+        self.put('refresh-sources-result.json', {**self.owner, 'version':1, 'id':'old', 'status':'applied'})
+        with patch.object(helper, 'ACKNOWLEDGEMENT_SECONDS', .01), patch.object(helper.time, 'sleep', lambda _: None):
+            with self.assertRaisesRegex(ValueError, 'timed out'):
+                helper.refresh_sources(self.folder)
+        self.assertTrue(json.loads((self.folder/'refresh-sources.json').read_text())['withdrawn'])
+        def replace_owner(_):
+            self.put('session.json', {'protocol':'flowview-folder-v1', **self.owner, 'connectionId':'other'})
+        with patch.object(helper.time, 'sleep', replace_owner):
+            with self.assertRaisesRegex(ValueError, 'connection|owner|session'):
+                helper.refresh_sources(self.folder)
+
+    def test_refresh_prevents_concurrent_request_and_propagates_busy_or_invalid_provider(self):
+        self.refresh_ready()
+        self.put('refresh-sources.json', {**self.owner, 'id':'pending', 'expiresAt':time.time()*1000+90000})
+        with self.assertRaisesRegex(ValueError, 'already pending'):
+            helper.refresh_sources(self.folder)
+        (self.folder/'refresh-sources.json').unlink()
+        for status, code in [('busy','busy'),('rejected','invalid_sources'),('unchanged','ok')]:
+            with patch.object(helper.time, 'sleep', lambda _, status=status,code=code:self.refresh_receipt(status,code=code)):
+                result=helper.refresh_sources(self.folder)
+            self.assertEqual(result['status'], status)
+            self.assertEqual(result['code'], code)
+
+    def test_refresh_requires_a_complete_consistent_receipt(self):
+        self.refresh_ready()
+        with patch.object(helper.time, 'sleep', lambda _:self.refresh_receipt(snapshotCurrent=None)):
+            with self.assertRaisesRegex(ValueError, 'Malformed refresh receipt'):
+                helper.refresh_sources(self.folder)
+        self.assertTrue(json.loads((self.folder/'refresh-sources.json').read_text())['withdrawn'])
+
     def test_paired_project_requires_nonempty_ledger_and_packages_it(self):
         manifest = json.loads((self.folder / 'session.json').read_text())
         manifest['pairedArtifacts'] = True

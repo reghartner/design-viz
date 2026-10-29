@@ -447,6 +447,76 @@ def watch(folder, interval=0.25, minutes=25):
             pass
 
 
+def refresh_sources(folder):
+    """Request one provider refresh from the already-connected consumer editor."""
+    owner = identity(folder)
+    wait_for_editor(folder, owner)
+    def protocol_file(name):
+        target = folder / name
+        if target.exists() and target.stat().st_size > (16384 if name == 'refresh-sources-result.json' else 8192):
+            raise ValueError(f'{name} exceeds the refresh protocol size limit.')
+        return pending_object(folder, name)
+
+    state = read(folder, 'state.json')
+    if not isinstance(state, dict) or any(state.get(k) != v for k, v in owner.items()):
+        raise ValueError('Consumer state belongs to another connection. Reconnect this consumer.')
+    capability = state.get('localSources')
+    if not isinstance(capability, dict):
+        raise ValueError('This connection does not support refresh-sources. Reconnect the consumer with a current Workbench.')
+    if capability.get('available') is not True:
+        return {**owner, 'status': 'rejected', 'code': capability.get('code', 'unavailable'),
+                'message': capability.get('message', 'Reconnect the consumer through its repository root.'),
+                'currentRevision': state.get('revision'), 'localSources': capability}
+    revision = state.get('revision')
+    if not isinstance(revision, str) or not revision or len(revision) > 200:
+        raise ValueError('Consumer state has no valid revision. Wait for the Workbench to publish it.')
+    def owned(value):
+        return isinstance(value, dict) and all(value.get(k) == v for k, v in owner.items())
+    def available():
+        connected_editor(folder, owner)
+        previous = protocol_file('refresh-sources.json')
+        result = protocol_file('refresh-sources-result.json')
+        if (owned(previous) and not previous.get('withdrawn') and
+                isinstance(previous.get('expiresAt'), (int, float)) and previous['expiresAt'] > time.time()*1000 and
+                not (owned(result) and result.get('id') == previous.get('id'))):
+            raise ValueError('A refresh is already pending for this consumer. Wait for its receipt before retrying.')
+    available()
+    request = {**owner, 'version': 1, 'id': uuid.uuid4().hex, 'baseRevision': revision,
+               'expiresAt': int(time.time()*1000) + ACKNOWLEDGEMENT_SECONDS*1000}
+    write(folder, 'refresh-sources.json', request, guard=available)
+    deadline = time.monotonic() + ACKNOWLEDGEMENT_SECONDS
+    try:
+        while True:
+            connected_editor(folder, owner, allow_stale=True)
+            current = protocol_file('refresh-sources.json')
+            if current != request:
+                raise ValueError('Refresh request was replaced or withdrawn. Run refresh-sources again.')
+            result = protocol_file('refresh-sources-result.json')
+            if owned(result) and result.get('id') == request['id']:
+                if (result.get('version') != 1 or result.get('baseRevision') != revision or
+                        result.get('status') not in ('applied', 'unchanged', 'rejected', 'busy') or
+                        not isinstance(result.get('revision'), str) or not result['revision'] or len(result['revision']) > 200 or
+                        not isinstance(result.get('currentRevision'), str) or not result['currentRevision'] or len(result['currentRevision']) > 200 or
+                        not isinstance(result.get('snapshotCurrent'), bool) or
+                        result['snapshotCurrent'] != (result['revision'] == result['currentRevision'])):
+                    raise ValueError('Malformed refresh receipt. Keep the files for inspection; do not blindly retry.')
+                connected_editor(folder, owner, allow_stale=True)
+                return result
+            if time.monotonic() >= deadline:
+                raise ValueError('Refresh timed out. Bring the connected consumer Workbench tab to the front, inspect its state, then retry refresh-sources.')
+            time.sleep(.25)
+    except (OSError, ValueError):
+        # Expiry and explicit withdrawal prevent a delayed browser read from
+        # applying a timed-out request. Never withdraw another command's file.
+        try:
+            if protocol_file('refresh-sources.json') == request:
+                write(folder, 'refresh-sources.json', {**request, 'withdrawn': True},
+                      guard=lambda: assert_owner(folder, owner))
+        except (OSError, ValueError):
+            pass
+        raise
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--folder', type=Path, default=Path(__file__).resolve().parent)
@@ -455,6 +525,7 @@ def main():
     watching.add_argument('--interval', type=float, default=0.25)
     watching.add_argument('--minutes', type=float, default=25)
     commands.add_parser('prepare')
+    commands.add_parser('refresh-sources', help='Refresh saved repo providers in the connected consumer; no begin/proposal needed')
     beginning = commands.add_parser('begin', help='Register a request from the native agent conversation')
     beginning.add_argument('--text', required=True)
     checking = commands.add_parser('preflight')
@@ -475,6 +546,13 @@ def main():
             command.add_argument('--summary', default='Updated the story.')
     args = parser.parse_args()
     folder = args.folder.resolve()
+    if args.command == 'refresh-sources':
+        result = refresh_sources(folder)
+        print(json.dumps(result))
+        if result.get('status') not in ('applied', 'unchanged') or result.get('snapshotCurrent') is False:
+            print(result.get('message', 'Refresh was not accepted.') if result.get('snapshotCurrent') is not False else 'The refresh was accepted, but the consumer changed before its receipt was saved. Inspect the current revision before continuing.', file=sys.stderr)
+            raise SystemExit(1)
+        return
     if args.command == 'prepare':
         print(prepare(folder))
         return

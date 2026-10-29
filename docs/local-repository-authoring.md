@@ -62,8 +62,31 @@ includes bounded provenance: the registered relative source path, root display
 label and snapshot time. No deployed library is used as a fallback. Authored import
 references remain in the JSON. Local presentation and imported-node positions
 remain editable, with normal Undo/Redo, autosave and browser draft recovery.
-For a repository project, save provider edits in that worktree, then choose
-**File → Refresh local sources**. This reads the current consumer draft's direct
+For an agent-connected repository consumer, save a complete batch of authorized
+provider edits in that worktree, then run the **consumer's** helper:
+
+```sh
+python3 <consumer>/.flowview-agent/folder-agent.py refresh-sources
+```
+
+No `begin`, spec/ledger proposal or confirmation is needed for this command.
+The already-open consumer must have a folder-agent connection through its granted
+repository root. A provider's helper targets that provider, not another consumer;
+a separate unconnected consumer cannot be refreshed. This command reads no paths
+from the agent and never opens a browser picker. Desktop **File → Refresh local
+sources** remains the manual fallback.
+
+Wait for the matching JSON receipt: `applied` or `unchanged`, with `currentRevision`
+and bounded `localSources` provenance. `state.json.localSources` also reports
+availability, consumer ID, relative source path and root label. Neither label nor
+ID proves an absolute worktree or branch. Busy/rejected outcomes exit nonzero;
+finish a gesture or proposal review, repair the stated error, then retry. On a
+timeout, bring the connected consumer tab to the front and inspect its state.
+A changed revision before receipt persistence is reported explicitly, never as
+proof that the original refresh remains current. No watcher or refresh on every
+filesystem save is needed.
+
+Refresh reads the current consumer draft's direct
 and transitive imports, including newly added dependencies, without replacing
 its exact text, coverage ledger, tracking, presentation or layout overlays.
 The consumer does not need to be saved or merged first. One Undo/Redo restores

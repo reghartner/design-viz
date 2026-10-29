@@ -4,8 +4,8 @@ A provider owns reusable structure; each consumer owns its narrative. Imports
 are validated against the complete approved snapshot at build time, then resolved
 in memory when a reader or editor opens them. The fetched provider closure is
 frozen for that session: no polling or automatic reconciliation. Repository
-projects have an explicit desktop **File → Refresh local sources** action for
-saved worktree providers; see [local repository authoring](local-repository-authoring.md).
+agents refresh saved worktree providers with the connected consumer helper
+`folder-agent.py refresh-sources` (desktop **File → Refresh local sources** fallback); see [local repository authoring](local-repository-authoring.md).
 Cloud-attached projects keep their saved cloud provider snapshots and cannot
 refresh from local files, even when a folder is connected.
 Reopening a diagram from the library pins the newly deployed revision; a plain

@@ -2,7 +2,7 @@
 function createFolderAgentFiles(directory){
   // Recovery holds before/after copies of both artifacts. JSON escaping can
   // double each 4 MiB spec and expand each 256 KiB ledger up to sixfold.
-  function limit(name){return name==='pilot-status.json'?4096:(name==='artifact-write.json'?20:8)*1024*1024;}
+  function limit(name){return name==='refresh-sources.json'?8192:name==='refresh-sources-result.json'?16384:name==='pilot-status.json'?4096:(name==='artifact-write.json'?20:8)*1024*1024;}
   async function readText(name,maxBytes){
     if(!/^[\w .-]+$/.test(name) || name==='.' || name==='..')throw Error('Use a plain session filename.');
     try{
@@ -113,6 +113,7 @@ function createFolderAgentClient(opts){
   var connected=false,disposed=false,epoch=0,manifest=null,exchange=null,project=null,pilotStatus=null;
   var heartbeatReady=false,life=createWorkbenchLifetime(),heartbeatTimer=null,heartbeatJob=null,heartbeatListeners=[],editorChain=Promise.resolve();
   var lastArtifactState='saved',lastState='',lastHeartbeat=-Infinity,pending=null,transcript=[],seen=new Set(),nativeSeen=new Set(),chain=Promise.resolve();
+  var refreshSeen=new Set(),pendingRefreshResult=null;
   var activity=[],activitySeen=new Set(),requestAt=null,lastAgentAt=null,turnEpoch=0,changes=[],preflight=null,changesDirty=false,reviewMode=opts.reviewMode!==false,reviewCandidate=null,reviewDecision=null,pendingReviewResult=null,pendingAcceptance=null,reviewVersion=0;
   function serial(action){var job=chain.then(action);chain=job.catch(function(){});return job;}
   // Heartbeats must not wait behind artifact saves or proposal preparation.
@@ -131,7 +132,7 @@ function createFolderAgentClient(opts){
   }
   function retire(status,write){
     var owner=manifest && {sessionId:manifest.sessionId,connectionId:manifest.connectionId};
-    connected=false;heartbeatReady=false;pending=null;pendingAcceptance=null;epoch++;stopHeartbeat();stopHeartbeatListeners();clearReview();publish({status:status,listening:false});
+    connected=false;heartbeatReady=false;pending=null;pendingAcceptance=null;pendingRefreshResult=null;epoch++;stopHeartbeat();stopHeartbeatListeners();clearReview();publish({status:status,listening:false});
     return write && owner?writeDisconnected(owner):Promise.resolve();
   }
   function scheduleHeartbeat(){
@@ -330,11 +331,68 @@ function createFolderAgentClient(opts){
     pendingAcceptance=null;pendingReviewResult=null;pending=null;turnEpoch++;clearReview();
     publish({status:'Update accepted and saved. Continue in your agent.',progress:''});
   }
+  // A refresh is independent of a story request and accepts no paths or source.
+  // Keep an accepted outcome before any async receipt write; retries must never
+  // reread providers or reapply it after an intervening Undo.
+  async function refreshConnectionGuard(token){
+    function current(){var value=opts.snapshot();if(!alive(token) || !value.open || value.project!==project)throw Error('Refresh connection or project changed.');}
+    current();var owner=await files.read('session.json');current();var editor=await files.read('editor.json');current();
+    if(!belongs(owner) || !belongs(editor) || editor.connected!==true)throw Error('Refresh folder ownership changed. Reconnect the consumer.');
+  }
+  async function finishRefresh(token){
+    var result=pendingRefreshResult;if(!result)return;
+    var guard=function(){return refreshConnectionGuard(token);};
+    await guard();await snapshot(token,guard);await guard();
+    var current=exchange.request().snapshot;
+    var receipt=envelope(Object.assign({},result,{currentRevision:current.revision,snapshotCurrent:current.revision===result.revision}));
+    async function receiptGuard(){await guard();if(exchange.request().snapshot.revision!==current.revision)throw Error('Consumer changed while saving the refresh receipt. Retrying its current revision.');}
+    await files.write('refresh-sources-result.json',receipt,receiptGuard);await receiptGuard();
+    if(pendingRefreshResult===result)pendingRefreshResult=null;
+  }
+  async function refreshSources(token){
+    if(pendingRefreshResult){await finishRefresh(token);return true;}
+    var request=await readOptional('refresh-sources.json');if(!alive(token) || !belongs(request) || !validId(request.id) || refreshSeen.has(request.id))return false;
+    var signature=JSON.stringify(request),current=exchange.request().snapshot,basis=current.revision;
+    function check(){
+      var latest=exchange.request().snapshot;
+      if(!alive(token) || !latest.open || latest.project!==project || latest.revision!==basis)throw Object.assign(Error('Consumer revision or connection changed during refresh. Retry with the current revision.'),{refreshCode:'stale'});
+      if(request.withdrawn || now()>=request.expiresAt)throw Object.assign(Error('Refresh request expired or was withdrawn. Run refresh-sources again.'),{refreshCode:'expired'});
+    }
+    async function guard(){
+      check();await refreshConnectionGuard(token);check();
+      var latest=await readOptional('refresh-sources.json');check();
+      if(JSON.stringify(latest)!==signature)throw Error('Refresh request changed before publication. Retry.');
+      if(reviewCandidate || pendingAcceptance || opts.busy && opts.busy()){var busy=Error('Finish the active gesture or proposal review, then retry refresh-sources.');busy.refreshCode='busy';throw busy;}
+    }
+    var outcome;
+    refreshSeen.add(request.id);
+    if(request.version!==1 || Object.keys(request).some(function(key){return !['version','sessionId','connectionId','id','baseRevision','expiresAt','withdrawn'].includes(key);}) || typeof request.baseRevision!=='string' || request.baseRevision.length>200 || !Number.isFinite(request.expiresAt) || request.expiresAt>now()+120000 || request.withdrawn!==undefined && request.withdrawn!==true)
+      outcome={status:'rejected',code:'invalid_request',message:'Invalid refresh envelope. Use the consumer helper refresh-sources command; no paths or source are accepted.'};
+    else if(request.withdrawn || request.expiresAt<=now())outcome={status:'rejected',code:'expired',message:'Refresh request expired or was withdrawn. Run refresh-sources again.'};
+    else if(request.baseRevision!==basis)outcome={status:'rejected',code:'stale',message:'Consumer revision changed. Run refresh-sources again to use the current draft.'};
+    else if(!opts.refreshSources)outcome={status:'rejected',code:'unsupported',message:'Reconnect the consumer with a current Workbench to enable refresh-sources.'};
+    else{
+      try{
+        await guard();
+        var proposal=await readOptional('proposal.json');await guard();
+        if(belongs(proposal) && proposal.requestId===pending && validId(proposal.id) && !seen.has(proposal.id))outcome={status:'busy',code:'busy',message:'A proposal awaits review. Finish that review, then retry refresh-sources.'};
+        else outcome=await opts.refreshSources({check:check,guard:guard});
+      }catch(error){outcome={status:error.refreshCode==='busy'?'busy':'rejected',code:error.refreshCode || 'stale',message:error.message};}
+    }
+    if(!alive(token))return true;
+    if(!outcome || !['applied','unchanged','rejected','busy'].includes(outcome.status))outcome={status:'rejected',code:'failed',message:'Refresh did not return an accepted outcome.'};
+    var after=exchange.request().snapshot;
+    pendingRefreshResult={version:1,id:request.id,baseRevision:typeof request.baseRevision==='string'?request.baseRevision.slice(0,200):null,status:outcome.status,code:outcome.code,
+      message:String(outcome.message || '').slice(0,1000),revision:after.revision,topologyRevision:after.topologyRevision,
+      localSources:outcome.localSources || after.localSources || null,at:now()};
+    await finishRefresh(token);return true;
+  }
   async function poll(){
     if(!connected || disposed)return;
     var token=epoch,turn=turnEpoch;
     if(pendingAcceptance){await finishAcceptance(token,turn);if(!alive(token))return;turn=turnEpoch;}
     var requestId=pending,sent=await snapshot(token);if(!sent || !alive(token) || turn!==turnEpoch)return;
+    if(await refreshSources(token))return;
     var health=null;try{health=await files.read('pilot-status.json');}catch(ignored){}
     if(!alive(token) || turn!==turnEpoch)return;
     pilotStatus=folderAgentPilotHealth(health,manifest,now());
@@ -505,7 +563,7 @@ function createFolderAgentClient(opts){
       }
       manifest={protocol:'flowview-folder-v1',workflow:opts.workflow || 'embedded',sessionId:existing && !renewal?existing.sessionId:uuid(),connectionId:uuid(),createdAt:preview?preview.createdAt:now()};
       if(files.artifacts){manifest.artifacts=files.artifacts;manifest.pairedArtifacts=true;manifest.claimAt=now();}
-      pilotStatus=null;project=snap.project;connected=true;epoch++;turnEpoch++;clearReview();pendingReviewResult=null;pendingAcceptance=null;lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
+      pilotStatus=null;project=snap.project;connected=true;epoch++;turnEpoch++;clearReview();pendingReviewResult=null;pendingAcceptance=null;pendingRefreshResult=null;refreshSeen.clear();lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
       activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;preflight=null;
       exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,prepare:opts.prepare,requireLedger:opts.requireLedger});
       var recoveryState='state-'+manifest.connectionId+'.json';
@@ -651,7 +709,7 @@ function createFolderAgentClient(opts){
       // Callers can release their folder lock only after outstanding saves drain.
       return Promise.allSettled([closing,chain]).then(function(results){if(results[0].status==='rejected')throw results[0].reason;});
     },
-    destroy:function(){connected=false;heartbeatReady=false;disposed=true;pendingAcceptance=null;epoch++;stopHeartbeat();stopHeartbeatListeners();life.destroy();clearReview();},
+    destroy:function(){connected=false;heartbeatReady=false;disposed=true;pendingAcceptance=null;pendingRefreshResult=null;epoch++;stopHeartbeat();stopHeartbeatListeners();life.destroy();clearReview();},
     manifest:function(){return manifest;}
   };
 }

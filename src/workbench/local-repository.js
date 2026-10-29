@@ -39,7 +39,7 @@ async function readLocalRepositoryTopology(directory,source,sourcePath,check){
       var file=await(await handle.getFileHandle(parts[parts.length-1])).getFile();check();
       if(file.size>4*1024*1024)throw Error('Local '+(path==='canon.json'?'registry':'topology provider')+' exceeds the 4 MiB limit: '+path);
       var text=await file.text();check();return text;
-    }catch(error){if(error.name==='AbortError')throw error;throw Object.assign(Error(path+': '+error.message),{name:error.name});}
+    }catch(error){if(error.name==='AbortError' || error.refreshCode)throw error;throw Object.assign(Error(path+': '+error.message),{name:error.name});}
   }
   for(var attempt=0;attempt<2;attempt++){
     check();
@@ -61,7 +61,7 @@ async function readLocalRepositoryTopology(directory,source,sourcePath,check){
         var text=id===entry.id?source:await read(provider.path);
         if(id!==entry.id)reads.set(provider.path,text);
         spec=FlowCanonLibrary.spec(id===entry.id?raw:JSON.parse(text),provider);
-      }catch(error){throw Object.assign(Error('Consumer '+entry.id+' / provider '+id+' ('+provider.path+'): '+error.message),{name:error.name});}
+      }catch(error){if(error.refreshCode)throw error;throw Object.assign(Error('Consumer '+entry.id+' / provider '+id+' ('+provider.path+'): '+error.message),{name:error.name});}
       for(var dependency of FlowTopology.dependencies(spec))await load(dependency,id);
       visiting.delete(id);cache.set(id,spec);
     }

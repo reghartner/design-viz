@@ -153,9 +153,9 @@ test('tracking authoring guidance separates Jira evidence from coverage presenta
   assert.ok(fs.existsSync(file), 'live-status guide exists');
   const guide = fs.readFileSync(file,'utf8');
   for (const term of ['flow.live-status','tracking','tickets','prs','Jira','informational','#735']) assert.ok(guide.includes(term),term);
-  for (const pattern of [/todo[^\n]*dotted[^\n]*#6b7280/i,/active[^\n]*#1666c7[^\n]*pulse/i,/done[^\n]*#237d3d[^\n]*steady/i,
-    /blocked[^\n]*solid[^\n]*#b42338/i,/missing[^\n]*dashed[^\n]*#e14b5a/i,/No change needed[^\n]*#748b78/i,
-    /waiting[^\n]*dashed grey[^\n]*dashed red/i,/15%/,
+  for (const pattern of [/todo[^\n]*dotted[^\n]*#8fb4ff/i,/active[^\n]*#009dff[^\n]*pulse/i,/done[^\n]*#2ed600[^\n]*steady/i,
+    /blocked[^\n]*solid[^\n]*#e81717/i,/missing[^\n]*dashed[^\n]*#e81717/i,/No change needed[^\n]*#2ed600/i,
+    /waiting[^\n]*dashed light blue[^\n]*dashed red/i,/15%/,
     /blocked > missing > active > \(all done → done\) > \(all todo → todo\) > otherwise active/,
     /steps, coins and chips[^.]*derive[^.]*edges and nodes[^.]*never carry tickets/is,
     /missingWork/,/prs[^.]*icon/i,/never carry live state/i,/## Rendering/]) assert.match(guide,pattern);

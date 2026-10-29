@@ -24,7 +24,12 @@
     // Capture the production page ground before restoring the neutral editor shell.
     document.body.classList.remove('palette-page');var ground=getComputedStyle(document.body).background;document.body.classList.add('palette-page');view.parentElement.style.background=ground;
     ctl=renderPage(view,fixture.page,skin.value,{}, {liveStatus:{colorsPreview:true}});ctl.liveStatus.apply(fixture.map);repaint();}
-  function defaults(name,prop){if(prop==='borderColor')return getComputedStyle(view).getPropertyValue('--dv-'+name).trim();if(prop==='borderWidth')return name==='live-blocked'?3:2;if(prop==='fillStrength')return 15;return name==='live-active' || name==='live-done'?100:0;}
+  function defaults(name,prop){
+    // Read the production node's resolved tokens so preview controls and resets
+    // follow the same CSS defaults as every viewer (including fixed borders).
+    var computed=getComputedStyle(view.querySelector('.node.dv-'+name)),token={borderColor:'line',borderWidth:'node-width',fillStrength:'fill',glowStrength:'glow'}[prop],value=computed.getPropertyValue('--dv-live-'+token).trim();
+    return prop==='borderColor'?value:parseFloat(value)*(prop==='glowStrength'?100:1);
+  }
   function sync(){
     var computed=window.getComputedStyle(view);
     Object.keys(appearanceRows).forEach(function(name){Object.keys(appearanceRows[name]).forEach(function(prop){var row=appearanceRows[name][prop],overrides=draft.appearance && draft.appearance[name] || {},set=Object.prototype.hasOwnProperty.call(overrides,prop),value=set?overrides[prop]:defaults(name,prop);row.input.value=value;if(row.slider)row.slider.value=value;row.input.removeAttribute('aria-invalid');if(row.color)row.color.value=value;row.reset.disabled=!set;});});
@@ -34,7 +39,7 @@
   function edit(name,value,input){
     if(!/^#[0-9a-f]{6}$/i.test(value)){input.setAttribute('aria-invalid','true');say('Use a six-digit hex color such as #1666c7.',true);return;}
     draft.colors[name]=value.toLowerCase();input.removeAttribute('aria-invalid');repaint();
-    rows[name].hex.value=value.toLowerCase();rows[name].hex.removeAttribute('aria-invalid');rows[name].color.value=value;rows[name].reset.disabled=false;var border=appearanceRows[name] && appearanceRows[name].borderColor;if(border && !(draft.appearance && draft.appearance[name] && draft.appearance[name].borderColor)){border.input.value=value;border.color.value=value;}say('Unsaved preview. Save defaults to apply across this site.');
+    rows[name].hex.value=value.toLowerCase();rows[name].hex.removeAttribute('aria-invalid');rows[name].color.value=value;rows[name].reset.disabled=false;var border=appearanceRows[name] && appearanceRows[name].borderColor;if(border && !(draft.appearance && draft.appearance[name] && draft.appearance[name].borderColor)){var line=defaults(name,'borderColor');border.input.value=line;border.color.value=line;}say('Unsaved preview. Save defaults to apply across this site.');
   }
   function appearanceControl(parent,field,prop,title){
     var name=field[0],setting=FlowStatusColors.settings[prop],row=document.createElement('div');row.className='palette-setting';

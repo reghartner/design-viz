@@ -345,7 +345,9 @@ preset colour) when it is done. The same icons mark the hops of Blockers and
 dependency chains.
 The border is red when the upstream is blocked or missing, grey otherwise. There is
 no source line; an authored pair's reason is the button's tooltip. Clicking the
-button focuses the upstream's row. Below the table a light hint appears when an
+button scrolls to the upstream's row and visibly focuses its ticket key, including
+keys without a Jira URL. Enter and Space activate the same navigation; the key's
+outline clears when focus moves away. Below the table a light hint appears when an
 authored pair has no matching Jira link: “1 authored dependency (UX-89 → BE-68) has
 no Jira link. Suggest link in Jira”. It is a hint for the agent session; the page
 never writes to Jira.

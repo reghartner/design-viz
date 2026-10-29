@@ -44,7 +44,7 @@
       var icon=dep.tone==='red'?'alarm':dep.tone==='grey'?'hand':dep.tone==='done'?'check':null;
       var glyph=el(node,'span','icon','dv-live-dep-icon');if(icon){if(glyph.getAttribute('data-icon')!==icon){glyph.innerHTML=FlowIcons.render(icon,{className:'dv-live-dep-glyph',monochrome:true});glyph.setAttribute('data-icon',icon);}}else{glyph.innerHTML='';glyph.removeAttribute('data-icon');}glyph.hidden=!icon;
       el(node,'span','key','dv-live-dep-key',dep.key);el(node,'span','state','dv-live-state-pill'+(states.indexOf(dep.state)>=0?' dv-live-'+dep.state:''),dep.state);
-      if(!node._liveClick){node._liveClick=function(){var table=host.querySelector('table.dv-live-tickets'),row=table && table.querySelector('tr[data-live-ticket="'+node.getAttribute('data-live-dep-for')+'"]'),target=row && (row.querySelector('a') || row.querySelector('.dv-live-ticket-key'));if(target && target.focus){target.focus({preventScroll:false});if(row.scrollIntoView)row.scrollIntoView({block:'nearest'});}};node.addEventListener('click',node._liveClick);}
+      if(!node._liveClick){node._liveClick=function(){var table=host.querySelector('table.dv-live-tickets'),row=table && table.querySelector('tr[data-live-ticket="'+node.getAttribute('data-live-dep-for')+'"]'),keyCell=row && row.querySelector('.dv-live-ticket-key'),target=keyCell && (keyCell.querySelector('a') || keyCell);if(target && target.focus){target.focus({preventScroll:true});if(row.scrollIntoView)row.scrollIntoView({block:'nearest',inline:'nearest'});if(target.scrollIntoView)target.scrollIntoView({block:'nearest',inline:'nearest'});}};node.addEventListener('click',node._liveClick);}
       return node;
     }
     function link(parent,key,label,url){var node=el(parent,url?'a':'span',key,'nbacklink',label);
@@ -102,7 +102,7 @@
         var tbody=el(table,'tbody','tbody','');value.tickets.forEach(function(item){
           var row=el(tbody,'tr',item.key,'dv-live-ticket-row'+(item.tag?' dv-live-ticket-with-tag':''));row.setAttribute('data-live-ticket',item.key);if(item.laneColor)row.style.setProperty('--dv-live-lane-color',item.laneColor);else row.style.removeProperty('--dv-live-lane-color');
           // The keyed renderer keeps data rows and controls in order, with a companion row only for an informational tag.
-          var keyCell=el(row,'td','key','dv-live-ticket-key');link(keyCell,'link',item.key,item.url);if(item.epicLabel)el(keyCell,'div','epic','dv-live-ticket-epic',item.epicLabel);el(row,'td','title','dv-live-ticket-title',item.title);
+          var keyCell=el(row,'td','key','dv-live-ticket-key');keyCell.setAttribute('tabindex','-1');link(keyCell,'link',item.key,item.url);if(item.epicLabel)el(keyCell,'div','epic','dv-live-ticket-epic',item.epicLabel);el(row,'td','title','dv-live-ticket-title',item.title);
           el(el(row,'td','state',''),'span','pill','dv-live-state-pill'+(value.enabled && states.indexOf(item.state)>=0?' dv-live-'+item.state:''),item.state);
           var ownerCell=el(row,'td','owner','dv-live-ticket-owner');if(item.ownerUrl)link(ownerCell,'link',item.owner,item.ownerUrl);else el(ownerCell,'span','text','',item.owner);var depends=el(row,'td','depends','dv-live-ticket-depends');(item.dependsOn || []).forEach(function(dep){depButton(depends,dep.key,dep);});
           var prs=el(row,'td','prs','dv-live-ticket-prs'),links=item.prs && item.prs.links || [],covered=links.map(function(pr){return pr.url;});
@@ -184,6 +184,7 @@
 .dv-live-tickets th{font-weight:700;}
 .dv-live-tickets th:nth-child(1),.dv-live-tickets th:nth-child(3),.dv-live-tickets th:nth-child(6){width:1%;white-space:nowrap;}
 .dv-live-ticket-key{border-left:4px solid var(--dv-live-lane-color,transparent);white-space:nowrap;}
+.dv-live-ticket-key:focus,.dv-live-ticket-key a:focus{outline:2px solid var(--dink,currentColor);outline-offset:-2px;}
 .dv-live-ticket-title,.dv-live-ticket-owner{overflow-wrap:anywhere;}
 .dv-live-ticket-owner .nbacklink{display:inline-block;box-sizing:border-box;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:center;vertical-align:top;}
 .dv-live-tickets .dv-live-ticket-prs{white-space:normal;}

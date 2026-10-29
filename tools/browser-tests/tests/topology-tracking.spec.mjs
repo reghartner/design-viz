@@ -134,6 +134,14 @@ test('an Initiative board discovers stories over imported-only tracking and focu
   await expect(panel.locator('tr[data-live-coverage-for="API-2"],.dv-live-chip')).toHaveCount(0);
   const card=node(page).locator('.card');await card.focus();await expect(card).toBeFocused();
   const label=root.locator('text.lbl[data-dv-edge="0"]');await label.focus();await expect(label).toBeFocused();
+  // Dependency navigation covers provider tickets and consumer tracking on real imported nodes.
+  const destination=async key=>{
+    const target=panel.locator('tr[data-live-ticket="'+key+'"] .dv-live-ticket-key a');
+    await expect(target).toBeFocused();await expect(target).toHaveCSS('outline-style','solid');await expect(target).toHaveCSS('outline-width','2px');
+    expect(await target.evaluate(el=>{const r=el.getBoundingClientRect(),s=el.closest('.dv-live-tickets-scroll').getBoundingClientRect();return r.left>=s.left-1 && r.right<=s.right+1 && r.top>=s.top-1 && r.bottom<=s.bottom+1;})).toBe(true);
+  };
+  await panel.locator('tr[data-live-ticket="API-2"] [data-live-dep-for="CAN-1"]').click();await destination('CAN-1');
+  await panel.locator('.dv-live-chain [data-live-dep-for="API-2"]').first().press('Enter');await destination('API-2');
   expect(await page.evaluate(()=>window.__initiativeImportWatches.filter(w=>w.input.jql==='parent = EP-101').length)).toBe(1);
   await page.screenshot({path:info.outputPath('initiative-imported-tracking-board.png')});
 });

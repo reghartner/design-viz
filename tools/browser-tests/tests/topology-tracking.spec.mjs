@@ -1,8 +1,9 @@
 import {writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {projectFiles,useProjectDownloads} from '../helpers/project-export.mjs';
-import {test,expect,closeTools} from '../helpers/test.mjs';
+import {test,expect,closeTools,chooseNavigation} from '../helpers/test.mjs';
 import {digest} from '../../canon/drift.mjs';
+import C from '../../canon/core.cjs';
 
 test.beforeEach(useProjectDownloads);
 const diagram=raw=>raw.page.sections[0].diagram;
@@ -23,9 +24,9 @@ async function fixture(page,server,configure){
   await page.locator('#welcome-file').setInputFiles({name:'consumer.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(consumer,null,2))});
   await expect(node(page)).toBeVisible();await closeTools(page);return {provider,consumer};
 }
-async function select(page,kind){
+async function select(page,kind,id='canon::api'){
   await closeTools(page);
-  if(kind==='node')await node(page).click();else await page.locator('#docview path.edge[data-dv-edge="0"]').dispatchEvent('click');
+  if(kind==='node')await node(page,id).click();else await page.locator('#docview path.edge[data-dv-edge="0"]').dispatchEvent('click');
   await page.locator('#editor-tab-inspect').click();
 }
 async function history(page,before){
@@ -243,4 +244,119 @@ test('desktop imported missing-work marker uses consumer history and preserves i
 
 test('desktop provider missing-work intent is read only in its consumer',async({page,server})=>{
  await fixture(page,server,(provider)=>{diagram(provider).nodes.api.missingWork=true;});await select(page,'node');const control=page.locator('#guide').getByRole('checkbox',{name:'Missing work',exact:true});await expect(control).toBeChecked();await expect(control).toBeDisabled();
+});
+
+
+test('desktop resolved imported nodes accept missing work and tracking without a provider catalog',async({page,server},info)=>{
+  const model=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}});
+  const provider=model('provider',{nodes:{api:{title:'API',tickets:['CAN-1']},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+  const consumer=model('consumer',{nodes:{local:{title:'Local'}},rows:[['local']],topologyImports:[{spec:'provider',export:'core',as:'canon'}],panels:[{id:'status',type:'live-status'}],steps:[{id:'persist',edge:'canon::api->canon::store'}]});
+  const beforeProvider=JSON.stringify(provider),snapshot=C.materializeTopology([provider,consumer])[1];
+  await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');
+  await page.locator('#welcome-file').setInputFiles({name:'resolved.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(snapshot,null,2))});
+  await expect(node(page)).toBeVisible();await select(page,'node');
+  const marker=page.locator('#guide').getByRole('checkbox',{name:'Missing work',exact:true}),before=await source(page);
+  await expect(marker).toBeVisible();await expect(marker).toBeEnabled();await marker.check();await history(page,before);
+  expect(diagram(JSON.parse(await source(page))).nodes['canon::api'].missingWork).toBe(true);
+  await select(page,'node');const marked=await source(page);await marker.uncheck();await history(page,marked);
+  expect(diagram(JSON.parse(await source(page))).nodes['canon::api'].missingWork).toBeUndefined();
+  await select(page,'node');await marker.check();
+  await add(page,'node','Add ticket','API-2');await add(page,'node','Add PR',pr);
+  const availability=page.locator('#guide').getByRole('checkbox',{name:'Exists when tickets are complete',exact:true});
+  await select(page,'node');const beforeAvailability=await source(page);await availability.check();await history(page,beforeAvailability);
+  await add(page,'edge','Add ticket','EDGE-2');await add(page,'edge','Add PR',pr);
+  await select(page,'edge');const beforeEdgeRule=await source(page);await availability.check();await history(page,beforeEdgeRule);
+  await select(page,'node','local');const localBefore=await source(page);await marker.check();await history(page,localBefore);
+  await select(page,'node');await expect(marker).toBeChecked();await expect(node(page)).toHaveAttribute('data-live-appearance','missing');
+  await page.screenshot({path:info.outputPath('snapshot-imported-missing-work-assigned.png')});
+  const authored=JSON.parse(await source(page)),d=diagram(authored);
+  expect(d.nodes['canon::api']).toMatchObject({missingWork:true,tickets:['CAN-1','API-2'],prs:[pr],existsWhen:'tickets-done'});
+  expect(d.edges[0]).toMatchObject({tickets:['EDGE-2'],prs:[pr],existsWhen:'tickets-done'});
+  expect(d.topologyImports).toBeUndefined();expect(d.topologyProvenance).toEqual(diagram(snapshot).topologyProvenance);
+  const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+  const files=await projectFiles(await pending),json=files[Object.keys(files).find(n=>n.endsWith('.spec.json'))],html=files[Object.keys(files).find(n=>n.endsWith('.html'))];
+  expect(diagram(JSON.parse(json))).toEqual(d);
+  await page.locator('#file-input').setInputFiles({name:'saved-resolved.spec.json',mimeType:'application/json',buffer:Buffer.from(json)});await page.reload();
+  await select(page,'node');await expect(marker).toBeChecked();await expect(availability).toBeChecked();
+  await expect(page.getByRole('textbox',{name:'Add ticket',exact:true})).toBeVisible();await expect(page.locator('#guide')).toContainText('API-2');
+  await writeFile(path.join(server.root,'resolved-status.html'),html);
+  await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>{window.__snapshotRefs=refs;return {'CAN-1':{state:'done'},'API-2':{state:'done'},'EDGE-2':{state:'done'}};}};});
+  await page.goto(server.origin+'/resolved-status.html');
+  await expect.poll(()=>page.evaluate(()=>window.__snapshotRefs)).toMatchObject({tickets:['CAN-1','API-2','EDGE-2'],prs:[pr]});
+  for(const id of ['local','canon::api'])await expect(node(page,id)).toHaveAttribute('data-live-appearance','missing');
+  await expect(page.locator('#docview .dv-live-completion strong')).toHaveText('1/3 carriers done');
+  await node(page).locator('.card').focus();await page.keyboard.press('Enter');await expect(page.locator('.dv-live-popover')).toContainText('Missing work: additional work remains');
+  expect(JSON.stringify(provider)).toBe(beforeProvider);
+});
+
+for(const resolved of [false,true])test('desktop nested imported missing-work assignment stays in its '+(resolved?'snapshot':'authored')+' tab',async({page,server})=>{
+  const model=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}});
+  const provider=model('provider',{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+  const middle=model('middle',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'inner'}],topologyExports:{core:{nodes:['inner::api','inner::store'],edges:['inner::api->inner::store']}}});
+  const consumer=model('consumer',{}),id='outer::inner::api';
+  consumer.page.sections=[{tabs:[{label:'Overview',sections:[{id:'overview',diagram:{nodes:{local:{title:'Overview node'}},rows:[['local']]}}]},{label:'Delivery',sections:[{id:'delivery',diagram:{nodes:{},rows:[[]],topologyImports:[{spec:'middle',export:'core',as:'outer'}],panels:[{id:'status',type:'live-status'}],steps:[{id:'persist',edge:'outer::inner::api->outer::inner::store'}]}}]}]}];
+  const delivery=raw=>raw.page.sections[0].tabs[1].sections[0].diagram,models=[provider,middle,consumer],providersBefore=JSON.stringify([provider,middle]);
+  const raw=resolved?C.materializeTopology(models)[2]:consumer;
+  if(!resolved){
+    const catalog={version:3,diagrams:models.map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:2,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
+    await page.route('**/diagrams.json',route=>route.fulfill({json:catalog}));
+    for(const spec of models)await page.route('**/'+spec.page.canon.id+'.json',route=>route.fulfill({json:spec}));
+  }
+  await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');
+  await page.locator('#welcome-file').setInputFiles({name:'nested.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(raw,null,2))});
+  await chooseNavigation(page.locator('#docview .explore-navigation'),'Tab','Delivery');await select(page,'node',id);
+  const marker=page.locator('#guide').getByRole('checkbox',{name:'Missing work',exact:true}),before=await source(page);
+  await marker.check();await history(page,before);await expect(node(page,id)).toHaveAttribute('data-live-appearance','missing');
+  let authored=JSON.parse(await source(page));
+  if(resolved)expect(delivery(authored).nodes[id].missingWork).toBe(true);
+  else {expect(delivery(authored).topologyImports[0].nodeTracking).toEqual({'inner::api':{missingWork:true}});expect(delivery(authored).nodes[id]).toBeUndefined();}
+  expect(authored.page.sections[0].tabs[0]).toEqual(raw.page.sections[0].tabs[0]);
+  await select(page,'node',id);const checked=await source(page);await marker.uncheck();await history(page,checked);await select(page,'node',id);await marker.check();
+  const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+  const files=await projectFiles(await pending),json=files[Object.keys(files).find(n=>n.endsWith('.spec.json'))];
+  await page.locator('#file-input').setInputFiles({name:'nested-saved.spec.json',mimeType:'application/json',buffer:Buffer.from(json)});await page.reload();
+  await chooseNavigation(page.locator('#docview .explore-navigation'),'Tab','Delivery');await select(page,'node',id);await expect(marker).toBeChecked();await expect(node(page,id)).toHaveAttribute('data-live-appearance','missing');
+  expect(JSON.stringify([provider,middle])).toBe(providersBefore);
+});
+
+// Pointer gestures deliberately hit the rendered stroke, not a synthetic event
+// or the empty center of a curved path's bounding box.
+async function clickEdgeStroke(page,index){
+  const edge=page.locator('#docview path.edge[data-dv-edge="'+index+'"]');
+  await edge.scrollIntoViewIfNeeded();
+  const point=await edge.evaluate(el=>{const p=el.getPointAtLength(el.getTotalLength()*.23),screen=new DOMPoint(p.x,p.y).matrixTransform(el.getScreenCTM());return {x:screen.x,y:screen.y};});
+  await page.mouse.click(point.x,point.y);
+}
+for(const resolved of [false,true])test('desktop pointer clicks reveal Jira tickets on local and imported edges in '+(resolved?'snapshots':'authored imports'),async({page,server},info)=>{
+  const {provider,consumer}=await fixture(page,server,(provider,consumer)=>{
+    diagram(provider).edges[0].tickets=['CAN-3'];
+    const d=diagram(consumer);d.nodes={localA:{title:'Local A'},localB:{title:'Local B'}};d.rows=[['localA','localB']];
+    d.edges=[{from:'localA',to:'localB',label:'Local delivery',tickets:['LOCAL-4']}];
+    d.topologyImports[0].edgeTracking={'api->store':{tickets:['API-2']}};
+  });
+  if(resolved){
+    const snapshot=C.materializeTopology([provider,consumer])[1];
+    await page.locator('#file-input').setInputFiles({name:'resolved-edges.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(snapshot,null,2))});
+  }
+  const cases=[{index:0,keys:['LOCAL-4']},{index:1,keys:['CAN-3','API-2']}];
+  for(const {index,keys} of cases)for(const gesture of ['stroke','label']){
+    await closeTools(page);
+    if(gesture==='stroke')await clickEdgeStroke(page,index);else await page.locator('#docview text.lbl[data-dv-edge="'+index+'"]').click();
+    await page.locator('#editor-tab-inspect').click();
+    await expect(page.locator('#guide').getByRole('textbox',{name:'Add ticket',exact:true})).toBeVisible();
+    for(const key of keys)await expect(page.locator('#guide')).toContainText(key);
+  }
+  const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+  const files=await projectFiles(await pending),html=files[Object.keys(files).find(n=>n.endsWith('.html'))];
+  await writeFile(path.join(server.root,'pointer-edges.html'),html);
+  await page.addInitScript(()=>{window.flowviewLiveStatus={provider:()=>({'CAN-1':{state:'done'},'CAN-3':{state:'todo'},'API-2':{state:'todo'},'LOCAL-4':{state:'todo'}})};});
+  await page.goto(server.origin+'/pointer-edges.html');
+  for(const {index,keys} of cases)for(const gesture of ['stroke','label']){
+    await expect(page.locator('#docview path.edge[data-dv-edge="'+index+'"]').first()).toHaveClass(/dv-live-todo/);
+    if(gesture==='stroke')await clickEdgeStroke(page,index);else await page.locator('#docview text.lbl[data-dv-edge="'+index+'"]').click();
+    const pop=page.locator('#docview .dv-live-popover');await expect(pop).toBeVisible();
+    for(const key of keys)await expect(pop.getByRole('link',{name:key,exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/'+key);
+    if(index===1 && gesture==='label')await page.screenshot({path:info.outputPath('imported-edge-jira-pointer.png')});
+    await page.keyboard.press('Escape');await expect(pop).not.toBeVisible();
+  }
 });

@@ -237,3 +237,40 @@ test('missing-work overlays preserve provider intent and reference edits without
  assert.match(c.planTopologyTracking(JSON.stringify(f.source),f.source,0,'node','shared::api','missingWork',true,true,f.context).error,/inherited/);
  assert.equal(d(f.provider).nodes.api.missingWork,true);
 });
+
+test('resolved snapshot tracking edits are consumer-owned and use exact session history',()=>{
+ const f=fixtures(),providerBefore=plain(f.context),snapshot=c.FlowTopology.resolveSource(f.source,f.context),nodePath=['page','sections',0,'diagram','nodes','shared::api'],edgePath=['page','sections',0,'diagram','edges',1];
+ let text=JSON.stringify(snapshot,null,2),saved;
+ const session=c.createBuilderSession({source:{read:()=>text,write:v=>text=v},render(){},persistence:{read:()=>({}),preserve(){},cancel(){},save:value=>saved=value}});
+ session.replaceProject(text);
+ for(const [path,field,value] of [[nodePath,'missingWork','true'],[nodePath,'tickets','["AA-1"]'],[nodePath,'prs','["https://github.com/example/repo/pull/1"]'],[nodePath,'existsWhen','"tickets-done"'],[edgePath,'tickets','["AA-2"]'],[edgePath,'prs','["https://github.com/example/repo/pull/2"]'],[edgePath,'existsWhen','"tickets-done"'],[nodePath,'missingWork',null]]){
+  const before=text,observed=session.snapshot(),plan=c.planSetField(text,observed.raw,path,field,value);
+  assert.equal(session.accept(plan,{snapshot:observed}),true,plan.error);const after=text;
+  assert.notEqual(before,after);session.undo();assert.equal(text,before);session.redo();assert.equal(text,after);
+ }
+ assert.deepEqual(f.context,providerBefore);assert.equal(d(JSON.parse(text)).topologyImports,undefined);assert.deepEqual(plain(d(JSON.parse(text)).topologyProvenance),plain(d(snapshot).topologyProvenance));
+ assert.equal(d(JSON.parse(saved)).nodes['shared::api'].existsWhen,'tickets-done');
+});
+
+test('snapshot tracking permissions cannot change imported topology or smuggle invalid status fields',()=>{
+ const f=fixtures(),before=plain(c.FlowTopology.resolveSource(f.source,f.context));
+ for(const mutate of [
+  d=>d.nodes['shared::api'].title='renamed',d=>d.nodes['shared::api'].type='text',d=>d.edges[1].from='local',d=>d.floats[0].x+=1,d=>d.topologyProvenance.imports[0].as='other',
+  d=>d.nodes['shared::api'].missingWork='yes',d=>d.nodes['shared::api'].existsWhen='never',d=>d.nodes['shared::api'].tickets=['invalid'],d=>d.nodes['shared::api'].prs=['javascript:alert(1)'],d=>d.edges[1].missingWork=true
+ ]){
+  const after=plain(before);d(after).nodes['shared::api'].missingWork=true;mutate(d(after));assert.ok(c.FlowTopology.editError(before,after));
+ }
+ const text=plain(before);Object.assign(d(text).nodes['shared::api'],{type:'text',text:'Note'});
+ for(const field of ['missingWork','existsWhen']){
+  const after=plain(text);d(after).nodes['shared::api'][field]=field==='missingWork'?true:'tickets-done';assert.match(c.FlowTopology.editError(text,after),/read only/);
+ }
+});
+
+
+test('snapshot tracking and structural protection cover wrapped pages, bare pages and bare diagrams',()=>{
+ const f=fixtures(),resolved=plain(c.FlowTopology.resolveSource(f.source,f.context));
+ for(const [before,get] of [[resolved,d],[resolved.page,raw=>raw.sections[0].diagram],[d(resolved),raw=>raw]]){
+  const after=plain(before);get(after).nodes['shared::api'].missingWork=true;assert.equal(c.FlowTopology.editError(before,after),null);
+  get(after).nodes['shared::api'].title='Structure change';assert.match(c.FlowTopology.editError(before,after),/read only/);
+ }
+});

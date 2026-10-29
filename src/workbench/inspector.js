@@ -582,15 +582,15 @@ function trackingControls(val,overlay){
       if(ok)refreshFormSoon();
       return ok;
     }
-    var refs=trackingRefs(val);
-    if(session.target && session.target.kind==='node' && !(overlay && overlay.textBox)){
+    var refs=trackingRefs(val),textBox=overlay?overlay.textBox:isTextBoxNode(val);
+    if(session.target && session.target.kind==='node' && !textBox){
       var inheritedMissing=overlay && overlay.inherited.missingWork===true;
       var missingControl=checkboxControl(inheritedMissing || val.missingWork===true,function(checked){return overlay?overlay.update('missingWork',true,!checked):commitSimple('missingWork',checked?'true':null);});
       missingControl.querySelector('input').disabled=!!inheritedMissing;
       box.appendChild(frow('Missing work',missingControl));
       var missingHelp=document.createElement('p');missingHelp.className='fnote';missingHelp.textContent=(inheritedMissing?'Inherited from the provider. ':'')+'Additional work has no linked ticket. This stays visible in Live status, even with linked tickets, until cleared. With no tickets or marker, no change is needed.';box.appendChild(missingHelp);
     }
-    if(!(overlay && overlay.textBox)){
+    if(!textBox){
       var inheritedRule=overlay && overlay.inherited.existsWhen==='tickets-done';
       var existence=checkboxControl(inheritedRule || val.existsWhen==='tickets-done',function(checked){
         var ok=overlay?overlay.update('existsWhen','tickets-done',!checked):commitSimple('existsWhen',checked?JSON.stringify('tickets-done'):null);
@@ -2787,7 +2787,7 @@ function renderInspector(){
       var authoredRecord=specSectionPaths(parsed.raw)[t.section],authoredDiagram=authoredRecord && specValueAt(parsed.raw,authoredRecord.diagram);
       var hasAuthoredImport=(authoredDiagram && authoredDiagram.topologyImports || []).some(function(imp){return imp.as===imported.as;});
       var note=document.createElement('p');note.className='fnote';
-      note.textContent='Read-only topology structure from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). '+(hasAuthoredImport?'Drag a node to rearrange it here, or drag the reference’s ⋯ handle to move the whole block. Only this consumer’s presentation, arrangement, additional code references, tracking, and connection layout are saved; structure stays provider-owned.':'This resolved snapshot is read only. Open the authored consumer with its providers to rearrange nodes.')+' Edit this consumer’s steps, paths, failures, and panels here.';
+      note.textContent='Read-only topology structure from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). '+(hasAuthoredImport?'Drag a node to rearrange it here, or drag the reference’s ⋯ handle to move the whole block. Only this consumer’s presentation, arrangement, additional code references, tracking, and connection layout are saved; structure stays provider-owned.':'Edit this snapshot’s Tracking here; changes belong to this consumer document. Its imported structure stays fixed. Open the authored consumer with its providers to rearrange nodes.')+' Edit this consumer’s steps, paths, failures, and panels here.';
       guide.appendChild(note);
       documentDestinations(imported.destination || {spec:imported.spec},null,(normalize(parsed.raw).documentLinks || {}).siteBaseUrl).forEach(function(item){var link=document.createElement('a');link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Open source diagram · '+item.label;guide.appendChild(link);});
       if(t.kind==='node'){
@@ -2811,6 +2811,8 @@ function renderInspector(){
           if(!plan.error && plan.text===parsed.text){formError('');return true;}
           var ok=applyPlan(plan,null,parsed);if(ok)refreshFormSoon();return ok;
         }}));
+      }else if(t.kind==='node' || t.kind==='edge'){
+        guide.appendChild(trackingControls(resolvedValue));
       }
       if(hasAuthoredImport && t.kind==='node'){
         var localImport=authoredDiagram.topologyImports.find(function(imp){return imp.as===imported.as;}),relativeNode=t.id.slice(imported.as.length+2);

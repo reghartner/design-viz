@@ -964,8 +964,9 @@ test('native status ink follows shadow-host and SVG board surfaces and restores 
 });
 
 test('marker-only Live activates nodes steps and captions across sections before provider data',async({page,server},testInfo)=>{
- const spec={page:{title:'Coverage without a provider',sections:[{id:'gap',heading:'Remaining work',diagram:{nodes:{gap:{title:'Missing work',missingWork:true}},rows:[['gap']],steps:[{nodes:['gap']}]}} ,{id:'reuse',heading:'Existing work',diagram:{nodes:{reuse:{title:'Existing component'},tracked:{title:'Unknown ticket',tickets:['AA-1']}},rows:[['reuse','tracked']],steps:[{nodes:['reuse']},{nodes:['tracked']}]}}]}};
+ const spec={page:{title:'Coverage without a provider',sections:[{id:'gap',heading:'Remaining work',diagram:{nodes:{gap:{title:'Missing work',missingWork:true}},rows:[['gap']],steps:[{nodes:['gap']}]}} ,{id:'reuse',heading:'Existing work',diagram:{nodes:{reuse:{title:'Existing component'},peer:{title:'Existing peer'},tracked:{title:'Unknown ticket',tickets:['AA-1']}},rows:[['reuse','peer','tracked']],edges:[{from:'reuse',to:'peer',label:'Existing connection'}],steps:[{edge:'reuse->peer'},{nodes:['tracked']}]}}]}};
  const root=await open(page,server,spec,false),section=root.locator('#section-reuse');
+ await page.getByRole('button',{name:/Existing work/}).click();
  await expect(root.locator('[data-dv-node="gap"]')).toHaveAttribute('data-live-appearance','missing');
  await expect(section.locator('[data-dv-node="reuse"]')).toHaveAttribute('data-live-appearance','unchanged');
  await expect(section.locator('[data-dv-node="tracked"]')).not.toHaveAttribute('data-live-appearance');

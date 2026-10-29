@@ -54,7 +54,7 @@ function createBuilderSession(options){
     var entry=from[from.length-1];
     if(typeof entry!=='string'){
       var captured=entry.capture?entry.capture():entry.after;
-      var restored=entry.restore(entry.before);if(restored===false)return false;
+      var restored=entry.restore(entry.before,message);if(restored===false)return false;
       if(restored==='expired'){from.pop();historyVersion++;historyChanged();return historyStep(from,to,message);}
       from.pop();to.push({kind:entry.kind,capture:entry.capture,restore:entry.restore,before:captured,after:entry.before});
       historyVersion++;historyChanged();return true;
@@ -103,6 +103,34 @@ function createBuilderSession(options){
       if(disposed || !expected || expected.text!==text() || expected.project!==project)return false;
       checkTopologyContext(context);resolve(JSON.parse(text()),context);
       topologyContext=JSON.parse(JSON.stringify(context));topologyRevision++;save();return true;
+    },
+    refreshLocalTopology:function(context,expected){
+      if(disposed || !expected || expected.text!==text() || expected.project!==project || expected.topologyRevision!==topologyRevision)return false;
+      if(!topologyContext || !topologyContext.local || !context || !context.local || context.id!==topologyContext.id)throw Error('Refresh local sources requires the current local repository snapshot.');
+      var raw=JSON.parse(text());resolve(raw,context);
+      function content(value){return JSON.stringify(value.specs.map(function(spec){return spec.page.canon.id===value.id?{page:{canon:spec.page.canon}}:spec;}).sort(function(a,b){return a.page.canon.id.localeCompare(b.page.canon.id);}));}
+      if(content(context)===content(topologyContext))return 'unchanged';
+      function capture(){return {text:text(),context:JSON.parse(JSON.stringify(topologyContext))};}
+      function restore(value,message){
+        var previous=capture(),outcome;
+        topologyContext=JSON.parse(JSON.stringify(value.context));
+        if(text()!==value.text)options.source.write(value.text);
+        try{
+          outcome=render('history');
+          if(outcome && outcome.ok===false)throw Error('The refreshed topology could not be rendered.');
+        }catch(error){
+          topologyContext=previous.context;if(text()!==previous.text)options.source.write(previous.text);
+          try{render('history');}catch(ignored){}
+          throw error;
+        }
+        topologyRevision++;target=null;save();
+        if(options.topologyChanged)options.topologyChanged();
+        if(message && options.afterHistory)options.afterHistory(message,outcome);
+        return true;
+      }
+      var before=capture(),after={text:text(),context:JSON.parse(JSON.stringify(context))};
+      restore(after);
+      pushUndo({kind:'topology',capture:capture,restore:restore,before:before,after:after});return true;
     },
     openFolder:function(context,expected){
       if(disposed || !expected || expected.text!==text() || expected.project!==project || expected.topologyRevision!==topologyRevision)return false;

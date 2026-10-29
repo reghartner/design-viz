@@ -52,7 +52,7 @@ function initWorkbenchAgentChat(opts){
   var selectionFeedback=null,selectionFeedbackTimer=null;
   var state={connected:false,pending:null,transcript:[],changes:[],listening:false,pilotStatus:null},pilotRequested=false;
   var browserStorage=null,browserDatabase=null;try{browserStorage=window.localStorage;}catch(ignored){}try{browserDatabase=window.indexedDB;}catch(ignored){}
-  var recovery=createWorkbenchAgentRecovery({storage:browserStorage,indexedDB:browserDatabase}),remembered=recovery.read(),rememberedHandle=null,activeFolder=null,activeRepository=null,lastSaved='',accessLost=false,seenProject=null,cacheReady=false;
+  var recovery=createWorkbenchAgentRecovery({storage:browserStorage,indexedDB:browserDatabase}),remembered=recovery.read(),rememberedHandle=null,activeFolder=null,activeRepository=null,activeLocalRepository=null,lastSaved='',accessLost=false,seenProject=null,cacheReady=false;
   var get=function(id){return doc.getElementById('folder-agent-'+id);};
   var workingIndicator=get('working');
   var kitNode=doc.getElementById('flowview-folder-kit'),kit=null;
@@ -199,7 +199,7 @@ function initWorkbenchAgentChat(opts){
   }
   function resetConversationForProject(current){
     composeEpoch++;copying=false;copyFallback.hidden=true;copyPreview.value='';handoff.hidden=true;handoffText.value='';activeFiles=null;
-    cacheReady=false;seenProject=current.project;activeFolder=null;activeRepository=null;accessLost=false;lastSaved='';
+    cacheReady=false;seenProject=current.project;activeFolder=null;activeRepository=null;activeLocalRepository=null;accessLost=false;lastSaved='';
     Object.assign(state,{connected:false,pending:null,listening:false,transcript:[],changes:[],activity:[],activityPhase:'idle',review:null,preflight:null});
     get('input').value='';get('instructions').value='';get('pilot-capture').checked=false;
     get('folder').textContent='';get('guide-folder-name').textContent='';
@@ -489,7 +489,8 @@ function initWorkbenchAgentChat(opts){
     if(projectFolder && opts.setLedger)opts.setLedger(projectFolder.ledger,true);
     if(!kit)kit=JSON.parse(kitNode.textContent);
     var connectionProject=opts.snapshot().project;
-    var workingBinding=files.artifacts?{name:directory.name+'/'+files.artifacts.spec,paired:true,external:true,handle:directory,artifacts:files.artifacts,flush:function(){return client?client.flush():Promise.reject(Error('Reconnect the diagram folder.'));},retry:function(){return client?client.flush():Promise.reject(Error('Reconnect the diagram folder.'));}}:null;
+    if(!renewal)activeLocalRepository=projectFolder && projectFolder.localRepository || null;
+    var workingBinding=files.artifacts?{name:directory.name+'/'+files.artifacts.spec,paired:true,external:true,localRepository:activeLocalRepository,handle:directory,artifacts:files.artifacts,flush:function(){return client?client.flush():Promise.reject(Error('Reconnect the diagram folder.'));},retry:function(){return client?client.flush():Promise.reject(Error('Reconnect the diagram folder.'));}}:null;
     if(workingBinding && opts.workingDestination)opts.workingDestination(workingBinding);
     client=createFolderAgentClient({files:files,artifactStatus:function(state,detail){if(workingBinding && opts.workingStatus)opts.workingStatus(workingBinding,state,detail);},snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,prepare:opts.prepare,workflow:workflow,requireLedger:!!files.artifacts,
       level:function(){return get('level').value;},changed:function(update){if(life.alive() && token===generation && opts.snapshot().project===connectionProject){paint(update);if(update.connected===false && workingBinding && opts.workingStatus)opts.workingStatus(workingBinding,'disconnected');}}});
@@ -601,6 +602,7 @@ function initWorkbenchAgentChat(opts){
         directory=found.directory || directory;
         await prepareSource(found.source===null?opening.source:found.source);
         projectFolder=await found.initialize(checkOpening);
+        projectFolder.localRepository=found.repository?{handle:found.repository,path:found.topologyContext.localSource.path}:null;
         if(projectFolder.source===null && !projectFolder.hasLedger)projectFolder.ledger=opening.ledger || '';
         if((projectFolder.source===null?opening.source:projectFolder.source)!==preparedSource)throw Error('The saved story changed while opening the folder. Choose the diagram folder again.');
         if(!life.alive() || token!==generation)return;checkResumeDraft(opening);
@@ -719,6 +721,7 @@ function initWorkbenchAgentChat(opts){
     setSkin:function(name){if(reviewer.setSkin)reviewer.setSkin(name);},
     practice:opts.practice?{connect:connect,propose:function(){if(client)client.propose();}}:null,
     releaseWorking:function(){return client?disconnect():Promise.resolve();},
+    localRefreshBlocked:function(){return !!(connecting || renewing || copying || state.review);},
     readLedger:function(){return client && state.connected?client.readLedger():Promise.resolve(null);},
     recoveryInfo:function(){restoreRecoveryForProject(opts.snapshot());return {connected:state.connected,listening:state.listening,folderName:activeFolder?activeFolder.name:cacheReady && remembered?remembered.folderName:null,sessionId:client && client.manifest()?client.manifest().sessionId:null,changes:state.changes.slice(-100)};}};
 }

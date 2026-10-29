@@ -301,12 +301,14 @@
         <div class="specrow editor-file-tools">
         <button class="bbtn" id="working-file-open">Open working file…</button>
         <button class="bbtn" id="working-folder-open" title="Choose a diagram folder, or the repository root containing canon.json to resolve local imports">Choose working folder…</button>
+        <button class="bbtn" id="local-sources-refresh" disabled>Refresh local sources</button>
         <button class="bbtn" id="working-file-retry" hidden>Retry file save</button>
         <button class="bbtn" id="file-import">import Flowview / Mermaid / draw.io&#8230;</button>
         <button class="bbtn" type="button" id="file-show-exports" aria-controls="workspace-export">All exports in the Export menu</button>
         <input type="file" id="file-input" accept=".json,application/json" hidden>
         <input type="file" id="file-import-input" accept=".spec.json,.json,.mmd,.mermaid,.md,.markdown,.drawio,.xml,application/json,application/xml,text/plain,text/markdown,text/xml" hidden>
         </div>
+      <p id="local-sources-status" role="status">Local refresh requires a repository root containing canon.json.</p>
       <details class="ssec" id="sec-insert">
         <summary>import</summary>
         <div class="buildrow">

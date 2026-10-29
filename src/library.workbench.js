@@ -246,6 +246,9 @@ async function prepareAuthoredTopology(raw,context){
     ((context.catalog || {}).diagrams || []).forEach(function(entry){ids.add(entry.id);});
     var id='workbench-draft',suffix=2;while(ids.has(id))id='workbench-draft-'+suffix++;
     context.id=id;context.ephemeral=true;
+    // A copied consumer does not inherit the registered source path of the
+    // diagram whose providers it reuses. Refresh needs a new explicit binding.
+    delete context.localSource;
     context.specs.push({page:{canon:{version:1,id:id,kind:'design',owner:'group:default/workbench-draft'},sections:[{diagram:{nodes:{},rows:[[]]}}]}});
   }
   // The auxiliary consumer is already resolvable while each missing dependency

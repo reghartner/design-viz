@@ -4,7 +4,7 @@ const {composeSources,readSource}=require('../tools/source-loader.cjs');
 const copy=value=>JSON.parse(JSON.stringify(value));
 const diagram=spec=>spec.page.sections[0].diagram;
 function provider(id){return {page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{diagram:{nodes:{api:{title:id+' API'}},rows:[['api']],topologyExports:{public:{nodes:['api'],edges:[]}}}}]}};}
-async function harness(origin='https://test.invalid/flowspec.html',{missingIndex=false}={}){
+async function harness(origin='https://test.invalid/flowspec.html',{missingIndex=false,localSnapshot=false}={}){
   const {digest}=await import('../tools/canon/drift.mjs'),leaf=provider('leaf'),nested=provider('nested');
   diagram(nested).topologyImports=[{spec:'leaf',export:'public',as:'inner'}];diagram(nested).topologyExports.public.nodes.push('inner::api');
   const providers=[leaf,nested],catalog={version:3,diagrams:providers.map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:1,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
@@ -17,6 +17,7 @@ async function harness(origin='https://test.invalid/flowspec.html',{missingIndex
   vm.createContext(c);vm.runInContext(composeSources(['canon.js','validator.js','viewer/workspace-handoff.js','library.workbench.js','workbench/session.js','workbench/lifetime.js','workbench/agent-merge.js','workbench/agent-session.js','workbench/folder-agent.js']),c);
   const session=c.createBuilderSession({source:{read:()=>text,write:value=>text=value},persistence:{read:()=>({}),preserve(){},cancel(){},save:(source,baseline,artifacts)=>saved=copy(artifacts || {})},render(){session.resolve(JSON.parse(text));}});
   session.replaceProject(text);
+  if(localSnapshot){const consumer=JSON.parse(text);consumer.page.canon={version:1,id:'consumer',kind:'canonical',owner:'group:default/test'};session.replaceProject(text,null,{topologyContext:{version:1,id:'consumer',local:true,specs:copy([...providers,consumer])}});}
   const files={read:async name=>disk.has(name)?copy(disk.get(name)):null,readText:async name=>disk.has(name)?String(disk.get(name)):null,write:async(name,value)=>disk.set(name,copy(value))};
   const client=c.createFolderAgentClient({files,uuid:()=>`id-${++number}`,now:()=>100000,requireLedger:true,
     snapshot(){const snap=session.snapshot();return {source:snap.text,ledger,project:snap.project,topologyRevision:snap.topologyRevision,open:true};},busy:()=>false,
@@ -208,4 +209,12 @@ for(const change of ['disconnect','pagehide','destroy','source','project','conte
   release();await h.done();assert.equal(h.applied,0);
   assert.equal(h.session.text(),change==='source'?h.original.replace('Draft','Human draft'):h.original);
   assert.equal(JSON.stringify(h.session.topologyContext()),change==='project'?'null':before);h.local.destroy();
+});
+
+test('local refresh and its Undo retire an existing proposal review and require fresh approval without network',async()=>{
+ const h=await harness('https://test.invalid/flowspec.html',{localSnapshot:true});await h.client.poll();const first=h.client.reviewSnapshot();assert.equal(first.review.ok,true);
+ const next=h.session.topologyContext();diagram(next.specs[0]).nodes.api.title='Saved local provider';assert.equal(h.session.refreshLocalTopology(next,h.session.snapshot()),true);
+ assert.equal(await h.client.acceptReview(first.review.version),false);assert.equal(h.applies,0);const second=h.client.reviewSnapshot();assert.ok(second.review.version>first.review.version);assert.equal(diagram(h.session.resolve(JSON.parse(second.source),second.topologyContext)).nodes['shared::inner::api'].title,'Saved local provider');
+ h.session.undo();assert.equal(await h.client.acceptReview(second.review.version),false);assert.equal(h.applies,0);const third=h.client.reviewSnapshot();assert.ok(third.review.version>second.review.version);assert.equal(diagram(h.session.resolve(JSON.parse(third.source),third.topologyContext)).nodes['shared::inner::api'].title,'leaf API');assert.deepEqual(h.hits,[]);
+ await h.client.acceptReview(third.review.version);assert.equal(h.applies,1);
 });

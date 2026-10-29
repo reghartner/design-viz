@@ -98,7 +98,7 @@ test('ordinary folder opening reuses approved frozen contexts and refuses missin
     const prepared=await h.ctx.prepareLocalFolderTopology(found.source,{},context);
     const resolved=h.ctx.FlowTopology.resolveSource(JSON.parse(found.source),prepared);
     assert.equal(resolved.page.sections[0].diagram.nodes['shared::base::api'].title,'Shared API');
-    assert.equal(prepared.specs.find(s=>s.page.canon.id==='base').page.sections[0].diagram.nodes.api.title,'Shared API');
+    assert.equal(prepared.specs.find(s=>s.page.canon.id==='base').page.sections[0].diagram.nodes.api.title,'Shared API');assert.equal(prepared.localSource,undefined,'a copied ephemeral consumer cannot inherit another registered source path');
   }
   const context=JSON.parse(JSON.stringify(found.topologyContext));context.specs=context.specs.filter(s=>s.page.canon.id!=='middle');
   assert.throws(()=>h.ctx.prepareLocalFolderTopology(found.source,{},context),/Choose the repository root/);assert.equal(fetches,0);
@@ -136,4 +136,60 @@ test('aliased membership fails deterministically and invoking the resolver via a
   const executable=path.join(h.root,'resolve.mjs');await fs.symlink(path.resolve(__dirname,'../tools/canon/local-imports.mjs'),executable);
   const result=require('node:child_process').spawnSync(process.execPath,[executable,h.consumer,h.root],{encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);assert.equal(JSON.parse(result.stdout).page.canon.id,'consumer');
+});
+async function writeProvider(h,id,raw){await fs.writeFile(path.join(h.root,'diagrams/team',id,id+'.spec.json'),typeof raw==='string'?raw:JSON.stringify(raw));}
+const consumerPath='diagrams/team/consumer/consumer.spec.json';
+test('refresh resolves the exact current draft, new transitive dependencies and stacked overlays without reopening consumer files',async t=>{
+ const h=await setup(t),found=await h.ctx.openLocalRepositoryFolder(h.handle,consumerPath),before=JSON.stringify(found.topologyContext);
+ const draft=JSON.parse(found.source),imp=draft.page.sections[0].diagram.topologyImports[0];
+ imp.nodeOverrides={'base::api':{title:'My consumer title'}};imp.nodePositions={'base::api':{x:345,y:456}};
+ imp.edgeOverrides={'base::api->base::store':{label:'My edge'}};
+ h.inputs.base.page.sections[0].diagram.nodes.store.title='Changed on disk';await writeProvider(h,'base',h.inputs.base);
+ // New dependency is reachable only through the newly saved middle provider.
+ const extra=specs().base;extra.page.title='Extra';
+ await fs.mkdir(path.join(h.root,'diagrams/team/extra'));await writeProvider(h,'extra',extra);
+ const registry=JSON.parse(await fs.readFile(path.join(h.root,'canon.json')));registry.diagrams.push({folder:'diagrams/team/extra',owner:'group:default/test'});await fs.writeFile(path.join(h.root,'canon.json'),JSON.stringify(registry));
+ h.inputs.middle.page.sections[0].diagram.topologyImports.push({spec:'extra',export:'core',as:'extra'});await writeProvider(h,'middle',h.inputs.middle);
+ await fs.writeFile(h.consumer,'{ invalid disk consumer must not be read');
+ const source=' \n'+JSON.stringify(draft)+'\n',next=await h.ctx.readLocalRepositoryTopology(h.handle,source,consumerPath),resolved=h.ctx.FlowTopology.resolveSource(JSON.parse(source),next).page.sections[0].diagram;
+ assert.equal(resolved.nodes['shared::base::api'].title,'My consumer title');assert.equal(resolved.nodes['shared::base::api'].style,'moss');assert.equal(resolved.nodes['shared::base::store'].title,'Changed on disk');assert.equal(resolved.edges[0].label,'My edge');
+ assert.deepEqual(Array.from(next.specs,s=>s.page.canon.id),['base','extra','middle','consumer']);assert.equal(JSON.stringify(found.topologyContext),before);
+ assert.equal(await fs.readFile(h.consumer,'utf8'),'{ invalid disk consumer must not be read');assert.equal(next.localSource.path,consumerPath);
+});
+test('refresh rejects malformed providers, orphan overlays, missing registrations and invalid drafts with identity diagnostics',async t=>{
+ const h=await setup(t),source=JSON.stringify(h.inputs.consumer);
+ await writeProvider(h,'base','{');await assert.rejects(h.ctx.readLocalRepositoryTopology(h.handle,source,consumerPath),/consumer.*provider base.*base.spec.json/i);
+ await writeProvider(h,'base',h.inputs.base);
+ h.inputs.consumer.page.sections[0].diagram.topologyImports[0].nodePositions={'renamed':{x:1,y:2}};
+ await assert.rejects(h.ctx.readLocalRepositoryTopology(h.handle,JSON.stringify(h.inputs.consumer),consumerPath),/consumer.*import shared.*middle.*nodePositions.*renamed/i);
+ await assert.rejects(h.ctx.readLocalRepositoryTopology(h.handle,'{',consumerPath),/Repair the consumer JSON/);
+ await fs.writeFile(path.join(h.root,'canon.json'),'{"version":1,"diagrams":[]}');await assert.rejects(h.ctx.readLocalRepositoryTopology(h.handle,source,consumerPath),/consumer.*no longer registered/);
+});
+function observedRoot(root,onRead){
+ function wrap(dir,prefix=''){return {name:dir.name,async getDirectoryHandle(name){return wrap(await dir.getDirectoryHandle(name),prefix+name+'/');},async getFileHandle(name){const handle=await dir.getFileHandle(name);return {async getFile(){const file=await handle.getFile(),text=await file.text();return {size:file.size,text:async()=>onRead(prefix+name,text)};}};}};}
+ return wrap(root);
+}
+test('refresh deduplicates diamond acquisition, compares exact bytes and retries a racing save only once',async t=>{
+ const h=await setup(t),raw=h.inputs.consumer;raw.page.sections[0].diagram.topologyImports.push({spec:'base',export:'core',as:'direct'});
+ const counts=new Map(),root=observedRoot(h.handle,(name,text)=>{counts.set(name,(counts.get(name)||0)+1);return text;});
+ await h.ctx.readLocalRepositoryTopology(root,JSON.stringify(raw),consumerPath);
+ assert.equal(counts.get('diagrams/team/base/base.spec.json'),2,'one acquisition plus one independent byte verification, despite diamond');assert.equal(counts.has(consumerPath),false);assert.equal(counts.has('diagrams/unrelated/unrelated.spec.json'),false);
+ let read=0;const unstable=observedRoot(h.handle,(name,text)=>name==='canon.json' && ++read%2===0?text+' ':text);
+ await assert.rejects(h.ctx.readLocalRepositoryTopology(unstable,JSON.stringify(raw),consumerPath),/changed during refresh/);assert.equal(read,4);
+ let baseRead=0;const settles=observedRoot(h.handle,(name,text)=>name.endsWith('/base.spec.json') && ++baseRead===1?text.replace('Shared API','Before API'):text);
+ const next=await h.ctx.readLocalRepositoryTopology(settles,JSON.stringify(raw),consumerPath);assert.equal(next.specs[0].page.sections[0].diagram.nodes.api.title,'Shared API');assert.equal(baseRead,4);
+});
+test('refresh never shares provider caches between same-name roots and retires delayed acquisition',async t=>{
+ const one=await setup(t),two=await setup(t);one.handle.name=two.handle.name='worktree';two.inputs.base.page.sections[0].diagram.nodes.api.title='Other root';await writeProvider(two,'base',two.inputs.base);
+ const source=JSON.stringify(one.inputs.consumer),a=await one.ctx.readLocalRepositoryTopology(one.handle,source,consumerPath),b=await one.ctx.readLocalRepositoryTopology(two.handle,source,consumerPath);
+ assert.equal(a.specs[0].page.sections[0].diagram.nodes.api.title,'Shared API');assert.equal(b.specs[0].page.sections[0].diagram.nodes.api.title,'Other root');
+ let active=true;const late=observedRoot(one.handle,(name,text)=>{if(name.endsWith('/base.spec.json'))active=false;return text;});
+ await assert.rejects(one.ctx.readLocalRepositoryTopology(late,source,consumerPath,()=>{if(!active)throw Error('Retired project');}),/Retired project/);
+ const denied={...one.handle,queryPermission:async()=> 'denied'};await assert.rejects(one.ctx.readLocalRepositoryTopology(denied,source,consumerPath),/permission was lost/);
+ const deniedProvider=observedRoot(one.handle,(name,text)=>{if(name.endsWith('/base.spec.json'))throw Object.assign(Error('Permission lost inside provider read'),{name:'NotAllowedError'});return text;});await assert.rejects(one.ctx.readLocalRepositoryTopology(deniedProvider,source,consumerPath),error=>error.name==='NotAllowedError' && /provider base.*Permission lost/.test(error.message));
+});
+test('oversize provider acquisition is rejected before reading its body',async t=>{
+ const h=await setup(t);let bodyRead=false;
+ function wrap(dir){return {name:dir.name,async getDirectoryHandle(name){return wrap(await dir.getDirectoryHandle(name));},async getFileHandle(name){if(name==='base.spec.json')return {async getFile(){return {size:4*1024*1024+1,text:async()=>{bodyRead=true;return '{}';}};}};return dir.getFileHandle(name);}};}
+ await assert.rejects(h.ctx.readLocalRepositoryTopology(wrap(h.handle),JSON.stringify(h.inputs.consumer),consumerPath),/provider base.*4 MiB/);assert.equal(bodyRead,false);
 });

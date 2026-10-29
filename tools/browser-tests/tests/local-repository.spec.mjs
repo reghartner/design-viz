@@ -26,6 +26,8 @@ async function filePanel(page){await closeTools(page);await page.locator('#edito
 async function choose(page){await filePanel(page);await page.locator('#working-folder-open').click();await page.locator('dialog[open] select').selectOption('diagrams/team/consumer/consumer.spec.json');await page.locator('dialog[open]').getByRole('button',{name:'Open',exact:true}).click();}
 async function disk(page,id='consumer'){return page.evaluate(async id=>{let dir=await navigator.storage.getDirectory();for(const segment of ['diagrams','team',id])dir=await dir.getDirectoryHandle(segment);return (await(await dir.getFileHandle(id+'.spec.json')).getFile()).text();},id);}
 
+async function writeDisk(page,id,text){await page.evaluate(async({id,text})=>{let dir=await navigator.storage.getDirectory();for(const segment of ['diagrams','team',id])dir=await dir.getDirectoryHandle(segment);const stream=await(await dir.getFileHandle(id+'.spec.json')).createWritable();await stream.write(text);await stream.close();},{id,text});}
+async function refresh(page){await filePanel(page);await page.locator('#local-sources-refresh').click();}
 test('local repository imports render offline and retain editable positions, source, Undo and recovered frozen providers',async({page,server},info)=>{
   await page.setViewportSize({width:1440,height:900});await setup(page,server);
   const provider=await disk(page,'base'),middle=await disk(page,'middle');const requests=[];page.on('request',request=>requests.push(request.url()));
@@ -43,10 +45,23 @@ test('local repository imports render offline and retain editable positions, sou
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);await expect.poll(()=>disk(page)).toBe(edited);
   const snapshot=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).topologyContext);
   expect(snapshot.local).toBe(true);expect(snapshot.specs.map(spec=>spec.page.canon.id)).toEqual(['base','middle','consumer']);
+  const providerChanged=JSON.parse(provider);providerChanged.page.sections[0].diagram.nodes.api.title='Saved provider update';
+  await writeDisk(page,'base',JSON.stringify(providerChanged));await refresh(page);
+  await expect(page.locator('#local-sources-status')).toContainText('Local sources refreshed');await expect(node(page)).toContainText('Saved provider update');await expect(page.locator('#src')).toHaveValue(edited);
+  const accepted=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).topologyContext);
+  expect(accepted.specs[0].page.sections[0].diagram.nodes.api.title).toBe('Saved provider update');
+  const rendered=await node(page).elementHandle();await refresh(page);await expect(page.locator('#local-sources-status')).toContainText('No provider changes');expect(await rendered.evaluate(el=>el.isConnected)).toBe(true);
+  // Undo/Redo uses captured snapshots even when provider files change again.
+  await writeDisk(page,'base','{}');await page.locator('#undo-builder').click();await expect(node(page)).toContainText('Local shared API');await expect(page.locator('#src')).toHaveValue(edited);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(consumer);
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);await page.locator('#redo-builder').click();await expect(node(page)).toContainText('Saved provider update');
   await page.screenshot({path:info.outputPath('local-repository-edit.png')});
   // Later disk revisions cannot silently refresh the frozen recovered context.
   await page.evaluate(async()=>{let dir=await navigator.storage.getDirectory();for(const part of ['diagrams','team','base'])dir=await dir.getDirectoryHandle(part);const stream=await(await dir.getFileHandle('base.spec.json')).createWritable();await stream.write('{}');await stream.close();});
-  await page.reload();await expect(page.locator('#src')).toHaveValue(edited);await expect(node(page)).toContainText('Local shared API');
+  await page.reload();await expect(page.locator('#src')).toHaveValue(edited);await expect(node(page)).toContainText('Saved provider update');
+  await filePanel(page);await expect(page.locator('#local-sources-refresh')).toHaveText('Reconnect local sources…');await expect(page.locator('#local-sources-status')).toContainText('snapshot works offline');
+  await page.locator('#local-sources-refresh').click();await expect(page.locator('#local-sources-status')).toContainText('Refresh failed:');await expect(node(page)).toContainText('Saved provider update');
+  await expect(page.locator('#local-sources-refresh')).toHaveText('Reconnect local sources…');providerChanged.page.sections[0].diagram.nodes.api.title='Reconnected provider';await writeDisk(page,'base',JSON.stringify(providerChanged));await page.locator('#local-sources-refresh').click();await expect(node(page)).toContainText('Reconnected provider');await expect(page.locator('#src')).toHaveValue(edited);await expect(page.locator('#local-sources-refresh')).toHaveText('Refresh local sources');
 });
 
 test('nested folder diagnostics and late local provider reads preserve the current document',async({page,server})=>{
@@ -76,6 +91,7 @@ test('agent folder connection retains the granted repository root and writes the
     request.onsuccess=()=>{const db=request.result,read=db.transaction('handles').objectStore('handles').get('last');read.onsuccess=async()=>{db.close();try{await read.result.handle.getFileHandle('canon.json');resolve(true);}catch{resolve(false);}};};
   }))).toBe(true);
   expect(await disk(page)).toBe(consumer);
+  const changed=structuredClone(specs.base);changed.page.sections[0].diagram.nodes.api.title='Agent root refresh';await writeDisk(page,'base',JSON.stringify(changed));await page.locator('#folder-agent-guide').evaluate(el=>el.close());await refresh(page);await expect(node(page)).toContainText('Agent root refresh');
 });
 
 test('empty registry preserves an ordinary folder and nested imports reuse the existing frozen providers',async({page,server})=>{
@@ -105,4 +121,27 @@ test('empty registry preserves an ordinary folder and nested imports reuse the e
   },starter);
   await filePanel(page);await page.locator('#working-folder-open').click();
   await expect(page.locator('#workbench-working-status')).toContainText('Saved to /ordinary.spec.json');await expect(page.locator('#src')).toHaveValue(starter);
+});
+
+test('refresh preserves current handwritten imports, every overlay and ledger; invalid and removed identities retain last preview',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:900});await setup(page,server);
+ await page.evaluate(async()=>{let dir=await navigator.storage.getDirectory();for(const part of ['diagrams','team','consumer'])dir=await dir.getDirectoryHandle(part);const stream=await(await dir.getFileHandle('consumer.ledger.md',{create:true})).createWritable();await stream.write('# Exact ledger\r\nKeep evidence.\n');await stream.close();});
+ await choose(page);await expect(node(page)).toBeVisible();const previous=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
+ const draft=structuredClone(specs.consumer),imp=draft.page.sections[0].diagram.topologyImports[0];
+ Object.assign(imp,{nodeTracking:{'base::api':{tickets:['API-10']}},edgeTracking:{'base::api->base::store':{tickets:['API-11']}},nodeOverrides:{'base::api':{style:'teal'}},edgeOverrides:{'base::api->base::store':{label:'My connection'}},nodePositions:{'base::api':{x:450,y:150}},nodeCodeRefs:{'base::api':[{id:'local',repository:'https://github.com/example/service',path:'src/api.js',revision:'a'.repeat(40),anchor:{start:'start',end:'end'}}]}});
+ const exact=' \n'+JSON.stringify(draft,null,2)+'\n';await closeTools(page);await page.locator('#editor-tab-json').click();await page.locator('#src').fill(exact);
+ const changed=structuredClone(specs.base);changed.page.sections[0].diagram.nodes.api.title='New provider with my overlays';await writeDisk(page,'base',JSON.stringify(changed));await refresh(page);
+ await expect(page.locator('#local-sources-status')).toContainText('Local sources refreshed');await expect(node(page)).toContainText('New provider with my overlays');await expect(page.locator('#src')).toHaveValue(exact);
+ const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));expect(saved.ledger).toBe(previous.ledger);expect(saved.ledger).toBe('# Exact ledger\r\nKeep evidence.\n');
+ const context=saved.topologyContext;await writeDisk(page,'base','{half-written');await refresh(page);await expect(page.locator('#local-sources-status')).toContainText('Refresh failed:');await expect(node(page)).toContainText('New provider with my overlays');await expect(page.locator('#src')).toHaveValue(exact);expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).topologyContext)).toEqual(context);
+ const removed=structuredClone(specs.middle);removed.page.sections[0].diagram.topologyExports.core.nodes=['base::store'];removed.page.sections[0].diagram.topologyExports.core.edges=[];await writeDisk(page,'base',JSON.stringify(changed));await writeDisk(page,'middle',JSON.stringify(removed));await refresh(page);await expect(page.locator('#local-sources-status')).toContainText('nodePositions identity is not selected/exported: base::api');await expect(node(page)).toContainText('New provider with my overlays');await expect(page.locator('#src')).toHaveValue(exact);
+ await closeTools(page);await page.locator('#editor-tab-json').click();await page.locator('#src').fill('{ handwritten invalid');await refresh(page);await expect(page.locator('#local-sources-status')).toContainText('Repair the consumer JSON');await expect(page.locator('#src')).toHaveValue('{ handwritten invalid');await expect(node(page)).toContainText('New provider with my overlays');
+});
+
+test('refresh retires a delayed provider read after source changes or leaving the project',async({page,server})=>{
+ await setup(page,server);await choose(page);await expect(node(page)).toBeVisible();
+ await page.evaluate(()=>{const read=FileSystemFileHandle.prototype.getFile;FileSystemFileHandle.prototype.getFile=async function(...args){if(this.name==='base.spec.json' && !window.providerHeld){window.providerHeld=true;await new Promise(resolve=>window.releaseProvider=resolve);}return read.apply(this,args);};});
+ await refresh(page);await expect.poll(()=>page.evaluate(()=>window.providerHeld)).toBe(true);
+ await closeTools(page);await page.locator('#editor-tab-json').click();const exact=consumer+'\n';await page.locator('#src').fill(exact);await page.evaluate(()=>window.releaseProvider());await expect(page.locator('#local-sources-status')).toContainText('document or repository changed');await expect(page.locator('#src')).toHaveValue(exact);await expect(node(page)).toContainText('Local shared API');
+ await page.evaluate(()=>{window.providerHeld=false;});await refresh(page);await expect.poll(()=>page.evaluate(()=>window.providerHeld)).toBe(true);await page.locator('#workspace-home').click();await page.evaluate(()=>window.releaseProvider());await expect(page.locator('#welcome-home')).toBeVisible();await expect(page.locator('#src')).toHaveValue(exact);
 });

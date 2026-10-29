@@ -481,7 +481,13 @@ select an imported node or connection and use **Add ticket** or **Add PR**.
 Inherited references are displayed read-only. Removal applies only to consumer
 additions; each edit has one Undo/Redo. Duplicate additions do nothing.
 
-`nodeTracking` and `edgeTracking` values accept only `tickets` and `prs` arrays.
+`nodeTracking` and `edgeTracking` values accept `tickets` and `prs` arrays and
+optional `existsWhen: "tickets-done"`. Existence requires all resolved tickets to
+be Done, including inherited and local tickets. Provider-authored rules survive
+imports and remain read-only in the consumer. A consumer may add or remove its
+own rule using desktop Inspect → Tracking; reference edits and layout resets
+preserve it. No valid resolved tickets warns and ignores the rule. See
+[planned availability](live-status.md#planned-nodes-and-connections).
 Jira keys or browse URLs, and PR URLs, follow the [tracking parser](live-status.md#fields); invalid
 entries, unknown fields, and missing/deselected identities fail validation.
 Nested imports use complete provider-relative keys such as `inner::api` and

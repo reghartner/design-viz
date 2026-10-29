@@ -182,9 +182,9 @@ Optional `nodeCodeRefs: {providerNodeId: [codeReference, ...]}` appends consumer
 references after inherited references; it never replaces inherited evidence.
 Optional `nodeTracking: {providerNodeId: {tickets: [...], prs: [...]}}` and
 `edgeTracking: {"providerFrom->providerTo": {tickets: [...], prs: [...]}}`
-add delivery annotations to imported nodes and edges. Only `tickets` and `prs`
-arrays are allowed, using the ordinary Jira key/browse URL and absolute HTTP(S) PR URL
-parser. Unlike tolerant carrier metadata, malformed overlay fields are errors.
+add delivery annotations to imported nodes and edges. The `tickets` and `prs`
+arrays use the ordinary Jira key/browse URL and absolute HTTP(S) PR URL parser.
+Optional `existsWhen: "tickets-done"` adds an existence rule. Unlike tolerant carrier metadata, malformed overlay fields are errors.
 Keys must identify selected exported members, including full nested paths.
 Resolution merges inherited references first, then local additions in authored
 order, deduplicating tickets by Jira key and retaining the first reference. For
@@ -752,6 +752,20 @@ live colors come from Jira status only. Steps, coins and chips derive their stat
 from the nodes and edges they involve and never carry tickets. These fields
 declare `flow.live-status`; the overlay ships in every renderer entrypoint.
 See [live ticket status](../docs/live-status.md) for the state model and example.
+
+Optional `existsWhen: "tickets-done"` on nodes and edges marks planned construction.
+Every valid attached Jira ticket must explicitly be Done before it exists; unknown
+or missing evidence keeps it unavailable. With no valid tickets, or an invalid
+setting, warn and ignore the rule. PR state is irrelevant; text boxes are unsupported.
+Desktop **Inspect → Tracking → Exists when tickets are complete** changes this
+field with Undo/Redo; disabling removes it. Live unavailable edges break and stop
+packets. Nodes retain readable text with faded fill and dashed outline, and every
+incident edge breaks. Popovers explain “Not built yet” and show causing tickets.
+Actual Jira colors/counts/rollups remain intact. Live off, clear and destroy restore
+authored visuals; later evidence and navigation reapply the rule. Provider rules
+survive imports; consumer tracking overlays can add a rule but cannot disable an
+inherited one. Declare `flow.ticket-availability` as well as `flow.live-status`.
+See [live availability](../docs/live-status.md#planned-nodes-and-connections).
 
 ### groups — containment boundaries
 

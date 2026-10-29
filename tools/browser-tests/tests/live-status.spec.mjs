@@ -851,3 +851,64 @@ test('X desktop exclusion controls validate deduplicate undo redo remove and exp
  const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const files=await projectFiles(await pending),saved=JSON.parse(files[Object.keys(files).find(k=>k.endsWith('.spec.json'))]);
  expect(saved.page.tracking).toEqual({jira:{...spec.page.tracking.jira,exclude:['HW-124']},github:{org:'acme'}});expect(saved.page.sections).toEqual(spec.page.sections);
 });
+
+test('A1 planned availability keeps Jira state, breaks incident traffic and restores on Done',async({page,server},testInfo)=>{
+ await page.clock.install();
+ await page.addInitScript(()=>{window.__availabilityMap=null;window.flowviewLiveStatus={provider:()=>new Promise(resolve=>{window.__availabilityResolve=resolve;if(window.__availabilityMap!==null)resolve(window.__availabilityMap);})};});
+ const spec=JSON.parse(await readFile(path.join(repo,'examples/ticket-availability/ticket-availability.spec.json'),'utf8')),d=spec.page.sections[0].diagram;delete d.edges[0].label;
+ const root=await open(page,server,spec,false),node=root.locator('g.node[data-dv-node="api"]'),edge=root.locator('path.edge[data-dv-edge="1"]'),incident=root.locator('g.dv-live-comm-failure[data-dv-edge="0"]'),pop=root.locator('.dv-live-popover');
+ await expect(node).toHaveClass(/dv-live-unavailable/);await expect(root.locator('.dv-live-comm-failure')).toHaveCount(2);
+ await expect(incident).toHaveAttribute('role','button');await expect(incident).toHaveAttribute('aria-label',/Not built yet.*Planned API requires API-1, API-2/);await expect(incident).not.toHaveAttribute('aria-label',/blocked/);
+ await incident.press('Enter');await expect(pop).toContainText('Not built yet');await expect(pop.getByRole('link',{name:'API-1',exact:true})).toBeVisible();await expect(pop).toContainText('No status');await page.keyboard.press('Escape');await expect(incident).toBeFocused();
+ await expect.poll(()=>page.evaluate(()=>typeof window.__availabilityResolve)).toBe('function');
+ await page.evaluate(()=>{window.__availabilityMap={'API-1':{state:'done'},'LINK-1':{state:'active'},'APP-1':{state:'active'}};window.__availabilityResolve(window.__availabilityMap);});
+ await expect(node).toHaveClass(/dv-live-done/);await expect(node).toHaveClass(/dv-live-unavailable/);await expect(edge).toHaveClass(/dv-live-active/);await expect(edge).not.toHaveClass(/dv-live-blocked/);
+ await expect(root.locator('.dv-live-comm-failure')).toHaveCount(2);
+ const packets=root.locator('circle.pkt');expect(await packets.count()).toBeGreaterThan(0);
+ expect(await packets.evaluateAll(els=>els.filter(el=>el.querySelector('mpath')?.getAttribute('href')===('#'+document.querySelector('path.edge[data-dv-edge="1"]').id)).every(el=>getComputedStyle(el).display==='none'))).toBe(true);
+ for(const skin of ['aurora','pastel']){
+  await page.evaluate(skin=>window.dvSetSkin(skin),skin);await expect(node.locator('.card')).toHaveCSS('fill-opacity','0.3');await expect(node.locator('.card')).toHaveCSS('stroke-dasharray','7px, 5px');await expect(node.locator('.t1')).toHaveCSS('opacity','1');
+  await root.locator('#section-planned').screenshot({path:testInfo.outputPath('planned-'+skin+'.png')});
+ }
+ await page.evaluate(()=>{window.__availabilityMap['API-2']={state:'done'};});await page.clock.runFor(30001);
+ await expect(node).not.toHaveClass(/dv-live-unavailable/);await expect(root.locator('.dv-live-comm-failure')).toHaveCount(1);await expect(edge).toHaveClass(/dv-live-unavailable/);
+ await page.evaluate(()=>{window.__availabilityMap['LINK-1']={state:'done'};});await page.clock.runFor(30001);
+ await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure')).toHaveCount(0);
+ expect(await packets.evaluateAll(els=>els.every(el=>!el.classList.contains('dv-live-packet-hidden')))).toBe(true);
+ await page.evaluate(()=>{window.__availabilityMap={};});await page.clock.runFor(30001);await expect(node).toHaveClass(/dv-live-unavailable/);
+ await root.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure')).toHaveCount(0);await expect(node.locator('.card')).not.toHaveCSS('fill-opacity','0.3');
+ await root.locator('.dv-live-toggle').click();await expect(node).toHaveClass(/dv-live-unavailable/);
+});
+
+test('A2 desktop node and edge availability controls preserve source history and exported project',async({page,server},testInfo)=>{
+ await page.setViewportSize({width:1440,height:1000});await useProjectDownloads({page});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);
+ const source=page.locator('#src'),guide=page.locator('#guide'),control=guide.getByRole('checkbox',{name:'Exists when tickets are complete',exact:true});
+ const node=page.locator('#docview g.node[data-dv-node="hardware"] .card');await cardClick(node);await page.locator('#editor-tab-inspect').click();
+ const before=await source.inputValue();await expect(control).not.toBeChecked();await control.check();
+ await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.nodes.hardware.existsWhen).toBe('tickets-done');const changed=await source.inputValue();
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(changed);
+ await cardClick(node);await control.uncheck();await expect.poll(async()=>Object.hasOwn(JSON.parse(await source.inputValue()).page.sections[0].diagram.nodes.hardware,'existsWhen')).toBe(false);await control.check();
+ await page.locator('#docview text.lbl[data-dv-edge="1"]').click();await expect(control).not.toBeChecked();await control.check();
+ await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.edges[1].existsWhen).toBe('tickets-done');
+ await guide.screenshot({path:testInfo.outputPath('availability-inspector.png')});
+ const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const files=await projectFiles(await pending),saved=JSON.parse(files[Object.keys(files).find(k=>k.endsWith('.spec.json'))]);
+ expect(saved.page.sections[0].diagram.nodes.hardware).toEqual({...raw.page.sections[0].diagram.nodes.hardware,existsWhen:'tickets-done'});
+ expect(saved.page.sections[0].diagram.edges[1]).toEqual({...raw.page.sections[0].diagram.edges[1],existsWhen:'tickets-done'});
+ expect(saved.page.flowview.features).toContain('flow.ticket-availability');
+});
+
+test('A3 availability survives rebuilt native diagrams and clear or destroy restores authored visuals',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:1000});
+ await writeFile(path.join(server.root,'availability-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'availability-native.html'),'<style>body{margin:0}#host{position:fixed;inset:0}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./availability-native.js";window.mount=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/availability-native.html');await page.waitForFunction(()=>!!window.mount);
+ const spec=JSON.parse(await readFile(path.join(repo,'examples/ticket-availability/ticket-availability.spec.json'),'utf8'));
+ spec.page.sections[0].diagram.paths=[{id:'forward',steps:['request','store','response']},{id:'reverse',steps:['response','request','store']}];
+ await page.evaluate(spec=>{window.viewer=window.mount(document.querySelector('#host'),spec,{});},spec);
+ const root=page.locator('#host'),node=root.locator('g.node[data-dv-node="api"]');await expect(node).toHaveClass(/dv-live-unavailable/);
+ await root.locator('.path-chip[data-dv-path="reverse"]').click();await expect(node).toHaveClass(/dv-live-unavailable/);await expect(root.locator('.dv-live-comm-failure')).toHaveCount(2);
+ await page.evaluate(()=>window.viewer.controller.liveStatus.clear());await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target')).toHaveCount(0);await expect(node.locator('.card')).not.toHaveCSS('fill-opacity','0.3');
+ await page.evaluate(()=>window.viewer.controller.liveStatus.apply({}));await expect(node).toHaveClass(/dv-live-unavailable/);
+ await page.evaluate(()=>window.viewer.controller.liveStatus.destroy());await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target')).toHaveCount(0);await expect(node.locator('.card')).not.toHaveCSS('fill-opacity','0.3');
+ await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
+});

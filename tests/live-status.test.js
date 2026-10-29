@@ -1576,3 +1576,30 @@ test('X10 Jira linked issue metadata keeps outside containers out of board total
  const direct=upstream('KEEP-1',{name:'Story',hierarchyLevel:0}),dependent=jira('ST-1');dependent.fields.issuelinks=[link(upstream('KEEP-1',{name:'Epic',hierarchyLevel:1}))];
  assert.equal(C.liveStatusJiraMap(['ST-1','KEEP-1'],[[dependent,direct]],new Set(),'')['KEEP-1'].kind,'story','requested issue metadata wins over a linked stub');
 });
+
+test('ticket availability requires all explicit Done evidence without changing Jira rollup',()=>{
+ const {C}=harness(),value={tickets:['AA-1','AA-2'],existsWhen:'tickets-done'};
+ for(const map of [{},{'AA-1':{state:'done'}},{'AA-1':{state:'done'},'AA-2':{state:'unknown'}},{'AA-1':{state:'done'},'AA-2':{state:'missing'}},{'AA-1':{state:'done'},'AA-2':{state:'active'}}])assert.equal(C.liveStatusUnavailable(value,map),true);
+ assert.equal(C.liveStatusCarrier(value,{'AA-1':{state:'done'}}),'done','availability must not redefine Jira rollup');
+ assert.equal(C.liveStatusUnavailable(value,{'AA-1':{state:'done'},'AA-2':{state:'done'}}),false);
+ for(const other of [{tickets:['AA-1']},{existsWhen:'tickets-done'},{existsWhen:'tickets-done',tickets:['invalid'],prs:['https://example.test/pull/1']},{...value,type:'text',text:'Note'},{...value,existsWhen:'other'}])assert.equal(C.liveStatusUnavailable(other,{}),false);
+});
+test('planned nodes and incident edges stay unavailable through unknown evidence, navigation and independent edge gates',()=>{
+ const raw={nodes:{a:{title:'Planned API',tickets:['AA-1','AA-2'],existsWhen:'tickets-done'},b:{title:'Existing'}},rows:[['a','b']],edges:[{from:'a',to:'b',existsWhen:'tickets-done',tickets:['EE-1']},{from:'b',to:'a'}]},before=JSON.stringify(raw);
+ const h=harness(raw),api=h.ctl.liveStatus,node=h.view.querySelector('[data-dv-node="a"]'),edges=h.view.querySelectorAll('path.edge');
+ assert.ok(node.classList.contains('dv-live-unavailable'),'initial unknown evidence is unavailable');assert.equal(h.view.querySelectorAll('.dv-live-comm-failure').length,2);
+ assert.match(node.querySelector('.card').getAttribute('aria-label'),/Not built yet/);
+ api.apply({'AA-1':{state:'done'},'AA-2':{state:'active'},'EE-1':{state:'active'}});
+ assert.ok(node.classList.contains('dv-live-active'));assert.ok(!node.classList.contains('dv-live-blocked'));
+ assert.match(h.view.querySelector('text.lbl[data-dv-edge="1"]').getAttribute('aria-label'),/Planned API requires AA-1, AA-2/);
+ h.view.dispatchEvent({type:'navigation-mounted'});h.flush();assert.equal(h.view.querySelectorAll('.dv-live-comm-failure').length,2);
+ api.apply({'AA-1':{state:'done'},'AA-2':{state:'done'},'EE-1':{state:'todo'}});
+ assert.ok(!node.classList.contains('dv-live-unavailable'));assert.equal(h.view.querySelectorAll('.dv-live-comm-failure').length,1);assert.ok(edges[0].classList.contains('dv-live-unavailable'));assert.ok(!edges[1].classList.contains('dv-live-unavailable'));
+ api.apply({'AA-1':{state:'done'},'AA-2':{state:'done'},'EE-1':{state:'done'}});assert.equal(h.view.querySelectorAll('.dv-live-unavailable,.dv-live-comm-failure').length,0);
+ api.apply({});assert.ok(node.classList.contains('dv-live-unavailable'));
+ api.setEnabled(false);assert.equal(h.view.querySelectorAll('.dv-live-unavailable,.dv-live-comm-failure').length,0);
+ api.setEnabled(true);assert.ok(node.classList.contains('dv-live-unavailable'));
+ api.clear();assert.equal(h.view.querySelectorAll('.dv-live-unavailable,.dv-live-comm-failure').length,0);
+ api.apply({});api.destroy();assert.equal(h.view.querySelectorAll('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target').length,0);assert.equal(JSON.stringify(raw),before);
+ const fresh=harness(raw);fresh.ctl.liveStatus.destroy();assert.equal(fresh.view.querySelectorAll('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target').length,0,'destroy before first map restores visuals');
+});

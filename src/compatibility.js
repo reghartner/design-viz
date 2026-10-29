@@ -18,6 +18,7 @@ var FlowviewCompatibility = (function(){
   // Capabilities added after the baseline, with their first release.
   var released={
     'flow.live-status':['Live ticket status references','0.2.0'],
+    'flow.ticket-availability':['Ticket-gated node and connection availability','0.2.0'],
     'layout.controls-scale':['Whole step-control sizing in both placements','0.2.0'],
     'layout.playback-position':['Play buttons above or beside steps','0.2.0'],
     'content.edge-json-contracts':['Edge JSON contracts and step replacements','0.2.0'],
@@ -68,12 +69,12 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
-      function tracked(value){return object(value) && ['tickets','prs'].some(function(key){return Array.isArray(value[key]) && value[key].length;});}
-      if(Object.values(d.nodes || {}).some(tracked) || (Array.isArray(d.edges)?d.edges:[]).some(tracked))used['flow.live-status']=true;
+      function tracked(value){if(object(value) && value.existsWhen==='tickets-done')used['flow.ticket-availability']=true;return object(value) && ['tickets','prs'].some(function(key){return Array.isArray(value[key]) && value[key].length;});}
+      Object.values(d.nodes || {}).concat(Array.isArray(d.edges)?d.edges:[]).forEach(function(value){if(tracked(value))used['flow.live-status']=true;});
       (Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp){
         if(!object(imp))return;
         ['nodeTracking','edgeTracking'].forEach(function(field){
-          if(object(imp[field]) && Object.values(imp[field]).some(tracked))used['flow.live-status']=true;
+          if(object(imp[field]))Object.values(imp[field]).forEach(function(value){if(tracked(value))used['flow.live-status']=true;});
         });
       });
       if(d.graphFrame!=null)used['layout.graph-frame']=true;

@@ -92,8 +92,8 @@ After the packet, route source/handoff details:
   [Independent visual review](references/independent-visual-review.md) applies
   only with already-authorized delegation and available rendered captures.
 - [Diagram links](../../../cookbook/diagram-handoffs.md); [design reviews](../../../docs/design-review.md).
-- [Jira](../../../docs/live-status.md): desktop `tracking.jira.exclude`.
-  Count parent stories − exclusions + manual tickets + displayed dependencies once.
+- [Jira / `existsWhen:"tickets-done"`](../../../docs/live-status.md): desktop
+  `tracking.jira.exclude`; count parents − exclusions + manual + dependency stories once.
 
 Deliver spec/ledger files together. Ask unresolved story decisions and, after
 relevant checks, needed Mixed/Engineering source access plainly.

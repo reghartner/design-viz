@@ -82,6 +82,11 @@ function deltaWarnings(value, path, warnings){
   }
 }
 function trackingWarnings(value, path, warnings){
+  if(value && Object.prototype.hasOwnProperty.call(value,'existsWhen')){
+    if(value.existsWhen!=='tickets-done')warnings.push(path+'.existsWhen: expected "tickets-done" — ignored');
+    else if(isTextBoxNode(value))warnings.push(path+'.existsWhen: text boxes do not support availability — ignored');
+    else if(!trackingRefs(value).tickets.length)warnings.push(path+'.existsWhen: requires at least one valid Jira ticket — ignored');
+  }
   trackingRefs(value, function(field, index){
     var at = path + '.' + field;
     if (index === null)

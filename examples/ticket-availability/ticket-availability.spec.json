@@ -1,0 +1,106 @@
+{
+  "page": {
+    "title": "Planned delivery components",
+    "contract": "1",
+    "flowview": {
+      "authoredWith": "0.2.0",
+      "minVersion": "0.2.0",
+      "features": [
+        "flow.live-status",
+        "flow.ticket-availability",
+        "panel.live-status"
+      ]
+    },
+    "tracking": {
+      "jira": {
+        "site": "https://example.atlassian.net"
+      }
+    },
+    "sections": [
+      {
+        "id": "planned",
+        "heading": "New API and transport",
+        "text": [
+          "The API and its incident connections remain unavailable until API-1 and API-2 are Done. The new transport separately requires LINK-1. Existing work remains available."
+        ],
+        "diagram": {
+          "nodes": {
+            "client": {
+              "title": "Existing client",
+              "tickets": [
+                "APP-1"
+              ]
+            },
+            "api": {
+              "title": "Planned API",
+              "tickets": [
+                "API-1",
+                "API-2"
+              ],
+              "existsWhen": "tickets-done"
+            },
+            "store": {
+              "title": "Existing store"
+            }
+          },
+          "rows": [
+            [
+              "client",
+              "api",
+              "store"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "client",
+              "to": "api",
+              "label": "Request"
+            },
+            {
+              "from": "api",
+              "to": "store",
+              "label": "New transport",
+              "tickets": [
+                "LINK-1"
+              ],
+              "existsWhen": "tickets-done"
+            },
+            {
+              "from": "store",
+              "to": "client",
+              "label": "Existing response",
+              "tickets": [
+                "APP-1"
+              ]
+            }
+          ],
+          "panels": [
+            {
+              "id": "delivery",
+              "type": "live-status",
+              "title": "Delivery status"
+            }
+          ],
+          "view": "ambient",
+          "steps": [
+            {
+              "id": "request",
+              "edge": "client->api",
+              "text": "Call the planned API."
+            },
+            {
+              "id": "store",
+              "edge": "api->store",
+              "text": "Use the new transport."
+            },
+            {
+              "id": "response",
+              "edge": "store->client",
+              "text": "Return on the existing connection."
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

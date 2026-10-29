@@ -30,11 +30,11 @@ function geometry(core, diagram) {
   return plain({layout, adjust, paths: edges.map((edge, index) => core.edgePath(edge, layout, adjust[index]))});
 }
 
-test('the geometry leaf needs only clamp and centers row placement across the canvas', () => {
+test('the geometry leaf uses pure tracking and clamp and centers row placement across the canvas', () => {
   const validator = withoutDOM();
   vm.runInContext(readSource('validator.js'), validator);
   const leaf = withoutDOM({clamp: validator.clamp});
-  vm.runInContext(readSource('core/geometry.js'), leaf);
+  vm.runInContext(readSource('core/tracking.js')+'\n'+readSource('core/geometry.js'), leaf);
   const d = {nodes: {a: {}, b: {}, c: {}}, rows: [['a', 'b'], ['c']], edges: [{from: 'a', to: 'b'}]};
   const result = geometry(leaf, d);
   assert.deepEqual(Object.values(result.layout.pos).map(node => [node.cx, node.cy]), [[110, 69], [1070, 69], [590, 263]]);
@@ -44,6 +44,24 @@ test('the geometry leaf needs only clamp and centers row placement across the ca
   assert.deepEqual(plain(leaf.sanitizedGroupParents(groups, (id, message) => warnings.push(id + ': ' + message))), {child: 'a'});
   assert.deepEqual(warnings, ['a: parent chain loops — parent ignored', 'b: parent chain loops — parent ignored']);
   assert.deepEqual(groups, {a: {parent: 'b'}, b: {parent: 'a'}, child: {parent: 'a'}});
+});
+
+test('availability reserves a fixed footer consistently in pure geometry, rows, stacks, lanes and floats', () => {
+  const leaf=withoutDOM({clamp:(v,a,b)=>Math.max(a,Math.min(b,v))}),full=withoutDOM();
+  vm.runInContext(readSource('core/tracking.js')+'\n'+readSource('core/text-box.js')+'\n'+readSource('core/geometry.js'),leaf);
+  vm.runInContext(readSource('validator.js'),full);
+  const gated={existsWhen:'tickets-done',tickets:['API-1'],prs:['https://github.com/acme/api/pull/1']};
+  for(const routing of [undefined,'lanes']){
+    const d={routing,nodes:{a:{...gated,group:'box'},b:{group:'box'},c:{...gated},f:{...gated,sub:'Float body'},plain:{},invalid:{existsWhen:'tickets-done',tickets:['no']},url:{existsWhen:'tickets-done',tickets:['https://jira.example/browse/API-2']},text:{...gated,type:'text',text:'Note'}},groups:{box:{title:'Group'}},rows:[[['a','b'],'c'],['invalid','url']],floats:[{id:'f',x:350,y:800},{id:'plain',x:650,y:800},{id:'text',x:900,y:800}],edges:[]};
+    const before=JSON.stringify(d),L=plain(leaf.layout(d));
+    assert.deepEqual(L,plain(full.layout(d)));
+    assert.equal(JSON.stringify(d),before);
+    assert.equal(L.pos.a.h,86);assert.equal(L.pos.b.h,54);assert.equal(L.pos.c.h,86);
+    assert.equal(L.pos.b.cy-L.pos.a.cy,(86+54)/2+46);
+    assert.equal(L.pos.f.h,90);assert.equal(L.pos.f.cy,800);assert.equal(L.pos.plain.h,50);
+    assert.equal(L.pos.invalid.h,54);assert.equal(L.pos.url.h,86);assert.equal(leaf.nodeAvailabilitySpace(d.nodes.text),0);
+    assert.ok(L.groups.box.y+L.groups.box.h>=L.pos.b.cy+L.pos.b.h/2);
+  }
 });
 
 test('rows use both sides equally for curves, lanes, stacks and single-node rows', () => {
@@ -89,7 +107,7 @@ test('headless validator and standalone geometry match viewer layouts, routes an
   vm.runInContext(readSource('validator.js'), headless);
   vm.runInContext(readSource('validator.js') + '\n' + readSource('engine.js'), viewer);
   const leaf = withoutDOM({clamp: headless.clamp});
-  vm.runInContext(readSource('core/geometry.js'), leaf);
+  vm.runInContext(readSource('core/tracking.js')+'\n'+readSource('core/geometry.js'), leaf);
   for (const file of fixtures) {
     const raw = JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')), before = JSON.stringify(raw);
     const page = headless.normalize(raw), diagrams = [];

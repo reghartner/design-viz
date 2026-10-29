@@ -451,3 +451,10 @@ test('frozen effective provider evidence stamps authored imports without copying
   const invalid={page:{flowview:{features:'invalid'},sections:raw.page.sections}};
   assert.deepEqual(plain(C.stamp(invalid,effective)),invalid);
 });
+
+test('ticket availability is detected beyond earlier tracked carriers and in consumer overlays',()=>{
+ for(const diagram of [{nodes:{a:{tickets:['AA-1']},b:{tickets:['AA-2'],existsWhen:'tickets-done'}}},{nodes:{a:{tickets:['AA-1']}},edges:[{from:'a',to:'b',existsWhen:'tickets-done',tickets:['AA-2']}]},{topologyImports:[{nodeTracking:{a:{tickets:['AA-1']},b:{existsWhen:'tickets-done'}}}]}]){
+  const raw={page:{sections:[{diagram}]}},stamped=C.stamp(raw),older={...C.features};delete older['flow.ticket-availability'];
+  assert.ok(C.detect(raw).includes('flow.ticket-availability'));assert.ok(C.check(stamped,{version:C.version,contract:'1',features:older}).missingFeatures.includes('flow.ticket-availability'));
+ }
+});

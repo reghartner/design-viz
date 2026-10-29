@@ -583,6 +583,18 @@ function trackingControls(val,overlay){
       return ok;
     }
     var refs=trackingRefs(val);
+    if(!(overlay && overlay.textBox)){
+      var inheritedRule=overlay && overlay.inherited.existsWhen==='tickets-done';
+      var existence=checkboxControl(inheritedRule || val.existsWhen==='tickets-done',function(checked){
+        var ok=overlay?overlay.update('existsWhen','tickets-done',!checked):commitSimple('existsWhen',checked?JSON.stringify('tickets-done'):null);
+        if(ok)refreshFormSoon();return ok;
+      });
+      existence.querySelector('input').disabled=!!inheritedRule;
+      box.appendChild(frow('Exists when tickets are complete',existence));
+      var existenceHelp=document.createElement('p');existenceHelp.className='fnote';
+      existenceHelp.textContent=(inheritedRule?'Inherited from the provider. ':'')+'In Live status, show this node or connection as not built until every attached Jira ticket is Done. Requires at least one valid ticket. Pull requests do not count.';
+      box.appendChild(existenceHelp);
+    }
     if(overlay){
       var inherited=document.createElement('p');inherited.className='fnote';
       inherited.textContent='Inherited tracking (read only): '+(overlay.inherited.tickets.concat(overlay.inherited.prs).join(', ') || 'None')+'. Additional references are saved only in this consumer.';
@@ -2786,7 +2798,7 @@ function renderInspector(){
         var trackingContext=session.topologyContext(),trackingContextKey=JSON.stringify(trackingContext);
         var trackingId=t.kind==='node'?t.id:builderEdgeKey(resolvedValue);
         var trackingTarget=topologyTrackingTarget(parsed.text,parsed.raw,t.section,t.kind,trackingId,trackingContext,t.index);
-        if(!trackingTarget.error)guide.appendChild(trackingControls(trackingTarget.local,{inherited:trackingTarget.inherited,update:function(field,ref,remove){
+        if(!trackingTarget.error)guide.appendChild(trackingControls(trackingTarget.local,{inherited:trackingTarget.inherited,textBox:isTextBoxNode(resolvedValue),update:function(field,ref,remove){
           if(session.text()!==parsed.text || JSON.stringify(session.topologyContext())!==trackingContextKey){formError('The source or provider context changed. Render and reselect.');return false;}
           var plan=planTopologyTracking(parsed.text,parsed.raw,t.section,t.kind,trackingId,field,ref,remove,trackingContext,t.index);
           if(!plan.error && plan.text===parsed.text){formError('');return true;}

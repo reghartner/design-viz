@@ -4144,3 +4144,26 @@ path.edge.dv-live-missing:not(.dv-live-waiting){stroke-dasharray:2 3!important;}
 .dv-live-state-pill{border:1px solid currentColor;border-radius:4px;padding:0 5px;font-size:11px;}
 @media(prefers-reduced-motion:reduce){.dv-live-changed{animation:none!important;}}
 @media print{.dv-live-changed{animation:none!important;}}
+
+/* Construction visuals are distinct from actual Jira state classes/counts.
+   A partial Done response remains slate until every attached ticket is Done. */
+:is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-unavailable .card{
+  fill:var(--ns-bg)!important;fill-opacity:1!important;stroke:var(--ns-line)!important;
+  stroke-dasharray:5 4!important;filter:none!important;
+}
+.node.dv-live-unavailable{--dv-live-color:var(--ns-line);}
+.node.dv-live-unavailable>.dv-live-halo{opacity:0!important;animation:none!important;}
+.node.dv-live-unavailable .t1{fill:var(--ns-ink)!important;}
+.node.dv-live-unavailable .t2{fill:var(--ns-sub)!important;}
+.node.dv-live-reserved>.icbg{fill:none!important;stroke:var(--ns-sub)!important;stroke-dasharray:2 2;stroke-width:.7;}
+.node.dv-live-reserved>use,.node.dv-live-reserved>.node-image{visibility:hidden;}
+.dv-live-construction{pointer-events:none;}
+.dv-live-hatching{fill:none;stroke:var(--ns-line);stroke-width:1;opacity:.09;}
+.dv-live-construction-frame{fill:none;stroke:var(--ns-line);stroke-width:1;opacity:.65;}
+.dv-live-placeholder-icon{fill:none;stroke:var(--ns-sub);stroke-width:1.1;stroke-linejoin:round;}
+.dv-live-reservation-divider{fill:none;stroke:var(--ns-line);stroke-width:.6;opacity:.45;}
+.dv-live-reservation-title,.dv-live-reservation-tickets{fill:var(--ns-sub);font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0;}
+.dv-live-reservation-title{font-weight:600;}
+.stepmode .node.dv-live-unavailable:not(.lit){opacity:max(var(--dv-dim,.45),.65)!important;}
+.dv-live-comm-failure.dv-live-unavailable{--comm-color:var(--dv-live-color,var(--dv-live-todo))!important;}
+.dv-live-availability-detail{font-size:12px;line-height:1.5;max-width:36em;}

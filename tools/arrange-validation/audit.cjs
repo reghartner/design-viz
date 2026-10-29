@@ -5,8 +5,8 @@
 const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
-const native=vm.createContext({});
-vm.runInContext('function clamp(n,a,b){return Math.max(a,Math.min(b,n));}\n'+fs.readFileSync(path.join(__dirname,'../../src/core/geometry.js'),'utf8'),native);
+const native=vm.createContext({URL});
+vm.runInContext('function clamp(n,a,b){return Math.max(a,Math.min(b,n));}\n'+fs.readFileSync(path.join(__dirname,'../../src/core/tracking.js'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname,'../../src/core/geometry.js'),'utf8'),native);
 function auditDiagram(diagram){
   const layout=native.layout(diagram),ids=Object.keys(diagram.nodes),overlaps=[],intrusions=[],headerIntrusions=[],outsideFrame=[];
   const headers=Object.entries(layout.groups).map(([id,b])=>({id,x:b.x,y:b.y,w:b.w,h:20}));

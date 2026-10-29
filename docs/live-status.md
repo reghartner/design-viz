@@ -4,6 +4,60 @@ Live ticket references connect a diagram's implementation work to Jira without
 copying changing status into the authored spec. Hardware, firmware, UX and backend
 work can be tracked on the nodes and the interactions between them.
 
+
+### Planned nodes and connections
+
+Set `"existsWhen": "tickets-done"` on a node or edge when its tickets create
+something that does not exist yet. In desktop Workbench, select the carrier and
+use **Inspect → Tracking → Exists when tickets are complete**. Leave this off
+for tickets improving an existing component or connection. Unchecking removes
+the optional field; Undo/Redo and project export preserve it.
+
+Availability requires **every valid attached Jira ticket** to have explicit
+`state: "done"`. Missing entries, unknown states, `missing`, Todo and In Progress
+keep it unavailable. PR state never decides existence. No valid tickets means
+the rule warns and is ignored; invalid `existsWhen` values also warn and are
+ignored. Text boxes do not support the rule. Jira states, counts, rollups and
+dependency waiting remain unchanged.
+
+While Live is on, an unavailable connection shows a communication break and
+stops packet animation. An unavailable node keeps its readable title and subtitle.
+Todo, unknown and partial-Done evidence show a neutral dashed **reserved space**
+with a box placeholder and a bounded ticket summary. If no attached ticket has a
+known unfinished state, the label is **AWAITING JIRA STATUS**: absent or unknown
+evidence alone does not claim the node is unbuilt. This includes Done plus
+unknown evidence. Known Todo uses **NOT BUILT YET**. Blocked
+or missing evidence uses the same reservation in rose. An actual In Progress
+rollup shows a blue **blueprint frame** with light hatching and its original icon.
+Every ticket explicitly Done makes the node **green**, using the ordinary moss
+live Done fill and outline, with all construction decoration removed.
+A fixed 32px footer is reserved in gated-node geometry, including stacks and floats,
+so status updates never move the diagram. The original content and controls stay
+in their body area. Long ticket summaries abbreviate; the popover retains every
+causing ticket. Every connection touching an unavailable node also breaks, even
+without its own tickets. Its accessible name and ticket popover say
+**Awaiting Jira status** for an awaiting cause or **Not built yet** for a known
+unfinished cause, list the relevant tickets, and retain the actual Jira state.
+Mixed edge/endpoint causes each retain their own explanation. Neither wording
+changes the all-Done availability rule or packet suppression. Labels, unlabeled break glyphs and node cards retain keyboard access;
+there are no extra canvas status badges beyond the reserved-space explanation.
+All-Done evidence restores green live Done appearance and traffic, unless another endpoint or the edge itself still
+has an unfinished existence rule.
+
+The rule applies while awaiting the first status response and to partial or
+empty responses. Live off, explicit `clear()` and controller destruction restore
+authored visuals. A later response or re-enabling Live reapplies the rule.
+Navigation and rebuilt diagrams use the current evidence.
+
+Provider-authored rules survive topology imports. Consumer `nodeTracking` and
+`edgeTracking` overlays may add `existsWhen: "tickets-done"`; it evaluates all
+resolved tickets, inherited and local. A provider rule remains read-only in the
+consumer and cannot be disabled there. Removing a consumer rule restores provider
+behavior and preserves all other tracking. Resolved-only snapshots remain read-only.
+The separate `flow.ticket-availability` capability lets older viewers report
+unsupported behavior. See the runnable
+[planned availability example](../examples/ticket-availability/ticket-availability.spec.json).
+
 ## Fields
 
 Any diagram node or edge can carry these optional references:
@@ -211,7 +265,7 @@ Click a painted node's card or an edge's line, label or live break glyph for
 ticket status, title, assignee and the informational PR summary. The
 node's own links, detail and handoff controls keep their clicks. In the reader
 that card or edge label is one keyboard button named for its tickets and state.
-An unlabelled edge uses its path, or its visible live break when blocked.
+An unlabelled edge uses its path, or its visible live break when blocked or unavailable.
 Press Enter/Space to open the popover.
 Escape or an outside click closes it and
 returns focus to the carrier. In the Workbench, clicks keep selecting for
@@ -554,9 +608,11 @@ Blocked edges reuse the communication **Not sent** break glyph, without canvas
 text, in both Ambient and Step mode: the edge already names its ends and a text
 label would sit on the edge label, its step coin or a node card. The break's
 title and accessible name keep the full sentence with the blocking keys. The break lasts until the live state
-changes or Live is disabled. Missing edges keep their red stroke without a
-communication break. Todo edges use a dashed grey stroke and hide packet dots;
-active and done edges retain ordinary packet animation. Authored step failures
+changes or Live is disabled. Without an existence rule, missing edges keep their
+red stroke without a communication break. Todo edges use a dashed grey stroke
+and hide packet dots; active and done edges retain ordinary packet animation.
+An unavailable edge or endpoint adds a break and stops packets regardless of
+Jira state, as described under [planned availability](#planned-nodes-and-connections). Authored step failures
 keep their own lifecycle, and reduced-motion behavior is unchanged.
 
 ## Publishing as a claude.ai artifact

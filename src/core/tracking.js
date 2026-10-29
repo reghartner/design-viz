@@ -127,3 +127,9 @@ function trackingDependencyLinks(page,invalid){
   });
   return out.length?out:TRACKING_DEFAULT_DEPENDENCY_LINKS.slice();
 }
+
+/* Existence is opt-in and supported only on real carriers with Jira references. */
+function trackingExistsWhen(value){
+  var text=value && value.type==='text' && (Object.prototype.hasOwnProperty.call(value,'text') || Object.prototype.hasOwnProperty.call(value,'textStyle'));
+  return value && !text && value.existsWhen==='tickets-done' && Array.isArray(value.tickets) && value.tickets.some(trackingTicket)?'tickets-done':null;
+}

@@ -195,3 +195,13 @@ test('Jira browse URLs share strict ticket identity and preserve authored link f
   assert.deepEqual(plain(C.trackingEpics({tracking:{jira:{epic:valid[0][0]}}})),[]);
   assert.deepEqual(plain(C.trackingDependencies({tracking:{dependencies:[{ticket:valid[0][0],on:'API-1'}]}})),[]);
 });
+
+test('existsWhen validates without discarding source and ignores unsupported carriers',()=>{
+ for(const value of ['bad',null,false]){
+  const raw=trackingDiagram({tickets:['AA-1'],existsWhen:value}),page=C.normalize(raw),result=C.validate(page);
+  assert.equal(result.errors.length,0);assert.equal(result.warnings.filter(w=>w.includes('.existsWhen: expected')).length,2);
+  assert.equal(page.sections[0].diagram.nodes.a.existsWhen,value);
+ }
+ const raw=trackingDiagram({existsWhen:'tickets-done'}),result=C.validate(C.normalize(raw));assert.equal(result.warnings.filter(w=>w.includes('requires at least one valid Jira ticket')).length,2);
+ const page=C.normalize(trackingDiagram({tickets:['AA-1'],existsWhen:'tickets-done'}));assert.equal(C.trackingExistsWhen(page.sections[0].diagram.nodes.a),'tickets-done');assert.equal(C.trackingExistsWhen(page.sections[0].diagram.edges[0]),'tickets-done');
+});

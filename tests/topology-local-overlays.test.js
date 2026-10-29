@@ -208,3 +208,19 @@ test('browse URLs survive nested node/edge tracking, key dedupe, removal and fro
   assert.equal(session.accept(plan,{snapshot}),true);const after=current;session.undo();assert.equal(current,original);session.redo();assert.equal(current,after);
   assert.equal(c.trackingTicketURL(d(c.FlowTopology.resolveSource(JSON.parse(after),saved.topologyContext)).nodes['outer::shared::api'],'AA-5'),'https://consumer.test/browse/AA-5');
 });
+
+test('availability overlays preserve provider rules and local additions across reference edits and removal',()=>{
+ const f=fixtures();d(f.provider).nodes.api.tickets=['API-1'];d(f.provider).nodes.api.existsWhen='tickets-done';d(f.provider).edges[0].tickets=['API-2'];
+ const before=plain(f.context);
+ let source=apply(f,(t,r)=>c.planTopologyTracking(t,r,0,'edge','shared::api->shared::store','existsWhen','tickets-done',false,f.context,1));
+ assert.equal(d(source).topologyImports[0].edgeTracking['api->store'].existsWhen,'tickets-done');
+ assert.equal(d(c.FlowTopology.resolveSource(source,f.context)).nodes['shared::api'].existsWhen,'tickets-done');
+ assert.equal(d(c.FlowTopology.resolveSource(source,f.context)).edges[1].existsWhen,'tickets-done');
+ source=apply({...f,source},(t,r)=>c.planTopologyTracking(t,r,0,'edge','shared::api->shared::store','tickets','API-3',false,f.context,1));
+ assert.deepEqual(d(source).topologyImports[0].edgeTracking['api->store'],{tickets:['API-3'],existsWhen:'tickets-done'});
+ source=apply({...f,source},(t,r)=>c.planTopologyTracking(t,r,0,'edge','shared::api->shared::store','existsWhen','tickets-done',true,f.context,1));
+ assert.deepEqual(d(source).topologyImports[0].edgeTracking['api->store'],{tickets:['API-3']});
+ assert.match(c.planTopologyTracking(JSON.stringify(source),source,0,'node','shared::api','existsWhen','tickets-done',true,f.context).error,/inherited/);
+ assert.equal(c.topologyTrackingTarget(JSON.stringify(source),source,0,'node','shared::api',f.context).inherited.existsWhen,'tickets-done');
+ assert.throws(()=>c.FlowTopology.validateTracking({existsWhen:'prs-merged'},'tracking'),/existsWhen/);assert.deepEqual(f.context,before);
+});

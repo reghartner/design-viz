@@ -193,19 +193,28 @@ function topologyTrackingTarget(text,raw,section,kind,id,context,index){
   if(t.error)return t;
   if(!t.owner)return {error:'Choose a node or connection in an authored topology import.'};
   t.field=kind==='node'?'nodeTracking':'edgeTracking';
-  t.local=trackingStoredRefs((t.got.d.topologyImports[t.index][t.field] || {})[t.relative]);
+  var local=(t.got.d.topologyImports[t.index][t.field] || {})[t.relative];
+  t.local=trackingStoredRefs(local);if(local && local.existsWhen==='tickets-done')t.local.existsWhen=local.existsWhen;
   // Resolve without this consumer addition to distinguish inherited duplicates
   // even when a refreshed provider now carries a formerly local reference.
   var base=builderClone(raw),imp=specValueAt(base,t.got.path).topologyImports[t.index];
   if(imp[t.field])delete imp[t.field][t.relative];
   try{
     var resolved=FlowTopology.resolveSource(base,context),d=specValueAt(resolved,t.got.path);
-    t.inherited=trackingRefs(kind==='node'?d.nodes[id]:d.edges.find(function(edge){return builderEdgeKey(edge)===id;}));
+    var inherited=kind==='node'?d.nodes[id]:d.edges.find(function(edge){return builderEdgeKey(edge)===id;});
+    t.inherited=trackingRefs(inherited);if(inherited.existsWhen==='tickets-done')t.inherited.existsWhen=inherited.existsWhen;
   }catch(ex){return {error:ex.message};}
   return t;
 }
 function planTopologyTracking(text,raw,section,kind,id,field,ref,remove,context,index){
-  if(field!=='tickets' && field!=='prs')return {error:'Choose tickets or pull requests.'};
+  if(field!=='tickets' && field!=='prs' && field!=='existsWhen')return {error:'Choose tickets, pull requests or availability.'};
+  if(field==='existsWhen'){
+    var target=topologyTrackingTarget(text,raw,section,kind,id,context,index);if(target.error)return target;
+    if(target.inherited.existsWhen)return {error:'Availability is inherited from the provider.'};
+    if(!remove && ref!=='tickets-done')return {error:'existsWhen must be tickets-done.'};
+    if(remove)delete target.local.existsWhen;else target.local.existsWhen=ref;
+    return topologyTrackingPlan(text,raw,target,context);
+  }
   var annotation={};annotation[field]=[ref];
   try{FlowTopology.validateTracking(annotation,'tracking');}catch(ex){return {error:ex.message};}
   var identity=trackingRefs(annotation)[field][0];
@@ -214,7 +223,11 @@ function planTopologyTracking(text,raw,section,kind,id,field,ref,remove,context,
   var refs=t.local[field],at=trackingRefs(t.local)[field].indexOf(identity);
   if(remove){if(at<0)return {text:text};refs.splice(at,1);}
   else {if(at>=0 || t.inherited[field].indexOf(identity)>=0)return {text:text};refs.push(ref);}
+  return topologyTrackingPlan(text,raw,t,context);
+}
+function topologyTrackingPlan(text,raw,t,context){
   var value={};['tickets','prs'].forEach(function(key){if(t.local[key].length)value[key]=t.local[key];});
+  if(t.local.existsWhen)value.existsWhen=t.local.existsWhen;
   return topologyLocalPlan(text,raw,t,t.field,t.relative,Object.keys(value).length?value:null,context);
 }
 function builderEdgeLayoutTarget(text,raw,section,index,key,context){

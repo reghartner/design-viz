@@ -216,3 +216,13 @@ test('desktop browse URLs edit imported and local tickets and stay clickable wit
   await expect(root.locator('.dv-live-popover').getByRole('link',{name:'CAN-1',exact:true})).toHaveAttribute('href','https://provider.example.test/browse/CAN-1');
   await page.screenshot({path:info.outputPath('jira-url-tracking-desktop.png')});
 });
+
+test('desktop availability controls respect provider inheritance and preserve consumer overlay history',async({page,server})=>{
+ await fixture(page,server,(provider)=>{diagram(provider).nodes.api.existsWhen='tickets-done';diagram(provider).edges[0].tickets=['CAN-2'];});
+ await select(page,'node');const control=page.locator('#guide').getByRole('checkbox',{name:'Exists when tickets are complete',exact:true});await expect(control).toBeChecked();await expect(control).toBeDisabled();await expect(page.locator('#guide')).toContainText('Inherited from the provider.');
+ await select(page,'edge');await expect(control).toBeEnabled();await expect(control).not.toBeChecked();const before=await source(page);await control.check();await history(page,before);
+ await expect.poll(async()=>diagram(JSON.parse(await source(page))).topologyImports[0].edgeTracking).toEqual({'api->store':{existsWhen:'tickets-done'}});
+ await add(page,'edge','Add ticket','CAN-3');await select(page,'edge');await expect(control).toBeChecked();
+ await control.uncheck();await expect.poll(async()=>diagram(JSON.parse(await source(page))).topologyImports[0].edgeTracking).toEqual({'api->store':{tickets:['CAN-3']}});
+ await select(page,'node');await expect(control).toBeChecked();await expect(control).toBeDisabled();
+});

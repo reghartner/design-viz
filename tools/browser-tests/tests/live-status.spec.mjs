@@ -13,7 +13,7 @@
 | V10 | Host hook: `renderPage(..., {liveStatus: {provider: function(refs, signal) → Promise<map>, refreshMs}})`. When present: call the provider after first paint, then every `max(refreshMs, 30000)` ms while `document.visibilityState === 'visible'` (pause when hidden, one catch-up call on return); an AbortController signal is passed and aborted on destroy; rejections set `note(message,'error')` and keep the last map. `mountNativeSpec` (src/native/mount.js) forwards `liveStatus` and src/native/mount.d.ts declares `liveStatus?: {provider: (refs: {tickets: string[]; prs: string[]}, signal: AbortSignal) => Promise<Record<string, LiveStatusEntry>>; refreshMs?: number}` with a `LiveStatusEntry` type. src/boot.flowview.js passes `window.flowviewLiveStatus` (if set before boot) as that option. |
 | V11 | Without live evidence, tracked Step captions still show authored ticket references; no carrier paint is applied. Pages without ticket refs keep no Live control markup or derived ticket row. |
 */
-import {readFile,writeFile} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,cp} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -21,6 +21,7 @@ import sourceLoader from '../../../tools/source-loader.cjs';
 import {test,expect,paste,prepareEditorSurface,closeTools} from '../helpers/test.mjs';
 import {projectFiles,useProjectDownloads} from '../helpers/project-export.mjs';
 import {repo} from '../helpers/prepare.mjs';
+import {publishLibrary} from '../../canon/library.mjs';
 // Freeze the original overlay fixture: the authored story may evolve independently.
 const raw={"page":{"title":"Connected doorbell delivery","contract":"1","flowview":{"authoredWith":"0.2.0","minVersion":"0.2.0","features":["flow.live-status"]},"tracking":{"jira":{"site":"https://acme.atlassian.net"}},"sections":[{"heading":"From button press to resident notification","text":["Track implementation work on each component and the interactions between them. The spec stores references; Jira owns live status."],"diagram":{"nodes":{"hardware":{"title":"Hardware","sub":"Doorbell button","tickets":["HW-123"]},"firmware":{"title":"Firmware","sub":"Event delivery","tickets":["FW-45"],"prs":["https://github.com/acme/firmware/pull/88"]},"backend":{"title":"Backend","sub":"Notification service","tickets":["BE-67"]},"ux":{"title":"UX mobile app","sub":"Resident experience","tickets":["UX-89"]}},"rows":[["hardware","firmware","backend","ux"]],"edges":[{"from":"hardware","to":"firmware","label":"press","tickets":["HW-124","FW-46"]},{"from":"firmware","to":"backend","label":"event","kind":"https","tickets":["BE-68"],"prs":["https://github.com/acme/backend/pull/91"]},{"from":"backend","to":"ux","label":"notify","kind":"https"}]}}]}};
 raw.page.sections[0].diagram.panels=[{id:'status',type:'live-status',title:'Epic status'}];
@@ -774,6 +775,58 @@ test('R3 Workbench demo paint has no badges and a card click selects without the
  await expect(view.locator('g.node[data-dv-node="firmware"]')).toHaveClass(/\bdv-sel\b/);
  await expect(view.locator('.dv-live-pointer')).toHaveCount(0);await strokeClick(page,view.locator('path.edge[data-dv-edge="1"]'));await expect(view.locator('.dv-live-popover')).toBeHidden();
  await expect(view.locator('path.edge[data-dv-edge="1"]')).toHaveClass(/\bdv-sel\b/);
+});
+
+test('R4 desktop status multi-selection stays visible on local and imported nodes after focus and live updates',async({page,server},testInfo)=>{
+ await page.setViewportSize({width:1600,height:1200});
+ const root=path.join(server.root,'status-selection'),workbench=path.join(root,'workbench');await mkdir(workbench,{recursive:true});
+ for(const [from,to] of [['workbench.html','flowspec.html'],['catalog.json','catalog.json'],['starters.json','starters.json']])await cp(path.join(server.root,from),path.join(workbench,to));
+ const specs={
+  provider:{page:{title:'Shared status nodes',sections:[{diagram:{nodes:{a:{title:'Imported active',tickets:['SEL-2']},b:{title:'Imported blocked',tickets:['SEL-4']}},rows:[['a','b']],topologyExports:{core:{nodes:['a','b'],edges:[]}}}}]}},
+  consumer:{page:{title:'Status selection',sections:[{id:'selection',diagram:{nodes:{local:{title:'Local todo',tickets:['SEL-1']},done:{title:'Local done',tickets:['SEL-3']}},rows:[['local','done']],topologyImports:[{spec:'provider',export:'core',as:'shared',position:{x:80,y:250}}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}}
+ };
+ for(const [id,spec] of Object.entries(specs)){const folder=path.join(root,'diagrams',id);await mkdir(folder,{recursive:true});await writeFile(path.join(folder,id+'.spec.json'),JSON.stringify(spec));await writeFile(path.join(folder,id+'.html'),'<!doctype html>');}
+ const registryPath=path.join(root,'canon.json');await writeFile(registryPath,JSON.stringify({version:1,diagrams:Object.keys(specs).map(id=>({folder:'diagrams/'+id,owner:'group:default/test'}))}));
+ await publishLibrary({registryPath,output:path.join(workbench,'diagrams.json')});
+ await page.goto(server.origin+'/status-selection/workbench/flowspec.html?diagram=consumer');await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();await prepareEditorSurface(page);
+ const view=page.locator('#docview'),node=id=>view.locator('g.node[data-dv-node="'+id+'"]'),card=id=>node(id).locator('.card');
+ const ids=['local','shared::a','done','shared::b'];
+ expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.nodes['shared::a']).toBeUndefined();
+ await expect(view.locator('.dv-topology-boundary[data-topology-import="shared"]')).toBeVisible();
+ await page.getByRole('checkbox',{name:'Demo live status',exact:true}).check();
+ const paint=async id=>card(id).evaluate(el=>{const s=getComputedStyle(el);return {fill:s.fill,stroke:s.stroke,width:s.strokeWidth,dash:s.strokeDasharray,animation:s.animationName};});
+ const assertSelection=async selected=>{
+  for(const id of ids){
+   if(selected.includes(id)){
+    await expect(node(id)).toHaveClass(/\bdv-sel\b/);
+    await expect(card(id),id+' persistent selection').toHaveCSS('outline-style','dashed');
+    await expect(card(id)).toHaveCSS('outline-width','2px');await expect(card(id)).toHaveCSS('outline-offset','4px');
+    expect(await card(id).evaluate(el=>getComputedStyle(el).outlineColor)).not.toBe('rgba(0, 0, 0, 0)');
+   }else{await expect(node(id)).not.toHaveClass(/\bdv-sel\b/);await expect(card(id)).toHaveCSS('outline-style','none');}
+  }
+ };
+ const select=async(id,modifiers=[])=>{await card(id).scrollIntoViewIfNeeded();const box=await card(id).boundingBox();await card(id).click({position:{x:box.width-6,y:box.height/2},modifiers});};
+ const initial={};for(const [index,id] of ids.entries()){await expect(node(id)).toHaveAttribute('data-live-appearance',['todo','active','done','blocked'][index]);initial[id]=await paint(id);}
+ await select('local');await select('shared::a',['Shift']);await expect(node('shared::a')).toBeFocused();await assertSelection(['local','shared::a']);
+ await select('done',['ControlOrMeta']);await select('shared::b',['Meta']);await assertSelection(ids);
+ // Moving keyboard focus out of the SVG must not erase any selected member.
+ await prepareEditorSurface(page);
+ await page.getByRole('checkbox',{name:'Demo live status',exact:true}).focus();await assertSelection(ids);
+ for(const id of ids)expect(await paint(id),id+' status appearance survives selection').toEqual(initial[id]);
+ await view.screenshot({path:testInfo.outputPath('status-multi-selection.png')});
+ await view.getByRole('button',{name:'Next day',exact:true}).click();await assertSelection(ids);
+ for(const [index,id] of ids.entries())await expect(node(id)).toHaveAttribute('data-live-appearance',['active','done','blocked','todo'][index]);
+ await select('done',['ControlOrMeta']);await assertSelection(['local','shared::a','shared::b']);
+ await select('shared::b',['Meta']);await select('shared::a',['Shift']);await assertSelection(['local']);
+ await select('shared::a',['Shift']);await select('done');await assertSelection(['done']);
+ await page.keyboard.press('Escape');await assertSelection([]);
+ // A full demo toggle rebuilds the SVG. Fresh selections must receive the same
+ // treatment, and ordinary cards retain their existing marching-ants stroke.
+ await page.getByRole('checkbox',{name:'Demo live status',exact:true}).uncheck();
+ await select('local');await select('shared::a',['Shift']);
+ await page.getByRole('checkbox',{name:'Demo live status',exact:true}).focus();
+ for(const id of ['local','shared::a']){await expect(card(id)).toHaveCSS('stroke-width','3.5px');await expect(card(id)).toHaveCSS('stroke-dasharray','7px, 5px');await expect(card(id)).toHaveCSS('animation-name','none');}
+ await page.getByRole('checkbox',{name:'Demo live status',exact:true}).check();await select('local');await select('shared::a',['Shift']);await assertSelection(['local','shared::a']);
 });
 
 /* Canvas label hygiene (#761, Chuck 2026-10-27).

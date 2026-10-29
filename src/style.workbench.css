@@ -812,6 +812,10 @@ textarea.fctl{resize:vertical; min-height:44px;}
 @keyframes dvselants{to{stroke-dashoffset:-24;}}
 .grp.dv-sel .grpbox, g.node.dv-sel .card{stroke:var(--accent); stroke-width:3.5; stroke-dasharray:7 5;
   animation:dvselants .9s linear infinite; filter:drop-shadow(0 0 5px var(--selglow));}
+/* Live status owns the card's stroke, pattern and animation. Keep authoring
+   selection outside that paint so every selected node retains its ring when
+   pointer/keyboard focus moves to another node or out of the diagram. */
+.docview g.node[data-live-appearance].dv-sel .card{outline:2px dashed var(--accent);outline-offset:4px;}
 /* Inactive authoring windows retain their exact animation position while
    avoiding continuous cosmetic paint anywhere in their graph. SMIL packet
    clocks are owned separately by the builder motion lifetime. */

@@ -4021,52 +4021,38 @@ body .docview .termbar[data-playback-position][hidden]{display:none;}
   .node-review-badge,.review-badge{color:#333 !important;}
 }
 
-/* Live evidence uses one palette in every skin. It wins over authored tone,
-   protocol and step paint only for carriers present in the runtime map. */
-/* Live state colours use the Node Styles preset lines (#610): todo slate,
-   done moss, blocked and missing rose, plus the internal Active Azure palette.
-   Dark values follow the presets' pure-Aurora variants. --dv-live-on is the engine's step-colour ink
-   (stepCircleInk: black or white, whichever contrasts more). Active markers use
-   a pale Azure interior with the state colour retained on their outline. */
-/* Runtime-only: Azure is not an authored Node Styles choice. */
-.node.dv-live-active.ns-azure{--ns-bg:#E9F2FF;--ns-line:#2878DF;--ns-ink:#163D72;--ns-sub:#345B88;}
-.sk-aurora:not(.sk-editorial):not(.sk-pastel) .node.dv-live-active.ns-azure{--ns-bg:#172E4C;--ns-line:#72B5FF;--ns-ink:#E2EFFF;--ns-sub:#A9C8EE;}
-:root{--dv-live-todo:#6E89A5;--dv-live-active:#2878DF;--dv-live-done:#539A43;--dv-live-blocked:#D15A63;--dv-live-missing:#D15A63;--dv-live-on:#000000;}
-.sk-aurora:not(.sk-editorial):not(.sk-pastel){--dv-live-todo:#88A1BC;--dv-live-active:#72B5FF;--dv-live-done:#6FB261;--dv-live-blocked:#E8777D;--dv-live-missing:#E8777D;--dv-live-on:#000000;}
-.dv-live-todo{--dv-live-color:var(--dv-live-todo);}
+/* Shared status language: 15% tint over each host surface, never faded text. */
+:root{--dv-live-todo:#6b7280;--dv-live-active:#1666c7;--dv-live-done:#237d3d;--dv-live-blocked:#b42338;--dv-live-missing:#e14b5a;--dv-live-unchanged:#748b78;}
+.dv-live-todo{--dv-live-color:var(--dv-live-todo);--dv-live-dash:1 4;--dv-live-border:dotted;}
 .dv-live-active{--dv-live-color:var(--dv-live-active);}
 .dv-live-done{--dv-live-color:var(--dv-live-done);}
 .dv-live-blocked{--dv-live-color:var(--dv-live-blocked);}
-.dv-live-missing{--dv-live-color:var(--dv-live-missing);}
-:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){--step-color:var(--dv-live-color)!important;--step-ink:var(--dv-live-on)!important;}
-.sk-aurora{--dv-live-card:#101a2c;}
-.sk-daylight{--dv-live-card:#fff;}
-body.sk-editorial .docview{--dv-live-card:var(--ed-sheet,#fff);}
-body.sk-terminal .docview{--dv-live-card:#07150b;}
-body.sk-pastel .docview{--dv-live-card:#fff;}
-body.sk-blueprint .docview{--dv-live-card:#08366d;}
-body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview{--dv-live-card:var(--fl-card,#fff);}
-:is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing) .card{
-  stroke:var(--ns-line,var(--dv-live-color))!important;fill:var(--ns-bg,var(--dv-live-card))!important;filter:drop-shadow(0 0 3px var(--ns-line,var(--dv-live-color)))!important;animation:none!important;
-}
-/* Active keeps its Azure text when a narrative tone is also present. */
-.docview .node.dv-live-active.ns-azure .t1{fill:var(--ns-ink)!important;}
-.docview .node.dv-live-active.ns-azure .t2{fill:var(--ns-sub)!important;}
-.dv-live-halo{fill:none;stroke:var(--dv-live-color);stroke-width:2;filter:drop-shadow(0 0 6px var(--dv-live-color));opacity:.5;pointer-events:none;}
-:is(.dv-live-active,.dv-live-blocked,.dv-live-missing)>.dv-live-halo{animation:dv-live-halo-pulse 2.4s ease-in-out infinite;}
-@keyframes dv-live-halo-pulse{0%,100%{opacity:.3;}50%{opacity:.75;}}
-:is(path.edge,path.halo):is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){stroke:var(--dv-live-color)!important;}
-text.lbl:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){fill:var(--dv-live-color)!important;}
-.coin:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing)>circle{fill:var(--step-color)!important;stroke:var(--step-ink)!important;}
-.coin:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing)>text{fill:var(--step-ink)!important;}
-.schip:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){background:var(--step-color)!important;color:var(--step-ink)!important;border-color:var(--step-ink)!important;}
-/* Keep small Active markers light enough for their dark numerals in every skin. */
-:is(.coin,.schip).dv-live-active{--step-color:#E9F2FF!important;}
-.coin.dv-live-active>circle{stroke:var(--dv-live-active)!important;}
-.schip.dv-live-active{border-color:var(--dv-live-active)!important;}
-/* Live selection stays compact; keyboard focus keeps its separate outline. */
-.schip:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing)[aria-current="true"]{box-shadow:0 0 0 1px var(--dv-live-color)!important;}
-.stepmode :is(.node,.edge,.halo,.lbl,.coin):is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing):not(.lit):not(.comm-hidden):not(.dv-live-comm-hidden){opacity:max(var(--dv-dim,.45),.55)!important;}
+.dv-live-missing{--dv-live-color:var(--dv-live-missing);--dv-live-dash:6 4;--dv-live-border:dashed;}
+.dv-live-unchanged{--dv-live-color:var(--dv-live-unchanged);}
+[data-live-appearance]{--dv-live-backing:color-mix(in srgb,var(--dv-live-color) 15%,transparent);--step-color:var(--dv-live-color)!important;--step-ink:var(--dv-live-ink,#000)!important;}
+.docview .node[data-live-appearance] .card{fill:color-mix(in srgb,var(--dv-live-color) 15%,var(--dv-board-ground))!important;fill-opacity:1!important;stroke:var(--dv-live-color)!important;stroke-width:2!important;stroke-dasharray:var(--dv-live-dash,none)!important;stroke-linecap:round;filter:none!important;animation:none!important;}
+.docview .node[data-live-appearance] .t1,.docview .node[data-live-appearance] .t2{fill:var(--dv-live-ink,#000)!important;opacity:1!important;}
+.docview .node[data-live-appearance="blocked"] .card{stroke-width:3!important;}
+.dv-live-halo{fill:none;stroke:var(--dv-live-color);stroke-width:2;filter:drop-shadow(0 0 6px var(--dv-live-color));opacity:0;pointer-events:none;}
+.dv-live-active>.dv-live-halo{animation:dv-live-halo-pulse 2.6s ease-in-out infinite;}
+.dv-live-done>.dv-live-halo{opacity:.35;}
+@keyframes dv-live-halo-pulse{0%,100%{opacity:.12;}50%{opacity:.65;}}
+:is(path.edge,path.halo)[data-live-appearance]{stroke:var(--dv-live-color)!important;}
+text.lbl[data-live-appearance]{fill:var(--dv-live-color)!important;}
+.coin[data-live-appearance]>circle{fill:var(--dv-live-backing)!important;stroke:var(--dv-live-color)!important;stroke-width:2!important;stroke-dasharray:var(--dv-live-dash,none)!important;stroke-linecap:round;}
+.coin[data-live-appearance]>text{fill:var(--dv-live-ink,#000)!important;}
+.coin.dv-live-done>circle{filter:drop-shadow(0 0 3px #237d3d66);}
+.coin.dv-live-active>circle{animation:dv-live-coin-pulse 2.6s ease-in-out infinite!important;}
+@keyframes dv-live-coin-pulse{0%,100%{stroke-opacity:.6;filter:drop-shadow(0 0 1px #1666c733);}50%{stroke-opacity:1;filter:drop-shadow(0 0 5px #1666c788);}}
+:is(.schip,.dv-live-state-pill,.dv-live-count)[data-live-appearance]{position:relative;isolation:isolate;background:var(--dv-live-backing)!important;color:var(--dv-live-ink,#000)!important;border:2px var(--dv-live-border,solid) var(--dv-live-color)!important;box-shadow:none!important;}
+:is(.schip,.dv-live-state-pill,.dv-live-count)[data-live-appearance="done"]{box-shadow:0 0 6px #237d3d55!important;}
+:is(.schip,.dv-live-state-pill,.dv-live-count)[data-live-appearance="active"]::before{content:"";position:absolute;inset:-2px;border:2px solid var(--dv-live-color);border-radius:inherit;box-shadow:0 0 7px #1666c7;pointer-events:none;animation:dv-live-halo-pulse 2.6s ease-in-out infinite;}
+.schip[data-live-appearance][aria-current="true"]{outline:none;}
+.schip[data-live-appearance][aria-current="true"]::after{content:"";position:absolute;width:12px;height:2px;left:50%;bottom:-5px;transform:translateX(-50%);background:var(--dv-live-ink,#000);border-radius:1px;}
+.schip[data-live-appearance]:focus-visible{outline:2px solid var(--dv-live-ink,#000);outline-offset:3px;}
+.stepmode :is(.node,.coin)[data-live-appearance]:not(.comm-hidden):not(.dv-live-comm-hidden){opacity:1!important;}
+@media(prefers-reduced-motion:reduce){.dv-live-active>.dv-live-halo{animation:none!important;opacity:.35;}.coin.dv-live-active>circle,[data-live-appearance="active"]::before{animation:none!important;}}
+@media print{[data-live-appearance]{--dv-live-ink:#000!important;print-color-adjust:exact;-webkit-print-color-adjust:exact;}.dv-live-active>.dv-live-halo,.coin.dv-live-active>circle,[data-live-appearance="active"]::before{animation:none!important;}}
 .dv-live-target,.dv-live-pointer,g.node:has(>.card.dv-live-target){cursor:pointer;}
 .dv-live-target:focus:not(:focus-visible){outline:none;}
 .dv-live-target:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:3px;}
@@ -4112,9 +4098,9 @@ text.lbl:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-liv
 :is(path.edge,path.halo).dv-live-waiting{stroke:var(--dv-live-waiting-color)!important;stroke-dasharray:5 5!important;}
 .node.dv-live-waiting>.dv-live-halo{stroke:var(--dv-live-waiting-color);filter:drop-shadow(0 0 6px var(--dv-live-waiting-color));}
 path.edge.dv-live-todo{stroke-dasharray:5 5!important;}
-/* Missing tickets are dotted rose; blocked stays solid rose. */
+/* Missing work and missing tickets share a dashed outline. */
 :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-missing:not(.dv-live-waiting) .card,
-path.edge.dv-live-missing:not(.dv-live-waiting){stroke-dasharray:2 3!important;}
+path.edge.dv-live-missing:not(.dv-live-waiting){stroke-dasharray:6 4!important;}
 .dv-live-packet-hidden,.dv-live-comm-suppressed{display:none!important;}
 .dv-live-comm-hidden{visibility:hidden!important;opacity:0!important;animation:none!important;pointer-events:none;}
 .dv-live-comm-failure{--comm-color:var(--dv-live-blocked)!important;}
@@ -4135,24 +4121,18 @@ path.edge.dv-live-missing:not(.dv-live-waiting){stroke-dasharray:2 3!important;}
 .dv-live-caption{display:block;font-size:11px;font-weight:700;margin-top:6px;}
 .lanepill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){border-color:var(--dv-live-color)!important;color:var(--dv-live-color)!important;}
 .dv-live-stale-detail{grid-column:1 / -1;color:var(--dtext);}
-/* Keep the carrier group's positioned SVG transform intact. Match the live
-   card paint specificity so its animation reset cannot suppress this pulse. */
-@media screen and (prefers-reduced-motion:no-preference){
-  :is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-changed .card,
-  path.edge.dv-live-changed{transform-box:fill-box;transform-origin:center;animation:dvnodepulse .64s ease-out!important;}
-}
 .dv-live-state-pill{border:1px solid currentColor;border-radius:4px;padding:0 5px;font-size:11px;}
 @media(prefers-reduced-motion:reduce){.dv-live-changed{animation:none!important;}}
 @media print{.dv-live-changed{animation:none!important;}}
 
 /* Construction visuals are distinct from actual Jira state classes/counts.
    A partial Done response remains slate until every attached ticket is Done. */
-:is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-unavailable .card{
+:is(.sk-aurora,.sk-daylight,body.sk-editorial,body.sk-terminal,body.sk-pastel,body.sk-blueprint,body.sk-rose,body.sk-lavender,body.sk-lilac) .node.dv-live-unavailable:not([data-live-appearance]) .card{
   fill:var(--ns-bg)!important;fill-opacity:1!important;stroke:var(--ns-line)!important;
   stroke-dasharray:5 4!important;filter:none!important;
 }
-.node.dv-live-unavailable{--dv-live-color:var(--ns-line);}
-.node.dv-live-unavailable>.dv-live-halo{opacity:0!important;animation:none!important;}
+.node.dv-live-unavailable:not([data-live-appearance]){--dv-live-color:var(--ns-line);}
+.node.dv-live-unavailable:not([data-live-appearance])>.dv-live-halo{opacity:0!important;animation:none!important;}
 .node.dv-live-unavailable .t1{fill:var(--ns-ink)!important;}
 .node.dv-live-unavailable .t2{fill:var(--ns-sub)!important;}
 .node.dv-live-reserved>.icbg{fill:none!important;stroke:var(--ns-sub)!important;stroke-dasharray:2 2;stroke-width:.7;}

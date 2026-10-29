@@ -868,3 +868,30 @@ node/edge. A consumer needs only an import, page tracking settings, a live-statu
 panel and its own steps; it need not copy any topology.
 
 See [the canonical provider and tracking-only consumer example](shared-topology.md#delivery-tracking-on-canonical-topology).
+
+## Status appearance and uncovered work
+
+Nodes, step markers, step controls and ticket-status pills share a 15% tinted
+backing with high-contrast ink chosen against their host surface. Todo is dotted
+grey; active has a slowly pulsing blue outline/glow; done has a steady green glow;
+blocked is solid red; missing is dashed red. Only the outline/glow animates, and
+reduced-motion and print disable that animation. Selection remains separate.
+
+In desktop **Inspect → Tracking**, **Missing work** saves `missingWork: true` on a
+node. This is authored coverage intent, not a Jira status. For example:
+
+```json
+{"title":"Audit logging","tickets":["AUDIT-42"],"missingWork":true}
+```
+
+The marker says additional unlinked work remains, even if AUDIT-42 is Done. Clear
+it when that work is covered. Blocked ticket evidence takes precedence over the
+marker; the marker takes precedence over active, done and todo. It participates
+in step appearance without inventing a ticket or increasing Jira counts.
+
+With Live status data applied, nodes with no linked tickets and no missing-work
+marker automatically show **No change needed** (quiet sage, solid outline, no
+glow). This state is neutral in mixed step rollups: done plus no-change stays
+done. Linked tickets without provider evidence remain unknown. Text boxes stay
+inert. Clear, disable and destroy restore authored paint. Existing ticket-gated
+availability still requires every linked ticket to be confirmed Done.

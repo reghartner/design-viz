@@ -418,6 +418,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     validateTextBox(n, DP+'.nodes.'+id, errors);
     deltaWarnings(n, DP + '.nodes.' + id, warnings);
     trackingWarnings(n, DP + '.nodes.' + id, warnings);
+    if (Object.prototype.hasOwnProperty.call(n, 'missingWork') && typeof n.missingWork !== 'boolean')
+      warnings.push(DP + '.nodes.' + id + '.missingWork: must be true or false — ignored');
     validateHandoff(n.handoff,n,DP+'.nodes.'+id+'.handoff',errors);
     if (Object.prototype.hasOwnProperty.call(n, 'delta') && typeof n.delta !== 'boolean')
       warnings.push(DP + '.nodes.' + id + '.delta: must be true or false — ignored');

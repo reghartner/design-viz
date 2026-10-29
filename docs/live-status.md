@@ -29,7 +29,7 @@ evidence alone does not claim the node is unbuilt. This includes Done plus
 unknown evidence. Known Todo uses **NOT BUILT YET**. Blocked
 or missing evidence uses the same reservation in rose. An actual In Progress
 rollup shows a blue **blueprint frame** with light hatching and its original icon.
-Every ticket explicitly Done makes the node **green**, using the ordinary moss
+Every ticket explicitly Done makes the node **green**, using the
 live Done fill and outline, with all construction decoration removed.
 A fixed 32px footer is reserved in gated-node geometry, including stacks and floats,
 so status updates never move the diagram. The original content and controls stay
@@ -217,16 +217,16 @@ and authored intent such as `missingWork`, never live Jira status.
 
 | State | Paint |
 | --- | --- |
-| `todo` | Dotted grey outline (`#6b7280`) |
-| `active` | Blue outline (`#1666c7`); only border/glow slowly pulses |
-| `done` | Green outline (`#237d3d`) with a steady soft glow |
-| `blocked` | Strong solid red outline (`#b42338`) |
-| `missing` | Dashed red outline (`#e14b5a`) |
-| No change needed | Derived coverage state: solid muted sage (`#748b78`), no glow |
-| waiting (any state) | Dashed grey while the direct upstream is unfinished; dashed red when blocked or missing |
+| `todo` | Dotted light-blue outline (`#8fb4ff`) |
+| `active` | Blue outline (`#009dff`); only border/glow slowly pulses |
+| `done` | Green outline (`#2ed600`) with a steady soft glow |
+| `blocked` | Strong solid red outline (`#e81717`) |
+| `missing` | Dashed red outline (`#e81717`) |
+| No change needed | Derived coverage state: solid green (`#2ed600`), faint fill, no glow |
+| waiting (any state) | Dashed light blue while the direct upstream is unfinished; dashed red when blocked or missing |
 
 Nodes, step coins/chips, panel counts and ticket-state pills share these tokens.
-Their backing is a 15% tint over the actual board or host surface. Title,
+Their backing uses the configured status tint over the actual board or host surface. Title,
 subtitle and numeral ink is black or white, selected for contrast against that
 composed backing. Active pulses take 2.6 seconds and never animate text or
 geometry; reduced motion and print disable the pulse. Existing node presets are
@@ -346,7 +346,7 @@ key and its state pill. The icon is the shared `hand` glyph while the upstream i
 unfinished, `alarm` when it is blocked or missing, and the green `check` (the done
 preset colour) when it is done. The same icons mark the hops of Blockers and
 dependency chains.
-The border is red when the upstream is blocked or missing, grey otherwise. There is
+The border is red when the upstream is blocked or missing, light blue otherwise. There is
 no source line; an authored pair's reason is the button's tooltip. Clicking the
 button scrolls to the upstream's row and visibly focuses its ticket key, including
 keys without a Jira URL. Enter and Space activate the same navigation; the key's
@@ -367,9 +367,9 @@ plus, when the entry carries `prs.links`, the pull requests GitHub reports for
 the ticket (see "Pull requests from GitHub"). A plain authored link is the
 monochrome icon with the URL as its tooltip. A GitHub-enriched icon takes the
 pull request's state colour and a small checks dot (`.dv-live-pr-checks[data-checks]`).
-PRs and checks keep their separate Node Styles preset lines: `data-pr-state` open
-moss, draft slate, merged violet, closed rose; checks passing moss, failing rose,
-pending amber (`--dv-pr-*` and `--dv-checks-*` in `style.core.css`, with the
+PR open uses blue (`#009dff`) in every skin. Other PR/check colors retain their
+Node Styles preset lines: draft slate, merged violet, closed rose; checks passing
+moss, failing rose, pending amber (`--dv-pr-*` and `--dv-checks-*` in `style.core.css`, with the
 presets' dark values on pure Aurora, Terminal and Blueprint); its tooltip and accessible name read
 “#742 Title · open · checks failing · changes requested · author · owner/repo”.
 No icon shows a time since the pull request was updated. Jira's Development
@@ -553,7 +553,7 @@ Jira-sourced `dependsOn` entries. A timeline-level `epics: {"DOOR-100": {"summar
 seeds the epic box; its state derives from that day's children. In the example FW-46 is blocked by HW-124 and
 BE-67 depends on FW-45; the authored pair UX-89 → BE-68 has no Jira link, so the
 panel shows the Suggest link hint. Day 4 paints the controller red (waiting on the
-blocked HW-124), Day 7 grey (HW-124 unblocked but unfinished), Day 8 clears it. The
+blocked HW-124), Day 7 light blue (HW-124 unblocked but unfinished), Day 8 clears it. The
 example's `DOOR-100` gains `UX-90`, “Alert sound setting”, in the APP lane on Day 8.
 It is never assigned to a carrier. Without an embedded timeline, four days are synthesized
 from the page's ticket keys: todo, active, one blocker, then all done.
@@ -583,7 +583,7 @@ or missing X still waits: the panel, the chains and the popover record it, while
 its carrier keeps its own blocked or missing paint on the canvas as the stronger
 state (solid blocked red or dashed missing red, without the waiting stroke). The tone comes from the
 **direct** upstream: an unfinished Y paints X
-grey (slate) with the raised-hand icon in the panel; a blocked or missing Y
+light blue with the raised-hand icon in the panel; a blocked or missing Y
 (including a key the map never reports) paints X red (rose) with the alarm icon.
 Chains propagate naturally, each hop taking its tone from its own upstream.
 `liveStatusTicketWaiting(dependencies, map)` returns `{ticket: {tone, on: [{key,
@@ -614,7 +614,7 @@ text, in both Ambient and Step mode: the edge already names its ends and a text
 label would sit on the edge label, its step coin or a node card. The break's
 title and accessible name keep the full sentence with the blocking keys. The break lasts until the live state
 changes or Live is disabled. Without an existence rule, missing edges keep their
-red stroke without a communication break. Todo edges use a dashed grey stroke
+red stroke without a communication break. Todo edges use a dashed light-blue stroke
 and hide packet dots; active and done edges retain ordinary packet animation.
 An unavailable edge or endpoint adds a break and stops packets regardless of
 Jira state, as described under [planned availability](#planned-nodes-and-connections). Authored step failures
@@ -879,9 +879,9 @@ See [the canonical provider and tracking-only consumer example](shared-topology.
 
 ## Status appearance and uncovered work
 
-Nodes, step markers, step controls and ticket-status pills share a 15% tinted
+Nodes, step markers, step controls and ticket-status pills share status-tinted
 backing with high-contrast ink chosen against their host surface. Todo is dotted
-grey; active has a slowly pulsing blue outline/glow; done has a steady green glow;
+light blue; active has a slowly pulsing blue outline/glow; done has a steady green glow;
 blocked is solid red; missing is dashed red. Only the outline/glow animates, and
 reduced-motion and print disable that animation. Selection remains separate.
 
@@ -908,7 +908,7 @@ imported, nested and resolved-snapshot connections follow the same behavior;
 a provider-inherited marker stays read-only in authored import overlays.
 
 With Live status data applied, nodes with no linked tickets and no missing-work
-marker automatically show **No change needed** (quiet sage, solid outline, no
+marker automatically show **No change needed** (green, faint fill, solid outline, no
 glow). This state is neutral in mixed step rollups: done plus no-change stays
 done. Linked tickets without provider evidence remain unknown. Text boxes stay
 inert. Clear, disable and destroy restore authored paint. Existing ticket-gated
@@ -924,17 +924,28 @@ Done, Blocked, Missing work and Unchanged, plus PR states and check results.
 Expand a status’s **border, fill & glow** controls to set independent border
 color, border width (0–8 px), background fill tint (0–100%) and glow strength
 (0–200% of normal). The base color remains the fill/accent color; borders follow
-it until explicitly overridden. Border settings affect node cards, pills and
+it unless the repository default fixes a border color (Unchanged uses `#2ed600`)
+or a personal override is set. Border settings affect node cards, pills and
 coins, including imported nodes. Edge paths retain their existing status colors
 and widths; dependency waiting outlines retain their evidence color and dash
 pattern. A zero-width border hides
 the outline without disabling a separately enabled glow.
 
-Built-in defaults remain 15% fill, 2 px borders (3 px on Blocked node cards),
-dotted To do and dashed Missing work. Active and Done start at 100% glow;
-other states start at 0%. Active pulses when motion is allowed, while other
-states glow steadily. Reduced motion and print disable animations. Text ink
-is recalculated against the actual fill tint and host surface.
+The repository ships these defaults for all local and imported nodes, pills and coins:
+
+| Status | Border width | Fill tint | Glow strength |
+| --- | --- | --- | --- |
+| To do | 3 px, dotted | 15% | 0% |
+| Active | 2 px | 15% | 100% |
+| Done | 3.5 px | 14% | 153% |
+| Blocked | 3 px on node cards; 2 px on pills/coins | 15% | 183% |
+| Missing work | 2 px, dashed | 15% | 130% |
+| Unchanged | 1 px, fixed green border | 3% | 0% |
+
+Active pulses when motion is allowed; other enabled glows stay steady.
+Reduced motion and print disable animations. Text ink is recalculated against
+the actual fill tint and host surface. These defaults work without browser storage
+or saving a palette; syncing the source repository carries them into a fork.
 
 PR means pull request: open is ready for review, draft is work in progress,
 merged is included in its target branch, and closed ended without merging.
@@ -947,8 +958,10 @@ segments retain their independent status color.
 Edits, **Reset all**, per-setting reset and JSON import change only the preview
 until **Save defaults**. Save stores explicit overrides in
 `localStorage["flowview.status-colors.v1"]`; an empty palette removes that key.
-Untouched values retain the built-in CSS defaults, including skin-specific PR
-colors. JSON export includes only overrides, with a versioned envelope:
+Untouched values retain the built-in CSS defaults, including skin-specific
+draft/merged/closed PR and check colors. Reset reveals these repository defaults;
+existing personal overrides take precedence. JSON export includes only overrides,
+with a versioned envelope:
 
 ```json
 {"version":1,"colors":{"live-active":"#1666c7","pr-open":"#539a43"}}

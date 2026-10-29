@@ -138,7 +138,7 @@ test('live status preserves step selection dimming across skins and Live toggles
   await expect(node('backend')).toHaveCSS('opacity','1');
   await expect(coin(0)).toHaveCSS('opacity','0.55');
   await expect(coin(1)).toHaveCSS('opacity','1');
-  await expect(node('hardware').locator('.card')).toHaveCSS('stroke','rgb(22, 102, 199)');
+  await expect(node('hardware').locator('.card')).toHaveCSS('stroke','rgb(0, 157, 255)');
   await root.locator('.dv-live-toggle').click();
   await expect(node('hardware')).not.toHaveAttribute('data-live-appearance');
   await expect(node('hardware')).not.toHaveCSS('opacity','1');
@@ -171,7 +171,7 @@ test('V5 all nine skins share status backings, patterns, contrast and separate s
   spec.page.skin=skin;const root=await open(page,server,spec),section=root.locator('#section-delivery');
   const hardware=section.locator('[data-dv-node="hardware"]'),activeChip=section.locator('.schip[data-step-source="3"]').first(),activeCoin=section.locator('.coin[data-dv-step="3"]');
   await expect(hardware).toHaveAttribute('data-live-appearance','active');
-  await expect(hardware.locator('.card')).toHaveCSS('stroke','rgb(22, 102, 199)');
+  await expect(hardware.locator('.card')).toHaveCSS('stroke','rgb(0, 157, 255)');
   await expect(hardware.locator('.t1')).toHaveCSS('fill',await hardware.locator('.t2').evaluate(el=>getComputedStyle(el).fill));
   for(const label of ['.t1','.t2']){const measured=await contrast(hardware,'fill','fill',label);expect(measured.ratio,skin+' node '+label+' contrast').toBeGreaterThanOrEqual(4.5);measured.back.forEach((v,i)=>expect(Math.abs(v-measured.expected[i]),skin+' 15% node backing').toBeLessThan(1.5));}
   await expect(section.locator('[data-dv-node="backend"]>.dv-live-halo')).not.toHaveCSS('filter','none');await expect(section.locator('[data-dv-node="backend"]>.dv-live-halo')).toHaveCSS('animation-name','none');
@@ -181,16 +181,16 @@ test('V5 all nine skins share status backings, patterns, contrast and separate s
   for(const [id,dash] of [['todo','1px, 4px'],['uncovered','6px, 4px'],['unchanged','none']])await expect(section.locator('[data-dv-node="'+id+'"] .card')).toHaveCSS('stroke-dasharray',dash);
   for(const [index,state] of [[3,'active'],[4,'done'],[5,'todo'],[6,'missing'],[7,'unchanged']]){
    const chip=section.locator('.schip[data-step-source="'+index+'"]').first();await expect(chip).toHaveAttribute('data-live-appearance',state);
-   const measured=await contrast(chip,'backgroundColor','color');expect(measured.alpha).toBeCloseTo(.15,2);expect(measured.ratio,skin+' '+state+' chip contrast').toBeGreaterThanOrEqual(4.5);
+   const measured=await contrast(chip,'backgroundColor','color');expect(measured.alpha).toBeCloseTo(state==='done'?.14:state==='unchanged'?.03:.15,2);expect(measured.ratio,skin+' '+state+' chip contrast').toBeGreaterThanOrEqual(4.5);
   }
-  await expect(activeCoin.locator('circle')).toHaveCSS('stroke','rgb(22, 102, 199)');const coinContrast=await contrast(activeCoin,'fill','fill','text');expect(coinContrast.alpha).toBeCloseTo(.15,2);expect(coinContrast.ratio,skin+' coin numeral contrast').toBeGreaterThanOrEqual(4.5);
+  await expect(activeCoin.locator('circle')).toHaveCSS('stroke','rgb(0, 157, 255)');const coinContrast=await contrast(activeCoin,'fill','fill','text');expect(coinContrast.alpha).toBeCloseTo(.15,2);expect(coinContrast.ratio,skin+' coin numeral contrast').toBeGreaterThanOrEqual(4.5);
   const edgeLabel=section.locator('text.lbl[data-dv-edge="0"]');
   await expect(edgeLabel).toHaveCSS('opacity','1');expect((await contrast(edgeLabel,'backgroundColor','fill')).ratio,skin+' ambient edge label contrast').toBeGreaterThanOrEqual(4.5);
   await activeChip.click();await expect(activeChip).toHaveCSS('box-shadow','none');
   await expect(edgeLabel).not.toHaveClass(/\blit\b/);await expect(edgeLabel).toHaveCSS('opacity','1');expect((await contrast(edgeLabel,'backgroundColor','fill')).ratio,skin+' inactive step edge label contrast').toBeGreaterThanOrEqual(4.5);
   expect(await activeChip.evaluate(el=>getComputedStyle(el,'::after').height)).toBe('2px');
   await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');await expect(activeChip).toBeFocused();await expect(activeChip).toHaveCSS('outline-style','solid');
-  for(const pill of [root.locator('[data-live-count="active"]'),root.locator('tr[data-live-ticket="HW-123"] .dv-live-state-pill')]){await expect(pill).toHaveCSS('border-color','rgb(22, 102, 199)');const measured=await contrast(pill,'backgroundColor','color');expect(measured.alpha).toBeCloseTo(.15,2);expect(measured.ratio).toBeGreaterThanOrEqual(4.5);}
+  for(const pill of [root.locator('[data-live-count="active"]'),root.locator('tr[data-live-ticket="HW-123"] .dv-live-state-pill')]){await expect(pill).toHaveCSS('border-color','rgb(0, 157, 255)');const measured=await contrast(pill,'backgroundColor','color');expect(measured.alpha).toBeCloseTo(.15,2);expect(measured.ratio).toBeGreaterThanOrEqual(4.5);}
   for(const text of [root.locator('.dv-live-tickets th').first(),root.locator('tr[data-live-ticket="HW-123"] .dv-live-ticket-title')])expect((await contrast(text,'backgroundColor','color')).ratio,skin+' ticket table text contrast').toBeGreaterThanOrEqual(4.5);
   const caption=section.locator('.dv-live-caption');await expect(caption).toHaveCSS('display','inline-flex');expect(await caption.evaluate(el=>el.getBoundingClientRect().width<el.parentElement.getBoundingClientRect().width*.8)).toBe(true);
   await cardClick(hardware.locator('.card'));await expect(root.locator('.dv-live-popover .dv-live-ticket-state')).toHaveAttribute('data-live-appearance','active');await page.keyboard.press('Escape');
@@ -859,14 +859,14 @@ test('L1 every demo day keeps live text off edge labels, coins, badges and node 
  expect(breaks,'blocked days still draw the break glyph').toBeGreaterThan(0);
 });
 
-/* Live paint uses Node Styles rendering, with an internal Azure palette for Active.
+/* Live paint keeps Node Styles classes while shared status tokens control appearance.
  P1 nodes wear `node-styled ns-<preset>` (todo slate, active azure, done moss, blocked/missing rose, waiting slate or rose by upstream tone);
-    edges and node cards take that preset's --ns-line in a light and a dark skin; Active coins use a pale Azure fill. Coin numerals follow the
+    edges and node cards use the repository status color in light and dark skins; coins use the status fill tint (Done 14%, other ticket states 15%). Coin numerals follow the
     engine's step-colour rule (stepCircleInk: black or white, whichever contrasts more), which is black on every live fill.
- P2 missing carriers have a dotted rose outline/stroke; blocked ones are solid.
+ P2 missing carriers have a dashed red outline/stroke; blocked ones are solid.
  P3 an authored node `style` yields to live state and returns when Live is turned off. */
 const LIVE_PRESET={todo:'slate',active:'azure',done:'moss',blocked:'rose',missing:'rose'};
-function statusLine(state){return {todo:'rgb(107, 114, 128)',active:'rgb(22, 102, 199)',done:'rgb(35, 125, 61)',blocked:'rgb(180, 35, 56)',missing:'rgb(225, 75, 90)'}[state];}
+function statusLine(state){return {todo:'rgb(143, 180, 255)',active:'rgb(0, 157, 255)',done:'rgb(46, 214, 0)',blocked:'rgb(232, 23, 23)',missing:'rgb(232, 23, 23)'}[state];}
 async function presetLine(page,token){
  return page.evaluate(t=>{
   const svg=document.querySelector('#docview g.node').ownerSVGElement,g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node ns-'+t+(t==='azure'?' dv-live-active':''));svg.appendChild(g);
@@ -882,10 +882,10 @@ test('P1 live nodes wear Node Styles presets; Active coins keep pale Azure inter
   await expect(root.locator('path.edge[data-dv-edge="0"]'),skin+' active edge').toHaveCSS('stroke',statusLine('active'));
   const coins=await root.locator('g.coin[data-dv-step]').evaluateAll(els=>els.map(el=>({state:(/dv-live-(todo|active|done|blocked|missing)/.exec(el.getAttribute('class'))||[])[1],fill:getComputedStyle(el.querySelector('circle')).fill,ink:getComputedStyle(el.querySelector('text')).fill})).filter(c=>c.state));
   expect(coins.length,skin+' painted coins').toBeGreaterThan(0);
-  for(const coin of coins){expect(coin.fill).toContain('/ 0.15)');expect(coin.ink).toBe(skin==='aurora'?'rgb(255, 255, 255)':'rgb(0, 0, 0)');}
+  for(const coin of coins){expect(coin.fill).toContain('/ '+(coin.state==='done'?'0.14':'0.15')+')');expect(coin.ink).toBe(skin==='aurora'?'rgb(255, 255, 255)':'rgb(0, 0, 0)');}
  }
  await demoDay(root,4);
- // Day 4: mcu waits red on the blocked HW-124 (rose); ingest waits grey on the unfinished FW-45 (slate).
+ // Day 4: mcu waits red on blocked HW-124; ingest waits light blue on unfinished FW-45.
  for(const [id,token] of [['chime','rose'],['button','azure'],['mcu','rose'],['ingest','slate']]){await expect(node(id),id).toHaveClass(/\bnode-styled\b/);await expect(node(id),id).toHaveClass(new RegExp('\\bns-'+token+'\\b'));}
  for(const skin of ['daylight','aurora']){
   await page.evaluate(s=>window.dvSetSkin(s),skin);
@@ -917,11 +917,11 @@ test('G2 G7 G11 GitHub icons carry state checks and review in the Tickets table 
  const spec={page:{tracking:{jira:{site:'https://acme.atlassian.net'},github:{repos:['acme/firmware']}},sections:[{diagram:{nodes:{a:{title:'Work',tickets:['HW-123'],prs:[742,755,700,701].map(n=>'https://github.com/acme/firmware/pull/'+n).concat('https://code.test/pull/1')}},rows:[['a']],panels:[{id:'status',type:'live-status',title:'Epic status'}]}}]}};
  const root=await open(page,server,spec,false),node=root.locator('g.node[data-dv-node="a"]');await expect(node).toHaveClass(/dv-live-active/);const table=root.locator('.dv-live-tickets'),icons=table.locator('a.dv-live-pr-link[data-pr-state]');
  await expect(icons).toHaveCount(4);await expect(table.locator('a.dv-live-pr-link')).toHaveCount(5);
- // Pastel takes the presets' light lines: moss, violet, slate, rose (src/style.core.css, node style presets).
- const colour={open:'rgb(83, 154, 67)',merged:'rgb(155, 107, 206)',draft:'rgb(110, 137, 165)',closed:'rgb(209, 90, 99)'};
+ // Open PRs share blue with Active; other PR/check colors retain the Pastel preset lines.
+ const colour={open:'rgb(0, 157, 255)',merged:'rgb(155, 107, 206)',draft:'rgb(110, 137, 165)',closed:'rgb(209, 90, 99)'};
  for(const [n,state] of [[742,'open'],[755,'merged'],[700,'draft'],[701,'closed']]){const icon=table.locator('a.dv-live-pr-link[href="https://github.com/acme/firmware/pull/'+n+'"]');await expect(icon).toHaveAttribute('data-pr-state',state);await expect(icon).toHaveAttribute('aria-label',new RegExp('^Pull request #'+n+' Change '+n+' · '+state));await expect(icon).toHaveCSS('color',colour[state]);await expect(icon).toHaveCSS('animation-name','none');await expect(icon).not.toHaveText(/\S/);}
  await expect(table.locator('a[href="https://github.com/acme/firmware/pull/742"]')).toHaveAttribute('title',/checks failing · approved/);await expect(table.locator('a[href="https://github.com/acme/firmware/pull/742"]')).not.toHaveAttribute('title',/ago|updated/);
- await expect(table.locator('.dv-live-pr-checks[data-checks="failing"]')).toHaveCSS('background-color',colour.closed);await expect(table.locator('.dv-live-pr-checks[data-checks="passing"]')).toHaveCSS('background-color',colour.open);
+ await expect(table.locator('.dv-live-pr-checks[data-checks="failing"]')).toHaveCSS('background-color',colour.closed);await expect(table.locator('.dv-live-pr-checks[data-checks="passing"]')).toHaveCSS('background-color','rgb(83, 154, 67)');
  const plain=table.locator('a[href="https://code.test/pull/1"]');await expect(plain).toBeVisible();await expect(plain).not.toHaveAttribute('data-pr-state',/./);await expect(plain).toHaveAttribute('aria-label','Pull request #1 on code.test');
  await expect(root.locator('.dv-live-connection-github')).toHaveText('GitHub connected');await expect(root.locator('.dv-live-connection')).toHaveAttribute('data-state','connected');
  const card=node.locator('.card');await card.focus();await page.keyboard.press('Enter');const pop=root.locator('.dv-live-popover');await expect(pop).toBeVisible();await expect(pop.locator('a.dv-live-pr-link[data-pr-state]')).toHaveCount(4);await expect(pop.locator('a.dv-live-pr-link[href="https://github.com/acme/firmware/pull/742"]')).toHaveCSS('color',colour.open);
@@ -1092,7 +1092,7 @@ test('A3 availability survives rebuilt native diagrams and clear or destroy rest
  expect(await node.locator('.dv-live-reservation-tickets').evaluate(el=>el.getBBox().x+el.getBBox().width)).toBeLessThan(150);
  await node.locator('.card').press('Enter');for(let i=0;i<9;i++)await expect(root.locator('.dv-live-popover').getByRole('link',{name:'LONGPROJECTKEY-1234567890'+i,exact:true})).toBeVisible();await page.keyboard.press('Escape');
  await page.evaluate(()=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),window.availabilitySpec,{});});
- await apply({'API-1':{state:'active'}});await page.evaluate(()=>window.viewer.controller.liveStatus.setEnabled(false));await expect(root.locator('.dv-live-construction,.dv-live-blueprint,.dv-live-reserved')).toHaveCount(0);expect(await node.evaluate(el=>getComputedStyle(el).getPropertyValue('--ns-line').trim())).not.toBe('#1666c7');
+ await apply({'API-1':{state:'active'}});await page.evaluate(()=>window.viewer.controller.liveStatus.setEnabled(false));await expect(root.locator('.dv-live-construction,.dv-live-blueprint,.dv-live-reserved')).toHaveCount(0);expect(await node.evaluate(el=>getComputedStyle(el).getPropertyValue('--ns-line').trim())).not.toBe('#009dff');
  await page.evaluate(()=>window.viewer.controller.liveStatus.setEnabled(true));await expect(node).toHaveClass(/dv-live-blueprint/);
  await root.locator('.path-chip[data-dv-path="reverse"]').click();await expect(node).toHaveClass(/dv-live-blueprint/);await expect(root.locator('.dv-live-comm-failure')).toHaveCount(2);
  await page.evaluate(()=>window.viewer.controller.liveStatus.clear());await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target')).toHaveCount(0);await expect(node.locator('.dv-live-construction')).toHaveCount(0);

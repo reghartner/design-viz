@@ -4022,13 +4022,13 @@ body .docview .termbar[data-playback-position][hidden]{display:none;}
 }
 
 /* Shared status appearance. Overrides are scoped by FlowStatusColors to each viewer. */
-:root{--dv-live-todo:#6b7280;--dv-live-active:#1666c7;--dv-live-done:#237d3d;--dv-live-blocked:#b42338;--dv-live-missing:#e14b5a;--dv-live-unchanged:#748b78;}
-.dv-live-todo{--dv-live-color:var(--dv-live-todo);--dv-live-line:var(--dv-live-todo-border-color,var(--dv-live-todo));--dv-live-width:var(--dv-live-todo-border-width,2px);--dv-live-node-width:var(--dv-live-todo-border-width,2px);--dv-live-fill:var(--dv-live-todo-fill-strength,15%);--dv-live-glow:var(--dv-live-todo-glow-strength,0);--dv-live-dash:1 4;--dv-live-border:dotted;}
+:root{--dv-live-todo:#8fb4ff;--dv-live-active:#009dff;--dv-live-done:#2ed600;--dv-live-blocked:#e81717;--dv-live-missing:#e81717;--dv-live-unchanged:#2ed600;}
+.dv-live-todo{--dv-live-color:var(--dv-live-todo);--dv-live-line:var(--dv-live-todo-border-color,var(--dv-live-todo));--dv-live-width:var(--dv-live-todo-border-width,3px);--dv-live-node-width:var(--dv-live-todo-border-width,3px);--dv-live-fill:var(--dv-live-todo-fill-strength,15%);--dv-live-glow:var(--dv-live-todo-glow-strength,0);--dv-live-dash:1 4;--dv-live-border:dotted;}
 .dv-live-active{--dv-live-color:var(--dv-live-active);--dv-live-line:var(--dv-live-active-border-color,var(--dv-live-active));--dv-live-width:var(--dv-live-active-border-width,2px);--dv-live-node-width:var(--dv-live-active-border-width,2px);--dv-live-fill:var(--dv-live-active-fill-strength,15%);--dv-live-glow:var(--dv-live-active-glow-strength,1);}
-.dv-live-done{--dv-live-color:var(--dv-live-done);--dv-live-line:var(--dv-live-done-border-color,var(--dv-live-done));--dv-live-width:var(--dv-live-done-border-width,2px);--dv-live-node-width:var(--dv-live-done-border-width,2px);--dv-live-fill:var(--dv-live-done-fill-strength,15%);--dv-live-glow:var(--dv-live-done-glow-strength,1);}
-.dv-live-blocked{--dv-live-color:var(--dv-live-blocked);--dv-live-line:var(--dv-live-blocked-border-color,var(--dv-live-blocked));--dv-live-width:var(--dv-live-blocked-border-width,2px);--dv-live-node-width:var(--dv-live-blocked-border-width,3px);--dv-live-fill:var(--dv-live-blocked-fill-strength,15%);--dv-live-glow:var(--dv-live-blocked-glow-strength,0);}
-.dv-live-missing{--dv-live-color:var(--dv-live-missing);--dv-live-line:var(--dv-live-missing-border-color,var(--dv-live-missing));--dv-live-width:var(--dv-live-missing-border-width,2px);--dv-live-node-width:var(--dv-live-missing-border-width,2px);--dv-live-fill:var(--dv-live-missing-fill-strength,15%);--dv-live-glow:var(--dv-live-missing-glow-strength,0);--dv-live-dash:6 4;--dv-live-border:dashed;}
-.dv-live-unchanged{--dv-live-color:var(--dv-live-unchanged);--dv-live-line:var(--dv-live-unchanged-border-color,var(--dv-live-unchanged));--dv-live-width:var(--dv-live-unchanged-border-width,2px);--dv-live-node-width:var(--dv-live-unchanged-border-width,2px);--dv-live-fill:var(--dv-live-unchanged-fill-strength,15%);--dv-live-glow:var(--dv-live-unchanged-glow-strength,0);}
+.dv-live-done{--dv-live-color:var(--dv-live-done);--dv-live-line:var(--dv-live-done-border-color,var(--dv-live-done));--dv-live-width:var(--dv-live-done-border-width,3.5px);--dv-live-node-width:var(--dv-live-done-border-width,3.5px);--dv-live-fill:var(--dv-live-done-fill-strength,14%);--dv-live-glow:var(--dv-live-done-glow-strength,1.53);}
+.dv-live-blocked{--dv-live-color:var(--dv-live-blocked);--dv-live-line:var(--dv-live-blocked-border-color,var(--dv-live-blocked));--dv-live-width:var(--dv-live-blocked-border-width,2px);--dv-live-node-width:var(--dv-live-blocked-border-width,3px);--dv-live-fill:var(--dv-live-blocked-fill-strength,15%);--dv-live-glow:var(--dv-live-blocked-glow-strength,1.83);}
+.dv-live-missing{--dv-live-color:var(--dv-live-missing);--dv-live-line:var(--dv-live-missing-border-color,var(--dv-live-missing));--dv-live-width:var(--dv-live-missing-border-width,2px);--dv-live-node-width:var(--dv-live-missing-border-width,2px);--dv-live-fill:var(--dv-live-missing-fill-strength,15%);--dv-live-glow:var(--dv-live-missing-glow-strength,1.3);--dv-live-dash:6 4;--dv-live-border:dashed;}
+.dv-live-unchanged{--dv-live-color:var(--dv-live-unchanged);--dv-live-line:var(--dv-live-unchanged-border-color,#2ed600);--dv-live-width:var(--dv-live-unchanged-border-width,1px);--dv-live-node-width:var(--dv-live-unchanged-border-width,1px);--dv-live-fill:var(--dv-live-unchanged-fill-strength,3%);--dv-live-glow:var(--dv-live-unchanged-glow-strength,0);}
 [data-live-appearance]{--dv-live-backing:color-mix(in srgb,var(--dv-live-color) var(--dv-live-fill),transparent);--step-color:var(--dv-live-color)!important;--step-ink:var(--dv-live-ink,#000)!important;}
 .docview .node[data-live-appearance]{--ns-line:var(--dv-live-line);--ns-sub:var(--dv-live-ink,#000);}
 .docview .node[data-live-appearance] .card{fill:color-mix(in srgb,var(--dv-live-color) var(--dv-live-fill),var(--dv-board-ground))!important;fill-opacity:1!important;stroke:var(--dv-live-line)!important;stroke-width:var(--dv-live-node-width)!important;stroke-dasharray:var(--dv-live-dash,none)!important;stroke-linecap:round;filter:none!important;animation:none!important;}
@@ -4071,13 +4071,13 @@ text.lbl[data-live-appearance]{fill:var(--dv-live-ink,#000)!important;}
 .dv-live-pr-link{position:relative;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;color:var(--navigation-accent,var(--dink));}
 .dv-live-pr-link .dv-live-pr-icon{width:14px;height:14px;flex:none;}
 .dv-live-pr-link:hover{background:color-mix(in srgb,var(--navigation-accent,var(--dink)) 10%,transparent);}
-/* Pull request state and check colours are Node Styles preset lines (#610), like the
-   live state tokens above: open moss, draft slate, merged violet, closed rose; checks
-   passing moss, failing rose, pending amber. Dark values follow the presets' pure-Aurora
-   variants. The selectors repeat .nbacklink so they outrank the per-skin
+/* Open pull requests use the shared blue in every skin. Other PR/check colours
+   retain Node Styles preset lines (#610): draft slate, merged violet, closed rose;
+   checks passing moss, failing rose, pending amber. Their dark values follow
+   the presets' pure-Aurora variants. The selectors repeat .nbacklink so they outrank the per-skin
    `body.sk-* .nbacklink` link colours in the panel and in the popover alike. */
-:root{--dv-pr-open:#539A43;--dv-pr-draft:#6E89A5;--dv-pr-merged:#9B6BCE;--dv-pr-closed:#D15A63;--dv-checks-passing:#539A43;--dv-checks-failing:#D15A63;--dv-checks-pending:#AC7D00;}
-.sk-aurora:not(.sk-editorial):not(.sk-pastel){--dv-pr-open:#6FB261;--dv-pr-draft:#88A1BC;--dv-pr-merged:#B386E4;--dv-pr-closed:#E8777D;--dv-checks-passing:#6FB261;--dv-checks-failing:#E8777D;--dv-checks-pending:#C99414;}
+:root{--dv-pr-open:#009dff;--dv-pr-draft:#6E89A5;--dv-pr-merged:#9B6BCE;--dv-pr-closed:#D15A63;--dv-checks-passing:#539A43;--dv-checks-failing:#D15A63;--dv-checks-pending:#AC7D00;}
+.sk-aurora:not(.sk-editorial):not(.sk-pastel){--dv-pr-draft:#88A1BC;--dv-pr-merged:#B386E4;--dv-pr-closed:#E8777D;--dv-checks-passing:#6FB261;--dv-checks-failing:#E8777D;--dv-checks-pending:#C99414;}
 .nbacklink.dv-live-pr-link[data-pr-state="open"],.nbacklink.dv-live-pr-link[data-pr-state="open"]:is(:hover,:focus){color:var(--dv-pr-open);}
 .nbacklink.dv-live-pr-link[data-pr-state="draft"],.nbacklink.dv-live-pr-link[data-pr-state="draft"]:is(:hover,:focus){color:var(--dv-pr-draft);}
 .nbacklink.dv-live-pr-link[data-pr-state="merged"],.nbacklink.dv-live-pr-link[data-pr-state="merged"]:is(:hover,:focus){color:var(--dv-pr-merged);}

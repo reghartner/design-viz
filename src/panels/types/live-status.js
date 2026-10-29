@@ -179,7 +179,7 @@
 .dv-live-excluded-story{display:flex;flex-wrap:wrap;gap:4px 8px;padding:8px 0;border-bottom:1px solid var(--explore-border);}
 .dv-live-excluded-reason{flex-basis:100%;color:var(--dfaint);font-size:11px;}
 .dv-live-tickets-scroll{overflow:auto;max-width:100%;}
-.dv-live-tickets{width:100%;min-width:580px;table-layout:auto;border-collapse:collapse;text-align:left;font-size:12px;}
+.dv-live-tickets{color:var(--dtext);width:100%;min-width:580px;table-layout:auto;border-collapse:collapse;text-align:left;font-size:12px;}
 .dv-live-tickets th,.dv-live-tickets td{padding:8px;vertical-align:top;border-bottom:1px solid var(--explore-border);}
 .dv-live-tickets th{font-weight:700;}
 .dv-live-tickets th:nth-child(1),.dv-live-tickets th:nth-child(3),.dv-live-tickets th:nth-child(6){width:1%;white-space:nowrap;}

@@ -4030,6 +4030,7 @@ body .docview .termbar[data-playback-position][hidden]{display:none;}
 .dv-live-missing{--dv-live-color:var(--dv-live-missing);--dv-live-dash:6 4;--dv-live-border:dashed;}
 .dv-live-unchanged{--dv-live-color:var(--dv-live-unchanged);}
 [data-live-appearance]{--dv-live-backing:color-mix(in srgb,var(--dv-live-color) 15%,transparent);--step-color:var(--dv-live-color)!important;--step-ink:var(--dv-live-ink,#000)!important;}
+.docview .node[data-live-appearance]{--ns-line:var(--dv-live-color);--ns-sub:var(--dv-live-ink,#000);}
 .docview .node[data-live-appearance] .card{fill:color-mix(in srgb,var(--dv-live-color) 15%,var(--dv-board-ground))!important;fill-opacity:1!important;stroke:var(--dv-live-color)!important;stroke-width:2!important;stroke-dasharray:var(--dv-live-dash,none)!important;stroke-linecap:round;filter:none!important;animation:none!important;}
 .docview .node[data-live-appearance] .t1,.docview .node[data-live-appearance] .t2{fill:var(--dv-live-ink,#000)!important;opacity:1!important;}
 .docview .node[data-live-appearance="blocked"] .card{stroke-width:3!important;}
@@ -4120,7 +4121,7 @@ path.edge.dv-live-missing:not(.dv-live-waiting){stroke-dasharray:6 4!important;}
 .dv-live-step-state{flex-shrink:0;color:var(--dv-live-color,inherit);white-space:nowrap;}
 .dv-live-step-tickets .nbacklink{flex-shrink:0;white-space:nowrap;color:inherit;text-decoration:underline;text-underline-offset:2px;}
 .dv-live-step-tickets a:focus-visible{outline:2px solid var(--acc);outline-offset:3px;border-radius:2px;}
-.dv-live-caption{display:block;font-size:11px;font-weight:700;margin-top:6px;}
+.dv-live-caption{display:inline-flex;width:fit-content;max-width:100%;align-self:flex-start;font-size:11px;font-weight:700;margin-top:6px;}
 .lanepill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){border-color:var(--dv-live-color)!important;color:var(--dv-live-color)!important;}
 .dv-live-stale-detail{grid-column:1 / -1;color:var(--dtext);}
 .dv-live-state-pill:not([data-live-appearance]){color:var(--dv-live-ink,inherit)!important;}

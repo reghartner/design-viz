@@ -109,9 +109,8 @@ function liveStatusInk(el,state){
   var lum=rgb.map(function(v,i){var n=(v*(1-amount)+tint[i]*amount)/255;return n<=.04045?n/12.92:Math.pow((n+.055)/1.055,2.4);});
   var light=lum[0]*.2126+lum[1]*.7152+lum[2]*.0722;el.style.setProperty('--dv-live-ink',light>.179?'#000000':'#ffffff');
 }
-/* Live node paint uses Node Styles rendering (#610), with an internal Azure
-   palette for Active.
-   An authored preset is saved on first paint and restored when paint clears. */
+/* Preserve authored Node Styles while live classes supply shared appearance.
+   Presets also support the unknown-evidence construction fallback. */
 var LIVE_STATUS_PRESETS = {todo:'slate',active:'azure',done:'moss',blocked:'rose',missing:'rose',unchanged:'moss'};
 function liveStatusPreset(el,token){
   var saved=el._livePreset;

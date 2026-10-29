@@ -68,12 +68,14 @@ test('local repository imports render offline and retain editable positions, sou
   await expect(page.locator('#local-sources-refresh')).toHaveText('Reconnect local sources…');providerChanged.page.sections[0].diagram.nodes.api.title='Reconnected provider';await writeDisk(page,'base',JSON.stringify(providerChanged));await page.locator('#local-sources-refresh').click();await expect(node(page)).toContainText('Reconnected provider');await expect(page.locator('#src')).toHaveValue(edited);await expect(page.locator('#local-sources-refresh')).toHaveText('Refresh local sources');
 });
 
-test('nested folder diagnostics and late local provider reads preserve the current document',async({page,server})=>{
-  // No local root has been granted yet, so ordinary-folder adoption may consult
-  // the deployed catalog. It has no copy of these local providers.
+test('ordinary unregistered folder can remain open with unresolved imports then select a separate source root',async({page,server})=>{
   await page.route('**/diagrams.json',route=>route.fulfill({json:{version:3,diagrams:[]}}));
   await setup(page,server);await page.evaluate(()=>{window.pickNested=true;});await filePanel(page);await page.locator('#working-folder-open').click();
-  await expect(page.locator('#guide')).toContainText('Choose the repository root containing canon.json');await expect(page.locator('#src')).toHaveValue(starter);
+  await expect(page.locator('#src')).toHaveValue(consumer);await expect(page.locator('#local-sources-status')).toContainText('Imports unresolved');
+  await page.evaluate(()=>{window.pickNested=false;});await page.locator('#local-sources-select').click();await expect(node(page)).toContainText('Local shared API');await expect(page.locator('#src')).toHaveValue(consumer);await expect(page.locator('#workbench-working-status')).toContainText('consumer/consumer.spec.json');
+});
+test('late local provider reads preserve the current document during folder opening',async({page,server})=>{
+  await setup(page,server);
   await page.evaluate(()=>{
     window.pickNested=false;
     const read=FileSystemFileHandle.prototype.getFile;
@@ -200,5 +202,37 @@ test('agent CLI held provider read cannot publish after disconnect even when man
   const changed=structuredClone(specs.base);changed.page.sections[0].diagram.nodes.api.title='Must not appear';await disk.provider(JSON.stringify(changed));await page.evaluate(()=>{window.holdLocalProvider=true;});const command=disk.command();await expect.poll(()=>page.evaluate(()=>window.localProviderHeld)).toBe(true);
   await page.locator('#editor-tab-agent').click();if(!await page.locator('#folder-agent-disconnect').isVisible())await page.locator('#folder-agent-pairing>summary').click();await page.locator('#folder-agent-disconnect').click();
   await expect.poll(async()=>JSON.parse(await readFile(path.join(disk.support,'editor.json'),'utf8')).connected).toBe(false);await page.evaluate(()=>window.releaseLocalProvider());const result=await command;expect(result.code).not.toBe(0);await expect(node(page)).toContainText('Local shared API');await filePanel(page);await expect(page.locator('#local-sources-refresh')).toHaveText('Refresh local sources');await expect(page.locator('#src')).toHaveValue(consumer);
+ }finally{await page.close();await disk.close();}
+});
+
+test('ordinary file opens unpublished imports and separately selected provider roots switch atomically with Undo',async({page,server})=>{
+ const {separateLocalSources,localSourceSpecs}=await import('../helpers/local-source-repository.mjs');const disk=await separateLocalSources(page,server,{connect:false});
+ try{
+  await expect(page.locator('#workbench-working-status')).toContainText('independent.spec.json');await filePanel(page);await page.locator('#local-sources-select').click();await expect(node(page)).toContainText('Unpublished API');await expect(page.locator('#src')).toHaveValue(disk.exact);
+  const first=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).topologyContext);expect(first.ephemeral).toBe(true);expect(first.localSource.path).toBeUndefined();expect(first.localSource.providers).toHaveLength(2);
+  await page.evaluate(()=>{window.providerPickerPath='/sources-b/worktree';});await page.locator('#local-sources-select').click();await expect.poll(async()=>page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).topologyContext.localSource.selectionId)).not.toBe(first.localSource.selectionId);
+  await page.locator('#undo-builder').click();await expect(page.locator('#local-sources-refresh')).toHaveText('Reconnect local sources…');await expect(node(page)).toContainText('Unpublished API');
+  await page.locator('#redo-builder').click();await expect(page.locator('#local-sources-refresh')).toHaveText('Refresh local sources');
+  const changed=structuredClone(localSourceSpecs.base);changed.page.sections[0].diagram.nodes.api.title='Second worktree saved';await disk.provider(disk.roots[1],'base',JSON.stringify(changed));await refresh(page);await expect(node(page)).toContainText('Second worktree saved');await expect(page.locator('#src')).toHaveValue(disk.exact);
+  expect(await readFile(path.join(disk.consumerFolder,'independent.spec.json'),'utf8')).toBe(disk.exact);await expect(page.locator('#workbench-working-status')).toContainText('independent.spec.json');
+  const another=structuredClone(localSourceSpecs.consumer);another.page.sections[0].diagram.topologyImports=[{spec:'never-published',export:'core',as:'new'}];const pending=JSON.stringify(another,null,2);await writeFile(path.join(disk.consumerFolder,'another.spec.json'),pending);await page.evaluate(()=>{window.consumerFileName='another.spec.json';});await page.locator('#working-file-open').click();await expect(page.locator('#src')).toHaveValue(pending);await expect(page.locator('#local-sources-status')).toContainText('Imports unresolved');
+ }finally{await page.close();await disk.close();}
+});
+test('generated consumer CLI selects separate unpublished providers, repeats, repairs and switches without begin or menu',async({page,server},info)=>{
+ const {separateLocalSources,localSourceSpecs}=await import('../helpers/local-source-repository.mjs');const disk=await separateLocalSources(page,server);
+ try{
+  const command=await disk.command('--source-repo',disk.roots[0]);expect(command.code,command.stderr).toBe(0);const first=JSON.parse(command.stdout);expect(first.status).toBe('applied');expect(first.localSources.available).toBe(true);expect(first.localSources.code).toBe('ready');expect(first.localSources.mode).toBe('agent-snapshot');expect(first.localSources.needsSnapshot).toBe(true);expect(first.localSources.snapshotSha256).toMatch(/^[a-f0-9]{64}$/);expect(first.localSources.providerCount).toBe(2);expect(first.localSources.capturedAt).toMatch(/Z$/);await expect(node(page)).toContainText('Unpublished API');expect((await disk.readState()).localSources.sourceSelectionId).toBeTruthy();
+  const extra=structuredClone(localSourceSpecs.base);extra.page.sections[0].diagram.nodes.api.title='New transitive dependency';await mkdir(path.join(disk.roots[0],'diagrams/extra'));await disk.provider(disk.roots[0],'extra',JSON.stringify(extra));
+  const registry=JSON.parse(await readFile(path.join(disk.roots[0],'canon.json'),'utf8'));registry.diagrams.push({folder:'diagrams/extra',owner:'group:default/local'});await writeFile(path.join(disk.roots[0],'canon.json'),JSON.stringify(registry));
+  const middle=structuredClone(localSourceSpecs.middle);middle.page.sections[0].diagram.topologyImports.push({spec:'extra',export:'core',as:'extra'});middle.page.sections[0].diagram.topologyExports.core.nodes.push('extra::api');await disk.provider(disk.roots[0],'middle',JSON.stringify(middle));const transitive=await disk.command();expect(transitive.code,transitive.stderr).toBe(0);await expect(page.locator('#docview g.node[data-dv-node="shared::extra::api"]')).toContainText('New transitive dependency');
+  const draft=structuredClone(localSourceSpecs.consumer);draft.page.sections[0].diagram.nodes.local.title='Unsaved consumer edit';const exact=' \n'+JSON.stringify(draft,null,2)+'\n';await page.locator('#editor-tab-json').click();await page.locator('#src').fill(exact);await closeTools(page);await expect.poll(async()=>(await disk.readState()).source).toBe(exact);
+  const changed=structuredClone(localSourceSpecs.base);changed.page.sections[0].diagram.nodes.api.title='External agent saved provider';await disk.provider(disk.roots[0],'base',JSON.stringify(changed));const update=await disk.command();expect(update.code,update.stderr).toBe(0);const accepted=JSON.parse(update.stdout);await expect(node(page)).toContainText('External agent saved provider');await expect(page.locator('#src')).toHaveValue(exact);expect((await disk.readState()).ledger).toContain('Preserve imported work.');
+  const rendered=await node(page).elementHandle();const same=await disk.command();expect(same.code,same.stderr).toBe(0);expect(JSON.parse(same.stdout).status).toBe('unchanged');expect(await rendered.evaluate(el=>el.isConnected)).toBe(true);
+  await disk.provider(disk.roots[0],'base','{half saved');const invalid=await disk.command();expect(invalid.code).not.toBe(0);await expect(node(page)).toContainText('External agent saved provider');await expect(page.locator('#src')).toHaveValue(exact);
+  await page.locator('#undo-builder').click();await expect(node(page)).toContainText('Unpublished API');await page.locator('#redo-builder').click();await expect(node(page)).toContainText('External agent saved provider');await expect.poll(async()=>(await disk.readState()).topologyRevision).toBe(accepted.topologyRevision+2);
+  await disk.provider(disk.roots[0],'base',JSON.stringify(changed));const switchResult=await disk.command('--source-repo',disk.roots[1]);expect(switchResult.code,switchResult.stderr).toBe(0);await expect(node(page)).toContainText('Unpublished API');
+  await page.locator('#undo-builder').click();await expect(node(page)).toContainText('External agent saved provider');await expect.poll(async()=>(await disk.readState()).localSources.sourceSelectionId).toBe(first.localSources.sourceSelectionId);const afterUndo=await disk.command();expect(afterUndo.code).not.toBe(0);expect(afterUndo.stderr).toContain('Reselect');
+  const reconnect=await disk.command('--source-repo',disk.roots[0]);expect(reconnect.code,reconnect.stderr).toBe(0);await expect(page.locator('#src')).toHaveValue(exact);
+  const state=await disk.readState();expect(JSON.stringify(state)).not.toContain(disk.folder);expect(await readFile(path.join(disk.support,'local-sources-selection.json'),'utf8')).toContain(disk.roots[0]);await expect(readFile(path.join(disk.support,'request.json'))).rejects.toThrow(/ENOENT/);await page.screenshot({path:info.outputPath('independent-source-cli.png')});
  }finally{await page.close();await disk.close();}
 });

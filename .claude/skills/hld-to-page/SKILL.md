@@ -84,7 +84,7 @@ After the packet, route source/handoff details:
   includes its backend and needs no source checkout or build.
 - **Canon/topology:** `--feature topology`; keep imports/exports/providers.
   Merge `export:["a","b"]`; nest via re-exported IDs. [Overlays](../../../docs/shared-topology.md).
-  Saved repo edits: consumer `folder-agent.py refresh-sources`; desktop File fallback. No cloud disk refresh.
+  Repo preview: consumer `folder-agent.py refresh-sources --source-repo /repo`. No cloud disk refresh.
 - **Optional detail:** the [workflow reference](references/authoring-workflow.md)
   preserves phases. [Recipe routing](references/recipe-routing.md) and
   [authoring details](references/authoring-details.md) cover special features.

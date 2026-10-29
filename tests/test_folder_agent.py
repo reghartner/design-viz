@@ -120,6 +120,60 @@ class FolderAgentTests(unittest.TestCase):
                 helper.refresh_sources(self.folder)
         self.assertTrue(json.loads((self.folder/'refresh-sources.json').read_text())['withdrawn'])
 
+    def provider_repository(self):
+        temporary = tempfile.TemporaryDirectory(prefix='flowview-provider-test-')
+        self.addCleanup(temporary.cleanup)
+        repository = Path(temporary.name)
+        entries = []
+        for ident, spec in {'base': {'page': {'sections': []}}, 'middle': {'page': {'blocks': [{'tabs': [{'sections': [{'diagram': {'topologyImports': [{'spec': 'base'}]}}]}]}]}}}.items():
+            directory = repository/'diagrams'/ident
+            directory.mkdir(parents=True, exist_ok=True)
+            (directory/(ident+'.spec.json')).write_text(json.dumps(spec))
+            entries.append({'folder': 'diagrams/'+ident, 'owner': 'group:default/test'})
+        entries.append({'folder': 'diagrams/unrelated', 'owner': 'group:default/test'})
+        (repository/'canon.json').write_text(json.dumps({'version': 1, 'diagrams': entries}))
+        return repository
+
+    def test_separate_repository_snapshot_covers_page_diagram_and_inactive_tab_imports(self):
+        repository = self.provider_repository()
+        diagram = {'topologyImports': [{'spec': 'middle'}]}
+        for raw in [diagram, {'sections': [{'diagram': diagram}]}, {'page': {'blocks': [{'tabs': [{'sections': [{'diagram': diagram}]}]}]}}]:
+            snapshot = helper.local_provider_snapshot(json.dumps(raw), repository, 'selection')
+            self.assertEqual([p['path'] for p in snapshot['providers']], ['diagrams/base/base.spec.json', 'diagrams/middle/middle.spec.json'])
+            self.assertNotIn(str(repository), json.dumps(snapshot))
+        base = repository/'diagrams/base/base.spec.json'
+        base.unlink()
+        outside = self.folder/'outside.spec.json'
+        outside.write_text('{}')
+        base.symlink_to(outside)
+        with self.assertRaisesRegex(ValueError, 'escapes'):
+            helper.local_provider_snapshot(json.dumps(diagram), repository, 'selection')
+
+    def test_source_repo_selection_is_helper_private_repeatable_and_requires_reselection_after_undo(self):
+        repository = self.provider_repository()
+        self.refresh_ready(available=False, acceptsSnapshot=True, code='reconnect_required')
+        state = helper.read(self.folder, 'state.json')
+        state['source'] = json.dumps({'topologyImports': [{'spec': 'middle'}]})
+        self.put('state.json', state)
+        with patch.object(helper.time, 'sleep', lambda _: self.refresh_receipt()):
+            result = helper.refresh_sources(self.folder, repository)
+        self.assertEqual(result['status'], 'applied')
+        selection = helper.read(self.folder, 'local-sources-selection.json')
+        request = helper.read(self.folder, 'refresh-sources.json')
+        self.assertEqual(request['sources']['selectionId'], selection['selectionId'])
+        self.assertNotIn(str(repository), json.dumps(request))
+        state['localSources']['sourceSelectionId'] = selection['selectionId']
+        self.put('state.json', state)
+        with patch.object(helper.time, 'sleep', lambda _: self.refresh_receipt('unchanged')):
+            self.assertEqual(helper.refresh_sources(self.folder)['status'], 'unchanged')
+        state['localSources']['sourceSelectionId'] = 'restored-other-source'
+        self.put('state.json', state)
+        with self.assertRaisesRegex(ValueError, 'Reselect'):
+            helper.refresh_sources(self.folder)
+        self.refresh_ready(available=False, acceptsSnapshot=False, code='cloud_project', message='Cloud')
+        with patch.object(helper, 'local_provider_snapshot', side_effect=AssertionError('No cloud disk read')):
+            self.assertEqual(helper.refresh_sources(self.folder, repository)['code'], 'cloud_project')
+
     def test_paired_project_requires_nonempty_ledger_and_packages_it(self):
         manifest = json.loads((self.folder / 'session.json').read_text())
         manifest['pairedArtifacts'] = True

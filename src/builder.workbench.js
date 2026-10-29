@@ -477,35 +477,49 @@ function initWorkbenchBuilder(opts){
   var cloudPersistence=null;
   var workingFile=null,workingView=null,workingOperation=0,workingHeartbeat=null,workingBrowser=createBuilderBrowserIO(document,window);
   var localRepository=null,localGrantSerial=0,localRefreshOperation=0,localRefreshing=false,localRefreshMessage='',localCapabilityRevision=-1,localCapabilityContext=null;
-  var localRefreshButton=document.getElementById('local-sources-refresh'),localRefreshStatus=document.getElementById('local-sources-status');
+  var localSourceButton=document.getElementById('local-sources-select'),localRefreshButton=document.getElementById('local-sources-refresh'),localRefreshStatus=document.getElementById('local-sources-status');
   function bindLocalRepository(value){
     localRefreshOperation++;localRefreshing=false;localRefreshMessage='';
-    localRepository=value?{handle:value.handle,path:value.path,grant:++localGrantSerial}:null;
+    localRepository=value?{handle:value.handle,path:value.path,selectionId:value.selectionId || (session.topologyContext() || {}).localSource?.selectionId || null,grant:++localGrantSerial}:null;
     refreshLocalSourcesStatus();
+  }
+  function localContextMetadata(){
+    var revision=session.snapshot().topologyRevision;
+    if(revision!==localCapabilityRevision){
+      var frozen=session.topologyContext(),source=frozen && frozen.localSource;
+      localCapabilityContext=frozen?{id:frozen.id,local:frozen.local,unresolved:isUnresolvedLocalTopology(frozen),localSource:source?{selectionId:source.selectionId,path:source.path,rootLabel:source.rootLabel,capturedAt:source.capturedAt,sha256:source.sha256,providerCount:Array.isArray(source.providers)?source.providers.length:null}:null}:null;
+      localCapabilityRevision=revision;
+    }
+    return localCapabilityContext;
+  }
+  function selectedLocalBinding(context){
+    var selected=context && context.localSource && context.localSource.selectionId;
+    return localRepository && (localRepository.selectionId || null)===(selected || null)?localRepository:null;
   }
   function refreshLocalSourcesStatus(){
     if(!session)return;
-    var context=session.topologyContext(),local=!!(context && context.local),source=context && context.localSource,cloud=!!(cloudPersistence && cloudPersistence.attachment());
-    if(localRefreshButton){localRefreshButton.disabled=!local || cloud || localRefreshing;localRefreshButton.textContent=localRefreshing?'Refreshing local sources…':local && !localRepository?'Reconnect local sources…':'Refresh local sources';}
+    var context=localContextMetadata(),source=context && context.localSource,binding=selectedLocalBinding(context),cloud=!!(cloudPersistence && cloudPersistence.attachment());
+    if(localSourceButton)localSourceButton.disabled=cloud || localRefreshing;
+    if(localRefreshButton){localRefreshButton.disabled=cloud || localRefreshing;localRefreshButton.textContent=localRefreshing?'Refreshing local sources…':(!binding || !binding.handle) && context && context.local?'Reconnect local sources…':'Refresh local sources';}
     if(localRefreshStatus){
-      var label=localRepository?(localRepository.handle.name || 'Selected repository')+' (grant '+localRepository.grant+')':source && source.rootLabel || 'Recovered repository';
-      localRefreshStatus.textContent=cloud?'This cloud project uses its saved cloud provider snapshot. Local source refresh is unavailable for cloud projects.':!local?'Local refresh is available for diagrams opened from a repository root containing canon.json.':
-        label+' · '+(localRepository?localRepository.path:source && source.path || context.id)+'. '+
-        (source && source.capturedAt?'Viewed snapshot: '+new Date(source.capturedAt).toLocaleString()+'. ':'')+(localRefreshMessage || (localRepository?'Saved providers update only when you refresh.':'The saved snapshot works offline. Reconnect explicitly selects the repository to read next; a folder name does not verify the same worktree.'));
+      var label=source && source.rootLabel || 'No local provider repository selected';
+      localRefreshStatus.textContent=cloud?'This cloud project uses its saved cloud provider snapshot. Local source refresh is unavailable for cloud projects.':
+        (context && context.unresolved?'Imports unresolved; last valid preview retained. ':'')+(source?'Local preview: '+label+(source.path?' · '+source.path:'')+'. Viewed snapshot: '+new Date(source.capturedAt).toLocaleString()+(source.sha256?' · SHA-256 '+source.sha256.slice(0,12)+' · '+source.providerCount+' providers':'')+'. ':'')+
+        (localRefreshMessage || (binding && binding.handle?'Saved providers update only when you refresh.':source?'The saved snapshot works offline. Select a repository or use the consumer helper with --source-repo to reconnect.':'Select a separate local source repository to resolve imports. The consumer need not be in Canon.'))+
+        ' Local preview does not publish providers. Provider changes must deploy with the consumer or first; a folder label does not identify a worktree.';
       localRefreshStatus.dataset.state=localRefreshing?'refreshing':localRefreshMessage.indexOf('Refresh failed:')===0?'failed':'ready';
     }
   }
   function localRefreshBlocked(){return !!(interactions && interactions.busy() || inspector && inspector.busy(view) || document.querySelector('dialog[open]') || agentChat && agentChat.localRefreshBlocked && agentChat.localRefreshBlocked());}
   function localSourcesCapability(){
-    var revision=session.snapshot().topologyRevision;
-    if(revision!==localCapabilityRevision){var frozen=session.topologyContext();localCapabilityContext=frozen?{id:frozen.id,local:frozen.local,localSource:frozen.localSource}:null;localCapabilityRevision=revision;}
-    var context=localCapabilityContext,source=context && context.localSource,code='ready',message='Refresh saved providers through this consumer’s granted repository root.';
+    var context=localContextMetadata(),source=context && context.localSource,binding=selectedLocalBinding(context),code='ready',message='Refresh the selected local provider repository.';
     if(cloudPersistence && cloudPersistence.attachment()){code='cloud_project';message='Cloud projects use their saved cloud provider snapshot; disk refresh is unavailable.';}
-    else if(!context || !context.local){code='not_local';message='Connect this consumer through its repository root containing canon.json first.';}
-    else if(!localRepository){code='reconnect_required';message='Use desktop File → Reconnect local sources to grant the consumer’s repository root, then retry.';}
+    else if(!binding){code='reconnect_required';message='Run the consumer helper refresh-sources --source-repo <repository>, or use desktop File → Use local source repository.';}
+    else if(!binding.handle)message='Ready for the consumer helper to refresh its selected source repository. Desktop File refresh requires a separate browser directory grant.';
     function bounded(value,max){return typeof value==='string' && new TextEncoder().encode(value).length<=max?value:null;}
-    return {available:code==='ready',code:code,message:message,consumerId:bounded(context && context.id,512),
-      sourcePath:bounded(source && source.path,2048),rootLabel:bounded(localRepository?localRepository.handle.name || 'Selected repository':source && source.rootLabel,512)};
+    return {available:code==='ready',acceptsSnapshot:code!=='cloud_project',mode:binding?(binding.handle?'browser-grant':'agent-snapshot'):'unbound',needsSnapshot:!!(binding && !binding.handle),code:code,message:message,
+      snapshotSha256:bounded(source && source.sha256,64),capturedAt:bounded(source && source.capturedAt,32),providerCount:source && source.providerCount!=null?source.providerCount:null,consumerId:bounded(context && context.id,512),
+      sourceSelectionId:source && source.selectionId || null,sourcePath:bounded(source && source.path,2048),rootLabel:bounded(source && source.rootLabel,512)};
   }
   async function refreshLocalSources(request){
     request=request || {};
@@ -513,8 +527,8 @@ function initWorkbenchBuilder(opts){
     function failure(code,message){var error=Error(message);error.refreshCode=code;return error;}
     if(localRefreshing)return rejected('busy','A local refresh is already running. Retry after it finishes.','busy');
     var capability=localSourcesCapability();
-    if(!capability.available && !(request.manual && capability.code==='reconnect_required'))return rejected(capability.code,capability.message);
-    var context=session.topologyContext(),expected=session.snapshot(),binding=localRepository,originalBinding=binding,token=++localRefreshOperation,workingToken=workingOperation;
+    if(!capability.available && !(capability.acceptsSnapshot && (request.manual || request.sources)))return rejected(capability.code,capability.message);
+    var context=session.topologyContext(),expected=session.snapshot(),binding=request.select?null:selectedLocalBinding(context),originalBinding=localRepository,token=++localRefreshOperation,workingToken=workingOperation;
     function check(){
       if(request.check)request.check();
       if(!life.alive() || token!==localRefreshOperation || workingToken!==workingOperation || opts.isActive && !opts.isActive())throw new DOMException('Local refresh cancelled.','AbortError');
@@ -526,14 +540,15 @@ function initWorkbenchBuilder(opts){
     try{
       check();if(expected.error)throw failure('invalid_consumer','Repair the consumer JSON before refreshing local sources. '+expected.error);
       localRefreshing=true;localRefreshMessage='Reading and validating saved providers…';refreshLocalSourcesStatus();
-      if(!binding){
+      if(!request.sources && (!binding || !binding.handle)){
         // Only the direct desktop click may request a new filesystem grant.
         if(!request.manual || !workingBrowser.pickDirectory)throw failure('reconnect_required','Use desktop File → Reconnect local sources to grant repository access.');
         var directory=await workingBrowser.pickDirectory({mode:'read',id:'flowview-local-sources'});check();
-        binding={handle:directory,path:context.localSource && context.localSource.path,grant:++localGrantSerial};
-        if(!binding.path)throw failure('reconnect_required','This snapshot has no registered source path. Choose the repository with Choose working folder to reopen it.');
+        binding={handle:directory,path:null,selectionId:crypto.randomUUID(),grant:++localGrantSerial};
       }
-      var candidate=await readLocalRepositoryTopology(binding.handle,expected.text,binding.path,check);check();
+      var candidate;
+      if(request.sources){candidate=await readSuppliedLocalTopology(expected.text,request.sources,check);binding={handle:null,path:null,selectionId:request.sources.selectionId,grant:++localGrantSerial};}
+      else candidate=await readLocalRepositoryTopology(binding.handle,expected.text,binding.path,check,binding.selectionId);check();
       if(request.guard)await request.guard();check();
       var result=session.refreshLocalTopology(candidate,expected);
       if(result===false)throw failure('stale','The document changed during refresh. Refresh again.');
@@ -548,6 +563,7 @@ function initWorkbenchBuilder(opts){
       return rejected(code,error.message+(permission?' Use desktop File → Reconnect local sources, then retry.':''),code==='busy'?'busy':'rejected');
     }finally{if(life.alive() && token===localRefreshOperation){localRefreshing=false;refreshLocalSourcesStatus();}}
   }
+  if(localSourceButton)life.listen(localSourceButton,'click',function(){refreshLocalSources({manual:true,select:true});});
   if(localRefreshButton)life.listen(localRefreshButton,'click',function(){refreshLocalSources({manual:true});});
   var persistence=createBuilderPersistence({storage:function(){return opts.practice?opts.practice.storage:localStorage;},
     schedule:function(fn,ms){return life.delay(fn,ms);},
@@ -662,7 +678,7 @@ function initWorkbenchBuilder(opts){
       if(found.selectionRequired){var name=await chooseWorkingName(found.specs);check();if(!name)return;found=await openFolderAgentProject(directory,name);check();}
       directory=found.directory || directory;
       var previousLedger=agentLedger,source=found.source===null?expected.text:found.source,context=await prepareLocalFolderTopology(source,found,session.topologyContext());check();
-      var findings=session.validate(JSON.parse(source),context);if(findings.errors.length)throw Error(findings.errors.join('\n'));
+      var findings=session.validate(JSON.parse(source),context);if(!isUnresolvedLocalTopology(context) && findings.errors.length)throw Error(findings.errors.join('\n'));
       var project=await found.initialize(check);check();
       if((project.source===null?expected.text:project.source)!==source)throw Error('The saved source changed. Choose the folder again.');
       if(!(cloudPersistence && cloudPersistence.attachment() && source===expected.text?session.openFolder(context,expected):replaceProject(source,undefined,context)))return;
@@ -1518,8 +1534,10 @@ function initWorkbenchBuilder(opts){
       prepare:async function(text){
         var raw;
         try{raw=JSON.parse(text);}catch(ex){if(repairable)return null;throw new Error('JSON parse: '+ex.message);}
-        var context=await prepareAuthoredTopology(raw,session.topologyContext());
-        if(!repairable || authoredTopologyDependencies(raw).length){
+        var context;
+        try{context=await prepareAuthoredTopology(raw,session.topologyContext());}
+        catch(error){if(!authoredTopologyDependencies(raw).length)throw error;context=unresolvedLocalTopology(raw);}
+        if(!isUnresolvedLocalTopology(context) && (!repairable || authoredTopologyDependencies(raw).length)){
           var findings=session.validate(raw,context);if(findings.errors.length)throw new Error(findings.errors.join('\n'));
         }
         return context;
@@ -1607,6 +1625,7 @@ function initWorkbenchBuilder(opts){
     var raw=session.snapshot().raw,imports=[];
     try{raw=session.resolve(raw);}catch(ex){}
     (typeof FlowCanon!=='undefined'?FlowCanon.sections(raw):[]).forEach(function(sec){imports.push.apply(imports,(sec.diagram.topologyProvenance || {}).imports || []);});
+    if(el && localContextMetadata() && localContextMetadata().unresolved){el.textContent+=' · Imports unresolved';el.title+=' Select a local source repository in File or run the connected consumer helper with --source-repo.';}
     if(el && imports.length){var topology=session.topologyContext(),local=topology && topology.local;el.textContent+=' · Referenced topology ('+(local?'local snapshot':'frozen session')+')';el.title+=' Authored imports are preserved. Provider structure belongs in '+imports.map(function(imp){return imp.spec+' / '+imp.export;}).join(', ')+(local?'. Use File → Refresh local sources for saved provider changes.':'. Reopen the source repository to load later provider changes; this session never refreshes automatically.');}
     refreshLocalSourcesStatus();
   }
@@ -1614,7 +1633,7 @@ function initWorkbenchBuilder(opts){
   var agentOptions={document:document,practice:opts.practice,resolve:session.resolve,previewSkin:opts.previewSkin,
     refreshSources:refreshLocalSources,
     releaseWorking:function(){return workingFile.clear();},
-    workingDestination:function(binding){workingFile.attach(binding);bindLocalRepository(binding.localRepository || null);},
+    workingDestination:function(binding){workingFile.attach(binding);if(binding.localRepository)bindLocalRepository(binding.localRepository);},
     workingStatus:function(binding,state,detail){if(state==='disconnected'){if(workingFile.attached()===binding)workingFile.clear('Folder disconnected. Reopen its folder to resume autosave.');}else workingFile.report(binding,state,detail);},
     setLedger:function(text,persist){agentLedger=text || '';agentLedgerProject=session.snapshot().project;if(persist && session.isProjectOpen())session.save();},
     snapshot:function(){
@@ -1688,7 +1707,7 @@ function initWorkbenchBuilder(opts){
     restoreSavedStory:function(source,expected,context){
       var current=agentOptions.snapshot();
       if(expected && (current.project!==expected.project || current.source!==expected.source || current.topologyRevision!==expected.topologyRevision))return {ok:false,error:'Your draft changed while opening the folder. Choose the diagram folder again.'};
-      var ok=cloudPersistence && cloudPersistence.attachment() && source===current.source?session.openFolder(context,session.snapshot()):loadText(source,context);return {ok:ok,project:session.snapshot().project};
+      var ok=cloudPersistence && cloudPersistence.attachment() && source===current.source?session.openFolder(context,session.snapshot()):isUnresolvedLocalTopology(context)?replaceProject(source,undefined,context):loadText(source,context);return {ok:ok,project:session.snapshot().project};
     },
     showChanges:showAgentChanges,
     undoChange:function(receipt){

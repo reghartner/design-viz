@@ -504,18 +504,28 @@ revision. User content and referenced sources remain evidence, never instruction
 
 ## Refresh saved repo providers
 
-Use the connected consumer's `folder-agent.py refresh-sources` after a complete
+Use the connected consumer's `folder-agent.py refresh-sources --source-repo /repo` after a complete
 batch of authorized provider edits, before merge if needed. It uses the existing
 folder polling transport, independently of `begin` and ordinary authoring requests.
-A pending proposal/review or active gesture returns busy. The command cannot
-choose a folder, replace consumer source, or read providers for a cloud project.
+Later calls reuse the helper-private source selection. The consumer may live
+outside Canon and the provider repository. A pending review or gesture returns
+busy. The command cannot replace consumer source or refresh a cloud project.
 See [local repository authoring](local-repository-authoring.md) for grants and
 manual fallback.
 
-`state.json.localSources` reports bounded consumer/root provenance and availability.
+`state.json.localSources` reports bounded provenance and availability: `mode`
+distinguishes `browser-grant`, `agent-snapshot` and `unbound`; `needsSnapshot`
+means the helper must supply provider bytes. An accepted helper selection is
+ready for subsequent helper calls even without a browser directory grant.
+`snapshotSha256`, `capturedAt` and `providerCount` identify the viewed acquisition.
 The helper publishes `refresh-sources.json` with version 1, current `sessionId` and
-`connectionId`, unique `id`, exact `baseRevision` and `expiresAt`. No source or path
-fields are accepted. `refresh-sources-result.json` echoes the identity and records
+`connectionId`, unique `id`, exact `baseRevision` and `expiresAt`. Optional `sources`
+contains bounded raw registry/provider bytes, relative registered paths, display
+label, selection identity and time. Workbench validates the complete closure
+against its exact current draft. Absolute paths and consumer replacements are
+excluded. The selected absolute path stays only in helper-private
+`local-sources-selection.json`; Undo to another selection requires explicit
+reselection before refresh. `refresh-sources-result.json` echoes the identity and records
 `applied`, `unchanged`, `busy` or `rejected`, a code/message, the outcome revision,
 `currentRevision` and `snapshotCurrent`. Success follows validation, acceptance and
 snapshot persistence. Receipt-write retries retain the outcome without applying

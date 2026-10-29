@@ -2,7 +2,7 @@
 function createFolderAgentFiles(directory){
   // Recovery holds before/after copies of both artifacts. JSON escaping can
   // double each 4 MiB spec and expand each 256 KiB ledger up to sixfold.
-  function limit(name){return name==='refresh-sources.json'?8192:name==='refresh-sources-result.json'?16384:name==='pilot-status.json'?4096:(name==='artifact-write.json'?20:8)*1024*1024;}
+  function limit(name){return name==='refresh-sources.json'?8*1024*1024:name==='refresh-sources-result.json'?16384:name==='pilot-status.json'?4096:(name==='artifact-write.json'?20:8)*1024*1024;}
   async function readText(name,maxBytes){
     if(!/^[\w .-]+$/.test(name) || name==='.' || name==='..')throw Error('Use a plain session filename.');
     try{
@@ -331,7 +331,8 @@ function createFolderAgentClient(opts){
     pendingAcceptance=null;pendingReviewResult=null;pending=null;turnEpoch++;clearReview();
     publish({status:'Update accepted and saved. Continue in your agent.',progress:''});
   }
-  // A refresh is independent of a story request and accepts no paths or source.
+  // A refresh is independent of a story request. Optional provider bytes are
+  // revalidated against the current consumer; no consumer replacement is accepted.
   // Keep an accepted outcome before any async receipt write; retries must never
   // reread providers or reapply it after an intervening Undo.
   async function refreshConnectionGuard(token){
@@ -366,8 +367,8 @@ function createFolderAgentClient(opts){
     }
     var outcome;
     refreshSeen.add(request.id);
-    if(request.version!==1 || Object.keys(request).some(function(key){return !['version','sessionId','connectionId','id','baseRevision','expiresAt','withdrawn'].includes(key);}) || typeof request.baseRevision!=='string' || request.baseRevision.length>200 || !Number.isFinite(request.expiresAt) || request.expiresAt>now()+120000 || request.withdrawn!==undefined && request.withdrawn!==true)
-      outcome={status:'rejected',code:'invalid_request',message:'Invalid refresh envelope. Use the consumer helper refresh-sources command; no paths or source are accepted.'};
+    if(request.version!==1 || Object.keys(request).some(function(key){return !['version','sessionId','connectionId','id','baseRevision','expiresAt','withdrawn','sources'].includes(key);}) || typeof request.baseRevision!=='string' || request.baseRevision.length>200 || !Number.isFinite(request.expiresAt) || request.expiresAt>now()+120000 || request.withdrawn!==undefined && request.withdrawn!==true)
+      outcome={status:'rejected',code:'invalid_request',message:'Invalid refresh envelope. Use the consumer helper refresh-sources command; only bounded provider snapshots are accepted.'};
     else if(request.withdrawn || request.expiresAt<=now())outcome={status:'rejected',code:'expired',message:'Refresh request expired or was withdrawn. Run refresh-sources again.'};
     else if(request.baseRevision!==basis)outcome={status:'rejected',code:'stale',message:'Consumer revision changed. Run refresh-sources again to use the current draft.'};
     else if(!opts.refreshSources)outcome={status:'rejected',code:'unsupported',message:'Reconnect the consumer with a current Workbench to enable refresh-sources.'};
@@ -376,7 +377,7 @@ function createFolderAgentClient(opts){
         await guard();
         var proposal=await readOptional('proposal.json');await guard();
         if(belongs(proposal) && proposal.requestId===pending && validId(proposal.id) && !seen.has(proposal.id))outcome={status:'busy',code:'busy',message:'A proposal awaits review. Finish that review, then retry refresh-sources.'};
-        else outcome=await opts.refreshSources({check:check,guard:guard});
+        else outcome=await opts.refreshSources({check:check,guard:guard,sources:request.sources});
       }catch(error){outcome={status:error.refreshCode==='busy'?'busy':'rejected',code:error.refreshCode || 'stale',message:error.message};}
     }
     if(!alive(token))return true;

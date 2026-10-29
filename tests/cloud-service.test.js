@@ -74,3 +74,9 @@ test('local refresh provenance round trips with exact consumer and ledger, witho
  }
  await assert.rejects(save(f,{...v,topologyContext:{...context,local:false}},{operationId:'not-local'}),{status:400});
 });
+
+test('independent local preview provenance round trips without absolute paths or arbitrary metadata',async()=>{
+ const f=await fixture(),localSource={selectionId:'selection-one',rootLabel:'worktree',capturedAt:'2026-10-29T12:00:00.000Z',sha256:'a'.repeat(64),providers:[{path:'diagrams/base/base.spec.json',sha256:'b'.repeat(64)}]},context={version:1,id:'workbench-draft',ephemeral:true,local:true,specs:[{page:{canon:{id:'workbench-draft'}}}],localSource},v={...value(' exact consumer '),topologyContext:context};
+ await save(f,v);assert.deepEqual([...f.snapshots.values()][0],v);
+ for(const [i,patch] of [{selectionId:'../path'},{sha256:'invalid'},{providers:[{path:'/private/base',sha256:'b'.repeat(64)}]},{providers:[...localSource.providers,...localSource.providers]},{absolutePath:'/worktree'},{providers:[{...localSource.providers[0],handle:{}}]}].entries())await assert.rejects(save(f,{...v,topologyContext:{...context,localSource:{...localSource,...patch}}},{operationId:'invalid-independent-'+i}),{status:400});
+});

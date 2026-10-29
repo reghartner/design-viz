@@ -17,6 +17,7 @@ or generated copies.
 | Name | Composition and consumer |
 | --- | --- |
 | `standalone` | Shared compatibility, Canon, validator/core/panels and engine, followed by explicit viewer boot; Python fills the offline HTML skeleton |
+| `status-colors` | Shared viewer and production CSS with the desktop status palette editor boot; emits `workbench/status-colors.html` |
 | `workbench` | Shared viewer and all editor bundles, followed by explicit workbench boot; Python adds the existing curated templates and skeleton |
 | `backend` | Compatibility, Canon, validator/core/panels and `core/backend.js`; exports the existing Canon default facade plus `compatibility`, `validateSpec` and `viewerRouting` |
 | `native` | Shared viewer definitions without boot; the native adapter adds its instance environment, mount lifecycle, scoped styles and namespaced fonts |
@@ -120,7 +121,7 @@ the former policy requiring committed runtime JavaScript. Authored pages under
 | `apps/backstage/src/generated/nativeViewer.d.ts` | Exact copy of authored `src/native/mount.d.ts` |
 | `apps/backstage/src/generated/compatibility.d.ts` | Exact copy of authored `src/compatibility.d.ts` |
 | `apps/backstage/src/generated/FONT-LICENSES.txt` | License files selected by `src/fonts/manifest.json` through the named native asset profile |
-| `template/flowview.html`, `workbench/flowspec.html`, `workbench/diagrams.json` | Shared manifest, HTML skeletons, authoring kit and Canon inputs; `tools/build.py` |
+| `template/flowview.html`, `workbench/flowspec.html`, `workbench/status-colors.html`, `workbench/diagrams.json` | Shared manifest, HTML skeletons, authoring kit and Canon inputs; `tools/build.py` |
 
 Use Node 24 and Python 3.10+ from a clean checkout:
 

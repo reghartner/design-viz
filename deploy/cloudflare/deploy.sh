@@ -54,6 +54,7 @@ python3 tools/build.py --no-library --no-catalog
 rm -rf "$SITE"
 mkdir -p "$SITE/workbench" "$SITE/template"
 cp "$ROOT/workbench/flowspec.html" "$SITE/workbench/flowspec.html"
+cp "$ROOT/workbench/status-colors.html" "$SITE/workbench/status-colors.html"
 # Always an empty library index, whatever canon.json lists: this deploy ships no
 # diagrams/ folders. Its presence makes Browse show nothing instead of the
 # bundled fictional example (src/library.workbench.js falls back only on 404).

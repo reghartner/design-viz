@@ -3,6 +3,7 @@
 
   template/flowview.html = standalone entrypoint + skeleton + demo spec
   workbench/flowspec.html = workbench entrypoint + skeleton + curated templates
+  workbench/status-colors.html = desktop palette editor + production viewer
   tools/canon/generated-runtime.cjs = static DOM-free backend entrypoint
   workbench/diagrams.json = metadata index for folders listed in root canon.json
 
@@ -298,6 +299,7 @@ def main() -> int:
     for name, skeleton, output in [
         ('standalone', 'flowview.skel.html', ROOT / 'template/flowview.html'),
         ('workbench', 'workbench.skel.html', ROOT / 'workbench/flowspec.html'),
+        ('status-colors', 'status-colors.skel.html', ROOT / 'workbench/status-colors.html'),
     ]:
         if args.template_only and name != 'standalone':
             continue
@@ -314,7 +316,7 @@ def main() -> int:
         if name == 'standalone':
             mapping['DEMO_SPEC'] = read('flowview.demo.json').strip()
             mapping['HUMAN_GUIDE'] = human_guide()
-        else:
+        elif name == 'workbench':
             mapping['WORKBENCH_TEMPLATES'] = workbench_templates()
             mapping['WORKBENCH_CANON'] = workbench_canon()
             mapping['WORKBENCH_ONBOARDING'] = json.dumps(json.loads(read('starters/onboarding.json')), ensure_ascii=True).replace('<', '\\u003c')

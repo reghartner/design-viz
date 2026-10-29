@@ -34,6 +34,7 @@ function prepareImageContext(directory,{company=path.join(ROOT,'company')}={}){
   fs.rmSync(path.join(directory,'tools/canon/generated-runtime.cjs'),{force:true});
   // Exercise a fresh source-only image context, even if the local checkout was built.
   fs.rmSync(path.join(directory,'workbench/flowspec.html'),{force:true});
+  fs.rmSync(path.join(directory,'workbench/status-colors.html'),{force:true});
   for(const file of fs.readdirSync(path.join(ROOT,'tools'))){
     if(/\.(?:py|cjs|js)$/.test(file))fs.copyFileSync(path.join(ROOT,'tools',file),path.join(directory,'tools',file));
   }

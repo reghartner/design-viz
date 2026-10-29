@@ -43,6 +43,7 @@
     "viewer/tab-views.js",
     "viewer/workspace-handoff.js",
     "viewer/deltas.js",
+    "viewer/status-colors.js",
     "viewer/live-status.js",
     "engine.js",
     "viewer/detail-overview.js",
@@ -284,6 +285,21 @@
         "planPlaceOptimally": "planPlaceOptimally",
         "normalizeAgentPlacement": "normalizeWorkbenchAgentPlacement"
       }
+    },
+    "status-colors": {
+      "sources": [
+        "compatibility.js",
+        "canon.js",
+        "validator.js",
+        "engine.js"
+      ],
+      "boot": "boot.status-colors.js",
+      "styles": [
+        "page",
+        "core"
+      ],
+      "fonts": "all",
+      "icons": true
     }
   },
   "assets": {

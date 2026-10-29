@@ -78,7 +78,7 @@ test('failed communications center blocked and dropped gaps on short local and c
  for(const step of [0,1]){
   await section.locator('.schip[data-step-source="'+step+'"]').first().click();
   const failures=section.locator('.comm-failure:not(.dv-live-comm-failure)');await expect(failures).toHaveCount(2);
-  const metrics=[];for(const failure of await failures.all())metrics.push(await expectCenteredBreak(failure));
+  const metrics=[];for(const failure of await failures.all()){metrics.push(await expectCenteredBreak(failure));await expect(failure.locator('.comm-break')).toHaveCSS('stroke','rgb(180, 35, 56)');}
   expect(metrics.some(g=>g.length<100)).toBe(true);expect(metrics.some(g=>g.curved)).toBe(true);
  }
  await section.locator('.schip[data-step-source="0"]').first().click();

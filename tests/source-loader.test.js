@@ -36,7 +36,7 @@ test('unknown entrypoints, missing inputs/exports, duplicate physical files and 
   fs.rmSync(path.join(dir,'helpers/a.js'));fs.rmSync(path.join(dir,'helpers/b.js'));assert.throws(()=>loader.entrypoint('probe',dir),/Empty source glob/);
 });
 test('actual entrypoints have unique ordered declarations and deliberate exports, without exposing private test helpers',()=>{
-  for(const name of ['standalone','workbench','backend','native','forge','compatibility']){
+  for(const name of ['standalone','workbench','status-colors','backend','native','forge','compatibility']){
     const entry=loader.entrypoint(name),files=entry.records.map(record=>record.file);
     assert.equal(new Set(files).size,files.length,name);assert.equal(files.filter(file=>file==='compatibility.js').length,1);
     if(files.includes('icons/brand.js')){

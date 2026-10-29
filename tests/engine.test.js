@@ -804,7 +804,7 @@ test('fitted title outputs are bounded and reuse recent results across new node 
       setAttribute(name,value){attrs[name]=String(value);},
       getComputedTextLength(){measured++;return this.textContent.length*6;}};
     const card={getAttribute:()=>54};
-    return {querySelector:selector=>selector==='.t1'?text:selector==='.card'?card:null,querySelectorAll:()=>[],children:[]};
+    return {getAttribute:()=>null,querySelector:selector=>selector==='.t1'?text:selector==='.card'?card:null,querySelectorAll:()=>[],children:[]};
   }
   for(let i=0;i<513;i++)C.fitLaneNodeTitle(node(),'Short '+i,200,'',measurement);
   assert.strictEqual(cache.size,512);assert.strictEqual(measured,513);
@@ -812,6 +812,24 @@ test('fitted title outputs are bounded and reuse recent results across new node 
   C.fitLaneNodeTitle(node(),'Short 0',200,'',measurement);assert.strictEqual(measured,514);
   assert.strictEqual(cache.size,512);
   for(const value of cache.values())assert.ok(Object.values(value).every(field=>typeof field!=='object'),'cache stores no DOM owners');
+});
+
+test('title fitting uses the body height without spending a reserved footer on subtitle space',()=>{
+  function label(y){
+    const attrs={x:'46',y:String(y)};
+    return {textContent:'',getAttribute:name=>attrs[name],hasAttribute:name=>Object.hasOwn(attrs,name),
+      setAttribute(name,value){attrs[name]=String(value);},removeAttribute(name){delete attrs[name];}};
+  }
+  function fit(bodyHeight){
+    const text=label(25),sub=label(41),card={getAttribute:()=>82};
+    const node={getAttribute:name=>name==='data-dv-body-height'?bodyHeight:null,
+      querySelector:selector=>selector==='.t1'?text:selector==='.t2'?sub:selector==='.card'?card:null,querySelectorAll:()=>[]};
+    C.fitLaneNodeTitle(node,'Title',150,'Subtitle');
+    return [text.getAttribute('y'),sub.getAttribute('y')];
+  }
+  assert.deepStrictEqual(fit('50'),['27','43'],'short custom bodies keep their single-line baselines despite the footer');
+  assert.deepStrictEqual(fit('58'),['25','41'],'ordinary subtitled float bodies retain their baselines');
+  assert.deepStrictEqual(fit(null),['25','41'],'legacy callers fall back to the card height');
 });
 
 test('title observers and font listeners retire with their board, including already queued callbacks',()=>{

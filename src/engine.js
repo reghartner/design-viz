@@ -904,7 +904,7 @@ function fitLaneNodeTitle(node, title, width, subtitle, measurement){
   }
   /* Layout reserves 58px for floats with subtitles. Keep the fallback for
      older/custom short card geometry supplied directly to the fitter. */
-  var twoLines = Number(card.getAttribute('height')) >= 54 || !hasSub;
+  var twoLines = Number(node.getAttribute('data-dv-body-height') || card.getAttribute('height')) >= 54 || !hasSub;
   if (!twoLines){ titleY = 27; subY = 43; }
   var cache = measurement && measurement.cache, key = null, needsTip = false;
   if (cache && measurement.typography){
@@ -1106,7 +1106,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   Object.keys(d.nodes).forEach(function(id){
     var n = d.nodes[id] || {}, p = L.pos[id];
     if (!p) return;
-    var small = p.float === true;
+    var small = p.float === true,bodyH=p.h-nodeAvailabilitySpace(n);
     var icon = ICON_SET.indexOf(n.icon) >= 0 ? n.icon : 'gear';
     var tint = TINT_SET.indexOf(n.tint) >= 0 ? n.tint : 'cmd';
     var nodeStyle = NODE_STYLE_SET.indexOf(n.style) >= 0 ? n.style : null;
@@ -1133,7 +1133,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
        icon, which keeps one position on every card of a size. */
     /* Floats reserve the control row, then center the full-size icon in the
        remaining height. Subtitled floats have more room than title-only ones. */
-    var hitH=small?12:14,iconY=small?hitH+(p.h-hitH-26)/2:14,controlY=n.handoff?14:hitH/2;
+    var hitH=small?12:14,iconY=small?hitH+(bodyH-hitH-26)/2:14,controlY=n.handoff?14:hitH/2;
     function controlX(cornerX){return n.handoff?cornerX:18+18*slot++;}
     var linkX=hasNodeLink?controlX(p.w-15):0;
     var referenceX=hasReferences?controlX(p.w-(hasNodeLink?38:15)):0;
@@ -1144,14 +1144,14 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       return n.handoff ? '<circle cx="' + cx + '" cy="14" r="' + cornerR + '" fill="transparent"/>' :
         '<rect class="nhit" x="' + (cx-9) + '" y="0" width="18" height="' + hitH + '" rx="4" fill="transparent"/>';
     }
-    s += '<g class="node tint-' + tint + (nodeStyle ? ' node-styled ns-' + nodeStyle : '') + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + (reviewBaseline(n) ? ' review-baseline' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' + hiddenAttrs +
+    s += '<g class="node tint-' + tint + (nodeStyle ? ' node-styled ns-' + nodeStyle : '') + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + (reviewBaseline(n) ? ' review-baseline' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '" data-dv-body-height="' + bodyH + '"' + hiddenAttrs +
          (nodeStyle ? ' data-dv-style="' + nodeStyle + '"' : '') +
          (nodeImage ? ' data-dv-node-image="true" aria-label="' + esc(nodeTitle + '. ' + n.alt) + '"' : '') + ' transform="translate(' + x + ' ' + y + ')">' +
          (L.routing === 'lanes' || nodeImage ? '<title>'+esc(nodeImage ? nodeTitle + ' — ' + n.alt : nodeTitle)+'</title>' : '') +
          (n.handoff ? handoffNodeContent(n,p,id,prefix,options) :
          '<rect class="card" width="' + p.w + '" height="' + p.h + '" rx="12"/>' +
          (nodeImage ?
-           '<image class="node-image" href="' + esc(nodeImage) + '" x="7" y="' + imageY + '" width="38" height="' + (p.h-imageY-7) + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true"/>' +
+           '<image class="node-image" href="' + esc(nodeImage) + '" x="7" y="' + imageY + '" width="38" height="' + (bodyH-imageY-7) + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true"/>' +
            '<text class="t1" x="' + textX + '" y="' + (small?25:23) + '">' + esc(nodeTitle) + '</text>' +
            '<text class="t2" x="' + textX + '" y="' + (small?41:40) + '">' + esc(n.sub || 'Embedded image') + '</text>' :
            '<rect class="icbg" x="12" y="' + iconY + '" width="26" height="26" rx="8"/>' +
@@ -1170,7 +1170,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
            '<g class="nbackref" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false" data-dv-node-id="' + esc(id) + '" aria-label="Other pages containing ' + esc(nodeTitle) + '">' +
            controlHit(backlinkX,9) +
            '<text x="' + backlinkX + '" y="' + (controlY+4) + '" text-anchor="middle">&#8599;</text></g>' : '') +
-         (n.detail ? '<g class="detail-trigger" role="button" tabindex="0" data-dv-detail="' + esc(id) + '" aria-label="Explore ' + esc(nodeTitle) + '"><title>' + 'Explore ' + esc(nodeTitle) + '</title><rect x="' + (p.w-30) + '" y="' + (p.h-25) + '" width="26" height="22" rx="6"/><text x="' + (p.w-17) + '" y="' + (p.h-9) + '" text-anchor="middle">⊞</text></g>' : '') +
+         (n.detail ? '<g class="detail-trigger" role="button" tabindex="0" data-dv-detail="' + esc(id) + '" aria-label="Explore ' + esc(nodeTitle) + '"><title>' + 'Explore ' + esc(nodeTitle) + '</title><rect x="' + (p.w-30) + '" y="' + (bodyH-25) + '" width="26" height="22" rx="6"/><text x="' + (p.w-17) + '" y="' + (bodyH-9) + '" text-anchor="middle">⊞</text></g>' : '') +
          '</g>';
   });
   s += '</svg>';

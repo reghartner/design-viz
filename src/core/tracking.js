@@ -130,5 +130,6 @@ function trackingDependencyLinks(page,invalid){
 
 /* Existence is opt-in and supported only on real carriers with Jira references. */
 function trackingExistsWhen(value){
-  return value && !isTextBoxNode(value) && value.existsWhen==='tickets-done' && trackingRefs(value).tickets.length?'tickets-done':null;
+  var text=value && value.type==='text' && (Object.prototype.hasOwnProperty.call(value,'text') || Object.prototype.hasOwnProperty.call(value,'textStyle'));
+  return value && !text && value.existsWhen==='tickets-done' && Array.isArray(value.tickets) && value.tickets.some(trackingTicket)?'tickets-done':null;
 }

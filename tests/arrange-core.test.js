@@ -9,8 +9,8 @@ const {execFileSync}=require('node:child_process');
 const core=require('../tools/arrange/core.cjs'),{arrangeGraph}=core;
 function arrangeDiagram(d,options){const result=core.autoArrangeCandidates(d,options);return {diagram:core.autoArrangeDiagram(d,result),metrics:result.metrics};}
 const quick={seed:71,restarts:1,iterations:1600};
-const geometry=vm.createContext({});
-vm.runInContext('function clamp(n,a,b){return Math.max(a,Math.min(b,n));}\n'+fs.readFileSync(path.join(__dirname,'../src/core/geometry.js'),'utf8'),geometry);
+const geometry=vm.createContext({URL});
+vm.runInContext('function clamp(n,a,b){return Math.max(a,Math.min(b,n));}\n'+fs.readFileSync(path.join(__dirname,'../src/core/tracking.js'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname,'../src/core/geometry.js'),'utf8'),geometry);
 const diagram=(ids,edges)=>({nodes:Object.fromEntries(ids.map(id=>[id,{title:id,icon:'server'}])),rows:[ids],edges:edges.map(([from,to],i)=>({id:'edge-'+i,from,to}))});
 function bare(result){const clone=structuredClone(result);for(const key of ['runtimeMs','placementMs','routingMs']){delete clone.metrics?.[key];clone.reports?.forEach(r=>delete r[key]);}return clone;}
 function assertGeometry(d){
@@ -38,6 +38,16 @@ function assertGeometry(d){
 test('arranges and routes a fork, reconvergence, skip link and feedback without mutating input',()=>{
   const d=diagram(['a','b','c','d','e','f'],[['a','b'],['b','c'],['b','d'],['c','e'],['d','e'],['e','f'],['a','e'],['e','b']]),copy=structuredClone(d);
   const result=arrangeDiagram(d,quick);assert.deepEqual(d,copy);assert.deepEqual(result.diagram.nodes,d.nodes);assert.equal(result.metrics.cardIntrusions,0);assertGeometry(result.diagram);
+});
+
+test('arrangement reserves gated node footers for both flat and grouped layouts',()=>{
+ for(const grouped of [false,true]){
+  const d=diagram(['a','b','c','d'],[['a','b'],['b','c'],['c','d']]);
+  for(const node of Object.values(d.nodes))Object.assign(node,{existsWhen:'tickets-done',tickets:['API-1'],sub:'Body subtitle'});
+  if(grouped){d.groups={box:{title:'Construction'}};d.nodes.b.group='box';d.nodes.c.group='box';}
+  const result=arrangeDiagram(d,quick);assertGeometry(result.diagram);
+  const L=geometry.layout(result.diagram);for(const p of Object.values(L.pos))assert.equal(p.h,90);
+ }
 });
 
 test('ignores previous authored geometry and node presentation',()=>{

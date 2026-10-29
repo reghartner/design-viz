@@ -304,6 +304,7 @@
     },
     "iconLibrary": "icons/library.js",
     "autoArrangeWorker": [
+      "core/tracking.js",
       "core/geometry.js",
       "core/text-box.js",
       "core/arrange/placement.js",

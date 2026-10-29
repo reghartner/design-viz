@@ -1584,11 +1584,25 @@ test('ticket availability requires all explicit Done evidence without changing J
  assert.equal(C.liveStatusUnavailable(value,{'AA-1':{state:'done'},'AA-2':{state:'done'}}),false);
  for(const other of [{tickets:['AA-1']},{existsWhen:'tickets-done'},{existsWhen:'tickets-done',tickets:['invalid'],prs:['https://example.test/pull/1']},{...value,type:'text',text:'Note'},{...value,existsWhen:'other'}])assert.equal(C.liveStatusUnavailable(other,{}),false);
 });
+test('availability distinguishes awaiting evidence from known unfinished work in every cause',()=>{
+ const {C}=harness(),value={title:'API',tickets:['AA-1','AA-2'],existsWhen:'tickets-done'};
+ for(const map of [{},{'AA-1':{state:'unknown'}},{'AA-1':{state:'done'}},{'AA-1':{state:'done'},'AA-2':{state:'unknown'}}]){
+  const causes=C.liveStatusAvailability(value,map);assert.equal(causes[0].awaiting,true);assert.match(C.liveStatusAvailabilityLabel(causes),/Awaiting Jira status/);assert.doesNotMatch(C.liveStatusAvailabilityLabel(causes),/Not built/);
+ }
+ for(const state of ['todo','active','blocked','missing']){
+  const causes=C.liveStatusAvailability(value,{'AA-1':{state}});assert.equal(causes[0].awaiting,false,state);assert.match(C.liveStatusAvailabilityLabel(causes),/Not built yet/);
+ }
+ const edge={from:'a',to:'b',tickets:['EE-1'],existsWhen:'tickets-done'},diagram={nodes:{a:value,b:{}}};
+ const mixed=C.liveStatusAvailability(edge,{'EE-1':{state:'todo'}},diagram),label=C.liveStatusAvailabilityLabel(mixed);
+ assert.equal(mixed[0].awaiting,false);assert.equal(mixed[1].awaiting,true);
+ assert.match(label,/Not built yet · a → b requires EE-1/);assert.match(label,/Awaiting Jira status · API requires confirmed Done status for AA-1, AA-2/);
+ assert.equal(C.liveStatusAvailability(value,{'AA-1':{state:'done'},'AA-2':{state:'done'}}),null);
+});
 test('planned nodes and incident edges stay unavailable through unknown evidence, navigation and independent edge gates',()=>{
  const raw={nodes:{a:{title:'Planned API',tickets:['AA-1','AA-2'],existsWhen:'tickets-done'},b:{title:'Existing'}},rows:[['a','b']],edges:[{from:'a',to:'b',existsWhen:'tickets-done',tickets:['EE-1']},{from:'b',to:'a'}]},before=JSON.stringify(raw);
  const h=harness(raw),api=h.ctl.liveStatus,node=h.view.querySelector('[data-dv-node="a"]'),edges=h.view.querySelectorAll('path.edge');
  assert.ok(node.classList.contains('dv-live-unavailable'),'initial unknown evidence is unavailable');assert.equal(h.view.querySelectorAll('.dv-live-comm-failure').length,2);
- assert.match(node.querySelector('.card').getAttribute('aria-label'),/Not built yet/);
+ assert.match(node.querySelector('.card').getAttribute('aria-label'),/Awaiting Jira status/);
  api.apply({'AA-1':{state:'done'},'AA-2':{state:'active'},'EE-1':{state:'active'}});
  assert.ok(node.classList.contains('dv-live-active'));assert.ok(!node.classList.contains('dv-live-blocked'));
  assert.match(h.view.querySelector('text.lbl[data-dv-edge="1"]').getAttribute('aria-label'),/Planned API requires AA-1, AA-2/);

@@ -114,7 +114,9 @@ function liveStatusUnavailable(value,map){
 function liveStatusAvailability(value,map,diagram){
   var causes=[];
   function add(carrier,id){
-    if(liveStatusUnavailable(carrier,map))causes.push({id:id,label:carrier.title || id,value:carrier,tickets:trackingRefs(carrier).tickets});
+    if(!liveStatusUnavailable(carrier,map))return;
+    var tickets=trackingRefs(carrier).tickets,awaiting=!tickets.some(function(key){var state=map[key] && map[key].state;return LIVE_STATUS_STATES.indexOf(state)>=0 && state!=='done';});
+    causes.push({id:id,label:carrier.title || id,value:carrier,tickets:tickets,awaiting:awaiting});
   }
   if(value){
     add(value,value.from?value.from+' → '+value.to:'This node');
@@ -123,10 +125,54 @@ function liveStatusAvailability(value,map,diagram){
   return causes.length?causes:null;
 }
 function liveStatusAvailabilityLabel(causes){
-  return causes?'Not built yet · '+causes.map(function(cause){return cause.label+' requires '+cause.tickets.join(', ')+' to be Done';}).join('; '):'';
+  return causes?causes.map(function(cause){return cause.awaiting?'Awaiting Jira status · '+cause.label+' requires confirmed Done status for '+cause.tickets.join(', '):'Not built yet · '+cause.label+' requires '+cause.tickets.join(', ')+' to be Done';}).join('; '):'';
 }
 function liveStatusAvailabilityClass(el,causes){
   el.classList.toggle('dv-live-unavailable',!!causes);
+}
+/* Bounded node artwork, always inside the card's authored geometry. No IDs or
+   pattern definitions: native siblings and rebuilt boards cannot collide. */
+function liveStatusNodeConstruction(el,value,state,causes){
+  el.querySelectorAll('.dv-live-construction').forEach(function(item){item.remove();});
+  el.classList.remove('dv-live-reserved','dv-live-blueprint');
+  if(!causes)return;
+  var card=el.querySelector('.card');if(!card)return;
+  var w=Number(card.getAttribute('width') || card.getAttribute('data-node-width')),
+    h=Number(card.getAttribute('height') || card.getAttribute('data-node-height')),
+    body=Number(el.getAttribute('data-dv-body-height')) || h-32,active=state==='active';
+  if(!isFinite(w) || !isFinite(h) || w<40 || h<40)return;
+  el.classList.add(active?'dv-live-blueprint':'dv-live-reserved');
+  var doc=el.ownerDocument || document;
+  function svg(tag,attrs,parent){var item=doc.createElementNS(SVGNS,tag);Object.keys(attrs).forEach(function(key){item.setAttribute(key,attrs[key]);});parent.appendChild(item);return item;}
+  var art=svg('g',{'class':'dv-live-construction','aria-hidden':'true','pointer-events':'none'},card.parentNode);
+  if(active)card.parentNode.insertBefore(art,card.nextSibling);
+  var right=w-(el.classList.contains('node-handoff')?28:10);
+  if(active){
+    var strokes=[],left=8,top=8,bottom=h-8,width=right-left,height=bottom-top;
+    for(var x=-height;x<width;x+=10){
+      var x1=Math.max(0,x),y1=Math.max(0,-x),x2=Math.min(width,x+height),y2=Math.min(height,width-x);
+      strokes.push('M'+(left+x1)+' '+(top+y1)+'L'+(left+x2)+' '+(top+y2));
+    }
+    svg('path',{'class':'dv-live-hatching',d:strokes.join('')},art);
+    svg('path',{'class':'dv-live-construction-frame',d:'M4 17V4H17M'+(right-11)+' 4H'+(right+2)+'V17M'+(right+2)+' '+(h-17)+'V'+(h-4)+'H'+(right-11)+'M17 '+(h-4)+'H4V'+(h-17)},art);
+    return;
+  }
+  var icon=el.querySelector('use'),image=el.querySelector('.node-image');
+  if(icon || image){
+    var ix=icon?Number(icon.getAttribute('x')):18,iy=icon?Number(icon.getAttribute('y')):body/2-8;
+    svg('path',{'class':'dv-live-placeholder-icon',transform:'translate('+ix+' '+iy+')',d:'M1 4L8 1L15 4V12L8 15L1 12ZM1 4L8 7L15 4M8 7V15'},art);
+  }
+  svg('path',{'class':'dv-live-reservation-divider',d:'M10 '+(body+1)+'H'+right},art);
+  var caption=causes.every(function(cause){return cause.awaiting;})?'AWAITING JIRA STATUS':'NOT BUILT YET';
+  var captionEl=svg('text',{'class':'dv-live-reservation-title',x:10,y:body+12},art);captionEl.textContent=caption;
+  // Narrow handoff cards tighten letter spacing rather than reducing glyph size.
+  if(caption.length*6>right-10){captionEl.setAttribute('textLength',right-10);captionEl.setAttribute('lengthAdjust','spacing');}
+  var tickets=trackingRefs(value).tickets,budget=Math.max(4,Math.floor((right-10)/6)),summary=tickets.join(' + ');
+  if(summary.length>budget){
+    var suffix=tickets.length>1?' +'+(tickets.length-1):'',limit=Math.max(1,budget-suffix.length-1);
+    summary=tickets[0].slice(0,limit)+(tickets[0].length>limit?'…':'')+suffix;
+  }
+  svg('text',{'class':'dv-live-reservation-tickets',x:10,y:body+25},art).textContent=summary;
 }
 function liveStatusBlockingKeys(value,map){
   return trackingRefs(value).tickets.filter(function(key){return map[key] && ['blocked','missing'].indexOf(map[key].state)>=0;});
@@ -827,7 +873,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var unavailable=on && availabilityOn?liveStatusAvailability(value,map):null;liveStatusAvailabilityClass(el,unavailable);
       var waits=waiting[id],painted=state==='blocked' || state==='missing'?null:waits;decorateCarrier(el,el.classList.contains('node-text')?null:value,binding.page.tracking);liveStatusClass(el,state);liveStatusWaitingClass(el,painted);
       // Waiting tone wears the upstream's preset: slate while unfinished, rose when blocked or missing.
-      liveStatusPreset(el,painted?(painted.tone==='red'?'rose':'slate'):state?LIVE_STATUS_PRESETS[state]:null);
+      liveStatusPreset(el,unavailable?(state==='active'?'azure':state==='blocked' || state==='missing'?'rose':'slate'):painted?(painted.tone==='red'?'rose':'slate'):state?LIVE_STATUS_PRESETS[state]:null);
+      liveStatusNodeConstruction(el,value,state,unavailable);
       if(!state && !waits && !unavailable)return;
       var card=el.querySelector('.card');if(!card)return;
       var halo=card.cloneNode(false);halo.setAttribute('class','dv-live-halo');halo.removeAttribute('id');halo.setAttribute('aria-hidden','true');el.insertBefore(halo,el.firstChild);
@@ -985,9 +1032,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       view.querySelectorAll('.dv-live-board-lane').forEach(function(el){el.classList.remove('dv-live-board-lane');});
       view.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').forEach(function(el){el.remove();});
       if(applied || availabilityOn){
-        clearTargets();view.querySelectorAll('.dv-live-halo').forEach(function(el){el.remove();});
+        clearTargets();view.querySelectorAll('.dv-live-halo,.dv-live-construction').forEach(function(el){el.remove();});
         view.querySelectorAll('[data-dv-node],[data-dv-edge]').forEach(function(el){if(el._livePulseEnd){el.removeEventListener('animationend',el._livePulseEnd);delete el._livePulseEnd;}});
-        view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing,.dv-live-waiting,.dv-live-stale,.dv-live-changed,.dv-live-unavailable').forEach(function(el){liveStatusClass(el,null);liveStatusWaitingClass(el,null);liveStatusPreset(el,null);el.classList.remove('dv-live-stale','dv-live-changed','dv-live-unavailable');});
+        view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing,.dv-live-waiting,.dv-live-stale,.dv-live-changed,.dv-live-unavailable').forEach(function(el){liveStatusClass(el,null);liveStatusWaitingClass(el,null);liveStatusPreset(el,null);el.classList.remove('dv-live-stale','dv-live-changed','dv-live-unavailable','dv-live-reserved','dv-live-blueprint');});
       }
       if(renderOptions && renderOptions.loadDetail===wrappedLoad)renderOptions.loadDetail=originalLoad;
     }

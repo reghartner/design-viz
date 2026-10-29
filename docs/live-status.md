@@ -17,17 +17,31 @@ Availability requires **every valid attached Jira ticket** to have explicit
 `state: "done"`. Missing entries, unknown states, `missing`, Todo and In Progress
 keep it unavailable. PR state never decides existence. No valid tickets means
 the rule warns and is ignored; invalid `existsWhen` values also warn and are
-ignored. Text boxes do not support the rule. Jira colors, counts, rollups and
+ignored. Text boxes do not support the rule. Jira states, counts, rollups and
 dependency waiting remain unchanged.
 
 While Live is on, an unavailable connection shows a communication break and
-stops packet animation. An unavailable node stays in layout with readable text,
-a faded card fill and dashed outline. Every connection touching that node also
-breaks, even without its own tickets. Its accessible name and ticket popover say
-**Not built yet**, list the cause and relevant tickets, and retain the actual
-Jira state. Labels, unlabeled break glyphs and node cards retain keyboard access;
-there are no extra canvas status badges. All-Done evidence restores ordinary
-live appearance and traffic, unless another endpoint or the edge itself still
+stops packet animation. An unavailable node keeps its readable title and subtitle.
+Todo, unknown and partial-Done evidence show a neutral dashed **reserved space**
+with a box placeholder and a bounded ticket summary. If no attached ticket has a
+known unfinished state, the label is **AWAITING JIRA STATUS**: absent or unknown
+evidence alone does not claim the node is unbuilt. This includes Done plus
+unknown evidence. Known Todo uses **NOT BUILT YET**. Blocked
+or missing evidence uses the same reservation in rose. An actual In Progress
+rollup shows a blue **blueprint frame** with light hatching and its original icon.
+Every ticket explicitly Done makes the node **green**, using the ordinary moss
+live Done fill and outline, with all construction decoration removed.
+A fixed 32px footer is reserved in gated-node geometry, including stacks and floats,
+so status updates never move the diagram. The original content and controls stay
+in their body area. Long ticket summaries abbreviate; the popover retains every
+causing ticket. Every connection touching an unavailable node also breaks, even
+without its own tickets. Its accessible name and ticket popover say
+**Awaiting Jira status** for an awaiting cause or **Not built yet** for a known
+unfinished cause, list the relevant tickets, and retain the actual Jira state.
+Mixed edge/endpoint causes each retain their own explanation. Neither wording
+changes the all-Done availability rule or packet suppression. Labels, unlabeled break glyphs and node cards retain keyboard access;
+there are no extra canvas status badges beyond the reserved-space explanation.
+All-Done evidence restores green live Done appearance and traffic, unless another endpoint or the edge itself still
 has an unfinished existence rule.
 
 The rule applies while awaiting the first status response and to partial or

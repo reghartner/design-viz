@@ -759,9 +759,16 @@ or missing evidence keeps it unavailable. With no valid tickets, or an invalid
 setting, warn and ignore the rule. PR state is irrelevant; text boxes are unsupported.
 Desktop **Inspect → Tracking → Exists when tickets are complete** changes this
 field with Undo/Redo; disabling removes it. Live unavailable edges break and stop
-packets. Nodes retain readable text with faded fill and dashed outline, and every
-incident edge breaks. Popovers explain “Not built yet” and show causing tickets.
-Actual Jira colors/counts/rollups remain intact. Live off, clear and destroy restore
+packets. Nodes awaiting evidence show a dashed reserved space with “AWAITING JIRA
+STATUS” and compact ticket references, including Done plus unknown evidence.
+Known unfinished Todo uses “NOT BUILT YET”; active nodes show a blue blueprint frame. Blocked
+or missing reservations use rose. All tickets Done turns the node green (moss),
+removing construction decoration. A fixed 32px footer keeps status changes from
+moving the diagram; original body content and controls retain their space. Every
+incident edge of an unavailable node breaks. Accessible names and popovers explain
+“Awaiting Jira status” for causes without known unfinished evidence, or “Not built
+yet” for known unfinished causes, and show causing tickets.
+Actual Jira states/counts/rollups remain intact. Live off, clear and destroy restore
 authored visuals; later evidence and navigation reapply the rule. Provider rules
 survive imports; consumer tracking overlays can add a rule but cannot disable an
 inherited one. Declare `flow.ticket-availability` as well as `flow.live-status`.

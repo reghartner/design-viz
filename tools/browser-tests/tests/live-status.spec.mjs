@@ -858,8 +858,8 @@ test('A1 planned availability keeps Jira state, breaks incident traffic and rest
  const spec=JSON.parse(await readFile(path.join(repo,'examples/ticket-availability/ticket-availability.spec.json'),'utf8')),d=spec.page.sections[0].diagram;delete d.edges[0].label;
  const root=await open(page,server,spec,false),node=root.locator('g.node[data-dv-node="api"]'),edge=root.locator('path.edge[data-dv-edge="1"]'),incident=root.locator('g.dv-live-comm-failure[data-dv-edge="0"]'),pop=root.locator('.dv-live-popover');
  await expect(node).toHaveClass(/dv-live-unavailable/);await expect(root.locator('.dv-live-comm-failure')).toHaveCount(2);
- await expect(incident).toHaveAttribute('role','button');await expect(incident).toHaveAttribute('aria-label',/Not built yet.*Planned API requires API-1, API-2/);await expect(incident).not.toHaveAttribute('aria-label',/blocked/);
- await incident.press('Enter');await expect(pop).toContainText('Not built yet');await expect(pop.getByRole('link',{name:'API-1',exact:true})).toBeVisible();await expect(pop).toContainText('No status');await page.keyboard.press('Escape');await expect(incident).toBeFocused();
+ await expect(incident).toHaveAttribute('role','button');await expect(incident).toHaveAttribute('aria-label',/Awaiting Jira status.*Planned API requires confirmed Done status for API-1, API-2/);await expect(incident).not.toHaveAttribute('aria-label',/blocked/);
+ await incident.press('Enter');await expect(pop).toContainText('Awaiting Jira status');await expect(pop).not.toContainText('Not built yet');await expect(pop.getByRole('link',{name:'API-1',exact:true})).toBeVisible();await expect(pop).toContainText('No status');await page.keyboard.press('Escape');await expect(incident).toBeFocused();
  await expect.poll(()=>page.evaluate(()=>typeof window.__availabilityResolve)).toBe('function');
  await page.evaluate(()=>{window.__availabilityMap={'API-1':{state:'done'},'LINK-1':{state:'active'},'APP-1':{state:'active'}};window.__availabilityResolve(window.__availabilityMap);});
  await expect(node).toHaveClass(/dv-live-done/);await expect(node).toHaveClass(/dv-live-unavailable/);await expect(edge).toHaveClass(/dv-live-active/);await expect(edge).not.toHaveClass(/dv-live-blocked/);
@@ -867,7 +867,7 @@ test('A1 planned availability keeps Jira state, breaks incident traffic and rest
  const packets=root.locator('circle.pkt');expect(await packets.count()).toBeGreaterThan(0);
  expect(await packets.evaluateAll(els=>els.filter(el=>el.querySelector('mpath')?.getAttribute('href')===('#'+document.querySelector('path.edge[data-dv-edge="1"]').id)).every(el=>getComputedStyle(el).display==='none'))).toBe(true);
  for(const skin of ['aurora','pastel']){
-  await page.evaluate(skin=>window.dvSetSkin(skin),skin);await expect(node.locator('.card')).toHaveCSS('fill-opacity','0.3');await expect(node.locator('.card')).toHaveCSS('stroke-dasharray','7px, 5px');await expect(node.locator('.t1')).toHaveCSS('opacity','1');
+  await page.evaluate(skin=>window.dvSetSkin(skin),skin);await expect(node.locator('.card')).toHaveCSS('fill-opacity','1');await expect(node.locator('.card')).toHaveCSS('stroke-dasharray','5px, 4px');await expect(node.locator('.t1')).toHaveCSS('opacity','1');
   await root.locator('#section-planned').screenshot({path:testInfo.outputPath('planned-'+skin+'.png')});
  }
  await page.evaluate(()=>{window.__availabilityMap['API-2']={state:'done'};});await page.clock.runFor(30001);
@@ -876,7 +876,7 @@ test('A1 planned availability keeps Jira state, breaks incident traffic and rest
  await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure')).toHaveCount(0);
  expect(await packets.evaluateAll(els=>els.every(el=>!el.classList.contains('dv-live-packet-hidden')))).toBe(true);
  await page.evaluate(()=>{window.__availabilityMap={};});await page.clock.runFor(30001);await expect(node).toHaveClass(/dv-live-unavailable/);
- await root.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure')).toHaveCount(0);await expect(node.locator('.card')).not.toHaveCSS('fill-opacity','0.3');
+ await root.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure')).toHaveCount(0);await expect(node.locator('.dv-live-construction')).toHaveCount(0);
  await root.locator('.dv-live-toggle').click();await expect(node).toHaveClass(/dv-live-unavailable/);
 });
 
@@ -897,18 +897,59 @@ test('A2 desktop node and edge availability controls preserve source history and
  expect(saved.page.flowview.features).toContain('flow.ticket-availability');
 });
 
-test('A3 availability survives rebuilt native diagrams and clear or destroy restores authored visuals',async({page,server})=>{
+test('A3 availability survives rebuilt native diagrams and clear or destroy restores authored visuals',async({page,server},testInfo)=>{
  await page.setViewportSize({width:1440,height:1000});
  await writeFile(path.join(server.root,'availability-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
  await writeFile(path.join(server.root,'availability-native.html'),'<style>body{margin:0}#host{position:fixed;inset:0}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./availability-native.js";window.mount=mountNativeViewer;</script>');
  await page.goto(server.origin+'/availability-native.html');await page.waitForFunction(()=>!!window.mount);
  const spec=JSON.parse(await readFile(path.join(repo,'examples/ticket-availability/ticket-availability.spec.json'),'utf8'));
+ Object.assign(spec.page.sections[0].diagram.nodes.api,{icon:'server',sub:'Requests',link:'https://example.com/api',detail:{section:'inside'}});
+ spec.page.sections.push({id:'inside',heading:'API internals',detailOnly:true,diagram:{nodes:{inside:{title:'Internal'}},rows:[['inside']],edges:[]}});
+ const diagram=spec.page.sections[0].diagram;diagram.nodes.image={title:'Image node',sub:'Thumbnail',image:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1kAAAAASUVORK5CYII=',alt:'Test image',tickets:['API-1','API-2'],existsWhen:'tickets-done'};diagram.nodes.handoff={title:'API continuation',handoff:{spec:'api',claudeUrl:'https://claude.ai/artifact/api'},tickets:['API-1','API-2'],existsWhen:'tickets-done'};diagram.floats=[{id:'image',x:350,y:260},{id:'handoff',x:800,y:260}];
  spec.page.sections[0].diagram.paths=[{id:'forward',steps:['request','store','response']},{id:'reverse',steps:['response','request','store']}];
- await page.evaluate(spec=>{window.viewer=window.mount(document.querySelector('#host'),spec,{});},spec);
+ await page.evaluate(spec=>{window.availabilitySpec=spec;window.viewer=window.mount(document.querySelector('#host'),spec,{});},spec);
  const root=page.locator('#host'),node=root.locator('g.node[data-dv-node="api"]');await expect(node).toHaveClass(/dv-live-unavailable/);
- await root.locator('.path-chip[data-dv-path="reverse"]').click();await expect(node).toHaveClass(/dv-live-unavailable/);await expect(root.locator('.dv-live-comm-failure')).toHaveCount(2);
- await page.evaluate(()=>window.viewer.controller.liveStatus.clear());await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target')).toHaveCount(0);await expect(node.locator('.card')).not.toHaveCSS('fill-opacity','0.3');
- await page.evaluate(()=>window.viewer.controller.liveStatus.apply({}));await expect(node).toHaveClass(/dv-live-unavailable/);
- await page.evaluate(()=>window.viewer.controller.liveStatus.destroy());await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target')).toHaveCount(0);await expect(node.locator('.card')).not.toHaveCSS('fill-opacity','0.3');
+ const geometry=await node.evaluate(el=>({transform:el.getAttribute('transform'),h:el.querySelector('.card').getAttribute('height'),detail:el.querySelector('.detail-trigger rect').getAttribute('y')}));
+ expect(geometry.h).toBe('86');expect(Number(geometry.detail)+22).toBeLessThanOrEqual(54);
+ const imageNode=root.locator('g.node[data-dv-node="image"]'),handoff=root.locator('g.node[data-dv-node="handoff"]');
+ expect(await imageNode.locator('.node-image').evaluate(el=>Number(el.getAttribute('y'))+Number(el.getAttribute('height')))).toBeLessThanOrEqual(58);
+ expect(Number(await handoff.locator('.t2').getAttribute('y'))).toBeLessThan(50);
+ const apply=async map=>page.evaluate(map=>window.viewer.controller.liveStatus.apply(map),map);
+ const color=async token=>node.evaluate((el,token)=>{const g=el.cloneNode(false);g.setAttribute('class','node node-styled ns-'+token);el.parentNode.appendChild(g);const style=getComputedStyle(g),probe=document.createElement('span');el.getRootNode().appendChild(probe);const resolve=k=>{probe.style.color=style.getPropertyValue(k).trim();return getComputedStyle(probe).color;};const out={bg:resolve('--ns-bg'),line:resolve('--ns-line')};probe.remove();g.remove();return out;},token);
+ for(const skin of ['aurora','pastel']){
+  await page.evaluate(skin=>(window.viewer.destroy(),window.viewer=window.mount(document.querySelector('#host'),window.availabilitySpec,{skin})),skin);
+  await root.getByRole('button',{name:'Readable',exact:true}).first().click();
+  await apply({});await expect(node).toHaveClass(/dv-live-reserved/);await expect(node.locator('.dv-live-reservation-title')).toHaveText('AWAITING JIRA STATUS');
+  await expect(imageNode.locator('.node-image')).toHaveCSS('visibility','hidden');await expect(handoff.locator('.dv-live-reservation-title')).toHaveText('AWAITING JIRA STATUS');expect(await handoff.locator('.dv-live-reservation-title').evaluate(el=>el.getBBox().x+el.getBBox().width)).toBeLessThanOrEqual(122);
+  await expect(node.locator('.dv-live-reservation-tickets')).toHaveCSS('font-size','10px');
+  expect(await node.locator('.dv-live-construction text').evaluateAll(els=>els.every(el=>{const b=el.getBBox();return b.x>=0&&b.x+b.width<=150&&b.y+b.height<=86;}))).toBe(true);
+  await node.screenshot({path:testInfo.outputPath('reserved-'+skin+'.png')});
+  const content=await node.locator('.t1,.t2').evaluateAll(els=>els.map(el=>({y:el.getAttribute('y'),box:el.getBBox().y+el.getBBox().height})));expect(content.every(el=>el.box<54)).toBe(true);
+  await apply({'API-1':{state:'done'}});await expect(node).toHaveClass(/dv-live-done/);await expect(node).toHaveClass(/ns-slate/);await expect(node).not.toHaveClass(/ns-moss/);await expect(node.locator('.dv-live-reservation-title')).toHaveText('AWAITING JIRA STATUS');await expect(node.locator('.card')).toHaveAttribute('aria-label',/Awaiting Jira status/);await expect(node.locator('.card')).not.toHaveAttribute('aria-label',/Not built/);
+  await apply({'API-1':{state:'active'},'API-2':{state:'todo'}});await expect(node).toHaveClass(/dv-live-blueprint/);await expect(node).toHaveClass(/ns-azure/);await expect(node.locator('.dv-live-hatching')).toHaveCount(1);await expect(node.locator('.dv-live-reservation-title')).toHaveCount(0);await expect(node.locator('use').first()).toHaveCSS('visibility','visible');
+  await expect(imageNode.locator('.node-image')).toHaveCSS('visibility','visible');await expect(handoff.locator('.dv-live-hatching')).toHaveCount(1);
+  await node.screenshot({path:testInfo.outputPath('blueprint-'+skin+'.png')});
+  await apply({'API-1':{state:'todo'},'API-2':{state:'todo'}});await expect(node).toHaveClass(/dv-live-reserved/);await expect(node).toHaveClass(/ns-slate/);await expect(node.locator('.dv-live-hatching')).toHaveCount(0);await expect(node.locator('.dv-live-reservation-title')).toHaveText('NOT BUILT YET');await expect(node.locator('.card')).toHaveAttribute('aria-label',/Not built yet/);await node.screenshot({path:testInfo.outputPath('known-todo-'+skin+'.png')});
+  await apply({'API-1':{state:'blocked'},'API-2':{state:'todo'}});await expect(node).toHaveClass(/dv-live-reserved/);await expect(node).toHaveClass(/ns-rose/);await expect(node).not.toHaveClass(/dv-live-blueprint/);
+  await apply({'API-1':{state:'missing'}});await expect(node).toHaveClass(/ns-rose/);
+  await apply({'API-1':{state:'done'},'API-2':{state:'todo'}});await expect(node).toHaveClass(/dv-live-blueprint/);
+  await apply({'API-1':{state:'done'},'API-2':{state:'done'},'LINK-1':{state:'done'}});await expect(node).toHaveClass(/dv-live-done/);await expect(node).toHaveClass(/ns-moss/);await expect(node.locator('.dv-live-construction')).toHaveCount(0);
+  const moss=await color('moss');await expect(node.locator('.card')).toHaveCSS('fill',moss.bg);await expect(node.locator('.card')).toHaveCSS('stroke',moss.line);await expect(node.locator('.card')).toHaveCSS('stroke-dasharray','none');
+  await node.screenshot({path:testInfo.outputPath('completed-green-'+skin+'.png')});
+  expect(await node.locator('.t1,.t2').evaluateAll(els=>els.map(el=>({y:el.getAttribute('y'),box:el.getBBox().y+el.getBBox().height})))).toEqual(content);
+  await root.locator('#section-planned .board').screenshot({path:testInfo.outputPath('completed-board-'+skin+'.png')});
+  expect(await node.evaluate(el=>({transform:el.getAttribute('transform'),h:el.querySelector('.card').getAttribute('height'),detail:el.querySelector('.detail-trigger rect').getAttribute('y')}))).toEqual(geometry);
+ }
+ await page.evaluate(()=>{const spec=structuredClone(window.availabilitySpec);spec.page.sections[0].diagram.nodes.api.tickets=Array.from({length:9},(_,i)=>'LONGPROJECTKEY-1234567890'+i);window.longTicketSpec=spec;window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{});});
+ await expect(node.locator('.dv-live-reservation-tickets')).toContainText('+8');
+ expect(await node.locator('.dv-live-reservation-tickets').evaluate(el=>el.getBBox().x+el.getBBox().width)).toBeLessThan(150);
+ await node.locator('.card').press('Enter');for(let i=0;i<9;i++)await expect(root.locator('.dv-live-popover').getByRole('link',{name:'LONGPROJECTKEY-1234567890'+i,exact:true})).toBeVisible();await page.keyboard.press('Escape');
+ await page.evaluate(()=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),window.availabilitySpec,{});});
+ await apply({'API-1':{state:'active'}});await page.evaluate(()=>window.viewer.controller.liveStatus.setEnabled(false));await expect(root.locator('.dv-live-construction,.dv-live-blueprint,.dv-live-reserved')).toHaveCount(0);
+ await page.evaluate(()=>window.viewer.controller.liveStatus.setEnabled(true));await expect(node).toHaveClass(/dv-live-blueprint/);
+ await root.locator('.path-chip[data-dv-path="reverse"]').click();await expect(node).toHaveClass(/dv-live-blueprint/);await expect(root.locator('.dv-live-comm-failure')).toHaveCount(2);
+ await page.evaluate(()=>window.viewer.controller.liveStatus.clear());await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target')).toHaveCount(0);await expect(node.locator('.dv-live-construction')).toHaveCount(0);
+ await page.evaluate(()=>window.viewer.controller.liveStatus.apply({'API-1':{state:'active'}}));await expect(node).toHaveClass(/dv-live-blueprint/);
+ await page.evaluate(()=>window.viewer.controller.liveStatus.destroy());await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target')).toHaveCount(0);await expect(node.locator('.dv-live-construction')).toHaveCount(0);
  await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
 });

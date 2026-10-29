@@ -1,11 +1,18 @@
-/* Pure diagram layout, routing and collision geometry. The only shared
-   call-time dependency is clamp() from validator.js; no DOM initialization.
+/* Pure diagram layout, routing and collision geometry. Shared call-time dependencies
+   are clamp(), the pure tracking helpers, and textBoxSize() for text boxes;
+   no DOM initialization.
    Loaded once by the logical validator bundle before panel definitions. */
 
 var W = 1180, CARD_H = 54, FLOAT_H = 50, ROW_GAP = 140, STACK_GAP = 46;
 /* Reserve equal card gutters; a fixed right column left a node-sized blank
    strip when Auto or Fit width scaled the entire canvas. */
 var LEFT_X = 110, RIGHT_X = W - LEFT_X;
+/* A fixed reservation belongs to authored geometry, never the changing Jira map.
+   Bodies keep their original height; the live overlay owns only this footer. */
+function nodeAvailabilitySpace(node){
+  return trackingExistsWhen(node)?32:0;
+}
+function nodeCardHeight(node,height){return height+nodeAvailabilitySpace(node);}
 
 /* Optional saved drawing bounds, not a reader camera. Invalid containers keep
    the legacy canvas. Native measurement includes text/decorations; this pure
@@ -194,9 +201,10 @@ function layout(spec){
   if (hasGroups) top += 26 + 34 * (maxDepth - 1); /* one title band per ancestor */
 
   spec.rows.forEach(function(slots, r){
-    var maxStack = 1;
-    slots.forEach(function(s){ if (Array.isArray(s)) maxStack = Math.max(maxStack, s.length); });
-    var rowH = maxStack * CARD_H + (maxStack - 1) * STACK_GAP;
+    var rowH = Math.max.apply(null,[CARD_H].concat(slots.map(function(slot){
+      var ids=Array.isArray(slot)?slot:[slot];
+      return ids.reduce(function(height,id){return height+nodeCardHeight(spec.nodes[id],CARD_H);},0)+Math.max(0,ids.length-1)*STACK_GAP;
+    })));
     var center = top + rowH / 2;
     var k = slots.length;
     var xs = [];
@@ -207,14 +215,16 @@ function layout(spec){
     slots.forEach(function(s, i){
       if (Array.isArray(s)){
         var m = s.length;
-        var totalH = m * CARD_H + (m - 1) * STACK_GAP;
+        var totalH = s.reduce(function(height,id){return height+nodeCardHeight(spec.nodes[id],CARD_H);},0) + (m - 1) * STACK_GAP,cursor=center-totalH/2;
         s.forEach(function(id, j){
-          pos[id] = {cx: xs[i], cy: center - totalH/2 + CARD_H/2 + j*(CARD_H+STACK_GAP),
-                     w:170, h:CARD_H, row:r, flow:i, stack:true};
+          var height=nodeCardHeight(spec.nodes[id],CARD_H);
+          pos[id] = {cx: xs[i], cy: cursor+height/2,
+                     w:170, h:height, row:r, flow:i, stack:true};
+          cursor+=height+STACK_GAP;
         });
       } else {
         /* Supported lane rows have at most five cards, 240px apart. */
-        pos[s] = {cx: xs[i], cy: center, w:lanes ? 190 : 150, h:CARD_H, row:r, flow:i, stack:false};
+        pos[s] = {cx: xs[i], cy: center, w:lanes ? 190 : 150, h:nodeCardHeight(spec.nodes[s],CARD_H), row:r, flow:i, stack:false};
       }
     });
     rowsMeta.push({top:top, center:center, height:rowH, slots:slots, k:k});
@@ -249,7 +259,7 @@ function layout(spec){
       var cx = f.noSpread===true ? f.x : xs[spreadIndex++] + (typeof f.dx === 'number' ? f.dx : 0);
       var cy = fy + (typeof f.dy === 'number' ? f.dy : 0);
       if(positionedFloat(f)){cx=f.x;cy=f.y;}
-      var floatNode=spec.nodes[f.id],floatSize=floatNode && floatNode.type==='text' && (Object.prototype.hasOwnProperty.call(floatNode,'text') || Object.prototype.hasOwnProperty.call(floatNode,'textStyle'))?textBoxSize(floatNode):{w:150,h:floatNode && (floatNode.sub || floatNode.image)?58:FLOAT_H};
+      var floatNode=spec.nodes[f.id],floatSize=floatNode && floatNode.type==='text' && (Object.prototype.hasOwnProperty.call(floatNode,'text') || Object.prototype.hasOwnProperty.call(floatNode,'textStyle'))?textBoxSize(floatNode):{w:150,h:nodeCardHeight(floatNode,floatNode && (floatNode.sub || floatNode.image)?58:FLOAT_H)};
       pos[f.id] = {cx:cx, cy:cy, w:floatSize.w, h:floatSize.h, row:-1, flow:-1, stack:false, float:true};
       if(positionedFloat(f))pos[f.id].free=true;
     });
@@ -268,7 +278,7 @@ function layout(spec){
     });
     var insertX=existingRight+160,occupied=Object.keys(pos).map(function(id){return pos[id];});
     inserted.forEach(function(f){
-      var sizedNode=spec.nodes[f.id],size=sizedNode && sizedNode.type==='text' && (Object.prototype.hasOwnProperty.call(sizedNode,'text') || Object.prototype.hasOwnProperty.call(sizedNode,'textStyle'))?textBoxSize(sizedNode):{w:150,h:sizedNode && (sizedNode.sub || sizedNode.image)?58:FLOAT_H};
+      var sizedNode=spec.nodes[f.id],size=sizedNode && sizedNode.type==='text' && (Object.prototype.hasOwnProperty.call(sizedNode,'text') || Object.prototype.hasOwnProperty.call(sizedNode,'textStyle'))?textBoxSize(sizedNode):{w:150,h:nodeCardHeight(sizedNode,sizedNode && (sizedNode.sub || sizedNode.image)?58:FLOAT_H)};
       var y=42+size.h/2;
       while(occupied.some(function(p){
         return Math.abs(insertX-p.cx)<(size.w+p.w)/2+24 && Math.abs(y-p.cy)<(size.h+p.h)/2+24;

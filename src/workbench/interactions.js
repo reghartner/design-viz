@@ -379,7 +379,7 @@ function createBuilderInteractions(opts){
       kind=member.hasAttribute('data-dv-node')?'node':member.hasAttribute('data-dv-edge')?'edge':'group';
       id=member.getAttribute('data-dv-'+kind);
       target={kind:kind,section:section,el:member};
-      if(kind==='edge'){target.index=Number(id);var edge=(diagram.edges || [])[target.index];id=edge && builderEdgeKey(edge);}else target.id=id;
+      if(kind==='edge'){target.index=Number(id);var edge=(diagram.edges || [])[target.index];id=edge && builderEdgeKey(edge);target.key=id;}else target.id=id;
     }
     imports.sort(function(a,b){return b.as.split('::').length-a.as.split('::').length;});
     var imp=imports.find(function(value){return boundary?value.as===boundary.getAttribute('data-topology-import'):member && (value[kind==='node'?'nodes':kind==='edge'?'edges':'groups'] || []).includes(id);});
@@ -418,7 +418,9 @@ function createBuilderInteractions(opts){
     var unavailable='This provider has no verified published link in this repository catalog.';
     item('Go to diagram',function(){window.open(url,'_blank','noopener,noreferrer');},url?null:unavailable);
     item('Inspect imported member',function(){selectSpatial([ref.target]);if(opts.workspace)opts.workspace.showTool('inspect',{closeUtilities:true});});
-    item('Clear Custom Edges',function(){},'This topology belongs to its provider; no authored custom edge geometry is in scope.');
+    var routingTarget=Object.assign({},ref.target,ref.target.kind==='edge'?{imported:true}:{});
+    var clearPlan=planClearCustomEdges(ref.s.text,ref.s.raw,{targets:[routingTarget]},context);
+    item('Clear Custom Edges',function(){applyPlan(clearPlan,null,ref.s);},clearPlan.error || (clearPlan.noop?'No authored custom edge geometry is in scope.':null));
     item('Copy diagram link',function(){window.navigator.clipboard.writeText(url).catch(function(){if(current())inspectorMessage('Could not copy the diagram link.');});},!url?unavailable:!window.navigator.clipboard?'Clipboard access is unavailable in this browser.':null);
     var got=builderDiagram(ref.s.text,ref.s.raw,ref.section),direct=!got.error && (got.d.topologyImports || []).some(function(imp){return imp.as===ref.imp.as;});
     var reset=direct?planResetTopologyArrangement(ref.s.text,ref.s.raw,ref.section,ref.imp.as):{error:ref.imp.as.indexOf('::')>=0?'Reset the containing reference to restore this nested arrangement.':'Open the authored consumer with its providers to reset its arrangement.'};

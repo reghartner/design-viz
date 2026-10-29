@@ -92,7 +92,9 @@ Use **Clear Custom Edges** in an edge Inspector or its right-click menu to resto
 automatic entry, exit and curve routing without changing the connection type,
 label or label placement. A multi-selection clears selected edges plus edges
 incident to selected nodes; the section Inspector applies the same one-Undo action
-to the whole diagram. Imported provider edges stay read-only.
+to the whole diagram. Imported edges participate too: the consumer saves routing
+suppression overrides while the provider stays unchanged. Reset imported connection
+layout restores the provider routing instead.
 
 The feature is shared by standalone HTML, native Backstage and Forge viewers.
 Exports advertise `layout.free-nodes` and `layout.edge-ports` compatibility

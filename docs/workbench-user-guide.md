@@ -247,7 +247,12 @@ of nodes and a shared right-click action menu. Explore also includes on-canvas
 panels and step controls. The Nodes & connections chapter explains mixed
 selection, keyboard focus and graph-unit nudging, alignment centers, equal-gap
 distribution, row/column spacing expansion, Fit selection, Free placement, position
-locks, and Undo. Spacing expansion adds 50 graph units between successive selected
+locks, and Undo. Imported nodes participate in nudging and distribution alongside
+local nodes; only this consumer’s arrangement is saved. **Clear Custom Edges**
+also clears imported connection routing in this consumer, including inherited
+ports and curves, while preserving provider data, labels, and label positions.
+**Reset imported connection layout** restores the provider arrangement instead.
+Spacing expansion adds 50 graph units between successive selected
 center lanes per click while keeping the first movable lane fixed. A node's
 right-click menu locks or unlocks its position; selected-node menus name the bulk
 actions explicitly. Locked members stay selected and fixed during a mixed drag,

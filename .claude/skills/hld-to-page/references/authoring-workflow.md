@@ -122,7 +122,7 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     crossings, labels and group titles can need scoped manual refinements.
     This is the initial layout and default, not visual proof. Preserve unrelated
     existing geometry. For ordinary existing edits, preserve layout and routes;
-    add nodes only as `{id:"<new-node-id>",side:"below",noSpread:true}` floats. Workbench places additions near their connections automatically before paired preview and saves those coordinates on acceptance; no coordinate work or placement caveat is needed. To intentionally place existing nodes, use `tools/place-nodes.cjs --section 0 --node ID input.json output.json`.
+    add nodes only as `{id:"<new-node-id>",side:"below",noSpread:true}` floats. Workbench auto-places before preview and saves accepted points; no coordinate work/caveat. Selected: `tools/place-nodes.cjs`.
     User feedback that the rendered candidate clips content or is hard to read
     authorizes scoped candidate layout repair, including tile sizing, without
     another permission question or handing arrangement back to the user. Keep

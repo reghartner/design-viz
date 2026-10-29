@@ -921,11 +921,30 @@ built `workbench/status-colors.html` page on the same site as your viewers.
 The page previews the production renderer with local and genuinely imported
 nodes. It offers color pickers and six-digit hex fields for To do, Active,
 Done, Blocked, Missing work and Unchanged, plus PR states and check results.
+Expand a status’s **border, fill & glow** controls to set independent border
+color, border width (0–8 px), background fill tint (0–100%) and glow strength
+(0–200% of normal). The base color remains the fill/accent color; borders follow
+it until explicitly overridden. Border settings affect node cards, pills and
+coins, including imported nodes. Edge paths retain their existing status colors
+and widths; dependency waiting outlines retain their evidence color and dash
+pattern. A zero-width border hides
+the outline without disabling a separately enabled glow.
+
+Built-in defaults remain 15% fill, 2 px borders (3 px on Blocked node cards),
+dotted To do and dashed Missing work. Active and Done start at 100% glow;
+other states start at 0%. Active pulses when motion is allowed, while other
+states glow steadily. Reduced motion and print disable animations. Text ink
+is recalculated against the actual fill tint and host surface.
+
+PR means pull request: open is ready for review, draft is work in progress,
+merged is included in its target branch, and closed ended without merging.
+The small GitHub check dots show passing, failing or pending automated checks;
+no dot means no result is available.
 Waiting indicators inherit To do and Blocked. The broken-edge icon is always
 red (`#b42338`), including authored failures and unavailable connections; edge
 segments retain their independent status color.
 
-Edits, **Reset all**, per-color reset and JSON import change only the preview
+Edits, **Reset all**, per-setting reset and JSON import change only the preview
 until **Save defaults**. Save stores explicit overrides in
 `localStorage["flowview.status-colors.v1"]`; an empty palette removes that key.
 Untouched values retain the built-in CSS defaults, including skin-specific PR
@@ -939,7 +958,20 @@ Supported names are `live-todo`, `live-active`, `live-done`, `live-blocked`,
 `live-missing`, `live-unchanged`, `pr-open`, `pr-draft`, `pr-merged`, `pr-closed`,
 `checks-passing`, `checks-failing` and `checks-pending`. Imports reject unknown
 fields, unknown names and values other than `#RRGGBB` without replacing the
-preview. Storage errors are reported; the preview remains exportable.
+preview. Appearance edits use the version 2 envelope below. All appearance
+fields are optional; numbers must be finite and within their stated bounds.
+An invalid field rejects the entire import atomically. Legacy version 1 saved
+palettes and imports remain supported, and loading never rewrites storage.
+Adding an appearance override upgrades the draft to version 2 while retaining
+its existing colors. Resetting a field removes its override; saving an empty
+palette removes the storage key.
+
+```json
+{"version":2,"colors":{"live-active":"#1666c7"},"appearance":{"live-active":{"borderColor":"#103c72","borderWidth":3,"fillStrength":25,"glowStrength":75}}}
+```
+
+Only the six `live-*` status names are supported in `appearance`; PR/check
+settings remain color-only. Storage errors are reported; the preview remains exportable.
 
 Preferences apply to updated standalone, Workbench, Forge and native viewers
 on the same origin in this browser, including open tabs and sibling native

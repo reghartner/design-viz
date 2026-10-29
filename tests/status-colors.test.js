@@ -24,3 +24,24 @@ test('all viewer assemblies and dedicated editor use the palette owner once',()=
  for(const name of ['standalone','workbench','native','forge','status-colors'])assert.equal(entrypoint(name).body.split('var FlowStatusColors=').length,2,name);
  assert.match(entrypoint('status-colors').source,/Palette imported as a preview/);
 });
+
+test('version 2 appearance validates bounds, normalizes colors and rejects whole invalid palettes',()=>{
+ const c=setup();
+ const appearance={'live-active':{borderColor:'#ABCDEF',borderWidth:0,fillStrength:100,glowStrength:200}};
+ assert.deepEqual(JSON.parse(JSON.stringify(c.validate({version:2,colors:{},appearance}))),{version:2,colors:{},appearance:{'live-active':{borderColor:'#abcdef',borderWidth:0,fillStrength:100,glowStrength:200}}});
+ for(const values of [{borderColor:'red'},{borderWidth:-1},{borderWidth:8.1},{borderWidth:'2'},{fillStrength:101},{fillStrength:NaN},{glowStrength:201},{glowStrength:Infinity},{radius:4},JSON.parse('{"__proto__":1}')])assert.throws(()=>c.validate({version:2,colors:{'live-active':'#123456'},appearance:{'live-active':values}}));
+ for(const appearance of [null,[],{'pr-open':{borderWidth:2}},{'comm-break':{borderColor:'#000000'}},JSON.parse('{"__proto__":{}}')])assert.throws(()=>c.validate({version:2,colors:{},appearance}));
+ assert.throws(()=>c.validate({version:1,colors:{},appearance:{}}));
+});
+test('appearance-only saves, legacy reads and resetting remove every scoped override',()=>{
+ const c=setup(),saved=new Map(),styles=new Map(),events=[];
+ const win={localStorage:{getItem:k=>saved.get(k)??null,setItem:(k,v)=>saved.set(k,v),removeItem:k=>saved.delete(k)},CustomEvent:class{constructor(type){this.type=type;}},dispatchEvent:e=>events.push(e)};
+ const legacy='{"version":1,"colors":{"live-active":"#ABCDEF"}}';saved.set(c.key,legacy);
+ assert.equal(c.read(win).colors['live-active'],'#abcdef');assert.equal(saved.get(c.key),legacy,'load never rewrites saved JSON');
+ const v2={version:2,colors:{},appearance:{'live-active':{borderColor:'#123456',borderWidth:4.5,fillStrength:80,glowStrength:0}}};
+ c.save(win,v2);assert.equal(JSON.parse(saved.get(c.key)).version,2);
+ const view={style:{setProperty:(k,v)=>styles.set(k,v),removeProperty:k=>styles.delete(k)}};c.apply(view,c.read(win));
+ assert.deepEqual(Object.fromEntries(styles),{'--dv-live-active-border-color':'#123456','--dv-live-active-border-width':'4.5px','--dv-live-active-fill-strength':'80%','--dv-live-active-glow-strength':'0'});
+ c.apply(view,{version:1,colors:{}});assert.equal(styles.size,0);
+ c.save(win,{version:2,colors:{},appearance:{'live-active':{}}});assert.equal(saved.size,0);
+});

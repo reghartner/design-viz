@@ -85,3 +85,50 @@ test('native sibling palettes isolate host styles, refresh ink and retire listen
  await page.evaluate(()=>{window.viewers[1].destroy();window.paletteHeld.forEach(fn=>fn(new CustomEvent('flowview-status-colors-change')));});expect(await page.evaluate(()=>window.paletteListeners.size)).toBe(0);
  await expect(page.locator('#one .docview,#two .docview')).toHaveCount(0);
 });
+
+
+test('status appearance preserves legacy saves and controls every local and imported status',async({page,context,server},testInfo)=>{
+ await page.setViewportSize({width:1700,height:1200});await page.goto(server.origin+'/status-colors.html');
+ const legacy='{"version":1,"colors":{"live-active":"#9933cc"}}';
+ await page.evaluate(value=>localStorage.setItem('flowview.status-colors.v1',value),legacy);await page.reload();
+ expect(await page.evaluate(()=>localStorage.getItem('flowview.status-colors.v1'))).toBe(legacy);
+ await page.getByText('Active border, fill & glow',{exact:true}).click();
+ await expect(page.getByRole('textbox',{name:'Active border color',exact:true})).toHaveValue('#9933cc');
+ await page.getByRole('textbox',{name:'Active border color',exact:true}).fill('#123456');
+ await page.getByRole('slider',{name:'Active border width (px) slider',exact:true}).focus();await page.keyboard.press('Home');await page.keyboard.press('ArrowRight');await expect(page.getByRole('spinbutton',{name:'Active border width (px)',exact:true})).toHaveValue('0.5');
+ await page.getByRole('spinbutton',{name:'Active border width (px)',exact:true}).fill('5');
+ await page.getByRole('spinbutton',{name:'Active fill tint (%)',exact:true}).fill('100');
+ await page.getByRole('spinbutton',{name:'Active glow strength (%)',exact:true}).fill('0');
+ const view=page.locator('#palette-view');
+ for(const id of ['active','shared::imported']){const node=view.locator('[data-dv-node="'+id+'"]');await expect(node.locator('.card')).toHaveCSS('stroke','rgb(18, 52, 86)');await expect(node.locator('.card')).toHaveCSS('stroke-width','5px');await expect(node.locator('.dv-live-halo')).toHaveCSS('opacity','0');}
+ for(const pill of await view.locator('.dv-live-state-pill[data-live-appearance=active]').all()){
+  await expect(pill).toHaveCSS('border-top-width','5px');expect(await pill.evaluate(el=>getComputedStyle(el,'::before').opacity)).toBe('0');await expect(pill).toHaveCSS('box-shadow','none');
+ }
+ await page.getByRole('button',{name:'Save defaults',exact:true}).click();
+ let saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('flowview.status-colors.v1')));
+ expect(saved).toEqual({version:2,colors:{'live-active':'#9933cc'},appearance:{'live-active':{borderColor:'#123456',borderWidth:5,fillStrength:100,glowStrength:0}}});
+ const reader=await context.newPage();await reader.goto(server.origin+'/standalone.html');await expect(reader.locator('#docview')).toHaveCSS('--dv-live-active-border-width','5px');
+ await page.getByRole('button',{name:'Reset Active border color',exact:true}).click();await expect(view.locator('[data-dv-node=active] .card')).toHaveCSS('stroke','rgb(153, 51, 204)');
+ await page.getByRole('button',{name:'Save defaults',exact:true}).click();expect(await reader.locator('#docview').evaluate(el=>el.style.getPropertyValue('--dv-live-active-border-color'))).toBe('');
+ await page.getByText('Import / export colors',{exact:true}).click();
+ const states=['todo','active','done','blocked','missing','unchanged'];
+ const palette={version:2,colors:Object.fromEntries(states.map(state=>['live-'+state,'#000000'])),appearance:Object.fromEntries(states.map(state=>['live-'+state,{borderColor:'#008888',borderWidth:4,fillStrength:100,glowStrength:0}]))};
+ await page.getByLabel('Palette JSON').fill(JSON.stringify(palette));await page.getByRole('button',{name:'Import JSON',exact:true}).click();
+ for(const skin of ['pastel','aurora']){
+  await page.getByLabel('Preview skin').selectOption(skin);
+  for(const state of states)for(const id of [state,'shared::'+(state==='active'?'imported':state)]){
+   const node=view.locator('[data-dv-node="'+id+'"]');await expect(node).toHaveAttribute('data-live-appearance',state);await expect(node.locator('.card')).toHaveCSS('stroke','rgb(0, 136, 136)');await expect(node.locator('.card')).toHaveCSS('stroke-width','4px');await expect(node.locator('.t1')).toHaveCSS('fill','rgb(255, 255, 255)');
+   expect(await node.locator('.card').evaluate(el=>getComputedStyle(el).fill)).toMatch(/(?:color\(srgb 0 0 0\)|rgb\(0, 0, 0\))/);
+  }
+  for(const icon of await view.locator('.comm-break').all())await expect(icon).toHaveCSS('stroke','rgb(180, 35, 56)');
+ }
+ await page.emulateMedia({media:'print'});await expect(view.locator('[data-dv-node=active] .t1')).toHaveCSS('fill','rgb(255, 255, 255)');await expect(view.locator('[data-dv-node=active] .dv-live-halo')).toHaveCSS('animation-name','none');await page.emulateMedia({media:'screen'});
+ await page.getByRole('spinbutton',{name:'Active fill tint (%)',exact:true}).fill('0');await page.getByLabel('Preview skin').selectOption('pastel');await expect(view.locator('[data-dv-node=active] .t1')).toHaveCSS('fill','rgb(0, 0, 0)');
+ await page.getByLabel('Preview skin').selectOption('aurora');await expect(view.locator('[data-dv-node=active] .t1')).toHaveCSS('fill','rgb(255, 255, 255)');
+ await page.getByLabel('Palette JSON').fill(JSON.stringify({version:2,colors:{'live-active':'#ffffff'},appearance:{'live-active':{fillStrength:101}}}));await page.getByRole('button',{name:'Import JSON',exact:true}).click();await expect(page.locator('#palette-message')).toContainText('Import rejected');await expect(page.getByRole('textbox',{name:'Active hex',exact:true})).toHaveValue('#000000');
+ await page.getByRole('spinbutton',{name:'Active border width (px)',exact:true}).fill('9');await page.getByRole('button',{name:'Save defaults',exact:true}).click();await expect(page.locator('#palette-message')).toContainText('highlighted');
+ await page.getByRole('spinbutton',{name:'Active border width (px)',exact:true}).fill('4');
+ const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export JSON',exact:true}).click();const exported=await download,stream=await exported.createReadStream();let content='';for await(const chunk of stream)content+=chunk;expect(JSON.parse(content).appearance['live-active'].fillStrength).toBe(0);
+ await page.getByRole('button',{name:'Reset all',exact:true}).click();await page.getByRole('button',{name:'Save defaults',exact:true}).click();expect(await page.evaluate(()=>localStorage.getItem('flowview.status-colors.v1'))).toBeNull();await expect(reader.locator('#docview')).toHaveCSS('--dv-live-active','#1666c7');expect(await reader.locator('#docview').evaluate(el=>el.style.getPropertyValue('--dv-live-active-border-width'))).toBe('');
+ await page.getByLabel('Preview skin').selectOption('pastel');await page.getByRole('spinbutton',{name:'Active glow strength (%)',exact:true}).fill('150');await page.getByRole('spinbutton',{name:'Active fill tint (%)',exact:true}).fill('25');await page.locator('.palette-controls').evaluate(el=>el.scrollTop=0);await page.screenshot({path:testInfo.outputPath('status-appearance-desktop.png'),fullPage:true});
+});

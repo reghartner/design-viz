@@ -86,13 +86,15 @@ function liveStatusClass(el,state){
     else if(el.classList.contains(name))el.classList.remove(name);
   });
   if(state){el.setAttribute('data-live-appearance',state);liveStatusInk(el,state);}
-  else {el.removeAttribute('data-live-appearance');el.style.removeProperty('--dv-live-ink');}
+  else {el.removeAttribute('data-live-appearance');el.style.removeProperty('--dv-live-ink');el.style.removeProperty('--dv-live-print-ink');}
 }
-/* Choose ink against the actual host surface plus the 15% status tint.
+/* Choose ink against the actual host surface plus the configured status tint.
    Walk transparent ancestors; use the board ground for SVG carriers. */
 function liveStatusInk(el,state){
   var doc=el.ownerDocument,win=doc && doc.defaultView;if(!win || !win.getComputedStyle)return;
-  var tint=state && rgba(win.getComputedStyle(el).getPropertyValue('--dv-live-'+state)),amount=tint ? .15 : 0;tint=tint || [0,0,0];
+  var computed=win.getComputedStyle(el),tint=state && rgba(computed.getPropertyValue('--dv-live-'+state)),strength=parseFloat(computed.getPropertyValue('--dv-live-fill')),amount=tint ? (Number.isFinite(strength)?strength/100:.15) : 0;tint=tint || [0,0,0];
+  // Edge labels have no tinted backing; their ink must follow the ground alone.
+  if(el.classList.contains('lbl'))amount=0;
   function rgba(raw){
     var match=/^#([0-9a-f]{6})$/i.exec(raw.trim());if(match)return [parseInt(match[1].slice(0,2),16),parseInt(match[1].slice(2,4),16),parseInt(match[1].slice(4,6),16),1];
     match=/rgba?\(([^)]+)\)/.exec(raw);if(match){var c=match[1].split(/[, /]+/).map(Number);return [c[0],c[1],c[2],c.length>3?c[3]:1];}
@@ -106,8 +108,11 @@ function liveStatusInk(el,state){
     if(color[3]>0)layers.push(color);if(color[3]===1)break;
   }
   var rgb=[255,255,255];layers.reverse().forEach(function(layer){rgb=rgb.map(function(v,i){return v*(1-layer[3])+layer[i]*layer[3];});});
-  var lum=rgb.map(function(v,i){var n=(v*(1-amount)+tint[i]*amount)/255;return n<=.04045?n/12.92:Math.pow((n+.055)/1.055,2.4);});
-  var light=lum[0]*.2126+lum[1]*.7152+lum[2]*.0722;el.style.setProperty('--dv-live-ink',light>.179?'#000000':'#ffffff');
+  function ink(rgb){var lum=rgb.map(function(v,i){var n=(v*(1-amount)+tint[i]*amount)/255;return n<=.04045?n/12.92:Math.pow((n+.055)/1.055,2.4);});
+  var light=lum[0]*.2126+lum[1]*.7152+lum[2]*.0722;return light>.179?'#000000':'#ffffff';}
+  el.style.setProperty('--dv-live-ink',ink(rgb));
+  // Print uses white board grounds; retain contrast even with a fully opaque tint.
+  el.style.setProperty('--dv-live-print-ink',ink([255,255,255]));
 }
 /* Preserve authored Node Styles while live classes supply shared appearance.
    Presets also support the unknown-evidence construction fallback. */

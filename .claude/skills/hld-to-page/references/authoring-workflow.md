@@ -122,7 +122,7 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     crossings, labels and group titles can need scoped manual refinements.
     This is the initial layout and default, not visual proof. Preserve unrelated
     existing geometry. For ordinary existing edits, preserve layout and routes;
-    add nodes only as `{id:"<new-node-id>",side:"below",noSpread:true}` floats.
+    add local nodes as `{id:"<new-node-id>",side:"below",noSpread:true}` floats. All nodes auto-place before preview; acceptance saves placement. No handwork/caveat. Selected: `tools/place-nodes.cjs`.
     User feedback that the rendered candidate clips content or is hard to read
     authorizes scoped candidate layout repair, including tile sizing, without
     another permission question or handing arrangement back to the user. Keep

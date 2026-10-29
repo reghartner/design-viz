@@ -1827,7 +1827,7 @@ test('folder proposal loads a new pinned topology provider without a connect ste
     await page.locator('#welcome-agent').click();await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
     await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);await page.context().grantPermissions(['clipboard-read','clipboard-write']);
     await askAgent(page,h,'Import the submitted provider.');const request=await h.read('request.json'),candidate=request.candidate;
-    const raw=JSON.parse(source);raw.page.blocks[0].diagram.topologyImports=[{spec:'submitted',export:'public',as:'shared'}];const edited=JSON.stringify(raw,null,2);
+    const raw=JSON.parse(source);raw.page.blocks[0].diagram.topologyImports=[{spec:'submitted',export:'public',as:'shared',nodePositions:{api:{x:0,y:0}}}];raw.page.blocks[0].diagram.edges.push({from:'a',to:'shared::api'});const edited=JSON.stringify(raw,null,2);
     await writeFile(path.join(h.session,candidate.spec),edited);await writeFile(path.join(h.session,candidate.ledger),afterLedger);
     h.run('propose','--request',request.id,'--revision',candidate.baseRevision,'--file',candidate.spec,'--ledger',candidate.ledger,'--summary','Import approved provider');
     // The banner first announces the proposal and only later reports a blocked
@@ -1839,17 +1839,24 @@ test('folder proposal loads a new pinned topology provider without a connect ste
     await expect(page.locator('#agent-update-feedback')).toBeHidden();
     expect(await page.locator('#agent-update-feedback').inputValue()).not.toMatch(/Connect repository catalog|Referenced topology/);
     expect(hits).toEqual(['submitted']);
+    await page.locator('#agent-update-details').click();const accepted=await page.locator('#agent-update-source').inputValue(),placed=JSON.parse(accepted).page.blocks[0].diagram.topologyImports[0];
+    expect(accepted).not.toBe(edited);expect(placed.nodePositions.api).toBeDefined();
+    const geometry=await page.locator('#agent-update-view g.node').evaluateAll(nodes=>Object.fromEntries(nodes.map(n=>{const m=n.transform.baseVal.consolidate().matrix,c=n.querySelector('.card');return [n.getAttribute('data-dv-node'),{x:m.e+Number(c.getAttribute('width'))/2,y:m.f+Number(c.getAttribute('height'))/2,w:Number(c.getAttribute('width')),h:Number(c.getAttribute('height'))}];})));
+    const imported=geometry['shared::api'];expect({x:imported.x,y:imported.y}).toEqual({x:placed.position.x+placed.nodePositions.api.x,y:placed.position.y+placed.nodePositions.api.y});
+    expect(Math.hypot(imported.x-geometry.a.x,imported.y-geometry.a.y)).toBeLessThan(600);
+    for(const id of ['a','b','c']){const p=geometry[id];expect(Math.abs(imported.x-p.x)>=(imported.w+p.w)/2+24 || Math.abs(imported.y-p.y)>=(imported.h+p.h)/2+24).toBe(true);}
+    await page.locator('#agent-update-details-close').click();
     // Nothing is persisted during review: the draft never pinned a context, so none is stored yet.
     const staged=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
     expect((staged.topologyContext?.specs || []).map(spec=>spec.page.canon.id)).not.toContain('submitted');
     await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');
     const committed=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
     expect(committed.topologyContext.ephemeral).toBe(true);expect(committed.topologyContext.specs.map(spec=>spec.page.canon.id)).toContain('submitted');
-    await expect(page.locator('#src')).toHaveValue(edited);expect(edited).not.toContain('shared::api');expect(edited).not.toContain('topologyProvenance');
-    await expect.poll(()=>readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(edited);await expect.poll(()=>readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(afterLedger);
+    await expect(page.locator('#src')).toHaveValue(accepted);expect(JSON.parse(accepted).page.blocks[0].diagram.nodes['shared::api']).toBeUndefined();expect(accepted).not.toContain('topologyProvenance');
+    await expect.poll(()=>readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(accepted);await expect.poll(()=>readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(afterLedger);
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
     await expect.poll(()=>readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(beforeLedger);await expect(page.locator('#undo-builder')).toBeDisabled();
-    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);await expect.poll(()=>readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(afterLedger);
+    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(accepted);await expect.poll(()=>readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(afterLedger);
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
@@ -2088,4 +2095,30 @@ test('agent change navigation restores legacy Views after reorder and reveals an
     await page.screenshot({path:info.outputPath('change-navigation-legacy-camera-1440x900.png')});
     await expect(page.locator('#src')).toHaveValue(original);await page.locator('#agent-update-discard').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('rejected');expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
+});
+
+test('new agent nodes are placed before paired preview and exact accepted geometry persists with one Undo',async({page},info)=>{
+ const h=await setup(page);
+ try{
+  const initial={page:{title:'Automatic additions',blocks:[{heading:'Existing',diagram:{nodes:{a:{title:'Client'},b:{title:'Service'},origin:{title:'Authored origin'}},rows:[['a','b']],floats:[{id:'origin',side:'below',x:0,y:0,noSpread:true}],edges:[{from:'a',to:'b',bend:28}],steps:[{edge:'a->b',text:'Request'}]}}]}};
+  const original=JSON.stringify(initial);await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);await page.locator('#welcome-paste-form button[type=submit]').click();await connectExternal(page);
+  const request=await askAgent(page,h,'Add a cache and worker connected to the service.'),candidate=structuredClone(initial),d=candidate.page.blocks[0].diagram;
+  d.nodes.cache={title:'New cache'};d.nodes.worker={title:'New worker'};d.nodes.explicit={title:'Explicit location'};
+  d.floats.push({id:'worker',side:'below',x:0,y:0},{id:'explicit',side:'below',x:700,y:400,noSpread:true});d.edges.push({from:'b',to:'cache'},{from:'cache',to:'worker'});
+  candidate.page.blocks.unshift({heading:'New section',diagram:{nodes:{origin:{title:'New origin placeholder'},anchor:{title:'Explicit anchor'}},rows:[[]],floats:[{id:'origin',side:'below',x:0,y:0},{id:'anchor',side:'below',x:400,y:400,noSpread:true}],edges:[{from:'anchor',to:'origin'}]}});
+  await writeFile(path.join(h.session,request.candidate.spec),JSON.stringify(candidate));await writeFile(path.join(h.session,request.candidate.ledger),'# Coverage\n\nAdded cache and worker.\n');
+  h.run('propose','--request',request.id,'--revision',request.candidate.baseRevision,'--file',request.candidate.spec,'--ledger',request.candidate.ledger,'--summary','Add cache and worker');
+  await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-commit')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(original);
+  await page.locator('#agent-update-details').click();const preview=await page.locator('#agent-update-source').inputValue(),pd=JSON.parse(preview).page.blocks[1].diagram,newDiagram=JSON.parse(preview).page.blocks[0].diagram;
+  const newOrigin=newDiagram.floats.find(f=>f.id==='origin');expect(newOrigin.noSpread).toBe(true);expect(newOrigin.x!==0 || newOrigin.y!==0).toBe(true);
+  expect(newDiagram.floats.find(f=>f.id==='anchor')).toEqual(candidate.page.blocks[0].diagram.floats[1]);
+  for(const id of ['cache','worker']){const f=pd.floats.find(f=>f.id===id);expect(f.noSpread).toBe(true);expect(Number.isFinite(f.x) && Number.isFinite(f.y)).toBe(true);expect(f.x!==0 || f.y!==0).toBe(true);}
+  expect(pd.floats.find(f=>f.id==='origin')).toEqual(d.floats.find(f=>f.id==='origin'));expect(pd.floats.find(f=>f.id==='explicit')).toEqual(d.floats.find(f=>f.id==='explicit'));expect(pd.edges).toEqual(d.edges);
+  const centers=await page.locator('#agent-update-view').locator('g.node').evaluateAll(nodes=>Object.fromEntries(nodes.map(n=>{const m=n.transform.baseVal.consolidate().matrix,c=n.querySelector('.card');return [n.getAttribute('data-dv-node'),{x:m.e+Number(c.getAttribute('width'))/2,y:m.f+Number(c.getAttribute('height'))/2}];})));
+  for(const id of ['cache','worker']){const f=pd.floats.find(f=>f.id===id);expect(centers[id]).toEqual({x:f.x,y:f.y});}
+  await page.locator('#agent-update-details-close').click();await info.attach('automatic-placement-paired-preview',{body:await page.screenshot(),contentType:'image/png'});
+  await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');await expect(page.locator('#src')).toHaveValue(preview);
+  expect(await readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(preview);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(preview);expect(h.errors).toEqual([]);
+ }finally{await page.close();await h.cleanup();}
 });

@@ -31,6 +31,11 @@ function createWorkbenchAgentExchange(opts){
         outcome.ledger=incoming===before?local:incoming;
       }
       function validated(context){
+        if(outcome.ok && opts.normalize){
+          try{outcome.source=opts.normalize(current.source,outcome.source,context);}
+          catch(ex){return blocked('Could not place new nodes: '+ex.message);}
+          if(new TextEncoder().encode(outcome.source).length>4*1024*1024)return blocked('The combined story exceeds the 4 MiB size limit.');
+        }
         if(outcome.ok && opts.validate){
           try{var error=opts.prepare?opts.validate(outcome.source,context):opts.validate(outcome.source);if(error)return blocked('The combined story failed validation: '+error);}
           catch(ex){return blocked('The combined story failed validation: '+ex.message);}
@@ -71,15 +76,19 @@ function createWorkbenchAgentExchange(opts){
           current=snapshot();
           if(!current.open || current.revision!==revision)return result('rejected','Your document changed while preparing the proposal. Reread state.json and revise it.');
           if(error)return result('rejected','Could not prepare proposal: '+error.message);
-          try{var validation=opts.validate && opts.validate(source,nextContext);if(validation)return result('rejected','Proposal failed validation: '+validation);}
+          try{if(opts.normalize)source=opts.normalize(current.source,source,nextContext);var validation=opts.validate && opts.validate(source,nextContext);if(validation)return result('rejected','Proposal failed validation: '+validation);}
           catch(ex){return result('rejected','Proposal failed validation: '+ex.message);}
           // Recheck focus/gestures and all normal acceptance rules after I/O.
-          return receive(reply,sent,nextContext);
+          return receive(Object.assign({},reply,{proposal:Object.assign({},proposal,{source:source})}),sent,nextContext);
         }
         return Promise.resolve().then(function(){if(guard())return opts.prepare(source);}).then(function(value){return prepared(value);},function(error){return prepared(null,error);});
       }
       var outcome;
-      try{outcome=opts.apply(source,current,proposal,context);}
+      try{
+        if(opts.normalize)source=opts.normalize(current.source,source,context);
+        if(opts.normalize && new TextEncoder().encode(source).length>4*1024*1024)return result('rejected','The story exceeds the 4 MiB size limit.');
+        outcome=opts.apply(source,current,proposal,context);
+      }
       catch(ex){return result('rejected','Could not apply proposal: '+ex.message);}
       if(!outcome || !outcome.ok)return result('rejected',outcome && outcome.error || 'Document changed before the proposal could apply.');
       current=snapshot();
@@ -107,7 +116,7 @@ function initWorkbenchAgentSession(opts){
   doc.getElementById('editor-company').appendChild(details);
   var bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
   var clientId=Array.from(bytes,function(byte){return byte.toString(16).padStart(2,'0');}).join('');
-  var exchange=createWorkbenchAgentExchange({clientId:clientId,snapshot:opts.snapshot,busy:function(){return pointerHeld || opts.busy();},apply:opts.apply,prepare:opts.prepare,validate:opts.validate});
+  var exchange=createWorkbenchAgentExchange({clientId:clientId,snapshot:opts.snapshot,busy:function(){return pointerHeld || opts.busy();},apply:opts.apply,prepare:opts.prepare,normalize:opts.normalize,validate:opts.validate});
   function label(message){status.textContent=message;button.title=message;}
   function send(payload,signal){
     return fetch('/__flowview_agent/sync',{method:'POST',headers:{'Content-Type':'application/json','X-Flowview-Session':config.token},

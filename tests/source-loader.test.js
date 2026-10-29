@@ -74,3 +74,13 @@ test('asset inventory keeps page CSS raw, ordered panel CSS and the explicit all
   assert.equal((loader.fontCss('all').match(/@font-face/g)||[]).length,24);
   assert.throws(()=>loader.fontAssets('unknown'),/Unknown font profile/);
 });
+
+test('placement entrypoint is deterministic, DOM-free, and exposes the shared selected-node and proposal planners',()=>{
+  const source=loader.moduleSource('placement','cjs');assert.equal(loader.moduleSource('placement','cjs'),source);
+  const context={module:{exports:{}}};for(const name of ['document','window','require','process'])Object.defineProperty(context,name,{get(){throw Error(name+' accessed');}});
+  vm.runInNewContext(source,context);const planner=context.module.exports;
+  assert.deepEqual(Object.keys(planner).sort(),['normalizeAgentPlacement','planPlaceOptimally']);
+  const raw={nodes:{a:{},b:{}},rows:[['a']],floats:[{id:'b',side:'below',x:0,y:0}],edges:[{from:'a',to:'b'}]},text=JSON.stringify(raw);
+  const result=planner.planPlaceOptimally(text,raw,[{kind:'node',section:0,id:'b'}]);assert.ok(result.text,result.error);assert.equal(JSON.stringify(raw),text);
+  assert.equal(loader.entrypoint('placement').records.some(record=>record.file==='engine.js' || record.file==='builder.workbench.js'),false);
+});

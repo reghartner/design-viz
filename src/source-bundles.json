@@ -270,6 +270,20 @@
       "exports": {
         "FlowviewCompatibility": "FlowviewCompatibility"
       }
+    },
+    "placement": {
+      "sources": [
+        "canon.js",
+        "validator.js",
+        "workbench/source-edit.js",
+        "workbench/targets.js",
+        "workbench/commands/common.js",
+        "workbench/commands/layout.js"
+      ],
+      "exports": {
+        "planPlaceOptimally": "planPlaceOptimally",
+        "normalizeAgentPlacement": "normalizeWorkbenchAgentPlacement"
+      }
     }
   },
   "assets": {

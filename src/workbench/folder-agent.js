@@ -566,7 +566,7 @@ function createFolderAgentClient(opts){
       if(files.artifacts){manifest.artifacts=files.artifacts;manifest.pairedArtifacts=true;manifest.claimAt=now();}
       pilotStatus=null;project=snap.project;connected=true;epoch++;turnEpoch++;clearReview();pendingReviewResult=null;pendingAcceptance=null;pendingRefreshResult=null;refreshSeen.clear();lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
       activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;preflight=null;
-      exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,prepare:opts.prepare,requireLedger:opts.requireLedger});
+      exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,prepare:opts.prepare,normalize:opts.normalize,requireLedger:opts.requireLedger});
       var recoveryState='state-'+manifest.connectionId+'.json';
       manifest.recoveryState=recoveryState;
       try{

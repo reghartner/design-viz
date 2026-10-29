@@ -365,10 +365,14 @@ for graph-only work. Both CLIs require distinct input/output files; use repeated
 `--section` or `--all` deliberately on pages with multiple diagrams. Read
 `docs/auto-arrange.md` for limitations and render-review guidance.
 
-For an existing diagram, append a raw float
+For a local addition, append a raw float
 `{id:"<new-node-id>",side:"below",noSpread:true}` plus its semantic edges.
-`noSpread` keeps this unpositioned insertion outside existing automatic float
-spacing and lane routing, so established node positions and routes stay stable.
+Add imported nodes through `topologyImports`, without copying provider nodes.
+Workbench places new local/imported nodes near their connections before paired
+preview, then saves those same coordinates on acceptance. Existing centers and
+routes stay stable. No second command or placement caveat is needed. To
+intentionally place selected existing nodes, use
+`node tools/place-nodes.cjs --section 0 --node ID input.json output.json`.
 Do not add X/Y, ports or route fields unless the user requests placement or a
 rearrangement.
 

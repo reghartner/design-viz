@@ -1,5 +1,5 @@
 /* Pure reference insertion. Validate the complete candidate against an approved
-   authored snapshot; only the consumer import array is edited. */
+   authored snapshot; placement edits stay in the consumer. */
 function topologyNamespace(diagram,stem){
   stem=String(stem || 'child').replace(/[^a-zA-Z0-9_.-]/g,'-').replace(/^[^a-zA-Z0-9]+/,'') || 'child';
   function taken(name){return (diagram.topologyImports || []).some(function(imp){return imp.as===name;}) ||
@@ -17,6 +17,7 @@ function planAddTopologyImport(text,raw,section,reference,context){
   var plan=planSetField(text,raw,got.path,'topologyImports',JSON.stringify(imports,null,2));
   if(plan.error)return plan;
   try{
+    plan.text=normalizeWorkbenchAgentPlacement(text,plan.text,context);
     var resolved=FlowTopology.resolveSource(JSON.parse(plan.text),context);
     var diagram=specValueAt(resolved,specSectionPaths(resolved)[section].diagram);
     var provenance=diagram.topologyProvenance.imports.find(function(imp){return imp.as===reference.as;});

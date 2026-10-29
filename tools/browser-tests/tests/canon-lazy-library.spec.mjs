@@ -1,3 +1,4 @@
+import {nodeGeometry,expectImportPlacement} from '../helpers/node-placement.mjs';
 import {projectSource,useProjectDownloads} from '../helpers/project-export.mjs';
 import {chooseNavigation} from '../helpers/test.mjs';
 import {test,expect,prepareEditorSurface,inspectPageElement} from '../helpers/test.mjs';
@@ -90,8 +91,10 @@ test('reference picker browses bounded exports, inserts a closed subset, and pre
   await testInfo.attach('reference-picker',{body:await page.locator('#topology-picker').screenshot(),contentType:'image/png'});
   await page.locator('#topology-add').click();await prepareEditorSurface(page);
   const after=await page.locator('#src').inputValue(),raw=JSON.parse(after),d=raw.page.blocks[0].diagram;
-  expect(d.topologyImports).toEqual([{spec:'first',export:'channels',as:'notify',nodes:['dispatch','push','sms'],edges:['dispatch->push','dispatch->sms']}]);
-  expect(d.nodes['notify::push']).toBeUndefined();expect(d.topologyProvenance).toBeUndefined();expect(d.topologyImports[0].position).toBeUndefined();
+  expect(d.topologyImports[0]).toMatchObject({spec:'first',export:'channels',as:'notify',nodes:['dispatch','push','sms'],edges:['dispatch->push','dispatch->sms']});expect(Object.keys(d.topologyImports[0].nodePositions).sort()).toEqual(['dispatch','push','sms']);
+  expect(d.nodes['notify::push']).toBeUndefined();expect(d.topologyProvenance).toBeUndefined();expect(Number.isFinite(d.topologyImports[0].position.x)).toBe(true);
+  const centers=await page.locator('#docview g.node[data-dv-node="a"]').evaluate(n=>Object.fromEntries(Array.from(n.closest('svg').querySelectorAll('g.node')).map(node=>{const m=node.transform.baseVal.consolidate().matrix,c=node.querySelector('.card');return [node.getAttribute('data-dv-node'),{x:m.e+Number(c.getAttribute('width'))/2,y:m.f+Number(c.getAttribute('height'))/2,w:Number(c.getAttribute('width')),h:Number(c.getAttribute('height'))}];})));
+  for(const id of ['dispatch','push','sms'])for(const [other,q] of Object.entries(centers)){if(other==='notify::'+id)continue;const p=centers['notify::'+id];expect(Math.abs(p.x-q.x)>=(p.w+q.w)/2+24 || Math.abs(p.y-q.y)>=(p.h+q.h)/2+24).toBe(true);}
   await expect(page.locator('#docview [data-dv-node="notify::push"]')).toBeVisible();await expect(page.locator('#docview [data-dv-node="notify::email"]')).toHaveCount(0);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(fixture.before);await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
@@ -136,6 +139,9 @@ test('a referenced block is visibly framed, blocked removal explains consumer re
 
 for(const canvas of [false,true])test('reference actions navigate, explain blocked deletion, and undo in '+(canvas?'Canvas':'Standard'),async({page,server},info)=>{
   await page.setViewportSize({width:canvas?1280:1440,height:1000});const fixture=await pickerFixture(page,server);
+  // Establish the desktop camera before insertion; Canon handoff can retain a
+  // tiny initial camera on this platform, even without any imported nodes.
+  if(!canvas)await page.locator('#docview .doc-sec').first().getByRole('button',{name:'Fit diagram',exact:true}).click();
   if(canvas){
     const raw=JSON.parse(await page.locator('#src').inputValue());raw.page.blocks[0].diagram.layouts=[{...editorSpec().page.blocks[0].diagram.layouts[0],id:'canvas',name:'Canvas',presentation:'explore'}];raw.page.blocks[0].diagram.defaultLayout='canvas';
     await page.locator('#editor-tab-json').click();await page.locator('#src').fill(JSON.stringify(raw,null,2));await page.locator('#go').click();await prepareEditorSurface(page);
@@ -143,6 +149,7 @@ for(const canvas of [false,true])test('reference actions navigate, explain block
   await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();await page.locator('#topology-add').click();await prepareEditorSurface(page);
   const handle=page.getByRole('button',{name:'Reference actions for first',exact:true}),menu=page.getByRole('menu',{name:'Reference actions for first',exact:true});
   const member=page.locator('#docview g.node[data-dv-node="first::dispatch"]');
+  for(const node of [page.locator('#docview g.node[data-dv-node="a"]'),member])expect((await node.boundingBox()).width).toBeGreaterThan(20);
   await expect(handle).toBeVisible();await handle.click({button:'right'});await expect(menu).toBeVisible();
   await expect(menu.getByRole('menuitem',{name:'Go to diagram',exact:true})).toBeFocused();
   await info.attach('reference-menu-'+(canvas?'canvas':'standard'),{body:await page.screenshot(),contentType:'image/png'});
@@ -194,10 +201,13 @@ test('reference actions choose the deepest provider and refuse unverified deploy
 });
 
 test('Add to step gives imported nodes and edges the same emphasis as local members',async({page,server},info)=>{
-  await page.setViewportSize({width:1440,height:1000});await pickerFixture(page,server);await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();await page.locator('#topology-add').click();await prepareEditorSurface(page);
+  await page.setViewportSize({width:1440,height:1000});await pickerFixture(page,server);
+  await page.locator('#docview .doc-sec').first().getByRole('button',{name:'Fit diagram',exact:true}).click();
+  await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();await page.locator('#topology-add').click();await prepareEditorSurface(page);
   await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#editor-tab-inspect').click();
   await page.locator('#guide').getByRole('button',{name:'ADD TO STEP',exact:true}).click();await prepareEditorSurface(page);
   const localNode=page.locator('#docview g.node[data-dv-node="c"]'),importedNode=page.locator('#docview g.node[data-dv-node="first::dispatch"]');
+  for(const node of [localNode,importedNode])expect((await node.boundingBox()).width).toBeGreaterThan(20);
   await localNode.locator('.t1').click();await importedNode.locator('.t1').click();
   const localEdge=page.locator('#docview path.edge[data-dv-edge="0"]'),importedEdge=page.locator('#docview path.edge[data-dv-edge="1"]');
   await importedEdge.dispatchEvent('click');
@@ -240,7 +250,7 @@ test('a brand-new local diagram on a deployed site browses providers automatical
   await page.locator('#topology-namespace').fill('notify');await page.locator('#topology-add').click();await prepareEditorSurface(page);
   const authored=JSON.parse(await page.locator('#src').inputValue()),d=authored.page.blocks[0].diagram;
   expect(authored.page.canon).toBeUndefined();expect(JSON.stringify(authored)).not.toContain('workbench-draft');
-  expect(d.topologyImports).toEqual([{spec:'first',export:'channels',as:'notify'}]);expect(d.nodes['notify::dispatch']).toBeUndefined();
+  expect(d.topologyImports).toHaveLength(1);await expectImportPlacement(page,d.topologyImports[0],{spec:'first',export:'channels',as:'notify'},['dispatch','push','email','sms']);expect(d.nodes).toEqual(before.page.blocks[0].diagram.nodes);
   await expect(page.locator('#docview [data-dv-node="notify::dispatch"]')).toBeVisible();
   const recovered=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
   expect(recovered.topologyContext.ephemeral).toBe(true);expect(recovered.topologyContext.id).toMatch(/^workbench-draft/);
@@ -377,15 +387,15 @@ for(const failure of ['revision','malformed'])test('reference picker fails close
 });
 
 test('reference picker targets another section, uses the full-export shorthand and suggests a collision-free namespace',async({page,server},info)=>{
-  await pickerFixture(page,server);await page.setViewportSize({width:760,height:1000});await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
+  await pickerFixture(page,server);await page.setViewportSize({width:1440,height:1000});await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
   await page.getByLabel('Import destination section',{exact:true}).selectOption('1');await page.locator('#topology-section').selectOption('1');
   await page.locator('#topology-add').click();await prepareEditorSurface(page);
   const raw=JSON.parse(await page.locator('#src').inputValue());expect(raw.page.blocks[0].diagram.topologyImports).toBeUndefined();
-  expect(raw.page.blocks[1].diagram.topologyImports).toEqual([{spec:'first',export:'archive',as:'first'}]);
+  expect(raw.page.blocks[1].diagram.topologyImports).toHaveLength(1);await expectImportPlacement(page,raw.page.blocks[1].diagram.topologyImports[0],{spec:'first',export:'archive',as:'first'},['archive']);expect(Object.keys(raw.page.blocks[1].diagram.nodes)).toEqual(['local']);
   await expect(page.locator('#docview [data-dv-node="first::archive"]')).toBeVisible();
   await openTopology(page);await expect(page.locator('#topology-namespace')).toHaveValue('first-2');
   await expect(page.locator('#topology-add')).toBeEnabled();
-  await info.attach('reference-picker-narrow',{body:await page.locator('#topology-picker').screenshot(),contentType:'image/png'});
+  await info.attach('reference-picker-desktop',{body:await page.locator('#topology-picker').screenshot(),contentType:'image/png'});
   await page.locator('#topology-cancel').click();
 });
 
@@ -1054,16 +1064,18 @@ test('Browse diagrams searches published content across tabs and panels with fac
 
 
 test('reference picker combines same-section exports with crossing connections and exact Undo',async({page,server},info)=>{
-  await pickerFixture(page,server,provider=>{
+  const fixture=await pickerFixture(page,server,provider=>{
     provider.page.sections[0].diagram.topologyExports={dispatch:{nodes:['dispatch'],edges:[]},channels:{nodes:['push','email','sms'],edges:[]}};
   });
-  const before=await page.locator('#src').inputValue();await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
+  const providerPath=path.join(fixture.root,'diagrams/first/first.spec.json'),providerBytes=await readFile(providerPath,'utf8');
+  const before=await page.locator('#src').inputValue(),beforeGeometry=await nodeGeometry(page,'a');await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
   await page.locator('#topology-export').selectOption(['dispatch','channels']);
   await expect(page.locator('#topology-nodes input')).toHaveCount(4);await expect(page.locator('#topology-edges input')).toHaveCount(3);
   await page.locator('#topology-namespace').fill('merged');await page.screenshot({path:info.outputPath('merged-export-picker.png')});
   await page.locator('#topology-add').click();
-  const after=await page.locator('#src').inputValue(),imp=JSON.parse(after).page.blocks[0].diagram.topologyImports[0];
-  expect(imp).toEqual({spec:'first',export:['dispatch','channels'],as:'merged'});
+  const after=await page.locator('#src').inputValue(),d=JSON.parse(after).page.blocks[0].diagram,imp=d.topologyImports[0];
+  expect(d.topologyImports).toHaveLength(1);await expectImportPlacement(page,imp,{spec:'first',export:['dispatch','channels'],as:'merged'},['dispatch','email','push','sms'],beforeGeometry);
+  expect(d.nodes).toEqual(JSON.parse(before).page.blocks[0].diagram.nodes);expect(d.edges).toEqual(JSON.parse(before).page.blocks[0].diagram.edges);expect(d.topologyProvenance).toBeUndefined();expect(await readFile(providerPath,'utf8')).toBe(providerBytes);
   await expect(page.locator('#docview g.node[data-dv-node="merged::dispatch"]')).toHaveCount(1);
   await expect(page.locator('#docview path.edge')).toHaveCount(4);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);

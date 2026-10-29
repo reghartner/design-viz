@@ -55,7 +55,7 @@
       el(body,'p','excluded-help','dv-live-suggest','Parent exclusions apply before manual tickets and displayed dependencies are added.');
       var exclusions=el(body,'ul','excluded','dv-live-excluded');exclusions.setAttribute('aria-label','Excluded stories');
       items.forEach(function(item){var row=el(exclusions,'li',item.key,'dv-live-excluded-story');row.setAttribute('data-live-excluded',item.key);
-        link(row,'key',item.key,item.url);el(row,'span','title','',item.title);el(row,'span','state','dv-live-state-pill',item.state);el(row,'span','reason','dv-live-excluded-reason',item.reason);
+        link(row,'key',item.key,item.url);el(row,'span','title','',item.title);el(row,'span','state','dv-live-state-pill'+(states.indexOf(item.state)>=0?' dv-live-'+item.state:''),item.state);el(row,'span','reason','dv-live-excluded-reason',item.reason);
       });
     }
     function paint(value){
@@ -64,7 +64,7 @@
       var available=value && value.available,hasData=available && value.hasData;
       var toggle=button(head,'toggle','reader-button dv-live-toggle','Live','setEnabled');toggle.hidden=!hasData;
       toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled)));
-      states.forEach(function(state){var count=el(head,'span','count-'+state,'dv-live-count',state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
+      states.forEach(function(state){var count=el(head,'span','count-'+state,'dv-live-count'+(hasData && value && value.enabled && value.counts[state]?' dv-live-'+state:''),state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
       var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo'}[conn.state];
       var connection=el(head,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
       var connWho=(conn.source || '')+(connLabel && connLabel!==String(conn.source || '').toLowerCase()?' '+connLabel:'');
@@ -117,7 +117,7 @@
         var suggestions=value.suggestions || [],suggest=el(body,'p','suggest','dv-live-suggest',suggestions.length?suggestions.length+' authored '+(suggestions.length===1?'dependency':'dependencies')+' ('+suggestions.map(function(item){return item.ticket+' → '+item.on;}).join(', ')+') '+(suggestions.length===1?'has':'have')+' no Jira link. Suggest link in Jira':'');suggest.hidden=!suggestions.length;
         if(!suggestions.length)suggest.remove();
         el(body,'h3','blockers-heading','','Blockers and dependency chains');var blockers=el(body,'ul','blockers','dv-live-blockers');
-        value.blockers.forEach(function(item){var row=el(blockers,'li',item.key,'dv-live-blocker');link(row,'key',item.key,item.url);el(row,'span','state','dv-live-state-pill',item.state);el(row,'span','lanes','dv-live-blocker-lanes',item.lanes);el(row,'span','downstream','dv-live-downstream',item.downstream);if(item.state==='missing')el(row,'span','missing','dv-live-missing-detail','not found in Jira (deleted, renamed, or no permission)');});
+        value.blockers.forEach(function(item){var row=el(blockers,'li',item.key,'dv-live-blocker');link(row,'key',item.key,item.url);el(row,'span','state','dv-live-state-pill'+(states.indexOf(item.state)>=0?' dv-live-'+item.state:''),item.state);el(row,'span','lanes','dv-live-blocker-lanes',item.lanes);el(row,'span','downstream','dv-live-downstream',item.downstream);if(item.state==='missing')el(row,'span','missing','dv-live-missing-detail','not found in Jira (deleted, renamed, or no permission)');});
         // One row per chain: each hop is the same bounded button, "holds" between hops.
         var chains=el(body,'ul','chains','dv-live-chains'),depOf=function(key){var found=null;value.tickets.some(function(ticket){return (ticket.dependsOn || []).some(function(dep){if(dep.key===key)found=dep;return !!found;});});
           var entry=value.states[key],state=found?found.state:entry && states.indexOf(entry.state)>=0?entry.state:'missing';return {key:key,state:state,tone:found?found.tone:state==='done'?'done':state==='blocked' || state==='missing'?'red':'grey',reason:found?found.reason:''};};
@@ -131,6 +131,9 @@
       // #758: a built page carries an agent guide block; tell editors where it is. Nothing is painted without it.
       if(doc.getElementById('dv-agent-guide'))el(host,'p','agent-guide','dv-live-agent-guide',"Editors: ask your agent to read this page's agent guide (id dv-agent-guide)");
       sweep(host);
+      if(value && !value.enabled && typeof liveStatusClass==='function')host.querySelectorAll('[data-live-appearance],.dv-live-state-pill,.dv-live-count').forEach(function(node){liveStatusClass(node,null);});
+      if(typeof liveStatusClass==='function')states.forEach(function(state){host.querySelectorAll('.dv-live-'+state).forEach(function(node){liveStatusClass(node,state);});});
+      if(typeof liveStatusInk==='function')host.querySelectorAll('.dv-live-state-pill:not([data-live-appearance])').forEach(function(node){liveStatusInk(node,null);});
       if(focused && host.contains(focused) && doc.activeElement!==focused && focused.focus)focused.focus({preventScroll:true});
     }
     function cleanup(){if(!live)return;live=false;host._livePanelApi=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();}
@@ -141,11 +144,6 @@
   }
   var LIVE_STYLES=String.raw`.dv-live-toggle{display:flex;gap:4px;align-items:center;}
 .dv-live-count{border-radius:4px;padding:2px 4px;color:var(--dv-live-on);}
-.dv-live-count[data-live-count="todo"]{background:var(--dv-live-todo);}
-.dv-live-count[data-live-count="active"]{background:var(--dv-live-active);}
-.dv-live-count[data-live-count="done"]{background:var(--dv-live-done);}
-.dv-live-count[data-live-count="blocked"]{background:var(--dv-live-blocked);}
-.dv-live-count[data-live-count="missing"]{background:var(--dv-live-missing);}
 .dv-live-note{color:var(--dtext);}
 .dv-live-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
 .dv-live-connection[hidden]{display:none!important;}
@@ -181,7 +179,7 @@
 .dv-live-excluded-story{display:flex;flex-wrap:wrap;gap:4px 8px;padding:8px 0;border-bottom:1px solid var(--explore-border);}
 .dv-live-excluded-reason{flex-basis:100%;color:var(--dfaint);font-size:11px;}
 .dv-live-tickets-scroll{overflow:auto;max-width:100%;}
-.dv-live-tickets{width:100%;min-width:580px;table-layout:auto;border-collapse:collapse;text-align:left;font-size:12px;}
+.dv-live-tickets{color:var(--dtext);width:100%;min-width:580px;table-layout:auto;border-collapse:collapse;text-align:left;font-size:12px;}
 .dv-live-tickets th,.dv-live-tickets td{padding:8px;vertical-align:top;border-bottom:1px solid var(--explore-border);}
 .dv-live-tickets th{font-weight:700;}
 .dv-live-tickets th:nth-child(1),.dv-live-tickets th:nth-child(3),.dv-live-tickets th:nth-child(6){width:1%;white-space:nowrap;}
@@ -212,7 +210,6 @@
 .dv-live-none{color:var(--dfaint);}
 .dv-live-suggest{margin:8px 0 0;font:11px/1.5 'IBM Plex Sans',sans-serif;color:var(--dfaint);}
 .dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}
-.dv-live-tickets .dv-live-state-pill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){background:var(--dv-live-color);border-color:var(--dv-live-color);color:var(--dv-live-on);}
 
 .pwidget.pt-live-status{display:flex;flex-direction:column}
 .pt-live-status>.ptitle{flex:none}

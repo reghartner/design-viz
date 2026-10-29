@@ -86,7 +86,7 @@ test('V2 V4 apply paints nodes, edge paths/halos/labels and step carriers; disab
  for(const id of ['text','absent'])assert.doesNotMatch(view.querySelector('[data-dv-node="'+id+'"]').className,/dv-live-/);
  assert.deepEqual(events[0].counts,{todo:1,active:1,done:1,blocked:1,missing:1});assert.equal(events[0].updatedAt,'2026-10-26T10:00:00Z');assert.equal(events[0].states['AA-1'].state,'active');assert.equal(api.state('AA-1').state,'active');
  api.setEnabled(false);assert.equal(api.enabled(),false);assert.equal(view.querySelectorAll('.dv-live-active,.dv-live-blocked,.dv-live-missing').length,0);api.setEnabled(true);assert.ok(view.querySelector('path.edge').classList.contains('dv-live-blocked'));
- api.apply({'AA-1':{state:'nonsense'},'BB-1':{state:'done'}});assert.equal(api.state('AA-1'),null);assert.doesNotMatch(view.querySelector('[data-dv-node="a"]').className,/dv-live-/);assert.ok(view.querySelector('[data-dv-node="b"]').classList.contains('dv-live-done'));
+ api.apply({'AA-1':{state:'nonsense'},'BB-1':{state:'done'}});assert.equal(api.state('AA-1'),null);assert.doesNotMatch(view.querySelector('[data-dv-node="a"]').className,/dv-live-/);assert.ok(!view.querySelector('[data-dv-node="b"]').classList.contains('dv-live-done'),'partial evidence cannot claim completion');
  api.clear();assert.equal(view.querySelectorAll('.dv-live-done,.dv-live-badge').length,0);assert.deepEqual(events.at(-1).counts,{todo:0,active:0,done:0,blocked:0,missing:0});assert.equal(events.length,5);
 });
 test('V7 authored ticket menu exists without a provider and preserves plain keys without a site',()=>{
@@ -468,14 +468,12 @@ test('P1 P3 live nodes wear Node Styles presets and restore authored styles when
  api.setEnabled(false);assert.ok(a.classList.contains('ns-teal') && a.classList.contains('node-styled') && !a.classList.contains('ns-azure'));assert.ok(!c.classList.contains('node-styled') && !c.classList.contains('ns-rose'));
  api.setEnabled(true);api.destroy();assert.ok(a.classList.contains('ns-teal') && !a.classList.contains('ns-azure'));assert.ok(!c.classList.contains('ns-rose'));
 });
-test('P4 text on live fills follows the engine step-colour contrast rule in light and dark skins',()=>{
- const C={URL};vm.runInNewContext(entrypoint('native').source,C);const css=fs.readFileSync('src/style.core.css','utf8');
- const block=(selector)=>{const at=css.indexOf(selector+'{--dv-live-todo:');assert.ok(at>=0,selector);return css.slice(at,css.indexOf('}',at));};
- for(const selector of [':root','.sk-aurora:not(.sk-editorial):not(.sk-pastel)']){
-  const body=block(selector),on=(/--dv-live-on:(#[0-9A-Fa-f]{6})/.exec(body) || /--dv-live-on:(#[0-9A-Fa-f]{6})/.exec(block(':root')))[1];
-  for(const state of ['todo','active','done','blocked','missing']){const fill=new RegExp('--dv-live-'+state+':(#[0-9A-Fa-f]{6})').exec(body)[1];assert.equal(C.stepCircleInk(fill.toLowerCase()),on.toLowerCase(),selector+' '+state);}
- }
- assert.match(css,/--step-ink:var\(--dv-live-on\)!important/);assert.match(fs.readFileSync('src/panels/types/live-status.js','utf8'),/\.dv-live-count\{[^}]*color:var\(--dv-live-on\)/);
+test('P4 shared status backing and text contrast are separated from provider state',()=>{
+ const h=harness(),C=h.C;
+ assert.deepEqual(plain(C.LIVE_STATUS_STATES),['todo','active','done','blocked','missing']);
+ for(const [value,map,want] of [[{}, {}, 'unchanged'],[{missingWork:true},{},'missing'],[{tickets:['AA-1']},{},null],[{tickets:['AA-1'],missingWork:true},{'AA-1':{state:'done'}},'missing'],[{tickets:['AA-1'],missingWork:true},{'AA-1':{state:'blocked'}},'blocked']])assert.equal(C.liveStatusPresentation(value,map,true),want);
+ for(const [states,want] of [[['unchanged','done'],'done'],[['unchanged','todo'],'todo'],[['unchanged','unknown'],null],[['unchanged','unchanged'],'unchanged']])assert.equal(C.liveStatusPresentationRollup(states),want);
+ h.ctl.liveStatus.destroy();
 });
 test('S2 S3 demo conversion maps metadata, PR case and missing requested keys',()=>{
  const C=storyContext();assert.equal(typeof C.liveStatusDemoMap,'function');
@@ -800,13 +798,13 @@ test('B10 validator warns for non-positive staleDays and Story mode documents th
  const doc=fs.readFileSync('docs/live-status.md','utf8');assert.match(doc,/## Story mode/);assert.match(doc,/onBeforeAdvance/);assert.match(doc,/staleDays/);assert.match(fs.readFileSync('contract/authoring-contract.md','utf8'),/tracking\.staleDays/);
 });
 
-test('B5 change class selects the card pulse without targeting the positioned node group',()=>{
+test('B5 status updates never scale or move the positioned node or text',()=>{
  const h=harness(fixture()),api=h.ctl.liveStatus,node=h.view.querySelector('g.node[data-dv-node="a"]');
  node.setAttribute('transform','translate(320 180)');api.apply({'AA-1':{state:'todo'}});api.apply({'AA-1':{state:'active'}});
  assert.ok(node.matches('.node.dv-live-changed'));
  assert.ok(node.querySelector('.card'),'the changed carrier owns the CSS pulse target');
  const css=fs.readFileSync('src/style.core.css','utf8');
- assert.match(css,/\.node\.dv-live-changed \.card,\s*path\.edge\.dv-live-changed\{[^}]*animation:dvnodepulse/);
+ assert.doesNotMatch(css,/\.node\.dv-live-changed \.card,\s*path\.edge\.dv-live-changed\{[^}]*animation:dvnodepulse/);
  assert.doesNotMatch(css,/\.node\.dv-live-changed\s*[,\{]/);
  assert.equal(node.getAttribute('transform'),'translate(320 180)');
  node.dispatchEvent({type:'animationend',target:node.querySelector('.card'),animationName:'dvnodepulse'});
@@ -1616,4 +1614,44 @@ test('planned nodes and incident edges stay unavailable through unknown evidence
  api.clear();assert.equal(h.view.querySelectorAll('.dv-live-unavailable,.dv-live-comm-failure').length,0);
  api.apply({});api.destroy();assert.equal(h.view.querySelectorAll('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target').length,0);assert.equal(JSON.stringify(raw),before);
  const fresh=harness(raw);fresh.ctl.liveStatus.destroy();assert.equal(fresh.view.querySelectorAll('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target').length,0,'destroy before first map restores visuals');
+});
+
+test('coverage markers survive normalization, propagate to steps, never manufacture Jira evidence and restore cleanly',()=>{
+ const raw={nodes:{reuse:{title:'Existing'},gap:{title:'Uncovered',missingWork:true},tracked:{tickets:['AA-1','AA-2']},text:{type:'text',text:'Note',missingWork:true}},rows:[['reuse','gap','tracked']],steps:[{id:'reuse',nodes:['reuse']},{id:'gap',nodes:['gap']},{id:'mixed',nodes:['reuse','tracked']}]};
+ const h=harness(raw),api=h.ctl.liveStatus,d=h.ctl.page.sections[0].diagram;
+ assert.equal(d.nodes.gap.missingWork,true);assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().hasData,true);
+ assert.equal(h.view.querySelector('[data-dv-node="gap"]').getAttribute('data-live-appearance'),'missing');
+ api.apply({'AA-1':{state:'done'}});
+ assert.equal(h.view.querySelector('[data-dv-node="reuse"]').getAttribute('data-live-appearance'),'unchanged');
+ assert.equal(h.view.querySelector('[data-dv-node="tracked"]').getAttribute('data-live-appearance'),null);
+ assert.equal(h.view.querySelector('[data-dv-node="text"]').getAttribute('data-live-appearance'),null);
+ assert.equal(h.C.liveStatusStep(d,d.steps[1],{}),'missing');assert.equal(h.C.liveStatusCaption(d,d.steps[1],{}),'MISSING WORK · unlinked work remains');
+ assert.equal(h.C.liveStatusCaption(d,d.steps[0],{}),'NO CHANGE NEEDED');
+ assert.equal(h.C.liveStatusStep(d,d.steps[2],{'AA-1':{state:'done'}}),null);
+ assert.equal(h.C.liveStatusStep(d,d.steps[2],{'AA-1':{state:'done'},'AA-2':{state:'done'}}),'done');
+ assert.deepEqual(plain(api.refs().tickets),['AA-1','AA-2']);assert.deepEqual(plain(api.snapshot().counts),{todo:0,active:0,done:1,blocked:0,missing:0});
+ assert.equal(h.C.liveStatusReadiness(h.ctl.page,{'AA-1':{state:'done'},'AA-2':{state:'done'}},{}).ready,false);
+ const card=h.view.querySelector('[data-dv-node="gap"]').querySelector('.card');assert.match(card.getAttribute('aria-label'),/Work status.*Missing work/);
+ h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});assert.match(h.view.querySelector('.dv-live-coverage-detail').textContent,/additional work remains/);
+ api.clear();assert.equal(h.view.querySelectorAll('[data-live-appearance]').length,0);api.apply({});api.destroy();assert.equal(h.view.querySelectorAll('[data-live-appearance]').length,0);
+ const invalid=h.C.validate(h.C.normalize({nodes:{a:{missingWork:'yes'}},rows:[['a']]}));assert.ok(invalid.warnings.some(w=>w.includes('missingWork')));
+});
+
+test('missing work activates consistent page-wide coverage before provider evidence without changing ordinary pages',()=>{
+ const raw={page:{sections:[{id:'gap',diagram:{nodes:{gap:{missingWork:true}},rows:[['gap']],steps:[{nodes:['gap']}]}} ,{id:'reuse',diagram:{nodes:{reuse:{title:'Existing'},tracked:{tickets:['AA-1']},text:{type:'text',text:'Note'}},rows:[['reuse','tracked']],steps:[{nodes:['reuse']},{nodes:['tracked']}]}}]}};
+ const h=harness(raw),api=h.ctl.liveStatus,rec=h.ctl.sections[1],controls=stepTicketControls(h,rec);
+ function state(id){return h.view.querySelector('[data-dv-node="'+id+'"]').getAttribute('data-live-appearance');}
+ assert.equal(api.snapshot().available,true);assert.equal(api.enabled(),true);
+ assert.equal(state('gap'),'missing');assert.equal(state('reuse'),'unchanged');assert.equal(state('tracked'),null);assert.equal(state('text'),null);
+ for(const selector of ['g.coin[data-dv-step="0"]','button.schip[data-step-source="0"]'])assert.equal(rec.sectionEl.querySelector(selector).getAttribute('data-live-appearance'),'unchanged');
+ assert.equal(controls.host.querySelector('.dv-live-caption').textContent,'NO CHANGE NEEDED');
+ controls.change(1);assert.equal(controls.host.querySelector('.dv-live-caption').textContent,'AWAITING TICKET STATUS');
+ assert.deepEqual(plain(api.snapshot().counts),{todo:0,active:0,done:0,blocked:0,missing:0});
+ api.setEnabled(false);assert.equal(h.view.querySelectorAll('[data-live-appearance]').length,0);
+ api.setEnabled(true);assert.equal(state('reuse'),'unchanged');assert.equal(state('gap'),'missing');
+ api.clear();assert.equal(h.view.querySelectorAll('[data-live-appearance]').length,0);api.destroy();
+ for(const nodes of [{reuse:{}},{reuse:{},text:{type:'text',text:'Note',missingWork:true}}]){
+  const ordinary=harness({nodes,rows:[['reuse']],steps:[{nodes:['reuse']}]});const control=stepTicketControls(ordinary);
+  assert.equal(ordinary.ctl.liveStatus.snapshot().available,false);assert.equal(ordinary.view.querySelectorAll('[data-live-appearance]').length,0);assert.equal(control.host.querySelector('.dv-live-caption'),null);ordinary.ctl.liveStatus.destroy();
+ }
 });

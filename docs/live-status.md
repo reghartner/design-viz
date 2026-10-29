@@ -209,35 +209,35 @@ PRs stay icons; the demo timeline supplies their GitHub detail.
 
 ## State model
 
-The overlay uses these runtime states. The spec never stores status.
+The provider reports five runtime Jira evidence states. The spec stores references
+and authored intent such as `missingWork`, never live Jira status.
 
 | State | Paint |
 | --- | --- |
-| `todo` | Slate preset |
-| `active` | Azure (blue), slow pulse |
-| `done` | Moss preset |
-| `blocked` | Rose preset, pulse |
-| `missing` | Rose preset with a dotted outline, pulse; the popover, caption and Tickets table say missing |
-| waiting (any state) | Slate preset, dashed, while the direct upstream is unfinished; Rose preset, dashed, when it is blocked or missing |
+| `todo` | Dotted grey outline (`#6b7280`) |
+| `active` | Blue outline (`#1666c7`); only border/glow slowly pulses |
+| `done` | Green outline (`#237d3d`) with a steady soft glow |
+| `blocked` | Strong solid red outline (`#b42338`) |
+| `missing` | Dashed red outline (`#e14b5a`) |
+| No change needed | Derived coverage state: solid muted sage (`#748b78`), no glow |
+| waiting (any state) | Dashed grey while the direct upstream is unfinished; dashed red when blocked or missing |
 
-Live paint uses the Node Styles presets (see `docs/node-styles.md`) plus an
-internal Azure palette for Active. Azure is not an authored Node Styles choice.
-Its light background/line/title/subtitle are `#E9F2FF` / `#2878DF` / `#163D72` /
-`#345B88`; its dark values are `#172E4C` / `#72B5FF` / `#E2EFFF` / `#A9C8EE`.
-A painted node wears `node-styled ns-<preset>`, so its
-card takes the preset's background, line and ink in the current skin, including
-the dark variants on Aurora, Terminal and Blueprint. Edge strokes, halos, the
-break glyph, step coins and chips, and the panel's count and state
-pills use the same preset line colours through `--dv-live-<state>`. Numerals and
-pill text use `--dv-live-on`, chosen by the engine's step-colour contrast rule
-(black or white, whichever contrasts more); it is black on every live fill.
+Nodes, step coins/chips, panel counts and ticket-state pills share these tokens.
+Their backing is a 15% tint over the actual board or host surface. Title,
+subtitle and numeral ink is black or white, selected for contrast against that
+composed backing. Active pulses take 2.6 seconds and never animate text or
+geometry; reduced motion and print disable the pulse. Existing node presets are
+saved and restored when Live clears or turns off. Waiting and construction
+artwork remain separate dependency and availability evidence.
 
 For an element with several tickets, roll up their states in this order:
 
 blocked > missing > active > (all done → done) > (all todo → todo) > otherwise active
 
 Steps, coins and chips derive their state from the edges and nodes they involve
-and never carry tickets. Live status color comes from Jira status only.
+and never carry tickets. Unlinked, unmarked nodes derive No change needed; an
+explicit `missingWork: true` contributes Missing. No-change is neutral in mixed
+rollups. Linked tickets without evidence never imply Done or No change needed.
 Pull requests never carry live state: an authored `prs` URL is an icon, and the
 GitHub detail that may colour that icon (open, draft, merged, closed, checks,
 review) stays on the icon and in its tooltip. Jira's Development summary is
@@ -362,7 +362,7 @@ plus, when the entry carries `prs.links`, the pull requests GitHub reports for
 the ticket (see "Pull requests from GitHub"). A plain authored link is the
 monochrome icon with the URL as its tooltip. A GitHub-enriched icon takes the
 pull request's state colour and a small checks dot (`.dv-live-pr-checks[data-checks]`).
-Both use Node Styles preset lines, like the live state tokens: `data-pr-state` open
+PRs and checks keep their separate Node Styles preset lines: `data-pr-state` open
 moss, draft slate, merged violet, closed rose; checks passing moss, failing rose,
 pending amber (`--dv-pr-*` and `--dv-checks-*` in `style.core.css`, with the
 presets' dark values on pure Aurora, Terminal and Blueprint); its tooltip and accessible name read
@@ -576,7 +576,7 @@ linkType?, reason?}]}`. X waits on Y while Y is not done, unless X itself is
 already active or done: then the link is listed but X is not waiting. A blocked
 or missing X still waits: the panel, the chains and the popover record it, while
 its carrier keeps its own blocked or missing paint on the canvas as the stronger
-state (solid or dotted rose, no dashed waiting stroke). The tone comes from the
+state (solid blocked red or dashed missing red, without the waiting stroke). The tone comes from the
 **direct** upstream: an unfinished Y paints X
 grey (slate) with the raised-hand icon in the panel; a blocked or missing Y
 (including a key the map never reports) paints X red (rose) with the alarm icon.
@@ -810,8 +810,10 @@ Ambient mode or when Live is disabled. The Live status panel keeps its overall
 progress, Tickets team stripes and Blockers team names.
 
 In Step mode, the caption ends with **BLOCKED · KEY · detail**, **MISSING · KEY**,
-**IN PROGRESS · n tickets**, **TODO · n tickets**, or **DONE**. Untracked steps
-have no live caption. Captions update on step changes and new evidence.
+**IN PROGRESS · n tickets**, **TODO · n tickets**, or **DONE**. Coverage adds
+**NO CHANGE NEEDED** and **MISSING WORK · unlinked work remains**. Incomplete
+provider evidence shows **AWAITING TICKET STATUS**. Captions update on step
+changes and new evidence.
 Aggregate captions, step/coin states, lane rollups, playback blockers and
 readiness continue to include the endpoints of selected edges and failed
 communications; the explicit-node rule applies only to the visible ticket list.
@@ -826,7 +828,7 @@ automatic playback (including its initial beat), never manual navigation.
 **First blocker** jumps through `stepper.jumpSource` to the earliest blocker in
 the current path, enters Step mode and focuses that carrier; it hides when none exist.
 
-Changed ticket states produce one carrier pulse (none with reduced motion).
+Changed ticket states update appearance without scaling or moving the carrier.
 The Live status panel beside the diagram shows a completion ring, blocker
 links, affected lanes and downstream carrier/step counts, and **Activity**.
 Activity records the latest 20 transitions, newest received first; the initial
@@ -868,3 +870,30 @@ node/edge. A consumer needs only an import, page tracking settings, a live-statu
 panel and its own steps; it need not copy any topology.
 
 See [the canonical provider and tracking-only consumer example](shared-topology.md#delivery-tracking-on-canonical-topology).
+
+## Status appearance and uncovered work
+
+Nodes, step markers, step controls and ticket-status pills share a 15% tinted
+backing with high-contrast ink chosen against their host surface. Todo is dotted
+grey; active has a slowly pulsing blue outline/glow; done has a steady green glow;
+blocked is solid red; missing is dashed red. Only the outline/glow animates, and
+reduced-motion and print disable that animation. Selection remains separate.
+
+In desktop **Inspect → Tracking**, **Missing work** saves `missingWork: true` on a
+node. This is authored coverage intent, not a Jira status. For example:
+
+```json
+{"title":"Audit logging","tickets":["AUDIT-42"],"missingWork":true}
+```
+
+The marker says additional unlinked work remains, even if AUDIT-42 is Done. Clear
+it when that work is covered. Blocked ticket evidence takes precedence over the
+marker; the marker takes precedence over active, done and todo. It participates
+in step appearance without inventing a ticket or increasing Jira counts.
+
+With Live status data applied, nodes with no linked tickets and no missing-work
+marker automatically show **No change needed** (quiet sage, solid outline, no
+glow). This state is neutral in mixed step rollups: done plus no-change stays
+done. Linked tickets without provider evidence remain unknown. Text boxes stay
+inert. Clear, disable and destroy restore authored paint. Existing ticket-gated
+availability still requires every linked ticket to be confirmed Done.

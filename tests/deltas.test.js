@@ -143,7 +143,7 @@ test('live-status example covers node and edge references without validation or 
   }
 });
 
-test('tracking authoring guidance documents references and the future Jira-only state model', () => {
+test('tracking authoring guidance separates Jira evidence from coverage presentation', () => {
   const contract = fs.readFileSync(path.join(__dirname,'../contract/authoring-contract.md'),'utf8');
   const marker = contract.indexOf('### Delta markers');
   const guidance = contract.slice(marker,contract.indexOf('### groups',marker));
@@ -153,11 +153,12 @@ test('tracking authoring guidance documents references and the future Jira-only 
   assert.ok(fs.existsSync(file), 'live-status guide exists');
   const guide = fs.readFileSync(file,'utf8');
   for (const term of ['flow.live-status','tracking','tickets','prs','Jira','informational','#735']) assert.ok(guide.includes(term),term);
-  for (const pattern of [/todo[^\n]*slate/i,/active[^\n]*azure[^\n]*slow pulse/i,/done[^\n]*moss/i,
-    /blocked[^\n]*rose[^\n]*pulse/i,/missing[^\n]*rose[^\n]*dotted[^\n]*pulse/i,/waiting[^\n]*slate[^\n]*dashed/i,/waiting[^\n]*rose[^\n]*dashed/i,
+  for (const pattern of [/todo[^\n]*dotted[^\n]*#6b7280/i,/active[^\n]*#1666c7[^\n]*pulse/i,/done[^\n]*#237d3d[^\n]*steady/i,
+    /blocked[^\n]*solid[^\n]*#b42338/i,/missing[^\n]*dashed[^\n]*#e14b5a/i,/No change needed[^\n]*#748b78/i,
+    /waiting[^\n]*dashed grey[^\n]*dashed red/i,/15%/,
     /blocked > missing > active > \(all done → done\) > \(all todo → todo\) > otherwise active/,
     /steps, coins and chips[^.]*derive[^.]*edges and nodes[^.]*never carry tickets/is,
-    /color comes from Jira status only/i,/prs[^.]*icon/i,/never carry live state/i,/## Rendering/]) assert.match(guide,pattern);
+    /missingWork/,/prs[^.]*icon/i,/never carry live state/i,/## Rendering/]) assert.match(guide,pattern);
 });
 
 test('Jira browse URLs share strict ticket identity and preserve authored link fallbacks',()=>{

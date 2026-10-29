@@ -194,7 +194,7 @@ function topologyTrackingTarget(text,raw,section,kind,id,context,index){
   if(!t.owner)return {error:'Choose a node or connection in an authored topology import.'};
   t.field=kind==='node'?'nodeTracking':'edgeTracking';
   var local=(t.got.d.topologyImports[t.index][t.field] || {})[t.relative];
-  t.local=trackingStoredRefs(local);if(local && local.existsWhen==='tickets-done')t.local.existsWhen=local.existsWhen;
+  t.local=trackingStoredRefs(local);if(local && local.missingWork===true)t.local.missingWork=true;if(local && local.existsWhen==='tickets-done')t.local.existsWhen=local.existsWhen;
   // Resolve without this consumer addition to distinguish inherited duplicates
   // even when a refreshed provider now carries a formerly local reference.
   var base=builderClone(raw),imp=specValueAt(base,t.got.path).topologyImports[t.index];
@@ -202,12 +202,20 @@ function topologyTrackingTarget(text,raw,section,kind,id,context,index){
   try{
     var resolved=FlowTopology.resolveSource(base,context),d=specValueAt(resolved,t.got.path);
     var inherited=kind==='node'?d.nodes[id]:d.edges.find(function(edge){return builderEdgeKey(edge)===id;});
-    t.inherited=trackingRefs(inherited);if(inherited.existsWhen==='tickets-done')t.inherited.existsWhen=inherited.existsWhen;
+    t.inherited=trackingRefs(inherited);if(inherited.missingWork===true)t.inherited.missingWork=true;if(inherited.existsWhen==='tickets-done')t.inherited.existsWhen=inherited.existsWhen;
   }catch(ex){return {error:ex.message};}
   return t;
 }
 function planTopologyTracking(text,raw,section,kind,id,field,ref,remove,context,index){
-  if(field!=='tickets' && field!=='prs' && field!=='existsWhen')return {error:'Choose tickets, pull requests or availability.'};
+  if(field!=='tickets' && field!=='prs' && field!=='existsWhen' && field!=='missingWork')return {error:'Choose tickets, pull requests or availability.'};
+  if(field==='missingWork'){
+    if(kind!=='node')return {error:'Missing work applies to nodes.'};
+    var marker=topologyTrackingTarget(text,raw,section,kind,id,context,index);if(marker.error)return marker;
+    if(marker.inherited.missingWork)return {error:'Missing work is inherited from the provider.'};
+    if(!remove && ref!==true)return {error:'missingWork must be true.'};
+    if(remove)delete marker.local.missingWork;else marker.local.missingWork=true;
+    return topologyTrackingPlan(text,raw,marker,context);
+  }
   if(field==='existsWhen'){
     var target=topologyTrackingTarget(text,raw,section,kind,id,context,index);if(target.error)return target;
     if(target.inherited.existsWhen)return {error:'Availability is inherited from the provider.'};
@@ -227,6 +235,7 @@ function planTopologyTracking(text,raw,section,kind,id,field,ref,remove,context,
 }
 function topologyTrackingPlan(text,raw,t,context){
   var value={};['tickets','prs'].forEach(function(key){if(t.local[key].length)value[key]=t.local[key];});
+  if(t.local.missingWork)value.missingWork=true;
   if(t.local.existsWhen)value.existsWhen=t.local.existsWhen;
   return topologyLocalPlan(text,raw,t,t.field,t.relative,Object.keys(value).length?value:null,context);
 }

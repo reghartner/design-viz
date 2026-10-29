@@ -13,8 +13,8 @@ In the step inspector, each hop has a **Delivery** selector:
 | Choice | Meaning | Appearance |
 | --- | --- | --- |
 | Delivered | Communication reaches its destination | Normal edge and packet |
-| Dropped in transit | An attempted send never arrives | Partial orange route, gap and ×; packet stops and fades |
-| Not sent | Communication is blocked or skipped before sending | Stop marker near the source; no packet |
+| Dropped in transit | An attempted send never arrives | Partial orange route, centered gap and ×; packet stops and fades at the midpoint |
+| Not sent | Communication is blocked or skipped before sending | Stop marker at the edge midpoint; no packet |
 
 **Add failed communication** adds an existing diagram edge to a step, starting
 as Dropped in transit. Choose Not sent if appropriate. Removing the hop also

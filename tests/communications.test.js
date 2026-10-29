@@ -79,14 +79,14 @@ test('dropped packets stop inside the gap and fade without reaching the destinat
   assert.equal(effect.group.getAttribute('aria-label'),'Dropped in transit: a → b');
   assert.ok(effect.hidden.every(e=>e.classList.contains('comm-hidden')));
   const motion=nodes.find(n=>n.tag==='animateMotion');
-  assert.deepEqual(motion.getAttribute('keyPoints').split(';').map(Number),[0,.55,.55]);
+  assert.deepEqual(motion.getAttribute('keyPoints').split(';').map(Number),[0,.5,.5]);
   assert.equal(motion.starts,1);assert.equal(nodes.find(n=>n.tag==='animate').starts,1);
   assert.equal(nodes.find(n=>n.tag==='animate').getAttribute('values'),'1;1;0');
   const before=nodes.find(n=>n.classList.contains('comm-before')).getAttribute('d');
   const after=nodes.find(n=>n.classList.contains('comm-after')).getAttribute('d');
-  assert.ok(before.endsWith('L100.00 0.00'));assert.ok(after.startsWith('M120.00 0.00'));
+  assert.ok(before.endsWith('L90.00 0.00'));assert.ok(after.startsWith('M110.00 0.00'));
   const markerX=Number(nodes.find(n=>n.classList.contains('comm-break')).getAttribute('transform').match(/translate\((\S+)/)[1]);
-  assert.ok(Math.abs(markerX-110)<.001);
+  assert.ok(Math.abs(markerX-100)<.001);
   c.settleCommunicationFailures(b);assert.equal(effect.packet.parentNode,null);
   assert.equal(effect.group.parentNode,b.svg);
   c.clearCommunicationFailures(b);assert.equal(effect.group.parentNode,null);
@@ -98,16 +98,16 @@ test('blocked and reduced-motion outcomes retain a static marker with no packet;
   c.showCommunicationFailures(b,{'a->b':'blocked','a->c':'dropped'},false);
   assert.ok(b.failureEffects.every(e=>e.packet===null));
   const marker=descendants(b.failureEffects[0].group).find(e=>e.classList.contains('comm-break'));
-  assert.equal(marker.getAttribute('transform'),'translate(24 0)');
+  assert.equal(marker.getAttribute('transform'),'translate(100 0)');
   assert.ok(marker.children.some(e=>e.tag==='circle'));
   c.clearCommunicationFailures(b);
   b.edgeIds['a->b'].pathEl.classList.add('dv-fragment-hidden');
   c.showCommunicationFailures(b,{'a->b':'dropped'},true);assert.equal(b.failureEffects.length,0);
   for(const length of [1,5,30,200,2000]){
-    for(const mode of ['dropped','blocked']){
-      const split=c.communicationBreak(length,mode);
-      assert.ok(0<split.before && split.before<split.stop && split.stop<split.after && split.after<length);
-    }
+    const split=c.communicationBreak(length);
+    assert.equal(split.stop,length / 2);
+    assert.ok(Math.abs((split.stop - split.before) - (split.after - split.stop))<1e-10);
+    assert.ok(0<split.before && split.before<split.stop && split.stop<split.after && split.after<length);
   }
 });
 test('playback suppresses explicit successful packets on failed hops and cleans up on later steps, paths, ambient and disposal',()=>{

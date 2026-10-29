@@ -16,6 +16,8 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
+import vm from 'node:vm';
+import sourceLoader from '../../../tools/source-loader.cjs';
 import {test,expect,paste,prepareEditorSurface,closeTools} from '../helpers/test.mjs';
 import {projectFiles,useProjectDownloads} from '../helpers/project-export.mjs';
 import {repo} from '../helpers/prepare.mjs';
@@ -52,6 +54,36 @@ async function open(page,server,spec=fixture(),provider=true){
  if(provider)await page.addInitScript(map=>{window.flowviewLiveStatus={provider:async(refs,signal)=>{window.__liveRefs=refs;return map;}};},FIXED_MAP);
  const file=path.join(server.root,'live-status.json'),out=path.join(server.root,'live-status.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/live-status.html');return page.locator('#docview');
 }
+async function expectCenteredBreak(failure){
+ const geometry=await failure.evaluate(group=>{
+  const path=group.ownerSVGElement.querySelector('path.edge[data-dv-edge="'+group.getAttribute('data-dv-edge')+'"]');
+  const length=path.getTotalLength(),mid=path.getPointAtLength(length / 2);
+  const marker=group.querySelector('.comm-break').transform.baseVal.consolidate().matrix;
+  const before=group.querySelector('.comm-before'),after=group.querySelector('.comm-after');
+  const gap=Math.min(10,length * .5 * .65),left=path.getPointAtLength(length / 2-gap),right=path.getPointAtLength(length / 2+gap);
+  const b=before.getPointAtLength(before.getTotalLength()),a=after.getPointAtLength(0);
+  return {marker:Math.hypot(marker.e-mid.x,marker.f-mid.y),before:Math.hypot(b.x-left.x,b.y-left.y),after:Math.hypot(a.x-right.x,a.y-right.y),curved:/[CQ]/.test(path.getAttribute('d')),length};
+ });
+ expect(geometry.marker).toBeLessThan(.01);expect(geometry.before).toBeLessThan(.02);expect(geometry.after).toBeLessThan(.02);
+ return geometry;
+}
+test('failed communications center blocked and dropped gaps on short local and curved imported edges',async({page,server},testInfo)=>{
+ const make=(id,diagram)=>({page:{title:'Centered failed connections',canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=make('provider',{nodes:{a:{title:'Imported sender'},b:{title:'Imported receiver'}},rows:[[]],floats:[{id:'a',x:100,y:100},{id:'b',x:600,y:100}],edges:[{from:'a',to:'b',curvePoints:[{t:.3,dx:0,dy:-150}]}],topologyExports:{core:{nodes:['a','b'],edges:['a->b']}}});
+ const source=make('consumer',{view:'step',nodes:{a:{title:'Local sender'},b:{title:'Local receiver'}},rows:[[]],floats:[{id:'a',x:100,y:100},{id:'b',x:280,y:100}],edges:[{from:'a',to:'b'}],topologyImports:[{spec:'provider',export:'core',as:'shared',position:{x:100,y:350}}],steps:[{failures:{'a->b':'blocked','shared::a->shared::b':'dropped'},text:'Failures at each route midpoint'},{failures:{'a->b':'dropped','shared::a->shared::b':'blocked'},text:'Both outcomes share the same midpoint'}]});
+ const context=vm.createContext({});vm.runInContext(sourceLoader.composeSources(['validator.js','canon.js']),context);
+ const resolved=JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(source,{version:1,id:'consumer',specs:[provider,source]})));
+ expect(source.page.sections[0].diagram.nodes['shared::a']).toBeUndefined();expect(resolved.page.sections[0].diagram.nodes['shared::a'].title).toBe('Imported sender');
+ const root=await open(page,server,resolved,false),section=root.locator('#section-main');
+ for(const step of [0,1]){
+  await section.locator('.schip[data-step-source="'+step+'"]').first().click();
+  const failures=section.locator('.comm-failure:not(.dv-live-comm-failure)');await expect(failures).toHaveCount(2);
+  const metrics=[];for(const failure of await failures.all())metrics.push(await expectCenteredBreak(failure));
+  expect(metrics.some(g=>g.length<100)).toBe(true);expect(metrics.some(g=>g.curved)).toBe(true);
+ }
+ await section.locator('.schip[data-step-source="0"]').first().click();
+ await section.screenshot({path:testInfo.outputPath('centered-failed-connections.png')});
+});
 test('V2 V3 V4 V6 V8 V9 V10 live states survive toggles, path rebuilds and detail navigation',async({page,server})=>{
  const root=await open(page,server),section=root.locator('#section-delivery'),node=id=>section.locator('g.node[data-dv-node="'+id+'"]');
  await expect(node('hardware')).toHaveClass(/dv-live-active/);await expect(node('firmware')).toHaveClass(/dv-live-active/);await expect(node('ux')).toHaveClass(/dv-live-missing/);await expect(node('todo')).toHaveClass(/dv-live-todo/);
@@ -698,6 +730,7 @@ test('R1 edge lines labels live break segments and glyphs open Jira tickets with
  await root.getByRole('heading',{name:'Connected doorbell delivery',exact:true}).click();await expect(pop).toBeHidden();await expect(label(1)).toBeFocused();
  await label(1).click();await expect(pop).toBeVisible();await page.keyboard.press('Escape');await expect(label(1)).toBeFocused();
  const failure=section.locator('g.dv-live-comm-failure[data-dv-edge="0"]');
+ await expectCenteredBreak(failure);
  await strokeClick(page,failure.locator('.comm-before'));await expect(pop).toHaveAttribute('aria-label','Live tickets for press');
  for(const key of ['HW-124','FW-46'])await expect(pop.getByRole('link',{name:key,exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/'+key);
  await expect(pop.locator('.dv-live-ticket')).toHaveCount(2);await page.keyboard.press('Escape');await expect(label(0)).toBeFocused();

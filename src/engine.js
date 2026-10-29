@@ -512,8 +512,8 @@ function communicationFailureText(diagram,failures){
       ((nodes[edge.from] || {}).title || edge.from) + ' → ' + ((nodes[edge.to] || {}).title || edge.to);
   }).filter(Boolean).join(' · ');
 }
-function communicationBreak(length,mode){
-  var stop = mode === 'blocked' ? Math.min(24,length * .25) : length * .55;
+function communicationBreak(length){
+  var stop = length * .5;
   var gap = Math.min(10,stop * .65,(length - stop) * .65);
   return {stop:stop, before:stop - gap, after:stop + gap};
 }
@@ -545,7 +545,7 @@ function showCommunicationFailures(board,failures,animate,options){
     if (!path || info.e.hidden===true || (!options.live && path.classList.contains('dv-fragment-hidden'))) return;
     var length = path.getTotalLength();
     if (!Number.isFinite(length) || length <= 0) return;
-    var mode = failures[key], split = communicationBreak(length,mode), point = path.getPointAtLength(split.stop);
+    var mode = failures[key], split = communicationBreak(length), point = path.getPointAtLength(split.stop);
     function svgEl(tag,attrs,parent){
       var el = document.createElementNS(SVGNS,tag);
       Object.keys(attrs).forEach(function(k){el.setAttribute(k,attrs[k]);});

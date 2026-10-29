@@ -16,7 +16,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface,closeTools} from '../helpers/test.mjs';
 import {projectFiles,useProjectDownloads} from '../helpers/project-export.mjs';
 import {repo} from '../helpers/prepare.mjs';
 // Freeze the original overlay fixture: the authored story may evolve independently.
@@ -924,7 +924,7 @@ test('A3 availability survives rebuilt native diagrams and clear or destroy rest
 });
 
 test('desktop Missing work is one undoable edit and survives exported project reload',async({page,server},testInfo)=>{
- await importWorkbench(page,server);const source=page.locator('#src'),node=page.locator('#docview g.node[data-dv-node="hardware"] .card');
+ await page.setViewportSize({width:1440,height:1000});await useProjectDownloads({page});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);const source=page.locator('#src'),node=page.locator('#docview g.node[data-dv-node="hardware"] .card');
  await cardClick(node);await page.locator('#editor-tab-inspect').click();const control=page.locator('#guide').getByRole('checkbox',{name:'Missing work',exact:true}),before=await source.inputValue();
  await control.check();await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.nodes.hardware.missingWork).toBe(true);const after=await source.inputValue();
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);
@@ -934,4 +934,24 @@ test('desktop Missing work is one undoable edit and survives exported project re
  await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-file').setInputFiles({name:'missing-work.spec.json',mimeType:'application/json',buffer:Buffer.from(saved)});
  await expect(node).toBeVisible();await closeTools(page);await cardClick(node);await page.locator('#editor-tab-inspect').click();await expect(control).toBeChecked();
  await control.uncheck();await expect.poll(async()=>Object.hasOwn(JSON.parse(await source.inputValue()).page.sections[0].diagram.nodes.hardware,'missingWork')).toBe(false);
+});
+
+test('native status ink follows shadow-host and SVG board surfaces and restores on destroy',async({page,server},testInfo)=>{
+ await page.setViewportSize({width:1440,height:1000});
+ await writeFile(path.join(server.root,'status-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'status-native.html'),'<style>body{margin:0}#host{background:#0b1220;min-height:100vh}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./status-native.js";window.mount=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/status-native.html');await page.waitForFunction(()=>!!window.mount);
+ for(const skin of ['aurora','pastel']){
+  await page.evaluate(({spec,skin,map})=>{if(window.viewer)window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{skin});window.viewer.controller.liveStatus.apply(map);},{spec:fixture(),skin,map:FIXED_MAP});
+  const root=page.locator('#host'),node=root.locator('#section-delivery [data-dv-node="hardware"]'),pill=root.locator('tr[data-live-ticket="HW-123"] .dv-live-state-pill');
+  await expect(node).toHaveAttribute('data-live-appearance','active');
+  for(const label of ['.t1','.t2'])expect((await contrast(node,'fill','fill',label)).ratio).toBeGreaterThanOrEqual(4.5);
+  expect((await contrast(pill,'backgroundColor','color')).ratio).toBeGreaterThanOrEqual(4.5);
+  await cardClick(node.locator('.card'));const pop=root.locator('.dv-live-popover .dv-live-ticket-state');await expect(pop).toBeVisible();expect((await contrast(pop,'backgroundColor','color')).ratio).toBeGreaterThanOrEqual(4.5);await page.keyboard.press('Escape');
+  await root.screenshot({path:testInfo.outputPath('native-status-'+skin+'.png')});
+  // SVG ground remains the actual substrate even if its wrapping HTML is transparent.
+  await node.evaluate(el=>{el.closest('.board').style.background='transparent';});await page.evaluate(map=>window.viewer.controller.liveStatus.apply(map),FIXED_MAP);
+  await expect(node.locator('.t1')).toHaveCSS('fill',skin==='aurora'?'rgb(255, 255, 255)':'rgb(0, 0, 0)');
+  await page.evaluate(()=>window.viewer.controller.liveStatus.destroy());await expect(root.locator('[data-live-appearance]')).toHaveCount(0);
+ }
 });

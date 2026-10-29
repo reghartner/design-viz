@@ -91,16 +91,22 @@ function liveStatusClass(el,state){
 /* Choose ink against the actual host surface plus the 15% status tint.
    Walk transparent ancestors; use the board ground for SVG carriers. */
 function liveStatusInk(el,state){
-  var win=el.ownerDocument && el.ownerDocument.defaultView;if(!win || !win.getComputedStyle)return;
-  var tint={todo:[107,114,128],active:[22,102,199],done:[35,125,61],blocked:[180,35,56],missing:[225,75,90],unchanged:[116,139,120]}[state];if(!tint)return;
-  var surface=el.closest('.board') || el.parentElement, layers=[];
-  for(var host=surface;host;host=host.parentElement){
-    var raw=win.getComputedStyle(host).backgroundColor,match=/rgba?\(([^)]+)\)/.exec(raw);if(!match)continue;
-    var parts=match[1].split(/[, /]+/).map(Number),alpha=parts.length>3?parts[3]:1;
-    if(alpha>0)layers.push({rgb:parts,alpha:alpha});if(alpha===1)break;
+  var doc=el.ownerDocument,win=doc && doc.defaultView;if(!win || !win.getComputedStyle)return;
+  var tint={todo:[107,114,128],active:[22,102,199],done:[35,125,61],blocked:[180,35,56],missing:[225,75,90],unchanged:[116,139,120]}[state],amount=tint ? .15 : 0;tint=tint || [0,0,0];
+  function rgba(raw){
+    var match=/^#([0-9a-f]{6})$/i.exec(raw.trim());if(match)return [parseInt(match[1].slice(0,2),16),parseInt(match[1].slice(2,4),16),parseInt(match[1].slice(4,6),16),1];
+    match=/rgba?\(([^)]+)\)/.exec(raw);if(match){var c=match[1].split(/[, /]+/).map(Number);return [c[0],c[1],c[2],c.length>3?c[3]:1];}
+    match=/color\(srgb ([^)]+)\)/.exec(raw);if(match){var p=match[1].split(/[ /]+/).map(Number);return [p[0]*255,p[1]*255,p[2]*255,p.length>3?p[3]:1];}
+    return null;
   }
-  var rgb=[255,255,255];layers.reverse().forEach(function(layer){rgb=rgb.map(function(v,i){return v*(1-layer.alpha)+layer.rgb[i]*layer.alpha;});});
-  var lum=rgb.map(function(v,i){var n=(v*.85+tint[i]*.15)/255;return n<=.04045?n/12.92:Math.pow((n+.055)/1.055,2.4);});
+  var board=el.closest('.board'),layers=[],ground=board && rgba(win.getComputedStyle(board).getPropertyValue('--dv-board-ground'));
+  if(ground)layers.push(ground);
+  else for(var host=el.parentElement;host;host=host.parentElement || (host.getRootNode && host.getRootNode().host)){
+    var color=rgba(win.getComputedStyle(host).backgroundColor);if(!color)continue;
+    if(color[3]>0)layers.push(color);if(color[3]===1)break;
+  }
+  var rgb=[255,255,255];layers.reverse().forEach(function(layer){rgb=rgb.map(function(v,i){return v*(1-layer[3])+layer[i]*layer[3];});});
+  var lum=rgb.map(function(v,i){var n=(v*(1-amount)+tint[i]*amount)/255;return n<=.04045?n/12.92:Math.pow((n+.055)/1.055,2.4);});
   var light=lum[0]*.2126+lum[1]*.7152+lum[2]*.0722;el.style.setProperty('--dv-live-ink',light>.179?'#000000':'#ffffff');
 }
 /* Live node paint uses Node Styles rendering (#610), with an internal Azure
@@ -123,6 +129,9 @@ function liveStatusPreset(el,token){
 }
 function liveStatusCarrier(value,map){
   return liveStatusRollup(trackingRefs(value).tickets.map(function(key){return map[key] && map[key].state;}));
+}
+function liveStatusEvidence(value,map){
+  return liveStatusPresentationRollup(trackingRefs(value).tickets.map(function(key){return map[key] && map[key].state || 'unknown';}));
 }
 /* Presentation is distinct from provider evidence: uncovered authored intent wins,
    and missing provider evidence never claims completion or no-change. */
@@ -304,7 +313,7 @@ function liveStatusEdgeBreaks(scope,diagram,map,on,availabilityOn){
     var board={svg:svg,edgeIds:Object.create(null)},failures=Object.create(null),labels=Object.create(null);
     (diagram.edges || []).forEach(function(edge,index){
       var path=svg.querySelector('path.edge[data-dv-edge="'+index+'"]');if(!path)return;
-      var state=on?liveStatusCarrier(edge,map):null,key=edge.from+'->'+edge.to,unavailable=on && availabilityOn!==false?liveStatusAvailability(edge,map,diagram):null;
+      var state=on?liveStatusEvidence(edge,map):null,key=edge.from+'->'+edge.to,unavailable=on && availabilityOn!==false?liveStatusAvailability(edge,map,diagram):null;
       if(state==='blocked' || unavailable){
         board.edgeIds[key]={e:edge,idx:index,pathEl:path,haloEl:svg.querySelector('path.halo[data-dv-edge="'+index+'"]')};
         failures[key]='blocked';labels[key]=unavailable?liveStatusAvailabilityLabel(unavailable):liveStatusBlockingKeys(edge,map).join(', ');
@@ -317,7 +326,7 @@ function liveStatusEdgeBreaks(scope,diagram,map,on,availabilityOn){
     showCommunicationFailures(board,failures,false,{live:true,labels:labels});
     svg.querySelectorAll('g.dv-live-comm-failure').forEach(function(el){
       var edge=diagram.edges[Number(el.getAttribute('data-dv-edge'))],causes=on && availabilityOn!==false?liveStatusAvailability(edge,map,diagram):null;
-      liveStatusAvailabilityClass(el,causes);liveStatusClass(el,on?liveStatusCarrier(edge,map):null);
+      liveStatusAvailabilityClass(el,causes);liveStatusClass(el,on?liveStatusEvidence(edge,map):null);
     });
     // A live break is the glyph alone: the edge names its ends, and the badge,
     // popover and the group's title/aria-label carry the blocking keys. Canvas
@@ -366,7 +375,7 @@ function liveStatusLanes(page,map){
 }
 function liveStatusCaption(diagram,step,map,waiting){
   var keys=liveStatusStepTickets(diagram,step).filter(function(key){return map[key];}),state=liveStatusStep(diagram,step,map);
-  if(!state)return '';
+  if(!state)return liveStatusStepTickets(diagram,step).length?'AWAITING TICKET STATUS':'';
   if(state==='done')return 'DONE';
   if(state==='unchanged')return 'NO CHANGE NEEDED';
   if(state==='missing' && !keys.some(function(key){return map[key].state==='missing';}))return 'MISSING WORK · unlinked work remains';
@@ -740,7 +749,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       });
     }
     var text=availabilityOn && (applied || liveStatusStepCarriers(d,step).some(function(carrier){return carrier.value.missingWork===true;}))?liveStatusCaption(d,step,map,ticketWaiting):'';
-    if(text){var caption=element('span','dv-live-caption dv-live-state-pill',text,host);liveStatusClass(caption,liveStatusStep(d,step,map));}
+    if(text){var caption=element('span','dv-live-caption dv-live-state-pill',text,host);liveStatusClass(caption,liveStatusStep(d,step,map));if(!caption.getAttribute('data-live-appearance'))liveStatusInk(caption,null);}
   }
   function laneLabel(id,source){return ((source.lanes || {})[id] || {}).label || id;}
   function laneRecords(){
@@ -917,7 +926,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       carrierTarget(card,id,value,state,binding.page.tracking,value.title || id,waits,unavailable);
     });
     scope.querySelectorAll('path.edge[data-dv-edge],path.halo[data-dv-edge],text.lbl[data-dv-edge]').forEach(function(el){
-      var index=Number(el.getAttribute('data-dv-edge')),value=(d.edges || [])[index],state=on?liveStatusCarrier(value,map):null;
+      var index=Number(el.getAttribute('data-dv-edge')),value=(d.edges || [])[index],state=on?liveStatusEvidence(value,map):null;
       var unavailable=on && availabilityOn?liveStatusAvailability(value,map,d):null;liveStatusAvailabilityClass(el,unavailable);
       var waits=value && waiting[value.from+'->'+value.to],painted=state==='blocked' || state==='missing'?null:waits;decorateCarrier(el,value,binding.page.tracking);liveStatusClass(el,state);liveStatusWaitingClass(el,painted);
       if((!state && !waits && !unavailable) || !el.classList.contains('edge'))return;

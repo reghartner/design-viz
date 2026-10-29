@@ -231,5 +231,8 @@ test('desktop imported missing-work marker uses consumer history and preserves i
  const {provider}=await fixture(page,server);await select(page,'node');const before=await source(page),control=page.locator('#guide').getByRole('checkbox',{name:'Missing work',exact:true});
  await control.check();await expect.poll(async()=>diagram(JSON.parse(await source(page))).topologyImports[0].nodeTracking.api.missingWork).toBe(true);await history(page,before);
  expect(diagram(provider).nodes.api.missingWork).toBeUndefined();await select(page,'node');await control.uncheck();await expect.poll(async()=>diagram(JSON.parse(await source(page))).topologyImports[0].nodeTracking).toBeUndefined();
- await fixture(page,server,(provider)=>{diagram(provider).nodes.api.missingWork=true;});await select(page,'node');await expect(control).toBeChecked();await expect(control).toBeDisabled();
+});
+
+test('desktop provider missing-work intent is read only in its consumer',async({page,server})=>{
+ await fixture(page,server,(provider)=>{diagram(provider).nodes.api.missingWork=true;});await select(page,'node');const control=page.locator('#guide').getByRole('checkbox',{name:'Missing work',exact:true});await expect(control).toBeChecked();await expect(control).toBeDisabled();
 });

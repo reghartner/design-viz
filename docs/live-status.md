@@ -237,10 +237,10 @@ For an element with several tickets, roll up their states in this order:
 
 blocked > missing > active > (all done → done) > (all todo → todo) > otherwise active
 
-Steps, coins and chips derive their state only from nodes and edges explicitly
-added to that step, including failed communications and imported elements. An
-edge does not bring its endpoint nodes into a step's status unless they are also
-listed in `nodes`. Steps never carry tickets. Unlinked, unmarked nodes derive No change needed; an
+Steps, coins and chips derive their state only from the edges and nodes explicitly
+added to that step, including failed communications and imported elements, and
+never carry tickets. An edge does not bring its endpoint nodes into a step's
+status unless they are also listed in `nodes`. Unlinked, unmarked nodes derive No change needed; an
 explicit `missingWork: true` contributes Missing. No-change is neutral in mixed
 rollups. Linked tickets without evidence never imply Done or No change needed.
 Pull requests never carry live state: an authored `prs` URL is an icon, and the

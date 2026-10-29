@@ -368,6 +368,8 @@ function liveStatusCaption(diagram,step,map,waiting){
   var keys=liveStatusStepTickets(diagram,step).filter(function(key){return map[key];}),state=liveStatusStep(diagram,step,map);
   if(!state)return '';
   if(state==='done')return 'DONE';
+  if(state==='unchanged')return 'NO CHANGE NEEDED';
+  if(state==='missing' && !keys.some(function(key){return map[key].state==='missing';}))return 'MISSING WORK · unlinked work remains';
   if(state==='blocked' || state==='missing'){
     var blockers=keys.filter(function(key){return map[key].state===state;}),detail=state==='blocked' && map[blockers[0]].detail;
     return state.toUpperCase()+' · '+blockers.join(', ')+(detail?' · '+detail:'');
@@ -389,14 +391,14 @@ function liveStatusReadiness(page,map,waiting){
   var result={total:0,done:0,ready:true,blockers:0,waiting:0},primaryCount=0,blockers=[];
   sectionRecords(page).forEach(function(record){var d=record.section.diagram;if(!d)return;
     var carriers=Object.keys(d.nodes || {}).filter(function(id){return !isTextBoxNode(d.nodes[id]);}).map(function(id){return d.nodes[id];}).concat(d.edges || []);
-    function complete(value){return trackingRefs(value).tickets.every(function(key){return map[key] && map[key].state==='done';});}
-    carriers.forEach(function(value){var keys=trackingRefs(value).tickets;if(!keys.length)return;result.total++;if(complete(value))result.done++;
+    function complete(value){return value.missingWork!==true && trackingRefs(value).tickets.every(function(key){return map[key] && map[key].state==='done';});}
+    carriers.forEach(function(value){var keys=trackingRefs(value).tickets;if(!keys.length && value.missingWork!==true)return;result.total++;if(complete(value))result.done++;
       liveStatusBlockingKeys(value,map).forEach(function(key){if(blockers.indexOf(key)<0)blockers.push(key);});
     });
     result.waiting+=Object.keys(liveStatusCarrierWaiting(d,map,waiting || {})).length;
     var primary=diagramPathList(d)[0];
     (primary?primary.indices:[]).forEach(function(index){liveStatusStepCarriers(d,d.steps[index]).forEach(function(carrier){
-      if(!trackingRefs(carrier.value).tickets.length)return;primaryCount++;if(!complete(carrier.value))result.ready=false;
+      if(!trackingRefs(carrier.value).tickets.length && carrier.value.missingWork!==true)return;primaryCount++;if(!complete(carrier.value))result.ready=false;
     });});
   });result.ready=result.ready && primaryCount>0;result.blockers=blockers.length;return result;
 }
@@ -553,7 +555,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       stories:storyKeys.length,done:storyKeys.filter(function(key){return map[key] && map[key].state==='done';}).length,onDiagram:storyKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length,
       blocked:blocked,waiting:waiting,outside:outside,ready:readiness.ready};
     return {states:copy(map),counts:counts,updatedAt:cacheUpdatedAt || latest,enabled:on,
-      available:!!(refs().tickets.length || refs().epics.length || coverage.excluded.length),hasData:!!(provider || applied),
+      available:!!(refs().tickets.length || refs().epics.length || coverage.excluded.length || hasMissingWork()),hasData:!!(provider || applied || hasMissingWork()),
       note:{text:noteText,kind:noteKind},actionLabel:actionFn?actionLabel:'',firstBlocker:!!firstBlocker(),
       lanes:panelLanes(pages),blockers:panelBlockers(pages),tickets:tickets,excluded:excluded,
       dependencies:copy(dependencies),waiting:copy(boardWaiting),chains:liveStatusDependencyChains(boardWaiting),suggestions:suggestions,epic:epic,
@@ -562,6 +564,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
       connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+relative(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}}};
   }
+  function hasMissingWork(){return sources().some(function(source){return sectionRecords(source).some(function(record){return Object.values(record.section.diagram && record.section.diagram.nodes || {}).some(function(node){return !isTextBoxNode(node) && node.missingWork===true;});});});}
   function connectPanels(){liveStatusPending.slice().forEach(function(pending){if(liveStatusControllerFor(pending.host)===api)pending.connect(api);});}
   function notify(){connectPanels();var value=snapshot();listeners.slice().forEach(function(fn){fn(value);});}
   function element(tag,cls,text,parent){var el=document.createElement(tag);el.className=cls;if(text!=null)el.textContent=String(text);if(parent)parent.appendChild(el);return el;}
@@ -736,8 +739,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         pill.textContent=labels[state] || 'No status';liveStatusClass(pill,state || null);
       });
     }
-    var text=liveStatusCaption(d,step,map,ticketWaiting);
-    if(text)element('span','dv-live-caption',text,host);
+    var text=availabilityOn && (applied || liveStatusStepCarriers(d,step).some(function(carrier){return carrier.value.missingWork===true;}))?liveStatusCaption(d,step,map,ticketWaiting):'';
+    if(text){var caption=element('span','dv-live-caption dv-live-state-pill',text,host);liveStatusClass(caption,liveStatusStep(d,step,map));}
   }
   function laneLabel(id,source){return ((source.lanes || {})[id] || {}).label || id;}
   function laneRecords(){
@@ -770,7 +773,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function focusBlocker(binding,index){
     var d=binding.section.diagram,carriers=liveStatusStepCarriers(d,d.steps[index]);
-    var carrier=carriers.find(function(carrier){return liveStatusBlockingKeys(carrier.value,map).length;});if(!carrier)return;
+    var carrier=carriers.find(function(carrier){return liveStatusBlockingKeys(carrier.value,map).length || carrier.value.missingWork===true;});if(!carrier)return;
     focusCarrier(binding,carrier.id);
   }
   function focusCarrier(binding,id){
@@ -998,7 +1001,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });
   }
   function visibility(){stopTimer();if(visible())fetchMap();}
-  var events=['diagram-tab-change','tab-view-change','diagram-view-change','navigation-mounted','detail-navigation'];
+  var events=['reader-skin-change','diagram-tab-change','tab-view-change','diagram-view-change','navigation-mounted','detail-navigation'];
   var api={
     refs:refs,
     snapshot:snapshot,

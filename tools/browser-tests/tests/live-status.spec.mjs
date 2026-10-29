@@ -67,67 +67,51 @@ test('V2 V3 V4 V6 V8 V9 V10 live states survive toggles, path rebuilds and detai
  await node('firmware').locator('.card').press('Enter');await expect(pop.getByRole('link',{name:'FW-45',exact:true})).toBeVisible();await expect(pop.getByRole('link',{name:'FW-46',exact:true})).toBeVisible();await expect(pop.getByRole('link',{name:'https://github.com/acme/firmware/pull/88',exact:true})).toBeVisible();await page.keyboard.press('Escape');
  await node('hardware').locator('.detail-trigger').click();await expect(root.locator('[data-dv-detail-preview] [data-dv-node="child"]')).toHaveClass(/dv-live-active/);
 });
-test('V5 all skins keep live card, edge, coin and chip paint above tones and authored colors',async({page,server},testInfo)=>{
- const spec=fixture(),d=spec.page.sections[0].diagram;d.steps[0].tone={hardware:'ok'};d.steps[0].color='#123456';d.edges.push({from:'hardware',to:'todo',label:'work',tickets:['HW-123']});d.steps.push({id:'active',edge:'hardware->todo',text:'Active work',color:'#654321'});d.paths[0].steps.push('active');const root=await open(page,server,spec),section=root.locator('#section-delivery');
- await section.locator('.schip[data-step-source="0"]').first().click();
+// Render CSS colors through the browser so color-mix and alpha are measured.
+async function contrast(locator,fillProperty,inkProperty,inkSelector){
+ return locator.evaluate((el,{fillProperty,inkProperty,inkSelector})=>{
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const ctx=canvas.getContext('2d');
+  const rgba=value=>{ctx.clearRect(0,0,1,1);ctx.fillStyle=value;ctx.fillRect(0,0,1,1);return [...ctx.getImageData(0,0,1,1).data].map((v,i)=>i===3?v/255:v);};
+  const mix=(top,bottom)=>top.slice(0,3).map((v,i)=>v*top[3]+bottom[i]*(1-top[3]));
+  const layers=[];for(let host=el.closest('.board')||el.parentElement;host;host=host.parentElement){const c=rgba(getComputedStyle(host).backgroundColor);layers.push(c);if(c[3]===1)break;}
+  let ground=[255,255,255];for(const c of layers.reverse())ground=mix(c,ground);
+  const target=el.matches('g.node')?el.querySelector('.card'):el.matches('g.coin')?el.querySelector('circle'):el;
+  const fill=rgba(getComputedStyle(target)[fillProperty]),back=mix(fill,ground),ink=rgba(getComputedStyle(inkSelector?el.querySelector(inkSelector):el)[inkProperty]);
+  const luminance=rgb=>rgb.slice(0,3).map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+  const l=[luminance(ink),luminance(back)].sort((a,b)=>a-b);const tint=rgba(getComputedStyle(el).getPropertyValue('--dv-live-color'));return {ratio:(l[1]+.05)/(l[0]+.05),alpha:fill[3],back,ground,expected:ground.map((v,i)=>v*.85+tint[i]*.15),ink:ink.slice(0,3)};
+ },{fillProperty,inkProperty,inkSelector});
+}
+test('V5 all nine skins share status backings, patterns, contrast and separate selection',async({page,server},testInfo)=>{
+ const spec=fixture(),d=spec.page.sections[0].diagram;d.nodes.unchanged={title:'Existing audit',sub:'No new work'};d.nodes.uncovered={title:'Uncovered work',sub:'Ticket still needed',missingWork:true};d.rows.push(['unchanged','uncovered']);
+ for(const [id,node] of [['active','hardware'],['done','backend'],['todo','todo'],['missing','uncovered'],['unchanged','unchanged']]){d.steps.push({id,nodes:[node],text:id,color:'#654321'});d.paths[0].steps.push(id);}
+ d.edges.push({from:'hardware',to:'todo',label:'active'});d.steps[3].edge='hardware->todo';
+ d.steps[0].tone={hardware:'ok'};
  for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){
-  if(['daylight','editorial'].includes(skin)){
-   // Legacy skins are supported authored inputs but absent from the picker.
-   spec.page.skin=skin;await open(page,server,spec,false);
-   await section.locator('.schip[data-step-source="0"]').first().click();
-  }else{
-   const nav=root.locator('.explore-navigation').first();
-   if(!await nav.locator('.reader-contents').isVisible())await nav.getByRole('button',{name:'Open Contents',exact:true}).click();
-   await nav.locator('.reader-theme-menu > summary').click();
-   await nav.locator('[data-reader-skin="'+skin+'"]').click();
-   await expect(nav.locator('.reader-theme-menu > summary')).toHaveAttribute('data-current-skin',skin);
+  spec.page.skin=skin;const root=await open(page,server,spec),section=root.locator('#section-delivery');
+  const hardware=section.locator('[data-dv-node="hardware"]'),activeChip=section.locator('.schip[data-step-source="3"]').first(),activeCoin=section.locator('.coin[data-dv-step="3"]');
+  await expect(hardware).toHaveAttribute('data-live-appearance','active');
+  await expect(hardware.locator('.card')).toHaveCSS('stroke','rgb(22, 102, 199)');
+  await expect(hardware.locator('.t1')).toHaveCSS('fill',await hardware.locator('.t2').evaluate(el=>getComputedStyle(el).fill));
+  for(const label of ['.t1','.t2']){const measured=await contrast(hardware,'fill','fill',label);expect(measured.ratio,skin+' node '+label+' contrast').toBeGreaterThanOrEqual(4.5);measured.back.forEach((v,i)=>expect(Math.abs(v-measured.expected[i]),skin+' 15% node backing').toBeLessThan(1.5));}
+  const nodeColors=await hardware.evaluate(el=>({ink:getComputedStyle(el.querySelector('.t1')).fill,fill:getComputedStyle(el.querySelector('.card')).fill}));
+  expect(nodeColors.ink).toMatch(/^rgb\((?:0, 0, 0|255, 255, 255)\)$/);
+  for(const [id,dash] of [['todo','1px, 4px'],['uncovered','6px, 4px'],['unchanged','none']])await expect(section.locator('[data-dv-node="'+id+'"] .card')).toHaveCSS('stroke-dasharray',dash);
+  for(const [index,state] of [[3,'active'],[4,'done'],[5,'todo'],[6,'missing'],[7,'unchanged']]){
+   const chip=section.locator('.schip[data-step-source="'+index+'"]').first();await expect(chip).toHaveAttribute('data-live-appearance',state);
+   const measured=await contrast(chip,'backgroundColor','color');expect(measured.alpha).toBeCloseTo(.15,2);expect(measured.ratio,skin+' '+state+' chip contrast').toBeGreaterThanOrEqual(4.5);
   }
-  await expect(root).toHaveClass(new RegExp('(^|\\s)sk-'+skin+'(\\s|$)'));
-  const azure=['aurora','terminal','blueprint'].includes(skin)
-   ?{background:'rgb(23, 46, 76)',line:'rgb(114, 181, 255)',title:'rgb(226, 239, 255)',subtitle:'rgb(169, 200, 238)'}
-   :{background:'rgb(233, 242, 255)',line:'rgb(40, 120, 223)',title:'rgb(22, 61, 114)',subtitle:'rgb(52, 91, 136)'};
-  const hardware=section.locator('[data-dv-node="hardware"]');
-  await expect(hardware.locator('.card'),skin+' Azure background').toHaveCSS('fill',azure.background);
-  await expect(hardware.locator('.card'),skin+' Azure outline').toHaveCSS('stroke',azure.line);
-  await expect(hardware.locator('.t1'),skin+' Azure title over tone').toHaveCSS('fill',azure.title);
-  await expect(hardware.locator('.t2'),skin+' Azure subtitle over tone').toHaveCSS('fill',azure.subtitle);
-  await expect(hardware.locator('.dv-live-halo')).toHaveCSS('stroke',azure.line);
-  for(const selector of ['path.edge[data-dv-edge="3"]','path.halo[data-dv-edge="3"]'])await expect(section.locator(selector)).toHaveCSS('stroke',azure.line);
-  await expect(section.locator('text.lbl[data-dv-edge="3"]')).toHaveCSS('fill',azure.line);
-  const activeCoin=section.locator('.coin[data-dv-step="3"]'),activeChip=section.locator('.schip[data-step-source="3"]').first();
-  await expect(activeCoin.locator('circle')).toHaveCSS('fill','rgb(233, 242, 255)');
-  await expect(activeCoin.locator('circle')).toHaveCSS('stroke',azure.line);
-  await expect(activeCoin.locator('text')).toHaveCSS('fill','rgb(0, 0, 0)');
-  await expect(activeChip).toHaveCSS('background-color','rgb(233, 242, 255)');
-  await expect(activeChip).toHaveCSS('border-color',azure.line);
-  await expect(activeChip).toHaveCSS('color','rgb(0, 0, 0)');
-  await activeChip.click();await expect(activeChip).toHaveAttribute('aria-current','true');
-  await expect(activeChip,skin+' compact status-colored selection over authored color').toHaveCSS('box-shadow',azure.line+' 0px 0px 0px 1px');
-  if(['aurora','pastel'].includes(skin))await section.locator('.termbar').screenshot({path:testInfo.outputPath('selected-active-'+skin+'.png')});
-  // Native keyboard navigation must still expose a distinct focus cue.
-  await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
-  await expect(activeChip).toBeFocused();await expect(activeChip).toHaveCSS('outline-style','solid');
-  expect(await activeChip.evaluate(el=>el.matches(':focus-visible')&&parseFloat(getComputedStyle(el).outlineWidth)>=1&&parseFloat(getComputedStyle(el).outlineOffset)>=2),skin+' keyboard focus outline').toBe(true);
-  const live=root.locator('.dv-live-toggle');await live.click();
-  await expect(activeCoin.locator('circle')).toHaveCSS('fill','rgb(101, 67, 33)');
-  await expect(activeChip).toHaveCSS('background-color','rgb(101, 67, 33)');
-  await live.click();await expect(activeChip).toHaveCSS('background-color','rgb(233, 242, 255)');
-  await expect(root.locator('.dv-live-head [data-live-count="active"]')).toHaveCSS('background-color',azure.line);
-  await expect(root.locator('.dv-live-tickets tr[data-live-ticket="HW-123"] .dv-live-state-pill')).toHaveCSS('background-color',azure.line);
-  await cardClick(hardware.locator('.card'));
-  await expect(root.locator('.dv-live-popover .dv-live-ticket-state')).toHaveText('active');
-  await page.keyboard.press('Escape');
-  await expect(section.locator('path.edge[data-dv-edge="0"]')).toHaveCSS('stroke',await presetLine(page,'rose'));await expect(section.locator('.coin[data-dv-step="0"] > circle')).toHaveCSS('fill',await presetLine(page,'rose'));await expect(section.locator('.schip[data-step-source="0"]').first()).toHaveCSS('background-color',await presetLine(page,'rose'));
-  const blockedChip=section.locator('.schip[data-step-source="0"]').first();await blockedChip.click();
-  await expect(blockedChip).toHaveAttribute('aria-current','true');
-  await expect(blockedChip,skin+' compact blocked selection').toHaveCSS('box-shadow',(await presetLine(page,'rose'))+' 0px 0px 0px 1px');
-  await expect(activeChip).toHaveAttribute('aria-current','false');
-  await expect(activeChip).not.toHaveCSS('box-shadow',azure.line+' 0px 0px 0px 1px');
+  await expect(activeCoin.locator('circle')).toHaveCSS('stroke','rgb(22, 102, 199)');const coinContrast=await contrast(activeCoin,'fill','fill','text');expect(coinContrast.alpha).toBeCloseTo(.15,2);expect(coinContrast.ratio,skin+' coin numeral contrast').toBeGreaterThanOrEqual(4.5);
+  await activeChip.click();await expect(activeChip).toHaveCSS('box-shadow','none');
+  expect(await activeChip.evaluate(el=>getComputedStyle(el,'::after').height)).toBe('2px');
+  await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');await expect(activeChip).toBeFocused();await expect(activeChip).toHaveCSS('outline-style','solid');
+  for(const pill of [root.locator('[data-live-count="active"]'),root.locator('tr[data-live-ticket="HW-123"] .dv-live-state-pill')]){await expect(pill).toHaveCSS('border-color','rgb(22, 102, 199)');const measured=await contrast(pill,'backgroundColor','color');expect(measured.alpha).toBeCloseTo(.15,2);expect(measured.ratio).toBeGreaterThanOrEqual(4.5);}
+  await cardClick(hardware.locator('.card'));await expect(root.locator('.dv-live-popover .dv-live-ticket-state')).toHaveAttribute('data-live-appearance','active');await page.keyboard.press('Escape');
+  if(['aurora','pastel'].includes(skin))await section.screenshot({path:testInfo.outputPath('status-surfaces-'+skin+'.png')});
+  await root.locator('.dv-live-toggle').click();await expect(activeChip).toHaveCSS('background-color','rgb(101, 67, 33)');await expect(hardware).not.toHaveAttribute('data-live-appearance');await root.locator('.dv-live-toggle').click();await expect(activeChip).toHaveAttribute('data-live-appearance','active');
  }
- await page.emulateMedia({reducedMotion:'no-preference'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-duration','2.4s');
- await page.emulateMedia({reducedMotion:'reduce'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-name','none');
- await expect.poll(()=>section.locator('[data-dv-node="ux"]').evaluate(el=>+getComputedStyle(el).opacity)).toBeGreaterThanOrEqual(.55);
- await page.emulateMedia({media:'print',reducedMotion:'no-preference'});await expect(section.locator('[data-dv-node="hardware"] .dv-live-halo')).toHaveCSS('animation-name','none');await expect(section.locator('[data-dv-node="hardware"] .card')).toHaveCSS('stroke',await presetLine(page,'azure'));await expect(section.locator('.coin[data-dv-step="3"] > circle')).toHaveCSS('fill','rgb(233, 242, 255)');
+ await page.emulateMedia({reducedMotion:'no-preference'});await expect(page.locator('[data-dv-node="hardware"] .dv-live-halo').first()).toHaveCSS('animation-duration','2.6s');
+ await page.emulateMedia({reducedMotion:'reduce'});await expect(page.locator('[data-dv-node="hardware"] .dv-live-halo').first()).toHaveCSS('animation-name','none');
+ await page.emulateMedia({media:'print',reducedMotion:'no-preference'});await expect(page.locator('[data-dv-node="hardware"] .dv-live-halo').first()).toHaveCSS('animation-name','none');
 });
 test('V7 V11 authored reference menus work without provider paint',async({page,server})=>{
  const root=await open(page,server,fixture(),false);await expect(root.locator('.dv-live-badge')).toHaveCount(0);await expect(root.locator('.dv-live-toggle')).toBeHidden();
@@ -167,14 +151,14 @@ test('S1 S2 S3 S4 S5 S6 built demo plays the story through blockers to completio
  await expect(node('mcu')).toHaveClass(/dv-live-waiting/);await expect(node('mcu')).toHaveClass(/dv-live-active/);await expect(node('mcu')).toHaveAttribute('data-dv-live-waiting-on','HW-124');await expect(node('mcu')).toHaveAttribute('data-dv-live-waiting-tone','red');await expect(node('button')).not.toHaveClass(/dv-live-waiting/);
  await expect(node('ingest')).toHaveClass(/dv-live-waiting/);await expect(node('ingest')).toHaveAttribute('data-dv-live-waiting-tone','grey');await expect(node('ingest')).toHaveAttribute('data-dv-live-waiting-on','FW-45');
  await expect(node('mcu').locator('.dv-live-waiting-tag')).toHaveCount(0);await expect(root.locator('svg .dv-live-waiting-icon')).toHaveCount(0);await node('mcu').locator('.card').press('Enter');await expect(root.locator('.dv-live-popover .dv-live-waiting-detail')).toHaveText('Waiting on HW-124 · blocked');await expect(root.locator('.dv-live-popover .dv-live-waiting-chain')).toHaveText('HW-124 holds FW-46');await page.keyboard.press('Escape');
- for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){await page.evaluate(s=>window.dvSetSkin(s),skin);await expect(node('mcu').locator('.card')).toHaveCSS('stroke',await presetLine(page,'rose'));await expect(node('mcu').locator('.card')).toHaveCSS('stroke-dasharray','5px, 5px');await expect(node('mcu').locator('.dv-live-halo'),skin+' red waiting halo').toHaveCSS('stroke',await presetLine(page,'rose'));await expect(node('ingest').locator('.card'),skin+' grey waiting card').toHaveCSS('stroke',await presetLine(page,'slate'));}
- await page.emulateMedia({media:'print'});await expect(node('mcu').locator('.card')).toHaveCSS('stroke',await presetLine(page,'rose'));await expect(node('mcu').locator('.dv-live-halo')).toHaveCSS('animation-name','none');await page.emulateMedia({media:'screen'});
+ for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){await page.evaluate(s=>window.dvSetSkin(s),skin);await expect(node('mcu').locator('.card')).toHaveCSS('stroke',statusLine('blocked'));await expect(node('mcu').locator('.card')).toHaveCSS('stroke-dasharray','5px, 5px');await expect(node('mcu').locator('.dv-live-halo'),skin+' red waiting halo').toHaveCSS('stroke',statusLine('blocked'));await expect(node('ingest').locator('.card'),skin+' grey waiting card').toHaveCSS('stroke',statusLine('todo'));}
+ await page.emulateMedia({media:'print'});await expect(node('mcu').locator('.card')).toHaveCSS('stroke',statusLine('blocked'));await expect(node('mcu').locator('.dv-live-halo')).toHaveCSS('animation-name','none');await page.emulateMedia({media:'screen'});
  await root.locator('.schip[data-step-source="0"]').first().click();await expect(failure).toHaveCount(1);await expect(failure).toBeVisible();
  for(let day=5;day<=12;day++){
   await next.click();await expect(root.locator('.dv-live-note')).toContainText('Day '+day+' —');
   if(day===6){await expect(node('app')).toHaveClass(/dv-live-missing/);await expect(root.locator('g.comm-failure[data-dv-edge="4"]')).toHaveCount(0);}
   // Day 7: HW-124 is unblocked but unfinished, so FW-46 still waits, now grey. Day 8: FW-46 is active and nothing waits.
-  if(day===7){await expect(root.locator('g.comm-failure')).toHaveCount(0);await expect(node('mcu')).toHaveClass(/dv-live-waiting/);await expect(node('mcu')).toHaveAttribute('data-dv-live-waiting-tone','grey');await expect(node('mcu').locator('.card')).toHaveCSS('stroke',await presetLine(page,'slate'));}
+  if(day===7){await expect(root.locator('g.comm-failure')).toHaveCount(0);await expect(node('mcu')).toHaveClass(/dv-live-waiting/);await expect(node('mcu')).toHaveAttribute('data-dv-live-waiting-tone','grey');await expect(node('mcu').locator('.card')).toHaveCSS('stroke',statusLine('todo'));}
   if(day===8)await expect(root.locator('.dv-live-waiting')).toHaveCount(0);
   if(day===9){await expect(node('chime')).toHaveClass(/dv-live-done/);await expect(node('chime')).not.toHaveClass(/dv-live-waiting/);}
  }
@@ -463,7 +447,7 @@ test('B1 B2 B3 B4 B5 B7 B8 story playback stops on blockers and details reach re
  }
  await expect.poll(async()=> (await panel.locator('.dv-live-epic-counts').textContent()).split(' · ')[0]).toBe('Ready to demo');
  // Completed upstream work wears the green check (Chuck, PR #784 review).
- const doneDep=panel.locator('tr[data-live-ticket="FW-46"] .dv-live-dep');await expect(doneDep).toHaveAttribute('data-tone','done');await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCount(1);await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCSS('color',await presetLine(page,'moss'));await expect(panel.locator('.dv-live-epic-progress')).toHaveText('8 of 8 stories done · 7 of 8 on diagram');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(root.getByRole('button',{name:'First blocker',exact:true})).toBeHidden();await expect(panel.locator('.dv-live-completion')).toContainText('11/11');
+ const doneDep=panel.locator('tr[data-live-ticket="FW-46"] .dv-live-dep');await expect(doneDep).toHaveAttribute('data-tone','done');await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCount(1);await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCSS('color',statusLine('done'));await expect(panel.locator('.dv-live-epic-progress')).toHaveText('8 of 8 stories done · 7 of 8 on diagram');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(root.getByRole('button',{name:'First blocker',exact:true})).toBeHidden();await expect(panel.locator('.dv-live-completion')).toContainText('11/11');
  await page.keyboard.press('Escape');await expect(panel).toBeVisible();await expect(panel.locator('.pbody')).not.toBeEmpty();
 });
 test('B2 B3 automatic advancement pauses on the newly selected missing beat; manual navigation remains available',async({page,server})=>{
@@ -480,31 +464,15 @@ test('B5 B9 reduced motion creates no change pulse after real demo changes',asyn
  const root=await openStory(page,server);await root.getByRole('button',{name:'Next day',exact:true}).click();await expect(root.locator('.dv-live-changed')).toHaveCount(0);
 });
 
-test('B5 changed node pulses its card in every skin without moving the positioned group',async({page,server})=>{
- const root=await openStory(page,server),node=root.locator('g.node[data-dv-node="button"]');
- await page.emulateMedia({reducedMotion:'no-preference'});
- const before=await node.evaluate(el=>{
-  const card=el.querySelector('.card');
-  const pause=ev=>{
-   if(ev.target!==card || ev.animationName!=='dvnodepulse')return;
-   const animation=card.getAnimations().find(a=>a.animationName==='dvnodepulse');
-   animation.pause();animation.currentTime=230;el.removeEventListener('animationstart',pause);
-  };
-  el.addEventListener('animationstart',pause);
-  return {transform:getComputedStyle(el).transform,attribute:el.getAttribute('transform')};
- });
- await root.getByRole('button',{name:'Next day',exact:true}).click();
- await expect(node).toHaveClass(/dv-live-changed/);
- await expect.poll(()=>node.locator('.card').evaluate(el=>el.getAnimations().some(a=>a.animationName==='dvnodepulse' && a.playState==='paused'))).toBe(true);
+test('B5 changing evidence keeps text and geometry steady while only active borders pulse',async({page,server})=>{
+ const root=await openStory(page,server),node=root.locator('g.node[data-dv-node="button"]');await page.emulateMedia({reducedMotion:'no-preference'});
+ const before=await node.getAttribute('transform');await root.getByRole('button',{name:'Next day',exact:true}).click();
  for(const skin of ['aurora','daylight','editorial','terminal','pastel','blueprint','rose','lavender','lilac']){
-  await page.evaluate(s=>window.dvSetSkin(s),skin);
-  await expect(node.locator('.card')).toHaveCSS('animation-name','dvnodepulse');
-  await expect(node).toHaveCSS('transform',before.transform);await expect(node).toHaveAttribute('transform',before.attribute);
-  expect(await node.evaluate(el=>el.getAnimations().some(a=>a.animationName==='dvnodepulse'))).toBe(false);
-  expect(await node.locator('.card').evaluate(el=>getComputedStyle(el).transform)).not.toBe('none');
+  await page.evaluate(s=>window.dvSetSkin(s),skin);await expect(node.locator('.card')).toHaveCSS('animation-name','none');await expect(node).toHaveAttribute('transform',before);
+  const halo=node.locator('.dv-live-halo');await expect(halo).toHaveCSS('animation-duration','2.6s');
+  const states=await node.evaluate(el=>{const a=el.querySelector('.dv-live-halo').getAnimations()[0];a.pause();a.currentTime=0;const low=getComputedStyle(el.querySelector('.dv-live-halo')).opacity;a.currentTime=1300;return {low,high:getComputedStyle(el.querySelector('.dv-live-halo')).opacity,text:getComputedStyle(el.querySelector('.t1')).opacity,transform:getComputedStyle(el.querySelector('.t1')).transform};});
+  expect(+states.high).toBeGreaterThan(+states.low);expect(states.text).toBe('1');expect(states.transform).toBe('none');
  }
- await node.locator('.card').evaluate(el=>el.getAnimations().find(a=>a.animationName==='dvnodepulse').finish());
- await expect(node).not.toHaveClass(/dv-live-changed/);
 });
 
 test('E6 E10 E11 built epic Tickets table lists all children without diagram links',async({page,server})=>{
@@ -720,6 +688,7 @@ test('L1 every demo day keeps live text off edge labels, coins, badges and node 
  P2 missing carriers have a dotted rose outline/stroke; blocked ones are solid.
  P3 an authored node `style` yields to live state and returns when Live is turned off. */
 const LIVE_PRESET={todo:'slate',active:'azure',done:'moss',blocked:'rose',missing:'rose'};
+function statusLine(state){return {todo:'rgb(107, 114, 128)',active:'rgb(22, 102, 199)',done:'rgb(35, 125, 61)',blocked:'rgb(180, 35, 56)',missing:'rgb(225, 75, 90)'}[state];}
 async function presetLine(page,token){
  return page.evaluate(t=>{
   const svg=document.querySelector('#docview g.node').ownerSVGElement,g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node ns-'+t+(t==='azure'?' dv-live-active':''));svg.appendChild(g);
@@ -730,27 +699,27 @@ test('P1 live nodes wear Node Styles presets; Active coins keep pale Azure inter
  const root=await openStory(page,server),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
  await demoDay(root,2);
  for(const skin of ['daylight','aurora']){
-  await page.evaluate(s=>window.dvSetSkin(s),skin);
+  await page.evaluate(s=>window.dvSetSkin(s),skin);await expect.poll(()=>node('button').evaluate(el=>el.style.getPropertyValue('--dv-live-ink'))).toBe(skin==='aurora'?'#ffffff':'#000000');
   await expect(root.locator('path.edge[data-dv-edge="0"]'),skin).toHaveClass(/dv-live-active/);
-  await expect(root.locator('path.edge[data-dv-edge="0"]'),skin+' active edge').toHaveCSS('stroke',await presetLine(page,'azure'));
+  await expect(root.locator('path.edge[data-dv-edge="0"]'),skin+' active edge').toHaveCSS('stroke',statusLine('active'));
   const coins=await root.locator('g.coin[data-dv-step]').evaluateAll(els=>els.map(el=>({state:(/dv-live-(todo|active|done|blocked|missing)/.exec(el.getAttribute('class'))||[])[1],fill:getComputedStyle(el.querySelector('circle')).fill,ink:getComputedStyle(el.querySelector('text')).fill})).filter(c=>c.state));
   expect(coins.length,skin+' painted coins').toBeGreaterThan(0);
-  for(const coin of coins){expect(coin.fill,skin+' '+coin.state+' coin').toBe(coin.state==='active'?'rgb(233, 242, 255)':await presetLine(page,LIVE_PRESET[coin.state]));expect(coin.ink,skin+' '+coin.state+' coin numeral').toBe('rgb(0, 0, 0)');}
+  for(const coin of coins){expect(coin.fill).toContain('/ 0.15)');expect(coin.ink).toBe(skin==='aurora'?'rgb(255, 255, 255)':'rgb(0, 0, 0)');}
  }
  await demoDay(root,4);
  // Day 4: mcu waits red on the blocked HW-124 (rose); ingest waits grey on the unfinished FW-45 (slate).
  for(const [id,token] of [['chime','rose'],['button','azure'],['mcu','rose'],['ingest','slate']]){await expect(node(id),id).toHaveClass(/\bnode-styled\b/);await expect(node(id),id).toHaveClass(new RegExp('\\bns-'+token+'\\b'));}
  for(const skin of ['daylight','aurora']){
   await page.evaluate(s=>window.dvSetSkin(s),skin);
-  for(const [id,token] of [['chime','rose'],['button','azure'],['mcu','rose'],['ingest','slate']])await expect(node(id).locator('.card'),skin+' '+id).toHaveCSS('stroke',await presetLine(page,token));
-  await expect(root.locator('path.edge[data-dv-edge="3"]'),skin+' grey waiting edge').toHaveClass(/dv-live-waiting/);await expect(root.locator('path.edge[data-dv-edge="3"]'),skin+' grey waiting edge').toHaveCSS('stroke',await presetLine(page,'slate'));
+  for(const [id,token] of [['chime','rose'],['button','azure'],['mcu','rose'],['ingest','slate']])await expect(node(id).locator('.card'),skin+' '+id).toHaveCSS('stroke',statusLine({rose:'blocked',slate:'todo',azure:'active',moss:'done'}[token]));
+  await expect(root.locator('path.edge[data-dv-edge="3"]'),skin+' grey waiting edge').toHaveClass(/dv-live-waiting/);await expect(root.locator('path.edge[data-dv-edge="3"]'),skin+' grey waiting edge').toHaveCSS('stroke',statusLine('todo'));
  }
 });
 test('P2 missing carriers are dotted rose, blocked ones solid rose',async({page,server})=>{
  const root=await openStory(page,server),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');await demoDay(root,6);
  await expect(node('app')).toHaveClass(/dv-live-missing/);await expect(node('app')).toHaveClass(/\bns-rose\b/);
- await expect(node('app').locator('.card')).toHaveCSS('stroke-dasharray','2px, 3px');
- await expect(root.locator('path.edge[data-dv-edge="4"]')).toHaveClass(/dv-live-missing/);await expect(root.locator('path.edge[data-dv-edge="4"]')).toHaveCSS('stroke-dasharray','2px, 3px');
+ await expect(node('app').locator('.card')).toHaveCSS('stroke-dasharray','6px, 4px');
+ await expect(root.locator('path.edge[data-dv-edge="4"]')).toHaveClass(/dv-live-missing/);await expect(root.locator('path.edge[data-dv-edge="4"]')).toHaveCSS('stroke-dasharray','6px, 4px');
  await expect(node('chime')).toHaveClass(/dv-live-blocked/);await expect(node('chime').locator('.card')).toHaveCSS('stroke-dasharray','none');
 });
 test('P3 an authored node style yields to live paint and returns when Live is off',async({page,server})=>{
@@ -862,7 +831,7 @@ test('A1 planned availability keeps Jira state, breaks incident traffic and rest
  await incident.press('Enter');await expect(pop).toContainText('Awaiting Jira status');await expect(pop).not.toContainText('Not built yet');await expect(pop.getByRole('link',{name:'API-1',exact:true})).toBeVisible();await expect(pop).toContainText('No status');await page.keyboard.press('Escape');await expect(incident).toBeFocused();
  await expect.poll(()=>page.evaluate(()=>typeof window.__availabilityResolve)).toBe('function');
  await page.evaluate(()=>{window.__availabilityMap={'API-1':{state:'done'},'LINK-1':{state:'active'},'APP-1':{state:'active'}};window.__availabilityResolve(window.__availabilityMap);});
- await expect(node).toHaveClass(/dv-live-done/);await expect(node).toHaveClass(/dv-live-unavailable/);await expect(edge).toHaveClass(/dv-live-active/);await expect(edge).not.toHaveClass(/dv-live-blocked/);
+ await expect(node).not.toHaveClass(/dv-live-done/);await expect(node).toHaveClass(/dv-live-unavailable/);await expect(edge).toHaveClass(/dv-live-active/);await expect(edge).not.toHaveClass(/dv-live-blocked/);
  await expect(root.locator('.dv-live-comm-failure')).toHaveCount(2);
  const packets=root.locator('circle.pkt');expect(await packets.count()).toBeGreaterThan(0);
  expect(await packets.evaluateAll(els=>els.filter(el=>el.querySelector('mpath')?.getAttribute('href')===('#'+document.querySelector('path.edge[data-dv-edge="1"]').id)).every(el=>getComputedStyle(el).display==='none'))).toBe(true);
@@ -925,7 +894,7 @@ test('A3 availability survives rebuilt native diagrams and clear or destroy rest
   expect(await node.locator('.dv-live-construction text').evaluateAll(els=>els.every(el=>{const b=el.getBBox();return b.x>=0&&b.x+b.width<=150&&b.y+b.height<=86;}))).toBe(true);
   await node.screenshot({path:testInfo.outputPath('reserved-'+skin+'.png')});
   const content=await node.locator('.t1,.t2').evaluateAll(els=>els.map(el=>({y:el.getAttribute('y'),box:el.getBBox().y+el.getBBox().height})));expect(content.every(el=>el.box<54)).toBe(true);
-  await apply({'API-1':{state:'done'}});await expect(node).toHaveClass(/dv-live-done/);await expect(node).toHaveClass(/ns-slate/);await expect(node).not.toHaveClass(/ns-moss/);await expect(node.locator('.dv-live-reservation-title')).toHaveText('AWAITING JIRA STATUS');await expect(node.locator('.card')).toHaveAttribute('aria-label',/Awaiting Jira status/);await expect(node.locator('.card')).not.toHaveAttribute('aria-label',/Not built/);
+  await apply({'API-1':{state:'done'}});await expect(node).not.toHaveClass(/dv-live-done/);await expect(node).toHaveClass(/ns-slate/);await expect(node).not.toHaveClass(/ns-moss/);await expect(node.locator('.dv-live-reservation-title')).toHaveText('AWAITING JIRA STATUS');await expect(node.locator('.card')).toHaveAttribute('aria-label',/Awaiting Jira status/);await expect(node.locator('.card')).not.toHaveAttribute('aria-label',/Not built/);
   await apply({'API-1':{state:'active'},'API-2':{state:'todo'}});await expect(node).toHaveClass(/dv-live-blueprint/);await expect(node).toHaveClass(/ns-azure/);await expect(node.locator('.dv-live-hatching')).toHaveCount(1);await expect(node.locator('.dv-live-reservation-title')).toHaveCount(0);await expect(node.locator('use').first()).toHaveCSS('visibility','visible');
   await expect(imageNode.locator('.node-image')).toHaveCSS('visibility','visible');await expect(handoff.locator('.dv-live-hatching')).toHaveCount(1);
   await node.screenshot({path:testInfo.outputPath('blueprint-'+skin+'.png')});
@@ -934,7 +903,7 @@ test('A3 availability survives rebuilt native diagrams and clear or destroy rest
   await apply({'API-1':{state:'missing'}});await expect(node).toHaveClass(/ns-rose/);
   await apply({'API-1':{state:'done'},'API-2':{state:'todo'}});await expect(node).toHaveClass(/dv-live-blueprint/);
   await apply({'API-1':{state:'done'},'API-2':{state:'done'},'LINK-1':{state:'done'}});await expect(node).toHaveClass(/dv-live-done/);await expect(node).toHaveClass(/ns-moss/);await expect(node.locator('.dv-live-construction')).toHaveCount(0);
-  const moss=await color('moss');await expect(node.locator('.card')).toHaveCSS('fill',moss.bg);await expect(node.locator('.card')).toHaveCSS('stroke',moss.line);await expect(node.locator('.card')).toHaveCSS('stroke-dasharray','none');
+  await expect(node.locator('.card')).toHaveCSS('stroke',statusLine('done'));await expect(node.locator('.card')).toHaveCSS('stroke-dasharray','none');
   await node.screenshot({path:testInfo.outputPath('completed-green-'+skin+'.png')});
   expect(await node.locator('.t1,.t2').evaluateAll(els=>els.map(el=>({y:el.getAttribute('y'),box:el.getBBox().y+el.getBBox().height})))).toEqual(content);
   await root.locator('#section-planned .board').screenshot({path:testInfo.outputPath('completed-board-'+skin+'.png')});
@@ -952,4 +921,17 @@ test('A3 availability survives rebuilt native diagrams and clear or destroy rest
  await page.evaluate(()=>window.viewer.controller.liveStatus.apply({'API-1':{state:'active'}}));await expect(node).toHaveClass(/dv-live-blueprint/);
  await page.evaluate(()=>window.viewer.controller.liveStatus.destroy());await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target')).toHaveCount(0);await expect(node.locator('.dv-live-construction')).toHaveCount(0);
  await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
+});
+
+test('desktop Missing work is one undoable edit and survives exported project reload',async({page,server},testInfo)=>{
+ await importWorkbench(page,server);const source=page.locator('#src'),node=page.locator('#docview g.node[data-dv-node="hardware"] .card');
+ await cardClick(node);await page.locator('#editor-tab-inspect').click();const control=page.locator('#guide').getByRole('checkbox',{name:'Missing work',exact:true}),before=await source.inputValue();
+ await control.check();await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.nodes.hardware.missingWork).toBe(true);const after=await source.inputValue();
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);
+ await cardClick(node);await expect(control).toBeChecked();await page.locator('#guide').screenshot({path:testInfo.outputPath('missing-work-inspector.png')});
+ const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const files=await projectFiles(await pending),saved=files[Object.keys(files).find(k=>k.endsWith('.spec.json'))];
+ expect(JSON.parse(saved).page.flowview.features).toContain('flow.missing-work');
+ await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-file').setInputFiles({name:'missing-work.spec.json',mimeType:'application/json',buffer:Buffer.from(saved)});
+ await expect(node).toBeVisible();await closeTools(page);await cardClick(node);await page.locator('#editor-tab-inspect').click();await expect(control).toBeChecked();
+ await control.uncheck();await expect.poll(async()=>Object.hasOwn(JSON.parse(await source.inputValue()).page.sections[0].diagram.nodes.hardware,'missingWork')).toBe(false);
 });

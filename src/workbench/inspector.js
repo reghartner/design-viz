@@ -583,9 +583,12 @@ function trackingControls(val,overlay){
       return ok;
     }
     var refs=trackingRefs(val);
-    if(!overlay && session.target && session.target.kind==='node'){
-      box.appendChild(frow('Missing work',checkboxControl(val.missingWork===true,function(checked){return commitSimple('missingWork',checked?'true':null);})));
-      var missingHelp=document.createElement('p');missingHelp.className='fnote';missingHelp.textContent='Additional work has no linked ticket. This stays visible in Live status, even with linked tickets, until you clear it. With no tickets or marker, no change is needed.';box.appendChild(missingHelp);
+    if(session.target && session.target.kind==='node' && !(overlay && overlay.textBox)){
+      var inheritedMissing=overlay && overlay.inherited.missingWork===true;
+      var missingControl=checkboxControl(inheritedMissing || val.missingWork===true,function(checked){return overlay?overlay.update('missingWork',true,!checked):commitSimple('missingWork',checked?'true':null);});
+      missingControl.querySelector('input').disabled=!!inheritedMissing;
+      box.appendChild(frow('Missing work',missingControl));
+      var missingHelp=document.createElement('p');missingHelp.className='fnote';missingHelp.textContent=(inheritedMissing?'Inherited from the provider. ':'')+'Additional work has no linked ticket. This stays visible in Live status, even with linked tickets, until cleared. With no tickets or marker, no change is needed.';box.appendChild(missingHelp);
     }
     if(!(overlay && overlay.textBox)){
       var inheritedRule=overlay && overlay.inherited.existsWhen==='tickets-done';

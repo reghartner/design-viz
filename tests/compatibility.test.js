@@ -458,3 +458,9 @@ test('ticket availability is detected beyond earlier tracked carriers and in con
   assert.ok(C.detect(raw).includes('flow.ticket-availability'));assert.ok(C.check(stamped,{version:C.version,contract:'1',features:older}).missingFeatures.includes('flow.ticket-availability'));
  }
 });
+
+test('missing-work only nodes and consumer overlays declare coverage and live-status capabilities',()=>{
+ for(const diagram of [{nodes:{gap:{missingWork:true}},rows:[['gap']]},{topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{missingWork:true}}}]}]){
+  const features=C.detect({page:{sections:[{diagram}]}});assert.ok(features.includes('flow.missing-work'));assert.ok(features.includes('flow.live-status'));
+ }
+});

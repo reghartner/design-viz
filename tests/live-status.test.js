@@ -1615,3 +1615,24 @@ test('planned nodes and incident edges stay unavailable through unknown evidence
  api.apply({});api.destroy();assert.equal(h.view.querySelectorAll('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target').length,0);assert.equal(JSON.stringify(raw),before);
  const fresh=harness(raw);fresh.ctl.liveStatus.destroy();assert.equal(fresh.view.querySelectorAll('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target').length,0,'destroy before first map restores visuals');
 });
+
+test('coverage markers survive normalization, propagate to steps, never manufacture Jira evidence and restore cleanly',()=>{
+ const raw={nodes:{reuse:{title:'Existing'},gap:{title:'Uncovered',missingWork:true},tracked:{tickets:['AA-1','AA-2']},text:{type:'text',text:'Note',missingWork:true}},rows:[['reuse','gap','tracked']],steps:[{id:'reuse',nodes:['reuse']},{id:'gap',nodes:['gap']},{id:'mixed',nodes:['reuse','tracked']}]};
+ const h=harness(raw),api=h.ctl.liveStatus,d=h.ctl.page.sections[0].diagram;
+ assert.equal(d.nodes.gap.missingWork,true);assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().hasData,true);
+ assert.equal(h.view.querySelector('[data-dv-node="gap"]').getAttribute('data-live-appearance'),'missing');
+ api.apply({'AA-1':{state:'done'}});
+ assert.equal(h.view.querySelector('[data-dv-node="reuse"]').getAttribute('data-live-appearance'),'unchanged');
+ assert.equal(h.view.querySelector('[data-dv-node="tracked"]').getAttribute('data-live-appearance'),null);
+ assert.equal(h.view.querySelector('[data-dv-node="text"]').getAttribute('data-live-appearance'),null);
+ assert.equal(h.C.liveStatusStep(d,d.steps[1],{}),'missing');assert.equal(h.C.liveStatusCaption(d,d.steps[1],{}),'MISSING WORK · unlinked work remains');
+ assert.equal(h.C.liveStatusCaption(d,d.steps[0],{}),'NO CHANGE NEEDED');
+ assert.equal(h.C.liveStatusStep(d,d.steps[2],{'AA-1':{state:'done'}}),null);
+ assert.equal(h.C.liveStatusStep(d,d.steps[2],{'AA-1':{state:'done'},'AA-2':{state:'done'}}),'done');
+ assert.deepEqual(plain(api.refs().tickets),['AA-1','AA-2']);assert.deepEqual(plain(api.snapshot().counts),{todo:0,active:0,done:1,blocked:0,missing:0});
+ assert.equal(h.C.liveStatusReadiness(h.ctl.page,{'AA-1':{state:'done'},'AA-2':{state:'done'}},{}).ready,false);
+ const card=h.view.querySelector('[data-dv-node="gap"]').querySelector('.card');assert.match(card.getAttribute('aria-label'),/Work status.*Missing work/);
+ h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});assert.match(h.view.querySelector('.dv-live-coverage-detail').textContent,/additional work remains/);
+ api.clear();assert.equal(h.view.querySelectorAll('[data-live-appearance]').length,0);api.apply({});api.destroy();assert.equal(h.view.querySelectorAll('[data-live-appearance]').length,0);
+ const invalid=h.C.validate(h.C.normalize({nodes:{a:{missingWork:'yes'}},rows:[['a']]}));assert.ok(invalid.warnings.some(w=>w.includes('missingWork')));
+});

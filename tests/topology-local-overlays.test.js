@@ -224,3 +224,16 @@ test('availability overlays preserve provider rules and local additions across r
  assert.equal(c.topologyTrackingTarget(JSON.stringify(source),source,0,'node','shared::api',f.context).inherited.existsWhen,'tickets-done');
  assert.throws(()=>c.FlowTopology.validateTracking({existsWhen:'prs-merged'},'tracking'),/existsWhen/);assert.deepEqual(f.context,before);
 });
+
+test('missing-work overlays preserve provider intent and reference edits without fake tickets',()=>{
+ const f=fixtures(),source=apply(f,(t,r)=>c.planTopologyTracking(t,r,0,'node','shared::api','missingWork',true,false,f.context));
+ assert.deepEqual(d(source).topologyImports[0].nodeTracking,{api:{missingWork:true}});
+ assert.equal(d(c.FlowTopology.resolveSource(source,f.context)).nodes['shared::api'].missingWork,true);
+ const linked=apply({...f,source},(t,r)=>c.planTopologyTracking(t,r,0,'node','shared::api','tickets','AA-1',false,f.context));
+ assert.deepEqual(d(linked).topologyImports[0].nodeTracking.api,{tickets:['AA-1'],missingWork:true});
+ const removed=apply({...f,source:linked},(t,r)=>c.planTopologyTracking(t,r,0,'node','shared::api','missingWork',true,true,f.context));
+ assert.deepEqual(d(removed).topologyImports[0].nodeTracking.api,{tickets:['AA-1']});
+ d(f.provider).nodes.api.missingWork=true;
+ assert.match(c.planTopologyTracking(JSON.stringify(f.source),f.source,0,'node','shared::api','missingWork',true,true,f.context).error,/inherited/);
+ assert.equal(d(f.provider).nodes.api.missingWork,true);
+});

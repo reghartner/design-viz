@@ -87,12 +87,14 @@ var FlowTopology = (function(){
   }
 
   function validateTracking(value,at){
-    shape(value,['tickets','prs','existsWhen'],at);
+    shape(value,['tickets','prs','existsWhen','missingWork'],at);
+    if(Object.prototype.hasOwnProperty.call(value,'missingWork') && typeof value.missingWork!=='boolean')fail(at,'missingWork must be true or false');
     if(Object.prototype.hasOwnProperty.call(value,'existsWhen') && value.existsWhen!=='tickets-done')fail(at,'existsWhen must be tickets-done');
     trackingRefs(value,function(field,index){fail(at,'invalid '+field+(index===null?' array':' entry '+index));});
   }
   function applyTracking(value,addition){
     if(!addition)return;
+    if(!value.from && addition.missingWork===true)value.missingWork=true;
     if(addition.existsWhen==='tickets-done')value.existsWhen=addition.existsWhen;
     var inherited=trackingStoredRefs(value),local=trackingStoredRefs(addition);
     var merged=trackingStoredRefs({tickets:inherited.tickets.concat(local.tickets),prs:inherited.prs.concat(local.prs)});

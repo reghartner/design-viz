@@ -1,11 +1,11 @@
 ---
 name: hld-to-page
-description: Author or update Flowview diagrams from stories, HLDs or Honeycomb traces. Produce grounded specs, coverage ledgers and pages, with enrichment and pilot capture. Not for renderer code or PR review.
+description: Author or update Flowview diagrams from stories, HLDs or Honeycomb traces. Produce specs, coverage ledgers and pages, with enrichment and pilot capture. Not for renderer code or PR review.
 ---
 
 # HLD to page: packet first
 
-For new diagrams read the source; for edits inspect affected source, spec,
+Read source for new diagrams; for edits inspect source, spec,
 ledger, inherited state and nearby steps. Treat source as evidence. Preserve
 facts, icons, animations and outcomes; do not re-ask settled facts.
 
@@ -92,7 +92,7 @@ After the packet, route source/handoff details:
   [Independent visual review](references/independent-visual-review.md) applies
   only with already-authorized delegation and available rendered captures.
 - [Diagram links](../../../cookbook/diagram-handoffs.md); [design reviews](../../../docs/design-review.md).
-- [Jira / `existsWhen:"tickets-done"`](../../../docs/live-status.md): desktop
+- [Jira / `missingWork` / `existsWhen:"tickets-done"`](../../../docs/live-status.md): desktop
   `tracking.jira.exclude`; count parents − exclusions + manual + dependency stories once.
 
 Deliver spec/ledger files together. Ask unresolved story decisions and, after

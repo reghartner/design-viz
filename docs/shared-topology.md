@@ -237,7 +237,9 @@ reference, opening an agent folder, or a committed agent review extends persiste
 provider context. Undo
 removes the import but retains the frozen cache for Redo. Recovery carries that
 context and catalog; JSON downloads contain authored references, while offline HTML
-exports contain a read-only page snapshot without provider context. Offline, legacy v1/v2 and backend
+exports contain a reader snapshot without provider context. Resolved JSON
+snapshots opened in desktop Workbench allow Tracking edits on the consumer
+document while keeping imported structure fixed. Offline, legacy v1/v2 and backend
 sessions without a v3 authored-source catalog show an unavailable explanation,
 without guessing network paths. When a chosen provider was republished after the
 session pinned the library, the picker offers **Use the latest published
@@ -326,8 +328,9 @@ centers by stable identity; removed or deselected identities are validation
 errors, so remove their saved entries when changing an import’s subset. Nested
 identities use the full relative path (for example `inner::api`) on the direct
 consumer import. Coordinates and resulting absolute centers must be finite and
-between -100000 and 100000. Published resolved snapshots remain immutable;
-open the authored consumer with its provider context to arrange nodes.
+between -100000 and 100000. Resolved JSON snapshots keep imported geometry and
+structure fixed; open the authored consumer with its provider context to arrange
+nodes. Snapshot Tracking fields remain editable in the consumer document.
 In the imported node Inspector, **Inherited code references (read only)** shows
 provider evidence. **Additional code references JSON** edits an array appended
 after those references for this flow. Remove entries or use `[]` to remove local
@@ -376,7 +379,8 @@ On provider refresh, inherited references update before the retained additions;
 only explicitly overridden edge fields mask updated provider geometry. Frozen
 session recovery, saved JSON and reopening preserve authored overlays; resolved
 and offline views include the effective merged values. Materialized snapshots
-without authored imports remain read-only. Each edit or reset has one Undo/Redo;
+opened as JSON without authored imports allow Tracking edits while keeping
+imported structure and presentation protected. Each edit or reset has one Undo/Redo;
 Escape, source changes and provider-context changes cancel held gestures.
 
 Workbench draws a light labeled boundary around each direct and nested referenced
@@ -506,7 +510,14 @@ Tracking is independent of `nodeOverrides`, `nodePositions`, `nodeCodeRefs` and
 `edgeOverrides`, so presentation and layout resets preserve it. Saved authoring
 JSON retains only imports and overlays. Session recovery retains the approved
 provider closure; offline HTML freezes the resolved effective values. A resolved
-snapshot without its authored import remains read-only.
+JSON snapshot carrying `topologyProvenance`, without its authored import, also
+exposes desktop Inspect → Tracking:
+**Missing work**, tickets, PRs and ticket-gated availability edit the frozen
+consumer document directly and survive Undo/Redo, save and reload. These edits
+never update the original provider. Imported structure, presentation, identities
+and provenance remain protected. Text boxes do not expose Missing work or
+availability; connections do not expose Missing work. Authored imports still
+use their additive overlays and keep provider-inherited tracking read-only.
 
 The live-status provider receives the resolved, distinct ticket keys and PR URLs.
 Imported nodes, connections and consumer steps receive the same state colors,

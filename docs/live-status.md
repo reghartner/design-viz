@@ -53,7 +53,10 @@ Provider-authored rules survive topology imports. Consumer `nodeTracking` and
 `edgeTracking` overlays may add `existsWhen: "tickets-done"`; it evaluates all
 resolved tickets, inherited and local. A provider rule remains read-only in the
 consumer and cannot be disabled there. Removing a consumer rule restores provider
-behavior and preserves all other tracking. Resolved-only snapshots remain read-only.
+behavior and preserves all other tracking. Resolved JSON snapshots opened in
+Workbench expose the same desktop Tracking controls: edits affect that consumer
+snapshot, including its availability rule, while imported structure and the
+original provider stay unchanged.
 The separate `flow.ticket-availability` capability lets older viewers report
 unsupported behavior. See the runnable
 [planned availability example](../examples/ticket-availability/ticket-availability.spec.json).

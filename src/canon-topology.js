@@ -25,7 +25,10 @@ var FlowTopology = (function(){
     if(!Array.isArray(value) || value.some(function(id){return typeof id!=='string' || !id;}) || new Set(value).size!==value.length)fail(at,'expected an array of unique identities');
     return value;
   }
-  function sections(spec){return FlowCanon.sections(spec);}
+  function sections(spec){
+    if(spec && object(spec.nodes) && Array.isArray(spec.rows) && !spec.page && !spec.blocks && !spec.sections)return [{diagram:spec}];
+    return FlowCanon.sections(spec);
+  }
   function edgeKey(e){return e.from+'->'+e.to;}
   function declarations(spec){return sections(spec).some(function(s){return own(s.diagram,'topologyImports') || own(s.diagram,'topologyExports');});}
   function stable(value){
@@ -349,11 +352,37 @@ var FlowTopology = (function(){
   function origin(d,kind,id){
     return (((d || {}).topologyProvenance || {}).imports || []).find(function(imp){return (imp[kind] || []).includes(id);});
   }
+  // A resolved snapshot owns its delivery annotations. Its imported graph and
+  // provider metadata remain protected; no provider document is edited here.
+  function snapshotTracking(value,node){
+    var tracking={};if(!object(value))return tracking;
+    var fields=['tickets','prs'];
+    if(!isTextBoxNode(value)){fields.push('existsWhen');if(node)fields.push('missingWork');}
+    fields.forEach(function(field){if(own(value,field))tracking[field]=value[field];});return tracking;
+  }
+  function protectedValue(value,node){
+    if(!object(value))return value;
+    var copy=clone(value);Object.keys(snapshotTracking(value,node)).forEach(function(field){delete copy[field];});return copy;
+  }
+  function snapshotTrackingError(before,after){
+    var error=null;
+    function check(previous,next,node,id){
+      if(error || sameDefinition(snapshotTracking(previous,node),snapshotTracking(next,node)))return;
+      try{validateTracking(snapshotTracking(next,node),'snapshot '+(node?'node ':'connection ')+id+' tracking');}catch(ex){error=ex.message;}
+    }
+    ((before.topologyProvenance || {}).imports || []).forEach(function(imp){
+      (imp.nodes || []).forEach(function(id){check((before.nodes || {})[id],(after.nodes || {})[id],true,id);});
+      (imp.edges || []).forEach(function(id){
+        var previous=(before.edges || []).filter(function(edge){return edgeKey(edge)===id;});
+        (after.edges || []).filter(function(edge){return edgeKey(edge)===id;}).forEach(function(edge,index){check(previous[index],edge,false,id);});
+      });
+    });return error;
+  }
   function protectedStructure(d){
     var imports=((d.topologyProvenance || {}).imports || []),nodes=[],edges=[],groups=[];
     imports.forEach(function(imp){nodes.push.apply(nodes,imp.nodes || []);edges.push.apply(edges,imp.edges || []);groups.push.apply(groups,imp.groups || []);});
-    return {provenance:d.topologyProvenance,nodes:nodes.map(function(id){return [id,(d.nodes || {})[id]];}),
-      edges:edges.map(function(id){return [id,(d.edges || []).filter(function(e){return edgeKey(e)===id;})];}),
+    return {provenance:d.topologyProvenance,nodes:nodes.map(function(id){return [id,protectedValue((d.nodes || {})[id],true)];}),
+      edges:edges.map(function(id){return [id,(d.edges || []).filter(function(e){return edgeKey(e)===id;}).map(function(edge){return protectedValue(edge,false);})];}),
       groups:groups.map(function(id){return [id,(d.groups || {})[id]];}),
       rows:(d.rows || []).flatMap(function(row,r){return row.flatMap(function(slot,c){return (Array.isArray(slot)?slot:[slot]).flatMap(function(id,i){return nodes.includes(id)?[[id,r,c,i,Array.isArray(slot)]]:[];});});}),
       floats:(d.floats || []).filter(function(f){return nodes.includes(f.id);})};
@@ -364,7 +393,8 @@ var FlowTopology = (function(){
       if(!sec.diagram.topologyProvenance || error)return;
       var target=sec.id?next.find(function(s){return s.id===sec.id;}):next[index];
       if(!target || JSON.stringify(protectedStructure(sec.diagram))!==JSON.stringify(protectedStructure(target.diagram)))
-        error='Imported topology is read only in this snapshot. Edit its provider and rebuild canon; consumer steps, paths, failures, and panels remain editable.';
+        error='Imported topology structure is read only in this snapshot. Tracking, consumer steps, paths, failures, and panels remain editable.';
+      else error=snapshotTrackingError(sec.diagram,target.diagram);
     });
     return error;
   }

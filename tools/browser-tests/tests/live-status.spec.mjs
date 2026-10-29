@@ -504,6 +504,40 @@ test('E6 desktop Ticket columns give long titles and linked owners room to wrap'
  expect(sizes.titleLines).toBeGreaterThan(1);expect(sizes.ownerHeight).toBeGreaterThan(30);expect(sizes.ownerDisplay).toBe('inline-block');expect(sizes.ownerAlignment).toBe('center');expect(sizes.linkWidth).toBeLessThanOrEqual(sizes.ownerWidth);expect(sizes.scrollWidth).toBeLessThanOrEqual(720);
  await panel.screenshot({path:testInfo.outputPath('status-panel-widths.png')});
 });
+for(const linked of [true,false])test('D8 desktop dependency buttons visibly focus ticket identities '+(linked?'with Jira links':'without Jira links'),async({page,server},testInfo)=>{
+ await page.setViewportSize({width:1440,height:1000});
+ await writeFile(path.join(server.root,'dependencies-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'dependencies-native.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./dependencies-native.js";window.mount=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/dependencies-native.html');await page.waitForFunction(()=>!!window.mount);
+ const spec={page:{title:'Dependency navigation',tracking:linked?{jira:{site:'https://jira.test'}}:{},sections:[{heading:'Delivery',diagram:{nodes:{work:{title:'Work',tickets:Array.from({length:18},(_,i)=>'WORK-'+(i+1))}},rows:[['work']],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}};
+ const map=Object.fromEntries(Array.from({length:18},(_,i)=>['WORK-'+(i+1),{state:'todo',title:'Delivery work '+(i+1)}]));
+ Object.assign(map['WORK-1'],{state:'blocked',assignee:'Alex',assigneeId:'alex',prs:{links:[{url:'https://github.com/acme/work/pull/1'}]}});
+ map['WORK-18'].dependsOn=[{key:'WORK-1',source:'jira'}];
+ await page.evaluate(({spec,map})=>{window.viewer=window.mount(document.querySelector('#host'),spec,{});window.viewer.controller.liveStatus.apply(map);},{spec,map});
+ const panel=page.locator('#host .pt-live-status'),scroll=panel.locator('.dv-live-tickets-scroll'),row=panel.locator('tr[data-live-ticket="WORK-1"]'),key=row.locator(linked?'.dv-live-ticket-key a':'.dv-live-ticket-key'),dep=panel.locator('tr[data-live-ticket="WORK-18"] .dv-live-dep');
+ await scroll.evaluate(el=>{el.style.maxHeight='180px';});
+ await expect(row.locator('.dv-live-ticket-prs a')).toHaveCount(1);
+ if(linked){await expect(key).toHaveAttribute('href','https://jira.test/browse/WORK-1');await expect(key).toHaveAttribute('target','_blank');}
+ const checkDestination=async()=>{
+  await expect(key).toBeFocused();
+  await expect(key).toHaveCSS('outline-style','solid');await expect(key).toHaveCSS('outline-width','2px');
+  expect(await key.evaluate(el=>getComputedStyle(el).outlineColor)).not.toBe('rgba(0, 0, 0, 0)');
+  expect(await key.evaluate(el=>{const r=el.getBoundingClientRect(),s=el.closest('.dv-live-tickets-scroll').getBoundingClientRect();return r.left>=s.left-1 && r.right<=s.right+1;})).toBe(true);
+  expect(await row.evaluate(el=>{const r=el.getBoundingClientRect(),s=el.closest('.dv-live-tickets-scroll').getBoundingClientRect();return r.top>=s.top-1 && r.bottom<=s.bottom+1;})).toBe(true);
+ };
+ await dep.scrollIntoViewIfNeeded();expect(await scroll.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
+ await dep.click();await checkDestination();
+ for(const activation of ['Enter','Space']){await dep.focus();await dep.press(activation);await checkDestination();}
+ const hop=panel.locator('.dv-live-chain [data-live-dep-for="WORK-1"]').first();await hop.click();await checkDestination();
+ // Refresh changes row order and evidence while the destination retains focus.
+ await key.evaluate(el=>{window.__dependencyTarget=el;});
+ map['WORK-1'].state='done';map['WORK-2'].state='blocked';
+ await page.evaluate(map=>window.viewer.controller.liveStatus.apply(map),map);
+ await expect(key).toBeFocused();expect(await key.evaluate(el=>el===window.__dependencyTarget)).toBe(true);
+ await dep.click();await checkDestination();
+ await panel.screenshot({path:testInfo.outputPath('dependency-destination.png')});
+ await dep.focus();await expect(key).not.toBeFocused();await expect(key).toHaveCSS('outline-style','none');
+});
 test('E8 desktop page Parent controls validate preserve history export and demo',async({page,server})=>{
  await page.setViewportSize({width:1440,height:1000});await useProjectDownloads({page});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);
  const src=page.locator('#src'),settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();};await settings();

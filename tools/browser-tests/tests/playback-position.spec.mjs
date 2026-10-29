@@ -165,3 +165,34 @@ for(const host of ['reader','native'])test(`${host}: Standard grid honors saved 
  expect(await bar.locator('.schips').evaluate(el=>el.style.getPropertyValue('--path-label-width'))).toBe('300px');
  await bar.getByRole('button',{name:'Next step',exact:true}).click();await expect(bar.locator('.stepid')).toHaveText('s1');
 });
+
+for(const host of ['reader','workbench'])test(`${host}: current step decorations fit without spurious scrolling`,async({page,server},info)=>{
+ await page.setViewportSize({width:1440,height:1000});
+ if(host==='reader')await page.addInitScript(()=>{window.flowviewLiveStatus={provider:async()=>({'STEP-1':{state:'active'}})};});
+ const spec=story('simple','beside');
+ if(host==='reader')spec.page.sections[0].diagram.nodes.a.tickets=['STEP-1'];
+ if(host==='workbench'){
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec));await prepareEditorSurface(page);
+ }else await open(page,server,spec);
+ const source=host==='workbench'?await page.locator('#src').inputValue():null;
+ const chips=page.locator('#docview .termbar .schips').first(),first=chips.locator('.schip').first();
+ await first.click();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
+ await expect(first).toBeFocused();await expect(first).toHaveAttribute('aria-current','true');
+ if(host==='reader')await expect(first).toHaveAttribute('data-live-appearance','active');
+ const metrics=await chips.evaluate(el=>({width:el.clientWidth,scrollWidth:el.scrollWidth,height:el.clientHeight,scrollHeight:el.scrollHeight}));
+ await info.attach('track-geometry',{body:JSON.stringify(metrics),contentType:'application/json'});
+ expect(metrics.scrollWidth).toBe(metrics.width);expect(metrics.scrollHeight).toBe(metrics.height);
+ await page.locator('#docview .termbar').first().screenshot({path:info.outputPath('current-step-focus.png')});
+ if(source!==null)await expect(page.locator('#src')).toHaveValue(source);
+});
+
+test('many numbered steps retain genuine horizontal scrolling',async({page,server})=>{
+ const spec=story('floating','above'),d=spec.page.sections[0].diagram;delete d.paths;
+ d.steps=Array.from({length:80},(_,i)=>({id:'s'+i,edge:'a->b',text:'Step '+i}));
+ await open(page,server,spec);
+ const chips=page.locator('.termbar .schips').first();
+ expect(await chips.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeGreaterThan(0);
+ await chips.locator('.schip').last().click();
+ await expect(chips.locator('.schip').last()).toHaveAttribute('aria-current','true');
+ expect(await chips.evaluate(el=>el.scrollLeft)).toBeGreaterThan(0);
+});

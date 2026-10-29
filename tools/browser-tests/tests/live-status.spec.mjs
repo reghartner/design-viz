@@ -84,7 +84,7 @@ async function contrast(locator,fillProperty,inkProperty,inkSelector){
 test('V5 all nine skins share status backings, patterns, contrast and separate selection',async({page,server},testInfo)=>{
  const spec=fixture(),d=spec.page.sections[0].diagram;d.nodes.unchanged={title:'Existing audit',sub:'No new work'};d.nodes.uncovered={title:'Uncovered work',sub:'Ticket still needed',missingWork:true};d.rows.push(['unchanged','uncovered']);
  for(const [id,node] of [['active','hardware'],['done','backend'],['todo','todo'],['missing','uncovered'],['unchanged','unchanged']]){d.steps.push({id,nodes:[node],text:id,color:'#654321'});d.paths[0].steps.push(id);}
- d.edges.push({from:'hardware',to:'todo',label:'active'});d.steps[3].edge='hardware->todo';
+ d.edges.push({from:'hardware',to:'todo',label:'active'},{from:'backend',to:'unchanged',label:'done'});d.steps[3].edge='hardware->todo';d.steps[4].edge='backend->unchanged';
  d.steps[0].tone={hardware:'ok'};
  for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){
   spec.page.skin=skin;const root=await open(page,server,spec),section=root.locator('#section-delivery');
@@ -93,6 +93,8 @@ test('V5 all nine skins share status backings, patterns, contrast and separate s
   await expect(hardware.locator('.card')).toHaveCSS('stroke','rgb(22, 102, 199)');
   await expect(hardware.locator('.t1')).toHaveCSS('fill',await hardware.locator('.t2').evaluate(el=>getComputedStyle(el).fill));
   for(const label of ['.t1','.t2']){const measured=await contrast(hardware,'fill','fill',label);expect(measured.ratio,skin+' node '+label+' contrast').toBeGreaterThanOrEqual(4.5);measured.back.forEach((v,i)=>expect(Math.abs(v-measured.expected[i]),skin+' 15% node backing').toBeLessThan(1.5));}
+  await expect(section.locator('[data-dv-node="backend"]>.dv-live-halo')).not.toHaveCSS('filter','none');await expect(section.locator('[data-dv-node="backend"]>.dv-live-halo')).toHaveCSS('animation-name','none');
+  await expect(section.locator('.coin[data-dv-step="4"]>circle')).not.toHaveCSS('filter','none');await expect(section.locator('.coin[data-dv-step="4"]>circle')).toHaveCSS('animation-name','none');
   const nodeColors=await hardware.evaluate(el=>({ink:getComputedStyle(el.querySelector('.t1')).fill,fill:getComputedStyle(el.querySelector('.card')).fill}));
   expect(nodeColors.ink).toMatch(/^rgb\((?:0, 0, 0|255, 255, 255)\)$/);
   for(const [id,dash] of [['todo','1px, 4px'],['uncovered','6px, 4px'],['unchanged','none']])await expect(section.locator('[data-dv-node="'+id+'"] .card')).toHaveCSS('stroke-dasharray',dash);

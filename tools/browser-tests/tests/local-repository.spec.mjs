@@ -1,6 +1,7 @@
 import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {cloudFolder} from '../helpers/cloud-folder.mjs';
-import {mkdir,writeFile,readFile} from 'node:fs/promises';
+import {mkdir,writeFile,readFile,cp,rm} from 'node:fs/promises';
+import {publishLibrary} from '../../canon/library.mjs';
 import {spawn} from 'node:child_process';
 import path from 'node:path';
 import {source as starter} from '../fixtures/editor-spec.mjs';
@@ -237,4 +238,41 @@ test('generated consumer CLI selects separate unpublished providers, repeats, re
   const reconnect=await disk.command('--source-repo',disk.roots[0]);expect(reconnect.code,reconnect.stderr).toBe(0);await expect(page.locator('#src')).toHaveValue(exact);
   const state=await disk.readState();expect(JSON.stringify(state)).not.toContain(disk.folder);expect(await readFile(path.join(disk.support,'local-sources-selection.json'),'utf8')).toContain(disk.roots[0]);await expect(readFile(path.join(disk.support,'request.json'))).rejects.toThrow(/ENOENT/);await page.screenshot({path:info.outputPath('independent-source-cli.png')});
  }finally{await page.close();await disk.close();}
+});
+
+/* #833 Use site library. Contract (issue #833 acceptance):
+   | row | fixture | assertion (scoped) | rejects |
+   | switch without clearing storage | draft on a selected local source repository | #local-sources-site click makes the imported node show the site provider title | an impl with no visible action |
+   | picker lists the site library | same, after the switch | #topology-provider options are the site library's providers | an impl that keeps the local catalog |
+   | saved draft keeps the site context | same | dv-workbench-draft.topologyContext is non-local with the site catalogURL | an impl that only changes memory |
+   | Undo restores the local source; Redo the site | same | imported node title and saved context.local flip back and forth | an impl without history |
+   | reload keeps the site context | reload after Redo | imported node still shows the site title | an impl that recovers the local snapshot */
+async function siteLibrary(server){
+ const root=path.join(server.root,'site-833-'+process.pid+'-'+Date.now()),workbench=path.join(root,'workbench');
+ await mkdir(workbench,{recursive:true});
+ for(const [from,to] of [['workbench.html','flowspec.html'],['catalog.json','catalog.json'],['starters.json','starters.json']])await cp(path.join(server.root,from),path.join(workbench,to));
+ const {localSourceSpecs}=await import('../helpers/local-source-repository.mjs'),site=structuredClone(localSourceSpecs);
+ site.base.page.title='Site provider';site.base.page.sections[0].diagram.nodes.api.title='Site published API';site.middle.page.title='Site middle';
+ for(const id of ['base','middle']){await mkdir(path.join(root,'diagrams',id),{recursive:true});await writeFile(path.join(root,'diagrams',id,id+'.spec.json'),JSON.stringify(site[id]));await writeFile(path.join(root,'diagrams',id,id+'.html'),'<!doctype html>');}
+ const registryPath=path.join(root,'canon.json');await writeFile(registryPath,JSON.stringify({version:1,diagrams:['base','middle'].map(id=>({folder:'diagrams/'+id,owner:'group:default/site'}))}));
+ await publishLibrary({registryPath,output:path.join(workbench,'diagrams.json')});
+ const base=server.origin+'/'+path.relative(server.root,root)+'/workbench/';
+ return {url:base+'flowspec.html',catalogURL:base+'diagrams.json',close:()=>rm(root,{recursive:true,force:true})};
+}
+test('Use site library leaves a selected local source repository with Undo, and the importer lists the site library after reload',async({page,server})=>{
+ const site=await siteLibrary(server),{separateLocalSources}=await import('../helpers/local-source-repository.mjs');
+ const disk=await separateLocalSources(page,server,{connect:false,workbench:site.url,emptyLibrary:false});
+ const saved=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).topologyContext);
+ try{
+  await filePanel(page);await page.locator('#local-sources-select').click();await expect(node(page)).toContainText('Unpublished API');
+  expect((await saved()).local,'precondition: the draft uses the local source repository').toBe(true);
+  await page.locator('#local-sources-site').click();await expect(node(page)).toContainText('Site published API');
+  const after=await saved();expect(!!after.local).toBe(false);expect(after.catalogURL).toBe(site.catalogURL);
+  await closeTools(page);await page.locator('#diagram-add').click();await page.locator('#add-topology').click();
+  await expect(page.locator('#topology-provider option')).toHaveText(['Site provider · base','Site middle · middle']);
+  await page.locator('#topology-cancel').click();
+  await page.locator('#undo-builder').click();await expect(node(page)).toContainText('Unpublished API');expect((await saved()).local).toBe(true);
+  await page.locator('#redo-builder').click();await expect(node(page)).toContainText('Site published API');expect(!!(await saved()).local).toBe(false);
+  await page.reload();await expect(node(page)).toContainText('Site published API');
+ }finally{await page.close();await disk.close();await site.close();}
 });

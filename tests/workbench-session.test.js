@@ -423,3 +423,42 @@ test('explicit source selection initializes local context and same-content switc
  const rendered=h.renders;assert.equal(s.refreshLocalTopology({...two,localSource:{...two.localSource,capturedAt:'later'}},s.snapshot()),'unchanged');assert.equal(h.renders,rendered);
  s.undo();assert.equal(s.topologyContext().localSource.selectionId,'repo-one');s.undo();assert.equal(s.topologyContext(),null);s.redo();s.redo();assert.equal(s.topologyContext().localSource.selectionId,'repo-two');
 });
+/* #833 Use site library: leaving a local provider repository without clearing browser storage.
+   Contract (issue #833 acceptance):
+   | row | fixture | assertion (scoped) | rejects |
+   | local -> site library is one Undo step | local context, site context | context === site, text unchanged, historyType 'topology', revision+1 | an impl that swaps context without history |
+   | saved draft keeps the site context | same | dv-workbench-draft.topologyContext.local is falsy, catalogURL is site | an impl that only changes memory |
+   | Undo restores the local snapshot; Redo the site one | same | deepEqual local / site | an impl that clears instead of restoring |
+   | import-free document may leave with no context | local context, null next | topologyContext() === null | an impl that requires a catalog |
+   | refuses when the draft is not local | null / non-local current | throws /local/, nothing changes | an impl that replaces any context |
+   | refuses a local replacement | local next | throws, context unchanged | an impl that accepts any context |
+   | stale document returns false | snapshot before an edit | false, context unchanged | an impl that ignores the expected snapshot |
+   | unresolvable site context is refused atomically | resolveSource throws | throws, context, history and draft unchanged | an impl that commits before validating */
+function siteContext(){return {version:1,id:'workbench-draft',ephemeral:true,catalogURL:'https://site.invalid/diagrams.json',catalog:{version:3,diagrams:[]},specs:[{page:{canon:{id:'workbench-draft'},sections:[]}}]};}
+test('Use site library replaces a local provider snapshot as one undoable, saved topology step',()=>{
+ const h=harness(),s=h.session,local=localContext('Local'),site=siteContext();s.replaceProject(h.text,null,{topologyContext:local});
+ assert.equal(s.topologyContext().local,true,'precondition: the draft starts on a local snapshot');
+ const before=h.text,revision=s.snapshot().topologyRevision;
+ assert.equal(s.useSiteTopology(site,s.snapshot()),true);
+ assert.deepEqual(plain(s.topologyContext()),site);assert.equal(h.text,before);assert.equal(s.historyType(),'topology');assert.equal(s.snapshot().topologyRevision,revision+1);
+ const saved=JSON.parse(h.storage.get('dv-workbench-draft')).topologyContext;assert.equal(!!saved.local,false);assert.equal(saved.catalogURL,site.catalogURL);
+ s.undo();assert.deepEqual(plain(s.topologyContext()),local);assert.equal(JSON.parse(h.storage.get('dv-workbench-draft')).topologyContext.local,true);
+ s.redo();assert.deepEqual(plain(s.topologyContext()),site);
+});
+test('Use site library lets an import-free document leave the local snapshot with no context',()=>{
+ const h=harness(),s=h.session;s.replaceProject(h.text,null,{topologyContext:localContext('Local')});
+ assert.equal(s.useSiteTopology(null,s.snapshot()),true);assert.equal(s.topologyContext(),null);
+ s.undo();assert.equal(s.topologyContext().local,true);
+});
+test('Use site library refuses non-local drafts, local replacements, stale snapshots and unresolvable site contexts',()=>{
+ const h=harness(),s=h.session;
+ assert.throws(()=>s.useSiteTopology(siteContext(),s.snapshot()),/local/);assert.equal(s.topologyContext(),null);
+ s.replaceProject(h.text,null,{topologyContext:{...siteContext(),local:false}});assert.throws(()=>s.useSiteTopology(siteContext(),s.snapshot()),/local/);
+ const local=localContext('Local');s.replaceProject(h.text,null,{topologyContext:local});
+ assert.throws(()=>s.useSiteTopology(localContext('Other'),s.snapshot()));assert.deepEqual(plain(s.topologyContext()),local);
+ const stale=s.snapshot();s.accept({text:'{"title":"edited"}'});assert.equal(s.useSiteTopology(siteContext(),stale),false);assert.deepEqual(plain(s.topologyContext()),local);
+ const version=s.historyVersion(),draft=h.storage.get('dv-workbench-draft');
+ context.FlowTopology={resolveSource(raw,value){if(value && !value.local)throw Error('Missing provider middle in the site library.');return raw;}};
+ try{assert.throws(()=>s.useSiteTopology(siteContext(),s.snapshot()),/Missing provider middle/);}finally{delete context.FlowTopology;}
+ assert.deepEqual(plain(s.topologyContext()),local);assert.equal(s.historyVersion(),version);assert.equal(h.storage.get('dv-workbench-draft'),draft);
+});

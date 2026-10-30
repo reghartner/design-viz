@@ -11,7 +11,7 @@ export const localSourceSpecs={
 };
 // Exported for real external-author exercises: keep page live and let a process
 // edit provider files and invoke command(...), using the generated consumer kit.
-export async function separateLocalSources(page,server,{connect=true}={}){
+export async function separateLocalSources(page,server,{connect=true,workbench=server.origin+'/workbench.html',emptyLibrary=true}={}){
  const disk=await cloudFolder(page),consumerFolder=path.join(disk.folder,'consumer'),support=path.join(consumerFolder,'.flowview-agent');
  await mkdir(consumerFolder,{recursive:true});
  const exact=' \n'+JSON.stringify(localSourceSpecs.consumer,null,2)+'\n';
@@ -23,8 +23,8 @@ export async function separateLocalSources(page,server,{connect=true}={}){
    window.showDirectoryPicker=async options=>window.flowviewTestDirectory(options?.id==='flowview-local-sources'?window.providerPickerPath:'/consumer');
    window.showOpenFilePicker=async()=>[await window.flowviewTestDirectory('/consumer').getFileHandle(window.consumerFileName || 'independent.spec.json')];
  });
- await page.route('**/diagrams.json',route=>route.fulfill({json:{version:3,diagrams:[]}}));
- await page.goto(server.origin+'/workbench.html');await paste(page,starter);await closeTools(page);await page.locator('#editor-tab-file').click();await page.locator('#working-file-open').click();await expect(page.locator('#src')).toHaveValue(exact);
+ if(emptyLibrary)await page.route('**/diagrams.json',route=>route.fulfill({json:{version:3,diagrams:[]}}));
+ await page.goto(workbench);await paste(page,starter);await closeTools(page);await page.locator('#editor-tab-file').click();await page.locator('#working-file-open').click();await expect(page.locator('#src')).toHaveValue(exact);
  if(connect){await closeTools(page);await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-guide').evaluate(el=>el.close());await closeTools(page);}
  return {...disk,consumerFolder,support,exact,roots:roots.map(root=>path.join(disk.folder,root)),
   readState:async()=>JSON.parse(await readFile(path.join(support,'state.json'),'utf8')),

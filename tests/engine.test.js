@@ -4780,6 +4780,13 @@ test('coinSlots keeps one coin on the midpoint and spreads shared-edge coins alo
     const cx=pts.reduce((s,pt)=>s+pt.x,0)/n;assert.ok(Math.abs(cx-100)<1e-9,'row is centred on the midpoint');
   }
 });
+test('coinSlots reserves the full hit bounds when live controls graze a lone coin',()=>{
+  const path=linePath([{x:0,y:50},{x:200,y:50}]),mid=path.getPointAtLength(100);
+  const avoid=C.coinObstacleIndex([{x:105,y:45,w:16,h:10}]);avoid.strict=true;
+  const points=C.coinSlots(path,path.len,mid,1,avoid);
+  assert.equal(points.length,1);assert.equal(C.coinCover(points,avoid),0);
+  assert.notDeepEqual(plain(points),[mid]);
+});
 test('coinSlots packs a bounded grid when the edge is too short or bends too tightly',()=>{
   /* a 50px vertical edge: no room along it, so the coins stack across it, left to right */
   const short=linePath([{x:0,y:0},{x:0,y:50}]),smid=short.getPointAtLength(25);

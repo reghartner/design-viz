@@ -68,6 +68,8 @@ var FlowIcons = (function () {
   add('car', 'Car', 'Home', 'blue', path('M4 17H2.5v-5l3-1L8 6h7l4 5 2.5 2v4H20M8 17h8', 'wash') + path('M5.5 11H19M12 6v5') + circle(6, 17, 2, 'accent') + circle(18, 17, 2, 'accent'), true);
   add('speaker', 'Speaker', 'Audio', 'violet', speaker, true);
 
+  // Jira glyph: Simple Icons 11.15.0 (CC0), embedded for offline use.
+  add('jira', 'Jira', 'Software', 'blue', solid('<path fill="currentColor" d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0Z"/>'));
   add('battery', 'Battery', 'Power', 'teal', battery(solid(rect(5, 9, 4, 6, 1, 'accent') + rect(10.5, 9, 4, 6, 1, 'accent'))));
   add('battery-full', 'Battery full', 'Power', 'green', battery(solid(rect(5, 9, 3, 6, .8, 'accent') + rect(9.5, 9, 3, 6, .8, 'accent') + rect(14, 9, 3, 6, .8, 'accent'))));
   add('battery-low', 'Battery low', 'Power', 'red', battery(solid(rect(5, 9, 3, 6, .8, 'accent')) + path('M14 9.5v2.5M14 14.5h.01')));

@@ -266,10 +266,22 @@ node styles, node tones and step colors while enabled.
 
 The canvas has no status badges (#762): card stroke and halo, edge stroke, the
 dashed todo and waiting strokes, step coins and the break glyph carry the state.
-Click a painted node's card or an edge's line, label or live break glyph for
+Tracked local and imported nodes and edges show a small Jira icon (a subtle
+stack for multiple distinct issues), with no visible count or extra state badge.
+The cues are present before provider evidence and remain when Live is off. Node
+cues prefer a free corner; edge cues reserve their full click areas against
+measured cards, labels, controls, coins and break glyphs. Live breaks retain the
+physical route midpoint and visible step coins repack around them. Authored
+failures retain their intentional coin hiding. Placement reruns after path,
+filter and Live changes, and the board frame grows to include displaced cues.
+
+Click a Jira cue, a tracked node's card or an edge's line, label or live break glyph for
 ticket status, title, assignee and the informational PR summary. The
 node's own links, detail and handoff controls keep their clicks. In the reader
-that card or edge label is one keyboard button named for its tickets and state.
+that card or edge label is one keyboard button named for its tickets and state;
+the Jira cue shares that button without adding another Tab stop. On a whole-card
+handoff, the separate Jira cue owns the ticket button and the card keeps its
+navigation action.
 An unlabelled edge uses its path, or its visible live break when blocked or unavailable.
 Press Enter/Space to open the popover.
 Escape or an outside click closes it and

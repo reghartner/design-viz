@@ -341,6 +341,7 @@ function liveStatusEdgeBreaks(scope,diagram,map,on,availabilityOn){
     // popover and the group's title/aria-label carry the blocking keys. Canvas
     // text here would sit on the edge label, its coin or a node card.
     svg.querySelectorAll('g.dv-live-comm-failure .dv-live-break-label').forEach(function(el){el.remove();});
+    if(svg._layoutStatusCoins)svg._layoutStatusCoins();
   });
 }
 function liveStatusStep(diagram,step,map){
@@ -643,8 +644,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     pop.style.top=Math.max(8,Math.min(window.innerHeight-pop.offsetHeight-8,rect.bottom+6))+'px';
     dismiss.focus({preventScroll:true});document.addEventListener('click',outside,true);document.addEventListener('keydown',escape,true);
   }
-  /* Carriers are their own ticket triggers (#762; Chuck 2026-10-27 removed the
-     canvas badges): a ticketed node's card, and an edge's line or label.
+  /* Cards and edge labels remain the single keyboard ticket triggers. Small
+     Jira cues are pointer aliases, never an additional status badge or tab stop.
      Pointer aliases on the line, halo and live break share the label's button
      (the path or visible live break when unlabelled), so each edge has just
      one keyboard stop. In
@@ -669,6 +670,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function clearTargets(){
     view.querySelectorAll('.dv-live-pointer').forEach(function(el){el.classList.remove('dv-live-pointer');el._livePointerTarget=null;});
     view.querySelectorAll('.dv-live-target').forEach(clearTarget);
+    view.querySelectorAll('.dv-jira-cue').forEach(function(el){el.remove();});
   }
   function carrierPointer(el,target){
     if(!el || !target || authoring)return;
@@ -914,6 +916,72 @@ function createLiveStatus(ctl,page,options,renderOptions){
         }),tag:linked.indexOf(key)>=0?'DEPENDENCY ONLY':!owners.length?'NOT ON DIAGRAM':coverage.notInEpic.indexOf(key)>=0?(coverage.initiatives?'NOT IN SCOPE':'NOT IN EPIC'):''};
     });
   }
+  /* Jira is a link affordance, independent of provider evidence and Live paint.
+     Reserve the complete 22-unit pointer area. Candidates follow the measured
+     route (including reversed/vertical curves), then search farther off it;
+     nodes prefer an inside corner and fall back just outside a crowded corner. */
+  function paintJiraCues(scope,d){
+    scope.querySelectorAll('svg').forEach(function(svg){
+      var obstacles=[];
+      svg.querySelectorAll('.node .card,.node .icbg,.node use,.node image,.node text,.handoff-stripe,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff],.dvdelta,.node-review-badge,.coin,.coin-base,.comm-break,text.lbl').forEach(function(el){
+        var box=boardControlBox(el,svg);if(box)obstacles.push({el:el,box:box});
+      });
+      function free(point,ignore){
+        return !obstacles.some(function(item){var b=item.box;return item.el!==ignore && point.x+13>b.x && point.x-13<b.x+b.w && point.y+13>b.y && point.y-13<b.y+b.h;});
+      }
+      // If even the bounded local search is crowded, keep the link discoverable
+      // in clear space beside the drawing; frame expansion includes that slot.
+      function overflow(point){
+        return {x:obstacles.reduce(function(right,item){return Math.max(right,item.box.x+item.box.w+14);},point.x),y:point.y};
+      }
+      function cue(parent,target,value,point,local){
+        var tickets=trackingRefs(value).tickets;if(!tickets.length || !point)return;
+        var marker=document.createElementNS(SVGNS,'g');marker.setAttribute('class','dv-jira-cue'+(tickets.length>1?' dv-jira-stack':''));
+        marker.setAttribute('transform','translate('+(point.x-(local?local.x:0))+' '+(point.y-(local?local.y:0))+')');
+        marker.setAttribute('aria-hidden','true');marker.setAttribute('data-jira-carrier',target.getAttribute('data-live-carrier') || value.from+'->'+value.to);
+        if(parent===svg)marker.setAttribute('data-dv-edge',target.getAttribute('data-dv-edge'));
+        function add(tag,attrs){var el=document.createElementNS(SVGNS,tag);Object.keys(attrs).forEach(function(key){el.setAttribute(key,attrs[key]);});marker.appendChild(el);return el;}
+        add('rect',{'class':'dv-jira-hit',x:-11,y:-11,width:22,height:22,rx:5});
+        if(tickets.length>1)add('use',{'class':'dv-jira-back',href:'#i-jira',x:-3,y:-9,width:12,height:12});
+        add('use',{'class':'dv-jira-icon',href:'#i-jira',x:tickets.length>1?-8:-6,y:tickets.length>1?-4:-6,width:12,height:12});
+        add('title',{}).textContent='Jira · '+tickets.join(', ');
+        parent.appendChild(marker);
+        // A handoff owns its whole card; keep its link and keyboard action intact.
+        // Only these cards transfer the ticket button to the separate Jira cue.
+        if(target.closest('.handoff-link')){
+          var carrier=target._liveCarrier,id=target.getAttribute('data-live-carrier');clearTarget(target);
+          if(carrier){marker.removeAttribute('aria-hidden');carrierTarget(marker,id,carrier.value,carrier.state,carrier.tracking,carrier.label,carrier.waiting,carrier.availability);}
+        }else carrierPointer(marker,target);
+        obstacles.push({el:marker,box:{x:point.x-11,y:point.y-11,w:22,h:22}});
+      }
+      svg.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){
+        var value=(d.nodes || {})[node.getAttribute('data-dv-node')],card=node.querySelector('.card'),box=boardControlBox(card,svg);
+        if(!box || !trackingRefs(value).tickets.length)return;
+        var point=null,candidates=[{x:box.x+box.w-13,y:box.y+13},{x:box.x+box.w-13,y:box.y+box.h-13},{x:box.x+13,y:box.y+13},{x:box.x+13,y:box.y+box.h-13}];
+        for(var ring=1;ring<=32;ring++){
+          var gap=13+ring*24;
+          candidates.push({x:box.x+box.w+gap-24,y:box.y+13},{x:box.x+box.w-13,y:box.y-gap+24},{x:box.x+box.w-13,y:box.y+box.h+gap-24},{x:box.x-gap+24,y:box.y+13});
+        }
+        point=candidates.find(function(p){return free(p,card);}) || overflow(candidates[0]);
+        cue(node,card,value,point,{x:box.x,y:box.y});
+      });
+      svg.querySelectorAll('path.edge[data-dv-edge]').forEach(function(path){
+        var value=(d.edges || [])[Number(path.getAttribute('data-dv-edge'))];
+        if(!trackingRefs(value).tickets.length || path.closest('.dv-fragment-hidden') || value.hidden===true)return;
+        var length=path.getTotalLength(),point=null;
+        for(var ring=0;ring<32 && !point;ring++){
+          var offset=16+ring*24;
+          [.5,.35,.65,.2,.8].some(function(fraction){
+            var at=length*fraction,p=path.getPointAtLength(at),a=path.getPointAtLength(Math.max(0,at-2)),b=path.getPointAtLength(Math.min(length,at+2)),dx=b.x-a.x,dy=b.y-a.y,n=Math.hypot(dx,dy)||1;
+            return [-1,1].some(function(side){var candidate={x:p.x-side*dy/n*offset,y:p.y+side*dx/n*offset};if(!free(candidate))return false;point=candidate;return true;});
+          });
+        }
+        var markerTarget=path._livePointerTarget || path;
+        cue(svg,markerTarget,value,point || overflow(path.getPointAtLength(length/2)));
+      });
+      if(svg._refreshStatusFrame)svg._refreshStatusFrame();
+    });
+  }
   function paintBinding(binding){
     var scope=binding.el,d=binding.section.diagram;if(!d)return;
     var waiting=on?liveStatusCarrierWaiting(d,map,ticketWaiting):{},coverageActive=presentationActive();
@@ -926,16 +994,16 @@ function createLiveStatus(ctl,page,options,renderOptions){
       // Waiting tone wears the upstream's preset: slate while unfinished, rose when blocked or missing.
       liveStatusPreset(el,unavailable?(state==='active'?'azure':state==='blocked' || state==='missing'?'rose':'slate'):painted?(painted.tone==='red'?'rose':'slate'):state?LIVE_STATUS_PRESETS[state]:null);
       liveStatusNodeConstruction(el,value,state,unavailable);
-      if(!state && !waits && !unavailable)return;
+      if(!state && !waits && !unavailable && !trackingRefs(value).tickets.length)return;
       var card=el.querySelector('.card');if(!card)return;
-      var halo=card.cloneNode(false);halo.setAttribute('class','dv-live-halo');halo.removeAttribute('id');halo.setAttribute('aria-hidden','true');el.insertBefore(halo,el.firstChild);
+      if(state || waits || unavailable){var halo=card.cloneNode(false);halo.setAttribute('class','dv-live-halo');halo.removeAttribute('id');halo.setAttribute('aria-hidden','true');el.insertBefore(halo,el.firstChild);}
       carrierTarget(card,id,value,state,binding.page.tracking,value.title || id,waits,unavailable);
     });
     scope.querySelectorAll('path.edge[data-dv-edge],path.halo[data-dv-edge],text.lbl[data-dv-edge]').forEach(function(el){
       var index=Number(el.getAttribute('data-dv-edge')),value=(d.edges || [])[index],state=on?liveStatusEdgePresentation(value,map,availabilityOn):null;
       var unavailable=on && availabilityOn?liveStatusAvailability(value,map,d):null;liveStatusAvailabilityClass(el,unavailable);
       var waits=value && waiting[value.from+'->'+value.to],painted=state==='blocked' || state==='missing'?null:waits;decorateCarrier(el,value,binding.page.tracking);liveStatusClass(el,state);liveStatusWaitingClass(el,painted);
-      if((!state && !waits && !unavailable) || !el.classList.contains('edge'))return;
+      if((!state && !waits && !unavailable && !trackingRefs(value).tickets.length) || !el.classList.contains('edge'))return;
       var svg=el.closest('svg'),label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');
       var target=carrierTarget(label || el,value.from+'->'+value.to,value,state,binding.page.tracking,value.label || value.from+' → '+value.to,waits,unavailable);
       carrierPointer(el,target);carrierPointer(svg.querySelector('path.halo[data-dv-edge="'+index+'"]'),target);
@@ -953,6 +1021,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       }
       carrierPointer(el,target);
     });
+    paintJiraCues(scope,d);
     scope.querySelectorAll('g.coin[data-dv-step],button.schip[data-step-source]').forEach(function(el){
       var index=Number(el.getAttribute(el.classList.contains('coin')?'data-dv-step':'data-step-source')),step=(d.steps || [])[index];
       liveStatusClass(el,on && availabilityOn && step && coverageActive?liveStatusStep(d,step,map):null);
@@ -989,7 +1058,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     try{
       var focused=view.ownerDocument && view.ownerDocument.activeElement,focusCarrier=focused && focused.classList && focused.classList.contains('dv-live-target') && focused.getAttribute('data-live-carrier'),focusBinding=focusCarrier && bindings.find(function(binding){return binding.el.contains(focused);});
       close(false);syncBindings();clearTargets();refreshDependencies();
-      if(applied || availabilityOn){
+      if(applied || availabilityOn || refs().tickets.length){
         view.querySelectorAll('.dv-live-halo').forEach(function(el){el.remove();});
         bindings.forEach(paintBinding);
       }
@@ -1082,7 +1151,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(pop)pop.remove();listeners=[];
       view.querySelectorAll('.dv-live-board-lane').forEach(function(el){el.classList.remove('dv-live-board-lane');});
       view.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').forEach(function(el){el.remove();});
-      if(applied || availabilityOn){
+      if(applied || availabilityOn || refs().tickets.length){
         clearTargets();view.querySelectorAll('.dv-live-halo,.dv-live-construction').forEach(function(el){el.remove();});
         view.querySelectorAll('[data-dv-node],[data-dv-edge]').forEach(function(el){if(el._livePulseEnd){el.removeEventListener('animationend',el._livePulseEnd);delete el._livePulseEnd;}});
         view.querySelectorAll('.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing,.dv-live-unchanged,.dv-live-waiting,.dv-live-stale,.dv-live-changed,.dv-live-unavailable').forEach(function(el){liveStatusClass(el,null);liveStatusWaitingClass(el,null);liveStatusPreset(el,null);el.classList.remove('dv-live-stale','dv-live-changed','dv-live-unavailable','dv-live-reserved','dv-live-blueprint');});

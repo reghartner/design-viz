@@ -4153,3 +4153,11 @@ path.edge.dv-live-missing:not(.dv-live-waiting){stroke-dasharray:6 4!important;}
 .stepmode .node.dv-live-unavailable:not(.lit){opacity:max(var(--dv-dim,.45),.65)!important;}
 .dv-live-comm-failure.dv-live-unavailable{--comm-color:var(--dv-live-color,var(--dv-live-todo))!important;}
 .dv-live-availability-detail{font-size:12px;line-height:1.5;max-width:36em;}
+
+/* Small Jira affordances keep a constant identity beside status-colored ink. */
+.dv-jira-cue{color:#0c66e4;pointer-events:all;}
+.dv-jira-hit{fill:#edf4ff;fill-opacity:.94;stroke:none;}
+.dv-jira-icon,.dv-jira-back{pointer-events:none;}
+.dv-jira-back{opacity:.48;}
+.dv-jira-cue.dv-live-pointer{cursor:pointer;}
+.dv-jira-cue.dv-live-pointer:hover .dv-jira-hit{stroke:#0c66e4;stroke-width:1;}

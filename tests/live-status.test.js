@@ -428,7 +428,7 @@ test('R1 R2 R3 apply paints no badges; ticketed cards and edge labels are popove
  const card=h.view.querySelector('[data-dv-node="b"]').querySelector('.card');
  assert.equal(card.getAttribute('role'),'button');assert.equal(card.getAttribute('tabindex'),'0');assert.equal(card.getAttribute('aria-haspopup'),'dialog');assert.match(card.getAttribute('aria-label'),/^Live tickets for .*waiting on EE-1/);
  const label=h.view.querySelector('text.lbl[data-dv-edge="0"]');assert.equal(label.getAttribute('role'),'button');assert.equal(label.getAttribute('tabindex'),'0');
- api.setEnabled(false);assert.equal(card.getAttribute('tabindex'),null);assert.equal(card.getAttribute('role'),null);api.setEnabled(true);assert.equal(card.getAttribute('tabindex'),'0');
+ api.setEnabled(false);assert.equal(card.getAttribute('tabindex'),'0');assert.equal(card.getAttribute('role'),'button');assert.doesNotMatch(card.getAttribute('aria-label'),/waiting on/);api.setEnabled(true);assert.equal(card.getAttribute('tabindex'),'0');
  const w=harness(fixture(),{},{authoring:true});w.ctl.liveStatus.apply(fixed);const wcard=w.view.querySelector('[data-dv-node="b"]').querySelector('.card');
  assert.ok(w.view.querySelector('[data-dv-node="b"]').classList.contains('dv-live-active'));assert.equal(wcard.getAttribute('tabindex'),null);assert.equal(wcard.getAttribute('role'),null);
  assert.equal(w.view.querySelectorAll('.dv-live-badge').length,0);
@@ -445,9 +445,9 @@ test('R1 edge lines halos and live break glyphs open their own tickets through o
   assert.equal(label.getAttribute('aria-expanded'),'true');h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
  }
  assert.equal(line.getAttribute('tabindex'),null);assert.equal(halo.getAttribute('tabindex'),null);assert.equal(label.getAttribute('tabindex'),'0');
- api.setEnabled(false);assert.equal(h.view.querySelectorAll('.dv-live-pointer').length,0);click(line);assert.equal(h.view.querySelector('.dv-live-popover').hidden,true);
+ api.setEnabled(false);assert.ok(h.view.querySelectorAll('.dv-live-pointer').length>0);click(line);assert.equal(h.view.querySelector('.dv-live-popover').hidden,false);h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
  api.setEnabled(true);click(line);assert.equal(h.view.querySelector('.dv-live-popover').hidden,false);
- api.clear();assert.equal(h.view.querySelectorAll('.dv-live-pointer,.dv-live-target,.dv-live-comm-failure').length,0);click(line);assert.equal(h.view.querySelector('.dv-live-popover').hidden,true);
+ api.clear();assert.equal(h.view.querySelectorAll('.dv-live-comm-failure').length,0);click(line);assert.equal(h.view.querySelector('.dv-live-popover').hidden,false);assert.equal(h.view.querySelector('.dv-live-ticket-state').textContent,'No status');h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
  api.apply({'EE-1':{state:'done'}});h.ctl.sections[0].sectionEl.dispatchEvent({type:'dv:pathrender'});h.flush();click(line);assert.equal(h.view.querySelector('.dv-live-popover').hidden,false);
  api.destroy();assert.equal(h.view.querySelectorAll('.dv-live-pointer,.dv-live-target').length,0);
  const u=harness(data);u.view.querySelector('text.lbl').remove();u.ctl.liveStatus.apply({'EE-1':{state:'done'}});
@@ -455,7 +455,7 @@ test('R1 edge lines halos and live break glyphs open their own tickets through o
  u.view.dispatchEvent({type:'click',target:path,button:0,preventDefault(){},stopPropagation(){}});assert.equal(u.view.querySelector('.dv-live-popover').hidden,false);
  u.ctl.liveStatus.apply(fixed);const breakTarget=u.view.querySelector('.dv-live-comm-failure');assert.equal(path.getAttribute('tabindex'),null);assert.equal(breakTarget.getAttribute('tabindex'),'0');assert.equal(breakTarget.getAttribute('role'),'button');
  u.view.dispatchEvent({type:'keydown',target:breakTarget,key:'Enter',preventDefault(){},stopPropagation(){}});assert.equal(u.view.querySelector('.dv-live-popover').hidden,false);
- u.ctl.liveStatus.clear();assert.equal(u.view.querySelectorAll('.dv-live-pointer,.dv-live-target,.dv-live-comm-failure').length,0);
+ u.ctl.liveStatus.clear();assert.equal(u.view.querySelectorAll('.dv-live-comm-failure').length,0);assert.equal(path.getAttribute('tabindex'),'0');
  const w=harness(data,{},{authoring:true});w.ctl.liveStatus.apply(fixed);assert.equal(w.view.querySelectorAll('.dv-live-pointer').length,0);
  w.view.dispatchEvent({type:'click',target:w.view.querySelector('path.edge'),button:0,preventDefault(){assert.fail('authoring click prevented');},stopPropagation(){assert.fail('authoring click stopped');}});assert.equal(w.view.querySelector('.dv-live-popover'),null);
 });

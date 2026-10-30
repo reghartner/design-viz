@@ -684,8 +684,9 @@ function coinSlots(path, len, mid, n, avoid, marked){
   var index = avoid && avoid.cells ? avoid : coinObstacleIndex(avoid);
   /* a lone coin sits on the midpoint, exactly as before shared rows, unless
      the midpoint itself lies on a card (e.g. a view leaves one coin on an edge
-     that runs under a float); a coin merely grazing a card stays put */
-  if (n === 1 && (marked ? coinCover([mid], index, 0, true) === 0 : !coinPointOnCard(mid, index))) return [{x: mid.x, y: mid.y}];
+     that runs under a float); a coin merely grazing a card stays put. Live control
+     reservations set strict so even a grazing hit-area overlap moves the coin. */
+  if (n === 1 && (marked || index.strict ? coinCover([mid], index, 0, marked) === 0 : !coinPointOnCard(mid, index))) return [{x: mid.x, y: mid.y}];
   // The badge projects toward the next coin on an ascending diagonal. Reserve
   // its hit area as well as the number, including in the fallback grid.
   var spacing = marked ? 44 : COIN_STEP, clearance = marked ? 42 : COIN_CLEAR, end = marked ? 36 : COIN_END;
@@ -1040,6 +1041,19 @@ function boardContentBounds(svg){
   });
   return unionGraphFrame(null,boxes,24);
 }
+/* Measured control bounds in the board coordinate space. Include transparent
+   hit rectangles, but never reserve controls hidden by path/step filtering. */
+function boardControlBox(el,svg){
+  if(!el || typeof el.getCTM!=='function' || typeof svg.getCTM!=='function')return null;
+  var style=el.ownerDocument.defaultView.getComputedStyle(el);
+  if(style.display==='none' || style.visibility==='hidden' || el.closest('.dv-fragment-hidden,.view-step-hidden,.comm-hidden,.dv-live-comm-suppressed'))return null;
+  var root=svg.getCTM(),matrix=el.getCTM();if(!root || !matrix)return null;
+  var box=el.getBBox();if(!box.width && !box.height)return null;
+  matrix=root.inverse().multiply(matrix);
+  var points=[[box.x,box.y],[box.x+box.width,box.y],[box.x,box.y+box.height],[box.x+box.width,box.y+box.height]].map(function(p){return {x:matrix.a*p[0]+matrix.c*p[1]+matrix.e,y:matrix.b*p[0]+matrix.d*p[1]+matrix.f};});
+  var x=Math.min.apply(null,points.map(function(p){return p.x;})),y=Math.min.apply(null,points.map(function(p){return p.y;}));
+  return {x:x,y:y,w:Math.max.apply(null,points.map(function(p){return p.x;}))-x,h:Math.max.apply(null,points.map(function(p){return p.y;}))-y};
+}
 function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   destroyBoardLinks(el);
   // Visibility is presentation only: retain identities, layout and story data.
@@ -1235,10 +1249,11 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
 
   var coinRects = [], deltaRects = [], labelEls = [], pendingLabelBadges = [], coinGroups = [];
   /* every card (row nodes and floats, padded) is off limits for coins */
-  var coinAvoid = coinObstacleIndex(Object.keys(L.pos).map(function(id){
+  var coinCardRects = Object.keys(L.pos).map(function(id){
     var p = L.pos[id];
     return {x: p.cx - p.w / 2 - COIN_PAD, y: p.cy - p.h / 2 - COIN_PAD, w: p.w + 2 * COIN_PAD, h: p.h + 2 * COIN_PAD};
-  }));
+  });
+  var coinAvoid = coinObstacleIndex(coinCardRects);
   function deltaBadge(parent, x, y, value, label, unrecorded){
     var badge = appendDeltaMarker(parent, value, label, x, y);
     if (!unrecorded) deltaRects.push({x:x - 12, y:y - 12, w:24, h:24});
@@ -1409,8 +1424,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     });
   })();
 
-  function refreshFrame(){
-    if(!validGraphFrame(d.graphFrame))return;
+  function refreshFrame(force){
+    if(!force && !validGraphFrame(d.graphFrame))return;
     var ink=boardContentBounds(svg);
     if(ink){
       vb=unionGraphFrame(vb,[ink],0);
@@ -1424,6 +1439,19 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       });
     }
   }
+  // The overlay calls this after creating physical break glyphs and before
+  // placing its ticket cues. Reuse the same coin algorithm and filter state.
+  svg._layoutStatusCoins=function(){
+    var broken=Array.from(svg.querySelectorAll('.comm-break')).some(function(el){return !!boardControlBox(el,svg);});
+    var reserved=[];
+    if(broken)svg.querySelectorAll('.comm-break,text.lbl,.dvdelta,.node-review-badge,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff]').forEach(function(el){
+      if(el.closest('.coin'))return;
+      var box=boardControlBox(el,svg);if(box)reserved.push({x:box.x-4,y:box.y-4,w:box.w+8,h:box.h+8});
+    });
+    var avoid=reserved.length?coinObstacleIndex(coinCardRects.concat(reserved)):coinAvoid;avoid.strict=reserved.length>0;
+    coinGroups.forEach(function(group){group.avoid=avoid;layoutCoinGroup(group);});
+  };
+  svg._refreshStatusFrame=function(){refreshFrame(true);};
   refreshFrame();
   /* Ink measured before webfonts settle, or skipped while an inactive tab
      hid the board, is stale. Re-measure once fonts are ready and each time the

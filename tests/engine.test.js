@@ -4787,6 +4787,55 @@ test('coinSlots reserves the full hit bounds when live controls graze a lone coi
   assert.equal(points.length,1);assert.equal(C.coinCover(points,avoid),0);
   assert.notDeepEqual(plain(points),[mid]);
 });
+function fakeCoin(hidden){
+  const attrs={},classes=new Set(hidden?['view-step-hidden']:[]);
+  return {attrs,classList:{contains:c=>classes.has(c),toggle:(c,on)=>{if(on)classes.add(c);else classes.delete(c);},add:c=>classes.add(c)},
+    setAttribute(k,v){attrs[k]=String(v);},removeAttribute(k){delete attrs[k];},getAttribute(k){return k in attrs?attrs[k]:null;}};
+}
+test('stepCoinOffset reads one finite author-placed offset per edge key',()=>{
+  const st={coinOffsets:{'a->b':{dx:12,dy:-8},'b->c':{dx:'1',dy:2},'c->d':{dx:Infinity,dy:0}}};
+  assert.deepStrictEqual(plain(C.stepCoinOffset(st,'a->b')),{dx:12,dy:-8});
+  for(const key of ['b->c','c->d','x->y','toString'])assert.strictEqual(C.stepCoinOffset(st,key),null,key);
+  for(const value of [null,[],'a',{}])assert.strictEqual(C.stepCoinOffset({coinOffsets:value},'a->b'),null);
+  assert.strictEqual(C.stepCoinOffset(null,'a->b'),null);
+});
+test('layoutCoinGroup leaves an author-placed coin at its offset and packs only the automatic coins',()=>{
+  const path=linePath([{x:0,y:50},{x:200,y:50}]),mid=path.getPointAtLength(100);
+  const coins=[fakeCoin(),fakeCoin(),fakeCoin()],bases=[fakeCoin(),fakeCoin(),fakeCoin()];
+  const group={path,len:path.len,mid,coins,bases,deltas:[false,false,false],fixed:[null,{dx:40,dy:-60},null],avoid:[]};
+  const round=pts=>plain(pts).map(p=>({x:Math.round(p.x),y:Math.round(p.y),ci:p.ci}));
+  const placed=round(C.layoutCoinGroup(group));
+  /* the two automatic coins form a two-coin row; the placed coin keeps its offset */
+  assert.deepStrictEqual(placed,[{x:85,y:50,ci:0},{x:140,y:-10,ci:1},{x:115,y:50,ci:2}]);
+  assert.strictEqual(coins[1].attrs.transform,'translate(40.00 -60.00)');
+  assert.strictEqual(bases[1].attrs.transform,'translate(40.00 -60.00)','the backing disc follows its coin');
+  /* a view hides the first coin: the remaining automatic coin returns to the
+     midpoint, and the placed coin does not move */
+  coins[0].classList.add('view-step-hidden');
+  assert.deepStrictEqual(round(C.layoutCoinGroup(group)),[{x:140,y:-10,ci:1},{x:100,y:50,ci:2}]);
+  assert.strictEqual(coins[2].attrs.transform,undefined);
+  assert.strictEqual(coins[1].attrs.transform,'translate(40.00 -60.00)');
+  assert.ok(bases[0].classList.contains('view-step-hidden'));
+  /* a hidden placed coin takes no slot and reports no point */
+  coins[1].classList.add('view-step-hidden');coins[0].classList.toggle('view-step-hidden',false);
+  assert.deepStrictEqual(plain(C.layoutCoinGroup(group)).map(p=>p.ci),[0,2]);
+});
+test('step coinOffsets warn when malformed or not on one of the step edges',()=>{
+  const d={nodes:{a:{},b:{},c:{}},rows:[['a','b','c']],edges:[{from:'a',to:'b'},{from:'b',to:'c'}],
+    steps:[{edge:'a->b',coinOffsets:{'a->b':{dx:10,dy:-4}}},{edge:'a->b',coinOffsets:{'b->c':{dx:1,dy:1},'a->b':{dx:'1',dy:0}}},{edge:'b->c',coinOffsets:[]}]};
+  const result=C.validate(C.normalize(d)),coins=result.warnings.filter(w=>w.includes('coinOffsets'));
+  assert.strictEqual(result.errors.length,0);
+  assert.ok(!coins.some(w=>w.includes('steps[0]')),'a valid offset is silent');
+  assert.ok(coins.some(w=>w.includes('steps[1].coinOffsets.b->c: edge must be declared and used by this step')));
+  assert.ok(coins.some(w=>w.includes('steps[1].coinOffsets.a->b: expected {dx, dy}')));
+  assert.ok(coins.some(w=>w.includes('steps[2].coinOffsets: expected an object')));
+});
+test('compatibility records manually placed step circles',()=>{
+  const raw={nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b'}],steps:[{edge:'a->b'}]};
+  assert.ok(!C.FlowviewCompatibility.detect(raw).includes('layout.coin-positions'));
+  raw.steps[0].coinOffsets={'a->b':{dx:4,dy:4}};
+  assert.ok(C.FlowviewCompatibility.detect(raw).includes('layout.coin-positions'));
+});
 test('coinSlots packs a bounded grid when the edge is too short or bends too tightly',()=>{
   /* a 50px vertical edge: no room along it, so the coins stack across it, left to right */
   const short=linePath([{x:0,y:0},{x:0,y:50}]),smid=short.getPointAtLength(25);
@@ -4858,7 +4907,7 @@ test('a lone visible coin moves off a card that covers the midpoint',()=>{
   const el=hidden=>{const attrs={},cls=new Set(hidden?['view-step-hidden']:[]);return {attrs,cls,classList:{contains:c=>cls.has(c),toggle:(c,on)=>on?cls.add(c):cls.delete(c)},setAttribute(k,v){attrs[k]=v;},removeAttribute(k){delete attrs[k];}};};
   const coins=[el(true),el(false),el(true)];
   const pts=C.layoutCoinGroup({path:flat,len:flat.len,mid:fmid,coins,avoid:C.coinObstacleIndex(straddle)});
-  assert.deepStrictEqual(plain(pts),[{x:25,y:30}]);
+  assert.deepStrictEqual(plain(pts),[{x:25,y:30,ci:1}],'each point names its coin');
   assert.strictEqual(coins[1].attrs.transform,'translate(0.00 30.00)');
 });
 test('coinSlots forms a compact square once the block leaves the endpoint cards',()=>{

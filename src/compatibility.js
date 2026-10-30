@@ -39,7 +39,8 @@ var FlowviewCompatibility = (function(){
     'media.screen-playing':['Camera screen Playing mode for recorded-clip playback','0.2.0'],
     'media.screen-scene-override':['Camera screen scene changes per step','0.2.0'],
     'media.scene-raccoon-at-night':['Raccoon-at-night camera clip','0.2.0'],
-    'media.residential-clips':['Driveway, garage and side-gate camera clips','0.2.0']
+    'media.residential-clips':['Driveway, garage and side-gate camera clips','0.2.0'],
+    'layout.coin-positions':['Manually placed step circles','0.2.0']
   };
   Object.keys(released).forEach(function(id){features[id]={label:released[id][0],since:released[id][1]};});
   // Panel capabilities come from their definitions at build time.
@@ -155,6 +156,7 @@ var FlowviewCompatibility = (function(){
         if((Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (object(s.panels)?s.panels:s.patch);return object(patches) && object(patches[p.id]) && Object.prototype.hasOwnProperty.call(patches[p.id],'drain');}))used['flow.story-time']=true;
       });
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.color!=null;}))used['flow.step-colors']=true;
+      if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.coinOffsets) && Object.keys(s.coinOffsets).length;}))used['layout.coin-positions']=true;
       if(object(d.nodes) && Object.keys(d.nodes).some(function(id){return object(d.nodes[id]) && d.nodes[id].style!=null;}))used['media.node-styles']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.panelVisibility!=null;}))used['flow.panel-visibility']=true;
       if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;

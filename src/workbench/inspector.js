@@ -1049,6 +1049,15 @@ function stepForm(val, ctx){
     colorRow.appendChild(colorLabel);colorRow.appendChild(colorBox);rows.push(colorRow);
     var colorHelp=document.createElement('p');colorHelp.className='step-color-help';
     colorHelp.textContent='This step only. Repeat the color on adjacent steps to mark a phase; no alternate path is needed.';rows.push(colorHelp);
+    var coinPlaced=!!(val.coinOffsets && typeof val.coinOffsets==='object' && !Array.isArray(val.coinOffsets) && Object.keys(val.coinOffsets).length);
+    var coinBox=document.createElement('div');coinBox.className='step-coin-position';
+    var coinState=document.createElement('span');coinState.className='fnote';
+    coinState.textContent=coinPlaced?'Placed manually.':'Automatic. Drag the circle on the board to place it.';coinBox.appendChild(coinState);
+    var resetCoin=actionButton('Reset to automatic',function(){
+      return commitCascade(function(raw){return planStepCoinOffset(session.text(),raw,t.section,t.index,null,null);},{after:function(){renderInspector();}});
+    });
+    resetCoin.disabled=!coinPlaced;resetCoin.setAttribute('aria-label','Reset step circle to automatic position');coinBox.appendChild(resetCoin);
+    rows.push(frow('Circle position',coinBox));
     var evidence=document.createElement('details');
     var evidenceTitle=document.createElement('summary'); evidenceTitle.textContent='Code and trace evidence';evidence.appendChild(evidenceTitle);
     evidence.appendChild(frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr')));

@@ -497,6 +497,14 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(DP + '.steps[' + ti + '].delta: must be true or false — ignored');
     var keys = stepKeys(st);
     var failures = stepFailures(st);
+    if(st && st.coinOffsets!=null){
+      var OP=DP+'.steps['+ti+'].coinOffsets';
+      if(!specObject(st.coinOffsets))warnings.push(OP+': expected an object mapping edge keys to {dx, dy} — using automatic positions');
+      else Object.keys(st.coinOffsets).forEach(function(key){
+        if(!stepCoinOffset(st,key))warnings.push(OP+'.'+key+': expected {dx, dy} with finite numbers — using the automatic position');
+        else if(!Object.prototype.hasOwnProperty.call(edgeKeys,key) || keys.indexOf(key)<0)warnings.push(OP+'.'+key+': edge must be declared and used by this step — ignored');
+      });
+    }
     if(st && st.contracts!=null){
       var CP=DP+'.steps['+ti+'].contracts';
       if(!specObject(st.contracts))warnings.push(CP+': expected an object mapping edge keys to JSON contracts — ignored');

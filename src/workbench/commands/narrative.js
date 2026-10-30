@@ -169,6 +169,7 @@ function planDuplicateStep(text, raw, sectionIdx, stepIdx, pathId){
   var steps = got.d.steps;
   if (!Number.isInteger(stepIdx) || !Array.isArray(steps) || !steps[stepIdx]) return {error:'step not found'};
   var clone = builderClone(steps[stepIdx]);
+  delete clone.coinOffsets; /* a copy placed on its original's circle would hide it */
   if (typeof clone.id === 'string' && clone.id){
     var taken = Object.create(null);
     steps.forEach(function(step){ if (step && typeof step.id === 'string') taken[step.id] = true; });
@@ -208,6 +209,7 @@ function planPathStepEdit(text,raw,section,pathId,index,action,metadata){
         color:['#fb923c','#c084fc','#f472b6','#4ade80'][(d.paths.length-1)%4],steps:p.steps.slice(0,at+1).concat(step.id)});
     } else if(action === 'add' || action === 'duplicate'){
       var step=action==='duplicate'?builderClone(steps[index]):{text:'Describe what happens in this step',nodes:Object.keys(d.nodes || {}).slice(0,1)};
+      delete step.coinOffsets;
       step.id=newId(action==='duplicate'?step.id+'-copy':'step-');resultIndex=steps.length;steps.push(step);
       p.steps.splice(action==='duplicate'?at+1:p.steps.length,0,step.id);
     } else if(action === 'earlier' || action === 'later'){
@@ -283,6 +285,7 @@ function planStepToggleHop(text, raw, sectionIdx, stepIdx, key){
     var failures = stepFailures(st);
     if (has) delete failures[key];
     if(has && st.contracts){delete st.contracts[key];if(!Object.keys(st.contracts).length)delete st.contracts;}
+    if(has && st.coinOffsets && typeof st.coinOffsets==='object'){delete st.coinOffsets[key];if(!Object.keys(st.coinOffsets).length)delete st.coinOffsets;}
     if (has && Array.isArray(st.packets)) st.packets = st.packets.filter(function(pk){return pk.edge !== key;});
     var delivered = next.filter(function(k){return !Object.prototype.hasOwnProperty.call(failures,k);});
     delete st.edge; delete st.edges;
@@ -293,6 +296,31 @@ function planStepToggleHop(text, raw, sectionIdx, stepIdx, key){
   if (r.error) return r;
   r.added = !has;
   return r;
+}
+
+/* Place this step's coin on edge `key` at offset {dx, dy} from the edge
+   midpoint (rounded), or with offset null return it to its automatic slot.
+   A null key with a null offset resets every coin of the step. The step is
+   always consumer-authored, so imported edges need no provider edit. */
+function planStepCoinOffset(text,raw,sectionIdx,stepIdx,key,offset){
+  var got = builderStepAt(raw,sectionIdx,stepIdx);
+  if (!got) return {error:'step not found — reselect and try again'};
+  var cur = got.st.coinOffsets, map = Object.create(null);
+  if (cur != null && (typeof cur !== 'object' || Array.isArray(cur))) return {error:'Fix this step\'s coinOffsets to be an object before placing its circle.'};
+  Object.keys(cur || {}).forEach(function(k){ map[k] = cur[k]; });
+  if (offset){
+    if (typeof key !== 'string' || builderStepHops(got.st).indexOf(key) < 0) return {error:'This circle no longer belongs to that step. Render, then try again.'};
+    var dx = Math.round(offset.dx), dy = Math.round(offset.dy);
+    if (!isFinite(dx) || !isFinite(dy)) return {error:'Circle offsets must be finite numbers.'};
+    map[key] = {dx:dx, dy:dy};
+  } else if (key == null){
+    if (!Object.keys(map).length) return {error:'This step\'s circle is already in its automatic position.'};
+    map = Object.create(null);
+  } else {
+    if (!Object.prototype.hasOwnProperty.call(map,key)) return {error:'This circle is already in its automatic position.'};
+    delete map[key];
+  }
+  return planSetField(text,raw,got.path,'coinOffsets',Object.keys(map).length ? JSON.stringify(map) : null);
 }
 
 function planStepCommunication(text,raw,sectionIdx,stepIdx,key,outcome){

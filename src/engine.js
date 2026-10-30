@@ -777,26 +777,34 @@ function coinSlots(path, len, mid, n, avoid, marked){
   return best;
 }
 /* Place the visible coins of one shared edge; hidden coins keep no slot.
+   An author-placed coin (group.fixed[i] = {dx, dy}) stays at its offset and
+   takes no slot, so re-packing moves only the automatic coins around it.
    Each coin's backing disc (which masks the edge line under a dimmed coin)
-   follows its coin's slot and visibility. */
+   follows its coin's slot and visibility. Returns the visible coins' points,
+   each with its coin index `ci`. */
 function layoutCoinGroup(group){
-  var shown = [];
+  var shown = [], placed = [];
   group.coins.forEach(function(g, i){
     var hide = g.classList.contains('view-step-hidden'), base = group.bases && group.bases[i];
     if (base) base.classList.toggle('view-step-hidden', hide);
-    if (!hide) shown.push(i);
+    if (hide) return;
+    var fixed = group.fixed && group.fixed[i];
+    if (fixed) placed.push({x: group.mid.x + fixed.dx, y: group.mid.y + fixed.dy, ci: i});
+    else shown.push(i);
   });
   var marked = shown.some(function(i){ return group.deltas && group.deltas[i]; });
   var pts = coinSlots(group.path, group.len, group.mid, shown.length, group.avoid, marked);
-  shown.forEach(function(ci, i){
-    var dx = pts[i].x - group.mid.x, dy = pts[i].y - group.mid.y;
-    [group.coins[ci], group.bases && group.bases[ci]].forEach(function(el){
+  shown.forEach(function(ci, i){ placed.push({x: pts[i].x, y: pts[i].y, ci: ci}); });
+  placed.sort(function(a, b){ return a.ci - b.ci; });
+  placed.forEach(function(pt){
+    var dx = pt.x - group.mid.x, dy = pt.y - group.mid.y;
+    [group.coins[pt.ci], group.bases && group.bases[pt.ci]].forEach(function(el){
       if (!el) return;
       if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) el.removeAttribute('transform');
       else el.setAttribute('transform', 'translate(' + dx.toFixed(2) + ' ' + dy.toFixed(2) + ')');
     });
   });
-  return pts;
+  return placed;
 }
 /* Cards reserve two title lines without changing row heights. Measure the
    active skin's font, including the space occupied by links and drill-down. */
@@ -1271,7 +1279,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var coinLeft = mid.x, coinLeftY = mid.y;
 
     if (edgeSteps.length && !info.coinEls){ /* a duplicate from->to declaration shares the first one's coins */
-      var group = {path: path, len: len, mid: mid, coins: [], bases: [], deltas: [], avoid: coinAvoid};
+      var group = {path: path, len: len, mid: mid, coins: [], bases: [], deltas: [], fixed: [], avoid: coinAvoid};
       info.coinEls = group.coins; info.coinBaseEls = group.bases;
       edgeSteps.forEach(function(n){
         /* each coin is drawn at the midpoint and moved to its slot by a
@@ -1288,6 +1296,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
         g.setAttribute('id', prefix + '-coin-' + n);
         g.setAttribute('data-dv-step', String(d._sourceIndices ? d._sourceIndices[n - 1] : n - 1));
         g.setAttribute('data-dv-coin-edge', String(info.idx));
+        g.setAttribute('data-dv-coin-key', e.from + '->' + e.to);
         markFragmentElement(g, e);
         var c = document.createElementNS(SVGNS, 'circle');
         c.setAttribute('cx', mid.x); c.setAttribute('cy', mid.y); c.setAttribute('r', COIN_R);
@@ -1296,14 +1305,16 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
         t.textContent = n;
         g.appendChild(c); g.appendChild(t); svg.appendChild(g);
         if (stepDelta) deltaBadge(g, mid.x + 13, mid.y - 13, d.steps[n - 1], d.steps[n - 1].title || d.steps[n - 1].id || 'step ' + n, true);
-        group.coins.push(g); group.bases.push(base); group.deltas.push(stepDelta);
+        var fixed = stepCoinOffset(d.steps[n - 1], e.from + '->' + e.to);
+        if (fixed) g.classList.add('coin-placed');
+        group.coins.push(g); group.bases.push(base); group.deltas.push(stepDelta); group.fixed.push(fixed);
       });
       info.coinEl = group.coins[0];
       coinGroups.push(group);
-      layoutCoinGroup(group).forEach(function(pt, i){
+      layoutCoinGroup(group).forEach(function(pt){
         coinRects.push({x: pt.x - 11, y: pt.y - 11, w: 22, h: 22});
         /* coin badges travel with their coin: record them at the final slot */
-        if (group.deltas[i]) deltaRects.push({x: pt.x + 1, y: pt.y - 25, w: 24, h: 24});
+        if (group.deltas[pt.ci]) deltaRects.push({x: pt.x + 1, y: pt.y - 25, w: 24, h: 24});
         if (pt.x < coinLeft){ coinLeft = pt.x; coinLeftY = pt.y; }
       });
     }

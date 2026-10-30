@@ -32,6 +32,15 @@ function stepDeliveredKeys(st){
   var failures = stepFailures(st);
   return stepKeys(st).filter(function(key){return !Object.prototype.hasOwnProperty.call(failures,key);});
 }
+/* An author-placed coin: {dx, dy} from its edge midpoint, keyed by edge.
+   Anything malformed leaves the coin in its automatic slot. */
+function stepCoinOffset(st,key){
+  var map=st && st.coinOffsets,value;
+  if(!map || typeof map!=='object' || Array.isArray(map) || !Object.prototype.hasOwnProperty.call(map,key))return null;
+  value=map[key];
+  if(!value || typeof value!=='object' || typeof value.dx!=='number' || typeof value.dy!=='number' || !isFinite(value.dx) || !isFinite(value.dy))return null;
+  return {dx:value.dx,dy:value.dy};
+}
 function stepNodes(st){
   return (st && Array.isArray(st.nodes)) ? st.nodes : [];
 }

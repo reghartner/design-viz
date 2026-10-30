@@ -2243,6 +2243,16 @@ An ordered array walking the flow. Each step:
   keep their opacity, and the current-step ring remains visible. Use a caption
   to explain each phase, so color is not the only cue. See
   [step colors](../docs/step-colors.md) for editor controls and an example.
+- `coinOffsets` — optional **author-placed step circles**:
+  `{"from->to": {"dx": 40, "dy": -24}}`. Each entry moves this step's numbered
+  coin on that edge to the given offset (diagram units) from the edge midpoint,
+  so it follows when nodes move. Other coins on the edge keep their automatic
+  slots, and path or view filters that re-pack coins leave a placed coin where
+  it is. The key must be an edge this step uses (imported connections included:
+  the offset lives on the consumer's step, not the provider). Malformed entries
+  warn and fall back to the automatic position. The Workbench writes it when a
+  circle is dragged; right-click the circle or use Inspect → Circle position to
+  reset it. Specs that use it record `layout.coin-positions` (0.2.0).
 - `time` — optional **story time** for this step (requires the diagram's
   `storyTime`, see "Story time and device constants"): relative to the
   previous step on the same path (`"+3h19m"`, `"+45m"`, `"+1d2h"`, `"+90s"`),

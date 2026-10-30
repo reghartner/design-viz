@@ -32,6 +32,8 @@ function wireStepCoins(host, prefix, describe, activate){
     if (!coin.isConnected || coin.classList.contains('view-step-hidden')) return;
     var info = describe(coin);
     if (!info) return;
+    // A path change re-renders the board's contents, card included.
+    if (!card.isConnected) host.appendChild(card);
     card.replaceChildren();
     var eyebrow = document.createElement('span'); eyebrow.className = 'step-coin-card-label';
     eyebrow.textContent = ['Step ' + info.number].concat(info.lane ? [info.lane] : [], info.route ? [info.route] : []).join(' · ');
@@ -46,6 +48,10 @@ function wireStepCoins(host, prefix, describe, activate){
     }
     card.hidden = false;
     if (card.showPopover) card.showPopover();
+    shown = coin; coin.setAttribute('aria-describedby', card.id);
+    place(coin);
+  }
+  function place(coin){
     // Keep the card over the visible part of the board, above the coin when
     // it fits there. The card narrows to the board's width; only a board
     // shorter than the card lets it extend above or below, inside the window.
@@ -59,7 +65,14 @@ function wireStepCoins(host, prefix, describe, activate){
     if (top < minY) top = rect.bottom + 8;
     card.style.left = Math.max(minX, Math.min(maxX - w, rect.left + rect.width / 2 - w / 2)) + 'px';
     card.style.top = Math.max(minY, Math.min(maxY - h, top)) + 'px';
-    shown = coin; coin.setAttribute('aria-describedby', card.id);
+  }
+  // Follow active and readers scroll the board; the card moves with its coin
+  // and closes once the coin leaves the visible board.
+  function scrolled(){
+    if (!shown) return;
+    var rect = shown.getBoundingClientRect(), board = host.getBoundingClientRect();
+    if (!shown.isConnected || rect.bottom < board.top || rect.top > board.bottom || rect.right < board.left || rect.left > board.right) hide();
+    else place(shown);
   }
   function schedule(coin){
     if (shown === coin || pending === coin) return;
@@ -103,7 +116,7 @@ function wireStepCoins(host, prefix, describe, activate){
   listen(document, 'keydown', function(ev){ if (ev.key === 'Escape' && (shown || pending)) hide(); }, true);
   // Any press away from the shown coin (a path, view or step control) closes it.
   listen(document, 'pointerdown', function(ev){ if ((shown || pending) && !coinOf(ev.target)) hide(); }, true);
-  listen(document, 'scroll', hide, true);
+  listen(document, 'scroll', scrolled, true);
   listen(window, 'resize', hide);
   return {hide:hide, destroy:function(){ hide(); listeners.forEach(function(off){ off(); }); if (card.remove) card.remove(); }};
 }

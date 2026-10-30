@@ -59,8 +59,8 @@ test('a board coin shows its step after a hover delay and goes to that step on c
  await expect(card.locator('.step-coin-card-label')).toHaveText('Step 3 · NET · Hub → Cloud');
  await root.locator('.path-chip[data-dv-path="hub"]').click();
  await expect(card).toBeHidden();
- await expect(coin(1)).toHaveClass(/view-step-hidden/);
- await expect(coin(1)).not.toHaveAttribute('tabindex',/.*/);
+ // This path never uses cloud->app, so its board has no coin for that step.
+ await expect(coin(1)).toHaveCount(0);
  await coin(2).hover();
  await expect(card.locator('.step-coin-card-label')).toHaveText('Step 2 · NET · Hub → Cloud');
  await page.mouse.move(2,2);await expect(card).toBeHidden();

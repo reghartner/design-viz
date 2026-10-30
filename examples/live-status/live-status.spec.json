@@ -22,6 +22,66 @@
         }
       ]
     },
+    "editHistory": [
+      {
+        "at": "2026-10-29T14:05:00Z",
+        "by": {
+          "name": "Sam"
+        },
+        "changes": [
+          {
+            "op": "add",
+            "ticket": "FW-46",
+            "edge": [
+              "button",
+              "mcu"
+            ],
+            "path": [
+              "sections",
+              0,
+              "diagram",
+              "edges",
+              0
+            ],
+            "label": "Doorbell button → Doorbell controller"
+          }
+        ]
+      },
+      {
+        "at": "2026-10-30T16:23:15Z",
+        "by": {
+          "name": "Riley"
+        },
+        "changes": [
+          {
+            "op": "add",
+            "ticket": "BE-68",
+            "node": "ingest",
+            "path": [
+              "sections",
+              0,
+              "diagram",
+              "nodes",
+              "ingest"
+            ],
+            "label": "Event ingest"
+          },
+          {
+            "op": "remove",
+            "ticket": "UX-90",
+            "node": "app",
+            "path": [
+              "sections",
+              0,
+              "diagram",
+              "nodes",
+              "app"
+            ],
+            "label": "Resident app"
+          }
+        ]
+      }
+    ],
     "lanes": {
       "HW": {
         "label": "Hardware",
@@ -54,6 +114,11 @@
               "id": "status",
               "type": "live-status",
               "title": "Epic status"
+            },
+            {
+              "id": "history",
+              "type": "edit-history",
+              "title": "Edit history"
             }
           ],
           "sectionLayout": {
@@ -79,6 +144,13 @@
                 "w": 12,
                 "h": 27,
                 "panel": "status"
+              },
+              {
+                "panel": "history",
+                "x": 0,
+                "y": 35,
+                "w": 24,
+                "h": 8
               }
             ],
             "backstage": [
@@ -101,6 +173,13 @@
                 "y": 16,
                 "w": 24,
                 "h": 16
+              },
+              {
+                "panel": "history",
+                "x": 0,
+                "y": 32,
+                "w": 24,
+                "h": 8
               }
             ],
             "confluence": [
@@ -123,6 +202,13 @@
                 "y": 16,
                 "w": 24,
                 "h": 16
+              },
+              {
+                "panel": "history",
+                "x": 0,
+                "y": 32,
+                "w": 24,
+                "h": 8
               }
             ]
           },

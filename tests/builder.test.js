@@ -318,10 +318,12 @@ test('PANEL_SETUP_FIELDS covers exactly the engine panel types with known contro
   const kinds = new Set(['text', 'num', 'csv', 'scene', 'image', 'json', 'jsonArr', 'jsonAny',
                          'clock', 'rows', 'map', 'objf']);
   for (const [type, fields] of Object.entries(B.PANEL_SETUP_FIELDS)){
-    if (type === 'live-status') {
+    /* Runtime-evidence panels (#827 adds the read-only edit history) have no configuration. */
+    const runtimeTitles = {'live-status': 'Live status', 'edit-history': 'Edit history'};
+    if (runtimeTitles[type]) {
       assert.deepStrictEqual(plain(fields), [], 'runtime evidence has no setup fields');
       assert.deepStrictEqual(plain(B.PANEL_PATCH_FIELDS[type]), [], 'runtime evidence has no patch fields');
-      assert.deepStrictEqual(plain(B.PANEL_TEMPLATES[type]), {title:'Live status'});
+      assert.deepStrictEqual(plain(B.PANEL_TEMPLATES[type]), {title: runtimeTitles[type]});
       continue;
     }
     assert.ok(fields.length >= 1, type);
@@ -391,7 +393,7 @@ test('every PANEL_SETUP_FIELDS entry uses a known control kind with a sane shape
       }
     });
     const last = B.PANEL_SETUP_FIELDS[type][B.PANEL_SETUP_FIELDS[type].length - 1];
-    if (type === 'live-status') assert.strictEqual(last, undefined, 'runtime evidence has no starting snapshot');
+    if (type === 'live-status' || type === 'edit-history') assert.strictEqual(last, undefined, 'runtime evidence has no starting snapshot');
     else if (type !== 'image' && type !== 'inflight') assert.strictEqual(last[0], 'initial', type + ' ends with initial');
     if (type === 'inflight') assert.strictEqual(last[0], 'lanes', 'inflight has declarations but no starting snapshot');
   });

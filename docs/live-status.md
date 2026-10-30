@@ -726,9 +726,18 @@ it, `flowspec.json` holding the spec text verbatim (outer whitespace stripped,
 one trailing newline; never re-serialized). The page carries a marker line
 after its `flowspec` block, `<meta name="dv-spec-file" content="flowspec.json">`,
 so the standalone boot fetches `flowspec.json` relative to the page and renders
-that file; the inline block is kept as the fallback for a page opened where the
-fetch fails (a `file://` path, or the file missing). A fetched file that is not
-JSON fails loud rather than silently rendering the stale inline copy. The
+that file; the inline block is kept as the fallback. When the file cannot load
+for any reason (an HTTP error status, a network or `file://` fetch failure,
+malformed JSON) the page boots from the inline copy and shows a large,
+persistent warning above the page (Chuck 2026-10-30): "This board couldn't
+load its latest version. You're seeing the copy saved when the page was
+published; changes saved since then are not shown." Its **Copy error** button
+copies diagnostics for an agent (what failed, the file name, page title,
+`page.flowview.authoredWith` and the build version, the time, and the hint that
+the page booted from its inline block); when the clipboard is unavailable the
+text appears in a read-only field instead. Code sees the state as
+`ctl.sourceFallback()` → `{reason: "http" | "network" | "parse", detail}`,
+null when the file loaded (#828 disables Save while it is set). The
 fetched spec passes the same workspace-handoff check as the inline one
 (`verifyWorkspaceHandoff` in `src/boot.flowview.js`) before boot; a failed
 check shows the handoff error and never boots the fetched spec, and never falls

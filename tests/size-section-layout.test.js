@@ -13,11 +13,10 @@ test('a longest path of four steps or fewer puts step controls in a left column 
  assert.deepEqual([graph.x,graph.y,graph.w],[7,0,17]);
  assert.equal(controls.h,graph.h);assert.ok(graph.h>=r.controls.rows&&graph.h>=r.diagram.rows);
 });
-test('a longer path stacks a full-width diagram above full-width step controls',()=>{
- const r=Z.sizeSection(diagram(5),grid),[graph,controls]=r.sectionLayout.default;
- assert.equal(r.arrangement,'stacked');assert.match(r.reason,/5 steps/);
- assert.deepEqual([graph.x,graph.y,graph.w,graph.h],[0,0,24,r.diagram.rows]);
- assert.deepEqual([controls.controls,controls.y,controls.w,controls.h],['steps',graph.h,24,r.controls.rows]);
+test('a longer path keeps the composer layout and is reported, not rewritten',()=>{
+ const r=Z.sizeSection(diagram(5),grid);
+ assert.equal(r.sectionLayout,undefined);assert.match(r.skipped,/5 steps \(more than 4\); keep the compose-page-layout/);
+ const out=Z.sizeSpec(page(diagram(5)),1200).output;assert.equal(out.page.sections[0].diagram.sectionLayout,undefined);
 });
 test('step controls grow with their longest caption and the diagram with its drawing height',()=>{
  const short=S.stepControls(diagram(3),300),long=S.stepControls(diagram(3,'Detailed step narrative. '.repeat(30)),300);

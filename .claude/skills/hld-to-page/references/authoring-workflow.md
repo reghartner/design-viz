@@ -136,9 +136,9 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     and use its output. It sizes both containers from their own content (node
     positions, the longest step caption, path count and length). When the
     longest path has 4 steps or fewer it puts step controls in a left column
-    (7 of 24 columns) beside the diagram, both tall enough; longer paths stack
-    them. It reports and skips sections with panels (keep the composer's layout
-    there). Do not hand-edit its sizes; fix content (shorter captions, tighter
+    (7 of 24 columns) beside the diagram, both tall enough. It reports and
+    skips longer paths and sections with panels; keep the composer's layout
+    there. Do not hand-edit its sizes; fix content (shorter captions, tighter
     nodes) and rerun. Report any `notes` it prints.
 14. **No node groups unless the operator asks for them.** Groups degrade
     auto-arrange. Default to none; keep groups the source spec already has.

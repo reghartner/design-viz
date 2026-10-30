@@ -11,7 +11,7 @@ const S=core.containerSize;
 const HELP='Usage: node tools/size-section-layout.cjs [--width 800..1920] [--write output.json] input.json\n'+
  'Sizes step controls and the diagram of every diagram section from their content and prints a sectionLayout for each.\n'+
  'Longest path of 4 steps or fewer: step controls in a left column (7 of 24 columns), diagram on the right, one shared height.\n'+
- 'Longer paths: diagram full width, step controls full width below it.\n'+
+ 'Longer paths, or a side-by-side layout that does not fit: the section is reported and keeps its compose-page-layout.cjs layout.\n'+
  '--write saves a copy of the input with those sectionLayouts applied; the input is never modified. Sizes are estimates.\n';
 const SHORT_PATH_STEPS=4,SIDE_CONTROLS_COLUMNS=7;
 
@@ -47,11 +47,9 @@ function sizeSection(d,grid){
   }
   notes.push(controls.unsupported?'step controls do not fit 7 columns':'diagram is too wide for 17 columns (labels '+diagram.labelPx.toFixed(1)+'px, floor '+S.FLOOR_PX+'px)');
  }
- const diagram=S.diagram(d,px(24),grid.scale,bounds),dh=Math.min(40,diagram.rows),ch=Math.min(40,full.rows);
- if(diagram.labelPx<S.READABLE_PX)notes.push('diagram labels estimate '+diagram.labelPx.toFixed(1)+'px at full width (readable is '+S.READABLE_PX+'px); tighten node spacing or split the diagram');
- return {arrangement:'stacked',reason:full.maxPathSteps>SHORT_PATH_STEPS?'longest path has '+full.maxPathSteps+' steps (more than 4)':'side-by-side does not fit',
-  controls:{w:24,rows:full.rows,maxCaptionLines:full.maxLines},diagram:{w:24,rows:diagram.rows,labelPx:+diagram.labelPx.toFixed(1)},notes,
-  sectionLayout:{columns:24,default:[{x:0,y:0,w:24,h:dh},{controls:'steps',x:0,y:dh,w:24,h:ch}]}};
+ // Longer stories keep the composer's layout (step controls above the diagram,
+ // sized with the same math); a full-width diagram above them pushes them off screen.
+ return {skipped:(full.maxPathSteps>SHORT_PATH_STEPS?'longest path has '+full.maxPathSteps+' steps (more than 4)':'side-by-side does not fit')+'; keep the compose-page-layout.cjs layout',notes};
 }
 function sizeSpec(raw,width){
  const verdict=core.validateSpec(raw);if(verdict.errors.length)throw Error('Invalid input:\n'+verdict.errors.map(m=>'- '+m).join('\n'));

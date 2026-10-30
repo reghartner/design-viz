@@ -29,6 +29,8 @@ test('a diagram too wide to read beside the step controls keeps the composer lay
 });
 test('step controls grow with their longest caption and path, and the diagram with its drawing',()=>{
  assert.ok(S.stepControlsMinWidth(diagram(20))>S.stepControlsMinWidth(diagram(4)));
+ const shared={...diagram(4),paths:[{id:'a',steps:['s0','s1','s2']},{id:'b',steps:['s0','s3']}]};
+ assert.ok(S.stepControlsMinWidth(shared)>=230+3*44+28+30,'shared-step timeline keeps its 230px default label column');
  assert.ok(S.diagram(null,700,1,{x:0,y:0,w:900,h:200}).readableWidth>S.diagram(null,700,1,{x:0,y:0,w:400,h:200}).readableWidth);
  const short=S.stepControls(diagram(3),300),long=S.stepControls(diagram(3,'Detailed step narrative. '.repeat(30)),300);
  assert.ok(long.rows>short.rows&&long.maxLines>short.maxLines);

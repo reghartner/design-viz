@@ -102,8 +102,10 @@ function stepControlsMinWidth(d){
     longest=Math.max.apply(null,[1].concat(paths.map(function(p){return p.indices.length;}))),track;
   if(paths.length>1){
     var graph=pathTimelineGraph(paths);
-    // Path label column (150px minimum) plus 44px timeline columns, or 35px matrix chips.
-    track=graph.hasShared?150+Math.max(1,graph.columns)*44+28:150+longest*35;
+    // A shared-step timeline has a fixed-width label column (230px default; only
+    // named views override it) and 44px columns; the plain path matrix shrinks its
+    // label column to 150px beside 35px chips.
+    track=graph.hasShared?sectionPathLabelWidth(undefined)+Math.max(1,graph.columns)*44+28:150+longest*35;
   }else track=longest*(delta?38:29)+10;
   // Transport (previous, play, next, status) and the 200px caption floor; frame padding.
   return Math.max(260,track)+30;

@@ -832,7 +832,10 @@ entry on every Save. The panel shows them newest first:
 ]
 ```
 
-Required per entry: `at` (ISO-8601 string) and a non-empty `changes` array
+Required per entry: `at` (an ISO-8601 date-time with date, time including
+seconds, optional fraction of any length, and `Z` or a `±hh:mm` offset, such as
+`2026-10-30T16:23:15.987Z`; impossible calendar dates are rejected) and a
+non-empty `changes` array
 whose items carry `op` (`"add"` or `"remove"`), `ticket` (a Jira key) and the
 carrier (`node` id, or `edge: [from, to]`). Optional: `by` (`id` and `name`
 strings, either may be empty), each change's `path` (array) and `label` (the

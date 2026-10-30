@@ -585,9 +585,10 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
    the newest 200 entries (by `at`, ties by position) are used, newest first. The
    live-status controller and the edit-history panel read the same filtered list. */
 var EDIT_HISTORY_LIMIT = 200;
-/* A real ISO-8601 date-time: YYYY-MM-DDThh:mm:ss[.fff](Z|±hh:mm). Date.parse alone
-   would roll 2026-02-30 into March, so the calendar fields are checked as written. */
-var EDIT_HISTORY_AT=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(?:Z|[+-](\d{2}):(\d{2}))$/;
+/* A real ISO-8601 date-time: YYYY-MM-DDThh:mm:ss[.f…](Z|±hh:mm), any number of
+   fractional-second digits. Date.parse alone would roll 2026-02-30 into March, so
+   the calendar fields are checked as written. */
+var EDIT_HISTORY_AT=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$/;
 function editHistoryTimestamp(value){
   var m=typeof value==='string'?EDIT_HISTORY_AT.exec(value):null;if(!m)return false;
   var year=+m[1],month=+m[2],day=+m[3],date=new Date(Date.UTC(year,month-1,day));

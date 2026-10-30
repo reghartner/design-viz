@@ -710,7 +710,9 @@ Optional page-level `editHistory` is the board's save history: an array of
 entries, hand-written today (the board's planned Edit mode, #828, will append
 one per Save) and shown by the `edit-history` panel. `at`, a non-empty `changes` array and each change's `op`,
 `ticket` and carrier are required; `by`, `by.id`, `by.name`, `path` and `label`
-are optional. Malformed entries warn and are ignored, a non-array warns once,
+are optional. `at` is an ISO-8601 date-time with seconds, an optional fraction
+of any length and `Z` or a `±hh:mm` offset (`2026-10-30T16:23:15.987Z`).
+Malformed entries warn and are ignored, a non-array warns once,
 and more than 200 entries warn once with only the newest 200 used. See
 [Edit history](../docs/live-status.md#edit-history).
 Valid keys are deduplicated in authored order; invalid entries warn individually

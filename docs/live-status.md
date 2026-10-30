@@ -717,6 +717,39 @@ behaves as before: authored PR links stay plain icons, Jira's Development count
 stays, and the header's connection line reads “GitHub not connected” on pages
 that carry GitHub PR URLs or a `tracking.github` scope.
 
+### Two-file publish: `index.html` + `flowspec.json`
+
+A board that will save its own edits from inside the artifact (#825) is
+published as two files. `python3 tools/inject.py <spec.json>
+template/flowview.html <dir>/index.html --two-file` writes the page and, beside
+it, `flowspec.json` holding the spec text verbatim (outer whitespace stripped,
+one trailing newline; never re-serialized). The page carries a marker line
+after its `flowspec` block, `<meta name="dv-spec-file" content="flowspec.json">`,
+so the standalone boot fetches `flowspec.json` relative to the page and renders
+that file; the inline block is kept as the fallback for a page opened where the
+fetch fails (a `file://` path, or the file missing). A fetched file that is not
+JSON fails loud rather than silently rendering the stale inline copy. The
+fetched spec passes the same workspace-handoff check as the inline one
+(`verifyWorkspaceHandoff` in `src/boot.flowview.js`) before boot; a failed
+check shows the handoff error and never boots the fetched spec, and never falls
+back to the inline copy. Whichever text boots is kept verbatim and exposed as
+`ctl.sourceText()` (for the inline path, the block's text content); the board's
+Edit mode splices its changes into that text.
+
+Publish both files with the Artifact tool: `index.html` as the page and
+`flowspec.json` through `files`. Later edits republish only `flowspec.json`
+(pass `url` and the file in `files`; files left out are kept), so the page HTML
+is never regenerated and comments survive. Re-injecting a two-file page without
+`--two-file` drops the marker, as it replaces a stale guide. For a tracked page
+published this way the declaration adds the artifact and user capabilities the
+board's Edit mode needs; single-file tracked pages keep the declaration above,
+untracked pages stay comments-only:
+
+```js
+capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]},
+  comments: {"composer_only": true, "customAnchors": true}, artifact: {}, user: {scopes: ["profile"]}}
+```
+
 ## Pull requests from GitHub
 
 Jira cannot return pull-request URLs (its Development field carries counts and
@@ -814,6 +847,15 @@ checks. It is under 6 KB, never contains secrets
 a built page replaces the previous guide. When the block is present the Live
 status panel ends with a muted line, "Editors: ask your agent to read this
 page's agent guide (id dv-agent-guide)"; pages without the block show nothing.
+
+For a page injected with `--two-file` the guide's edit loop targets
+`flowspec.json` instead of the inline block: read that file from the artifact
+(always the current version, since the board saves its own edits into it and
+records each save under `page.editHistory`, which the agent keeps), change it,
+validate, and republish only that file to the same URL with the files form.
+The inline block is described as the stale fallback and must not be edited.
+A tracked two-file page's declaration adds `artifact` and `user`
+(`{scopes: ["profile"]}`).
 
 ## Story mode
 

@@ -43,6 +43,7 @@
     "viewer/tab-views.js",
     "viewer/workspace-handoff.js",
     "viewer/deltas.js",
+    "viewer/step-coins.js",
     "viewer/status-colors.js",
     "viewer/live-status.js",
     "engine.js",

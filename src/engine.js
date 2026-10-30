@@ -1749,9 +1749,33 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       var index=selectedPath.indices.indexOf(Number(coin.getAttribute('data-dv-step'))),position=visible.indexOf(index);
       coin.classList.toggle('view-step-hidden',position<0);
       var text=coin.querySelector('text');if(text && position>=0)text.textContent=String(position+1);
+      if(coinsNavigate && position>=0){
+        var st=steps[index];
+        coin.setAttribute('tabindex','0');coin.setAttribute('role','button');
+        coin.setAttribute('aria-label','Go to step '+(position+1)+(st && st.text?': '+String(st.text).replace(/`+|\*\*/g,''):''));
+      }else{coin.removeAttribute('tabindex');coin.removeAttribute('role');coin.removeAttribute('aria-label');}
     });
     if (board && board.layoutCoins) board.layoutCoins();
   }
+  /* A reader's coin goes to its step exactly like the matching step button;
+     the editor preview leaves clicks to its own step selection (#836). */
+  var coinsNavigate=!(options && options.authoring);
+  function coinIndex(coin){return selectedPath.indices.indexOf(Number(coin.getAttribute('data-dv-step')));}
+  function describeCoin(coin){
+    var index=coinIndex(coin),position=stops().indexOf(index),st=steps[index];
+    if(position<0 || !st)return null;
+    var edge=null,edgeIdx=Number(coin.getAttribute('data-dv-coin-edge'));
+    Object.keys(board.edgeIds).some(function(k){var info=board.edgeIds[k];if(info.idx===edgeIdx){edge=info.e;return true;}return false;});
+    function title(id){var node=(d.nodes || {})[id];return node && node.title || id;}
+    return {number:position+1,lane:st.lane,route:edge?title(edge.from)+' → '+title(edge.to):'',text:st.text,
+      hint:coinsNavigate?'Click to go to this step':''};
+  }
+  function goToCoin(coin){
+    var index=coinIndex(coin);
+    if(destroyed || stops().indexOf(index)<0)return;
+    stopAuto();clearEditingPreview();setStep(index);
+  }
+  var stepCoins=wireStepCoins(boardDiv,prefix,describeCoin,coinsNavigate?goToCoin:null);
   function sharedPeers(shared,path){
     return shared.occurrences.filter(function(o){return o.path.id!==path.id;}).map(function(o){
       var at=viewPath(o.path).indices.indexOf(shared.sourceIndex);
@@ -2268,6 +2292,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       destroyed = true; beforeAdvance=[];stopAuto(); clearLit(); clearCaptionTween(); clearWireContracts();
       if(pathTimeline)pathTimeline.destroy();
       if(chipDeltas)chipDeltas.destroy();
+      stepCoins.destroy();
       if(chipsBox.removeEventListener)chipsBox.removeEventListener('focusin',revealFocusedPathStep);
       if (document.removeEventListener) document.removeEventListener('visibilitychange', visibilityChanged);
     },

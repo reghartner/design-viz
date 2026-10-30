@@ -585,9 +585,19 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
    the newest 200 entries (by `at`, ties by position) are used, newest first. The
    live-status controller and the edit-history panel read the same filtered list. */
 var EDIT_HISTORY_LIMIT = 200;
+/* A real ISO-8601 date-time: YYYY-MM-DDThh:mm:ss[.fff](Z|±hh:mm). Date.parse alone
+   would roll 2026-02-30 into March, so the calendar fields are checked as written. */
+var EDIT_HISTORY_AT=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(?:Z|[+-](\d{2}):(\d{2}))$/;
+function editHistoryTimestamp(value){
+  var m=typeof value==='string'?EDIT_HISTORY_AT.exec(value):null;if(!m)return false;
+  var year=+m[1],month=+m[2],day=+m[3],date=new Date(Date.UTC(year,month-1,day));
+  if(month<1 || month>12 || day<1 || date.getUTCMonth()!==month-1 || date.getUTCDate()!==day)return false;
+  if(+m[4]>23 || +m[5]>59 || +m[6]>59 || (m[7]!=null && (+m[7]>23 || +m[8]>59)))return false;
+  return isFinite(Date.parse(value));
+}
 function editHistoryEntryProblem(entry){
   if(!specObject(entry))return 'must be an object';
-  if(typeof entry.at!=='string' || !/^\d{4}-\d{2}-\d{2}T/.test(entry.at) || !isFinite(Date.parse(entry.at)))return 'at: must be an ISO-8601 timestamp';
+  if(!editHistoryTimestamp(entry.at))return 'at: must be an ISO-8601 date-time such as 2026-10-30T16:23:15Z';
   if(Object.prototype.hasOwnProperty.call(entry,'by')){
     if(!specObject(entry.by))return 'by: must be an object';
     if(Object.prototype.hasOwnProperty.call(entry.by,'id') && typeof entry.by.id!=='string')return 'by.id: must be a string';

@@ -817,8 +817,9 @@ page's agent guide (id dv-agent-guide)"; pages without the block show nothing.
 
 ## Edit history
 
-`page.editHistory` records one entry per save of the shared board (written by
-the board's edit mode, or by hand), newest first on the page:
+`page.editHistory` is the board's save history: one entry per change set,
+hand-written today. The board's Edit mode (#828, planned) will append an
+entry on every Save. The panel shows them newest first:
 
 ```json
 "editHistory": [
@@ -838,7 +839,8 @@ strings, either may be empty), each change's `path` (array) and `label` (the
 carrier's display name at save time, so history stays readable after a rename).
 Validation follows the warning-only policy of the other tracking fields: a
 malformed entry warns and is ignored, a non-array warns once, and more than 200
-entries warn once with only the newest 200 used (edit mode trims to 200 on save).
+entries warn once with only the newest 200 used (the planned Edit mode will
+trim to 200 on save).
 
 The **Edit history** panel shows those entries. Add it to the diagram's panels
 after the Live status panel and place it below the board in every host profile:
@@ -857,9 +859,9 @@ when the connector has answered, the operation and the carrier label (stored
 claude.ai profile name for `by.id` when it resolves, else the stored `by.name`,
 else "Someone". Everyone sees the panel; nobody edits it, on desktop or in
 read-only viewing. It has no authored state: `initial` and step patches warn
-and are ignored. Without entries it reads "No edits yet." Existing boards keep
-saving history without the panel; it is shown once the author adds the
-declaration above.
+and are ignored. Without entries it reads "No edits yet." A board without the
+panel keeps its `editHistory` field; the history is shown once the author adds
+the declaration above.
 
 ## Story mode
 

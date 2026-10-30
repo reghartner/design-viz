@@ -707,8 +707,8 @@ state. See `docs/live-status.md` for that transport contract.
 Optional page-level `editHistory` is the board's save history: an array of
 `{"at": "<ISO-8601>", "by"?: {"id"?: "", "name"?: ""}, "changes": [{"op": "add"|"remove",
 "ticket": "EX-1", "node": "<id>" | "edge": ["<from>", "<to>"], "path"?: [...], "label"?: ""}]}`
-entries, written by the board's edit mode or by hand and shown by the
-`edit-history` panel. `at`, a non-empty `changes` array and each change's `op`,
+entries, hand-written today (the board's planned Edit mode, #828, will append
+one per Save) and shown by the `edit-history` panel. `at`, a non-empty `changes` array and each change's `op`,
 `ticket` and carrier are required; `by`, `by.id`, `by.name`, `path` and `label`
 are optional. Malformed entries warn and are ignored, a non-array warns once,
 and more than 200 entries warn once with only the newest 200 used. See
@@ -1086,9 +1086,9 @@ perspectives" of one timeline). Types:
   declares it. Status stays in the runtime provider, never the exported spec.
   See [Live status panel](../docs/live-status.md#live-status-panel) for provider,
   coverage navigation and demo behavior.
-- `edit-history` — the board's save history, read-only:
+- `edit-history` — the board's hand-written save history (`page.editHistory`), read-only:
   `{"id":"history","type":"edit-history","title":"Edit history"}`.
-  Lists `page.editHistory` newest first: one collapsible row per save with the
+  Lists `page.editHistory` newest first: one collapsible row per entry with the
   editor (live claude.ai profile name, else the stored `by.name`, else
   "Someone"), the time, "N changes" and the first change; expanding a row shows
   one line per change with ticket key, live ticket title when available, the

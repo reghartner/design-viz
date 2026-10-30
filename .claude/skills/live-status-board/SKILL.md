@@ -146,7 +146,8 @@ controls; no reader menu is needed. Use all three host profiles.
 }
 ```
 
-The `edit-history` panel (#827) lists the board's saves (`page.editHistory`)
+The `edit-history` panel (#827) lists the entries of `page.editHistory`
+(hand-written today; the planned Edit mode, #828, will append one per Save)
 newest first, below the board in every profile; a profile that does not name
 it hides it. It needs no authored state. See `docs/live-status.md` § Edit history.
 

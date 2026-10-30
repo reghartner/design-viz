@@ -207,7 +207,7 @@ Per step:
     `prefers-reduced-motion` it never auto-advances: the transport is
     spotlit instead, the authored target becomes a secondary ring, and the
     copy points at the ‹ › step arrows.
-    Replay example is not offered under reduced motion; **Try controls**
+    Replay example is not offered under reduced motion; **Try the controls**
     provides keyboard access to the highlighted manual controls.
   - `click` — a demonstrated action: the tour scrolls the control's node to
     center, settles, reveals it ringed, holds ~600ms (cause before effect),
@@ -223,7 +223,7 @@ Per step:
     engine's own silent close — no history entry, no URL change.
   **Authoring rule:** use `demo.click` when the narration says the tour
   has opened or pressed something. For a reader exercise, ring the real
-  control and explain the action and its way back; **Try controls** lets
+  control and explain the action and its way back; **Try the controls** lets
   keyboard users take part. Do not describe an action as demonstrated
   when the tour only points at its button.
 
@@ -396,7 +396,7 @@ is restored when the tour finishes or is skipped.
 5. Run `node tools/validate.js <spec>` — tour problems are warnings, never
    render blockers.
 6. Walk the tour with `#tour=1`, every persona and reduced motion both on
-   and off. Check keyboard access through Try controls, Replay example,
+   and off. Check keyboard access through Try the controls, Replay example,
    hidden panels, and Expand/Exit. Watch the console for unresolved-target
    or state warnings; fix each one in a page-authored config.
 7. Use `offset` last, for small pixel corrections only.
@@ -428,7 +428,7 @@ is restored when the tour finishes or is skipped.
   any width, on a step where the counter would sit on a ring, it steps
   aside for that step.
 - Keyboard: ← → navigate lessons while focus is on the tour's controls;
-  Esc skips (hint hidden on the chooser). **Try controls** moves focus to
+  Esc skips (hint hidden on the chooser). **Try the controls** moves focus to
   a usable control in a highlighted region. Tab and Shift+Tab include
   highlighted controls as well as the tour buttons; arrow keys there keep
   their normal meaning, including moving or resizing a floating panel.

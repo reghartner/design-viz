@@ -63,7 +63,7 @@ test('the built-in tour finds later-tab capabilities and numbers only the lesson
     if(detailTopics.includes(title))await expect(activeTab(page)).toHaveText('Details');
     if(title==='Choose a View'){
       const body=page.locator('.dv-tour-ui .dv-tour-body').first();
-      await expect(body).toContainText('screen icon on a View marks Explore');
+      await expect(body).toContainText('full Explore, where you can pan and zoom');
       await expect(body).toContainText('pan and zoom');
       const screenshot=info.outputPath('tour-explore-marker.png');await page.screenshot({path:screenshot});
       await info.attach('tour-explore-marker',{path:screenshot,contentType:'image/png'});

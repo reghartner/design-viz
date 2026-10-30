@@ -1902,7 +1902,7 @@ function createBuilderInteractions(opts){
     selectAllNodes:function(){return life.alive() && spatial.selectAllNodes();},
     inspectSelection:life.guard(inspectSelection),
     spatialActions:function(host,lifetime){return spatial.actions(host,lifetime);},
-    busy:function(){return life.alive() && !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag || pathReorder.busy() || curveEditor.busy());},
+    busy:function(){return life.alive() && !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag || coinDrag || pathReorder.busy() || curveEditor.busy());},
     toggleAdding:life.guard(function(t){if(addToStep){cancelAddToStep(null);return;}if(connect)cancelConnect(null);addToStep={section:t.section,step:t.index};addToStepStatus();renderInspector();}),
     beforeReplace:life.guard(beforeReplace),retire:life.guard(retire),
     destroy:function(){if(!life.alive())return;life.destroy();retire();

@@ -9,7 +9,7 @@
 | row | fixture | assertion (scoped) | rejects |
 |---|---|---|---|
 | E1 Edit only for editors with the artifact capability | boardSpec; canEdit false; then canEdit true with use("artifact") null | Live status panel: no Edit button; the EX-1 row is not draggable; a drag onto B leaves EX-1 NOT ON DIAGRAM; zero publish calls | an Edit button shown to every viewer; one gated only on canEdit |
-| E2 drop on a node + Save | EX-1 (NOT ON DIAGRAM) dragged onto node B | while the row is held over B: `g.node[data-dv-node=b]` has `dv-edit-over`, A does not, and B's card stroke is none of the five live-state colors; before Save: zero publishes, B's Jira cue appears, EX-1 tag gone, button "Save 1 change"; after Save: exactly one publish of only flowspec.json (application/json) whose B.tickets == ["EX-1"], one new page.editHistory entry {at ISO between click and answer, by {id,name} of user.me(), changes [{op add, ticket EX-1, node b, label "Beta service", path to B}]}, every other authored line unchanged; Save/Discard gone; the Edit history panel shows the entry | a re-serialized spec; a publish per drop; a history entry without by or label; a whole-document publish |
+| E2 drop on a node + Save | EX-1 (NOT ON DIAGRAM) dragged onto node B | while the row is held over B: `g.node[data-dv-node=b]` has `dv-edit-over`, A does not, and B's card stroke is none of the five live-state, four --dv-pr-* or three --dv-checks-* colors; before Save: zero publishes, B's Jira cue appears, EX-1 tag gone, button "Save 1 change"; after Save: exactly one publish of only flowspec.json (application/json) whose B.tickets == ["EX-1"], one new page.editHistory entry {at ISO between click and answer, by {id,name} of user.me(), changes [{op add, ticket EX-1, node b, label "Beta service", path to B}]}, every other authored line unchanged; Save/Discard gone; the Edit history panel shows the entry | a re-serialized spec; a publish per drop; a history entry without by or label; a whole-document publish |
 | E3 drop on an edge + Save | EX-1 dragged onto edge A → B ("calls") | edges[0].tickets == ["EX-1"]; change {edge ["a","b"], label "Alpha service → Beta service"} | edge label text instead of endpoint titles; writing to a node |
 | E4 add-only | AA-1 (on A) dragged onto B | A.tickets and B.tickets both ["AA-1"] | a move (removing from A) |
 | E5 no-op drops | AA-1 onto A; EX-1 onto B twice | after the first: no Save, no Discard; after the repeat: still "Save 1 change"; saved B.tickets == ["EX-1"] | counting a drop that changes nothing; duplicating a key |
@@ -74,9 +74,12 @@ test('E2 E8 dropping a NOT ON DIAGRAM ticket on a node and saving publishes flow
  const release=await holdTicketOver(page,panel,'EX-1',await cardPoint(nodeCard(root,'b')));
  await expect(root.locator('g.node[data-dv-node="b"]')).toHaveClass(/\bdv-edit-over\b/);
  await expect(root.locator('g.node[data-dv-node="a"]')).not.toHaveClass(/\bdv-edit-over\b/);
- const liveColors=await page.evaluate(()=>['todo','active','done','blocked','missing'].map(state=>{const probe=document.createElement('i');probe.style.color='var(--dv-live-'+state+')';document.body.appendChild(probe);const color=getComputedStyle(probe).color;probe.remove();return color;}));
+ // resolved inside the board, so skin overrides of these tokens apply
+ const stateColors=await nodeCard(root,'b').evaluate(el=>['dv-live-todo','dv-live-active','dv-live-done','dv-live-blocked','dv-live-missing','dv-pr-open','dv-pr-draft','dv-pr-merged','dv-pr-closed','dv-checks-passing','dv-checks-failing','dv-checks-pending'].map(token=>{
+  const probe=document.createElement('i');probe.style.color='var(--'+token+')';el.closest('.doc-sec').appendChild(probe);const color=getComputedStyle(probe).color;probe.remove();return color;}));
  const hoverStroke=await nodeCard(root,'b').evaluate(el=>getComputedStyle(el).stroke);
- expect(liveColors,'hover highlight is not a live-state color').not.toContain(hoverStroke);
+ expect(hoverStroke).toMatch(/^rgb/);
+ expect(stateColors,'hover highlight is not a live-state, PR or checks color').not.toContain(hoverStroke);
  await release();
  await expect(root.locator('.dv-edit-over')).toHaveCount(0);
  await expect(saveButton(panel)).toHaveText('Save 1 change');await expect(discardButton(panel)).toBeVisible();

@@ -1,0 +1,60 @@
+{
+  "profile": "authoring-review-v3",
+  "status": "Loaded by rubric.md and delivered after it in the same reviewer prompt. Where a rule here is more specific than rubric.md it applies; it never adds a criterion, deduction or cap.",
+  "rules": [
+    {
+      "id": "questions",
+      "decision": "Count independently answerable decisions, not question marks or numbered items. A clause counts separately when it could receive a complete answer while the other stays unanswered. Only the clause that repeats supplied information is already answered. Choosing story/mixed/engineering scope, or whether to add a technical view, is a presentation-scope question, not a technical one. Asking for protocols, APIs, services or implementation facts is technical. A written 'No questions needed' is a valid batch when the request already supplies every necessary choice, including the technical level."
+    },
+    {
+      "id": "provenance-chrome",
+      "decision": "Renderer-generated provenance text shown from correctly preserved supplied bindings or codeRefs (for example the 'Services, APIs and source code' disclosure and 'Code · <label>' step links) is not an author technical-level deduction. Record it once per candidate as a renderer row, with its visible location and reader impact; in the presentation assessment it is evidence only for the dimensions it actually affects. Deleting, renaming or inventing required provenance is still a backstage defect. Text the author writes in captions, node or edge labels, legends, panel text or section text is authored even when copied from source terminology."
+    },
+    {
+      "id": "story-level-role-labels",
+      "decision": "At story level, a plain functional role label is allowed even when the box represents backend work, for example 'Event intake', 'Clip storage', 'Alert sender' and 'Camera status'. These are not service names, API names, protocols, HTTP codes or code terms merely because several role boxes are drawn or because a role corresponds to a real component, and the author need not consolidate them into one cloud box. Deduct only when authored reader-visible text uses an actual supplied catalog or service identifier, a protocol or API/HTTP/code term, or an unmistakably renamed concrete implementation identity. Contrast: 'Clip storage' is permitted; an actual identifier from brief/catalog.json, 'GET /...', 'MQTT', '202', a function name or a source path is not. Renderer-generated provenance remains governed by provenance-chrome."
+    },
+    {
+      "id": "battery-conflict",
+      "decision": "Source rates and times are often approximate; read them with their stated ranges and the renderer's display precision, and do not treat exact point arithmetic as disproving an approximate statement. When the anchors and rate still cannot be reconciled and the tension is noted, a direct anchor-to-anchor jump and an interval shown as unspecified (battery charge null / NO DATA, optionally with a label such as 'Unspecified') are both correct. The unspecified interval starts at the first intervening step with a strictly later story time, not at a same-time continuation of the known anchor. While the charge is unspecified, sourced operations stay as events in captions or the ledger without numeric drain patches, and a cost already included in an anchored reading is not applied again. A report the source establishes whose number the evidence does not give is correctly a device-app battery card with value null, status ready, reportedAt at the report's actual time and detail null, so the computed report age stays visible; the missing number is explained in the panel note, caption or section text. status ready renders 'Current' and does not itself prove delivery; the source does. unknown fits absent or unknown report data; stale fits a known delivered reading that has aged past its cadence, for example during an outage. Marking an established heartbeat failed or absent is a panel-state contradiction, and an authored detail that hides a report's age is judged as freshness text. Deduct each distinct visible authored intermediate number that holds a value or implies an unstated rate, including a newly reported app value derived from such a hold. Physical battery and a newly reported app value are distinct units. A hidden numeric state is not a visible assertion unless a caption, a report or a later visible state relies on it. A cached number kept with its original report time is not a new report; relabeling it as fresh is a false freshness text. A text or numeric-string battery value is invalid."
+    },
+    {
+      "id": "precision",
+      "decision": "Compare values at the displayed or declared precision. The battery panel rounds to whole percent (20.42 displays 20), so a report of 20 at that moment is consistent. Thresholds use the actual value; do not add any other tolerance. Distinguish the value reported at report time from the physical value at a later step."
+    },
+    {
+      "id": "freshness-and-hidden-fields",
+      "decision": "device-app phoneScreen=home hides field cards but keeps their stored values. Hidden freshness text cannot receive a freshness deduction. A device-app field hidden by phoneScreen 'home', a hidden panel, or an internal viewport is not a reader-visible reported-state assertion at that step. Do not deduct merely because a newer backend report exists while the old stored field is hidden. Deduct when the brief explicitly requires the hidden client model itself to update, when a visible caption or report relies on that hidden value, or when the field later becomes visible without correction and contradicts the established report. Place the unit at the relying or visible step. One carried hidden value is one authored state, not a new unit at every hidden step. False visible freshness text remains a time defect; a visible incompatible card state remains a panels defect; do not charge both for the same symptom."
+    },
+    {
+      "id": "edges-and-reads",
+      "decision": "At engineering level, omitting the design's device-shadow/app dependency is a missing service hop. 'Last report 06:30' is historical and does not assert a new report. 'The app now reads/fetches/refreshes' asserts an operation whose hops must be lit. 'The app shows the last reported value' describes display only. An illustrative placement of the known app read is allowed; a claimed refresh cadence is not. One claimed message missing several hops is one unit."
+    },
+    {
+      "id": "open-clip-and-visible-events",
+      "decision": "When the answers require the resident to open the clip, a visible matching still scene or thumbnail, in the phone or a separate panel, plus a caption or label clearly identifying the opening is sufficient; animation, video or a specific banner is not required. A caption alone with no visible clip is one missing panel event. If a promised card or clip is hidden by the screen state or lies outside the visible area in the supplied captures, it is not visible; do not infer visibility from the source. A retained completed fact such as 'Clip uploaded' is not false after opening, and it does not by itself show the opening. Deduct only an explicit contradictory current-state claim, such as 'not yet opened' or a recording mode claiming the ended capture as current. Opening the app or clip does not imply notification dismissal."
+    },
+    {
+      "id": "carry-forward",
+      "decision": "Evaluate sparse carry-forward with each panel type's actual renderer fold. Do not presume homemap signal/event arrays follow ordinary carry-forward without supplied renderer evidence; defer that determination. A stale-state defect needs an explicit state change that makes the old display false."
+    },
+    {
+      "id": "backstage",
+      "decision": "A binding is a catalog identity link; its one api operation need not list every endpoint. Each explicit node or step call assertion must match an approved operation for that service. Judge wrong identity or binding fields separately from operation mismatches, and do not treat a mismatch as an invented identity unless an identity is actually invented or renamed."
+    },
+    {
+      "id": "fidelity",
+      "decision": "Neutral scene decoration, layout, and the minimal depiction of a source-required action (for example a neutral tap animation or icon to open a required clip) are not invented behavior, and generic illustration is not deducted automatically. Naming a particular route or action ('taps the notification' rather than 'opens the clip') is a factual claim that needs a source. A generic resident icon differs from an explicit location or state claim (bedroom, awake, asleep) that the source does not give; a marker placed in a defined room keeps asserting that room until it is moved, cleared or made nonassertive, and that claim is a fidelity unit. Named routes, ongoing room or state placements, unsupported causes or actions (the resident switched Wi-Fi off), behavioral guarantees, times and outcomes remain defects even when labeled illustrative. Business stories may pick sensible minutes and an otherwise consistent date within the supplied approximate periods; an outage start after the last heartbeat and before or at delivery is a permissible illustrative choice if the resulting states follow the design's timing rules."
+    },
+    {
+      "id": "units",
+      "decision": "One unique authored step, state or claim at its source location is one unit. A shared step reused on two paths counts once. Distinct authored steps can each violate a per-step rule. A structural missing engineering hop and a separately claimed unlit execution are different defects. Repeated mentions by ledgers, reports or reviewers do not create units. Assign each symptom once, to the most specific criterion. Every correctness row contains exactly one unique authored step, state, claim or structural omission and exactly one deduction amount listed for that criterion. Never total several units in one row: if three story-level labels each warrant -2, write three 'level | -2 | ...' rows, not one 'level | -6' row or 'level | -10' row. When rows exceed a criterion cap, keep the distinct rows and cap only the criterion score. The row's location must identify the single source unit."
+    }
+  ],
+  "limitations": [
+    "Only the seven correctness criteria, their deductions, exceptions and caps apply to the 100-point score.",
+    "No aesthetic, animation, platform-UX, completeness or inferred-requirement deduction may be added to correctness.",
+    "Do not infer executions, dismissals, refresh cadence, user actions or persistence rules that the design, answers, spec or established renderer semantics do not state.",
+    "Unresolved findings are recorded as deferred limitations, not speculative deductions."
+  ]
+}

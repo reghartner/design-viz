@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "profile": "authoring-review-v2",
+  "description": "Prospective reviewer profile. rubric.md and interpretations.json are delivered together as the reviewer prompt. Case inputs still come from the frozen overnight bundle. Scores are not directly comparable with the legacy judge2 rubric.",
+  "files": [
+    {
+      "path": "rubric.md",
+      "sha256": "9a298edd4582b777bdf945c952acbeeb19c41b8707a0e1efde12393c4b80c70d"
+    },
+    {
+      "path": "interpretations.json",
+      "sha256": "cc1f5d242fe792bc0962e32436fab10e732d88026af630c0fa6b30c9f17a65ea"
+    }
+  ]
+}

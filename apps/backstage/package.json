@@ -82,7 +82,7 @@
     "vitest": "5.0.5",
     "vite": "8.3.4",
     "@backstage/catalog-model": "1.10.1",
-    "@backstage/frontend-plugin-api": "0.18.1",
+    "@backstage/frontend-plugin-api": "0.18.2",
     "@backstage/plugin-catalog-react": "3.2.3",
     "@backstage/core-plugin-api": "1.12.10",
     "rollup": "4.64.7",

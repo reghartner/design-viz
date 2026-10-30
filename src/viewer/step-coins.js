@@ -5,13 +5,15 @@
 var STEP_COIN_CARD_DELAY_MS = 400;
 
 function wireStepCoins(host, prefix, describe, activate){
+  if (!host || !host.addEventListener) return {hide:function(){}, destroy:function(){}};
   var card = document.createElement('div');
   card.className = 'nbackpop step-coin-card'; card.id = prefix + '-coin-card';
   card.setAttribute('role', 'tooltip'); card.setAttribute('popover', 'manual'); card.hidden = true;
   host.appendChild(card);
   var timer = 0, shown = null, pending = null, listeners = [];
   function listen(target, type, fn, capture){
-    target.addEventListener(type, fn, capture); listeners.push(function(){ target.removeEventListener(type, fn, capture); });
+    if (!target || !target.addEventListener) return;
+    target.addEventListener(type, fn, capture); listeners.push(function(){ if (target.removeEventListener) target.removeEventListener(type, fn, capture); });
   }
   function coinOf(target){
     var coin = target && target.closest ? target.closest('g.coin[data-dv-step]') : null;
@@ -103,5 +105,5 @@ function wireStepCoins(host, prefix, describe, activate){
   listen(document, 'pointerdown', function(ev){ if ((shown || pending) && !coinOf(ev.target)) hide(); }, true);
   listen(document, 'scroll', hide, true);
   listen(window, 'resize', hide);
-  return {hide:hide, destroy:function(){ hide(); listeners.forEach(function(off){ off(); }); card.remove(); }};
+  return {hide:hide, destroy:function(){ hide(); listeners.forEach(function(off){ off(); }); if (card.remove) card.remove(); }};
 }

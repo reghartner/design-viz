@@ -3,6 +3,7 @@
 // are spec-derived estimates and contracts; historical training code stays frozen.
 const L = require('./model.cjs');
 const V1 = require('./contracts.cjs');
+const {containerSize} = require('./core.cjs');
 
 const VERSION = 'estimated-packing-2';
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -50,11 +51,11 @@ function controlBands(base, controlHeight=3, minWidth=10, heights={}) {
 // controls: native Chromium measures up to 145px of header. Add 20px for the
 // board/tile inset and rounding; tile height must never clip the width-sized SVG.
 function graphHeight(bounds,w,pitch,minimum=0) {
-  return Math.max(4,Math.ceil(((w*pitch-8)*bounds.h/Math.max(1,bounds.w)+165)/40),minimum);
+  return Math.max(containerSize.diagram(null,w*pitch-8,1,bounds).rows,minimum);
 }
 function graphWaste(bounds,w,h,pitch,scale) {
-  const fit=Math.max(0,(w*pitch-10)/Math.max(1,bounds.w));
-  return {horizontalFraction:0,emptyGridCells:0,labelEstimate:12*fit*scale,oversizePenalty:Math.max(0,12*fit*scale-20)*10};
+  const labelEstimate=containerSize.diagram(null,w*pitch-8,scale,bounds).labelPx;
+  return {horizontalFraction:0,emptyGridCells:0,labelEstimate,oversizePenalty:Math.max(0,labelEstimate-20)*10};
 }
 function solve(source,{registry,geometry,measurements={},minimums={},excludeLayout=null,controlPolicy=null}={}) {
   if(controlPolicy&&!['above-group','below-group','interior-band','column-band'].includes(controlPolicy))throw Error('Unsupported: unknown control policy');

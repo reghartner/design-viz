@@ -117,7 +117,7 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     nodes, edges, panels and steps with `rows:[[]]` and unpositioned floats;
     run `node <VIZ>/tools/compose-page-layout.cjs --section <zero-based-section> <draft.spec.json> <different-arranged.spec.json>` and use its output.
     The shared production arranger selects positions, ports, cubic routes and
-    frame from topology; groups and nested groups constrain placement. Its limit
+    frame from topology; groups constrain placement, so add none unless rule 14 allows. Its limit
     is 80 nodes and 160 connections per diagram. Inspect the rendered output;
     crossings, labels and group titles can need scoped manual refinements.
     This is the initial layout and default, not visual proof. Preserve unrelated
@@ -131,6 +131,63 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     and submit the full candidate for paired Workbench preview, and report the
     actual tool results. See `docs/auto-arrange.md` for sizing guidance,
     supported inputs and estimation limits.
+13. **Size step controls and the diagram with the helper.** After composing,
+    run `node <VIZ>/tools/size-section-layout.cjs --write <sized.spec.json> <arranged.spec.json>`
+    and use its output. It sizes both containers from their own content: the
+    step controls' minimum width (path count and length), the diagram's
+    readable width (node positions) and the longest step caption. When both fit
+    side by side it puts step controls in a left column and the diagram on the
+    right, both tall enough; a small diagram leaves the controls more room. It
+    skips sections that do not fit, have panels, named views or Explore, or have
+    no nodes or steps; keep the composer's layout there. On an existing page,
+    pass `--section <zero-based-section>` for each section whose nodes or steps
+    you changed, so every other section keeps its geometry. Do not hand-edit its
+    sizes unless rule 12's user-feedback repair applies; otherwise fix content
+    (shorter captions, tighter nodes) and rerun. Report each section's `skipped`
+    reason and `notes` from its JSON output.
+14. **No node groups unless the operator asks for them.** Groups constrain
+    auto-arrange. Default to none, even where a contract or cookbook recipe
+    shows a boundary; keep groups the source spec already has.
+15. **Auto-arrange; do not hand-place.** New diagram: compose (rule 12), then
+    size (rule 13). Nodes added to an existing diagram: add them as
+    `{id, side:"below", noSpread:true}` floats so they auto-place (rule 12); rerun
+    the composer with `--rearrange` only when the operator authorizes
+    rearranging the diagram. Place nodes by hand only on an explicit
+    manual-placement request.
+16. **Use shared steps by default when they make sense.** A shared step is the
+    same step ID listed in more than one `diagram.paths` sequence; there is no
+    other field. When two paths go through the same moment (same nodes and
+    edges lit, same meaning), list the one step in both paths instead of a
+    copy; shared openings and endings render once. Do not share steps whose
+    captions or panel states would differ by path. List the shared steps in
+    the ledger and summary.
+17. **Headers and bullets, not long sentences.** Section `text` is one or two
+    short sentences (a lead, plus any required illustrative-values line);
+    everything else is `bullets`, grouped under a bold bullet item
+    (`**Decisions**`) with its points in `sub`. Keep step captions to one or
+    two short sentences. Turn source paragraphs into bullets.
+18. **No panel exists only to hold prose.** A panel that `holds` on every step
+    and shows no device, app or data state fails the boring-panel check: move
+    its words (decisions, references, notes) to the section's `text`/`bullets`.
+19. **Every reference is a link; find the real URL.** Each doc, Jira key, PR
+    or Confluence page mentioned links to its real URL. Look it up with this
+    session's tools (Jira, GitHub, Confluence, repo, catalog; rule 10) from
+    what the operator gave (key, repo, site, title). Use the URL a tool
+    returns, or the standard address on a site or repo the operator gave
+    (`<jira-site>/browse/<KEY>`, `github.com/<owner>/<repo>/pull/<N>`; the ledger
+    says if a tool confirmed it). Never invent a host. Prose:
+    `[REPLAY-120](https://…)`; nodes and steps: the `link` field. If neither
+    works, keep the reference as text, list it under **Missing links** in the
+    ledger with what you searched, and ask for all missing links in one question.
+20. **Group tabs the way the reader experiences the product.** If the page
+    will have tabs and neither the request nor the source settles the
+    grouping, ask how to group them (Phase 2), proposing user-experience
+    grouping (for example recording, customer playback, internal playback) as
+    the default, not the order or teams in which things were decided. On a
+    page with tabs, every section goes inside the tabs container: a direct
+    section in `blocks` shows on every tab (above the tab bar if it comes
+    before the container, below if after). Put intro and
+    "Considered/rejected" content in their own tab or the first tab's text.
 
 And always: honesty. No invented facts. Unknown is not failed. End each path
 at its last source-backed outcome; do not add a user action (opening the
@@ -198,6 +255,12 @@ each battery device the source gives no rate for: at engineering level, each
 unknown drain or charge rate that affects the story is one decision; at story
 or mixed level choose it yourself (an illustrative estimate, or 0 for a wired
 device) and list it under **Decisions I made**.
+
+**If the page will have tabs and neither the request nor the source settles
+the grouping, ask how to group them** (rule 20): propose
+grouping by the reader's experience of the product (each user-facing flow
+gets a tab) as the default, and name the alternatives the source suggests
+(decision groups, teams, system layers).
 
 Then ask only what the source and request leave open, from this list:
 audience; the one-sentence takeaway; the moments the viewer must see;

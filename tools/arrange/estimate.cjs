@@ -1,15 +1,11 @@
 'use strict';
 // Deterministic CSS-pixel estimates, not DOM measurements. Fixed constants are
 // conservative typography/chrome priors; authored state uses the real folders.
-const core=require('./core.cjs'),M=require('./model.cjs');
+const core=require('./core.cjs');
 const R=core.viewerRouting();
 // Visible text can itself be a URL or data string. Asset fields (image.src,
 // appscreens.screens[].src) are selected separately by their panel models.
-function text(value){if(value==null)return '';if(typeof value==='string')return value;return typeof value==='object'?Object.values(value).map(text).filter(Boolean).join(' '):String(value);}
-function lines(value,width,font=14){
- const input=text(value);if(!input)return 0;const available=Math.max(font*3,width),advance=c=>/[\u2e80-\uffff]/u.test(c)?font:/[MW@#%]/.test(c)?font*.9:/[il.,' ]/.test(c)?font*.38:font*.62;
- return input.split('\n').reduce((n,line)=>{let used=0,count=1;for(const word of line.split(/(\s+)/)){const size=[...word].reduce((s,c)=>s+advance(c),0);if(used&&used+size>available){count++;used=0;}count+=Math.max(0,Math.ceil(size/available)-1);used=size>available?size%available:used+size;}return n+count;},0);
-}
+const S=core.containerSize,text=S.text,lines=S.textLines,inlineRows=S.inlineRows;
 function states(d){
  const result=[{state:{mode:'ambient'},panels:R.foldPanelStates({...d,steps:[]})}];
  result[0].panels=Object.fromEntries(Object.entries(result[0].panels).map(([id,values])=>[id,values[0]||{}]));
@@ -35,46 +31,8 @@ function screenAudioHeight(s,width){
  return 7+24+22+22+48+(a.text?24+lines(a.text,caption,11)*16+(a.source?lines(a.source,caption,9)*14+2:0):a.source?6+lines(a.source,content,10)*14:0)+
    (a.detection&&a.detection!=='none'?24:0)+(a.reason?6+lines(a.reason,content,10)*14:0);
 }
-function controlDepth(d,all,width){
- const paths=R.diagramPathList(d),available=Math.max(1,width-30),delta=(d.steps||[]).some(s=>s.delta),chipPitch=delta?38:29;
- let tracks=0,captionWidth=available,overhead;
- if(paths.length>1){
-  const graph=R.pathTimelineGraph(paths);
-  if(graph.hasShared){const rows=R.pathTimelineRows(paths,graph);tracks=44+32*Math.max(...rows.lanes.values(),...rows.shared.values());}
-  else tracks=paths.reduce((n,p)=>n+Math.max(32,lines(p.label,190,11)*16+12)+8,0);
-  // Transport, separate path track, gaps, frame and horizontal-scroll gutter.
-  overhead=36+20+tracks+16+(delta?14:4)+30;
- }else{
-  const chips=Math.max(1,paths[0]?.indices.length||0)*chipPitch;
-  const remaining=available-290-Math.min(chips,available)-20;
-  if(remaining>=200){captionWidth=remaining;overhead=50;}
-  else {tracks=Math.ceil(chips/available)*36;overhead=30+36+10+tracks+10;}
- }
- // Evidence links and runtime chips occupy independent wrapping rows beneath
- // the narrative. Resolve actual link labels/URL validity through the canon
- // helper. The native stepper forwards codeRefs, not node/API bindings; URL
- // payloads and code anchors are not visible caption text.
- const captionSamples=all.filter(s=>s.step).map(({step})=>{
-  const maxLines=Math.max(1,lines([step.text,step.lane,step.id,step.link?'source':'',paths.length>1?'Shared step · also in '+paths.map(p=>p.label||p.id).join(', '):''].filter(Boolean).join(' '),Math.max(1,captionWidth-40),14));
-  const evidenceHeight=inlineRows(core.links({codeRefs:step.codeRefs}).map(l=>l.label+' ↗'),captionWidth,14,22,12,8,0);
-  const runtimeHeight=inlineRows((step.conditions||[]).map(c=>'! '+c.label),captionWidth,12,18,20,12,7);
-  return {maxLines,evidenceHeight,runtimeHeight:runtimeHeight?runtimeHeight+8:0,height:maxLines*22+evidenceHeight+(runtimeHeight?runtimeHeight+8:0)};
- });
- const maxLines=Math.max(1,...captionSamples.map(s=>s.maxLines)),contentHeight=Math.max(22,...captionSamples.map(s=>s.height));
- // The native mode strip is outside the termbar, inside the saved steps tile.
- return {neededHeight:36+overhead+contentHeight,maxLines,trackHeight:tracks,captionWidth,evidenceHeight:Math.max(0,...captionSamples.map(s=>s.evidenceHeight)),runtimeHeight:Math.max(0,...captionSamples.map(s=>s.runtimeHeight)),unsupported:available<200};
-}
-// Approximate inline-block/flex wrapping with conservative monospace advances.
-// Long labels wrap within an item; short links/chips share the same row.
-function inlineRows(labels,width,font,lineHeight,paddingX,paddingY,gap){
- let used=0,row=0,total=0;
- for(const label of labels){
-  const length=[...label].reduce((n,c)=>n+(/[\u2e80-\uffff]/u.test(c)?font:font*.65),0),w=Math.min(width,length+paddingX),h=Math.max(1,lines(label,width-paddingX,font),Math.ceil(length/Math.max(1,width-paddingX)))*lineHeight+paddingY;
-  if(used&&used+gap+w>width){total+=row+gap;used=0;row=0;}
-  used+=(used?gap:0)+w;row=Math.max(row,h);
- }
- return total+row;
-}
+// Step controls and the diagram size themselves in src/core/container-size.js.
+function controlDepth(d,_all,width){return S.stepControls(d,width);}
 function panelSize(p,s,width,layout={}){
  const inner=Math.max(70,width-32),row=(v,w=inner)=>Math.max(1,lines(v,w,13))*19+12,rows=list=>(Array.isArray(list)?list:[]).reduce((n,v)=>n+row(v),0);
  const note=lines(s.note||p.note,inner)*20;let foot=note+(s.audio?40+lines(s.audio.caption||s.audio.text,inner)*19:0);
@@ -129,22 +87,7 @@ function panelSize(p,s,width,layout={}){
  const titleLines=lines(p.title,inner,13),chrome=64+Math.max(0,titleLines-1)*18;
  return {nativeLimits,bodyWidthCap,intrinsicHeight:Math.ceil(h*1.08+8),chrome,paddingX:32,extraHeight:extra,nativeContent:layout.sectionSizing?.aspectPolicy==='intrinsic'?{height:h,width:inner}:null,text:text([p.title,s,p.fields,p.checks,p.columns]),minimumWidth:p.type==='signal'?340:p.type==='replicas'?280:0,model,scroll,fullHeight};
 }
-function graphBounds(d){
- if(!Object.keys(d.nodes||{}).length)return {x:0,y:0,w:1,h:1};
- const clean=M.clone(d);delete clean.graphFrame;const geometry=R.layout(clean),exported=core.exportAnonymousLayout({page:{title:'Composition',sections:[{diagram:clean}]}}).diagrams[0],boxes=[];
- const add=(x,y,w,h)=>boxes.push({x,y,w,h});
- for(const n of exported.nodes)add(n.x,n.y,n.width,n.height);
- for(const b of Object.values(geometry.groups||{}))add(b.x,b.y,b.w,b.h);
- exported.edges.forEach((edge,i)=>{const n=(edge.path.match(/-?\d*\.?\d+(?:e[+-]?\d+)?/gi)||[]).map(Number),xs=n.filter((_,i)=>i%2===0),ys=n.filter((_,i)=>i%2===1);if(!xs.length)return;const x=Math.min(...xs),y=Math.min(...ys),w=Math.max(...xs)-x,h=Math.max(...ys)-y;add(x,y,w,h);
-  const e=d.edges[i],count=(d.steps||[]).filter(s=>(s.edges||[s.edge]).includes(e.from+'->'+e.to)).length;
-  // Labels and moving step markers may extend past the path. Use a conservative
-  // envelope around the complete path hull, including authored label offsets.
-  const pad=Math.max(16,Math.min(180,count*12)),label=text(e.label).length*3.6;
-  add(x+Math.min(0,e.labelDx||0)-label-pad,y+Math.min(0,e.labelDy||0)-30,w+Math.abs(e.labelDx||0)+2*(label+pad),h+Math.abs(e.labelDy||0)+60);
- });
- const x=Math.floor(Math.min(...boxes.map(b=>b.x))-30),y=Math.floor(Math.min(...boxes.map(b=>b.y))-30),w=Math.ceil(Math.max(...boxes.map(b=>b.x+b.w))+30)-x,h=Math.ceil(Math.max(...boxes.map(b=>b.y+b.h))+30)-y;
- if(![x,y,w,h].every(Number.isFinite)||Math.max(Math.abs(x),Math.abs(y),w,h)>100000)throw Error('Unsupported: graph geometry exceeds bounded frame');return {x,y,w,h};
-}
+function graphBounds(d){return S.diagramBounds(d);}
 function inputs(source,width){
  const d=source.diagram,all=states(d),layouts=core.arrangementLayouts,registry={get:type=>Object.hasOwn(layouts,type)?{layout:layouts[type]}:undefined};
  const hostWidth=width-80,geometry={gridWidth:Math.max(1000,hostWidth),gridTop:160,scale:Math.min(1,hostWidth/1000),bounds:graphBounds(d)},pitch=(geometry.gridWidth+8)/24,measurements={},minimums={};

@@ -779,7 +779,8 @@ See [live availability](../docs/live-status.md#planned-nodes-and-connections).
 Declare `"groups": {"doorbell": {"title": "Doorbell unit"}}` at the diagram
 level and tag member nodes with `"group": "doorbell"`. The engine draws a
 dashed, titled boundary box around all members — a device that holds two
-chips, a VPC around services. Rules:
+chips, a VPC around services. Add groups only when the operator asks for them;
+they constrain auto-arrange, so a new diagram has none by default. Rules:
 
 - Place group members ADJACENTLY — one stack column works best (the boundary
   is a bounding box over member positions, not a layout constraint).
@@ -2468,9 +2469,9 @@ contract stays the authority; a recipe shows the working subset for one task.
    `text` and key constraints into `bullets`).
 5. More than two flows, or a requested walkthrough → wrap sections in `tabs`.
    A guided tab = the same diagram object plus `"view": "step"`.
-6. A device with internal structure (chips, radio, sensors) → a `groups`
-   boundary around its member nodes, plus `panels` showing its internal state
-   patched per step. Tag steps with `lanes` (NET / DEV / CAM) so readers
+6. A device with internal structure (chips, radio, sensors) → `panels`
+   showing its internal state patched per step. Add a `groups` boundary only
+   when the operator asks for one: groups constrain auto-arrange. Tag steps with `lanes` (NET / DEV / CAM) so readers
    track which layer acts.
 7. Pick each panel by the ARGUMENT the section makes, not by decoration —
    every widget exists to carry one kind of claim:

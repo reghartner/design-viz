@@ -10,10 +10,12 @@ const {diagramRecords,atomicWrite,distinctPaths}=require('./auto-arrange-spec.cj
 const S=core.containerSize;
 const HELP='Usage: node tools/size-section-layout.cjs [--width 800..1920] [--write output.json] input.json\n'+
  'Sizes step controls and the diagram of every diagram section from their content and prints a sectionLayout for each.\n'+
- 'Longest path of 4 steps or fewer: step controls in a left column (7 of 24 columns), diagram on the right, one shared height.\n'+
- 'Longer paths, or a side-by-side layout that does not fit: the section is reported and keeps its compose-page-layout.cjs layout.\n'+
- '--write saves a copy of the input with those sectionLayouts applied; the input is never modified. Sizes are estimates.\n';
-const SHORT_PATH_STEPS=4,SIDE_CONTROLS_COLUMNS=7;
+ 'Side by side when the step controls\' minimum width plus the diagram\'s readable width (10px labels) fit in 24 columns:\n'+
+ '  step controls on the left get the columns the diagram does not need at its natural width (12px labels), from their minimum up to 14 of 24;\n'+
+ '  diagram on the right gets the rest, never below its readable width. One shared height.\n'+
+ 'Otherwise the section is reported and keeps its compose-page-layout.cjs layout.\n'+ '--write saves a copy of the input with those sectionLayouts applied; the input is never modified. Sizes are estimates.\n';
+
+const CONTROLS_MAX_COLUMNS=14;
 
 function parseArgs(args){
  const options={width:1200,write:null,input:null};
@@ -34,22 +36,21 @@ function sizeSection(d,grid){
  if(d.layouts?.length||d.exploreLayout||d.presentation==='explore')return skip('has named views or Explore; size it in Workbench');
  if(!Object.keys(d.nodes||{}).length)return skip('has no nodes');
  if(!(d.steps||[]).length)return skip('has no steps');
- const bounds=S.diagramBounds(d),full=controlsFor(d,px(24)),notes=[];
- if(full.maxPathSteps<=SHORT_PATH_STEPS){
-  const cw=SIDE_CONTROLS_COLUMNS,dw=24-cw,controls=controlsFor(d,px(cw)),diagram=S.diagram(d,px(dw),grid.scale,bounds);
-  if(!controls.unsupported&&diagram.labelPx>=S.FLOOR_PX){
-   const h=Math.min(40,Math.max(controls.rows,diagram.rows));
-   if(Math.max(controls.rows,diagram.rows)>40)notes.push('content needs more than 40 rows; the taller container scrolls');
-   if(diagram.labelPx<S.READABLE_PX)notes.push('diagram labels estimate '+diagram.labelPx.toFixed(1)+'px (readable is '+S.READABLE_PX+'px); tighten node spacing or split the diagram');
-   return {arrangement:'side-by-side',reason:'longest path has '+full.maxPathSteps+' steps (4 or fewer)',
-    controls:{w:cw,rows:controls.rows,maxCaptionLines:controls.maxLines},diagram:{w:dw,rows:diagram.rows,labelPx:+diagram.labelPx.toFixed(1)},notes,
-    sectionLayout:{columns:24,default:[{controls:'steps',x:0,y:0,w:cw,h},{x:cw,y:0,w:dw,h}]}};
-  }
-  notes.push(controls.unsupported?'step controls do not fit 7 columns':'diagram is too wide for 17 columns (labels '+diagram.labelPx.toFixed(1)+'px, floor '+S.FLOOR_PX+'px)');
- }
- // Longer stories keep the composer's layout (step controls above the diagram,
- // sized with the same math); a full-width diagram above them pushes them off screen.
- return {skipped:(full.maxPathSteps>SHORT_PATH_STEPS?'longest path has '+full.maxPathSteps+' steps (more than 4)':'side-by-side does not fit')+'; keep the compose-page-layout.cjs layout',notes};
+ const bounds=S.diagramBounds(d),cols=px=>Math.ceil((px+8)/grid.pitch),notes=[];
+ const sized=S.diagram(d,px(24),grid.scale,bounds),controlsMin=cols(S.stepControlsMinWidth(d)),readable=cols(sized.readableWidth),natural=cols(sized.naturalWidth);
+ const widths={controlsMinimum:controlsMin,diagramReadable:readable,diagramNatural:natural};
+ // Longer stories or wide diagrams keep the composer's layout (step controls
+ // above the diagram, sized with the same math).
+ if(controlsMin+readable>24)return {skipped:'step controls need '+controlsMin+' columns and the readable diagram '+readable+' (more than 24); keep the compose-page-layout.cjs layout',widths,notes};
+ // Step controls get what the diagram does not need at its natural size, at
+ // least their minimum and at most CONTROLS_MAX_COLUMNS, so a small diagram
+ // still keeps 40% or more of the section; the diagram never drops below readable.
+ const cw=Math.min(24-readable,Math.max(controlsMin,Math.min(CONTROLS_MAX_COLUMNS,24-natural))),dw=24-cw,controls=controlsFor(d,px(cw)),diagram=S.diagram(d,px(dw),grid.scale,bounds);
+ const h=Math.min(40,Math.max(controls.rows,diagram.rows));
+ if(Math.max(controls.rows,diagram.rows)>40)notes.push('content needs more than 40 rows; the taller container scrolls');
+ return {arrangement:'side-by-side',reason:'step controls need '+controlsMin+' columns and the readable diagram '+readable+' (natural '+natural+')',widths,
+  controls:{w:cw,rows:controls.rows,maxCaptionLines:controls.maxLines},diagram:{w:dw,rows:diagram.rows,labelPx:+diagram.labelPx.toFixed(1)},notes,
+  sectionLayout:{columns:24,default:[{controls:'steps',x:0,y:0,w:cw,h},{x:cw,y:0,w:dw,h}]}};
 }
 function sizeSpec(raw,width){
  const verdict=core.validateSpec(raw);if(verdict.errors.length)throw Error('Invalid input:\n'+verdict.errors.map(m=>'- '+m).join('\n'));
@@ -65,5 +66,5 @@ function main(argv){
  if(options.write){const verdict=core.validateSpec(output);if(verdict.errors.length)throw Error('Sized output is invalid:\n'+verdict.errors.join('\n'));atomicWrite(options.write,JSON.stringify(output,null,2)+'\n');}
  process.stdout.write(JSON.stringify({width:options.width,written:options.write||null,sections:results},null,2)+'\n');
 }
-module.exports={sizeSection,sizeSpec,parseArgs,SHORT_PATH_STEPS};
+module.exports={sizeSection,sizeSpec,parseArgs};
 if(require.main===module){try{main(process.argv.slice(2));}catch(e){process.stderr.write(e.message+'\n'+HELP);process.exitCode=1;}}

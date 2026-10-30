@@ -5,20 +5,31 @@ const S=core.containerSize,grid=S.grid(1200);
 const diagram=(steps=3,text='Short step.')=>({
  nodes:{a:{title:'A'},b:{title:'B'},c:{title:'C'}},rows:[['a','b','c']],edges:[{from:'a',to:'b'},{from:'b',to:'c'}],
  steps:Array.from({length:steps},(_,i)=>({id:'s'+i,nodes:[i%2?'b':'a'],edge:i%2?'b->c':'a->b',text}))});
+// Free placement, as auto-arrange writes it; spread sets the drawing's width.
+const narrow=(steps=3,spread=0)=>{const d=diagram(steps);d.rows=[[]];d.floats=['a','b','c'].map((id,i)=>({id,x:100+(i%2)*spread,y:60+i*120}));return d;};
 const page=d=>({page:{title:'Sizing',sections:[{diagram:d}]}});
-test('a longest path of four steps or fewer puts step controls in a left column beside the diagram',()=>{
- const r=Z.sizeSection(diagram(4),grid),[controls,graph]=r.sectionLayout.default;
- assert.equal(r.arrangement,'side-by-side');
- assert.deepEqual([controls.controls,controls.x,controls.y,controls.w],['steps',0,0,7]);
- assert.deepEqual([graph.x,graph.y,graph.w],[7,0,17]);
- assert.equal(controls.h,graph.h);assert.ok(graph.h>=r.controls.rows&&graph.h>=r.diagram.rows);
+test('a diagram whose readable width fits beside the step controls goes on the right of them',()=>{
+ for(const spread of [0,250,500]){
+  const r=Z.sizeSection(narrow(4,spread),grid),[controls,graph]=r.sectionLayout.default;
+  assert.equal(r.arrangement,'side-by-side');
+  assert.deepEqual([controls.controls,controls.x,controls.y,graph.x,graph.y],['steps',0,0,controls.w,0]);
+  assert.equal(controls.w+graph.w,24);
+  assert.ok(controls.w>=r.widths.controlsMinimum&&controls.w<=14,'controls between their minimum and 14 columns');
+  assert.ok(graph.w>=r.widths.diagramReadable,'diagram never below its readable width');
+  assert.equal(controls.h,graph.h);assert.ok(graph.h>=r.controls.rows&&graph.h>=r.diagram.rows);
+ }
+ const small=Z.sizeSection(narrow(4,0),grid).sectionLayout.default,wide=Z.sizeSection(narrow(4,500),grid).sectionLayout.default;
+ assert.ok(small[1].w<wide[1].w,'a wider drawing takes more columns from the step controls');
 });
-test('a longer path keeps the composer layout and is reported, not rewritten',()=>{
- const r=Z.sizeSection(diagram(5),grid);
- assert.equal(r.sectionLayout,undefined);assert.match(r.skipped,/5 steps \(more than 4\); keep the compose-page-layout/);
- const out=Z.sizeSpec(page(diagram(5)),1200).output;assert.equal(out.page.sections[0].diagram.sectionLayout,undefined);
+test('a diagram too wide to read beside the step controls keeps the composer layout and is reported',()=>{
+ const r=Z.sizeSection(diagram(4),grid);
+ assert.equal(r.sectionLayout,undefined);assert.match(r.skipped,/more than 24\); keep the compose-page-layout/);
+ assert.ok(r.widths.controlsMinimum+r.widths.diagramReadable>24);
+ assert.equal(Z.sizeSpec(page(diagram(4)),1200).output.page.sections[0].diagram.sectionLayout,undefined);
 });
-test('step controls grow with their longest caption and the diagram with its drawing height',()=>{
+test('step controls grow with their longest caption and path, and the diagram with its drawing',()=>{
+ assert.ok(S.stepControlsMinWidth(diagram(20))>S.stepControlsMinWidth(diagram(4)));
+ assert.ok(S.diagram(null,700,1,{x:0,y:0,w:900,h:200}).readableWidth>S.diagram(null,700,1,{x:0,y:0,w:400,h:200}).readableWidth);
  const short=S.stepControls(diagram(3),300),long=S.stepControls(diagram(3,'Detailed step narrative. '.repeat(30)),300);
  assert.ok(long.rows>short.rows&&long.maxLines>short.maxLines);
  const flat=S.diagram(null,700,1,{x:0,y:0,w:1000,h:200}),tall=S.diagram(null,700,1,{x:0,y:0,w:1000,h:800});
@@ -39,11 +50,11 @@ test('sections the helper does not own are reported, not rewritten',()=>{
 });
 test('--write saves a valid sized copy and leaves the input unchanged',t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'size-layout-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
- const input=path.join(dir,'in.json'),output=path.join(dir,'out.json'),bytes=JSON.stringify(page(diagram(3)));fs.writeFileSync(input,bytes);
+ const input=path.join(dir,'in.json'),output=path.join(dir,'out.json'),bytes=JSON.stringify(page(narrow(3)));fs.writeFileSync(input,bytes);
  const run=spawnSync(process.execPath,[path.resolve(__dirname,'../tools/size-section-layout.cjs'),'--write',output,input],{encoding:'utf8'});
  assert.equal(run.status,0,run.stderr);assert.equal(fs.readFileSync(input,'utf8'),bytes);
  const sized=JSON.parse(fs.readFileSync(output,'utf8'));assert.deepEqual(core.validateSpec(sized).errors,[]);
- assert.deepEqual(sized.page.sections[0].diagram.sectionLayout,JSON.parse(run.stdout).sections[0].sectionLayout);
+ assert.ok(sized.page.sections[0].diagram.sectionLayout);assert.deepEqual(sized.page.sections[0].diagram.sectionLayout,JSON.parse(run.stdout).sections[0].sectionLayout);
  const same=spawnSync(process.execPath,[path.resolve(__dirname,'../tools/size-section-layout.cjs'),'--write',input,input],{encoding:'utf8'});
  assert.notEqual(same.status,0);assert.match(same.stderr,/different files/);assert.equal(fs.readFileSync(input,'utf8'),bytes);
 });

@@ -95,6 +95,20 @@ function stepControlsSize(d,width){
     pathCount:paths.length,maxPathSteps:Math.max.apply(null,[0].concat(paths.map(function(p){return p.indices.length;})))};
 }
 
+/* Narrowest step-controls width that shows the transport and every step chip
+   (or the path timeline) on one track without horizontal scrolling. */
+function stepControlsMinWidth(d){
+  var paths=diagramPathList(d),delta=(d.steps||[]).some(function(s){return s.delta;}),
+    longest=Math.max.apply(null,[1].concat(paths.map(function(p){return p.indices.length;}))),track;
+  if(paths.length>1){
+    var graph=pathTimelineGraph(paths);
+    // Path label column (150px minimum) plus 44px timeline columns, or 35px matrix chips.
+    track=graph.hasShared?150+Math.max(1,graph.columns)*44+28:150+longest*35;
+  }else track=longest*(delta?38:29)+10;
+  // Transport (previous, play, next, status) and the 200px caption floor; frame padding.
+  return Math.max(260,track)+30;
+}
+
 /* Diagram bounds: placed nodes, group boxes and routed edges with a
    conservative envelope for edge labels and moving step markers. */
 function diagramContentBounds(d){
@@ -124,9 +138,10 @@ function diagramSize(d,width,scale,bounds){
   var drawing=width*bounds.h/Math.max(1,bounds.w),neededHeight=drawing+DIAGRAM_CHROME_PX;
   return {bounds:bounds,neededHeight:Math.ceil(neededHeight),rows:containerRows(neededHeight-CONTAINER_GAP_PX,4),
     labelPx:DIAGRAM_LABEL_PX*Math.max(0,(width-2)/Math.max(1,bounds.w))*scale,
+    naturalWidth:Math.ceil(bounds.w/scale+64),
     readableWidth:Math.ceil(bounds.w*DIAGRAM_READABLE_PX/DIAGRAM_LABEL_PX/scale+64),
     minimumWidth:Math.ceil(bounds.w*DIAGRAM_FLOOR_PX/DIAGRAM_LABEL_PX/scale+64)};
 }
 var FlowContainerSize={grid:containerGrid,textLines:containerTextLines,text:containerText,inlineRows:containerInlineRows,
-  stepControls:stepControlsSize,diagram:diagramSize,diagramBounds:diagramContentBounds,rows:containerRows,
+  stepControls:stepControlsSize,stepControlsMinWidth:stepControlsMinWidth,diagram:diagramSize,diagramBounds:diagramContentBounds,rows:containerRows,
   READABLE_PX:DIAGRAM_READABLE_PX,FLOOR_PX:DIAGRAM_FLOOR_PX};

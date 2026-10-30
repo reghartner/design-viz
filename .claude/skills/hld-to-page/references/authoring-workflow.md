@@ -133,13 +133,14 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     supported inputs and estimation limits.
 13. **Size step controls and the diagram with the helper.** After composing,
     run `node <VIZ>/tools/size-section-layout.cjs --write <sized.spec.json> <arranged.spec.json>`
-    and use its output. It sizes both containers from their own content (node
-    positions, the longest step caption, path count and length). When the
-    longest path has 4 steps or fewer it puts step controls in a left column
-    (7 of 24 columns) beside the diagram, both tall enough. It reports and
-    skips longer paths and sections with panels; keep the composer's layout
-    there. Do not hand-edit its sizes; fix content (shorter captions, tighter
-    nodes) and rerun. Report any `notes` it prints.
+    and use its output. It sizes both containers from their own content: the
+    step controls' minimum width (path count and length), the diagram's
+    readable width (node positions) and the longest step caption. When both fit
+    side by side it puts step controls in a left column and the diagram on the
+    right, both tall enough; a small diagram leaves the controls more room. It
+    reports and skips sections that do not fit or have panels; keep the
+    composer's layout there. Do not hand-edit its sizes; fix content (shorter
+    captions, tighter nodes) and rerun. Report any `notes` it prints.
 14. **No node groups unless the operator asks for them.** Groups degrade
     auto-arrange. Default to none; keep groups the source spec already has.
 15. **Auto-arrange every new diagram and after adding nodes** (rules 12 and 13).

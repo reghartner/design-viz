@@ -442,3 +442,76 @@ test('desktop inherited edge Missing work is read only while local additions rem
  const marker=page.locator('#guide').getByRole('checkbox',{name:'Missing work',exact:true});await expect(marker).toBeChecked();await expect(marker).toBeDisabled();
  const input=page.locator('#guide').getByRole('textbox',{name:'Add ticket',exact:true}),before=await source(page);await input.fill('EXTRA-1');await input.press('Enter');await history(page,before);expect(diagram(JSON.parse(await source(page))).topologyImports[0].edgeTracking).toEqual({'api->store':{tickets:['EXTRA-1']}});
 });
+
+/* #828 shared-board Edit mode on imported carriers (standalone two-file board whose
+   flowview-topology block holds the frozen provider). Contract source: #828 "What changes"
+   (imported nodes and edges) + "Test + flip"; §0 ruling (Chuck 2026-10-30): the issue's own
+   Test + flip plan. Local-carrier rows E1–E15 live in tests/board-edit.spec.mjs.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| I1 imported node | provider api holds CAN-1; consumer overlay nodeTracking.api holds LOC-1 | in Edit mode canon::api's popover: CAN-1 has no Remove, LOC-1 has Remove; Remove LOC-1 + drop EX-1 → Save → only flowspec.json is published; consumer nodeTracking == {api:{tickets:["EX-1"]}}, no "canon::api" key under nodes, no provider ticket copied in; changes carry node "canon::api" and the overlay path | writing to the resolved carrier (nodes["canon::api"]); Remove on provider-inherited tickets |
+| I2 imported edge | provider edge api → store holds CAN-2; overlay edgeTracking["api->store"] holds LOC-2 | same through the edge label: edgeTracking == {"api->store":{tickets:["EX-1"]}}; change edge ["canon::api","canon::store"], label "API → Store" | writing to the resolved edge; Remove on CAN-2 |
+| I3 conflict replay: imports swapped | two imports of core as "one" and "two"; editor drops on two::api; the winner swaps the imports | after the reload and Save, EX-1 is in the import whose `as` is "two" (now index 0) and not in "one" | replay by stored import index |
+Flip: write to the resolved imported carrier instead of the overlay → I1/I2 overlay assertions fail.
+*/
+import {buildBoard as buildEditBoard,serveWinner,mockRuntime,publishes,openBoard,TRACKING,PANELS,cardPoint,nodeCard,edgeLabel,dragTicket,startEditing,saveButton,
+ save as saveBoard} from '../helpers/board-edit.mjs';
+function importedBoard(imports=[{spec:'provider',export:'core',as:'canon',position:{x:80,y:250},nodeTracking:{api:{tickets:['LOC-1']}},edgeTracking:{'api->store':{tickets:['LOC-2']}}}]){
+  const model=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}});
+  const provider=model('provider',{nodes:{api:{title:'API',tickets:['CAN-1']},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist',tickets:['CAN-2']}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+  const consumer=model('consumer',{nodes:{local:{title:'Local worker'}},rows:[['local']],topologyImports:imports,panels:structuredClone(PANELS)});
+  consumer.page.tracking=structuredClone(TRACKING);
+  return {provider,consumer,context:specs=>({version:1,id:'consumer',specs})};
+}
+const editPopover=async(page,target)=>{await target.scrollIntoViewIfNeeded();const box=await target.boundingBox();await page.mouse.click(box.x+box.width-8,box.y+box.height/2);const pop=page.locator('.dv-live-popover');await expect(pop).toBeVisible();return pop;};
+const overlay=(saved,index=0)=>saved.page.sections[0].diagram.topologyImports[index];
+
+test('I1 desktop board Edit mode writes an imported node through the consumer overlay',async({page,server})=>{
+  const {provider,consumer,context}=importedBoard(),board=await buildEditBoard(server,'imported-node',consumer,{topology:context([provider,consumer])});
+  await mockRuntime(page);const {root,panel}=await openBoard(page,board);await startEditing(panel);
+  const pop=await editPopover(page,nodeCard(root,'canon::api'));
+  await expect(pop.locator('.dv-live-ticket').filter({hasText:'CAN-1'})).toHaveCount(1);
+  await expect(pop.getByRole('button',{name:'Remove CAN-1 from API',exact:true})).toHaveCount(0);
+  await pop.getByRole('button',{name:'Remove LOC-1 from API',exact:true}).click();
+  await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(root,'canon::api')));
+  const text=await saveBoard(page,panel,2),saved=JSON.parse(text);
+  expect((await publishes(page))[0].paths).toEqual(['flowspec.json']);
+  expect(overlay(saved).nodeTracking).toEqual({api:{tickets:['EX-1']}});
+  expect(overlay(saved).edgeTracking).toEqual({'api->store':{tickets:['LOC-2']}});
+  expect(Object.keys(saved.page.sections[0].diagram.nodes)).toEqual(['local']);
+  expect(text).not.toContain('CAN-1');
+  const at=['page','sections',0,'diagram','topologyImports',0,'nodeTracking','api'];
+  expect(saved.page.editHistory[0].changes).toEqual([{op:'remove',ticket:'LOC-1',path:at,node:'canon::api',label:'API'},{op:'add',ticket:'EX-1',path:at,node:'canon::api',label:'API'}]);
+});
+
+test('I2 desktop board Edit mode writes an imported edge through the consumer overlay',async({page,server})=>{
+  const {provider,consumer,context}=importedBoard(),board=await buildEditBoard(server,'imported-edge',consumer,{topology:context([provider,consumer])});
+  await mockRuntime(page);const {root,panel}=await openBoard(page,board);await startEditing(panel);
+  const pop=await editPopover(page,edgeLabel(root,0));
+  await expect(pop.locator('.dv-live-ticket').filter({hasText:'CAN-2'})).toHaveCount(1);
+  await expect(pop.getByRole('button',{name:/^Remove CAN-2 /})).toHaveCount(0);
+  await pop.getByRole('button',{name:/^Remove LOC-2 /}).click();
+  await dragTicket(page,panel,'EX-1',await cardPoint(edgeLabel(root,0)));
+  const text=await saveBoard(page,panel,2),saved=JSON.parse(text);
+  expect(overlay(saved).edgeTracking).toEqual({'api->store':{tickets:['EX-1']}});
+  expect(overlay(saved).nodeTracking).toEqual({api:{tickets:['LOC-1']}});
+  expect(saved.page.sections[0].diagram.edges).toBeUndefined();expect(text).not.toContain('CAN-2');
+  const at=['page','sections',0,'diagram','topologyImports',0,'edgeTracking','api->store'];
+  expect(saved.page.editHistory[0].changes).toEqual([{op:'remove',ticket:'LOC-2',path:at,edge:['canon::api','canon::store'],label:'API → Store'},{op:'add',ticket:'EX-1',path:at,edge:['canon::api','canon::store'],label:'API → Store'}]);
+});
+
+test('I3 desktop board conflict replay finds a swapped topology import by its provider reference',async({page,server})=>{
+  const imports=[{spec:'provider',export:'core',as:'one',position:{x:80,y:250}},{spec:'provider',export:'core',as:'two',position:{x:80,y:450}}];
+  const {provider,consumer,context}=importedBoard(imports),board=await buildEditBoard(server,'imported-swap',consumer,{topology:context([provider,consumer])});
+  await mockRuntime(page,{reject:'conflict',rejectOnce:true});
+  let {root,panel}=await openBoard(page,board);await startEditing(panel);
+  await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(root,'two::api')));
+  await saveButton(panel).click();await expect.poll(()=>publishes(page).then(list=>list.length)).toBe(1);
+  const winner=structuredClone(consumer);winner.page.sections[0].diagram.topologyImports.reverse();
+  await serveWinner(board,winner);await page.reload();({root,panel}=await openBoard(page,board));
+  await expect(panel.locator('.dv-live-edit-notice')).toHaveText(/1 of your changes were re-applied; 0 could not be/);
+  await page.waitForTimeout(500);expect(await publishes(page)).toEqual([]);
+  const saved=JSON.parse(await saveBoard(page,panel,1));
+  expect(overlay(saved,0).as).toBe('two');expect(overlay(saved,0).nodeTracking).toEqual({api:{tickets:['EX-1']}});
+  expect(overlay(saved,1).as).toBe('one');expect(overlay(saved,1).nodeTracking).toBeUndefined();
+});

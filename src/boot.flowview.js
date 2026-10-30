@@ -137,7 +137,6 @@ function boot(raw, sourceText){
      flowspec.json, ?spec= file, or the inline block), never re-serialized —
      the board's Edit mode splices its changes into this text (#825). */
   var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget,liveStatus:liveOptions,handoffHost:window.flowviewHandoffHost,sourceText:sourceText});
-  ctl.sourceText = function(){ return sourceText; };
   if (embedRequest){
     /* compose with the step deep-link fields: m=/s= without an explicit
        d= selector must address the EMBEDDED diagram, not the page's
@@ -188,8 +187,12 @@ function boot(raw, sourceText){
   if (typeof wireReaderShortcuts === 'function') wireReaderShortcuts(ctl, view, window);
   /* Host notification, the output side of the flowviewLiveStatus /
      flowviewHandoffHost inputs: a shell or harness registered before boot
-     receives the controller once the page is wired. */
-  if (typeof window.flowviewBooted === 'function') window.flowviewBooted(ctl);
+     receives the controller once the page is wired. A throwing hook is the
+     host's bug, never the page's. */
+  if (typeof window.flowviewBooted === 'function'){
+    try { window.flowviewBooted(ctl); }
+    catch (ex){ if (window.console) console.warn('flowspec: flowviewBooted hook failed: ' + ex.message); }
+  }
 }
 
 var inlineText = (document.getElementById('flowspec') || {}).textContent || '';

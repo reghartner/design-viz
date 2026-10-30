@@ -57,7 +57,7 @@ function boardEditSamePrefix(path,prefix){return prefix.every(function(part,i){r
 
 function createBoardEditor(options){
   var win=options.win || window,text=options.text,base=text,context=options.context || null,fallback=options.fallback || null;
-  var ops=[],active=false,saving=false,readOnly=false,canEdit=false,artifact=null,user=null,notice=null,listeners=[],lastMap=null;
+  var ops=[],active=false,saving=false,readOnly=false,reloading=false,canEdit=false,artifact=null,user=null,notice=null,listeners=[],lastMap=null;
   var stashKey='flowview-board-edit:'+String(win.location && win.location.pathname || '')+':'+(options.specFile || 'flowspec.json');
 
   function changed(){listeners.slice().forEach(function(fn){try{fn();}catch(ex){}});}
@@ -199,7 +199,7 @@ function createBoardEditor(options){
     return null;
   }
 
-  function beforeUnload(ev){if(!ops.length)return;ev.preventDefault();ev.returnValue='';return '';}
+  function beforeUnload(ev){if(!ops.length || reloading)return;ev.preventDefault();ev.returnValue='';return '';}
   win.addEventListener('beforeunload',beforeUnload);
 
   var api={
@@ -238,8 +238,9 @@ function createBoardEditor(options){
       },function(error){
         saving=false;var code=error && error.code;
         if(code==='conflict'){
-          // The runtime reloads this view to the winning version; the stash replays there.
-          notice={kind:'warn',text:'Another editor saved first. Loading their version…'};changed();return;
+          // The runtime reloads this view to the winning version; the stash replays
+          // there, so that reload must not raise the leave-page warning.
+          reloading=true;notice={kind:'warn',text:'Another editor saved first. Loading their version…'};changed();return;
         }
         unstash();
         if(BOARD_EDIT_READ_ONLY.indexOf(code)>=0){

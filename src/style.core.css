@@ -4062,9 +4062,11 @@ text.lbl[data-live-appearance]{fill:var(--dv-live-ink,#000)!important;}
 .dv-live-target:focus:not(:focus-visible){outline:none;}
 .dv-live-target:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:3px;}
 /* #828 board Edit mode: carriers accept dropped Tickets rows; the one under the pointer highlights. */
-g.node.dv-edit-target .card{stroke-dasharray:5 3;}
-g.node.dv-edit-over .card{stroke:var(--dv-live-active)!important;stroke-width:3px!important;stroke-dasharray:none;}
-path.edge.dv-edit-over{stroke:var(--dv-live-active)!important;stroke-width:4px!important;}
+g.node.dv-edit-target,path.edge.dv-edit-target{cursor:copy;}
+/* The reader's focus ink (as the carrier focus ring), never a live-state, PR or checks color or a dash:
+   the highlight must not read as a ticket state. */
+.docview g.node.dv-edit-over[data-dv-node] .card{stroke:var(--dink,currentColor)!important;stroke-width:3.5px!important;stroke-dasharray:none!important;filter:drop-shadow(0 0 5px color-mix(in srgb,var(--dink,currentColor) 45%,transparent));}
+.docview path.edge.dv-edit-over[data-dv-edge]{stroke:var(--dink,currentColor)!important;stroke-width:4px!important;stroke-dasharray:none!important;}
 .dv-live-popover{inset:auto;margin:0;flex-direction:column;align-items:stretch;padding:12px;font-size:11px;font-weight:400;max-width:min(420px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;}
 .dv-live-popover .node-link-title{padding-right:28px;}
 .dv-live-ticket{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:8px 0;border-bottom:1px solid currentColor;}

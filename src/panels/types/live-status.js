@@ -110,7 +110,7 @@
       var editControl=button(head,'edit','reader-button dv-live-edit','Edit','editStart');editControl.hidden=!(edit && edit.editable && !editing);editControl.disabled=!!(edit && (edit.blocked || edit.saving));
       var saveControl=button(head,'save','reader-button dv-live-save',edit && edit.saving?'Saving…':'Save '+pending+' change'+(pending===1?'':'s'),'editSave');saveControl.hidden=!(editing && pending);saveControl.disabled=!!(edit && edit.saving);
       var discardControl=button(head,'discard','reader-button dv-live-discard','Discard','editDiscard');discardControl.hidden=!(editing && pending);discardControl.disabled=!!(edit && edit.saving);
-      button(head,'done','reader-button dv-live-done','Done','editDone').hidden=!(editing && !pending);
+      button(head,'done','reader-button dv-live-edit-done','Done','editDone').hidden=!(editing && !pending);
       var reason=el(head,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
       var editNotice=el(head,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
       var editShown=!!(edit && (edit.editable || edit.notice));

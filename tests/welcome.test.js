@@ -190,3 +190,34 @@ test('shared links exclude review context and viewer fragments; demos retain his
   const empty=context.createWelcomeNavigation(navigationWindow('https://example.test/?diagram='),'editor',()=>{});
   assert.equal(empty.screen(),'reader');assert.equal(empty.diagram(),'');
 });
+
+/* Browse filter links (#834). Rows: ?browse opens the library screen with decoded filters
+   and no extra history entry; unrelated query fields and the fragment are kept; browse(filters)
+   rewrites only Browse fields with replaceState (bare `browse`, empty fields omitted, folder
+   parts joined by '/'); leaving the library strips Browse fields; Back restores them;
+   ?diagram wins over Browse fields; malformed values are dropped. */
+test('Browse links route to the library with decoded filters and filter updates replace only Browse fields',()=>{
+  const win=navigationWindow('https://example.test/workbench.html?host=a%20b&browse&q=a%20%26%20b&team=group%3Adefault%2Fx&service=component%3Adefault%2Fcart&topic=t&folder=f1/f2&theme=dark#part');
+  const nav=context.createWelcomeNavigation(win,'home',()=>{});
+  assert.equal(nav.screen(),'library');assert.equal(win.history.length,1);
+  assert.deepEqual(plain(nav.browse()),{q:'a & b',team:'group:default/x',service:'component:default/cart',topic:'t',folder:['f1','f2']});
+  nav.browse({q:'z',team:'',folder:['a b'],ignored:'x'});
+  assert.equal(win.location.search,'?host=a%20b&theme=dark&browse&q=z&folder=a%20b');assert.equal(win.location.hash,'#part');
+  assert.equal(win.history.length,1);assert.deepEqual(plain(nav.browse()),{q:'z',folder:['a b']});
+  nav.browse({});assert.equal(win.location.search,'?host=a%20b&theme=dark&browse');
+  nav.browse({topic:'t'});nav.go('editor');assert.equal(win.location.search,'?host=a%20b&theme=dark');assert.equal(nav.browse(),null);
+  win.history.back();assert.equal(nav.screen(),'library');assert.deepEqual(plain(nav.browse()),{topic:'t'});
+  assert.equal(win.location.search,'?host=a%20b&theme=dark&browse&topic=t');
+  nav.go('reader','doorbell');assert.equal(win.location.search,'?host=a%20b&theme=dark&diagram=doorbell');
+  // Entering Browse from Welcome writes the bare marker.
+  const home=navigationWindow(),fromHome=context.createWelcomeNavigation(home,'home',()=>{});
+  fromHome.go('library');assert.equal(home.location.search,'?layout=backstage&browse');assert.equal(fromHome.browse(),null);
+  // ?diagram wins and Browse fields are removed.
+  const both=navigationWindow('https://example.test/workbench.html?diagram=d&browse&q=x&folder=a');
+  const reader=context.createWelcomeNavigation(both,'home',()=>{});
+  assert.equal(reader.screen(),'reader');assert.equal(both.location.search,'?diagram=d');
+  // Malformed values: empty folder parts and over-long values are dropped.
+  const odd=navigationWindow('https://example.test/workbench.html?browse&folder=%2Fa%2F%2Fb%2F&q='+'x'.repeat(301));
+  const oddNav=context.createWelcomeNavigation(odd,'home',()=>{});
+  assert.deepEqual(plain(oddNav.browse()),{folder:['a','b']});
+});

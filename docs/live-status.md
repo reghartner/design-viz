@@ -872,6 +872,56 @@ described as the stale fallback and must not be edited.
 A tracked two-file page's declaration adds `artifact` and `user`
 (`{scopes: ["profile"]}`).
 
+## Edit history
+
+`page.editHistory` is the board's save history: one entry per change set,
+hand-written today. The board's Edit mode (#828, planned) will append an
+entry on every Save. The panel shows them newest first:
+
+```json
+"editHistory": [
+  {"at": "2026-10-30T16:23:15.987Z",
+   "by": {"id": "u_…", "name": "Chuck"},
+   "changes": [
+     {"op": "add", "ticket": "EX-1", "node": "payment-api", "label": "Payment API",
+      "path": ["sections", 0, "diagram", "nodes", "payment-api"]},
+     {"op": "remove", "ticket": "AA-1", "edge": ["door", "cloud"], "label": "Door → Cloud"}]}
+]
+```
+
+Required per entry: `at` (an ISO-8601 date-time with date, time including
+seconds, optional fraction of any length, and `Z` or a `±hh:mm` offset, such as
+`2026-10-30T16:23:15.987Z`; impossible calendar dates are rejected) and a
+non-empty `changes` array
+whose items carry `op` (`"add"` or `"remove"`), `ticket` (a Jira key) and the
+carrier (`node` id, or `edge: [from, to]`). Optional: `by` (`id` and `name`
+strings, either may be empty), each change's `path` (array) and `label` (the
+carrier's display name at save time, so history stays readable after a rename).
+Validation follows the warning-only policy of the other tracking fields: a
+malformed entry warns and is ignored, a non-array warns once, and more than 200
+entries warn once with only the newest 200 used (the planned Edit mode will
+trim to 200 on save).
+
+The **Edit history** panel shows those entries. Add it to the diagram's panels
+after the Live status panel and place it below the board in every host profile:
+
+```json
+{"id": "history", "type": "edit-history", "title": "Edit history"}
+```
+
+In a section with an explicit `sectionLayout`, add a full-width tile for it to
+each profile (`{"panel": "history", "x": 0, "y": <below the other tiles>, "w": 24, "h": 8}`);
+a profile that does not name the panel does not show it. Each row reads
+editor · time · "N changes" · the first change ("EX-1 added to Payment API");
+clicking a row expands one line per change with the ticket key, its live title
+when the connector has answered, the operation and the carrier label (stored
+`label`, else the node id or `from → to`). The editor name is the viewer's live
+claude.ai profile name for `by.id` when it resolves, else the stored `by.name`,
+else "Someone". Everyone sees the panel; nobody edits it, on desktop or in
+read-only viewing. It has no authored state: `initial` and step patches warn
+and are ignored. Without entries it reads "No edits yet." A board without the
+panel keeps its `editHistory` field; the history is shown once the author adds
+the declaration above.
 ## Story mode
 
 Live evidence follows the story's nodes and edges. Diagrams with a Live status

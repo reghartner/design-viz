@@ -464,6 +464,8 @@ function liveStatusWhenReady(host,connect){
 function createLiveStatus(ctl,page,options,renderOptions){
   options=options || {};page=page || {};
   var view=ctl.view,authoring=!!(renderOptions && renderOptions.authoring),records=sectionRecords(page),map=Object.create(null),on=true,retired=false,applied=false,availabilityOn=true;
+  // #827: the validated edit history rides the snapshot so the edit-history panel can read it through this seam.
+  var editHistory=typeof editHistoryEntries==='function'?editHistoryEntries(page):[];
   var destroyListeners=[],listeners=[],bindings=[],observer=null,frame=0,firstPaint=0,timer=0,pending=false,catchUp=false,painting=false;
   var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
@@ -576,6 +578,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       dependencies:copy(dependencies),waiting:copy(boardWaiting),chains:liveStatusDependencyChains(boardWaiting),suggestions:suggestions,epic:epic,
       coverage:coverage,readiness:readiness,activity:copy(activity.filter(function(item){return storyKeys.indexOf(item.key)>=0;})).map(function(item){item.relative=item.at?relative(item.at):'time unavailable';return item;}),
       demo:demoControls?{playing:!!demoControls.playing,manual:!!demoControls.manual,ended:!!demoControls.ended}:null,verdict:verdict,
+      editHistory:copy(editHistory),
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
       connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+relative(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}}};
   }

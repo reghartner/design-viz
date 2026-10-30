@@ -121,26 +121,35 @@ controls; no reader menu is needed. Use all three host profiles.
 
 ```json
 {
-  "panels": [{"id":"status", "type":"live-status", "title":"Epic status"}],
+  "panels": [{"id":"status", "type":"live-status", "title":"Epic status"},
+             {"id":"history", "type":"edit-history", "title":"Edit history"}],
   "sectionLayout": {"columns":24,
     "default": [
       {"panel":"status","x":0,"y":0,"w":12,"h":27},
       {"x":12,"y":0,"w":12,"h":21},
-      {"controls":"steps","attachTo":"diagram","x":12,"y":30,"w":12,"h":5}
+      {"controls":"steps","attachTo":"diagram","x":12,"y":30,"w":12,"h":5},
+      {"panel":"history","x":0,"y":35,"w":24,"h":8}
     ],
     "backstage": [
       {"x":0,"y":0,"w":24,"h":10},
       {"controls":"steps","x":0,"y":10,"w":24,"h":6},
-      {"panel":"status","x":0,"y":16,"w":24,"h":16}
+      {"panel":"status","x":0,"y":16,"w":24,"h":16},
+      {"panel":"history","x":0,"y":32,"w":24,"h":8}
     ],
     "confluence": [
       {"x":0,"y":0,"w":24,"h":10},
       {"controls":"steps","x":0,"y":10,"w":24,"h":6},
-      {"panel":"status","x":0,"y":16,"w":24,"h":16}
+      {"panel":"status","x":0,"y":16,"w":24,"h":16},
+      {"panel":"history","x":0,"y":32,"w":24,"h":8}
     ]
   }
 }
 ```
+
+The `edit-history` panel (#827) lists the entries of `page.editHistory`
+(hand-written today; the planned Edit mode, #828, will append one per Save)
+newest first, below the board in every profile; a profile that does not name
+it hides it. It needs no authored state. See `docs/live-status.md` § Edit history.
 
 Rules of thumb that make the board readable:
 

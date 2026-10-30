@@ -703,6 +703,18 @@ story's parent Epic. Empty parents get their own metadata lookup. Shared and
 explicitly tracked Epics are deduplicated. Runtime `kind`, `parent`, `epic` and
 `initiatives` membership belong only in the live provider map, never in authored
 state. See `docs/live-status.md` for that transport contract.
+
+Optional page-level `editHistory` is the board's save history: an array of
+`{"at": "<ISO-8601>", "by"?: {"id"?: "", "name"?: ""}, "changes": [{"op": "add"|"remove",
+"ticket": "EX-1", "node": "<id>" | "edge": ["<from>", "<to>"], "path"?: [...], "label"?: ""}]}`
+entries, hand-written today (the board's planned Edit mode, #828, will append
+one per Save) and shown by the `edit-history` panel. `at`, a non-empty `changes` array and each change's `op`,
+`ticket` and carrier are required; `by`, `by.id`, `by.name`, `path` and `label`
+are optional. `at` is an ISO-8601 date-time with seconds, an optional fraction
+of any length and `Z` or a `±hh:mm` offset (`2026-10-30T16:23:15.987Z`).
+Malformed entries warn and are ignored, a non-array warns once,
+and more than 200 entries warn once with only the newest 200 used. See
+[Edit history](../docs/live-status.md#edit-history).
 Valid keys are deduplicated in authored order; invalid entries warn individually
 and an invalid field type warns once, never errors. Epic children automatically
 appear in the Tickets table; mapping them to nodes and edges remains an authoring
@@ -779,7 +791,8 @@ See [live availability](../docs/live-status.md#planned-nodes-and-connections).
 Declare `"groups": {"doorbell": {"title": "Doorbell unit"}}` at the diagram
 level and tag member nodes with `"group": "doorbell"`. The engine draws a
 dashed, titled boundary box around all members — a device that holds two
-chips, a VPC around services. Rules:
+chips, a VPC around services. Add groups only when the operator asks for them;
+they constrain auto-arrange, so a new diagram has none by default. Rules:
 
 - Place group members ADJACENTLY — one stack column works best (the boundary
   is a bounding box over member positions, not a layout constraint).
@@ -1076,6 +1089,19 @@ perspectives" of one timeline). Types:
   declares it. Status stays in the runtime provider, never the exported spec.
   See [Live status panel](../docs/live-status.md#live-status-panel) for provider,
   coverage navigation and demo behavior.
+- `edit-history` — the board's hand-written save history (`page.editHistory`), read-only:
+  `{"id":"history","type":"edit-history","title":"Edit history"}`.
+  Lists `page.editHistory` newest first: one collapsible row per entry with the
+  editor (live claude.ai profile name, else the stored `by.name`, else
+  "Someone"), the time, "N changes" and the first change; expanding a row shows
+  one line per change with ticket key, live ticket title when available, the
+  operation and the carrier label (stored `label`, else node id or `from → to`).
+  Add it after the `live-status` panel and, in a section with `sectionLayout`,
+  name it in every profile below the board (a profile that omits it hides it).
+  It has no authored state: `initial` and step patches warn and are ignored;
+  step `panelVisibility` still works. No setup or patch fields are needed.
+  Without entries it reads "No edits yet." Everyone sees it; nobody edits it.
+  See [Edit history](../docs/live-status.md#edit-history).
 - `appscreens` — a collection of exported app screens selected by story steps.
   Declare up to 32 `screens`, each with a unique nonempty `id`, `label`, `alt`,
   embedded PNG/JPEG/WebP `src` (512 KiB decoded maximum), optional `caption`
@@ -2468,9 +2494,9 @@ contract stays the authority; a recipe shows the working subset for one task.
    `text` and key constraints into `bullets`).
 5. More than two flows, or a requested walkthrough → wrap sections in `tabs`.
    A guided tab = the same diagram object plus `"view": "step"`.
-6. A device with internal structure (chips, radio, sensors) → a `groups`
-   boundary around its member nodes, plus `panels` showing its internal state
-   patched per step. Tag steps with `lanes` (NET / DEV / CAM) so readers
+6. A device with internal structure (chips, radio, sensors) → `panels`
+   showing its internal state patched per step. Add a `groups` boundary only
+   when the operator asks for one: groups constrain auto-arrange. Tag steps with `lanes` (NET / DEV / CAM) so readers
    track which layer acts.
 7. Pick each panel by the ARGUMENT the section makes, not by decoration —
    every widget exists to carry one kind of claim:

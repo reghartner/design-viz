@@ -1,0 +1,72 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawnSync}=require('node:child_process');
+const Z=require('../tools/size-section-layout.cjs'),core=require('../tools/arrange/core.cjs'),P=require('../tools/arrange/packing.cjs'),E=require('../tools/arrange/estimate.cjs');
+const S=core.containerSize,grid=S.grid(1200);
+const diagram=(steps=3,text='Short step.')=>({
+ nodes:{a:{title:'A'},b:{title:'B'},c:{title:'C'}},rows:[['a','b','c']],edges:[{from:'a',to:'b'},{from:'b',to:'c'}],
+ steps:Array.from({length:steps},(_,i)=>({id:'s'+i,nodes:[i%2?'b':'a'],edge:i%2?'b->c':'a->b',text}))});
+// Free placement, as auto-arrange writes it; spread sets the drawing's width.
+const narrow=(steps=3,spread=0)=>{const d=diagram(steps);d.rows=[[]];d.floats=['a','b','c'].map((id,i)=>({id,x:100+(i%2)*spread,y:60+i*120}));return d;};
+const page=d=>({page:{title:'Sizing',sections:[{diagram:d}]}});
+test('a diagram whose readable width fits beside the step controls goes on the right of them',()=>{
+ for(const spread of [0,250,500]){
+  const r=Z.sizeSection(narrow(4,spread),grid),[controls,graph]=r.sectionLayout.default;
+  assert.equal(r.arrangement,'side-by-side');
+  assert.deepEqual([controls.controls,controls.x,controls.y,graph.x,graph.y],['steps',0,0,controls.w,0]);
+  assert.equal(controls.w+graph.w,24);
+  assert.ok(controls.w>=r.widths.controlsMinimum&&controls.w<=14,'controls between their minimum and 14 columns');
+  assert.ok(graph.w>=r.widths.diagramReadable,'diagram never below its readable width');
+  assert.equal(controls.h,graph.h);assert.ok(graph.h>=r.controls.rows&&graph.h>=r.diagram.rows);
+ }
+ const small=Z.sizeSection(narrow(4,0),grid).sectionLayout.default,wide=Z.sizeSection(narrow(4,500),grid).sectionLayout.default;
+ assert.ok(small[1].w<wide[1].w,'a wider drawing takes more columns from the step controls');
+});
+test('a diagram too wide to read beside the step controls keeps the composer layout and is reported',()=>{
+ const r=Z.sizeSection(diagram(4),grid);
+ assert.equal(r.sectionLayout,undefined);assert.match(r.skipped,/more than 24\); keep the compose-page-layout/);
+ assert.ok(r.widths.controlsMinimum+r.widths.diagramReadable>24);
+ assert.equal(Z.sizeSpec(page(diagram(4)),1200).output.page.sections[0].diagram.sectionLayout,undefined);
+});
+test('step controls grow with their longest caption and path, and the diagram with its drawing',()=>{
+ assert.ok(S.stepControlsMinWidth(diagram(20))>S.stepControlsMinWidth(diagram(4)));
+ const shared={...diagram(4),paths:[{id:'a',steps:['s0','s1','s2']},{id:'b',steps:['s0','s3']}]};
+ assert.ok(S.stepControlsMinWidth(shared)>=230+3*44+28+30,'shared-step timeline keeps its 230px default label column');
+ assert.equal(S.stepControlsMinWidth(shared,360)-S.stepControlsMinWidth(shared),130,'an authored pathLabelWidth widens the timeline minimum');
+ assert.ok(S.diagram(null,700,1,{x:0,y:0,w:900,h:200}).readableWidth>S.diagram(null,700,1,{x:0,y:0,w:400,h:200}).readableWidth);
+ const short=S.stepControls(diagram(3),300),long=S.stepControls(diagram(3,'Detailed step narrative. '.repeat(30)),300);
+ assert.ok(long.rows>short.rows&&long.maxLines>short.maxLines);
+ const flat=S.diagram(null,700,1,{x:0,y:0,w:1000,h:200}),tall=S.diagram(null,700,1,{x:0,y:0,w:1000,h:800});
+ assert.ok(tall.rows>flat.rows);assert.equal(flat.labelPx,tall.labelPx);
+ assert.ok(S.diagram(null,700,1,{x:0,y:0,w:2000,h:200}).labelPx<flat.labelPx);
+});
+test('the composer reads the same step-control and diagram sizes',()=>{
+ const d=diagram(4,'Wrapped caption text. '.repeat(8)),bounds={x:0,y:0,w:1180,h:300};
+ assert.deepEqual(E.controlDepth(d,E.states(d),400),S.stepControls(d,400));
+ assert.equal(P.graphHeight(bounds,17,grid.pitch),S.diagram(null,17*grid.pitch-8,1,bounds).rows);
+ assert.equal(P.graphWaste(bounds,17,0,grid.pitch,1).labelEstimate,S.diagram(null,17*grid.pitch-8,1,bounds).labelPx);
+});
+test('sections the helper does not own are reported, not rewritten',()=>{
+ const withPanel={...diagram(),panels:[{id:'p',type:'state'}]};
+ assert.match(Z.sizeSection(withPanel,grid).skipped,/compose-page-layout/);
+ assert.match(Z.sizeSection({...diagram(),layouts:[{id:'v'}]},grid).skipped,/named views/);
+ assert.match(Z.sizeSection({...diagram(),steps:[]},grid).skipped,/no steps/);
+});
+test('--write saves a valid sized copy and leaves the input unchanged',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'size-layout-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const input=path.join(dir,'in.json'),output=path.join(dir,'out.json'),bytes=JSON.stringify(page(narrow(3)));fs.writeFileSync(input,bytes);
+ const run=spawnSync(process.execPath,[path.resolve(__dirname,'../tools/size-section-layout.cjs'),'--write',output,input],{encoding:'utf8'});
+ assert.equal(run.status,0,run.stderr);assert.equal(fs.readFileSync(input,'utf8'),bytes);
+ const sized=JSON.parse(fs.readFileSync(output,'utf8'));assert.deepEqual(core.validateSpec(sized).errors,[]);
+ assert.ok(sized.page.sections[0].diagram.sectionLayout);assert.deepEqual(sized.page.sections[0].diagram.sectionLayout,JSON.parse(run.stdout).sections[0].sectionLayout);
+ const same=spawnSync(process.execPath,[path.resolve(__dirname,'../tools/size-section-layout.cjs'),'--write',input,input],{encoding:'utf8'});
+ assert.notEqual(same.status,0);assert.match(same.stderr,/different files/);assert.equal(fs.readFileSync(input,'utf8'),bytes);
+});
+test('--section sizes only the named sections and leaves the others untouched',()=>{
+ const raw={page:{title:'Two',sections:[{diagram:narrow(3)},{diagram:narrow(3)}]}};
+ const {results,output}=Z.sizeSpec(raw,1200,[1]);
+ assert.deepEqual(results.map(r=>r.section),[1]);
+ assert.equal(output.page.sections[0].diagram.sectionLayout,undefined);assert.ok(output.page.sections[1].diagram.sectionLayout);
+ assert.throws(()=>Z.sizeSpec(raw,1200,[5]),/Section 5 does not contain a diagram/);
+ assert.deepEqual(Z.parseArgs(['--section','0','--section','2','in.json']).sections,[0,2]);
+ assert.throws(()=>Z.parseArgs(['--section','x','in.json']),/zero-based/);
+});

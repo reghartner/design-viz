@@ -6,7 +6,7 @@
 // use compose-page-layout.cjs or Workbench for those.
 const fs=require('node:fs');
 const core=require('./arrange/core.cjs');
-const {diagramRecords,atomicWrite}=require('./auto-arrange-spec.cjs');
+const {diagramRecords,atomicWrite,distinctPaths}=require('./auto-arrange-spec.cjs');
 const S=core.containerSize;
 const HELP='Usage: node tools/size-section-layout.cjs [--width 800..1920] [--write output.json] input.json\n'+
  'Sizes step controls and the diagram of every diagram section from their content and prints a sectionLayout for each.\n'+
@@ -62,6 +62,7 @@ function sizeSpec(raw,width){
 }
 function main(argv){
  const options=parseArgs(argv);if(options.help){process.stdout.write(HELP);return;}
+ if(options.write)distinctPaths(options.input,options.write);
  const {results,output}=sizeSpec(JSON.parse(fs.readFileSync(options.input,'utf8')),options.width);
  if(options.write){const verdict=core.validateSpec(output);if(verdict.errors.length)throw Error('Sized output is invalid:\n'+verdict.errors.join('\n'));atomicWrite(options.write,JSON.stringify(output,null,2)+'\n');}
  process.stdout.write(JSON.stringify({width:options.width,written:options.write||null,sections:results},null,2)+'\n');

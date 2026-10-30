@@ -45,4 +45,6 @@ test('--write saves a valid sized copy and leaves the input unchanged',t=>{
  assert.equal(run.status,0,run.stderr);assert.equal(fs.readFileSync(input,'utf8'),bytes);
  const sized=JSON.parse(fs.readFileSync(output,'utf8'));assert.deepEqual(core.validateSpec(sized).errors,[]);
  assert.deepEqual(sized.page.sections[0].diagram.sectionLayout,JSON.parse(run.stdout).sections[0].sectionLayout);
+ const same=spawnSync(process.execPath,[path.resolve(__dirname,'../tools/size-section-layout.cjs'),'--write',input,input],{encoding:'utf8'});
+ assert.notEqual(same.status,0);assert.match(same.stderr,/different files/);assert.equal(fs.readFileSync(input,'utf8'),bytes);
 });

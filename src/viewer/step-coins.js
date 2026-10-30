@@ -57,7 +57,7 @@ function wireStepCoins(host, prefix, describe, activate){
     // shorter than the card lets it extend above or below, inside the window.
     var rect = coin.getBoundingClientRect(), board = host.getBoundingClientRect();
     var minX = Math.max(8, board.left + 8), maxX = Math.min(window.innerWidth - 8, board.right - 8);
-    card.style.maxWidth = Math.max(120, Math.min(300, maxX - minX)) + 'px';
+    card.style.maxWidth = Math.max(0, Math.min(300, maxX - minX)) + 'px';
     var w = card.offsetWidth, h = card.offsetHeight;
     var minY = Math.max(8, board.top + 8), maxY = Math.min(window.innerHeight - 8, board.bottom - 8);
     if (maxY - minY < h){ minY = 8; maxY = window.innerHeight - 8; }

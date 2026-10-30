@@ -49,7 +49,7 @@ actions do not edit the JSON or add Undo history.
 
 Readers work the same way: in a published page and in the library reader, the
 **?** button and the **?** key open the reader's keyboard shortcuts (step,
-Present and tab keys). **Tour** replays the guided tour, and the library reader's
+Present and tab keys). **TOUR** replays the guided tour, and the library reader's
 **User guide** button opens this guide. Diagrams embedded in Backstage and
 Confluence have the same **?** button and key; their sheet lists only the keys
 they handle there (tab keys and Esc, with no Present).

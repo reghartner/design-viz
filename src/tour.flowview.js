@@ -27,7 +27,9 @@ function wireTour(ctl, view, win, config, options){
   var request = options.request !== undefined ? options.request :
     tourHashRequest(win.location.hash);
 
-  var progress=config===TOUR_DEFAULT_CONFIG?createTourProgress(win):null;
+  // A host may pass a copy of the built-in config (e.g. reworded) and keep its planning.
+  var builtInTour=config===TOUR_DEFAULT_CONFIG || options.builtInTour===true;
+  var progress=builtInTour?createTourProgress(win):null;
   var discoveryMode=false,unseenCount=0;
 
   function storageDone(){
@@ -1291,7 +1293,7 @@ function wireTour(ctl, view, win, config, options){
     fullScrim(); /* the overlay opens on a fully dimmed page */
     ctl.suppressFragmentWrites = true;
     takeSnapshot();
-    if(config===TOUR_DEFAULT_CONFIG)planDefaultTour();
+    if(builtInTour)planDefaultTour();
     fullscreenChanged();
     list = buildList();
     at = 0;

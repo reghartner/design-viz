@@ -195,7 +195,13 @@ function initWorkbenchOnboarding(opts){
 }
 
 function workbenchPracticeLessons(chapter){
-  if(chapter==='viewer')return TOUR_DEFAULT_CONFIG;
+  if(chapter==='viewer'){
+    // Practice has no TOUR button (replay:false); point finishes at the chapter button instead.
+    var viewer=JSON.parse(JSON.stringify(TOUR_DEFAULT_CONFIG));
+    viewer.steps.forEach(function(step){['body','reducedMotionBody'].forEach(function(key){if(step.copy && step.copy[key])step.copy[key]=step.copy[key].replace('Replay this tour anytime from the TOUR button.','Replay it anytime from 1. Explore a diagram above.');});});
+    viewer.steps[0].copy.note=viewer.steps[0].copy.note.replace('Replay anytime from TOUR.','Replay anytime from 1. Explore a diagram above.');
+    return viewer;
+  }
   function step(id,selector,heading,body,state){return {id:id,target:{selector:selector,within:'page'},diagramState:state,copy:{eyebrow:{viewer:'EXPLORE A DIAGRAM',agent:'WORK WITH YOUR AGENT',manual:'EDIT IN WORKBENCH'}[chapter]+' · PRACTICE',heading:heading,body:body}};}
   var lessons={
     agent:[
@@ -212,7 +218,7 @@ function workbenchPracticeLessons(chapter){
       step('copy-agent','#folder-agent-selection','Copy for agent, bottom left','Try Copy for agent. It copies the selected references and context only; it does not start a request. Paste that context beside your request in the same agent conversation. Next, try editing directly in the workbench.')
     ],
     manual:[
-      step('add','#diagram-add','Start with Add to Diagram','This large button is your entry to nodes, connections, steps, panels, and services from your catalog. Choose a destination section, then add the part your story needs.'),
+      step('add','#diagram-add','Start with Add to Diagram','This large Add button is your entry to nodes, connections, steps, panels, and services from your catalog. Choose a destination section, then add the part your story needs.'),
       step('panel-library','#panel-picker','Choose a panel visually','Browse the real panel library, search or filter by category, select a preview, then explicitly add it. Home maps, App screens, Device app and other panels are different views of the same story.'),
       step('catalog','#catalog-picker','Build with services from your catalog','In your workspace this picker uses your Backstage-sourced catalog or an imported snapshot. This tour supplies a fictional catalog. Choose services and review new/reused counts. Optional connections reflect declared dependencies—not a story sequence.'),
       step('inspector','#editor-inspect','Select something to edit it','Click a node on the diagram, then edit its title, icon, style and other fields in the inspector. Changes are immediate and undoable. Panels have their own fields when selected.'),
@@ -367,7 +373,7 @@ function initWorkbenchPractice(opts){
   if(chapter==='example')return;
   function controller(){return reader || opts.controller();}
   tour=wireTour(controller(),doc.body,window,workbenchPracticeLessons(chapter),{
-    request:'force',recordCompletion:false,restore:false,replay:false,controller:controller,prepareStep:chapter==='viewer'?null:prepare,
+    request:'force',recordCompletion:false,restore:false,replay:false,builtInTour:chapter==='viewer',controller:controller,prepareStep:chapter==='viewer'?null:prepare,
     beforeAdvance:function(step){
       if(step.id==='commit' && opts.agent.hasReview()){
         if(!doc.getElementById('agent-update-dialog').open)click('agent-update-open');

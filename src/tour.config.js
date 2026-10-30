@@ -24,7 +24,7 @@ var TOUR_DEFAULT_CONFIG = {
           {persona: 'eng', label: 'The engineering', sub: 'Calls, branching paths, source links, and room to explore.'},
           {persona: 'both', label: 'Show me both', sub: 'The full walkthrough, at your pace.'}
         ],
-        note: 'This walkthrough covers the controls available on this page. Replay anytime from ?.'
+        note: 'This walkthrough covers the controls available on this page. Replay anytime from TOUR.'
       }
     },
     {
@@ -33,7 +33,7 @@ var TOUR_DEFAULT_CONFIG = {
       secondary: [{target: {selector: '.reader-tree-views:has([aria-current="page"])', within: 'page'}}],
       copy: {
         heading: 'Choose a View',
-        body: 'Open Contents to choose a Tab, section and View. Each View renders one section in Standard or full Explore. Use ‹ › to move through the document’s section Views, or choose a page in Contents. A screen icon on a View marks Explore, where you can pan and zoom the graph.'
+        body: 'Open Contents to choose a Tab, section and View. Each View renders one section in Standard or full Explore, where you can pan and zoom the graph. Use ‹ › to move through the document’s section Views, or choose a page in Contents.'
       }
     },
     {
@@ -58,7 +58,7 @@ var TOUR_DEFAULT_CONFIG = {
       copy: {
         heading: 'One call at a time',
         body: 'Step follows the sequence one call at a time. Watch this example, replay it, or use ‹ › to move by hand.',
-        reducedMotionBody: 'Step follows the sequence one call at a time. Choose Try controls, then use the ‹ › buttons to move by hand. Automatic playback is off.'
+        reducedMotionBody: 'Step follows the sequence one call at a time. Choose Try the controls, then use the ‹ › buttons to move by hand. Automatic playback is off.'
       },
       secondary: [
         {
@@ -75,7 +75,7 @@ var TOUR_DEFAULT_CONFIG = {
       copy: {
         heading: 'Play the story',
         body: '▶ plays the flow one step every 3 seconds; ‹ › move by hand.',
-        reducedMotionBody: 'Use the ‹ › buttons to walk through the story at your own pace. Choose Try controls to reach them with the keyboard. Automatic playback is off.'
+        reducedMotionBody: 'Use the ‹ › buttons to walk through the story at your own pace. Choose Try the controls to reach them with the keyboard. Automatic playback is off.'
       },
       secondary: [
         {
@@ -125,7 +125,7 @@ var TOUR_DEFAULT_CONFIG = {
       ],
       copy: {
         heading: 'Nodes link to the real system',
-        body: 'The tour just opened this node’s ⋯ menu — every node with links has one: its Backstage entry, API definition, and code references, where available. Every ↗ jumps to the source.'
+        body: 'The tour just opened this node’s ⋯ menu — every node with links has one: its Backstage entry, API definition, code references and tickets, where available. Every ↗ jumps to the source.'
       }
     },
     {
@@ -163,12 +163,12 @@ var TOUR_DEFAULT_CONFIG = {
          panel. A plain selector union would pick it first in DOM order. */
       target: {selector: '.explore-window:not([hidden]), .viewport-explore:not(:has(.explore-window:not([hidden]))) .explore-panel-menu', within: 'section'},
       secondary: [
-        {target: {selector: '.explore-player', within: 'section'}, note: 'Step controls default to Floating, pinned to the viewport. Panels → Step controls → On canvas makes them move and zoom with the graph.'}
+        {target: {selector: '.explore-player', within: 'section'}, note: 'Step controls follow the View default, usually Floating, pinned to the viewport. Panels → Step controls → On canvas makes them move and zoom with the graph.'}
       ],
       reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'Make room to explore',
-        body: 'In Explore, panels float above the graph. Move one by its header, resize its corner, or hide it with ×. Try controls lets you use the header and resize handle with arrow keys. The next lesson shows how to bring hidden panels back.'
+        body: 'In Explore, panels float above the graph. Move one by its header, resize its corner, or hide it with ×. Try the controls lets you use the header and resize handle with arrow keys. The next lesson shows how to bring hidden panels back.'
       }
     },
     {
@@ -198,8 +198,8 @@ var TOUR_DEFAULT_CONFIG = {
       kind: 'done',
       copy: {
         heading: 'Now try it',
-        body: 'Choose a numbered step, then use ▶ or the ‹ › buttons to follow the story. Replay this tour anytime from the Tour button.',
-        reducedMotionBody: 'Choose a numbered step, then use the ‹ › buttons to follow the story. Automatic playback stays off. Replay this tour anytime from the Tour button.'
+        body: 'Choose a numbered step, then use ▶ or the ‹ › buttons to follow the story. Replay this tour anytime from the TOUR button.',
+        reducedMotionBody: 'Choose a numbered step, then use the ‹ › buttons to follow the story. Automatic playback stays off. Replay this tour anytime from the TOUR button.'
       }
     },
     {
@@ -208,8 +208,8 @@ var TOUR_DEFAULT_CONFIG = {
       kind: 'done',
       copy: {
         heading: 'Now try it',
-        body: 'Choose a numbered step and follow the calls with ▶ or ‹ ›. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the Tour button.',
-        reducedMotionBody: 'Choose a numbered step and follow the calls with the ‹ › buttons. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the Tour button.'
+        body: 'Choose a numbered step and follow the calls with ▶ or ‹ ›. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the TOUR button.',
+        reducedMotionBody: 'Choose a numbered step and follow the calls with the ‹ › buttons. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the TOUR button.'
       }
     }
   ]

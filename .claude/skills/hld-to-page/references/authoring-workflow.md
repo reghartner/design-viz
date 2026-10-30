@@ -138,37 +138,56 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     readable width (node positions) and the longest step caption. When both fit
     side by side it puts step controls in a left column and the diagram on the
     right, both tall enough; a small diagram leaves the controls more room. It
-    reports and skips sections that do not fit or have panels; keep the
-    composer's layout there. Do not hand-edit its sizes; fix content (shorter
-    captions, tighter nodes) and rerun. Report any `notes` it prints.
-14. **No node groups unless the operator asks for them.** Groups degrade
-    auto-arrange. Default to none; keep groups the source spec already has.
-15. **Auto-arrange every new diagram and after adding nodes** (rules 12 and 13).
-    Never hand-place nodes in a new diagram.
-16. **Use shared steps by default when they make sense.** When two paths go
-    through the same moment (same nodes and edges lit, same meaning), give
-    both paths the same step ID instead of a copy; shared openings and endings
-    render once. Do not share steps whose captions or panel states would
-    differ by path. List the shared steps in the ledger and summary.
-17. **Headers and bullets, not long sentences.** Section text is one short
-    lead sentence at most; everything else is `bullets` (with `sub` lists)
-    under bold headers. Keep step captions to one or two short sentences.
-    Turn source paragraphs into bullets.
-18. **No text-only panels.** A panel must show state that changes across
-    steps. Static prose, decisions, references or notes go in the section's
-    `text`/`bullets`, never in a panel.
-19. **Every reference is a link.** Each doc, Jira key, PR or ticket the page
-    mentions is a Markdown link `[REPLAY-120](https://…)`. Build the URL from a
-    base the source gives (a Jira site, a GitHub repo). If no URL can be
-    built, do not leave a bare key: ask for the link (Phase 2) and list it in
-    the ledger as missing.
-20. **Group tabs the way the reader experiences the product.** Before
-    drafting tabs, ask how to group them (Phase 2), proposing user-experience
+    skips sections that do not fit, have panels, named views or Explore, or have
+    no nodes or steps; keep the composer's layout there. On an existing page,
+    pass `--section <zero-based-section>` for each section whose nodes or steps
+    you changed, so every other section keeps its geometry. Do not hand-edit its
+    sizes unless rule 12's user-feedback repair applies; otherwise fix content
+    (shorter captions, tighter nodes) and rerun. Report each section's `skipped`
+    reason and `notes` from its JSON output.
+14. **No node groups unless the operator asks for them.** Groups constrain
+    auto-arrange. Default to none, even where a contract or cookbook recipe
+    shows a boundary; keep groups the source spec already has.
+15. **Auto-arrange; do not hand-place.** New diagram: compose (rule 12), then
+    size (rule 13). Nodes added to an existing diagram: add them as
+    `{id, side:"below", noSpread:true}` floats so they auto-place (rule 12); rerun
+    the composer with `--rearrange` only when the operator authorizes
+    rearranging the diagram. Place nodes by hand only on an explicit
+    manual-placement request.
+16. **Use shared steps by default when they make sense.** A shared step is the
+    same step ID listed in more than one `diagram.paths` sequence; there is no
+    other field. When two paths go through the same moment (same nodes and
+    edges lit, same meaning), list the one step in both paths instead of a
+    copy; shared openings and endings render once. Do not share steps whose
+    captions or panel states would differ by path. List the shared steps in
+    the ledger and summary.
+17. **Headers and bullets, not long sentences.** Section `text` is one or two
+    short sentences (a lead, plus any required illustrative-values line);
+    everything else is `bullets`, grouped under a bold bullet item
+    (`**Decisions**`) with its points in `sub`. Keep step captions to one or
+    two short sentences. Turn source paragraphs into bullets.
+18. **No panel exists only to hold prose.** A panel that `holds` on every step
+    and shows no device, app or data state fails the boring-panel check: move
+    its words (decisions, references, notes) to the section's `text`/`bullets`.
+19. **Every reference is a link; find the real URL.** Each doc, Jira key, PR,
+    ticket or Confluence page the page mentions must link to its real URL.
+    Look it up with the tools this session has (Jira/Atlassian, GitHub,
+    Confluence, the repository and catalog, rule 10), starting from what the
+    operator gave you (a key, a repo, a site, a title). Use the URL the tool
+    returns; never invent one. In prose use `[REPLAY-120](https://…)`; on a
+    node or step use its `link` field (labels do not render Markdown). Only
+    if the lookup fails: keep the reference visible as text, list it under
+    **Missing links** in the ledger with what you searched, and ask for all
+    missing links in one question.
+20. **Group tabs the way the reader experiences the product.** If the page
+    will have tabs and neither the request nor the source settles the
+    grouping, ask how to group them (Phase 2), proposing user-experience
     grouping (for example recording, customer playback, internal playback) as
-    the default, not the order or teams in which things were decided. When a
-    page has tabs, put every section inside a tab: a section outside the tabs
-    block shows above every tab. Intro and "Considered/rejected" content get
-    their own tab (or go in the first tab's text), never a direct section.
+    the default, not the order or teams in which things were decided. On a
+    page with tabs, every section goes inside the tabs container: a direct
+    section in `blocks` shows on every tab (above the tab bar if it comes
+    before the container, below if after). Put intro and
+    "Considered/rejected" content in their own tab or the first tab's text.
 
 And always: honesty. No invented facts. Unknown is not failed. End each path
 at its last source-backed outcome; do not add a user action (opening the
@@ -237,7 +256,8 @@ unknown drain or charge rate that affects the story is one decision; at story
 or mixed level choose it yourself (an illustrative estimate, or 0 for a wired
 device) and list it under **Decisions I made**.
 
-**If the page will have tabs, ask how to group them** (rule 20): propose
+**If the page will have tabs and neither the request nor the source settles
+the grouping, ask how to group them** (rule 20): propose
 grouping by the reader's experience of the product (each user-facing flow
 gets a tab) as the default, and name the alternatives the source suggests
 (decision groups, teams, system layers).

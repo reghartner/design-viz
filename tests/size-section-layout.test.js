@@ -61,3 +61,12 @@ test('--write saves a valid sized copy and leaves the input unchanged',t=>{
  const same=spawnSync(process.execPath,[path.resolve(__dirname,'../tools/size-section-layout.cjs'),'--write',input,input],{encoding:'utf8'});
  assert.notEqual(same.status,0);assert.match(same.stderr,/different files/);assert.equal(fs.readFileSync(input,'utf8'),bytes);
 });
+test('--section sizes only the named sections and leaves the others untouched',()=>{
+ const raw={page:{title:'Two',sections:[{diagram:narrow(3)},{diagram:narrow(3)}]}};
+ const {results,output}=Z.sizeSpec(raw,1200,[1]);
+ assert.deepEqual(results.map(r=>r.section),[1]);
+ assert.equal(output.page.sections[0].diagram.sectionLayout,undefined);assert.ok(output.page.sections[1].diagram.sectionLayout);
+ assert.throws(()=>Z.sizeSpec(raw,1200,[5]),/Section 5 does not contain a diagram/);
+ assert.deepEqual(Z.parseArgs(['--section','0','--section','2','in.json']).sections,[0,2]);
+ assert.throws(()=>Z.parseArgs(['--section','x','in.json']),/zero-based/);
+});

@@ -8,20 +8,22 @@ const fs=require('node:fs');
 const core=require('./arrange/core.cjs');
 const {diagramRecords,atomicWrite,distinctPaths}=require('./auto-arrange-spec.cjs');
 const S=core.containerSize;
-const HELP='Usage: node tools/size-section-layout.cjs [--width 800..1920] [--write output.json] input.json\n'+
+const HELP='Usage: node tools/size-section-layout.cjs [--section INDEX ...] [--width 800..1920] [--write output.json] input.json\n'+
  'Sizes step controls and the diagram of every diagram section from their content and prints a sectionLayout for each.\n'+
  'Side by side when the step controls\' minimum width plus the diagram\'s readable width (10px labels) fit in 24 columns:\n'+
  '  step controls on the left get the columns the diagram does not need at its natural width (12px labels), from their minimum up to 14 of 24;\n'+
  '  diagram on the right gets the rest, never below its readable width. One shared height.\n'+
- 'Otherwise the section is reported and keeps its compose-page-layout.cjs layout.\n'+ '--write saves a copy of the input with those sectionLayouts applied; the input is never modified. Sizes are estimates.\n';
+ 'Otherwise the section is reported and keeps its compose-page-layout.cjs layout.\n'+ '--section limits sizing to those zero-based diagram sections (repeatable); other sections keep their geometry. Default: every section.\n'+
+ '--write saves a copy of the input with those sectionLayouts applied; the input is never modified. Sizes are estimates.\n';
 
 const CONTROLS_MAX_COLUMNS=14;
 
 function parseArgs(args){
- const options={width:1200,write:null,input:null};
+ const options={width:1200,write:null,input:null,sections:null};
  for(let i=0;i<args.length;i++){
   const a=args[i];
   if(a==='--help'||a==='-h'){options.help=true;continue;}
+  if(a==='--section'){const value=args[++i];if(!/^\d+$/.test(value||''))throw Error('--section requires a zero-based section index');(options.sections||(options.sections=[])).push(Number(value));continue;}
   if(a==='--width'||a==='--write'){const value=args[++i];if(value==null)throw Error(a+' requires a value');options[a.slice(2)]=a==='--width'?Number(value):value;continue;}
   if(options.input)throw Error('Only one input file');options.input=a;
  }
@@ -52,17 +54,19 @@ function sizeSection(d,grid){
   controls:{w:cw,rows:controls.rows,maxCaptionLines:controls.maxLines},diagram:{w:dw,rows:diagram.rows,labelPx:+diagram.labelPx.toFixed(1)},notes,
   sectionLayout:{columns:24,default:[{controls:'steps',x:0,y:0,w:cw,h},{x:cw,y:0,w:dw,h}]}};
 }
-function sizeSpec(raw,width){
+function sizeSpec(raw,width,sections=null){
  const verdict=core.validateSpec(raw);if(verdict.errors.length)throw Error('Invalid input:\n'+verdict.errors.map(m=>'- '+m).join('\n'));
  const grid=S.grid(width),output=JSON.parse(JSON.stringify(raw));
- const results=diagramRecords(output).map(r=>{let result;try{result=sizeSection(r.diagram,grid);}catch(e){result={skipped:'could not size this diagram on its own ('+e.message+'); size it in Workbench'};}if(result.sectionLayout)r.diagram.sectionLayout=result.sectionLayout;return {section:r.section,path:r.path,...result};});
+ const records=diagramRecords(output);
+ for(const i of sections||[])if(!records.some(r=>r.section===i))throw Error('Section '+i+' does not contain a diagram');
+ const results=records.filter(r=>!sections||sections.includes(r.section)).map(r=>{let result;try{result=sizeSection(r.diagram,grid);}catch(e){result={skipped:'could not size this diagram on its own ('+e.message+'); size it in Workbench'};}if(result.sectionLayout)r.diagram.sectionLayout=result.sectionLayout;return {section:r.section,path:r.path,...result};});
  if(!results.length)throw Error('Input contains no diagrams');
  return {results,output};
 }
 function main(argv){
  const options=parseArgs(argv);if(options.help){process.stdout.write(HELP);return;}
  if(options.write)distinctPaths(options.input,options.write);
- const {results,output}=sizeSpec(JSON.parse(fs.readFileSync(options.input,'utf8')),options.width);
+ const {results,output}=sizeSpec(JSON.parse(fs.readFileSync(options.input,'utf8')),options.width,options.sections);
  if(options.write){const verdict=core.validateSpec(output);if(verdict.errors.length)throw Error('Sized output is invalid:\n'+verdict.errors.join('\n'));atomicWrite(options.write,JSON.stringify(output,null,2)+'\n');}
  process.stdout.write(JSON.stringify({width:options.width,written:options.write||null,sections:results},null,2)+'\n');
 }

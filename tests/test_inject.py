@@ -48,11 +48,14 @@ SPEC = {"page": {"title": "T & Co <Test>", "blocks": [{"heading": "h"}]}}
 
 TIMELINE_BLOCK = re.compile(
     r'^<script type="application/json" id="live-timeline">\n(.*?)\n</script>', re.S | re.M)
+# #826: a page published in two-file mode carries this marker so boot fetches flowspec.json.
+SPEC_FILE_MARKER = '<meta name="dv-spec-file" content="flowspec.json">'
 EXAMPLE_SPEC = ROOT / "examples/live-status/live-status.spec.json"
 EXAMPLE_TIMELINE = ROOT / "examples/live-status/live-status.timeline.json"
 
 
-def run_inject(template_text, spec_text, extra_args=(), extra_files=None):
+def run_inject(template_text, spec_text, extra_args=(), extra_files=None, sidecars=()):
+    """Inject into a temp dir; `sidecars` names extra outputs to read back (None when absent)."""
     with tempfile.TemporaryDirectory() as td:
         td = pathlib.Path(td)
         (td / "t.html").write_text(template_text)
@@ -64,7 +67,11 @@ def run_inject(template_text, spec_text, extra_args=(), extra_files=None):
         r = subprocess.run([sys.executable, str(INJECT), str(td / "s.json"),
                             str(td / "t.html"), str(out)] + args,
                            capture_output=True, text=True)
-        return r, out.read_text() if out.exists() else None
+        html = out.read_text() if out.exists() else None
+        if not sidecars:
+            return r, html
+        extra = {name: (td / name).read_text() if (td / name).exists() else None for name in sidecars}
+        return r, html, extra
 
 
 def tracked_spec():
@@ -308,6 +315,97 @@ class InjectTests(unittest.TestCase):
         self.assertEqual(len(GUIDE_BLOCK.findall(out)), 1)
         self.assertNotIn("old guide", out)
         self.assertIn(BACKLINK_OPEN + '\n{"services": {}}\n</script>', out)
+
+    # #826: two-file publish. Contract matrix (rows P1-P6; the browser rows are in
+    # tools/browser-tests/tests/two-file-board.spec.mjs):
+    # | row | fixture | assertion (scoped) | rejects |
+    # | P1 two-file writes flowspec.json beside the page | --two-file, formatted spec | sidecar text == inline block text + "\n"; parses to the spec | re-serialized (json.dumps) sidecar; sidecar elsewhere |
+    # | P2 marker present once, inline block kept | --two-file | exactly one SPEC_FILE_MARKER line; FLOWSPEC_BLOCK still parses to spec; marker precedes the guide | marker-only impl that drops the block; stacked markers |
+    # | P3 single-file writes no sidecar and no marker | same spec, no flag | sidecar is None; marker count 0 | always-on sidecar |
+    # | P4 two-file tracked declaration adds artifact + user | tracked spec, --two-file | declaration == {mcp, comments, artifact: {}, user: {scopes: ["profile"]}} | artifact without user; user without the profile scope |
+    # | P5 single-file tracked declaration unchanged | tracked spec, no flag | declaration keys == {mcp, comments} (test :214 also) | adding artifact/user to every tracked page |
+    # | P6 untracked two-file declaration stays comments-only | SPEC, --two-file | declaration == {comments} (test :292 also) | adding artifact/user to untracked pages |
+    # | P7 re-injecting a two-file page single-file drops the marker | built two-file page as template, no flag | marker count 0; one guide | stale marker survives like a stale guide would |
+    def test_two_file_writes_flowspec_json_beside_the_page_and_marks_the_html(self):
+        formatted = '{\n\t"page": {\n  "blocks": [{"heading": "h"}],\n\t\t"title": "Two files"\n  }\n}\n\n'
+        r, out, files = run_inject(TEMPLATE, formatted, ["--two-file"], sidecars=("flowspec.json",))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        sidecar = files["flowspec.json"]
+        self.assertIsNotNone(sidecar, "flowspec.json written beside the page")
+        # P1: the authored text verbatim (outer whitespace stripped, one trailing newline), never re-serialized
+        self.assertEqual(sidecar, formatted.strip() + "\n")
+        self.assertEqual(json.loads(sidecar), json.loads(formatted))
+        self.assertNotEqual(sidecar.strip(), json.dumps(json.loads(formatted)))
+        # P2: the inline block holds the same text and the marker sits once between it and the guide
+        self.assertEqual(FLOWSPEC_BLOCK.search(out)[1], formatted.strip())
+        self.assertEqual(out.count(SPEC_FILE_MARKER), 1)
+        self.assertEqual(len(re.findall(r'^<meta name="dv-spec-file"', out, re.M)), 1)
+        self.assertLess(FLOWSPEC_BLOCK.search(out).start(), out.index(SPEC_FILE_MARKER))
+        self.assertLess(out.index(SPEC_FILE_MARKER), GUIDE_BLOCK.search(out).start())
+        self.assertEqual(len(GUIDE_BLOCK.findall(out)), 1)
+        self.assertIn("<title>Two files</title>", out)
+        # P3: without the flag nothing changes
+        r, out, files = run_inject(TEMPLATE, formatted, sidecars=("flowspec.json",))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIsNone(files["flowspec.json"])
+        self.assertEqual(out.count(SPEC_FILE_MARKER), 0)
+        self.assertNotIn('dv-spec-file', out)
+        self.assertEqual(FLOWSPEC_BLOCK.search(out)[1], formatted.strip())
+
+    def test_two_file_tracked_page_declares_artifact_and_user_single_file_and_untracked_do_not(self):
+        tracked = json.dumps(tracked_spec())
+
+        def declaration(html):
+            guide = GUIDE_BLOCK.search(html)[1]
+            fences = re.findall(r"```json\n(.*?)\n```", guide, re.S)
+            self.assertEqual(len(fences), 1)
+            return json.loads(fences[0]), guide
+
+        # P4: a tracked two-file page adds the artifact and user capabilities to today's declaration
+        r, out = run_inject(TEMPLATE, tracked, ["--two-file"])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        two_file, guide = declaration(out)
+        self.assertEqual(two_file, {
+            "mcp": {"servers": [{"server": "Atlassian", "tools": ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]},
+            "comments": {"composer_only": True, "customAnchors": True},
+            "artifact": {},
+            "user": {"scopes": ["profile"]},
+        })
+        self.assertEqual(two_file["user"]["scopes"], ["profile"])
+        # the edit loop names the file, the files-form publish and how board edits come back
+        for needle in ("flowspec.json", "files", "editHistory", "same URL"):
+            self.assertIn(needle, guide, needle)
+        self.assertLess(len(guide.encode("utf-8")), 6 * 1024)
+        # P5: a single-file tracked page keeps today's declaration
+        r, out = run_inject(TEMPLATE, tracked)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        single, guide = declaration(out)
+        self.assertEqual(set(single), {"mcp", "comments"})
+        self.assertEqual(single["mcp"], two_file["mcp"])
+        self.assertEqual(single["comments"], two_file["comments"])
+        self.assertNotIn("editHistory", guide)
+        # P6: an untracked two-file page stays comments-only
+        r, out = run_inject(TEMPLATE, json.dumps(SPEC), ["--two-file"])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        untracked, guide = declaration(out)
+        self.assertEqual(untracked, {"comments": {"composer_only": True, "customAnchors": True}})
+        self.assertIn("flowspec.json", guide)
+
+    def test_reinjecting_a_two_file_page_without_the_flag_drops_the_marker(self):
+        # P7: a built two-file page used as the template loses its marker, as it loses its stale guide
+        r, built = run_inject(TEMPLATE, json.dumps(SPEC), ["--two-file"])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(built.count(SPEC_FILE_MARKER), 1)
+        r, out, files = run_inject(built, json.dumps(tracked_spec()), sidecars=("flowspec.json",))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(out.count(SPEC_FILE_MARKER), 0)
+        self.assertIsNone(files["flowspec.json"])
+        self.assertEqual(len(GUIDE_BLOCK.findall(out)), 1)
+        self.assertEqual(json.loads(FLOWSPEC_BLOCK.search(out)[1]), tracked_spec())
+        # and the other way: re-injecting two-file keeps exactly one marker
+        r, out = run_inject(built, json.dumps(SPEC), ["--two-file"])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(out.count(SPEC_FILE_MARKER), 1)
 
     def test_conventional_legacy_inject_discovers_and_embeds_crossref(self):
         with tempfile.TemporaryDirectory() as td:

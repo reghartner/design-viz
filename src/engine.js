@@ -1424,9 +1424,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     });
   })();
 
-  function refreshFrame(force){
-    if(!force && !validGraphFrame(d.graphFrame))return;
-    var ink=boardContentBounds(svg);
+  function extendFrame(ink){
     if(ink){
       vb=unionGraphFrame(vb,[ink],0);
       // First-visible/font/coin measurements can report the same frame after
@@ -1439,10 +1437,13 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       });
     }
   }
+  function refreshFrame(){
+    if(validGraphFrame(d.graphFrame))extendFrame(boardContentBounds(svg));
+  }
   // The overlay calls this after creating physical break glyphs and before
   // placing its ticket cues. Reuse the same coin algorithm and filter state.
   svg._layoutStatusCoins=function(){
-    var broken=Array.from(svg.querySelectorAll('.comm-break')).some(function(el){return !!boardControlBox(el,svg);});
+    var broken=Array.from(svg.querySelectorAll('.dv-live-comm-failure .comm-break')).some(function(el){return !!boardControlBox(el,svg);});
     var reserved=[];
     if(broken)svg.querySelectorAll('.comm-break,text.lbl,.dvdelta,.node-review-badge,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff]').forEach(function(el){
       if(el.closest('.coin'))return;
@@ -1451,7 +1452,16 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var avoid=reserved.length?coinObstacleIndex(coinCardRects.concat(reserved)):coinAvoid;avoid.strict=reserved.length>0;
     coinGroups.forEach(function(group){group.avoid=avoid;layoutCoinGroup(group);});
   };
-  svg._refreshStatusFrame=function(){refreshFrame(true);};
+  svg._refreshStatusFrame=function(){
+    // Status repaint must not reframe ordinary authored/editor ink: its fitted
+    // frame is already intentional. Grow only for the overlay's own controls
+    // and coins displaced by a live break, and only if they extend past it.
+    var boxes=[],liveBreak=Array.from(svg.querySelectorAll('.dv-live-comm-failure .comm-break')).some(function(el){return !!boardControlBox(el,svg);});
+    svg.querySelectorAll('.dv-jira-cue,.dv-live-comm-failure .comm-break'+(liveBreak?',.coin':'')).forEach(function(el){
+      var box=boardControlBox(el,svg);if(box)boxes.push(box);
+    });
+    if(boxes.length)extendFrame(unionGraphFrame(null,boxes,4));
+  };
   refreshFrame();
   /* Ink measured before webfonts settle, or skipped while an inactive tab
      hid the board, is stale. Re-measure once fonts are ready and each time the

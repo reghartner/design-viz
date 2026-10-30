@@ -55,3 +55,26 @@ test('native Backstage diagrams also use both sides of the fitted canvas',async(
   await expectFullWidth(board);
   await board.getByRole('button',{name:'Fit width',exact:true}).click();await expectFullWidth(board);
 });
+
+test('Jira repaint preserves fitted framing when its cue stays inside a card',async({page,server})=>{
+  const spec=widthSpec('aurora','curves');let originalFrame;
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec));
+  for(const tracked of [false,true]){
+    if(tracked){
+      spec.page.sections[0].diagram.nodes.a.tickets=['UI-1'];
+      await page.locator('#editor-tab-json').click();await page.locator('#src').fill(JSON.stringify(spec));await page.locator('#go').click();
+    }
+    await prepareEditorSurface(page);
+    const board=page.locator('.board'),svg=board.locator('.boardcanvas>svg');
+    await expectFullWidth(board);
+    const frame=await svg.getAttribute('viewBox');
+    if(!tracked)originalFrame=frame;else expect(frame).toBe(originalFrame);
+    await expect(board.locator('.dv-jira-cue')).toHaveCount(tracked?1:0);
+    expect(await svg.evaluate(el=>{
+      const observer=new MutationObserver(()=>{});observer.observe(el,{attributes:true,attributeFilter:['viewBox']});
+      for(let i=0;i<3;i++)el._refreshStatusFrame();
+      const writes=observer.takeRecords().length;observer.disconnect();return writes;
+    })).toBe(0);
+    await expect(svg).toHaveAttribute('viewBox',frame);await expectFullWidth(board);
+  }
+});

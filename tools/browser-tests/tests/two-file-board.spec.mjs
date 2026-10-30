@@ -14,6 +14,10 @@
 | B4 fetched spec fails the workspace-handoff gate | two-file page, inline spec A, file spec B (same canon id), `#fv=` request with A's revision | `#docview .errbox` contains "changed since"; `#docview .doc-title` count 0 | skipping the gate on the fetched path (B renders); falling back to the inline A on gate failure (A renders) |
 | B5 fetched spec passes the gate | same page, `#fv=` request with B's revision | `#docview .doc-title` text == B's title | a gate that compares against the inline block |
 | B6 missing flowspec.json boots the inline block | two-file page with the file deleted (404 allowed) | `#docview .doc-title` == inline title; `.errbox` count 0; `ctl.sourceText()` === `#flowspec` textContent (trimmed: the block text on disk); one request for flowspec.json was made | fail() on fetch error; no fetch attempt at all |
+| B7 load failure shows the persistent warning (Chuck 2026-10-30) | B6's page (HTTP 404) and B8's page (malformed) | `.dv-source-fallback[role=alert]` visible, names both facts (latest version not loaded; copy saved at publish shown, later changes not shown), no dismiss control; `ctl.sourceFallback()` == `{reason:'http', detail:'HTTP 404'}` / `{reason:'parse', detail:<JSON.parse message>}`; `.errbox` count 0 | a toast; a dismissible notice; fail() on a malformed file; a boot that reports no fallback state |
+| B8 malformed flowspec.json boots the inline block | two-file page whose file is `{not json` | `#docview .doc-title` == inline title; `ctl.sourceText()` === `#flowspec` textContent | rendering nothing; rendering the broken file; sourceText from the file |
+| B9 Copy error copies the diagnostics | real click on the banner's `Copy error` button with clipboard permission granted | clipboard text contains the failure detail (parse message / `HTTP 404`), `flowspec.json`, the page title, the renderer version line, a timestamp and the inline-boot hint; the button reads `Copied` | copying only the banner sentence; a button that opens a dialog |
+| B10 no banner without the marker and without a failure | B3's single-file page; B1's two-file page that loaded | `.dv-source-fallback` count 0; `ctl.sourceFallback()` null | a banner on every two-file page; a banner on single-file pages |
 */
 import {mkdir,readFile,writeFile,rm} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -56,6 +60,27 @@ function captureController(page){
  return page.addInitScript(()=>{window.flowviewBooted=ctl=>{window.__board=ctl;};});
 }
 const sourceText=page=>page.evaluate(()=>window.__board && typeof window.__board.sourceText==='function'?window.__board.sourceText():null);
+const sourceFallback=page=>page.evaluate(()=>window.__board && typeof window.__board.sourceFallback==='function'?window.__board.sourceFallback():'no sourceFallback accessor');
+const BANNER_FACTS=[/latest version/i,/saved when the page was published/i,/not shown/i];
+// The persistent warning: visible, both facts, no way to dismiss it, no error box.
+async function expectFallbackBanner(page){
+ const banner=page.locator('.dv-source-fallback[role="alert"]');await expect(banner).toHaveCount(1);await expect(banner).toBeVisible();
+ for(const fact of BANNER_FACTS)await expect(banner).toContainText(fact);
+ await expect(banner.getByRole('button')).toHaveCount(1);await expect(banner.getByRole('button',{name:'Copy error',exact:true})).toBeVisible();
+ expect((await banner.boundingBox()).height).toBeGreaterThan(40);
+ await expect(page.locator('#docview .errbox')).toHaveCount(0);
+ return banner;
+}
+// A real click copies the diagnostics; the clipboard is read back as data.
+async function copyError(page,banner){
+ await banner.getByRole('button',{name:'Copy error',exact:true}).click();
+ await expect(banner.getByRole('button')).toHaveText('Copied');
+ return page.evaluate(()=>navigator.clipboard.readText());
+}
+async function expectDiagnostics(text,detail,title){
+ expect(text).toContain(detail);expect(text).toContain('flowspec.json');expect(text).toContain(title);
+ expect(text).toMatch(/authoredWith|not stamped/);expect(text).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);expect(text).toMatch(/inline flowspec block/);
+}
 const blockText=page=>page.evaluate(()=>document.getElementById('flowspec').textContent);
 function specRequests(page){
  const urls=[];page.on('request',request=>{if(request.url().endsWith('/flowspec.json'))urls.push(request.url());});return urls;
@@ -76,6 +101,9 @@ test('two-file page renders from flowspec.json and keeps its exact text as sourc
  // B2: byte for byte, never re-serialized
  expect(await sourceText(page)).toBe(await readFile(file,'utf8'));
  expect(await sourceText(page)).not.toBe(await blockText(page));
+ // B10: a loaded file is no fallback
+ await expect(page.locator('.dv-source-fallback')).toHaveCount(0);
+ expect(await sourceFallback(page)).toBeNull();
 });
 
 test('single-file page keeps the inline block text as sourceText and never fetches',async({page,server})=>{
@@ -90,6 +118,9 @@ test('single-file page keeps the inline block text as sourceText and never fetch
  const content=await blockText(page);expect(content.trim()).toBe(block);expect(content).not.toBe(block);
  expect(await sourceText(page)).toBe(content);
  expect(requests).toEqual([]);
+ // B10: single-file pages never show the warning
+ await expect(page.locator('.dv-source-fallback')).toHaveCount(0);
+ expect(await sourceFallback(page)).toBeNull();
 });
 
 test('fetched flowspec.json passes the workspace-handoff gate before boot',async({page,server})=>{
@@ -111,10 +142,11 @@ test('fetched flowspec.json passes the workspace-handoff gate before boot',async
  expect(await sourceText(page)).toBe(served);
 });
 
-test('two-file page without its flowspec.json boots the inline block',async({page,server,audit})=>{
+test('two-file page without its flowspec.json boots the inline block and warns',async({page,context,server,audit})=>{
  const {dir,html,url}=await build(server,'missing',JSON.stringify(inline),true);
  await rm(path.join(dir,'flowspec.json'));
  audit.allowStatus(404,requested=>requested.endsWith('/flowspec.json'));
+ await context.grantPermissions(['clipboard-read','clipboard-write'],{origin:server.origin});
  await captureController(page);const requests=specRequests(page);
  await page.goto(url);
  // B6: the fetch was attempted, failed, and the inline block rendered
@@ -123,4 +155,28 @@ test('two-file page without its flowspec.json boots the inline block',async({pag
  expect(requests).toHaveLength(1);
  const content=await blockText(page);expect(content.trim()).toBe(blockOf(html));
  expect(await sourceText(page)).toBe(content);
+ // B7: the persistent warning, with the HTTP status as the reason
+ const banner=await expectFallbackBanner(page);
+ expect(await sourceFallback(page)).toEqual({reason:'http',detail:'HTTP 404'});
+ // B9: Copy error
+ await expectDiagnostics(await copyError(page,banner),'HTTP 404','Inline block');
+});
+
+test('two-file page with a malformed flowspec.json boots the inline block and warns',async({page,context,server})=>{
+ const {dir,html,url}=await build(server,'malformed',JSON.stringify(inline),true);
+ await writeFile(path.join(dir,'flowspec.json'),'{not json\n');
+ await context.grantPermissions(['clipboard-read','clipboard-write'],{origin:server.origin});
+ await captureController(page);const requests=specRequests(page);
+ await page.goto(url);
+ // B8: the broken file is fetched, the inline block renders
+ await expect(page.locator('#docview .doc-title')).toHaveText('Inline block');
+ await expect(page.locator('#docview .node')).toHaveCount(2);
+ expect(requests).toHaveLength(1);
+ const content=await blockText(page);expect(content.trim()).toBe(blockOf(html));
+ expect(await sourceText(page)).toBe(content);
+ // B7: the warning names the parse failure
+ const banner=await expectFallbackBanner(page);
+ const fallback=await sourceFallback(page);expect(fallback.reason).toBe('parse');expect(fallback.detail).toMatch(/JSON|token|json/i);
+ // B9: Copy error carries that detail
+ await expectDiagnostics(await copyError(page,banner),fallback.detail,'Inline block');
 });

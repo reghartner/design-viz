@@ -18,7 +18,7 @@
 | E8 leave warning | one pending change; then after Save; then after Discard | navigation raises one beforeunload dialog with a pending change and none after Save or Discard | no handler; a handler left armed after Save/Discard |
 | E9 read-only rejection | publish rejects not_writer | Edit, Save and Discard gone; the panel says the board is read-only here | treating not_writer as a retryable error |
 | E10 conflict | publish rejects conflict once; the reload serves another editor's spec (A retitled, its own history entry) | the runtime's reload raises no beforeunload dialog (also E12–E14); after reload: A's new title shows (the winner rendered), EX-1 re-applied (B has it, tag gone), notice "Another editor saved first. 1 of your changes were re-applied; 0 could not be", zero publishes until Save; Save publishes the winner text plus EX-1 on B with both history entries | an automatic second publish; replay onto the editor's stale text; losing the winner's history |
-| E11 duplicate identities | node id door in sections one and two; two parallel edges door → cloud in section two | drops onto section two's door and the second parallel edge change only sections[1].nodes.door and sections[1].edges[1] | addressing by node id or endpoints alone |
+| E11 duplicate identities | node id door in sections one and two; two parallel edges door → cloud in section two (the second bent apart: same-endpoint edges otherwise draw on one line); panel on section two's page | drops onto section two's door and the second parallel edge change only sections[1].nodes.door and sections[1].edges[1] | addressing by node id or endpoints alone |
 | E12 conflict replay: sections swapped | editor drops on section "second"'s door; the winner swaps the sections | EX-1 lands on the door of the section whose id is "second" (now index 0), not on index 1 | replay by stored numeric path |
 | E13 conflict replay: ambiguous parallel edge | two identical unlabeled door → cloud edges; the editor drops on the second; the winner deletes the first | the op is dropped and listed ("0 of your changes were re-applied; 1 could not be"), the remaining edge has no EX-1, no Save button | replaying onto the only remaining edge |
 | E14 conflict replay: carrier deleted | editor drops on B; the winner deletes B | op dropped and listed; no carrier gains EX-1 | applying to a same-titled or nearby carrier |
@@ -27,7 +27,7 @@ Flip: remove the drop handler → E2's publish count 0 ≠ 1.
 */
 import {test,expect} from '../helpers/test.mjs';
 import {rm} from 'node:fs/promises';
-import {EDITOR,boardSpec,buildBoard,serveWinner,mockRuntime,publishes,openBoard,ticketRow,coverageTag,editButton,saveButton,discardButton,
+import {EDITOR,boardSpec,buildBoard,serveWinner,mockRuntime,publishes,openBoard,showBoard,ticketRow,coverageTag,editButton,saveButton,discardButton,
  nodeCard,edgeLabel,cardPoint,strokePoint,dragTicket,holdTicketOver,reloadRecordingDialogs,startEditing,save,diagramAt,expectSurgical,withoutEdits,TRACKING,PANELS} from '../helpers/board-edit.mjs';
 
 const cue=(root,id)=>root.locator('g.node[data-dv-node="'+id+'"] .dv-jira-cue');
@@ -190,7 +190,7 @@ test('E10 a conflict replays the stashed change onto the winning spec without pu
  const winner=boardSpec();diagramAt(winner).nodes.a.title='Alpha renamed by Bo';
  winner.page.editHistory=[{at:'2026-10-30T10:00:00.000Z',by:{id:'u_bo',name:'Bo'},changes:[{op:'add',ticket:'AA-1',node:'a',label:'Alpha service'}]}];
  const winnerText=await serveWinner(board,winner);
- expect(await reloadRecordingDialogs(page),'the conflict reload raises no leave-page warning').toEqual([]);({root,panel}=await openBoard(page,board));
+ expect(await reloadRecordingDialogs(page),'the conflict reload raises no leave-page warning').toEqual([]);({root,panel}=await showBoard(page));
  await expect(root.locator('g.node[data-dv-node="a"]')).toContainText('Alpha renamed by Bo');
  await expect(panel.locator('.dv-live-edit-notice')).toHaveText(/^Another editor saved first\. 1 of your changes were re-applied; 0 could not be/);
  await expect(coverageTag(panel,'EX-1')).toHaveCount(0);await expect(cue(root,'b')).toHaveCount(1);
@@ -202,16 +202,21 @@ test('E10 a conflict replays the stashed change onto the winning spec without pu
  expectSurgical(winnerText,text);
 });
 
+/* Each section is its own reader page, so the Live status panel sits in section
+   "second", beside the duplicates under test. Parallel edges with the same
+   endpoints draw on one line (the validator warns), so the second one is bent
+   apart with curvePoints to be pointer-reachable; geometry is not identity. */
 function twoSections({labels=true,parallel=2}={}){
+ const edge=(i)=>Object.assign({from:'door',to:'cloud'},labels?{label:['primary','backup'][i]}:{},i?{curvePoints:[{t:.5,dx:0,dy:-90}]}:{});
  const section=(id,heading,panels)=>({id,heading,diagram:{nodes:{door:{title:'Door '+heading},cloud:{title:'Cloud '+heading}},rows:[['door','cloud']],
-  edges:id==='second'?Array.from({length:parallel},(_,i)=>labels?{from:'door',to:'cloud',label:['primary','backup'][i]}:{from:'door',to:'cloud'}):[{from:'door',to:'cloud',label:'link'}],...(panels?{panels:structuredClone(PANELS)}:{})}});
- return {page:{title:'Duplicate identities',tracking:structuredClone(TRACKING),sections:[section('first','one',true),section('second','two',false)]}};
+  edges:id==='second'?Array.from({length:parallel},(_,i)=>edge(i)):[{from:'door',to:'cloud',label:'link'}],...(panels?{panels:structuredClone(PANELS)}:{})}});
+ return {page:{title:'Duplicate identities',tracking:structuredClone(TRACKING),sections:[section('first','one',false),section('second','two',true)]}};
 }
 const sectionScope=(root,id)=>root.locator('#section-'+id);
 
 test('E11 duplicate node ids and parallel edges: a drop changes only the carrier under the pointer',async({page,server})=>{
  const spec=twoSections(),board=await buildBoard(server,'duplicates',spec);await mockRuntime(page);
- const {root,panel}=await openBoard(page,board);await startEditing(panel);
+ const {root,panel}=await openBoard(page,board,{pageNumber:2});await startEditing(panel);
  const second=sectionScope(root,'second');
  await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(second,'door')));
  await dragTicket(page,panel,'EX-1',await cardPoint(edgeLabel(second,1)));
@@ -221,12 +226,13 @@ test('E11 duplicate node ids and parallel edges: a drop changes only the carrier
  expect(saved.page.editHistory[0].changes.map(change=>change.path)).toEqual([['page','sections',1,'diagram','nodes','door'],['page','sections',1,'diagram','edges',1]]);
 });
 
-async function conflictThenReload(page,board,act,winner){
- let {root,panel}=await openBoard(page,board);await startEditing(panel);
+async function conflictThenReload(page,board,act,winner,{before=1,after=1}={}){
+ let {root,panel}=await openBoard(page,board,{pageNumber:before});await startEditing(panel);
  await act(root,panel);
  await saveButton(panel).click();await expect.poll(()=>publishes(page).then(list=>list.length)).toBe(1);
  await serveWinner(board,winner);
- expect(await reloadRecordingDialogs(page),'the conflict reload raises no leave-page warning').toEqual([]);({root,panel}=await openBoard(page,board));
+ expect(await reloadRecordingDialogs(page),'the conflict reload raises no leave-page warning').toEqual([]);
+ ({root,panel}=await showBoard(page,{pageNumber:after}));
  const notice=panel.locator('.dv-live-edit-notice');await expect(notice).toBeVisible();
  await page.waitForTimeout(500);expect(await publishes(page),'no automatic second publish').toEqual([]);
  return {root,panel,notice};
@@ -237,7 +243,7 @@ test('E12 conflict replay finds a swapped section by identity, not position',asy
  const winner=structuredClone(spec);winner.page.sections.reverse();
  const {panel,notice}=await conflictThenReload(page,board,async(root,panel)=>{
   await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(sectionScope(root,'second'),'door')));
- },winner);
+ },winner,{before:2,after:1});
  await expect(notice).toHaveText(/1 of your changes were re-applied; 0 could not be/);
  const saved=JSON.parse(await save(page,panel,1));
  expect(saved.page.sections[0].id).toBe('second');
@@ -250,7 +256,7 @@ test('E13 conflict replay drops an op whose parallel edge was ambiguous when it 
  const {root,panel,notice}=await conflictThenReload(page,board,async(root,panel)=>{
   await dragTicket(page,panel,'EX-1',await strokePoint(page,sectionScope(root,'second'),1));
   await expect(saveButton(panel)).toHaveText('Save 1 change');
- },winner);
+ },winner,{before:2,after:2});
  await expect(notice).toHaveText(/0 of your changes were re-applied; 1 could not be \(carrier moved, removed or ambiguous\): .*EX-1/);
  await expect(saveButton(panel)).toHaveCount(0);await expect(coverageTag(panel,'EX-1')).toHaveText('NOT ON DIAGRAM');
  await expect(root.locator('.dv-jira-cue')).toHaveCount(0);

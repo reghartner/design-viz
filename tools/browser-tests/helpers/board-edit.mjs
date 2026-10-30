@@ -81,10 +81,23 @@ export async function mockRuntime(page,{canEdit=true,artifact=true,reject=null,r
 }
 export const publishes=page=>page.evaluate(()=>window.__publishes);
 
-export async function openBoard(page,board){
+/* `pageNumber`: the reader page that holds the Live status panel (each
+   section is its own page); the drag needs panel and target on screen together. */
+export async function openBoard(page,board,{pageNumber=1}={}){
  await page.setViewportSize({width:1440,height:1600});
  await page.goto(board.url);
- const root=page.locator('#docview'),panel=root.locator('.pwidget.pt-live-status');
+ return showBoard(page,{pageNumber});
+}
+// The loaded board, paged to the Live status panel, without navigating again.
+export async function showBoard(page,{pageNumber=1}={}){
+ const root=page.locator('#docview'),panel=root.locator('.pwidget.pt-live-status'),label=page.locator('.reader-page-label');
+ if(pageNumber>1){
+  await expect(label).toContainText(/Page \d+ of/);
+  for(let n=0;n<4 && !(await label.textContent()).startsWith('Page '+pageNumber+' ');n++){
+   const before=await label.textContent();await page.getByRole('button',{name:'Next page',exact:true}).click();await expect(label).not.toHaveText(before);
+  }
+  await expect(label).toContainText('Page '+pageNumber+' of');
+ }
  await expect(panel.locator('table.dv-live-tickets')).toBeVisible();
  return {root,panel};
 }

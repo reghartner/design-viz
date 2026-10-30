@@ -29,8 +29,9 @@ function diagramSearchText(values,spec){
 /* Description and tags are optional; indexes published before them, or with
    malformed values, still load as if the metadata were absent. */
 function libraryDescription(value){return typeof value==='string'?value:'';}
-/* Folder is optional discovery metadata, never a URL or an ID. The last
-   directory owns the diagram; only its parents form the browse namespace. */
+/* Folder is optional discovery metadata, never a diagram ID. The last
+   directory owns the diagram; only its parents form the browse namespace,
+   which a Browse link may name as a filter. */
 function libraryNamespace(value){
   if(typeof value!=='string' || value.length>2048 || /[\\\x00-\x1f\x7f]/.test(value))return [];
   var parts=value.split('/');
@@ -309,6 +310,7 @@ function initWorkbenchLibrary(opts){
   var copy=document.getElementById('canon-reader-copy');
   var search=document.getElementById('welcome-library-search'),empty=document.getElementById('welcome-library-empty');
   var specRequests=new Map(),headerObserver=null,namespace=[],folderRows=new Map(),folderExpansion=new Map(),foldersOpen=true;
+  var linkNote=document.getElementById('welcome-library-link-note'),linkFilters=null;
   var folders=document.getElementById('welcome-library-folders'),folderPath=document.getElementById('welcome-library-folder-path'),folderTree=document.getElementById('welcome-library-folder-tree');
   var folderShell=document.getElementById('welcome-library-shell'),folderToggle=document.getElementById('welcome-library-folders-toggle'),folderToolbar=document.getElementById('welcome-library-folder-toolbar');
   var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,shortcuts=null,exploreCanvas=null,deepLinks=null,positionChange=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
@@ -555,6 +557,35 @@ function initWorkbenchLibrary(opts){
   function setFoldersOpen(open){foldersOpen=open;renderFolders();folderToggle.focus({preventScroll:true});}
   folderToggle.addEventListener('click',function(){setFoldersOpen(!foldersOpen);});
   document.getElementById('welcome-library-folders-close').addEventListener('click',function(){setFoldersOpen(false);});
+  // Apply a Browse link's filters once the catalog's options exist. Values the
+  // catalog no longer has are dropped and named, so the page never shows a
+  // subset the link did not ask for.
+  function applyLink(link){
+    var dropped=[];
+    function option(select,value){return Array.from(select.options).some(function(item){return item.value===value;});}
+    search.value=link.q || '';
+    ['team','topic'].forEach(function(key){
+      facets[key].value='';
+      if(link[key]){if(option(facets[key],link[key]))facets[key].value=link[key];else dropped.push(key+' “'+link[key]+'”');}
+    });
+    facets.service.value='';
+    if(link.service){
+      var value=serviceValues.has(link.service)?serviceValues.get(link.service):!serviceRefs.has(link.service) && option(facets.service,link.service)?link.service:null;
+      if(value)facets.service.value=value;else dropped.push('service “'+link.service+'”');
+    }
+    namespace=[];
+    if(link.folder){
+      if(entries.some(function(entry){return libraryInNamespace(entry,link.folder);})){
+        namespace=link.folder.slice();for(var depth=1;depth<namespace.length;depth++)folderExpansion.set(JSON.stringify(namespace.slice(0,depth)),true);
+      }else dropped.push('folder “'+link.folder.join('/')+'”');
+    }
+    linkNote.textContent=dropped.length?'Some filters in this link no longer match and were removed: '+dropped.join(', ')+'.':'';
+    linkNote.hidden=!dropped.length;
+  }
+  function currentLink(){
+    var service=facets.service.value;
+    return {q:search.value,team:facets.team.value,service:serviceRefs.has(service)?serviceRefs.get(service):service,topic:facets.topic.value,folder:namespace};
+  }
   function cards(){
     retireServiceRows();grid.replaceChildren();
     if(!entries.some(function(entry){return libraryInNamespace(entry,namespace);}))namespace=[];
@@ -586,6 +617,7 @@ function initWorkbenchLibrary(opts){
     });
     serviceObserver=new ResizeObserver(updateServiceRows);serviceRows.forEach(function(row){serviceObserver.observe(row.element);});
     document.fonts.ready.then(function(){if(serviceObserver)updateServiceRows();});
+    if(linkFilters){applyLink(linkFilters);linkFilters=null;}
     buildFolderTree();if(published)readRecent();filterCards();
   }
   function renderRecent(){
@@ -609,6 +641,7 @@ function initWorkbenchLibrary(opts){
     serviceRows.forEach(function(row){row.close();});updateServiceRows();
     grid.querySelectorAll('.canon-library-service').forEach(function(chip){chip.setAttribute('aria-pressed',String(serviceValues.get(chip.dataset.service)===facets.service.value));});
     renderFolders();renderRecent();
+    if(active==='library' && opts.browse)opts.browse(currentLink());
   }
   window.addEventListener('resize',updateServiceRows);
   window.addEventListener('scroll',function(event){if(event.target===document)serviceRows.forEach(function(row){row.close();});},true);
@@ -625,6 +658,7 @@ function initWorkbenchLibrary(opts){
     try{
       await load();if(token!==sequence)return;
       if(screen==='library'){
+        linkFilters=opts.browse?opts.browse():null;linkNote.hidden=true;linkNote.textContent='';
         cards();status.textContent=origin+' · '+entries.length+' diagram'+(entries.length===1?'':'s')+(entries.length?'':'. Your repository snapshot is empty.');return;
       }
       if(opts.shareable() && !published)throw new Error('No published diagram library is available at this address. Publish the site’s diagrams.json and retry.');
@@ -689,6 +723,7 @@ function initWorkbenchLibrary(opts){
       else {title.textContent='Diagram unavailable';error.textContent=ex.message;error.hidden=false;readerRetry.hidden=false;}
     }
   }
+  bindCopyControl(window,document.getElementById('welcome-library-copy'),function(){return location.href;});
   bindCopyControl(window,copy,function(){return deepLinks?deepLinks.currentURL():canonDiagramURL(location.href,current.id);});
   function refresh(){pending=null;specRequests.clear();show(active,opts.selected());}
   retry.addEventListener('click',refresh);readerRetry.addEventListener('click',refresh);

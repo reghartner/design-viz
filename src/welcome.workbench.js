@@ -51,9 +51,36 @@ function canonDiagramURL(href,id){
   var url=new URL(href);url.search='';url.hash='';url.searchParams.set('diagram',id);return url.href;
 }
 
+/* Browse filter links: ?browse&q=&team=&service=&topic=&folder=a/b. `browse`
+   marks the Browse fields as ours; without it q/team/... belong to the host. */
+var BROWSE_TEXT_FIELDS=['q','team','service','topic'];
+function cleanBrowseFilters(value){
+  if(!value || typeof value!=='object' || Array.isArray(value))return null;
+  var out={};
+  BROWSE_TEXT_FIELDS.forEach(function(name){if(typeof value[name]==='string' && value[name] && value[name].length<=300)out[name]=value[name];});
+  if(Array.isArray(value.folder)){
+    var parts=value.folder.filter(function(part){return typeof part==='string' && part && part.length<=300 && part.indexOf('/')<0;});
+    if(parts.length)out.folder=parts;
+  }
+  return out;
+}
+function browseFiltersFromQuery(params){
+  var raw={};
+  BROWSE_TEXT_FIELDS.forEach(function(name){if(params.has(name))raw[name]=params.get(name);});
+  if(params.has('folder'))raw.folder=params.get('folder').split('/');
+  return cleanBrowseFilters(raw);
+}
+function browseQueryFields(filters){
+  var fields=['browse'];filters=cleanBrowseFilters(filters) || {};
+  BROWSE_TEXT_FIELDS.forEach(function(name){if(filters[name])fields.push(name+'='+encodeURIComponent(filters[name]));});
+  if(filters.folder)fields.push('folder='+filters.folder.map(encodeURIComponent).join('/'));
+  return fields;
+}
+
 /* Screens are history entries, not project snapshots. The small visit marker
-   only retires an old Canon attachment; authored text stays in the draft owner. */
-function createWelcomeNavigation(win, initial, changed){
+   only retires an old Canon attachment; authored text stays in the draft owner.
+   libraryAvailable=false (a --no-library build) ignores Browse links. */
+function createWelcomeNavigation(win, initial, changed, libraryAvailable){
   var key='flowviewWorkbenchEntry', retiredPrefix='dv-workbench-retired-entry-';
   var names=['home','paste','new','build','agent','editor','library','reader'];
   function read(state){
@@ -68,6 +95,8 @@ function createWelcomeNavigation(win, initial, changed){
   var handoff=readWorkspaceHandoff(win.location.hash);
   if(linked.has('diagram') || handoff){
     current=Object.assign({},current,{screen:'reader',diagram:handoff ? handoff.id : linked.get('diagram'),shareable:true,canon:false});
+  }else if(linked.has('browse') && libraryAvailable!==false){
+    current=Object.assign({},current,{screen:'library',browse:browseFiltersFromQuery(linked)});
   }
   function wasRetired(route){
     var retired=!!route.retired || retiredVisits.has(route.visit);
@@ -100,18 +129,21 @@ function createWelcomeNavigation(win, initial, changed){
     if(target.m==='step' || target.m==='ambient')out.m=target.m;
     return out;
   }
-  function write(screen,replace,diagram,shareable){
+  function write(screen,replace,diagram,shareable,browse){
     var selected=diagram===undefined?current.diagram:diagram;
     var published=shareable===undefined?current.shareable!==false:shareable;
     var readerTarget=selected===current.diagram?cleanReaderTarget(current.readerTarget):null;
+    var filters=screen!=='library'?null:cleanBrowseFilters(browse===undefined && current.screen==='library'?current.browse:browse);
     current={v:1,screen:screen,visit:current.visit,depth:current.depth+(replace?0:1),canon:!!current.canon,retired:retired};
     if(screen==='reader' && typeof selected==='string'){
       current.diagram=selected;current.shareable=published;
       if(readerTarget)current.readerTarget=readerTarget;
     }
-    var url=new URL(win.location.href);
+    if(filters)current.browse=filters;
+    var url=new URL(win.location.href),ownsBrowse=url.searchParams.has('browse');
     var fields=url.search.slice(1).split('&').filter(function(field){
       var params=new URLSearchParams(field);
+      if(ownsBrowse && (params.has('browse') || params.has('folder') || BROWSE_TEXT_FIELDS.some(function(name){return params.has(name);})))return false;
       if(handoff && (params.has('canon') || params.has('review')))
         return screen==='reader' && handoff.id===selected && params.has('canon');
       return field && !params.has('diagram') && (screen!=='reader' || !params.has('canon') && !params.has('review'));
@@ -120,6 +152,7 @@ function createWelcomeNavigation(win, initial, changed){
       var fragment=new URLSearchParams(url.hash.slice(1));fragment.delete('fv');url.hash=fragment.toString();
     }
     if(screen==='reader' && published && typeof selected==='string')fields.push('diagram='+encodeURIComponent(selected));
+    if(screen==='library')fields=fields.concat(browseQueryFields(filters));
     win.history[replace?'replaceState':'pushState'](stateWith(current),'',url.pathname+(fields.length?'?'+fields.join('&'):'')+url.hash);
     cleanCanon();
   }
@@ -149,6 +182,12 @@ function createWelcomeNavigation(win, initial, changed){
       if(target)next.readerTarget=target;else delete next.readerTarget;
       current=next;
       win.history.replaceState(stateWith(current),'',win.location.pathname+win.location.search+win.location.hash);
+    },
+    /* The current Browse entry's filters; setting them rewrites only the
+       Browse query fields of this entry (no new Back stop). */
+    browse:function(value){
+      if(!arguments.length)return current.screen==='library' && current.browse?cleanBrowseFilters(current.browse):null;
+      if(current.screen==='library')write('library',true,undefined,undefined,value || {});
     },
     retired:function(){return retired;},
     go:function(screen,diagram,shareable){move(screen,false,true,diagram,shareable);},
@@ -539,8 +578,9 @@ function initWorkbenchWelcome(opts){
   });
   renderTemplates(); updatePrompt();
   var handoff=readWorkspaceHandoff(location.hash),legacyCanon=handoff && new URLSearchParams(location.search).get('canon');
-  navigation=createWelcomeNavigation(window,opts.skipWelcome?'editor':'home',display);
+  navigation=createWelcomeNavigation(window,opts.skipWelcome?'editor':'home',display,!el('welcome-library').hidden);
   library=initWorkbenchLibrary({builtin:opts.canon,handoff:handoff,legacyCanon:legacyCanon,selected:navigation.diagram,shareable:navigation.shareable,skin:opts.skin,
+    browse:navigation.browse,
     position:navigation.readerTarget,savePosition:navigation.readerTarget,
     open:function(id,published){navigation.go('reader',id,published);},
     unknown:function(value){navigation.replace('home',true);error('welcome-link-error','No published diagram matches “'+value+'”. Choose one from Browse diagrams.');},edit:function(spec,request,direct,topologyContext,target){

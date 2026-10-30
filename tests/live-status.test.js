@@ -1723,3 +1723,80 @@ test('edge missing work beats Done without changing Jira evidence and restores a
  assert.equal(clear.view.querySelectorAll('.dv-live-comm-failure').length,0);assert.equal(clear.ctl.liveStatus.snapshot().readiness.ready,true);clear.ctl.liveStatus.destroy();
  const invalid=h.C.validate(h.C.normalize({nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',missingWork:'yes'}]}));assert.ok(invalid.warnings.some(w=>w.includes('.edges[0].missingWork')));
 });
+
+/* #827 page.editHistory reaches the edit-history panel through the live-status seam.
+   §0 ruling (Chuck 2026-10-30): the issue's own Test + flip plan. Rows (matrix continues
+   tests/live-status-panel.test.js H1–H10 and tools/browser-tests/tests/edit-history.spec.mjs B1–B2):
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| H5 snapshot carries validated history | page with one bad and two good entries | `snapshot().editHistory` deep-equals `editHistoryEntries(page)`, newest first, a copy | an impl exposing raw page.editHistory |
+| H7 mounted panel renders rows from the controller and repaints on change | panel mounted inside the view | one `details.dv-edit-details` per entry newest first; summary who/when/count/first; change lines op/ticket/carrier; label fallbacks; ticket title appears after apply() | an impl reading page data directly or never subscribing |
+| H7b pending bridge | panel mounted before the controller exists | rows appear once `liveStatusWhenReady` connects | an impl that only connects at mount time |
+| H8 editor name resolution | mocked window.claude.use('user') | A "Alex Live" (stored "Alex Old"), B "Bo" (resolved ""), C "Someone"; use→null: A "Alex Old" | an impl that drops the profiles() lookup (A shows "Alex Old") |
+| H11 panel shows at most 200 rows | 201 entries | 200 details rows | an impl that renders page.editHistory unbounded |
+*/
+const HISTORY_PANEL={id:'history',type:'edit-history',title:'Edit history'};
+function historyFixture(editHistory){
+ const raw={page:{tracking:{jira:{site:'https://jira.test'}},editHistory,sections:[{id:'main',diagram:{nodes:{a:{title:'Node A',tickets:['AA-1']},b:{title:'Node B',tickets:['BB-1']}},rows:[['a','b']],edges:[{from:'a',to:'b',tickets:['EE-1']}],panels:[{id:'status',type:'live-status'},{...HISTORY_PANEL}]}}]}};
+ return raw;
+}
+const HISTORY=[
+ {at:'2026-10-28T09:00:00Z',by:{id:'u_bo',name:'Bo'},changes:[{op:'remove',ticket:'EE-1',edge:['a','b']}]},
+ {at:'2026-10-30T16:23:15Z',by:{id:'u_alex',name:'Alex Old'},changes:[{op:'add',ticket:'AA-1',node:'a',path:['sections',0,'diagram','nodes','a'],label:'Node A'},{op:'remove',ticket:'BB-1',node:'b',label:'Node B'}]},
+ {at:'2026-10-29T12:00:00Z',by:{id:'u_cam',name:''},changes:[{op:'add',ticket:'BB-1',node:'b'}]}];
+function mountHistory(h,host=h.view){
+ const d=h.C.PanelRegistry.get('edit-history');assert.ok(d,'H7 registered panel');
+ const body=host.appendChild(new Element('div',{class:'pbody'}));
+ const result=d.render(body,{...HISTORY_PANEL},{},'pastel',[],0,false);result.mounted();
+ return {body,rows:()=>body.querySelectorAll('details.dv-edit-details'),destroy(){if(body._panelMotionCleanup)body._panelMotionCleanup();body.remove();}};
+}
+const historySettle=async()=>{for(let i=0;i<4;i++)await new Promise(setImmediate);};
+test('H5 snapshot().editHistory equals the validated entries of the rendered page, newest first',()=>{
+ const raw=historyFixture([HISTORY[0],{at:'bad'},HISTORY[1],HISTORY[2]]),h=harness(raw);
+ const expected=plain(h.C.editHistoryEntries(h.ctl.page));assert.equal(expected.length,3);assert.equal(expected[0].at,'2026-10-30T16:23:15Z');
+ const got=h.ctl.liveStatus.snapshot().editHistory;assert.deepEqual(plain(got),expected);
+ got[0].at='mutated';assert.equal(h.ctl.liveStatus.snapshot().editHistory[0].at,'2026-10-30T16:23:15Z','snapshot hands out a copy');
+ h.ctl.liveStatus.destroy();
+ const none=harness(historyFixture());assert.deepEqual(plain(none.ctl.liveStatus.snapshot().editHistory),[]);none.ctl.liveStatus.destroy();
+});
+test('H7 H11 a panel mounted in the view lists rows newest first with collapsible details and repaints with ticket titles',async()=>{
+ const h=harness(historyFixture(HISTORY)),status=mountHistory(h);await historySettle();
+ const rows=status.rows();assert.equal(rows.length,3);
+ assert.deepEqual(rows.map(r=>r.closest('li').getAttribute('data-edit-at')),['2026-10-30T16:23:15Z','2026-10-29T12:00:00Z','2026-10-28T09:00:00Z']);
+ for(const row of rows){assert.equal(row.tagName,'details');assert.ok(!row.open && row.getAttribute('open')===null,'collapsed by default');assert.equal(row.children[0].tagName,'summary');}
+ const first=rows[0],summary=first.querySelector('summary.dv-edit-summary');
+ assert.equal(textOf(summary.querySelector('.dv-edit-who')).trim(),'Alex Old','no claude runtime: stored name');
+ const when=summary.querySelector('time.dv-edit-when');assert.equal(when.getAttribute('datetime'),'2026-10-30T16:23:15Z');assert.ok(textOf(when).trim().length);
+ assert.equal(textOf(summary.querySelector('.dv-edit-count')).trim(),'2 changes');assert.equal(textOf(summary.querySelector('.dv-edit-first')).trim(),'AA-1 added to Node A');
+ assert.equal(textOf(rows[2].querySelector('.dv-edit-count')).trim(),'1 change');assert.equal(textOf(rows[2].querySelector('.dv-edit-first')).trim(),'EE-1 removed from a → b','edge without label falls back to from → to');
+ assert.equal(textOf(rows[1].querySelector('.dv-edit-first')).trim(),'BB-1 added to b','node without label falls back to the id');
+ assert.equal(textOf(rows[1].querySelector('.dv-edit-who')).trim(),'Someone','empty stored name');
+ const changes=first.querySelectorAll('li.dv-edit-change');assert.equal(changes.length,2);
+ assert.deepEqual(changes.map(c=>[c.getAttribute('data-edit-op'),c.getAttribute('data-edit-ticket'),textOf(c.querySelector('.dv-edit-carrier')).trim()]),[['add','AA-1','Node A'],['remove','BB-1','Node B']]);
+ assert.equal(changes[0].querySelector('.dv-edit-ticket-title'),null,'no title before the map arrives');
+ h.ctl.liveStatus.apply({'AA-1':{state:'active',title:'Button delivery'}});await historySettle();
+ const after=status.rows();assert.equal(after.length,3);assert.equal(textOf(after[0].querySelector('li.dv-edit-change .dv-edit-ticket-title')).trim(),'Button delivery','repainted from onChange with the live title');
+ status.destroy();h.ctl.liveStatus.destroy();
+ const many=[];for(let i=0;i<201;i++)many.push({at:new Date(Date.UTC(2026,0,1,0,i)).toISOString(),changes:[{op:'add',ticket:'AA-1',node:'a'}]});
+ const capped=harness(historyFixture(many)),cappedPanel=mountHistory(capped);await historySettle();assert.equal(cappedPanel.rows().length,200);cappedPanel.destroy();capped.ctl.liveStatus.destroy();
+ const empty=harness(historyFixture()),emptyPanel=mountHistory(empty);await historySettle();assert.equal(emptyPanel.rows().length,0);assert.equal(textOf(emptyPanel.body.querySelector('.dv-edit-history-empty')).trim(),'No edits yet.');emptyPanel.destroy();empty.ctl.liveStatus.destroy();
+});
+test('H7b a panel mounted before its controller connects through the pending bridge and retires with it',async()=>{
+ const raw=historyFixture(HISTORY),h=harness(raw);h.ctl.liveStatus.destroy();
+ const status=mountHistory(h);await historySettle();assert.equal(status.rows().length,0,'nothing to paint before a controller');
+ h.ctl.liveStatus=h.C.createLiveStatus(h.ctl,h.ctl.page,{},{});h.ctl.liveStatus.note('hello');await historySettle();
+ assert.equal(status.rows().length,3,'connected when the controller notified');
+ h.ctl.liveStatus.destroy();assert.equal(typeof status.body._panelMotionCleanup,'function');status.destroy();
+});
+test('H8 editor names: live profile name, else the stored copy, else "Someone"',async()=>{
+ const resolved={u_alex:{id:'u_alex',name:'Alex Live'},u_bo:{id:'u_bo',name:''},u_cam:{id:'u_cam',name:''}};
+ const h=harness(historyFixture(HISTORY));let asked=null;
+ h.win.claude={use:name=>Promise.resolve(name==='user'?{profiles:ids=>{asked=[...ids];return Promise.resolve(Object.fromEntries(ids.map(id=>[id,resolved[id] || {id,name:''}])));}}:null)};
+ const status=mountHistory(h);await historySettle();
+ assert.deepEqual([...asked].sort(),['u_alex','u_bo','u_cam'],'profiles() batched with the ids on screen');
+ assert.deepEqual(status.rows().map(r=>textOf(r.querySelector('.dv-edit-who')).trim()),['Alex Live','Someone','Bo']);
+ status.destroy();h.ctl.liveStatus.destroy();
+ const none=harness(historyFixture(HISTORY));none.win.claude={use:()=>Promise.resolve(null)};const plainPanel=mountHistory(none);await historySettle();
+ assert.deepEqual(plainPanel.rows().map(r=>textOf(r.querySelector('.dv-edit-who')).trim()),['Alex Old','Someone','Bo'],'user namespace absent: stored names');
+ plainPanel.destroy();none.ctl.liveStatus.destroy();
+});

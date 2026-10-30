@@ -97,15 +97,15 @@ function stepControlsSize(d,width){
 
 /* Narrowest step-controls width that shows the transport and every step chip
    (or the path timeline) on one track without horizontal scrolling. */
-function stepControlsMinWidth(d){
+function stepControlsMinWidth(d,labelWidth){
   var paths=diagramPathList(d),delta=(d.steps||[]).some(function(s){return s.delta;}),
     longest=Math.max.apply(null,[1].concat(paths.map(function(p){return p.indices.length;}))),track;
   if(paths.length>1){
     var graph=pathTimelineGraph(paths);
-    // A shared-step timeline has a fixed-width label column (230px default; only
-    // named views override it) and 44px columns; the plain path matrix shrinks its
-    // label column to 150px beside 35px chips.
-    track=graph.hasShared?sectionPathLabelWidth(undefined)+Math.max(1,graph.columns)*44+28:150+longest*35;
+    // A shared-step timeline's label column does not shrink: it is the arrangement's
+    // pathLabelWidth (160-360px, set on named views; 230px by default) plus 44px
+    // columns. The plain path matrix shrinks its label column to 150px beside 35px chips.
+    track=graph.hasShared?sectionPathLabelWidth(labelWidth)+Math.max(1,graph.columns)*44+28:150+longest*35;
   }else track=longest*(delta?38:29)+10;
   // Transport (previous, play, next, status) and the 200px caption floor; frame padding.
   return Math.max(260,track)+30;

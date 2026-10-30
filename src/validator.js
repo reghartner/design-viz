@@ -580,6 +580,50 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   });
 }
 
+/* #827: one `page.editHistory` entry per board save. Warning-only like the other
+   tracking fields: malformed entries are ignored, a non-array warns once, and only
+   the newest 200 entries (by `at`, ties by position) are used, newest first. The
+   live-status controller and the edit-history panel read the same filtered list. */
+var EDIT_HISTORY_LIMIT = 200;
+function editHistoryEntryProblem(entry){
+  if(!specObject(entry))return 'must be an object';
+  if(typeof entry.at!=='string' || !/^\d{4}-\d{2}-\d{2}T/.test(entry.at) || !isFinite(Date.parse(entry.at)))return 'at: must be an ISO-8601 timestamp';
+  if(Object.prototype.hasOwnProperty.call(entry,'by')){
+    if(!specObject(entry.by))return 'by: must be an object';
+    if(Object.prototype.hasOwnProperty.call(entry.by,'id') && typeof entry.by.id!=='string')return 'by.id: must be a string';
+    if(Object.prototype.hasOwnProperty.call(entry.by,'name') && typeof entry.by.name!=='string')return 'by.name: must be a string';
+  }
+  if(!Array.isArray(entry.changes) || !entry.changes.length)return 'changes: must be a non-empty array';
+  for(var i=0;i<entry.changes.length;i++){
+    var change=entry.changes[i],at='changes['+i+']';
+    if(!specObject(change))return at+': must be an object';
+    if(change.op!=='add' && change.op!=='remove')return at+'.op: must be "add" or "remove"';
+    if(typeof change.ticket!=='string' || !trackingKeyPattern.test(change.ticket))return at+'.ticket: must be a Jira key';
+    var node=Object.prototype.hasOwnProperty.call(change,'node'),edge=Object.prototype.hasOwnProperty.call(change,'edge');
+    var nodeOk=typeof change.node==='string' && change.node.length>0;
+    var edgeOk=Array.isArray(change.edge) && change.edge.length===2 && change.edge.every(function(id){return typeof id==='string' && id.length>0;});
+    if(node===edge || (node && !nodeOk) || (edge && !edgeOk))return at+': needs a "node" id or an "edge" [from, to]';
+    if(Object.prototype.hasOwnProperty.call(change,'path') && !Array.isArray(change.path))return at+'.path: must be an array';
+    if(Object.prototype.hasOwnProperty.call(change,'label') && typeof change.label!=='string')return at+'.label: must be a string';
+  }
+  return null;
+}
+function editHistoryEntries(page, warn){
+  warn=typeof warn==='function'?warn:function(){};
+  if(!specObject(page) || !Object.prototype.hasOwnProperty.call(page,'editHistory'))return [];
+  var value=page.editHistory;
+  if(!Array.isArray(value)){warn('editHistory: must be an array of edit entries — ignored');return [];}
+  var kept=[];
+  value.forEach(function(entry,index){
+    var problem=editHistoryEntryProblem(entry);
+    if(problem){warn('editHistory['+index+']: '+problem+' — entry ignored');return;}
+    kept.push({entry:entry,index:index,at:Date.parse(entry.at)});
+  });
+  kept.sort(function(a,b){return b.at-a.at || b.index-a.index;});
+  if(kept.length>EDIT_HISTORY_LIMIT){warn('editHistory: '+kept.length+' entries — only the newest '+EDIT_HISTORY_LIMIT+' are used');kept=kept.slice(0,EDIT_HISTORY_LIMIT);}
+  return kept.map(function(item){return item.entry;});
+}
+
 function validate(page){
   var errors = [], warnings = [];
   if (!specObject(page)){ errors.push('top level: expected {page:{blocks:[...]}} (or sections), or a bare diagram with nodes+rows'); return {errors:errors, warnings:warnings}; }
@@ -602,6 +646,7 @@ function validate(page){
     warnings.push('tracking.dependencies['+index+']: '+(self?'a ticket cannot depend on itself':'use {"ticket": "UX-89", "on": "HW-124", "reason"?: "text"} with Jira keys')+' — entry ignored');
   });
   trackingDependencyLinks(page,function(index){warnings.push('tracking.jira.dependencyLinks'+(index===null?': must be an array of Jira link descriptions such as "is blocked by" — using the defaults':'['+index+']: use a non-empty link description — entry ignored'));});
+  editHistoryEntries(page,function(message){warnings.push(message);});
   var statusPanels=[],hasTracking=Object.prototype.hasOwnProperty.call(page,'tracking'),hasTickets=false;
   sectionRecords(page).forEach(function(record){var d=record.section.diagram || {};
     Object.keys(d.nodes || {}).map(function(id){return d.nodes[id];}).concat(d.edges || []).forEach(function(carrier){if(trackingRefs(carrier).tickets.length)hasTickets=true;});

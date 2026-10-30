@@ -393,7 +393,7 @@ test('every PANEL_SETUP_FIELDS entry uses a known control kind with a sane shape
       }
     });
     const last = B.PANEL_SETUP_FIELDS[type][B.PANEL_SETUP_FIELDS[type].length - 1];
-    if (type === 'live-status') assert.strictEqual(last, undefined, 'runtime evidence has no starting snapshot');
+    if (type === 'live-status' || type === 'edit-history') assert.strictEqual(last, undefined, 'runtime evidence has no starting snapshot');
     else if (type !== 'image' && type !== 'inflight') assert.strictEqual(last[0], 'initial', type + ' ends with initial');
     if (type === 'inflight') assert.strictEqual(last[0], 'lanes', 'inflight has declarations but no starting snapshot');
   });

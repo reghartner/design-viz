@@ -117,7 +117,7 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     nodes, edges, panels and steps with `rows:[[]]` and unpositioned floats;
     run `node <VIZ>/tools/compose-page-layout.cjs --section <zero-based-section> <draft.spec.json> <different-arranged.spec.json>` and use its output.
     The shared production arranger selects positions, ports, cubic routes and
-    frame from topology; groups and nested groups constrain placement. Its limit
+    frame from topology; groups constrain placement, so add none unless rule 14 allows. Its limit
     is 80 nodes and 160 connections per diagram. Inspect the rendered output;
     crossings, labels and group titles can need scoped manual refinements.
     This is the initial layout and default, not visual proof. Preserve unrelated
@@ -131,6 +131,43 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     and submit the full candidate for paired Workbench preview, and report the
     actual tool results. See `docs/auto-arrange.md` for sizing guidance,
     supported inputs and estimation limits.
+13. **Size step controls and the diagram with the helper.** After composing,
+    run `node <VIZ>/tools/size-section-layout.cjs --write <sized.spec.json> <arranged.spec.json>`
+    and use its output. It sizes both containers from their own content (node
+    positions, the longest step caption, path count and length). When the
+    longest path has 4 steps or fewer it puts step controls in a left column
+    (7 of 24 columns) beside the diagram, both tall enough; longer paths stack
+    them. It reports and skips sections with panels (keep the composer's layout
+    there). Do not hand-edit its sizes; fix content (shorter captions, tighter
+    nodes) and rerun. Report any `notes` it prints.
+14. **No node groups unless the operator asks for them.** Groups degrade
+    auto-arrange. Default to none; keep groups the source spec already has.
+15. **Auto-arrange every new diagram and after adding nodes** (rules 12 and 13).
+    Never hand-place nodes in a new diagram.
+16. **Use shared steps by default when they make sense.** When two paths go
+    through the same moment (same nodes and edges lit, same meaning), give
+    both paths the same step ID instead of a copy; shared openings and endings
+    render once. Do not share steps whose captions or panel states would
+    differ by path. List the shared steps in the ledger and summary.
+17. **Headers and bullets, not long sentences.** Section text is one short
+    lead sentence at most; everything else is `bullets` (with `sub` lists)
+    under bold headers. Keep step captions to one or two short sentences.
+    Turn source paragraphs into bullets.
+18. **No text-only panels.** A panel must show state that changes across
+    steps. Static prose, decisions, references or notes go in the section's
+    `text`/`bullets`, never in a panel.
+19. **Every reference is a link.** Each doc, Jira key, PR or ticket the page
+    mentions is a Markdown link `[REPLAY-120](https://…)`. Build the URL from a
+    base the source gives (a Jira site, a GitHub repo). If no URL can be
+    built, do not leave a bare key: ask for the link (Phase 2) and list it in
+    the ledger as missing.
+20. **Group tabs the way the reader experiences the product.** Before
+    drafting tabs, ask how to group them (Phase 2), proposing user-experience
+    grouping (for example recording, customer playback, internal playback) as
+    the default, not the order or teams in which things were decided. When a
+    page has tabs, put every section inside a tab: a section outside the tabs
+    block shows above every tab. Intro and "Considered/rejected" content get
+    their own tab (or go in the first tab's text), never a direct section.
 
 And always: honesty. No invented facts. Unknown is not failed. End each path
 at its last source-backed outcome; do not add a user action (opening the
@@ -198,6 +235,11 @@ each battery device the source gives no rate for: at engineering level, each
 unknown drain or charge rate that affects the story is one decision; at story
 or mixed level choose it yourself (an illustrative estimate, or 0 for a wired
 device) and list it under **Decisions I made**.
+
+**If the page will have tabs, ask how to group them** (rule 20): propose
+grouping by the reader's experience of the product (each user-facing flow
+gets a tab) as the default, and name the alternatives the source suggests
+(decision groups, teams, system layers).
 
 Then ask only what the source and request leave open, from this list:
 audience; the one-sentence takeaway; the moments the viewer must see;

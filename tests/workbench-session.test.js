@@ -434,9 +434,10 @@ test('explicit source selection initializes local context and same-content switc
    | refuses a local replacement | local next | throws, context unchanged | an impl that accepts any context |
    | stale document returns false | snapshot before an edit | false, context unchanged | an impl that ignores the expected snapshot |
    | unresolvable site context is refused atomically | resolveSource throws | throws, context, history and draft unchanged | an impl that commits before validating */
+function siteSwitch(s){assert.equal(typeof s.useSiteTopology,'function','the session offers Use site library (#833)');}
 function siteContext(){return {version:1,id:'workbench-draft',ephemeral:true,catalogURL:'https://site.invalid/diagrams.json',catalog:{version:3,diagrams:[]},specs:[{page:{canon:{id:'workbench-draft'},sections:[]}}]};}
 test('Use site library replaces a local provider snapshot as one undoable, saved topology step',()=>{
- const h=harness(),s=h.session,local=localContext('Local'),site=siteContext();s.replaceProject(h.text,null,{topologyContext:local});
+ const h=harness(),s=h.session,local=localContext('Local'),site=siteContext();siteSwitch(s);s.replaceProject(h.text,null,{topologyContext:local});
  assert.equal(s.topologyContext().local,true,'precondition: the draft starts on a local snapshot');
  const before=h.text,revision=s.snapshot().topologyRevision;
  assert.equal(s.useSiteTopology(site,s.snapshot()),true);
@@ -446,12 +447,12 @@ test('Use site library replaces a local provider snapshot as one undoable, saved
  s.redo();assert.deepEqual(plain(s.topologyContext()),site);
 });
 test('Use site library lets an import-free document leave the local snapshot with no context',()=>{
- const h=harness(),s=h.session;s.replaceProject(h.text,null,{topologyContext:localContext('Local')});
+ const h=harness(),s=h.session;siteSwitch(s);s.replaceProject(h.text,null,{topologyContext:localContext('Local')});
  assert.equal(s.useSiteTopology(null,s.snapshot()),true);assert.equal(s.topologyContext(),null);
  s.undo();assert.equal(s.topologyContext().local,true);
 });
 test('Use site library refuses non-local drafts, local replacements, stale snapshots and unresolvable site contexts',()=>{
- const h=harness(),s=h.session;
+ const h=harness(),s=h.session;siteSwitch(s);
  assert.throws(()=>s.useSiteTopology(siteContext(),s.snapshot()),/local/);assert.equal(s.topologyContext(),null);
  s.replaceProject(h.text,null,{topologyContext:{...siteContext(),local:false}});assert.throws(()=>s.useSiteTopology(siteContext(),s.snapshot()),/local/);
  const local=localContext('Local');s.replaceProject(h.text,null,{topologyContext:local});

@@ -266,7 +266,8 @@ test('Use site library leaves a selected local source repository with Undo, and 
  try{
   await filePanel(page);await page.locator('#local-sources-select').click();await expect(node(page)).toContainText('Unpublished API');
   expect((await saved()).local,'precondition: the draft uses the local source repository').toBe(true);
-  await page.locator('#local-sources-site').click();await expect(node(page)).toContainText('Site published API');
+  const useSite=page.locator('#local-sources-site');await expect(useSite,'File panel offers Use site library (#833)').toHaveText('Use site library',{timeout:3000});await expect(useSite).toBeEnabled();
+  await useSite.click();await expect(node(page)).toContainText('Site published API');
   const after=await saved();expect(!!after.local).toBe(false);expect(after.catalogURL).toBe(site.catalogURL);
   await closeTools(page);await page.locator('#diagram-add').click();await page.locator('#add-topology').click();
   await expect(page.locator('#topology-provider option')).toHaveText(['Site provider · base','Site middle · middle']);

@@ -904,7 +904,7 @@ test('Browse exploration combines facets, keyboard topics and search; grid/list 
    6 topic applied | topic=commerce | Topic select value | -
    7 folder applied | folder=features/commerce | folder path [aria-current] 'commerce' | folder ignored
    8 combined result | all of the above | '#welcome-library-count' 1 of 7; visible titles exactly ['Checkout & pay'] | filters applied but cards not refiltered
-   9 opening adds no history entry | direct link | history.length unchanged (1) | pushState on hydration
+   9 opening adds no history entry | direct link in a new tab (about:blank + link = 2) | history.length at document start == after hydration == 2 | pushState on hydration
    10 unrelated query preserved | host=keep | first param host=keep | rebuilding query from scratch
    11 live URL per control | Welcome -> Browse, fill/select/click | params after each change | URL written only on Copy
    12 bare browse on Browse | enter via button | params [host, browse] and raw '&browse' | no URL on Browse
@@ -957,7 +957,9 @@ test('a Browse link opens the filtered subset with search, team, service, topic 
   // Precondition: the unfiltered library shows all five diagrams, so each filter must narrow it.
   await page.goto(fixture.url);await page.locator('#welcome-library').click();await expect(count).toHaveText('7 of 7 diagrams');
   const link=fixture.url+'?host=keep&browse&q=checkout%20%26%20pay&team=group%3Adefault%2Fpayments&service=component%3Adefault%2Fcart&topic=commerce&folder=features/commerce';
-  const fresh=await page.context().newPage();await fresh.goto(link);
+  const fresh=await page.context().newPage();
+  // A new tab already holds about:blank; record the count before any app script runs.
+  await fresh.addInitScript(()=>{if(window.__historyAtLoad===undefined)window.__historyAtLoad=history.length;});await fresh.goto(link);
   await expect(browseScreen(fresh)).toBeVisible();await expect(fresh.locator('#welcome-home')).toBeHidden();
   await expect(fresh.getByRole('searchbox',{name:'Search diagrams'})).toHaveValue('checkout & pay');
   await expect(fresh.getByLabel('Team',{exact:true})).toHaveValue('group:default/payments');
@@ -966,7 +968,7 @@ test('a Browse link opens the filtered subset with search, team, service, topic 
   await expect(fresh.locator('#welcome-library-folder-path [aria-current]')).toHaveText('commerce');
   await expect(fresh.locator('#welcome-library-count')).toHaveText('1 of 7 diagrams');expect(await visibleLibraryTitles(fresh)).toEqual(['Checkout & pay']);
   await expect(fresh.locator('#welcome-library-link-note')).toBeHidden();
-  expect(await fresh.evaluate(()=>history.length)).toBe(1);expect(urlParams(fresh)[0]).toEqual(['host','keep']);
+  expect(await fresh.evaluate(()=>[window.__historyAtLoad,history.length])).toEqual([2,2]);expect(urlParams(fresh)[0]).toEqual(['host','keep']);
   // A legacy node-title service is carried as the title.
   await fresh.goto(fixture.url+'?browse&service=Old%20cart');
   await expect(fresh.getByLabel('Service',{exact:true})).toHaveValue('Old cart');await expect(fresh.locator('#welcome-library-count')).toHaveText('1 of 7 diagrams');

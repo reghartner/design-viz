@@ -396,7 +396,7 @@ function createBuilderInteractions(opts){
     }catch(ex){return null;}
   }
   function openReferenceMenu(ev){
-    if(opts.isActive && !opts.isActive() || addToStep || connect || nodeDrag || groupDrag || rowDrag || drag || pathReorder && pathReorder.busy())return;
+    if(opts.isActive && !opts.isActive() || addToStep || connect || nodeDrag || groupDrag || rowDrag || drag || coinDrag || pathReorder && pathReorder.busy())return;
     var ref=referenceTarget(ev.target);if(!ref)return;
     // A selected imported member participates in the ordinary multi-object
     // menu. Leave this event for spatial selection so actions can combine the
@@ -447,6 +447,47 @@ function createBuilderInteractions(opts){
     var scrollPositions=[];for(var host=ref.el.parentElement;host;host=host.parentElement)scrollPositions.push({el:host,left:host.scrollLeft,top:host.scrollTop});
     referenceMenuLife.listen(view,'scroll',function(e){var saved=scrollPositions.find(function(p){return p.el===e.target;});if(saved && (saved.el.scrollLeft!==saved.left || saved.el.scrollTop!==saved.top))closeReferenceMenu(false);},true);
   }
+  /* A step circle's menu: reset an author-placed circle to its automatic
+     slot. Steps are always consumer-authored, so circles on imported
+     connections reset like local ones. */
+  function openCoinMenu(ev){
+    if(opts.isActive && !opts.isActive() || addToStep || connect || nodeDrag || groupDrag || rowDrag || drag || coinDrag || pathReorder && pathReorder.busy())return;
+    if(!ev.target || !ev.target.closest || inDetailPreview(ev.target))return;
+    var coin=ev.target.closest('g.coin[data-dv-step][data-dv-coin-key]'),sec=coin && coin.closest('.doc-sec[data-dv-section]'),s=coin && sec && parseEditor();
+    if(!s || s.error || s.renderedText!=null && s.renderedText!==s.text)return;
+    ev.preventDefault();ev.stopImmediatePropagation();closeReferenceMenu(false);if(spatial)spatial.clear();pausePreview();
+    var section=Number(sec.getAttribute('data-dv-section')),index=Number(coin.getAttribute('data-dv-step')),key=coin.getAttribute('data-dv-coin-key');
+    var contextKey=JSON.stringify(session.topologyContext()),target={section:section,kind:'step',index:index};
+    function current(){var now=parseEditor();return !now.error && now.project===s.project && now.text===s.text && (now.renderedText==null || now.renderedText===now.text) && JSON.stringify(session.topologyContext())===contextKey && coin.isConnected && (!opts.isActive || opts.isActive());}
+    referenceMenu=document.createElement('div');referenceMenu.className='dv-object-menu dv-coin-menu';referenceMenu.setAttribute('popover','manual');referenceMenu.setAttribute('role','menu');referenceMenu.setAttribute('aria-label','Step circle actions');
+    referenceMenuLife=createWorkbenchLifetime();referenceOpener=null;
+    function item(label,action,reason){
+      var button=document.createElement('button');button.type='button';button.setAttribute('role','menuitem');button.textContent=label;button.tabIndex=-1;
+      if(reason){button.setAttribute('aria-disabled','true');button.title=reason;var note=document.createElement('small');note.textContent=reason;button.appendChild(note);}
+      referenceMenuLife.listen(button,'click',function(e){e.stopPropagation();if(reason)return;var valid=current();closeReferenceMenu(false);if(valid)action();});referenceMenu.appendChild(button);
+    }
+    var reset=planStepCoinOffset(s.text,s.raw,section,index,key,null);
+    item('Reset to automatic position',function(){
+      if(applyPlan(planStepCoinOffset(s.text,s.raw,section,index,key,null),null,s)){session.target=target;session.insertSection=section;rehighlight();renderInspector();}
+    },reset.error);
+    item('Inspect step',function(){selectTarget(target,false,false);});
+    (coin.closest('.section-viewport') || sec).appendChild(referenceMenu);if(referenceMenu.showPopover)referenceMenu.showPopover();
+    var bounds=referenceMenu.getBoundingClientRect(),anchor=coin.getBoundingClientRect(),x=ev.clientX || anchor.left,y=ev.clientY || anchor.bottom;
+    referenceMenu.style.left=Math.max(8,Math.min(x,window.innerWidth-bounds.width-8))+'px';referenceMenu.style.top=Math.max(8,Math.min(y,window.innerHeight-bounds.height-8))+'px';
+    var items=Array.from(referenceMenu.querySelectorAll('button'));items[0].tabIndex=0;items[0].focus({preventScroll:true});
+    referenceMenuLife.listen(referenceMenu,'keydown',function(e){
+      if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeReferenceMenu(false);return;}
+      if(e.key==='Tab'){closeReferenceMenu(false);return;}
+      var at=items.indexOf(document.activeElement),next=at;
+      if(e.key==='ArrowDown')next=(at+1)%items.length;else if(e.key==='ArrowUp')next=(at+items.length-1)%items.length;else if(e.key==='Home')next=0;else if(e.key==='End')next=items.length-1;else return;
+      e.preventDefault();items.forEach(function(button,i){button.tabIndex=i===next?0:-1;});items[next].focus();
+    });
+    referenceMenuLife.listen(document,'pointerdown',function(e){if(referenceMenu && !referenceMenu.contains(e.target))closeReferenceMenu(false);},true);
+    referenceMenuLife.listen(document,'focusin',function(e){if(referenceMenu && !referenceMenu.contains(e.target))closeReferenceMenu(false);});
+    referenceMenuLife.listen(window,'resize',function(){closeReferenceMenu(false);});
+    referenceMenuLife.listen(view,'scroll',function(){closeReferenceMenu(false);},true);
+  }
+  life.listen(view,'contextmenu',openCoinMenu,true);
   life.listen(view,'contextmenu',openReferenceMenu,true);
   life.listen(view,'click',function(ev){if(!suppressClick && ev.target.closest('.dv-topology-handle'))openReferenceMenu(ev);},true);
   life.listen(view,'keydown',function(ev){
@@ -458,7 +499,7 @@ function createBuilderInteractions(opts){
   life.own(function(){closeReferenceMenu(false);});
   var spatial=createBuilderSpatialSelection({document:document,window:window,view:view,src:src,session:session,isActive:opts.isActive,
     targetFromEvent:targetFromEvent,selection:function(){return multiSel.length?multiSel:session.target?[Object.assign({},session.target,{el:findTargetEl(session.target)})]:[];},
-    select:selectSpatial,toggle:toggleMultiSelect,find:findTargetEl,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag || pathReorder && pathReorder.busy());},
+    select:selectSpatial,toggle:toggleMultiSelect,find:findTargetEl,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag || coinDrag || pathReorder && pathReorder.busy());},
     inspect:function(){inspectSelection(false);},openAdd:opts.openAdd
   });
   life.own(function(){spatial.destroy();});
@@ -867,7 +908,7 @@ function createBuilderInteractions(opts){
 
   /* ---- drag an edge label to set its labelDx/labelDy nudges;
           drag a node onto another to swap, or into a row/slot gap ---- */
-  var drag = null, nodeDrag = null, groupDrag = null, suppressClick = false;
+  var drag = null, nodeDrag = null, groupDrag = null, coinDrag = null, suppressClick = false;
   /* one cancellation path for the node drag: Escape, and every controlled
      replacement (which detaches the dragged elements), both land here */
   function cancelNodeDrag(){
@@ -933,6 +974,17 @@ function createBuilderInteractions(opts){
     if (nd.ghost && nd.ghost.parentNode) nd.ghost.parentNode.removeChild(nd.ghost);
     if (nd.ghostBack && nd.ghostBack.parentNode) nd.ghostBack.parentNode.removeChild(nd.ghostBack);
     nd.ghost = null; nd.ghostBack = null;
+  }
+  /* put a dragged step circle (and its backing disc) back in its slot */
+  function cancelCoinDrag(){
+    var cd = coinDrag;
+    coinDrag = null;
+    if (!cd) return;
+    [cd.el, cd.base].forEach(function(el){
+      if (!el) return;
+      if (cd.transform == null) el.removeAttribute('transform'); else el.setAttribute('transform', cd.transform);
+    });
+    cd.el.classList.remove('dv-dragsrc');
   }
   function svgPointAt(svg, inv, clientX, clientY){
     var pt = svg.createSVGPoint();
@@ -1465,6 +1517,26 @@ function createBuilderInteractions(opts){
       }
       return;
     }
+    var coinEl = ev.target.closest('g.coin[data-dv-step][data-dv-coin-key]');
+    if (coinEl){
+      if (addToStep) return;
+      var coinSvg = coinEl.ownerSVGElement, coinCtm = coinSvg && coinSvg.getScreenCTM && coinSvg.getScreenCTM();
+      if (!coinCtm) return;
+      var coinInv, coinStart;
+      try {
+        coinInv = coinCtm.inverse();
+        coinStart = svgPointAt(coinSvg, coinInv, ev.clientX, ev.clientY);
+      } catch (ex){ return; } /* non-invertible CTM: no drag, plain click still selects the step */
+      if (!isFinite(coinStart.x) || !isFinite(coinStart.y)) return;
+      var coinBase = coinEl.previousElementSibling, slot = /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(coinEl.getAttribute('transform') || '');
+      coinDrag = {snapshot:parseEditor(), contextKey:JSON.stringify(session.topologyContext()), el:coinEl,
+                  base:coinBase && coinBase.classList.contains('coin-base') ? coinBase : null, svg:coinSvg, inv:coinInv,
+                  x0:coinStart.x, y0:coinStart.y, cx0:ev.clientX, cy0:ev.clientY,
+                  slot:{x:slot ? Number(slot[1]) : 0, y:slot ? Number(slot[2]) : 0},
+                  transform:coinEl.getAttribute('transform'), dx:0, dy:0, moved:false};
+      ev.preventDefault(); /* no text selection while dragging */
+      return;
+    }
     var lbl = ev.target.closest('text.lbl[data-dv-edge]');
     if (!lbl) return;
     var svg = lbl.ownerSVGElement;
@@ -1513,6 +1585,18 @@ function createBuilderInteractions(opts){
       var gdx = ev.clientX - groupDrag.x0, gdy = ev.clientY - groupDrag.y0;
       if (gdx * gdx + gdy * gdy > 25) groupDrag.moved = true;
       if (groupDrag.moved) updateGroupDrag(ev);
+      return;
+    }
+    if (coinDrag){
+      var cdx = ev.clientX - coinDrag.cx0, cdy = ev.clientY - coinDrag.cy0;
+      if (cdx * cdx + cdy * cdy > 25) coinDrag.moved = true; /* > 5px straight-line */
+      if (!coinDrag.moved) return;
+      var cpt = svgPointAt(coinDrag.svg, coinDrag.inv, ev.clientX, ev.clientY);
+      coinDrag.dx = cpt.x - coinDrag.x0; coinDrag.dy = cpt.y - coinDrag.y0;
+      var move = 'translate(' + (coinDrag.slot.x + coinDrag.dx) + ' ' + (coinDrag.slot.y + coinDrag.dy) + ')';
+      coinDrag.el.setAttribute('transform', move);
+      if (coinDrag.base) coinDrag.base.setAttribute('transform', move);
+      coinDrag.el.classList.add('dv-dragsrc');
       return;
     }
     if (!drag) return;
@@ -1612,6 +1696,27 @@ function createBuilderInteractions(opts){
       if(!session.accept(gdPlan,{snapshot:gdParsed,beforePublish:clearMultiSelect}))return;
       session.target = {section: gd.gi, kind: 'group', id: gd.key};
       session.insertSection = gd.gi;
+      rehighlight();
+      renderInspector();
+      return;
+    }
+    if (coinDrag){
+      var cd = coinDrag;
+      cancelCoinDrag();
+      if (!cd.moved) return; /* a plain click: selects the step as before */
+      suppressClick = true;
+      life.delay(function(){ suppressClick = false; }, 0);
+      var cdSec = cd.el.closest('.doc-sec');
+      var cdGi = cdSec ? parseInt(cdSec.getAttribute('data-dv-section'), 10) : NaN, cdIdx = parseInt(cd.el.getAttribute('data-dv-step'), 10);
+      if (isNaN(cdGi) || isNaN(cdIdx)) return;
+      var cdParsed = parseEditor();
+      if (cdParsed.error){ inspectorMessage(cdParsed.error); return; }
+      if(cdParsed.text!==cd.snapshot.text || cdParsed.project!==cd.snapshot.project || !cd.el.isConnected || cdParsed.renderedText!=null && cdParsed.renderedText!==cdParsed.text || JSON.stringify(session.topologyContext())!==cd.contextKey){inspectorMessage('The source changed. Step circle move cancelled.');return;}
+      var cdPlan = planStepCoinOffset(cdParsed.text, cdParsed.raw, cdGi, cdIdx, cd.el.getAttribute('data-dv-coin-key'), {dx:cd.slot.x + cd.dx, dy:cd.slot.y + cd.dy});
+      if (cdPlan.error){ inspectorMessage(cdPlan.error); return; }
+      if(!session.accept(cdPlan,{snapshot:cdParsed,beforePublish:clearMultiSelect}))return;
+      session.target = {section: cdGi, kind: 'step', index: cdIdx};
+      session.insertSection = cdGi;
       rehighlight();
       renderInspector();
       return;
@@ -1731,13 +1836,17 @@ function createBuilderInteractions(opts){
     closeReferenceMenu(false);
     if(spatial)spatial.clear();
     curveEditor.cancel();
-    cancelNodeDrag();cancelGroupDrag();cancelRowDrag();
+    cancelNodeDrag();cancelGroupDrag();cancelRowDrag();cancelCoinDrag();
     if(drag){drag.lbl.removeAttribute('transform');drag=null;}
   }
-  life.listen(window,'keydown',function(ev){if(ev.key==='Escape' && drag){drag.lbl.removeAttribute('transform');drag=null;ev.preventDefault();ev.stopImmediatePropagation();}},true);
+  life.listen(window,'keydown',function(ev){
+    if(ev.key!=='Escape')return;
+    if(drag){drag.lbl.removeAttribute('transform');drag=null;ev.preventDefault();ev.stopImmediatePropagation();}
+    else if(coinDrag){cancelCoinDrag();ev.preventDefault();ev.stopImmediatePropagation();}
+  },true);
   life.listen(window,'blur',cancelGestures);
   life.listen(window,'pointercancel',cancelGestures);
-  life.listen(src,'input',function(){if(drag){drag.lbl.removeAttribute('transform');drag=null;}if(connect)cancelConnect('Connection cancelled — the source changed.');});
+  life.listen(src,'input',function(){if(drag){drag.lbl.removeAttribute('transform');drag=null;}cancelCoinDrag();if(connect)cancelConnect('Connection cancelled — the source changed.');});
   life.listen(window,'blur',function(){if(connect)cancelConnect('Connection cancelled');});
   function beforeReplace(request){
     textEditor.clear();
@@ -1793,7 +1902,7 @@ function createBuilderInteractions(opts){
     selectAllNodes:function(){return life.alive() && spatial.selectAllNodes();},
     inspectSelection:life.guard(inspectSelection),
     spatialActions:function(host,lifetime){return spatial.actions(host,lifetime);},
-    busy:function(){return life.alive() && !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag || pathReorder.busy() || curveEditor.busy());},
+    busy:function(){return life.alive() && !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag || coinDrag || pathReorder.busy() || curveEditor.busy());},
     toggleAdding:life.guard(function(t){if(addToStep){cancelAddToStep(null);return;}if(connect)cancelConnect(null);addToStep={section:t.section,step:t.index};addToStepStatus();renderInspector();}),
     beforeReplace:life.guard(beforeReplace),retire:life.guard(retire),
     destroy:function(){if(!life.alive())return;life.destroy();retire();

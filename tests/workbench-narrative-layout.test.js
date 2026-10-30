@@ -145,6 +145,61 @@ test('planStepToggleHop adds, removes, and normalizes edge/edges shapes', () => 
   assert.match(B.planStepToggleHop(RICH_TEXT, RICH, 0, 0, 'zz->qq').error, /no edge/);
 });
 
+test('planStepCoinOffset places, moves and resets one step circle per edge', () => {
+  const step = text => JSON.parse(text).page.blocks[0].diagram.steps[1];
+  /* steps[1] uses a->c and b->a; offsets round to whole diagram units */
+  const placed = B.planStepCoinOffset(RICH_TEXT, RICH, 0, 1, 'a->c', {dx: 40.4, dy: -23.6});
+  assert.ok(!placed.error, placed.error);
+  assert.deepStrictEqual(plain(step(placed.text).coinOffsets), {'a->c': {dx: 40, dy: -24}});
+  assert.strictEqual(step(placed.text).text, 's2', 'only the offset field changes');
+  const both = B.planStepCoinOffset(placed.text, JSON.parse(placed.text), 0, 1, 'b->a', {dx: 0, dy: 12});
+  assert.deepStrictEqual(plain(step(both.text).coinOffsets), {'a->c': {dx: 40, dy: -24}, 'b->a': {dx: 0, dy: 12}});
+  /* reset one edge, then the last: the empty map is removed */
+  const one = B.planStepCoinOffset(both.text, JSON.parse(both.text), 0, 1, 'a->c', null);
+  assert.deepStrictEqual(plain(step(one.text).coinOffsets), {'b->a': {dx: 0, dy: 12}});
+  const none = B.planStepCoinOffset(one.text, JSON.parse(one.text), 0, 1, 'b->a', null);
+  assert.ok(!('coinOffsets' in step(none.text)));
+  /* a null key resets every circle of the step (the Inspector button) */
+  const all = B.planStepCoinOffset(both.text, JSON.parse(both.text), 0, 1, null, null);
+  assert.ok(!('coinOffsets' in step(all.text)));
+  /* errors: unmoved circle, foreign edge, missing step, malformed map */
+  assert.match(B.planStepCoinOffset(RICH_TEXT, RICH, 0, 1, 'a->c', null).error, /already in its automatic position/);
+  assert.match(B.planStepCoinOffset(RICH_TEXT, RICH, 0, 1, null, null).error, /already in its automatic position/);
+  assert.match(B.planStepCoinOffset(RICH_TEXT, RICH, 0, 1, 'a->b', {dx: 1, dy: 1}).error, /no longer belongs/);
+  assert.match(B.planStepCoinOffset(RICH_TEXT, RICH, 0, 1, 'a->c', {dx: NaN, dy: 1}).error, /finite/);
+  assert.match(B.planStepCoinOffset(RICH_TEXT, RICH, 0, 9, 'a->c', {dx: 1, dy: 1}).error, /step not found/);
+  const bad = JSON.parse(RICH_TEXT);bad.page.blocks[0].diagram.steps[1].coinOffsets = [];
+  assert.match(B.planStepCoinOffset(JSON.stringify(bad), bad, 0, 1, 'a->c', {dx: 1, dy: 1}).error, /coinOffsets/);
+});
+
+test('a step circle on an imported connection is placed on the consumer step', () => {
+  /* steps reference imported edges by their resolved key; the offset lives on
+     the authored step, so no provider fragment changes */
+  const raw = {page: {blocks: [{heading: 'S', diagram: {nodes: {local: {}}, rows: [['local']],
+    topologyImports: [{spec: 'shared-spec', export: 'core', as: 'shared'}],
+    steps: [{edge: 'shared::api->shared::store', text: 'save'}]}}]}};
+  const text = JSON.stringify(raw, null, 2);
+  const plan = B.planStepCoinOffset(text, raw, 0, 0, 'shared::api->shared::store', {dx: -30, dy: 18});
+  assert.ok(!plan.error, plan.error);
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(plain(d.steps[0].coinOffsets), {'shared::api->shared::store': {dx: -30, dy: 18}});
+  assert.deepStrictEqual(plain(d.topologyImports), plain(raw.page.blocks[0].diagram.topologyImports));
+});
+
+test('step circle offsets follow their edge: toggling the hop off, renaming, and duplicating', () => {
+  const placed = B.planStepCoinOffset(RICH_TEXT, RICH, 0, 1, 'a->c', {dx: 5, dy: 6});
+  const off = B.planStepToggleHop(placed.text, JSON.parse(placed.text), 0, 1, 'a->c');
+  assert.ok(!('coinOffsets' in JSON.parse(off.text).page.blocks[0].diagram.steps[1]), 'a removed hop drops its circle offset');
+  const steps = [{edge: 'a->c', coinOffsets: {'a->c': {dx: 5, dy: 6}}}];
+  B.builderRetargetStepKeys(steps, 'a->c', 'a->d');
+  assert.deepStrictEqual(plain(steps[0].coinOffsets), {'a->d': {dx: 5, dy: 6}});
+  B.builderRetargetStepKeys(steps, 'a->d', null);
+  assert.ok(!('coinOffsets' in steps[0]));
+  const dup = B.planDuplicateStep(placed.text, JSON.parse(placed.text), 0, 1);
+  const dupSteps = JSON.parse(dup.text).page.blocks[0].diagram.steps;
+  assert.ok(dupSteps[1].coinOffsets && !('coinOffsets' in dupSteps[2]), 'the copy starts in the automatic position');
+});
+
 test('planStepToggleNode adds and removes lit nodes, dropping the empty list', () => {
   const add = B.planStepToggleNode(RICH_TEXT, RICH, 0, 0, 'c');
   assert.deepStrictEqual(JSON.parse(add.text).page.blocks[0].diagram.steps[0].nodes, ['c']);

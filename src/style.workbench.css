@@ -806,6 +806,9 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .contract-manager button{text-align:left;white-space:normal;overflow-wrap:anywhere;}
 .docview text.lbl{cursor:grab;}
 /* drag nudges labelDx/labelDy; click selects */
+.docview g.coin{cursor:grab;}
+.docview g.coin.dv-dragsrc{cursor:grabbing;opacity:.8;}
+/* drag places a step circle (step.coinOffsets); click selects the step */
 /* the selection ring animates its dashes — nothing else on the page moves
    its stroke, so a selected element cannot be mistaken for a lit step node
    (solid teal) or a step member (thin static dashes) */

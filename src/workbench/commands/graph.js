@@ -436,6 +436,11 @@ function builderRetargetStepKeys(steps, oldKey, newKey){
       Object.keys(st.contracts).forEach(function(key){var next=key===oldKey?newKey:key;if(next)contracts[next]=st.contracts[key];});
       if(Object.keys(contracts).length)st.contracts=contracts;else delete st.contracts;
     }
+    if(st.coinOffsets && typeof st.coinOffsets==='object' && !Array.isArray(st.coinOffsets)){
+      var coins=Object.create(null);
+      Object.keys(st.coinOffsets).forEach(function(key){var next=key===oldKey?newKey:key;if(next)coins[next]=st.coinOffsets[key];});
+      if(Object.keys(coins).length)st.coinOffsets=coins;else delete st.coinOffsets;
+    }
     if (st.failures && typeof st.failures === 'object' && !Array.isArray(st.failures)){
       var failures = Object.create(null);
       Object.keys(st.failures).forEach(function(key){

@@ -1,5 +1,17 @@
 # Changelog
 
+## Manually placed step circles (2026-10-30)
+
+- Workbench authors drag a step circle on the board to place it (#840). The
+  offset from its edge's midpoint is saved on the step as
+  `coinOffsets["from->to"]`, so the circle follows when nodes move; other
+  circles on that edge keep their automatic places, and paths or views that
+  re-pack circles leave a placed one where it is. Right-click the circle
+  (**Reset to automatic position**) or use Inspect → **Circle position** to
+  reset it; Undo covers both. Circles on imported connections work the same
+  way because the offset lives on the consumer's step. Specs that use it
+  record `layout.coin-positions`.
+
 ## Browser recovery storage cleanup (2026-10-28)
 
 - Workbench frees its own browser recovery data without developer tools (#406):

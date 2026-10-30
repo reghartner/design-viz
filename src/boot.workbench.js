@@ -159,6 +159,8 @@ var CONTRACT = [
   '  Use only for established non-delivery, not a received request with an error.',
   '- Optional step.color: #RGB or #RRGGBB colors that step circle/coin only.',
   '  Repeat on adjacent steps for phases; omit for default colors. Never carries.',
+  '- step.coinOffsets {"a->b":{dx,dy}} is set by dragging step circles in the',
+  '  Workbench. Keep it when rewriting a step; do not invent offsets.',
   '- Optional diagram.paths: [{id, label, color, steps:[step IDs]}]. First path is',
   '  the default; steps becomes a shared registry. Reuse IDs for the shared prefix,',
   '  then reference different outcome steps. Path chips sit left of aligned step',

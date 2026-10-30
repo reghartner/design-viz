@@ -218,7 +218,7 @@ Publish only when asked. Steps:
    `python3 tools/inject.py <spec.json> template/flowview.html <dir>/index.html --two-file`.
    That writes `index.html` and, beside it, `flowspec.json` (the spec text
    verbatim) and marks the page so it boots from the file (#826). Publish both:
-   `index.html` as the page, `flowspec.json` through `files`
+   `index.html` as `file_path`, `flowspec.json` through `files`
    (`{"flowspec.json": "<dir>/flowspec.json"}`). The two-file form is what
    lets the board save its own edits later; a single-file page
    (`<out.html>` without the flag) still works for one-off sharing.
@@ -269,10 +269,13 @@ ring shows carriers done.
 Republishing: pass the artifact's existing URL as `url` on the publish call,
 after reading that artifact with the Artifact tool's read action in the
 current conversation; a publish without `url` creates a new artifact with a
-new link and none of the old comments. For a two-file board republish only
-`flowspec.json` (`url` plus the file in `files`; the page is kept), and read
-the artifact's current `flowspec.json` first: the board saves viewers' edits
-into it under `page.editHistory`, which the republished file must keep. The
+new link and none of the old comments. For a two-file board only
+`flowspec.json` changes, but the publish call still needs the page (a call
+with `url` and `files` alone is refused): read the artifact's current
+`flowspec.json` first (the board saves viewers' edits into it under
+`page.editHistory`, which the republished file must keep), read its
+`index.html` to a local file, then publish with `url`, that saved page as
+`file_path` unchanged, and the edited file in `files`. The
 same steps are in the page's embedded agent guide, so an editor's agent that
 has only the artifact URL can run this loop too. Do this after every accepted
 spec change the author has authorized publishing for; the author is working in

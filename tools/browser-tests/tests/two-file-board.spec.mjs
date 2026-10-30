@@ -23,7 +23,11 @@ import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
 const MARKER='<meta name="dv-spec-file" content="flowspec.json">';
-const BLOCK=/^<script type="application\/json" id="flowspec">\n([\s\S]*?)\n<\/script>/m;
+// The block as written on disk. Python's text-mode write makes the HTML CRLF on
+// Windows (m3); the HTML parser normalizes CRLF to LF in text content, so the
+// on-disk text is normalized the same way before any comparison with the DOM.
+const BLOCK=/^<script type="application\/json" id="flowspec">\r?\n([\s\S]*?)\r?\n<\/script>/m;
+const blockOf=html=>{const m=BLOCK.exec(html);expect(m,'inline flowspec block present').not.toBeNull();return m[1].replace(/\r\n/g,'\n');};
 const canon={version:1,id:'board',kind:'canonical',owner:'group:default/test'};
 const diagram={nodes:{a:{title:'Alpha'},b:{title:'Beta'}},rows:[['a','b']],edges:[{from:'a',to:'b'}]};
 const inline={page:{title:'Inline block',canon,sections:[{id:'main',heading:'Main board',diagram}]}};
@@ -62,7 +66,7 @@ test('two-file page renders from flowspec.json and keeps its exact text as sourc
  const file=path.join(dir,'flowspec.json');
  expect(JSON.parse(await readFile(file,'utf8'))).toEqual(inline);
  const text=formatted('Served from the file');expectDistinctive(text);await writeFile(file,text);
- expect(BLOCK.exec(html)[1]).toBe(JSON.stringify(inline));expect(text).not.toBe(BLOCK.exec(html)[1]);
+ expect(blockOf(html)).toBe(JSON.stringify(inline));expect(text).not.toBe(blockOf(html));
  await captureController(page);const requests=specRequests(page);
  await page.goto(url);
  // B1: the file wins over the inline block
@@ -77,7 +81,7 @@ test('two-file page renders from flowspec.json and keeps its exact text as sourc
 test('single-file page keeps the inline block text as sourceText and never fetches',async({page,server})=>{
  const text=formatted('Inline formatted');expectDistinctive(text);
  const {html,url}=await build(server,'single',text,false);
- const block=BLOCK.exec(html)[1];expect(block).toBe(text.trim());expect(block).not.toBe(JSON.stringify(JSON.parse(block)));
+ const block=blockOf(html);expect(block).toBe(text.trim());expect(block).not.toBe(JSON.stringify(JSON.parse(block)));
  await captureController(page);const requests=specRequests(page);
  await page.goto(url);
  await expect(page.locator('#docview .doc-title')).toHaveText('Inline formatted');
@@ -117,6 +121,6 @@ test('two-file page without its flowspec.json boots the inline block',async({pag
  await expect(page.locator('#docview .doc-title')).toHaveText('Inline block');
  await expect(page.locator('#docview .errbox')).toHaveCount(0);
  expect(requests).toHaveLength(1);
- const content=await blockText(page);expect(content.trim()).toBe(BLOCK.exec(html)[1]);
+ const content=await blockText(page);expect(content.trim()).toBe(blockOf(html));
  expect(await sourceText(page)).toBe(content);
 });

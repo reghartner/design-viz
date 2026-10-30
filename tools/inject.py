@@ -188,10 +188,11 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False) -> str:
             "keep it.",
             "2. Change the JSON. Keep every field you do not understand.",
             "3. " + validate_step,
-            f"4. Republish only `{SPEC_FILE_NAME}` to the same URL: pass `url` on the publish call "
-            f"and the edited file as `files` (path `{SPEC_FILE_NAME}`); files the call leaves out "
-            "are kept, so the page HTML is never regenerated. A new URL loses every comment and "
-            "the edit history.",
+            f"4. Republish to the same URL: the publish call needs the page too, so first read "
+            "`index.html` from this artifact (read action, `path`) to a local file, then publish "
+            f"with `url`, `file_path` = that saved page unchanged, and `files` = "
+            f'{{"{SPEC_FILE_NAME}": <the edited file>}}. The page HTML is never regenerated; '
+            "a new URL loses every comment and the edit history.",
             "5. Pass the capability declaration below on every publish; it is not recoverable from "
             "the files.",
         ]
@@ -380,7 +381,7 @@ def main(argv=None) -> int:
         # The same authored text as the inline block, never re-serialized: the
         # page keeps this file's exact bytes as its editable source (#826).
         spec_file = Path(out_path).resolve().parent / SPEC_FILE_NAME
-        spec_file.write_text(raw + "\n", encoding="utf-8")
+        spec_file.write_text(raw + "\n", encoding="utf-8", newline="\n")
         print(f"wrote {spec_file}")
     return 0
 

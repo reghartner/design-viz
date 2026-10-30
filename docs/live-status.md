@@ -736,10 +736,15 @@ back to the inline copy. Whichever text boots is kept verbatim and exposed as
 `ctl.sourceText()` (for the inline path, the block's text content); the board's
 Edit mode splices its changes into that text.
 
-Publish both files with the Artifact tool: `index.html` as the page and
-`flowspec.json` through `files`. Later edits republish only `flowspec.json`
-(pass `url` and the file in `files`; files left out are kept), so the page HTML
-is never regenerated and comments survive. Re-injecting a two-file page without
+Publish both files with the Artifact tool: `index.html` as `file_path` and
+`flowspec.json` through `files`. Later edits change only `flowspec.json`, but
+the publish call always needs the page: read the artifact's `index.html` (read
+action with `path`) to a local file, then publish with `url`, that saved page
+as `file_path` unchanged, and the edited `flowspec.json` in `files`. The page
+HTML is never regenerated and comments survive (verified on claude.ai,
+2026-10-30: a publish with `url` and `files` but no `file_path` is refused;
+with the read-back page the stored capabilities carried forward and the edited
+title showed). Re-injecting a two-file page without
 `--two-file` drops the marker, as it replaces a stale guide. For a tracked page
 published this way the declaration adds the artifact and user capabilities the
 board's Edit mode needs; single-file tracked pages keep the declaration above,
@@ -852,8 +857,9 @@ For a page injected with `--two-file` the guide's edit loop targets
 `flowspec.json` instead of the inline block: read that file from the artifact
 (always the current version, since the board saves its own edits into it and
 records each save under `page.editHistory`, which the agent keeps), change it,
-validate, and republish only that file to the same URL with the files form.
-The inline block is described as the stale fallback and must not be edited.
+validate, and republish to the same URL with the artifact's own `index.html`
+read back as the page and the edited file in `files`. The inline block is
+described as the stale fallback and must not be edited.
 A tracked two-file page's declaration adds `artifact` and `user`
 (`{scopes: ["profile"]}`).
 

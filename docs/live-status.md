@@ -114,7 +114,9 @@ Epic/Initiative names as a fallback). An Epic includes its work items; an Initia
 includes its child Epics and their work items. “Stories” in this board means those
 ordinary work items, including Tasks and Bugs. Containers never count as stories.
 This is a bounded two-level hierarchy, not arbitrary project-tree traversal.
-Assigning a story to a node or edge remains an authoring step.
+Assigning a story to a node or edge is an authoring step, or, on a board published
+in two files, an Edit-mode change saved from the board itself (see "Edit mode on the
+shared board" below).
 
 `tracking.jira.exclude` is an optional array of Jira story keys, for example
 `"exclude": ["DOOR-108", "DOOR-109"]`. `trackingExclusions(page)` returns valid
@@ -763,6 +765,47 @@ untracked pages stay comments-only:
 capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]},
   comments: {"composer_only": true, "customAnchors": true}, artifact: {}, user: {scopes: ["profile"]}}
 ```
+
+### Edit mode on the shared board (#828)
+
+On a two-file board opened on claude.ai, people with edit access to the artifact
+(`user.canEdit()` true and `claude.use("artifact")` available) see **Edit** in the
+Live status panel header. Viewers and commenters keep a read-only board. In Edit
+mode:
+
+- **Assign:** drag a Tickets row onto a node or an edge (its line, label or Jira
+  cue). Dragging only adds: a ticket already on other carriers stays there, and a
+  drop on a carrier that already holds the key changes nothing. Drag only; there
+  is no keyboard path and no Undo (desktop only).
+- **Remove:** the carrier's ticket popover shows **Remove** for tickets authored on
+  that carrier. Tickets the popover lists because of an availability rule, and
+  provider-inherited tickets on imported carriers, have none. A move is add +
+  remove.
+- Imported nodes and edges write the consumer overlay
+  (`topologyImports[].nodeTracking` / `edgeTracking`, as the Workbench does); the
+  provider spec never changes.
+- After the first change the header shows **Save N changes** and **Discard**.
+  Discard drops every pending change and shows the last loaded spec. Leaving the
+  page with pending changes raises the browser's leave-page warning.
+- **Save** appends one `page.editHistory` entry (`at`, `by: {id, name}` from
+  `user.me()`, one change per operation with the carrier's path, identity and
+  display label; the newest 200 entries are kept) and publishes only
+  `flowspec.json` (`artifact.publish({"flowspec.json": {content, contentType:
+  "application/json"}})`). Each change is spliced into the authored text, so every
+  other line of the file stays as written.
+- **Another editor saved first** (`conflict`): the runtime reloads the view to
+  the winning version and the page replays the pending changes onto it by each
+  carrier's identity (section id or heading, edge endpoints and label, the import's
+  provider reference), never by position. A change whose carrier is gone, or was
+  not unique when it was made (two identical unlabeled parallel edges), is dropped
+  and listed. Nothing is published until the editor saves again.
+- A read-only answer (`not_writer`, `not_granted`, `capability_disabled`,
+  `not_declared`) hides the edit controls and says the board is read-only here.
+- While the page shows the "couldn't load its latest version" warning (booted from
+  the inline copy), Edit is disabled with that reason: saving the old copy would
+  overwrite newer changes and their history.
+
+Pulling the saved `flowspec.json` back into the repository stays the author's job.
 
 ## Pull requests from GitHub
 

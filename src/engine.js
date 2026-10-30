@@ -4218,12 +4218,13 @@ function wirePresenter(ctl, view, win){
     if (doc.fullscreenElement && doc.exitFullscreen) doc.exitFullscreen().catch(function(){});
   }
   btn.addEventListener('click', function(){ presenting() ? exit() : enter(); });
-  doc.addEventListener('fullscreenchange', function(){
+  function fullscreenChange(){
     if (!doc.fullscreenElement && presenting()){
       doc.body.classList.remove('presenting');
       label(false);
     }
-  });
+  }
+  doc.addEventListener('fullscreenchange', fullscreenChange);
   function stepKey(sp, ev){
     if (!sp) return;
     if (sp.mode() !== 'step') sp.enterStep(false);
@@ -4245,7 +4246,7 @@ function wirePresenter(ctl, view, win){
     var rec = section && ctl.sections.find(function(r){ return r.sectionEl === section; });
     return rec && rec.stepper && !section.hidden ? rec.stepper : null;
   }
-  doc.addEventListener('keydown', function(ev){
+  function keydown(ev){
     var stepping = ev.key === 'ArrowRight' || ev.key === 'ArrowLeft' || ev.key === ' ';
     if (!presenting()){
       if (stepping) stepKey(focusedStepper(ev), ev);
@@ -4261,5 +4262,11 @@ function wirePresenter(ctl, view, win){
     } else if (ev.key === 'Escape'){
       exit();
     }
-  });
+  }
+  doc.addEventListener('keydown', keydown);
+  /* A board edit re-renders the page and wires a new presenter (#828). */
+  return {destroy: function(){
+    doc.removeEventListener('keydown', keydown);doc.removeEventListener('fullscreenchange', fullscreenChange);
+    if (btn.parentNode) btn.parentNode.removeChild(btn);
+  }};
 }

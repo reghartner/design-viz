@@ -25,9 +25,10 @@ function wireArtifactComments(ctl,view,win){
   var claude=null;
   try{claude=win.claude;}catch(ex){claude=null;}
   if(!claude || typeof claude.use!=='function')return null;
-  var doc=win.document,ctrl=null,on=false,threads=[],frame=0,last=null,ring=null,listening=false,mutations=null,bySection=null,down=null;
+  var doc=win.document,ctrl=null,on=false,threads=[],frame=0,last=null,ring=null,listening=false,mutations=null,bySection=null,bySectionOf=null,down=null;
   function sectionOf(el){
-    if(!bySection){bySection=new Map();ctl.sections.forEach(function(rec){bySection.set(rec.sectionEl,rec);});}
+    // An edited board re-renders its sections (#828): rebuild when they change.
+    if(!bySection || bySectionOf!==ctl.sections){bySection=new Map();bySectionOf=ctl.sections;ctl.sections.forEach(function(rec){bySection.set(rec.sectionEl,rec);});}
     for(var node=el;node;node=node.parentElement){var rec=bySection.get(node);if(rec)return rec;}
     return null;
   }

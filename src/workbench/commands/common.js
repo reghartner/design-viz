@@ -71,6 +71,8 @@ function builderNewNodeFloats(d, ids){
    depth. */
 
 function builderClone(v){ return JSON.parse(JSON.stringify(v)); }
+/* Rendered connection identity; shared with the standalone board editor (#828). */
+function builderEdgeKey(e){ return ((e && e.from) || '') + '->' + ((e && e.to) || ''); }
 /* Planners operate on authored source, which can intentionally omit topology
    supplied by a frozen Workbench session. Callers editing a live document pass
    session.validate; standalone command tests and import preparation retain the

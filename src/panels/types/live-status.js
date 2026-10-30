@@ -105,7 +105,16 @@
       var action=button(head,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
       var first=button(head,'first','reader-button dv-live-first','First blocker','firstBlocker');first.hidden=!hasData || !value.firstBlocker;
       if(hasData && value.demo){var demo=el(head,'span','demo','dv-live-demo');var play=button(demo,'play','reader-button',value.demo.playing?'Pause':'Play','toggleDemo');play.disabled=value.demo.manual || value.demo.ended;button(demo,'next','reader-button','Next day','nextDemo').disabled=value.demo.ended;}
-      head.hidden=!available || !(hasData || value.note.text || value.actionLabel);
+      // #828 shared-board Edit mode lives in this header: Edit for editors, then a prominent Save N changes and Discard.
+      var edit=available && value.edit || null,pending=edit?edit.pending:0,editing=!!(edit && edit.active);
+      var editControl=button(head,'edit','reader-button dv-live-edit','Edit','editStart');editControl.hidden=!(edit && edit.editable && !editing);editControl.disabled=!!(edit && (edit.blocked || edit.saving));
+      var saveControl=button(head,'save','reader-button dv-live-save',edit && edit.saving?'Saving…':'Save '+pending+' change'+(pending===1?'':'s'),'editSave');saveControl.hidden=!(editing && pending);saveControl.disabled=!!(edit && edit.saving);
+      var discardControl=button(head,'discard','reader-button dv-live-discard','Discard','editDiscard');discardControl.hidden=!(editing && pending);discardControl.disabled=!!(edit && edit.saving);
+      button(head,'done','reader-button dv-live-done','Done','editDone').hidden=!(editing && !pending);
+      var reason=el(head,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
+      var editNotice=el(head,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
+      var editShown=!!(edit && (edit.editable || edit.notice));
+      head.hidden=!available || !(hasData || value.note.text || value.actionLabel || editShown);
       if(!available)el(host,'p','empty','dv-live-empty','This page has no ticket references.');
       if(hasData){
         var body=el(host,'div','body','dv-live-panel-body'),epic=value.epic || {keys:[]};
@@ -140,7 +149,10 @@
           }else th.textContent=label;
         });
         var tbody=el(table,'tbody','tbody','');sortedTickets(value.tickets,sort).forEach(function(item){
-          var row=el(tbody,'tr',item.key,'dv-live-ticket-row'+(item.tag?' dv-live-ticket-with-tag':''));row.setAttribute('data-live-ticket',item.key);if(item.laneColor)row.style.setProperty('--dv-live-lane-color',item.laneColor);else row.style.removeProperty('--dv-live-lane-color');
+          var row=el(tbody,'tr',item.key,'dv-live-ticket-row'+(item.tag?' dv-live-ticket-with-tag':'')+(editing?' dv-live-draggable':''));row.setAttribute('data-live-ticket',item.key);
+          // Edit mode: a row drags its key onto a node or an edge (the board adds it there; drag only, #825).
+          if(editing)row.setAttribute('draggable','true');else row.removeAttribute('draggable');
+          if(!row._liveDrag){row._liveDrag=function(ev){if(row.getAttribute('draggable')!=='true' || !ev.dataTransfer)return;var key=row.getAttribute('data-live-ticket');ev.dataTransfer.setData('application/x-flowview-ticket',key);ev.dataTransfer.setData('text/plain',key);ev.dataTransfer.effectAllowed='copy';};row.addEventListener('dragstart',row._liveDrag);}if(item.laneColor)row.style.setProperty('--dv-live-lane-color',item.laneColor);else row.style.removeProperty('--dv-live-lane-color');
           // The keyed renderer keeps data rows and controls in order, with a companion row only for an informational tag.
           var keyCell=el(row,'td','key','dv-live-ticket-key');keyCell.setAttribute('tabindex','-1');link(keyCell,'link',item.key,item.url);if(item.epicLabel)el(keyCell,'div','epic','dv-live-ticket-epic',item.epicLabel);el(row,'td','title','dv-live-ticket-title',item.title);
           el(el(row,'td','state',''),'span','pill','dv-live-state-pill'+(value.enabled && states.indexOf(item.state)>=0?' dv-live-'+item.state:''),item.state);
@@ -254,6 +266,13 @@
 .dv-live-chain-holds{font:11px/1.4 'IBM Plex Sans',sans-serif;color:var(--dfaint);}
 .dv-live-none{color:var(--dfaint);}
 .dv-live-suggest{margin:8px 0 0;font:11px/1.5 'IBM Plex Sans',sans-serif;color:var(--dfaint);}
+.dv-live-save{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#fff;font-weight:700;}
+.dv-live-save:disabled{opacity:.7;}
+.dv-live-edit-reason,.dv-live-edit-notice{flex-basis:100%;font:12px/1.5 'IBM Plex Sans',sans-serif;color:var(--dtext);}
+.dv-live-edit-notice[data-kind="warn"],.dv-live-edit-notice[data-kind="error"]{color:var(--dv-live-blocked);}
+.dv-live-draggable{cursor:grab;}
+.dv-live-draggable:active{cursor:grabbing;}
+.dv-live-remove{justify-self:end;}
 .dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}
 
 .pwidget.pt-live-status{display:flex;flex-direction:column}

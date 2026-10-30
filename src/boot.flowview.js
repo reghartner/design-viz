@@ -157,8 +157,8 @@ function sourceFallbackBanner(fallback, page, specFile){
 }
 
 function boot(raw, sourceText, sourceFallback){
-  var topology=document.getElementById('flowview-topology');
-  if(topology){try{raw=FlowTopology.resolveSource(raw,JSON.parse(topology.textContent));}catch(ex){fail([ex.message]);return;}}
+  var topology=document.getElementById('flowview-topology'),topologyContext=null;
+  if(topology){try{topologyContext=JSON.parse(topology.textContent);raw=FlowTopology.resolveSource(raw,topologyContext);}catch(ex){fail([ex.message]);return;}}
   var page = normalize(raw);
   if (raw && raw.tour && page && !page.tour && window.console)
     console.warn('flowspec: top-level "tour" is ignored — the tour config belongs inside "page" (page.tour)');
@@ -178,7 +178,14 @@ function boot(raw, sourceText, sourceFallback){
   /* sourceText: the exact authored text this page booted from (fetched
      flowspec.json, ?spec= file, or the inline block), never re-serialized —
      the board's Edit mode splices its changes into this text (#825). */
-  var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget,liveStatus:liveOptions,handoffHost:window.flowviewHandoffHost,sourceText:sourceText,sourceFallback:sourceFallback || null});
+  /* #828: a two-file board can be edited in place by people with edit access.
+     The editor keeps the authored text and pending changes across renders;
+     each change re-renders the page from the new text (rerender below). */
+  var editor = specFile && typeof sourceText === 'string' && !embedRequest && typeof createBoardEditor === 'function' ?
+    createBoardEditor({win: window, text: sourceText, specFile: specFile, fallback: sourceFallback || null, context: topologyContext,
+                       render: function(text){ return rerender(text); }}) : null;
+  var renderOptions = {layoutTarget:layoutTarget,liveStatus:liveOptions,handoffHost:window.flowviewHandoffHost,sourceText:sourceText,sourceFallback:sourceFallback || null,boardEditor:editor};
+  var ctl = renderPage(view, page, bootSkin, backlinkData, renderOptions);
   if (sourceFallback && view.parentNode){
     var banner = sourceFallbackBanner(sourceFallback, page, specFile);
     view.parentNode.insertBefore(banner, view);
@@ -208,45 +215,85 @@ function boot(raw, sourceText, sourceFallback){
   var preservedHash = embedRequest ?
     'embed=' + encodeURIComponent(String(embedRequest.section)) +
     (embedRequest.skin ? '&sk=' + encodeURIComponent(embedRequest.skin) : '') : null;
-  deepLinkChannel = wireDeepLinks(ctl, window, preservedHash); /* tabs, every diagram/step, contract cards + rows */
-  applyEmbedMode(ctl);
-  if (pendingLinkBase){
-    deepLinkChannel.receiveLinkBaseMessage(pendingLinkBase);
-    pendingLinkBase = null;
-  }
   var artifactHost=tourArtifactHost(window.location.hostname) || !!window.claude,guideAction=null;
   if(artifactHost && typeof initWorkbenchHumanGuide==='function'){
     guideAction=document.createElement('button');guideAction.type='button';guideAction.className='mbtn explore-guide-button';guideAction.textContent='User guide';
     guideAction.setAttribute('data-open-human-guide','');guideAction.setAttribute('aria-haspopup','dialog');
   }
-  initViewerExploreCanvas(ctl,view,{action:guideAction});
-  wirePresenter(ctl, view, window);
-  if(guideAction)initWorkbenchHumanGuide();
-  /* Published as a claude.ai artifact: page-owned comment anchors so a
-     comment records its Tab/View and "Go to" can switch to it. Inert when
-     window.claude or the declared capability is absent. */
-  if (typeof wireArtifactComments === 'function') wireArtifactComments(ctl, view, window);
-  if (!(liveOptions && liveOptions.demo) && typeof wireLiveStatusClaude === 'function') wireLiveStatusClaude(ctl, page, window);
-  /* First-run guided tour: a page's own page.tour replaces the built-in
-     default wholesale; an unusable override falls back to the default so a
-     typo never costs the tour. wireTour itself refuses embeds and #tour=0. */
-  if (typeof wireTour === 'function' && !embedRequest){
-    var tourConfig = tourUsableConfig(page.tour) ? page.tour :
-      (typeof TOUR_DEFAULT_CONFIG !== 'undefined' ? TOUR_DEFAULT_CONFIG : null);
-    wireTour(ctl, view, window, tourConfig,
-             {request: tourRequest, deepLink: tourDeferredByLink,
-              autostart: !artifactHost});
+  /* Everything wired to one render's controller. An edit re-render retires
+     these with the controller and wires them again for the new one. */
+  var wired = [];
+  function retire(handle){ if (handle && typeof handle.destroy === 'function') wired.push(handle); }
+  function wireRender(first){
+    deepLinkChannel = wireDeepLinks(ctl, window, preservedHash); /* tabs, every diagram/step, contract cards + rows */
+    retire(deepLinkChannel);
+    applyEmbedMode(ctl);
+    if (pendingLinkBase){
+      deepLinkChannel.receiveLinkBaseMessage(pendingLinkBase);
+      pendingLinkBase = null;
+    }
+    retire(initViewerExploreCanvas(ctl,view,{action:guideAction}));
+    retire(wirePresenter(ctl, view, window));
+    if (first){
+      if(guideAction)initWorkbenchHumanGuide();
+      /* Published as a claude.ai artifact: page-owned comment anchors so a
+         comment records its Tab/View and "Go to" can switch to it. Inert when
+         window.claude or the declared capability is absent. Wired once; an
+         editable board hands it a handle that follows every re-render. */
+      if (typeof wireArtifactComments === 'function') wireArtifactComments(editor ? currentController() : ctl, view, window);
+    }
+    if (!(liveOptions && liveOptions.demo) && typeof wireLiveStatusClaude === 'function') wireLiveStatusClaude(ctl, page, window);
+    /* First-run guided tour: a page's own page.tour replaces the built-in
+       default wholesale; an unusable override falls back to the default so a
+       typo never costs the tour. wireTour itself refuses embeds and #tour=0.
+       After an edit it only comes back as the replay button. */
+    if (typeof wireTour === 'function' && !embedRequest){
+      var tourConfig = tourUsableConfig(page.tour) ? page.tour :
+        (typeof TOUR_DEFAULT_CONFIG !== 'undefined' ? TOUR_DEFAULT_CONFIG : null);
+      retire(wireTour(ctl, view, window, tourConfig, first ?
+               {request: tourRequest, deepLink: tourDeferredByLink, autostart: !artifactHost} :
+               {request: 'suppress', autostart: false}));
+    }
+    /* "?" opens the reader's keyboard shortcuts; the tour keeps its own button. */
+    if (typeof wireReaderShortcuts === 'function') retire(wireReaderShortcuts(ctl, view, window));
+    /* Host notification, the output side of the flowviewLiveStatus /
+       flowviewHandoffHost inputs: a shell or harness registered before boot
+       receives the controller once the page is wired (again after an edit
+       re-render). A throwing hook is the host's bug, never the page's. */
+    if (typeof window.flowviewBooted === 'function'){
+      try { window.flowviewBooted(ctl); }
+      catch (ex){ if (window.console) console.warn('flowspec: flowviewBooted hook failed: ' + ex.message); }
+    }
   }
-  /* "?" opens the reader's keyboard shortcuts; the tour keeps its own button. */
-  if (typeof wireReaderShortcuts === 'function') wireReaderShortcuts(ctl, view, window);
-  /* Host notification, the output side of the flowviewLiveStatus /
-     flowviewHandoffHost inputs: a shell or harness registered before boot
-     receives the controller once the page is wired. A throwing hook is the
-     host's bug, never the page's. */
-  if (typeof window.flowviewBooted === 'function'){
-    try { window.flowviewBooted(ctl); }
-    catch (ex){ if (window.console) console.warn('flowspec: flowviewBooted hook failed: ' + ex.message); }
+  /* A stable handle on whichever controller is current (comment anchors are
+     registered once with the runtime). */
+  function currentController(){
+    return new Proxy({}, {
+      get: function(_, key){ var value = ctl[key]; return typeof value === 'function' ? value.bind(ctl) : value; },
+      set: function(_, key, value){ ctl[key] = value; return true; },
+      has: function(_, key){ return key in ctl; }
+    });
   }
+  /* #828: re-render from edited text. The text is normalized and validated
+     first; a text that fails is refused (the editor keeps the previous one). */
+  function rerender(text){
+    var next;
+    try {
+      var parsed = JSON.parse(text);
+      next = normalize(topologyContext ? FlowTopology.resolveSource(parsed, topologyContext) : parsed);
+    } catch (ex){ return ex.message; }
+    var checked = validate(next);
+    if (checked.errors.length) return checked.errors[0];
+    var scrollX = window.scrollX, scrollY = window.scrollY;
+    wired.splice(0).reverse().forEach(function(handle){ try { handle.destroy(); } catch (ex){} });
+    ctl.destroy();
+    page = next;
+    ctl = renderPage(view, page, bootSkin, backlinkData, Object.assign({}, renderOptions, {sourceText: text}));
+    wireRender(false);
+    window.scrollTo(scrollX, scrollY);
+    return null;
+  }
+  wireRender(true);
 }
 
 var inlineText = (document.getElementById('flowspec') || {}).textContent || '';

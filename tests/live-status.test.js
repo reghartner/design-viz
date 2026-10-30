@@ -549,7 +549,7 @@ test('P2 chunks of 25 keys preserve order in three batches of at most ten',()=>{
 test('P1 P9 provider is standalone only and inert without runtime, refs, namespace or with host provider',async()=>{
  assert.match(entrypoint('standalone').body,/function wireLiveStatusClaude\(/);
  for(const name of ['native','workbench','forge'])assert.doesNotMatch(entrypoint(name).body,/function wireLiveStatusClaude\(/);
- assert.match(fs.readFileSync('src/boot.flowview.js','utf8'),/wireArtifactComments\(ctl, view, window\);\s*(?:if[^\n]+)?wireLiveStatusClaude\(ctl, page, window\)/);
+ assert.match(fs.readFileSync('src/boot.flowview.js','utf8'),/wireArtifactComments\([^;\n]*\bview, window\);\s*\}?\s*(?:if[^\n]+)?wireLiveStatusClaude\(ctl, page, window\)/);
  const h=providerHarness(),wire=h.C.wireLiveStatusClaude;delete h.win.claude;assert.equal(wire(h.ctl,h.ctl.page,h.win),null);
  Object.defineProperty(h.win,'claude',{configurable:true,get(){throw Error('unavailable');}});assert.equal(wire(h.ctl,h.ctl.page,h.win),null);
  Object.defineProperty(h.win,'claude',{configurable:true,value:{use:()=>Promise.resolve(null)},writable:true});assert.equal(await h.start(),null);assert.equal(h.calls.length,0);assert.equal(h.view.querySelector('.dv-live-head').hidden,true);

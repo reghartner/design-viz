@@ -466,6 +466,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var view=ctl.view,authoring=!!(renderOptions && renderOptions.authoring),records=sectionRecords(page),map=Object.create(null),on=true,retired=false,applied=false,availabilityOn=true;
   // #827: the validated edit history rides the snapshot so the edit-history panel can read it through this seam.
   var editHistory=typeof editHistoryEntries==='function'?editHistoryEntries(page):[];
+  // #828: the shared-board editor outlives this controller (each edit re-renders the page); Workbench authoring never edits here.
+  var editor=!authoring && renderOptions && renderOptions.boardEditor || null;
+  function editing(){return !!(editor && editor.state().active);}
   var destroyListeners=[],listeners=[],bindings=[],observer=null,frame=0,firstPaint=0,timer=0,pending=false,catchUp=false,painting=false;
   var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
@@ -578,7 +581,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       dependencies:copy(dependencies),waiting:copy(boardWaiting),chains:liveStatusDependencyChains(boardWaiting),suggestions:suggestions,epic:epic,
       coverage:coverage,readiness:readiness,activity:copy(activity.filter(function(item){return storyKeys.indexOf(item.key)>=0;})).map(function(item){item.relative=item.at?relative(item.at):'time unavailable';return item;}),
       demo:demoControls?{playing:!!demoControls.playing,manual:!!demoControls.manual,ended:!!demoControls.ended}:null,verdict:verdict,
-      editHistory:copy(editHistory),
+      editHistory:copy(editHistory),edit:editor?editor.state():null,
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
       connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+relative(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}}};
   }
@@ -598,7 +601,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function outside(ev){if(active && !active.contains(ev.target) && !pop.contains(ev.target) && carrierFrom(ev.target)!==active)close(true);}
   function escape(ev){if(ev.key==='Escape' && active){ev.preventDefault();ev.stopPropagation();close(true);}}
-  function show(trigger,value,tracking,label,waiting,availability){
+  function show(trigger,value,tracking,label,waiting,availability,ref){
     if(retired)return;
     if(active===trigger){close(true);return;}close(false);
     if(!pop){pop=element('div','nbackpop dv-live-popover',null,view);pop.setAttribute('role','dialog');pop.setAttribute('popover','manual');pop.hidden=true;}
@@ -627,8 +630,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
         element('div','dv-live-waiting-chain',chain.join(' holds '),pop);
       });
     }
+    // Edit mode: Remove only for tickets authored on this carrier, never for availability causes or provider-inherited ones.
+    var removable=ref && editing()?editor.removable(ref):[];
     found.tickets.forEach(function(key){
       var entry=map[key],row=element('div','dv-live-ticket',null,pop);
+      if(removable.indexOf(key)>=0){
+        var remove=element('button','reader-button dv-live-remove','Remove',row);remove.type='button';remove.setAttribute('aria-label','Remove '+key+' from '+label);
+        remove.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();close(false);setTimeout(function(){editor.remove(ref,key);},0);});
+      }
       link(row,key,liveStatusTicketURL(tracking,key,entry,trackingTicketURL(value,key) || (availability || []).map(function(cause){return trackingTicketURL(cause.value,key);}).filter(Boolean)[0]));
       var pill=element('span','dv-live-ticket-state dv-live-state-pill',entry?entry.state:'No status',row);liveStatusClass(pill,entry?entry.state:null);
       if(entry){
@@ -656,10 +665,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
      the Workbench owns carrier clicks, selection and focus, so the trigger
      stays inert and the Tickets table remains the route to the popover. */
   var CARRIER_ATTRS=['role','tabindex','aria-label','aria-haspopup','aria-expanded'];
-  function carrierTarget(el,id,value,state,tracking,label,waiting,availability){
+  function carrierTarget(el,id,value,state,tracking,label,waiting,availability,ref){
     if(!el._liveSaved){el._liveSaved={};CARRIER_ATTRS.forEach(function(name){el._liveSaved[name]=el.getAttribute(name);});}
     el.classList.add('dv-live-target');el.setAttribute('data-live-carrier',id);
-    el._liveCarrier={value:value,state:state,tracking:tracking,label:label,waiting:waiting,availability:availability};
+    el._liveCarrier={value:value,state:state,tracking:tracking,label:label,waiting:waiting,availability:availability,ref:ref || null};
     if(authoring)return el;
     el.setAttribute('role','button');el.setAttribute('tabindex','0');el.setAttribute('aria-haspopup','dialog');el.setAttribute('aria-expanded','false');
     el.setAttribute('aria-label',(trackingRefs(value).tickets.length?'Live tickets for ':'Work status for ')+label+(state?' · '+(state==='unchanged'?'No change needed':state==='missing' && value.missingWork===true?'Missing work':state):'')+(availability?' · '+liveStatusAvailabilityLabel(availability):'')+(waiting && waiting.keys?' · waiting on '+waiting.keys.join(', '):''));
@@ -689,7 +698,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var node=target.closest('g.node[data-dv-node]');if(!node || !view.contains(node) || target.closest(CARRIER_SKIP))return null;
     return node.querySelector('.card.dv-live-target');
   }
-  function openCarrier(el){var c=el._liveCarrier;show(el,c.value,c.tracking,c.label,c.waiting,c.availability);}
+  function openCarrier(el){var c=el._liveCarrier;show(el,c.value,c.tracking,c.label,c.waiting,c.availability,c.ref);}
   function carrierClick(ev){
     if(authoring || retired || ev.defaultPrevented || ev.button>0)return;
     var el=carrierFrom(ev.target);if(!el || !el._liveCarrier)return;
@@ -702,9 +711,46 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   view.addEventListener('click',carrierClick);view.addEventListener('keydown',carrierKey);
   destroyListeners.push(function(){view.removeEventListener('click',carrierClick);view.removeEventListener('keydown',carrierKey);});
+  /* #828 Edit mode drop targets: a Tickets row dragged onto a node card or an
+     edge (line, halo, label, live break or its Jira cue) adds its key to that
+     carrier of this page. Detail pages loaded from other specs are not editable. */
+  var EDIT_TICKET_TYPE='application/x-flowview-ticket',dropOver=null;
+  function dropRef(target){
+    if(!editing() || !target || !target.closest)return null;
+    var inside=bindings.filter(function(binding){return binding.ordinal!=null && binding.el.contains(target);});
+    var binding=inside.filter(function(candidate){return !inside.some(function(other){return other!==candidate && candidate.el.contains(other.el);});})[0];
+    if(!binding)return null;
+    var node=target.closest('g.node[data-dv-node]');
+    if(node && binding.el.contains(node))return node.classList.contains('node-text')?null:{el:node,ref:{section:binding.ordinal,kind:'node',id:node.getAttribute('data-dv-node')}};
+    var edge=target.closest('[data-dv-edge]'),index=edge?Number(edge.getAttribute('data-dv-edge')):NaN;
+    if(!edge || !binding.el.contains(edge) || !isFinite(index))return null;
+    var svg=edge.closest('svg');
+    return {el:svg && svg.querySelector('path.edge[data-dv-edge="'+index+'"]') || edge,ref:{section:binding.ordinal,kind:'edge',index:index}};
+  }
+  function setDropOver(el){if(dropOver===el)return;if(dropOver)dropOver.classList.remove('dv-edit-over');dropOver=el;if(el)el.classList.add('dv-edit-over');}
+  function carriesTicket(ev){return !!(ev.dataTransfer && Array.prototype.indexOf.call(ev.dataTransfer.types || [],EDIT_TICKET_TYPE)>=0);}
+  function dragOver(ev){
+    if(!carriesTicket(ev))return;
+    var hit=dropRef(ev.target);setDropOver(hit && hit.el);if(!hit)return;
+    ev.preventDefault();ev.dataTransfer.dropEffect='copy';
+  }
+  function dragLeave(ev){var hit=dropRef(ev.relatedTarget);if(!hit || hit.el!==dropOver)setDropOver(null);}
+  function drop(ev){
+    if(!carriesTicket(ev))return;
+    var hit=dropRef(ev.target);setDropOver(null);if(!hit)return;
+    ev.preventDefault();
+    var key=ev.dataTransfer.getData(EDIT_TICKET_TYPE);if(!trackingKeyPattern.test(key))return;
+    // The editor re-renders the page; leave this event's dispatch first.
+    setTimeout(function(){if(editor)editor.add(hit.ref,key);},0);
+  }
+  if(editor){
+    view.addEventListener('dragover',dragOver);view.addEventListener('dragleave',dragLeave);view.addEventListener('drop',drop);
+    var offEditor=editor.onChange(function(){if(!retired){paint();notify();}});
+    destroyListeners.push(function(){offEditor();setDropOver(null);view.removeEventListener('dragover',dragOver);view.removeEventListener('dragleave',dragLeave);view.removeEventListener('drop',drop);});
+  }
   function sourceBindings(){
     var found=[];
-    ctl.sections.forEach(function(rec){var record=records.find(function(r){return r.reference===rec.reference;});if(record)found.push({el:rec.sectionEl,section:record.section,page:page,stepper:rec.stepper});});
+    ctl.sections.forEach(function(rec){var index=records.findIndex(function(r){return r.reference===rec.reference;});if(index>=0)found.push({el:rec.sectionEl,section:records[index].section,page:page,stepper:rec.stepper,ordinal:index});});
     var saved=ctl.details && ctl.details.snapshot(),activeSections=ctl.details && ctl.details.activeSections();
     if(saved && activeSections){
       var currentPage=page,record=detailSection(page,saved.section),section=record && record.section;
@@ -714,7 +760,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         if(detail.spec)currentPage=remotePages[remoteKey(detail)];
         var target=currentPage && (detail.section?detailSection(currentPage,detail.section):sectionRecords(currentPage).find(function(r){return r.section.diagram;}));
         section=target && target.section;
-        var rec=activeSections[index+1];if(section && rec)found.push({el:rec.sectionEl,section:section,page:currentPage,stepper:rec.stepper});
+        var rec=activeSections[index+1],ordinal=currentPage===page?records.findIndex(function(r){return r.section===section;}):-1;
+        if(section && rec)found.push({el:rec.sectionEl,section:section,page:currentPage,stepper:rec.stepper,ordinal:ordinal>=0?ordinal:null});
       });
     }
     return found;
@@ -953,7 +1000,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         // Only these cards transfer the ticket button to the separate Jira cue.
         if(target.closest('.handoff-link')){
           var carrier=target._liveCarrier,id=target.getAttribute('data-live-carrier');clearTarget(target);
-          if(carrier){marker.removeAttribute('aria-hidden');carrierTarget(marker,id,carrier.value,carrier.state,carrier.tracking,carrier.label,carrier.waiting,carrier.availability);}
+          if(carrier){marker.removeAttribute('aria-hidden');carrierTarget(marker,id,carrier.value,carrier.state,carrier.tracking,carrier.label,carrier.waiting,carrier.availability,carrier.ref);}
         }else carrierPointer(marker,target);
         obstacles.push({el:marker,box:{x:point.x-11,y:point.y-11,w:22,h:22}});
       }
@@ -1000,7 +1047,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(!state && !waits && !unavailable && !trackingRefs(value).tickets.length)return;
       var card=el.querySelector('.card');if(!card)return;
       if(state || waits || unavailable){var halo=card.cloneNode(false);halo.setAttribute('class','dv-live-halo');halo.removeAttribute('id');halo.setAttribute('aria-hidden','true');el.insertBefore(halo,el.firstChild);}
-      carrierTarget(card,id,value,state,binding.page.tracking,value.title || id,waits,unavailable);
+      carrierTarget(card,id,value,state,binding.page.tracking,value.title || id,waits,unavailable,binding.ordinal!=null?{section:binding.ordinal,kind:'node',id:id}:null);
     });
     scope.querySelectorAll('path.edge[data-dv-edge],path.halo[data-dv-edge],text.lbl[data-dv-edge]').forEach(function(el){
       var index=Number(el.getAttribute('data-dv-edge')),value=(d.edges || [])[index],state=on?liveStatusEdgePresentation(value,map,availabilityOn):null;
@@ -1008,7 +1055,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var waits=value && waiting[value.from+'->'+value.to],painted=state==='blocked' || state==='missing'?null:waits;decorateCarrier(el,value,binding.page.tracking);liveStatusClass(el,state);liveStatusWaitingClass(el,painted);
       if((!state && !waits && !unavailable && !trackingRefs(value).tickets.length) || !el.classList.contains('edge'))return;
       var svg=el.closest('svg'),label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');
-      var target=carrierTarget(label || el,value.from+'->'+value.to,value,state,binding.page.tracking,value.label || value.from+' → '+value.to,waits,unavailable);
+      var target=carrierTarget(label || el,value.from+'->'+value.to,value,state,binding.page.tracking,value.label || value.from+' → '+value.to,waits,unavailable,binding.ordinal!=null?{section:binding.ordinal,kind:'edge',index:index}:null);
       carrierPointer(el,target);carrierPointer(svg.querySelector('path.halo[data-dv-edge="'+index+'"]'),target);
     });
     liveStatusEdgeBreaks(scope,d,map,on,availabilityOn);
@@ -1019,7 +1066,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       // keyboard button onto the visible replacement so Escape can focus it.
       if(target===path){
         var carrier=path._liveCarrier;
-        target=carrierTarget(el,path.getAttribute('data-live-carrier'),carrier.value,carrier.state,carrier.tracking,carrier.label,carrier.waiting,carrier.availability);
+        target=carrierTarget(el,path.getAttribute('data-live-carrier'),carrier.value,carrier.state,carrier.tracking,carrier.label,carrier.waiting,carrier.availability,carrier.ref);
         clearTarget(path);carrierPointer(path,target);carrierPointer(svg.querySelector('path.halo[data-dv-edge="'+el.getAttribute('data-dv-edge')+'"]'),target);
       }
       carrierPointer(el,target);
@@ -1066,6 +1113,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         bindings.forEach(paintBinding);
       }
       bindings.forEach(paintStory);paintLanes();
+      view.querySelectorAll('.dv-edit-target').forEach(function(el){el.classList.remove('dv-edit-target');});
+      if(editing())bindings.forEach(function(binding){if(binding.ordinal!=null)binding.el.querySelectorAll('g.node[data-dv-node]:not(.node-text),path.edge[data-dv-edge]').forEach(function(el){el.classList.add('dv-edit-target');});});
       if(focusBinding){var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier;});if(replacement)replacement.focus({preventScroll:true});}
       changedKeys=[];
     }finally{
@@ -1100,6 +1149,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     state:function(ref){return map[ref]?copy(map[ref]):null;},
     apply:function(value){
       if(retired)return;var next=Object.create(null);
+      if(editor)editor.rememberMap(value);
       Object.keys(value || {}).forEach(function(key){
         var entry=value[key];if(!trackingKeyPattern.test(key) || !entry || LIVE_STATUS_STATES.indexOf(entry.state)<0)return;
         var item={state:entry.state};if(['initiative','epic','story'].indexOf(entry.kind)>=0)item.kind=entry.kind;
@@ -1145,6 +1195,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
     action:function(label,fn){if(retired)return;actionLabel=typeof label==='string'?label:'';actionFn=actionLabel && typeof fn==='function'?fn:null;notify();},
     setDemoControls:function(value){if(retired)return;demoControls=value;notify();},
     status:function(value){setStatus(value);},
+    editStart:function(){if(!retired && editor)editor.start();},
+    editDone:function(){if(!retired && editor)editor.done();},
+    editSave:function(){if(!retired && editor)editor.save();},
+    editDiscard:function(){if(!retired && editor)editor.discard();},
     destroy:function(){
       if(retired)return;on=false;paintLanes();retired=true;releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
@@ -1166,6 +1220,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   liveStatusControllers.set(view,api);
   connectPanels();
   paint();events.forEach(function(type){view.addEventListener(type,schedule);});
+  // An edit re-renders the page: the new controller starts from the last live map so colors never reset.
+  if(editor && editor.lastMap())api.apply(editor.lastMap());
   if(provider){document.addEventListener('visibilitychange',visibility);firstPaint=requestAnimationFrame(function(){firstPaint=requestAnimationFrame(function(){firstPaint=0;fetchMap();});});}
   if(options.demo && typeof options.demo.mount==='function')demoDestroy=options.demo.mount(api);
   return api;

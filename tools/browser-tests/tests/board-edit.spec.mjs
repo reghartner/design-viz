@@ -22,7 +22,7 @@
 | E12 conflict replay: sections swapped | editor drops on section "second"'s door; the winner swaps the sections | EX-1 lands on the door of the section whose id is "second" (now index 0), not on index 1 | replay by stored numeric path |
 | E13 conflict replay: ambiguous parallel edge | two identical unlabeled door → cloud edges; the editor drops on the second; the winner deletes the first | the op is dropped and listed ("0 of your changes were re-applied; 1 could not be"), the remaining edge has no EX-1, no Save button | replaying onto the only remaining edge |
 | E14 conflict replay: carrier deleted | editor drops on B; the winner deletes B | op dropped and listed; no carrier gains EX-1 | applying to a same-titled or nearby carrier |
-| E15 inline fallback cannot save | two-file page whose flowspec.json is missing (inline copy, warning banner) | Edit is disabled with the reason "couldn't load its latest version"; EX-1 row not draggable; zero publishes | saving the fallback copy over the newer file |
+| E15 inline fallback cannot save | two-file page whose flowspec.json is missing (inline copy, warning banner) | Edit is absent or disabled (the #828 comment allows hiding or disabling); the Live status panel shows a reason naming the latest version not loading; a drag of EX-1 onto B changes nothing (EX-1 stays NOT ON DIAGRAM, no Save); zero publishes | saving the fallback copy over the newer file; an enabled Edit; a silent lock with no reason |
 Flip: remove the drop handler → E2's publish count 0 ≠ 1.
 */
 import {test,expect} from '../helpers/test.mjs';
@@ -260,8 +260,10 @@ test('E15 a board booted from its inline fallback copy cannot enter Edit mode or
  await mockRuntime(page);
  const {root,panel}=await openBoard(page,board);
  await expect(page.locator('.dv-source-fallback[role="alert"]')).toBeVisible();
- const edit=editButton(panel);await expect(edit).toBeVisible();await expect(edit).toBeDisabled();
- await expect(panel.locator('.dv-live-edit-reason')).toContainText("couldn't load its latest version");
+ // Editing resolves asynchronously; the reason is the signal that the page decided.
+ await expect(panel.getByText(/(couldn't|could not|did not|didn't) load its latest version|latest version (did not|didn't|could not|couldn't) load/i)).toBeVisible();
+ const edit=editButton(panel);
+ if(await edit.count())await expect(edit).toBeDisabled();
  await expect(ticketRow(panel,'EX-1')).not.toHaveAttribute('draggable','true');
  await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(root,'b')));
  await expect(saveButton(panel)).toHaveCount(0);await expect(coverageTag(panel,'EX-1')).toHaveText('NOT ON DIAGRAM');

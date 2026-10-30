@@ -169,16 +169,16 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
 18. **No panel exists only to hold prose.** A panel that `holds` on every step
     and shows no device, app or data state fails the boring-panel check: move
     its words (decisions, references, notes) to the section's `text`/`bullets`.
-19. **Every reference is a link; find the real URL.** Each doc, Jira key, PR,
-    ticket or Confluence page the page mentions must link to its real URL.
-    Look it up with the tools this session has (Jira/Atlassian, GitHub,
-    Confluence, the repository and catalog, rule 10), starting from what the
-    operator gave you (a key, a repo, a site, a title). Use the URL the tool
-    returns; never invent one. In prose use `[REPLAY-120](https://…)`; on a
-    node or step use its `link` field (labels do not render Markdown). Only
-    if the lookup fails: keep the reference visible as text, list it under
-    **Missing links** in the ledger with what you searched, and ask for all
-    missing links in one question.
+19. **Every reference is a link; find the real URL.** Each doc, Jira key, PR
+    or Confluence page mentioned links to its real URL. Look it up with this
+    session's tools (Jira, GitHub, Confluence, repo, catalog; rule 10) from
+    what the operator gave (key, repo, site, title). Use the URL a tool
+    returns, or the standard address on a site or repo the operator gave
+    (`<jira-site>/browse/<KEY>`, `github.com/<owner>/<repo>/pull/<N>`; the ledger
+    says if a tool confirmed it). Never invent a host. Prose:
+    `[REPLAY-120](https://…)`; nodes and steps: the `link` field. If neither
+    works, keep the reference as text, list it under **Missing links** in the
+    ledger with what you searched, and ask for all missing links in one question.
 20. **Group tabs the way the reader experiences the product.** If the page
     will have tabs and neither the request nor the source settles the
     grouping, ask how to group them (Phase 2), proposing user-experience

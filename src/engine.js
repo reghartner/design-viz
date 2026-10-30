@@ -1744,6 +1744,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   var chipButtons = [], pathButtons = [], pathTimeline = null, chipDeltas = null;
   function paintStepCoins(){
     if (board.deltaDetails) board.deltaDetails.close();
+    if (stepCoins) stepCoins.hide(); // numbers may change under an open card
     var visible=stops();
     svg.querySelectorAll('.coin[data-dv-step]').forEach(function(coin){
       var index=selectedPath.indices.indexOf(Number(coin.getAttribute('data-dv-step'))),position=visible.indexOf(index);

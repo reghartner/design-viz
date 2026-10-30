@@ -36,6 +36,10 @@ test('a board coin shows its step after a hover delay and goes to that step on c
  await expect(card.locator('.step-coin-card-text code')).toHaveText('status');
  await expect(card.locator('.step-coin-card-hint')).toHaveText('Click to go to this step');
  await expect(coin(1)).toHaveAttribute('aria-describedby',await card.getAttribute('id'));
+ const cardBox=await card.boundingBox(),boardBox=await root.locator('.board').first().boundingBox();
+ expect(cardBox.x).toBeGreaterThanOrEqual(boardBox.x);expect(cardBox.y).toBeGreaterThanOrEqual(boardBox.y);
+ expect(cardBox.x+cardBox.width).toBeLessThanOrEqual(boardBox.x+boardBox.width);
+ expect(cardBox.y+cardBox.height).toBeLessThanOrEqual(boardBox.y+boardBox.height);
 
  // Clicking from the ambient view enters step view at that step.
  await coin(1).click();
@@ -49,8 +53,12 @@ test('a board coin shows its step after a hover delay and goes to that step on c
  await page.waitForTimeout(600);
  await expect(card).toBeHidden();
 
- // On another path, coins renumber; the card and Enter follow that path.
+ // An open card closes when another control is pressed, here a path chip;
+ // on that path coins renumber and the card and Enter follow it.
+ await coin(2).hover();
+ await expect(card.locator('.step-coin-card-label')).toHaveText('Step 3 · NET · Hub → Cloud');
  await root.locator('.path-chip[data-dv-path="hub"]').click();
+ await expect(card).toBeHidden();
  await expect(coin(1)).toHaveClass(/view-step-hidden/);
  await expect(coin(1)).not.toHaveAttribute('tabindex',/.*/);
  await coin(2).hover();

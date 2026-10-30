@@ -44,11 +44,17 @@ function wireStepCoins(host, prefix, describe, activate){
     }
     card.hidden = false;
     if (card.showPopover) card.showPopover();
-    var rect = coin.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
-    card.style.left = Math.max(8, Math.min(vw - card.offsetWidth - 8, rect.left + rect.width / 2 - card.offsetWidth / 2)) + 'px';
-    var top = rect.top - card.offsetHeight - 8;
-    if (top < 8) top = rect.bottom + 8;
-    card.style.top = Math.max(8, Math.min(vh - card.offsetHeight - 8, top)) + 'px';
+    // Keep the card over the visible part of the board, above the coin when
+    // it fits there; a board smaller than the card falls back to the window.
+    var rect = coin.getBoundingClientRect(), board = host.getBoundingClientRect(), w = card.offsetWidth, h = card.offsetHeight;
+    var minX = Math.max(8, board.left + 8), maxX = Math.min(window.innerWidth - 8, board.right - 8);
+    var minY = Math.max(8, board.top + 8), maxY = Math.min(window.innerHeight - 8, board.bottom - 8);
+    if (maxX - minX < w){ minX = 8; maxX = window.innerWidth - 8; }
+    if (maxY - minY < h){ minY = 8; maxY = window.innerHeight - 8; }
+    var top = rect.top - h - 8;
+    if (top < minY) top = rect.bottom + 8;
+    card.style.left = Math.max(minX, Math.min(maxX - w, rect.left + rect.width / 2 - w / 2)) + 'px';
+    card.style.top = Math.max(minY, Math.min(maxY - h, top)) + 'px';
     shown = coin; coin.setAttribute('aria-describedby', card.id);
   }
   function schedule(coin){
@@ -91,6 +97,8 @@ function wireStepCoins(host, prefix, describe, activate){
     });
   }
   listen(document, 'keydown', function(ev){ if (ev.key === 'Escape' && (shown || pending)) hide(); }, true);
+  // Any press away from the shown coin (a path, view or step control) closes it.
+  listen(document, 'pointerdown', function(ev){ if ((shown || pending) && !coinOf(ev.target)) hide(); }, true);
   listen(document, 'scroll', hide, true);
   listen(window, 'resize', hide);
   return {hide:hide, destroy:function(){ hide(); listeners.forEach(function(off){ off(); }); card.remove(); }};

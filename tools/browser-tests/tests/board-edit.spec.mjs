@@ -9,7 +9,7 @@
 | row | fixture | assertion (scoped) | rejects |
 |---|---|---|---|
 | E1 Edit only for editors with the artifact capability | boardSpec; canEdit false; then canEdit true with use("artifact") null | Live status panel: no Edit button; the EX-1 row is not draggable; a drag onto B leaves EX-1 NOT ON DIAGRAM; zero publish calls | an Edit button shown to every viewer; one gated only on canEdit |
-| E2 drop on a node + Save | EX-1 (NOT ON DIAGRAM) dragged onto node B | before Save: zero publishes, B's Jira cue appears, EX-1 tag gone, button "Save 1 change"; after Save: exactly one publish of only flowspec.json (application/json) whose B.tickets == ["EX-1"], one new page.editHistory entry {at ISO between click and answer, by {id,name} of user.me(), changes [{op add, ticket EX-1, node b, label "Beta service", path to B}]}, every other authored line unchanged; Save/Discard gone; the Edit history panel shows the entry | a re-serialized spec; a publish per drop; a history entry without by or label; a whole-document publish |
+| E2 drop on a node + Save | EX-1 (NOT ON DIAGRAM) dragged onto node B | while the row is held over B: `g.node[data-dv-node=b]` has `dv-edit-over`, A does not, and B's card stroke is none of the five live-state colors; before Save: zero publishes, B's Jira cue appears, EX-1 tag gone, button "Save 1 change"; after Save: exactly one publish of only flowspec.json (application/json) whose B.tickets == ["EX-1"], one new page.editHistory entry {at ISO between click and answer, by {id,name} of user.me(), changes [{op add, ticket EX-1, node b, label "Beta service", path to B}]}, every other authored line unchanged; Save/Discard gone; the Edit history panel shows the entry | a re-serialized spec; a publish per drop; a history entry without by or label; a whole-document publish |
 | E3 drop on an edge + Save | EX-1 dragged onto edge A → B ("calls") | edges[0].tickets == ["EX-1"]; change {edge ["a","b"], label "Alpha service → Beta service"} | edge label text instead of endpoint titles; writing to a node |
 | E4 add-only | AA-1 (on A) dragged onto B | A.tickets and B.tickets both ["AA-1"] | a move (removing from A) |
 | E5 no-op drops | AA-1 onto A; EX-1 onto B twice | after the first: no Save, no Discard; after the repeat: still "Save 1 change"; saved B.tickets == ["EX-1"] | counting a drop that changes nothing; duplicating a key |
@@ -17,7 +17,7 @@
 | E7 Discard | two pending changes | Discard → zero publishes, EX-1 NOT ON DIAGRAM again, B has no Jira cue, Save/Discard gone | Discard that hides buttons but keeps the edited board |
 | E8 leave warning | one pending change; then after Save; then after Discard | navigation raises one beforeunload dialog with a pending change and none after Save or Discard | no handler; a handler left armed after Save/Discard |
 | E9 read-only rejection | publish rejects not_writer | Edit, Save and Discard gone; the panel says the board is read-only here | treating not_writer as a retryable error |
-| E10 conflict | publish rejects conflict once; the reload serves another editor's spec (A retitled, its own history entry) | after reload: A's new title shows (the winner rendered), EX-1 re-applied (B has it, tag gone), notice "Another editor saved first. 1 of your changes were re-applied; 0 could not be", zero publishes until Save; Save publishes the winner text plus EX-1 on B with both history entries | an automatic second publish; replay onto the editor's stale text; losing the winner's history |
+| E10 conflict | publish rejects conflict once; the reload serves another editor's spec (A retitled, its own history entry) | the runtime's reload raises no beforeunload dialog (also E12–E14); after reload: A's new title shows (the winner rendered), EX-1 re-applied (B has it, tag gone), notice "Another editor saved first. 1 of your changes were re-applied; 0 could not be", zero publishes until Save; Save publishes the winner text plus EX-1 on B with both history entries | an automatic second publish; replay onto the editor's stale text; losing the winner's history |
 | E11 duplicate identities | node id door in sections one and two; two parallel edges door → cloud in section two | drops onto section two's door and the second parallel edge change only sections[1].nodes.door and sections[1].edges[1] | addressing by node id or endpoints alone |
 | E12 conflict replay: sections swapped | editor drops on section "second"'s door; the winner swaps the sections | EX-1 lands on the door of the section whose id is "second" (now index 0), not on index 1 | replay by stored numeric path |
 | E13 conflict replay: ambiguous parallel edge | two identical unlabeled door → cloud edges; the editor drops on the second; the winner deletes the first | the op is dropped and listed ("0 of your changes were re-applied; 1 could not be"), the remaining edge has no EX-1, no Save button | replaying onto the only remaining edge |
@@ -28,7 +28,7 @@ Flip: remove the drop handler → E2's publish count 0 ≠ 1.
 import {test,expect} from '../helpers/test.mjs';
 import {rm} from 'node:fs/promises';
 import {EDITOR,boardSpec,buildBoard,serveWinner,mockRuntime,publishes,openBoard,ticketRow,coverageTag,editButton,saveButton,discardButton,
- nodeCard,edgeLabel,cardPoint,strokePoint,dragTicket,startEditing,save,diagramAt,expectSurgical,withoutEdits,TRACKING,PANELS} from '../helpers/board-edit.mjs';
+ nodeCard,edgeLabel,cardPoint,strokePoint,dragTicket,holdTicketOver,reloadRecordingDialogs,startEditing,save,diagramAt,expectSurgical,withoutEdits,TRACKING,PANELS} from '../helpers/board-edit.mjs';
 
 const cue=(root,id)=>root.locator('g.node[data-dv-node="'+id+'"] .dv-jira-cue');
 const popover=page=>page.locator('.dv-live-popover');
@@ -70,7 +70,15 @@ test('E2 E8 dropping a NOT ON DIAGRAM ticket on a node and saving publishes flow
  const {root,panel}=await openBoard(page,board);await precondition(root,panel);
  await expect(saveButton(panel)).toHaveCount(0);await startEditing(panel);
  await expect(ticketRow(panel,'EX-1')).toHaveAttribute('draggable','true');
- await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(root,'b')));
+ // the drop target under the held row highlights, and only that one
+ const release=await holdTicketOver(page,panel,'EX-1',await cardPoint(nodeCard(root,'b')));
+ await expect(root.locator('g.node[data-dv-node="b"]')).toHaveClass(/\bdv-edit-over\b/);
+ await expect(root.locator('g.node[data-dv-node="a"]')).not.toHaveClass(/\bdv-edit-over\b/);
+ const liveColors=await page.evaluate(()=>['todo','active','done','blocked','missing'].map(state=>{const probe=document.createElement('i');probe.style.color='var(--dv-live-'+state+')';document.body.appendChild(probe);const color=getComputedStyle(probe).color;probe.remove();return color;}));
+ const hoverStroke=await nodeCard(root,'b').evaluate(el=>getComputedStyle(el).stroke);
+ expect(liveColors,'hover highlight is not a live-state color').not.toContain(hoverStroke);
+ await release();
+ await expect(root.locator('.dv-edit-over')).toHaveCount(0);
  await expect(saveButton(panel)).toHaveText('Save 1 change');await expect(discardButton(panel)).toBeVisible();
  await expect(coverageTag(panel,'EX-1')).toHaveCount(0);await expect(cue(root,'b')).toHaveCount(1);
  expect(await publishes(page),'nothing is published before Save').toEqual([]);
@@ -179,7 +187,7 @@ test('E10 a conflict replays the stashed change onto the winning spec without pu
  const winner=boardSpec();diagramAt(winner).nodes.a.title='Alpha renamed by Bo';
  winner.page.editHistory=[{at:'2026-10-30T10:00:00.000Z',by:{id:'u_bo',name:'Bo'},changes:[{op:'add',ticket:'AA-1',node:'a',label:'Alpha service'}]}];
  const winnerText=await serveWinner(board,winner);
- await page.reload();({root,panel}=await openBoard(page,board));
+ expect(await reloadRecordingDialogs(page),'the conflict reload raises no leave-page warning').toEqual([]);({root,panel}=await openBoard(page,board));
  await expect(root.locator('g.node[data-dv-node="a"]')).toContainText('Alpha renamed by Bo');
  await expect(panel.locator('.dv-live-edit-notice')).toHaveText(/^Another editor saved first\. 1 of your changes were re-applied; 0 could not be/);
  await expect(coverageTag(panel,'EX-1')).toHaveCount(0);await expect(cue(root,'b')).toHaveCount(1);
@@ -214,7 +222,8 @@ async function conflictThenReload(page,board,act,winner){
  let {root,panel}=await openBoard(page,board);await startEditing(panel);
  await act(root,panel);
  await saveButton(panel).click();await expect.poll(()=>publishes(page).then(list=>list.length)).toBe(1);
- await serveWinner(board,winner);await page.reload();({root,panel}=await openBoard(page,board));
+ await serveWinner(board,winner);
+ expect(await reloadRecordingDialogs(page),'the conflict reload raises no leave-page warning').toEqual([]);({root,panel}=await openBoard(page,board));
  const notice=panel.locator('.dv-live-edit-notice');await expect(notice).toBeVisible();
  await page.waitForTimeout(500);expect(await publishes(page),'no automatic second publish').toEqual([]);
  return {root,panel,notice};

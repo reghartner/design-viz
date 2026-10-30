@@ -179,7 +179,18 @@ function boot(raw, sourceText, sourceFallback){
      flowspec.json, ?spec= file, or the inline block), never re-serialized —
      the board's Edit mode splices its changes into this text (#825). */
   var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget,liveStatus:liveOptions,handoffHost:window.flowviewHandoffHost,sourceText:sourceText,sourceFallback:sourceFallback || null});
-  if (sourceFallback && view.parentNode) view.parentNode.insertBefore(sourceFallbackBanner(sourceFallback, page, specFile), view);
+  if (sourceFallback && view.parentNode){
+    var banner = sourceFallbackBanner(sourceFallback, page, specFile);
+    view.parentNode.insertBefore(banner, view);
+    /* The reader's document navigation is fixed at --flowview-navigation-top
+       (the library reader sets it to its header height, library.workbench.js);
+       the banner takes that slot so the navigation sits below it, never over
+       its Copy error button, and both stay visible while the page scrolls. */
+    var sizeBanner = function(){ view.style.setProperty('--flowview-navigation-top', Math.ceil(banner.getBoundingClientRect().height) + 'px'); };
+    sizeBanner();
+    if (typeof ResizeObserver === 'function') new ResizeObserver(sizeBanner).observe(banner);
+    else window.addEventListener('resize', sizeBanner);
+  }
   if (embedRequest){
     /* compose with the step deep-link fields: m=/s= without an explicit
        d= selector must address the EMBEDDED diagram, not the page's

@@ -19,7 +19,7 @@ body.sk-daylight{background:#F4F2EC;}
   border:1px solid #5A2A22; border-radius:10px; padding:14px 16px; white-space:pre-wrap;}
 /* Two-file page that booted from its inline copy (#826): a large, persistent
    warning above the page, the same on every skin. */
-.dv-source-fallback{display:flex;flex-wrap:wrap;align-items:center;gap:14px 22px;padding:18px 26px;
+.dv-source-fallback{position:sticky;top:0;z-index:101;display:flex;flex-wrap:wrap;align-items:center;gap:14px 22px;padding:18px 26px;
   background:#FFF1C2;color:#5A3D00;border-bottom:3px solid #D99A06;font:600 16px/1.5 'IBM Plex Sans',system-ui,sans-serif;}
 .dv-source-fallback-text{flex:1 1 420px;margin:0;}
 .dv-source-fallback-copy{font:600 14px/1 'IBM Plex Sans',system-ui,sans-serif;padding:11px 18px;border-radius:8px;

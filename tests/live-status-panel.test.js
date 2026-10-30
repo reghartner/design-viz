@@ -89,7 +89,7 @@ test('import-local ticket refs participate in live-status panel warnings before 
 |---|---|---|---|
 | H1 non-array warns once, ignored | editHistory:"x" | one warning `editHistory: must be an array…`; entries [] | an impl that warns per char or throws |
 | H2 valid full + minimal entries kept | full entry; entry without by/path/label | no warnings; both returned | a presence check on optional fields |
-| H3 each malformed shape warns individually, entry ignored | 12 bad shapes | one `editHistory[i]…entry ignored` per bad entry; good entry survives | an impl dropping the whole list on one bad entry |
+| H3 each malformed shape warns individually, entry ignored | 27 bad shapes: missing fields, wrong types for every required and optional field, a bad change after a good one | one `editHistory[i]…entry ignored` per bad entry; good entry survives | an impl dropping the whole list on one bad entry |
 | H4 >200 warns once, newest 200 kept | 201 entries with increasing at | one cap warning; 200 returned, newest first | an impl keeping the oldest 200 or warning per entry |
 | H6 definition facets + completeness | PanelRegistry.get('edit-history') | label/since/no setup or patch fields/template/picker/compat/planAddPanel | a type missing from PANEL_TYPES or the picker |
 | H6b authored state warns and folds empty | initial + step patches | 'edit history has no authored state' ×2; fold [{},{}] | folding authored state into the panel |
@@ -105,8 +105,11 @@ test('H1 H2 editHistory: a non-array warns once and valid entries, full or minim
  const bad=historyFixture('nope');assert.deepEqual(historyWarnings(bad),['editHistory: must be an array of edit entries — ignored']);assert.deepEqual(plain(C.editHistoryEntries(C.normalize(bad))),[]);
  const full=entryAt('2026-10-30T16:23:15.987Z',{changes:[{op:'add',ticket:'AA-1',node:'a',path:['sections',0,'diagram','nodes','a'],label:'Node A'},{op:'remove',ticket:'BB-1',edge:['a','b'],path:['sections',0,'diagram','edges',0],label:'A → B'}]});
  const minimal={at:'2026-10-29T10:00:00Z',changes:[{op:'remove',ticket:'BB-1',edge:['a','b']}]};
- const raw=historyFixture([minimal,full]);assert.deepEqual(plain(C.validate(C.normalize(raw))),{errors:[],warnings:[]});
- assert.deepEqual(plain(C.editHistoryEntries(C.normalize(raw))),[full,minimal],'newest first, entries intact');
+ // Optional fields may be absent or empty without making the entry malformed (#827 field contract).
+ const emptyBy={at:'2026-10-28T10:00:00Z',by:{},changes:[{op:'add',ticket:'AA-1',node:'a',path:[],label:''}]};
+ const blankBy={at:'2026-10-27T10:00:00Z',by:{id:'',name:''},changes:[{op:'add',ticket:'AA-1',node:'a'}]};
+ const raw=historyFixture([minimal,full,blankBy,emptyBy]);assert.deepEqual(plain(C.validate(C.normalize(raw))),{errors:[],warnings:[]});
+ assert.deepEqual(plain(C.editHistoryEntries(C.normalize(raw))),[full,minimal,emptyBy,blankBy],'newest first, entries intact');
  assert.deepEqual(plain(C.validate(C.normalize(historyFixture()))),{errors:[],warnings:[]},'a declared panel without history is not a warning');
 });
 test('H3 editHistory: every malformed shape warns on its own index and only that entry is ignored',()=>{
@@ -114,7 +117,13 @@ test('H3 editHistory: every malformed shape warns on its own index and only that
  const bad=[42,{changes:[{op:'add',ticket:'AA-1',node:'a'}]},{at:'yesterday',changes:[{op:'add',ticket:'AA-1',node:'a'}]},{at:'2026-10-30T12:00:00Z'},{at:'2026-10-30T12:00:00Z',changes:[]},
   {at:'2026-10-30T12:00:00Z',changes:[{op:'move',ticket:'AA-1',node:'a'}]},{at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'aa-1',node:'a'}]},{at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1'}]},
   {at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1',edge:['a']}]},{at:'2026-10-30T12:00:00Z',by:'Alex',changes:[{op:'add',ticket:'AA-1',node:'a'}]},{at:'2026-10-30T12:00:00Z',by:{name:7},changes:[{op:'add',ticket:'AA-1',node:'a'}]},
-  {at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1',node:'a',path:'sections.0'}]},{at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1',node:'a',label:['A']}]}];
+  {at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1',node:'a',path:'sections.0'}]},{at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1',node:'a',label:['A']}]},
+  // Structural types (test review cycle 1): wrong-typed required and optional fields, not only missing ones.
+  null,{at:123,changes:[{op:'add',ticket:'AA-1',node:'a'}]},{at:'2026-10-30T12:00:00Z',changes:'AA-1'},{at:'2026-10-30T12:00:00Z',changes:[null]},{at:'2026-10-30T12:00:00Z',changes:[7]},
+  {at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1',node:5}]},{at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1',node:''}]},{at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1',edge:['a',2]}]},
+  {at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1',edge:'a->b'}]},{at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1',node:'a',edge:['a','b']}]},{at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:7,node:'a'}]},
+  {at:'2026-10-30T12:00:00Z',by:{id:7},changes:[{op:'add',ticket:'AA-1',node:'a'}]},{at:'2026-10-30T12:00:00Z',by:null,changes:[{op:'add',ticket:'AA-1',node:'a'}]},{at:'2026-10-30T12:00:00Z',by:['Alex'],changes:[{op:'add',ticket:'AA-1',node:'a'}]},
+  {at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1',node:'a'},{op:'add'}]}];
  const raw=historyFixture([good,...bad]),warnings=historyWarnings(raw);
  assert.equal(warnings.length,bad.length,warnings.join('\n'));
  bad.forEach((_,i)=>assert.match(warnings[i],new RegExp('^editHistory\\['+(i+1)+'\\].* — entry ignored$'),warnings[i]));

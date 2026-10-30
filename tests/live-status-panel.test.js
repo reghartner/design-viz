@@ -89,7 +89,7 @@ test('import-local ticket refs participate in live-status panel warnings before 
 |---|---|---|---|
 | H1 non-array warns once, ignored | editHistory:"x" | one warning `editHistory: must be an array…`; entries [] | an impl that warns per char or throws |
 | H2 valid full + minimal entries kept | full entry; entry without by/path/label | no warnings; both returned | a presence check on optional fields |
-| H3 each malformed shape warns individually, entry ignored | 32 bad shapes: impossible calendar dates and non-ISO shapes, missing fields, wrong types for every required and optional field, a bad change after a good one | one `editHistory[i]…entry ignored` per bad entry; good entry survives | an impl dropping the whole list on one bad entry |
+| H3 each malformed shape warns individually, entry ignored | 34 bad shapes: a trailing fraction dot, a missing offset, impossible calendar dates and non-ISO shapes, missing fields, wrong types for every required and optional field, a bad change after a good one | one `editHistory[i]…entry ignored` per bad entry; good entry survives | an impl dropping the whole list on one bad entry |
 | H4 >200 warns once, newest 200 kept | 201 entries with increasing at | one cap warning; 200 returned, newest first | an impl keeping the oldest 200 or warning per entry |
 | H6 definition facets + completeness | PanelRegistry.get('edit-history') | label/since/no setup or patch fields/template/picker/compat/planAddPanel | a type missing from PANEL_TYPES or the picker |
 | H6b authored state warns and folds empty | initial + step patches | 'edit history has no authored state' ×2; fold [{},{}] | folding authored state into the panel |
@@ -112,8 +112,12 @@ test('H1 H2 editHistory: a non-array warns once and valid entries, full or minim
  const millis={at:'2026-10-26T08:00:00.250Z',changes:[{op:'add',ticket:'AA-1',node:'a'}]};
  const offset={at:'2026-10-25T23:30:00+02:00',changes:[{op:'add',ticket:'AA-1',node:'a'}]};
  const leap={at:'2028-02-29T00:00:00Z',changes:[{op:'add',ticket:'AA-1',node:'a'}]};
- const raw=historyFixture([minimal,full,blankBy,emptyBy,leap,offset,millis]);assert.deepEqual(plain(C.validate(C.normalize(raw))),{errors:[],warnings:[]});
- assert.deepEqual(plain(C.editHistoryEntries(C.normalize(raw))),[leap,full,minimal,emptyBy,blankBy,millis,offset],'newest first, entries intact');
+ // Rework review cycle 4: ISO-8601 allows any number of fractional-second digits.
+ const tenth={at:'2026-10-24T08:00:00.1Z',changes:[{op:'add',ticket:'AA-1',node:'a'}]};
+ const micro={at:'2026-10-23T08:00:00.1234Z',changes:[{op:'add',ticket:'AA-1',node:'a'}]};
+ const nano={at:'2026-10-22T08:00:00.123456789+05:30',changes:[{op:'add',ticket:'AA-1',node:'a'}]};
+ const raw=historyFixture([minimal,full,blankBy,emptyBy,leap,offset,millis,nano,tenth,micro]);assert.deepEqual(plain(C.validate(C.normalize(raw))),{errors:[],warnings:[]});
+ assert.deepEqual(plain(C.editHistoryEntries(C.normalize(raw))),[leap,full,minimal,emptyBy,blankBy,millis,offset,tenth,micro,nano],'newest first, entries intact');
  assert.deepEqual(plain(C.validate(C.normalize(historyFixture()))),{errors:[],warnings:[]},'a declared panel without history is not a warning');
 });
 test('H3 editHistory: every malformed shape warns on its own index and only that entry is ignored',()=>{
@@ -130,7 +134,8 @@ test('H3 editHistory: every malformed shape warns on its own index and only that
   {at:'2026-10-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1',node:'a'},{op:'add'}]},
   // Diff review cycle 3: Date.parse alone accepts impossible calendar dates; `at` must be a real ISO-8601 date-time.
   {at:'2026-02-30T12:00:00Z',changes:[{op:'add',ticket:'AA-1',node:'a'}]},{at:'2026-13-01T00:00:00Z',changes:[{op:'add',ticket:'AA-1',node:'a'}]},{at:'2026-10-30T25:00:00Z',changes:[{op:'add',ticket:'AA-1',node:'a'}]},
-  {at:'2026-10-30 12:00:00Z',changes:[{op:'add',ticket:'AA-1',node:'a'}]},{at:'2026-10-30T12:00Z',changes:[{op:'add',ticket:'AA-1',node:'a'}]}];
+  {at:'2026-10-30 12:00:00Z',changes:[{op:'add',ticket:'AA-1',node:'a'}]},{at:'2026-10-30T12:00Z',changes:[{op:'add',ticket:'AA-1',node:'a'}]},
+  {at:'2026-10-30T16:23:15.Z',changes:[{op:'add',ticket:'AA-1',node:'a'}]},{at:'2026-10-30T16:23:15.5',changes:[{op:'add',ticket:'AA-1',node:'a'}]}];
  const raw=historyFixture([good,...bad]),warnings=historyWarnings(raw);
  assert.equal(warnings.length,bad.length,warnings.join('\n'));
  bad.forEach((_,i)=>assert.match(warnings[i],new RegExp('^editHistory\\['+(i+1)+'\\].* — entry ignored$'),warnings[i]));

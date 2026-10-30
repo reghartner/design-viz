@@ -131,6 +131,23 @@ export async function dragTicket(page,panel,key,to){
  await page.mouse.move(to.x,to.y,{steps:12});
  await page.mouse.up();
 }
+/* The press-and-move half of dragTicket: the row is held over `to` until the
+   returned release() drops it there. */
+export async function holdTicketOver(page,panel,key,to){
+ const row=ticketRow(panel,key);await expect(row).toBeVisible();
+ const from=await centre(row.locator('.dv-live-ticket-title'));
+ await page.mouse.move(from.x,from.y);await page.mouse.down();
+ await page.mouse.move(from.x+12,from.y+6,{steps:3});
+ await page.mouse.move(to.x,to.y,{steps:12});await page.mouse.move(to.x+1,to.y,{steps:2});
+ return ()=>page.mouse.up();
+}
+/* Reload as the runtime does after a conflict, recording any leave-page dialog. */
+export async function reloadRecordingDialogs(page){
+ const seen=[];const handler=dialog=>{seen.push(dialog.type());dialog.accept().catch(()=>{});};
+ page.on('dialog',handler);
+ await page.reload();
+ page.off('dialog',handler);return seen;
+}
 export async function startEditing(panel){
  const edit=editButton(panel);await expect(edit).toBeVisible();await expect(edit).toBeEnabled();await edit.click();
 }

@@ -454,7 +454,7 @@ test('desktop inherited edge Missing work is read only while local additions rem
 | I3 conflict replay: imports swapped | two imports of core as "one" and "two"; editor drops on two::api; the winner swaps the imports | after the reload and Save, EX-1 is in the import whose `as` is "two" (now index 0) and not in "one" | replay by stored import index |
 Flip: write to the resolved imported carrier instead of the overlay → I1/I2 overlay assertions fail.
 */
-import {buildBoard as buildEditBoard,serveWinner,mockRuntime,publishes,openBoard,TRACKING,PANELS,cardPoint,nodeCard,edgeLabel,dragTicket,startEditing,saveButton,
+import {buildBoard as buildEditBoard,serveWinner,mockRuntime,publishes,openBoard,TRACKING,PANELS,cardPoint,nodeCard,edgeLabel,dragTicket,startEditing,saveButton,reloadRecordingDialogs,
  save as saveBoard} from '../helpers/board-edit.mjs';
 function importedBoard(imports=[{spec:'provider',export:'core',as:'canon',position:{x:80,y:250},nodeTracking:{api:{tickets:['LOC-1']}},edgeTracking:{'api->store':{tickets:['LOC-2']}}}]){
   const model=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}});
@@ -508,7 +508,7 @@ test('I3 desktop board conflict replay finds a swapped topology import by its pr
   await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(root,'two::api')));
   await saveButton(panel).click();await expect.poll(()=>publishes(page).then(list=>list.length)).toBe(1);
   const winner=structuredClone(consumer);winner.page.sections[0].diagram.topologyImports.reverse();
-  await serveWinner(board,winner);await page.reload();({root,panel}=await openBoard(page,board));
+  await serveWinner(board,winner);expect(await reloadRecordingDialogs(page)).toEqual([]);({root,panel}=await openBoard(page,board));
   await expect(panel.locator('.dv-live-edit-notice')).toHaveText(/1 of your changes were re-applied; 0 could not be/);
   await page.waitForTimeout(500);expect(await publishes(page)).toEqual([]);
   const saved=JSON.parse(await saveBoard(page,panel,1));

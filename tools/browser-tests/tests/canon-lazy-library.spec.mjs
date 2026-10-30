@@ -900,9 +900,10 @@ test('Browse exploration combines facets, keyboard topics and search; grid/list 
    3 team applied | team=group:default/payments | Team select value | team display-name matching
    4 bound service applied | service=component:default/cart | Service select value 'entity:component:default/cart' | applying before cards() builds options (value reset to '')
    5 legacy title service applied | service=Old cart | Service select value 'Old cart' | bound-only lookup
+   5b imported-node service | service=component:default/api; storefront imports it, no local binding | storefront card visible, 2 of 7 | lookup limited to local node bindings
    6 topic applied | topic=commerce | Topic select value | -
    7 folder applied | folder=features/commerce | folder path [aria-current] 'commerce' | folder ignored
-   8 combined result | all of the above | '#welcome-library-count' 1 of 5; visible titles exactly ['Checkout & pay'] | filters applied but cards not refiltered
+   8 combined result | all of the above | '#welcome-library-count' 1 of 7; visible titles exactly ['Checkout & pay'] | filters applied but cards not refiltered
    9 opening adds no history entry | direct link | history.length unchanged (1) | pushState on hydration
    10 unrelated query preserved | host=keep | first param host=keep | rebuilding query from scratch
    11 live URL per control | Welcome -> Browse, fill/select/click | params after each change | URL written only on Copy
@@ -933,8 +934,17 @@ async function linkFixture(server){
     await mkdir(path.join(fixture.root,folder),{recursive:true});await writeFile(path.join(fixture.root,folder,id+'.spec.json'),JSON.stringify(spec));
     membership.push({folder,owner:'group:default/'+owner});
   }
+  // An imported node's bound service: the consumer has no local binding; its only
+  // service is component:default/api, imported from the provider's core export.
+  for(const [folder,example] of [['diagrams/shared/platform','platform'],['diagrams/integrations/storefront','checkout']]){
+    const spec=JSON.parse(await readFile(new URL('../../../examples/canon/topology/'+example+'.json',import.meta.url),'utf8')),id=folder.split('/').at(-1);
+    await mkdir(path.join(fixture.root,folder),{recursive:true});await writeFile(path.join(fixture.root,folder,id+'.spec.json'),JSON.stringify(spec));
+    membership.push({folder,owner:'group:default/platform'});
+  }
   await writeFile(path.join(fixture.root,'canon.json'),JSON.stringify({version:1,diagrams:membership}));
   const index=await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
+  const consumer=index.diagrams.find(entry=>entry.id==='storefront');
+  if(!consumer || consumer.boundServices.map(service=>service.entityRef).join()!=='component:default/api')throw Error('fixture: storefront must carry only the imported bound service');
   const legacy=index.diagrams.find(entry=>entry.id==='legacy');delete legacy.boundServices;legacy.services=['Old cart'];
   await writeFile(path.join(fixture.root,'workbench/diagrams.json'),JSON.stringify(index));
   return fixture;
@@ -945,7 +955,7 @@ const browseScreen=page=>page.locator('#welcome-library-screen');
 test('a Browse link opens the filtered subset with search, team, service, topic and folder applied',async({page,server})=>{
   const fixture=await linkFixture(server),count=page.locator('#welcome-library-count');
   // Precondition: the unfiltered library shows all five diagrams, so each filter must narrow it.
-  await page.goto(fixture.url);await page.locator('#welcome-library').click();await expect(count).toHaveText('5 of 5 diagrams');
+  await page.goto(fixture.url);await page.locator('#welcome-library').click();await expect(count).toHaveText('7 of 7 diagrams');
   const link=fixture.url+'?host=keep&browse&q=checkout%20%26%20pay&team=group%3Adefault%2Fpayments&service=component%3Adefault%2Fcart&topic=commerce&folder=features/commerce';
   const fresh=await page.context().newPage();await fresh.goto(link);
   await expect(browseScreen(fresh)).toBeVisible();await expect(fresh.locator('#welcome-home')).toBeHidden();
@@ -954,38 +964,44 @@ test('a Browse link opens the filtered subset with search, team, service, topic 
   await expect(fresh.getByLabel('Service',{exact:true})).toHaveValue('entity:component:default/cart');
   await expect(fresh.getByLabel('Topic',{exact:true})).toHaveValue('commerce');
   await expect(fresh.locator('#welcome-library-folder-path [aria-current]')).toHaveText('commerce');
-  await expect(fresh.locator('#welcome-library-count')).toHaveText('1 of 5 diagrams');expect(await visibleLibraryTitles(fresh)).toEqual(['Checkout & pay']);
+  await expect(fresh.locator('#welcome-library-count')).toHaveText('1 of 7 diagrams');expect(await visibleLibraryTitles(fresh)).toEqual(['Checkout & pay']);
   await expect(fresh.locator('#welcome-library-link-note')).toBeHidden();
   expect(await fresh.evaluate(()=>history.length)).toBe(1);expect(urlParams(fresh)[0]).toEqual(['host','keep']);
   // A legacy node-title service is carried as the title.
   await fresh.goto(fixture.url+'?browse&service=Old%20cart');
-  await expect(fresh.getByLabel('Service',{exact:true})).toHaveValue('Old cart');await expect(fresh.locator('#welcome-library-count')).toHaveText('1 of 5 diagrams');
+  await expect(fresh.getByLabel('Service',{exact:true})).toHaveValue('Old cart');await expect(fresh.locator('#welcome-library-count')).toHaveText('1 of 7 diagrams');
   expect(await visibleLibraryTitles(fresh)).toEqual(['Legacy cart']);
+  // A service bound only on an imported node selects the consumer as well as its provider.
+  await fresh.goto(fixture.url+'?browse&service=component%3Adefault%2Fapi');
+  await expect(fresh.getByLabel('Service',{exact:true})).toHaveValue('entity:component:default/api');await expect(fresh.locator('#welcome-library-count')).toHaveText('2 of 7 diagrams');
+  await expect(mainLibrary(fresh).locator('[data-id="storefront"]')).toBeVisible();await expect(mainLibrary(fresh).locator('[data-id="platform"]')).toBeVisible();
 });
 
 test('Browse filters write the address bar live without Back entries, survive reload and copy through Copy link',async({page,server})=>{
   const fixture=await linkFixture(server),count=page.locator('#welcome-library-count'),search=page.getByRole('searchbox',{name:'Search diagrams'});
   await page.addInitScript(()=>{Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.copiedLink=text;}}});});
-  await page.goto(fixture.url+'?host=keep');await page.locator('#welcome-library').click();await expect(count).toHaveText('5 of 5 diagrams');
+  await page.goto(fixture.url+'?host=keep');await page.locator('#welcome-library').click();await expect(count).toHaveText('7 of 7 diagrams');
   await expect.poll(()=>urlParams(page)).toEqual([['host','keep'],['browse','']]);expect(new URL(page.url()).search).toBe('?host=keep&browse');
   const length=await page.evaluate(()=>history.length);
-  await search.fill('refunds');await expect(count).toHaveText('1 of 5 diagrams');
+  await search.fill('refunds');await expect(count).toHaveText('1 of 7 diagrams');
   await expect.poll(()=>urlParams(page)).toEqual([['host','keep'],['browse',''],['q','refunds']]);
   await search.fill('');await page.getByLabel('Team',{exact:true}).selectOption('group:default/payments');
   await expect.poll(()=>urlParams(page)).toEqual([['host','keep'],['browse',''],['team','group:default/payments']]);
   await page.getByLabel('Service',{exact:true}).selectOption('entity:component:default/ledger');
   await expect.poll(()=>urlParams(page)).toEqual([['host','keep'],['browse',''],['team','group:default/payments'],['service','component:default/ledger']]);
+  await page.getByLabel('Service',{exact:true}).selectOption('entity:component:default/api');
+  await expect.poll(()=>urlParams(page)).toEqual([['host','keep'],['browse',''],['team','group:default/payments'],['service','component:default/api']]);
   await page.getByLabel('Service',{exact:true}).selectOption('Old cart');
   await expect.poll(()=>urlParams(page)).toEqual([['host','keep'],['browse',''],['team','group:default/payments'],['service','Old cart']]);
   await page.getByLabel('Service',{exact:true}).selectOption('');await page.getByLabel('Topic',{exact:true}).selectOption('commerce');
   await page.getByRole('navigation',{name:'Folder hierarchy'}).getByRole('button',{name:'Browse folder: features / commerce',exact:true}).click();
-  await expect(count).toHaveText('2 of 5 diagrams');
+  await expect(count).toHaveText('2 of 7 diagrams');
   await expect.poll(()=>urlParams(page)).toEqual([['host','keep'],['browse',''],['team','group:default/payments'],['topic','commerce'],['folder','features/commerce']]);
   expect(await page.evaluate(()=>history.length)).toBe(length);
   const copy=browseScreen(page).getByRole('button',{name:'Copy link',exact:true});await expect(copy).toBeVisible();await copy.click();
   await expect.poll(()=>page.evaluate(()=>window.copiedLink)).toBe(page.url());expect(page.url()).toContain('topic=commerce');
   await page.reload();
-  await expect(browseScreen(page)).toBeVisible();await expect(count).toHaveText('2 of 5 diagrams');
+  await expect(browseScreen(page)).toBeVisible();await expect(count).toHaveText('2 of 7 diagrams');
   await expect(page.getByLabel('Team',{exact:true})).toHaveValue('group:default/payments');await expect(page.getByLabel('Topic',{exact:true})).toHaveValue('commerce');
   await expect(page.locator('#welcome-library-folder-path [aria-current]')).toHaveText('commerce');
   await page.getByRole('button',{name:'Clear all',exact:true}).click();
@@ -999,21 +1015,21 @@ test('Browse links drop stale filters with a note, yield to ?diagram, and leave 
   await page.goto(fixture.url+'?browse&team=group%3Adefault%2Fgone&service=component%3Adefault%2Fgone&topic=commerce&folder=features/missing');
   await expect(browseScreen(page)).toBeVisible();await expect(page.getByLabel('Topic',{exact:true})).toHaveValue('commerce');
   await expect(page.getByLabel('Team',{exact:true})).toHaveValue('');await expect(page.getByLabel('Service',{exact:true})).toHaveValue('');
-  await expect(page.locator('#welcome-library-folder-path [aria-current]')).toHaveText('All folders');await expect(count).toHaveText('3 of 5 diagrams');
+  await expect(page.locator('#welcome-library-folder-path [aria-current]')).toHaveText('All folders');await expect(count).toHaveText('3 of 7 diagrams');
   await expect(note).toBeVisible();for(const value of ['group:default/gone','component:default/gone','features/missing'])await expect(note).toContainText(value);
   await expect.poll(()=>urlParams(page)).toEqual([['browse',''],['topic','commerce']]);
   // ?diagram wins over Browse fields.
   await page.goto(fixture.url+'?diagram=checkout&browse&q=x');await expect(page.locator('#canon-reader-edit')).toBeEnabled();
   await expect(browseScreen(page)).toBeHidden();await expect.poll(()=>urlParams(page)).toEqual([['diagram','checkout']]);
   // Leaving strips Browse fields; Back restores them and the filter.
-  await page.goto(fixture.url+'?host=keep&browse&topic=commerce');await expect(count).toHaveText('3 of 5 diagrams');
+  await page.goto(fixture.url+'?host=keep&browse&topic=commerce');await expect(count).toHaveText('3 of 7 diagrams');
   await browseScreen(page).locator('[data-welcome-back]').click();await expect(page.locator('#welcome-home')).toBeVisible();
   await expect.poll(()=>urlParams(page)).toEqual([['host','keep']]);
   await page.goBack();await expect(browseScreen(page)).toBeVisible();await expect(page.getByLabel('Topic',{exact:true})).toHaveValue('commerce');
   await expect.poll(()=>urlParams(page)).toEqual([['host','keep'],['browse',''],['topic','commerce']]);
   await mainLibrary(page).getByRole('link',{name:'Refunds',exact:true}).click();await expect(page.locator('#canon-reader-edit')).toBeEnabled();
   await expect.poll(()=>urlParams(page)).toEqual([['host','keep'],['diagram','refunds']]);
-  await page.goBack();await expect(count).toHaveText('3 of 5 diagrams');await expect.poll(()=>urlParams(page)).toEqual([['host','keep'],['browse',''],['topic','commerce']]);
+  await page.goBack();await expect(count).toHaveText('3 of 7 diagrams');await expect.poll(()=>urlParams(page)).toEqual([['host','keep'],['browse',''],['topic','commerce']]);
 });
 
 test('a workbench built without the library ignores Browse links and stays on Welcome',async({page,server})=>{

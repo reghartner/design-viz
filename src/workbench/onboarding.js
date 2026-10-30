@@ -373,7 +373,7 @@ function initWorkbenchPractice(opts){
   if(chapter==='example')return;
   function controller(){return reader || opts.controller();}
   tour=wireTour(controller(),doc.body,window,workbenchPracticeLessons(chapter),{
-    request:'force',recordCompletion:false,restore:false,replay:false,controller:controller,prepareStep:chapter==='viewer'?null:prepare,
+    request:'force',recordCompletion:false,restore:false,replay:false,builtInTour:chapter==='viewer',controller:controller,prepareStep:chapter==='viewer'?null:prepare,
     beforeAdvance:function(step){
       if(step.id==='commit' && opts.agent.hasReview()){
         if(!doc.getElementById('agent-update-dialog').open)click('agent-update-open');

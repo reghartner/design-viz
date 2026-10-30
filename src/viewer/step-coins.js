@@ -45,11 +45,13 @@ function wireStepCoins(host, prefix, describe, activate){
     card.hidden = false;
     if (card.showPopover) card.showPopover();
     // Keep the card over the visible part of the board, above the coin when
-    // it fits there; a board smaller than the card falls back to the window.
-    var rect = coin.getBoundingClientRect(), board = host.getBoundingClientRect(), w = card.offsetWidth, h = card.offsetHeight;
+    // it fits there. The card narrows to the board's width; only a board
+    // shorter than the card lets it extend above or below, inside the window.
+    var rect = coin.getBoundingClientRect(), board = host.getBoundingClientRect();
     var minX = Math.max(8, board.left + 8), maxX = Math.min(window.innerWidth - 8, board.right - 8);
+    card.style.maxWidth = Math.max(120, Math.min(300, maxX - minX)) + 'px';
+    var w = card.offsetWidth, h = card.offsetHeight;
     var minY = Math.max(8, board.top + 8), maxY = Math.min(window.innerHeight - 8, board.bottom - 8);
-    if (maxX - minX < w){ minX = 8; maxX = window.innerWidth - 8; }
     if (maxY - minY < h){ minY = 8; maxY = window.innerHeight - 8; }
     var top = rect.top - h - 8;
     if (top < minY) top = rect.bottom + 8;

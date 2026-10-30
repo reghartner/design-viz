@@ -478,6 +478,7 @@ function initWorkbenchBuilder(opts){
   var workingFile=null,workingView=null,workingOperation=0,workingHeartbeat=null,workingBrowser=createBuilderBrowserIO(document,window);
   var localRepository=null,localGrantSerial=0,localRefreshOperation=0,localRefreshing=false,localRefreshMessage='',localCapabilityRevision=-1,localCapabilityContext=null;
   var localSourceButton=document.getElementById('local-sources-select'),localRefreshButton=document.getElementById('local-sources-refresh'),localRefreshStatus=document.getElementById('local-sources-status');
+  var localSiteButton=document.getElementById('local-sources-site');
   function bindLocalRepository(value){
     localRefreshOperation++;localRefreshing=false;localRefreshMessage='';
     localRepository=value?{handle:value.handle,path:value.path,selectionId:value.selectionId || (session.topologyContext() || {}).localSource?.selectionId || null,grant:++localGrantSerial}:null;
@@ -500,6 +501,7 @@ function initWorkbenchBuilder(opts){
     if(!session)return;
     var context=localContextMetadata(),source=context && context.localSource,binding=selectedLocalBinding(context),cloud=!!(cloudPersistence && cloudPersistence.attachment());
     if(localSourceButton)localSourceButton.disabled=cloud || localRefreshing;
+    if(localSiteButton)localSiteButton.disabled=cloud || localRefreshing || !(context && context.local);
     if(localRefreshButton){localRefreshButton.disabled=cloud || localRefreshing;localRefreshButton.textContent=localRefreshing?'Refreshing local sources…':(!binding || !binding.handle) && context && context.local?'Reconnect local sources…':'Refresh local sources';}
     if(localRefreshStatus){
       var label=source && source.rootLabel || 'No local provider repository selected';
@@ -564,6 +566,25 @@ function initWorkbenchBuilder(opts){
     }finally{if(life.alive() && token===localRefreshOperation){localRefreshing=false;refreshLocalSourcesStatus();}}
   }
   if(localSourceButton)life.listen(localSourceButton,'click',function(){refreshLocalSources({manual:true,select:true});});
+  /* Use site library (#833): replace the local provider snapshot with this
+     site's published library. A provider the site lacks refuses the switch. */
+  async function useSiteLibrary(){
+    var context=session.topologyContext(),expected=session.snapshot(),token=++localRefreshOperation;
+    if(localRefreshing || !context || !context.local || cloudPersistence && cloudPersistence.attachment())return;
+    if(expected.error){localRefreshMessage='Repair the consumer JSON before using the site library. '+expected.error;refreshLocalSourcesStatus();return;}
+    if(localRefreshBlocked()){localRefreshMessage='Finish the current canvas or inspector action before using the site library.';refreshLocalSourcesStatus();return;}
+    localRefreshing=true;localRefreshMessage='Loading the site library…';refreshLocalSourcesStatus();
+    try{
+      var next=await prepareAuthoredTopology(expected.raw,null);
+      if(!life.alive() || token!==localRefreshOperation)return;
+      var result=session.useSiteTopology(next,expected);
+      if(result===false)throw Error('The document changed while the site library loaded. Try again.');
+      localRepository=null;localRefreshMessage='Using the site library. Undo returns to the local source snapshot.';refreshProvenance();
+    }catch(error){
+      if(life.alive() && token===localRefreshOperation)localRefreshMessage='Could not use the site library: '+error.message+' The local source snapshot is still in use.';
+    }finally{if(life.alive() && token===localRefreshOperation){localRefreshing=false;refreshLocalSourcesStatus();}}
+  }
+  if(localSiteButton)life.listen(localSiteButton,'click',useSiteLibrary);
   if(localRefreshButton)life.listen(localRefreshButton,'click',function(){refreshLocalSources({manual:true});});
   var persistence=createBuilderPersistence({storage:function(){return opts.practice?opts.practice.storage:localStorage;},
     schedule:function(fn,ms){return life.delay(fn,ms);},

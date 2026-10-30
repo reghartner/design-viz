@@ -93,6 +93,13 @@ source can be refreshed by the helper; the browser requires its own explicit
 selection to read it directly. Existing registered root-based folder opening
 remains supported.
 
+**File → Use site library** leaves the local source repository. The draft's
+imports then resolve from this site's published diagram library, and the
+topology importer lists that library's providers. The switch is one Undo step
+and is kept in browser recovery. If the document imports a provider the site
+library does not publish, the switch is refused and the local snapshot stays in
+use. A document without imports simply drops the local snapshot.
+
 Wait for the matching `applied` or `unchanged` receipt and `currentRevision` before
 claiming an agent refresh succeeded. `state.json.localSources` reports bounded
 consumer/source provenance, snapshot capability and availability. Busy/rejected

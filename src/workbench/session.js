@@ -95,6 +95,30 @@ function createBuilderSession(options){
     if(hooks && hooks.afterSave)hooks.afterSave();
     return true;
   }
+  /* One snapshot history entry that swaps the frozen topology context. */
+  function commitTopology(context){
+    function capture(){var unresolved=false;try{resolve(JSON.parse(text()));}catch(error){unresolved=true;}return {text:text(),context:JSON.parse(JSON.stringify(topologyContext)),unresolved:unresolved};}
+    function restore(value,message){
+      var previous=capture(),outcome;
+      topologyContext=value.context?JSON.parse(JSON.stringify(value.context)):null;
+      if(text()!==value.text)options.source.write(value.text);
+      try{
+        outcome=render('history');
+        if(outcome && outcome.ok===false && !value.unresolved)throw Error('The refreshed topology could not be rendered.');
+      }catch(error){
+        topologyContext=previous.context;if(text()!==previous.text)options.source.write(previous.text);
+        try{render('history');}catch(ignored){}
+        throw error;
+      }
+      topologyRevision++;target=null;save();
+      if(options.topologyChanged)options.topologyChanged();
+      if(message && options.afterHistory)options.afterHistory(message,outcome);
+      return true;
+    }
+    var before=capture(),after={text:text(),context:context?JSON.parse(JSON.stringify(context)):null};
+    restore(after);
+    pushUndo({kind:'topology',capture:capture,restore:restore,before:before,after:after});return true;
+  }
   return {
     text:text,
     resolve:resolve,
@@ -110,27 +134,16 @@ function createBuilderSession(options){
       var raw=JSON.parse(text());resolve(raw,context);
       function content(value){if(!value)return null;return JSON.stringify([value.localSource && value.localSource.selectionId || null,value.specs.map(function(spec){return spec.page.canon.id===value.id?{page:{canon:spec.page.canon}}:spec;}).sort(function(a,b){return a.page.canon.id.localeCompare(b.page.canon.id);})]);}
       if(content(context)===content(topologyContext))return 'unchanged';
-      function capture(){var unresolved=false;try{resolve(JSON.parse(text()));}catch(error){unresolved=true;}return {text:text(),context:JSON.parse(JSON.stringify(topologyContext)),unresolved:unresolved};}
-      function restore(value,message){
-        var previous=capture(),outcome;
-        topologyContext=JSON.parse(JSON.stringify(value.context));
-        if(text()!==value.text)options.source.write(value.text);
-        try{
-          outcome=render('history');
-          if(outcome && outcome.ok===false && !value.unresolved)throw Error('The refreshed topology could not be rendered.');
-        }catch(error){
-          topologyContext=previous.context;if(text()!==previous.text)options.source.write(previous.text);
-          try{render('history');}catch(ignored){}
-          throw error;
-        }
-        topologyRevision++;target=null;save();
-        if(options.topologyChanged)options.topologyChanged();
-        if(message && options.afterHistory)options.afterHistory(message,outcome);
-        return true;
-      }
-      var before=capture(),after={text:text(),context:JSON.parse(JSON.stringify(context))};
-      restore(after);
-      pushUndo({kind:'topology',capture:capture,restore:restore,before:before,after:after});return true;
+      return commitTopology(context);
+    },
+    /* Use site library (#833): leave a local provider snapshot for the site's
+       published library (or none for an import-free draft) as one Undo step. */
+    useSiteTopology:function(context,expected){
+      if(disposed || !expected || expected.text!==text() || expected.project!==project || expected.topologyRevision!==topologyRevision)return false;
+      if(!topologyContext || !topologyContext.local)throw Error('Use site library applies only to a draft that uses a local source repository.');
+      if(context && context.local)throw Error('Use site library needs the site library, not another local source repository.');
+      resolve(JSON.parse(text()),context);
+      return commitTopology(context);
     },
     openFolder:function(context,expected){
       if(disposed || !expected || expected.text!==text() || expected.project!==project || expected.topologyRevision!==topologyRevision)return false;

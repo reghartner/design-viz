@@ -191,8 +191,9 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False) -> str:
             f"4. Republish to the same URL: the publish call needs the page too, so first read "
             "`index.html` from this artifact (read action, `path`) to a local file, then publish "
             f"with `url`, `file_path` = that saved page unchanged, and `files` = "
-            f'{{"{SPEC_FILE_NAME}": <the edited file>}}. The page HTML is never regenerated; '
-            "a new URL loses every comment and the edit history.",
+            f'{{"{SPEC_FILE_NAME}": <the edited file>}}. The page HTML is never regenerated. '
+            "A new URL loses every comment and the artifact's version history; "
+            "`page.editHistory` travels inside the file, so keep it.",
             "5. Pass the capability declaration below on every publish; it is not recoverable from "
             "the files.",
         ]

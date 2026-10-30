@@ -237,8 +237,10 @@ For an element with several tickets, roll up their states in this order:
 
 blocked > missing > active > (all done → done) > (all todo → todo) > otherwise active
 
-Steps, coins and chips derive their state from the edges and nodes they involve
-and never carry tickets. Unlinked, unmarked nodes derive No change needed; an
+Steps, coins and chips derive their state only from the edges and nodes explicitly
+added to that step, including failed communications and imported elements, and
+never carry tickets. An edge does not bring its endpoint nodes into a step's
+status unless they are also listed in `nodes`. Unlinked, unmarked nodes derive No change needed; an
 explicit `missingWork: true` contributes Missing. No-change is neutral in mixed
 rollups. Linked tickets without evidence never imply Done or No change needed.
 Pull requests never carry live state: an authored `prs` URL is an icon, and the
@@ -256,8 +258,8 @@ fields keep their existing requirements.
 ## Rendering
 
 The overlay (#735) paints nodes and edges from a runtime ticket map. Step coins
-and chips roll up the involved edges and endpoint/explicit nodes, including failed
-communications. Text boxes stay unpainted. Missing map entries add no state;
+and chips roll up only the directly selected edges and nodes, including failed
+communications and imported carriers. Text boxes stay unpainted. Missing map entries add no state;
 unknown state strings are ignored. The Live toggle restores authored paint when
 disabled, including an authored node `style` preset. Status colors override
 node styles, node tones and step colors while enabled.
@@ -826,9 +828,10 @@ In Step mode, the caption ends with **BLOCKED · KEY · detail**, **MISSING · K
 **NO CHANGE NEEDED** and **MISSING WORK · unlinked work remains**. Incomplete
 provider evidence shows **AWAITING TICKET STATUS**. Captions update on step
 changes and new evidence.
-Aggregate captions, step/coin states, lane rollups, playback blockers and
-readiness continue to include the endpoints of selected edges and failed
-communications; the explicit-node rule applies only to the visible ticket list.
+Captions, step/coin states, playback blockers and First blocker focus follow
+the same directly selected carriers as the visible ticket list. Lane rollups,
+page-wide counts, readiness and dependency summaries retain their broader
+coverage of selected edge endpoints.
 
 Playback pauses on the first blocked or missing beat, including the first beat
 when starting or replaying, and focuses the first blocking carrier.

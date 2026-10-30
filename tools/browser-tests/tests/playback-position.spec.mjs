@@ -170,7 +170,10 @@ for(const host of ['reader','workbench'])test(`${host}: current step decorations
  await page.setViewportSize({width:1440,height:1000});
  if(host==='reader')await page.addInitScript(()=>{window.flowviewLiveStatus={provider:async()=>({'STEP-1':{state:'active'}})};});
  const spec=story('simple','beside');
- if(host==='reader')spec.page.sections[0].diagram.nodes.a.tickets=['STEP-1'];
+ if(host==='reader'){
+  const diagram=spec.page.sections[0].diagram;
+  diagram.nodes.a.tickets=['STEP-1'];diagram.steps[0].nodes=['a'];
+ }
  if(host==='workbench'){
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec));await prepareEditorSurface(page);
  }else await open(page,server,spec);

@@ -99,7 +99,9 @@ test('desktop imported node and edge tracking edits, history, export and reload 
   await expect.poll(()=>page.evaluate(()=>window.__importedRefs)).toMatchObject({tickets:['CAN-1','API-2'],prs:[pr]});
   const root=page.locator('#docview'),panel=root.locator('.pt-live-status'),edge=root.locator('path.edge[data-dv-edge="0"]');
   await expect(node(page)).toHaveClass(/dv-live-blocked/);await expect(edge).toHaveClass(/dv-live-todo/);await expect(edge).toHaveClass(/dv-live-waiting/);
-  await expect(root.locator('g.coin[data-dv-step="0"]')).toHaveClass(/dv-live-blocked/);
+  // This step selects only the imported edge; the blocked source node is implicit.
+  await expect(root.locator('g.coin[data-dv-step="0"]')).toHaveClass(/dv-live-todo/);
+  await expect(root.locator('.schip[data-step-source="0"]').first()).toHaveClass(/dv-live-todo/);
   await expect(panel.locator('tr[data-live-ticket]')).toHaveCount(2);await expect(panel.locator('[data-live-count="todo"]')).toContainText('1');
   await expect(panel.locator('.dv-live-epic-counts')).toContainText('1 blocked');
   await expect(panel.locator('tr[data-live-coverage-for="API-2"],.dv-live-chip')).toHaveCount(0);

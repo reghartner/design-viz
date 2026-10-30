@@ -409,7 +409,33 @@ test('B1 selected edges highlight endpoints but list only directly authored tick
  await section.locator('.schip[data-step-source="3"]').first().click();await expect(row).toHaveCount(0);
  await expect(section.locator('g.node[data-dv-node="backend"]')).toHaveClass(/\blit\b/);
  await expect(section.locator('g.node[data-dv-node="ux"]')).toHaveClass(/\blit\b/);
- await expect(bar.locator('.dv-live-caption')).toContainText('MISSING · BE-68');
+ await expect(bar.locator('.dv-live-caption')).toHaveText('NO CHANGE NEEDED');
+});
+test('desktop step coins, captions and blocker navigation use only direct local and imported carriers',async({page,server},testInfo)=>{
+ await page.setViewportSize({width:1440,height:1000});
+ await writeFile(path.join(server.root,'direct-steps-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'direct-steps-native.html'),'<style>body{margin:0}#host{min-height:100vh}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./direct-steps-native.js";window.mount=mountNativeViewer;</script>');
+ const make=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=make('provider',{nodes:{p:{title:'Imported source'},q:{title:'Imported target',missingWork:true}},rows:[['p','q']],edges:[{from:'p',to:'q',label:'Imported delivery'}],topologyExports:{core:{nodes:['p','q'],edges:['p->q']}}});
+ const source=make('consumer',{view:'step',autoplay:false,nodes:{a:{title:'Local source',tickets:['AA-1']},b:{title:'Local target',missingWork:true}},rows:[['a','b']],edges:[{from:'a',to:'b',tickets:['EE-1'],label:'Local delivery'}],topologyImports:[{spec:'provider',export:'core',as:'imp',nodeTracking:{p:{tickets:['IP-1']}},edgeTracking:{'p->q':{tickets:['IE-1']}}}],steps:[{id:'prior',nodes:['a'],text:'Earlier blocked node'},{id:'local',edge:'a->b',text:'Local edge only'},{id:'imported',edge:'imp::p->imp::q',text:'Imported edge only'},{id:'explicit',edge:'imp::p->imp::q',nodes:['imp::p'],text:'Imported source explicitly added'}],paths:[{id:'main',label:'Main',steps:['local','imported','explicit']},{id:'with-prior',label:'With prior',steps:['prior','local','imported','explicit']}],panels:[{id:'status',type:'live-status'}]});
+ source.page.tracking={jira:{site:'https://jira.test'}};
+ const context=vm.createContext({});vm.runInContext(sourceLoader.composeSources(['validator.js','canon.js']),context);
+ const spec=JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(source,{version:1,id:'consumer',specs:[provider,source]})));
+ expect(source.page.sections[0].diagram.nodes['imp::p']).toBeUndefined();expect(spec.page.sections[0].diagram.nodes['imp::p'].tickets).toEqual(['IP-1']);
+ await page.goto(server.origin+'/direct-steps-native.html');await page.waitForFunction(()=>!!window.mount);
+ await page.evaluate(spec=>{window.viewer=window.mount(document.querySelector('#host'),spec,{});window.viewer.controller.liveStatus.apply({'AA-1':{state:'blocked'},'EE-1':{state:'done'},'IP-1':{state:'blocked',detail:'Imported source blocked'},'IE-1':{state:'todo'}});},spec);
+ const root=page.locator('#host'),section=root.locator('#section-main'),chip=i=>section.locator('.schip[data-step-source="'+i+'"]').first(),coin=i=>section.locator('g.coin[data-dv-step="'+i+'"]'),caption=section.locator('.dv-live-caption');
+ await expect(chip(1)).toHaveAttribute('data-live-appearance','done');await expect(coin(1)).toHaveAttribute('data-live-appearance','done');
+ await expect(chip(2)).toHaveAttribute('data-live-appearance','todo');await expect(coin(2)).toHaveAttribute('data-live-appearance','todo');
+ await expect(chip(3)).toHaveAttribute('data-live-appearance','blocked');await expect(coin(3)).toHaveAttribute('data-live-appearance','blocked');
+ await chip(1).click();await expect(caption).toHaveText('DONE');await expect(section.locator('.dv-live-step-tickets a')).toHaveText(['EE-1']);
+ await chip(2).click();await expect(caption).toHaveText('TODO · 1 tickets');await expect(section.locator('.dv-live-step-tickets a')).toHaveText(['IE-1']);
+ await section.screenshot({path:testInfo.outputPath('direct-imported-step-status.png')});
+ await root.getByRole('button',{name:'First blocker',exact:true}).click();await expect(chip(3)).toHaveAttribute('aria-current','true');await expect(caption).toHaveText('BLOCKED · IP-1 · Imported source blocked');await expect(section.locator('[data-live-carrier="imp::p"]:focus')).toHaveCount(1);
+ await section.locator('.path-chip[data-dv-path="with-prior"]').click();await expect(chip(1)).toHaveAttribute('data-live-appearance','done');await expect(chip(2)).toHaveAttribute('data-live-appearance','todo');
+ await page.evaluate(()=>window.viewer.controller.liveStatus.apply({'AA-1':{state:'blocked'},'EE-1':{state:'done'},'IP-1':{state:'done'},'IE-1':{state:'done'}}));
+ await expect(chip(2)).toHaveAttribute('data-live-appearance','done');await expect(coin(2)).toHaveAttribute('data-live-appearance','done');
+ await chip(2).click();await expect(caption).toHaveText('DONE');await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
 });
 test('B1 step ticket links sit beneath prose before evidence and follow navigation without team-wide tickets',async({page,server},testInfo)=>{
  await page.clock.install();

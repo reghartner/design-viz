@@ -687,19 +687,39 @@ test('B1 step tickets use directly selected nodes and edges, excluding implicit 
  api.setEnabled(true);assert.equal(keys().length,2);change(0,'ambient');assert.equal(keys().length,0);
  change(0,'step');api.destroy();assert.equal(keys().length,0);assert.ok(!pill.classList.contains('dv-live-board-lane'));assert.equal(host.textContent,'Authored prose');assert.equal(JSON.stringify(raw),before);assert.equal(JSON.stringify(h.ctl.page),normalized);
 });
-test('B1 direct ticket selection preserves aliases, edge tickets and broader endpoint rollups',()=>{
+test('B1 step state and captions use direct carriers while broad aggregates retain endpoints',()=>{
  const {C}=harness(),d={nodes:{a:{tickets:['AA-1','SH-1']},b:{tickets:['BB-1','SH-1']},text:{type:'text',text:'Note',tickets:['TT-1']}},edges:[{from:'a',to:'b',tickets:['EE-1','SH-1']}]};
  for(const step of [{edge:'a->b'},{edges:['a->b']},{failures:{'a->b':'blocked'}},{failures:{'a->b':'dropped'}}]){
   assert.deepEqual(plain(C.liveStatusStepTickets(d,step,true)),['EE-1','SH-1']);
   assert.deepEqual(plain(C.liveStatusStepTickets(d,{...step,nodes:['a','a','text']},true)),['EE-1','SH-1','AA-1']);
   assert.deepEqual(plain(C.liveStatusStepTickets(d,step)),['EE-1','SH-1','AA-1','BB-1']);
   assert.deepEqual(plain(C.liveStatusStepCarriers(d,step).map(carrier=>carrier.id)),['a->b','a','b']);
-  assert.equal(C.liveStatusStep(d,step,{'AA-1':{state:'blocked'}}),'blocked');
-  assert.equal(C.liveStatusCaption(d,step,{'AA-1':{state:'blocked',detail:'Endpoint work'}}),'BLOCKED · AA-1 · Endpoint work');
-  assert.equal(C.liveStatusCaption(d,step,{'BB-1':{state:'missing'}}),'MISSING · BB-1');
+  assert.equal(C.liveStatusStep(d,step,{'AA-1':{state:'blocked'},'EE-1':{state:'done'},'SH-1':{state:'done'}}),'done');
+  assert.equal(C.liveStatusCaption(d,step,{'AA-1':{state:'blocked',detail:'Endpoint work'},'EE-1':{state:'todo'},'SH-1':{state:'todo'}}),'TODO · 2 tickets');
+  assert.equal(C.liveStatusCaption(d,step,{'BB-1':{state:'missing'},'EE-1':{state:'done'},'SH-1':{state:'done'}}),'DONE');
+  assert.equal(C.liveStatusStep(d,{...step,nodes:['a']},{'AA-1':{state:'blocked'},'EE-1':{state:'done'},'SH-1':{state:'done'}}),'blocked','an explicitly added endpoint participates');
+  assert.equal(C.liveStatusCaption(d,{...step,nodes:['a']},{'AA-1':{state:'blocked',detail:'Endpoint work'},'EE-1':{state:'done'},'SH-1':{state:'done'}}),'BLOCKED · AA-1 · Endpoint work');
  }
  assert.deepEqual(plain(C.liveStatusStepTickets(d,{nodes:['a','text']},true)),['AA-1','SH-1']);
  assert.deepEqual(plain(C.liveStatusStepTickets(d,{nodes:['text']},true)),[]);
+});
+test('direct step rollups ignore prior beats and implicit endpoint gaps across edge aliases',()=>{
+ const {C}=harness(),d={nodes:{a:{tickets:['AA-1']},b:{missingWork:true},c:{tickets:['CC-1']}},edges:[{from:'a',to:'b',tickets:['EE-1']},{from:'b',to:'c'}]},blocked={'AA-1':{state:'blocked'},'CC-1':{state:'missing'},'EE-1':{state:'done'}};
+ const steps=[{nodes:['a']},{edge:'a->b'},{edges:['a->b']},{failures:{'a->b':'dropped'}},{edge:'b->c'},{nodes:['b'],edge:'a->b'}];
+ for(const step of steps.slice(1,4)){
+  assert.equal(C.liveStatusStep(d,step,blocked),'done','a previous blocked node and an implicit missing endpoint cannot contaminate a direct edge');
+  assert.equal(C.liveStatusCaption(d,step,blocked),'DONE');
+ }
+ assert.equal(C.liveStatusStep(d,steps[4],blocked),'unchanged','an untracked edge does not inherit endpoint state');
+ assert.equal(C.liveStatusCaption(d,steps[4],blocked),'NO CHANGE NEEDED');
+ assert.equal(C.liveStatusStep(d,steps[5],blocked),'missing','explicitly adding the endpoint opts it in');
+ assert.equal(C.liveStatusCaption(d,steps[5],blocked),'MISSING WORK · unlinked work remains');
+ assert.equal(C.liveStatusStep(d,{edge:'a->b'},{'AA-1':{state:'blocked'}}),null,'the selected edge awaits its own evidence');
+ assert.equal(C.liveStatusCaption(d,{edge:'a->b'},{'AA-1':{state:'blocked'}}),'AWAITING TICKET STATUS');
+ assert.equal(C.liveStatusCaption(d,{edge:'a->b'},{'EE-1':{state:'todo'}},{'AA-1':{tone:'red',on:[{key:'UP-1'}]}}),'TODO · 1 tickets','an implicit endpoint cannot add a waiting suffix');
+ assert.equal(C.liveStatusCaption(d,{edge:'a->b'},{'EE-1':{state:'todo'}},{'EE-1':{tone:'red',on:[{key:'UP-3'}]}}),'TODO · 1 tickets · waiting on UP-3');
+ assert.equal(C.liveStatusStep(d,{nodes:['unknown']},blocked),null,'an empty direct set has no state');
+ assert.equal(C.liveStatusCaption(d,{nodes:['unknown']},blocked),'');
 });
 test('B1 lane suppression belongs only to diagrams with an authored live-status panel',()=>{
  const diagram=panel=>({nodes:{a:{tickets:['AA-1']}},rows:[['a']],panels:panel?[{id:'status',type:'live-status'}]:[],steps:[{lane:'TEAM',nodes:['a']}]});
@@ -751,7 +771,7 @@ test('B2 caption distinguishes blocked missing active done todo and untracked st
  const d={nodes:{a:{tickets:['AA-1']},b:{tickets:['BB-1']}},edges:[{from:'a',to:'b',tickets:['EE-1']} ]},step={edge:'a->b'};
  assert.equal(C.liveStatusCaption(d,step,{'EE-1':{state:'blocked',detail:'waiting on bench'}}),'BLOCKED · EE-1 · waiting on bench');
  assert.equal(C.liveStatusCaption(d,{nodes:['a']},{'AA-1':{state:'missing'}}),'MISSING · AA-1');
- assert.equal(C.liveStatusCaption(d,step,{'AA-1':{state:'active'},'BB-1':{state:'todo'}}),'IN PROGRESS · 2 tickets');
+ assert.equal(C.liveStatusCaption(d,step,{'AA-1':{state:'active'},'BB-1':{state:'todo'}}),'AWAITING TICKET STATUS');
  assert.equal(C.liveStatusCaption(d,{nodes:['a']},{'AA-1':{state:'done'}}),'DONE');
  assert.equal(C.liveStatusCaption(d,{nodes:['a']},{'AA-1':{state:'todo'}}),'TODO · 1 tickets');
  assert.equal(C.liveStatusCaption(d,{nodes:['unknown']},{}),'');
@@ -1346,7 +1366,12 @@ test('imported consumer tracking drives refs, carrier coverage, dependencies, re
  assert.deepEqual(plain(snap.counts),{todo:1,active:0,done:0,blocked:1,missing:0});
  assert.equal(snap.readiness.total,3);assert.equal(snap.readiness.done,0);assert.equal(snap.readiness.ready,false);assert.equal(snap.readiness.blockers,1);
  assert.deepEqual(plain(snap.coverage.onDiagram),['AA-1','AA-2']);
- assert.ok(h.view.querySelector('path.edge').classList.contains('dv-live-waiting'));assert.ok(h.view.querySelector('g.coin').classList.contains('dv-live-blocked'));
+ const d=h.ctl.page.sections[0].diagram;
+ assert.ok(h.view.querySelector('path.edge').classList.contains('dv-live-waiting'));
+ assert.ok(h.view.querySelector('g.coin').classList.contains('dv-live-todo'),'the imported edge is todo despite its blocked implicit endpoint');
+ assert.equal(C.liveStatusCaption(d,d.steps[0],{'AA-1':{state:'blocked'},'AA-2':{state:'todo'}}),'TODO · 1 tickets');
+ assert.equal(C.liveStatusStep(d,{...d.steps[0],nodes:['canon::api']},{'AA-1':{state:'blocked'},'AA-2':{state:'todo'}}),'blocked','an explicitly added imported endpoint participates');
+ assert.equal(C.liveStatusCaption(d,{...d.steps[0],nodes:['canon::api']},{'AA-1':{state:'blocked',detail:'Provider work'},'AA-2':{state:'todo'}}),'BLOCKED · AA-1 · Provider work');
  api.apply({'AA-1':{state:'done'},'AA-2':{state:'done'}});
  assert.equal(api.snapshot().readiness.total,3);assert.equal(api.snapshot().readiness.done,3);assert.equal(api.snapshot().readiness.ready,true);
  assert.equal(h.view.querySelectorAll('.dv-live-waiting').length,0);

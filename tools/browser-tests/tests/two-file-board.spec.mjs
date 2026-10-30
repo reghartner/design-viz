@@ -18,6 +18,8 @@
 | B8 malformed flowspec.json boots the inline block | two-file page whose file is `{not json` | `#docview .doc-title` == inline title; `ctl.sourceText()` === `#flowspec` textContent | rendering nothing; rendering the broken file; sourceText from the file |
 | B9 Copy error copies the diagnostics | real click on the banner's `Copy error` button with clipboard permission granted | clipboard text contains the failure detail (parse message / `HTTP 404`), `flowspec.json`, the page title, the renderer version line, a timestamp and the inline-boot hint; the button reads `Copied` | copying only the banner sentence; a button that opens a dialog |
 | B10 no banner without the marker and without a failure | B3's single-file page; B1's two-file page that loaded | `.dv-source-fallback` count 0; `ctl.sourceFallback()` null | a banner on every two-file page; a banner on single-file pages |
+| B11 network failure boots the inline block and warns | two-file page whose flowspec.json request is aborted by the test (`route.abort('aborted')`) | `#docview .doc-title` == inline title; banner as B7; `ctl.sourceFallback().reason` == `network`, detail names the fetch failure; Copy error text contains that detail | treating only HTTP statuses and parse errors as failures; fail() on a network error |
+| B12 the warning persists | B6's page after 3 s, a real click on a node card and a wheel scroll | banner still visible, still one button reading `Copy error`, no close/dismiss control (`[aria-label*=close i]`, `[aria-label*=dismiss i]`, `.close`) | a toast that auto-hides; a banner that collapses on interaction; a dismiss button |
 */
 import {mkdir,readFile,writeFile,rm} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -69,7 +71,20 @@ async function expectFallbackBanner(page){
  await expect(banner.getByRole('button')).toHaveCount(1);await expect(banner.getByRole('button',{name:'Copy error',exact:true})).toBeVisible();
  expect((await banner.boundingBox()).height).toBeGreaterThan(40);
  await expect(page.locator('#docview .errbox')).toHaveCount(0);
+ await expectNoDismiss(banner);
  return banner;
+}
+async function expectNoDismiss(banner){
+ await expect(banner.locator('[aria-label*="close" i],[aria-label*="dismiss" i],.close,[data-dismiss]')).toHaveCount(0);
+ await expect(banner.getByRole('button')).toHaveCount(1);await expect(banner.getByRole('button')).toHaveText('Copy error');
+}
+// Persistent: still there after time passes and after ordinary reading gestures.
+async function expectBannerPersists(page,banner){
+ await page.waitForTimeout(3000);
+ const card=page.locator('#docview .node').first();await card.scrollIntoViewIfNeeded();const box=await card.boundingBox();await card.click({position:{x:box.width-6,y:box.height/2}});
+ await page.mouse.wheel(0,400);await page.waitForTimeout(300);
+ await expect(banner).toBeVisible();await expectNoDismiss(banner);
+ for(const fact of BANNER_FACTS)await expect(banner).toContainText(fact);
 }
 // A real click copies the diagnostics; the clipboard is read back as data.
 async function copyError(page,banner){
@@ -158,8 +173,31 @@ test('two-file page without its flowspec.json boots the inline block and warns',
  // B7: the persistent warning, with the HTTP status as the reason
  const banner=await expectFallbackBanner(page);
  expect(await sourceFallback(page)).toEqual({reason:'http',detail:'HTTP 404'});
+ // B12: still there after time and interaction
+ await expectBannerPersists(page,banner);
  // B9: Copy error
  await expectDiagnostics(await copyError(page,banner),'HTTP 404','Inline block');
+});
+
+test('two-file page whose flowspec.json request fails boots the inline block and warns',async({page,context,server,audit})=>{
+ const {dir,html,url}=await build(server,'network',JSON.stringify(inline),true);
+ expect(JSON.parse(await readFile(path.join(dir,'flowspec.json'),'utf8'))).toEqual(inline);
+ // The file exists; the network drops the request. Only that one abort is allowed by the audit.
+ page.on('request',request=>{if(request.url().endsWith('/flowspec.json'))audit.allowAbort(request);});
+ audit.allowStatus(0,requested=>requested.endsWith('/flowspec.json'));
+ await page.route('**/flowspec.json',route=>route.abort('aborted'));
+ await context.grantPermissions(['clipboard-read','clipboard-write'],{origin:server.origin});
+ await captureController(page);const requests=specRequests(page);
+ await page.goto(url);
+ // B11: the inline block renders behind the warning
+ await expect(page.locator('#docview .doc-title')).toHaveText('Inline block');
+ await expect(page.locator('#docview .node')).toHaveCount(2);
+ expect(requests).toHaveLength(1);
+ const content=await blockText(page);expect(content.trim()).toBe(blockOf(html));
+ expect(await sourceText(page)).toBe(content);
+ const banner=await expectFallbackBanner(page);
+ const fallback=await sourceFallback(page);expect(fallback.reason).toBe('network');expect(fallback.detail).toMatch(/fetch/i);
+ await expectDiagnostics(await copyError(page,banner),fallback.detail,'Inline block');
 });
 
 test('two-file page with a malformed flowspec.json boots the inline block and warns',async({page,context,server})=>{

@@ -3,6 +3,12 @@
    (marker "__demo") a ?spec=<relative.json> query fetches an adjacent spec
    file instead. http(s)-served pages only — file:// cannot fetch, which is
    why injection (tools/inject.py) stays the default distribution mode.
+   A page injected with --two-file (#826) carries <meta name="dv-spec-file">
+   and fetches flowspec.json beside it: that file is the board's editable
+   source, so it wins over the inline block, which stays the fallback when
+   the file cannot load (file://, file missing, bad status, malformed JSON);
+   that fallback is announced by a persistent banner. Whichever text boots
+   is kept verbatim as the controller's sourceText.
    Browser-only fragment, concatenated last by tools/build.py. */
 
 var view = document.getElementById('docview');
@@ -109,7 +115,48 @@ function applyEmbedMode(ctl){
   target.sectionEl.classList.add('dv-embed-target');
 }
 
-function boot(raw){
+/* Chuck 2026-10-30: a two-file page that could not load flowspec.json boots
+   from the inline copy and says so, persistently, with a Copy error button
+   whose text an editor can paste to an agent. Built here, outside the view,
+   so renderPage never clears it. */
+function sourceFallbackBanner(fallback, page, specFile){
+  var banner = document.createElement('div');
+  banner.className = 'dv-source-fallback'; banner.setAttribute('role', 'alert');
+  var text = document.createElement('p');
+  text.className = 'dv-source-fallback-text';
+  text.textContent = "This board couldn't load its latest version. You're seeing the copy saved when the page was published; changes saved since then are not shown.";
+  var button = document.createElement('button');
+  button.type = 'button'; button.className = 'dv-source-fallback-copy'; button.textContent = 'Copy error';
+  var field = document.createElement('textarea');
+  field.className = 'dv-source-fallback-report'; field.readOnly = true; field.hidden = true;
+  field.setAttribute('aria-label', 'Error details');
+  function report(){
+    var flowview = page && page.flowview && typeof page.flowview === 'object' ? page.flowview : {};
+    var authored = typeof flowview.authoredWith === 'string' && flowview.authoredWith ? flowview.authoredWith : 'not stamped';
+    var build = typeof FlowviewCompatibility !== 'undefined' && FlowviewCompatibility.version ? FlowviewCompatibility.version : 'unknown';
+    return ['Flowview board: ' + specFile + ' did not load',
+            'What failed: ' + fallback.detail + ' (' + fallback.reason + ')',
+            'File: ' + specFile + ' beside ' + String(window.location.href).replace(/#.*$/, ''),
+            'Page: ' + (page && page.title ? page.title : '(untitled)'),
+            'Renderer: page.flowview.authoredWith ' + authored + '; build ' + build,
+            'Time: ' + new Date().toISOString(),
+            'Hint: The page booted from its inline flowspec block; check ' + specFile + ' in the artifact.'].join('\n');
+  }
+  button.addEventListener('click', function(){
+    var diagnostics = report();
+    var clipboard = navigator.clipboard;
+    var write = clipboard && typeof clipboard.writeText === 'function' ?
+      clipboard.writeText(diagnostics) : Promise.reject(new Error('clipboard unavailable'));
+    write.then(function(){ button.textContent = 'Copied'; }, function(){
+      /* no clipboard access: show the text so the editor can select it */
+      field.value = diagnostics; field.hidden = false; field.focus(); field.select();
+    });
+  });
+  banner.appendChild(text); banner.appendChild(button); banner.appendChild(field);
+  return banner;
+}
+
+function boot(raw, sourceText, sourceFallback){
   var topology=document.getElementById('flowview-topology');
   if(topology){try{raw=FlowTopology.resolveSource(raw,JSON.parse(topology.textContent));}catch(ex){fail([ex.message]);return;}}
   var page = normalize(raw);
@@ -128,7 +175,22 @@ function boot(raw){
   var layoutTarget=new URLSearchParams(window.location.search).get('layout');
   var liveOptions=window.flowviewLiveStatus;
   if(liveDemoRequest && !(liveOptions && typeof liveOptions.provider==='function'))liveOptions=createLiveStatusDemo(document);
-  var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget,liveStatus:liveOptions,handoffHost:window.flowviewHandoffHost});
+  /* sourceText: the exact authored text this page booted from (fetched
+     flowspec.json, ?spec= file, or the inline block), never re-serialized —
+     the board's Edit mode splices its changes into this text (#825). */
+  var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget,liveStatus:liveOptions,handoffHost:window.flowviewHandoffHost,sourceText:sourceText,sourceFallback:sourceFallback || null});
+  if (sourceFallback && view.parentNode){
+    var banner = sourceFallbackBanner(sourceFallback, page, specFile);
+    view.parentNode.insertBefore(banner, view);
+    /* The reader's document navigation is fixed at --flowview-navigation-top
+       (the library reader sets it to its header height, library.workbench.js);
+       the banner takes that slot so the navigation sits below it, never over
+       its Copy error button, and both stay visible while the page scrolls. */
+    var sizeBanner = function(){ view.style.setProperty('--flowview-navigation-top', Math.ceil(banner.getBoundingClientRect().height) + 'px'); };
+    sizeBanner();
+    if (typeof ResizeObserver === 'function') new ResizeObserver(sizeBanner).observe(banner);
+    else window.addEventListener('resize', sizeBanner);
+  }
   if (embedRequest){
     /* compose with the step deep-link fields: m=/s= without an explicit
        d= selector must address the EMBEDDED diagram, not the page's
@@ -177,31 +239,71 @@ function boot(raw){
   }
   /* "?" opens the reader's keyboard shortcuts; the tour keeps its own button. */
   if (typeof wireReaderShortcuts === 'function') wireReaderShortcuts(ctl, view, window);
+  /* Host notification, the output side of the flowviewLiveStatus /
+     flowviewHandoffHost inputs: a shell or harness registered before boot
+     receives the controller once the page is wired. A throwing hook is the
+     host's bug, never the page's. */
+  if (typeof window.flowviewBooted === 'function'){
+    try { window.flowviewBooted(ctl); }
+    catch (ex){ if (window.console) console.warn('flowspec: flowviewBooted hook failed: ' + ex.message); }
+  }
 }
 
+var inlineText = (document.getElementById('flowspec') || {}).textContent || '';
 var raw = null, parseErr = null;
 try {
-  raw = JSON.parse(document.getElementById('flowspec').textContent);
+  raw = JSON.parse(inlineText);
 } catch (ex){
   parseErr = 'JSON parse: ' + ex.message;
 }
 var specParam = /[?&]spec=([^&#]+)/.exec(window.location.search);
 var isDemo = !!(raw && raw.page && raw.page.__demo);
+/* #826: the two-file marker names a bare file beside the page (the name is
+   authored by tools/inject.py, not by the URL); anything else is ignored. */
+var specFileMeta = document.querySelector('meta[name="dv-spec-file"]');
+var specFile = specFileMeta ? specFileMeta.getAttribute('content') : null;
+if (!/^[A-Za-z0-9._-]+$/.test(specFile || '')) specFile = null;
+
+function bootInline(fallback){
+  if (parseErr){ fail([parseErr]); return; }
+  if(workspaceRequest)verifyWorkspaceHandoff(raw,workspaceRequest,window.crypto).then(function(){boot(raw, inlineText, fallback);},function(ex){fail([ex.message]);});
+  else boot(raw, inlineText, fallback);
+}
 
 if (specParam && (isDemo || parseErr)){
   applySkinClasses(document.body, view, resolveSkin(readCookieText()));
   var specUrl = decodeURIComponent(specParam[1]);
   fetch(specUrl).then(function(r){
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
-  }).then(async function(spec){await verifyWorkspaceHandoff(spec,workspaceRequest,window.crypto);boot(spec);}).catch(function(ex){
+    return r.text();
+  }).then(async function(text){var spec=JSON.parse(text);await verifyWorkspaceHandoff(spec,workspaceRequest,window.crypto);boot(spec, text);}).catch(function(ex){
     fail(['?spec fetch "' + specUrl + '": ' + ex.message,
           'The ?spec= mode works only on http(s)-served pages — file:// cannot fetch.',
           'For a file that opens anywhere, inject the spec instead: tools/inject.py <spec.json> <template> <out.html>.']);
   });
-} else if (parseErr){
-  fail([parseErr]);
+} else if (specFile){
+  applySkinClasses(document.body, view, resolveSkin(readCookieText()));
+  /* Any load failure (HTTP status, network or file://, malformed JSON) boots
+     the inline copy with a persistent warning (Chuck 2026-10-30); the reason
+     travels as {reason, detail} into the banner and ctl.sourceFallback(). */
+  var fetched = null, fallback = null;
+  fetch(specFile).then(function(r){
+    if (!r.ok){ fallback = {reason: 'http', detail: 'HTTP ' + r.status}; return; }
+    return r.text().then(function(text){
+      try { fetched = {spec: JSON.parse(text), text: text}; }
+      catch (ex){ fallback = {reason: 'parse', detail: 'JSON parse: ' + ex.message}; }
+    });
+  }).catch(function(ex){
+    fallback = {reason: 'network', detail: 'fetch: ' + ex.message};
+  }).then(function(){
+    if (!fetched){
+      if (window.console) console.warn('flowspec: ' + specFile + ' did not load (' + fallback.detail + '); rendering the inline block');
+      bootInline(fallback); return;
+    }
+    /* the handoff gate guards the fetched spec itself: a failed check never
+       boots it and never falls back to the inline copy */
+    return verifyWorkspaceHandoff(fetched.spec, workspaceRequest, window.crypto).then(function(){ boot(fetched.spec, fetched.text); }, function(ex){ fail([ex.message]); });
+  });
 } else {
-  if(workspaceRequest)verifyWorkspaceHandoff(raw,workspaceRequest,window.crypto).then(function(){boot(raw);},function(ex){fail([ex.message]);});
-  else boot(raw);
+  bootInline();
 }

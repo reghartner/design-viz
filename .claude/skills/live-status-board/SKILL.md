@@ -224,7 +224,13 @@ another board's timeline.
 Publish only when asked. Steps:
 
 1. `python3 tools/build.py`, then
-   `python3 tools/inject.py <spec.json> template/flowview.html <out.html>`.
+   `python3 tools/inject.py <spec.json> template/flowview.html <dir>/index.html --two-file`.
+   That writes `index.html` and, beside it, `flowspec.json` (the spec text
+   verbatim) and marks the page so it boots from the file (#826). Publish both:
+   `index.html` as `file_path`, `flowspec.json` through `files`
+   (`{"flowspec.json": "<dir>/flowspec.json"}`). The two-file form is what
+   lets the board save its own edits later; a single-file page
+   (`<out.html>` without the flag) still works for one-off sharing.
 2. claude.ai never forwards a URL `#fragment` to the artifact, so a first-run
    tour would start for every viewer. In the artifact copy only, add before
    the boot script: `<script>if(!location.hash)location.hash="#tour=0";</script>`.
@@ -243,6 +249,9 @@ Publish only when asked. Steps:
    `{server: "GitHub", tools: ["search_pull_requests", "pull_request_read"]}`.
    Without it the board still works; PR icons stay plain and the header says
    "GitHub not connected" when the page has GitHub links or a scope.
+   For a tracked two-file page add the two capabilities the board's Edit mode
+   needs: `artifact: {}, user: {scopes: ["profile"]}` (the page's agent guide
+   prints the full declaration). Single-file pages keep the declaration above.
 4. The built page carries an agent guide block
    (`<script type="text/markdown" id="dv-agent-guide">`, written by
    `tools/inject.py`) with this edit loop, the declaration above as JSON, the
@@ -269,10 +278,16 @@ ring shows carriers done.
 Republishing: pass the artifact's existing URL as `url` on the publish call,
 after reading that artifact with the Artifact tool's read action in the
 current conversation; a publish without `url` creates a new artifact with a
-new link and none of the old comments. The same steps are in the page's
-embedded agent guide, so an editor's agent that has only the artifact URL can
-run this loop too. Do this after every accepted spec
-change the author has authorized publishing for; the author is working in
+new link and none of the old comments. For a two-file board only
+`flowspec.json` changes, but the publish call still needs the page (a call
+with `url` and `files` alone is refused): read the artifact's current
+`flowspec.json` first (the board saves viewers' edits into it under
+`page.editHistory`, which the republished file must keep), read its
+`index.html` to a local file, then publish with `url`, that saved page as
+`file_path` unchanged, and the edited file in `files`. The
+same steps are in the page's embedded agent guide, so an editor's agent that
+has only the artifact URL can run this loop too. Do this after every accepted
+spec change the author has authorized publishing for; the author is working in
 the Workbench and sees no live state there.
 
 ## 5. Verify after publishing

@@ -717,6 +717,53 @@ behaves as before: authored PR links stay plain icons, Jira's Development count
 stays, and the header's connection line reads “GitHub not connected” on pages
 that carry GitHub PR URLs or a `tracking.github` scope.
 
+### Two-file publish: `index.html` + `flowspec.json`
+
+A board that will save its own edits from inside the artifact (#825) is
+published as two files. `python3 tools/inject.py <spec.json>
+template/flowview.html <dir>/index.html --two-file` writes the page and, beside
+it, `flowspec.json` holding the spec text verbatim (outer whitespace stripped,
+one trailing newline; never re-serialized). The page carries a marker line
+after its `flowspec` block, `<meta name="dv-spec-file" content="flowspec.json">`,
+so the standalone boot fetches `flowspec.json` relative to the page and renders
+that file; the inline block is kept as the fallback. When the file cannot load
+for any reason (an HTTP error status, a network or `file://` fetch failure,
+malformed JSON) the page boots from the inline copy and shows a large,
+persistent warning above the page (Chuck 2026-10-30): "This board couldn't
+load its latest version. You're seeing the copy saved when the page was
+published; changes saved since then are not shown." Its **Copy error** button
+copies diagnostics for an agent (what failed, the file name, page title,
+`page.flowview.authoredWith` and the build version, the time, and the hint that
+the page booted from its inline block); when the clipboard is unavailable the
+text appears in a read-only field instead. Code sees the state as
+`ctl.sourceFallback()` → `{reason: "http" | "network" | "parse", detail}`,
+null when the file loaded (#828 disables Save while it is set). The
+fetched spec passes the same workspace-handoff check as the inline one
+(`verifyWorkspaceHandoff` in `src/boot.flowview.js`) before boot; a failed
+check shows the handoff error and never boots the fetched spec, and never falls
+back to the inline copy. Whichever text boots is kept verbatim and exposed as
+`ctl.sourceText()` (for the inline path, the block's text content); the board's
+Edit mode splices its changes into that text.
+
+Publish both files with the Artifact tool: `index.html` as `file_path` and
+`flowspec.json` through `files`. Later edits change only `flowspec.json`, but
+the publish call always needs the page: read the artifact's `index.html` (read
+action with `path`) to a local file, then publish with `url`, that saved page
+as `file_path` unchanged, and the edited `flowspec.json` in `files`. The page
+HTML is never regenerated and comments survive (verified on claude.ai,
+2026-10-30: a publish with `url` and `files` but no `file_path` is refused;
+with the read-back page the stored capabilities carried forward and the edited
+title showed). Re-injecting a two-file page without
+`--two-file` drops the marker, as it replaces a stale guide. For a tracked page
+published this way the declaration adds the artifact and user capabilities the
+board's Edit mode needs; single-file tracked pages keep the declaration above,
+untracked pages stay comments-only:
+
+```js
+capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]},
+  comments: {"composer_only": true, "customAnchors": true}, artifact: {}, user: {scopes: ["profile"]}}
+```
+
 ## Pull requests from GitHub
 
 Jira cannot return pull-request URLs (its Development field carries counts and
@@ -815,6 +862,16 @@ a built page replaces the previous guide. When the block is present the Live
 status panel ends with a muted line, "Editors: ask your agent to read this
 page's agent guide (id dv-agent-guide)"; pages without the block show nothing.
 
+For a page injected with `--two-file` the guide's edit loop targets
+`flowspec.json` instead of the inline block: read that file from the artifact
+(always the current version, since the board saves its own edits into it and
+records each save under `page.editHistory`, which the agent keeps), change it,
+validate, and republish to the same URL with the artifact's own `index.html`
+read back as the page and the edited file in `files`. The inline block is
+described as the stale fallback and must not be edited.
+A tracked two-file page's declaration adds `artifact` and `user`
+(`{scopes: ["profile"]}`).
+
 ## Edit history
 
 `page.editHistory` is the board's save history: one entry per change set,
@@ -865,7 +922,6 @@ read-only viewing. It has no authored state: `initial` and step patches warn
 and are ignored. Without entries it reads "No edits yet." A board without the
 panel keeps its `editHistory` field; the history is shown once the author adds
 the declaration above.
-
 ## Story mode
 
 Live evidence follows the story's nodes and edges. Diagrams with a Live status

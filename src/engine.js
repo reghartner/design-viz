@@ -3598,6 +3598,12 @@ function renderPage(view, page, skin, backlinks, options){
   paintTabExploreIndicators();
   var viewInitial=ctl.views.primary(ctl.tabBlocks.length?1:null,ctl.tabBlocks.length?0:null);
   if(viewInitial)ctl.activeTarget={kind:'diagram',section:viewInitial.number};
+  /* the exact authored text this page booted from (standalone boot passes
+     it; hosts that render a parsed spec leave it undefined), #826 */
+  ctl.sourceText=function(){return options.sourceText;};
+  /* {reason, detail} when the standalone boot fell back to the inline copy
+     because flowspec.json did not load; null otherwise (#828 disables Save) */
+  ctl.sourceFallback=function(){return options.sourceFallback || null;};
   ctl.liveStatus=createLiveStatus(ctl,page,options.liveStatus,options);
   if(records.some(function(r){return r.section.detailOnly || Object.values(r.section.diagram && r.section.diagram.nodes || {}).some(function(n){return n.detail;});}))
     ctl.details=wireDetailFlows(ctl,page,skin,backlinks,options);

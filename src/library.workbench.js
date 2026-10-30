@@ -584,7 +584,7 @@ function initWorkbenchLibrary(opts){
   }
   function currentLink(){
     var service=facets.service.value;
-    return {q:search.value.trim(),team:facets.team.value,service:serviceRefs.has(service)?serviceRefs.get(service):service,topic:facets.topic.value,folder:namespace};
+    return {q:search.value,team:facets.team.value,service:serviceRefs.has(service)?serviceRefs.get(service):service,topic:facets.topic.value,folder:namespace};
   }
   function cards(){
     retireServiceRows();grid.replaceChildren();

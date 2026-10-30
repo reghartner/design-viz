@@ -737,7 +737,7 @@ test('L3 L4 L5 L10 live-status panel is beside the diagram without a click and k
  const a=await diagram.boundingBox(),b=await tile.boundingBox();expect(b.x+b.width).toBeLessThanOrEqual(a.x+2);expect(Math.abs(b.y-a.y)).toBeLessThan(2);expect(b.width).toBeGreaterThan(300);
  await expect(head.locator('.dv-live-connection')).toHaveAttribute('data-state','demo');await expect(head.locator('.dv-live-connection')).toContainText('Demo, refreshed');await expect(root.locator('time.dv-live-updated')).toHaveCount(0);
  await expect(root.locator('.reader-navigation > .dv-live-control')).toHaveCount(0);await expect(root.locator('.dv-live-popover[popover],.dv-live-panel[popover],.dv-live-carrier-preview[popover]')).toHaveCount(0);
- await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-target')).toHaveCount(0);await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-target').first()).toBeVisible();
+ await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-comm-failure')).toHaveCount(0);await expect(root.locator('.dv-jira-cue').first()).toBeVisible();await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-target').first()).toBeVisible();
  await head.getByRole('button',{name:'Next day',exact:true}).click();await expect(head.locator('.dv-live-note')).toContainText('Day 2');
  for(let day=3;day<=12;day++)await head.getByRole('button',{name:'Next day',exact:true}).click();
  await expect(body.locator('tr[data-live-coverage-for="UX-90"]')).toContainText('NOT ON DIAGRAM');await expect(body.locator('.dv-live-epic-progress')).toContainText('7 of 8 on diagram');
@@ -811,7 +811,7 @@ test('R1 edge lines labels live break segments and glyphs open Jira tickets with
  await expect(label(2)).toHaveCount(0);await expect(line(2)).toHaveAttribute('tabindex','0');await strokeClick(page,line(2));
  await expect(pop).toHaveAttribute('aria-label','Live tickets for backend → ux');await expect(pop.getByRole('link',{name:'FW-45',exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/FW-45');
  await page.keyboard.press('Escape');await expect(line(2)).toBeFocused();await page.keyboard.press('Enter');await expect(pop).toBeVisible();await page.keyboard.press('Escape');await page.keyboard.press(' ');await expect(pop).toBeVisible();
- await root.locator('.dv-live-toggle').click();await expect(pop).toBeHidden();await expect(root.locator('.dv-live-pointer,.dv-live-target,.dv-live-comm-failure')).toHaveCount(0);await strokeClick(page,line(1));await expect(pop).toBeHidden();
+ await root.locator('.dv-live-toggle').click();await expect(pop).toBeHidden();await expect(root.locator('.dv-live-comm-failure')).toHaveCount(0);await expect(label(1)).toHaveAttribute('tabindex','0');await strokeClick(page,line(1));await expect(pop).toBeVisible();await page.keyboard.press('Escape');
  await root.locator('.dv-live-toggle').click();await section.locator('.path-chip[data-dv-path="retry"]').click();
  await strokeClick(page,line(1));await expect(pop).toBeVisible();await expect(pop).toHaveAttribute('aria-label','Live tickets for event');
 });
@@ -824,7 +824,7 @@ test('R1 unlabeled blocked edges use their visible live break for pointer keyboa
  await expect(pop.getByRole('link',{name:'HW-124',exact:true})).toHaveAttribute('href','https://acme.atlassian.net/browse/HW-124');
  await page.keyboard.press('Escape');await expect(failure).toBeFocused();await expect(failure).toBeVisible();
  await page.keyboard.press('Enter');await expect(pop).toBeVisible();await page.keyboard.press('Escape');await page.keyboard.press(' ');await expect(pop).toBeVisible();await page.keyboard.press('Escape');
- await root.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-pointer,.dv-live-target,.dv-live-comm-failure')).toHaveCount(0);
+ await root.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-comm-failure')).toHaveCount(0);await expect(line).toHaveAttribute('tabindex','0');
  await root.locator('.dv-live-toggle').click();await strokeClick(page,failure.locator('.comm-break path'));await expect(pop).toBeVisible();await page.keyboard.press('Escape');await expect(failure).toBeFocused();
 });
 test('R2 keyboard reaches ticketed carriers without panel diagram links',async({page,server})=>{
@@ -1167,7 +1167,7 @@ test('A3 availability survives rebuilt native diagrams and clear or destroy rest
  await apply({'API-1':{state:'active'}});await page.evaluate(()=>window.viewer.controller.liveStatus.setEnabled(false));await expect(root.locator('.dv-live-construction,.dv-live-blueprint,.dv-live-reserved')).toHaveCount(0);expect(await node.evaluate(el=>getComputedStyle(el).getPropertyValue('--ns-line').trim())).not.toBe('#009dff');
  await page.evaluate(()=>window.viewer.controller.liveStatus.setEnabled(true));await expect(node).toHaveClass(/dv-live-blueprint/);
  await root.locator('.path-chip[data-dv-path="reverse"]').click();await expect(node).toHaveClass(/dv-live-blueprint/);await expect(root.locator('.dv-live-comm-failure')).toHaveCount(2);
- await page.evaluate(()=>window.viewer.controller.liveStatus.clear());await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target')).toHaveCount(0);await expect(node.locator('.dv-live-construction')).toHaveCount(0);
+ await page.evaluate(()=>window.viewer.controller.liveStatus.clear());await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure')).toHaveCount(0);await expect(node.locator('.dv-jira-cue')).toBeVisible();await expect(node.locator('.card')).toHaveAttribute('tabindex','0');await expect(node.locator('.dv-live-construction')).toHaveCount(0);
  await page.evaluate(()=>window.viewer.controller.liveStatus.apply({'API-1':{state:'active'}}));await expect(node).toHaveClass(/dv-live-blueprint/);
  await page.evaluate(()=>window.viewer.controller.liveStatus.destroy());await expect(root.locator('.dv-live-unavailable,.dv-live-comm-failure,.dv-live-target')).toHaveCount(0);await expect(node.locator('.dv-live-construction')).toHaveCount(0);
  await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
@@ -1243,4 +1243,57 @@ test('marker-only edges break before provider data and restore authored failures
   if(action!=='destroy'){await page.evaluate(()=>window.viewer.controller.liveStatus.apply({}));await page.evaluate(()=>window.viewer.controller.liveStatus.setEnabled(true));await expect(broken).toBeVisible();}
  }
  await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
+});
+
+test('Jira cues reserve hit areas around local and imported controls, shared coins and centered breaks',async({page,server},info)=>{
+ await page.setViewportSize({width:1600,height:1100});
+ await writeFile(path.join(server.root,'jira-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'jira-native.html'),'<style>body{margin:0}#host{min-height:100vh}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./jira-native.js";window.mount=mountNativeViewer;</script>');
+ const make=(id,diagram)=>({page:{title:'Jira collision placement',canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=make('provider',{nodes:{p:{title:'Imported sender',link:'https://example.test/source',delta:true,deltaText:'Changed',status:'proposed'},q:{title:'Imported receiver'}},rows:[[]],floats:[{id:'p',x:100,y:100},{id:'q',x:650,y:100}],edges:[{from:'p',to:'q',label:'Curved shared delivery',curvePoints:[{t:.3,dx:0,dy:-90}],delta:true}],topologyExports:{core:{nodes:['p','q'],edges:['p->q']}}});
+ const source=make('consumer',{view:'ambient',autoplay:false,nodes:{a:{title:'Local sender',tickets:['AA-1'],link:'https://example.test/source',detail:{section:'detail'},delta:true,deltaText:'Changed',status:'proposed'},b:{title:'Local receiver',tickets:['BB-1','BB-2']},c:{title:'Other endpoint'},v:{title:'Vertical target'},h:{title:'Continuation',tickets:['HH-1'],handoff:{localSection:'destination'}},note:{type:'text',text:'Untracked note',tickets:['NO-1']}},rows:[[]],floats:[{id:'a',x:100,y:100},{id:'b',x:280,y:100},{id:'c',x:650,y:100},{id:'v',x:280,y:640},{id:'h',x:900,y:400},{id:'note',x:900,y:640}],edges:[{from:'a',to:'b',label:'Short',tickets:['EE-1','EE-2']},{from:'c',to:'b',label:'Reversed',tickets:['RR-1'],delta:true},{from:'b',to:'v',tickets:['VV-1']}],topologyImports:[{spec:'provider',export:'core',as:'shared',position:{x:100,y:390},nodeTracking:{p:{tickets:['IP-1','IP-2']},q:{tickets:['IQ-1']}},edgeTracking:{'p->q':{tickets:['IE-1']}}}],steps:[{id:'one',edge:'a->b'},{id:'two',edge:'a->b',delta:true},{id:'three',edge:'a->b'},{id:'reverse',edge:'c->b'},{id:'vertical',edge:'b->v'},{id:'curve',edge:'shared::p->shared::q'}],paths:[{id:'all',label:'All',steps:['one','two','three','reverse','vertical','curve']},{id:'few',label:'Fewer',steps:['one','reverse','vertical','curve']}],panels:[{id:'status',type:'live-status'}]});
+ source.page.tracking={jira:{site:'https://jira.test'}};source.page.sections.push({id:'destination',heading:'Destination',diagram:{nodes:{end:{title:'Destination'}},rows:[['end']]}});source.page.sections.push({id:'detail',heading:'Details',detailOnly:true,diagram:{nodes:{child:{title:'Details'}},rows:[['child']]}});
+ const context=vm.createContext({});vm.runInContext(sourceLoader.composeSources(['validator.js','canon.js']),context);
+ const spec=JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(source,{version:1,id:'consumer',specs:[provider,source]})));
+ expect(spec.page.sections[0].diagram.nodes['shared::p'].tickets).toEqual(['IP-1','IP-2']);
+ await page.goto(server.origin+'/jira-native.html');await page.waitForFunction(()=>!!window.mount);
+ await page.evaluate(spec=>{window.jiraInput=spec;window.jiraBefore=JSON.stringify(spec);window.viewer=window.mount(document.querySelector('#host'),spec,{});},spec);
+ const root=page.locator('#host'),section=root.locator('#section-main'),cues=section.locator('.dv-jira-cue'),pop=root.locator('.dv-live-popover');
+ await expect(cues).toHaveCount(9);await expect(section.locator('[data-dv-node="note"] .dv-jira-cue,[data-dv-node="c"] .dv-jira-cue')).toHaveCount(0);
+ await expect(section.locator('.dv-jira-stack')).toHaveCount(3);
+ const imported=section.locator('[data-dv-node="shared::p"] .dv-jira-cue');await imported.click();await expect(pop.getByRole('link',{name:'IP-1',exact:true})).toHaveAttribute('href','https://jira.test/browse/IP-1');await expect(pop.getByRole('link',{name:'IP-2',exact:true})).toBeVisible();await expect(pop).toContainText('No status');await page.keyboard.press('Escape');await expect(section.locator('[data-dv-node="shared::p"] .card')).toBeFocused();
+ const map={'EE-1':{state:'blocked'},'RR-1':{state:'blocked'},'VV-1':{state:'blocked'},'IE-1':{state:'blocked'}};
+ const measure=()=>section.locator('.board svg').first().evaluate(svg=>{
+  const visible=el=>{const s=getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'&&!el.closest('.view-step-hidden,.dv-fragment-hidden,.comm-hidden,.dv-live-comm-suppressed');};
+  const overlap=(a,b)=>a.left<b.right-.1&&a.right>b.left+.1&&a.top<b.bottom-.1&&a.bottom>b.top+.1;
+  const markers=[...svg.querySelectorAll('.dv-jira-cue')].filter(visible),issues=[];
+  const obstacles=[...svg.querySelectorAll('.card,.icbg,.node use:not(.dv-jira-icon):not(.dv-jira-back),.node text,.nlink,.nbackref,.detail-trigger,.handoff-link,.dvdelta,.node-review-badge,.coin,.comm-break,text.lbl')].filter(el=>visible(el)&&!el.closest('.dv-jira-cue'));
+  for(const marker of markers){const r=marker.getBoundingClientRect(),node=marker.closest('.node');for(const el of obstacles){if(el===node?.querySelector('.card'))continue;if(overlap(r,el.getBoundingClientRect()))issues.push(marker.getAttribute('data-jira-carrier')+' overlaps '+el.getAttribute('class'));}
+   for(const other of markers){if(other!==marker&&overlap(r,other.getBoundingClientRect()))issues.push('cue overlap');}
+   const frame=svg.getBoundingClientRect();if(r.left<frame.left||r.right>frame.right||r.top<frame.top||r.bottom>frame.bottom)issues.push('clipped cue');
+  }
+  for(const coin of [...svg.querySelectorAll('.coin')].filter(visible))for(const broken of [...svg.querySelectorAll('.comm-break')].filter(visible))if(overlap(coin.getBoundingClientRect(),broken.getBoundingClientRect()))issues.push('coin overlaps break');
+  return {issues,coins:[...svg.querySelectorAll('.coin')].filter(visible).length};
+ });
+ await expect.poll(async()=>(await measure()).issues).toEqual([]);
+ await page.evaluate(map=>window.viewer.controller.liveStatus.apply(map),map);
+ await expect(section.locator('.dv-live-comm-failure')).toHaveCount(4);for(const broken of await section.locator('.dv-live-comm-failure').all())await expectCenteredBreak(broken);
+ await expect.poll(async()=>(await measure()).issues).toEqual([]);expect((await measure()).coins).toBe(6);
+ const edgeCue=section.locator('.dv-jira-cue[data-jira-carrier="a->b"]');await edgeCue.click();await expect(pop.getByRole('link',{name:'EE-1',exact:true})).toBeVisible();await expect(pop.getByRole('link',{name:'EE-2',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(section.locator('text.lbl[data-dv-edge="0"]')).toBeFocused();
+ await section.screenshot({path:info.outputPath('jira-coins-breaks-imported.png')});
+ await section.locator('.path-chip[data-dv-path="few"]').click();await expect(cues).toHaveCount(9);await expect.poll(async()=>(await measure()).coins).toBe(4);await expect.poll(async()=>(await measure()).issues).toEqual([]);
+ for(const action of ['off','on','clear','on']){await page.evaluate(action=>{const api=window.viewer.controller.liveStatus;if(action==='clear')api.clear();else api.setEnabled(action==='on');},action);await expect(cues).toHaveCount(9);await expect.poll(async()=>(await measure()).issues).toEqual([]);}
+ await imported.click();await expect(pop).toContainText('No status');await page.keyboard.press('Escape');
+ // Whole-card handoffs retain their original action and have one separate ticket button.
+ const handoff=section.locator('[data-dv-node="h"]');await expect(handoff.locator('.card')).not.toHaveAttribute('role','button');await expect(handoff.locator('.dv-jira-cue')).toHaveAttribute('tabindex','0');await handoff.locator('.dv-jira-cue').press('Enter');await expect(pop.getByRole('link',{name:'HH-1',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(handoff.locator('.dv-jira-cue')).toBeFocused();await handoff.locator('.handoff-link').click();await expect(root.locator('#section-destination')).toBeVisible();await expect(pop).toBeHidden();await root.locator('.handoff-back').click();await expect(section).toBeVisible();await expect(cues).toHaveCount(9);
+ expect(await page.evaluate(()=>JSON.stringify(window.jiraInput)===window.jiraBefore)).toBe(true);
+ await page.evaluate(()=>window.viewer.controller.liveStatus.destroy());await expect(root.locator('.dv-jira-cue,.dv-live-pointer,.dv-live-target')).toHaveCount(0);await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
+});
+
+test('desktop Jira cues retain node and edge authoring selection without opening tickets or changing source',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);
+ const source=page.locator('#src'),before=await source.inputValue(),root=page.locator('#docview');
+ await root.locator('[data-dv-node="hardware"] .dv-jira-cue').click();await page.locator('#editor-tab-inspect').click();await expect(page.locator('#guide').getByLabel('Name',{exact:true})).toHaveValue('Hardware');
+ await root.locator('.dv-jira-cue[data-dv-edge="0"]').click();await expect(page.locator('#guide').getByLabel('label',{exact:true})).toHaveValue('press');
+ await expect(root.locator('.dv-live-popover')).toHaveCount(0);await expect(source).toHaveValue(before);await expect(root.locator('.dv-jira-cue[tabindex="0"]')).toHaveCount(0);
 });

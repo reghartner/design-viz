@@ -1734,6 +1734,7 @@ test('edge missing work beats Done without changing Jira evidence and restores a
 | H7b pending bridge | panel mounted before the controller exists | rows appear once `liveStatusWhenReady` connects | an impl that only connects at mount time |
 | H8 editor name resolution | mocked window.claude.use('user') | A "Alex Live" (stored "Alex Old"), B "Bo" (resolved ""), C "Someone"; use→null: A "Alex Old" | an impl that drops the profiles() lookup (A shows "Alex Old") |
 | H11 panel shows at most 200 rows | 201 entries | 200 details rows | an impl that renders page.editHistory unbounded |
+| H12 history works on untracked pages (Chuck 2026-10-30) | page with no page.tracking, no tickets and no live-status panel | snapshot().editHistory carries the entries; the mounted panel renders one row per entry | an impl that creates the controller or paints only for tracked boards |
 */
 const HISTORY_PANEL={id:'history',type:'edit-history',title:'Edit history'};
 function historyFixture(editHistory){
@@ -1799,4 +1800,13 @@ test('H8 editor names: live profile name, else the stored copy, else "Someone"',
  const none=harness(historyFixture(HISTORY));none.win.claude={use:()=>Promise.resolve(null)};const plainPanel=mountHistory(none);await historySettle();
  assert.deepEqual(plainPanel.rows().map(r=>textOf(r.querySelector('.dv-edit-who')).trim()),['Alex Old','Someone','Bo'],'user namespace absent: stored names');
  plainPanel.destroy();none.ctl.liveStatus.destroy();
+});
+test('H12 Chuck 2026-10-30: history renders on a page without tracking, tickets or a live-status panel',async()=>{
+ const raw={page:{title:'Plain page',editHistory:HISTORY,sections:[{id:'main',diagram:{nodes:{a:{title:'Node A'},b:{title:'Node B'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],panels:[{...HISTORY_PANEL}]}}]}};
+ assert.equal(raw.page.tracking,undefined);const h=harness(raw);
+ assert.deepEqual(plain(h.C.validate(h.ctl.page)),{errors:[],warnings:[]},'an untracked page with history is clean');
+ assert.deepEqual(plain(h.ctl.liveStatus.snapshot().editHistory),plain(h.C.editHistoryEntries(h.ctl.page)));assert.equal(h.ctl.liveStatus.snapshot().editHistory.length,3);
+ const status=mountHistory(h);await historySettle();
+ const rows=status.rows();assert.equal(rows.length,3);assert.equal(textOf(rows[0].querySelector('.dv-edit-first')).trim(),'AA-1 added to Node A');
+ status.destroy();h.ctl.liveStatus.destroy();
 });

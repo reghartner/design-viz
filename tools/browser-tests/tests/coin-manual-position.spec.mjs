@@ -67,7 +67,7 @@ test('Workbench drags a step circle to a saved offset, keeps a press as step sel
  await expect(coin(root,1)).toHaveClass(/dv-sel/);expect(await source(page)).toBe(original);
 
  // An unmoved circle offers reset only as a disabled reason.
- await coin(root,1).locator('circle').first().click({button:'right'});
+ await coin(root,1).click({button:'right'});
  await expect(resetItem(page)).toHaveAttribute('aria-disabled','true');
  await page.keyboard.press('Escape');await expect(menu(page)).toHaveCount(0);
 
@@ -87,7 +87,7 @@ test('Workbench drags a step circle to a saved offset, keeps a press as step sel
  await page.screenshot({path:testInfo.outputPath('coin-dragged.png')});
 
  // Right-click reset returns it to the automatic row; Undo restores the placement.
- await coin(root,1).locator('circle').first().click({button:'right'});
+ await coin(root,1).click({button:'right'});
  await expect(resetItem(page)).not.toHaveAttribute('aria-disabled','true');await resetItem(page).click();
  await expect.poll(()=>offsets(page,1)).toBeUndefined();
  await expect(coin(root,1)).toHaveAttribute('transform','translate(15.00 0.00)');
@@ -95,7 +95,7 @@ test('Workbench drags a step circle to a saved offset, keeps a press as step sel
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(moved);
 
  // The Inspector button resets the selected step's circle too.
- await coin(root,1).locator('circle').first().click();
+ await coin(root,1).click();
  if(!await page.locator('#workspace-window-inspect').isVisible())await page.locator('#editor-tab-inspect').click();
  const button=page.getByRole('button',{name:'Reset step circle to automatic position',exact:true});
  await expect(button).toBeEnabled();await button.click();
@@ -131,7 +131,7 @@ test('a circle on an imported connection drags and resets on the consumer step',
  await expect(imported).toHaveAttribute('transform','translate('+saved.dx.toFixed(2)+' '+saved.dy.toFixed(2)+')');
  const moved=await source(page);await history(page,original,moved);
  await page.screenshot({path:testInfo.outputPath('imported-coin-dragged.png')});
- await imported.locator('circle').first().click({button:'right'});await resetItem(page).click();
+ await imported.click({button:'right'});await resetItem(page).click();
  await expect.poll(()=>offsets(page,1)).toBeUndefined();
  expect(diagram(JSON.parse(await source(page)))).toEqual(diagram(JSON.parse(original)));
 });

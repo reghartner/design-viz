@@ -48,8 +48,11 @@ function boardEditResolveChain(raw,chain){
       value.forEach(function(element,i){if(boardEditIdentity(chain[index-1],element)===part.key)walk(element,index+1,path.concat([i]));});
       return;
     }
-    if(index<chain.length-1 && (!value || typeof value!=='object' || !Object.prototype.hasOwnProperty.call(value,part)))return;
-    walk(value?value[part]:undefined,index+1,path.concat([part]));
+    // A member may be absent only past the last array element of the chain: an
+    // overlay entry (nodeTracking / edgeTracking) does not exist until the first add.
+    var present=value && typeof value==='object' && Object.prototype.hasOwnProperty.call(value,part);
+    if(!present && chain.slice(index+1).some(function(next){return next && typeof next==='object';}))return;
+    walk(present?value[part]:undefined,index+1,path.concat([part]));
   })(raw,0,[]);
   return found;
 }

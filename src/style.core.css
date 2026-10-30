@@ -218,6 +218,14 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
    dashed line running through it */
 .coin-base{fill:var(--dv-board-ground);pointer-events:none;}
 .coin-base.view-step-hidden{display:none;}
+/* a reader's coin is a step button: hover or keyboard focus rings it (#836) */
+.coin[role="button"]{cursor:pointer;outline:none;}
+.coin[role="button"]:is(:hover,:focus-visible)>circle{stroke:var(--acc)!important;stroke-width:2.4px!important;}
+.nbackpop.step-coin-card{inset:auto;margin:0;flex-direction:column;align-items:flex-start;gap:4px;width:max-content;max-width:min(300px,calc(100vw - 16px));
+  padding:9px 12px;pointer-events:none;font:400 13px/1.45 'IBM Plex Sans',sans-serif;}
+.step-coin-card-label{font:700 10px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);}
+.step-coin-card-text{color:var(--dink);overflow-wrap:anywhere;}
+.step-coin-card-hint{font:500 10.5px/1.4 'IBM Plex Mono',monospace;opacity:.8;}
 /* a step-colored coin keeps its number readable when dimmed: its ink is
    chosen against the full color, so it fades less than a plain coin */
 .stepmode .coin.step-colored:not(.lit){opacity:max(var(--dv-dim, .4), .75) !important;}

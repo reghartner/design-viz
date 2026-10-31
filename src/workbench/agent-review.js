@@ -194,6 +194,39 @@ function workbenchAgentReviewEntries(changes,pages,ledgerChanged){
   if(ledgerChanged)entries.push({status:'modified',label:'Coverage ledger · evidence and decisions',current:{kind:'ledger'},proposed:{kind:'ledger'}});
   return entries;
 }
+/* Shared compare engine input: the authored page plus the same page resolved
+   with the frozen topology context the dialog renders with. */
+function workbenchAgentReviewEngineSide(text,ledger,resolve,context){
+  var authored=normalize(JSON.parse(text)),resolved=authored;
+  if(resolve){try{var raw=JSON.parse(text);resolved=normalize(context?resolve(raw,context):resolve(raw)) || authored;}catch(ex){resolved=authored;}}
+  return {authored:authored,resolved:resolved,ledger:typeof ledger==='string'?ledger:null};
+}
+/* Imported nodes and connections from the engine's change list: provider
+   changes and the resolved differences attached to an import declaration. */
+function workbenchAgentReviewImportedEntries(engine,pages){
+  var out=[],records={current:sectionRecords(pages.current),proposed:sectionRecords(pages.proposed)};
+  function target(path){
+    var m=/\.nodes\[("(?:[^"\\]|\\.)*")\]|\.nodes\.([A-Za-z_$][\w$]*)|\.edges\[(\d+)\]/.exec(path || '');
+    if(!m)return null;
+    return m[3]!=null?{kind:'edges',key:Number(m[3])}:{kind:'nodes',key:m[1]!=null?JSON.parse(m[1]):m[2]};
+  }
+  (engine || []).forEach(function(e){
+    var items=e.origin==='imported' && e.cause==='provider'?[e]:e.kind==='import'?e.resolved || []:[];
+    items.forEach(function(item){
+      // Provider entries are located at the import declaration; their key names the node or edge.
+      var provider=item===e,kind=e.kind==='edge'?'edges':'nodes';
+      var before=provider?(e.key && e.key.before!=null?{kind:kind,key:e.key.before}:null):target(item.beforePath);
+      var after=provider?(e.key && e.key.after!=null?{kind:kind,key:e.key.after}:null):target(item.afterPath),t=after || before;if(!t)return;
+      var section=e.section || {},record=section.after!=null?records.proposed[section.after]:section.before!=null?records.current[section.before]:null;
+      var location=record?[record.tabLabel,record.section && (record.section.heading || record.section.id) || 'Section '+record.number].filter(Boolean).join(' / ')+' · ':'';
+      var entry={status:item.status,label:location+(t.kind==='nodes'?'Imported node ':'Imported connection ')+String(t.key)};
+      if(before && section.before!=null)entry.current={section:section.before,kind:before.kind,key:String(before.key)};
+      if(after && section.after!=null)entry.proposed={section:section.after,kind:after.kind,key:String(after.key)};
+      out.push(entry);
+    });
+  });
+  return out;
+}
 function workbenchAgentReviewDecorate(root,side,enabled){
   root.removeAttribute('data-agent-change');
   Array.prototype.forEach.call(root.querySelectorAll('[data-agent-change]'),function(node){node.removeAttribute('data-agent-change');});
@@ -336,7 +369,12 @@ function initWorkbenchAgentReview(opts){
       'Your changes and the agent’s separate changes are combined in this preview.';
     el('issues').hidden=!!next.review.ok;el('feedback').value=workbenchAgentConflictFeedback(next.review);
     changes=null;entries=[];selected=-1;
-    try{var current=normalize(JSON.parse(next.current)),proposed=normalize(JSON.parse(next.source));if(current && proposed){changes=workbenchAgentReviewChanges(current,proposed);entries=workbenchAgentReviewEntries(changes,{current:current,proposed:proposed},next.ledger!==next.currentLedger);}}catch(ex){}
+    try{var current=normalize(JSON.parse(next.current)),proposed=normalize(JSON.parse(next.source));if(current && proposed){changes=workbenchAgentReviewChanges(current,proposed);entries=workbenchAgentReviewEntries(changes,{current:current,proposed:proposed},next.ledger!==next.currentLedger);
+      // The authored model above cannot see imported topology; the shared
+      // compare engine (#847) compares the resolved pages too.
+      if(typeof compareDocuments==='function')entries=entries.concat(workbenchAgentReviewImportedEntries(compareDocuments(
+        workbenchAgentReviewEngineSide(next.current,next.currentLedger,opts.resolve,next.topologyContext),
+        workbenchAgentReviewEngineSide(next.source,next.ledger,opts.resolve,next.topologyContext)),{current:current,proposed:proposed}));}}catch(ex){}
     populate();draw();
   }
   function open(){if(!state)return;if(!dialog.open)dialog.showModal();viewing='proposed';highlights=true;details=false;reviewedVersion=state.version;displayState();refresh();el('close').focus();}

@@ -1,99 +1,207 @@
 'use strict';
 /* Stress run for the shared compare engine (issue #847; Chuck's coverage
-   ruling 2026-10-31: separate stress file). Inputs: the 48 deterministic
-   panel-placement scenarios (tools/panel-placement/corpus.cjs), each built
-   into a real spec, then a seeded set of single-field mutations.
+   ruling 2026-10-31: separate stress file).
+
+   Inputs:
+   - the 48 deterministic panel-placement scenarios (tools/panel-placement/
+     corpus.cjs), each built into a real spec, given a step path, and put
+     through every LOCAL mutation kind below (seeded choice of step/panel/node);
+   - a topology fixture (provider + consumer) put through every IMPORT
+     mutation kind below.
+
+   LOCAL mutation kinds: step panel patch, caption, node field, edge label,
+   step tone, step panelVisibility, step time, panel title (render-only),
+   panel visible, panel initial, document title, section heading, layout
+   name, View added, story time, path membership, ledger.
+   IMPORT mutation kinds: provider node field, provider edge label, provider
+   node added, override node field, override edge field, import as, import
+   export, import spec, tone on an imported node.
 
    Invariants per mutation (all asserted):
    S1 identity        compare(x, x) is []
-   S2 symmetry        compare(b, a) mirrors compare(a, b): added<->removed, paths swapped
+   S2 symmetry        compare(b, a) is the FULL mirror of compare(a, b): statuses
+                      flip; paths, field values, effect step lists, scopes and
+                      resolved items swap sides
    S3 immutability    neither side is mutated
    S4 determinism     two runs are deepEqual
-   S5 localization    exactly one entry, exactly one field, at the expected
-                      beforePath/afterPath with the expected values; no entry
-                      for an unmutated field
-   S6 completeness    every id whose folded state / tone / visibility differs
-                      (independent oracle over the folds) has an effect equal to it
-   S7 precision       no effect is reported for an id the oracle shows unchanged
-   S8 declaration     a panel-declaration title edit (render-only) is
-                      effect:'declaration' with no effects and a visible-step scope
-   S9 timing          comparing the largest scenario with its mutation takes < 2000 ms
+   S5 localization    exactly one entry of the expected kind/status/cause/origin,
+                      with exactly the expected fields (paths and values)
+   S6 completeness    every (path, category, id) whose folds differ under the
+                      independent oracle (steps paired by id; 'ambient' by the
+                      renderer rule) has an effect with exactly those before
+                      AND after step lists
+   S7 precision       no effect for a (path, category, id) the oracle shows unchanged
+   S8 declaration     a render-only panel edit is effect:'declaration', no
+                      effects, scopes equal the oracle's visible steps + ambient
+   S9 timing          comparing the largest scenario with a mutation < 2000 ms
 */
 const test=require('node:test'),assert=require('node:assert/strict');
 const corpus=require('../tools/panel-placement/corpus.cjs');
 const plain=v=>JSON.parse(JSON.stringify(v));
 const C=corpus.engine(),IMAGE='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1kAAAAASUVORK5CYII=';
-const build=s=>corpus.specification(C,s,IMAGE);
-const SEC=i=>'sections[0].diagram';
-
+const SEC='sections[0].diagram',R='resolved:'+SEC;
+const key=(path,k)=>path+(/^[A-Za-z_$][\w$]*$/.test(k)?'.'+k:'['+JSON.stringify(k)+']');
+function build(s){const spec=corpus.specification(C,s,IMAGE),d=spec.page.sections[0].diagram;d.paths=[{id:'main',steps:d.steps.map(x=>x.id)}];return spec;}
 function rng(seed){let s=seed>>>0||1;return ()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};}
-const side=raw=>({authored:C.normalize(plain(raw)),resolved:C.normalize(plain(raw)),ledger:null});
-function compare(a,b){
+const pick=(r,list)=>list[Math.floor(r()*list.length)];
+const side=(raw,{context=null,ledger=null}={})=>({authored:C.normalize(plain(raw)),resolved:C.normalize(context?C.FlowTopology.resolveSource(plain(raw),context):plain(raw)),ledger});
+const sortJ=list=>(list||[]).map(x=>JSON.stringify(plain(x))).sort();
+function mirror(e){
+  const flip={added:'removed',removed:'added',modified:'modified'},m=plain(e);m.status=flip[m.status];[m.beforePath,m.afterPath]=[e.afterPath,e.beforePath];
+  m.fields=(e.fields||[]).map(f=>plain({beforePath:f.afterPath,afterPath:f.beforePath,before:f.after,after:f.before}));
+  m.effects=(e.effects||[]).map(x=>plain(Object.assign({},x,{beforeSteps:x.afterSteps,afterSteps:x.beforeSteps})));
+  if('scopeBefore' in e || 'scopeAfter' in e){m.scopeBefore=e.scopeAfter;m.scopeAfter=e.scopeBefore;}
+  if(e.resolved)m.resolved=e.resolved.map(r=>plain(Object.assign({},r,{status:flip[r.status],beforePath:r.afterPath,afterPath:r.beforePath,before:r.after,after:r.before})));
+  return m;
+}
+const norm=e=>{const x=plain(e);x.fields=sortJ(x.fields);x.effects=sortJ(x.effects);if(x.resolved)x.resolved=sortJ(x.resolved);return JSON.stringify(x,Object.keys(x).sort());};
+function compare(a,b,label){
   assert.equal(typeof C.compareDocuments,'function','compareDocuments(before, after) is defined by the shared engine');
   const sa=plain(a),sb=plain(b),out=plain(C.compareDocuments(a,b));
-  assert.deepEqual(plain(a),sa,'S3 before not mutated');assert.deepEqual(plain(b),sb,'S3 after not mutated');return out;
-}
-function oracle(d0,d1,category,id){
-  const f={state:d=>C.foldPanelStates(d)[id],tone:d=>C.foldNodeTones(d).map(s=>s[id]),visibility:d=>C.foldPanelVisibility(d)[id]}[category];
-  const a=f(d0)||[],b=f(d1)||[],out=[];
-  for(let i=0;i<Math.max(a.length,b.length);i++)if(JSON.stringify(a[i])!==JSON.stringify(b[i]))out.push(i);
+  assert.deepEqual(plain(a),sa,'S3 before not mutated '+label);assert.deepEqual(plain(b),sb,'S3 after not mutated '+label);
+  assert.deepEqual(plain(C.compareDocuments(a,b)),out,'S4 determinism '+label);
+  assert.deepEqual(plain(C.compareDocuments(b,a)).map(norm).sort(),out.map(mirror).map(norm).sort(),'S2 full mirror '+label);
   return out;
 }
-/* Each mutation returns {path, before, after, kind}. Paths are page-root paths. */
-const MUTATIONS={
-  patch(d,r){const k=Math.floor(r()*d.steps.length),p=d.panels[Math.floor(r()*d.panels.length)];d.steps[k].panels=d.steps[k].panels||{};const had=d.steps[k].panels[p.id];
-    if(had){had.stressNote='m';return {kind:'step',path:'steps['+k+'].panels.'+p.id+'.stressNote',before:undefined,after:'m',beforeNull:true};}
-    d.steps[k].panels[p.id]={stressNote:'m'};return {kind:'step',path:'steps['+k+'].panels.'+p.id,before:undefined,after:{stressNote:'m'},beforeNull:true};},
-  caption(d,r){const k=Math.floor(r()*d.steps.length),old=d.steps[k].text;d.steps[k].text=old+' (edited)';return {kind:'step',path:'steps['+k+'].text',before:old,after:old+' (edited)'};},
-  node(d,r){const ids=Object.keys(d.nodes),id=ids[Math.floor(r()*ids.length)],old=d.nodes[id].sub;d.nodes[id].sub='mutated sub';
-    return {kind:'node',path:'nodes'+(/^[A-Za-z_$][\w$]*$/.test(id)?'.'+id:'['+JSON.stringify(id)+']')+'.sub',before:old,after:'mutated sub',beforeNull:old===undefined};},
-  edge(d,r){if(!d.edges.length)return null;const i=Math.floor(r()*d.edges.length),old=d.edges[i].label;d.edges[i].label='mutated label';return {kind:'edge',path:'edges['+i+'].label',before:old,after:'mutated label',beforeNull:old===undefined};},
-  tone(d,r){const k=Math.floor(r()*d.steps.length),ids=Object.keys(d.nodes),id=ids[Math.floor(r()*ids.length)];if(d.steps[k].tone)return null;d.steps[k].tone={[id]:'alert'};return {kind:'step',path:'steps['+k+'].tone',before:undefined,after:{[id]:'alert'},beforeNull:true};},
-  visibility(d,r){const k=Math.floor(r()*d.steps.length),p=d.panels[Math.floor(r()*d.panels.length)];if(d.steps[k].panelVisibility)return null;d.steps[k].panelVisibility={[p.id]:false};return {kind:'step',path:'steps['+k+'].panelVisibility',before:undefined,after:{[p.id]:false},beforeNull:true};},
-  title(d,r){const i=Math.floor(r()*d.panels.length),old=d.panels[i].title;d.panels[i].title=old+' (renamed)';return {kind:'panel',path:'panels['+i+'].title',before:old,after:old+' (renamed)',declaration:true};}
+/* Independent oracle over the folds. */
+function oracle(d0,d1,category,id,pathId){
+  const f={state:d=>C.foldPanelStates(d)[id],tone:d=>C.foldNodeTones(d).map(s=>s[id]),visibility:d=>C.foldPanelVisibility(d)[id]}[category];
+  const pa=C.diagramForPath(d0,pathId),pb=C.diagramForPath(d1,pathId),fa=f(pa)||[],fb=f(pb)||[];
+  const ia=pa._sourceIndices,ib=pb._sourceIndices,ida=ia.map(i=>d0.steps[i].id),idb=ib.map(i=>d1.steps[i].id),bs=[],as=[];
+  if(ia.length || ib.length){
+    ida.forEach((sid,k)=>{const j=idb.indexOf(sid);if(j<0 || JSON.stringify(fa[k])!==JSON.stringify(fb[j])){bs.push(ia[k]);if(j>=0)as.push(ib[j]);}});
+    idb.forEach((sid,j)=>{if(ida.indexOf(sid)<0)as.push(ib[j]);});
+  }
+  bs.sort((x,y)=>x-y);as.sort((x,y)=>x-y);
+  if(category==='state'){
+    const amb=(d,st)=>{const p=(d.panels||[]).find(x=>x.id===id);if(!p)return undefined;const v=C.PanelViews.get(p.type);return v && v.options && v.options.ambientInitial?p.initial:st[0];};
+    if(JSON.stringify(amb(d0,fa))!==JSON.stringify(amb(d1,fb))){bs.push('ambient');as.push('ambient');}
+  }
+  return {beforeSteps:bs,afterSteps:as};
+}
+function visibleScope(d,id){
+  const p=C.diagramForPath(d,C.diagramPathList(d)[0].id),v=C.foldPanelVisibility(p)[id]||[],out=[];
+  p._sourceIndices.forEach((src,k)=>{if(v[k]!==false && !out.includes(src))out.push(src);});
+  return out.sort((x,y)=>x-y).concat(['ambient']);
+}
+function checkEffects(e,d0,d1,label){
+  const pathIds=C.diagramPathList(d0).map(p=>p.id).filter(id=>C.diagramPathList(d1).some(p=>p.id===id));
+  const panelIds=[...new Set((d0.panels||[]).map(p=>p.id).concat((d1.panels||[]).map(p=>p.id)))];
+  const nodeIds=[...new Set(Object.keys(d0.nodes||{}).concat(Object.keys(d1.nodes||{})))];
+  for(const pathId of pathIds)for(const [cat,kind,ids] of [['state','panel',panelIds],['visibility','panel',panelIds],['tone','node',nodeIds]])for(const id of ids){
+    const want=oracle(d0,d1,cat,id,pathId),got=(e.effects||[]).find(x=>x.pathId===pathId && x.category===cat && x.target.id===id);
+    if(want.beforeSteps.length || want.afterSteps.length){
+      assert.ok(got,'S6 missing '+cat+' '+id+' on '+pathId+' '+label);
+      assert.deepEqual({beforeSteps:got.beforeSteps,afterSteps:got.afterSteps},want,'S6 '+cat+' '+id+' on '+pathId+' '+label);
+      assert.equal(got.target.kind,kind);
+    }else assert.equal(got,undefined,'S7 invented '+cat+' '+id+' on '+pathId+' '+label);
+  }
+}
+/* LOCAL mutations: (spec, r) -> {kind, status?, path?, before?, after?, fields?, declaration?, ledger?} */
+const F=(bp,ap,before,after)=>plain({beforePath:bp,afterPath:ap,before,after});
+const LOCAL={
+  patch(s,r){const d=s.page.sections[0].diagram,k=Math.floor(r()*d.steps.length),p=pick(r,d.panels);d.steps[k].panels=d.steps[k].panels||{};d.steps[k].panels[p.id]=Object.assign({},d.steps[k].panels[p.id],{stressNote:'m'});
+    return {kind:'step',fields:[F(null,key(SEC+'.steps['+k+'].panels',p.id)+'.stressNote',undefined,'m')]};},
+  caption(s,r){const d=s.page.sections[0].diagram,k=Math.floor(r()*d.steps.length),old=d.steps[k].text;d.steps[k].text=old+' (edited)';
+    return {kind:'step',fields:[F(SEC+'.steps['+k+'].text',SEC+'.steps['+k+'].text',old,old+' (edited)')]};},
+  node(s,r){const d=s.page.sections[0].diagram,id=pick(r,Object.keys(d.nodes)),old=d.nodes[id].sub,p=key(SEC+'.nodes',id)+'.sub';d.nodes[id].sub='mutated sub';
+    return {kind:'node',origin:'local',fields:[F(old===undefined?null:p,p,old,'mutated sub')]};},
+  edge(s,r){const d=s.page.sections[0].diagram;if(!d.edges.length)return null;const i=Math.floor(r()*d.edges.length),old=d.edges[i].label,p=SEC+'.edges['+i+'].label';d.edges[i].label='mutated label';
+    return {kind:'edge',origin:'local',fields:[F(old===undefined?null:p,p,old,'mutated label')]};},
+  tone(s,r){const d=s.page.sections[0].diagram,k=Math.floor(r()*d.steps.length),id=pick(r,Object.keys(d.nodes));if(d.steps[k].tone)return null;d.steps[k].tone={[id]:'alert'};
+    return {kind:'step',fields:[F(null,key(SEC+'.steps['+k+'].tone',id),undefined,'alert')]};},
+  visibility(s,r){const d=s.page.sections[0].diagram,k=Math.floor(r()*d.steps.length),p=pick(r,d.panels);if(d.steps[k].panelVisibility)return null;d.steps[k].panelVisibility={[p.id]:false};
+    return {kind:'step',fields:[F(null,key(SEC+'.steps['+k+'].panelVisibility',p.id),undefined,false)]};},
+  time(s,r){const d=s.page.sections[0].diagram,k=1+Math.floor(r()*(d.steps.length-1));if(d.steps[k].time!==undefined)return null;d.steps[k].time='+'+(k+1)+'h';
+    return {kind:'step',fields:[F(null,SEC+'.steps['+k+'].time',undefined,'+'+(k+1)+'h')]};},
+  title(s,r){const d=s.page.sections[0].diagram,i=Math.floor(r()*d.panels.length),old=d.panels[i].title;d.panels[i].title=old+' (renamed)';
+    return {kind:'panel',declaration:true,panelId:d.panels[i].id,fields:[F(SEC+'.panels['+i+'].title',SEC+'.panels['+i+'].title',old,old+' (renamed)')]};},
+  visible(s,r){const d=s.page.sections[0].diagram,i=Math.floor(r()*d.panels.length);if(d.panels[i].visible!==undefined)return null;d.panels[i].visible=false;
+    return {kind:'panel',fields:[F(null,SEC+'.panels['+i+'].visible',undefined,false)]};},
+  initial(s,r){const d=s.page.sections[0].diagram,i=Math.floor(r()*d.panels.length);d.panels[i].initial=Object.assign({},d.panels[i].initial,{stressNote:'m'});
+    return {kind:'panel',fields:[F(null,SEC+'.panels['+i+'].initial.stressNote',undefined,'m')]};},
+  docTitle(s){const old=s.page.title;s.page.title=old+' (retitled)';return {kind:'document',fields:[F('title','title',old,old+' (retitled)')]};},
+  heading(s){const old=s.page.sections[0].heading;s.page.sections[0].heading=old+' (edited)';return {kind:'section',fields:[F('sections[0].heading','sections[0].heading',old,old+' (edited)')]};},
+  layout(s){const d=s.page.sections[0].diagram,old=d.layouts[0].name;d.layouts[0].name=old+' (renamed)';return {kind:'layout',fields:[F(SEC+'.layouts[0].name',SEC+'.layouts[0].name',old,old+' (renamed)')]};},
+  view(s){const sec=s.page.sections[0];if(sec.views)return null;sec.views=[{id:'stress-view',name:'Stress view'}];return {kind:'view',status:'added',afterPath:'sections[0].views[0]',fields:[]};},
+  storyTime(s){const d=s.page.sections[0].diagram;if(d.storyTime)return null;d.storyTime={start:'2026-09-24T22:30'};return {kind:'section',fields:[F(null,SEC+'.storyTime.start',undefined,'2026-09-24T22:30')]};},
+  path(s,r){const d=s.page.sections[0].diagram,old=d.paths[0].steps.slice(),k=1+Math.floor(r()*(old.length-1));d.paths[0].steps=old.filter((x,i)=>i!==k);
+    return {kind:'path',fields:[F(SEC+'.paths[0].steps',SEC+'.paths[0].steps',old,d.paths[0].steps)]};},
+  ledger(){return {kind:'ledger',ledger:['one\ntwo','one\nTWO'],fields:[F('ledger:2-2','ledger:2-2','two','TWO')]};}
 };
 
 const scenarios=corpus.scenarios();
-test('precondition: the corpus supplies 48 scenarios with steps and panels',()=>{
+test('precondition: the corpus supplies 48 scenarios with steps, panels and layouts',()=>{
   assert.equal(scenarios.length,48);
-  scenarios.forEach(s=>{const d=build(s).page.sections[0].diagram;assert.ok(d.steps.length>=1 && d.panels.length>=1,s.id);});
+  scenarios.forEach(s=>{const d=build(s).page.sections[0].diagram;assert.ok(d.steps.length>=2 && d.panels.length>=1 && d.layouts.length>=1,s.id);});
 });
-
 for(const s of scenarios){
   test('stress '+s.id,()=>{
     const spec=build(s),r=rng(s.id.split('').reduce((h,c)=>h*31+c.charCodeAt(0),7));
-    const A=side(spec);
-    assert.deepEqual(compare(A,side(spec)),[],'S1 identity');
-    for(const name of Object.keys(MUTATIONS)){
-      const next=plain(spec),d=next.page.sections[0].diagram,m=MUTATIONS[name](d,r);if(!m)continue;
-      const B=side(next),ab=compare(A,B),ab2=compare(A,B),ba=compare(B,A);
-      const label=s.id+' '+name+' '+m.path;
-      assert.deepEqual(ab,ab2,'S4 determinism '+label);
-      const flip={added:'removed',removed:'added',modified:'modified'};
-      assert.deepEqual(ba.map(e=>[e.kind,e.status,e.beforePath,e.afterPath].join('|')).sort(),ab.map(e=>[e.kind,flip[e.status],e.afterPath,e.beforePath].join('|')).sort(),'S2 symmetry '+label);
-      assert.equal(ab.length,1,'S5 one entry '+label+' '+JSON.stringify(ab.map(e=>[e.kind,e.beforePath,e.afterPath])));
-      const e=ab[0],full=SEC()+'.'+m.path;
-      assert.equal(e.kind,m.kind,'S5 kind '+label);
-      assert.deepEqual(e.fields,[plain({beforePath:m.beforeNull?null:full,afterPath:full,before:m.before,after:m.after})],'S5 field '+label);
-      const d0=spec.page.sections[0].diagram;
+    assert.deepEqual(compare(side(spec),side(spec),s.id),[],'S1 identity');
+    let ran=0;
+    for(const name of Object.keys(LOCAL)){
+      const next=plain(spec),m=LOCAL[name](next,r);if(!m)continue;ran++;
+      const label=s.id+' '+name,A=side(spec,{ledger:m.ledger?m.ledger[0]:null}),B=side(next,{ledger:m.ledger?m.ledger[1]:null});
+      const out=compare(A,B,label);
+      assert.equal(out.length,1,'S5 one entry '+label+' '+JSON.stringify(out.map(e=>[e.kind,e.status,e.beforePath,e.afterPath])));
+      const e=out[0];
+      assert.equal(e.kind,m.kind,'S5 kind '+label);assert.equal(e.status,m.status||'modified','S5 status '+label);assert.equal(e.cause,'document','S5 cause '+label);
+      if(m.origin)assert.equal(e.origin,m.origin,'S5 origin '+label);
+      if(m.afterPath)assert.equal(e.afterPath,m.afterPath,'S5 path '+label);
+      assert.deepEqual(sortJ(e.fields),sortJ(m.fields),'S5 fields '+label);
+      const d0=spec.page.sections[0].diagram,d1=next.page.sections[0].diagram;
       if(m.declaration){
         assert.equal(e.effect,'declaration','S8 '+label);assert.deepEqual(e.effects,[],'S8 '+label);
-        assert.ok(Array.isArray(e.scopeAfter) && e.scopeAfter.includes('ambient'),'S8 scope '+label);
-        continue;
-      }
-      const ids={state:d0.panels.map(p=>p.id),visibility:d0.panels.map(p=>p.id),tone:Object.keys(d0.nodes)};
-      for(const cat of Object.keys(ids))for(const id of ids[cat]){
-        const want=oracle(d0,d,cat,id),got=(e.effects||[]).find(x=>x.category===cat && x.target.id===id);
-        if(want.length){assert.ok(got,'S6 missing '+cat+' '+id+' '+label);assert.deepEqual(got.afterSteps.filter(x=>x!=='ambient'),want,'S6 '+cat+' '+id+' '+label);}
-        else assert.equal(got,undefined,'S7 invented '+cat+' '+id+' '+label);
-      }
+        assert.deepEqual(e.scopeBefore,visibleScope(d0,m.panelId),'S8 scopeBefore '+label);assert.deepEqual(e.scopeAfter,visibleScope(d1,m.panelId),'S8 scopeAfter '+label);
+      }else checkEffects(e,d0,d1,label);
     }
+    assert.ok(ran>=14,'precondition: at least 14 mutation kinds applied to '+s.id+' (got '+ran+')');
   });
 }
+
+/* IMPORT mutations over a topology fixture. */
+function topo(){
+  const spec=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',heading:'Main',diagram:d}]}});
+  const provider=spec('provider',{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'ab'}],topologyExports:{public:{nodes:['a','b'],edges:['a->b']},onlyA:{nodes:['a'],edges:[]}}});
+  const provider2=spec('provider2',{nodes:{a:{title:'A2'}},rows:[['a']],topologyExports:{public:{nodes:['a'],edges:[]}}});
+  const consumer=spec('consumer',{nodes:{local:{title:'Local'}},rows:[['local']],panels:[{id:'g',type:'gauge',title:'G',initial:{value:1}}],steps:[{id:'t0',nodes:['local']},{id:'t1',nodes:['local']},{id:'t2',nodes:['local']}],topologyImports:[{spec:'provider',export:'public',as:'child'}]});
+  return {provider,provider2,consumer,ctx:(p=provider)=>({version:1,id:'consumer',specs:[p,provider2,consumer]})};
+}
+const I=(kind,status,bp,ap,extra={})=>Object.assign({kind,status,origin:'imported',beforePath:bp,afterPath:ap},extra);
+const IMPORT={
+  providerNode:t=>{const p=plain(t.provider);p.page.sections[0].diagram.nodes.a.title='A!';return {after:[t.consumer,t.ctx(p)],kind:'node',cause:'provider',fields:[F(R+'.nodes["child::a"].title',R+'.nodes["child::a"].title','A','A!')]};},
+  providerEdge:t=>{const p=plain(t.provider);p.page.sections[0].diagram.edges[0].label='ab!';return {after:[t.consumer,t.ctx(p)],kind:'edge',cause:'provider',fields:[F(R+'.edges[0].label',R+'.edges[0].label','ab','ab!')]};},
+  providerAdd:t=>{const p=plain(t.provider),d=p.page.sections[0].diagram;d.nodes.c={title:'C'};d.rows=[['a','b','c']];d.topologyExports.public.nodes.push('c');return {after:[t.consumer,t.ctx(p)],kind:'node',status:'added',cause:'provider',afterPath:R+'.nodes["child::c"]',fields:[]};},
+  overrideNode:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].nodeOverrides={a:{sub:'S'}};return {after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(null,SEC+'.topologyImports[0].nodeOverrides.a.sub',undefined,'S')],resolved:[I('node','modified',null,R+'.nodes["child::a"].sub',{after:'S'})]};},
+  overrideEdge:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].edgeOverrides={'a->b':{label:'X'}};return {after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(null,SEC+'.topologyImports[0].edgeOverrides["a->b"].label',undefined,'X')],resolved:[I('edge','modified',R+'.edges[0].label',R+'.edges[0].label',{before:'ab',after:'X'})]};},
+  as:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].as='kid';return {after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(SEC+'.topologyImports[0].as',SEC+'.topologyImports[0].as','child','kid')],
+    resolved:[I('node','removed',R+'.nodes["child::a"]',null),I('node','removed',R+'.nodes["child::b"]',null),I('edge','removed',R+'.edges[0]',null),I('node','added',null,R+'.nodes["kid::a"]'),I('node','added',null,R+'.nodes["kid::b"]'),I('edge','added',null,R+'.edges[0]')]};},
+  export:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].export='onlyA';return {after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(SEC+'.topologyImports[0].export',SEC+'.topologyImports[0].export','public','onlyA')],resolved:[I('node','removed',R+'.nodes["child::b"]',null),I('edge','removed',R+'.edges[0]',null)]};},
+  spec:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].spec='provider2';return {after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(SEC+'.topologyImports[0].spec',SEC+'.topologyImports[0].spec','provider','provider2')],
+    resolved:[I('node','modified',R+'.nodes["child::a"].title',R+'.nodes["child::a"].title',{before:'A',after:'A2'}),I('node','removed',R+'.nodes["child::b"]',null),I('edge','removed',R+'.edges[0]',null)]};},
+  importedTone:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.steps[1].tone={'child::b':'ok'};return {after:[c,t.ctx()],kind:'step',cause:'document',fields:[F(null,SEC+'.steps[1].tone["child::b"]',undefined,'ok')],effects:true};}
+};
+test('stress imported topology: every import mutation kind',()=>{
+  const t=topo(),A=side(t.consumer,{context:t.ctx()});
+  assert.deepEqual(compare(A,side(t.consumer,{context:t.ctx()}),'topo identity'),[],'S1 identity');
+  for(const [name,make] of Object.entries(IMPORT)){
+    const m=make(t),B=side(m.after[0],{context:m.after[1]}),out=compare(A,B,name);
+    assert.equal(out.length,1,'S5 one entry '+name+' '+JSON.stringify(out.map(e=>[e.kind,e.status,e.cause,e.beforePath,e.afterPath])));
+    const e=out[0];
+    assert.equal(e.kind,m.kind,name);assert.equal(e.status,m.status||'modified',name);assert.equal(e.cause,m.cause,name);
+    if(m.kind!=='step')assert.equal(e.origin,'imported',name);
+    if(m.afterPath)assert.equal(e.afterPath,m.afterPath,name);
+    assert.deepEqual(sortJ(e.fields),sortJ(m.fields),'S5 fields '+name);
+    if(m.resolved)assert.deepEqual(sortJ(e.resolved),sortJ(m.resolved),'S5 attached resolved '+name);
+    checkEffects(e,A.resolved.sections[0].diagram,B.resolved.sections[0].diagram,name);
+    if(m.effects)assert.ok(e.effects.length,'precondition-backed: imported tone has an effect '+name);
+  }
+});
 
 test('S9 timing: largest scenario compare under 2000 ms',()=>{
   const sized=scenarios.map(s=>[s,JSON.stringify(build(s)).length]).sort((a,b)=>b[1]-a[1]);
   const spec=build(sized[0][0]),next=plain(spec);next.page.sections[0].diagram.steps[0].text+=' x';
-  const A=side(spec),B=side(next),t0=Date.now();compare(A,B);const ms=Date.now()-t0;
-  assert.ok(ms<2000,'compare took '+ms+' ms');
+  const A=side(spec),B=side(next);assert.equal(typeof C.compareDocuments,'function','compareDocuments(before, after) is defined by the shared engine');
+  const t0=Date.now();C.compareDocuments(A,B);const ms=Date.now()-t0;assert.ok(ms<2000,'compare took '+ms+' ms');
 });

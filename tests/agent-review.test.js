@@ -141,7 +141,11 @@ test('review resolves imports and re-exports with the frozen session while prese
   const h=uiHarness({topology:true,current,source,context:f.context}),e=h.elements;
   f.provider.page.sections[0].diagram.nodes.a.title='Later provider edit';
   const modelInputs=[],changes=h.c.compareDocuments;
-  h.c.compareDocuments=(a,b)=>{modelInputs.push(plain([a,b]));return changes(a,b);};
+  /* A provider-caused imported change the frozen fixture cannot produce on its
+     own; it must reach the visible change list through the engine's result. */
+  const sentinel={kind:'node',status:'modified',origin:'imported',cause:'provider',beforePath:'resolved:sections[0].diagram.nodes["child::b"]',afterPath:'resolved:sections[0].diagram.nodes["child::b"]',
+    fields:[{beforePath:'resolved:sections[0].diagram.nodes["child::b"].title',afterPath:'resolved:sections[0].diagram.nodes["child::b"].title',before:'B',after:'Sentinel B'}],effects:[]};
+  h.c.compareDocuments=(a,b)=>{modelInputs.push(plain([a,b]));return changes(a,b).concat([sentinel]);};
   h.ui.update(h.review);e['agent-update-open'].fire('click');
   assert.equal(h.counts().rendered,1);assert.equal(e['agent-update-commit'].disabled,false);
   assert.equal(h.pages[0].sections[0].diagram.nodes['child::a'].title,'Frozen A');
@@ -151,6 +155,8 @@ test('review resolves imports and re-exports with the frozen session while prese
   assert.equal(modelInputs[0][1].authored.sections[0].diagram.nodes['child::a'],undefined,'authored side has no materialized imported node');
   assert.equal(modelInputs[0][1].resolved.sections[0].diagram.nodes['child::a'].title,'Frozen A','resolved side includes the imported node, so imported changes reach the change list');
   assert.equal(modelInputs[0][0].resolved.sections[0].diagram.nodes['child::a'].title,'Frozen A','current side is resolved too');
+  const listed=e['agent-update-change-list'].children.map(li=>li.children[0].textContent);
+  assert.ok(listed.some(text=>text.includes('child::b') && /imported/i.test(text)),'the engine result builds the change list: imported entry listed — got '+JSON.stringify(listed));
   e['agent-update-current'].fire('click');assert.equal(e['agent-update-commit'].disabled,true);assert.equal(e['agent-update-source'].value,current);
   assert.equal(h.pages[1].sections[0].diagram.nodes.local.title,'Before');assert.equal(h.pages[1].sections[0].diagram.nodes['child::a'].title,'Frozen A');
   e['agent-update-proposed'].fire('click');assert.equal(e['agent-update-commit'].disabled,false);assert.equal(h.pages[2].sections[0].diagram.nodes.local.title,'After');

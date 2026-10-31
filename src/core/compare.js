@@ -93,7 +93,7 @@ function comparePairs(a, b, naturalKeys, leftover){
   return {pairs:pairs, removed:a.map(function(v, i){ return i; }).filter(function(i){ return !usedA.has(i); }),
     added:b.map(function(v, i){ return i; }).filter(function(i){ return !usedB.has(i); })};
 }
-var COMPARE_EDGE_KEY = function(e){ return e && e.from != null && e.to != null ? 'ends:' + e.from + '>' + e.to + '|' + (e.fromPort || '') + '>' + (e.toPort || '') : null; };
+var COMPARE_EDGE_KEY = function(e){ return e && e.from != null && e.to != null ? 'ends:' + JSON.stringify([String(e.from), String(e.to), e.fromPort || '', e.toPort || '']) : null; };
 var COMPARE_CAPTION_KEY = function(v){ return v && typeof v.text === 'string' ? 'text:' + v.text : null; };
 COMPARE_CAPTION_KEY.unique = true;
 var COMPARE_IMPORT_KEYS = [function(v){ return v && v.as != null ? 'as:' + v.as : null; },
@@ -339,7 +339,7 @@ function compareSectionEffects(xa, xb, actual){
   function ident(d){ return (d.steps || []).map(function(s, i){ return [i, i]; }); }
   function sets(diffs, side){
     var out = {};
-    diffs.forEach(function(d){ if (d.category === 'state' && d.target.kind === 'panel') out[d.pathId + '|' + d.target.id] = d[side]; });
+    diffs.forEach(function(d){ if (d.category === 'state' && d.target.kind === 'panel') out[JSON.stringify([d.pathId, d.target.id])] = d[side]; });
     return out;
   }
   var fromBefore = sets(compareReaderDiffs(xa, swap(xa, xb), ident(xa)), 'beforeSteps');
@@ -348,7 +348,7 @@ function compareSectionEffects(xa, xb, actual){
   var out = [];
   actual.forEach(function(d){
     if (d.category !== 'state' || d.target.kind !== 'panel') return;
-    var key = d.pathId + '|' + d.target.id, a = fromBefore[key] || [], b = fromAfter[key] || [];
+    var key = JSON.stringify([d.pathId, d.target.id]), a = fromBefore[key] || [], b = fromAfter[key] || [];
     var changes = d.changes.filter(function(c){
       return c.beforeStep != null && a.indexOf(c.beforeStep) >= 0 || c.afterStep != null && b.indexOf(c.afterStep) >= 0;
     });

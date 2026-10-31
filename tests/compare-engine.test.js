@@ -60,6 +60,9 @@
    R23 absent document        compare(null, side)        exactly document + one per section; mirrored      extra record entries
    R24 identity / full mirror symmetry (fields, effects, scopes, resolved) / immutability                 invented entries; one-sided payloads
    R25 un-IDed steps          insert + edit without ids  pairing by exact content, caption, then 1:1; effects = oracle with those pairs   id-only pairing
+   R27 tab metadata           tabs[j].label/highlight     kind 'tab' at blocks[i].tabs[j], leaf fields     tab settings ignored
+   R28 declaration scope      panel visible only on alt   scope = union of visible steps over all paths    first-path-only scope
+   R29 attribution            path edit + alt-only step + rows edit   path effects only on its own path; step effects only on paths containing the step; layout-only section edit has no effects   every effect attached to every section/path/step entry
    R26 locus                  every entry in every row   section/key/step asserted; record path has its kind's shape under its section;
                               every field path sits under its entry's record path; paths resolve           self-consistent wrong loci
 */
@@ -166,7 +169,7 @@ function assertLocus(e,a,b,label){
       edge:/\.diagram\.edges\[\d+\]$/,node:/\.diagram\.nodes(\.[A-Za-z_$][\w$]*|\["(?:[^"\\]|\\.)*"\])$/,import:/\.diagram\.topologyImports\[\d+\]$/,view:/\.views\[\d+\]$/}[e.kind];
     if(e.kind==='section')assert.equal(path,base,label+' section entry path is its record path');
     else if(base!=null){assert.ok(path.startsWith(base+'.'),label+' '+e.kind+' path under its section '+path);assert.match(path.slice(base.length),shape,label+' '+e.kind+' path shape '+path);}
-    else assert.match(path,/^(blocks|sections)\[\d+\]\.tabs\[\d+\]\.views\[\d+\]$/,label+' tab-owned View path '+path);
+    else assert.match(path,e.kind==='tab'?/^(blocks|sections)\[\d+\]\.tabs\[\d+\]$/:/^(blocks|sections)\[\d+\]\.tabs\[\d+\]\.views\[\d+\]$/,label+' tab-owned '+e.kind+' path '+path);
     for(const f of e.fields||[]){const fp=w==='before'?f.beforePath:f.afterPath;if(fp!=null)assert.ok(fp===path || fp.startsWith(path+'.') || fp.startsWith(path+'['),label+' field '+fp+' sits under the entry record '+path);}
     const t=tokens(path),last=t[t.length-1],v=at(sd,path);
     const want=v && typeof v==='object' && (typeof v.id==='string' && v.id || typeof v.id==='number')?v.id:last;
@@ -542,4 +545,38 @@ test('R25 un-IDed steps pair by exact content, then caption, then 1:1; effects e
   const b2=strip(base()),a2=strip(base());a2.steps[3].text='Renamed';a2.steps[3].panels={q:{value:2}};
   const m2=only(compare(side(doc(b2)),side(doc(a2))),x=>x.kind==='step','leftover pair');
   assert.equal(m2.status,'modified');assert.deepEqual(m2.step,{before:3,after:3});
+});
+
+test('R27 tab metadata: a tab label/highlight edit is one tab entry at blocks[i].tabs[j] with leaf fields',()=>{
+  const mk=(label,hl)=>({page:{title:'T',blocks:[{id:'top',heading:'Top'},{tabs:[{label,highlight:hl,views:[{id:'v',name:'V'}],sections:[{id:'a',heading:'A',diagram:base()}]},{label:'Two',sections:[{id:'b',heading:'B'}]}]}]}});
+  const out=compare(side(mk('One','old')),side(mk('Uno','new')));
+  assert.equal(out.length,1,JSON.stringify(out.map(e=>[e.kind,e.afterPath])));
+  const e=out[0];assert.equal(e.kind,'tab');assert.equal(e.status,'modified');assert.equal(e.cause,'document');
+  assert.equal(e.beforePath,'blocks[1].tabs[0]');assert.equal(e.afterPath,'blocks[1].tabs[0]');
+  assert.deepEqual(e.key,{before:0,after:0});assert.deepEqual(e.section,{before:null,after:null});
+  assert.deepEqual(sortJ(e.fields),sortJ([{beforePath:'blocks[1].tabs[0].label',afterPath:'blocks[1].tabs[0].label',before:'One',after:'Uno'},
+    {beforePath:'blocks[1].tabs[0].highlight',afterPath:'blocks[1].tabs[0].highlight',before:'old',after:'new'}]));
+  assert.deepEqual(e.effects,[]);
+});
+
+test('R28 render-only declaration scope is the union of visible steps over every path',()=>{
+  const mk=()=>base({steps:steps(6,{0:{panelVisibility:{p:false}},3:{panelVisibility:{p:true}}}),paths:[{id:'main',steps:['s0','s1','s2']},{id:'alt',steps:['s0','s3','s4','s5']}]});
+  const before=mk(),after=mk();after.panels[0].max=900;
+  const e=only(compare(side(doc(before)),side(doc(after))),x=>x.kind==='panel','one panel entry');
+  assert.equal(e.effect,'declaration');
+  assert.deepEqual(e.scopeBefore,[3,4,5,'ambient'],'visible only on alt: steps 3,4,5 plus ambient');assert.deepEqual(e.scopeAfter,[3,4,5,'ambient']);
+});
+
+test('R29 attribution: path edits report only their own path, step edits only paths containing the step, layout-only section edits nothing',()=>{
+  const mk=()=>base({steps:steps(6,{1:{panels:{p:{value:20}}},3:{panels:{p:{value:30}}},5:{panels:{q:{value:7}}}}),paths:[{id:'main',steps:['s0','s1','s2','s3']},{id:'alt',steps:['s0','s4','s5']}]});
+  const before=mk(),after=mk();after.paths[0].steps=['s0','s3','s2','s1'];after.steps[5].panels={q:{value:8}};after.rows=[['b','a']];
+  const out=compare(side(doc(before)),side(doc(after)));
+  assert.equal(out.length,3,JSON.stringify(out.map(e=>[e.kind,e.afterPath])));
+  const path=only(out,x=>x.kind==='path','path entry'),step=only(out,x=>x.kind==='step','step entry'),sec=only(out,x=>x.kind==='section','section entry');
+  assert.ok(path.effects.length && path.effects.every(x=>x.pathId==='main'),'path effects only on main: '+JSON.stringify(path.effects.map(x=>x.pathId)));
+  const wantMain=[];for(const [cat,kind,ids] of [['state','panel',['p','q']],['visibility','panel',['p','q']],['tone','node',['a','b']]])for(const id of ids){const o=expectEffect(before,after,'main',kind,id,cat);if(o.changes.length)wantMain.push(o);}
+  assert.deepEqual(sortJ(path.effects),sortJ(wantMain));
+  assert.deepEqual(step.effects,[expectEffect(before,after,'alt','panel','q','state')],'s5 is only on alt');
+  assert.deepEqual(sec.fields,[{beforePath:SEC+'.rows',afterPath:SEC+'.rows',before:[['a','b']],after:[['b','a']]}]);
+  assert.deepEqual(sec.effects,[],'a layout-only section edit has no reader effects');
 });

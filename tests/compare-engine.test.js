@@ -64,6 +64,7 @@
    R28 declaration scope      panel visible only on alt   scope = union of visible steps over all paths    first-path-only scope
    R29 attribution            path edit + alt-only step + rows edit   path effects only on its own path; step effects only on paths containing the step; layout-only section edit has no effects   every effect attached to every section/path/step entry
    R30 section attribution    storyTime + step tone edit  section effects only panel state; tone effect only on the step   section takes every folded difference
+   R31 section counterfactual storyTime + gauge patch    section effects = folds of (before + only the section's settings); patch effect stays on its step   section takes another edit's state effect
    R26 locus                  every entry in every row   section/key/step asserted; record path has its kind's shape under its section;
                               every field path sits under its entry's record path; paths resolve           self-consistent wrong loci
 */
@@ -589,4 +590,15 @@ test('R30 a story-time section edit reports only panel-state effects; an unrelat
   const sec=only(out,x=>x.kind==='section','section entry'),step=only(out,x=>x.kind==='step','step entry');
   assert.deepEqual(sec.effects,[expectEffect(before,after,'happy','panel','bat','state')],'story time changes battery state only');
   assert.deepEqual(step.effects,[expectEffect(before,after,'happy','node','a','tone')],'the tone edit is reported on its step only');
+});
+
+test('R31 a story-time section edit reports only what its own settings change; another step patch keeps its own effect',()=>{
+  const mk=()=>base({panels:[{id:'bat',type:'battery',title:'Battery',drainPerHour:1,initial:{charge:64,trend:'idle'}},{id:'g',type:'gauge',title:'G',initial:{value:1}}],storyTime:{start:'2026-09-24T22:30'},steps:steps(5,{1:{time:'+1h'},3:{time:'2026-09-25T06:50'}})});
+  const before=mk(),after=mk();after.storyTime.start='2026-09-24T20:30';after.steps[2].panels={g:{value:9}};
+  const sectionOnly=plain(before);sectionOnly.storyTime=plain(after.storyTime);
+  const out=compare(side(doc(before)),side(doc(after)));assert.equal(out.length,2,JSON.stringify(out.map(e=>[e.kind,e.afterPath])));
+  const sec=only(out,x=>x.kind==='section','section entry'),step=only(out,x=>x.kind==='step','step entry');
+  assert.deepEqual(sec.effects,[expectEffect(before,sectionOnly,'happy','panel','bat','state')],'section effects are the story-time change alone');
+  assert.ok(!sec.effects.some(x=>x.target.id==='g'),'the gauge patch is not attributed to the section');
+  assert.deepEqual(step.effects,[expectEffect(before,after,'happy','panel','g','state')]);
 });

@@ -13,7 +13,7 @@
     "core/story-time.js",
     "core/section-layout.js",
     "core/state.js",
-    "core/visibility-evidence.js",
+    "core/visibility-evidence.js", "core/compare.js",
     "core/geometry.js",
     "core/text-box.js",
     "core/details.js",

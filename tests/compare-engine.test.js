@@ -15,6 +15,8 @@
    `resolved:`. Ledger hunks use `ledger:<from>-<to>` (1-based lines).
    Step coordinates are source-step indices on the path; 'ambient' sorts last.
    A field path is null on the side where that field (or its record) is absent.
+   Fields are reported at the highest key that differs: an object present on one
+   side only is one field (e.g. steps[1].tone), not one field per leaf.
    Records with different explicit ids never pair (they are added + removed).
 
    CONTRACT MATRIX (each row asserted below; fixture -> scoped assertion -> rejects)
@@ -209,7 +211,7 @@ test('R13 step tone patches on local and imported nodes report tone effects',()=
     const after=plain(t.consumer);after.page.sections[0].diagram.steps[1].tone={[node]:'warn'};
     const A=side(t.consumer,{context:t.ctx()}),B=side(after,{context:t.ctx()});
     const e=only(compare(A,B),x=>x.kind==='step',node+': one step entry');
-    assert.deepEqual(e.fields.map(f=>f.afterPath),[TSEC+'.steps[1].tone'+(node==='local'?'.local':'["child::a"]')]);
+    assert.deepEqual(e.fields,[{beforePath:null,afterPath:TSEC+'.steps[1].tone',before:undefined,after:{[node]:'warn'}}].map(plain));
     const eff=effectOf(e,node,'tone');assert.deepEqual(eff.target,{kind:'node',id:node});
     assert.deepEqual({beforeSteps:eff.beforeSteps,afterSteps:eff.afterSteps},oracle(A.resolved.sections[0].diagram,B.resolved.sections[0].diagram,'tone',node,'happy'));
     assert.deepEqual(eff.afterSteps,[1,2]);

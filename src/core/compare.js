@@ -313,6 +313,10 @@ function compareImportOwner(imports, key){
 /* Diagram-level settings that only arrange the picture; editing them cannot
    change folded panel state, node tones or panel visibility. */
 var COMPARE_LAYOUT_ONLY = ['rows','groups','floats','columns','view','autoplay','defaultLayout','showStepIds','legend','title','notes','topologyExports'];
+/* Diagram-level settings read by the folds: story time and device defaults
+   feed panel state (battery, clocks). None of them change node tones or
+   panel visibility. */
+var COMPARE_FOLD_FIELDS = ['storyTime','deviceDefaults'];
 function comparePathsContaining(d, src){
   var out = [];
   if (src == null) return out;
@@ -323,9 +327,9 @@ function compareTouches(e, ctx){
   if (e.kind === 'section'){
     var relevant = e.fields.some(function(f){
       var p = f.afterPath || f.beforePath, m = /\.diagram\.([A-Za-z_$][\w$]*)/.exec(p || '');
-      return m && COMPARE_LAYOUT_ONLY.indexOf(m[1]) < 0;
+      return m && COMPARE_FOLD_FIELDS.indexOf(m[1]) >= 0;
     });
-    return function(){ return relevant; };
+    return function(d){ return relevant && d.category === 'state' && d.target.kind === 'panel'; };
   }
   if (e.kind === 'path' && e.status === 'modified'){ var pid = (e._b || e._a).id; return function(d){ return d.pathId === pid; }; }
   if (e.kind === 'panel'){ var id = (e._a || e._b).id; return function(d){ return d.target.kind === 'panel' && d.target.id === id; }; }

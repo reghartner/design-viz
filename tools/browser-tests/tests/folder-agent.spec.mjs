@@ -1988,7 +1988,8 @@ test('agent change navigation restores legacy Views after reorder and reveals an
     const view=page.locator('#agent-update-view'),before=page.locator('#agent-update-view-before'),node=view.locator('.explore-active-section [data-dv-node="b"]'),board=view.locator('.explore-active-section .explore-board');
     const item=page.locator('#agent-update-compare .compare-rail').getByRole('button',{name:/^Modified · Node Recovery backend · title$/});
     await item.click();await expect(node).toBeInViewport();await view.getByRole('button',{name:'Zoom in',exact:true}).click();
-    await board.evaluate(el=>{el.scrollLeft=el.scrollWidth;el.scrollTop=el.scrollHeight;});await expect(node).not.toBeInViewport();
+    await board.hover();for(let i=0;i<12 && await node.isVisible() && await node.evaluate(el=>{const r=el.getBoundingClientRect();return r.right>0 && r.bottom>0 && r.left<innerWidth && r.top<innerHeight;});i++)await page.mouse.wheel(600,600);
+    await expect(node).not.toBeInViewport();
     await page.locator('#agent-update-next').click();await page.locator('#agent-update-previous').click();await expect(node).toBeInViewport();
     // One-way framing: the Before pane shows the same change in its own section and View.
     await expect(before.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','2');await expect(before.locator('.explore-active-section [data-dv-node="b"]')).toContainText('Backend');

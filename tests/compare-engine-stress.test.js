@@ -179,6 +179,10 @@ const LOCAL={
 };
 
 const scenarios=corpus.scenarios();
+test('precondition: the engine lives in the shared validator.js logical bundle',()=>{
+  const {readSource}=require('../tools/source-loader.cjs'),vm=require('node:vm'),V={URL,console};vm.createContext(V);vm.runInContext(readSource('validator.js'),V);
+  assert.equal(typeof V.compareDocuments,'function','compareDocuments(before, after) is defined by the shared engine in the validator.js bundle');
+});
 test('precondition: the corpus supplies 48 scenarios with steps, panels and layouts',()=>{
   assert.equal(scenarios.length,48);
   scenarios.forEach(s=>{const d=build(s).page.sections[0].diagram;assert.ok(d.steps.length>=3 && d.panels.length>=1 && d.layouts.length>=1,s.id);assert.notDeepEqual(d.paths[0].steps,d.paths[1].steps,s.id+' has two distinct paths');});

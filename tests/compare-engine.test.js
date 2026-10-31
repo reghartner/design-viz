@@ -66,6 +66,9 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource}=require('../tools/source-loader.cjs');
 const plain=v=>JSON.parse(JSON.stringify(v));
+/* V loads ONLY the shared validator.js logical bundle: the engine must live
+   there (#847). C adds canon.js solely to resolve topology for fixtures. */
+const V={URL,console};vm.createContext(V);vm.runInContext(readSource('validator.js'),V);
 const C={URL,console};vm.createContext(C);
 vm.runInContext(readSource('validator.js'),C);vm.runInContext(readSource('canon.js'),C);
 
@@ -89,10 +92,11 @@ function mirror(e){
 const stable=v=>Array.isArray(v)?'['+v.map(stable).join(',')+']':v && typeof v==='object'?'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}':JSON.stringify(v);
 const normEntry=e=>{const x=plain(e);x.fields=sortJ(x.fields);x.effects=sortJ((x.effects||[]).map(f=>Object.assign({},f,{changes:sortJ(f.changes)})));if(x.resolved)x.resolved=sortJ(x.resolved);return stable(x);};
 function compare(a,b){
-  assert.equal(typeof C.compareDocuments,'function','compareDocuments(before, after) is defined by the shared engine');
-  const sa=plain(a),sb=plain(b),out=plain(C.compareDocuments(a,b));
+  assert.equal(typeof V.compareDocuments,'function','compareDocuments(before, after) is defined by the shared engine in the validator.js bundle');
+  a=a && plain(a);b=b && plain(b);
+  const sa=plain(a),sb=plain(b),out=plain(V.compareDocuments(a,b));
   assert.deepEqual(plain(a),sa,'before side not mutated');assert.deepEqual(plain(b),sb,'after side not mutated');
-  const back=plain(C.compareDocuments(b,a));
+  const back=plain(V.compareDocuments(b,a));
   assert.deepEqual(back.map(normEntry).sort(),out.map(mirror).map(normEntry).sort(),'compare(b,a) is the full mirror of compare(a,b)');
   if(a && b)assertLoci(out,a,b);
   return out;

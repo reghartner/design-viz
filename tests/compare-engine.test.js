@@ -349,7 +349,8 @@ test('R19 provider-only additions and removals of imported nodes and edges are t
     const n=only(out,x=>x.kind==='node' && x.status===status,node);
     assert.deepEqual(n.effects,[expectEffect(A0.resolved.sections[0].diagram,B0.resolved.sections[0].diagram,'happy','node',node,'tone')]);assert.ok(n.effects[0].changes.length,'precondition: '+node+' tone changes');
   }
-  assert.deepEqual(sortJ(out.map(e=>e.key)),sortJ([{before:'child::b',after:null},{before:null,after:'child::c'},{before:0,after:null},{before:null,after:0}]));
+  for(const [kind,status,key] of [['node','removed',{before:'child::b',after:null}],['node','added',{before:null,after:'child::c'}],['edge','removed',{before:0,after:null}],['edge','added',{before:null,after:0}]])
+    assert.deepEqual(only(out,x=>x.kind===kind && x.status===status,kind+' '+status).key,key,kind+' '+status+' key');
 });
 
 test('R13 step tone patches on local and imported nodes: leaf paths and tone effects equal to the oracle',()=>{

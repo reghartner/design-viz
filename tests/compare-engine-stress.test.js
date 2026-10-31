@@ -145,33 +145,33 @@ function checkLoci(out,A,B,label){
 const F=(bp,ap,before,after)=>plain({beforePath:bp,afterPath:ap,before,after});
 const LOCAL={
   patch(s,r){const d=s.page.sections[0].diagram,k=Math.floor(r()*d.steps.length),p=pick(r,d.panels);d.steps[k].panels=d.steps[k].panels||{};d.steps[k].panels[p.id]=Object.assign({},d.steps[k].panels[p.id],{stressNote:'m'});
-    return {kind:'step',fields:[F(null,key(SEC+'.steps['+k+'].panels',p.id)+'.stressNote',undefined,'m')]};},
+    return {root:SEC+'.steps['+k+']',kind:'step',fields:[F(null,key(SEC+'.steps['+k+'].panels',p.id)+'.stressNote',undefined,'m')]};},
   caption(s,r){const d=s.page.sections[0].diagram,k=Math.floor(r()*d.steps.length),old=d.steps[k].text;d.steps[k].text=old+' (edited)';
-    return {kind:'step',fields:[F(SEC+'.steps['+k+'].text',SEC+'.steps['+k+'].text',old,old+' (edited)')]};},
+    return {root:SEC+'.steps['+k+']',kind:'step',fields:[F(SEC+'.steps['+k+'].text',SEC+'.steps['+k+'].text',old,old+' (edited)')]};},
   node(s,r){const d=s.page.sections[0].diagram,id=pick(r,Object.keys(d.nodes)),old=d.nodes[id].sub,p=key(SEC+'.nodes',id)+'.sub';d.nodes[id].sub='mutated sub';
-    return {kind:'node',origin:'local',fields:[F(old===undefined?null:p,p,old,'mutated sub')]};},
+    return {root:key(SEC+'.nodes',id),kind:'node',origin:'local',fields:[F(old===undefined?null:p,p,old,'mutated sub')]};},
   edge(s,r){const d=s.page.sections[0].diagram;if(!d.edges.length)return null;const i=Math.floor(r()*d.edges.length),old=d.edges[i].label,p=SEC+'.edges['+i+'].label';d.edges[i].label='mutated label';
-    return {kind:'edge',origin:'local',fields:[F(old===undefined?null:p,p,old,'mutated label')]};},
+    return {root:SEC+'.edges['+i+']',kind:'edge',origin:'local',fields:[F(old===undefined?null:p,p,old,'mutated label')]};},
   tone(s,r){const d=s.page.sections[0].diagram,k=Math.floor(r()*d.steps.length),id=pick(r,Object.keys(d.nodes));if(d.steps[k].tone)return null;d.steps[k].tone={[id]:'alert'};
-    return {kind:'step',fields:[F(null,key(SEC+'.steps['+k+'].tone',id),undefined,'alert')]};},
+    return {root:SEC+'.steps['+k+']',kind:'step',fields:[F(null,key(SEC+'.steps['+k+'].tone',id),undefined,'alert')]};},
   visibility(s,r){const d=s.page.sections[0].diagram,k=Math.floor(r()*d.steps.length),p=pick(r,d.panels);if(d.steps[k].panelVisibility)return null;d.steps[k].panelVisibility={[p.id]:false};
-    return {kind:'step',fields:[F(null,key(SEC+'.steps['+k+'].panelVisibility',p.id),undefined,false)]};},
+    return {root:SEC+'.steps['+k+']',kind:'step',fields:[F(null,key(SEC+'.steps['+k+'].panelVisibility',p.id),undefined,false)]};},
   time(s,r){const d=s.page.sections[0].diagram,k=1+Math.floor(r()*(d.steps.length-1));if(d.steps[k].time!==undefined)return null;d.steps[k].time='+'+(k+1)+'h';
-    return {kind:'step',fields:[F(null,SEC+'.steps['+k+'].time',undefined,'+'+(k+1)+'h')]};},
+    return {root:SEC+'.steps['+k+']',kind:'step',fields:[F(null,SEC+'.steps['+k+'].time',undefined,'+'+(k+1)+'h')]};},
   title(s,r){const d=s.page.sections[0].diagram,i=Math.floor(r()*d.panels.length),old=d.panels[i].title;d.panels[i].title=old+' (renamed)';
-    return {kind:'panel',declaration:true,panelId:d.panels[i].id,fields:[F(SEC+'.panels['+i+'].title',SEC+'.panels['+i+'].title',old,old+' (renamed)')]};},
+    return {root:SEC+'.panels['+i+']',kind:'panel',declaration:true,panelId:d.panels[i].id,fields:[F(SEC+'.panels['+i+'].title',SEC+'.panels['+i+'].title',old,old+' (renamed)')]};},
   visible(s,r){const d=s.page.sections[0].diagram,i=Math.floor(r()*d.panels.length);if(d.panels[i].visible!==undefined)return null;d.panels[i].visible=false;
-    return {kind:'panel',fields:[F(null,SEC+'.panels['+i+'].visible',undefined,false)]};},
+    return {root:SEC+'.panels['+i+']',kind:'panel',fields:[F(null,SEC+'.panels['+i+'].visible',undefined,false)]};},
   initial(s,r){const d=s.page.sections[0].diagram,i=Math.floor(r()*d.panels.length);d.panels[i].initial=Object.assign({},d.panels[i].initial,{stressNote:'m'});
-    return {kind:'panel',fields:[F(null,SEC+'.panels['+i+'].initial.stressNote',undefined,'m')]};},
-  docTitle(s){const old=s.page.title;s.page.title=old+' (retitled)';return {kind:'document',fields:[F('title','title',old,old+' (retitled)')]};},
-  heading(s){const old=s.page.sections[0].heading;s.page.sections[0].heading=old+' (edited)';return {kind:'section',fields:[F('sections[0].heading','sections[0].heading',old,old+' (edited)')]};},
-  layout(s){const d=s.page.sections[0].diagram,old=d.layouts[0].name;d.layouts[0].name=old+' (renamed)';return {kind:'layout',fields:[F(SEC+'.layouts[0].name',SEC+'.layouts[0].name',old,old+' (renamed)')]};},
-  view(s){const sec=s.page.sections[0];if(sec.views)return null;sec.views=[{id:'stress-view',name:'Stress view'}];return {kind:'view',status:'added',afterPath:'sections[0].views[0]',fields:[]};},
-  storyTime(s){const d=s.page.sections[0].diagram;if(d.storyTime)return null;d.storyTime={start:'2026-09-24T22:30'};return {kind:'section',fields:[F(null,SEC+'.storyTime.start',undefined,'2026-09-24T22:30')]};},
+    return {root:SEC+'.panels['+i+']',kind:'panel',fields:[F(null,SEC+'.panels['+i+'].initial.stressNote',undefined,'m')]};},
+  docTitle(s){const old=s.page.title;s.page.title=old+' (retitled)';return {root:'',kind:'document',fields:[F('title','title',old,old+' (retitled)')]};},
+  heading(s){const old=s.page.sections[0].heading;s.page.sections[0].heading=old+' (edited)';return {root:'sections[0]',kind:'section',fields:[F('sections[0].heading','sections[0].heading',old,old+' (edited)')]};},
+  layout(s){const d=s.page.sections[0].diagram,old=d.layouts[0].name;d.layouts[0].name=old+' (renamed)';return {root:SEC+'.layouts[0]',kind:'layout',fields:[F(SEC+'.layouts[0].name',SEC+'.layouts[0].name',old,old+' (renamed)')]};},
+  view(s){const sec=s.page.sections[0];if(sec.views)return null;sec.views=[{id:'stress-view',name:'Stress view'}];return {root:'sections[0].views[0]',kind:'view',status:'added',afterPath:'sections[0].views[0]',fields:[]};},
+  storyTime(s){const d=s.page.sections[0].diagram;if(d.storyTime)return null;d.storyTime={start:'2026-09-24T22:30'};return {root:'sections[0]',kind:'section',fields:[F(null,SEC+'.storyTime.start',undefined,'2026-09-24T22:30')]};},
   path(s,r){const d=s.page.sections[0].diagram,old=d.paths[0].steps.slice(),k=1+Math.floor(r()*(old.length-1));d.paths[0].steps=old.filter((x,i)=>i!==k);
-    return {kind:'path',fields:[F(SEC+'.paths[0].steps',SEC+'.paths[0].steps',old,d.paths[0].steps)]};},
-  ledger(){return {kind:'ledger',ledger:['one\ntwo','one\nTWO'],fields:[F('ledger:2-2','ledger:2-2','two','TWO')]};}
+    return {root:SEC+'.paths[0]',kind:'path',fields:[F(SEC+'.paths[0].steps',SEC+'.paths[0].steps',old,d.paths[0].steps)]};},
+  ledger(){return {root:'ledger',kind:'ledger',ledger:['one\ntwo','one\nTWO'],fields:[F('ledger:2-2','ledger:2-2','two','TWO')]};}
 };
 
 const scenarios=corpus.scenarios();
@@ -192,7 +192,8 @@ for(const s of scenarios){
       const e=out[0];
       assert.equal(e.kind,m.kind,'S5 kind '+label);assert.equal(e.status,m.status||'modified','S5 status '+label);assert.equal(e.cause,'document','S5 cause '+label);
       if(m.origin)assert.equal(e.origin,m.origin,'S5 origin '+label);
-      if(m.afterPath)assert.equal(e.afterPath,m.afterPath,'S5 path '+label);
+      assert.equal(e.afterPath,m.root,'S5 record path after '+label);
+      assert.equal(e.beforePath,(m.status||'modified')==='added'?null:m.root,'S5 record path before '+label);
       assert.deepEqual(sortJ(e.fields),sortJ(m.fields),'S5 fields '+label);
       const d0=spec.page.sections[0].diagram,d1=next.page.sections[0].diagram;
       if(m.declaration){
@@ -215,17 +216,17 @@ function topo(){
 }
 const I=(kind,status,bp,ap,extra={})=>Object.assign({kind,status,origin:'imported',beforePath:bp,afterPath:ap},extra);
 const IMPORT={
-  providerNode:t=>{const p=plain(t.provider);p.page.sections[0].diagram.nodes.a.title='A!';return {after:[t.consumer,t.ctx(p)],kind:'node',cause:'provider',fields:[F(R+'.nodes["child::a"].title',R+'.nodes["child::a"].title','A','A!')]};},
-  providerEdge:t=>{const p=plain(t.provider);p.page.sections[0].diagram.edges[0].label='ab!';return {after:[t.consumer,t.ctx(p)],kind:'edge',cause:'provider',fields:[F(R+'.edges[0].label',R+'.edges[0].label','ab','ab!')]};},
-  providerAdd:t=>{const p=plain(t.provider),d=p.page.sections[0].diagram;d.nodes.c={title:'C'};d.rows=[['a','b','c']];d.topologyExports.public.nodes.push('c');return {after:[t.consumer,t.ctx(p)],kind:'node',status:'added',cause:'provider',afterPath:SEC+'.topologyImports[0]',fields:[]};},
-  overrideNode:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].nodeOverrides={a:{sub:'S'}};return {after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(null,SEC+'.topologyImports[0].nodeOverrides.a.sub',undefined,'S')],resolved:[I('node','modified',null,R+'.nodes["child::a"].sub',{after:'S'})]};},
-  overrideEdge:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].edgeOverrides={'a->b':{label:'X'}};return {after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(null,SEC+'.topologyImports[0].edgeOverrides["a->b"].label',undefined,'X')],resolved:[I('edge','modified',R+'.edges[0].label',R+'.edges[0].label',{before:'ab',after:'X'})]};},
-  as:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].as='kid';return {after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(SEC+'.topologyImports[0].as',SEC+'.topologyImports[0].as','child','kid')],
+  providerNode:t=>{const p=plain(t.provider);p.page.sections[0].diagram.nodes.a.title='A!';return {root:SEC+'.topologyImports[0]',after:[t.consumer,t.ctx(p)],kind:'node',cause:'provider',fields:[F(R+'.nodes["child::a"].title',R+'.nodes["child::a"].title','A','A!')]};},
+  providerEdge:t=>{const p=plain(t.provider);p.page.sections[0].diagram.edges[0].label='ab!';return {root:SEC+'.topologyImports[0]',after:[t.consumer,t.ctx(p)],kind:'edge',cause:'provider',fields:[F(R+'.edges[0].label',R+'.edges[0].label','ab','ab!')]};},
+  providerAdd:t=>{const p=plain(t.provider),d=p.page.sections[0].diagram;d.nodes.c={title:'C'};d.rows=[['a','b','c']];d.topologyExports.public.nodes.push('c');return {root:SEC+'.topologyImports[0]',after:[t.consumer,t.ctx(p)],kind:'node',status:'added',cause:'provider',afterPath:SEC+'.topologyImports[0]',fields:[]};},
+  overrideNode:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].nodeOverrides={a:{sub:'S'}};return {root:SEC+'.topologyImports[0]',after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(null,SEC+'.topologyImports[0].nodeOverrides.a.sub',undefined,'S')],resolved:[I('node','modified',null,R+'.nodes["child::a"].sub',{after:'S'})]};},
+  overrideEdge:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].edgeOverrides={'a->b':{label:'X'}};return {root:SEC+'.topologyImports[0]',after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(null,SEC+'.topologyImports[0].edgeOverrides["a->b"].label',undefined,'X')],resolved:[I('edge','modified',R+'.edges[0].label',R+'.edges[0].label',{before:'ab',after:'X'})]};},
+  as:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].as='kid';return {root:SEC+'.topologyImports[0]',after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(SEC+'.topologyImports[0].as',SEC+'.topologyImports[0].as','child','kid')],
     resolved:[I('node','removed',R+'.nodes["child::a"]',null),I('node','removed',R+'.nodes["child::b"]',null),I('edge','removed',R+'.edges[0]',null),I('node','added',null,R+'.nodes["kid::a"]'),I('node','added',null,R+'.nodes["kid::b"]'),I('edge','added',null,R+'.edges[0]')]};},
-  export:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].export='onlyA';return {after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(SEC+'.topologyImports[0].export',SEC+'.topologyImports[0].export','public','onlyA')],resolved:[I('node','removed',R+'.nodes["child::b"]',null),I('edge','removed',R+'.edges[0]',null)]};},
-  spec:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].spec='provider2';return {after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(SEC+'.topologyImports[0].spec',SEC+'.topologyImports[0].spec','provider','provider2')],
+  export:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].export='onlyA';return {root:SEC+'.topologyImports[0]',after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(SEC+'.topologyImports[0].export',SEC+'.topologyImports[0].export','public','onlyA')],resolved:[I('node','removed',R+'.nodes["child::b"]',null),I('edge','removed',R+'.edges[0]',null)]};},
+  spec:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].spec='provider2';return {root:SEC+'.topologyImports[0]',after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(SEC+'.topologyImports[0].spec',SEC+'.topologyImports[0].spec','provider','provider2')],
     resolved:[I('node','modified',R+'.nodes["child::a"].title',R+'.nodes["child::a"].title',{before:'A',after:'A2'}),I('node','removed',R+'.nodes["child::b"]',null),I('edge','removed',R+'.edges[0]',null)]};},
-  importedTone:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.steps[1].tone={'child::b':'ok'};return {after:[c,t.ctx()],kind:'step',cause:'document',fields:[F(null,SEC+'.steps[1].tone["child::b"]',undefined,'ok')],effects:true};}
+  importedTone:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.steps[1].tone={'child::b':'ok'};return {root:SEC+'.steps[1]',after:[c,t.ctx()],kind:'step',cause:'document',fields:[F(null,SEC+'.steps[1].tone["child::b"]',undefined,'ok')],effects:true};}
 };
 test('stress imported topology: every import mutation kind',()=>{
   const t=topo(),A=side(t.consumer,{context:t.ctx()});
@@ -236,7 +237,7 @@ test('stress imported topology: every import mutation kind',()=>{
     const e=out[0];
     assert.equal(e.kind,m.kind,name);assert.equal(e.status,m.status||'modified',name);assert.equal(e.cause,m.cause,name);
     if(m.kind!=='step')assert.equal(e.origin,'imported',name);
-    if(m.afterPath)assert.equal(e.afterPath,m.afterPath,name);
+    assert.equal(e.afterPath,m.root,'S5 record path after '+name);assert.equal(e.beforePath,(m.status||'modified')==='added'?null:m.root,'S5 record path before '+name);
     assert.deepEqual(sortJ(e.fields),sortJ(m.fields),'S5 fields '+name);
     if(m.resolved)assert.deepEqual(sortJ(e.resolved),sortJ(m.resolved),'S5 attached resolved '+name);
     checkEffects(e,A.resolved.sections[0].diagram,B.resolved.sections[0].diagram,name);

@@ -66,6 +66,7 @@
    R30 section attribution    storyTime + step tone edit  section effects only panel state; tone effect only on the step   section takes every folded difference
    R31 section counterfactual storyTime + gauge patch    section effects = folds of (before + only the section's settings); patch effect stays on its step   section takes another edit's state effect
    R32 interacting edits      storyTime + step time + battery drain   compare(a,b) mirrors compare(b,a); section effect values are the real folded values   direction-dependent counterfactual values
+   R33 id collisions          path 'a|b' + panel 'c' vs path 'a' + panel 'b|c'   section effects never include the other panel   joined-string lookup keys
    R26 locus                  every entry in every row   section/key/step asserted; record path has its kind's shape under its section;
                               every field path sits under its entry's record path; paths resolve           self-consistent wrong loci
 */
@@ -613,4 +614,15 @@ test('R32 interacting story-time, step-time and battery edits stay mirror-symmet
   const eff=effectOf(sec,'bat','state');assert.ok(eff && eff.changes.length,'the story-time edit changes battery state');
   eff.changes.forEach(c=>assert.ok(actual.changes.some(x=>JSON.stringify(x)===JSON.stringify(c)),'section change '+JSON.stringify(c)+' carries the real before/after folded values'));
   assert.ok(!sec.effects.some(x=>x.target.id==='g'),'nothing on the untouched gauge');
+});
+
+test('R33 ids containing separators never collide: a story-time edit does not pick up another panel on another path',()=>{
+  const mk=()=>base({panels:[{id:'c',type:'battery',title:'Battery',drainPerHour:1,initial:{charge:64,trend:'idle'}},{id:'b|c',type:'gauge',title:'G',initial:{value:1}}],
+    storyTime:{start:'2026-09-24T22:30'},steps:steps(5,{1:{time:'+1h'},3:{time:'2026-09-25T06:50'}}),paths:[{id:'a|b',steps:['s0','s1','s2','s3','s4']},{id:'a',steps:['s0','s2','s3']}]});
+  const before=mk(),after=mk();after.storyTime.start='2026-09-24T20:30';after.steps[2].panels={'b|c':{value:9}};
+  const out=compare(side(doc(before)),side(doc(after)));
+  const sec=only(out,x=>x.kind==='section','section entry');
+  assert.ok(sec.effects.length,'precondition: story time changes the battery');
+  assert.ok(sec.effects.every(x=>x.target.id==='c'),'section effects only on the battery: '+JSON.stringify(sec.effects.map(x=>[x.pathId,x.target.id])));
+  const step=only(out,x=>x.kind==='step','step entry');assert.ok(step.effects.every(x=>x.target.id==='b|c'));
 });

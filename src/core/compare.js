@@ -171,7 +171,7 @@ function compareReaderDiffs(da, db, stepPairs){
 }
 function compareVisibleScope(d, panelId){
   var out = [];
-  diagramPathList(d).slice(0, 1).forEach(function(path){
+  diagramPathList(d).forEach(function(path){
     var f = compareFoldsFor(d, path.id), v = f.visibility(panelId) || [];
     f.indices.forEach(function(src, k){ if (v[k] !== false && out.indexOf(src) < 0) out.push(src); });
   });
@@ -289,7 +289,7 @@ function compareSection(ra, rb, resA, resB, entries, ia, ib){
   /* Reader effects come from the resolved diagrams. */
   var diffs = compareReaderDiffs(xa, xb, stepMatch.pairs);
   local.forEach(function(e){
-    var touches = compareTouches(e, sectionEntry);
+    var touches = compareTouches(e, {da:xa, db:xb, dpa:dpa, dpb:dpb});
     e.section = {before:e.beforePath == null ? null : ia, after:e.afterPath == null ? null : ib};
     e.effects = diffs.filter(function(d){ return touches(d); });
     if (e.kind === 'path' && e.status !== 'modified'){
@@ -310,14 +310,32 @@ function compareSection(ra, rb, resA, resB, entries, ia, ib){
 function compareImportOwner(imports, key){
   return (Array.isArray(imports) ? imports : []).findIndex(function(imp){ return imp && imp.as != null && String(key).indexOf(String(imp.as) + '::') === 0; });
 }
-function compareTouches(e, sectionEntry){
-  if (e.kind === 'section' || e.kind === 'path' && e.status === 'modified') return function(){ return true; };
+/* Diagram-level settings that only arrange the picture; editing them cannot
+   change folded panel state, node tones or panel visibility. */
+var COMPARE_LAYOUT_ONLY = ['rows','groups','floats','columns','view','autoplay','defaultLayout','showStepIds','legend','title','notes','topologyExports'];
+function comparePathsContaining(d, src){
+  var out = [];
+  if (src == null) return out;
+  diagramPathList(d).forEach(function(path){ if (path.indices.indexOf(src) >= 0) out.push(path.id); });
+  return out;
+}
+function compareTouches(e, ctx){
+  if (e.kind === 'section'){
+    var relevant = e.fields.some(function(f){
+      var p = f.afterPath || f.beforePath, m = /\.diagram\.([A-Za-z_$][\w$]*)/.exec(p || '');
+      return m && COMPARE_LAYOUT_ONLY.indexOf(m[1]) < 0;
+    });
+    return function(){ return relevant; };
+  }
+  if (e.kind === 'path' && e.status === 'modified'){ var pid = (e._b || e._a).id; return function(d){ return d.pathId === pid; }; }
   if (e.kind === 'panel'){ var id = (e._a || e._b).id; return function(d){ return d.target.kind === 'panel' && d.target.id === id; }; }
   if (e.kind === 'node'){ var nk = e.key && (e.key.after != null ? e.key.after : e.key.before); return function(d){ return d.category === 'tone' && d.target.id === nk; }; }
   if (e.kind === 'step'){
     var ka = compareStepPatchKeys(e._a), kb = compareStepPatchKeys(e._b);
     var all = ka.all || kb.all || (e._a && e._b && !compareSame(e._a.time, e._b.time));
+    var paths = comparePathsContaining(ctx.da, e._ia).concat(comparePathsContaining(ctx.db, e._ib));
     return function(d){
+      if (paths.indexOf(d.pathId) < 0) return false;
       if (all && d.target.kind === 'panel' && d.category === 'state') return true;
       var keys = d.category === 'tone' ? ka.tone.concat(kb.tone) : d.category === 'visibility' ? ka.visibility.concat(kb.visibility) : ka.state.concat(kb.state);
       return keys.indexOf(d.target.id) >= 0;
@@ -364,17 +382,21 @@ function compareResolved(da, db, xa, xb, pa, pb){
 function compareTabViews(A, B, entries){
   function owners(page){
     var out = [], raw = page && (page.blocks || page.sections) || [], pfx = page && page.blocks ? 'blocks' : 'sections';
-    raw.forEach(function(b, i){ if (b && Array.isArray(b.tabs)) b.tabs.forEach(function(t, j){ out.push({label:t && t.label, views:t && t.views, path:pfx + '[' + i + '].tabs[' + j + ']', i:i, j:j}); }); });
+    raw.forEach(function(b, i){ if (b && Array.isArray(b.tabs)) b.tabs.forEach(function(t, j){ out.push({tab:t, label:t && t.label, views:t && t.views, path:pfx + '[' + i + '].tabs[' + j + ']', i:i, j:j}); }); });
     return out;
   }
   var oa = owners(A), ob = owners(B), used = new Set();
   oa.forEach(function(a){
     var b = ob.find(function(x){ return !used.has(x) && x.label === a.label; }) || ob.find(function(x){ return !used.has(x) && x.i === a.i && x.j === a.j; });
-    if (!b) return; used.add(b);
+    if (!b){ entries.push({kind:'tab', status:'removed', cause:'document', beforePath:a.path, afterPath:null, section:{before:null, after:null}, key:{before:a.j, after:null}, fields:[], effects:[]}); return; }
+    used.add(b);
+    var tabFields = compareFields(compareWithout(a.tab, ['sections','views']), compareWithout(b.tab, ['sections','views']), a.path, b.path);
+    if (tabFields.length) entries.push({kind:'tab', status:'modified', cause:'document', beforePath:a.path, afterPath:b.path, section:{before:null, after:null}, key:{before:a.j, after:b.j}, fields:tabFields, effects:[]});
     var local = [];
     compareRecordEntries('view', {a:a.views, b:b.views}, a.path + '.views', b.path + '.views', {}, local);
     local.forEach(function(e){ e.section = {before:null, after:null}; delete e._a; delete e._b; delete e._ia; delete e._ib; entries.push(e); });
   });
+  ob.forEach(function(b){ if (!used.has(b)) entries.push({kind:'tab', status:'added', cause:'document', beforePath:null, afterPath:b.path, section:{before:null, after:null}, key:{before:null, after:b.j}, fields:[], effects:[]}); });
 }
 /* Coverage ledger: line hunks from a longest-common-subsequence diff. */
 function compareLedger(a, b, entries){

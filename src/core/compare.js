@@ -288,11 +288,8 @@ function compareSection(ra, rb, resA, resB, entries, ia, ib){
   imports.forEach(function(e){ e.resolved = e.resolved || []; local.push(e); });
   /* Reader effects come from the resolved diagrams. */
   var diffs = compareReaderDiffs(xa, xb, stepMatch.pairs);
-  /* A section's own fold-read settings are attributed counterfactually: apply
-     only those settings to the before diagram, compare with it, and map the
-     coordinates onto the after side through the step pairing. Other edits in
-     the same comparison therefore never land on the section entry. */
-  var sectionDiffs = sectionEntry ? compareSectionEffects(xa, xb, stepMatch.pairs) : [];
+  /* Section effects: see compareSectionEffects (symmetric counterfactual). */
+  var sectionDiffs = sectionEntry ? compareSectionEffects(xa, xb, diffs) : [];
   local.forEach(function(e){
     var touches = compareTouches(e, {da:xa, db:xb, dpa:dpa, dpb:dpb});
     e.section = {before:e.beforePath == null ? null : ia, after:e.afterPath == null ? null : ib};
@@ -325,20 +322,44 @@ function comparePathsContaining(d, src){
   diagramPathList(d).forEach(function(path){ if (path.indices.indexOf(src) >= 0) out.push(path.id); });
   return out;
 }
-function compareSectionEffects(xa, xb, stepPairs){
+/* Section settings read by the folds (storyTime, deviceDefaults). Which steps
+   the section edit changes is decided counterfactually and symmetrically: a
+   coordinate belongs to the section if applying only the section's settings
+   to the before diagram changes it, or removing them from the after diagram
+   changes it. The values reported are the real before/after folded values, as
+   for every other effect, so compare(b, a) mirrors compare(a, b). */
+function compareSectionEffects(xa, xb, actual){
   var changed = COMPARE_FOLD_FIELDS.filter(function(k){ return !compareSame(xa[k], xb[k]); });
   if (!changed.length) return [];
-  var hybrid = Object.assign({}, xa);
-  changed.forEach(function(k){ if (xb[k] === undefined) delete hybrid[k]; else hybrid[k] = xb[k]; });
-  var ident = (xa.steps || []).map(function(s, i){ return [i, i]; }), toAfter = new Map();
-  stepPairs.forEach(function(p){ toAfter.set(p[0], p[1]); });
-  function map(step){ return step === 'ambient' || step == null ? step : toAfter.has(step) ? toAfter.get(step) : null; }
-  return compareReaderDiffs(xa, hybrid, ident).filter(function(d){ return d.category === 'state' && d.target.kind === 'panel'; }).map(function(d){
-    return {pathId:d.pathId, target:d.target, category:d.category, beforeSteps:d.beforeSteps,
-      afterSteps:d.afterSteps.map(map).filter(function(v){ return v != null; }),
-      changes:d.changes.map(function(c){ var o = {beforeStep:c.beforeStep, afterStep:map(c.afterStep), before:c.before, after:c.after}; return o; })};
+  function swap(d, from){
+    var out = Object.assign({}, d);
+    changed.forEach(function(k){ if (from[k] === undefined) delete out[k]; else out[k] = from[k]; });
+    return out;
+  }
+  function ident(d){ return (d.steps || []).map(function(s, i){ return [i, i]; }); }
+  function sets(diffs, side){
+    var out = {};
+    diffs.forEach(function(d){ if (d.category === 'state' && d.target.kind === 'panel') out[d.pathId + '|' + d.target.id] = d[side]; });
+    return out;
+  }
+  var fromBefore = sets(compareReaderDiffs(xa, swap(xa, xb), ident(xa)), 'beforeSteps');
+  var fromAfter = sets(compareReaderDiffs(swap(xb, xa), xb, ident(xb)), 'afterSteps');
+  var num = function(x, y){ return (x === 'ambient') - (y === 'ambient') || (x === 'ambient' ? 0 : x - y); };
+  var out = [];
+  actual.forEach(function(d){
+    if (d.category !== 'state' || d.target.kind !== 'panel') return;
+    var key = d.pathId + '|' + d.target.id, a = fromBefore[key] || [], b = fromAfter[key] || [];
+    var changes = d.changes.filter(function(c){
+      return c.beforeStep != null && a.indexOf(c.beforeStep) >= 0 || c.afterStep != null && b.indexOf(c.afterStep) >= 0;
+    });
+    if (!changes.length) return;
+    var bs = [], as = [];
+    changes.forEach(function(c){ if (c.beforeStep != null && bs.indexOf(c.beforeStep) < 0) bs.push(c.beforeStep); if (c.afterStep != null && as.indexOf(c.afterStep) < 0) as.push(c.afterStep); });
+    out.push({pathId:d.pathId, target:d.target, category:d.category, beforeSteps:bs.sort(num), afterSteps:as.sort(num), changes:changes});
   });
+  return out;
 }
+
 function compareTouches(e, ctx){
   if (e.kind === 'path' && e.status === 'modified'){ var pid = (e._b || e._a).id; return function(d){ return d.pathId === pid; }; }
   if (e.kind === 'panel'){ var id = (e._a || e._b).id; return function(d){ return d.target.kind === 'panel' && d.target.id === id; }; }

@@ -384,13 +384,15 @@ test('R15 story time: storyTime.start and steps[i].time edits at exact leaf path
 test('R16 moved and edited step has side-specific paths',()=>{
   const before=base(),after=base();const moved=Object.assign({},before.steps[4],{id:'m',text:'Old'});before.steps[4]=moved;
   after.steps.splice(4,1);after.steps.splice(5,0,Object.assign({},moved,{text:'New'}));
-  const e=only(compare(side(doc(before)),side(doc(after))),x=>x.kind==='step' && x.status==='modified','one modified step');
+  const o1=compare(side(doc(before)),side(doc(after)));assert.equal(o1.length,1,'only the moved step is reported: '+JSON.stringify(o1.map(x=>[x.kind,x.status,x.afterPath])));
+  const e=only(o1,x=>x.kind==='step' && x.status==='modified','one modified step');
   assert.equal(e.beforePath,SEC+'.steps[4]');assert.equal(e.afterPath,SEC+'.steps[5]');
   assert.deepEqual(e.step,{before:4,after:5});assert.deepEqual(e.key,{before:'m',after:'m'});
   assert.deepEqual(e.fields,[{beforePath:SEC+'.steps[4].text',afterPath:SEC+'.steps[5].text',before:'Old',after:'New'}]);
   /* Moved AND re-patched: the effect lists the step at index 4 before and 5 after. */
   const b2=plain(before),a2=plain(after);b2.steps[4].panels={p:{value:10}};a2.steps[5].panels={p:{value:55}};
-  const e2=only(compare(side(doc(b2)),side(doc(a2))),x=>x.kind==='step' && x.status==='modified','moved and re-patched step');
+  const o2=compare(side(doc(b2)),side(doc(a2)));assert.equal(o2.length,1,'only the moved step is reported');
+  const e2=only(o2,x=>x.kind==='step' && x.status==='modified','moved and re-patched step');
   assert.deepEqual(e2.fields.find(f=>/panels/.test(f.afterPath)),{beforePath:SEC+'.steps[4].panels.p.value',afterPath:SEC+'.steps[5].panels.p.value',before:10,after:55});
   const eff=effectOf(e2,'p','state');assert.deepEqual(eff,expectEffect(b2,a2,'happy','panel','p','state'));
   const own=eff.changes.find(c=>c.beforeStep===4);
@@ -425,7 +427,13 @@ test('R18 added and removed records of every kind carry status, a null path on t
     ['edge','added',null,SEC+'.edges[0]'],['edge','removed',SEC+'.edges[0]',null],['layout','added',null,SEC+'.layouts[0]'],['layout','removed',SEC+'.layouts[0]',null],
     ['view','added',null,'sections[0].views[0]'],['view','removed','sections[0].views[0]',null],['section','added',null,'sections[1]'],['section','removed','sections[1]',null]];
   for(const [kind,status,bp,ap] of want){const e=only(out,x=>x.kind===kind && x.status===status && x.beforePath===bp && x.afterPath===ap,kind+' '+status);assert.deepEqual(e.fields,[],kind+' '+status+' has no fields');}
-  assert.equal(only(out,x=>x.kind==='node' && x.status==='added','added node').origin,'local');
+  /* Exact output set: the 16 add/remove records above, plus the section's rows
+     edit and the main path's membership edit; every entry is document-caused and
+     every node/edge entry is local. */
+  const exact=want.concat([['section','modified','sections[0]','sections[0]'],['path','modified',SEC+'.paths[0]',SEC+'.paths[0]']]);
+  assert.deepEqual(sortJ(out.map(e=>[e.kind,e.status,e.beforePath,e.afterPath])),sortJ(exact),'exact entry set, no duplicates or invented entries');
+  out.forEach(e=>{assert.equal(e.cause,'document',e.kind+' '+e.status+' cause');if(e.kind==='node' || e.kind==='edge')assert.equal(e.origin,'local',e.kind+' '+e.status+' origin');});
+  assert.deepEqual(only(out,x=>x.kind==='path' && x.status==='modified','main path').fields,[{beforePath:SEC+'.paths[0].steps',afterPath:SEC+'.paths[0].steps',before:['s0','s1','s2','gone'],after:['s0','s1','s2','new']}]);
   const addPanel=only(out,x=>x.kind==='panel' && x.status==='added','added panel'),remPanel=only(out,x=>x.kind==='panel' && x.status==='removed','removed panel');
   assert.deepEqual(addPanel.key,{before:null,after:'r'});assert.deepEqual(remPanel.key,{before:'q',after:null});
   assert.deepEqual(sortJ(addPanel.effects),sortJ(['state','visibility'].map(cat=>expectEffect(before,after,'main','panel','r',cat)).filter(x=>x.changes.length)));

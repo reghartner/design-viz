@@ -93,7 +93,8 @@ function comparePairs(a, b, naturalKeys, leftover){
   return {pairs:pairs, removed:a.map(function(v, i){ return i; }).filter(function(i){ return !usedA.has(i); }),
     added:b.map(function(v, i){ return i; }).filter(function(i){ return !usedB.has(i); })};
 }
-var COMPARE_EDGE_KEY = function(e){ return e && e.from != null && e.to != null ? 'ends:' + JSON.stringify([String(e.from), String(e.to), e.fromPort || '', e.toPort || '']) : null; };
+/* Ports may be objects; compareSignature sorts keys so equal ports match. */
+var COMPARE_EDGE_KEY = function(e){ return e && e.from != null && e.to != null ? 'ends:' + compareSignature([String(e.from), String(e.to), e.fromPort || '', e.toPort || '']) : null; };
 var COMPARE_CAPTION_KEY = function(v){ return v && typeof v.text === 'string' ? 'text:' + v.text : null; };
 COMPARE_CAPTION_KEY.unique = true;
 var COMPARE_IMPORT_KEYS = [function(v){ return v && v.as != null ? 'as:' + v.as : null; },

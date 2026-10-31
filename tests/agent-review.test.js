@@ -32,7 +32,7 @@ function uiHarness(options={}){
     applySkinClasses:()=>true,initViewerExploreCanvas:()=>({destroy(){}}),renderPage:()=>({sections:[],destroy(){}}),
     /* Recording stand-in for the shared component. */
     mountCompareView(host,opts){
-      const m={host,opts:plain({before:opts.before,after:opts.after,entries:opts.entries,ids:opts.ids}),live:opts,destroyed:false,skins:[],selected:-1};
+      const m={host,opts:plain({before:opts.before,after:opts.after,entries:opts.entries,ids:opts.ids}),live:opts,destroyed:false,skins:[],selected:opts.entries.length?0:-1};/* like the real view: first change selected */
       mounts.push(m);
       return {select(i){m.selected=i;if(opts.onSelect)opts.onSelect(opts.entries[i],i,{before:{shown:true},after:{shown:true}});return {};},
         next(){return this.select(m.selected+1);},previous(){return this.select(m.selected-1);},selected:()=>m.selected,count:()=>opts.entries.length,
@@ -77,9 +77,9 @@ test('change counts and Prev/Next drive the mounted view; Details and Escape kee
   assert.ok(n>=2,'precondition: node and ledger changes');
   const counts={added:0,removed:0,modified:0};m.opts.entries.forEach(x=>counts[x.status]++);
   assert.equal(e['agent-update-change-modified'].textContent,counts.modified+' modified');assert.equal(e['agent-update-change-added'].textContent,counts.added+' added');assert.equal(e['agent-update-change-removed'].textContent,counts.removed+' removed');
-  e['agent-update-next'].fire('click');assert.equal(m.selected,1);e['agent-update-previous'].fire('click');assert.equal(m.selected,0);
   assert.equal(e['agent-update-details-panel'].hidden,true);e['agent-update-details'].fire('click');assert.equal(e['agent-update-details-panel'].hidden,false);
   e['agent-update-dialog'].fire('cancel');assert.equal(e['agent-update-details-panel'].hidden,true);assert.equal(e['agent-update-dialog'].open,true,'Escape dismisses Details first');
+  e['agent-update-next'].fire('click');assert.equal(m.selected,1);e['agent-update-previous'].fire('click');assert.equal(m.selected,0);
   assert.equal(m.destroyed,false,'Details never remounts the view');assert.equal(h.mounts.length,1);h.ui.destroy();
 });
 test('selecting a ledger or document change opens Details on the matching field; a non-rendered target says so',()=>{

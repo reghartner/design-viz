@@ -1957,7 +1957,8 @@ test('agent change navigation reaches other Views and paths and preserves stable
     await view.getByRole('button',{name:'Zoom out',exact:true}).click();
     const camera=scope=>scope.locator('.explore-active-section .explore-board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
     await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));const beforeCamera=await camera(before);
-    await view.locator('.explore-active-section .explore-board').evaluate(el=>{el.scrollLeft+=120;el.scrollTop+=80;});
+    const afterBoard=view.locator('.explore-active-section .explore-board'),afterBefore=await camera(view);
+    await afterBoard.hover();await page.mouse.wheel(120,80);await expect.poll(async()=>JSON.stringify(await camera(view))).not.toBe(JSON.stringify(afterBefore));
     await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
     expect(await camera(before),'a manual move of the After pane leaves the Before pane camera unchanged').toEqual(beforeCamera);
     await page.screenshot({path:info.outputPath('change-navigation-proposed-1280x720.png')});

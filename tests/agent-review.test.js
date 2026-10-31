@@ -73,17 +73,20 @@ test('opening mounts one side-by-side compare view with both documents, the engi
   h.ui.destroy();assert.equal(mounted(h,1).destroyed,true);
 });
 test('change counts and Prev/Next drive the mounted view; Details and Escape keep the view mounted',()=>{
-  const h=uiHarness(),e=h.elements;h.ui.update(h.review);h.ui.open();const m=mounted(h),n=m.opts.entries.length;
-  assert.ok(n>=2,'precondition: node and ledger changes');
-  const counts={added:0,removed:0,modified:0};m.opts.entries.forEach(x=>counts[x.status]++);
+  const h=uiHarness(),e=h.elements;h.ui.update(h.review);h.ui.open();
+  const side=(text,ledger)=>({authored:h.c.normalize(JSON.parse(text)),resolved:h.c.normalize(JSON.parse(text)),ledger});
+  const expected=h.c.compareDocuments(side(h.snapshot.current,'old'),side(h.snapshot.source,'new'));assert.ok(expected.length>=2,'precondition: node and ledger changes');
+  const counts={added:0,removed:0,modified:0};expected.forEach(x=>counts[x.status]++);
   assert.equal(e['agent-update-change-modified'].textContent,counts.modified+' modified');assert.equal(e['agent-update-change-added'].textContent,counts.added+' added');assert.equal(e['agent-update-change-removed'].textContent,counts.removed+' removed');
   assert.equal(e['agent-update-details-panel'].hidden,true);e['agent-update-details'].fire('click');assert.equal(e['agent-update-details-panel'].hidden,false);
   e['agent-update-dialog'].fire('cancel');assert.equal(e['agent-update-details-panel'].hidden,true);assert.equal(e['agent-update-dialog'].open,true,'Escape dismisses Details first');
-  e['agent-update-next'].fire('click');assert.equal(m.selected,1);e['agent-update-previous'].fire('click');assert.equal(m.selected,0);
-  assert.equal(m.destroyed,false,'Details never remounts the view');assert.equal(h.mounts.length,1);h.ui.destroy();
+  e['agent-update-next'].fire('click');assert.equal(h.mounts[0]?.selected,1,'Next moves the mounted view to the second change');
+  e['agent-update-previous'].fire('click');assert.equal(h.mounts[0]?.selected,0,'Previous moves it back');
+  assert.equal(h.mounts.length,1,'Details never remounts the view');h.ui.destroy();
 });
 test('selecting a ledger or document change opens Details on the matching field; a non-rendered target says so',()=>{
-  const h=uiHarness(),e=h.elements;h.ui.update(h.review);h.ui.open();const m=mounted(h),live=m.live;
+  const h=uiHarness(),e=h.elements;h.ui.update(h.review);h.ui.open();
+  assert.equal(typeof h.mounts[0]?.live.onSelect,'function','the dialog hands the compare view a selection callback');const live=h.mounts[0].live;
   const ledger=live.entries.findIndex(x=>x.kind==='ledger');assert.ok(ledger>=0,'precondition: ledger change');
   live.onSelect(live.entries[ledger],ledger,{before:{shown:false},after:{shown:false}});
   assert.equal(e['agent-update-details-panel'].hidden,false);assert.equal(e['agent-update-ledger'].focused,true);assert.match(e['agent-update-position'].textContent,/Coverage ledger/);
@@ -96,8 +99,8 @@ test('selecting a ledger or document change opens Details on the matching field;
 });
 test('the review uses the selected site skin and updates it live without remounting',()=>{
   const h=uiHarness({skin:()=> 'terminal'});h.ui.update(h.review);h.ui.open();
-  assert.equal(mounted(h).live.skin(mounted(h).live.after),'terminal');
-  assert.equal(h.ui.setSkin('rose'),true);assert.deepEqual(mounted(h).skins,['rose']);assert.equal(h.mounts.length,1);h.ui.destroy();
+  assert.equal(typeof h.mounts[0]?.live.skin,'function','the site skin is handed to the compare view');assert.equal(h.mounts[0].live.skin(h.mounts[0].live.after),'terminal');
+  assert.equal(h.ui.setSkin('rose'),true);assert.deepEqual(h.mounts[0].skins,['rose'],'a live skin change reaches the compare view');assert.equal(h.mounts.length,1);h.ui.destroy();
 });
 test('close and Escape keep a proposal pending, decline rejects it, and a refreshed version needs fresh review',()=>{
   const h=uiHarness(),e=h.elements;h.ui.update(h.review);h.ui.open();
@@ -105,7 +108,7 @@ test('close and Escape keep a proposal pending, decline rejects it, and a refres
   e['agent-update-dialog'].fire('cancel');assert.deepEqual(h.rejected,[]);h.ui.open();
   e['agent-update-details'].fire('click');h.replaceSnapshot({...h.snapshot,review:{...h.snapshot.review,version:2},source:h.snapshot.source.replace('Changed','Refreshed')});h.ui.update(h.snapshot.review);
   assert.equal(e['agent-update-details-panel'].hidden,false,'refresh preserves the open details drawer');
-  assert.equal(mounted(h,-1).opts.after.sections[0].diagram.nodes.a.title,'Refreshed','the refreshed proposal is remounted');
+  assert.equal(h.mounts.at(-1)?.opts.after.sections[0].diagram.nodes.a.title,'Refreshed','the refreshed proposal is remounted');
   assert.equal(e['agent-update-review-refresh'].hidden,false);assert.equal(e['agent-update-commit'].disabled,true);
   e['agent-update-commit'].fire('click');assert.deepEqual(h.accepted,[],'the newly refreshed version cannot be accepted as the old review');
   e['agent-update-review-refresh'].fire('click');assert.equal(e['agent-update-commit'].disabled,false);e['agent-update-commit'].fire('click');
@@ -136,8 +139,7 @@ test('both sides are resolved with the frozen session; the mounted entries are t
     fields:[{beforePath:'resolved:sections[0].diagram.nodes["child::b"].title',afterPath:'resolved:sections[0].diagram.nodes["child::b"].title',before:'B',after:'Sentinel B'}],effects:[]};
   h.c.compareDocuments=(a,b)=>{modelInputs.push(plain([a,b]));return changes(a,b).concat([sentinel]);};
   h.ui.update(h.review);e['agent-update-open'].fire('click');
-  const m=mounted(h);assert.equal(e['agent-update-commit'].disabled,false);
-  assert.equal(m.opts.before.sections[0].diagram.nodes['child::a'].title,'Frozen A');assert.equal(m.opts.before.sections[0].diagram.nodes.local.title,'Before');
+  assert.equal(h.mounts[0]?.opts.before.sections[0].diagram.nodes['child::a']?.title,'Frozen A','the Before side is resolved with the frozen session');const m=h.mounts[0];assert.equal(e['agent-update-commit'].disabled,false);assert.equal(m.opts.before.sections[0].diagram.nodes.local.title,'Before');
   assert.equal(m.opts.after.sections[0].diagram.nodes['child::a'].title,'Frozen A');assert.equal(m.opts.after.sections[0].diagram.nodes.local.title,'After');
   assert.deepEqual(modelInputs[0][1].authored.sections[0].diagram.topologyImports,f.proposed.page.sections[0].diagram.topologyImports,'authored side keeps import declarations');
   assert.equal(modelInputs[0][1].resolved.sections[0].diagram.nodes['child::a'].title,'Frozen A');assert.equal(modelInputs[0][0].resolved.sections[0].diagram.nodes['child::a'].title,'Frozen A');
@@ -167,8 +169,8 @@ test('invalid topology, missing frozen context and missing resolver fail visibly
 });
 test('a ledger-only proposal lists one change; stale replacement remounts with no changes and gates Accept',()=>{
   const h=uiHarness({source:JSON.stringify({sections:[section('one','One',{nodes:{a:{title:'A'}},rows:[['a']]})]})}),e=h.elements;
-  h.ui.update(h.review);h.ui.open();assert.deepEqual(mounted(h).opts.entries.map(x=>x.kind),['ledger']);assert.equal(e['agent-update-next'].disabled,false);
+  h.ui.update(h.review);h.ui.open();assert.deepEqual(h.mounts[0]?.opts.entries.map(x=>x.kind),['ledger'],'one ledger change is handed to the compare view');assert.equal(e['agent-update-next'].disabled,false);
   h.replaceSnapshot({...h.snapshot,ledger:h.snapshot.currentLedger,review:{...h.review,version:2}});h.ui.update(h.snapshot.review);
-  assert.deepEqual(mounted(h,-1).opts.entries,[]);assert.equal(mounted(h).destroyed,true);
+  assert.deepEqual(h.mounts.at(-1)?.opts.entries,[],'the stale replacement remounts with no changes');assert.equal(h.mounts[0].destroyed,true);
   assert.equal(e['agent-update-next'].disabled,true);assert.equal(e['agent-update-commit'].disabled,true);assert.deepEqual(h.accepted,[]);h.ui.destroy();
 });

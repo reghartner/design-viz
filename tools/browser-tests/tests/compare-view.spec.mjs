@@ -151,8 +151,10 @@ viewerTest('V7 the shared compare component mounts on a viewer-only page and cle
 test('V8 twenty open/close cycles on the largest example leave nothing behind and open within 2x a single render',async({page})=>{
   test.setTimeout(240000);
   const largest=JSON.parse(await readFile(path.join(root,'examples/flowview-product-tour/flowview-product-tour.spec.json'),'utf8'));
-  const proposed=plain(largest),firstSteps=(proposed.page.blocks || proposed.page.sections).find(b=>b.diagram && b.diagram.steps && b.diagram.steps.length).diagram.steps;
-  firstSteps[0].text=String(firstSteps[0].text || '')+' (agent edit)';
+  /* The example nests sections inside tab groups: search both levels. */
+  const stepped=page=>{for(const b of page.blocks || page.sections || []){if(b.diagram && (b.diagram.steps || []).length)return b.diagram;for(const t of b.tabs || [])for(const sec of t.sections || [])if(sec.diagram && (sec.diagram.steps || []).length)return sec.diagram;}return null;};
+  const proposed=plain(largest),diagram=stepped(proposed.page);expect(diagram,'precondition: the largest example has a diagram with steps').toBeTruthy();
+  diagram.steps[0].text=String(diagram.steps[0].text || '')+' (agent edit)';
   const h=await setup(page);
   try{
     // Baseline: the viewer rendering the proposal alone, served through the fixture origin.

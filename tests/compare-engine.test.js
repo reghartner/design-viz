@@ -8,13 +8,16 @@
    side    = null (absent document) | {authored, resolved, ledger}
    entry   = {kind, status, origin?, cause, effect?, beforePath, afterPath,
               section:{before, after}   section record index on each side (null if absent / not section-scoped),
-              key:{before, after}       record key on each side: id, node key, or array index when un-IDed,
+              key:{before, after}       record key on each side: id, node key, or index within its own array when un-IDed,
               step:{before, after}      source-step index on each side (step entries only),
               fields:[{beforePath, afterPath, before, after}],
               effects:[{pathId, target:{kind,id}, category, beforeSteps, afterSteps,
                         changes:[{beforeStep, afterStep, before, after}]}],
               scopeBefore?, scopeAfter?,
               resolved?:[{kind, status, origin, beforePath, afterPath, before?, after?}]}
+   A provider-only change (cause 'provider') is located at the consumer's import
+   declaration (`<sec>.topologyImports[i]`, null on the side it is absent) with
+   the resolved node key or edge index as `key`; its field paths are `resolved:`.
    Paths start at the normalized page root (no `page.` prefix). Keys that are
    not plain identifiers use ["key"]. Resolved-only differences are prefixed
    `resolved:`. Ledger hunks use `ledger:<from>-<to>` (1-based lines).
@@ -82,7 +85,8 @@ function mirror(e){
   if(e.resolved)m.resolved=e.resolved.map(r=>plain(Object.assign({},r,{status:flip[r.status],beforePath:r.afterPath,afterPath:r.beforePath,before:r.after,after:r.before})));
   return m;
 }
-const normEntry=e=>{const x=plain(e);x.fields=sortJ(x.fields);x.effects=sortJ((x.effects||[]).map(f=>Object.assign({},f,{changes:sortJ(f.changes)})));if(x.resolved)x.resolved=sortJ(x.resolved);return JSON.stringify(x,Object.keys(x).sort());};
+const stable=v=>Array.isArray(v)?'['+v.map(stable).join(',')+']':v && typeof v==='object'?'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}':JSON.stringify(v);
+const normEntry=e=>{const x=plain(e);x.fields=sortJ(x.fields);x.effects=sortJ((x.effects||[]).map(f=>Object.assign({},f,{changes:sortJ(f.changes)})));if(x.resolved)x.resolved=sortJ(x.resolved);return stable(x);};
 function compare(a,b){
   assert.equal(typeof C.compareDocuments,'function','compareDocuments(before, after) is defined by the shared engine');
   const sa=plain(a),sb=plain(b),out=plain(C.compareDocuments(a,b));
@@ -132,8 +136,30 @@ function at(side,path){
   const toks=[...path.matchAll(/(?:^|\.)([A-Za-z_$][\w$]*)|\[(\d+)\]|\[("(?:[^"\\]|\\.)*")\]/g)].map(m=>m[1]!=null?m[1]:m[2]!=null?Number(m[2]):JSON.parse(m[3]));
   return toks.reduce((v,k)=>v==null?undefined:v[k],root);
 }
+const tokens=path=>[...path.replace(/^resolved:/,'').matchAll(/(?:^|\.)([A-Za-z_$][\w$]*)|\[(\d+)\]|\[("(?:[^"\\]|\\.)*")\]/g)].map(m=>m[1]!=null?m[1]:m[2]!=null?Number(m[2]):JSON.parse(m[3]));
+function sectionOf(sd,path){
+  const recs=C.sectionRecords(sd.authored),p=path.replace(/^resolved:/,'');let best=null;
+  recs.forEach((r,i)=>{if((p===r.path || p.startsWith(r.path+'.')) && (best==null || r.path.length>recs[best].path.length))best=i;});return best;
+}
+function assertLocus(e,a,b,label){
+  if(e.kind==='document' || e.kind==='ledger')return;
+  assert.ok(e.section && 'before' in e.section && 'after' in e.section,label+' '+e.kind+' has a section locus');
+  assert.ok(e.key && 'before' in e.key && 'after' in e.key,label+' '+e.kind+' has a key locus');
+  for(const [sd,path,w] of [[a,e.beforePath,'before'],[b,e.afterPath,'after']]){
+    if(path==null){assert.equal(e.section[w],null,label+' section.'+w+' null with null path');assert.equal(e.key[w],null,label+' key.'+w+' null with null path');continue;}
+    assert.equal(e.section[w],sectionOf(sd,path),label+' section.'+w+' is the record containing '+path);
+    if(e.cause==='provider'){assert.notEqual(e.key[w],null,label+' provider key.'+w);continue;}
+    const t=tokens(path),last=t[t.length-1],v=at(sd,path);
+    const want=v && typeof v==='object' && (typeof v.id==='string' && v.id || typeof v.id==='number')?v.id:last;
+    assert.deepEqual(e.key[w],want,label+' key.'+w+' at '+path);
+    if(e.kind==='step')assert.equal(e.step[w],last,label+' step.'+w+' at '+path);
+  }
+}
 function assertLoci(entries,a,b,label=''){
   for(const e of entries){
+    assertLocus(e,a,b,label);
+    if((e.effects||[]).length)assert.equal(e.effect,'state',label+' '+e.kind+' with proven effects is effect:state');
+    if(e.effect==='declaration')assert.deepEqual(e.effects,[],label+' declaration entries carry no effects');
     for(const [s,p,which] of [[a,e.beforePath,'before'],[b,e.afterPath,'after']]){
       if(p==null || e.kind==='ledger')continue;
       assert.notEqual(at(s,p),undefined,label+' '+e.kind+' '+which+'Path resolves: '+p);
@@ -208,6 +234,7 @@ test('R6 R7 panel visible flag: visibility effects never include ambient; zero-s
   assert.deepEqual(e.fields,[{beforePath:null,afterPath:SEC+'.panels[0].visible',after:false}]);
   assert.deepEqual(e.effects,[expectEffect(before,after,'happy','panel','p','visibility')]);
   assert.deepEqual(stepsOf(e.effects[0]),{beforeSteps:[0,1,2,3],afterSteps:[0,1,2,3]});
+  assert.equal(e.effect,'state');
   const z0=base({steps:[]}),z1=base({steps:[]});z1.panels[0].initial.value=7;
   const zs=only(compare(side(doc(z0)),side(doc(z1))),x=>x.kind==='panel','zero-step initial edit');
   assert.deepEqual(zs.effects,[expectEffect(z0,z1,'happy','panel','p','state')]);
@@ -238,14 +265,14 @@ function topo(){
 const R='resolved:sections[0].diagram';
 const item=(kind,status,bp,ap,extra={})=>Object.assign({kind,status,origin:'imported',beforePath:bp,afterPath:ap},extra);
 
-test('R9 provider-only change: identical authored pages, different provider contexts -> imported/provider entry at a resolved path',()=>{
+test('R9 provider-only change: identical authored pages, different provider contexts -> imported/provider entry at the import declaration with resolved field paths',()=>{
   const t=topo(),p2=plain(t.provider);p2.page.sections[0].diagram.nodes.a.title='A changed';
   const a=side(t.consumer,{context:t.ctx()}),b=side(t.consumer,{context:t.ctx(p2)});
   assert.deepEqual(a.authored,b.authored,'precondition: authored identical');
   assert.equal(b.resolved.sections[0].diagram.nodes['child::a'].title,'A changed','precondition: resolved differs');
   const out=compare(a,b),e=only(out,x=>x.kind==='node','one node entry');
   assert.equal(out.length,1);assert.equal(e.origin,'imported');assert.equal(e.cause,'provider');assert.equal(e.status,'modified');
-  assert.equal(e.beforePath,R+'.nodes["child::a"]');assert.equal(e.afterPath,R+'.nodes["child::a"]');assert.deepEqual(e.key,{before:'child::a',after:'child::a'});
+  assert.equal(e.beforePath,SEC+'.topologyImports[0]');assert.equal(e.afterPath,SEC+'.topologyImports[0]');assert.deepEqual(e.key,{before:'child::a',after:'child::a'});assert.deepEqual(e.section,{before:0,after:0});
   assert.deepEqual(e.fields,[{beforePath:R+'.nodes["child::a"].title',afterPath:R+'.nodes["child::a"].title',before:'A',after:'A changed'}]);
 });
 
@@ -294,10 +321,11 @@ test('R19 provider-only additions and removals of imported nodes and edges are t
   d.nodes.c={title:'C'};d.rows=[['a','c']];delete d.nodes.b;d.edges=[{from:'a',to:'c',label:'ac'}];d.topologyExports.public={nodes:['a','c'],edges:['a->c']};
   const out=compare(side(t.consumer,{context:t.ctx()}),side(t.consumer,{context:t.ctx(p2)}));
   assert.deepEqual(sortJ(out.map(e=>({kind:e.kind,status:e.status,origin:e.origin,cause:e.cause,beforePath:e.beforePath,afterPath:e.afterPath}))),sortJ([
-    {kind:'node',status:'removed',origin:'imported',cause:'provider',beforePath:R+'.nodes["child::b"]',afterPath:null},
-    {kind:'node',status:'added',origin:'imported',cause:'provider',beforePath:null,afterPath:R+'.nodes["child::c"]'},
-    {kind:'edge',status:'removed',origin:'imported',cause:'provider',beforePath:R+'.edges[0]',afterPath:null},
-    {kind:'edge',status:'added',origin:'imported',cause:'provider',beforePath:null,afterPath:R+'.edges[0]'}]));
+    {kind:'node',status:'removed',origin:'imported',cause:'provider',beforePath:SEC+'.topologyImports[0]',afterPath:null},
+    {kind:'node',status:'added',origin:'imported',cause:'provider',beforePath:null,afterPath:SEC+'.topologyImports[0]'},
+    {kind:'edge',status:'removed',origin:'imported',cause:'provider',beforePath:SEC+'.topologyImports[0]',afterPath:null},
+    {kind:'edge',status:'added',origin:'imported',cause:'provider',beforePath:null,afterPath:SEC+'.topologyImports[0]'}]));
+  assert.deepEqual(sortJ(out.map(e=>e.key)),sortJ([{before:'child::b',after:null},{before:null,after:'child::c'},{before:0,after:null},{before:null,after:0}]));
 });
 
 test('R13 step tone patches on local and imported nodes: leaf paths and tone effects equal to the oracle',()=>{
@@ -308,7 +336,7 @@ test('R13 step tone patches on local and imported nodes: leaf paths and tone eff
     const out=compare(A,B),e=only(out,x=>x.kind==='step',node+': one step entry');assert.equal(out.length,1);
     assert.deepEqual(e.fields,[{beforePath:null,afterPath:SEC+'.steps[1].tone'+leaf,after:'warn'}]);
     assert.deepEqual(e.effects,[expectEffect(A.resolved.sections[0].diagram,B.resolved.sections[0].diagram,'happy','node',node,'tone')]);
-    assert.deepEqual(stepsOf(e.effects[0]),{beforeSteps:[1,2],afterSteps:[1,2]});
+    assert.deepEqual(stepsOf(e.effects[0]),{beforeSteps:[1,2],afterSteps:[1,2]});assert.equal(e.effect,'state');
     assert.deepEqual(e.effects[0].changes,[{beforeStep:1,afterStep:1,after:'warn'},{beforeStep:2,afterStep:2,after:'warn'}]);
   }
 });
@@ -319,6 +347,7 @@ test('R14 step panelVisibility patch: leaf path, visibility effect and no state 
   assert.deepEqual(e.fields,[{beforePath:null,afterPath:SEC+'.steps[3].panelVisibility.p',after:false}]);
   assert.deepEqual(e.effects,[expectEffect(before,after,'happy','panel','p','visibility')]);
   assert.deepEqual(stepsOf(e.effects[0]),{beforeSteps:[3,4,5,6,7],afterSteps:[3,4,5,6,7]});
+  assert.equal(e.effect,'state');
 });
 
 test('R15 story time: storyTime.start and steps[i].time edits at exact leaf paths with effects equal to the fold oracle',()=>{
@@ -332,7 +361,7 @@ test('R15 story time: storyTime.start and steps[i].time edits at exact leaf path
     const out=compare(side(doc(before)),side(doc(after)));assert.equal(out.length,1,kind);
     const e=out[0];assert.equal(e.kind,kind);
     assert.deepEqual(e.fields,[{beforePath:path,afterPath:path,before:was,after:now}]);
-    assert.deepEqual(e.effects,[expectEffect(before,after,'happy','panel','bat','state')]);
+    assert.deepEqual(e.effects,[expectEffect(before,after,'happy','panel','bat','state')]);assert.equal(e.effect,'state');
   }
 });
 
@@ -355,7 +384,7 @@ test('R17 path membership and order: entry at paths[i].steps; state, tone and vi
     const o=expectEffect(before,after,'main',kind,id,cat);if(o.beforeSteps.length || o.afterSteps.length)want.push(o);
   }
   assert.ok(want.some(w=>w.category==='state') && want.some(w=>w.category==='tone') && want.some(w=>w.category==='visibility'),'precondition: all three categories differ');
-  assert.deepEqual(sortJ(e.effects),sortJ(want));
+  assert.deepEqual(sortJ(e.effects),sortJ(want));assert.equal(e.effect,'state');
 });
 
 test('R18 added and removed records of every kind carry status, a null path on the absent side, and oracle effects',()=>{
@@ -381,6 +410,7 @@ test('R18 added and removed records of every kind carry status, a null path on t
   assert.deepEqual(addStep.step,{before:null,after:8});assert.deepEqual(remStep.step,{before:8,after:null});
   const o=expectEffect(before,after,'main','panel','p','state');assert.ok(o.changes.length,'precondition: the step swap changes p on main');
   assert.deepEqual(addStep.effects,[o]);assert.deepEqual(remStep.effects,[o]);
+  for(const x of [addPanel,remPanel,addStep,remStep])assert.equal(x.effect,'state',x.kind+' '+x.status);
   const addPath=only(out,x=>x.kind==='path' && x.status==='added','added path'),remPath=only(out,x=>x.kind==='path' && x.status==='removed','removed path');
   assert.deepEqual(addPath.effects,[{pathId:'fresh',target:{kind:'path',id:'fresh'},category:'membership',beforeSteps:[],afterSteps:[0,2],changes:[]}]);
   assert.deepEqual(remPath.effects,[{pathId:'old',target:{kind:'path',id:'old'},category:'membership',beforeSteps:[0,1],afterSteps:[],changes:[]}]);
@@ -420,10 +450,14 @@ test('R22 legacy steps[i].patch alias reports the .patch path and the same effec
 });
 
 test('R23 absent document: exactly one document entry plus one entry per section, mirrored',()=>{
-  const p={page:{title:'T',sections:[{id:'a',heading:'A',diagram:base()},{id:'b',heading:'B'}]}};
-  const strip=e=>[e.kind,e.status,e.beforePath,e.afterPath,e.fields.length];
-  assert.deepEqual(compare(null,side(p)).map(strip),[['document','added',null,'',0],['section','added',null,'sections[0]',0],['section','added',null,'sections[1]',0]]);
-  assert.deepEqual(compare(side(p),null).map(strip),[['document','removed','',null,0],['section','removed','sections[0]',null,0],['section','removed','sections[1]',null,0]]);
+  const p={page:{title:'T',blocks:[{id:'a',heading:'A',diagram:base()},{tabs:[{label:'One',sections:[{id:'b',heading:'B'},{heading:'C'}]},{label:'Two',sections:[{id:'d',heading:'D',diagram:base()}]}]}]}};
+  const strip=e=>[e.kind,e.status,e.beforePath,e.afterPath,e.fields.length,e.section && [e.section.before,e.section.after],e.key && [e.key.before,e.key.after]];
+  assert.deepEqual(compare(null,side(p)).map(strip),[['document','added',null,'',0,undefined,undefined],
+    ['section','added',null,'blocks[0]',0,[null,0],[null,'a']],['section','added',null,'blocks[1].tabs[0].sections[0]',0,[null,1],[null,'b']],
+    ['section','added',null,'blocks[1].tabs[0].sections[1]',0,[null,2],[null,1]],['section','added',null,'blocks[1].tabs[1].sections[0]',0,[null,3],[null,'d']]]);
+  assert.deepEqual(compare(side(p),null).map(strip),[['document','removed','',null,0,undefined,undefined],
+    ['section','removed','blocks[0]',null,0,[0,null],['a',null]],['section','removed','blocks[1].tabs[0].sections[0]',null,0,[1,null],['b',null]],
+    ['section','removed','blocks[1].tabs[0].sections[1]',null,0,[2,null],[1,null]],['section','removed','blocks[1].tabs[1].sections[0]',null,0,[3,null],['d',null]]]);
 });
 
 test('R24 identity is empty; compare() already asserts the full mirror for every case above',()=>{
@@ -443,7 +477,7 @@ test('R25 un-IDed steps pair by exact content, then caption, then 1:1; effects e
   assert.deepEqual(mod.step,{before:5,after:6});
   assert.deepEqual(mod.fields,[{beforePath:null,afterPath:SEC+'.steps[6].panels.p.value',after:33}]);
   const pairs=[[0,0],[1,1],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8]];
-  assert.deepEqual(mod.effects,[expectEffect(before,after,'happy','panel','p','state',pairs)]);
+  assert.deepEqual(mod.effects,[expectEffect(before,after,'happy','panel','p','state',pairs)]);assert.equal(mod.effect,'state');
   assert.deepEqual(added.effects,[expectEffect(before,after,'happy','panel','q','state',pairs)]);
   /* 1:1 leftover: the only un-IDed, unmatched step on each side pairs even when its caption changed too. */
   const b2=strip(base()),a2=strip(base());a2.steps[3].text='Renamed';a2.steps[3].panels={q:{value:2}};

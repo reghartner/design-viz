@@ -143,7 +143,8 @@ test('review resolves imports and re-exports with the frozen session while prese
   const modelInputs=[],changes=h.c.compareDocuments;
   /* A provider-caused imported change the frozen fixture cannot produce on its
      own; it must reach the visible change list through the engine's result. */
-  const sentinel={kind:'node',status:'modified',origin:'imported',cause:'provider',beforePath:'resolved:sections[0].diagram.nodes["child::b"]',afterPath:'resolved:sections[0].diagram.nodes["child::b"]',
+  const sentinel={kind:'node',status:'modified',origin:'imported',cause:'provider',beforePath:'sections[0].diagram.topologyImports[0]',afterPath:'sections[0].diagram.topologyImports[0]',
+    section:{before:0,after:0},key:{before:'child::b',after:'child::b'},
     fields:[{beforePath:'resolved:sections[0].diagram.nodes["child::b"].title',afterPath:'resolved:sections[0].diagram.nodes["child::b"].title',before:'B',after:'Sentinel B'}],effects:[]};
   h.c.compareDocuments=(a,b)=>{modelInputs.push(plain([a,b]));return changes(a,b).concat([sentinel]);};
   h.ui.update(h.review);e['agent-update-open'].fire('click');

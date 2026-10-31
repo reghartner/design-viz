@@ -57,7 +57,8 @@ function mirror(e){
   if(e.resolved)m.resolved=e.resolved.map(r=>plain(Object.assign({},r,{status:flip[r.status],beforePath:r.afterPath,afterPath:r.beforePath,before:r.after,after:r.before})));
   return m;
 }
-const norm=e=>{const x=plain(e);x.fields=sortJ(x.fields);x.effects=sortJ((x.effects||[]).map(f=>Object.assign({},f,{changes:sortJ(f.changes)})));if(x.resolved)x.resolved=sortJ(x.resolved);return JSON.stringify(x,Object.keys(x).sort());};
+const stable=v=>Array.isArray(v)?'['+v.map(stable).join(',')+']':v && typeof v==='object'?'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}':JSON.stringify(v);
+const norm=e=>{const x=plain(e);x.fields=sortJ(x.fields);x.effects=sortJ((x.effects||[]).map(f=>Object.assign({},f,{changes:sortJ(f.changes)})));if(x.resolved)x.resolved=sortJ(x.resolved);return stable(x);};
 function compare(a,b,label){
   assert.equal(typeof C.compareDocuments,'function','compareDocuments(before, after) is defined by the shared engine');
   const sa=plain(a),sb=plain(b),out=plain(C.compareDocuments(a,b));
@@ -112,9 +113,22 @@ function at(sd,path){
   const toks=[...path.matchAll(/(?:^|\.)([A-Za-z_$][\w$]*)|\[(\d+)\]|\[("(?:[^"\\]|\\.)*")\]/g)].map(m=>m[1]!=null?m[1]:m[2]!=null?Number(m[2]):JSON.parse(m[3]));
   return toks.reduce((v,k)=>v==null?undefined:v[k],root);
 }
+const tokens=path=>[...path.replace(/^resolved:/,'').matchAll(/(?:^|\.)([A-Za-z_$][\w$]*)|\[(\d+)\]|\[("(?:[^"\\]|\\.)*")\]/g)].map(m=>m[1]!=null?m[1]:m[2]!=null?Number(m[2]):JSON.parse(m[3]));
+function sectionOf(sd,path){const recs=C.sectionRecords(sd.authored),p=path.replace(/^resolved:/,'');let best=null;recs.forEach((r,i)=>{if((p===r.path || p.startsWith(r.path+'.')) && (best==null || r.path.length>recs[best].path.length))best=i;});return best;}
 function checkLoci(out,A,B,label){
   for(const e of out){
-    if(e.kind==='ledger')continue;
+    if((e.effects||[]).length)assert.equal(e.effect,'state','effect discriminator '+label);
+    if(e.effect==='declaration')assert.deepEqual(e.effects,[],'declaration has no effects '+label);
+    if(e.kind==='ledger' || e.kind==='document')continue;
+    assert.ok(e.section && e.key,'section and key locus '+label+' '+e.kind);
+    for(const [sd,path,w] of [[A,e.beforePath,'before'],[B,e.afterPath,'after']]){
+      if(path==null){assert.equal(e.section[w],null,label);assert.equal(e.key[w],null,label);continue;}
+      assert.equal(e.section[w],sectionOf(sd,path),'section.'+w+' '+label+' '+path);
+      if(e.cause==='provider'){assert.notEqual(e.key[w],null,label);continue;}
+      const t=tokens(path),last=t[t.length-1],v=at(sd,path),want=v && typeof v==='object' && (typeof v.id==='string' && v.id || typeof v.id==='number')?v.id:last;
+      assert.deepEqual(e.key[w],want,'key.'+w+' '+label+' '+path);
+      if(e.kind==='step')assert.equal(e.step[w],last,'step.'+w+' '+label);
+    }
     if(e.beforePath!=null)assert.notEqual(at(A,e.beforePath),undefined,'locus resolves '+label+' '+e.beforePath);
     if(e.afterPath!=null)assert.notEqual(at(B,e.afterPath),undefined,'locus resolves '+label+' '+e.afterPath);
     for(const f of e.fields||[]){
@@ -203,7 +217,7 @@ const I=(kind,status,bp,ap,extra={})=>Object.assign({kind,status,origin:'importe
 const IMPORT={
   providerNode:t=>{const p=plain(t.provider);p.page.sections[0].diagram.nodes.a.title='A!';return {after:[t.consumer,t.ctx(p)],kind:'node',cause:'provider',fields:[F(R+'.nodes["child::a"].title',R+'.nodes["child::a"].title','A','A!')]};},
   providerEdge:t=>{const p=plain(t.provider);p.page.sections[0].diagram.edges[0].label='ab!';return {after:[t.consumer,t.ctx(p)],kind:'edge',cause:'provider',fields:[F(R+'.edges[0].label',R+'.edges[0].label','ab','ab!')]};},
-  providerAdd:t=>{const p=plain(t.provider),d=p.page.sections[0].diagram;d.nodes.c={title:'C'};d.rows=[['a','b','c']];d.topologyExports.public.nodes.push('c');return {after:[t.consumer,t.ctx(p)],kind:'node',status:'added',cause:'provider',afterPath:R+'.nodes["child::c"]',fields:[]};},
+  providerAdd:t=>{const p=plain(t.provider),d=p.page.sections[0].diagram;d.nodes.c={title:'C'};d.rows=[['a','b','c']];d.topologyExports.public.nodes.push('c');return {after:[t.consumer,t.ctx(p)],kind:'node',status:'added',cause:'provider',afterPath:SEC+'.topologyImports[0]',fields:[]};},
   overrideNode:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].nodeOverrides={a:{sub:'S'}};return {after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(null,SEC+'.topologyImports[0].nodeOverrides.a.sub',undefined,'S')],resolved:[I('node','modified',null,R+'.nodes["child::a"].sub',{after:'S'})]};},
   overrideEdge:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].edgeOverrides={'a->b':{label:'X'}};return {after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(null,SEC+'.topologyImports[0].edgeOverrides["a->b"].label',undefined,'X')],resolved:[I('edge','modified',R+'.edges[0].label',R+'.edges[0].label',{before:'ab',after:'X'})]};},
   as:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].as='kid';return {after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(SEC+'.topologyImports[0].as',SEC+'.topologyImports[0].as','child','kid')],

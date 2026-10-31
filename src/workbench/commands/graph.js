@@ -417,7 +417,6 @@ function planDeleteGroup(text, raw, sectionIdx, key){
   });
 }
 
-function builderEdgeKey(e){ return ((e && e.from) || '') + '->' + ((e && e.to) || ''); }
 function builderRetargetStepKeys(steps, oldKey, newKey){
   /* Point every step reference at newKey; null newKey removes the
      reference (a step may legally end up edgeless). */

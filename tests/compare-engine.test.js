@@ -63,6 +63,7 @@
    R27 tab metadata           tabs[j].label/highlight     kind 'tab' at blocks[i].tabs[j], leaf fields     tab settings ignored
    R28 declaration scope      panel visible only on alt   scope = union of visible steps over all paths    first-path-only scope
    R29 attribution            path edit + alt-only step + rows edit   path effects only on its own path; step effects only on paths containing the step; layout-only section edit has no effects   every effect attached to every section/path/step entry
+   R30 section attribution    storyTime + step tone edit  section effects only panel state; tone effect only on the step   section takes every folded difference
    R26 locus                  every entry in every row   section/key/step asserted; record path has its kind's shape under its section;
                               every field path sits under its entry's record path; paths resolve           self-consistent wrong loci
 */
@@ -579,4 +580,13 @@ test('R29 attribution: path edits report only their own path, step edits only pa
   assert.deepEqual(step.effects,[expectEffect(before,after,'alt','panel','q','state')],'s5 is only on alt');
   assert.deepEqual(sec.fields,[{beforePath:SEC+'.rows',afterPath:SEC+'.rows',before:[['a','b']],after:[['b','a']]}]);
   assert.deepEqual(sec.effects,[],'a layout-only section edit has no reader effects');
+});
+
+test('R30 a story-time section edit reports only panel-state effects; an unrelated tone edit stays on its step',()=>{
+  const mk=()=>base({panels:[{id:'bat',type:'battery',title:'Battery',drainPerHour:1,initial:{charge:64,trend:'idle'}}],storyTime:{start:'2026-09-24T22:30'},steps:steps(5,{1:{time:'+1h'},3:{time:'2026-09-25T06:50'}})});
+  const before=mk(),after=mk();after.storyTime.start='2026-09-24T20:30';after.steps[2].tone={a:'alert'};
+  const out=compare(side(doc(before)),side(doc(after)));assert.equal(out.length,2,JSON.stringify(out.map(e=>[e.kind,e.afterPath])));
+  const sec=only(out,x=>x.kind==='section','section entry'),step=only(out,x=>x.kind==='step','step entry');
+  assert.deepEqual(sec.effects,[expectEffect(before,after,'happy','panel','bat','state')],'story time changes battery state only');
+  assert.deepEqual(step.effects,[expectEffect(before,after,'happy','node','a','tone')],'the tone edit is reported on its step only');
 });

@@ -67,6 +67,7 @@
    R31 section counterfactual storyTime + gauge patch    section effects = folds of (before + only the section's settings); patch effect stays on its step   section takes another edit's state effect
    R32 interacting edits      storyTime + step time + battery drain   compare(a,b) mirrors compare(b,a); section effect values are the real folded values   direction-dependent counterfactual values
    R33 id collisions          path 'a|b' + panel 'c' vs path 'a' + panel 'b|c'   section effects never include the other panel   joined-string lookup keys
+   R34 object ports           ports {side,offset} vs {offset,side} + label edit   one modified edge   order-sensitive port keys
    R26 locus                  every entry in every row   section/key/step asserted; record path has its kind's shape under its section;
                               every field path sits under its entry's record path; paths resolve           self-consistent wrong loci
 */
@@ -625,4 +626,14 @@ test('R33 ids containing separators never collide: a story-time edit does not pi
   assert.ok(sec.effects.length,'precondition: story time changes the battery');
   assert.ok(sec.effects.every(x=>x.target.id==='c'),'section effects only on the battery: '+JSON.stringify(sec.effects.map(x=>[x.pathId,x.target.id])));
   const step=only(out,x=>x.kind==='step','step entry');assert.ok(step.effects.every(x=>x.target.id==='b|c'));
+});
+
+test('R34 equivalent object ports in a different key order still pair the edge: a label edit is one modified edge',()=>{
+  const before=base(),after=base();
+  before.edges=[{from:'a',to:'b',label:'go',fromPort:{side:'right',offset:0.5},toPort:{side:'left',offset:0.25}}];
+  after.edges=[{from:'a',to:'b',label:'went',fromPort:{offset:0.5,side:'right'},toPort:{offset:0.25,side:'left'}}];
+  const out=compare(side(doc(before)),side(doc(after)));
+  assert.equal(out.length,1,JSON.stringify(out.map(e=>[e.kind,e.status,e.afterPath])));
+  assert.equal(out[0].kind,'edge');assert.equal(out[0].status,'modified');
+  assert.deepEqual(out[0].fields,[{beforePath:SEC+'.edges[0].label',afterPath:SEC+'.edges[0].label',before:'go',after:'went'}]);
 });

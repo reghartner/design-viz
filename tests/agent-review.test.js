@@ -1,85 +1,48 @@
 'use strict';
+/* Agent-update preview dialog (src/workbench/agent-review.js). Since #848 the
+   dialog mounts the shared side-by-side compare view (src/viewer/compare-view.js)
+   with both resolved documents and the shared engine's change list (#847). The
+   component's own rendering, rail, navigation and framing are covered in the
+   browser by tools/browser-tests/tests/compare-view.spec.mjs; here a recording
+   stand-in proves what the dialog hands it and that the dialog's own controls
+   (Accept, Decline, refresh/stale gating, Details, skins, clipboard) behave. */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource}=require('../tools/source-loader.cjs');
 const plain=value=>JSON.parse(JSON.stringify(value));
-function modelContext(){
-  const c={};vm.createContext(c);vm.runInContext(readSource('core/navigation.js'),c);vm.runInContext(readSource('core/document.js'),c);vm.runInContext(readSource('core/tab-views.js'),c);vm.runInContext(readSource('core/details.js'),c);vm.runInContext(readSource('workbench/agent-review.js'),c);return c;
-}
 function section(id,heading,diagram,extra={}){return {id,heading,diagram,...extra};}
-test('review change model uses stable identities across section and item insertion/reordering without mutating specs',()=>{
-  const c=modelContext();
-  const current={sections:[
-    section('alpha','Alpha',{nodes:{a:{title:'A'},old:{title:'Old'}},edges:[{id:'flow',from:'a',to:'old',label:'before'}],panels:[{id:'phone',type:'deviceapp',title:'Before'}],steps:[{id:'start',title:'Start'},{id:'finish',title:'Before'}],rows:[['a','old']]}),
-    section('beta','Beta',{nodes:{b:{title:'B'}},edges:[],panels:[],steps:[],rows:[['b']]})]};
-  const proposed={sections:[
-    section('new','New',{nodes:{n:{title:'New'}},rows:[['n']]}),
-    section('beta','Beta',{nodes:{b:{title:'B'}},edges:[],panels:[],steps:[],rows:[['b']]}),
-    section('alpha','Alpha',{nodes:{fresh:{title:'Fresh'},a:{title:'A changed'}},edges:[{id:'flow',from:'a',to:'fresh',label:'after'}],panels:[{id:'phone',type:'deviceapp',title:'After'},{id:'log',type:'log'}],steps:[{id:'finish',title:'After'},{id:'inserted',title:'Inserted'},{id:'start',title:'Start'}],rows:[['a','fresh']]})]};
-  const beforeCurrent=JSON.stringify(current),beforeProposed=JSON.stringify(proposed),changes=plain(c.workbenchAgentReviewChanges(current,proposed));
-  assert.equal(JSON.stringify(current),beforeCurrent);assert.equal(JSON.stringify(proposed),beforeProposed);
-  assert.equal(changes.proposed.sections[0].status,'added');assert.equal(changes.current.sections[1],undefined,'stable section reorder is unchanged');
-  const before=changes.current.sections[0],after=changes.proposed.sections[2];
-  assert.deepEqual(before.nodes,{a:'modified',old:'removed'});assert.deepEqual(after.nodes,{a:'modified',fresh:'added'});
-  assert.deepEqual(before.edges,{0:'modified'});assert.deepEqual(after.edges,{0:'modified'});
-  assert.deepEqual(before.panels,{0:'modified'});assert.deepEqual(after.panels,{0:'modified',1:'added'});
-  assert.deepEqual(before.steps,{1:'modified'});assert.deepEqual(after.steps,{0:'modified',1:'added'});
-  assert.equal(before.status,'modified','rows use the section fallback');assert.equal(after.status,'modified');
-  assert.deepEqual(changes.current.counts,{added:0,removed:1,modified:5});
-  assert.deepEqual(changes.proposed.counts,{added:4,removed:0,modified:5});
-});
-test('un-IDed exact items survive insertion and reorder while natural edge counterparts are modified',()=>{
-  const c=modelContext(),current={sections:[section(null,'Only',{nodes:{a:{},b:{}},edges:[{from:'a',to:'b',label:'old'}],panels:[],steps:[{title:'One'},{title:'One'},{title:'Two'}],rows:[['a','b']]})]};
-  const proposed={sections:[section(null,'Only',{nodes:{a:{},b:{}},edges:[{from:'a',to:'b',label:'new'}],panels:[],steps:[{title:'Two'},{title:'Inserted'},{title:'One'},{title:'One'}],rows:[['a','b']]})]};
-  const changes=plain(c.workbenchAgentReviewChanges(current,proposed));
-  assert.deepEqual(changes.current.sections[0].steps,{});assert.deepEqual(changes.proposed.sections[0].steps,{1:'added'});
-  assert.deepEqual(changes.current.sections[0].edges,{0:'modified'});assert.deepEqual(changes.proposed.sections[0].edges,{0:'modified'});
-});
-test('page and diagram properties without one rendered target use document and section fallbacks',()=>{
-  const c=modelContext(),current={title:'Before',sections:[section('one','One',{nodes:{a:{}},rows:[['a']],view:'ambient'})]};
-  const proposed={title:'After',sections:[section('one','One',{nodes:{a:{}},rows:[['a']],view:'step'})]};
-  const changes=plain(c.workbenchAgentReviewChanges(current,proposed));
-  assert.equal(changes.current.document,'modified');assert.equal(changes.proposed.document,'modified');
-  assert.equal(changes.current.sections[0].status,'modified');assert.equal(changes.proposed.sections[0].status,'modified');
-  assert.deepEqual(changes.current.counts,{added:0,removed:0,modified:2});assert.deepEqual(changes.proposed.counts,{added:0,removed:0,modified:2});
-});
-function fakeNode(attrs={},parent=null){
-  return {attrs:{...attrs},parent,children:[],setAttribute(k,v){this.attrs[k]=String(v);},getAttribute(k){return this.attrs[k]??null;},removeAttribute(k){delete this.attrs[k];},
-    toggleAttribute(k,on){if(on)this.attrs[k]='';else delete this.attrs[k];},closest(selector){if(selector==='[data-dv-section]'){let n=this;while(n){if(n.attrs['data-dv-section']!=null)return n;n=n.parent;}}return null;}};
-}
-test('review decoration can be disabled and reapplied after rendered content is reparented',()=>{
-  const c=modelContext(),root=fakeNode(),sectionNode=fakeNode({'data-dv-section':'0'},root),otherSection=fakeNode({'data-dv-section':'1'},root);
-  const node=fakeNode({'data-dv-node':'camera'},sectionNode),edge=fakeNode({'data-dv-edge':'0'},sectionNode),step=fakeNode({'data-step-source':'2'},sectionNode);
-  const all=[sectionNode,otherSection,node,edge,step];root.querySelectorAll=selector=>selector==='[data-agent-change]'?all.filter(n=>n.attrs['data-agent-change']):all.filter(n=>{
-    const key=selector.slice(1,-1);return n.attrs[key]!=null;
-  });
-  const side={sections:{0:{status:'modified',nodes:{camera:'added'},edges:{0:'modified'},panels:{},steps:{2:'added'}}}};
-  c.workbenchAgentReviewDecorate(root,side,true);assert.equal(root.attrs['data-agent-highlights'],'');assert.equal(node.attrs['data-agent-change'],'added');assert.equal(edge.attrs['data-agent-change'],'modified');
-  c.workbenchAgentReviewDecorate(root,side,false);assert.equal(root.attrs['data-agent-highlights'],undefined);assert.equal(node.attrs['data-agent-change'],undefined);
-  node.parent=otherSection;c.workbenchAgentReviewDecorate(root,side,true);assert.equal(node.attrs['data-agent-change'],undefined,'a contained navigation reparent cannot borrow another section change');
-  node.parent=sectionNode;c.workbenchAgentReviewDecorate(root,side,true);assert.equal(node.attrs['data-agent-change'],'added');
-});
+function mounted(h,i=0){if(i<0)i=h.mounts.length+i;assert.ok(h.mounts[i],'the dialog mounts the shared compare view (#848)');return h.mounts[i];}
 function uiHarness(options={}){
-  const ids=['changes-panel','changes','changes-close','change-list','position','previous','next','banner','dialog','view','scroll','commit','current','proposed','source','ledger','ledger-summary','summary','note','note-text','issues','feedback','ledger-panel','close','open','banner-title','banner-summary','discard','copy-feedback','return','highlights','details','details-panel','details-close','review-refresh','change-added','change-removed','change-modified','change-status'];
+  /* The trailing ids are the pre-#848 single-pane controls: present so the
+     dialog code from before #848 initializes and every test fails on its own
+     assertion rather than on setup. */
+  const ids=['position','previous','next','banner','dialog','compare','commit','source','source-before','ledger','ledger-summary','ledger-before','ledger-before-summary','summary','note','note-text','issues','feedback','ledger-panel','close','open','banner-title','banner-summary','discard','copy-feedback','return','details','details-panel','details-close','review-refresh','change-added','change-removed','change-modified','change-status','changes-panel','changes','changes-close','change-list','view','scroll','current','proposed','highlights'];
   function element(id){
     const listeners={},classes=new Set(),attrs={};return {id,children:[],hidden:false,open:false,textContent:'',value:'',disabled:false,attrs,listeners,
       classList:{toggle(name,on){if(on)classes.add(name);else classes.delete(name);},contains:name=>classes.has(name)},
       addEventListener(type,fn){(listeners[type]||(listeners[type]=[])).push(fn);},removeEventListener(type,fn){listeners[type]=(listeners[type]||[]).filter(v=>v!==fn);},
       fire(type,event={preventDefault(){}}){(listeners[type]||[]).slice().forEach(fn=>fn.call(this,event));},setAttribute(k,v){attrs[k]=String(v);},getAttribute(k){return attrs[k]??null;},
-      toggleAttribute(k,on){if(on)attrs[k]='';else delete attrs[k];},removeAttribute(k){delete attrs[k];},appendChild(node){this.children.push(node);},replaceChildren(){this.children=[];},querySelectorAll(selector){const all=this.children.flatMap(node=>[node,...node.querySelectorAll(selector)]);return all.filter(node=>selector==='[data-change-index]' && node.getAttribute('data-change-index')!==null);},focus(){},select(){},
-      showModal(){this.open=true;},close(){this.open=false;}};
+      toggleAttribute(k,on){if(on)attrs[k]='';else delete attrs[k];},removeAttribute(k){delete attrs[k];},appendChild(node){this.children.push(node);},replaceChildren(){this.children=[];},querySelectorAll(){return [];},focus(){this.focused=true;},select(){},
+      closest(){return null;},showModal(){this.open=true;},close(){this.open=false;}};
   }
   const elements={};ids.forEach(id=>elements['agent-update-'+id]=element(id));
-  const observers=[];class Observer{constructor(callback){this.callback=callback;this.disconnected=false;observers.push(this);}observe(){this.observed=true;}disconnect(){this.disconnected=true;}}
-  const doc={body:element('body'),createElement:element,defaultView:{MutationObserver:Observer},getElementById:id=>elements[id]};let snapshot,rendered=0,destroyed=0,canvasDestroyed=0,canvasOptions;
-  const pages=[],skins=[],appliedSkins=[],accepted=[],rejected=[];
-  const c={workbenchReaderPreviewSnapshot:()=>({}),restoreWorkbenchReaderPreviewSnapshot:()=>({matches:new Map()}),restoreWorkbenchReaderCameras:()=>{},document:doc,navigator:{clipboard:options.clipboard || {}},normalize:raw=>raw.page || raw,validate:()=>({errors:[]}),
-    applySkinClasses(body,view,skin){appliedSkins.push({body,view,skin});return true;},
-    initViewerExploreCanvas(ctl,view,opts){canvasOptions=opts;return {destroy(){canvasDestroyed++;}};}};
-  c.renderPage=function(root,page,skin){rendered++;pages.push(plain(page));skins.push(skin);return {sections:[],destroy(){destroyed++;}};};
-  vm.createContext(c);vm.runInContext(readSource('core/navigation.js'),c);vm.runInContext(readSource('core/document.js'),c);vm.runInContext(readSource('core/tab-views.js'),c);vm.runInContext(readSource('core/details.js'),c);vm.runInContext(readSource('workbench/lifetime.js'),c);vm.runInContext(readSource('workbench/agent-review.js'),c);
+  const doc={body:element('body'),createElement:element,defaultView:{},getElementById:id=>elements[id]};let snapshot;
+  const mounts=[],accepted=[],rejected=[];
+  const c={document:doc,navigator:{clipboard:options.clipboard || {}},
+    workbenchReaderPreviewSnapshot:()=>({}),restoreWorkbenchReaderPreviewSnapshot:()=>({matches:new Map()}),restoreWorkbenchReaderCameras:()=>{},
+    applySkinClasses:()=>true,initViewerExploreCanvas:()=>({destroy(){}}),renderPage:()=>({sections:[],destroy(){}}),
+    /* Recording stand-in for the shared component. */
+    mountCompareView(host,opts){
+      const m={host,opts:plain({before:opts.before,after:opts.after,entries:opts.entries,ids:opts.ids}),live:opts,destroyed:false,skins:[],selected:-1};
+      mounts.push(m);
+      return {select(i){m.selected=i;if(opts.onSelect)opts.onSelect(opts.entries[i],i,{before:{shown:true},after:{shown:true}});return {};},
+        next(){return this.select(m.selected+1);},previous(){return this.select(m.selected-1);},selected:()=>m.selected,count:()=>opts.entries.length,
+        label:i=>'label '+i,setSkin(name){m.skins.push(name);return true;},destroy(){m.destroyed=true;host.replaceChildren();}};
+    }};
+  vm.createContext(c);
+  for(const file of ['validator.js','workbench/lifetime.js','workbench/agent-review.js'])vm.runInContext(readSource(file),c);
   let session;
   if(options.topology){
-    vm.runInContext(readSource('canon.js'),c);vm.runInContext(readSource('validator.js'),c);vm.runInContext(readSource('workbench/session.js'),c);
+    vm.runInContext(readSource('canon.js'),c);vm.runInContext(readSource('workbench/session.js'),c);
     let text=options.current;
     session=c.createBuilderSession({source:{read:()=>text,write:value=>text=value},persistence:{read:()=>({}),preserve(){},cancel(){},save(){}},render(){}});
     session.replaceProject(text,null,{topologyContext:options.context});
@@ -88,27 +51,53 @@ function uiHarness(options={}){
   snapshot={current,source,currentLedger:'old',ledger:'new',review:{version:1,id:'p',requestId:'r',ok:true,summary:'Changed A',conflicts:[]}};
   if(options.current)snapshot.current=options.current;if(options.source)snapshot.source=options.source;
   if(options.ok===false)snapshot.review.ok=false;
-  const ui=c.initWorkbenchAgentReview({document:doc,resolve:session && !options.omitResolver?session.resolve:undefined,skin:options.skin,snapshot:()=>snapshot,accept:async version=>accepted.push({version,source:snapshot.source}),reject:async(message,version)=>rejected.push({message,version})});
-  return {c,ui,elements,observers,pages,skins,appliedSkins,accepted,rejected,get snapshot(){return snapshot;},replaceSnapshot(next){snapshot=next;},session,canvasOptions:()=>canvasOptions,counts:()=>({rendered,destroyed,canvasDestroyed}),review:snapshot.review};
+  if(options.ledgers){snapshot.currentLedger=options.ledgers[0];snapshot.ledger=options.ledgers[1];}
+  const ui=c.initWorkbenchAgentReview({document:doc,resolve:session && !options.omitResolver?session.resolve:(options.topology?undefined:raw=>raw),skin:options.skin,snapshot:()=>snapshot,accept:async version=>accepted.push({version,source:snapshot.source}),reject:async(message,version)=>rejected.push({message,version})});
+  return {c,ui,elements,mounts,accepted,rejected,get snapshot(){return snapshot;},replaceSnapshot(next){snapshot=next;},session,review:snapshot.review};
 }
-test('review preview uses the selected site skin and updates it live without rebuilding',()=>{
-  const h=uiHarness({skin:()=> 'terminal'});h.ui.update(h.review);h.ui.open();
-  assert.deepEqual(h.skins,['terminal']);assert.equal(h.counts().rendered,1);
-  assert.equal(h.ui.setSkin('rose'),true);assert.equal(h.counts().rendered,1);
-  assert.equal(h.appliedSkins.length,1);assert.equal(h.appliedSkins[0].body.id,'body');assert.equal(h.appliedSkins[0].view.id,'view');assert.equal(h.appliedSkins[0].skin,'rose');
+
+test('opening mounts one side-by-side compare view with both documents, the engine entries and the dialog pane ids',()=>{
+  const h=uiHarness(),e=h.elements;h.ui.update(h.review);e['agent-update-open'].fire('click');
+  const m=mounted(h);assert.equal(h.mounts.length,1);
+  assert.equal(m.host,e['agent-update-compare'],'mounted into #agent-update-compare');
+  assert.equal(m.opts.before.sections[0].diagram.nodes.a.title,'A');assert.equal(m.opts.after.sections[0].diagram.nodes.a.title,'Changed');
+  const side=text=>({authored:h.c.normalize(JSON.parse(text)),resolved:h.c.normalize(JSON.parse(text))});
+  assert.deepEqual(m.opts.entries,plain(h.c.compareDocuments({...side(h.snapshot.current),ledger:'old'},{...side(h.snapshot.source),ledger:'new'})),'entries are exactly the shared engine output');
+  assert.deepEqual(m.opts.ids,{before:{scroll:'agent-update-scroll-before',view:'agent-update-view-before'},after:{scroll:'agent-update-scroll',view:'agent-update-view'}});
+  assert.equal(e['agent-update-commit'].disabled,false,'Accept needs no side selection');
+  assert.equal(e['agent-update-source'].value,h.snapshot.source);assert.equal(e['agent-update-source-before'].value,h.snapshot.current);
+  assert.equal(e['agent-update-ledger'].textContent,'new');assert.equal(e['agent-update-ledger-before'].textContent,'old');
+  assert.equal(e['agent-update-ledger-before-summary'].textContent,'Coverage ledger · Current state');assert.equal(e['agent-update-ledger-summary'].textContent,'Coverage ledger · Changed in this update');
+  e['agent-update-close'].fire('click');assert.equal(m.destroyed,true,'closing destroys the compare view');
+  e['agent-update-open'].fire('click');assert.equal(h.mounts.length,2,'each opening mounts a fresh view');
+  h.ui.destroy();assert.equal(mounted(h,1).destroyed,true);
+});
+test('change counts and Prev/Next drive the mounted view; Details and Escape keep the view mounted',()=>{
+  const h=uiHarness(),e=h.elements;h.ui.update(h.review);h.ui.open();const m=mounted(h),n=m.opts.entries.length;
+  assert.ok(n>=2,'precondition: node and ledger changes');
+  const counts={added:0,removed:0,modified:0};m.opts.entries.forEach(x=>counts[x.status]++);
+  assert.equal(e['agent-update-change-modified'].textContent,counts.modified+' modified');assert.equal(e['agent-update-change-added'].textContent,counts.added+' added');assert.equal(e['agent-update-change-removed'].textContent,counts.removed+' removed');
+  e['agent-update-next'].fire('click');assert.equal(m.selected,1);e['agent-update-previous'].fire('click');assert.equal(m.selected,0);
+  assert.equal(e['agent-update-details-panel'].hidden,true);e['agent-update-details'].fire('click');assert.equal(e['agent-update-details-panel'].hidden,false);
+  e['agent-update-dialog'].fire('cancel');assert.equal(e['agent-update-details-panel'].hidden,true);assert.equal(e['agent-update-dialog'].open,true,'Escape dismisses Details first');
+  assert.equal(m.destroyed,false,'Details never remounts the view');assert.equal(h.mounts.length,1);h.ui.destroy();
+});
+test('selecting a ledger or document change opens Details on the matching field; a non-rendered target says so',()=>{
+  const h=uiHarness(),e=h.elements;h.ui.update(h.review);h.ui.open();const m=mounted(h),live=m.live;
+  const ledger=live.entries.findIndex(x=>x.kind==='ledger');assert.ok(ledger>=0,'precondition: ledger change');
+  live.onSelect(live.entries[ledger],ledger,{before:{shown:false},after:{shown:false}});
+  assert.equal(e['agent-update-details-panel'].hidden,false);assert.equal(e['agent-update-ledger'].focused,true);assert.match(e['agent-update-position'].textContent,/Coverage ledger/);
+  const node=live.entries.findIndex(x=>x.kind==='node');
+  live.onSelect(live.entries[node],node,{before:{shown:false,reason:'view'},after:{shown:false,reason:'view'}});
+  assert.match(e['agent-update-position'].textContent,/not included in a View/);assert.equal(e['agent-update-source'].focused,true);
+  live.onSelect({...live.entries[node],status:'removed',afterPath:null},node,{before:{shown:true},after:{shown:false}});assert.match(e['agent-update-position'].textContent,/not in the proposal/);
+  live.onSelect({...live.entries[node],status:'added',beforePath:null},node,{before:{shown:false},after:{shown:true}});assert.match(e['agent-update-position'].textContent,/not in the current document/);
   h.ui.destroy();
 });
-test('review UI opens full-window with supporting details optional and retires redraws',()=>{
-  const h=uiHarness(),e=h.elements;h.ui.update(h.review);e['agent-update-open'].fire('click');
-  assert.equal(h.counts().rendered,1);assert.equal(h.canvasOptions().initialContentsOpen,false);assert.deepEqual(plain(h.canvasOptions().presentation),{panelsHiddenWhenGraphVisible:true,overlayScale:.5});assert.equal(h.canvasOptions().forceFit,true);assert.equal(h.canvasOptions().refitOnResize,true);assert.deepEqual(plain(h.canvasOptions().fitInsets),{left:24,right:24,top:20,bottom:24});assert.equal(e['agent-update-highlights'].getAttribute('aria-pressed'),'true');assert.equal(e['agent-update-commit'].disabled,false);
-  assert.equal(e['agent-update-details-panel'].hidden,true);e['agent-update-details'].fire('click');assert.equal(e['agent-update-details-panel'].hidden,false);assert.equal(e['agent-update-details'].getAttribute('aria-expanded'),'true');assert.equal(h.counts().rendered,1,'opening details preserves the rendered review');
-  e['agent-update-dialog'].fire('cancel');assert.equal(e['agent-update-details-panel'].hidden,true);assert.equal(e['agent-update-dialog'].open,true,'Escape dismisses Details before closing the review');assert.equal(h.counts().rendered,1);
-  e['agent-update-highlights'].fire('click');assert.equal(e['agent-update-highlights'].getAttribute('aria-pressed'),'false');
-  const firstObserver=h.observers[0];e['agent-update-current'].fire('click');assert.equal(firstObserver.disconnected,true);assert.equal(h.counts().rendered,2);
-  assert.equal(e['agent-update-highlights'].getAttribute('aria-pressed'),'false','redraw preserves the user toggle');assert.equal(e['agent-update-commit'].disabled,true);
-  e['agent-update-close'].fire('click');assert.equal(h.observers.at(-1).disconnected,true);
-  e['agent-update-open'].fire('click');assert.equal(e['agent-update-highlights'].getAttribute('aria-pressed'),'true','each review opens with useful highlights');assert.equal(e['agent-update-details-panel'].hidden,true,'details starts closed');
-  h.ui.destroy();assert.equal(h.observers.at(-1).disconnected,true);assert.ok(h.counts().destroyed>=3);assert.ok(h.counts().canvasDestroyed>=3);
+test('the review uses the selected site skin and updates it live without remounting',()=>{
+  const h=uiHarness({skin:()=> 'terminal'});h.ui.update(h.review);h.ui.open();
+  assert.equal(mounted(h).live.skin(mounted(h).live.after),'terminal');
+  assert.equal(h.ui.setSkin('rose'),true);assert.deepEqual(mounted(h).skins,['rose']);assert.equal(h.mounts.length,1);h.ui.destroy();
 });
 test('close and Escape keep a proposal pending, decline rejects it, and a refreshed version needs fresh review',()=>{
   const h=uiHarness(),e=h.elements;h.ui.update(h.review);h.ui.open();
@@ -116,6 +105,7 @@ test('close and Escape keep a proposal pending, decline rejects it, and a refres
   e['agent-update-dialog'].fire('cancel');assert.deepEqual(h.rejected,[]);h.ui.open();
   e['agent-update-details'].fire('click');h.replaceSnapshot({...h.snapshot,review:{...h.snapshot.review,version:2},source:h.snapshot.source.replace('Changed','Refreshed')});h.ui.update(h.snapshot.review);
   assert.equal(e['agent-update-details-panel'].hidden,false,'refresh preserves the open details drawer');
+  assert.equal(mounted(h,-1).opts.after.sections[0].diagram.nodes.a.title,'Refreshed','the refreshed proposal is remounted');
   assert.equal(e['agent-update-review-refresh'].hidden,false);assert.equal(e['agent-update-commit'].disabled,true);
   e['agent-update-commit'].fire('click');assert.deepEqual(h.accepted,[],'the newly refreshed version cannot be accepted as the old review');
   e['agent-update-review-refresh'].fire('click');assert.equal(e['agent-update-commit'].disabled,false);e['agent-update-commit'].fire('click');
@@ -136,43 +126,34 @@ function topologyFixture(){
   const proposed=plain(current);proposed.page.sections[0].diagram.nodes.local.title='After';
   return {provider,current,proposed,context:{version:1,id:'consumer',specs:[provider,current]}};
 }
-test('review resolves imports and re-exports with the frozen session while preserving authored source and change model',()=>{
+test('both sides are resolved with the frozen session; the mounted entries are the engine result, including imported changes',()=>{
   const f=topologyFixture(),current=JSON.stringify(f.current,null,4)+'\n',source=JSON.stringify(f.proposed,null,2)+'\n';
   const h=uiHarness({topology:true,current,source,context:f.context}),e=h.elements;
   f.provider.page.sections[0].diagram.nodes.a.title='Later provider edit';
   const modelInputs=[],changes=h.c.compareDocuments;
-  /* A provider-caused imported change the frozen fixture cannot produce on its
-     own; it must reach the visible change list through the engine's result. */
   const sentinel={kind:'node',status:'modified',origin:'imported',cause:'provider',beforePath:'sections[0].diagram.topologyImports[0]',afterPath:'sections[0].diagram.topologyImports[0]',
     section:{before:0,after:0},key:{before:'child::b',after:'child::b'},
     fields:[{beforePath:'resolved:sections[0].diagram.nodes["child::b"].title',afterPath:'resolved:sections[0].diagram.nodes["child::b"].title',before:'B',after:'Sentinel B'}],effects:[]};
   h.c.compareDocuments=(a,b)=>{modelInputs.push(plain([a,b]));return changes(a,b).concat([sentinel]);};
   h.ui.update(h.review);e['agent-update-open'].fire('click');
-  assert.equal(h.counts().rendered,1);assert.equal(e['agent-update-commit'].disabled,false);
-  assert.equal(h.pages[0].sections[0].diagram.nodes['child::a'].title,'Frozen A');
-  assert.equal(e['agent-update-source'].value,source);
-  assert.equal(typeof changes,'function','the review builds its change list with the shared compare engine (#847)');
+  const m=mounted(h);assert.equal(e['agent-update-commit'].disabled,false);
+  assert.equal(m.opts.before.sections[0].diagram.nodes['child::a'].title,'Frozen A');assert.equal(m.opts.before.sections[0].diagram.nodes.local.title,'Before');
+  assert.equal(m.opts.after.sections[0].diagram.nodes['child::a'].title,'Frozen A');assert.equal(m.opts.after.sections[0].diagram.nodes.local.title,'After');
   assert.deepEqual(modelInputs[0][1].authored.sections[0].diagram.topologyImports,f.proposed.page.sections[0].diagram.topologyImports,'authored side keeps import declarations');
-  assert.equal(modelInputs[0][1].authored.sections[0].diagram.nodes['child::a'],undefined,'authored side has no materialized imported node');
-  assert.equal(modelInputs[0][1].resolved.sections[0].diagram.nodes['child::a'].title,'Frozen A','resolved side includes the imported node, so imported changes reach the change list');
-  assert.equal(modelInputs[0][0].resolved.sections[0].diagram.nodes['child::a'].title,'Frozen A','current side is resolved too');
-  const listed=e['agent-update-change-list'].children.map(li=>li.children[0].textContent);
-  assert.ok(listed.some(text=>text.includes('child::b') && /imported/i.test(text)),'the engine result builds the change list: imported entry listed — got '+JSON.stringify(listed));
-  e['agent-update-current'].fire('click');assert.equal(e['agent-update-commit'].disabled,true);assert.equal(e['agent-update-source'].value,current);
-  assert.equal(h.pages[1].sections[0].diagram.nodes.local.title,'Before');assert.equal(h.pages[1].sections[0].diagram.nodes['child::a'].title,'Frozen A');
-  e['agent-update-proposed'].fire('click');assert.equal(e['agent-update-commit'].disabled,false);assert.equal(h.pages[2].sections[0].diagram.nodes.local.title,'After');
+  assert.equal(modelInputs[0][1].resolved.sections[0].diagram.nodes['child::a'].title,'Frozen A');assert.equal(modelInputs[0][0].resolved.sections[0].diagram.nodes['child::a'].title,'Frozen A');
+  assert.deepEqual(m.opts.entries.at(-1),plain(sentinel),'the mounted list is the engine result');
   e['agent-update-commit'].fire('click');assert.deepEqual(h.accepted,[{version:1,source}]);
-  assert.equal(h.snapshot.current,current);assert.equal(h.snapshot.source,source);assert.equal(h.session.text(),current);h.ui.destroy();
+  assert.equal(h.snapshot.current,current);assert.equal(h.session.text(),current);h.ui.destroy();
 });
-test('review resolves local exports without a Canon context and still requires an approved review',()=>{
+test('local exports resolve without a Canon context and Accept still requires an approved review',()=>{
   const f=topologyFixture(),source=JSON.stringify(f.provider);
   for(const ok of [true,false]){
     const h=uiHarness({topology:true,current:source,source,ok});h.ui.update(h.review);h.ui.open();
-    assert.equal(h.counts().rendered,1);assert.equal(h.elements['agent-update-commit'].disabled,!ok);
+    assert.equal(h.mounts.length,1);assert.equal(h.elements['agent-update-commit'].disabled,!ok);
     assert.equal(h.elements['agent-update-source'].value,source);h.ui.destroy();
   }
 });
-test('invalid topology, missing frozen context and missing resolver fail visibly without enabling Accept',()=>{
+test('invalid topology, missing frozen context and missing resolver fail visibly without mounting or enabling Accept',()=>{
   const f=topologyFixture(),invalid=plain(f.provider);invalid.page.sections[0].diagram.topologyExports.public.nodes.push('missing');
   for(const options of [
     {current:JSON.stringify(invalid),source:JSON.stringify(invalid)},
@@ -180,40 +161,14 @@ test('invalid topology, missing frozen context and missing resolver fail visibly
     {current:JSON.stringify(f.provider),source:JSON.stringify(f.provider),omitResolver:true}
   ]){
     const h=uiHarness({topology:true,...options}),e=h.elements;h.ui.update(h.review);h.ui.open();
-    for(const side of ['proposed','current']){
-      e['agent-update-'+side].fire('click');assert.match(e['agent-update-view'].textContent,/Could not render this preview: .+/);
-      assert.equal(e['agent-update-commit'].disabled,true);e['agent-update-commit'].fire('click');
-    }
-    assert.equal(h.counts().rendered,0);assert.deepEqual(h.accepted,[]);h.ui.destroy();
+    assert.match(e['agent-update-compare'].textContent,/Could not render this preview: .+/);assert.equal(h.mounts.length,0);
+    assert.equal(e['agent-update-commit'].disabled,true);e['agent-update-commit'].fire('click');assert.deepEqual(h.accepted,[]);h.ui.destroy();
   }
 });
-
-test('change list pairs reordered stable targets, includes alternate paths, Views, removals and ledger',()=>{
-  const c=modelContext(),a=section('a','Main',{nodes:{a:{title:'A'},gone:{title:'Removed worker'}},steps:[{id:'one',text:'One'},{id:'two',text:'Two'}],paths:[{id:'failure',label:'Failure',steps:['two']}],layouts:[{id:'wide',name:'Wide'}]});
-  const current={title:'Before',sections:[a,section('b','Other',{})],views:[{id:'all',name:'All',sections:['a','b']}]};
-  const proposed=plain(current);proposed.title='After';proposed.sections.reverse();const d=proposed.sections[1].diagram;
-  d.steps=[{id:'two',text:'Changed two'},{id:'one',text:'One'}];d.paths[0].label='Retry failure';d.layouts[0].name='Wider';delete d.nodes.gone;proposed.views[0].name='Updated View';
-  const changes=c.workbenchAgentReviewChanges(current,proposed),entries=plain(c.workbenchAgentReviewEntries(changes,{current,proposed},true));
-  const step=entries.find(entry=>entry.label.includes('Step Two'));
-  assert.deepEqual(step.current,{section:0,kind:'steps',key:'1'});assert.deepEqual(step.proposed,{section:1,kind:'steps',key:0});
-  assert.equal(entries.filter(entry=>entry.label.includes('Step')).length,1,'modified counterparts are one change');
-  assert.equal(entries.find(entry=>entry.label.includes('Removed worker')).proposed,undefined);
-  for(const name of ['Document metadata','Path Failure','Layout Wide','View All','Coverage ledger'])assert.ok(entries.some(entry=>entry.label.includes(name)),name);
-});
-test('ledger navigation is read-only and stale replacement retires its targets',()=>{
+test('a ledger-only proposal lists one change; stale replacement remounts with no changes and gates Accept',()=>{
   const h=uiHarness({source:JSON.stringify({sections:[section('one','One',{nodes:{a:{title:'A'}},rows:[['a']]})]})}),e=h.elements;
-  h.ui.update(h.review);h.ui.open();assert.equal(e['agent-update-changes'].textContent,'Changes (1)');assert.equal(e['agent-update-change-list'].children.length,1);
-  e['agent-update-next'].fire('click');assert.equal(e['agent-update-details-panel'].hidden,false);assert.match(e['agent-update-position'].textContent,/Coverage ledger/);
-  assert.deepEqual(h.accepted,[]);assert.deepEqual(h.rejected,[]);
+  h.ui.update(h.review);h.ui.open();assert.deepEqual(mounted(h).opts.entries.map(x=>x.kind),['ledger']);assert.equal(e['agent-update-next'].disabled,false);
   h.replaceSnapshot({...h.snapshot,ledger:h.snapshot.currentLedger,review:{...h.review,version:2}});h.ui.update(h.snapshot.review);
-  assert.equal(e['agent-update-changes'].textContent,'Changes (0)');assert.equal(e['agent-update-change-list'].children.length,0);assert.equal(e['agent-update-next'].disabled,true);assert.equal(e['agent-update-commit'].disabled,true);
-  assert.doesNotMatch(e['agent-update-position'].textContent,/evidence and decisions/);h.ui.destroy();
-});
-
-
-test('tab metadata changes have a meaningful containing-section destination',()=>{
-  const c=modelContext(),current={blocks:[{tabs:[{label:'Journey',defaultView:'before',views:[{id:'before',name:'Before',sections:['a']},{id:'after',name:'After',sections:['a']}],sections:[section('a','Main',{})]}]}]},proposed=plain(current);
-  proposed.blocks[0].tabs[0].defaultView='after';
-  const changes=c.workbenchAgentReviewChanges(current,proposed),entries=plain(c.workbenchAgentReviewEntries(changes,{current,proposed},false));
-  assert.equal(entries.length,1);assert.match(entries[0].label,/Tab settings: defaultView/);assert.equal(entries[0].current.section,0);assert.equal(entries[0].proposed.section,0);
+  assert.deepEqual(mounted(h,-1).opts.entries,[]);assert.equal(mounted(h).destroyed,true);
+  assert.equal(e['agent-update-next'].disabled,true);assert.equal(e['agent-update-commit'].disabled,true);assert.deepEqual(h.accepted,[]);h.ui.destroy();
 });

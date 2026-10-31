@@ -125,7 +125,10 @@ function checkLoci(out,A,B,label){
     for(const [sd,path,w] of [[A,e.beforePath,'before'],[B,e.afterPath,'after']]){
       if(path==null){assert.equal(e.section[w],null,label);assert.equal(e.key[w],null,label);continue;}
       assert.equal(e.section[w],sectionOf(sd,path),'section.'+w+' '+label+' '+path);
-      if(e.cause==='provider'){assert.notEqual(e.key[w],null,label);continue;}
+      if(e.cause==='provider'){assert.notEqual(e.key[w],null,label);
+        for(const f of e.fields||[]){const fp=w==='before'?f.beforePath:f.afterPath;if(fp==null)continue;const t=tokens(fp),k=t.indexOf(e.kind==='edge'?'edges':'nodes');
+          assert.ok(fp.startsWith('resolved:') && k>=0,'provider field path '+label);assert.deepEqual(e.key[w],t[k+1],'provider key.'+w+' matches field path '+label);}
+        continue;}
       const t=tokens(path),last=t[t.length-1],v=at(sd,path),want=v && typeof v==='object' && (typeof v.id==='string' && v.id || typeof v.id==='number')?v.id:last;
       assert.deepEqual(e.key[w],want,'key.'+w+' '+label+' '+path);
       if(e.kind==='step')assert.equal(e.step[w],last,'step.'+w+' '+label);
@@ -219,7 +222,7 @@ const I=(kind,status,bp,ap,extra={})=>Object.assign({kind,status,origin:'importe
 const IMPORT={
   providerNode:t=>{const p=plain(t.provider);p.page.sections[0].diagram.nodes.a.title='A!';return {root:SEC+'.topologyImports[0]',after:[t.consumer,t.ctx(p)],kind:'node',cause:'provider',fields:[F(R+'.nodes["child::a"].title',R+'.nodes["child::a"].title','A','A!')]};},
   providerEdge:t=>{const p=plain(t.provider);p.page.sections[0].diagram.edges[0].label='ab!';return {root:SEC+'.topologyImports[0]',after:[t.consumer,t.ctx(p)],kind:'edge',cause:'provider',fields:[F(R+'.edges[0].label',R+'.edges[0].label','ab','ab!')]};},
-  providerAdd:t=>{const p=plain(t.provider),d=p.page.sections[0].diagram;d.nodes.c={title:'C'};d.rows=[['a','b','c']];d.topologyExports.public.nodes.push('c');return {root:SEC+'.topologyImports[0]',after:[t.consumer,t.ctx(p)],kind:'node',status:'added',cause:'provider',afterPath:SEC+'.topologyImports[0]',fields:[]};},
+  providerAdd:t=>{/* key asserted explicitly below via m.key */const p=plain(t.provider),d=p.page.sections[0].diagram;d.nodes.c={title:'C'};d.rows=[['a','b','c']];d.topologyExports.public.nodes.push('c');return {root:SEC+'.topologyImports[0]',after:[t.consumer,t.ctx(p)],kind:'node',status:'added',cause:'provider',afterPath:SEC+'.topologyImports[0]',key:{before:null,after:'child::c'},fields:[]};},
   overrideNode:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].nodeOverrides={a:{sub:'S'}};return {root:SEC+'.topologyImports[0]',after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(null,SEC+'.topologyImports[0].nodeOverrides.a.sub',undefined,'S')],resolved:[I('node','modified',null,R+'.nodes["child::a"].sub',{after:'S'})]};},
   overrideEdge:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].edgeOverrides={'a->b':{label:'X'}};return {root:SEC+'.topologyImports[0]',after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(null,SEC+'.topologyImports[0].edgeOverrides["a->b"].label',undefined,'X')],resolved:[I('edge','modified',R+'.edges[0].label',R+'.edges[0].label',{before:'ab',after:'X'})]};},
   as:t=>{const c=plain(t.consumer);c.page.sections[0].diagram.topologyImports[0].as='kid';return {root:SEC+'.topologyImports[0]',after:[c,t.ctx()],kind:'import',cause:'document',fields:[F(SEC+'.topologyImports[0].as',SEC+'.topologyImports[0].as','child','kid')],
@@ -241,6 +244,7 @@ test('stress imported topology: every import mutation kind',()=>{
     assert.equal(e.afterPath,m.root,'S5 record path after '+name);assert.equal(e.beforePath,(m.status||'modified')==='added'?null:m.root,'S5 record path before '+name);
     assert.deepEqual(sortJ(e.fields),sortJ(m.fields),'S5 fields '+name);
     if(m.resolved)assert.deepEqual(sortJ(e.resolved),sortJ(m.resolved),'S5 attached resolved '+name);
+    if(m.key)assert.deepEqual(e.key,m.key,'S5 key '+name);
     checkEffects(e,A.resolved.sections[0].diagram,B.resolved.sections[0].diagram,name);
     if(m.effects)assert.ok(e.effects.length,'precondition-backed: imported tone has an effect '+name);
   }

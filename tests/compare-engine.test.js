@@ -149,7 +149,14 @@ function assertLocus(e,a,b,label){
   for(const [sd,path,w] of [[a,e.beforePath,'before'],[b,e.afterPath,'after']]){
     if(path==null){assert.equal(e.section[w],null,label+' section.'+w+' null with null path');assert.equal(e.key[w],null,label+' key.'+w+' null with null path');continue;}
     assert.equal(e.section[w],sectionOf(sd,path),label+' section.'+w+' is the record containing '+path);
-    if(e.cause==='provider'){assert.notEqual(e.key[w],null,label+' provider key.'+w);continue;}
+    if(e.cause==='provider'){
+      assert.notEqual(e.key[w],null,label+' provider key.'+w);
+      /* Independent of e.key: the resolved field paths name the node key or edge index. */
+      for(const f of e.fields||[]){const fp=w==='before'?f.beforePath:f.afterPath;if(fp==null)continue;
+        const t=tokens(fp),k=t.indexOf(e.kind==='edge'?'edges':'nodes');assert.ok(fp.startsWith('resolved:') && k>=0,label+' provider field path '+fp);
+        assert.deepEqual(e.key[w],t[k+1],label+' provider key.'+w+' matches its field path '+fp);}
+      continue;
+    }
     const rec=C.sectionRecords(sd.authored)[e.section[w]],base=rec?rec.path:null;
     const shape={step:/\.diagram\.steps\[\d+\]$/,panel:/\.diagram\.panels\[\d+\]$/,path:/\.diagram\.paths\[\d+\]$/,layout:/\.diagram\.layouts\[\d+\]$/,
       edge:/\.diagram\.edges\[\d+\]$/,node:/\.diagram\.nodes(\.[A-Za-z_$][\w$]*|\["(?:[^"\\]|\\.)*"\])$/,import:/\.diagram\.topologyImports\[\d+\]$/,view:/\.views\[\d+\]$/}[e.kind];
@@ -294,7 +301,8 @@ test('R10 R11 same resolved result, different cause: provider edit vs consumer o
   const ea=compare(base0,A),eb=compare(base0,B);
   assert.equal(ea.length,2,'provider case: one node + one edge entry');
   assert.deepEqual(only(ea,x=>x.kind==='node','provider node').fields,[{beforePath:R+'.nodes["child::a"].title',afterPath:R+'.nodes["child::a"].title',before:'A',after:'Same'}]);
-  const pe=only(ea,x=>x.kind==='edge','provider edge');assert.equal(pe.cause,'provider');assert.equal(pe.origin,'imported');
+  const pe=only(ea,x=>x.kind==='edge','provider edge');assert.equal(pe.cause,'provider');assert.equal(pe.origin,'imported');assert.deepEqual(pe.key,{before:0,after:0});
+  assert.deepEqual(only(ea,x=>x.kind==='node','provider node').key,{before:'child::a',after:'child::a'});
   assert.deepEqual(pe.fields,[{beforePath:R+'.edges[0].label',afterPath:R+'.edges[0].label',before:'ab',after:'Lbl'}]);
   assert.equal(ea.filter(x=>x.cause==='document').length,0,'provider case has no document-caused entry');
   assert.equal(eb.length,1,'override case: exactly one entry');
@@ -497,6 +505,7 @@ test('R22 legacy steps[i].patch alias reports the .patch path and the same effec
 test('R23 absent document: exactly one document entry plus one entry per section, mirrored',()=>{
   const p={page:{title:'T',blocks:[{id:'a',heading:'A',diagram:base()},{tabs:[{label:'One',sections:[{id:'b',heading:'B'},{heading:'C'}]},{label:'Two',sections:[{id:'d',heading:'D',diagram:base()}]}]}]}};
   const strip=e=>[e.kind,e.status,e.beforePath,e.afterPath,e.fields.length,e.section && [e.section.before,e.section.after],e.key && [e.key.before,e.key.after]];
+  for(const out of [compare(null,side(p)),compare(side(p),null)])out.forEach(e=>assert.equal(e.cause,'document',e.kind+' '+e.status+' cause'));
   assert.deepEqual(compare(null,side(p)).map(strip),[['document','added',null,'',0,undefined,undefined],
     ['section','added',null,'blocks[0]',0,[null,0],[null,'a']],['section','added',null,'blocks[1].tabs[0].sections[0]',0,[null,1],[null,'b']],
     ['section','added',null,'blocks[1].tabs[0].sections[1]',0,[null,2],[null,1]],['section','added',null,'blocks[1].tabs[1].sections[0]',0,[null,3],[null,'d']]]);

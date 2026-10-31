@@ -288,10 +288,15 @@ function compareSection(ra, rb, resA, resB, entries, ia, ib){
   imports.forEach(function(e){ e.resolved = e.resolved || []; local.push(e); });
   /* Reader effects come from the resolved diagrams. */
   var diffs = compareReaderDiffs(xa, xb, stepMatch.pairs);
+  /* A section's own fold-read settings are attributed counterfactually: apply
+     only those settings to the before diagram, compare with it, and map the
+     coordinates onto the after side through the step pairing. Other edits in
+     the same comparison therefore never land on the section entry. */
+  var sectionDiffs = sectionEntry ? compareSectionEffects(xa, xb, stepMatch.pairs) : [];
   local.forEach(function(e){
     var touches = compareTouches(e, {da:xa, db:xb, dpa:dpa, dpb:dpb});
     e.section = {before:e.beforePath == null ? null : ia, after:e.afterPath == null ? null : ib};
-    e.effects = diffs.filter(function(d){ return touches(d); });
+    e.effects = e === sectionEntry ? sectionDiffs : diffs.filter(function(d){ return touches(d); });
     if (e.kind === 'path' && e.status !== 'modified'){
       var rec = e._a || e._b, dd = e._a ? da : db, ids = Array.isArray(rec.steps) ? rec.steps : [];
       var src = ids.map(function(id){ return (dd.steps || []).findIndex(function(st){ return st && st.id === id; }); }).filter(function(i){ return i >= 0; });
@@ -310,9 +315,6 @@ function compareSection(ra, rb, resA, resB, entries, ia, ib){
 function compareImportOwner(imports, key){
   return (Array.isArray(imports) ? imports : []).findIndex(function(imp){ return imp && imp.as != null && String(key).indexOf(String(imp.as) + '::') === 0; });
 }
-/* Diagram-level settings that only arrange the picture; editing them cannot
-   change folded panel state, node tones or panel visibility. */
-var COMPARE_LAYOUT_ONLY = ['rows','groups','floats','columns','view','autoplay','defaultLayout','showStepIds','legend','title','notes','topologyExports'];
 /* Diagram-level settings read by the folds: story time and device defaults
    feed panel state (battery, clocks). None of them change node tones or
    panel visibility. */
@@ -323,14 +325,21 @@ function comparePathsContaining(d, src){
   diagramPathList(d).forEach(function(path){ if (path.indices.indexOf(src) >= 0) out.push(path.id); });
   return out;
 }
+function compareSectionEffects(xa, xb, stepPairs){
+  var changed = COMPARE_FOLD_FIELDS.filter(function(k){ return !compareSame(xa[k], xb[k]); });
+  if (!changed.length) return [];
+  var hybrid = Object.assign({}, xa);
+  changed.forEach(function(k){ if (xb[k] === undefined) delete hybrid[k]; else hybrid[k] = xb[k]; });
+  var ident = (xa.steps || []).map(function(s, i){ return [i, i]; }), toAfter = new Map();
+  stepPairs.forEach(function(p){ toAfter.set(p[0], p[1]); });
+  function map(step){ return step === 'ambient' || step == null ? step : toAfter.has(step) ? toAfter.get(step) : null; }
+  return compareReaderDiffs(xa, hybrid, ident).filter(function(d){ return d.category === 'state' && d.target.kind === 'panel'; }).map(function(d){
+    return {pathId:d.pathId, target:d.target, category:d.category, beforeSteps:d.beforeSteps,
+      afterSteps:d.afterSteps.map(map).filter(function(v){ return v != null; }),
+      changes:d.changes.map(function(c){ var o = {beforeStep:c.beforeStep, afterStep:map(c.afterStep), before:c.before, after:c.after}; return o; })};
+  });
+}
 function compareTouches(e, ctx){
-  if (e.kind === 'section'){
-    var relevant = e.fields.some(function(f){
-      var p = f.afterPath || f.beforePath, m = /\.diagram\.([A-Za-z_$][\w$]*)/.exec(p || '');
-      return m && COMPARE_FOLD_FIELDS.indexOf(m[1]) >= 0;
-    });
-    return function(d){ return relevant && d.category === 'state' && d.target.kind === 'panel'; };
-  }
   if (e.kind === 'path' && e.status === 'modified'){ var pid = (e._b || e._a).id; return function(d){ return d.pathId === pid; }; }
   if (e.kind === 'panel'){ var id = (e._a || e._b).id; return function(d){ return d.target.kind === 'panel' && d.target.id === id; }; }
   if (e.kind === 'node'){ var nk = e.key && (e.key.after != null ? e.key.after : e.key.before); return function(d){ return d.category === 'tone' && d.target.id === nk; }; }

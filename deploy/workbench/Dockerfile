@@ -23,7 +23,7 @@ COPY diagrams/ diagrams/
 COPY workbench/ workbench/
 RUN python3 tools/build.py && node tools/canon/library.mjs --thumbnails
 
-FROM nginx:1.30.6-alpine
+FROM nginx:1.31.7-alpine
 COPY --from=build /build/LICENSE /usr/share/nginx/html/LICENSE
 COPY deploy/workbench/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /build/workbench/ /usr/share/nginx/html/workbench/

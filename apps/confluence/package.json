@@ -18,7 +18,7 @@
     "@fontsource/sora": "5.3.0"
   },
   "devDependencies": {
-    "@forge/cli": "14.0.0",
+    "@forge/cli": "15.0.0",
     "@forge/manifest": "13.8.0",
     "esbuild": "0.28.2",
     "jsdom": "26.1.0"

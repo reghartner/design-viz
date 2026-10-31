@@ -26,11 +26,13 @@
    S4 determinism     two runs are deepEqual
    S5 localization    exactly one entry of the expected kind/status/cause/origin,
                       with exactly the expected fields (paths and values)
-   S6 completeness    every (path, category, id) whose folds differ under the
-                      independent oracle (steps paired by id; 'ambient' by the
-                      renderer rule) has an effect with exactly those before
-                      AND after step lists
-   S7 precision       no effect for a (path, category, id) the oracle shows unchanged
+   S6/S7 exact set    the entry's effect list equals EXACTLY the independent
+                      oracle's set over every common path (each scenario has two
+                      distinct paths), category and target: before AND after step
+                      lists and folded values ('ambient' by the renderer rule);
+                      no duplicates, no invented paths/categories/targets
+   S10 loci           every non-null locus path resolves in its side; every field
+                      value equals the value at its path; resolved loci resolve
    S8 declaration     a render-only panel edit is effect:'declaration', no
                       effects, scopes equal the oracle's visible steps + ambient
    S9 timing          comparing the largest scenario with a mutation < 2000 ms
@@ -41,7 +43,7 @@ const plain=v=>JSON.parse(JSON.stringify(v));
 const C=corpus.engine(),IMAGE='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1kAAAAASUVORK5CYII=';
 const SEC='sections[0].diagram',R='resolved:'+SEC;
 const key=(path,k)=>path+(/^[A-Za-z_$][\w$]*$/.test(k)?'.'+k:'['+JSON.stringify(k)+']');
-function build(s){const spec=corpus.specification(C,s,IMAGE),d=spec.page.sections[0].diagram;d.paths=[{id:'main',steps:d.steps.map(x=>x.id)}];return spec;}
+function build(s){const spec=corpus.specification(C,s,IMAGE),d=spec.page.sections[0].diagram;d.paths=[{id:'main',steps:d.steps.map(x=>x.id)},{id:'alt',steps:d.steps.filter((x,i)=>i%2===0 || i===d.steps.length-1).map(x=>x.id)}];return spec;}
 function rng(seed){let s=seed>>>0||1;return ()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};}
 const pick=(r,list)=>list[Math.floor(r()*list.length)];
 const side=(raw,{context=null,ledger=null}={})=>({authored:C.normalize(plain(raw)),resolved:C.normalize(context?C.FlowTopology.resolveSource(plain(raw),context):plain(raw)),ledger});
@@ -49,52 +51,80 @@ const sortJ=list=>(list||[]).map(x=>JSON.stringify(plain(x))).sort();
 function mirror(e){
   const flip={added:'removed',removed:'added',modified:'modified'},m=plain(e);m.status=flip[m.status];[m.beforePath,m.afterPath]=[e.afterPath,e.beforePath];
   m.fields=(e.fields||[]).map(f=>plain({beforePath:f.afterPath,afterPath:f.beforePath,before:f.after,after:f.before}));
-  m.effects=(e.effects||[]).map(x=>plain(Object.assign({},x,{beforeSteps:x.afterSteps,afterSteps:x.beforeSteps})));
+  m.effects=(e.effects||[]).map(x=>plain(Object.assign({},x,{beforeSteps:x.afterSteps,afterSteps:x.beforeSteps,changes:(x.changes||[]).map(c=>plain({beforeStep:c.afterStep,afterStep:c.beforeStep,before:c.after,after:c.before}))})));
+  for(const k of ['section','key','step'])if(e[k])m[k]={before:e[k].after,after:e[k].before};
   if('scopeBefore' in e || 'scopeAfter' in e){m.scopeBefore=e.scopeAfter;m.scopeAfter=e.scopeBefore;}
   if(e.resolved)m.resolved=e.resolved.map(r=>plain(Object.assign({},r,{status:flip[r.status],beforePath:r.afterPath,afterPath:r.beforePath,before:r.after,after:r.before})));
   return m;
 }
-const norm=e=>{const x=plain(e);x.fields=sortJ(x.fields);x.effects=sortJ(x.effects);if(x.resolved)x.resolved=sortJ(x.resolved);return JSON.stringify(x,Object.keys(x).sort());};
+const norm=e=>{const x=plain(e);x.fields=sortJ(x.fields);x.effects=sortJ((x.effects||[]).map(f=>Object.assign({},f,{changes:sortJ(f.changes)})));if(x.resolved)x.resolved=sortJ(x.resolved);return JSON.stringify(x,Object.keys(x).sort());};
 function compare(a,b,label){
   assert.equal(typeof C.compareDocuments,'function','compareDocuments(before, after) is defined by the shared engine');
   const sa=plain(a),sb=plain(b),out=plain(C.compareDocuments(a,b));
   assert.deepEqual(plain(a),sa,'S3 before not mutated '+label);assert.deepEqual(plain(b),sb,'S3 after not mutated '+label);
   assert.deepEqual(plain(C.compareDocuments(a,b)),out,'S4 determinism '+label);
   assert.deepEqual(plain(C.compareDocuments(b,a)).map(norm).sort(),out.map(mirror).map(norm).sort(),'S2 full mirror '+label);
+  checkLoci(out,a,b,label);
   return out;
 }
-/* Independent oracle over the folds. */
+/* Independent oracle over the folds (steps paired by id; 'ambient' by the renderer rule). */
 function oracle(d0,d1,category,id,pathId){
   const f={state:d=>C.foldPanelStates(d)[id],tone:d=>C.foldNodeTones(d).map(s=>s[id]),visibility:d=>C.foldPanelVisibility(d)[id]}[category];
   const pa=C.diagramForPath(d0,pathId),pb=C.diagramForPath(d1,pathId),fa=f(pa)||[],fb=f(pb)||[];
-  const ia=pa._sourceIndices,ib=pb._sourceIndices,ida=ia.map(i=>d0.steps[i].id),idb=ib.map(i=>d1.steps[i].id),bs=[],as=[];
+  const ia=pa._sourceIndices,ib=pb._sourceIndices,bs=[],as=[],changes=[],seen=new Set();
+  const toB=src=>{const id0=d0.steps[src].id;const k=(d1.steps||[]).findIndex(x=>x.id===id0);return k<0?null:k;};
   if(ia.length || ib.length){
-    ida.forEach((sid,k)=>{const j=idb.indexOf(sid);if(j<0 || JSON.stringify(fa[k])!==JSON.stringify(fb[j])){bs.push(ia[k]);if(j>=0)as.push(ib[j]);}});
-    idb.forEach((sid,j)=>{if(ida.indexOf(sid)<0)as.push(ib[j]);});
+    ia.forEach((src,k)=>{const sb=toB(src),j=sb==null?-1:ib.indexOf(sb);
+      if(j<0){bs.push(src);changes.push(plain({beforeStep:src,afterStep:null,before:fa[k]}));return;}
+      seen.add(sb);if(JSON.stringify(fa[k])!==JSON.stringify(fb[j])){bs.push(src);as.push(sb);changes.push(plain({beforeStep:src,afterStep:sb,before:fa[k],after:fb[j]}));}});
+    ib.forEach((src,j)=>{if(!seen.has(src)){as.push(src);changes.push(plain({beforeStep:null,afterStep:src,after:fb[j]}));}});
   }
   bs.sort((x,y)=>x-y);as.sort((x,y)=>x-y);
   if(category==='state'){
     const amb=(d,st)=>{const p=(d.panels||[]).find(x=>x.id===id);if(!p)return undefined;const v=C.PanelViews.get(p.type);return v && v.options && v.options.ambientInitial?p.initial:st[0];};
-    if(JSON.stringify(amb(d0,fa))!==JSON.stringify(amb(d1,fb))){bs.push('ambient');as.push('ambient');}
+    const a0=amb(d0,fa),b0=amb(d1,fb);if(JSON.stringify(a0)!==JSON.stringify(b0)){bs.push('ambient');as.push('ambient');changes.push(plain({beforeStep:'ambient',afterStep:'ambient',before:a0,after:b0}));}
   }
-  return {beforeSteps:bs,afterSteps:as};
+  return {beforeSteps:bs,afterSteps:as,changes};
 }
 function visibleScope(d,id){
   const p=C.diagramForPath(d,C.diagramPathList(d)[0].id),v=C.foldPanelVisibility(p)[id]||[],out=[];
   p._sourceIndices.forEach((src,k)=>{if(v[k]!==false && !out.includes(src))out.push(src);});
   return out.sort((x,y)=>x-y).concat(['ambient']);
 }
+/* S6 + S7: the entry's effect list equals EXACTLY the oracle's full set over
+   every common path, category and target (no duplicates, no invented items). */
 function checkEffects(e,d0,d1,label){
   const pathIds=C.diagramPathList(d0).map(p=>p.id).filter(id=>C.diagramPathList(d1).some(p=>p.id===id));
   const panelIds=[...new Set((d0.panels||[]).map(p=>p.id).concat((d1.panels||[]).map(p=>p.id)))];
   const nodeIds=[...new Set(Object.keys(d0.nodes||{}).concat(Object.keys(d1.nodes||{})))];
+  const want=[];
   for(const pathId of pathIds)for(const [cat,kind,ids] of [['state','panel',panelIds],['visibility','panel',panelIds],['tone','node',nodeIds]])for(const id of ids){
-    const want=oracle(d0,d1,cat,id,pathId),got=(e.effects||[]).find(x=>x.pathId===pathId && x.category===cat && x.target.id===id);
-    if(want.beforeSteps.length || want.afterSteps.length){
-      assert.ok(got,'S6 missing '+cat+' '+id+' on '+pathId+' '+label);
-      assert.deepEqual({beforeSteps:got.beforeSteps,afterSteps:got.afterSteps},want,'S6 '+cat+' '+id+' on '+pathId+' '+label);
-      assert.equal(got.target.kind,kind);
-    }else assert.equal(got,undefined,'S7 invented '+cat+' '+id+' on '+pathId+' '+label);
+    const o=oracle(d0,d1,cat,id,pathId);if(o.changes.length)want.push(Object.assign({pathId,target:{kind,id},category:cat},o));
+  }
+  assert.equal((e.effects||[]).length,new Set((e.effects||[]).map(x=>JSON.stringify(plain(x)))).size,'S7 no duplicate effects '+label);
+  assert.deepEqual(sortJ(e.effects),sortJ(want),'S6/S7 exact effect set '+label);
+  return want;
+}
+/* Every non-null locus path resolves; field values equal the values at their paths. */
+function at(sd,path){
+  let root=sd.authored;if(path.startsWith('resolved:')){root=sd.resolved;path=path.slice(9);}
+  if(path==='')return root;
+  const toks=[...path.matchAll(/(?:^|\.)([A-Za-z_$][\w$]*)|\[(\d+)\]|\[("(?:[^"\\]|\\.)*")\]/g)].map(m=>m[1]!=null?m[1]:m[2]!=null?Number(m[2]):JSON.parse(m[3]));
+  return toks.reduce((v,k)=>v==null?undefined:v[k],root);
+}
+function checkLoci(out,A,B,label){
+  for(const e of out){
+    if(e.kind==='ledger')continue;
+    if(e.beforePath!=null)assert.notEqual(at(A,e.beforePath),undefined,'locus resolves '+label+' '+e.beforePath);
+    if(e.afterPath!=null)assert.notEqual(at(B,e.afterPath),undefined,'locus resolves '+label+' '+e.afterPath);
+    for(const f of e.fields||[]){
+      if(f.beforePath!=null)assert.deepEqual(plain(at(A,f.beforePath)),plain(f.before),'field value '+label+' '+f.beforePath);
+      if(f.afterPath!=null)assert.deepEqual(plain(at(B,f.afterPath)),plain(f.after),'field value '+label+' '+f.afterPath);
+    }
+    for(const r of e.resolved||[]){
+      if(r.beforePath!=null)assert.notEqual(at(A,r.beforePath),undefined,'resolved locus '+label+' '+r.beforePath);
+      if(r.afterPath!=null)assert.notEqual(at(B,r.afterPath),undefined,'resolved locus '+label+' '+r.afterPath);
+    }
   }
 }
 /* LOCAL mutations: (spec, r) -> {kind, status?, path?, before?, after?, fields?, declaration?, ledger?} */
@@ -133,13 +163,13 @@ const LOCAL={
 const scenarios=corpus.scenarios();
 test('precondition: the corpus supplies 48 scenarios with steps, panels and layouts',()=>{
   assert.equal(scenarios.length,48);
-  scenarios.forEach(s=>{const d=build(s).page.sections[0].diagram;assert.ok(d.steps.length>=2 && d.panels.length>=1 && d.layouts.length>=1,s.id);});
+  scenarios.forEach(s=>{const d=build(s).page.sections[0].diagram;assert.ok(d.steps.length>=3 && d.panels.length>=1 && d.layouts.length>=1,s.id);assert.notDeepEqual(d.paths[0].steps,d.paths[1].steps,s.id+' has two distinct paths');});
 });
 for(const s of scenarios){
   test('stress '+s.id,()=>{
     const spec=build(s),r=rng(s.id.split('').reduce((h,c)=>h*31+c.charCodeAt(0),7));
     assert.deepEqual(compare(side(spec),side(spec),s.id),[],'S1 identity');
-    let ran=0;
+    let ran=0,altEffects=0;
     for(const name of Object.keys(LOCAL)){
       const next=plain(spec),m=LOCAL[name](next,r);if(!m)continue;ran++;
       const label=s.id+' '+name,A=side(spec,{ledger:m.ledger?m.ledger[0]:null}),B=side(next,{ledger:m.ledger?m.ledger[1]:null});
@@ -154,9 +184,10 @@ for(const s of scenarios){
       if(m.declaration){
         assert.equal(e.effect,'declaration','S8 '+label);assert.deepEqual(e.effects,[],'S8 '+label);
         assert.deepEqual(e.scopeBefore,visibleScope(d0,m.panelId),'S8 scopeBefore '+label);assert.deepEqual(e.scopeAfter,visibleScope(d1,m.panelId),'S8 scopeAfter '+label);
-      }else checkEffects(e,d0,d1,label);
+      }else altEffects+=checkEffects(e,d0,d1,label).filter(w=>w.pathId==='alt').length;
     }
     assert.ok(ran>=14,'precondition: at least 14 mutation kinds applied to '+s.id+' (got '+ran+')');
+    assert.ok(altEffects>0,'precondition: at least one mutation in '+s.id+' changes the second path, so per-path effects are exercised');
   });
 }
 

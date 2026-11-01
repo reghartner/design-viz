@@ -162,13 +162,16 @@ function mountCompareView(host, opts){
   /* Center a changed object; in Explore, first zoom a changed node up to a
      legible size (narrow panes fit whole sections small). Runs now and again
      after the viewer's own deferred fit, unless the selection has moved on. */
-  function frame(rec, object, t){
+  function frame(ctl, object, t){
     var token = selected;
     function apply(){
       if (destroyed || token !== selected || !object.isConnected) return;
-      if (t.attr === 'data-dv-node' && rec.viewport && rec.viewport.isExplore() && rec.viewport.canvasZoom){
-        var width = object.getBoundingClientRect().width, zoom = rec.viewport.canvasZoom();
-        if (width > 0 && width < COMPARE_LEGIBLE_NODE_PX - 1 && zoom > 0) rec.viewport.canvasZoom(Math.min(1, zoom * COMPARE_LEGIBLE_NODE_PX / width));
+      /* The Explore viewport that holds the object (a section's shown View can be another record). */
+      var vp = null;
+      (ctl.sections || []).forEach(function(r){ if (r.viewport && r.viewport.canvasZoom && r.sectionEl && r.sectionEl.contains(object) && r.viewport.isExplore()) vp = r.viewport; });
+      if (t.attr === 'data-dv-node' && vp){
+        var width = object.getBoundingClientRect().width, zoom = vp.canvasZoom();
+        if (width > 0 && width < COMPARE_LEGIBLE_NODE_PX - 1 && zoom > 0) vp.canvasZoom(Math.min(1, zoom * COMPARE_LEGIBLE_NODE_PX / width));
       }
       if (object.scrollIntoView) object.scrollIntoView({block:'center', inline:'center'});
     }
@@ -193,9 +196,14 @@ function mountCompareView(host, opts){
       visible = !!(route && rec.stepper.jumpSource(route.indices[0], route.id)) && visible;
     }
     p.ctl.activeTarget = {kind:'diagram', section:rec.number}; if (p.ctl.onChange) p.ctl.onChange();
-    var object = null;
-    if (t.attr && t.key != null) object = Array.prototype.find.call(rec.sectionEl.querySelectorAll('[' + t.attr + ']'), function(n){ return n.getAttribute(t.attr) === String(t.key) && n.getClientRects().length; });
-    if (object) frame(rec, object, t);
+    var object = null, bestArea = 0;
+    /* The largest rendered match: the board copy, not a thumbnail or overview copy. */
+    if (t.attr && t.key != null) Array.prototype.forEach.call(rec.sectionEl.querySelectorAll('[' + t.attr + ']'), function(n){
+      if (n.getAttribute(t.attr) !== String(t.key) || !n.getClientRects().length) return;
+      var r = n.getBoundingClientRect(), area = r.width * r.height;
+      if (!object || area > bestArea){ object = n; bestArea = area; }
+    });
+    if (object) frame(p.ctl, object, t);
     else if (rec.sectionEl && rec.sectionEl.scrollIntoView && (!rec.viewport || !rec.viewport.isExplore())) rec.sectionEl.scrollIntoView({block:'start'});
     return {side:side, shown:true, object:!!object, visible:visible};
   }

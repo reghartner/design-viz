@@ -955,8 +955,9 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
       expect(canvas.x).toBeGreaterThanOrEqual(area.x);expect(canvas.y).toBeGreaterThanOrEqual(area.y);
       expect(canvas.x+canvas.width).toBeLessThanOrEqual(area.x+area.width+1);
       expect(canvas.y+canvas.height).toBeLessThanOrEqual(area.y+area.height+1);
-      expect(canvas.width).toBeGreaterThan(400);expect(canvas.height).toBeGreaterThan(260);
-      expect(surface.width).toBeGreaterThan(400);expect(surface.height).toBeGreaterThan(260);
+      /* #848: each canvas is one of two panes beside the change list (about 345px wide at a 1024px window). */
+      expect(canvas.width).toBeGreaterThan(320);expect(canvas.height).toBeGreaterThan(260);
+      expect(surface.width).toBeGreaterThan(320);expect(surface.height).toBeGreaterThan(260);
       for(const id of ['close','previous','next','details','discard','commit']){
         const control=page.locator('#agent-update-'+id);await expect(control).toBeInViewport();
         if(await control.isEnabled())await control.click({trial:true});

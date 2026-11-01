@@ -992,8 +992,10 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     await expect(view.locator('.stepline')).toContainText('Recording ready');
     await view.locator('.path-chip[data-dv-path="failed"]').click();await expect(view.locator('.stepline')).toContainText('Exact hidden failure');
     await view.locator('.path-chip[data-dv-path="happy"]').click();
-    await expect(view.locator('.explore-window:visible')).toHaveCount(0);
-    await view.locator('.explore-panel-menu summary').click();await view.getByRole('button',{name:'Restore panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(1);
+    /* #848 Full mode starts with panels shown; Hide and Restore still work. */
+    await expect(view.locator('.explore-window:visible')).toHaveCount(1);
+    await view.locator('.explore-panel-menu summary').click();await view.getByRole('button',{name:'Hide panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(0);
+    await view.getByRole('button',{name:'Restore panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(1);
     await view.getByRole('button',{name:'Hide panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(0);
     await view.locator('.explore-panel-menu>summary').click();
     const reviewStage=await stage.boundingBox(),reviewZoom=await zoom.innerText();

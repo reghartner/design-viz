@@ -155,7 +155,7 @@ test('V8b mounting both panes takes at most 2x mounting one pane',async({page,se
     await expect(pane(host,'after').locator('svg[aria-label="flow diagram"]')).toHaveCount(4,{timeout:60000});
     await expect(pane(host,'after').locator('[data-dv-panel]')).toHaveCount(16,{timeout:60000});/* panel bodies count too */
     if(two){
-      await expect(changedSection('before').locator('[data-dv-node="n3"]').first()).toBeVisible({timeout:60000});
+      await expect(changedSection('before').locator('[data-dv-node="n3"]:visible').first()).toBeVisible({timeout:60000});
       await expect(changedSection('before').locator('[data-dv-panel]')).toHaveCount(4,{timeout:60000});
     }
     const elapsed=Date.now()-t;

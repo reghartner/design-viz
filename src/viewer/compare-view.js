@@ -395,7 +395,11 @@ function mountCompareView(host, opts){
   function buildFocus(entry){
     if (entry.kind !== 'step' && entry.kind !== 'panel') return null;
     var effect = (entry.effects || [])[0], pathId = effect ? effect.pathId : null;
-    var st = entry.kind === 'step' && entry.step || {};
+    /* The step to open: the edited step; for a panel settings change, the first step where the
+       panel is visible (the engine's scope), so it does not open where the panel is hidden. */
+    var firstStep = function(list){ return (list || []).find(function(v){ return typeof v === 'number'; }); };
+    var st = entry.kind === 'step' && entry.step ? entry.step :
+      entry.effect === 'declaration' ? (firstStep(entry.scopeAfter) != null ? {before:null, after:firstStep(entry.scopeAfter)} : {before:firstStep(entry.scopeBefore), after:null}) : {};
     var A = focusSide(entry, 'before', pathId, st.before), B = focusSide(entry, 'after', pathId, st.after);
     if (!A || !B || !A.indices.length && !B.indices.length) return null;
     var aToB = new Map(), bToA = new Map();
@@ -403,19 +407,29 @@ function mountCompareView(host, opts){
     var ctx = {entry:entry, before:A, after:B, aToB:aToB, bToA:bToA};
     var panelIds = [];
     [B, A].forEach(function(S){ (S.d.panels || []).forEach(function(p){ if (p && p.id && panelIds.indexOf(p.id) < 0) panelIds.push(p.id); }); });
-    var nodeIds = Object.keys(A.d.nodes || {}).concat(Object.keys(B.d.nodes || {})).filter(function(v, i, all){ return all.indexOf(v) === i; });
+    var nodeIds = Array.from(new Set(Object.keys(A.d.nodes || {}).concat(Object.keys(B.d.nodes || {}))));
     ctx.panelIds = panelIds;
+    /* Per-panel declaration difference and per-node tone arrays, computed once. */
+    ctx.declDiffers = {};
+    panelIds.forEach(function(id){
+      var pa = A.fold && A.fold.panels[id], pb = B.fold && B.fold.panels[id];
+      ctx.declDiffers[id] = !!(pa && pb) && !compareSame(compareWithout(pa, ['initial', 'visible']), compareWithout(pb, ['initial', 'visible']));
+    });
+    var tonesA = {}, tonesB = {};
+    if (A.fold && B.fold) nodeIds.forEach(function(id){ tonesA[id] = A.fold.tone(id); tonesB[id] = B.fold.tone(id); });
+    var posA = new Map(); A.indices.forEach(function(src, j){ posA.set(src, j); });
+    ctx.posA = posA; ctx.posB = new Map(); B.indices.forEach(function(src, k){ ctx.posB.set(src, k); });
     /* Panels that differ at each After position (null = the step has no pair in Before). */
     ctx.diffAt = B.indices.map(function(src, k){
-      var srcA = bToA.has(src) ? bToA.get(src) : null, j = srcA == null ? -1 : A.indices.indexOf(srcA);
+      var srcA = bToA.has(src) ? bToA.get(src) : null, j = srcA == null || !posA.has(srcA) ? -1 : posA.get(srcA);
       if (j < 0) return null;
       var out = panelIds.filter(function(id){ return panelDiffers(ctx, id, j, k); });
-      out.tone = nodeIds.some(function(id){ return !compareSame(A.fold.tone(id)[j], B.fold.tone(id)[k]); });
+      out.tone = nodeIds.some(function(id){ var x = tonesA[id][j], y = tonesB[id][k]; return x !== y && !compareSame(x, y); });
       return out;
     });
     /* Starting step: the edited step, else the first step the change affects, else the first step. */
     var srcA = null, srcB = null;
-    if (entry.kind === 'step' && entry.step){ srcA = entry.step.before; srcB = entry.step.after; }
+    if (st.before != null || st.after != null){ srcA = st.before == null ? null : st.before; srcB = st.after == null ? null : st.after; }
     else (entry.effects || []).some(function(e){
       if (e.pathId !== B.pathId && e.pathId !== A.pathId) return false;
       return (e.changes || []).some(function(c){
@@ -443,8 +457,8 @@ function mountCompareView(host, opts){
     if (!a.panel || !b.panel) return !!a.panel !== !!b.panel;
     /* `initial` and `visible` reach the reader through the folded state and visibility compared
        above; other declaration fields (title, unit, ...) show at every step. */
-    return !compareSame(a.state, b.state) || a.visible !== b.visible ||
-      !compareSame(compareWithout(a.panel, ['initial', 'visible']), compareWithout(b.panel, ['initial', 'visible']));
+    /* A settings difference shows only where the panel is visible (the engine's scope for it). */
+    return a.visible !== b.visible || ctx.declDiffers[id] && (a.visible || b.visible) || a.state !== b.state && !compareSame(a.state, b.state);
   }
   /* Move both sides to position `pos` of `side`'s path; the other side follows the step pairing. */
   function focusStep(side, pos){
@@ -462,7 +476,7 @@ function mountCompareView(host, opts){
     });
     return S.indices.map(function(src, k){
       if (edited.has(src)) return 'edited';
-      var kb = S.side === 'after' ? k : ctx.aToB.has(src) ? ctx.after.indices.indexOf(ctx.aToB.get(src)) : -1;
+      var kb = S.side === 'after' ? k : ctx.aToB.has(src) && ctx.posB.has(ctx.aToB.get(src)) ? ctx.posB.get(ctx.aToB.get(src)) : -1;
       var d = kb >= 0 ? ctx.diffAt[kb] : null;
       return d && (d.length || d.tone) ? 'carried' : '';
     });

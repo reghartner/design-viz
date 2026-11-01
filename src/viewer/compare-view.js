@@ -6,6 +6,7 @@
      entries       compareDocuments() output (src/core/compare.js)
      ids           optional element ids for the pane scroll/view nodes
      onSelect      optional callback(entry, index, result) after each selection
+     onRenderError optional callback({side, message}) when a pane cannot be rendered
    returns {select(i), next(), previous(), selected(), setSkin(name), destroy()}
 
    Selecting a change frames BOTH panes on it (one-way: the selection drives the
@@ -105,7 +106,7 @@ function compareRailGroups(entries, pages){
 function mountCompareView(host, opts){
   opts = opts || {};
   var doc = host.ownerDocument || document, entries = opts.entries || [], pages = {before:opts.before || null, after:opts.after || null};
-  var ids = opts.ids || {}, panes = {}, selected = -1, destroyed = false, skin = opts.skin, lastAfterView = null;
+  var ids = opts.ids || {}, panes = {}, selected = -1, destroyed = false, skin = opts.skin, lastAfterView = null, renderErrors = [];
   function el(tag, cls, text){ var n = doc.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
   host.replaceChildren();
   var root = el('div', 'compare-view'), rail = el('nav', 'compare-rail'), columns = el('div', 'compare-columns');
@@ -161,7 +162,12 @@ function mountCompareView(host, opts){
       p.ctl = compareViewTrack(renderPage(p.view, page, typeof skin === 'function' ? skin(page) : skin || page.skin, null, {autoplay:false}));
       if (typeof initViewerExploreCanvas === 'function') p.canvas = compareViewTrack(initViewerExploreCanvas(p.ctl, p.view, {container:p.scroll, initialContentsOpen:false,
         presentation:{panelsHiddenWhenGraphVisible:false, overlayScale:.5}, forceFit:true, refitOnResize:false, fitInsets:{left:24, right:24, top:20, bottom:24}}));
-    }catch(ex){ p.view.textContent = 'Could not render this side: ' + ex.message; }
+    }catch(ex){
+      p.view.textContent = 'Could not render this side: ' + ex.message;
+      var failure = {side:p.pane.getAttribute('data-side'), message:String(ex && ex.message || ex)};
+      renderErrors.push(failure);
+      if (typeof opts.onRenderError === 'function') opts.onRenderError(failure);
+    }
   }
   function completeBefore(){
     var p = panes.before;
@@ -205,7 +211,9 @@ function mountCompareView(host, opts){
   /* Rendered target of an entry on one side, or null when that side lacks it. */
   function target(entry, side){
     var path = side === 'before' ? entry.beforePath : entry.afterPath, sec = entry.section || {};
-    if (path == null || sec[side] == null) return null;
+    if (sec[side] == null) return null;
+    /* Added or removed object: this side lacks it, so show its section here. */
+    if (path == null) return {section:sec[side], kind:'section', attr:null, key:null};
     var t = {section:sec[side], kind:entry.kind, attr:COMPARE_KIND_ATTR[entry.kind], key:null};
     if (entry.cause === 'provider'){ t.attr = entry.kind === 'edge' ? 'data-dv-edge' : 'data-dv-node'; t.key = entry.key ? entry.key[side] : null; return t; }
     if (entry.kind === 'node') t.key = entry.key ? entry.key[side] : null;
@@ -298,6 +306,8 @@ function mountCompareView(host, opts){
     count:function(){ return entries.length; },
     label:function(i){ return entries[i] ? compareEntryLabel(entries[i], pages) : ''; },
     views:function(){ return {before:panes.before.view, after:panes.after.view}; },
+    /* Sides that could not be rendered: [{side, message}]. */
+    errors:function(){ return renderErrors.slice(); },
     setSkin:function(name){ skin = name; var ok = false; ['before', 'after'].forEach(function(side){ if (panes[side].ctl && typeof applySkinClasses === 'function') ok = applySkinClasses(doc.body, panes[side].view, name) || ok; }); return ok; },
     destroy:function(){
       if (destroyed) return; destroyed = true;

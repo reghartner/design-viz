@@ -68,9 +68,11 @@ function initWorkbenchAgentReview(opts){
       var after=workbenchAgentReviewEngineSide(shown.source,shown.ledger,opts.resolve,shown.topologyContext);
       [before.resolved,after.resolved].forEach(function(page){var findings=validate(page);if(findings.errors.length)throw Error(findings.errors.join('\n'));});
       entries=compareDocuments(before,after);changeStatus();navigationStatus();
-      view=mountCompareView(el('compare'),{before:before.resolved,after:after.resolved,entries:entries,skin:opts.skin,onSelect:onSelect,
+      var failed=function(failure){rendered=false;updateCommit();navigationStatus((failure.side==='before'?'Before':'After')+' could not be rendered: '+failure.message);};
+      view=mountCompareView(el('compare'),{before:before.resolved,after:after.resolved,entries:entries,skin:opts.skin,onSelect:onSelect,onRenderError:failed,
         ids:{before:{scroll:'agent-update-scroll-before',view:'agent-update-view-before'},after:{scroll:'agent-update-scroll',view:'agent-update-view'}}});
-      rendered=true;updateCommit();
+      /* Accept needs both sides rendered (a pane can fail during mount or when it completes later). */
+      var errors=view.errors?view.errors():[];rendered=!errors.length;updateCommit();if(errors.length)failed(errors[0]);
     }catch(ex){retire();entries=[];el('compare').textContent='Could not render this preview: '+ex.message;changeStatus();navigationStatus();}
   }
   function refresh(){

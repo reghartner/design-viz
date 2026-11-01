@@ -187,7 +187,7 @@ function mountCompareView(host, opts){
   opts = opts || {};
   var doc = host.ownerDocument || document, entries = opts.entries || [], pages = {before:opts.before || null, after:opts.after || null};
   var ids = opts.ids || {}, panes = {}, selected = -1, destroyed = false, skin = opts.skin, lastAfterView = null, renderErrors = [];
-  var mode = opts.mode === 'full' ? 'full' : 'focused', focusCtx = null;
+  var mode = opts.mode === 'full' ? 'full' : 'focused', focusCtx = null, displayOnlyCache = new Map();
   function el(tag, cls, text){ var n = doc.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
   host.replaceChildren();
   var root = el('div', 'compare-view'), rail = el('nav', 'compare-rail'), columns = el('div', 'compare-columns');
@@ -430,17 +430,21 @@ function mountCompareView(host, opts){
         return all.indexOf(k) === i && k !== 'initial' && k !== 'visible' && !compareSame(pa[k], pb[k]);
       });
       if (!keys.length) return;
-      var base = A.fold.state(id) || [];
-      ctx.declDiffers[id] = keys.some(function(k){
-        var changed = (A.d.panels || []).map(function(p){
-          if (!p || p.id !== id) return p;
-          var q = Object.assign({}, p);
-          if (Object.prototype.hasOwnProperty.call(pb, k)) q[k] = pb[k]; else delete q[k];
-          return q;
-        });
-        var trial = compareFoldsFor(Object.assign({}, A.d, {panels:changed}), A.pathId).state(id) || [];
+      /* Computed once per section pair, path and panel while the view is mounted; each trial folds
+         only this panel (a panel's fold reads its own declaration and the diagram, not other panels). */
+      var cacheKey = JSON.stringify([A.section, B.section, A.pathId, id]);
+      if (displayOnlyCache.has(cacheKey)){ ctx.declDiffers[id] = displayOnlyCache.get(cacheKey); return; }
+      var own = (A.d.panels || []).find(function(p){ return p && p.id === id; }) || pa;
+      var foldOne = function(decl){ return compareFoldsFor(Object.assign({}, A.d, {panels:[decl]}), A.pathId).state(id) || []; };
+      var base = foldOne(own);
+      var result = keys.some(function(k){
+        var q = Object.assign({}, own);
+        if (Object.prototype.hasOwnProperty.call(pb, k)) q[k] = pb[k]; else delete q[k];
+        var trial = foldOne(q);
         return trial.length === base.length && base.every(function(v, i){ return v === trial[i] || compareSame(v, trial[i]); });
       });
+      displayOnlyCache.set(cacheKey, result);
+      ctx.declDiffers[id] = result;
     });
     /* Panels that differ at each After position (null = the step has no pair in Before). */
     ctx.diffAt = B.indices.map(function(src, k){
@@ -460,6 +464,13 @@ function mountCompareView(host, opts){
       var both = changes.find(function(c){ return typeof c.afterStep === 'number' && typeof c.beforeStep === 'number'; }),
           one = changes.find(function(c){ return typeof c.afterStep === 'number' || typeof c.beforeStep === 'number'; }), pick = both || one;
       if (pick){ if (typeof pick.afterStep === 'number') srcB = pick.afterStep; else srcA = pick.beforeStep; }
+    }
+    /* A settings change opens on the first step of its scope that exists on both sides. */
+    if (entry.effect === 'declaration'){
+      var pairedB = (entry.scopeAfter || []).find(function(v){ return typeof v === 'number' && ctx.posB.has(v) && bToA.has(v) && posA.has(bToA.get(v)); }),
+          pairedA = (entry.scopeBefore || []).find(function(v){ return typeof v === 'number' && posA.has(v) && aToB.has(v) && ctx.posB.has(aToB.get(v)); });
+      if (pairedB != null){ srcB = pairedB; srcA = null; }
+      else if (pairedA != null){ srcA = pairedA; srcB = null; }
     }
     if (srcA == null && srcB == null) srcB = B.indices[0];
     if (srcA == null && srcB != null && bToA.has(srcB) && entry.kind !== 'step') srcA = bToA.get(srcB);

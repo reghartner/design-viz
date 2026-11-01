@@ -179,6 +179,18 @@ function compareWordDiff(before, after){
   for (var k = 0; k + 1 < runs.length; k++) if (runs[k].op === 'ins' && runs[k + 1].op === 'del'){ var t = runs[k]; runs[k] = runs[k + 1]; runs[k + 1] = t; }
   return runs;
 }
+/* Step fields the Focused view shows (caption, panel state and visibility, story time); other step
+   fields (the highlighted node or edge, tone) show only in the full diagram. */
+var COMPARE_FOCUS_STEP_FIELD = /^(text|panels|patch|panelVisibility|time)(\.|\[|$)/;
+function compareStepFieldNames(entry){
+  var base = entry.afterPath != null ? entry.afterPath : entry.beforePath, out = [];
+  (entry.fields || []).forEach(function(f){
+    var p = String(f.afterPath != null ? f.afterPath : f.beforePath || '').replace(/^resolved:/, '');
+    var rel = base && p.indexOf(base) === 0 ? p.slice(base.length).replace(/^\./, '') : p;
+    if (rel && out.indexOf(rel) < 0) out.push(rel);
+  });
+  return out;
+}
 function compareStepText(step){ return step && typeof step.text === 'string' ? step.text : ''; }
 function compareCarriedText(title, from, to){
   return from === to ? title + ' differs at step ' + from + ' only' : title + ' differs from step ' + from + ' through step ' + to;
@@ -396,6 +408,9 @@ function mountCompareView(host, opts){
      them (a step click whose paired step is on another path). */
   function buildFocus(entry, force){
     if (entry.kind !== 'step' && entry.kind !== 'panel') return null;
+    /* A modified step whose edits are all diagram-only (highlighted node or edge) shows in the full diagram. */
+    var stepFields = entry.kind === 'step' && entry.status === 'modified' ? compareStepFieldNames(entry) : [];
+    if (stepFields.length && !stepFields.some(function(f){ return COMPARE_FOCUS_STEP_FIELD.test(f); })) return null;
     var effect = (entry.effects || [])[0], pathId = effect ? effect.pathId : null;
     /* The step to open: the edited step; for a panel settings change, the first step where the
        panel is visible (the engine's scope), so it does not open where the panel is hidden. */
@@ -424,7 +439,8 @@ function mountCompareView(host, opts){
     if (!A || !B || !A.indices.length && !B.indices.length) return null;
     var aToB = new Map(), bToA = new Map();
     comparePairs(A.steps, B.steps, [COMPARE_CAPTION_KEY], true).pairs.forEach(function(p){ aToB.set(p[0], p[1]); bToA.set(p[1], p[0]); });
-    var ctx = {entry:entry, before:A, after:B, aToB:aToB, bToA:bToA};
+    var ctx = {entry:entry, before:A, after:B, aToB:aToB, bToA:bToA,
+      diagramOnly:stepFields.filter(function(f){ return !COMPARE_FOCUS_STEP_FIELD.test(f); })};
     var panelIds = [];
     [B, A].forEach(function(S){ (S.d.panels || []).forEach(function(p){ if (p && p.id && panelIds.indexOf(p.id) < 0) panelIds.push(p.id); }); });
     var nodeIds = Array.from(new Set(Object.keys(A.d.nodes || {}).concat(Object.keys(B.d.nodes || {}))));
@@ -583,6 +599,8 @@ function mountCompareView(host, opts){
       head.appendChild(box);
     });
     focus.appendChild(head);
+    if (ctx.diagramOnly && ctx.diagramOnly.length)
+      focus.appendChild(el('p', 'compare-focus-other', 'Also changed in the diagram: ' + ctx.diagramOnly.join(', ') + '. Use Full diagram to see it.'));
     var A = ctx.before, B = ctx.after;
     if (A.pos >= 0 && B.pos >= 0){
       var ta = compareStepText(A.fold.d.steps[A.pos]), tb = compareStepText(B.fold.d.steps[B.pos]);

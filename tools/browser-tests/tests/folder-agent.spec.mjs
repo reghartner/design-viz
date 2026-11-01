@@ -8,84 +8,7 @@ import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {createInterface} from 'node:readline';
 import {source} from '../fixtures/editor-spec.mjs';
-const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
-const origin='https://flowview-folder.test';
-// This substitutes ONLY the user picker/directory handles. Disk, helper, editor,
-// validation, rendering, history and conversation are real. It is not evidence
-// that a human granted native browser permission or that Claude's Monitor ran.
-async function setup(page){
-  const folder=await mkdtemp(path.join(tmpdir(),'flowview-browser-folder-'));let sessionFolder,failWrite,writeId=0,readGate=null,writeGate=null,listener;const requests=[],errors=[],writes=[];
-  const listenerActive=()=>listener && listener.exitCode===null && listener.signalCode===null;
-  async function stopListener(){
-    if(!listenerActive())return;
-    const closed=new Promise(resolve=>listener.once('close',resolve));listener.kill();await closed;
-  }
-  await writeFile(path.join(folder,'README.md'),'Existing agent project notes.');
-  page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
-  await page.exposeBinding('folderDisk',async(_,operation,name,value)=>{
-    const target=path.resolve(folder,'.'+name);if(!target.startsWith(folder+path.sep)&&target!==folder)throw Error('Outside test folder');
-    if(operation==='entries')return (await readdir(target,{withFileTypes:true})).map(e=>({name:e.name,kind:e.isDirectory()?'directory':'file'}));
-    if(operation==='mkdir'){if(!value?.create){try{return (await stat(target)).isDirectory();}catch(e){if(e.code==='ENOENT')return false;throw e;}}await mkdir(target,{recursive:true});sessionFolder=target;return true;}
-    if(operation==='write'){
-      if(writeGate)await writeGate(path.basename(target));
-      writes.push(name);
-      if(path.basename(target)===failWrite){failWrite=null;throw Error('Test write failure');}
-      // createWritable buffers writes until close; readers see a complete file.
-      const pending=path.join(path.dirname(target),'.browser-write-'+(++writeId));
-      try{await writeFile(pending,value,{flag:'wx'});await rename(pending,target);}finally{await rm(pending,{force:true});}
-      return;
-    }
-    if(operation==='read'){if(readGate)await readGate(path.basename(target));try{return await readFile(target,'utf8');}catch(e){if(e.code==='ENOENT')return null;throw e;}}
-    if(operation==='exists'){try{await stat(target);return true;}catch{return false;}}
-  });
-  await page.addInitScript(()=>{
-    localStorage.setItem('dv_tour_v1','done');
-    function dir(name){return {name:name.split('/').pop()||'Test folder',
-      async *values(){for(const entry of await window.folderDisk('entries',name || '/'))yield entry;},
-      async getDirectoryHandle(child,options){if(!await window.folderDisk('mkdir',name+'/'+child,options))throw new DOMException('Missing','NotFoundError');return dir(name+'/'+child);},
-      async getFileHandle(child,options){const file=name+'/'+child;
-        if(!options?.create && !await window.folderDisk('exists',file))throw new DOMException('Missing','NotFoundError');
-        return {async getFile(){const text=await window.folderDisk('read',file);return new File([text],child);},
-          async createWritable(){let value;return {async write(text){value=text;},async close(){await window.folderDisk('write',file,value);},async abort(){}};}};
-      }};}
-    window.pickerCalls=0;
-    window.showDirectoryPicker=async()=>{window.pickerCalls++;if(window.cancelPicker)throw new DOMException('Cancelled','AbortError');return dir(window.pickPath || '');};
-  });
-  await page.route('**/*',async route=>{
-    const url=new URL(route.request().url());
-    if(url.origin!==origin)throw Error('Unexpected network: '+url.href);
-    if(url.pathname.endsWith('/template/flowview.html'))return route.fulfill({contentType:'text/html',body:await readFile(path.join(root,'template/flowview.html'),'utf8')});
-    if(url.pathname==='/index.html')return route.fulfill({contentType:'text/html',body:await readFile(path.join(root,'workbench/flowspec.html'),'utf8')});
-    return route.fulfill({contentType:'application/json',body:'[]'});
-  });
-  await page.goto(origin+'/index.html');
-  return {folder,requests,errors,writes,readGate:gate=>readGate=gate,writeGate:gate=>writeGate=gate,failNextWrite:name=>failWrite=name,get session(){return sessionFolder;},
-    read:async name=>JSON.parse(await readFile(path.join(sessionFolder,name),'utf8')),
-    run:(...args)=>execFileSync('python3',[path.relative(folder,path.join(sessionFolder,'folder-agent.py')),...args],{cwd:folder,encoding:'utf8'}),
-    // The agent registers a request from its own conversation; begin waits for the editor.
-    begin:text=>new Promise((resolve,reject)=>{
-      const child=spawn('python3',[path.join(sessionFolder,'folder-agent.py'),'begin','--text',text],{cwd:folder,stdio:['ignore','pipe','pipe']});let out='',err='';
-      child.stdout.on('data',d=>out+=d);child.stderr.on('data',d=>err+=d);child.on('close',code=>code===0?resolve(JSON.parse(out)):reject(Error(err || 'begin exited '+code)));
-    }),
-    listen:async()=>{
-      await expect(page.locator('#folder-agent-copy')).toBeEnabled();
-      await expect.poll(()=>sessionFolder).toBeTruthy();
-      await expect.poll(async()=>{try{return JSON.parse(await readFile(path.join(sessionFolder,'session.json'),'utf8')).connectionId;}catch{return null;}}).toBeTruthy();
-      // A renewed session retires the old watcher; start one for the current connection.
-      const connection=JSON.parse(await readFile(path.join(sessionFolder,'session.json'),'utf8')).connectionId;
-      if(listenerActive() && listener.connection!==connection)await stopListener();
-      if(!listenerActive()){listener=spawn('python3',[path.join(sessionFolder,'folder-agent.py'),'watch','--minutes','2'],{stdio:'ignore'});listener.connection=connection;}
-      await expect(page.locator('#folder-agent-connection')).toHaveText('Claude listener active');
-    },
-    cleanup:async()=>{await stopListener();await rm(folder,{recursive:true,force:true});}};
-}
-async function closeGuide(page){
-  const guide=page.locator('#folder-agent-guide');
-  if(await guide.evaluate(dialog=>dialog.open)){
-    await page.locator('#folder-agent-close-guide').evaluate(button=>button.click());
-    await expect(guide).not.toBeVisible();
-  }
-}
+import {root,origin,setup,closeGuide,openAgent,askAgent,connectExternal} from '../helpers/folder-agent.mjs';
 async function enablePilot(page){
   const details=page.locator('#folder-agent-pilot-choice');
   if(!await details.evaluate(node=>node.open))await details.locator('summary').click();
@@ -93,26 +16,12 @@ async function enablePilot(page){
   await expect(details.locator('.folder-agent-hint')).toContainText('Off by default');
   await page.locator('#folder-agent-pilot-capture').check();
 }
-async function openAgent(page){
-  if(!await page.locator('#editor-agent').isVisible())await page.locator('#editor-tab-agent').click();
-  await closeGuide(page);
-}
 async function expectWorkbenchCanvas(page){
   const section=page.locator('.workspace-active-section'),viewport=page.viewportSize();
   const shell=await section.locator('.workbench-diagram-canvas').boundingBox(),nav=await page.locator('#docview > .explore-navigation').boundingBox();
   const stage=await section.locator('.explore-stage').boundingBox(),board=await section.locator('.explore-board').boundingBox();
   const metrics=await page.locator('body').evaluate(el=>({top:parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')),inset:parseFloat(getComputedStyle(el).getPropertyValue('--reader-host-inset'))||0}));expect(metrics.top).toBe(Math.ceil(nav.y+nav.height+10));expect(shell).toEqual({x:84+metrics.inset,y:metrics.top,width:viewport.width-96-metrics.inset,height:viewport.height-metrics.top-12});
   expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(board).toEqual(stage);
-}
-async function askAgent(page,h,text){
-  const begun=await h.begin(text),request=await h.read('request.json');expect(request.id).toBe(begun.id);
-  await expect(page.locator('#folder-agent-stage')).toHaveText('Request active · Continue in your agent');
-  return request;
-}
-async function connectExternal(page){
-  await openAgent(page);await page.locator('#folder-agent-open-setup').click();
-  await page.locator('#folder-agent-setup-mode-external').click();await page.locator('#folder-agent-connect').click();
-  await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
 }
 async function topologyFolderFixture(page,connections=false){
   const h=await setup(page),{digest}=await import('../../../tools/canon/drift.mjs');
@@ -577,9 +486,10 @@ test('agent topology declarations preview both states and commit authored source
     const view=page.locator('#agent-update-view'),commit=page.locator('#agent-update-commit');
     await expect(view.locator('[data-dv-node="a"]')).toContainText('Customer camera');await expect(commit).toBeEnabled();
     await expect(page.locator('#agent-update-source')).toHaveValue(proposed);await expect(page.locator('#src')).toHaveValue(current);
-    await page.locator('#agent-update-current').click();await expect(view.locator('[data-dv-node="a"]')).toContainText('Doorbell');
-    await expect(page.locator('#agent-update-source')).toHaveValue(current);await expect(commit).toBeDisabled();
-    await page.locator('#agent-update-proposed').click();await expect(view.locator('[data-dv-node="a"]')).toContainText('Customer camera');
+    // #848: Before and After are both visible; Accept never depends on a side toggle.
+    await expect(page.locator('#agent-update-view-before [data-dv-node="a"]')).toContainText('Doorbell');
+    await expect(page.locator('#agent-update-source-before')).toHaveValue(current);await expect(commit).toBeEnabled();
+    await expect(view.locator('[data-dv-node="a"]')).toContainText('Customer camera');
     await expect(page.locator('#agent-update-source')).toHaveValue(proposed);await expect(commit).toBeEnabled();
     await page.screenshot({path:info.outputPath('agent-topology-preview.png')});await commit.click();
     await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');
@@ -986,8 +896,8 @@ test('external branch copies context without dispatch, accepts native followups 
     expect(h.run('watch','--minutes','.002','--interval','.1')).toBe(''); // Even an optional watcher never dispatches a native request.
     await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-view')).toContainText('Doorbell');
     await page.screenshot({path:info.outputPath('agent-full-preview.png')});
-    await page.locator('#agent-update-current').click();await expect(page.locator('#agent-update-view')).toContainText('My story');await expect(page.locator('#agent-update-commit')).toBeDisabled();
-    await page.locator('#agent-update-proposed').click();await page.locator('#agent-update-commit').click();
+    await expect(page.locator('#agent-update-view-before')).toContainText('My story');await expect(page.locator('#agent-update-commit')).toBeEnabled();
+    await page.locator('#agent-update-commit').click();
     await expect(page.locator('#src')).toHaveValue(source);await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');h.run('reply','--request',request.id,'--text','Ready for our next question here.');
     // The legacy reply above is idempotent; acceptance records a Workbench
     // outcome on the original request, without inventing an agent answer.
@@ -1039,22 +949,32 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     await page.locator('#agent-update-open').click();
     const view=page.locator('#agent-update-view'),stage=view.locator('.explore-stage'),board=view.locator('.explore-board');
     async function contained(){
-      await expect(stage).toBeVisible();
-      const area=await page.locator('#agent-update-scroll').boundingBox(),canvas=await stage.boundingBox(),surface=await board.boundingBox();
-      if(canvas.y<area.y)await info.attach('contained-geometry',{body:JSON.stringify(await page.locator('#agent-update-scroll').evaluate(el=>({scrollTop:el.scrollTop,height:el.clientHeight,scrollHeight:el.scrollHeight,area:el.getBoundingClientRect().toJSON(),nav:el.querySelector('.reader-navigation').getBoundingClientRect().toJSON(),canvas:el.querySelector('.viewer-diagram-canvas').getBoundingClientRect().toJSON()}))),contentType:'application/json'});
-      expect(canvas.x).toBeGreaterThanOrEqual(area.x);expect(canvas.y).toBeGreaterThanOrEqual(area.y);
-      expect(canvas.x+canvas.width).toBeLessThanOrEqual(area.x+area.width+1);
-      expect(canvas.y+canvas.height).toBeLessThanOrEqual(area.y+area.height+1);
-      expect(canvas.width).toBeGreaterThan(400);expect(canvas.height).toBeGreaterThan(260);
-      expect(surface.width).toBeGreaterThan(400);expect(surface.height).toBeGreaterThan(260);
-      for(const id of ['close','current','proposed','highlights','details','discard','commit']){
+      /* Both panes: each canvas sits inside its own pane's scroll area at a usable size. */
+      for(const [scroll,pane] of [['#agent-update-scroll',view],['#agent-update-scroll-before',page.locator('#agent-update-view-before')]]){
+        const paneStage=pane.locator('.explore-stage'),paneBoard=pane.locator('.explore-board');
+        await expect(paneStage).toBeVisible();
+        const area=await page.locator(scroll).boundingBox(),canvas=await paneStage.boundingBox(),surface=await paneBoard.boundingBox();
+        if(canvas.y<area.y)await info.attach('contained-geometry',{body:JSON.stringify({scroll,area,canvas}),contentType:'application/json'});
+        expect(canvas.x).toBeGreaterThanOrEqual(area.x);expect(canvas.y).toBeGreaterThanOrEqual(area.y);
+        expect(canvas.x+canvas.width).toBeLessThanOrEqual(area.x+area.width+1);
+        expect(canvas.y+canvas.height).toBeLessThanOrEqual(area.y+area.height+1);
+        /* #848: each canvas is one of two panes beside the change list (about 345px wide at a 1024px window). */
+        expect(canvas.width,scroll+' canvas width').toBeGreaterThan(320);expect(canvas.height,scroll+' canvas height').toBeGreaterThan(260);
+        expect(surface.width,scroll+' board width').toBeGreaterThan(320);expect(surface.height,scroll+' board height').toBeGreaterThan(260);
+      }
+      /* The panes sit side by side: Before left of After, neither stacked under the other. */
+      const left=await page.locator('#agent-update-scroll-before').boundingBox(),right=await page.locator('#agent-update-scroll').boundingBox();
+      expect(left.x+left.width).toBeLessThanOrEqual(right.x+1);expect(Math.abs(left.y-right.y)).toBeLessThanOrEqual(1);
+      for(const id of ['close','previous','next','details','discard','commit']){
         const control=page.locator('#agent-update-'+id);await expect(control).toBeInViewport();
         if(await control.isEnabled())await control.click({trial:true});
       }
     }
-    async function changedNodeVisible(title){
+    /* minWidth: the framed change is legible (>=80px); after a manual Fit of a half-width pane the
+       whole section fits and the node is smaller, so only visibility and coverage are checked. */
+    async function changedNodeVisible(title,minWidth=80){
       const node=view.locator('[data-dv-node="b"]'),label=node.locator('.t1');await expect(node).toContainText(title);
-      await expect.poll(()=>node.evaluate(el=>{const r=el.getBoundingClientRect(),label=el.querySelector('.t1').getBoundingClientRect(),stage=el.closest('.explore-stage').getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return r.width>=80 && r.height>=28 && label.height>=8 && r.left>=stage.left && r.right<=stage.right && r.top>=stage.top && r.bottom<=stage.bottom && !!hit && el.contains(hit);})).toBe(true);
+      await expect.poll(()=>node.evaluate((el,minWidth)=>{const r=el.getBoundingClientRect(),label=el.querySelector('.t1').getBoundingClientRect(),stage=el.closest('.explore-stage').getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return r.width>=minWidth && r.height>=(minWidth?28:12) && label.height>=(minWidth?8:5) && r.left>=stage.left && r.right<=stage.right && r.top>=stage.top && r.bottom<=stage.bottom && !!hit && el.contains(hit);},minWidth)).toBe(true);
       await expect(label).toBeVisible();
     }
     const fullDialog=await page.locator('#agent-update-dialog').boundingBox(),viewport=page.viewportSize();
@@ -1063,14 +983,12 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     await expect(page.locator('#agent-update-details-panel')).toBeHidden();await expect(page.locator('#agent-update-note')).toBeHidden();
     await page.screenshot({path:info.outputPath('explore-review-default-1280x720.png')});await contained();
     await expect(view.locator('.reader-top>.reader-button').first()).toHaveAttribute('aria-expanded','false');await changedNodeVisible('Delivery service');
-    await expect(view.locator('.explore-window:visible')).toHaveCount(0);await view.locator('.explore-panel-menu summary').click();
-    await expect(view.getByRole('button',{name:'Restore panels',exact:true})).toBeVisible();await expect(view.locator('.explore-overlay-value')).toHaveText('50%');await view.locator('.explore-panel-menu summary').click();
+    /* #848 Full mode shows the section's panels (compare-view.spec.mjs V5); they stay at half scale and off the changed node (changedNodeVisible). */
+    await view.locator('.explore-panel-menu summary').click();await expect(view.locator('.explore-overlay-value')).toHaveText('50%');await view.locator('.explore-panel-menu summary').click();
     await expect(view.locator('[data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');
-    await expect(page.locator('#agent-update-change-status')).toContainText('1 modified');
-    await expect(page.locator('#agent-update-highlights')).toHaveAttribute('aria-pressed','true');
-    await page.locator('#agent-update-highlights').click();await expect(view).not.toHaveAttribute('data-agent-highlights','');
-    await expect(view.locator('[data-dv-node="b"]')).not.toHaveAttribute('data-agent-change');
-    await page.locator('#agent-update-highlights').click();await expect(view.locator('[data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');
+    await expect(page.locator('#agent-update-change-status')).toContainText('2 modified');/* #848: the count covers every listed change, including the coverage ledger */
+    await expect(page.locator('#agent-update-highlights')).toHaveCount(0);
+    await expect(page.locator('#agent-update-view-before [data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');
     await contained();
     await view.locator('.explore-legend-menu>summary').click();
     await expect(view.getByRole('group',{name:'Edge legend',exact:true}).locator('.li')).toBeVisible();
@@ -1084,8 +1002,10 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     await expect(view.locator('.stepline')).toContainText('Recording ready');
     await view.locator('.path-chip[data-dv-path="failed"]').click();await expect(view.locator('.stepline')).toContainText('Exact hidden failure');
     await view.locator('.path-chip[data-dv-path="happy"]').click();
-    await expect(view.locator('.explore-window:visible')).toHaveCount(0);
-    await view.locator('.explore-panel-menu summary').click();await view.getByRole('button',{name:'Restore panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(1);
+    /* #848 Full mode starts with panels shown; Hide and Restore still work. */
+    await expect(view.locator('.explore-window:visible')).toHaveCount(1);
+    await view.locator('.explore-panel-menu summary').click();await view.getByRole('button',{name:'Hide panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(0);
+    await view.getByRole('button',{name:'Restore panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(1);
     await view.getByRole('button',{name:'Hide panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(0);
     await view.locator('.explore-panel-menu>summary').click();
     const reviewStage=await stage.boundingBox(),reviewZoom=await zoom.innerText();
@@ -1096,15 +1016,21 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     await page.screenshot({path:info.outputPath('explore-review-details-1280x720.png')});
     await page.locator('#agent-update-details-close').click();await expect(page.locator('#agent-update-details-panel')).toBeHidden();expect(await stage.boundingBox()).toEqual(reviewStage);expect(await zoom.innerText()).toBe(reviewZoom);
     await page.locator('#agent-update-details').click();await page.keyboard.press('Escape');await expect(page.locator('#agent-update-details-panel')).toBeHidden();await expect(page.locator('#agent-update-dialog')).toBeVisible();expect(await zoom.innerText()).toBe(reviewZoom);
-    await contained();await changedNodeVisible('Delivery service');
-    await page.locator('#agent-update-current').click();await changedNodeVisible('Backend');
-    await expect(view.locator('[data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');await expect(page.locator('#agent-update-change-status')).toContainText('1 modified');
-    await expect(page.locator('#agent-update-commit')).toBeDisabled();await contained();
-    await page.locator('#agent-update-details').click();await expect(page.locator('#agent-update-ledger-summary')).toHaveText('Coverage ledger · Current state');await expect(page.locator('#agent-update-ledger')).toHaveText('No coverage ledger yet.');
-    await page.locator('#agent-update-proposed').click();await expect(page.locator('#agent-update-ledger')).toContainText('The service name changed');await page.locator('#agent-update-details-close').click();await contained();await changedNodeVisible('Delivery service');
-    await view.locator('.reader-top-view[data-tab-view$="-brief"]').click();await expect(stage).toBeHidden();
+    await contained();await changedNodeVisible('Delivery service',0);/* the reviewer pressed Fit above */
+    await expect(page.locator('#agent-update-view-before [data-dv-node="b"]')).toContainText('Backend');
+    await expect(page.locator('#agent-update-view-before [data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');await expect(page.locator('#agent-update-change-status')).toContainText('2 modified');
+    await expect(page.locator('#agent-update-commit')).toBeEnabled();await contained();
+    await page.locator('#agent-update-details').click();await expect(page.locator('#agent-update-ledger-before-summary')).toHaveText('Coverage ledger · Current state');await expect(page.locator('#agent-update-ledger-before')).toHaveText('No coverage ledger yet.');
+    await expect(page.locator('#agent-update-ledger')).toContainText('The service name changed');await page.locator('#agent-update-details-close').click();await contained();await changedNodeVisible('Delivery service',0);/* still after the reviewer's Fit */
+    /* A half-width pane may show the View tabs as the "Choose View" picker; use whichever is shown. */
+    const chooseView=async suffix=>{const tab=view.locator('.reader-top-view[data-tab-view$="-'+suffix+'"]');
+      if(await tab.isVisible())return tab.click();
+      const picker=view.getByRole('combobox',{name:'Choose View',exact:true});await expect(picker).toBeVisible();
+      const value=await picker.locator('option').evaluateAll((options,suffix)=>(options.find(o=>o.value.endsWith('-'+suffix))||{}).value,suffix);
+      expect(value,'the picker offers the '+suffix+' View').toBeTruthy();await picker.selectOption(value);};
+    await chooseView('brief');await expect(stage).toBeHidden();
     await expect(view.locator('[data-dv-node="b"]')).toBeVisible();
-    await view.locator('.reader-top-view[data-tab-view$="-explore"]').click();await contained();
+    await chooseView('explore');await contained();
     await page.locator('#agent-update-close').click();await expect(page.locator('#agent-update-dialog')).not.toBeVisible();
     await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
     await page.locator('#agent-update-open').click();await contained();
@@ -1177,9 +1103,9 @@ test('agent review keeps moved-node edge labels and step coins on its own board'
     }
     expect(await geometry(editor)).toEqual(before);await expect(page.locator('#src')).toHaveValue(original);
     await page.screenshot({path:info.outputPath('moved-edge-labels-proposed.png')});
-    await page.locator('#agent-update-current').click();expect(await geometry(view)).toEqual(before);
-    await expect(page.locator('#agent-update-commit')).toBeDisabled();
-    await page.locator('#agent-update-proposed').click();expect(await geometry(view)).toEqual(candidate);
+    await expect(page.locator('#agent-update-view-before'),'the Before pane is shown next to the proposal').toBeVisible();
+    expect(await geometry(page.locator('#agent-update-view-before'))).toEqual(before);
+    await expect(page.locator('#agent-update-commit')).toBeEnabled();expect(await geometry(view)).toEqual(candidate);
     await page.locator('#agent-update-commit').click();await expect(page.locator('#src')).toHaveValue(proposed);
     expect(await geometry(editor)).toEqual(candidate);
     await page.screenshot({path:info.outputPath('moved-edge-labels-accepted.png')});
@@ -1727,10 +1653,10 @@ test('diagram folder opens an existing named pair without metadata and reviews l
     await page.locator('#agent-update-ledger').focus();await page.keyboard.press('PageDown');
     await expect.poll(()=>page.locator('#agent-update-ledger').evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
     expect(await readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(beforeLedger);
-    await page.locator('#agent-update-current').click();await expect(page.locator('#agent-update-ledger')).toHaveText(beforeLedger.trim());
-    await expect(page.locator('#agent-update-ledger')).toBeVisible();
-    await expect(page.locator('#agent-update-ledger-summary')).toHaveText('Coverage ledger · Current state');
-    await page.locator('#agent-update-proposed').click();await page.screenshot({path:info.outputPath('paired-diagram-ledger-details.png')});
+    await expect(page.locator('#agent-update-ledger-before')).toHaveText(beforeLedger.trim());
+    await expect(page.locator('#agent-update-ledger-before')).toBeVisible();
+    await expect(page.locator('#agent-update-ledger-before-summary')).toHaveText('Coverage ledger · Current state');
+    await page.screenshot({path:info.outputPath('paired-diagram-ledger-details.png')});
     await expect(page.locator('#agent-update-ledger')).toHaveText(afterLedger.trim());
     await page.locator('#agent-update-details-close').click();await expect(page.locator('#agent-update-ledger')).toBeHidden();
     await expect(page.locator('#agent-update-commit')).toBeInViewport();
@@ -2037,34 +1963,45 @@ test('agent change navigation reaches other Views and paths and preserves stable
     await writeFile(path.join(h.session,'candidate.spec.json'),proposed);await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nReviewed recovery evidence.\n');
     h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Review recovery changes');
     await page.locator('#agent-update-open').click();
-    const scroller=page.locator('#agent-update-scroll');await scroller.evaluate(el=>el.scrollTop=240);const priorScroll=await scroller.evaluate(el=>el.scrollTop);expect(priorScroll).toBeGreaterThan(0);
-    await page.locator('#agent-update-current').click();await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBe(priorScroll);
-    await page.locator('#agent-update-proposed').click();await expect.poll(()=>scroller.evaluate(el=>el.scrollTop)).toBe(priorScroll);
-    await page.locator('#agent-update-changes').click();
-    const list=page.locator('#agent-update-change-list'),view=page.locator('#agent-update-view'),position=page.locator('#agent-update-position');
-    await list.getByRole('button',{name:/modified · Delivery · View Recovery/}).click();await expect(view.locator('.reader-top-view').filter({hasText:'Recovery review'})).toHaveAttribute('aria-selected','true');
-    await list.getByRole('button',{name:/modified · Recovery · Path Failure/}).click();await expect(view.locator('.explore-active-section [data-dv-path="failed"]')).toHaveAttribute('aria-pressed','true');
-    await list.getByRole('button',{name:/modified · Recovery · Step Exact hidden failure/}).click();
+    // #848: both panes are visible; the rail selection frames both (one-way); each pane keeps its own camera.
+    const rail=page.locator('#agent-update-compare .compare-rail'),view=page.locator('#agent-update-view'),before=page.locator('#agent-update-view-before'),position=page.locator('#agent-update-position');
+    await expect(rail,'the change rail is shown').toBeVisible();
+    const item=name=>rail.getByRole('button',{name});
+    await item(/^Modified · Path Retry failure · label$/).click();
+    for(const side of [view,before])await expect(side.locator('.explore-active-section [data-dv-path="failed"]')).toHaveAttribute('aria-pressed','true');
+    await item(/^Modified · Step failed · text$/).click();
     await expect(view.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','1');
     await expect(view.locator('.explore-active-section .schip[aria-current="true"]')).toHaveAttribute('data-step-source','0');
-    await page.locator('#agent-update-changes-close').click();
-    await view.getByRole('button',{name:'Zoom out',exact:true}).click();
-    const camera=()=>view.locator('.explore-active-section .explore-board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
-    await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));const before=await camera();
+    await expect(before.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','2');
+    await expect(before.locator('.explore-active-section .schip[aria-current="true"]')).toHaveAttribute('data-step-source','2');
+    const camera=scope=>scope.locator('.explore-active-section .explore-board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
+    const settle=()=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+    /* Wheel over a point of the pane's board that no floating panel covers. */
+    const wheelOnBoard=async scope=>{
+      const point=await scope.locator('.explore-active-section .explore-board').evaluate(board=>{const r=board.getBoundingClientRect();
+        for(let y=r.top+16;y<r.bottom-16;y+=24)for(let x=r.left+16;x<r.right-16;x+=24){const hit=document.elementFromPoint(x,y);if(hit && board.contains(hit) && !hit.closest('.explore-window,.workspace-window,.explore-tools,button'))return {x,y};}
+        return null;});
+      expect(point,'the board has an uncovered point').not.toBeNull();await page.mouse.move(point.x,point.y);await page.mouse.wheel(120,80);
+    };
+    /* Each pane's camera must move only from its own input, in both directions, for zoom and pan. */
+    const ownMoveOnly=async(moved,other,label,act)=>{
+      await settle();const otherCam=await camera(other),movedCam=await camera(moved);
+      await act();await expect.poll(async()=>JSON.stringify(await camera(moved)),{message:label+' changes its own camera'}).not.toBe(JSON.stringify(movedCam));
+      await settle();expect(await camera(other),label+' leaves the other pane camera unchanged').toEqual(otherCam);
+    };
+    /* Each pane opens fitted at its minimum zoom, so zoom in (zoom out cannot move a fitted camera). */
+    await ownMoveOnly(view,before,'zooming the After pane',()=>view.getByRole('button',{name:'Zoom in',exact:true}).click());
+    await ownMoveOnly(before,view,'zooming the Before pane',()=>before.getByRole('button',{name:'Zoom in',exact:true}).click());
+    await ownMoveOnly(view,before,'panning the After pane',async()=>{await wheelOnBoard(view);});
+    await ownMoveOnly(before,view,'panning the Before pane',async()=>{await wheelOnBoard(before);});
     await page.screenshot({path:info.outputPath('change-navigation-proposed-1280x720.png')});
-    await page.locator('#agent-update-current').click();
-    await expect(view.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','2');
-    await expect(view.locator('.explore-active-section .schip[aria-current="true"]')).toHaveAttribute('data-step-source','2');
-    await expect.poll(async()=>{const now=await camera();return now.zoom===before.zoom && Math.abs(now.x-before.x)<8 && Math.abs(now.y-before.y)<8;}).toBe(true);await expect(page.locator('#agent-update-commit')).toBeDisabled();
-    await page.locator('#agent-update-proposed').click();await expect.poll(async()=>{const now=await camera();return now.zoom===before.zoom && Math.abs(now.x-before.x)<8 && Math.abs(now.y-before.y)<8;}).toBe(true);
-    await expect(view.locator('.explore-active-section .schip[aria-current="true"]')).toHaveAttribute('data-step-source','0');
-    await page.locator('#agent-update-changes').click();await list.getByRole('button',{name:/removed · Recovery · Node Retired worker/}).click();
-    await expect(page.locator('#agent-update-current')).toHaveAttribute('aria-pressed','true');await expect(position).toContainText('Current');
-    await expect(view.locator('[data-dv-node="retired"]')).toBeVisible();await page.locator('#agent-update-proposed').click();await expect(position).toContainText('no counterpart');
-    await list.getByRole('button',{name:/modified · Unpublished section · Node Backend/}).click();await expect(position).toContainText('not included in a View');await expect(page.locator('#agent-update-source')).toBeFocused();
-    await page.locator('#agent-update-details-close').click();await page.locator('#agent-update-changes').click();await list.getByRole('button',{name:/Coverage ledger/}).click();await expect(page.locator('#agent-update-ledger')).toBeFocused();
+    await item(/^Removed · Node Retired worker$/).click();await expect(position).toContainText('Removed');await expect(position).toContainText('not in the proposal');
+    await expect(before.locator('[data-dv-node="retired"]')).toBeVisible();await expect(page.locator('#agent-update-commit')).toBeEnabled();
+    await item(/^Added · Node Replacement worker$/).click();await expect(view.locator('[data-dv-node="replacement"]')).toBeVisible();await expect(position).toContainText('not in the current document');
+    await item(/^Modified · Node Unpublished backend · title$/).click();await expect(position).toContainText('not included in a View');await expect(page.locator('#agent-update-source')).toBeFocused();
+    await page.locator('#agent-update-details-close').click();await item(/^Modified · Coverage ledger$/).click();await expect(page.locator('#agent-update-ledger')).toBeFocused();
     await expect(page.locator('#src')).toHaveValue(original);await page.locator('#agent-update-details-close').click();
-    await page.setViewportSize({width:1440,height:900});await page.locator('#agent-update-next').click();await page.locator('#agent-update-details-close').click();await page.locator('#agent-update-changes').click();
+    await page.setViewportSize({width:1440,height:900});await page.locator('#agent-update-next').click();await page.locator('#agent-update-details-close').click();
     await page.screenshot({path:info.outputPath('change-navigation-list-1440x900.png')});
     await page.locator('#agent-update-close').click();await expect(page.locator('#src')).toHaveValue(original);expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
@@ -2080,18 +2017,20 @@ test('agent change navigation restores legacy Views after reorder and reveals an
     await connectExternal(page);await askAgent(page,h,'Rename the recovery backend.');const request=await h.read('request.json'),state=await h.read('state.json');
     beta.diagram.nodes.b.title='Recovery backend';raw.page.blocks.reverse();const proposed=JSON.stringify(raw);
     await writeFile(path.join(h.session,'candidate.spec.json'),proposed);await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nReviewed backend.\n');h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md');
-    await page.locator('#agent-update-open').click();await page.locator('#agent-update-next').click();
-    const view=page.locator('#agent-update-view'),node=view.locator('.explore-active-section [data-dv-node="b"]'),board=view.locator('.explore-active-section .explore-board');
-    await expect(node).toBeInViewport();await view.getByRole('button',{name:'Zoom in',exact:true}).click();
-    await board.evaluate(el=>{el.scrollLeft=el.scrollWidth;el.scrollTop=el.scrollHeight;});await expect(node).not.toBeInViewport();
-    await page.locator('#agent-update-changes').click();await page.locator('#agent-update-change-list').getByRole('button',{name:/Recovery · Node Backend/}).click();await page.locator('#agent-update-changes-close').click();await expect(node).toBeInViewport();
-    const camera=()=>board.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
-    await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));const before=await camera();
-    await page.locator('#agent-update-current').click();await expect(view.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','2');await expect(node).toContainText('Backend');await expect.poll(camera).toEqual(before);
-    const viewPicker=view.getByRole('combobox',{name:'Choose View',exact:true});
+    await page.locator('#agent-update-open').click();
+    const view=page.locator('#agent-update-view'),before=page.locator('#agent-update-view-before'),node=view.locator('.explore-active-section [data-dv-node="b"]'),board=view.locator('.explore-active-section .explore-board');
+    const item=page.locator('#agent-update-compare .compare-rail').getByRole('button',{name:/^Modified · Node Recovery backend · title$/});
+    await expect(item,'the rail lists the backend rename').toBeVisible();await item.click();await expect(node).toBeInViewport();await view.getByRole('button',{name:'Zoom in',exact:true}).click();
+    await board.hover();for(let i=0;i<12 && await node.isVisible() && await node.evaluate(el=>{const r=el.getBoundingClientRect();return r.right>0 && r.bottom>0 && r.left<innerWidth && r.top<innerHeight;});i++)await page.mouse.wheel(600,600);
+    await expect(node).not.toBeInViewport();
+    await page.locator('#agent-update-next').click();await page.locator('#agent-update-previous').click();await expect(node).toBeInViewport();
+    // One-way framing: the Before pane shows the same change in its own section and View.
+    await expect(before.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','2');await expect(before.locator('.explore-active-section [data-dv-node="b"]')).toContainText('Backend');
+    await expect(before.locator('.explore-active-section [data-dv-node="b"]')).toBeInViewport();
+    const viewPicker=before.getByRole('combobox',{name:'Choose View',exact:true});
     if(await viewPicker.isVisible())await expect(viewPicker.locator('option:checked')).toHaveText('Recovery · Recovery canvas');
-    else await expect(view.getByRole('tab',{name:'Recovery · Recovery canvas',exact:true})).toHaveAttribute('aria-selected','true');
-    await page.locator('#agent-update-proposed').click();await expect(view.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','1');await expect.poll(camera).toEqual(before);
+    else await expect(before.getByRole('tab',{name:'Recovery · Recovery canvas',exact:true})).toHaveAttribute('aria-selected','true');
+    await expect(view.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','1');
     await page.screenshot({path:info.outputPath('change-navigation-legacy-camera-1440x900.png')});
     await expect(page.locator('#src')).toHaveValue(original);await page.locator('#agent-update-discard').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('rejected');expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}

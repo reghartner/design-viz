@@ -1,0 +1,30 @@
+/* Side-by-side compare view (#848): rail on the left, Before and After panes. */
+.compare-view{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:0;height:100%;min-height:0;}
+.compare-rail{overflow:auto;border-right:1px solid var(--line,#d6dbe4);padding:10px 10px 16px;background:var(--card,#fff);min-height:0;}
+.compare-rail-group{margin:0 0 14px;}
+.compare-rail-heading{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#5b6578);margin:6px 4px 6px;font-weight:600;}
+.compare-rail-list{list-style:none;margin:0;padding:0;}
+.compare-rail-list li{margin:0 0 4px;}
+.compare-rail-item{display:block;width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;line-height:1.4;padding:7px 10px;border:1px solid transparent;border-left:3px solid transparent;border-radius:6px;background:none;color:inherit;font:inherit;font-size:13px;cursor:pointer;}
+.compare-rail-item:hover{background:color-mix(in srgb,var(--accent,#2f6fed) 7%,transparent);}
+.compare-rail-item[aria-current="true"]{border-color:color-mix(in srgb,var(--accent,#2f6fed) 45%,transparent);border-left-color:var(--accent,#2f6fed);background:color-mix(in srgb,var(--accent,#2f6fed) 12%,var(--card,#fff));}
+.compare-rail-item[data-change-status="added"]{border-left-color:#24a36b55;}.compare-rail-item[data-change-status="removed"]{border-left-color:#d1435b55;}
+.compare-rail-empty{color:var(--muted,#5b6578);font-size:13px;margin:8px 4px;}
+.compare-columns{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:0;min-width:0;padding:8px 10px;background:var(--bg,#f4f6fa);}
+.compare-pane{display:flex;flex-direction:column;min-height:0;min-width:0;border:1px solid var(--line,#d6dbe4);border-radius:8px;background:var(--card,#fff);overflow:hidden;}
+.compare-pane[data-side="before"]{border-top:3px solid #d1435b;}.compare-pane[data-side="after"]{border-top:3px solid #24a36b;}
+.compare-pane-head{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line,#d6dbe4);}
+.compare-pane-title{margin:0;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted,#5b6578);font-weight:600;}
+.compare-pane-scroll{flex:1;min-height:0;overflow:auto;contain:strict;padding:6px 8px;}
+.compare-pane-scroll.viewer-exploring{overflow:hidden;}
+.compare-pane-empty{color:var(--muted,#5b6578);padding:24px;text-align:center;}
+.compare-pane-scroll [data-agent-change]{outline:3px solid var(--agent-change-color,#d6a100);outline-offset:3px;}
+.compare-pane-scroll [data-agent-change="added"]{--agent-change-color:#24a36b;}
+.compare-pane-scroll [data-agent-change="removed"]{--agent-change-color:#d1435b;outline-style:dashed;}
+.compare-pane-scroll path[data-dv-edge][data-agent-change]{stroke:var(--agent-change-color,#d6a100)!important;stroke-width:4px!important;outline:0;}
+.compare-pane-scroll .doc-sec[data-agent-change]{outline:0;box-shadow:inset 0 0 0 3px var(--agent-change-color,#d6a100);}
+/* The Workbench dialog styles every nav as a centered row; the rail is a column list. */
+.compare-view>nav.compare-rail{display:block;}
+/* renderPage replaces the view element's class, so pane rules hang off .compare-pane-scroll.
+   Each pane keeps its own +/- zoom buttons even when the pane is narrow. */
+.compare-pane-scroll .reader-narrow .reader-zoom-controls>.reader-button{display:inline-flex;}

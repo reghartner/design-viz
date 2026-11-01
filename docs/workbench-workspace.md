@@ -281,7 +281,8 @@ spec and ledger from the connected folder.
 and connection IDs; the accepted diagram and ledger stay unchanged.
 Both modes review spec/ledger proposals through **Preview Agent Updates** in the
 update banner.
-The review fills the browser workspace, keeps Current/Proposed and decisions in a
+The review fills the browser workspace with the current document (Before, left)
+and the proposal (After, right) beside a list of changes, keeps decisions in a
 pinned bar, and puts its summary, ledger and JSON in **Details**. **Accept changes**
 saves both artifacts as one Undo action; a Git commit remains
 a separate action in the agent. See [diagram folders](folder-agent-session.md).

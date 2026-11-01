@@ -543,9 +543,9 @@ function showCommunicationFailures(board,failures,animate,options){
   Object.keys(failures || {}).forEach(function(key){
     var info = board.edgeIds[key], path = info && info.pathEl;
     if (!path || info.e.hidden===true || (!options.live && path.classList.contains('dv-fragment-hidden'))) return;
-    var length = path.getTotalLength();
+    var length = pathLength(path);
     if (!Number.isFinite(length) || length <= 0) return;
-    var mode = failures[key], split = communicationBreak(length), point = path.getPointAtLength(split.stop);
+    var mode = failures[key], split = communicationBreak(length), point = pathPointAt(path, split.stop);
     function svgEl(tag,attrs,parent){
       var el = document.createElementNS(SVGNS,tag);
       Object.keys(attrs).forEach(function(k){el.setAttribute(k,attrs[k]);});
@@ -679,6 +679,33 @@ function coinPointOnCard(pt, index){
     return pt.x > r.x + COIN_PAD && pt.x < r.x + r.w - COIN_PAD && pt.y > r.y + COIN_PAD && pt.y < r.y + r.h - COIN_PAD;
   });
 }
+/* Optional path-geometry cache. Path lengths and points depend only on the
+   path's d attribute, so renders that draw the same edges (the two panes of a
+   compare view) can share them. Off (null) unless a caller opens a scope with
+   withPathGeometryCache; then results are plain {x, y} copies. */
+var PATH_GEOMETRY_CACHE = null;
+function pathGeometryEntry(path){
+  var d = path.getAttribute && path.getAttribute('d');
+  if (!d) return null;
+  var e = PATH_GEOMETRY_CACHE.get(d);
+  if (!e){ e = {length:path.getTotalLength(), points:new Map()}; PATH_GEOMETRY_CACHE.set(d, e); }
+  return e;
+}
+function pathLength(path){
+  var e = PATH_GEOMETRY_CACHE && pathGeometryEntry(path);
+  return e ? e.length : path.getTotalLength();
+}
+function pathPointAt(path, at){
+  var e = PATH_GEOMETRY_CACHE && pathGeometryEntry(path);
+  if (!e) return path.getPointAtLength(at);
+  var p = e.points.get(at);
+  if (!p){ var q = path.getPointAtLength(at); p = {x:q.x, y:q.y}; e.points.set(at, p); }
+  return p;
+}
+function withPathGeometryCache(cache, fn){
+  var previous = PATH_GEOMETRY_CACHE; PATH_GEOMETRY_CACHE = cache;
+  try{ return fn(); }finally{ PATH_GEOMETRY_CACHE = previous; }
+}
 function coinSlots(path, len, mid, n, avoid, marked){
   if (n < 1) return [];
   var index = avoid && avoid.cells ? avoid : coinObstacleIndex(avoid);
@@ -695,7 +722,7 @@ function coinSlots(path, len, mid, n, avoid, marked){
     var centre = Math.min(hi, Math.max(lo, len / 2));
     row = [];
     for (var i = 0; i < n; i++){
-      var p = path.getPointAtLength(centre + (i - (n - 1) / 2) * spacing);
+      var p = pathPointAt(path, centre + (i - (n - 1) / 2) * spacing);
       row.push({x: p.x, y: p.y});
     }
     if (!coinsApart(row, clearance)) row = null;
@@ -703,7 +730,7 @@ function coinSlots(path, len, mid, n, avoid, marked){
   }
   /* block axes in reading order: along runs left to right (top to bottom when
      vertical), across runs top to bottom (left to right when vertical) */
-  var p0 = path.getPointAtLength(Math.max(0, len / 2 - 2)), p1 = path.getPointAtLength(Math.min(len, len / 2 + 2));
+  var p0 = pathPointAt(path, Math.max(0, len / 2 - 2)), p1 = pathPointAt(path, Math.min(len, len / 2 + 2));
   var dx = p1.x - p0.x, dy = p1.y - p0.y, dl = Math.hypot(dx, dy);
   if (!(dl > 0)){ dx = 1; dy = 0; dl = 1; }
   dx /= dl; dy /= dl;
@@ -716,7 +743,7 @@ function coinSlots(path, len, mid, n, avoid, marked){
   [-1, 1].forEach(function(dir){
     var run = 0, limit = Math.min(len / 2 - end, need);
     while (run + 2 <= limit){
-      var q = path.getPointAtLength(len / 2 + dir * (run + 2));
+      var q = pathPointAt(path, len / 2 + dir * (run + 2));
       if (Math.abs((q.x - mid.x) * dy - (q.y - mid.y) * dx) > 1.5) break;
       run += 2;
     }
@@ -1272,8 +1299,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var path = svg.getElementById(info.domId);
     info.pathEl = path;
     info.haloEl = svg.querySelector('path.halo[data-dv-edge=\"' + info.idx + '\"]');
-    var len = path.getTotalLength();
-    var mid = path.getPointAtLength(len * 0.5);
+    var len = pathLength(path);
+    var mid = pathPointAt(path, len * 0.5);
     var edgeSteps = stepsByEdge[e.from + '->' + e.to] || [];
     var stepN = edgeSteps.length ? edgeSteps[0] : 0;
     var coinLeft = mid.x, coinLeftY = mid.y;
@@ -1365,9 +1392,9 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     (d.edges || []).forEach(function(e){
       var info = edgeIds[e.from + '->' + e.to];
       var path = svg.getElementById(info.domId);
-      var len = path.getTotalLength();
+      var len = pathLength(path);
       for (var t = 18; t < len - 8; t += 36){
-        var pt = path.getPointAtLength(t);
+        var pt = pathPointAt(path, t);
         obstacles.push({x: pt.x - 3, y: pt.y - 3, w: 6, h: 6});
       }
     });
@@ -1518,7 +1545,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       var info = edgeIds[k];
       if (!info) return;
       var path = svg.getElementById(info.domId);
-      var dur = Math.max(1.6, path.getTotalLength() / 260);
+      var dur = Math.max(1.6, pathLength(path) / 260);
       var dot = makeDot(info, 'pkt loopdot');
       dot.appendChild(motion(info.domId, dur, (-(i * 0.7 + j * 0.35)).toFixed(2) + 's', false));
       svg.appendChild(dot);
@@ -1533,7 +1560,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       if (!info || manualDone[k]) return;
       manualDone[k] = true;
       var path = svg.getElementById(info.domId);
-      var dur = clamp(path.getTotalLength() / 450, 0.8, 1.6);
+      var dur = clamp(pathLength(path) / 450, 0.8, 1.6);
       var dot = makeDot(info, 'pkt cpkt');
       dot.appendChild(motion(info.domId, dur, 'indefinite', true, prefix + '-am-' + info.idx));
       svg.appendChild(dot);

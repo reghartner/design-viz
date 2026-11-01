@@ -13,10 +13,13 @@
    V3 navigation       first change selected on open; Next/Previous and J/K move the selection
                        with wrap-around; aria-current and "i of n" follow                         rejects: buttons only; no wrap
    V4 step sync        selecting a step change puts BOTH panes on that step (each pane's caption)  rejects: only the After pane moves
+   V4b dialog focused  #848 PR 2 (Chuck 2026-11-01): the agent dialog mounts the view in Focused mode by
+                       default; selecting the step s2 change shows one Power row with "value 6 → 42"   rejects: dialog forces Full mode
    V5 full mode        each pane renders exactly the selected section's nodes (by id, per side)
                        and the section's declared panel;
                        selecting a node change brings it into view in both panes; a manual wheel
-                       scroll of the Before pane leaves the After pane's scroll unchanged          rejects: two-way lock; unframed target; wrong section
+                       scroll of the Before pane leaves the After pane's scroll unchanged; zooming
+                       either pane with its Zoom in button leaves the other pane's zoom and board          rejects: two-way lock; unframed target; wrong section
    V6 accept           with both panes shown, Accept stays enabled while every change is selected in
                        turn (added and step changes included); one Undo restores; Redo re-applies     rejects: Accept gated on a side toggle
    V7, V7b, V8b        viewer-only component page: see compare-view-standalone.spec.mjs
@@ -141,9 +144,23 @@ test('V4 selecting a step change puts both panes on that step',async({page})=>{
     await expect(caption(after)).toContainText('Store confirms the write');
   });
 });
+test('V4b the agent dialog opens Focused and shows the changed panel of a step change',async({page})=>{
+  await withProposal(page,async()=>{
+    const host=page.locator('#agent-update-compare');
+    await expect(host.getByRole('button',{name:'Focused',exact:true})).toHaveAttribute('aria-pressed','true');
+    await rail(host).getByRole('button',{name:ITEMS[1],exact:true}).click();
+    const rows=host.locator('.compare-focus-row');
+    await expect(rows).toHaveCount(1);await expect(rows.first()).toHaveAttribute('data-panel-id','p');
+    await expect(rows.first().locator('.compare-focus-chip')).toHaveText(['value 6 → 42']);
+    await expect(rows.first().locator('.compare-focus-cell[data-side="before"] .gaugeval')).toHaveText('6 mA');
+    await expect(rows.first().locator('.compare-focus-cell[data-side="after"] .gaugeval')).toHaveText('42 mA');
+  });
+});
 test('V5 Full mode renders each section exactly and frames a node change in both panes; manual scroll stays per pane',async({page})=>{
   await withProposal(page,async()=>{
     const before=dialogPane(page,'before'),after=dialogPane(page,'after');
+    /* #848 PR 2: Focused is the default; this test covers the Full diagram mode. */
+    await page.locator('#agent-update-compare').getByRole('button',{name:'Full diagram',exact:true}).click();
     const ids=(scope,section)=>scope.locator('[data-dv-section="'+section+'"] g.node[data-dv-node]').evaluateAll(nodes=>[...new Set(nodes.map(n=>n.getAttribute('data-dv-node')))].sort());
     await expect.poll(()=>ids(before,0)).toEqual(['a','b','c']);await expect.poll(()=>ids(after,0)).toEqual(['a','b','c']);
     await expect.poll(()=>ids(before,1)).toEqual(['x']);await expect.poll(()=>ids(after,1)).toEqual(['x','y']);
@@ -155,6 +172,16 @@ test('V5 Full mode renders each section exactly and frames a node change in both
     await left.hover();await page.mouse.wheel(0,400);
     await expect.poll(()=>left.evaluate(el=>el.scrollTop)).not.toBe(leftTop);
     await page.waitForTimeout(300);expect(await right.evaluate(el=>el.scrollTop),'manual scroll of Before leaves After unchanged').toBe(rightTop);
+    /* Manual zoom is per pane too (one-way sync): zooming one pane leaves the other pane's zoom and board unchanged. */
+    const zoomOf=side=>side.locator('.reader-zoom-menu>summary').first(),board=side=>side.locator('svg[aria-label="flow diagram"]:visible').first();
+    for(const [own,other,name] of [[before,after,'Before'],[after,before,'After']]){
+      const ownZoom=await zoomOf(own).innerText(),otherZoom=await zoomOf(other).innerText(),otherBoard=await board(other).boundingBox();
+      await own.getByRole('button',{name:'Zoom in',exact:true}).first().click();
+      await expect(zoomOf(own),'zooming the '+name+' pane changes its zoom').not.toHaveText(ownZoom);
+      await page.waitForTimeout(300);
+      expect(await zoomOf(other).innerText(),'zooming the '+name+' pane leaves the other pane\'s zoom').toBe(otherZoom);
+      expect(await board(other).boundingBox(),'zooming the '+name+' pane leaves the other pane\'s board').toEqual(otherBoard);
+    }
   });
 });
 test('V6 Accept is enabled without choosing a side and applies once with Undo/Redo',async({page})=>{
@@ -200,8 +227,11 @@ test('V8 twenty open/close cycles on a large document leave no renders, listener
     const host=page.locator('#agent-update-compare'),html=page.locator('html'),listeners=await keydown(),baseline=await live();let base=0;
     for(let cycle=1;cycle<=20;cycle++){
       await page.locator('#agent-update-open').click();
-      await expect(dialogPane(page,'before').locator('svg[aria-label="flow diagram"]').first()).toBeVisible();
-      await expect(dialogPane(page,'after').locator('svg[aria-label="flow diagram"]').first()).toBeVisible();
+      /* #848 PR 2: the view opens Focused, so the full panes are rendered underneath but not shown. */
+      await expect(dialogPane(page,'before').locator('svg[aria-label="flow diagram"]').first()).toBeAttached();
+      await expect(dialogPane(page,'after').locator('svg[aria-label="flow diagram"]').first()).toBeAttached();
+      /* The first change (a step caption edit) opens in the Focused view: both sides show their current step. */
+      await expect(host.locator('.compare-focus .compare-focus-step[aria-current="true"]')).toHaveCount(2);
       await expect.poll(live,{message:'two render controllers and two canvas controllers live while open'}).toBe(baseline+4);
       const items=rail(host).locator('button.compare-rail-item'),n=await items.count();expect(n,'precondition: the proposal has changes').toBeGreaterThan(2);
       for(let i=1;i<=n;i++){await page.keyboard.press('j');await expect(items.nth(i%n)).toHaveAttribute('aria-current','true');}

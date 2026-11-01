@@ -88,6 +88,21 @@ function comparePartialPage(page, index){
   if (list.some(function(block){ return block && Array.isArray(block.tabs); })) return null;
   var copy = Object.assign({}, page); copy[key] = [list[index]]; return copy;
 }
+/* Section index on `side` for an entry, also when the engine recorded only the other side (an
+   added or removed object): another entry that pairs the same section on both sides wins (an
+   id-less section whose heading changed has a new reference), else a section with the same
+   reference. Returns -1 when this side has no such section. */
+function compareSectionOnSide(entries, pages, entry, side){
+  var sec = entry.section || {}, other = side === 'before' ? 'after' : 'before';
+  if (sec[side] != null) return sec[side];
+  if (sec[other] == null) return -1;
+  for (var i = 0; i < (entries || []).length; i++){
+    var s = entries[i].section || {};
+    if (s[other] === sec[other] && s[side] != null) return s[side];
+  }
+  var from = pages[other] ? sectionRecords(pages[other])[sec[other]] : null;
+  return from && pages[side] ? sectionRecords(pages[side]).findIndex(function(r){ return r.reference === from.reference; }) : -1;
+}
 function compareEntryGroup(entry, pages){
   var sec = entry.section || {}, side = sec.after != null ? 'after' : sec.before != null ? 'before' : null;
   if (side == null){ var name = entry.kind === 'tab' || entry.kind === 'view' ? 'Tabs' : 'Document'; return {key:name, name:name}; }
@@ -214,12 +229,8 @@ function mountCompareView(host, opts){
     /* Added or removed object: this side lacks it, so show its section here. The engine
        records only the side that holds the object; match the section by reference. */
     if (path == null){
-      var index = sec[side];
-      if (index == null){
-        var other = side === 'before' ? 'after' : 'before', from = pages[other] && sec[other] != null ? sectionRecords(pages[other])[sec[other]] : null;
-        index = from && pages[side] ? sectionRecords(pages[side]).findIndex(function(r){ return r.reference === from.reference; }) : -1;
-      }
-      return index != null && index >= 0 ? {section:index, kind:'section', attr:null, key:null} : null;
+      var index = compareSectionOnSide(entries, pages, entry, side);
+      return index >= 0 ? {section:index, kind:'section', attr:null, key:null} : null;
     }
     if (sec[side] == null) return null;
     var t = {section:sec[side], kind:entry.kind, attr:COMPARE_KIND_ATTR[entry.kind], key:null};

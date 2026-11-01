@@ -24,7 +24,8 @@
                        240 steps, 16 panels; the largest example is 5 MB of embedded images and the
                        agent folder cannot connect it), visiting every change each cycle: after every
                        close the compare host is empty, every render controller created on open has
-                       had destroy() called (counted by wrapping renderPage and initViewerExploreCanvas)
+                       had destroy() called (FlowviewCompare.liveOwners(): each owner counted until its
+                       own destroy() runs)
                        and the document keydown listener count is back to its pre-open value; while
                        open there are 4 more (2 renders + 2 canvases); JS heap after GC grows <= 10%
                        from cycle 2 to 20                                                          rejects: leaked renders/listeners
@@ -183,14 +184,9 @@ test('V8 twenty open/close cycles on a large document leave no renders, listener
     const cdp=await page.context().newCDPSession(page);
     const heap=async()=>{await cdp.send('HeapProfiler.collectGarbage');return (await cdp.send('Runtime.getHeapUsage')).usedSize;};
     const keydown=async()=>{const {result}=await cdp.send('Runtime.evaluate',{expression:'document'});return (await cdp.send('DOMDebugger.getEventListeners',{objectId:result.objectId})).listeners.filter(l=>l.type==='keydown').length;};
-    /* Test instrumentation (counts only, drives nothing): wrap the viewer's renderPage so
-       every controller it returns is counted when created and when destroy() runs. */
-    await page.evaluate(()=>{
-      window.__cvRenders={live:0};
-      const count=name=>{const orig=window[name];window[name]=function(){const owner=orig.apply(this,arguments);if(!owner || typeof owner.destroy!=='function')return owner;window.__cvRenders.live++;const d=owner.destroy;let done=false;owner.destroy=function(){if(!done){done=true;window.__cvRenders.live--;}return d.apply(this,arguments);};return owner;};};
-      count('renderPage');count('initViewerExploreCanvas');
-    });
-    const live=()=>page.evaluate(()=>window.__cvRenders.live);
+    /* Read-only: the public entry point reports render and canvas owners created by
+       compare views whose own destroy() has not run (counted per owner, not set by close). */
+    const live=()=>page.evaluate(()=>window.FlowviewCompare?window.FlowviewCompare.liveOwners():null);
     const host=page.locator('#agent-update-compare'),html=page.locator('html'),listeners=await keydown(),baseline=await live();let base=0;
     for(let cycle=1;cycle<=20;cycle++){
       await page.locator('#agent-update-open').click();

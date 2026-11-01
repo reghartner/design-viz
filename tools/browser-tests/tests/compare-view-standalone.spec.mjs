@@ -1,6 +1,8 @@
 /* Shared compare component on a viewer-only page (issue #848, PR 1 of 3).
    Companion to compare-view.spec.mjs (the agent-preview dialog); these tests
-   use the audited local server, which the agent-folder fixture cannot.
+   use the audited local server, which the agent-folder fixture cannot. The
+   fixture script reaches the component only through its public page entry
+   point, window.FlowviewCompare (the bundles keep everything else private).
    Fixture pages are built before interaction; all interaction is real input.
 
    CONTRACT MATRIX
@@ -62,9 +64,9 @@ async function standalonePage(server,name,body){
 }
 test('V7 the shared compare component works on a viewer-only page and cleans up on destroy',async({page,server})=>{
   const {current,proposed}=fixture(),name='compare-standalone-'+Date.now();
-  await standalonePage(server,name,`var a=normalize(${JSON.stringify(current)}),b=normalize(${JSON.stringify(proposed)});
-  var entries=compareDocuments({authored:a,resolved:a,ledger:null},{authored:b,resolved:b,ledger:null});
-  var view=window.cv=mountCompareView(document.getElementById('compare-host'),{before:a,after:b,entries:entries,mode:'full'});`);
+  await standalonePage(server,name,`var a=FlowviewCompare.normalize(${JSON.stringify(current)}),b=FlowviewCompare.normalize(${JSON.stringify(proposed)});
+  var entries=FlowviewCompare.compare({authored:a,resolved:a,ledger:null},{authored:b,resolved:b,ledger:null});
+  var view=window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),{before:a,after:b,entries:entries,mode:'full'});`);
   await page.setViewportSize({width:1440,height:900});
   const cdp=await page.context().newCDPSession(page);
   const keydown=async()=>{const {result}=await cdp.send('Runtime.evaluate',{expression:'document'});return (await cdp.send('DOMDebugger.getEventListeners',{objectId:result.objectId})).listeners.filter(l=>l.type==='keydown').length;};
@@ -94,9 +96,9 @@ test('V7b an imported node change frames the imported node in both panes',async(
   const consumer=spec('consumer',{nodes:{local:{title:'Local'}},rows:[['local']],steps:[{id:'t0',nodes:['local']}],topologyImports:[{spec:'provider',export:'public',as:'child'}]});
   const consumer2=plain(consumer);consumer2.page.sections[0].diagram.nodes.local.title='Local renamed';
   const name='compare-imported-'+Date.now();
-  await standalonePage(server,name,`function side(c,p){var raw=JSON.parse(JSON.stringify(c));return {authored:normalize(JSON.parse(JSON.stringify(c))),resolved:normalize(FlowTopology.resolveSource(raw,{version:1,id:'consumer',specs:[p,c]})),ledger:null};}
-  var A=side(${JSON.stringify(consumer)},${JSON.stringify(provider)}),B=side(${JSON.stringify(consumer2)},${JSON.stringify(provider2)}),entries=compareDocuments(A,B);
-  var view=window.cv=mountCompareView(document.getElementById('compare-host'),{before:A.resolved,after:B.resolved,entries:entries,mode:'full'});`);
+  await standalonePage(server,name,`function side(c,p){var raw=JSON.parse(JSON.stringify(c));return {authored:FlowviewCompare.normalize(JSON.parse(JSON.stringify(c))),resolved:FlowviewCompare.normalize(FlowviewCompare.resolve(raw,{version:1,id:'consumer',specs:[p,c]})),ledger:null};}
+  var A=side(${JSON.stringify(consumer)},${JSON.stringify(provider)}),B=side(${JSON.stringify(consumer2)},${JSON.stringify(provider2)}),entries=FlowviewCompare.compare(A,B);
+  var view=window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),{before:A.resolved,after:B.resolved,entries:entries,mode:'full'});`);
   await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/'+name+'.html');
   const host=page.locator('#compare-host'),items=rail(host).locator('button.compare-rail-item');
   await expect(items).toHaveText(['Modified · Node Local renamed · title','Modified · Imported node child::n23 · title']);
@@ -120,9 +122,9 @@ test('V8b mounting both panes takes at most 2x mounting one pane',async({page,se
   }
   const current={page:{title:'Large',blocks}},proposed=plain(current);proposed.page.blocks[1].diagram.nodes.n3.title='Changed';
   const name='compare-perf-'+Date.now();
-  await standalonePage(server,name,`var a=normalize(${JSON.stringify(current)}),b=normalize(${JSON.stringify(proposed)});
-  var entries=compareDocuments({authored:a,resolved:a,ledger:null},{authored:b,resolved:b,ledger:null}),view=null,host=document.getElementById('compare-host');
-  function mount(single){if(view)view.destroy();view=mountCompareView(host,{before:single?null:a,after:b,entries:entries,mode:'full'});}
+  await standalonePage(server,name,`var a=FlowviewCompare.normalize(${JSON.stringify(current)}),b=FlowviewCompare.normalize(${JSON.stringify(proposed)});
+  var entries=FlowviewCompare.compare({authored:a,resolved:a,ledger:null},{authored:b,resolved:b,ledger:null}),view=null,host=document.getElementById('compare-host');
+  function mount(single){if(view)view.destroy();view=FlowviewCompare.mount(host,{before:single?null:a,after:b,entries:entries,mode:'full'});}
   var bar=document.getElementById('cv-destroy').parentNode;
   [['cv-one',true],['cv-two',false]].forEach(function(p){var btn=document.createElement('button');btn.id=p[0];btn.textContent=p[0];btn.addEventListener('click',function(){mount(p[1]);});bar.appendChild(btn);});
   view={previous:function(){},next:function(){},destroy:function(){}};`);

@@ -173,7 +173,7 @@ test('V5 Full mode renders each section exactly and frames a node change in both
     await expect.poll(()=>left.evaluate(el=>el.scrollTop)).not.toBe(leftTop);
     await page.waitForTimeout(300);expect(await right.evaluate(el=>el.scrollTop),'manual scroll of Before leaves After unchanged').toBe(rightTop);
     /* Manual zoom is per pane too (one-way sync): zooming one pane leaves the other pane's zoom and board unchanged. */
-    const zoomOf=side=>side.locator('.reader-zoom-menu>summary').first(),board=side=>side.locator('.explore-active-section .explore-board').first();
+    const zoomOf=side=>side.locator('.reader-zoom-menu>summary').first(),board=side=>side.locator('svg[aria-label="flow diagram"]:visible').first();
     for(const [own,other,name] of [[before,after,'Before'],[after,before,'After']]){
       const ownZoom=await zoomOf(own).innerText(),otherZoom=await zoomOf(other).innerText(),otherBoard=await board(other).boundingBox();
       await own.getByRole('button',{name:'Zoom in',exact:true}).first().click();
@@ -229,7 +229,9 @@ test('V8 twenty open/close cycles on a large document leave no renders, listener
       await page.locator('#agent-update-open').click();
       /* #848 PR 2: the view opens Focused, so the full panes are rendered underneath but not shown. */
       await expect(dialogPane(page,'before').locator('svg[aria-label="flow diagram"]').first()).toBeAttached();
-      await expect(dialogPane(page,'after').locator('svg[aria-label="flow diagram"]').first()).toBeVisible();
+      await expect(dialogPane(page,'after').locator('svg[aria-label="flow diagram"]').first()).toBeAttached();
+      /* The first change (a step caption edit) opens in the Focused view: both sides show their current step. */
+      await expect(host.locator('.compare-focus .compare-focus-step[aria-current="true"]')).toHaveCount(2);
       await expect.poll(live,{message:'two render controllers and two canvas controllers live while open'}).toBe(baseline+4);
       const items=rail(host).locator('button.compare-rail-item'),n=await items.count();expect(n,'precondition: the proposal has changes').toBeGreaterThan(2);
       for(let i=1;i<=n;i++){await page.keyboard.press('j');await expect(items.nth(i%n)).toHaveAttribute('aria-current','true');}

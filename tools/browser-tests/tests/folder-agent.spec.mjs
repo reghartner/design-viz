@@ -1014,9 +1014,15 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     await expect(page.locator('#agent-update-commit')).toBeEnabled();await contained();
     await page.locator('#agent-update-details').click();await expect(page.locator('#agent-update-ledger-before-summary')).toHaveText('Coverage ledger · Current state');await expect(page.locator('#agent-update-ledger-before')).toHaveText('No coverage ledger yet.');
     await expect(page.locator('#agent-update-ledger')).toContainText('The service name changed');await page.locator('#agent-update-details-close').click();await contained();await changedNodeVisible('Delivery service',0);/* still after the reviewer's Fit */
-    await view.locator('.reader-top-view[data-tab-view$="-brief"]').click();await expect(stage).toBeHidden();
+    /* A half-width pane may show the View tabs as the "Choose View" picker; use whichever is shown. */
+    const chooseView=async suffix=>{const tab=view.locator('.reader-top-view[data-tab-view$="-'+suffix+'"]');
+      if(await tab.isVisible())return tab.click();
+      const picker=view.getByRole('combobox',{name:'Choose View',exact:true});await expect(picker).toBeVisible();
+      const value=await picker.locator('option').evaluateAll((options,suffix)=>(options.find(o=>o.value.endsWith('-'+suffix))||{}).value,suffix);
+      expect(value,'the picker offers the '+suffix+' View').toBeTruthy();await picker.selectOption(value);};
+    await chooseView('brief');await expect(stage).toBeHidden();
     await expect(view.locator('[data-dv-node="b"]')).toBeVisible();
-    await view.locator('.reader-top-view[data-tab-view$="-explore"]').click();await contained();
+    await chooseView('explore');await contained();
     await page.locator('#agent-update-close').click();await expect(page.locator('#agent-update-dialog')).not.toBeVisible();
     await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
     await page.locator('#agent-update-open').click();await contained();

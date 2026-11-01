@@ -15,6 +15,8 @@ var COMPARE_KIND_LABEL = {document:'Document', section:'Section', node:'Node', e
 /* Render and canvas owners created by compare views whose own destroy() has not
    run yet; reported by FlowviewCompare.liveOwners(). */
 var compareViewLiveOwners = 0;
+/* Rendered width a selected node is zoomed up to (never past 100%). */
+var COMPARE_LEGIBLE_NODE_PX = 120;
 function compareViewTrack(owner){
   if (!owner || typeof owner.destroy !== 'function') return owner;
   var destroy = owner.destroy, done = false;
@@ -112,7 +114,9 @@ function mountCompareView(host, opts){
     box.appendChild(list); rail.appendChild(box);
   });
   if (!entries.length) rail.appendChild(el('p', 'compare-rail-empty', 'No changes.'));
-  ['before', 'after'].forEach(function(side){
+  /* Both panes draw mostly the same edges: share path measurements while mounting. */
+  var geometry = new Map();
+  withPathGeometryCache(geometry, function(){ ['before', 'after'].forEach(function(side){
     var pane = el('section', 'compare-pane'), head = el('header', 'compare-pane-head'), scroll = el('div', 'compare-pane-scroll'), view = el('div', 'compare-pane-view');
     pane.setAttribute('data-side', side);
     head.appendChild(el('h2', 'compare-pane-title', side === 'before' ? 'Before · current document' : 'After · agent proposal'));
@@ -127,7 +131,7 @@ function mountCompareView(host, opts){
       if (typeof initViewerExploreCanvas === 'function') p.canvas = compareViewTrack(initViewerExploreCanvas(p.ctl, view, {container:scroll, initialContentsOpen:false,
         presentation:{panelsHiddenWhenGraphVisible:false, overlayScale:.5}, forceFit:true, refitOnResize:true, fitInsets:{left:24, right:24, top:20, bottom:24}}));
     }catch(ex){ view.textContent = 'Could not render this side: ' + ex.message; }
-  });
+  }); });
   decorate();
   function decorate(){
     ['before', 'after'].forEach(function(side){
@@ -174,16 +178,21 @@ function mountCompareView(host, opts){
     p.ctl.activeTarget = {kind:'diagram', section:rec.number}; if (p.ctl.onChange) p.ctl.onChange();
     var object = null;
     if (t.attr && t.key != null) object = Array.prototype.find.call(rec.sectionEl.querySelectorAll('[' + t.attr + ']'), function(n){ return n.getAttribute(t.attr) === String(t.key) && n.getClientRects().length; });
+    /* Narrow panes fit whole sections small; zoom a changed node up to a legible size first. */
+    if (object && t.attr === 'data-dv-node' && rec.viewport && rec.viewport.isExplore() && rec.viewport.canvasZoom){
+      var width = object.getBoundingClientRect().width, zoom = rec.viewport.canvasZoom();
+      if (width > 0 && width < COMPARE_LEGIBLE_NODE_PX && zoom > 0) rec.viewport.canvasZoom(Math.min(1, zoom * COMPARE_LEGIBLE_NODE_PX / width));
+    }
     if (object && object.scrollIntoView) object.scrollIntoView({block:'center', inline:'center'});
     else if (rec.sectionEl && rec.sectionEl.scrollIntoView && (!rec.viewport || !rec.viewport.isExplore())) rec.sectionEl.scrollIntoView({block:'start'});
     return {side:side, shown:true, object:!!object, visible:visible};
   }
-  function select(index){
+  function select(index, initial){
     if (destroyed || !entries.length) return null;
     selected = ((index % entries.length) + entries.length) % entries.length;
     buttons.forEach(function(b, i){ if (b) b.setAttribute('aria-current', String(i === selected)); });
     if (buttons[selected] && buttons[selected].scrollIntoView) buttons[selected].scrollIntoView({block:'nearest'});
-    var entry = entries[selected], result = {before:navigate('before', entry), after:navigate('after', entry), label:compareEntryLabel(entry, pages)};
+    var entry = entries[selected], result = {before:navigate('before', entry), after:navigate('after', entry), label:compareEntryLabel(entry, pages), initial:!!initial};
     decorate();
     if (opts.onSelect) opts.onSelect(entry, selected, result);
     return result;
@@ -196,7 +205,8 @@ function mountCompareView(host, opts){
     else if (event.key === 'k' || event.key === 'K'){ event.preventDefault(); select(selected - 1); }
   }
   doc.addEventListener('keydown', onKey);
-  if (entries.length) select(0);
+  if (entries.length) withPathGeometryCache(geometry, function(){ select(0, true); });
+  geometry = null;
   return {
     select:select,
     next:function(){ return select(selected + 1); },

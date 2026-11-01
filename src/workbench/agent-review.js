@@ -42,10 +42,12 @@ function initWorkbenchAgentReview(opts){
   }
   function onSelect(entry,index,result){
     var parts=[(index+1)+' of '+entries.length,result && result.label || (view && view.label?view.label(index):entry.kind)];
-    if(entry.kind==='ledger'){parts.push('Coverage ledger · Shown in Details');navigationStatus(parts.join(' · '));showDetails('ledger');return;}
-    if(entry.kind==='document'){parts.push('Shown in Details; no rendered object');navigationStatus(parts.join(' · '));showDetails('source');return;}
+    /* The selection made when the preview opens never opens Details by itself. */
+    var reveal=function(target){if(!(result && result.initial))showDetails(target);};
+    if(entry.kind==='ledger'){parts.push('Coverage ledger · Shown in Details');navigationStatus(parts.join(' · '));reveal('ledger');return;}
+    if(entry.kind==='document'){parts.push('Shown in Details; no rendered object');navigationStatus(parts.join(' · '));reveal('source');return;}
     var b=result && result.before || {},a=result && result.after || {};
-    if(!a.shown && !b.shown && (a.reason==='view' || b.reason==='view')){parts.push('Section not included in a View · Inspect source in Details');navigationStatus(parts.join(' · '));showDetails('source');return;}
+    if(!a.shown && !b.shown && (a.reason==='view' || b.reason==='view')){parts.push('Section not included in a View · Inspect source in Details');navigationStatus(parts.join(' · '));reveal('source');return;}
     if(entry.status==='removed' || entry.afterPath==null)parts.push('Removed · not in the proposal');
     else if(entry.status==='added' || entry.beforePath==null)parts.push('Added · not in the current document');
     navigationStatus(parts.join(' · '));

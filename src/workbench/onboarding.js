@@ -377,7 +377,7 @@ function initWorkbenchPractice(opts){
     beforeAdvance:function(step){
       if(step.id==='commit' && opts.agent.hasReview()){
         if(!doc.getElementById('agent-update-dialog').open)click('agent-update-open');
-        click('agent-update-proposed');click('agent-update-commit');
+        click('agent-update-commit');
         return !opts.agent.hasReview();
       }
     },

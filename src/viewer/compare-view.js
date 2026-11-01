@@ -1,0 +1,225 @@
+/* Side-by-side compare view (#848). Shared by the agent-update preview and the
+   local Git Compare tool: no Workbench dependency.
+
+   mountCompareView(host, {before, after, entries, skin, mode, ids, onSelect})
+     before/after  normalized pages to render (already topology-resolved), or null
+     entries       compareDocuments() output (src/core/compare.js)
+     ids           optional element ids for the pane scroll/view nodes
+     onSelect      optional callback(entry, index, result) after each selection
+   returns {select(i), next(), previous(), selected(), setSkin(name), destroy()}
+
+   Selecting a change frames BOTH panes on it (one-way: the selection drives the
+   panes; manual pan/zoom in one pane never moves the other). */
+var COMPARE_KIND_LABEL = {document:'Document', section:'Section', node:'Node', edge:'Connection', panel:'Panel', step:'Step',
+  path:'Path', layout:'Layout', view:'View', tab:'Tab', import:'Import', ledger:'Coverage ledger'};
+/* Render and canvas owners created by compare views whose own destroy() has not
+   run yet; reported by FlowviewCompare.liveOwners(). */
+var compareViewLiveOwners = 0;
+function compareViewTrack(owner){
+  if (!owner || typeof owner.destroy !== 'function') return owner;
+  var destroy = owner.destroy, done = false;
+  compareViewLiveOwners++;
+  owner.destroy = function(){ if (!done){ done = true; compareViewLiveOwners--; } return destroy.apply(this, arguments); };
+  return owner;
+}
+var COMPARE_KIND_ATTR = {node:'data-dv-node', edge:'data-dv-edge', panel:'data-dv-panel', step:'data-step-source'};
+function compareViewAt(page, path){
+  if (!page || path == null) return undefined;
+  path = String(path).replace(/^resolved:/, '');
+  if (path === '') return page;
+  var v = page, re = /(?:^|\.)([A-Za-z_$][\w$]*)|\[(\d+)\]|\[("(?:[^"\\]|\\.)*")\]/g, m;
+  while ((m = re.exec(path)) && v != null) v = v[m[1] != null ? m[1] : m[2] != null ? Number(m[2]) : JSON.parse(m[3])];
+  return v;
+}
+function compareViewLastIndex(path){ var m = /\[(\d+)\]$/.exec(path || ''); return m ? Number(m[1]) : null; }
+function compareEntryName(entry, record){
+  var k = entry.kind, key = entry.key ? (entry.key.after != null ? entry.key.after : entry.key.before) : null;
+  if (k === 'document' || k === 'ledger') return '';
+  if (k === 'node') return record && record.title ? String(record.title) : String(key);
+  if (k === 'edge') return record && record.from != null ? String(record.from) + ' → ' + String(record.to) : String(key);
+  if (k === 'step') return record && typeof record.id === 'string' && record.id ? record.id : 'step ' + (Number(key) + 1);
+  if (k === 'section') return record && (record.heading || record.id) ? String(record.heading || record.id) : 'Section';
+  if (k === 'import') return record && record.as != null ? String(record.as) : String(key);
+  if (k === 'tab') return record && record.label ? String(record.label) : 'Tab ' + (Number(key) + 1);
+  if (record && (record.name || record.label || record.title)) return String(record.name || record.label || record.title);
+  return key == null ? '' : String(key);
+}
+/* "Status · Kind name · fields" with fields relative to the entry's record. */
+function compareEntryLabel(entry, pages){
+  var status = entry.status.charAt(0).toUpperCase() + entry.status.slice(1);
+  var record = entry.afterPath != null ? compareViewAt(pages.after, entry.afterPath) : compareViewAt(pages.before, entry.beforePath);
+  if (entry.cause === 'provider'){
+    var key = entry.key ? (entry.key.after != null ? entry.key.after : entry.key.before) : '';
+    record = null;
+    var name = 'Imported ' + (entry.kind === 'edge' ? 'connection ' : 'node ') + key;
+    return [status, name, compareEntryFields(entry)].filter(Boolean).join(' · ');
+  }
+  var title = (COMPARE_KIND_LABEL[entry.kind] || entry.kind) + (compareEntryName(entry, record) ? ' ' + compareEntryName(entry, record) : '');
+  return [status, title, compareEntryFields(entry)].filter(Boolean).join(' · ');
+}
+function compareEntryFields(entry){
+  if (entry.kind === 'ledger') return '';
+  var base = entry.afterPath != null ? entry.afterPath : entry.beforePath, out = [];
+  (entry.fields || []).forEach(function(f){
+    var p = f.afterPath != null ? f.afterPath : f.beforePath;
+    if (p == null) return;
+    var rel = p.replace(/^resolved:/, '');
+    if (entry.cause !== 'provider' && base && rel.indexOf(base) === 0) rel = rel.slice(base.length).replace(/^\./, '');
+    else if (entry.cause === 'provider') rel = rel.replace(/^.*?\.(nodes|edges)(\[[^\]]*\]|\.[A-Za-z_$][\w$]*)\.?/, '');
+    if (rel && out.indexOf(rel) < 0) out.push(rel);
+  });
+  return out.join(', ');
+}
+function compareEntryGroup(entry, pages){
+  var sec = entry.section || {}, side = sec.after != null ? 'after' : sec.before != null ? 'before' : null;
+  if (side == null) return entry.kind === 'tab' || entry.kind === 'view' ? 'Tabs' : 'Document';
+  var rec = sectionRecords(pages[side])[sec[side]], s = rec && rec.section || {};
+  return String(s.heading || s.id || 'Section ' + (sec[side] + 1));
+}
+function mountCompareView(host, opts){
+  opts = opts || {};
+  var doc = host.ownerDocument || document, entries = opts.entries || [], pages = {before:opts.before || null, after:opts.after || null};
+  var ids = opts.ids || {}, panes = {}, selected = -1, destroyed = false, skin = opts.skin;
+  function el(tag, cls, text){ var n = doc.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  host.replaceChildren();
+  var root = el('div', 'compare-view'), rail = el('nav', 'compare-rail'), columns = el('div', 'compare-columns');
+  rail.setAttribute('aria-label', 'Changes');
+  root.appendChild(rail); root.appendChild(columns); host.appendChild(root);
+  /* Rail: groups in first-appearance order (entries are in document order). */
+  var groups = [], byName = Object.create(null);
+  entries.forEach(function(entry, index){
+    var name = compareEntryGroup(entry, pages), g = byName[name];
+    if (!g){ g = byName[name] = {name:name, items:[]}; groups.push(g); }
+    g.items.push(index);
+  });
+  var buttons = [];
+  groups.forEach(function(g){
+    var box = el('section', 'compare-rail-group'), list = el('ol', 'compare-rail-list');
+    box.appendChild(el('h3', 'compare-rail-heading', g.name));
+    g.items.forEach(function(index){
+      var li = el('li'), b = el('button', 'compare-rail-item', compareEntryLabel(entries[index], pages));
+      b.type = 'button'; b.setAttribute('data-change-index', String(index)); b.setAttribute('data-change-status', entries[index].status);
+      b.addEventListener('click', function(){ select(index); });
+      buttons[index] = b; li.appendChild(b); list.appendChild(li);
+    });
+    box.appendChild(list); rail.appendChild(box);
+  });
+  if (!entries.length) rail.appendChild(el('p', 'compare-rail-empty', 'No changes.'));
+  ['before', 'after'].forEach(function(side){
+    var pane = el('section', 'compare-pane'), head = el('header', 'compare-pane-head'), scroll = el('div', 'compare-pane-scroll'), view = el('div', 'compare-pane-view');
+    pane.setAttribute('data-side', side);
+    head.appendChild(el('h2', 'compare-pane-title', side === 'before' ? 'Before · current document' : 'After · agent proposal'));
+    if (opts.titles && opts.titles[side]) head.querySelector('.compare-pane-title').textContent = opts.titles[side];
+    if (ids[side]){ if (ids[side].scroll) scroll.id = ids[side].scroll; if (ids[side].view) view.id = ids[side].view; }
+    scroll.tabIndex = 0; scroll.appendChild(view); pane.appendChild(head); pane.appendChild(scroll); columns.appendChild(pane);
+    panes[side] = {pane:pane, scroll:scroll, view:view, ctl:null, canvas:null, page:pages[side]};
+    if (!pages[side]){ view.appendChild(el('p', 'compare-pane-empty', side === 'before' ? 'Not in the current document.' : 'Not in the proposal.')); return; }
+    try{
+      var p = panes[side];
+      p.ctl = compareViewTrack(renderPage(view, pages[side], typeof skin === 'function' ? skin(pages[side]) : skin || pages[side].skin, null, {autoplay:false}));
+      if (typeof initViewerExploreCanvas === 'function') p.canvas = compareViewTrack(initViewerExploreCanvas(p.ctl, view, {container:scroll, initialContentsOpen:false,
+        presentation:{panelsHiddenWhenGraphVisible:false, overlayScale:.5}, forceFit:true, refitOnResize:true, fitInsets:{left:24, right:24, top:20, bottom:24}}));
+    }catch(ex){ view.textContent = 'Could not render this side: ' + ex.message; }
+  });
+  decorate();
+  function decorate(){
+    ['before', 'after'].forEach(function(side){
+      var p = panes[side]; if (!p.ctl) return;
+      Array.prototype.forEach.call(p.view.querySelectorAll('[data-agent-change]'), function(n){ n.removeAttribute('data-agent-change'); });
+      entries.forEach(function(entry){
+        var t = target(entry, side); if (!t || !t.attr) return;
+        var rec = (p.ctl.sections || []).find(function(r){ return r.number === t.section + 1; });
+        if (!rec || !rec.sectionEl) return;
+        Array.prototype.forEach.call(rec.sectionEl.querySelectorAll('[' + t.attr + ']'), function(n){
+          if (n.getAttribute(t.attr) === String(t.key)) n.setAttribute('data-agent-change', entry.status);
+        });
+      });
+    });
+  }
+  /* Rendered target of an entry on one side, or null when that side lacks it. */
+  function target(entry, side){
+    var path = side === 'before' ? entry.beforePath : entry.afterPath, sec = entry.section || {};
+    if (path == null || sec[side] == null) return null;
+    var t = {section:sec[side], kind:entry.kind, attr:COMPARE_KIND_ATTR[entry.kind], key:null};
+    if (entry.cause === 'provider'){ t.attr = entry.kind === 'edge' ? 'data-dv-edge' : 'data-dv-node'; t.key = entry.key ? entry.key[side] : null; return t; }
+    if (entry.kind === 'node') t.key = entry.key ? entry.key[side] : null;
+    else if (entry.kind === 'step') t.key = entry.step ? entry.step[side] : compareViewLastIndex(path);
+    else if (entry.kind === 'edge' || entry.kind === 'panel') t.key = compareViewLastIndex(path);
+    else if (entry.kind === 'path' || entry.kind === 'layout' || entry.kind === 'view'){ var rec = compareViewAt(pages[side], path); t.id = rec && rec.id; }
+    return t;
+  }
+  function navigate(side, entry){
+    var p = panes[side], t = target(entry, side);
+    if (!p.ctl || !t) return {side:side, shown:false};
+    var rec = (p.ctl.sections || []).find(function(r){ return r.number === t.section + 1; }), visible = true;
+    if (!rec) return {side:side, shown:false};
+    if (rec.tabBlock && p.ctl.tabBlocks && p.ctl.tabBlocks[rec.tabBlock - 1]) p.ctl.tabBlocks[rec.tabBlock - 1].select(rec.tab, false);
+    if (p.ctl.details) p.ctl.details.close(true);
+    if (t.kind === 'view' && p.ctl.views){ var owner = p.ctl.views.owner(rec); visible = !!(t.id && p.ctl.views.select(rec, t.id, undefined, true)); if (visible && owner && owner.selected) rec = owner.selected; }
+    else if (p.ctl.views) visible = p.ctl.views.ensure(rec, undefined, true);
+    if (!visible) return {side:side, shown:false, reason:'view'};
+    if (t.kind === 'layout' && t.id && rec.presentation){ if (!(p.ctl.views && p.ctl.views.ensure(rec, t.id, true))) rec.presentation.setView(t.id); }
+    if (t.kind === 'step' && rec.stepper && t.key != null) visible = rec.stepper.jumpSource(Number(t.key)) && visible;
+    if (t.kind === 'path' && rec.stepper && t.id){
+      var d = compareViewAt(pages[side], (entry[side + 'Path'] || '').replace(/\.paths\[\d+\]$/, '')), route = d && diagramPathList(d).find(function(x){ return x.id === t.id; });
+      visible = !!(route && rec.stepper.jumpSource(route.indices[0], route.id)) && visible;
+    }
+    p.ctl.activeTarget = {kind:'diagram', section:rec.number}; if (p.ctl.onChange) p.ctl.onChange();
+    var object = null;
+    if (t.attr && t.key != null) object = Array.prototype.find.call(rec.sectionEl.querySelectorAll('[' + t.attr + ']'), function(n){ return n.getAttribute(t.attr) === String(t.key) && n.getClientRects().length; });
+    if (object && object.scrollIntoView) object.scrollIntoView({block:'center', inline:'center'});
+    else if (rec.sectionEl && rec.sectionEl.scrollIntoView && (!rec.viewport || !rec.viewport.isExplore())) rec.sectionEl.scrollIntoView({block:'start'});
+    return {side:side, shown:true, object:!!object, visible:visible};
+  }
+  function select(index){
+    if (destroyed || !entries.length) return null;
+    selected = ((index % entries.length) + entries.length) % entries.length;
+    buttons.forEach(function(b, i){ if (b) b.setAttribute('aria-current', String(i === selected)); });
+    if (buttons[selected] && buttons[selected].scrollIntoView) buttons[selected].scrollIntoView({block:'nearest'});
+    var entry = entries[selected], result = {before:navigate('before', entry), after:navigate('after', entry), label:compareEntryLabel(entry, pages)};
+    decorate();
+    if (opts.onSelect) opts.onSelect(entry, selected, result);
+    return result;
+  }
+  function onKey(event){
+    if (destroyed || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+    var t = event.target, tag = t && t.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t && t.isContentEditable) return;
+    if (event.key === 'j' || event.key === 'J'){ event.preventDefault(); select(selected + 1); }
+    else if (event.key === 'k' || event.key === 'K'){ event.preventDefault(); select(selected - 1); }
+  }
+  doc.addEventListener('keydown', onKey);
+  if (entries.length) select(0);
+  return {
+    select:select,
+    next:function(){ return select(selected + 1); },
+    previous:function(){ return select(selected - 1); },
+    selected:function(){ return selected; },
+    count:function(){ return entries.length; },
+    label:function(i){ return entries[i] ? compareEntryLabel(entries[i], pages) : ''; },
+    views:function(){ return {before:panes.before.view, after:panes.after.view}; },
+    setSkin:function(name){ skin = name; var ok = false; ['before', 'after'].forEach(function(side){ if (panes[side].ctl && typeof applySkinClasses === 'function') ok = applySkinClasses(doc.body, panes[side].view, name) || ok; }); return ok; },
+    destroy:function(){
+      if (destroyed) return; destroyed = true;
+      doc.removeEventListener('keydown', onKey);
+      ['before', 'after'].forEach(function(side){
+        var p = panes[side]; if (!p) return;
+        try{ if (p.canvas) p.canvas.destroy(); }catch(ex){}
+        try{ if (p.ctl) p.ctl.destroy(); }catch(ex){}
+      });
+      host.replaceChildren();
+    }
+  };
+}
+
+/* Public page entry point: the viewer and Workbench bundles keep their
+   functions private, so pages that host a compare view (the local Git Compare
+   tool, #849) reach it here. */
+if (typeof window !== 'undefined') window.FlowviewCompare = {
+  version:1,
+  normalize:function(raw){ return normalize(raw); },
+  compare:function(before, after){ return compareDocuments(before, after); },
+  mount:function(host, opts){ return mountCompareView(host, opts); },
+  resolve:typeof FlowTopology !== 'undefined' ? function(raw, context){ return FlowTopology.resolveSource(raw, context); } : null,
+  liveOwners:function(){ return compareViewLiveOwners; }
+};

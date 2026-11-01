@@ -5,7 +5,7 @@
    changes in an intervening section are not reordered across them. */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource}=require('../tools/source-loader.cjs');
-function load(){const c={console};vm.createContext(c);for(const f of ['validator.js','viewer/compare-view.js'])vm.runInContext(readSource(f),c);return c;}
+function load(){const c={console};vm.createContext(c);for(const f of ['validator.js','canon.js','viewer/compare-view.js'])vm.runInContext(readSource(f),c);return c;}
 const node=t=>({nodes:{a:{title:t}},rows:[['a']]});
 test('sections sharing a heading form separate rail groups in document order',()=>{
   const c=load();
@@ -49,4 +49,17 @@ test('removed and added objects of one paired section are one rail group',()=>{
   const groups=JSON.parse(JSON.stringify(c.compareRailGroups(entries,{before,after})));
   assert.deepEqual(groups.map(g=>g.name),['Notes'],'one Notes group, not one per side');
   assert.equal(groups[0].items.length,entries.filter(e=>(e.section||{}).before===1 || (e.section||{}).after===1).length);
+});
+
+test('imported nodes removed and added by a provider change share their section\'s rail group',()=>{
+  const c=load();
+  const spec=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'flow',heading:'Flow',diagram:node('F')},{id:'main',heading:'Main',diagram:d}]}});
+  const provider=ids=>spec('provider',{nodes:Object.fromEntries(ids.map(i=>[i,{title:i}])),rows:[ids],topologyExports:{public:{nodes:ids,edges:[]}}});
+  const consumer=spec('consumer',{nodes:{local:{title:'Local'}},rows:[['local']],topologyImports:[{spec:'provider',export:'public',as:'child'}]});
+  const side=p=>({authored:c.normalize(JSON.parse(JSON.stringify(consumer))),resolved:c.normalize(c.FlowTopology.resolveSource(JSON.parse(JSON.stringify(consumer)),{version:1,id:'consumer',specs:[p,consumer]})),ledger:null});
+  const A=side(provider(['p1','gone'])),B=side(provider(['p1','fresh']));
+  const entries=c.compareDocuments(A,B),loci=JSON.parse(JSON.stringify(entries.map(e=>[e.kind,e.status,e.cause,e.section])));
+  assert.deepEqual(loci,[['node','removed','provider',{before:1,after:null}],['node','added','provider',{before:null,after:1}]],'precondition: provider-caused removal and addition, each recorded on one side only, with no entry pairing the section');
+  const groups=JSON.parse(JSON.stringify(c.compareRailGroups(entries,{before:A.resolved,after:B.resolved})));
+  assert.deepEqual(groups,[{key:'after:1',name:'Main',items:[0,1]}],'one Main group holds both imported changes');
 });

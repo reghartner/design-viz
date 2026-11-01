@@ -410,15 +410,23 @@ function mountCompareView(host, opts){
     var nodeIds = Array.from(new Set(Object.keys(A.d.nodes || {}).concat(Object.keys(B.d.nodes || {}))));
     ctx.panelIds = panelIds;
     /* Per-panel declaration difference and per-node tone arrays, computed once. */
-    ctx.declDiffers = {};
-    panelIds.forEach(function(id){
-      var pa = A.fold && A.fold.panels[id], pb = B.fold && B.fold.panels[id];
-      ctx.declDiffers[id] = !!(pa && pb) && !compareSame(compareWithout(pa, ['initial', 'visible']), compareWithout(pb, ['initial', 'visible']));
-    });
     var tonesA = {}, tonesB = {};
     if (A.fold && B.fold) nodeIds.forEach(function(id){ tonesA[id] = A.fold.tone(id); tonesB[id] = B.fold.tone(id); });
     var posA = new Map(); A.indices.forEach(function(src, j){ posA.set(src, j); });
     ctx.posA = posA; ctx.posB = new Map(); B.indices.forEach(function(src, k){ ctx.posB.set(src, k); });
+    /* Paired positions [j (Before), k (After)]. */
+    var paired = [];
+    B.indices.forEach(function(src, k){ var a = bToA.has(src) ? bToA.get(src) : null; if (a != null && posA.has(a)) paired.push([posA.get(a), k]); });
+    /* A settings difference counts on its own only when it is display-only: the panel's folded
+       state is the same at every paired step. Settings that feed the fold (a drain rate, a log
+       limit) show through the folded state, which is compared per step. */
+    ctx.declDiffers = {};
+    panelIds.forEach(function(id){
+      var pa = A.fold && A.fold.panels[id], pb = B.fold && B.fold.panels[id];
+      if (!pa || !pb || compareSame(compareWithout(pa, ['initial', 'visible']), compareWithout(pb, ['initial', 'visible']))){ ctx.declDiffers[id] = false; return; }
+      var sa = A.fold.state(id) || [], sb = B.fold.state(id) || [];
+      ctx.declDiffers[id] = paired.every(function(p){ var x = sa[p[0]], y = sb[p[1]]; return x === y || compareSame(x, y); });
+    });
     /* Panels that differ at each After position (null = the step has no pair in Before). */
     ctx.diffAt = B.indices.map(function(src, k){
       var srcA = bToA.has(src) ? bToA.get(src) : null, j = srcA == null || !posA.has(srcA) ? -1 : posA.get(srcA);
@@ -430,14 +438,14 @@ function mountCompareView(host, opts){
     /* Starting step: the edited step, else the first step the change affects, else the first step. */
     var srcA = null, srcB = null;
     if (st.before != null || st.after != null){ srcA = st.before == null ? null : st.before; srcB = st.after == null ? null : st.after; }
-    else (entry.effects || []).some(function(e){
-      if (e.pathId !== B.pathId && e.pathId !== A.pathId) return false;
-      return (e.changes || []).some(function(c){
-        if (typeof c.afterStep === 'number'){ srcB = c.afterStep; return true; }
-        if (typeof c.beforeStep === 'number'){ srcA = c.beforeStep; return true; }
-        return false;
-      });
-    });
+    else {
+      /* The first affected step present on both sides, else the first affected step on either side. */
+      var changes = [];
+      (entry.effects || []).forEach(function(e){ if (e.pathId === B.pathId || e.pathId === A.pathId) changes.push.apply(changes, e.changes || []); });
+      var both = changes.find(function(c){ return typeof c.afterStep === 'number' && typeof c.beforeStep === 'number'; }),
+          one = changes.find(function(c){ return typeof c.afterStep === 'number' || typeof c.beforeStep === 'number'; }), pick = both || one;
+      if (pick){ if (typeof pick.afterStep === 'number') srcB = pick.afterStep; else srcA = pick.beforeStep; }
+    }
     if (srcA == null && srcB == null) srcB = B.indices[0];
     if (srcA == null && srcB != null && bToA.has(srcB) && entry.kind !== 'step') srcA = bToA.get(srcB);
     if (srcB == null && srcA != null && aToB.has(srcA) && entry.kind !== 'step') srcB = aToB.get(srcA);

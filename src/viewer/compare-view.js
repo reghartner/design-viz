@@ -513,7 +513,21 @@ function mountCompareView(host, opts){
     var S = ctx[side], O = ctx[side === 'before' ? 'after' : 'before'], map = side === 'before' ? ctx.aToB : ctx.bToA;
     var src = S.indices[pos], other = map.has(src) ? map.get(src) : null;
     S.pos = pos; O.pos = other == null ? -1 : O.indices.indexOf(other);
+    syncPaneSteps();
     renderFocus();
+  }
+  /* Keep the full panes under the Focused view on the Focused step and path, so switching to
+     Full diagram shows the same step (a side without the step keeps its pane where it is). */
+  function syncPaneSteps(){
+    var ctx = focusCtx; if (!ctx || destroyed) return;
+    ['before', 'after'].forEach(function(side){
+      var S = ctx[side], p = panes[side];
+      if (!S || S.pos < 0 || !p) return;
+      if (p.partial != null && p.partial !== S.section) completeBefore();
+      if (!p.ctl) return;
+      var rec = recordFor(p, S.section);
+      if (rec && rec.stepper && rec.stepper.jumpSource) try{ rec.stepper.jumpSource(S.indices[S.pos], S.pathId); }catch(ex){}
+    });
   }
   function stepMarks(ctx, S){
     var edited = new Set();
@@ -632,6 +646,7 @@ function mountCompareView(host, opts){
     var result = {before:before, after:after, label:compareEntryLabel(entry, pages), initial:!!initial};
     decorate();
     try{ focusCtx = buildFocus(entry); }catch(ex){ focusCtx = null; }
+    syncPaneSteps();
     renderFocus(); applyMode();
     result.focused = mode === 'focused' && !!focusCtx;
     if (opts.onSelect) opts.onSelect(entry, selected, result);

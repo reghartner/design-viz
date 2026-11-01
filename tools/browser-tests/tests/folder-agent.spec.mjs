@@ -976,7 +976,7 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     /* #848 Full mode shows the section's panels (compare-view.spec.mjs V5); they stay at half scale and off the changed node (changedNodeVisible). */
     await view.locator('.explore-panel-menu summary').click();await expect(view.locator('.explore-overlay-value')).toHaveText('50%');await view.locator('.explore-panel-menu summary').click();
     await expect(view.locator('[data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');
-    await expect(page.locator('#agent-update-change-status')).toContainText('1 modified');
+    await expect(page.locator('#agent-update-change-status')).toContainText('2 modified');/* #848: the count covers every listed change, including the coverage ledger */
     await expect(page.locator('#agent-update-highlights')).toHaveCount(0);
     await expect(page.locator('#agent-update-view-before [data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');
     await contained();

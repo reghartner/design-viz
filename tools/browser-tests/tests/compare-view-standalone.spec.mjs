@@ -15,8 +15,10 @@
                     (the imported section starts below a tall local section, outside both panes)
                                                                                   rejects: local-only framing
    V8b open time    with real clicks, mounting both panes takes <= 2x mounting one pane of the same view
-                    (generated 4 sections, 160 nodes, 240 steps, 16 panels; median of 3 each, timed
-                    until every diagram and every panel in the mounted panes has rendered). Chuck 2026-10-31: "today's single-pane preview" no longer exists after
+                    (generated 4 sections, 160 nodes, 240 steps, 16 panels; median of 3 each). Timed
+                    until both panes show the selected change: After fully rendered, Before showing
+                    the changed node's section and its panels (Chuck 2026-11-01: the Before pane
+                    draws its other sections right after); the full Before document must follow. Chuck 2026-10-31: "today's single-pane preview" no longer exists after
                     #848, so the baseline is one pane of the same view; the limit stays at the issue's
                     2x and the implementation is optimized to meet it
                                                                                   rejects: quadratic or repeated rendering on open */
@@ -143,16 +145,25 @@ test('V8b mounting both panes takes at most 2x mounting one pane',async({page,se
   view={previous:function(){},next:function(){},destroy:function(){}};`);
   await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/'+name+'.html');
   const host=page.locator('#compare-host');
-  async function time(button,panes){
+  /* Timed until both panes show the selected change: the After pane fully rendered (4 diagrams,
+     16 panels) and the Before pane showing the changed node's section with its 4 panels
+     (Chuck 2026-11-01: the Before pane may draw its other sections right after). */
+  const changedSection=side=>pane(host,side).locator('[data-dv-section]').filter({has:page.locator('[data-dv-node="n3"]')}).first();
+  async function time(button,two){
     await page.locator('#cv-destroy').click();await expect.poll(()=>host.evaluate(el=>el.childElementCount)).toBe(0);
     const t=Date.now();await page.locator(button).click();
-    for(const side of panes){
-      await expect(pane(host,side).locator('svg[aria-label="flow diagram"]')).toHaveCount(4,{timeout:60000});
-      await expect(pane(host,side).locator('[data-dv-panel]')).toHaveCount(16,{timeout:60000});/* panel bodies count too */
+    await expect(pane(host,'after').locator('svg[aria-label="flow diagram"]')).toHaveCount(4,{timeout:60000});
+    await expect(pane(host,'after').locator('[data-dv-panel]')).toHaveCount(16,{timeout:60000});/* panel bodies count too */
+    if(two){
+      await expect(changedSection('before').locator('[data-dv-node="n3"]').first()).toBeVisible({timeout:60000});
+      await expect(changedSection('before').locator('[data-dv-panel]')).toHaveCount(4,{timeout:60000});
     }
-    return Date.now()-t;
+    const elapsed=Date.now()-t;
+    /* ...and the whole current document still arrives in the Before pane. */
+    if(two){await expect(pane(host,'before').locator('svg[aria-label="flow diagram"]')).toHaveCount(4,{timeout:60000});await expect(pane(host,'before').locator('[data-dv-panel]')).toHaveCount(16,{timeout:60000});}
+    return elapsed;
   }
   const median=list=>list.slice().sort((x,y)=>x-y)[1],one=[],two=[];
-  for(let i=0;i<3;i++){one.push(await time('#cv-one',['after']));two.push(await time('#cv-two',['before','after']));}
+  for(let i=0;i<3;i++){one.push(await time('#cv-one',false));two.push(await time('#cv-two',true));}
   expect(median(two),'both panes '+JSON.stringify(two)+' ms vs one pane '+JSON.stringify(one)+' ms').toBeLessThanOrEqual(2*median(one));
 });

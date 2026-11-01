@@ -392,7 +392,9 @@ function mountCompareView(host, opts){
     var fold = path ? compareFoldsFor(d, path.id) : null;
     return {side:side, section:index, d:d, steps:steps, pathId:path ? path.id : null, fold:fold, indices:fold ? fold.indices : [], pos:-1, skin:sideSkin(side)};
   }
-  function buildFocus(entry){
+  /* force: {before, after, pathBefore, pathAfter} opens the given source steps on paths that hold
+     them (a step click whose paired step is on another path). */
+  function buildFocus(entry, force){
     if (entry.kind !== 'step' && entry.kind !== 'panel') return null;
     var effect = (entry.effects || [])[0], pathId = effect ? effect.pathId : null;
     /* The step to open: the edited step; for a panel settings change, the first step where the
@@ -403,7 +405,8 @@ function mountCompareView(host, opts){
     /* A settings change: pair the steps first (pairing does not depend on the path) and open on
        the first visible step of its scope that has a pair, so the path chosen below holds a step
        that exists on both sides. */
-    if (entry.effect === 'declaration'){
+    if (force) st = {before:force.before, after:force.after};
+    if (entry.effect === 'declaration' && !force){
       var section = function(side){ var i = compareSectionOnSide(entries, pages, entry, side), r = i >= 0 && pages[side] ? sectionRecords(pages[side])[i] : null; return r && r.section && r.section.diagram; };
       var dA = section('before'), dB = section('after');
       if (dA && dB){
@@ -415,7 +418,8 @@ function mountCompareView(host, opts){
     }
     /* The side that holds the step picks the path; the other side follows it. */
     var A, B;
-    if (st.after == null && st.before != null){ A = focusSide(entry, 'before', pathId, st.before); B = focusSide(entry, 'after', A && A.pathId || pathId, st.after); }
+    if (force){ A = focusSide(entry, 'before', force.pathBefore, st.before); B = focusSide(entry, 'after', force.pathAfter, st.after); }
+    else if (st.after == null && st.before != null){ A = focusSide(entry, 'before', pathId, st.before); B = focusSide(entry, 'after', A && A.pathId || pathId, st.after); }
     else { B = focusSide(entry, 'after', pathId, st.after); A = focusSide(entry, 'before', B && B.pathId || pathId, st.before); }
     if (!A || !B || !A.indices.length && !B.indices.length) return null;
     var aToB = new Map(), bToA = new Map();
@@ -479,7 +483,7 @@ function mountCompareView(host, opts){
       if (pick){ if (typeof pick.afterStep === 'number') srcB = pick.afterStep; else srcA = pick.beforeStep; }
     }
     /* A settings change opens on the first step of its scope that exists on both sides. */
-    if (entry.effect === 'declaration'){
+    if (entry.effect === 'declaration' && !force){
       var pairedB = (entry.scopeAfter || []).find(function(v){ return typeof v === 'number' && ctx.posB.has(v) && bToA.has(v) && posA.has(bToA.get(v)); }),
           pairedA = (entry.scopeBefore || []).find(function(v){ return typeof v === 'number' && posA.has(v) && aToB.has(v) && ctx.posB.has(aToB.get(v)); });
       if (pairedB != null){ srcB = pairedB; srcA = null; }
@@ -512,6 +516,14 @@ function mountCompareView(host, opts){
     var ctx = focusCtx; if (!ctx || destroyed) return;
     var S = ctx[side], O = ctx[side === 'before' ? 'after' : 'before'], map = side === 'before' ? ctx.aToB : ctx.bToA;
     var src = S.indices[pos], other = map.has(src) ? map.get(src) : null;
+    if (other != null && O.indices.indexOf(other) < 0){
+      /* The paired step is on another path of the other side: rebuild both sides on paths that hold
+         the pair (this side keeps its path). */
+      var f = side === 'before' ? {before:src, after:other, pathBefore:S.pathId, pathAfter:O.pathId} : {before:other, after:src, pathBefore:O.pathId, pathAfter:S.pathId};
+      var next = null;
+      try{ next = buildFocus(ctx.entry, f); }catch(ex){ next = null; }
+      if (next){ focusCtx = next; syncPaneSteps(); renderFocus(); return; }
+    }
     S.pos = pos; O.pos = other == null ? -1 : O.indices.indexOf(other);
     syncPaneSteps();
     renderFocus();

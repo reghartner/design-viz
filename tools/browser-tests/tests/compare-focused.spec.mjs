@@ -107,13 +107,13 @@ async function mountPage(page,server,name,current,proposed,mode,script){
 }
 const side=(host,s)=>host.locator('.compare-focus-side[data-side="'+s+'"]');
 const stepButtons=(host,s)=>side(host,s).locator('button.compare-focus-step');
-const current=(host,s)=>side(host,s).locator('button.compare-focus-step[aria-current="true"]');
+const currentStep=(host,s)=>side(host,s).locator('button.compare-focus-step[aria-current="true"]');
 const rows=host=>host.locator('.compare-focus-row');
 const cell=(row,s)=>row.locator('.compare-focus-cell[data-side="'+s+'"]');
 const items=host=>host.locator('.compare-rail button.compare-rail-item');
 async function bothAt(host,n,captions){
   for(const s of ['before','after']){
-    await expect(current(host,s),s+' side is on step '+n).toHaveText(String(n));
+    await expect(currentStep(host,s),s+' side is on step '+n).toHaveText(String(n));
     if(captions)await expect(side(host,s).locator('.compare-focus-caption')).toHaveText(captions[s==='before'?0:1]);
   }
 }
@@ -236,10 +236,10 @@ test('F7 F9 added panels and removed steps show placeholders; a node change fall
   await expect(cell(row,'after').locator('.gaugeval')).toHaveText('3');
   /* F7: removed step */
   await items(host).nth(2).click();
-  await expect(current(host,'before')).toHaveText('2');
+  await expect(currentStep(host,'before')).toHaveText('2');
   await expect(side(host,'before').locator('.compare-focus-caption')).toHaveText('Middle');
   await expect(side(host,'after').locator('.compare-focus-missing')).toHaveText('Step not in the proposal');
-  await expect(current(host,'after')).toHaveCount(0);
+  await expect(currentStep(host,'after')).toHaveCount(0);
   await noGraphVisible(host);
 });
 
@@ -271,18 +271,18 @@ test('F4b step clicks follow the engine step pairing when the proposal inserts a
   await expect(stepButtons(host,'before'),'precondition: Before has 4 steps').toHaveCount(4);
   await expect(stepButtons(host,'after'),'precondition: After has 5 steps').toHaveCount(5);
   await stepButtons(host,'before').filter({hasText:/^3$/}).click();
-  await expect(current(host,'before')).toHaveText('3');
-  await expect(current(host,'after'),'Before step 3 (s3) pairs with After step 4').toHaveText('4');
+  await expect(currentStep(host,'before')).toHaveText('3');
+  await expect(currentStep(host,'after'),'Before step 3 (s3) pairs with After step 4').toHaveText('4');
   for(const s of ['before','after'])await expect(side(host,s).locator('.compare-focus-caption')).toHaveText('Three');
   await expect.poll(()=>rowTitles(host)).toEqual(['g']);
   await expect(rows(host).first().locator('.compare-focus-chip')).toHaveText(['value 5 → 7']);
   await stepButtons(host,'after').filter({hasText:/^2$/}).click();
-  await expect(current(host,'after')).toHaveText('2');
+  await expect(currentStep(host,'after')).toHaveText('2');
   await expect(side(host,'after').locator('.compare-focus-caption')).toHaveText('Inserted');
-  await expect(current(host,'before'),'the inserted step has no Before step').toHaveCount(0);
+  await expect(currentStep(host,'before'),'the inserted step has no Before step').toHaveCount(0);
   await expect(side(host,'before').locator('.compare-focus-missing')).toHaveText('Step not in the current document');
   await stepButtons(host,'after').filter({hasText:/^5$/}).click();
-  await expect(current(host,'before'),'After step 5 (s4) pairs with Before step 4').toHaveText('4');
+  await expect(currentStep(host,'before'),'After step 5 (s4) pairs with Before step 4').toHaveText('4');
   for(const s of ['before','after'])await expect(side(host,s).locator('.compare-focus-caption')).toHaveText('Four');
 });
 

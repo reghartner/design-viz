@@ -1966,6 +1966,8 @@ test('agent change navigation reaches other Views and paths and preserves stable
     // #848: both panes are visible; the rail selection frames both (one-way); each pane keeps its own camera.
     const rail=page.locator('#agent-update-compare .compare-rail'),view=page.locator('#agent-update-view'),before=page.locator('#agent-update-view-before'),position=page.locator('#agent-update-position');
     await expect(rail,'the change rail is shown').toBeVisible();
+    /* #848 PR 2: the view opens Focused; this test covers the full panes. */
+    await page.locator('#agent-update-compare').getByRole('button',{name:'Full diagram',exact:true}).click();
     const item=name=>rail.getByRole('button',{name});
     await item(/^Modified · Path Retry failure · label$/).click();
     for(const side of [view,before])await expect(side.locator('.explore-active-section [data-dv-path="failed"]')).toHaveAttribute('aria-pressed','true');

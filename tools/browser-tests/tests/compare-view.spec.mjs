@@ -227,7 +227,8 @@ test('V8 twenty open/close cycles on a large document leave no renders, listener
     const host=page.locator('#agent-update-compare'),html=page.locator('html'),listeners=await keydown(),baseline=await live();let base=0;
     for(let cycle=1;cycle<=20;cycle++){
       await page.locator('#agent-update-open').click();
-      await expect(dialogPane(page,'before').locator('svg[aria-label="flow diagram"]').first()).toBeVisible();
+      /* #848 PR 2: the view opens Focused, so the full panes are rendered underneath but not shown. */
+      await expect(dialogPane(page,'before').locator('svg[aria-label="flow diagram"]').first()).toBeAttached();
       await expect(dialogPane(page,'after').locator('svg[aria-label="flow diagram"]').first()).toBeVisible();
       await expect.poll(live,{message:'two render controllers and two canvas controllers live while open'}).toBe(baseline+4);
       const items=rail(host).locator('button.compare-rail-item'),n=await items.count();expect(n,'precondition: the proposal has changes').toBeGreaterThan(2);

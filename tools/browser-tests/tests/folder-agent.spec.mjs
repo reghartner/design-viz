@@ -973,8 +973,8 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     await expect(page.locator('#agent-update-details-panel')).toBeHidden();await expect(page.locator('#agent-update-note')).toBeHidden();
     await page.screenshot({path:info.outputPath('explore-review-default-1280x720.png')});await contained();
     await expect(view.locator('.reader-top>.reader-button').first()).toHaveAttribute('aria-expanded','false');await changedNodeVisible('Delivery service');
-    await expect(view.locator('.explore-window:visible')).toHaveCount(0);await view.locator('.explore-panel-menu summary').click();
-    await expect(view.getByRole('button',{name:'Restore panels',exact:true})).toBeVisible();await expect(view.locator('.explore-overlay-value')).toHaveText('50%');await view.locator('.explore-panel-menu summary').click();
+    /* #848 Full mode shows the section's panels (compare-view.spec.mjs V5); they stay at half scale and off the changed node (changedNodeVisible). */
+    await view.locator('.explore-panel-menu summary').click();await expect(view.locator('.explore-overlay-value')).toHaveText('50%');await view.locator('.explore-panel-menu summary').click();
     await expect(view.locator('[data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');
     await expect(page.locator('#agent-update-change-status')).toContainText('1 modified');
     await expect(page.locator('#agent-update-highlights')).toHaveCount(0);
@@ -1958,6 +1958,13 @@ test('agent change navigation reaches other Views and paths and preserves stable
     await expect(before.locator('.explore-active-section .schip[aria-current="true"]')).toHaveAttribute('data-step-source','2');
     const camera=scope=>scope.locator('.explore-active-section .explore-board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
     const settle=()=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+    /* Wheel over a point of the pane's board that no floating panel covers. */
+    const wheelOnBoard=async scope=>{
+      const point=await scope.locator('.explore-active-section .explore-board').evaluate(board=>{const r=board.getBoundingClientRect();
+        for(let y=r.top+16;y<r.bottom-16;y+=24)for(let x=r.left+16;x<r.right-16;x+=24){const hit=document.elementFromPoint(x,y);if(hit && board.contains(hit) && !hit.closest('.explore-window,.workspace-window,.explore-tools,button'))return {x,y};}
+        return null;});
+      expect(point,'the board has an uncovered point').not.toBeNull();await page.mouse.move(point.x,point.y);await page.mouse.wheel(120,80);
+    };
     /* Each pane's camera must move only from its own input, in both directions, for zoom and pan. */
     const ownMoveOnly=async(moved,other,label,act)=>{
       await settle();const otherCam=await camera(other),movedCam=await camera(moved);
@@ -1967,8 +1974,8 @@ test('agent change navigation reaches other Views and paths and preserves stable
     /* Each pane opens fitted at its minimum zoom, so zoom in (zoom out cannot move a fitted camera). */
     await ownMoveOnly(view,before,'zooming the After pane',()=>view.getByRole('button',{name:'Zoom in',exact:true}).click());
     await ownMoveOnly(before,view,'zooming the Before pane',()=>before.getByRole('button',{name:'Zoom in',exact:true}).click());
-    await ownMoveOnly(view,before,'panning the After pane',async()=>{await view.locator('.explore-active-section .explore-board').hover({position:{x:24,y:24}});await page.mouse.wheel(120,80);});
-    await ownMoveOnly(before,view,'panning the Before pane',async()=>{await before.locator('.explore-active-section .explore-board').hover({position:{x:24,y:24}});await page.mouse.wheel(120,80);});
+    await ownMoveOnly(view,before,'panning the After pane',async()=>{await wheelOnBoard(view);});
+    await ownMoveOnly(before,view,'panning the Before pane',async()=>{await wheelOnBoard(before);});
     await page.screenshot({path:info.outputPath('change-navigation-proposed-1280x720.png')});
     await item(/^Removed · Node Retired worker$/).click();await expect(position).toContainText('Removed');await expect(position).toContainText('not in the proposal');
     await expect(before.locator('[data-dv-node="retired"]')).toBeVisible();await expect(page.locator('#agent-update-commit')).toBeEnabled();

@@ -70,11 +70,23 @@ function compareEntryFields(entry){
   });
   return out.join(', ');
 }
+/* Rail groups: one per section (keyed by side + section index, so two sections
+   with the same heading stay separate), named by the section heading; entries
+   stay in the engine's document order. */
 function compareEntryGroup(entry, pages){
   var sec = entry.section || {}, side = sec.after != null ? 'after' : sec.before != null ? 'before' : null;
-  if (side == null) return entry.kind === 'tab' || entry.kind === 'view' ? 'Tabs' : 'Document';
+  if (side == null){ var name = entry.kind === 'tab' || entry.kind === 'view' ? 'Tabs' : 'Document'; return {key:name, name:name}; }
   var rec = sectionRecords(pages[side])[sec[side]], s = rec && rec.section || {};
-  return String(s.heading || s.id || 'Section ' + (sec[side] + 1));
+  return {key:side + ':' + sec[side], name:String(s.heading || s.id || 'Section ' + (sec[side] + 1))};
+}
+function compareRailGroups(entries, pages){
+  var groups = [], last = null;
+  (entries || []).forEach(function(entry, index){
+    var g = compareEntryGroup(entry, pages);
+    if (!last || last.key !== g.key){ last = {key:g.key, name:g.name, items:[]}; groups.push(last); }
+    last.items.push(index);
+  });
+  return groups;
 }
 function mountCompareView(host, opts){
   opts = opts || {};
@@ -86,12 +98,7 @@ function mountCompareView(host, opts){
   rail.setAttribute('aria-label', 'Changes');
   root.appendChild(rail); root.appendChild(columns); host.appendChild(root);
   /* Rail: groups in first-appearance order (entries are in document order). */
-  var groups = [], byName = Object.create(null);
-  entries.forEach(function(entry, index){
-    var name = compareEntryGroup(entry, pages), g = byName[name];
-    if (!g){ g = byName[name] = {name:name, items:[]}; groups.push(g); }
-    g.items.push(index);
-  });
+  var groups = compareRailGroups(entries, pages);
   var buttons = [];
   groups.forEach(function(g){
     var box = el('section', 'compare-rail-group'), list = el('ol', 'compare-rail-list');

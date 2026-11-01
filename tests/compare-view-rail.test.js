@@ -13,7 +13,7 @@ test('sections sharing a heading form separate rail groups in document order',()
   const before=page(''),after=page('!');
   const entries=c.compareDocuments({authored:before,resolved:before,ledger:null},{authored:after,resolved:after,ledger:null});
   assert.equal(typeof c.compareRailGroups,'function','compare-view.js defines compareRailGroups(entries, pages)');
-  const groups=c.compareRailGroups(entries,{before,after});
+  const groups=JSON.parse(JSON.stringify(c.compareRailGroups(entries,{before,after})));/* copy out of the vm realm */
   assert.deepEqual(groups.map(g=>g.name),['Same','Middle','Same']);
   const order=groups.flatMap(g=>g.items);
   assert.deepEqual(order,[...order].sort((a,b)=>a-b),'rail order equals entry (document) order');

@@ -18,7 +18,8 @@
    V5 full mode        each pane renders exactly the selected section's nodes (by id, per side)
                        and the section's declared panel;
                        selecting a node change brings it into view in both panes; a manual wheel
-                       scroll of the Before pane leaves the After pane's scroll unchanged          rejects: two-way lock; unframed target; wrong section
+                       scroll of the Before pane leaves the After pane's scroll unchanged; zooming
+                       either pane with its Zoom in button leaves the other pane's zoom and board          rejects: two-way lock; unframed target; wrong section
    V6 accept           with both panes shown, Accept stays enabled while every change is selected in
                        turn (added and step changes included); one Undo restores; Redo re-applies     rejects: Accept gated on a side toggle
    V7, V7b, V8b        viewer-only component page: see compare-view-standalone.spec.mjs
@@ -171,6 +172,16 @@ test('V5 Full mode renders each section exactly and frames a node change in both
     await left.hover();await page.mouse.wheel(0,400);
     await expect.poll(()=>left.evaluate(el=>el.scrollTop)).not.toBe(leftTop);
     await page.waitForTimeout(300);expect(await right.evaluate(el=>el.scrollTop),'manual scroll of Before leaves After unchanged').toBe(rightTop);
+    /* Manual zoom is per pane too (one-way sync): zooming one pane leaves the other pane's zoom and board unchanged. */
+    const zoomOf=side=>side.locator('.reader-zoom-menu>summary').first(),board=side=>side.locator('.explore-active-section .explore-board').first();
+    for(const [own,other,name] of [[before,after,'Before'],[after,before,'After']]){
+      const ownZoom=await zoomOf(own).innerText(),otherZoom=await zoomOf(other).innerText(),otherBoard=await board(other).boundingBox();
+      await own.getByRole('button',{name:'Zoom in',exact:true}).first().click();
+      await expect(zoomOf(own),'zooming the '+name+' pane changes its zoom').not.toHaveText(ownZoom);
+      await page.waitForTimeout(300);
+      expect(await zoomOf(other).innerText(),'zooming the '+name+' pane leaves the other pane\'s zoom').toBe(otherZoom);
+      expect(await board(other).boundingBox(),'zooming the '+name+' pane leaves the other pane\'s board').toEqual(otherBoard);
+    }
   });
 });
 test('V6 Accept is enabled without choosing a side and applies once with Undo/Redo',async({page})=>{

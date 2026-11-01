@@ -23,6 +23,11 @@
    F4 step click  clicking step 7 on the Before side moves both sides to 7 and redraws the rows
                   (Power draw, Event log); clicking step 2 on the After side moves both to 2 with
                   no rows and the empty-state text                             rejects: one-side stepping; stale rows
+   F4b pairing    the proposal inserts a step after step 1, so paired steps sit at different
+                  positions: clicking Before step 3 puts After on step 4 (the same step by id, same
+                  caption, same changed-panel row); clicking the inserted After step 2 leaves Before
+                  without a current step and shows "Step not in the current document"
+                                                                              rejects: pairing by position
    F5 caption     the caption change (step 8) shows both captions and a word diff with exact
                   removed and added words                                      rejects: whole-text replace; no diff
    F6 untrusted   markup in a caption and in a panel value is shown as literal text in the word diff
@@ -36,6 +41,9 @@
                                                                               rejects: toggle resets on selection
    F9 fallback    a node change in Focused mode shows the full panes with the note "This change
                   shows in the full diagram." (node cropping is PR 3)          rejects: blank view for node changes
+   F9b fallback   every change kind without a focused form in PR 2 falls back the same way: an
+   (all kinds)    imported node (provider change), a local edge, a section heading and a new node
+                  each show the full panes with the note and no focused view    rejects: local-node-only fallback
    excluded       section heading / ledger / document text diffs (issue row 2b's ledger and heading
                   cases, row 7b): not in PR 2 per the issue's PR split; node/edge crop: PR 3 */
 import {test,expect} from '../helpers/test.mjs';
@@ -80,7 +88,7 @@ function doorbell(){
    shared component through window.FlowviewCompare (no Workbench bundle). */
 /* JSON for an inline script: "<" is escaped so authored text such as "</script>" cannot end the script element. */
 const inline=v=>JSON.stringify(v).replace(/</g,'\\u003c');
-async function mountPage(page,server,name,current,proposed,mode){
+async function mountPage(page,server,name,current,proposed,mode,script){
   await writeFile(path.join(server.root,name+'.json'),JSON.stringify(current));
   execFileSync('python3',[path.join(root,'tools/inject.py'),path.join(server.root,name+'.json'),path.join(root,'template/flowview.html'),path.join(server.root,name+'.html')]);
   const html=await readFile(path.join(server.root,name+'.html'),'utf8');
@@ -89,9 +97,9 @@ async function mountPage(page,server,name,current,proposed,mode){
   await writeFile(path.join(server.root,name+'.html'),html.slice(0,at)+`<div id="compare-host" style="position:fixed;inset:0;z-index:9999;background:#fff"></div>
 <script>window.addEventListener('load',function(){
   if(!window.FlowviewCompare)return;
-  var a=FlowviewCompare.normalize(${inline(current)}),b=FlowviewCompare.normalize(${inline(proposed)});
+  ${script||`var a=FlowviewCompare.normalize(${inline(current)}),b=FlowviewCompare.normalize(${inline(proposed)});
   var entries=FlowviewCompare.compare({authored:a,resolved:a,ledger:null},{authored:b,resolved:b,ledger:null});
-  window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),${mode?`{before:a,after:b,entries:entries,mode:${JSON.stringify(mode)}}`:'{before:a,after:b,entries:entries}'});
+  window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),${mode?`{before:a,after:b,entries:entries,mode:${JSON.stringify(mode)}}`:'{before:a,after:b,entries:entries}'});`}
 });</script>`+html.slice(at));
   await page.setViewportSize({width:1440,height:900});
   await page.goto(server.origin+'/'+name+'.html');
@@ -251,4 +259,59 @@ test('F8 the Full diagram toggle shows both full panes and keeps its mode across
   await bothAt(host,8);
   await expect.poll(()=>rowTitles(host)).toEqual(['log']);
   await noGraphVisible(host);
+});
+
+test('F4b step clicks follow the engine step pairing when the proposal inserts a step',async({page,server})=>{
+  const current={page:{title:'Pairing',blocks:[{id:'p',heading:'Pairing',diagram:{view:'step',autoplay:false,nodes:{a:{title:'A'}},rows:[['a']],
+    panels:[{id:'g',type:'gauge',title:'Gauge',initial:{value:1}}],
+    steps:[{id:'s1',nodes:['a'],text:'One'},{id:'s2',nodes:['a'],text:'Two'},{id:'s3',nodes:['a'],text:'Three',panels:{g:{value:5}}},{id:'s4',nodes:['a'],text:'Four'}]}}]}};
+  const proposed=plain(current),d=proposed.page.blocks[0].diagram;
+  d.steps.splice(1,0,{id:'new',nodes:['a'],text:'Inserted'});d.steps[3].panels={g:{value:7}};
+  const host=await mountPage(page,server,'focus-pairing-'+Date.now(),current,proposed);
+  await expect(stepButtons(host,'before'),'precondition: Before has 4 steps').toHaveCount(4);
+  await expect(stepButtons(host,'after'),'precondition: After has 5 steps').toHaveCount(5);
+  await stepButtons(host,'before').filter({hasText:/^3$/}).click();
+  await expect(current(host,'before')).toHaveText('3');
+  await expect(current(host,'after'),'Before step 3 (s3) pairs with After step 4').toHaveText('4');
+  for(const s of ['before','after'])await expect(side(host,s).locator('.compare-focus-caption')).toHaveText('Three');
+  await expect.poll(()=>rowTitles(host)).toEqual(['g']);
+  await expect(rows(host).first().locator('.compare-focus-chip')).toHaveText(['value 5 → 7']);
+  await stepButtons(host,'after').filter({hasText:/^2$/}).click();
+  await expect(current(host,'after')).toHaveText('2');
+  await expect(side(host,'after').locator('.compare-focus-caption')).toHaveText('Inserted');
+  await expect(current(host,'before'),'the inserted step has no Before step').toHaveCount(0);
+  await expect(side(host,'before').locator('.compare-focus-missing')).toHaveText('Step not in the current document');
+  await stepButtons(host,'after').filter({hasText:/^5$/}).click();
+  await expect(current(host,'before'),'After step 5 (s4) pairs with Before step 4').toHaveText('4');
+  for(const s of ['before','after'])await expect(side(host,s).locator('.compare-focus-caption')).toHaveText('Four');
+});
+
+test('F9b imported nodes, edges, sections and added nodes fall back to the full panes in Focused mode',async({page,server})=>{
+  const spec=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',heading:'Main',diagram:d}]}});
+  const provider=spec('provider',{nodes:{p1:{title:'Provider one'},p2:{title:'Provider two'}},rows:[['p1','p2']],edges:[{from:'p1',to:'p2'}],
+    topologyExports:{public:{nodes:['p1','p2'],edges:['p1->p2']}}});
+  const provider2=plain(provider);provider2.page.sections[0].diagram.nodes.p2.title='Provider two changed';
+  const consumer=spec('consumer',{nodes:{a:{title:'Anchor'},b:{title:'Bee'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'old'}],
+    topologyImports:[{spec:'provider',export:'public',as:'child'}]});
+  const consumer2=plain(consumer),d=consumer2.page.sections[0].diagram;
+  consumer2.page.sections[0].heading='Main renamed';d.edges[0].label='new';d.nodes.c={title:'Sea'};d.rows=[['a','b','c']];
+  const script=`function side(c,p){var raw=JSON.parse(JSON.stringify(c));return {authored:FlowviewCompare.normalize(JSON.parse(JSON.stringify(c))),resolved:FlowviewCompare.normalize(FlowviewCompare.resolve(raw,{version:1,id:'consumer',specs:[p,c]})),ledger:null};}
+  var A=side(${inline(consumer)},${inline(provider)}),B=side(${inline(consumer2)},${inline(provider2)}),entries=FlowviewCompare.compare(A,B);
+  window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),{before:A.resolved,after:B.resolved,entries:entries});`;
+  /* The injected viewer page holds a plain document; the fixture script mounts the resolved consumer pair. */
+  const host=await mountPage(page,server,'focus-fallback-'+Date.now(),doorbell().current,null,null,script);
+  const labels=await items(host).allInnerTexts();
+  for(const want of [/^Modified · Section Main renamed/,/^Added · Node Sea$/,/^Modified · Connection .* · label$/,/^Modified · Imported node child::p2 · title$/])
+    expect(labels.some(l=>want.test(l)),'precondition: the rail lists '+want+' in '+JSON.stringify(labels)).toBe(true);
+  for(let i=0;i<labels.length;i++){
+    await items(host).nth(i).click();await expect(items(host).nth(i)).toHaveAttribute('aria-current','true');
+    await expect(host.getByRole('button',{name:'Focused',exact:true}),labels[i]).toHaveAttribute('aria-pressed','true');
+    await expect(host.locator('.compare-focus'),labels[i]+': no focused view').toBeHidden();
+    await expect(host.locator('.compare-mode-note'),labels[i]).toHaveText('This change shows in the full diagram.');
+    await expect(host.locator('.compare-pane[data-side="after"] [data-dv-node="a"]:visible').first(),labels[i]+': the After pane is shown').toBeVisible();
+    await expect(host.locator('.compare-pane[data-side="before"] [data-dv-node="a"]:visible').first(),labels[i]+': the Before pane is shown').toBeVisible();
+  }
+  const imported=labels.findIndex(l=>/Imported node child::p2/.test(l));
+  await items(host).nth(imported).click();
+  await expect(host.locator('.compare-pane[data-side="after"] [data-dv-node="child::p2"]:visible').first()).toContainText('Provider two changed');
 });

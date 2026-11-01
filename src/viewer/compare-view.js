@@ -147,19 +147,34 @@ function compareValueChips(before, after){
   return out;
 }
 /* Word-level diff (longest common subsequence of whitespace-separated words) as runs. */
+/* Largest middle stretch (words x words) compared word by word; longer changed stretches
+   show as one removed run and one added run so a long caption cannot stall the preview. */
+var COMPARE_WORD_DIFF_CELLS = 250000;
 function compareWordDiff(before, after){
   var a = String(before || '').split(/\s+/).filter(Boolean), b = String(after || '').split(/\s+/).filter(Boolean);
-  var n = a.length, m = b.length, L = [];
-  for (var i = 0; i <= n; i++){ L.push(new Array(m + 1).fill(0)); }
-  for (i = n - 1; i >= 0; i--) for (var j = m - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
   var runs = [];
   function push(op, word){ var last = runs[runs.length - 1]; if (last && last.op === op) last.text += ' ' + word; else runs.push({op:op, text:word}); }
-  i = 0; j = 0;
-  while (i < n || j < m){
-    if (i < n && j < m && a[i] === b[j]){ push('same', a[i]); i++; j++; }
-    else if (j < m && (i >= n || L[i][j + 1] > L[i + 1][j])){ push('ins', b[j]); j++; }
-    else if (i < n){ push('del', a[i]); i++; }
+  /* Common prefix and suffix first; only the changed middle is compared word by word. */
+  var start = 0, endA = a.length, endB = b.length;
+  while (start < endA && start < endB && a[start] === b[start]) start++;
+  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]){ endA--; endB--; }
+  var i, j;
+  for (i = 0; i < start; i++) push('same', a[i]);
+  var ma = a.slice(start, endA), mb = b.slice(start, endB), n = ma.length, m = mb.length;
+  if ((n + 1) * (m + 1) > COMPARE_WORD_DIFF_CELLS){
+    ma.forEach(function(w){ push('del', w); }); mb.forEach(function(w){ push('ins', w); });
+  } else {
+    var L = [];
+    for (i = 0; i <= n; i++) L.push(new Int32Array(m + 1));
+    for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--) L[i][j] = ma[i] === mb[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    i = 0; j = 0;
+    while (i < n || j < m){
+      if (i < n && j < m && ma[i] === mb[j]){ push('same', ma[i]); i++; j++; }
+      else if (j < m && (i >= n || L[i][j + 1] > L[i + 1][j])){ push('ins', mb[j]); j++; }
+      else if (i < n){ push('del', ma[i]); i++; }
+    }
   }
+  for (i = endA; i < a.length; i++) push('same', a[i]);
   /* Within a changed stretch, list removed words before added words. */
   for (var k = 0; k + 1 < runs.length; k++) if (runs[k].op === 'ins' && runs[k + 1].op === 'del'){ var t = runs[k]; runs[k] = runs[k + 1]; runs[k + 1] = t; }
   return runs;
@@ -363,20 +378,25 @@ function mountCompareView(host, opts){
     var name = typeof skin === 'function' ? skin(pages[side]) : skin || pages[side] && pages[side].skin;
     return SKIN_NAMES.indexOf(name) >= 0 ? name : DEFAULT_SKIN;
   }
-  function focusSide(entry, side, pathId){
+  function focusSide(entry, side, pathId, src){
     var index = compareSectionOnSide(entries, pages, entry, side), rec = index >= 0 && pages[side] ? sectionRecords(pages[side])[index] : null;
     var d = rec && rec.section && rec.section.diagram;
     if (!d) return null;
     /* A side without steps (the first step added, the only step removed) has no step controls. */
     var steps = Array.isArray(d.steps) ? d.steps : [], paths = steps.length ? diagramPathList(d) : [];
-    var path = paths.find(function(x){ return x.id === pathId; }) || paths[0];
+    /* The change's path; for an edited step, a path that contains that step (a caption edit on an
+       alternate path has no reader effect to name the path). */
+    var path = paths.find(function(x){ return x.id === pathId && (src == null || x.indices.indexOf(src) >= 0); }) ||
+      (src != null ? paths.find(function(x){ return x.indices.indexOf(src) >= 0; }) : null) ||
+      paths.find(function(x){ return x.id === pathId; }) || paths[0];
     var fold = path ? compareFoldsFor(d, path.id) : null;
     return {side:side, section:index, d:d, steps:steps, pathId:path ? path.id : null, fold:fold, indices:fold ? fold.indices : [], pos:-1, skin:sideSkin(side)};
   }
   function buildFocus(entry){
     if (entry.kind !== 'step' && entry.kind !== 'panel') return null;
     var effect = (entry.effects || [])[0], pathId = effect ? effect.pathId : null;
-    var A = focusSide(entry, 'before', pathId), B = focusSide(entry, 'after', pathId);
+    var st = entry.kind === 'step' && entry.step || {};
+    var A = focusSide(entry, 'before', pathId, st.before), B = focusSide(entry, 'after', pathId, st.after);
     if (!A || !B || !A.indices.length && !B.indices.length) return null;
     var aToB = new Map(), bToA = new Map();
     comparePairs(A.steps, B.steps, [COMPARE_CAPTION_KEY], true).pairs.forEach(function(p){ aToB.set(p[0], p[1]); bToA.set(p[1], p[0]); });

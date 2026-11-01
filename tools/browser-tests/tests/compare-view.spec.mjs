@@ -126,7 +126,8 @@ test('V3 Next/Previous and J/K move the selection in both directions with wrap-a
 test('V4 selecting a step change puts both panes on that step',async({page})=>{
   await withProposal(page,async()=>{
     const before=dialogPane(page,'before'),after=dialogPane(page,'after');
-    await rail(page.locator('#agent-update-compare')).getByRole('button',{name:ITEMS[2],exact:true}).click();
+    const step=rail(page.locator('#agent-update-compare')).getByRole('button',{name:ITEMS[2],exact:true});
+    await expect(step,'the rail lists the step change').toBeVisible();await step.click();
     await expect(caption(before)).toContainText('Store confirms');await expect(caption(before)).not.toContainText('the write');
     await expect(caption(after)).toContainText('Store confirms the write');
   });

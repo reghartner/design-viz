@@ -12,8 +12,8 @@
    V7b imported     a provider-caused imported node change frames that imported node in both panes
                                                                                   rejects: local-only framing
    V8b open time    with real clicks, mounting both panes takes <= 2x mounting one pane of the same view
-                    (median of 3 each, timed until every diagram section in the mounted panes has
-                    rendered). Chuck 2026-10-31: "today's single-pane preview" no longer exists after
+                    (generated 4 sections, 160 nodes, 240 steps, 16 panels; median of 3 each, timed
+                    until every diagram and every panel in the mounted panes has rendered). Chuck 2026-10-31: "today's single-pane preview" no longer exists after
                     #848, so the baseline is one pane of the same view; the limit stays at the issue's
                     2x and the implementation is optimized to meet it
                                                                                   rejects: quadratic or repeated rendering on open */
@@ -120,8 +120,9 @@ test('V8b mounting both panes takes at most 2x mounting one pane',async({page,se
     const nodes={},rows=[],edges=[],steps=[];
     for(let n=0;n<40;n++){nodes['n'+n]={title:'S'+k+' node '+n};if(n%8===0)rows.push([]);rows[rows.length-1].push('n'+n);}
     for(let n=0;n<39;n++)edges.push({from:'n'+n,to:'n'+(n+1)});
-    for(let t=0;t<60;t++)steps.push({id:'t'+t,edge:'n'+(t%39)+'->n'+(t%39+1),text:'Step '+t});
-    blocks.push({id:'s'+k,heading:'Large '+k,diagram:{view:'step',autoplay:false,nodes,rows,edges,steps}});
+    const panels=Array.from({length:4},(_,p)=>({id:'g'+p,type:'gauge',title:'Gauge '+k+'.'+p,initial:{value:p}}));
+    for(let t=0;t<60;t++)steps.push({id:'t'+t,edge:'n'+(t%39)+'->n'+(t%39+1),text:'Step '+t,panels:{['g'+(t%4)]:{value:t}}});
+    blocks.push({id:'s'+k,heading:'Large '+k,diagram:{view:'step',autoplay:false,nodes,rows,edges,panels,steps}});
   }
   const current={page:{title:'Large',blocks}},proposed=plain(current);proposed.page.blocks[1].diagram.nodes.n3.title='Changed';
   const name='compare-perf-'+Date.now();
@@ -136,7 +137,10 @@ test('V8b mounting both panes takes at most 2x mounting one pane',async({page,se
   async function time(button,panes){
     await page.locator('#cv-destroy').click();await expect.poll(()=>host.evaluate(el=>el.childElementCount)).toBe(0);
     const t=Date.now();await page.locator(button).click();
-    for(const side of panes)await expect(pane(host,side).locator('svg[aria-label="flow diagram"]')).toHaveCount(4,{timeout:60000});
+    for(const side of panes){
+      await expect(pane(host,side).locator('svg[aria-label="flow diagram"]')).toHaveCount(4,{timeout:60000});
+      await expect(pane(host,side).locator('[data-dv-panel]')).toHaveCount(16,{timeout:60000});/* panel bodies count too */
+    }
     return Date.now()-t;
   }
   const median=list=>list.slice().sort((x,y)=>x-y)[1],one=[],two=[];

@@ -1085,6 +1085,7 @@ test('agent review keeps moved-node edge labels and step coins on its own board'
     }
     expect(await geometry(editor)).toEqual(before);await expect(page.locator('#src')).toHaveValue(original);
     await page.screenshot({path:info.outputPath('moved-edge-labels-proposed.png')});
+    await expect(page.locator('#agent-update-view-before'),'the Before pane is shown next to the proposal').toBeVisible();
     expect(await geometry(page.locator('#agent-update-view-before'))).toEqual(before);
     await expect(page.locator('#agent-update-commit')).toBeEnabled();expect(await geometry(view)).toEqual(candidate);
     await page.locator('#agent-update-commit').click();await expect(page.locator('#src')).toHaveValue(proposed);
@@ -1946,6 +1947,7 @@ test('agent change navigation reaches other Views and paths and preserves stable
     await page.locator('#agent-update-open').click();
     // #848: both panes are visible; the rail selection frames both (one-way); each pane keeps its own camera.
     const rail=page.locator('#agent-update-compare .compare-rail'),view=page.locator('#agent-update-view'),before=page.locator('#agent-update-view-before'),position=page.locator('#agent-update-position');
+    await expect(rail,'the change rail is shown').toBeVisible();
     const item=name=>rail.getByRole('button',{name});
     await item(/^Modified · Path Retry failure · label$/).click();
     for(const side of [view,before])await expect(side.locator('.explore-active-section [data-dv-path="failed"]')).toHaveAttribute('aria-pressed','true');
@@ -1987,7 +1989,7 @@ test('agent change navigation restores legacy Views after reorder and reveals an
     await page.locator('#agent-update-open').click();
     const view=page.locator('#agent-update-view'),before=page.locator('#agent-update-view-before'),node=view.locator('.explore-active-section [data-dv-node="b"]'),board=view.locator('.explore-active-section .explore-board');
     const item=page.locator('#agent-update-compare .compare-rail').getByRole('button',{name:/^Modified · Node Recovery backend · title$/});
-    await item.click();await expect(node).toBeInViewport();await view.getByRole('button',{name:'Zoom in',exact:true}).click();
+    await expect(item,'the rail lists the backend rename').toBeVisible();await item.click();await expect(node).toBeInViewport();await view.getByRole('button',{name:'Zoom in',exact:true}).click();
     await board.hover();for(let i=0;i<12 && await node.isVisible() && await node.evaluate(el=>{const r=el.getBoundingClientRect();return r.right>0 && r.bottom>0 && r.left<innerWidth && r.top<innerHeight;});i++)await page.mouse.wheel(600,600);
     await expect(node).not.toBeInViewport();
     await page.locator('#agent-update-next').click();await page.locator('#agent-update-previous').click();await expect(node).toBeInViewport();

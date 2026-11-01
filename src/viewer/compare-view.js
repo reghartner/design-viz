@@ -400,7 +400,10 @@ function mountCompareView(host, opts){
     var firstStep = function(list){ return (list || []).find(function(v){ return typeof v === 'number'; }); };
     var st = entry.kind === 'step' && entry.step ? entry.step :
       entry.effect === 'declaration' ? (firstStep(entry.scopeAfter) != null ? {before:null, after:firstStep(entry.scopeAfter)} : {before:firstStep(entry.scopeBefore), after:null}) : {};
-    var A = focusSide(entry, 'before', pathId, st.before), B = focusSide(entry, 'after', pathId, st.after);
+    /* The side that holds the step picks the path; the other side follows it. */
+    var A, B;
+    if (st.after == null && st.before != null){ A = focusSide(entry, 'before', pathId, st.before); B = focusSide(entry, 'after', A && A.pathId || pathId, st.after); }
+    else { B = focusSide(entry, 'after', pathId, st.after); A = focusSide(entry, 'before', B && B.pathId || pathId, st.before); }
     if (!A || !B || !A.indices.length && !B.indices.length) return null;
     var aToB = new Map(), bToA = new Map();
     comparePairs(A.steps, B.steps, [COMPARE_CAPTION_KEY], true).pairs.forEach(function(p){ aToB.set(p[0], p[1]); bToA.set(p[1], p[0]); });
@@ -414,18 +417,30 @@ function mountCompareView(host, opts){
     if (A.fold && B.fold) nodeIds.forEach(function(id){ tonesA[id] = A.fold.tone(id); tonesB[id] = B.fold.tone(id); });
     var posA = new Map(); A.indices.forEach(function(src, j){ posA.set(src, j); });
     ctx.posA = posA; ctx.posB = new Map(); B.indices.forEach(function(src, k){ ctx.posB.set(src, k); });
-    /* Paired positions [j (Before), k (After)]. */
-    var paired = [];
-    B.indices.forEach(function(src, k){ var a = bToA.has(src) ? bToA.get(src) : null; if (a != null && posA.has(a)) paired.push([posA.get(a), k]); });
-    /* A settings difference counts on its own only when it is display-only: the panel's folded
-       state is the same at every paired step. Settings that feed the fold (a drain rate, a log
-       limit) show through the folded state, which is compared per step. */
+    /* A changed panel setting is display-only when applying it alone to the Before section leaves
+       the panel's folded state unchanged (a title, a unit); it then differs at every step where the
+       panel is visible. Settings the type's fold reads (a battery's drain rate) show through the
+       folded state, which is compared per step. */
     ctx.declDiffers = {};
     panelIds.forEach(function(id){
       var pa = A.fold && A.fold.panels[id], pb = B.fold && B.fold.panels[id];
-      if (!pa || !pb || compareSame(compareWithout(pa, ['initial', 'visible']), compareWithout(pb, ['initial', 'visible']))){ ctx.declDiffers[id] = false; return; }
-      var sa = A.fold.state(id) || [], sb = B.fold.state(id) || [];
-      ctx.declDiffers[id] = paired.every(function(p){ var x = sa[p[0]], y = sb[p[1]]; return x === y || compareSame(x, y); });
+      ctx.declDiffers[id] = false;
+      if (!pa || !pb) return;
+      var keys = Object.keys(pa).concat(Object.keys(pb)).filter(function(k, i, all){
+        return all.indexOf(k) === i && k !== 'initial' && k !== 'visible' && !compareSame(pa[k], pb[k]);
+      });
+      if (!keys.length) return;
+      var base = A.fold.state(id) || [];
+      ctx.declDiffers[id] = keys.some(function(k){
+        var changed = (A.d.panels || []).map(function(p){
+          if (!p || p.id !== id) return p;
+          var q = Object.assign({}, p);
+          if (Object.prototype.hasOwnProperty.call(pb, k)) q[k] = pb[k]; else delete q[k];
+          return q;
+        });
+        var trial = compareFoldsFor(Object.assign({}, A.d, {panels:changed}), A.pathId).state(id) || [];
+        return trial.length === base.length && base.every(function(v, i){ return v === trial[i] || compareSame(v, trial[i]); });
+      });
     });
     /* Panels that differ at each After position (null = the step has no pair in Before). */
     ctx.diffAt = B.indices.map(function(src, k){

@@ -1967,8 +1967,8 @@ test('agent change navigation reaches other Views and paths and preserves stable
     /* Each pane opens fitted at its minimum zoom, so zoom in (zoom out cannot move a fitted camera). */
     await ownMoveOnly(view,before,'zooming the After pane',()=>view.getByRole('button',{name:'Zoom in',exact:true}).click());
     await ownMoveOnly(before,view,'zooming the Before pane',()=>before.getByRole('button',{name:'Zoom in',exact:true}).click());
-    await ownMoveOnly(view,before,'panning the After pane',async()=>{await view.locator('.explore-active-section .explore-board').hover();await page.mouse.wheel(120,80);});
-    await ownMoveOnly(before,view,'panning the Before pane',async()=>{await before.locator('.explore-active-section .explore-board').hover();await page.mouse.wheel(120,80);});
+    await ownMoveOnly(view,before,'panning the After pane',async()=>{await view.locator('.explore-active-section .explore-board').hover({position:{x:24,y:24}});await page.mouse.wheel(120,80);});
+    await ownMoveOnly(before,view,'panning the Before pane',async()=>{await before.locator('.explore-active-section .explore-board').hover({position:{x:24,y:24}});await page.mouse.wheel(120,80);});
     await page.screenshot({path:info.outputPath('change-navigation-proposed-1280x720.png')});
     await item(/^Removed · Node Retired worker$/).click();await expect(position).toContainText('Removed');await expect(position).toContainText('not in the proposal');
     await expect(before.locator('[data-dv-node="retired"]')).toBeVisible();await expect(page.locator('#agent-update-commit')).toBeEnabled();

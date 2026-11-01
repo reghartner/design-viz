@@ -103,16 +103,19 @@ function compareSectionOnSide(entries, pages, entry, side){
   var from = pages[other] ? sectionRecords(pages[other])[sec[other]] : null;
   return from && pages[side] ? sectionRecords(pages[side]).findIndex(function(r){ return r.reference === from.reference; }) : -1;
 }
-function compareEntryGroup(entry, pages){
-  var sec = entry.section || {}, side = sec.after != null ? 'after' : sec.before != null ? 'before' : null;
-  if (side == null){ var name = entry.kind === 'tab' || entry.kind === 'view' ? 'Tabs' : 'Document'; return {key:name, name:name}; }
-  var rec = sectionRecords(pages[side])[sec[side]], s = rec && rec.section || {};
-  return {key:side + ':' + sec[side], name:String(s.heading || s.id || 'Section ' + (sec[side] + 1))};
+function compareEntryGroup(entry, pages, entries){
+  var sec = entry.section || {};
+  if (sec.after == null && sec.before == null){ var name = entry.kind === 'tab' || entry.kind === 'view' ? 'Tabs' : 'Document'; return {key:name, name:name}; }
+  /* One group per paired section: key on the After section when the section exists there (a
+     removed object's section is found through its pairing), else on the Before section. */
+  var after = compareSectionOnSide(entries || [entry], pages, entry, 'after'), side = after >= 0 ? 'after' : 'before', index = after >= 0 ? after : sec.before;
+  var rec = sectionRecords(pages[side])[index], s = rec && rec.section || {};
+  return {key:side + ':' + index, name:String(s.heading || s.id || 'Section ' + (index + 1))};
 }
 function compareRailGroups(entries, pages){
   var groups = [], last = null;
   (entries || []).forEach(function(entry, index){
-    var g = compareEntryGroup(entry, pages);
+    var g = compareEntryGroup(entry, pages, entries);
     if (!last || last.key !== g.key){ last = {key:g.key, name:g.name, items:[]}; groups.push(last); }
     last.items.push(index);
   });

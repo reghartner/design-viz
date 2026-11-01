@@ -416,6 +416,14 @@ function mountCompareView(host, opts){
     /* A modified step whose edits are all diagram-only (highlighted node or edge) shows in the full diagram. */
     var stepFields = entry.kind === 'step' && entry.status === 'modified' ? compareStepFieldNames(entry) : [];
     if (stepFields.length && !stepFields.some(function(f){ return COMPARE_FOCUS_STEP_FIELD.test(f); })) return null;
+    /* A panel change that affects no numbered step (only the Ambient view before step 1) shows in
+       the full diagram, which keeps its Ambient state. */
+    if (entry.kind === 'panel' && entry.status === 'modified' && !force){
+      var numeric = function(v){ return typeof v === 'number'; };
+      var stepped = (entry.effects || []).some(function(e){ return (e.changes || []).some(function(c){ return numeric(c.afterStep) || numeric(c.beforeStep); }); }) ||
+        (entry.scopeAfter || []).some(numeric) || (entry.scopeBefore || []).some(numeric);
+      if (!stepped) return null;
+    }
     var effect = (entry.effects || [])[0], pathId = effect ? effect.pathId : null;
     /* The step to open: the edited step; for a panel settings change, the first step where the
        panel is visible (the engine's scope), so it does not open where the panel is hidden. */

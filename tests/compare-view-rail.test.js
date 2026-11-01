@@ -36,3 +36,17 @@ test('the side without an added object finds the paired section even when an id-
   const a2=again.find(e=>e.kind==='node' && e.status==='added');
   assert.equal(c.compareSectionOnSide(again,{before:unpaired,after},a2,'before'),1,'paired through the section entry of the renamed heading');
 });
+
+/* #848 diff review cycle 5: removed and added objects of one paired section form one rail group
+   (the engine records a removed object only on Before and an added one only on After). */
+test('removed and added objects of one paired section are one rail group',()=>{
+  const c=load();
+  const page=nodes=>c.normalize({page:{title:'T',sections:[{id:'flow',heading:'Flow',diagram:node('F')},{id:'notes',heading:'Notes',diagram:{nodes:Object.fromEntries(nodes.map(n=>[n,{title:n.toUpperCase()}])),rows:[nodes]}}]}});
+  const before=page(['x','gone']),after=page(['x','fresh']);
+  const entries=c.compareDocuments({authored:before,resolved:before,ledger:null},{authored:after,resolved:after,ledger:null});
+  const kinds=JSON.parse(JSON.stringify(entries.filter(e=>e.kind==='node').map(e=>e.status).sort()));
+  assert.deepEqual(kinds,['added','removed'],'precondition: one removed and one added node');
+  const groups=JSON.parse(JSON.stringify(c.compareRailGroups(entries,{before,after})));
+  assert.deepEqual(groups.map(g=>g.name),['Notes'],'one Notes group, not one per side');
+  assert.equal(groups[0].items.length,entries.filter(e=>(e.section||{}).before===1 || (e.section||{}).after===1).length);
+});

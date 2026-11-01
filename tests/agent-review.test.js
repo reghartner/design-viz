@@ -36,7 +36,7 @@ function uiHarness(options={}){
       mounts.push(m);
       return {select(i){m.selected=i;if(opts.onSelect)opts.onSelect(opts.entries[i],i,{before:{shown:true},after:{shown:true}});return {};},
         next(){return this.select(m.selected+1);},previous(){return this.select(m.selected-1);},selected:()=>m.selected,count:()=>opts.entries.length,
-        label:i=>'label '+i,setSkin(name){m.skins.push(name);return true;},destroy(){m.destroyed=true;host.replaceChildren();}};
+        label:i=>'label '+i,errors:()=>(options.renderErrors || []).slice(),setSkin(name){m.skins.push(name);return true;},destroy(){m.destroyed=true;host.replaceChildren();}};
     }};
   vm.createContext(c);
   for(const file of ['validator.js','workbench/lifetime.js','workbench/agent-review.js'])vm.runInContext(readSource(file),c);
@@ -173,4 +173,13 @@ test('a ledger-only proposal lists one change; stale replacement remounts with n
   h.replaceSnapshot({...h.snapshot,ledger:h.snapshot.currentLedger,review:{...h.review,version:2}});h.ui.update(h.snapshot.review);
   assert.deepEqual(h.mounts.at(-1)?.opts.entries,[],'the stale replacement remounts with no changes');assert.equal(h.mounts[0].destroyed,true);
   assert.equal(e['agent-update-next'].disabled,true);assert.equal(e['agent-update-commit'].disabled,true);assert.deepEqual(h.accepted,[]);h.ui.destroy();
+});
+
+test('a pane that fails to render keeps Accept disabled and says which side failed (#848 diff review 2)',()=>{
+  const h=uiHarness({renderErrors:[{side:'before',message:'boom'}]}),e=h.elements;h.ui.update(h.review);e['agent-update-open'].fire('click');
+  mounted(h);
+  assert.equal(e['agent-update-commit'].disabled,true,'Accept stays disabled while a side cannot be reviewed');
+  assert.match(e['agent-update-position'].textContent,/Before could not be rendered: boom/);
+  const ok=uiHarness(),o=ok.elements;ok.ui.update(ok.review);o['agent-update-open'].fire('click');
+  assert.equal(o['agent-update-commit'].disabled,false,'precondition: without a render error Accept is enabled');
 });

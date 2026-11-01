@@ -105,6 +105,15 @@ test('V2 the rail groups changes by section with exact labels',async({page})=>{
     }
   });
 });
+test('V2b selecting an added change moves the side without it to that change\'s section',async({page})=>{
+  await withProposal(page,async()=>{
+    const items=rail(page.locator('#agent-update-compare')).locator('button.compare-rail-item'),before=dialogPane(page,'before');
+    const section=()=>before.locator('[data-navigation-section]').first().getAttribute('data-navigation-section');
+    await items.nth(0).click();await expect.poll(section,{message:'precondition: Before is on the first section'}).toBe('1');
+    await expect(items.nth(4)).toHaveText(ITEMS[4]);await items.nth(4).click();
+    await expect.poll(section,{message:'the Before pane moves to the Notes section of the added node'}).toBe('2');
+  });
+});
 test('V3 Next/Previous and J/K move the selection in both directions with wrap-around and move both panes',async({page})=>{
   await withProposal(page,async()=>{
     const items=rail(page.locator('#agent-update-compare')).locator('button.compare-rail-item'),position=page.locator('#agent-update-position');

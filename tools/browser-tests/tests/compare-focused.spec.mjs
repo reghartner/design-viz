@@ -24,7 +24,8 @@
                   (Power draw, Event log); clicking step 2 on the After side moves both to 2 with
                   no rows and the empty-state text                             rejects: one-side stepping; stale rows
    F4b pairing    the proposal inserts a step after step 1, so paired steps sit at different
-                  positions; run with step ids and without (content + caption pairing): clicking
+                  positions; run with step ids, without ids (content + caption pairing) and with only
+                  the inserted step id'd while the edited step's caption changes (one-to-one): clicking
                   Before step 3 puts After on step 4 (same caption, same changed-panel row);
                   clicking the inserted After step 2 leaves Before without a current step and shows
                   "Step not in the current document"; each side's step dots follow the pairing
@@ -263,16 +264,19 @@ test('F8 the Full diagram toggle shows both full panes and keeps its mode across
   await noGraphVisible(host);
 });
 
-/* With step ids the engine pairs by id; without ids it pairs identical steps by content and the edited
-   step by its unique caption. Both variants must give the same pairing and the same step dots. */
-for(const withIds of [true,false])test('F4b step clicks and step dots follow the engine step pairing when the proposal inserts a step ('+(withIds?'step ids':'no step ids')+')',async({page,server})=>{
-  const step=(id,text,extra)=>Object.assign(withIds?{id}:{},{nodes:['a'],text},extra||{});
+/* Three ways the engine pairs the edited step "Three" while an inserted step shifts positions: by id;
+   without ids by its unique caption; and, when its caption also changes and only the inserted step has an
+   id, as the single leftover id-less step on each side (one-to-one). All give the same pairing and dots. */
+const PAIRINGS=[{name:'step ids',ids:true,edited:'Three'},{name:'no step ids, caption pairing',ids:false,edited:'Three'},
+  {name:'no step ids, one-to-one pairing',ids:false,edited:'Three revised',insertedId:true}];
+for(const v of PAIRINGS)test('F4b step clicks and step dots follow the engine step pairing when the proposal inserts a step ('+v.name+')',async({page,server})=>{
+  const withIds=v.ids,step=(id,text,extra)=>Object.assign(withIds?{id}:{},{nodes:['a'],text},extra||{});
   const current={page:{title:'Pairing',blocks:[{id:'p',heading:'Pairing',diagram:{view:'step',autoplay:false,nodes:{a:{title:'A'}},rows:[['a']],
     panels:[{id:'g',type:'gauge',title:'Gauge',initial:{value:1}}],
     steps:[step('s1','One'),step('s2','Two'),step('s3','Three',{panels:{g:{value:5}}}),step('s4','Four')]}}]}};
   const proposed=plain(current),d=proposed.page.blocks[0].diagram;
-  d.steps.splice(1,0,step('new','Inserted'));d.steps[3].panels={g:{value:7}};
-  const host=await mountPage(page,server,'focus-pairing-'+(withIds?'ids':'noids')+'-'+Date.now(),current,proposed);
+  d.steps.splice(1,0,Object.assign(v.insertedId?{id:'new'}:{},step('new','Inserted')));d.steps[3].panels={g:{value:7}};d.steps[3].text=v.edited;
+  const host=await mountPage(page,server,'focus-pairing-'+PAIRINGS.indexOf(v)+'-'+Date.now(),current,proposed);
   await expect(stepButtons(host,'before'),'precondition: Before has 4 step buttons').toHaveCount(4);
   await expect(stepButtons(host,'after'),'precondition: After has 5 step buttons').toHaveCount(5);
   /* Dots: the edited step (Three: Before 3, After 4) and the inserted step (After 2) are edited; Four
@@ -283,7 +287,8 @@ for(const withIds of [true,false])test('F4b step clicks and step dots follow the
   await stepButtons(host,'before').filter({hasText:/^3$/}).click();
   await expect(currentStep(host,'before')).toHaveText('3');
   await expect(currentStep(host,'after'),'Before step 3 pairs with After step 4').toHaveText('4');
-  for(const s of ['before','after'])await expect(side(host,s).locator('.compare-focus-caption')).toHaveText('Three');
+  await expect(side(host,'before').locator('.compare-focus-caption')).toHaveText('Three');
+  await expect(side(host,'after').locator('.compare-focus-caption')).toHaveText(v.edited);
   await expect.poll(()=>rowTitles(host)).toEqual(['g']);
   await expect(rows(host).first().locator('.compare-focus-chip')).toHaveText(['value 5 → 7']);
   await stepButtons(host,'after').filter({hasText:/^2$/}).click();

@@ -183,10 +183,13 @@ function compareWordDiff(before, after){
    fields (the highlighted node or edge, tone) show only in the full diagram. */
 var COMPARE_FOCUS_STEP_FIELD = /^(text|panels|patch|panelVisibility|time)(\.|\[|$)/;
 function compareStepFieldNames(entry){
-  var base = entry.afterPath != null ? entry.afterPath : entry.beforePath, out = [];
+  var out = [];
   (entry.fields || []).forEach(function(f){
-    var p = String(f.afterPath != null ? f.afterPath : f.beforePath || '').replace(/^resolved:/, '');
-    var rel = base && p.indexOf(base) === 0 ? p.slice(base.length).replace(/^\./, '') : p;
+    /* Each field path is relative to the step record on its own side (a moved step has different
+       Before and After paths). */
+    var after = f.afterPath != null, base = after ? entry.afterPath : entry.beforePath;
+    var p = String(after ? f.afterPath : f.beforePath || '').replace(/^resolved:/, ''), b = String(base || '').replace(/^resolved:/, '');
+    var rel = b && p.indexOf(b) === 0 ? p.slice(b.length).replace(/^\./, '') : p;
     if (rel && out.indexOf(rel) < 0) out.push(rel);
   });
   return out;

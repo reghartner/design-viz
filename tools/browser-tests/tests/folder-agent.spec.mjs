@@ -962,9 +962,11 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
         if(await control.isEnabled())await control.click({trial:true});
       }
     }
-    async function changedNodeVisible(title){
+    /* minWidth: the framed change is legible (>=80px); after a manual Fit of a half-width pane the
+       whole section fits and the node is smaller, so only visibility and coverage are checked. */
+    async function changedNodeVisible(title,minWidth=80){
       const node=view.locator('[data-dv-node="b"]'),label=node.locator('.t1');await expect(node).toContainText(title);
-      await expect.poll(()=>node.evaluate(el=>{const r=el.getBoundingClientRect(),label=el.querySelector('.t1').getBoundingClientRect(),stage=el.closest('.explore-stage').getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return r.width>=80 && r.height>=28 && label.height>=8 && r.left>=stage.left && r.right<=stage.right && r.top>=stage.top && r.bottom<=stage.bottom && !!hit && el.contains(hit);})).toBe(true);
+      await expect.poll(()=>node.evaluate((el,minWidth)=>{const r=el.getBoundingClientRect(),label=el.querySelector('.t1').getBoundingClientRect(),stage=el.closest('.explore-stage').getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return r.width>=minWidth && r.height>=(minWidth?28:12) && label.height>=(minWidth?8:5) && r.left>=stage.left && r.right<=stage.right && r.top>=stage.top && r.bottom<=stage.bottom && !!hit && el.contains(hit);},minWidth)).toBe(true);
       await expect(label).toBeVisible();
     }
     const fullDialog=await page.locator('#agent-update-dialog').boundingBox(),viewport=page.viewportSize();
@@ -1006,7 +1008,7 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     await page.screenshot({path:info.outputPath('explore-review-details-1280x720.png')});
     await page.locator('#agent-update-details-close').click();await expect(page.locator('#agent-update-details-panel')).toBeHidden();expect(await stage.boundingBox()).toEqual(reviewStage);expect(await zoom.innerText()).toBe(reviewZoom);
     await page.locator('#agent-update-details').click();await page.keyboard.press('Escape');await expect(page.locator('#agent-update-details-panel')).toBeHidden();await expect(page.locator('#agent-update-dialog')).toBeVisible();expect(await zoom.innerText()).toBe(reviewZoom);
-    await contained();await changedNodeVisible('Delivery service');
+    await contained();await changedNodeVisible('Delivery service',0);/* the reviewer pressed Fit above */
     await expect(page.locator('#agent-update-view-before [data-dv-node="b"]')).toContainText('Backend');
     await expect(page.locator('#agent-update-view-before [data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');await expect(page.locator('#agent-update-change-status')).toContainText('1 modified');
     await expect(page.locator('#agent-update-commit')).toBeEnabled();await contained();

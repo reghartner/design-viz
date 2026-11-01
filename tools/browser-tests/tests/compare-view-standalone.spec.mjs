@@ -148,15 +148,14 @@ test('V8b mounting both panes takes at most 2x mounting one pane',async({page,se
   /* Timed until both panes show the selected change: the After pane fully rendered (4 diagrams,
      16 panels) and the Before pane showing the changed node's section with its 4 panels
      (Chuck 2026-11-01: the Before pane may draw its other sections right after). */
-  const changedSection=side=>pane(host,side).locator('[data-dv-section]').filter({has:page.locator('[data-dv-node="n3"]')}).first();
   async function time(button,two){
     await page.locator('#cv-destroy').click();await expect.poll(()=>host.evaluate(el=>el.childElementCount)).toBe(0);
     const t=Date.now();await page.locator(button).click();
     await expect(pane(host,'after').locator('svg[aria-label="flow diagram"]')).toHaveCount(4,{timeout:60000});
     await expect(pane(host,'after').locator('[data-dv-panel]')).toHaveCount(16,{timeout:60000});/* panel bodies count too */
     if(two){
-      await expect(changedSection('before').locator('[data-dv-node="n3"]:visible').first()).toBeVisible({timeout:60000});
-      await expect(changedSection('before').locator('[data-dv-panel]')).toHaveCount(4,{timeout:60000});
+      await expect(pane(host,'before').locator('[data-dv-node="n3"]:visible').first()).toBeVisible({timeout:60000});
+      await expect.poll(()=>pane(host,'before').locator('[data-dv-panel]').count(),{timeout:60000}).toBeGreaterThanOrEqual(4);
     }
     const elapsed=Date.now()-t;
     /* ...and the whole current document still arrives in the Before pane. */

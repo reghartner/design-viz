@@ -75,7 +75,7 @@ export async function setup(page){
       if(!listenerActive()){listener=spawn('python3',[path.join(sessionFolder,'folder-agent.py'),'watch','--minutes','2'],{stdio:'ignore'});listener.connection=connection;}
       await expect(page.locator('#folder-agent-connection')).toHaveText('Claude listener active');
     },
-    cleanup:async()=>{await stopListener();await rm(folder,{recursive:true,force:true});}};
+    cleanup:async()=>{await stopListener();await rm(folder,{recursive:true,force:true,maxRetries:5,retryDelay:100});}};
 }
 export async function closeGuide(page){
   const guide=page.locator('#folder-agent-guide');

@@ -12,6 +12,7 @@
                     (the component's J/K listener and both pane renders' listeners)
                                                                                   rejects: Workbench-only DOM/globals; leaked listener
    V7b imported     a provider-caused imported node change frames that imported node in both panes
+                    (the imported section starts below a tall local section, outside both panes)
                                                                                   rejects: local-only framing
    V8b open time    with real clicks, mounting both panes takes <= 2x mounting one pane of the same view
                     (generated 4 sections, 160 nodes, 240 steps, 16 panels; median of 3 each, timed
@@ -96,11 +97,15 @@ test('V7 the shared compare component works on a viewer-only page and cleans up 
 });
 test('V7b an imported node change frames the imported node in both panes',async({page,server})=>{
   const spec=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',heading:'Main',diagram:d}]}});
-  /* A wide provider: the changed imported node is the last of 24 in one row, off-screen until framed. */
+  /* A wide provider: the changed imported node is the last of 24 in one row. */
   const ids=Array.from({length:24},(_,i)=>'n'+i),pnodes=Object.fromEntries(ids.map(id=>[id,{title:'Provider '+id}]));
   const provider=spec('provider',{nodes:pnodes,rows:[ids],edges:ids.slice(1).map((id,i)=>({from:ids[i],to:id})),topologyExports:{public:{nodes:ids,edges:ids.slice(1).map((id,i)=>ids[i]+'->'+id)}}});
   const provider2=plain(provider);provider2.page.sections[0].diagram.nodes.n23.title='Provider n23 changed';
-  const consumer=spec('consumer',{nodes:{local:{title:'Local'}},rows:[['local']],steps:[{id:'t0',nodes:['local']}],topologyImports:[{spec:'provider',export:'public',as:'child'}]});
+  /* The consumer starts with a tall local section (the local change, at its top) so the imported
+     section sits below the fold until the imported change is selected. */
+  const tall=Array.from({length:16},(_,i)=>i?'l'+i:'local'),tnodes=Object.fromEntries(tall.map(id=>[id,{title:id==='local'?'Local':'Local '+id}]));
+  const consumer=spec('consumer',{nodes:{anchor:{title:'Anchor'}},rows:[['anchor']],topologyImports:[{spec:'provider',export:'public',as:'child'}]});
+  consumer.page.sections.unshift({id:'intro',heading:'Intro',diagram:{nodes:tnodes,rows:tall.map(id=>[id]),edges:tall.slice(1).map((id,i)=>({from:tall[i],to:id})),steps:[{id:'t0',nodes:['local']}]}});
   const consumer2=plain(consumer);consumer2.page.sections[0].diagram.nodes.local.title='Local renamed';
   const name='compare-imported-'+Date.now();
   await standalonePage(server,name,`function side(c,p){var raw=JSON.parse(JSON.stringify(c));return {authored:FlowviewCompare.normalize(JSON.parse(JSON.stringify(c))),resolved:FlowviewCompare.normalize(FlowviewCompare.resolve(raw,{version:1,id:'consumer',specs:[p,c]})),ledger:null};}

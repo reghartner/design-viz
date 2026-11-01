@@ -1956,13 +1956,18 @@ test('agent change navigation reaches other Views and paths and preserves stable
     await expect(view.locator('.explore-active-section .schip[aria-current="true"]')).toHaveAttribute('data-step-source','0');
     await expect(before.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','2');
     await expect(before.locator('.explore-active-section .schip[aria-current="true"]')).toHaveAttribute('data-step-source','2');
-    await view.getByRole('button',{name:'Zoom out',exact:true}).click();
     const camera=scope=>scope.locator('.explore-active-section .explore-board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
-    await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));const beforeCamera=await camera(before);
-    const afterBoard=view.locator('.explore-active-section .explore-board'),afterBefore=await camera(view);
-    await afterBoard.hover();await page.mouse.wheel(120,80);await expect.poll(async()=>JSON.stringify(await camera(view))).not.toBe(JSON.stringify(afterBefore));
-    await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
-    expect(await camera(before),'a manual move of the After pane leaves the Before pane camera unchanged').toEqual(beforeCamera);
+    const settle=()=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+    /* Each pane's camera must move only from its own input, in both directions, for zoom and pan. */
+    const ownMoveOnly=async(moved,other,label,act)=>{
+      await settle();const otherCam=await camera(other),movedCam=await camera(moved);
+      await act();await expect.poll(async()=>JSON.stringify(await camera(moved)),{message:label+' changes its own camera'}).not.toBe(JSON.stringify(movedCam));
+      await settle();expect(await camera(other),label+' leaves the other pane camera unchanged').toEqual(otherCam);
+    };
+    await ownMoveOnly(view,before,'zooming the After pane',()=>view.getByRole('button',{name:'Zoom out',exact:true}).click());
+    await ownMoveOnly(before,view,'zooming the Before pane',()=>before.getByRole('button',{name:'Zoom out',exact:true}).click());
+    await ownMoveOnly(view,before,'panning the After pane',async()=>{await view.locator('.explore-active-section .explore-board').hover();await page.mouse.wheel(120,80);});
+    await ownMoveOnly(before,view,'panning the Before pane',async()=>{await before.locator('.explore-active-section .explore-board').hover();await page.mouse.wheel(120,80);});
     await page.screenshot({path:info.outputPath('change-navigation-proposed-1280x720.png')});
     await item(/^Removed · Node Retired worker$/).click();await expect(position).toContainText('Removed');await expect(position).toContainText('not in the proposal');
     await expect(before.locator('[data-dv-node="retired"]')).toBeVisible();await expect(page.locator('#agent-update-commit')).toBeEnabled();

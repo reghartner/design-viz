@@ -159,6 +159,23 @@ function mountCompareView(host, opts){
     else if (entry.kind === 'path' || entry.kind === 'layout' || entry.kind === 'view'){ var rec = compareViewAt(pages[side], path); t.id = rec && rec.id; }
     return t;
   }
+  /* Center a changed object; in Explore, first zoom a changed node up to a
+     legible size (narrow panes fit whole sections small). Runs now and again
+     after the viewer's own deferred fit, unless the selection has moved on. */
+  function frame(rec, object, t){
+    var token = selected;
+    function apply(){
+      if (destroyed || token !== selected || !object.isConnected) return;
+      if (t.attr === 'data-dv-node' && rec.viewport && rec.viewport.isExplore() && rec.viewport.canvasZoom){
+        var width = object.getBoundingClientRect().width, zoom = rec.viewport.canvasZoom();
+        if (width > 0 && width < COMPARE_LEGIBLE_NODE_PX - 1 && zoom > 0) rec.viewport.canvasZoom(Math.min(1, zoom * COMPARE_LEGIBLE_NODE_PX / width));
+      }
+      if (object.scrollIntoView) object.scrollIntoView({block:'center', inline:'center'});
+    }
+    apply();
+    var win = doc.defaultView;
+    if (win && win.requestAnimationFrame) win.requestAnimationFrame(function(){ win.requestAnimationFrame(apply); });
+  }
   function navigate(side, entry){
     var p = panes[side], t = target(entry, side);
     if (!p.ctl || !t) return {side:side, shown:false};
@@ -178,12 +195,7 @@ function mountCompareView(host, opts){
     p.ctl.activeTarget = {kind:'diagram', section:rec.number}; if (p.ctl.onChange) p.ctl.onChange();
     var object = null;
     if (t.attr && t.key != null) object = Array.prototype.find.call(rec.sectionEl.querySelectorAll('[' + t.attr + ']'), function(n){ return n.getAttribute(t.attr) === String(t.key) && n.getClientRects().length; });
-    /* Narrow panes fit whole sections small; zoom a changed node up to a legible size first. */
-    if (object && t.attr === 'data-dv-node' && rec.viewport && rec.viewport.isExplore() && rec.viewport.canvasZoom){
-      var width = object.getBoundingClientRect().width, zoom = rec.viewport.canvasZoom();
-      if (width > 0 && width < COMPARE_LEGIBLE_NODE_PX && zoom > 0) rec.viewport.canvasZoom(Math.min(1, zoom * COMPARE_LEGIBLE_NODE_PX / width));
-    }
-    if (object && object.scrollIntoView) object.scrollIntoView({block:'center', inline:'center'});
+    if (object) frame(rec, object, t);
     else if (rec.sectionEl && rec.sectionEl.scrollIntoView && (!rec.viewport || !rec.viewport.isExplore())) rec.sectionEl.scrollIntoView({block:'start'});
     return {side:side, shown:true, object:!!object, visible:visible};
   }

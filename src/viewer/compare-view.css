@@ -17,14 +17,14 @@
 .compare-pane-title{margin:0;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted,#5b6578);font-weight:600;}
 .compare-pane-scroll{flex:1;min-height:0;overflow:auto;contain:strict;padding:6px 8px;}
 .compare-pane-scroll.viewer-exploring{overflow:hidden;}
-.compare-pane-view{max-width:1500px;margin:auto;}
 .compare-pane-empty{color:var(--muted,#5b6578);padding:24px;text-align:center;}
-.compare-pane-view [data-agent-change]{outline:3px solid var(--agent-change-color,#d6a100);outline-offset:3px;}
-.compare-pane-view [data-agent-change="added"]{--agent-change-color:#24a36b;}
-.compare-pane-view [data-agent-change="removed"]{--agent-change-color:#d1435b;outline-style:dashed;}
-.compare-pane-view path[data-dv-edge][data-agent-change]{stroke:var(--agent-change-color,#d6a100)!important;stroke-width:4px!important;outline:0;}
-.compare-pane-view .doc-sec[data-agent-change]{outline:0;box-shadow:inset 0 0 0 3px var(--agent-change-color,#d6a100);}
+.compare-pane-scroll [data-agent-change]{outline:3px solid var(--agent-change-color,#d6a100);outline-offset:3px;}
+.compare-pane-scroll [data-agent-change="added"]{--agent-change-color:#24a36b;}
+.compare-pane-scroll [data-agent-change="removed"]{--agent-change-color:#d1435b;outline-style:dashed;}
+.compare-pane-scroll path[data-dv-edge][data-agent-change]{stroke:var(--agent-change-color,#d6a100)!important;stroke-width:4px!important;outline:0;}
+.compare-pane-scroll .doc-sec[data-agent-change]{outline:0;box-shadow:inset 0 0 0 3px var(--agent-change-color,#d6a100);}
 /* The Workbench dialog styles every nav as a centered row; the rail is a column list. */
 .compare-view>nav.compare-rail{display:block;}
-/* Each pane keeps its own +/- zoom buttons even when the pane is narrow. */
-.compare-pane-view .reader-narrow .reader-zoom-controls>.reader-button{display:inline-flex;}
+/* renderPage replaces the view element's class, so pane rules hang off .compare-pane-scroll.
+   Each pane keeps its own +/- zoom buttons even when the pane is narrow. */
+.compare-pane-scroll .reader-narrow .reader-zoom-controls>.reader-button{display:inline-flex;}

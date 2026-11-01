@@ -46,21 +46,26 @@
                   to the node: no fallback note, Zoom out and Whole section offered
                                                                               rejects: full-diagram fallback for nodes
    F9b kinds      (PR 3, updated in place) an imported node (provider change), a local edge and a new
-                  node each show the cropped panes (Zoom out / Whole section, no note); a section
-                  heading change still shows the full panes with the note       rejects: local-node-only crop
+                  node each show the crop controls and no note (their framing and widening are C2,
+                  C3 and C6); a section heading change still shows the full panes with the note
+                                                                              rejects: crop controls on a section change
    --- PR 3 (node/edge crop; issue #848 rows 4 and 7a; Chuck 2026-10-31 crop + zoom out + whole
        section; 2026-11-01 coverage: extend this spec, F9/F9b updated in place) ---
-   C1 node crop   a local node change frames, in BOTH panes, the changed node and its direct
-                  neighbours inside the pane's visible area and leaves a far node of the same row
-                  outside it; Zoom out shows more nodes in both panes; Whole section shows the far
-                  nodes at both ends in both panes; the changed node carries the change outline in
-                  both panes and its neighbours do not                         rejects: no crop; one pane; fixed zoom
-   C2 imported    the same crop for an imported node changed by its provider (child::p6)
-                                                                              rejects: local-only crop
-   C3 connection  a connection change frames both endpoints and excludes the far nodes
-                                                                              rejects: node-only crop
-   C4 removed     a removed node: the Before pane frames the node and its neighbours; the After pane
-                  (without the node) frames its former neighbours               rejects: blank or whole-section side
+   Every crop case (C1-C4, C6) runs the same check (exerciseCrop), in BOTH panes: the framed
+   nodes are inside the pane's visible area and two far nodes of the same row are outside it; the
+   changed object carries the change outline and an unchanged neighbour does not; Zoom out shows
+   more nodes, keeps the changed object shown, and shrinks an unchanged reference node by the same
+   factor in both panes (1/1.6, within 0.05); Whole section shows both ends of the row.
+   C1 node crop   local node n6: n5 n6 n7 framed                               rejects: no crop; one pane; per-pane zoom
+   C2 imported    imported node child::p6 changed by its provider              rejects: local-only crop
+   C2b imp. conn. imported connection child::p5 -> child::p6 changed by its provider: endpoints and
+                  their neighbours (p4 p5 p6 p7) framed                         rejects: local-edge-only crop
+   C3 connection  local connection n5 -> n6: endpoints and their neighbours (n4 n5 n6 n7) framed
+                                                                              rejects: endpoint-only crop
+   C4 removed     removed node n6: Before frames n5 n6 n7; After (without n6) frames n5 n7
+                                                                              rejects: blank or whole-section side
+   C6 added       added node x after n11: After frames x and n11 (x outlined as added); Before
+                  (without x) frames n11; n0 and n1 outside                     rejects: unframed added node
    C5 reset       selecting another node change after Whole section crops again (the zoom level
                   belongs to one selection)                                    rejects: sticky Whole section
    excluded       section heading / ledger / document text diffs (issue row 2b's ledger and heading
@@ -377,58 +382,88 @@ async function cropped(host,s,inside,outside){
   for(const id of outside)await expect.poll(()=>shown(host,s,id),{message:s+' pane leaves '+id+' outside the crop'}).toBe(false);
 }
 const IDS=Array.from({length:12},(_,i)=>'n'+i);
+/* Rendered width of the largest copy of a node in the first section of a pane. */
+async function width(host,s,id){
+  return host.locator('.compare-pane[data-side="'+s+'"]').evaluate((pane,id)=>{let w=0;pane.querySelectorAll('[data-dv-section="0"] [data-dv-node]').forEach(n=>{if(n.getAttribute('data-dv-node')===id)w=Math.max(w,n.getBoundingClientRect().width);});return w;},id);
+}
+const outlined=(host,s,attr,key)=>host.locator('.compare-pane[data-side="'+s+'"] [data-dv-section="0"] ['+attr+'="'+key+'"][data-agent-change]');
+/* The shared crop check. cfg: {inside:{before,after}, far:[ids], all:[ids], changed:{before,after} as
+   [attr,key,status] or null, neighbour:[attr,key], ref: an unchanged node shown in both panes, ends:[ids]}. */
+async function exerciseCrop(host,cfg){
+  await expect(host.locator('.compare-mode-note'),'no fallback note').toBeHidden();
+  for(const s of ['before','after'])await cropped(host,s,cfg.inside[s],cfg.far);
+  for(const s of ['before','after']){
+    const c=cfg.changed[s];
+    if(c)await expect(outlined(host,s,c[0],c[1]).first(),s+': the changed object is outlined').toHaveAttribute('data-agent-change',c[2]);
+    await expect(outlined(host,s,cfg.neighbour[0],cfg.neighbour[1]),s+': an unchanged neighbour is not outlined').toHaveCount(0);
+  }
+  const count={},w={};
+  for(const s of ['before','after']){count[s]=await shownCount(host,s,cfg.all);w[s]=await width(host,s,cfg.ref);expect(w[s],'precondition: '+s+' shows the reference node').toBeGreaterThan(0);}
+  await host.getByRole('button',{name:'Zoom out',exact:true}).click();
+  for(const s of ['before','after'])await expect.poll(()=>shownCount(host,s,cfg.all),{message:s+': Zoom out shows more nodes'}).toBeGreaterThan(count[s]);
+  for(const s of ['before','after'])for(const id of cfg.keep[s])await expect.poll(()=>shown(host,s,id),{message:s+': still shows '+id}).toBe(true);
+  const ratio={};
+  for(const s of ['before','after']){await expect.poll(async()=>(await width(host,s,cfg.ref))/w[s],{message:s+': zoomed out by 1/1.6'}).toBeLessThan(.75);ratio[s]=(await width(host,s,cfg.ref))/w[s];}
+  expect(ratio.before,'both panes zoom out by the same factor '+JSON.stringify(ratio)).toBeGreaterThan(.5);
+  expect(Math.abs(ratio.before-ratio.after),'both panes zoom out by the same factor '+JSON.stringify(ratio)).toBeLessThan(.05);
+  await host.getByRole('button',{name:'Whole section',exact:true}).click();
+  for(const s of ['before','after'])await cropped(host,s,cfg.ends,[]);
+}
+const provided=(c,c2)=>`function side(c,p){var raw=JSON.parse(JSON.stringify(c));return {authored:FlowviewCompare.normalize(JSON.parse(JSON.stringify(c))),resolved:FlowviewCompare.normalize(FlowviewCompare.resolve(raw,{version:1,id:'consumer',specs:[p,c]})),ledger:null};}
+  var A=side(${inline(c.consumer)},${inline(c.provider)}),B=side(${inline(c.consumer)},${inline(c2)}),entries=FlowviewCompare.compare(A,B);
+  window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),{before:A.resolved,after:B.resolved,entries:entries});`;
+function providerPair(){
+  const spec=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',heading:'Main',diagram:d}]}});
+  const c=chain('p','Provider ');
+  const provider=spec('provider',Object.assign({},c,{topologyExports:{public:{nodes:Object.keys(c.nodes),edges:c.edges.map(e=>e.from+'->'+e.to)}}}));
+  const consumer=spec('consumer',{nodes:{anchor:{title:'Anchor'}},rows:[['anchor']],topologyImports:[{spec:'provider',export:'public',as:'child'}]});
+  return {provider,consumer};
+}
+const P=id=>'child::'+id,PIDS=Array.from({length:12},(_,i)=>P('p'+i));
 
-test('C1 C5 a node change crops both panes to the node and its neighbours; Zoom out and Whole section widen both; the outline marks only the changed node',async({page,server})=>{
+test('C1 C5 a local node change crops both panes to the node and its neighbours; Zoom out and Whole section widen both alike; the next change crops again',async({page,server})=>{
   const mk=()=>({page:{title:'Chain',blocks:[{id:'c',heading:'Chain',diagram:chain('n')},{id:'d',heading:'Other',diagram:chain('n')}]}});
   const current=mk(),proposed=plain(current);proposed.page.blocks[0].diagram.nodes.n6.title='Node n6 renamed';proposed.page.blocks[1].diagram.nodes.n3.title='Other n3 renamed';
   const host=await mountPage(page,server,'crop-node-'+Date.now(),current,proposed);
   await expect(items(host)).toHaveText(['Modified · Node Node n6 renamed · title','Modified · Node Other n3 renamed · title']);
-  await expect(host.locator('.compare-mode-note')).toBeHidden();
-  for(const s of ['before','after'])await cropped(host,s,['n5','n6','n7'],['n0','n11']);
-  for(const s of ['before','after']){
-    await expect(host.locator('.compare-pane[data-side="'+s+'"] [data-dv-section="0"] [data-dv-node="n6"][data-agent-change="modified"]').first(),s+': n6 outlined').toBeAttached();
-    await expect(host.locator('.compare-pane[data-side="'+s+'"] [data-dv-section="0"] [data-dv-node="n5"][data-agent-change]'),s+': neighbour not outlined').toHaveCount(0);
-  }
-  const before={};for(const s of ['before','after'])before[s]=await shownCount(host,s,IDS);
-  await host.getByRole('button',{name:'Zoom out',exact:true}).first().click();
-  for(const s of ['before','after'])await expect.poll(()=>shownCount(host,s,IDS),{message:s+': Zoom out shows more nodes'}).toBeGreaterThan(before[s]);
-  for(const s of ['before','after'])await expect.poll(()=>shown(host,s,'n6'),{message:s+': still shows n6'}).toBe(true);
-  await host.getByRole('button',{name:'Whole section',exact:true}).click();
-  for(const s of ['before','after'])await cropped(host,s,['n0','n6','n11'],[]);
+  await exerciseCrop(host,{inside:{before:['n5','n6','n7'],after:['n5','n6','n7']},far:['n0','n11'],all:IDS,
+    changed:{before:['data-dv-node','n6','modified'],after:['data-dv-node','n6','modified']},neighbour:['data-dv-node','n5'],ref:'n5',keep:{before:['n6'],after:['n6']},ends:['n0','n11']});
   /* C5: the next node change crops again */
   await page.keyboard.press('j');await expect(items(host).nth(1)).toHaveAttribute('aria-current','true');
   for(const s of ['before','after']){
     await expect.poll(()=>host.locator('.compare-pane[data-side="'+s+'"]').evaluate(pane=>{
       const box=pane.querySelector('.compare-pane-scroll').getBoundingClientRect(),sec=pane.querySelector('[data-dv-section="1"]');if(!sec)return 'no section';
-      const at=id=>{let best=null,a=0;sec.querySelectorAll('[data-dv-node="'+id+'"]').forEach(n=>{const r=n.getBoundingClientRect();if(r.width*r.height>a){best=r;a=r.width*r.height;}});return best && best.left>=box.left-1 && best.right<=box.right+1 && best.top>=box.top-1 && best.bottom<=box.bottom+1;};
+      const at=id=>{let best=null,a=0;sec.querySelectorAll('[data-dv-node="'+id+'"]').forEach(n=>{const r=n.getBoundingClientRect();if(r.width*r.height>a){best=r;a=r.width*r.height;}});return !!best && best.left>=box.left-1 && best.right<=box.right+1 && best.top>=box.top-1 && best.bottom<=box.bottom+1;};
       return [at('n2'),at('n3'),at('n4'),at('n11')].join(',');
     }),{message:s+': the Other section is cropped to n3 and its neighbours'}).toBe('true,true,true,false');
   }
 });
 
-test('C2 an imported node changed by its provider crops both panes to it and its neighbours',async({page,server})=>{
-  const spec=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',heading:'Main',diagram:d}]}});
-  const c=chain('p','Provider ');const provider=spec('provider',Object.assign({},c,{topologyExports:{public:{nodes:Object.keys(c.nodes),edges:c.edges.map(e=>e.from+'->'+e.to)}}}));
-  const provider2=plain(provider);provider2.page.sections[0].diagram.nodes.p6.title='Provider p6 changed';
-  const consumer=spec('consumer',{nodes:{anchor:{title:'Anchor'}},rows:[['anchor']],topologyImports:[{spec:'provider',export:'public',as:'child'}]});
-  const script=`function side(c,p){var raw=JSON.parse(JSON.stringify(c));return {authored:FlowviewCompare.normalize(JSON.parse(JSON.stringify(c))),resolved:FlowviewCompare.normalize(FlowviewCompare.resolve(raw,{version:1,id:'consumer',specs:[p,c]})),ledger:null};}
-  var A=side(${inline(consumer)},${inline(provider)}),B=side(${inline(consumer)},${inline(provider2)}),entries=FlowviewCompare.compare(A,B);
-  window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),{before:A.resolved,after:B.resolved,entries:entries});`;
-  const host=await mountPage(page,server,'crop-imported-'+Date.now(),doorbell().current,null,null,script);
+test('C2 an imported node changed by its provider crops both panes like a local node',async({page,server})=>{
+  const pair=providerPair(),p2=plain(pair.provider);p2.page.sections[0].diagram.nodes.p6.title='Provider p6 changed';
+  const host=await mountPage(page,server,'crop-imported-'+Date.now(),doorbell().current,null,null,provided(pair,p2));
   await expect(items(host)).toHaveText(['Modified · Imported node child::p6 · title']);
-  await expect(host.locator('.compare-mode-note')).toBeHidden();
-  for(const s of ['before','after'])await cropped(host,s,['child::p5','child::p6','child::p7'],['child::p0','child::p11']);
-  await host.getByRole('button',{name:'Whole section',exact:true}).click();
-  for(const s of ['before','after'])await cropped(host,s,['child::p0','child::p11'],[]);
+  await exerciseCrop(host,{inside:{before:[P('p5'),P('p6'),P('p7')],after:[P('p5'),P('p6'),P('p7')]},far:[P('p0'),P('p11')],all:PIDS,
+    changed:{before:['data-dv-node',P('p6'),'modified'],after:['data-dv-node',P('p6'),'modified']},neighbour:['data-dv-node',P('p5')],ref:P('p5'),keep:{before:[P('p6')],after:[P('p6')]},ends:[P('p0'),P('p11')]});
 });
 
-test('C3 a connection change crops both panes to its endpoints',async({page,server})=>{
+test('C2b an imported connection changed by its provider crops both panes to its endpoints and their neighbours',async({page,server})=>{
+  const pair=providerPair(),p2=plain(pair.provider);p2.page.sections[0].diagram.edges[5].label='hop five changed';/* p5 -> p6 */
+  const host=await mountPage(page,server,'crop-imported-edge-'+Date.now(),doorbell().current,null,null,provided(pair,p2));
+  const labels=await items(host).allInnerTexts();
+  expect(labels.length,'precondition: one change '+JSON.stringify(labels)).toBe(1);expect(labels[0]).toMatch(/^Modified · Imported connection /);
+  const key=await host.locator('.compare-pane[data-side="after"] [data-dv-section="0"] [data-dv-edge][data-agent-change="modified"]').first().getAttribute('data-dv-edge');
+  await exerciseCrop(host,{inside:{before:[P('p4'),P('p5'),P('p6'),P('p7')],after:[P('p4'),P('p5'),P('p6'),P('p7')]},far:[P('p0'),P('p11')],all:PIDS,
+    changed:{before:['data-dv-edge',key,'modified'],after:['data-dv-edge',key,'modified']},neighbour:['data-dv-node',P('p5')],ref:P('p5'),keep:{before:[P('p5'),P('p6')],after:[P('p5'),P('p6')]},ends:[P('p0'),P('p11')]});
+});
+
+test('C3 a local connection change crops both panes to its endpoints and their neighbours',async({page,server})=>{
   const current={page:{title:'Chain',blocks:[{id:'c',heading:'Chain',diagram:chain('n')}]}},proposed=plain(current);
   proposed.page.blocks[0].diagram.edges[5].label='hop five renamed';/* n5 -> n6 */
   const host=await mountPage(page,server,'crop-edge-'+Date.now(),current,proposed);
   await expect(items(host)).toHaveText([/^Modified · Connection n5 → n6 · label$/]);
-  for(const s of ['before','after'])await cropped(host,s,['n5','n6'],['n0','n11']);
-  for(const s of ['before','after'])await expect(host.locator('.compare-pane[data-side="'+s+'"] [data-dv-edge="5"][data-agent-change="modified"]').first(),s+': connection outlined').toBeAttached();
+  await exerciseCrop(host,{inside:{before:['n4','n5','n6','n7'],after:['n4','n5','n6','n7']},far:['n0','n11'],all:IDS,
+    changed:{before:['data-dv-edge','5','modified'],after:['data-dv-edge','5','modified']},neighbour:['data-dv-node','n5'],ref:'n5',keep:{before:['n5','n6'],after:['n5','n6']},ends:['n0','n11']});
 });
 
 test('C4 a removed node crops the Before pane to it and the After pane to its former neighbours',async({page,server})=>{
@@ -438,6 +473,17 @@ test('C4 a removed node crops the Before pane to it and the After pane to its fo
   const labels=await items(host).allInnerTexts(),i=labels.findIndex(l=>/^Removed · Node Node n6$/.test(l));
   expect(i,'precondition: the rail lists the removed node in '+JSON.stringify(labels)).toBeGreaterThanOrEqual(0);
   await items(host).nth(i).click();await expect(items(host).nth(i)).toHaveAttribute('aria-current','true');
-  await cropped(host,'before',['n5','n6','n7'],['n0','n11']);
-  await cropped(host,'after',['n5','n7'],['n0','n11']);
+  await exerciseCrop(host,{inside:{before:['n5','n6','n7'],after:['n5','n7']},far:['n0','n11'],all:IDS,
+    changed:{before:['data-dv-node','n6','removed'],after:null},neighbour:['data-dv-node','n5'],ref:'n5',keep:{before:['n6'],after:['n5','n7']},ends:['n0','n11']});
+});
+
+test('C6 an added node crops the After pane to it and the Before pane to its neighbour',async({page,server})=>{
+  const current={page:{title:'Chain',blocks:[{id:'c',heading:'Chain',diagram:chain('n')}]}},proposed=plain(current),d=proposed.page.blocks[0].diagram;
+  d.nodes.x={title:'Added x'};d.rows=[IDS.concat(['x'])];d.edges.push({from:'n11',to:'x',label:'new hop'});
+  const host=await mountPage(page,server,'crop-added-'+Date.now(),current,proposed);
+  const labels=await items(host).allInnerTexts(),i=labels.findIndex(l=>/^Added · Node Added x$/.test(l));
+  expect(i,'precondition: the rail lists the added node in '+JSON.stringify(labels)).toBeGreaterThanOrEqual(0);
+  await items(host).nth(i).click();await expect(items(host).nth(i)).toHaveAttribute('aria-current','true');
+  await exerciseCrop(host,{inside:{before:['n11'],after:['n11','x']},far:['n0','n1'],all:IDS.concat(['x']),
+    changed:{before:null,after:['data-dv-node','x','added']},neighbour:['data-dv-node','n11'],ref:'n11',keep:{before:['n11'],after:['x']},ends:['n0','n11']});
 });

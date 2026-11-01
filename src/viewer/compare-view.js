@@ -17,6 +17,8 @@ var COMPARE_KIND_LABEL = {document:'Document', section:'Section', node:'Node', e
 var compareViewLiveOwners = 0;
 /* Rendered width a selected node is zoomed up to (never past 100%). */
 var COMPARE_LEGIBLE_NODE_PX = 120;
+/* The Before pane's other sections render this long after the first paint, in idle time. */
+var COMPARE_BEFORE_DELAY_MS = 250, COMPARE_BEFORE_IDLE_MS = 1000;
 function compareViewTrack(owner){
   if (!owner || typeof owner.destroy !== 'function') return owner;
   var destroy = owner.destroy, done = false;
@@ -142,9 +144,16 @@ function mountCompareView(host, opts){
   /* The Before pane opens with only the first change's section; the rest of
      the document replaces it right after the first paint (or at once when a
      change in another section is selected). */
-  var win = doc.defaultView, completion = 0;
+  var win = doc.defaultView, completion = 0, completionIdle = 0;
   if (panes.before.partial != null){
-    if (win && win.requestAnimationFrame) completion = win.requestAnimationFrame(function(){ completion = win.setTimeout(completeBefore, 0); });
+    /* After the first paint, wait briefly, then use the browser's next idle time (at most 1 s later). */
+    if (win && win.requestAnimationFrame) completion = win.requestAnimationFrame(function(){
+      completion = win.setTimeout(function(){
+        completion = 0;
+        if (win.requestIdleCallback) completionIdle = win.requestIdleCallback(completeBefore, {timeout:COMPARE_BEFORE_IDLE_MS});
+        else completeBefore();
+      }, COMPARE_BEFORE_DELAY_MS);
+    });
     else completeBefore();
   }
   function renderPane(p, page){
@@ -156,8 +165,7 @@ function mountCompareView(host, opts){
   }
   function completeBefore(){
     var p = panes.before;
-    if (win){ if (win.cancelAnimationFrame) win.cancelAnimationFrame(completion); if (win.clearTimeout) win.clearTimeout(completion); }
-    completion = 0;
+    cancelCompletion();
     if (destroyed || p.partial == null) return;
     try{ if (p.canvas) p.canvas.destroy(); }catch(ex){}
     try{ if (p.ctl) p.ctl.destroy(); }catch(ex){}
@@ -166,6 +174,13 @@ function mountCompareView(host, opts){
     geometry = null;
     decorate();
     if (selected >= 0) navigate('before', entries[selected], lastAfterView);
+  }
+  function cancelCompletion(){
+    if (win){
+      if (completion){ if (win.cancelAnimationFrame) win.cancelAnimationFrame(completion); if (win.clearTimeout) win.clearTimeout(completion); }
+      if (completionIdle && win.cancelIdleCallback) win.cancelIdleCallback(completionIdle);
+    }
+    completion = completionIdle = 0;
   }
   /* Rendered record of a section index on one pane (a partial pane holds one section). */
   function recordFor(p, index){
@@ -286,7 +301,7 @@ function mountCompareView(host, opts){
     setSkin:function(name){ skin = name; var ok = false; ['before', 'after'].forEach(function(side){ if (panes[side].ctl && typeof applySkinClasses === 'function') ok = applySkinClasses(doc.body, panes[side].view, name) || ok; }); return ok; },
     destroy:function(){
       if (destroyed) return; destroyed = true;
-      if (win && completion){ if (win.cancelAnimationFrame) win.cancelAnimationFrame(completion); if (win.clearTimeout) win.clearTimeout(completion); }
+      cancelCompletion();
       doc.removeEventListener('keydown', onKey);
       ['before', 'after'].forEach(function(side){
         var p = panes[side]; if (!p) return;

@@ -45,7 +45,8 @@ function initWorkbenchAgentReview(opts){
     /* The selection made when the preview opens never opens Details by itself. */
     var reveal=function(target){if(!(result && result.initial))showDetails(target);};
     if(entry.kind==='ledger'){parts.push('Coverage ledger · Shown in Details');navigationStatus(parts.join(' · '));reveal('ledger');return;}
-    if(entry.kind==='document'){parts.push('Shown in Details; no rendered object');navigationStatus(parts.join(' · '));reveal('source');return;}
+    var sectionless=!entry.section || entry.section.before==null && entry.section.after==null;
+    if(entry.kind==='document' || sectionless && (entry.kind==='tab' || entry.kind==='view')){parts.push('Shown in Details; no rendered object');navigationStatus(parts.join(' · '));reveal('source');return;}
     var b=result && result.before || {},a=result && result.after || {};
     if(!a.shown && !b.shown && (a.reason==='view' || b.reason==='view')){parts.push('Section not included in a View · Inspect source in Details');navigationStatus(parts.join(' · '));reveal('source');return;}
     if(entry.status==='removed' || entry.afterPath==null)parts.push('Removed · not in the proposal');
@@ -112,6 +113,9 @@ function initWorkbenchAgentReview(opts){
     var latest=opts.snapshot();
     if(!shown || !latest || latest.review.version!==shown.review.version || reviewedVersion!==shown.review.version){refresh();return;}
     if(!rendered || !shown.review.ok)return;
+    /* The Before pane may still be rendering the rest of the document: finish it and accept only if every side rendered. */
+    var pending=view && view.finish?view.finish():[];
+    if(pending.length){rendered=false;updateCommit();navigationStatus((pending[0].side==='before'?'Before':'After')+' could not be rendered: '+pending[0].message);return;}
     var version=shown.review.version;close();await opts.accept(version);
     if(state)open();
   });

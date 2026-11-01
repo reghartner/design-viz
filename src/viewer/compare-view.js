@@ -327,6 +327,8 @@ function mountCompareView(host, opts){
     views:function(){ return {before:panes.before.view, after:panes.after.view}; },
     /* Sides that could not be rendered: [{side, message}]. */
     errors:function(){ return renderErrors.slice(); },
+    /* Render anything still pending (the rest of the Before document) now; returns errors(). */
+    finish:function(){ completeBefore(); return renderErrors.slice(); },
     setSkin:function(name){ skin = name; var ok = false; ['before', 'after'].forEach(function(side){ if (panes[side].ctl && typeof applySkinClasses === 'function') ok = applySkinClasses(doc.body, panes[side].view, name) || ok; }); return ok; },
     destroy:function(){
       if (destroyed) return; destroyed = true;

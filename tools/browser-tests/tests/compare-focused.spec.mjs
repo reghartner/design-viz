@@ -78,6 +78,8 @@ function doorbell(){
 
 /* Viewer-only page: the injected viewer template plus a fixture script that mounts the
    shared component through window.FlowviewCompare (no Workbench bundle). */
+/* JSON for an inline script: "<" is escaped so authored text such as "</script>" cannot end the script element. */
+const inline=v=>JSON.stringify(v).replace(/</g,'\\u003c');
 async function mountPage(page,server,name,current,proposed,mode){
   await writeFile(path.join(server.root,name+'.json'),JSON.stringify(current));
   execFileSync('python3',[path.join(root,'tools/inject.py'),path.join(server.root,name+'.json'),path.join(root,'template/flowview.html'),path.join(server.root,name+'.html')]);
@@ -87,7 +89,7 @@ async function mountPage(page,server,name,current,proposed,mode){
   await writeFile(path.join(server.root,name+'.html'),html.slice(0,at)+`<div id="compare-host" style="position:fixed;inset:0;z-index:9999;background:#fff"></div>
 <script>window.addEventListener('load',function(){
   if(!window.FlowviewCompare)return;
-  var a=FlowviewCompare.normalize(${JSON.stringify(current)}),b=FlowviewCompare.normalize(${JSON.stringify(proposed)});
+  var a=FlowviewCompare.normalize(${inline(current)}),b=FlowviewCompare.normalize(${inline(proposed)});
   var entries=FlowviewCompare.compare({authored:a,resolved:a,ledger:null},{authored:b,resolved:b,ledger:null});
   window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),${mode?`{before:a,after:b,entries:entries,mode:${JSON.stringify(mode)}}`:'{before:a,after:b,entries:entries}'});
 });</script>`+html.slice(at));

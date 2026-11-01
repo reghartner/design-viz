@@ -283,6 +283,8 @@ function mountCompareView(host, opts){
     geometry = null;
     decorate();
     if (selected >= 0) navigate('before', entries[selected], lastAfterView);
+    /* Then the Focused step and path (a panel change or a step clicked before completion). */
+    if (selected >= 0) syncPaneSteps();
   }
   function cancelCompletion(){
     if (win){

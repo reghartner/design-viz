@@ -13,6 +13,8 @@
    V3 navigation       first change selected on open; Next/Previous and J/K move the selection
                        with wrap-around; aria-current and "i of n" follow                         rejects: buttons only; no wrap
    V4 step sync        selecting a step change puts BOTH panes on that step (each pane's caption)  rejects: only the After pane moves
+   V4b dialog focused  #848 PR 2 (Chuck 2026-11-01): the agent dialog mounts the view in Focused mode by
+                       default; selecting the step s2 change shows one Power row with "value 6 → 42"   rejects: dialog forces Full mode
    V5 full mode        each pane renders exactly the selected section's nodes (by id, per side)
                        and the section's declared panel;
                        selecting a node change brings it into view in both panes; a manual wheel
@@ -141,9 +143,23 @@ test('V4 selecting a step change puts both panes on that step',async({page})=>{
     await expect(caption(after)).toContainText('Store confirms the write');
   });
 });
+test('V4b the agent dialog opens Focused and shows the changed panel of a step change',async({page})=>{
+  await withProposal(page,async()=>{
+    const host=page.locator('#agent-update-compare');
+    await expect(host.getByRole('button',{name:'Focused',exact:true})).toHaveAttribute('aria-pressed','true');
+    await rail(host).getByRole('button',{name:ITEMS[1],exact:true}).click();
+    const rows=host.locator('.compare-focus-row');
+    await expect(rows).toHaveCount(1);await expect(rows.first()).toHaveAttribute('data-panel-id','p');
+    await expect(rows.first().locator('.compare-focus-chip')).toHaveText(['value 6 → 42']);
+    await expect(rows.first().locator('.compare-focus-cell[data-side="before"] .gaugeval')).toHaveText('6 mA');
+    await expect(rows.first().locator('.compare-focus-cell[data-side="after"] .gaugeval')).toHaveText('42 mA');
+  });
+});
 test('V5 Full mode renders each section exactly and frames a node change in both panes; manual scroll stays per pane',async({page})=>{
   await withProposal(page,async()=>{
     const before=dialogPane(page,'before'),after=dialogPane(page,'after');
+    /* #848 PR 2: Focused is the default; this test covers the Full diagram mode. */
+    await page.locator('#agent-update-compare').getByRole('button',{name:'Full diagram',exact:true}).click();
     const ids=(scope,section)=>scope.locator('[data-dv-section="'+section+'"] g.node[data-dv-node]').evaluateAll(nodes=>[...new Set(nodes.map(n=>n.getAttribute('data-dv-node')))].sort());
     await expect.poll(()=>ids(before,0)).toEqual(['a','b','c']);await expect.poll(()=>ids(after,0)).toEqual(['a','b','c']);
     await expect.poll(()=>ids(before,1)).toEqual(['x']);await expect.poll(()=>ids(after,1)).toEqual(['x','y']);

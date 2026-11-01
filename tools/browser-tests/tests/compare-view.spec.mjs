@@ -23,9 +23,9 @@
    V8 stress           20 open/close cycles on a generated large document (4 sections, 160 nodes,
                        240 steps, 16 panels; the largest example is 5 MB of embedded images and the
                        agent folder cannot connect it), visiting every change each cycle: after every
-                       close the compare host is empty, the page reports 0 live compare renders
-                       (html[data-compare-renders]) and the document keydown listener count is back
-                       to its pre-open value; while open it reports 2; JS heap after GC grows <= 10%
+                       close the compare host is empty, every render controller created on open has
+                       had destroy() called (counted by wrapping renderPage) and the document keydown
+                       listener count is back to its pre-open value; while open there are 2 more; JS heap after GC grows <= 10%
                        from cycle 2 to 20                                                          rejects: leaked renders/listeners
    V9 stale gating     unchanged: covered by folder-agent.spec.mjs "an open review refreshes
                        visibly and cannot accept the new version as the old review" (kept as is) */
@@ -103,16 +103,22 @@ test('V2 the rail groups changes by section with exact labels',async({page})=>{
     }
   });
 });
-test('V3 Next/Previous and J/K move the selection with wrap-around',async({page})=>{
+test('V3 Next/Previous and J/K move the selection in both directions with wrap-around and move both panes',async({page})=>{
   await withProposal(page,async()=>{
     const items=rail(page.locator('#agent-update-compare')).locator('button.compare-rail-item'),position=page.locator('#agent-update-position');
-    await expect(items.nth(0)).toHaveAttribute('aria-current','true');await expect(position).toContainText('1 of 6');
-    await page.locator('#agent-update-next').click();await expect(items.nth(1)).toHaveAttribute('aria-current','true');await expect(position).toContainText('2 of 6');
-    await page.keyboard.press('j');await expect(items.nth(2)).toHaveAttribute('aria-current','true');await expect(position).toContainText('3 of 6');
-    await page.keyboard.press('k');await expect(items.nth(1)).toHaveAttribute('aria-current','true');
-    await page.locator('#agent-update-previous').click();await page.locator('#agent-update-previous').click();
-    await expect(items.nth(5)).toHaveAttribute('aria-current','true');await expect(position).toContainText('6 of 6');
-    await page.keyboard.press('j');await expect(items.nth(0)).toHaveAttribute('aria-current','true');await expect(position).toContainText('1 of 6');
+    const before=dialogPane(page,'before'),after=dialogPane(page,'after');
+    const at=async(i,label)=>{await expect(items.nth(i)).toHaveAttribute('aria-current','true');await expect(position).toContainText((i+1)+' of 6');};
+    const panesOn=async(beforeText,afterText)=>{await expect(caption(before)).toContainText(beforeText);await expect(caption(after)).toContainText(afterText);};
+    await at(0);
+    await page.locator('#agent-update-next').click();await at(1);await panesOn('API saves','API saves');
+    await page.keyboard.press('j');await at(2);await panesOn('Store confirms','Store confirms the write');
+    await page.keyboard.press('k');await at(1);await panesOn('API saves','API saves');
+    await page.locator('#agent-update-previous').click();await at(0);
+    await page.locator('#agent-update-previous').click();await at(5);/* Previous wraps first -> last */
+    await page.locator('#agent-update-next').click();await at(0);/* Next wraps last -> first */
+    await page.keyboard.press('k');await at(5);/* K wraps first -> last */
+    await page.keyboard.press('j');await at(0);/* J wraps last -> first */
+    await page.keyboard.press('j');await page.keyboard.press('j');await at(2);await panesOn('Store confirms','Store confirms the write');
   });
 });
 test('V4 selecting a step change puts both panes on that step',async({page})=>{
@@ -176,17 +182,21 @@ test('V8 twenty open/close cycles on a large document leave no renders, listener
     const cdp=await page.context().newCDPSession(page);
     const heap=async()=>{await cdp.send('HeapProfiler.collectGarbage');return (await cdp.send('Runtime.getHeapUsage')).usedSize;};
     const keydown=async()=>{const {result}=await cdp.send('Runtime.evaluate',{expression:'document'});return (await cdp.send('DOMDebugger.getEventListeners',{objectId:result.objectId})).listeners.filter(l=>l.type==='keydown').length;};
-    const host=page.locator('#agent-update-compare'),html=page.locator('html'),listeners=await keydown();let base=0;
+    /* Test instrumentation (counts only, drives nothing): wrap the viewer's renderPage so
+       every controller it returns is counted when created and when destroy() runs. */
+    await page.evaluate(()=>{const orig=window.renderPage;window.__cvRenders={live:0};window.renderPage=function(){const ctl=orig.apply(this,arguments);window.__cvRenders.live++;const d=ctl.destroy;let done=false;ctl.destroy=function(){if(!done){done=true;window.__cvRenders.live--;}return d.apply(this,arguments);};return ctl;};});
+    const live=()=>page.evaluate(()=>window.__cvRenders.live);
+    const host=page.locator('#agent-update-compare'),html=page.locator('html'),listeners=await keydown(),baseline=await live();let base=0;
     for(let cycle=1;cycle<=20;cycle++){
       await page.locator('#agent-update-open').click();
       await expect(dialogPane(page,'before').locator('svg[aria-label="flow diagram"]').first()).toBeVisible();
       await expect(dialogPane(page,'after').locator('svg[aria-label="flow diagram"]').first()).toBeVisible();
-      await expect(html,'two live compare renders while open').toHaveAttribute('data-compare-renders','2');
+      await expect.poll(live,{message:'two more live render controllers while open'}).toBe(baseline+2);
       const items=rail(host).locator('button.compare-rail-item'),n=await items.count();expect(n,'precondition: the proposal has changes').toBeGreaterThan(2);
       for(let i=1;i<=n;i++){await page.keyboard.press('j');await expect(items.nth(i%n)).toHaveAttribute('aria-current','true');}
       await page.locator('#agent-update-close').click();await expect(page.locator('#agent-update-dialog')).toBeHidden();
       await expect.poll(()=>host.evaluate(el=>el.childElementCount),{message:'cycle '+cycle+' leaves the compare host empty'}).toBe(0);
-      await expect(html,'cycle '+cycle+' leaves no live compare render').toHaveAttribute('data-compare-renders','0');
+      expect(await live(),'cycle '+cycle+' destroys both render controllers').toBe(baseline);
       expect(await keydown(),'cycle '+cycle+' removes the compare key listener').toBe(listeners);
       if(cycle===2)base=await heap();
     }

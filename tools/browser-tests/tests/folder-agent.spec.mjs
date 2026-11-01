@@ -1013,7 +1013,7 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     await expect(page.locator('#agent-update-view-before [data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');await expect(page.locator('#agent-update-change-status')).toContainText('2 modified');
     await expect(page.locator('#agent-update-commit')).toBeEnabled();await contained();
     await page.locator('#agent-update-details').click();await expect(page.locator('#agent-update-ledger-before-summary')).toHaveText('Coverage ledger · Current state');await expect(page.locator('#agent-update-ledger-before')).toHaveText('No coverage ledger yet.');
-    await expect(page.locator('#agent-update-ledger')).toContainText('The service name changed');await page.locator('#agent-update-details-close').click();await contained();await changedNodeVisible('Delivery service');
+    await expect(page.locator('#agent-update-ledger')).toContainText('The service name changed');await page.locator('#agent-update-details-close').click();await contained();await changedNodeVisible('Delivery service',0);/* still after the reviewer's Fit */
     await view.locator('.reader-top-view[data-tab-view$="-brief"]').click();await expect(stage).toBeHidden();
     await expect(view.locator('[data-dv-node="b"]')).toBeVisible();
     await view.locator('.reader-top-view[data-tab-view$="-explore"]').click();await contained();

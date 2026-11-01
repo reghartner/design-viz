@@ -139,25 +139,35 @@ test('V8b mounting both panes takes at most 2x mounting one pane',async({page,se
   const name='compare-perf-'+Date.now();
   await standalonePage(server,name,`var a=FlowviewCompare.normalize(${JSON.stringify(current)}),b=FlowviewCompare.normalize(${JSON.stringify(proposed)});
   var entries=FlowviewCompare.compare({authored:a,resolved:a,ledger:null},{authored:b,resolved:b,ledger:null}),view=null,host=document.getElementById('compare-host');
-  function mount(single){if(view)view.destroy();view=FlowviewCompare.mount(host,{before:single?null:a,after:b,entries:entries,mode:'full'});}
+  /* Timed in the page from the click to the frame after the first paint (Playwright's polling adds noise). */
+  function mount(single){if(view)view.destroy();var t=performance.now();view=FlowviewCompare.mount(host,{before:single?null:a,after:b,entries:entries,mode:'full'});
+    window.cvPainted=null;requestAnimationFrame(function(){requestAnimationFrame(function(){
+      var ms=performance.now()-t,q=function(side){return host.querySelector('.compare-pane[data-side="'+side+'"]');},A=q('after'),B=q('before');
+      window.cvPainted={ms:ms,afterSvg:A.querySelectorAll('svg[aria-label="flow diagram"]').length,afterPanels:A.querySelectorAll('[data-dv-panel]').length,
+        beforeN3:[].filter.call(B.querySelectorAll('[data-dv-node="n3"]'),function(n){return n.getClientRects().length>0;}).length,beforePanels:B.querySelectorAll('[data-dv-panel]').length};});});}
   document.getElementById('cv-one').addEventListener('click',function(){mount(true);});
   document.getElementById('cv-two').addEventListener('click',function(){mount(false);});
   view={previous:function(){},next:function(){},destroy:function(){}};`);
   await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/'+name+'.html');
   const host=page.locator('#compare-host');
-  /* Timed until both panes show the selected change: the After pane fully rendered (4 diagrams,
-     16 panels) and the Before pane showing the changed node's section with its 4 panels
-     (Chuck 2026-11-01: the Before pane may draw its other sections right after). */
+  /* Both panes must show the selected change at the first paint: the After pane fully rendered
+     (4 diagrams, 16 panels) and the Before pane showing the changed node's section with its
+     panels (Chuck 2026-11-01: the Before pane may draw its other sections right after). The time
+     is measured in the page from the click to the frame after that first paint. */
   async function time(button,two){
     await page.locator('#cv-destroy').click();await expect.poll(()=>host.evaluate(el=>el.childElementCount)).toBe(0);
-    const t=Date.now();await page.locator(button).click();
+    await page.locator(button).click();
     await expect(pane(host,'after').locator('svg[aria-label="flow diagram"]')).toHaveCount(4,{timeout:60000});
     await expect(pane(host,'after').locator('[data-dv-panel]')).toHaveCount(16,{timeout:60000});/* panel bodies count too */
     if(two){
       await expect(pane(host,'before').locator('[data-dv-node="n3"]:visible').first()).toBeVisible({timeout:60000});
       await expect.poll(()=>pane(host,'before').locator('[data-dv-panel]').count(),{timeout:60000}).toBeGreaterThanOrEqual(4);
     }
-    const elapsed=Date.now()-t;
+    const painted=await page.evaluate(()=>new Promise(r=>{(function wait(){if(window.cvPainted!=null)r(window.cvPainted);else requestAnimationFrame(wait);})();}));
+    /* What the panes held at that first paint. */
+    expect(painted.afterSvg,'After diagrams at first paint').toBe(4);expect(painted.afterPanels,'After panels at first paint').toBe(16);
+    if(two){expect(painted.beforeN3,'Before shows the changed node at first paint').toBeGreaterThan(0);expect(painted.beforePanels,'Before shows its section panels at first paint').toBeGreaterThanOrEqual(4);}
+    const elapsed=Math.round(painted.ms);
     /* ...and the whole current document still arrives in the Before pane. */
     if(two){await expect(pane(host,'before').locator('svg[aria-label="flow diagram"]')).toHaveCount(4,{timeout:60000});await expect(pane(host,'before').locator('[data-dv-panel]')).toHaveCount(16,{timeout:60000});}
     return elapsed;

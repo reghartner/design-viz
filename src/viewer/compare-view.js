@@ -211,9 +211,17 @@ function mountCompareView(host, opts){
   /* Rendered target of an entry on one side, or null when that side lacks it. */
   function target(entry, side){
     var path = side === 'before' ? entry.beforePath : entry.afterPath, sec = entry.section || {};
+    /* Added or removed object: this side lacks it, so show its section here. The engine
+       records only the side that holds the object; match the section by reference. */
+    if (path == null){
+      var index = sec[side];
+      if (index == null){
+        var other = side === 'before' ? 'after' : 'before', from = pages[other] && sec[other] != null ? sectionRecords(pages[other])[sec[other]] : null;
+        index = from && pages[side] ? sectionRecords(pages[side]).findIndex(function(r){ return r.reference === from.reference; }) : -1;
+      }
+      return index != null && index >= 0 ? {section:index, kind:'section', attr:null, key:null} : null;
+    }
     if (sec[side] == null) return null;
-    /* Added or removed object: this side lacks it, so show its section here. */
-    if (path == null) return {section:sec[side], kind:'section', attr:null, key:null};
     var t = {section:sec[side], kind:entry.kind, attr:COMPARE_KIND_ATTR[entry.kind], key:null};
     if (entry.cause === 'provider'){ t.attr = entry.kind === 'edge' ? 'data-dv-edge' : 'data-dv-node'; t.key = entry.key ? entry.key[side] : null; return t; }
     if (entry.kind === 'node') t.key = entry.key ? entry.key[side] : null;

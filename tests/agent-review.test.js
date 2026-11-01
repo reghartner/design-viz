@@ -36,7 +36,7 @@ function uiHarness(options={}){
       mounts.push(m);
       return {select(i){m.selected=i;if(opts.onSelect)opts.onSelect(opts.entries[i],i,{before:{shown:true},after:{shown:true}});return {};},
         next(){return this.select(m.selected+1);},previous(){return this.select(m.selected-1);},selected:()=>m.selected,count:()=>opts.entries.length,
-        label:i=>'label '+i,errors:()=>(options.renderErrors || []).slice(),setSkin(name){m.skins.push(name);return true;},destroy(){m.destroyed=true;host.replaceChildren();}};
+        label:i=>'label '+i,errors:()=>(options.renderErrors || []).slice(),finish(){m.finished=(m.finished||0)+1;return (options.finishErrors || options.renderErrors || []).slice();},setSkin(name){m.skins.push(name);return true;},destroy(){m.destroyed=true;host.replaceChildren();}};
     }};
   vm.createContext(c);
   for(const file of ['validator.js','workbench/lifetime.js','workbench/agent-review.js'])vm.runInContext(readSource(file),c);
@@ -182,4 +182,26 @@ test('a pane that fails to render keeps Accept disabled and says which side fail
   assert.match(e['agent-update-position'].textContent,/Before could not be rendered: boom/);
   const ok=uiHarness(),o=ok.elements;ok.ui.update(ok.review);o['agent-update-open'].fire('click');
   assert.equal(o['agent-update-commit'].disabled,false,'precondition: without a render error Accept is enabled');
+});
+
+test('Accept first finishes a pending Before render and does not accept when it fails (#848 diff review 4)',async()=>{
+  const h=uiHarness({finishErrors:[{side:'before',message:'late section'}]}),e=h.elements;h.ui.update(h.review);e['agent-update-open'].fire('click');
+  const m=mounted(h);assert.equal(e['agent-update-commit'].disabled,false,'precondition: Accept enabled while the rest of Before is pending');
+  await e['agent-update-commit'].listeners.click[0]();
+  assert.equal(m.finished,1,'Accept completes the Before pane first');
+  assert.equal(h.accepted.length,0,'a Before section that fails to render blocks Accept');
+  assert.equal(e['agent-update-commit'].disabled,true);assert.match(e['agent-update-position'].textContent,/Before could not be rendered: late section/);
+  const ok=uiHarness(),o=ok.elements;ok.ui.update(ok.review);o['agent-update-open'].fire('click');
+  await o['agent-update-commit'].listeners.click[0]();assert.equal(mounted(ok).finished,1);assert.equal(ok.accepted.length,1,'without a failure Accept applies once');
+});
+
+test('a tab or tab-level View change with no section opens the source in Details (#848 diff review 4)',()=>{
+  const h=uiHarness(),e=h.elements;h.ui.update(h.review);e['agent-update-open'].fire('click');
+  const live=mounted(h).live;
+  for(const kind of ['tab','view']){
+    e['agent-update-details-close'].fire('click');
+    live.onSelect({kind,status:'modified',section:{before:null,after:null},beforePath:'blocks[0]',afterPath:'blocks[0]'},0,{before:{shown:false},after:{shown:false}});
+    assert.equal(e['agent-update-details-panel'].hidden,false,kind+' change opens Details');
+    assert.match(e['agent-update-position'].textContent,/Shown in Details/,kind+' change says where it is shown');
+  }
 });

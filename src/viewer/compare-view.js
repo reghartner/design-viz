@@ -202,7 +202,7 @@ function mountCompareView(host, opts){
   opts = opts || {};
   var doc = host.ownerDocument || document, entries = opts.entries || [], pages = {before:opts.before || null, after:opts.after || null};
   var ids = opts.ids || {}, panes = {}, selected = -1, destroyed = false, skin = opts.skin, lastAfterView = null, renderErrors = [];
-  var mode = opts.mode === 'full' ? 'full' : 'focused', focusCtx = null, displayOnlyCache = new Map();
+  var mode = opts.mode === 'full' ? 'full' : 'focused', focusCtx = null, displayOnlyCache = new Map(), ambientOnly = false;
   function el(tag, cls, text){ var n = doc.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
   host.replaceChildren();
   var root = el('div', 'compare-view'), rail = el('nav', 'compare-rail'), columns = el('div', 'compare-columns');
@@ -285,6 +285,7 @@ function mountCompareView(host, opts){
     if (selected >= 0) navigate('before', entries[selected], lastAfterView);
     /* Then the Focused step and path (a panel change or a step clicked before completion). */
     if (selected >= 0) syncPaneSteps();
+    if (selected >= 0 && ambientOnly) ambientPanes(entries[selected]);
   }
   function cancelCompletion(){
     if (win){
@@ -422,9 +423,12 @@ function mountCompareView(host, opts){
       var numeric = function(v){ return typeof v === 'number'; };
       var stepped = (entry.effects || []).some(function(e){ return (e.changes || []).some(function(c){ return numeric(c.afterStep) || numeric(c.beforeStep); }); }) ||
         (entry.scopeAfter || []).some(numeric) || (entry.scopeBefore || []).some(numeric);
-      if (!stepped) return null;
+      if (!stepped){ ambientOnly = true; return null; }
     }
-    var effect = (entry.effects || [])[0], pathId = effect ? effect.pathId : null;
+    /* The path of the first effect that changes a numbered step (an earlier path may differ only in Ambient). */
+    var isNum = function(v){ return typeof v === 'number'; };
+    var effect = (entry.effects || []).find(function(e){ return (e.changes || []).some(function(c){ return isNum(c.afterStep) || isNum(c.beforeStep); }); }) || (entry.effects || [])[0],
+        pathId = effect ? effect.pathId : null;
     /* The step to open: the edited step; for a panel settings change, the first step where the
        panel is visible (the engine's scope), so it does not open where the panel is hidden. */
     var firstStep = function(list){ return (list || []).find(function(v){ return typeof v === 'number'; }); };
@@ -559,6 +563,17 @@ function mountCompareView(host, opts){
   }
   /* Keep the full panes under the Focused view on the Focused step and path, so switching to
      Full diagram shows the same step (a side without the step keeps its pane where it is). */
+  /* A panel change seen only in Ambient mode: put both full panes in Ambient mode on its section. */
+  function ambientPanes(entry){
+    ['before', 'after'].forEach(function(side){
+      var p = panes[side], index = compareSectionOnSide(entries, pages, entry, side);
+      if (!p || index < 0) return;
+      if (p.partial != null && p.partial !== index) completeBefore();
+      if (!p.ctl) return;
+      var rec = recordFor(p, index);
+      if (rec && rec.stepper && rec.stepper.enterAmbient) try{ rec.stepper.enterAmbient(); }catch(ex){}
+    });
+  }
   function syncPaneSteps(){
     var ctx = focusCtx; if (!ctx || destroyed) return;
     ['before', 'after'].forEach(function(side){
@@ -688,8 +703,10 @@ function mountCompareView(host, opts){
     var entry = entries[selected], after = navigate('after', entry), before = navigate('before', entry, lastAfterView = after.view);
     var result = {before:before, after:after, label:compareEntryLabel(entry, pages), initial:!!initial};
     decorate();
+    ambientOnly = false;
     try{ focusCtx = buildFocus(entry); }catch(ex){ focusCtx = null; }
     syncPaneSteps();
+    if (ambientOnly) ambientPanes(entry);
     renderFocus(); applyMode();
     result.focused = mode === 'focused' && !!focusCtx;
     if (opts.onSelect) opts.onSelect(entry, selected, result);

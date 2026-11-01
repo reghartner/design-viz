@@ -366,19 +366,20 @@ function mountCompareView(host, opts){
   function focusSide(entry, side, pathId){
     var index = compareSectionOnSide(entries, pages, entry, side), rec = index >= 0 && pages[side] ? sectionRecords(pages[side])[index] : null;
     var d = rec && rec.section && rec.section.diagram;
-    if (!d || !Array.isArray(d.steps) || !d.steps.length) return null;
-    var paths = diagramPathList(d), path = paths.find(function(x){ return x.id === pathId; }) || paths[0];
-    if (!path) return null;
-    var fold = compareFoldsFor(d, path.id);
-    return {side:side, section:index, d:d, pathId:path.id, fold:fold, indices:fold.indices, pos:-1, skin:sideSkin(side)};
+    if (!d) return null;
+    /* A side without steps (the first step added, the only step removed) has no step controls. */
+    var steps = Array.isArray(d.steps) ? d.steps : [], paths = steps.length ? diagramPathList(d) : [];
+    var path = paths.find(function(x){ return x.id === pathId; }) || paths[0];
+    var fold = path ? compareFoldsFor(d, path.id) : null;
+    return {side:side, section:index, d:d, steps:steps, pathId:path ? path.id : null, fold:fold, indices:fold ? fold.indices : [], pos:-1, skin:sideSkin(side)};
   }
   function buildFocus(entry){
     if (entry.kind !== 'step' && entry.kind !== 'panel') return null;
     var effect = (entry.effects || [])[0], pathId = effect ? effect.pathId : null;
     var A = focusSide(entry, 'before', pathId), B = focusSide(entry, 'after', pathId);
-    if (!A || !B) return null;
+    if (!A || !B || !A.indices.length && !B.indices.length) return null;
     var aToB = new Map(), bToA = new Map();
-    comparePairs(A.d.steps, B.d.steps, [COMPARE_CAPTION_KEY], true).pairs.forEach(function(p){ aToB.set(p[0], p[1]); bToA.set(p[1], p[0]); });
+    comparePairs(A.steps, B.steps, [COMPARE_CAPTION_KEY], true).pairs.forEach(function(p){ aToB.set(p[0], p[1]); bToA.set(p[1], p[0]); });
     var ctx = {entry:entry, before:A, after:B, aToB:aToB, bToA:bToA};
     var panelIds = [];
     [B, A].forEach(function(S){ (S.d.panels || []).forEach(function(p){ if (p && p.id && panelIds.indexOf(p.id) < 0) panelIds.push(p.id); }); });
@@ -407,20 +408,23 @@ function mountCompareView(host, opts){
     if (srcA == null && srcB != null && bToA.has(srcB) && entry.kind !== 'step') srcA = bToA.get(srcB);
     if (srcB == null && srcA != null && aToB.has(srcA) && entry.kind !== 'step') srcB = aToB.get(srcA);
     A.pos = srcA == null ? -1 : A.indices.indexOf(srcA); B.pos = srcB == null ? -1 : B.indices.indexOf(srcB);
-    if (A.pos < 0 && B.pos < 0) B.pos = 0;
+    if (A.pos < 0 && B.pos < 0){ if (B.indices.length) B.pos = 0; else A.pos = 0; }
     return ctx;
   }
   function panelCell(S, id, pos){
+    if (!S.fold || pos < 0) return {missing:'step'};
     var p = S.fold.panels[id];
     if (!p) return {missing:'panel'};
-    if (pos < 0) return {missing:'step'};
     var states = S.fold.state(id) || [], visibility = S.fold.visibility(id) || [];
     return {panel:p, state:states[pos], states:states, pos:pos, visible:visibility[pos] !== false};
   }
   function panelDiffers(ctx, id, posA, posB){
     var a = panelCell(ctx.before, id, posA), b = panelCell(ctx.after, id, posB);
     if (!a.panel || !b.panel) return !!a.panel !== !!b.panel;
-    return !compareSame(a.state, b.state) || a.visible !== b.visible || !compareSame(a.panel, b.panel);
+    /* `initial` and `visible` reach the reader through the folded state and visibility compared
+       above; other declaration fields (title, unit, ...) show at every step. */
+    return !compareSame(a.state, b.state) || a.visible !== b.visible ||
+      !compareSame(compareWithout(a.panel, ['initial', 'visible']), compareWithout(b.panel, ['initial', 'visible']));
   }
   /* Move both sides to position `pos` of `side`'s path; the other side follows the step pairing. */
   function focusStep(side, pos){
@@ -468,6 +472,7 @@ function mountCompareView(host, opts){
       box.appendChild(strip);
       if (S.pos < 0) box.appendChild(el('p', 'compare-focus-missing', side === 'before' ? 'Step not in the current document' : 'Step not in the proposal'));
       else box.appendChild(el('p', 'compare-focus-caption', compareStepText(S.fold.d.steps[S.pos])));
+      if (!S.indices.length) strip.hidden = true;
       head.appendChild(box);
     });
     focus.appendChild(head);
@@ -576,7 +581,13 @@ function mountCompareView(host, opts){
     errors:function(){ return renderErrors.slice(); },
     /* Render anything still pending (the rest of the Before document) now; returns errors(). */
     finish:function(){ completeBefore(); return renderErrors.slice(); },
-    setSkin:function(name){ skin = name; var ok = false; ['before', 'after'].forEach(function(side){ if (panes[side].ctl && typeof applySkinClasses === 'function') ok = applySkinClasses(doc.body, panes[side].view, name) || ok; }); return ok; },
+    setSkin:function(name){
+      skin = name; var ok = false;
+      ['before', 'after'].forEach(function(side){ if (panes[side].ctl && typeof applySkinClasses === 'function') ok = applySkinClasses(doc.body, panes[side].view, name) || ok; });
+      /* The Focused view draws its panels with the side's skin: redraw them with the new one. */
+      if (focusCtx && !destroyed){ focusCtx.before.skin = sideSkin('before'); focusCtx.after.skin = sideSkin('after'); renderFocus(); }
+      return ok;
+    },
     destroy:function(){
       if (destroyed) return; destroyed = true;
       cancelCompletion();

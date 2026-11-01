@@ -50,7 +50,8 @@ async function standalonePage(server,name,body){
   execFileSync('python3',[path.join(root,'tools/inject.py'),path.join(server.root,name+'.json'),path.join(root,'template/flowview.html'),path.join(server.root,name+'.html')]);
   const html=await readFile(path.join(server.root,name+'.html'),'utf8');
   expect(html,'precondition: viewer-only page').not.toContain('initWorkbenchAgentReview');
-  const at=html.lastIndexOf('</body>');expect(at,'precondition: the page has a closing body tag').toBeGreaterThan(0);
+  /* The injected viewer page ends without a closing body tag; append the fixture at the end then. */
+  const close=html.lastIndexOf('</body>'),at=close>=0?close:html.length;
   await writeFile(path.join(server.root,name+'.html'),html.slice(0,at)+`<div id="compare-host" style="position:fixed;inset:0 0 48px 0;z-index:9999;background:#fff"></div>
 <div style="position:fixed;left:0;right:0;bottom:0;height:48px;z-index:10000;background:#eee"><button id="cv-prev">Previous</button><button id="cv-next">Next</button><button id="cv-destroy">Destroy</button></div>
 <script>window.addEventListener('load',function(){${body}

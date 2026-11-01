@@ -24,8 +24,9 @@
                        240 steps, 16 panels; the largest example is 5 MB of embedded images and the
                        agent folder cannot connect it), visiting every change each cycle: after every
                        close the compare host is empty, every render controller created on open has
-                       had destroy() called (counted by wrapping renderPage) and the document keydown
-                       listener count is back to its pre-open value; while open there are 2 more; JS heap after GC grows <= 10%
+                       had destroy() called (counted by wrapping renderPage and initViewerExploreCanvas)
+                       and the document keydown listener count is back to its pre-open value; while
+                       open there are 4 more (2 renders + 2 canvases); JS heap after GC grows <= 10%
                        from cycle 2 to 20                                                          rejects: leaked renders/listeners
    V9 stale gating     unchanged: covered by folder-agent.spec.mjs "an open review refreshes
                        visibly and cannot accept the new version as the old review" (kept as is) */
@@ -184,19 +185,23 @@ test('V8 twenty open/close cycles on a large document leave no renders, listener
     const keydown=async()=>{const {result}=await cdp.send('Runtime.evaluate',{expression:'document'});return (await cdp.send('DOMDebugger.getEventListeners',{objectId:result.objectId})).listeners.filter(l=>l.type==='keydown').length;};
     /* Test instrumentation (counts only, drives nothing): wrap the viewer's renderPage so
        every controller it returns is counted when created and when destroy() runs. */
-    await page.evaluate(()=>{const orig=window.renderPage;window.__cvRenders={live:0};window.renderPage=function(){const ctl=orig.apply(this,arguments);window.__cvRenders.live++;const d=ctl.destroy;let done=false;ctl.destroy=function(){if(!done){done=true;window.__cvRenders.live--;}return d.apply(this,arguments);};return ctl;};});
+    await page.evaluate(()=>{
+      window.__cvRenders={live:0};
+      const count=name=>{const orig=window[name];window[name]=function(){const owner=orig.apply(this,arguments);if(!owner || typeof owner.destroy!=='function')return owner;window.__cvRenders.live++;const d=owner.destroy;let done=false;owner.destroy=function(){if(!done){done=true;window.__cvRenders.live--;}return d.apply(this,arguments);};return owner;};};
+      count('renderPage');count('initViewerExploreCanvas');
+    });
     const live=()=>page.evaluate(()=>window.__cvRenders.live);
     const host=page.locator('#agent-update-compare'),html=page.locator('html'),listeners=await keydown(),baseline=await live();let base=0;
     for(let cycle=1;cycle<=20;cycle++){
       await page.locator('#agent-update-open').click();
       await expect(dialogPane(page,'before').locator('svg[aria-label="flow diagram"]').first()).toBeVisible();
       await expect(dialogPane(page,'after').locator('svg[aria-label="flow diagram"]').first()).toBeVisible();
-      await expect.poll(live,{message:'two more live render controllers while open'}).toBe(baseline+2);
+      await expect.poll(live,{message:'two render controllers and two canvas controllers live while open'}).toBe(baseline+4);
       const items=rail(host).locator('button.compare-rail-item'),n=await items.count();expect(n,'precondition: the proposal has changes').toBeGreaterThan(2);
       for(let i=1;i<=n;i++){await page.keyboard.press('j');await expect(items.nth(i%n)).toHaveAttribute('aria-current','true');}
       await page.locator('#agent-update-close').click();await expect(page.locator('#agent-update-dialog')).toBeHidden();
       await expect.poll(()=>host.evaluate(el=>el.childElementCount),{message:'cycle '+cycle+' leaves the compare host empty'}).toBe(0);
-      expect(await live(),'cycle '+cycle+' destroys both render controllers').toBe(baseline);
+      expect(await live(),'cycle '+cycle+' destroys both render and both canvas controllers').toBe(baseline);
       expect(await keydown(),'cycle '+cycle+' removes the compare key listener').toBe(listeners);
       if(cycle===2)base=await heap();
     }

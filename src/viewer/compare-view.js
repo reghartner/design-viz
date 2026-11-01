@@ -75,6 +75,16 @@ function compareEntryFields(entry){
 /* Rail groups: one per section (keyed by side + section index, so two sections
    with the same heading stay separate), named by the section heading; entries
    stay in the engine's document order. */
+/* A copy of a plain document holding only section `index`, or null when the
+   document has tabs, page-level Views or a single section (those render in
+   full at once). */
+function comparePartialPage(page, index){
+  if (!page || page.views) return null;
+  var key = Array.isArray(page.blocks) ? 'blocks' : Array.isArray(page.sections) ? 'sections' : null, list = key && page[key];
+  if (!list || list.length < 2 || !(index >= 0 && index < list.length)) return null;
+  if (list.some(function(block){ return block && Array.isArray(block.tabs); })) return null;
+  var copy = Object.assign({}, page); copy[key] = [list[index]]; return copy;
+}
 function compareEntryGroup(entry, pages){
   var sec = entry.section || {}, side = sec.after != null ? 'after' : sec.before != null ? 'before' : null;
   if (side == null){ var name = entry.kind === 'tab' || entry.kind === 'view' ? 'Tabs' : 'Document'; return {key:name, name:name}; }
@@ -93,7 +103,7 @@ function compareRailGroups(entries, pages){
 function mountCompareView(host, opts){
   opts = opts || {};
   var doc = host.ownerDocument || document, entries = opts.entries || [], pages = {before:opts.before || null, after:opts.after || null};
-  var ids = opts.ids || {}, panes = {}, selected = -1, destroyed = false, skin = opts.skin;
+  var ids = opts.ids || {}, panes = {}, selected = -1, destroyed = false, skin = opts.skin, lastAfterView = null;
   function el(tag, cls, text){ var n = doc.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
   host.replaceChildren();
   var root = el('div', 'compare-view'), rail = el('nav', 'compare-rail'), columns = el('div', 'compare-columns');
@@ -125,21 +135,51 @@ function mountCompareView(host, opts){
     scroll.tabIndex = 0; scroll.appendChild(view); pane.appendChild(head); pane.appendChild(scroll); columns.appendChild(pane);
     panes[side] = {pane:pane, scroll:scroll, view:view, ctl:null, canvas:null, page:pages[side]};
     if (!pages[side]){ view.appendChild(el('p', 'compare-pane-empty', side === 'before' ? 'Not in the current document.' : 'Not in the proposal.')); return; }
-    try{
-      var p = panes[side];
-      p.ctl = compareViewTrack(renderPage(view, pages[side], typeof skin === 'function' ? skin(pages[side]) : skin || pages[side].skin, null, {autoplay:false}));
-      if (typeof initViewerExploreCanvas === 'function') p.canvas = compareViewTrack(initViewerExploreCanvas(p.ctl, view, {container:scroll, initialContentsOpen:false,
-        presentation:{panelsHiddenWhenGraphVisible:false, overlayScale:.5}, forceFit:true, refitOnResize:false, fitInsets:{left:24, right:24, top:20, bottom:24}}));
-    }catch(ex){ view.textContent = 'Could not render this side: ' + ex.message; }
+    var p = panes[side], first = side === 'before' && entries.length ? (entries[0].section || {}).before : null, partial = first != null ? comparePartialPage(pages.before, first) : null;
+    if (partial){ p.partial = first; renderPane(p, partial); } else renderPane(p, pages[side]);
   }); });
   decorate();
+  /* The Before pane opens with only the first change's section; the rest of
+     the document replaces it right after the first paint (or at once when a
+     change in another section is selected). */
+  var win = doc.defaultView, completion = 0;
+  if (panes.before.partial != null){
+    if (win && win.requestAnimationFrame) completion = win.requestAnimationFrame(function(){ completion = win.setTimeout(completeBefore, 0); });
+    else completeBefore();
+  }
+  function renderPane(p, page){
+    try{
+      p.ctl = compareViewTrack(renderPage(p.view, page, typeof skin === 'function' ? skin(page) : skin || page.skin, null, {autoplay:false}));
+      if (typeof initViewerExploreCanvas === 'function') p.canvas = compareViewTrack(initViewerExploreCanvas(p.ctl, p.view, {container:p.scroll, initialContentsOpen:false,
+        presentation:{panelsHiddenWhenGraphVisible:false, overlayScale:.5}, forceFit:true, refitOnResize:false, fitInsets:{left:24, right:24, top:20, bottom:24}}));
+    }catch(ex){ p.view.textContent = 'Could not render this side: ' + ex.message; }
+  }
+  function completeBefore(){
+    var p = panes.before;
+    if (win){ if (win.cancelAnimationFrame) win.cancelAnimationFrame(completion); if (win.clearTimeout) win.clearTimeout(completion); }
+    completion = 0;
+    if (destroyed || p.partial == null) return;
+    try{ if (p.canvas) p.canvas.destroy(); }catch(ex){}
+    try{ if (p.ctl) p.ctl.destroy(); }catch(ex){}
+    p.canvas = p.ctl = null; p.partial = null; p.view.replaceChildren();
+    withPathGeometryCache(geometry || new Map(), function(){ renderPane(p, pages.before); });
+    geometry = null;
+    decorate();
+    if (selected >= 0) navigate('before', entries[selected], lastAfterView);
+  }
+  /* Rendered record of a section index on one pane (a partial pane holds one section). */
+  function recordFor(p, index){
+    if (!p.ctl) return null;
+    if (p.partial != null) return index === p.partial ? (p.ctl.sections || [])[0] || null : null;
+    return (p.ctl.sections || []).find(function(r){ return r.number === index + 1; }) || null;
+  }
   function decorate(){
     ['before', 'after'].forEach(function(side){
       var p = panes[side]; if (!p.ctl) return;
       Array.prototype.forEach.call(p.view.querySelectorAll('[data-agent-change]'), function(n){ n.removeAttribute('data-agent-change'); });
       entries.forEach(function(entry){
         var t = target(entry, side); if (!t || !t.attr) return;
-        var rec = (p.ctl.sections || []).find(function(r){ return r.number === t.section + 1; });
+        var rec = recordFor(p, t.section);
         if (!rec || !rec.sectionEl) return;
         Array.prototype.forEach.call(rec.sectionEl.querySelectorAll('[' + t.attr + ']'), function(n){
           if (n.getAttribute(t.attr) === String(t.key)) n.setAttribute('data-agent-change', entry.status);
@@ -181,8 +221,9 @@ function mountCompareView(host, opts){
   }
   function navigate(side, entry, viewId){
     var p = panes[side], t = target(entry, side);
+    if (p.partial != null && (!t || t.section !== p.partial)) completeBefore();
     if (!p.ctl || !t) return {side:side, shown:false};
-    var rec = (p.ctl.sections || []).find(function(r){ return r.number === t.section + 1; }), visible = true;
+    var rec = recordFor(p, t.section), visible = true;
     if (!rec) return {side:side, shown:false};
     if (rec.tabBlock && p.ctl.tabBlocks && p.ctl.tabBlocks[rec.tabBlock - 1]) p.ctl.tabBlocks[rec.tabBlock - 1].select(rec.tab, false);
     if (p.ctl.details) p.ctl.details.close(true);
@@ -218,7 +259,7 @@ function mountCompareView(host, opts){
     selected = ((index % entries.length) + entries.length) % entries.length;
     buttons.forEach(function(b, i){ if (b) b.setAttribute('aria-current', String(i === selected)); });
     if (buttons[selected] && buttons[selected].scrollIntoView) buttons[selected].scrollIntoView({block:'nearest'});
-    var entry = entries[selected], after = navigate('after', entry), before = navigate('before', entry, after.view);
+    var entry = entries[selected], after = navigate('after', entry), before = navigate('before', entry, lastAfterView = after.view);
     var result = {before:before, after:after, label:compareEntryLabel(entry, pages), initial:!!initial};
     decorate();
     if (opts.onSelect) opts.onSelect(entry, selected, result);
@@ -232,8 +273,8 @@ function mountCompareView(host, opts){
     else if (event.key === 'k' || event.key === 'K'){ event.preventDefault(); select(selected - 1); }
   }
   doc.addEventListener('keydown', onKey);
-  if (entries.length) withPathGeometryCache(geometry, function(){ select(0, true); });
-  geometry = null;
+  if (entries.length) withPathGeometryCache(geometry || new Map(), function(){ select(0, true); });
+  if (panes.before.partial == null) geometry = null;
   return {
     select:select,
     next:function(){ return select(selected + 1); },
@@ -245,6 +286,7 @@ function mountCompareView(host, opts){
     setSkin:function(name){ skin = name; var ok = false; ['before', 'after'].forEach(function(side){ if (panes[side].ctl && typeof applySkinClasses === 'function') ok = applySkinClasses(doc.body, panes[side].view, name) || ok; }); return ok; },
     destroy:function(){
       if (destroyed) return; destroyed = true;
+      if (win && completion){ if (win.cancelAnimationFrame) win.cancelAnimationFrame(completion); if (win.clearTimeout) win.clearTimeout(completion); }
       doc.removeEventListener('keydown', onKey);
       ['before', 'after'].forEach(function(side){
         var p = panes[side]; if (!p) return;

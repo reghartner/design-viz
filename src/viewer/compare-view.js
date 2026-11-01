@@ -400,6 +400,19 @@ function mountCompareView(host, opts){
     var firstStep = function(list){ return (list || []).find(function(v){ return typeof v === 'number'; }); };
     var st = entry.kind === 'step' && entry.step ? entry.step :
       entry.effect === 'declaration' ? (firstStep(entry.scopeAfter) != null ? {before:null, after:firstStep(entry.scopeAfter)} : {before:firstStep(entry.scopeBefore), after:null}) : {};
+    /* A settings change: pair the steps first (pairing does not depend on the path) and open on
+       the first visible step of its scope that has a pair, so the path chosen below holds a step
+       that exists on both sides. */
+    if (entry.effect === 'declaration'){
+      var section = function(side){ var i = compareSectionOnSide(entries, pages, entry, side), r = i >= 0 && pages[side] ? sectionRecords(pages[side])[i] : null; return r && r.section && r.section.diagram; };
+      var dA = section('before'), dB = section('after');
+      if (dA && dB){
+        var b2a = new Map();
+        comparePairs(Array.isArray(dA.steps) ? dA.steps : [], Array.isArray(dB.steps) ? dB.steps : [], [COMPARE_CAPTION_KEY], true).pairs.forEach(function(p){ b2a.set(p[1], p[0]); });
+        var vB = (entry.scopeAfter || []).find(function(v){ return typeof v === 'number' && b2a.has(v); });
+        if (vB != null) st = {before:b2a.get(vB), after:vB};
+      }
+    }
     /* The side that holds the step picks the path; the other side follows it. */
     var A, B;
     if (st.after == null && st.before != null){ A = focusSide(entry, 'before', pathId, st.before); B = focusSide(entry, 'after', A && A.pathId || pathId, st.after); }

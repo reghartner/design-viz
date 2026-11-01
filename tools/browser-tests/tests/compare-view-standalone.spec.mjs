@@ -144,8 +144,14 @@ test('V8b mounting both panes takes at most 2x mounting one pane',async({page,se
     window.cvPainted=null;requestAnimationFrame(function(){requestAnimationFrame(function(){
       var ms=performance.now()-t,q=function(side){return host.querySelector('.compare-pane[data-side="'+side+'"]');},A=q('after'),B=q('before');
       window.cvPainted={ms:ms,afterSvg:A.querySelectorAll('svg[aria-label="flow diagram"]').length,afterPanels:A.querySelectorAll('[data-dv-panel]').length,
-        /* copies of the changed node that lie inside the Before pane's visible area */
-        beforeN3:(function(){var box=B.querySelector('.compare-pane-scroll').getBoundingClientRect();return [].filter.call(B.querySelectorAll('[data-dv-node="n3"]'),function(n){var r=n.getBoundingClientRect();return r.width>0 && r.height>0 && r.left>=box.left && r.right<=box.right && r.top>=box.top && r.bottom<=box.bottom;}).length;})(),beforePanels:B.querySelectorAll('[data-dv-panel]').length};});});}
+        /* the changed node of section "Large 1" (titled "S1 node 3"; every section has an n3), inside the
+           Before pane's visible area, and the panels of that same section */
+        beforeN3:0,beforePanels:0};
+      (function(){var box=B.querySelector('.compare-pane-scroll').getBoundingClientRect();
+        [].forEach.call(B.querySelectorAll('[data-dv-node="n3"]'),function(n){var r=n.getBoundingClientRect();
+          if(!(r.width>0 && r.height>0 && r.left>=box.left && r.right<=box.right && r.top>=box.top && r.bottom<=box.bottom) || n.textContent.indexOf('S1 node 3')<0)return;
+          window.cvPainted.beforeN3++;var sec=n.closest('[data-dv-section]');if(sec)window.cvPainted.beforePanels=Math.max(window.cvPainted.beforePanels,sec.querySelectorAll('[data-dv-panel]').length);});})();
+      window.cvPainted.done=true;});});}
   document.getElementById('cv-one').addEventListener('click',function(){mount(true);});
   document.getElementById('cv-two').addEventListener('click',function(){mount(false);});
   view={previous:function(){},next:function(){},destroy:function(){}};`);
@@ -167,7 +173,7 @@ test('V8b mounting both panes takes at most 2x mounting one pane',async({page,se
     const painted=await page.evaluate(()=>new Promise(r=>{(function wait(){if(window.cvPainted!=null)r(window.cvPainted);else requestAnimationFrame(wait);})();}));
     /* What the panes held at that first paint. */
     expect(painted.afterSvg,'After diagrams at first paint').toBe(4);expect(painted.afterPanels,'After panels at first paint').toBe(16);
-    if(two){expect(painted.beforeN3,'Before shows the changed node inside its visible area at first paint').toBeGreaterThan(0);expect(painted.beforePanels,'Before shows its section panels at first paint').toBeGreaterThanOrEqual(4);}
+    if(two){expect(painted.beforeN3,'Before shows the changed node inside its visible area at first paint').toBeGreaterThan(0);expect(painted.beforePanels,'the changed section shows its 4 panels in Before at first paint').toBeGreaterThanOrEqual(4);}
     const elapsed=Math.round(painted.ms);
     /* ...and the whole current document still arrives in the Before pane. */
     if(two){await expect(pane(host,'before').locator('svg[aria-label="flow diagram"]')).toHaveCount(4,{timeout:60000});await expect(pane(host,'before').locator('[data-dv-panel]')).toHaveCount(16,{timeout:60000});}

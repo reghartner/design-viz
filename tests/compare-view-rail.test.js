@@ -19,3 +19,20 @@ test('sections sharing a heading form separate rail groups in document order',()
   assert.deepEqual(order,[...order].sort((a,b)=>a-b),'rail order equals entry (document) order');
   assert.equal(order.length,entries.length);
 });
+
+/* #848 diff review cycle 3: an added or removed object has a section index only on the side that
+   holds it. The other side's section is found through another entry that pairs the same section
+   (a heading change of an id-less section changes its reference), else by reference. */
+test('the side without an added object finds the paired section even when an id-less heading changed',()=>{
+  const c=load();
+  const page=(heading,extra)=>c.normalize({page:{title:'T',sections:[{heading:'Flow',diagram:node('F')},{heading,diagram:{nodes:Object.assign({x:{title:'X'}},extra||{}),rows:[['x'].concat(Object.keys(extra||{}))]}}]}});
+  const before=page('Notes'),after=page('Notes renamed',{y:{title:'Y'}});
+  const entries=c.compareDocuments({authored:before,resolved:before,ledger:null},{authored:after,resolved:after,ledger:null});
+  const added=entries.find(e=>e.kind==='node' && e.status==='added');
+  assert.ok(added && added.section.before==null && added.section.after===1,'precondition: the engine records only the After section of the added node');
+  assert.equal(typeof c.compareSectionOnSide,'function','compare-view.js defines compareSectionOnSide(entries, pages, entry, side)');
+  assert.equal(c.compareSectionOnSide(entries,{before,after},added,'before'),1,'Before shows the renamed section');
+  const unpaired=page('Other',{}),again=c.compareDocuments({authored:unpaired,resolved:unpaired,ledger:null},{authored:after,resolved:after,ledger:null});
+  const a2=again.find(e=>e.kind==='node' && e.status==='added');
+  assert.equal(c.compareSectionOnSide(again,{before:unpaired,after},a2,'before'),1,'paired through the section entry of the renamed heading');
+});

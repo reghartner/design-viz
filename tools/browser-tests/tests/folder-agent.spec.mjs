@@ -949,15 +949,22 @@ test('copy and paste Explore review fills the desktop and keeps comparison, deta
     await page.locator('#agent-update-open').click();
     const view=page.locator('#agent-update-view'),stage=view.locator('.explore-stage'),board=view.locator('.explore-board');
     async function contained(){
-      await expect(stage).toBeVisible();
-      const area=await page.locator('#agent-update-scroll').boundingBox(),canvas=await stage.boundingBox(),surface=await board.boundingBox();
-      if(canvas.y<area.y)await info.attach('contained-geometry',{body:JSON.stringify(await page.locator('#agent-update-scroll').evaluate(el=>({scrollTop:el.scrollTop,height:el.clientHeight,scrollHeight:el.scrollHeight,area:el.getBoundingClientRect().toJSON(),nav:el.querySelector('.reader-navigation').getBoundingClientRect().toJSON(),canvas:el.querySelector('.viewer-diagram-canvas').getBoundingClientRect().toJSON()}))),contentType:'application/json'});
-      expect(canvas.x).toBeGreaterThanOrEqual(area.x);expect(canvas.y).toBeGreaterThanOrEqual(area.y);
-      expect(canvas.x+canvas.width).toBeLessThanOrEqual(area.x+area.width+1);
-      expect(canvas.y+canvas.height).toBeLessThanOrEqual(area.y+area.height+1);
-      /* #848: each canvas is one of two panes beside the change list (about 345px wide at a 1024px window). */
-      expect(canvas.width).toBeGreaterThan(320);expect(canvas.height).toBeGreaterThan(260);
-      expect(surface.width).toBeGreaterThan(320);expect(surface.height).toBeGreaterThan(260);
+      /* Both panes: each canvas sits inside its own pane's scroll area at a usable size. */
+      for(const [scroll,pane] of [['#agent-update-scroll',view],['#agent-update-scroll-before',page.locator('#agent-update-view-before')]]){
+        const paneStage=pane.locator('.explore-stage'),paneBoard=pane.locator('.explore-board');
+        await expect(paneStage).toBeVisible();
+        const area=await page.locator(scroll).boundingBox(),canvas=await paneStage.boundingBox(),surface=await paneBoard.boundingBox();
+        if(canvas.y<area.y)await info.attach('contained-geometry',{body:JSON.stringify({scroll,area,canvas}),contentType:'application/json'});
+        expect(canvas.x).toBeGreaterThanOrEqual(area.x);expect(canvas.y).toBeGreaterThanOrEqual(area.y);
+        expect(canvas.x+canvas.width).toBeLessThanOrEqual(area.x+area.width+1);
+        expect(canvas.y+canvas.height).toBeLessThanOrEqual(area.y+area.height+1);
+        /* #848: each canvas is one of two panes beside the change list (about 345px wide at a 1024px window). */
+        expect(canvas.width,scroll+' canvas width').toBeGreaterThan(320);expect(canvas.height,scroll+' canvas height').toBeGreaterThan(260);
+        expect(surface.width,scroll+' board width').toBeGreaterThan(320);expect(surface.height,scroll+' board height').toBeGreaterThan(260);
+      }
+      /* The panes sit side by side: Before left of After, neither stacked under the other. */
+      const left=await page.locator('#agent-update-scroll-before').boundingBox(),right=await page.locator('#agent-update-scroll').boundingBox();
+      expect(left.x+left.width).toBeLessThanOrEqual(right.x+1);expect(Math.abs(left.y-right.y)).toBeLessThanOrEqual(1);
       for(const id of ['close','previous','next','details','discard','commit']){
         const control=page.locator('#agent-update-'+id);await expect(control).toBeInViewport();
         if(await control.isEnabled())await control.click({trial:true});

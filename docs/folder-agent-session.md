@@ -335,6 +335,17 @@ excluded from all Views has a source fallback there. Pan and zoom in one pane
 do not move the other. These controls never edit or accept the proposal, and
 Accept does not depend on which change is selected.
 
+The comparison opens **Focused**. A step, panel or caption change shows each side's
+step controls at that step and then only the panels that differ there: one row per
+panel with Before on the left, After on the right, a label per changed value (for
+example `value 6 → 42`) and the range of steps where the panel differs. A caption
+change also shows a word diff. Dots on the step buttons mark edited steps and steps
+whose reader view differs because of an earlier edit. Clicking a step on either
+side moves both sides to that step (steps pair by id, content, caption, or as the
+one remaining step). Other changes show both full diagrams with the note "This
+change shows in the full diagram." **Full diagram** shows both full diagrams for
+every change until **Focused** is chosen again.
+
 A refreshed proposal replaces the list and retires the previous navigation state;
 its separate acceptance guard still requires review of the refreshed version.
 

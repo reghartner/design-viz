@@ -2,12 +2,15 @@
    local Git Compare tool: no Workbench dependency.
 
    mountCompareView(host, {before, after, entries, skin, mode, ids, onSelect})
+     mode          'focused' (default) or 'full'; Focused shows step and panel changes as each
+                   side's step controls plus only the panels that differ (other changes show the
+                   full panes); Full shows both full renders
      before/after  normalized pages to render (already topology-resolved), or null
      entries       compareDocuments() output (src/core/compare.js)
      ids           optional element ids for the pane scroll/view nodes
      onSelect      optional callback(entry, index, result) after each selection
      onRenderError optional callback({side, message}) when a pane cannot be rendered
-   returns {select(i), next(), previous(), selected(), setSkin(name), destroy()}
+   returns {select(i), next(), previous(), selected(), setMode(m), mode(), setSkin(name), destroy()}
 
    Selecting a change frames BOTH panes on it (one-way: the selection drives the
    panes; manual pan/zoom in one pane never moves the other). */
@@ -121,15 +124,67 @@ function compareRailGroups(entries, pages){
   });
   return groups;
 }
+/* ---------- Focused mode text helpers (#848 PR 2) ---------- */
+function compareChipValue(v){ return typeof v === 'string' ? v : String(v); }
+function compareChipEntries(n){ return n + (n === 1 ? ' entry' : ' entries'); }
+/* One label per changed top-level state field: after-state keys first, then removed keys. */
+function compareValueChips(before, after){
+  var a = comparePlain(before) ? before : {}, b = comparePlain(after) ? after : {}, out = [];
+  var keys = Object.keys(b).concat(Object.keys(a).filter(function(k){ return !Object.prototype.hasOwnProperty.call(b, k); }));
+  keys.forEach(function(k){
+    var hasA = Object.prototype.hasOwnProperty.call(a, k), hasB = Object.prototype.hasOwnProperty.call(b, k), va = a[k], vb = b[k];
+    if (hasA && hasB && compareSame(va, vb)) return;
+    var objA = va !== null && typeof va === 'object', objB = vb !== null && typeof vb === 'object';
+    if (Array.isArray(va) && Array.isArray(vb)){
+      var d = vb.length - va.length;
+      out.push(k + (d > 0 ? ' +' + compareChipEntries(d) : d < 0 ? ' −' + compareChipEntries(-d) : ' changed'));
+    }
+    else if (!hasA && !objB) out.push(k + ' → ' + compareChipValue(vb));
+    else if (!hasB && !objA) out.push(k + ' ' + compareChipValue(va) + ' → (none)');
+    else if (hasA && hasB && !objA && !objB) out.push(k + ' ' + compareChipValue(va) + ' → ' + compareChipValue(vb));
+    else out.push(k + ' changed');
+  });
+  return out;
+}
+/* Word-level diff (longest common subsequence of whitespace-separated words) as runs. */
+function compareWordDiff(before, after){
+  var a = String(before || '').split(/\s+/).filter(Boolean), b = String(after || '').split(/\s+/).filter(Boolean);
+  var n = a.length, m = b.length, L = [];
+  for (var i = 0; i <= n; i++){ L.push(new Array(m + 1).fill(0)); }
+  for (i = n - 1; i >= 0; i--) for (var j = m - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  var runs = [];
+  function push(op, word){ var last = runs[runs.length - 1]; if (last && last.op === op) last.text += ' ' + word; else runs.push({op:op, text:word}); }
+  i = 0; j = 0;
+  while (i < n || j < m){
+    if (i < n && j < m && a[i] === b[j]){ push('same', a[i]); i++; j++; }
+    else if (j < m && (i >= n || L[i][j + 1] > L[i + 1][j])){ push('ins', b[j]); j++; }
+    else if (i < n){ push('del', a[i]); i++; }
+  }
+  /* Within a changed stretch, list removed words before added words. */
+  for (var k = 0; k + 1 < runs.length; k++) if (runs[k].op === 'ins' && runs[k + 1].op === 'del'){ var t = runs[k]; runs[k] = runs[k + 1]; runs[k + 1] = t; }
+  return runs;
+}
+function compareStepText(step){ return step && typeof step.text === 'string' ? step.text : ''; }
+function compareCarriedText(title, from, to){
+  return from === to ? title + ' differs at step ' + from + ' only' : title + ' differs from step ' + from + ' through step ' + to;
+}
 function mountCompareView(host, opts){
   opts = opts || {};
   var doc = host.ownerDocument || document, entries = opts.entries || [], pages = {before:opts.before || null, after:opts.after || null};
   var ids = opts.ids || {}, panes = {}, selected = -1, destroyed = false, skin = opts.skin, lastAfterView = null, renderErrors = [];
+  var mode = opts.mode === 'full' ? 'full' : 'focused', focusCtx = null;
   function el(tag, cls, text){ var n = doc.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
   host.replaceChildren();
   var root = el('div', 'compare-view'), rail = el('nav', 'compare-rail'), columns = el('div', 'compare-columns');
+  var main = el('div', 'compare-main'), bar = el('div', 'compare-mode'), stage = el('div', 'compare-stage'), focus = el('section', 'compare-focus');
+  var modeButtons = {focused:el('button', 'compare-mode-button', 'Focused'), full:el('button', 'compare-mode-button', 'Full diagram')};
+  var modeNote = el('p', 'compare-mode-note', 'This change shows in the full diagram.');
   rail.setAttribute('aria-label', 'Changes');
-  root.appendChild(rail); root.appendChild(columns); host.appendChild(root);
+  bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Compare mode');
+  ['focused', 'full'].forEach(function(m){ var b = modeButtons[m]; b.type = 'button'; b.addEventListener('click', function(){ setMode(m); }); bar.appendChild(b); });
+  bar.appendChild(modeNote); focus.setAttribute('aria-label', 'Focused comparison'); focus.hidden = true;
+  stage.appendChild(columns); stage.appendChild(focus); main.appendChild(bar); main.appendChild(stage);
+  root.appendChild(rail); root.appendChild(main); host.appendChild(root);
   /* Rail: groups in first-appearance order (entries are in document order). */
   var groups = compareRailGroups(entries, pages);
   var buttons = [];
@@ -299,6 +354,189 @@ function mountCompareView(host, opts){
     var shownLayout = shownView && (shownView.legacyLayout || shownView.members && shownView.members[0] && shownView.members[0].layout);
     return {side:side, shown:true, object:!!object, visible:visible, view:shownView ? {id:shownView.id, layout:shownLayout || null} : null};
   }
+  /* ---------- Focused mode (#848 PR 2) ----------
+     Step and panel changes show each side's step controls at the change's step, a caption word
+     diff, and only the panels whose folded state differs there. Other changes show the full
+     panes (node and edge cropping is PR 3). The panes stay rendered and navigated underneath,
+     so switching to Full diagram is immediate. */
+  function sideSkin(side){
+    var name = typeof skin === 'function' ? skin(pages[side]) : skin || pages[side] && pages[side].skin;
+    return SKIN_NAMES.indexOf(name) >= 0 ? name : DEFAULT_SKIN;
+  }
+  function focusSide(entry, side, pathId){
+    var index = compareSectionOnSide(entries, pages, entry, side), rec = index >= 0 && pages[side] ? sectionRecords(pages[side])[index] : null;
+    var d = rec && rec.section && rec.section.diagram;
+    if (!d || !Array.isArray(d.steps) || !d.steps.length) return null;
+    var paths = diagramPathList(d), path = paths.find(function(x){ return x.id === pathId; }) || paths[0];
+    if (!path) return null;
+    var fold = compareFoldsFor(d, path.id);
+    return {side:side, section:index, d:d, pathId:path.id, fold:fold, indices:fold.indices, pos:-1, skin:sideSkin(side)};
+  }
+  function buildFocus(entry){
+    if (entry.kind !== 'step' && entry.kind !== 'panel') return null;
+    var effect = (entry.effects || [])[0], pathId = effect ? effect.pathId : null;
+    var A = focusSide(entry, 'before', pathId), B = focusSide(entry, 'after', pathId);
+    if (!A || !B) return null;
+    var aToB = new Map(), bToA = new Map();
+    comparePairs(A.d.steps, B.d.steps, [COMPARE_CAPTION_KEY], true).pairs.forEach(function(p){ aToB.set(p[0], p[1]); bToA.set(p[1], p[0]); });
+    var ctx = {entry:entry, before:A, after:B, aToB:aToB, bToA:bToA};
+    var panelIds = [];
+    [B, A].forEach(function(S){ (S.d.panels || []).forEach(function(p){ if (p && p.id && panelIds.indexOf(p.id) < 0) panelIds.push(p.id); }); });
+    var nodeIds = Object.keys(A.d.nodes || {}).concat(Object.keys(B.d.nodes || {})).filter(function(v, i, all){ return all.indexOf(v) === i; });
+    ctx.panelIds = panelIds;
+    /* Panels that differ at each After position (null = the step has no pair in Before). */
+    ctx.diffAt = B.indices.map(function(src, k){
+      var srcA = bToA.has(src) ? bToA.get(src) : null, j = srcA == null ? -1 : A.indices.indexOf(srcA);
+      if (j < 0) return null;
+      var out = panelIds.filter(function(id){ return panelDiffers(ctx, id, j, k); });
+      out.tone = nodeIds.some(function(id){ return !compareSame(A.fold.tone(id)[j], B.fold.tone(id)[k]); });
+      return out;
+    });
+    /* Starting step: the edited step, else the first step the change affects, else the first step. */
+    var srcA = null, srcB = null;
+    if (entry.kind === 'step' && entry.step){ srcA = entry.step.before; srcB = entry.step.after; }
+    else (entry.effects || []).some(function(e){
+      if (e.pathId !== B.pathId && e.pathId !== A.pathId) return false;
+      return (e.changes || []).some(function(c){
+        if (typeof c.afterStep === 'number'){ srcB = c.afterStep; return true; }
+        if (typeof c.beforeStep === 'number'){ srcA = c.beforeStep; return true; }
+        return false;
+      });
+    });
+    if (srcA == null && srcB == null) srcB = B.indices[0];
+    if (srcA == null && srcB != null && bToA.has(srcB) && entry.kind !== 'step') srcA = bToA.get(srcB);
+    if (srcB == null && srcA != null && aToB.has(srcA) && entry.kind !== 'step') srcB = aToB.get(srcA);
+    A.pos = srcA == null ? -1 : A.indices.indexOf(srcA); B.pos = srcB == null ? -1 : B.indices.indexOf(srcB);
+    if (A.pos < 0 && B.pos < 0) B.pos = 0;
+    return ctx;
+  }
+  function panelCell(S, id, pos){
+    var p = S.fold.panels[id];
+    if (!p) return {missing:'panel'};
+    if (pos < 0) return {missing:'step'};
+    var states = S.fold.state(id) || [], visibility = S.fold.visibility(id) || [];
+    return {panel:p, state:states[pos], states:states, pos:pos, visible:visibility[pos] !== false};
+  }
+  function panelDiffers(ctx, id, posA, posB){
+    var a = panelCell(ctx.before, id, posA), b = panelCell(ctx.after, id, posB);
+    if (!a.panel || !b.panel) return !!a.panel !== !!b.panel;
+    return !compareSame(a.state, b.state) || a.visible !== b.visible || !compareSame(a.panel, b.panel);
+  }
+  /* Move both sides to position `pos` of `side`'s path; the other side follows the step pairing. */
+  function focusStep(side, pos){
+    var ctx = focusCtx; if (!ctx || destroyed) return;
+    var S = ctx[side], O = ctx[side === 'before' ? 'after' : 'before'], map = side === 'before' ? ctx.aToB : ctx.bToA;
+    var src = S.indices[pos], other = map.has(src) ? map.get(src) : null;
+    S.pos = pos; O.pos = other == null ? -1 : O.indices.indexOf(other);
+    renderFocus();
+  }
+  function stepMarks(ctx, S){
+    var edited = new Set();
+    entries.forEach(function(e){
+      if (e.kind !== 'step' || !e.step || e.step[S.side] == null) return;
+      if (compareSectionOnSide(entries, pages, e, S.side) === S.section) edited.add(e.step[S.side]);
+    });
+    return S.indices.map(function(src, k){
+      if (edited.has(src)) return 'edited';
+      var kb = S.side === 'after' ? k : ctx.aToB.has(src) ? ctx.after.indices.indexOf(ctx.aToB.get(src)) : -1;
+      var d = kb >= 0 ? ctx.diffAt[kb] : null;
+      return d && (d.length || d.tone) ? 'carried' : '';
+    });
+  }
+  function cleanFocus(){
+    Array.prototype.forEach.call(focus.querySelectorAll('.pbody'), function(body){ try{ if (typeof cancelPanelMotion === 'function') cancelPanelMotion(body); }catch(ex){} });
+    focus.replaceChildren();
+  }
+  function addSkin(node, name){ if (typeof skinClasses === 'function') skinClasses(name).forEach(function(c){ node.classList.add(c); }); }
+  function renderFocus(){
+    cleanFocus();
+    var ctx = focusCtx; if (!ctx) return;
+    var head = el('div', 'compare-focus-head');
+    ['before', 'after'].forEach(function(side){
+      var S = ctx[side], box = el('div', 'compare-focus-side'), strip = el('div', 'compare-focus-steps'), marks = stepMarks(ctx, S);
+      box.setAttribute('data-side', side); addSkin(box, S.skin);
+      box.appendChild(el('h3', 'compare-focus-title', side === 'before' ? 'Before · current document' : 'After · agent proposal'));
+      strip.setAttribute('role', 'group'); strip.setAttribute('aria-label', (side === 'before' ? 'Before' : 'After') + ' steps');
+      S.indices.forEach(function(src, k){
+        var b = el('button', 'compare-focus-step', String(k + 1));
+        b.type = 'button';
+        if (k === S.pos) b.setAttribute('aria-current', 'true');
+        if (marks[k]) b.setAttribute('data-step-mark', marks[k]);
+        b.addEventListener('click', function(){ focusStep(side, k); });
+        strip.appendChild(b);
+      });
+      box.appendChild(strip);
+      if (S.pos < 0) box.appendChild(el('p', 'compare-focus-missing', side === 'before' ? 'Step not in the current document' : 'Step not in the proposal'));
+      else box.appendChild(el('p', 'compare-focus-caption', compareStepText(S.fold.d.steps[S.pos])));
+      head.appendChild(box);
+    });
+    focus.appendChild(head);
+    var A = ctx.before, B = ctx.after;
+    if (A.pos >= 0 && B.pos >= 0){
+      var ta = compareStepText(A.fold.d.steps[A.pos]), tb = compareStepText(B.fold.d.steps[B.pos]);
+      if (ta !== tb){
+        var diff = el('p', 'compare-word-diff');
+        compareWordDiff(ta, tb).forEach(function(run, i){
+          if (i) diff.appendChild(doc.createTextNode(' '));
+          diff.appendChild(run.op === 'same' ? doc.createTextNode(run.text) : el(run.op, null, run.text));
+        });
+        focus.appendChild(diff);
+      }
+    }
+    if (A.pos < 0 || B.pos < 0){
+      focus.appendChild(el('p', 'compare-focus-empty', 'No panel comparison: this step is only in ' + (A.pos < 0 ? 'the proposal.' : 'the current document.')));
+      return;
+    }
+    var changed = ctx.diffAt[B.pos] || [];
+    if (!changed.length){ focus.appendChild(el('p', 'compare-focus-empty', 'No panel differences at step ' + (B.pos + 1) + '.')); return; }
+    changed.forEach(function(id){
+      var row = el('div', 'compare-focus-row'), a = panelCell(A, id, A.pos), b = panelCell(B, id, B.pos), mid = el('div', 'compare-focus-change');
+      row.setAttribute('data-panel-id', id);
+      row.appendChild(focusCell(A, a, 'before'));
+      var chips = !a.panel ? ['panel added'] : !b.panel ? ['panel removed'] :
+        a.visible !== b.visible ? [(a.visible ? 'shown' : 'hidden') + ' → ' + (b.visible ? 'shown' : 'hidden')].concat(compareValueChips(a.state, b.state)) :
+        compareValueChips(a.state, b.state);
+      if (!chips.length) chips = ['panel settings changed'];
+      var list = el('ul', 'compare-focus-chips');
+      chips.forEach(function(text){ var li = el('li'); li.appendChild(el('span', 'compare-focus-chip', text)); list.appendChild(li); });
+      mid.appendChild(list);
+      /* The run of After steps around this one where the panel differs. */
+      var from = B.pos, to = B.pos;
+      while (from > 0 && ctx.diffAt[from - 1] && ctx.diffAt[from - 1].indexOf(id) >= 0) from--;
+      while (to + 1 < ctx.diffAt.length && ctx.diffAt[to + 1] && ctx.diffAt[to + 1].indexOf(id) >= 0) to++;
+      var decl = b.panel || a.panel;
+      mid.appendChild(el('p', 'compare-focus-note', compareCarriedText(String(decl.title || decl.id), from + 1, to + 1)));
+      row.appendChild(mid);
+      row.appendChild(focusCell(B, b, 'after'));
+      focus.appendChild(row);
+    });
+  }
+  function focusCell(S, c, side){
+    var cell = el('div', 'compare-focus-cell');
+    cell.setAttribute('data-side', side); addSkin(cell, S.skin);
+    if (!c.panel){ cell.appendChild(el('p', 'compare-focus-missing', side === 'before' ? 'Not in the current document' : 'Not in the proposal')); return cell; }
+    if (!c.visible){ cell.appendChild(el('p', 'compare-focus-missing', 'Hidden at this step')); return cell; }
+    var p = c.panel, card = el('div', 'pwidget pt-' + (PANEL_TYPES.indexOf(p.type) >= 0 ? p.type : 'unknown'));
+    if (p.title) card.appendChild(el('div', 'ptitle', String(p.title)));
+    var body = el('div', 'pbody'); card.appendChild(body); cell.appendChild(card);
+    try{
+      var decl = typeof FlowBrand !== 'undefined' ? Object.assign({}, p, {brand:FlowBrand.effective(S.d.brand, p.brand)}) : p;
+      renderPanelBody(body, decl, c.state, S.skin, c.states, c.pos, false);
+    }catch(ex){ body.textContent = 'Could not render this panel: ' + ex.message; }
+    return cell;
+  }
+  function applyMode(){
+    var entry = entries[selected], focused = mode === 'focused' && !!focusCtx;
+    focus.hidden = !focused;
+    columns.style.visibility = focused ? 'hidden' : '';
+    modeNote.hidden = !(mode === 'focused' && entry && !focusCtx);
+    modeButtons.focused.setAttribute('aria-pressed', String(mode === 'focused'));
+    modeButtons.full.setAttribute('aria-pressed', String(mode === 'full'));
+  }
+  function setMode(m){
+    if (destroyed || (m !== 'focused' && m !== 'full')) return mode;
+    mode = m; applyMode(); return mode;
+  }
   function select(index, initial){
     if (destroyed || !entries.length) return null;
     selected = ((index % entries.length) + entries.length) % entries.length;
@@ -307,6 +545,9 @@ function mountCompareView(host, opts){
     var entry = entries[selected], after = navigate('after', entry), before = navigate('before', entry, lastAfterView = after.view);
     var result = {before:before, after:after, label:compareEntryLabel(entry, pages), initial:!!initial};
     decorate();
+    try{ focusCtx = buildFocus(entry); }catch(ex){ focusCtx = null; }
+    renderFocus(); applyMode();
+    result.focused = mode === 'focused' && !!focusCtx;
     if (opts.onSelect) opts.onSelect(entry, selected, result);
     return result;
   }
@@ -318,6 +559,7 @@ function mountCompareView(host, opts){
     else if (event.key === 'k' || event.key === 'K'){ event.preventDefault(); select(selected - 1); }
   }
   doc.addEventListener('keydown', onKey);
+  applyMode();
   if (entries.length) withPathGeometryCache(geometry || new Map(), function(){ select(0, true); });
   if (panes.before.partial == null) geometry = null;
   return {
@@ -326,6 +568,8 @@ function mountCompareView(host, opts){
     previous:function(){ return select(selected - 1); },
     selected:function(){ return selected; },
     count:function(){ return entries.length; },
+    setMode:setMode,
+    mode:function(){ return mode; },
     label:function(i){ return entries[i] ? compareEntryLabel(entries[i], pages) : ''; },
     views:function(){ return {before:panes.before.view, after:panes.after.view}; },
     /* Sides that could not be rendered: [{side, message}]. */
@@ -336,6 +580,7 @@ function mountCompareView(host, opts){
     destroy:function(){
       if (destroyed) return; destroyed = true;
       cancelCompletion();
+      cleanFocus();
       doc.removeEventListener('keydown', onKey);
       ['before', 'after'].forEach(function(side){
         var p = panes[side]; if (!p) return;

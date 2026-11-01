@@ -8,7 +8,9 @@
    CONTRACT MATRIX
    V7  standalone   the component mounts on a viewer-only page (no Workbench bundle), shows both
                     panes and the rail; its Next/Previous and J/K work; destroy() empties the host
-                    and removes its key listener                                  rejects: Workbench-only DOM/globals; leaked listener
+                    and returns the document's keydown listener count to its value before mounting
+                    (the component's J/K listener and both pane renders' listeners)
+                                                                                  rejects: Workbench-only DOM/globals; leaked listener
    V7b imported     a provider-caused imported node change frames that imported node in both panes
                                                                                   rejects: local-only framing
    V8b open time    with real clicks, mounting both panes takes <= 2x mounting one pane of the same view
@@ -69,12 +71,14 @@ test('V7 the shared compare component works on a viewer-only page and cleans up 
   const {current,proposed}=fixture(),name='compare-standalone-'+Date.now();
   await standalonePage(server,name,`var a=FlowviewCompare.normalize(${JSON.stringify(current)}),b=FlowviewCompare.normalize(${JSON.stringify(proposed)});
   var entries=FlowviewCompare.compare({authored:a,resolved:a,ledger:null},{authored:b,resolved:b,ledger:null});
-  var view=window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),{before:a,after:b,entries:entries,mode:'full'});`);
+  var view=null;/* mounted by the cv-two button so the test can count listeners before mounting */
+  document.getElementById('cv-two').addEventListener('click',function(){view=window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),{before:a,after:b,entries:entries,mode:'full'});});`);
   await page.setViewportSize({width:1440,height:900});
   const cdp=await page.context().newCDPSession(page);
   const keydown=async()=>{const {result}=await cdp.send('Runtime.evaluate',{expression:'document'});return (await cdp.send('DOMDebugger.getEventListeners',{objectId:result.objectId})).listeners.filter(l=>l.type==='keydown').length;};
   await page.goto(server.origin+'/'+name+'.html');
   const host=page.locator('#compare-host');
+  const beforeMount=await keydown();await page.locator('#cv-two').click();
   await expect(pane(host,'before').locator('.compare-pane-title')).toHaveText('Before · current document');
   await expect(pane(host,'after').locator('[data-dv-node="b"]').first()).toContainText('Gateway');
   const items=rail(host).locator('button.compare-rail-item');await expect(items).toHaveText(ITEMS);
@@ -84,10 +88,10 @@ test('V7 the shared compare component works on a viewer-only page and cleans up 
   await page.keyboard.press('j');await expect(items.nth(0)).toHaveAttribute('aria-current','true');
   await page.keyboard.press('j');await page.keyboard.press('j');await expect(items.nth(2)).toHaveAttribute('aria-current','true');
   await expect(caption(pane(host,'after'))).toContainText('Store confirms the write');
-  const withView=await keydown();
+  expect(await keydown(),'precondition: the mounted view listens for J/K').toBeGreaterThan(beforeMount);
   await page.locator('#cv-destroy').click();
   await expect.poll(()=>host.evaluate(el=>el.childElementCount)).toBe(0);
-  expect(await keydown(),'destroy() removes the component key listener').toBe(withView-1);
+  expect(await keydown(),'destroy() removes every keydown listener the view added (component and both pane renders)').toBe(beforeMount);
   await page.keyboard.press('j');await expect(host.locator('*')).toHaveCount(0);
 });
 test('V7b an imported node change frames the imported node in both panes',async({page,server})=>{

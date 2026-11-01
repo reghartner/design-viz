@@ -24,10 +24,12 @@
                   (Power draw, Event log); clicking step 2 on the After side moves both to 2 with
                   no rows and the empty-state text                             rejects: one-side stepping; stale rows
    F4b pairing    the proposal inserts a step after step 1, so paired steps sit at different
-                  positions: clicking Before step 3 puts After on step 4 (the same step by id, same
-                  caption, same changed-panel row); clicking the inserted After step 2 leaves Before
-                  without a current step and shows "Step not in the current document"
-                                                                              rejects: pairing by position
+                  positions; run with step ids and without (content + caption pairing): clicking
+                  Before step 3 puts After on step 4 (same caption, same changed-panel row);
+                  clicking the inserted After step 2 leaves Before without a current step and shows
+                  "Step not in the current document"; each side's step dots follow the pairing
+                  (Before: 3 edited, 4 carried; After: 2 and 4 edited, 5 carried)
+                                                                              rejects: pairing by position or by id only; dots copied by index
    F5 caption     the caption change (step 8) shows both captions and a word diff with exact
                   removed and added words                                      rejects: whole-text replace; no diff
    F6 untrusted   markup in a caption and in a panel value is shown as literal text in the word diff
@@ -261,18 +263,26 @@ test('F8 the Full diagram toggle shows both full panes and keeps its mode across
   await noGraphVisible(host);
 });
 
-test('F4b step clicks follow the engine step pairing when the proposal inserts a step',async({page,server})=>{
+/* With step ids the engine pairs by id; without ids it pairs identical steps by content and the edited
+   step by its unique caption. Both variants must give the same pairing and the same step dots. */
+for(const withIds of [true,false])test('F4b step clicks and step dots follow the engine step pairing when the proposal inserts a step ('+(withIds?'step ids':'no step ids')+')',async({page,server})=>{
+  const step=(id,text,extra)=>Object.assign(withIds?{id}:{},{nodes:['a'],text},extra||{});
   const current={page:{title:'Pairing',blocks:[{id:'p',heading:'Pairing',diagram:{view:'step',autoplay:false,nodes:{a:{title:'A'}},rows:[['a']],
     panels:[{id:'g',type:'gauge',title:'Gauge',initial:{value:1}}],
-    steps:[{id:'s1',nodes:['a'],text:'One'},{id:'s2',nodes:['a'],text:'Two'},{id:'s3',nodes:['a'],text:'Three',panels:{g:{value:5}}},{id:'s4',nodes:['a'],text:'Four'}]}}]}};
+    steps:[step('s1','One'),step('s2','Two'),step('s3','Three',{panels:{g:{value:5}}}),step('s4','Four')]}}]}};
   const proposed=plain(current),d=proposed.page.blocks[0].diagram;
-  d.steps.splice(1,0,{id:'new',nodes:['a'],text:'Inserted'});d.steps[3].panels={g:{value:7}};
-  const host=await mountPage(page,server,'focus-pairing-'+Date.now(),current,proposed);
-  await expect(stepButtons(host,'before'),'precondition: Before has 4 steps').toHaveCount(4);
-  await expect(stepButtons(host,'after'),'precondition: After has 5 steps').toHaveCount(5);
+  d.steps.splice(1,0,step('new','Inserted'));d.steps[3].panels={g:{value:7}};
+  const host=await mountPage(page,server,'focus-pairing-'+(withIds?'ids':'noids')+'-'+Date.now(),current,proposed);
+  await expect(stepButtons(host,'before'),'precondition: Before has 4 step buttons').toHaveCount(4);
+  await expect(stepButtons(host,'after'),'precondition: After has 5 step buttons').toHaveCount(5);
+  /* Dots: the edited step (Three: Before 3, After 4) and the inserted step (After 2) are edited; Four
+     carries the Gauge difference (5 vs 7) and is carried on both sides; One and Two are unmarked. */
+  const marks=s=>stepButtons(host,s).evaluateAll(list=>list.map(b=>b.getAttribute('data-step-mark')||''));
+  await expect.poll(()=>marks('before'),{message:'Before step dots'}).toEqual(['','','edited','carried']);
+  await expect.poll(()=>marks('after'),{message:'After step dots'}).toEqual(['','edited','','edited','carried']);
   await stepButtons(host,'before').filter({hasText:/^3$/}).click();
   await expect(currentStep(host,'before')).toHaveText('3');
-  await expect(currentStep(host,'after'),'Before step 3 (s3) pairs with After step 4').toHaveText('4');
+  await expect(currentStep(host,'after'),'Before step 3 pairs with After step 4').toHaveText('4');
   for(const s of ['before','after'])await expect(side(host,s).locator('.compare-focus-caption')).toHaveText('Three');
   await expect.poll(()=>rowTitles(host)).toEqual(['g']);
   await expect(rows(host).first().locator('.compare-focus-chip')).toHaveText(['value 5 → 7']);
@@ -282,8 +292,9 @@ test('F4b step clicks follow the engine step pairing when the proposal inserts a
   await expect(currentStep(host,'before'),'the inserted step has no Before step').toHaveCount(0);
   await expect(side(host,'before').locator('.compare-focus-missing')).toHaveText('Step not in the current document');
   await stepButtons(host,'after').filter({hasText:/^5$/}).click();
-  await expect(currentStep(host,'before'),'After step 5 (s4) pairs with Before step 4').toHaveText('4');
+  await expect(currentStep(host,'before'),'After step 5 pairs with Before step 4').toHaveText('4');
   for(const s of ['before','after'])await expect(side(host,s).locator('.compare-focus-caption')).toHaveText('Four');
+  await expect(rows(host).first().locator('.compare-focus-note')).toHaveText('Gauge differs from step 4 through step 5');
 });
 
 test('F9b imported nodes, edges, sections and added nodes fall back to the full panes in Focused mode',async({page,server})=>{

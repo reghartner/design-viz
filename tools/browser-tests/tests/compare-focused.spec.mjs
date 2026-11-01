@@ -59,13 +59,15 @@
    C1 node crop   local node n6: n5 n6 n7 framed                               rejects: no crop; one pane; per-pane zoom
    C2 imported    imported node child::p6 changed by its provider              rejects: local-only crop
    C2b imp. conn. imported connection child::p5 -> child::p6 changed by its provider: endpoints and
-                  their neighbours (p4 p5 p6 p7) framed                         rejects: local-edge-only crop
+                  their neighbours (p4 p5 p6 p7) framed; the outlined connection is the one each side
+                  labels "hop 5" / "hop five changed"                           rejects: local-edge-only crop; wrong edge outlined
    C3 connection  local connection n5 -> n6: endpoints and their neighbours (n4 n5 n6 n7) framed
                                                                               rejects: endpoint-only crop
    C4 removed     removed node n6: Before frames n5 n6 n7; After (without n6) frames n5 n7
                                                                               rejects: blank or whole-section side
    C6 added       added node x after n11: After frames x and n11 (x outlined as added); Before
-                  (without x) frames n11; n0 and n1 outside                     rejects: unframed added node
+                  (without x) frames n11; n0 and n1 outside; Whole section shows n0..x in After and
+                  n0..n11 in Before                                            rejects: unframed added node
    C5 reset       selecting another node change after Whole section crops again (the zoom level
                   belongs to one selection)                                    rejects: sticky Whole section
    excluded       section heading / ledger / document text diffs (issue row 2b's ledger and heading
@@ -407,7 +409,7 @@ async function exerciseCrop(host,cfg){
   expect(ratio.before,'both panes zoom out by the same factor '+JSON.stringify(ratio)).toBeGreaterThan(.5);
   expect(Math.abs(ratio.before-ratio.after),'both panes zoom out by the same factor '+JSON.stringify(ratio)).toBeLessThan(.05);
   await host.getByRole('button',{name:'Whole section',exact:true}).click();
-  for(const s of ['before','after'])await cropped(host,s,cfg.ends,[]);
+  for(const s of ['before','after'])await cropped(host,s,Array.isArray(cfg.ends)?cfg.ends:cfg.ends[s],[]);
 }
 const provided=(c,c2)=>`function side(c,p){var raw=JSON.parse(JSON.stringify(c));return {authored:FlowviewCompare.normalize(JSON.parse(JSON.stringify(c))),resolved:FlowviewCompare.normalize(FlowviewCompare.resolve(raw,{version:1,id:'consumer',specs:[p,c]})),ledger:null};}
   var A=side(${inline(c.consumer)},${inline(c.provider)}),B=side(${inline(c.consumer)},${inline(c2)}),entries=FlowviewCompare.compare(A,B);
@@ -452,9 +454,14 @@ test('C2b an imported connection changed by its provider crops both panes to its
   const host=await mountPage(page,server,'crop-imported-edge-'+Date.now(),doorbell().current,null,null,provided(pair,p2));
   const labels=await items(host).allInnerTexts();
   expect(labels.length,'precondition: one change '+JSON.stringify(labels)).toBe(1);expect(labels[0]).toMatch(/^Modified · Imported connection /);
-  const key=await host.locator('.compare-pane[data-side="after"] [data-dv-section="0"] [data-dv-edge][data-agent-change="modified"]').first().getAttribute('data-dv-edge');
+  /* Each side's connection is found by its own label text, independently of the change outline. */
+  const keyOf=(s,label)=>host.locator('.compare-pane[data-side="'+s+'"] [data-dv-section="0"]').first().evaluate((sec,label)=>{
+    const hit=[...sec.querySelectorAll('[data-dv-edge]')].find(n=>n.textContent.trim()===label);return hit?hit.getAttribute('data-dv-edge'):null;},label);
+  await expect.poll(()=>keyOf('before','hop 5'),{message:'precondition: Before labels the connection "hop 5"'}).not.toBeNull();
+  await expect.poll(()=>keyOf('after','hop five changed'),{message:'precondition: After labels the connection "hop five changed"'}).not.toBeNull();
+  const keyB=await keyOf('before','hop 5'),keyA=await keyOf('after','hop five changed');
   await exerciseCrop(host,{inside:{before:[P('p4'),P('p5'),P('p6'),P('p7')],after:[P('p4'),P('p5'),P('p6'),P('p7')]},far:[P('p0'),P('p11')],all:PIDS,
-    changed:{before:['data-dv-edge',key,'modified'],after:['data-dv-edge',key,'modified']},neighbour:['data-dv-node',P('p5')],ref:P('p5'),keep:{before:[P('p5'),P('p6')],after:[P('p5'),P('p6')]},ends:[P('p0'),P('p11')]});
+    changed:{before:['data-dv-edge',keyB,'modified'],after:['data-dv-edge',keyA,'modified']},neighbour:['data-dv-node',P('p5')],ref:P('p5'),keep:{before:[P('p5'),P('p6')],after:[P('p5'),P('p6')]},ends:[P('p0'),P('p11')]});
 });
 
 test('C3 a local connection change crops both panes to its endpoints and their neighbours',async({page,server})=>{
@@ -485,5 +492,5 @@ test('C6 an added node crops the After pane to it and the Before pane to its nei
   expect(i,'precondition: the rail lists the added node in '+JSON.stringify(labels)).toBeGreaterThanOrEqual(0);
   await items(host).nth(i).click();await expect(items(host).nth(i)).toHaveAttribute('aria-current','true');
   await exerciseCrop(host,{inside:{before:['n11'],after:['n11','x']},far:['n0','n1'],all:IDS.concat(['x']),
-    changed:{before:null,after:['data-dv-node','x','added']},neighbour:['data-dv-node','n11'],ref:'n11',keep:{before:['n11'],after:['x']},ends:['n0','n11']});
+    changed:{before:null,after:['data-dv-node','x','added']},neighbour:['data-dv-node','n11'],ref:'n11',keep:{before:['n11'],after:['x']},ends:{before:['n0','n11'],after:['n0','x']}});
 });

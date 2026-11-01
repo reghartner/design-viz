@@ -55,8 +55,11 @@ async function standalonePage(server,name,body){
   /* The injected viewer page ends without a closing body tag; append the fixture at the end then. */
   const close=html.lastIndexOf('</body>'),at=close>=0?close:html.length;
   await writeFile(path.join(server.root,name+'.html'),html.slice(0,at)+`<div id="compare-host" style="position:fixed;inset:0 0 48px 0;z-index:9999;background:#fff"></div>
-<div style="position:fixed;left:0;right:0;bottom:0;height:48px;z-index:10000;background:#eee"><button id="cv-prev">Previous</button><button id="cv-next">Next</button><button id="cv-destroy">Destroy</button></div>
-<script>window.addEventListener('load',function(){${body}
+<div style="position:fixed;left:0;right:0;bottom:0;height:48px;z-index:10000;background:#eee"><button id="cv-prev">Previous</button><button id="cv-next">Next</button><button id="cv-one">cv-one</button><button id="cv-two">cv-two</button><button id="cv-destroy">Destroy</button></div>
+<script>window.addEventListener('load',function(){
+  /* Before #848 lands there is no entry point: leave the page empty so each test fails on its own first assertion. */
+  if(!window.FlowviewCompare)return;
+  ${body}
   document.getElementById('cv-prev').addEventListener('click',function(){view.previous();});
   document.getElementById('cv-next').addEventListener('click',function(){view.next();});
   document.getElementById('cv-destroy').addEventListener('click',function(){view.destroy();});
@@ -125,8 +128,8 @@ test('V8b mounting both panes takes at most 2x mounting one pane',async({page,se
   await standalonePage(server,name,`var a=FlowviewCompare.normalize(${JSON.stringify(current)}),b=FlowviewCompare.normalize(${JSON.stringify(proposed)});
   var entries=FlowviewCompare.compare({authored:a,resolved:a,ledger:null},{authored:b,resolved:b,ledger:null}),view=null,host=document.getElementById('compare-host');
   function mount(single){if(view)view.destroy();view=FlowviewCompare.mount(host,{before:single?null:a,after:b,entries:entries,mode:'full'});}
-  var bar=document.getElementById('cv-destroy').parentNode;
-  [['cv-one',true],['cv-two',false]].forEach(function(p){var btn=document.createElement('button');btn.id=p[0];btn.textContent=p[0];btn.addEventListener('click',function(){mount(p[1]);});bar.appendChild(btn);});
+  document.getElementById('cv-one').addEventListener('click',function(){mount(true);});
+  document.getElementById('cv-two').addEventListener('click',function(){mount(false);});
   view={previous:function(){},next:function(){},destroy:function(){}};`);
   await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/'+name+'.html');
   const host=page.locator('#compare-host');

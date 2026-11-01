@@ -129,7 +129,7 @@ function mountCompareView(host, opts){
       var p = panes[side];
       p.ctl = compareViewTrack(renderPage(view, pages[side], typeof skin === 'function' ? skin(pages[side]) : skin || pages[side].skin, null, {autoplay:false}));
       if (typeof initViewerExploreCanvas === 'function') p.canvas = compareViewTrack(initViewerExploreCanvas(p.ctl, view, {container:scroll, initialContentsOpen:false,
-        presentation:{panelsHiddenWhenGraphVisible:false, overlayScale:.5}, forceFit:true, refitOnResize:true, fitInsets:{left:24, right:24, top:20, bottom:24}}));
+        presentation:{panelsHiddenWhenGraphVisible:false, overlayScale:.5}, forceFit:true, refitOnResize:false, fitInsets:{left:24, right:24, top:20, bottom:24}}));
     }catch(ex){ view.textContent = 'Could not render this side: ' + ex.message; }
   }); });
   decorate();
@@ -179,7 +179,7 @@ function mountCompareView(host, opts){
     var win = doc.defaultView;
     if (win && win.requestAnimationFrame) win.requestAnimationFrame(function(){ win.requestAnimationFrame(apply); });
   }
-  function navigate(side, entry){
+  function navigate(side, entry, viewId){
     var p = panes[side], t = target(entry, side);
     if (!p.ctl || !t) return {side:side, shown:false};
     var rec = (p.ctl.sections || []).find(function(r){ return r.number === t.section + 1; }), visible = true;
@@ -187,7 +187,10 @@ function mountCompareView(host, opts){
     if (rec.tabBlock && p.ctl.tabBlocks && p.ctl.tabBlocks[rec.tabBlock - 1]) p.ctl.tabBlocks[rec.tabBlock - 1].select(rec.tab, false);
     if (p.ctl.details) p.ctl.details.close(true);
     if (t.kind === 'view' && p.ctl.views){ var owner = p.ctl.views.owner(rec); visible = !!(t.id && p.ctl.views.select(rec, t.id, undefined, true)); if (visible && owner && owner.selected) rec = owner.selected; }
-    else if (p.ctl.views) visible = p.ctl.views.ensure(rec, undefined, true);
+    else if (p.ctl.views){
+      /* One-way sync: open the View the After pane shows, when this side has it. */
+      visible = !!(viewId && p.ctl.views.ensure(rec, viewId, true)) || p.ctl.views.ensure(rec, undefined, true);
+    }
     if (!visible) return {side:side, shown:false, reason:'view'};
     if (t.kind === 'layout' && t.id && rec.presentation){ if (!(p.ctl.views && p.ctl.views.ensure(rec, t.id, true))) rec.presentation.setView(t.id); }
     if (t.kind === 'step' && rec.stepper && t.key != null) visible = rec.stepper.jumpSource(Number(t.key)) && visible;
@@ -205,14 +208,16 @@ function mountCompareView(host, opts){
     });
     if (object) frame(p.ctl, object, t);
     else if (rec.sectionEl && rec.sectionEl.scrollIntoView && (!rec.viewport || !rec.viewport.isExplore())) rec.sectionEl.scrollIntoView({block:'start'});
-    return {side:side, shown:true, object:!!object, visible:visible};
+    var shownView = p.ctl.views && p.ctl.views.current ? p.ctl.views.current(rec) : null;
+    return {side:side, shown:true, object:!!object, visible:visible, view:shownView && shownView.id || null};
   }
   function select(index, initial){
     if (destroyed || !entries.length) return null;
     selected = ((index % entries.length) + entries.length) % entries.length;
     buttons.forEach(function(b, i){ if (b) b.setAttribute('aria-current', String(i === selected)); });
     if (buttons[selected] && buttons[selected].scrollIntoView) buttons[selected].scrollIntoView({block:'nearest'});
-    var entry = entries[selected], result = {before:navigate('before', entry), after:navigate('after', entry), label:compareEntryLabel(entry, pages), initial:!!initial};
+    var entry = entries[selected], after = navigate('after', entry), before = navigate('before', entry, after.view);
+    var result = {before:before, after:after, label:compareEntryLabel(entry, pages), initial:!!initial};
     decorate();
     if (opts.onSelect) opts.onSelect(entry, selected, result);
     return result;

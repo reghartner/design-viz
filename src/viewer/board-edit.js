@@ -1,7 +1,8 @@
 /* Shared-board Edit mode (#828, design #825). A tracked board published as
    index.html + flowspec.json lets people with edit access add a ticket to a node
-   or edge (drag a Tickets row) and remove one authored there (carrier popover),
-   then Save publishes flowspec.json through the artifact runtime.
+   or edge (drag a Tickets row), remove one authored there and clear a Missing
+   work marker set on this board (carrier popover, #855), then Save publishes
+   flowspec.json through the artifact runtime.
 
    The editor outlives every render: it keeps the exact authored text the page
    booted from and the pending operations, splices each operation into that text
@@ -60,7 +61,7 @@ function boardEditSamePrefix(path,prefix){return prefix.every(function(part,i){r
 
 function createBoardEditor(options){
   var win=options.win || window,text=options.text,base=text,context=options.context || null,fallback=options.fallback || null;
-  var ops=[],active=false,saving=false,readOnly=false,reloading=false,canEdit=false,artifact=null,user=null,notice=null,listeners=[],lastMap=null;
+  var ops=[],active=false,saving=false,readOnly=false,reloading=false,canEdit=false,artifact=null,user=null,notice=null,listeners=[],lastMap=null,question=null;
   var stashKey='flowview-board-edit:'+String(win.location && win.location.pathname || '')+':'+(options.specFile || 'flowspec.json');
 
   function changed(){listeners.slice().forEach(function(fn){try{fn();}catch(ex){}});}
@@ -104,8 +105,23 @@ function createBoardEditor(options){
     return out;
   }
   function authoredKeys(t){return t && t.local?trackingRefs(t.local).tickets:[];}
+  /* #855: a carrier's Missing work marker. Clearable when this board set it (the
+     local carrier, or the consumer overlay of an imported one); a marker the
+     provider also sets is inherited, as in the Workbench, and names its source. */
+  function marker(t){
+    if(!t)return null;
+    if(!t.imported)return t.local && t.local.missingWork===true?{clearable:true}:null;
+    var m=topologyTrackingTarget(text,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,context,t.index);if(m.error)return null;
+    if(m.inherited.missingWork)return {clearable:false,source:m.got.d.topologyImports[m.index].spec};
+    return m.local.missingWork?{clearable:true}:null;
+  }
   // The new text, or the same text when the operation changes nothing.
   function splice(source,t,op,ticket){
+    if(op==='clear-missing-work'){
+      if(t.imported){var cleared=planTopologyTracking(source,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,'missingWork',true,true,context,t.index);return cleared.error?null:cleared.text;}
+      var removed=jsonSetField(source,t.path,'missingWork',null);
+      return removed?removed.text:null;
+    }
     if(t.imported){
       var plan=planTopologyTracking(source,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,'tickets',ticket,op==='remove',context,t.index);
       return plan.error?null:plan.text;
@@ -120,22 +136,25 @@ function createBoardEditor(options){
     return result?result.text:null;
   }
   function record(t,op,ticket){
-    var entry={op:op,ticket:ticket,path:t.path.slice(),label:t.label};
+    var entry={op:op};if(ticket!=null)entry.ticket=ticket;entry.path=t.path.slice();entry.label=t.label;
     if(t.kind==='node')entry.node=t.node;else entry.edge=t.edge.slice();
     return entry;
   }
-  function apply(op,ref,ticket){
+  // `ask`: the post-drop question to raise once the change has rendered (#855).
+  function apply(op,ref,ticket,ask){
     if(!active || saving || readOnly)return false;
     var t=target(text,ref);if(!t)return false;
     if(op==='remove' && authoredKeys(t).indexOf(ticket)<0)return false;
+    if(op==='clear-missing-work'){var m=marker(t);if(!m || !m.clearable)return false;}
     var next=splice(text,t,op,ticket);
     if(next==null || next===text)return false;
     if(!render(next))return false;
     var entry=record(t,op,ticket),chain=boardEditChain(t.raw,t.path);
-    // An operation that undoes a pending one cancels it.
-    var inverse=ops.findIndex(function(o){return o.ticket===ticket && o.op!==op && JSON.stringify(o.path)===JSON.stringify(entry.path);});
+    // An operation that undoes a pending one cancels it. A clear has no inverse here.
+    var inverse=op==='clear-missing-work'?-1:ops.findIndex(function(o){return o.ticket===ticket && o.op!==op && JSON.stringify(o.path)===JSON.stringify(entry.path);});
     if(inverse>=0)ops.splice(inverse,1);
     else ops.push({entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind});
+    question=ask || null;
     changed();return true;
   }
   function render(next){
@@ -164,13 +183,16 @@ function createBoardEditor(options){
     var applied=0,dropped=[];
     saved.ops.forEach(function(op){
       var entry=op && op.entry;if(!entry)return;
-      var describe=entry.ticket+' '+(entry.op==='add'?'on ':'off ')+(entry.label || entry.node || (entry.edge || []).join(' → '));
+      var where=entry.label || entry.node || (entry.edge || []).join(' → ');
+      var describe=entry.op==='clear-missing-work'?'Missing work cleared from '+where:entry.ticket+' '+(entry.op==='add'?'on ':'off ')+where;
       var raw=parsed(text),paths=op.replayable?boardEditResolveChain(raw,op.chain):[];
       var ref=paths.length===1?refFor(raw,paths[0],op.kind,entry):null;
       if(!ref){dropped.push(describe);return;}
       active=true;
       var before=text;
       if(!apply(entry.op,ref,entry.ticket) && text===before){
+        // A clear with no marker of this board's left to clear is dropped (#855).
+        if(entry.op==='clear-missing-work'){dropped.push(describe);return;}
         // Already true in the winning version: nothing left to do for it.
         var t=target(text,ref);var has=t && authoredKeys(t).indexOf(entry.ticket)>=0;
         if(t && ((entry.op==='add')===has))applied++;else dropped.push(describe);
@@ -212,21 +234,28 @@ function createBoardEditor(options){
     },
     onChange:function(fn){listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
     start:function(){if(!canEdit || !artifact || fallback || readOnly || active)return;active=true;notice=null;changed();},
-    done:function(){if(!active || ops.length || saving)return;active=false;changed();},
-    add:function(ref,ticket){return apply('add',ref,ticket);},
+    done:function(){if(!active || ops.length || saving)return;active=false;question=null;changed();},
+    /* A drop that adds a ticket to a carrier with a clearable Missing work marker
+       asks whether the ticket covers it (#855); the answer is never automatic. */
+    add:function(ref,ticket){var m=null;try{m=marker(target(text,ref));}catch(ex){m=null;}return apply('add',ref,ticket,m && m.clearable?{ref:ref,ticket:ticket}:null);},
     remove:function(ref,ticket){return apply('remove',ref,ticket);},
+    clearMissingWork:function(ref){return apply('clear-missing-work',ref);},
+    // {clearable:true} for a marker set on this board, {clearable:false, source} for a provider-inherited one, else null.
+    missingWork:function(ref){if(!active || readOnly)return null;try{return marker(target(text,ref));}catch(ex){return null;}},
+    question:function(){return active && !readOnly && question?{ref:question.ref,ticket:question.ticket}:null;},
+    endQuestion:function(){question=null;},
     // Tickets authored on this carrier itself: local tickets, or the consumer
     // overlay's for an imported one. Provider-inherited and availability rows are not.
     removable:function(ref){if(!active || readOnly)return [];try{return authoredKeys(target(text,ref));}catch(ex){return [];}},
     discard:function(){
       if(!ops.length || saving)return;
-      ops=[];active=false;notice=null;
+      ops=[];active=false;notice=null;question=null;
       if(!render(base))text=base;
       changed();
     },
     save:function(){
       if(!ops.length || saving || readOnly || fallback || !artifact)return;
-      saving=true;notice=null;changed();
+      saving=true;notice=null;question=null;changed();
       var changes=ops.map(function(op){return op.entry;});
       Promise.resolve(user && user.me ? user.me() : null).then(function(me){
         var by={};if(me && typeof me.id==='string' && me.id)by.id=me.id;if(me && typeof me.name==='string' && me.name)by.name=me.name;

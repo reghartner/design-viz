@@ -1,6 +1,6 @@
 ---
 name: live-status-board
-description: Author a Flowview live-status board (an "Epic Status board"), a diagram whose nodes and edges carry Jira ticket keys and paint themselves from live Jira state (grey to do, amber in progress, green done, red blocked or missing) when opened as a claude.ai artifact with the viewer's Atlassian connector. Load only when the request explicitly asks for live Jira status, an Epic Status board, or ticket tracking on the diagram; a delivery or cross-team diagram without that ask, and all plain Flowview authoring, stays on hld-to-page.
+description: Author a Flowview live-status board (an "Epic Status board"), a diagram whose nodes and edges carry Jira ticket keys and paint themselves from live Jira state (grey to do, blue in progress, green done, red blocked or missing) when opened as a claude.ai artifact with the viewer's Atlassian connector. Load only when the request explicitly asks for live Jira status, an Epic Status board, or ticket tracking on the diagram; a delivery or cross-team diagram without that ask, and all plain Flowview authoring, stays on hld-to-page.
 ---
 
 # Live-status board
@@ -272,7 +272,7 @@ What the viewer sees on first open: a dialog "This artifact uses connectors"
 listing the connector with a toggle and Continue. After Continue the Live status panel header
 may read "Jira did not answer; retrying" for a few seconds on a cold start;
 the retry is automatic. Then the header's connector indicator reads
-"Jira connected, refreshed just now", the state counts fill in, and the body's
+"Jira connected, refreshed <local time>", the state counts fill in, and the body's
 ring shows carriers done.
 
 Republishing: pass the artifact's existing URL as `url` on the publish call,

@@ -318,7 +318,11 @@ malformed transient containers instead of repairing them implicitly.
 ### Experimental Standard-section sizing
 
 `layout.sectionSizing` is optional metadata for the offline panel-placement
-experiment. Existing renderer/editor/preset behavior does not consume it.
+experiment. Existing renderer/editor/preset behavior does not consume it, with
+one exception: `height: 'content'` makes the Standard renderer grow the type's
+tile to its content in whole rows, never below the authored height, and push the
+tiles below it down. The saved arrangement is unchanged. Epic status
+(`live-status`) declares it.
 Widths (`minWidth`, `preferredWidth`, `maxWidth`) are native CSS pixels before
 host scaling. `grow` permits residual row width distribution; zero preserves
 fixed-body width. `aspectPolicy` is `fixed`, `intrinsic`, or `content`.

@@ -6,6 +6,13 @@
 {{STYLE_PAGE}}
 {{STYLE_CORE}}
 </style>
+<script>
+/* Hide the page while the Workbench script at the end runs; until then the markup shows both
+   Home and the editor toolbar unstyled. The block after that script shows the page when it
+   finishes or throws (a failed start stays visible instead of blank). Without scripts the
+   class is never set. */
+document.documentElement.classList.add('workbench-booting');
+</script>
 
 {{ICONS}}
 
@@ -67,6 +74,7 @@
       </div>
       <button type="button" class="welcome-resume" id="welcome-resume" hidden><span class="welcome-resume-icon" aria-hidden="true">↶</span><span><strong id="welcome-resume-title">Resume your draft</strong><span id="welcome-resume-detail"></span></span><span aria-hidden="true">Continue →</span></button>
       <button type="button" class="welcome-library-entry" id="welcome-library"{{WORKBENCH_LIBRARY_HIDDEN}}><span><b>Browse diagrams</b><span>Browse the published stories. Open read-only, edit when you choose.</span></span><span aria-hidden="true">→</span></button>
+      <div class="welcome-library-entry welcome-live-status" id="welcome-live-status" hidden><span><svg class="welcome-live-status-art" viewBox="0 0 300 117" aria-hidden="true" focusable="false"><rect x="18" y="12" width="168" height="74" rx="7" fill="#fff" stroke="#c9c2dc"/><path d="M56 34h34M122 34h24M134 43v19" stroke="#bfb8d3" stroke-width="1.5" stroke-dasharray="3 3" fill="none"/><rect x="28" y="25" width="28" height="18" rx="4" fill="#dcefd6" stroke="#93c788" stroke-width="1.4"/><rect x="90" y="25" width="32" height="18" rx="4" fill="#d6e9fb" stroke="#6fb2ea" stroke-width="1.6"/><rect x="146" y="25" width="30" height="18" rx="4" fill="#f1f3f8" stroke="#b6bfd2" stroke-dasharray="3 2"/><rect x="119" y="62" width="30" height="18" rx="4" fill="#f8e1e1" stroke="#e09a9a" stroke-width="1.4"/><rect x="18" y="92" width="168" height="15" rx="7.5" fill="#fff" stroke="#d6d1e6"/><circle cx="34" cy="99.5" r="4" fill="#93c788"/><circle cx="52" cy="99.5" r="4" fill="#93c788"/><circle cx="70" cy="99.5" r="4" fill="#6fb2ea"/><circle cx="88" cy="99.5" r="4" fill="#e09a9a"/><circle cx="106" cy="99.5" r="4" fill="#c4cad8"/><path d="M120 99.5h56" stroke="#e1ddeb" stroke-width="3" stroke-linecap="round"/><rect x="196" y="12" width="88" height="58" rx="7" fill="#fff" stroke="#c9c2dc"/><circle cx="211" cy="28" r="8" fill="none" stroke="#e6e3ef" stroke-width="3"/><path d="M211 20a8 8 0 0 1 7.6 10.5" fill="none" stroke="#93c788" stroke-width="3"/><path d="M224 25h50M224 31h34" stroke="#e1dceb" stroke-width="3" stroke-linecap="round"/><rect x="203" y="41" width="3" height="7" fill="#93c788"/><path d="M210 44.5h44" stroke="#e8e5ef" stroke-width="3"/><rect x="258" y="42" width="18" height="5" rx="2.5" fill="#dcefd6"/><rect x="203" y="51" width="3" height="7" fill="#6fb2ea"/><path d="M210 54.5h44" stroke="#e8e5ef" stroke-width="3"/><rect x="258" y="52" width="18" height="5" rx="2.5" fill="#d6e9fb"/><rect x="203" y="61" width="3" height="5" fill="#e09a9a"/><path d="M210 63.5h44" stroke="#e8e5ef" stroke-width="3"/><rect x="196" y="76" width="88" height="31" rx="7" fill="#fff" stroke="#c9c2dc"/><path d="M204 85h18m6 0h46M204 95h18m6 0h34" stroke="#e1dceb" stroke-width="3" stroke-linecap="round"/></svg><span><b>Live Feature Delivery Status Board</b><span>A living Claude Artifact which hydrates your diagram with live Jira ticket status, all sourced from a root Epic or Initiative.</span></span></span><a class="welcome-text-button" data-live-status-example target="_blank" rel="noopener noreferrer">Click here for an example <span aria-hidden="true">↗</span></a></div>
       <a id="welcome-gallery" class="welcome-text-button welcome-gallery-link" data-examples-gallery target="_blank" rel="noopener" hidden>Browse the examples gallery <span aria-hidden="true">↗</span></a>
       <details id="welcome-earlier-drafts" hidden><summary>Two most recent earlier drafts saved in this browser</summary><div id="welcome-earlier-list"></div>
         <div class="welcome-recovery-storage"><p id="welcome-recovery-storage"></p>
@@ -757,6 +765,14 @@ var WORKBENCH_CANON = {{WORKBENCH_CANON}};
 var WORKBENCH_ONBOARDING = {{WORKBENCH_ONBOARDING}};
 var WORKBENCH_LANDING = {{WORKBENCH_LANDING}};
 var WORKBENCH_EXAMPLES = {{WORKBENCH_EXAMPLES}};
+var WORKBENCH_LIVE_STATUS_EXAMPLE = {{WORKBENCH_LIVE_STATUS_EXAMPLE}};
 {{JS}}
+/* Show the page from inside this script too: the practice tour copies the document while
+   this script runs, before the block below exists, so its copy relies on this line. */
+document.documentElement.classList.remove('workbench-booting');
 })();
+</script>
+<script>
+/* A separate block, so the page is shown even when the Workbench script above throws. */
+document.documentElement.classList.remove('workbench-booting');
 </script>

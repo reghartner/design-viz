@@ -160,18 +160,20 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   var hasTickets=Object.keys(demoMap).length>0;
   var demoOn=hasTickets && !!(saved && saved.demoLiveStatus);
   var renderOptions={autoplay:false,authoring:true,layoutTarget:'default'};
-  if(demoOn)renderOptions.liveStatus={provider:function(){return Promise.resolve(demoMap);}};
-  var ctl = renderPage(view, display, skin, null, renderOptions);
-  ctl.demoLiveStatus=demoOn;
   if(demoOn){
     var demoDay=0,initialDemo=JSON.parse(JSON.stringify(demoMap)),demoStates=['todo','active','done','blocked'];
-    function paintDemo(){
-      Object.keys(initialDemo).forEach(function(key){demoMap[key]=Object.assign({},initialDemo[key],{state:demoStates[(demoStates.indexOf(initialDemo[key].state)+demoDay)%demoStates.length]});});
-      ctl.liveStatus.apply(demoMap);ctl.liveStatus.note('Demo day '+(demoDay+1),'info');
-      ctl.liveStatus.setDemoControls({playing:false,manual:true,ended:demoDay===3,toggle:function(){},next:function(){if(demoDay<3){demoDay++;paintDemo();}}});
-    }
-    paintDemo();
+    // A demo mount, as the reader's #live=demo uses, makes the connection read "Demo" instead of "Host connected" (#863).
+    renderOptions.liveStatus={provider:function(){return Promise.resolve(demoMap);},demo:{mount:function(live){
+      function paintDemo(){
+        Object.keys(initialDemo).forEach(function(key){demoMap[key]=Object.assign({},initialDemo[key],{state:demoStates[(demoStates.indexOf(initialDemo[key].state)+demoDay)%demoStates.length]});});
+        live.apply(demoMap);live.note('Demo day '+(demoDay+1),'info');
+        live.setDemoControls({playing:false,manual:true,ended:demoDay===3,toggle:function(){},next:function(){if(demoDay<3){demoDay++;paintDemo();}}});
+      }
+      paintDemo();
+    }}};
   }
+  var ctl = renderPage(view, display, skin, null, renderOptions);
+  ctl.demoLiveStatus=demoOn;
   var demoLabel=null,demoInput=null;
   function changeDemo(){if(lifecycle && lifecycle.demoLiveStatus)lifecycle.demoLiveStatus(demoInput.checked);}
   var doc=view.ownerDocument,previewButton=doc && doc.getElementById('open-page-preview');
@@ -297,15 +299,18 @@ function createWorkbenchPreviewController(opts){
       });
     }
   }
+  /* The Demo live status checkbox and a built-in template that opens with the
+     demo on (#865) share this one path. Demo state is preview state only. */
+  function setDemoLiveStatus(on){
+    if(!ctl || !page)return;
+    ctl.demoLiveStatus=on;
+    replace(page,renderedText,opts.skin(page),{origin:'demo-live-status'});
+  }
   function rebuild(next,text,skin,request){
     var replaced=false,previousPage=request.origin==='project' || request.origin==='import' ? null : page,previousCtl=ctl;
     try{
       var nextCtl=renderWorkbenchPreview(opts.view,next,skin,previousPage,previousCtl,{
-        demoLiveStatus:function(on){
-          if(!ctl || !page)return;
-          ctl.demoLiveStatus=on;
-          replace(page,renderedText,opts.skin(page),{origin:'demo-live-status'});
-        },
+        demoLiveStatus:setDemoLiveStatus,
         arrangementSection:opts.arrangementSection?opts.arrangementSection(request,next,page):null,
         beforeReplace:function(){
           if(opts.beforeReplace)opts.beforeReplace(request);
@@ -381,7 +386,7 @@ function createWorkbenchPreviewController(opts){
       if(!page)return {ok:false,replaced:false,text:renderedText,reason:'missing',origin:'skin'};
       return replace(page,renderedText,skin,{origin:'skin'});
     },
-    forgetDocument:function(){page=null;},
+    forgetDocument:function(){page=null;},setDemoLiveStatus:setDemoLiveStatus,
     controller:function(){return ctl;},page:function(){return page;},renderedText:function(){return renderedText;}
   };
 }

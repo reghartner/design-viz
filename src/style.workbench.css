@@ -23,6 +23,11 @@
   --accent:#43C8E0; --card:#151A21; --codebg:#12161C; --codeink:#B9C2CE;
   --selglow:rgba(67,200,224,.32);
 }
+/* While the Workbench script runs, paint nothing: the static markup holds both Home and the
+   editor toolbar, and neither is styled for its final state yet (#860). The practice tour
+   copy has its own startup concealment (workbenchPracticeSource), and its lessons measure
+   controls during boot, so this rule leaves it alone. */
+html.workbench-booting:not([data-flowview-practice]) body{visibility:hidden;}
 /* The welcome surface has its own quiet palette; project skins remain in the editor. */
 body.welcome-active{background:#f7f8fc;margin:0;}
 .workbench-header{display:flex;align-items:center;justify-content:space-between;max-width:1676px;margin:auto;padding:21px 30px;border-bottom:1px solid var(--line);gap:20px;}
@@ -148,6 +153,7 @@ body.welcome-active{background:#f7f8fc;margin:0;}
 .welcome-template-meta{display:block;color:#7c8497;font:9px 'IBM Plex Mono',monospace;border-top:1px solid #ececf3;padding-top:11px;margin-top:14px;}
 .welcome-template-card[data-category="business"] .welcome-template-art{background:#f8f0e9;}
 .welcome-template-card[data-category="devices"] .welcome-template-art{background:#edf4f0;}
+.welcome-template-card[data-category="delivery"] .welcome-template-art{background:#ecf2f9;}
 .welcome-template-card.welcome-blank{border-style:dashed;border-color:#bab2d2;background:#fdfcfe;}
 .welcome-blank .welcome-template-art{background:#f7f5fb;}
 .welcome-blank .welcome-template-art>span{z-index:1;background:#fdfcfe;color:#9888bc;display:grid;place-items:center;width:48px;height:48px;border:1px dashed #bdb4d0;border-radius:12px;font-size:30px;font-weight:400;}
@@ -1257,6 +1263,12 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 @media(min-width:761px) and (max-width:1100px){.welcome-actions:has(> #welcome-catalog[hidden])>.welcome-action:last-child{grid-column:1/-1}}
 @media(min-width:1101px){.welcome-actions:has(> #welcome-catalog[hidden]){grid-template-columns:repeat(3,minmax(0,1fr))}}
 .welcome-library-entry>span:first-child{display:flex;align-items:baseline;gap:20px}.welcome-library-entry b{font-size:16px}.welcome-library-entry span span{font-size:13px;color:#667084}
+/* The site-configured live status board example ("liveStatusExample", tools/build.py) under
+   Browse diagrams: the same row, but only its link acts. */
+.welcome-live-status{background:#fff;border-color:#cfc9e6;cursor:default}
+.welcome-live-status>span:first-child{align-items:center;gap:22px}.welcome-live-status-art{display:block;flex:none;width:150px;height:59px}
+.welcome-live-status b{display:block;font:600 17px 'Sora',sans-serif;letter-spacing:-.3px;color:#2b2f45}.welcome-live-status b+span{display:block;margin-top:6px;font-size:12px;line-height:1.55;color:#6b7186}
+.welcome-live-status>a{flex:none;text-decoration:none}
 .welcome:has(#welcome-library-screen:not([hidden])){max-width:1280px;padding-top:22px}
 #welcome-library-screen .welcome-back{margin-bottom:12px}
 .library-heading{display:flex;justify-content:space-between;align-items:center;gap:24px;margin-bottom:24px}

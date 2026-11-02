@@ -71,6 +71,22 @@ test('L8 rework the panel reference is extractable by widget_doc and publishing 
  assert.match(skill,/After Continue the Live status panel header/);assert.doesNotMatch(skill,/Live chip/);
 });
 
+/* #863 V2 color words (the rendered prose is also checked in tools/browser-tests/tests/live-status.spec.mjs):
+| row | element | fixture | assertion | broken implementation it rejects |
+|---|---|---|---|---|
+| V2a | live-status-board skill description | .claude/skills/live-status-board/SKILL.md frontmatter | names "blue in progress", never amber or orange | keeping "amber in progress" |
+| V2b | worked example prose, source and built page | examples/live-status/live-status.spec.json first section paragraph; examples/live-status/live-status.html | names "blue in progress", never amber or orange | fixing only one of the two files |
+The reference is the default active paint, --dv-live-active #009dff (commit 2f685821). */
+test('#863 V2 the skill description and worked example name the rendered blue for in progress',()=>{
+ assert.match(fs.readFileSync('src/style.core.css','utf8'),/--dv-live-active:#009dff;/);
+ const description=/^description: (.*)$/m.exec(fs.readFileSync('.claude/skills/live-status-board/SKILL.md','utf8'))[1];
+ assert.match(description,/\bblue in progress\b/);assert.doesNotMatch(description,/\b(amber|orange)\b/i);
+ const prose=JSON.parse(fs.readFileSync('examples/live-status/live-status.spec.json','utf8')).page.sections[0].text[0];
+ assert.match(prose,/\bblue in progress\b/);assert.doesNotMatch(prose,/\b(amber|orange)\b/i);
+ const built=fs.readFileSync('examples/live-status/live-status.html','utf8');
+ assert.ok(built.includes(prose),'the built example carries the same prose');
+});
+
 test('import-local ticket refs participate in live-status panel warnings before provider resolution',()=>{
  for(const field of ['nodeTracking','edgeTracking']){
   const raw={page:{sections:[{diagram:{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'canon',[field]:{[field==='nodeTracking'?'api':'api->db']:{tickets:['AA-1']}}}]}}]}};

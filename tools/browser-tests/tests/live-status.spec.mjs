@@ -849,6 +849,68 @@ test('R3 Workbench demo paint has no badges and a card click selects without the
  await expect(view.locator('path.edge[data-dv-edge="1"]')).toHaveClass(/\bdv-sel\b/);
 });
 
+/* #863 Epic status panel consistency contract matrix (desktop reader and Workbench; no phone layouts):
+| row | required state or element | fixture | scoped assertion | broken implementation it rejects |
+|---|---|---|---|---|
+| V1a | Live, First blocker, Play and Next day header buttons | worked example with #live=demo on day 4, in each selectable theme picked from the reader's Contents Theme menu | inside the Epic status section, every visible `.pt-live-status .reader-button` equals that section's `.playback-button` in computed border width, border style, border radius, background color, font family, font size and padding; a pressed toggle (Live) keeps the theme's pressed fill | browser-default buttons (2px outset, radius 0, #efefef); a fixed pastel pill that is wrong in Aurora, Blueprint and Terminal |
+| V1b | the connector action button (Allow Jira) | frozen fixture with the claude connector stub in approval mode | the visible action button equals the section's Play button on the same properties | styling only the demo and Live buttons |
+| V2 | in-progress color word in the worked example | worked example with #live=demo on day 2 | the section's first prose paragraph names "blue in progress" and no orange or amber while an active edge renders --dv-live-active blue (the skill description is checked in tests/live-status-panel.test.js) | leaving "orange in progress" |
+| V3 | Workbench Demo live status connection label | frozen fixture pasted into the Workbench, Demo live status checked, then Next day | the Epic status `.dv-live-connection` has data-state demo and its text starts with the source label "Demo", as the reader's #live=demo does (the refresh wording after the comma is not pinned) | the provider labelled "Host"; relabelling only the source while the state stays connected ("Demo connected") |
+*/
+test.describe('#863 Epic status panel consistency',()=>{
+ const sides=['Top','Right','Bottom','Left'];
+ const LOOK=[...sides.map(s=>'border'+s+'Width'),...sides.map(s=>'border'+s+'Style'),'borderTopLeftRadius','borderTopRightRadius','borderBottomRightRadius','borderBottomLeftRadius','backgroundColor','fontFamily','fontSize',...sides.map(s=>'padding'+s)];
+ // One read of the section's Play button and every visible Epic status header button.
+ const looks=section=>section.evaluate((sec,props)=>{
+  const read=el=>{const style=getComputedStyle(el);return Object.fromEntries(props.map(p=>[p,style[p]]));};
+  const shown=el=>el.getClientRects().length>0,plays=[...sec.querySelectorAll('.playback-button')].filter(shown),buttons=[...sec.querySelectorAll('.pt-live-status .reader-button')].filter(shown);
+  return {plays:plays.length,play:plays.length===1?read(plays[0]):null,buttons:buttons.map(el=>({name:el.textContent.trim(),pressed:el.getAttribute('aria-pressed')==='true',look:read(el)}))};
+ },LOOK);
+ const differences=result=>result.buttons.flatMap(b=>LOOK.filter(p=>!(p==='backgroundColor' && b.pressed) && b.look[p]!==result.play[p]).map(p=>b.name+' '+p+': '+b.look[p]+' vs Play '+result.play[p]));
+ test('V1 desktop demo header buttons match the section Play button in every reader theme',async({page,server})=>{
+  const root=await openStory(page,server),panel=root.locator('.pt-live-status'),section=root.locator('.doc-sec').filter({has:panel});
+  await expect(section).toHaveCount(1);await demoDay(root,4);await expect(panel.getByRole('button',{name:'First blocker',exact:true})).toBeVisible();
+  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','First blocker','Play','Next day']);
+  // Contrasting precondition: the reference is the default theme's pill, not a browser default.
+  expect(first.play).toMatchObject({borderTopStyle:'solid',borderTopWidth:'1px',borderTopLeftRadius:'999px'});
+  const toggle=root.locator('.reader-top>button'),plays=new Set();
+  for(const skin of ['pastel','aurora','blueprint','terminal','rose','lavender','lilac']){
+   if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.click();
+   await root.locator('.reader-theme-menu>summary').click();await root.locator('[data-reader-skin="'+skin+'"]').click();
+   await expect(root).toHaveClass(new RegExp('(^|\\s)sk-'+skin+'(\\s|$)'));await page.mouse.move(0,0);
+   // Theme transitions settle on both buttons before they are compared.
+   await expect.poll(async()=>differences(await looks(section)),{message:skin+' Epic status header buttons match Play'}).toEqual([]);
+   const settled=await looks(section);expect(settled.buttons.map(b=>b.name),skin).toEqual(['Live','First blocker','Play','Next day']);plays.add(JSON.stringify(settled.play));
+  }
+  expect(plays.size,'the themes give Play different looks').toBeGreaterThanOrEqual(4);
+ });
+ test('V1 desktop connector action button matches the section Play button',async({page,server})=>{
+  const {root}=await openClaude(page,server,'approval'),section=root.locator('#section-delivery'),panel=section.locator('.pt-live-status');
+  await expect(panel.getByRole('button',{name:'Allow Jira',exact:true})).toBeVisible();
+  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Allow Jira']);
+  expect(first.play).toMatchObject({borderTopStyle:'solid',borderTopWidth:'1px',borderTopLeftRadius:'999px'});
+  await expect.poll(async()=>differences(await looks(section)),{message:'Allow Jira matches Play'}).toEqual([]);
+ });
+ test('V2 desktop worked example prose names the rendered in-progress color',async({page,server})=>{
+  const root=await openStory(page,server),panel=root.locator('.pt-live-status'),section=root.locator('.doc-sec').filter({has:panel});
+  await demoDay(root,2);const edge=section.locator('path.edge[data-dv-edge="0"]');await expect(edge).toHaveClass(/dv-live-active/);await expect(edge).toHaveCSS('stroke',statusLine('active'));
+  const prose=section.locator('.sec-text[data-dv-para="0"]');await expect(prose).toContainText('blue in progress');await expect(prose).not.toContainText(/orange|amber/i);
+ });
+ test('V3 desktop Workbench Demo live status names its source Demo like the reader demo',async({page,server})=>{
+  const reader=await openStory(page,server),readerConnection=reader.locator('.pt-live-status .dv-live-connection');
+  await expect(readerConnection).toHaveAttribute('data-state','demo');await expect(readerConnection).toHaveText(/^Demo(?=,|$)/);
+  await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);
+  const panel=page.locator('#docview .pt-live-status'),connection=panel.locator('.dv-live-connection');
+  // Contrasting precondition: without demo data the panel has no connection line.
+  await expect(connection).toBeHidden();
+  await page.getByRole('checkbox',{name:'Demo live status',exact:true}).check();
+  await expect(connection).toBeVisible();await expect(connection).toHaveAttribute('data-state','demo');await expect(connection).toHaveText(/^Demo(?=,|$)/);
+  // A real Next day click comes after the preview provider has answered; the label stays Demo.
+  await panel.getByRole('button',{name:'Next day',exact:true}).click();await expect(panel.locator('.dv-live-note')).toHaveText('Demo day 2');
+  await expect(connection).toHaveAttribute('data-busy','false');await expect(connection).toHaveAttribute('data-state','demo');await expect(connection).toHaveText(/^Demo(?=,|$)/);
+ });
+});
+
 test('R4 desktop status multi-selection stays visible on local and imported nodes after focus and live updates',async({page,server},testInfo)=>{
  await page.setViewportSize({width:1600,height:1200});
  const root=path.join(server.root,'status-selection'),workbench=path.join(root,'workbench');await mkdir(workbench,{recursive:true});

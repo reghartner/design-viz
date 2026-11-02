@@ -60,7 +60,8 @@
                                                 then PR #7 (clicked in that order);      from-choice unchanged; after #7's: from-choice =  the row the user did not pick last
                                                                                        PR #7 row
                                                 release #8 first
-   P8   Show more while a page loads            150 extra PRs; hold the page-2 reply      Show more is disabled while page 2 loads; after   a second click that requests page 3 and
+   P8   Show more while a page loads            150 extra PRs; hold the page-2 reply;     Show more is disabled while page 2 loads; after   a second click that requests page 3 and
+                                                a forced second real click while held    release: no request for page 3 or later;
                                                                                        release: 152 rows, numbers #8, #7, #249..#100    drops page 2 (rows 101-152 unreachable)
    P9   Show more after a failed page           150 extra PRs; page 2 answers 500 once    alert shows the error, Show more enabled; retry   retry that skips the failed page
                                                                                        -> 152 rows, numbers #8, #7, #249..#100
@@ -411,7 +412,8 @@ test('P7: when two pull request rows are clicked, the later click chooses even i
 });
 
 test('P8: Show more is disabled while the next page loads, so no page is skipped',async({page,repo,open})=>{
-  let release=null;
+  let release=null;const pages=[];
+  page.on('request',r=>{const m=/\/api\/revisions\?.*page=(\d+)/.exec(r.url());if(m)pages.push(Number(m[1]));});
   await page.route(/\/api\/revisions\?.*page=2(&|$)/,async route=>{await new Promise(resolve=>{release=resolve;});await route.continue();});
   await open(ghStub(repo.c,{extra:150}));
   const dialog=await openPicker(page,'From');
@@ -422,11 +424,14 @@ test('P8: Show more is disabled while the next page loads, so no page is skipped
   await more.click();
   await expect.poll(()=>!!release).toBe(true);
   await expect(more).toBeDisabled();
+  /* A second real click while page 2 loads must not request another page. */
+  await more.click({force:true});
   release();
   await expect.poll(()=>options(dialog)).toHaveLength(152);
   const numbers=await dialog.getByRole('option').evaluateAll(els=>els.map(e=>[...e.querySelectorAll('[data-field="badge"]')].map(b=>b.textContent).find(t=>t.startsWith('PR #'))));
   expect(numbers).toEqual(['PR #8','PR #7',...Array.from({length:150},(_,i)=>'PR #'+(249-i))]);
   await expect(more).toHaveCount(0);
+  expect(pages.filter(n=>n>2)).toEqual([]);
 });
 
 test('B3: a revision chosen while Compare this commit is still looking up the parent is kept',async({page,repo,open})=>{

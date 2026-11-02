@@ -18,7 +18,8 @@
    CONTRACT MATRIX
    G1 revisions   tabs for flows/a.spec.json: document = commits whose first-parent diff changes it
                   (c7 c5 c3 c2 c1, newest first); all = every commit (c7..c1); branches = main, feature;
-                  tags = v1; prs = #7 and #8 from gh (with their head's branch/tag badges; a PR head
+                  tags = v1; prs = #7 and #8 from gh (with their head's branch and tag badges - a tag on #7's
+                  head is checked; a PR head
                   fetched as objects only decides "touches" by its own diff). Each row: full sha, 7-char short, ISO author
                   date, author, subject, branches (local and remote-tracking, sorted), tags, prs, touches (changes this document),
                   available (object present locally); search q filters rows; pages of <= 100
@@ -38,7 +39,8 @@
                   working-tree change) and the compare reads it              rejects: ref-creating fetch
    G6 read-only   status --porcelain=v2, HEAD, for-each-ref and the index hash are unchanged after
                   every call; fetch() changes only refs/remotes/origin/*, also when the repository
-                  configures another fetch refspec (+refs/heads/*:refs/custom/*)          rejects: any write
+                  configures another fetch refspec (+refs/heads/*:refs/custom/*), and it never changes the
+                  repository config (snapshots include a .git/config hash)          rejects: any write
    G8 non-ASCII   a document path with non-ASCII characters (flows/café.spec.json) gets its document-tab
                   and between rows                                  rejects: quoted paths from git log
    G7 status      status(): clone path, last fetch time (FETCH_HEAD mtime; null when there is none), gh
@@ -86,6 +88,10 @@ test('G1 revision tabs list dated, attributed rows with badges, search and pages
     assert.deepEqual(await rowsOf('prs'),[
       {sha:c.pr8,short:c.pr8.slice(0,7),date:'2026-01-08T12:00:00Z',author:'fork',subject:'Fork change',branches:[],tags:[],prs:[8],touches:false,available:false},
       {sha:c.c3,short:c.c3.slice(0,7),date:'2026-01-03T12:00:00Z',author:'carol',subject:'Feature step',branches:['feature','origin/feature'],tags:[],prs:[7],touches:true,available:true}],'pull requests from gh, newest update first, with the branch badges of their head');
+    /* A tag on PR #7's head appears as that PR row's tag badge. */
+    git(f.dir,['tag','pr-seven',c.c3]);
+    assert.deepEqual(plain((await r.revisions({doc:A,tab:'prs'})).rows[1].tags),['pr-seven']);
+    git(f.dir,['tag','-d','pr-seven']);
     /* Once fetched (objects only, on no ref), PR #8's head is available and its own diff decides "touches". */
     await r.resolve('pr:8');
     assert.deepEqual(plain((await r.revisions({doc:A,tab:'prs'})).rows[0]),
@@ -207,8 +213,10 @@ test('G6 every call is read-only; fetch changes only remote-tracking refs',async
     /* A repository-configured fetch refspec cannot make fetch write outside refs/remotes/origin/. */
     git(f.dir,['config','--add','remote.origin.fetch','+refs/heads/*:refs/custom/*']);
     git(f.other,['push','-q','origin','HEAD:refs/heads/second-remote']);
-    const beforeCustom=snapshot(f.dir);await r.fetch();
-    assert.deepEqual(refChanges(beforeCustom,snapshot(f.dir)),['refs/remotes/origin/second-remote'],'no refs/custom/* ref is written');
+    const beforeCustom=snapshot(f.dir);await r.fetch();const afterCustom=snapshot(f.dir);
+    assert.deepEqual(refChanges(beforeCustom,afterCustom),['refs/remotes/origin/second-remote'],'no refs/custom/* ref is written');
+    assert.equal(afterCustom.config,beforeCustom.config,'fetch does not change the repository config (the custom refspec stays)');
+    assert.deepEqual([afterCustom.head,afterCustom.index,afterCustom.status],[beforeCustom.head,beforeCustom.index,beforeCustom.status]);
     assert.ok((await r.revisions({doc:A,tab:'branches'})).rows.some(x=>x.branches.includes('origin/remote-only')),'the fetched branch is listed');
   }finally{await fs.rm(f.root,{recursive:true,force:true});}
 });

@@ -56,6 +56,7 @@ function snapshot(dir){
   const gitDir=path.join(dir,'.git');
   return {status:git(dir,['--no-optional-locks','status','--porcelain=v2','--branch']),head:git(dir,['rev-parse','HEAD']),refs:git(dir,['for-each-ref','--format=%(refname) %(objectname)']),
     index:crypto.createHash('sha256').update(fss.readFileSync(path.join(gitDir,'index'))).digest('hex'),
+    config:crypto.createHash('sha256').update(fss.readFileSync(path.join(gitDir,'config'))).digest('hex'),
     fetchHead:fss.existsSync(path.join(gitDir,'FETCH_HEAD'))?fss.readFileSync(path.join(gitDir,'FETCH_HEAD'),'utf8'):null};
 }
 /* Refs whose value was added, removed or changed between two snapshots. */

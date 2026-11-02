@@ -106,6 +106,9 @@
    A2   between list for all documents       same pair                               rows c7, c6, c5, c3, c2 (c4 changes README only)    between list still filtered to one file
    A3   imported-only change is listed       From c5, To c6                           rows [a "Edited · imported content", p Edited];     file-diff-only list (misses a)
                                                                                        a's rail [Imported node child::p2 · title]
+   A4   a document that cannot be loaded      commit edits a and adds broken.spec.json   after clicking broken: it is aria-current, the     the previous document's view left mounted
+                                             (not JSON); All changed documents, c7 ->   region is not busy, the note names the JSON error,  under the new selection
+                                             that commit; Compare, then click broken    no .compare-view, liveOwners() 0
    U2   untrusted text in the document list  commit with a hostile file name and       doc row path literal; rail labels and node text     innerHTML in the document list or rail
         and comparison                       node/section titles                      literal; no <img>/inline <script>; no __pwned
    AU   every test, context-wide (all pages): no page/console error, failed request, HTTP >= 400, or request outside the compare server
@@ -711,6 +714,32 @@ test('A3: a document whose imported provider changed is listed as edited althoug
   await expect.poll(()=>docRows(page)).toEqual([[A,'Edited · imported content'],[P,'Edited']]);
   await expect(docButton(page,A)).toHaveAttribute('aria-current','true');
   await expect(changeItems(page)).toHaveText(['Modified · Imported node child::p2 · title']);
+});
+
+test('A4: when the chosen document cannot be loaded, the previous comparison is removed and the error is shown',async({page,repo,open,errors})=>{
+  const {c}=repo,{writeFile,readFile}=await import('node:fs/promises');
+  const broken='flows/broken.spec.json';
+  const doc=JSON.parse(await readFile(path.join(repo.dir,A),'utf8'));doc.page.sections[0].diagram.nodes.a.title='Alpha eight';
+  await writeFile(path.join(repo.dir,A),JSON.stringify(doc,null,2)+'\n');await writeFile(path.join(repo.dir,broken),'{not json\n');
+  git(repo.dir,['add','--',A,broken]);
+  git(repo.dir,['commit','-q','-m','Broken spec'],{GIT_AUTHOR_DATE:'2026-01-08T10:00:00Z',GIT_COMMITTER_DATE:'2026-01-08T10:00:00Z'});
+  const head=git(repo.dir,['rev-parse','HEAD']);
+  errors.allow(400,/\/api\/compare\?(.*&)?doc=flows%2Fbroken\.spec\.json(&|$)/);
+  await open();
+  await allDocuments(page);
+  await choose(page,'From','All commits',c.c7);
+  await choose(page,'To','All commits',head);
+  await expect(compareButton(page)).toBeEnabled();
+  await compareButton(page).click();
+  await expect.poll(()=>docRows(page)).toEqual([[A,'Edited'],[broken,'Added']]);
+  await expect(changeItems(page)).toHaveText(['Modified · Node Alpha eight · title']);
+  expect(await liveOwners(page),'precondition: a view is mounted').toBeGreaterThan(0);
+  await docButton(page,broken).click();
+  await expect(docButton(page,broken)).toHaveAttribute('aria-current','true');
+  await expect(comparison(page)).not.toHaveAttribute('aria-busy','true');
+  await expect(comparison(page).locator('.note')).toContainText('not valid JSON');
+  await expect(views(page)).toHaveCount(0);
+  await expect.poll(()=>liveOwners(page)).toBe(0);
 });
 
 test('U2: document paths and node titles render literally in the document list and the comparison',async({page,repo,open})=>{

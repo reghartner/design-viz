@@ -92,6 +92,13 @@ normal size. This applies to the arrangement editor, page previews, and exported
 HTML; Explore keeps its independent canvas behavior and printing uses a readable
 stack. Maps fit their tiles; dense panels scroll internally. Diagram Auto / Fit
 width / Readable controls remain available.
+The Epic status panel (`live-status`) is the exception: in Standard its tile, and
+the section, grow to the panel's content in whole rows, so it has no inner scroll.
+The authored height is the minimum; when live data adds rows the tile grows again,
+and a tile below it in overlapping columns moves down. The saved arrangement keeps
+the authored height, which **Height** in the arrangement editor shows and edits;
+tiles show authored heights while you drag one. A panel type opts in with
+`layout.sectionSizing.height: 'content'` ([panel modularity](panel-modularity.md#experimental-standard-section-sizing)).
 Saved section arrangements are selected under **View → Arrangement for …**.
 Legacy `diagram.layouts` remain readable and retain their host profiles and
 geometry. The View membership reference selects an arrangement for its own

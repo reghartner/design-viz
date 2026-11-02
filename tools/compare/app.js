@@ -110,9 +110,9 @@
     more.setAttribute('aria-disabled', 'true');
     let out;
     try{ out = await api('/api/revisions?' + q({doc:state.doc, tab:state.tab, q:state.query, page:state.page})); }
-    catch(ex){ if (token === listToken){ error.textContent = ex.message; error.hidden = false; more.disabled = false; } return; }
+    catch(ex){ if (token === listToken){ error.textContent = ex.message; error.hidden = false; more.removeAttribute('aria-disabled'); } return; }
     if (token !== listToken) return;
-    more.disabled = false;
+    more.removeAttribute('aria-disabled');
     if (out.error){ error.textContent = out.error; error.hidden = false; } else error.hidden = true;
     list.append(...out.rows.map(rowNode));
     more.hidden = !(out.page < out.pages);

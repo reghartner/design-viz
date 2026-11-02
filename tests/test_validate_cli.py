@@ -4,6 +4,24 @@ Drives the real CLI via subprocess: broken fixtures must exit 1 with
 field-path errors, example specs must exit 0 with 0 errors, lint findings
 must fire on the seeded crowded fixture, and --quiet must suppress them.
 """
+# Issue #878 PR 1 contract matrix: the missing-provider error names its remedy.
+# Source: ticket #878 "How it should look" mode table and "Test + flip" test 1
+# (first and third cases); Chuck's ruling 2026-11-02: files passed together (no
+# connected-folder copy) gains the fix text naming both remedies with their exact
+# command forms; the --resolve-imports message is unchanged; import resolution and
+# exit codes are unchanged outside a connected folder.
+# Fixture "alias pair": write_alias_topology() = examples/canon/topology checkout
+# (page.blocks alias, imports platform export core) + platform provider.
+# Every assertion is scoped to the lines prefixed "<file>: " of the named spec.
+#
+# | row | fixture | assertion (scoped) | rejects |
+# |---|---|---|---|
+# | 1 provider supplied: resolves, no remedy (guard) | alias pair, both files passed | exit 0; "<consumer>: 0 errors" and "<provider>: 0 errors"; stdout names neither "--resolve-imports" nor "refresh-sources" | an impl that prints the remedy whenever a spec declares topology |
+# | 2 provider missing: error and exit unchanged | consumer passed alone | exit 1; "<consumer>: ERROR Topology checkout" with "missing spec platform"; "<consumer>: 1 errors, 0 warnings"; input bytes unchanged | an impl that replaces the topology error with the hint, counts the hint as a second error, or changes the exit code |
+# | 3 provider missing: names --resolve-imports (new) | consumer passed alone | a "<consumer>: " line contains "--resolve-imports <repository folder or registry>" | today's output; a paraphrase ("--resolve-imports <repo>"); a hint on stderr or without the file prefix |
+# | 4 provider missing: names refresh-sources (new) | consumer passed alone | a "<consumer>: " line contains "folder-agent.py refresh-sources --source-repo <repository>" | an impl naming only --resolve-imports; bare "refresh-sources" without the helper or --source-repo |
+# | 5 --resolve-imports, unlisted provider: message unchanged (guard) | alias pair + registry JSON listing only checkout; precondition: listing both resolves with 0 errors | exit 1; stderr empty; stdout lines exactly ["<consumer>: ERROR Topology import references missing spec platform in <registry>", "<consumer>: 1 errors, 0 warnings"]; input bytes unchanged | an impl that appends the files-passed-together remedy to every missing-spec error, or drops the registry path |
+# | 6 connected-folder copy mode, its out-of-date / not-live / oversize / copy-location cases (ticket test 1 other cases, 1b-1e, 2-5) | — | — | excluded — §0 ruling: "you do PR 1 only now ... PR 2 (the provider copy) comes later" |
 import pathlib
 import json
 import shutil
@@ -37,6 +55,30 @@ def run_cli(*args):
         ["node", str(CLI), *args],
         capture_output=True, text=True, cwd=ROOT,
     )
+
+
+# The two remedies a files-passed-together missing-provider error names (#878).
+MISSING_PROVIDER_REMEDIES = (
+    "--resolve-imports <repository folder or registry>",
+    "folder-agent.py refresh-sources --source-repo <repository>",
+)
+
+
+def write_alias_topology(temp):
+    """Both-alias consumer (page.blocks) and its provider, written into temp."""
+    consumer = temp / "checkout.json"
+    provider = temp / "platform.json"
+    consumer_raw = json.loads((TOPOLOGY / "checkout.json").read_text())
+    consumer_raw["page"]["blocks"] = consumer_raw["page"]["sections"]
+    consumer_raw["page"]["sections"] = []
+    consumer.write_text(json.dumps(consumer_raw))
+    shutil.copyfile(TOPOLOGY / "platform.json", provider)
+    return consumer, provider
+
+
+def file_lines(stdout, file):
+    """The output lines that belong to one input file."""
+    return [line for line in stdout.splitlines() if line.startswith(f"{file}: ")]
 
 
 @unittest.skipUnless(shutil.which("node"), "node not available")
@@ -110,26 +152,60 @@ class ValidateCliTest(unittest.TestCase):
 
     def test_both_alias_topology_batch_resolves_and_missing_provider_fails(self):
         with tempfile.TemporaryDirectory() as temp:
-            temp = pathlib.Path(temp)
-            consumer = temp / "checkout.json"
-            provider = temp / "platform.json"
-            consumer_raw = json.loads((TOPOLOGY / "checkout.json").read_text())
-            consumer_raw["page"]["blocks"] = consumer_raw["page"]["sections"]
-            consumer_raw["page"]["sections"] = []
-            consumer.write_text(json.dumps(consumer_raw))
-            shutil.copyfile(TOPOLOGY / "platform.json", provider)
+            consumer, provider = write_alias_topology(pathlib.Path(temp))
             before = (consumer.read_bytes(), provider.read_bytes())
 
+            # Row 1: with the provider supplied the batch resolves, so the
+            # failure below is caused by the missing provider alone.
             resolved = run_cli(str(consumer), str(provider))
             self.assertEqual(resolved.returncode, 0, resolved.stdout + resolved.stderr)
             self.assertIn(f"{consumer}: 0 errors", resolved.stdout)
             self.assertIn(f"{provider}: 0 errors", resolved.stdout)
+            self.assertNotIn("--resolve-imports", resolved.stdout)
+            self.assertNotIn("refresh-sources", resolved.stdout)
             self.assertEqual((consumer.read_bytes(), provider.read_bytes()), before)
 
+            # Row 2: the topology error, error count and exit code are unchanged.
             missing = run_cli(str(consumer))
             self.assertEqual(missing.returncode, 1, missing.stdout + missing.stderr)
             self.assertIn(f"{consumer}: ERROR Topology checkout", missing.stdout)
             self.assertIn("missing spec platform", missing.stdout)
+            self.assertIn(f"{consumer}: 1 errors, 0 warnings", missing.stdout)
+            self.assertEqual((consumer.read_bytes(), provider.read_bytes()), before)
+
+            # Rows 3-4: the consumer's own output names both remedies verbatim.
+            consumer_output = file_lines(missing.stdout, consumer)
+            for remedy in MISSING_PROVIDER_REMEDIES:
+                with self.subTest(remedy=remedy):
+                    self.assertTrue(any(remedy in line for line in consumer_output),
+                                    f"no {consumer} line names {remedy!r}:\n{missing.stdout}")
+
+    def test_resolve_imports_unlisted_provider_keeps_registry_message(self):
+        with tempfile.TemporaryDirectory() as temp:
+            temp = pathlib.Path(temp)
+            consumer, provider = write_alias_topology(temp)
+            registry = temp / "registry.json"
+            before = (consumer.read_bytes(), provider.read_bytes())
+            entries = [{"id": "checkout", "path": consumer.name},
+                       {"id": "platform", "path": provider.name}]
+
+            # Precondition: with the provider listed the same consumer resolves,
+            # so the failure below is caused by the unlisted provider alone.
+            registry.write_text(json.dumps({"version": 1, "diagrams": entries}))
+            listed = run_cli("--resolve-imports", str(registry), str(consumer))
+            self.assertEqual(listed.returncode, 0, listed.stdout + listed.stderr)
+            self.assertIn(f"{consumer}: 0 errors", listed.stdout)
+
+            # Row 5: the --resolve-imports message is unchanged; it names the
+            # registry it searched and gains no files-passed-together remedy.
+            registry.write_text(json.dumps({"version": 1, "diagrams": entries[:1]}))
+            unlisted = run_cli("--resolve-imports", str(registry), str(consumer))
+            self.assertEqual(unlisted.returncode, 1, unlisted.stdout + unlisted.stderr)
+            self.assertEqual(unlisted.stderr, "")
+            self.assertEqual(unlisted.stdout.splitlines(), [
+                f"{consumer}: ERROR Topology import references missing spec platform in {registry}",
+                f"{consumer}: 1 errors, 0 warnings",
+            ])
             self.assertEqual((consumer.read_bytes(), provider.read_bytes()), before)
 
     def test_invalid_first_then_valid_browse_url_import_batch(self):

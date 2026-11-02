@@ -84,17 +84,17 @@
   /* A pull request is chosen by number so the server can fetch a head the clone does not have.
      If that fails, the row is marked and stays unchosen. */
   async function pick(row, li){
-    if (li.getAttribute('aria-disabled') === 'true' || li.dataset.checking) return;
+    if (li.getAttribute('aria-disabled') === 'true' || li.getAttribute('aria-busy') === 'true') return;
     /* Only the latest click may choose: an earlier row's check that finishes later is ignored. */
     const side = state.side, token = listToken, click = ++pickToken, pr = state.tab === 'prs' && row.prs.length ? 'pr:' + row.prs[0] : null;
     if (pr){
-      li.dataset.checking = '1';
+      li.setAttribute('aria-busy', 'true');
       try{ await api('/api/documents?' + q({rev:pr})); }
       catch(ex){
         li.setAttribute('aria-disabled', 'true');
         li.querySelector('.meta').append(el('span', {class:'unavailable'}, 'not available locally'));
         return;
-      }finally{ delete li.dataset.checking; }
+      }finally{ li.removeAttribute('aria-busy'); }
       if (click !== pickToken || token !== listToken || state.side !== side) return;
     }
     closePicker();

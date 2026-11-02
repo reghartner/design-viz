@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* Git Compare local server (issue #849). Usage:
+/* Git Compare local server (issue #849): the picker page (index.html, app.js, app.css) and its JSON API. Usage:
      node tools/compare/serve.mjs --repo <path to a local clone> [--port <n>]
    Binds 127.0.0.1 only and serves a fixed allow-list: the page and a small read-only JSON API.
    GET  /api/status                          clone path, last fetch, gh sign-in (never the token)
@@ -19,8 +19,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const PAGE_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const API_CSP = "default-src 'none'; frame-ancestors 'none'";
 /* The static allow-list: request path -> [file under tools/compare, content type]. */
-const STATIC = {'/':['index.html', 'text/html; charset=utf-8']};
-const GET_ROUTES = new Set(['/', '/api/status', '/api/documents', '/api/revisions', '/api/between', '/api/compare']);
+const STATIC = {'/':['index.html', 'text/html; charset=utf-8'], '/app.js':['app.js', 'text/javascript; charset=utf-8'], '/app.css':['app.css', 'text/css; charset=utf-8']};
+const GET_ROUTES = new Set(['/', '/app.js', '/app.css', '/api/status', '/api/documents', '/api/revisions', '/api/between', '/api/compare']);
 
 function send(res, status, body, type, csp){
   res.writeHead(status, {'Content-Type':type, 'Cache-Control':'no-store', 'X-Content-Type-Options':'nosniff',

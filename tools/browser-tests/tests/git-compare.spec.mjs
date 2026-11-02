@@ -30,7 +30,8 @@
    P2   pick a row sets the side                From := c2 (All commits); To := PR #7   [data-testid=from-choice] / to-choice text      picker that never commits the choice
    P2b  unfetched PR head is usable             From := c7, To := PR #8 (only on remote) between rows exactly [PR eight, PR #8]; no ref   choosing a PR by raw SHA (server cannot
                                                                                        added                                            resolve an unfetched head)
-   P3   Swap exchanges the sides                click Swap                              from-choice shows PR #7 row, to-choice c2 row   Swap that copies one side
+   P3   Swap exchanges the sides                before: between c2..PR #7 = [c3]; Swap   from-choice shows PR #7 row, to-choice c2 row;  Swap that copies one side or only
+                                                                                       between list empty (c3..c2)                      swaps the labels
    P4   paging                                  gh stub with 150 extra PRs              100 options, "Show more" -> 152 with PR numbers  unpaged list; dropped or repeated rows
                                                                                        exactly #8, #7, #249..#100; button gone
    B0   between rows exact                      From := c1 (document tab), To := c7      region "Between these revisions" items:          rows from both directions; missing PR
@@ -47,7 +48,7 @@
    U0   untrusted text renders literally        commit subject, branch, tag, PR title    each field's textContent equals the payload;   innerHTML rendering anywhere
                                                 and PR author carry HTML payloads       no <img>/<script> in pickers or between list;
                                                                                        window.__pwned undefined
-   AU   every test: no page/console error, failed request, HTTP >= 400, or request outside the compare server
+   AU   every test, context-wide (all pages): no page/console error, failed request, HTTP >= 400, or request outside the compare server
    U1   page CSP                                response headers of "/"                 script-src 'self', no 'unsafe-inline'           inline script allowed
    Git refuses "<" and ">" in author names, so the hostile author comes from the PR author login. */
 import {test as base,expect} from '@playwright/test';
@@ -78,14 +79,15 @@ const test=base.extend({
   },
   /* Page errors, console errors, failed requests, HTTP errors and any request that leaves the
      compare server's origin all fail the test. */
-  errors:[async({page},use)=>{
+  errors:[async({context,page},use)=>{
     const errors=[],origins=[];
-    page.on('pageerror',e=>errors.push('page: '+e.message));
-    page.on('console',m=>{if(m.type()==='error')errors.push('console: '+m.text());});
-    page.on('request',r=>{const url=r.url();if(!origins.some(o=>url.startsWith(o+'/'))&&!/^(data|blob|about):/.test(url))errors.push('outbound: '+url);});
-    page.on('requestfailed',r=>errors.push('request failed: '+r.url()+' '+(r.failure()?.errorText||'')));
-    page.on('response',r=>{if(r.status()>=400)errors.push('HTTP '+r.status()+': '+r.url());});
-    await page.route(/^https?:/,route=>{const url=route.request().url();return origins.some(o=>url.startsWith(o+'/'))?route.continue():route.abort();});
+    /* Context-wide: every page of the context, including popups. */
+    const watch=p=>{p.on('pageerror',e=>errors.push('page: '+e.message));p.on('console',m=>{if(m.type()==='error')errors.push('console: '+m.text());});};
+    context.pages().forEach(watch);context.on('page',watch);
+    context.on('request',r=>{const url=r.url();if(!origins.some(o=>url.startsWith(o+'/'))&&!/^(data|blob|about):/.test(url))errors.push('outbound: '+url);});
+    context.on('requestfailed',r=>errors.push('request failed: '+r.url()+' '+(r.failure()?.errorText||'')));
+    context.on('response',r=>{if(r.status()>=400)errors.push('HTTP '+r.status()+': '+r.url());});
+    await context.route(/^https?:/,route=>{const url=route.request().url();return origins.some(o=>url.startsWith(o+'/'))?route.continue():route.abort();});
     errors.origins=origins;
     await use(errors);
     expect([...errors],'no page/console/request errors or outbound requests').toEqual([]);
@@ -191,10 +193,13 @@ test('P0 P1 P2 P3: every tab lists dated rows with badges; search filters; picks
   await choose(page,'To','Pull requests',c.c3);
   const pr7=choiceText({sha:short(c.c3),date:'2026-01-03 12:00',author:'carol',subject:'Feature step'});
   await expect(choice(page,'To')).toHaveText(pr7);
-  /* P3: Swap. */
+  await expect.poll(()=>betweenRows(page)).toEqual([{date:day(3),sha:short(c.c3),subject:'Reword step',prs:['PR #7']}]);
+  /* P3: Swap exchanges the pair the page uses, not only the labels: c3..c2 has no commits. */
   await page.getByRole('button',{name:'Swap'}).click();
   await expect(choice(page,'From')).toHaveText(pr7);
   await expect(choice(page,'To')).toHaveText(choiceText(r2));
+  await expect(between(page).getByRole('listitem')).toHaveCount(0);
+  await expect(between(page)).toContainText('No commits between these revisions change this document.');
   /* P2b: PR #8's head is not in the clone; choosing it fetches its objects (no ref) and the
      between list from c7 then shows its commit. */
   const refsBefore=snapshot(repo.dir);

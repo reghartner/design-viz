@@ -13,7 +13,14 @@
 | T8 carriers painted | #docview | at least one g.node[data-live-appearance] is visible | the checkbox checked but no paint |
 | T9 Chuck's arrangement | tile bounding boxes | status right ≤ diagram left; status and diagram tops align; history top ≥ diagram bottom; history left ≥ status right; no other tile starts left of status's right edge | the worked example's default (history full width under everything) |
 | T10 demo comes from the template open | uncheck (real click; carriers lose paint), Home, Start new project, Delivery status, card again | Demo live status is checked and carriers are painted again | demo state carried over from the previous preview instead of set by the template open |
-| T11 other opens stay off | right after T10 (demo on), Home, Paste JSON of the worked example examples/live-status (tickets, same panels) | its Demo live status checkbox is visible and unchecked; no g.node[data-live-appearance]; no .dv-live-panel-body | every ticketed document opening with demo on, or demo left on after the template |
+Second test: every other way in opens with the demo off (Chuck 2026-11-02, option 1). Before EACH row the
+Epic status board is opened from Start new project and its checkbox is asserted checked with a painted node
+(precondition), then Home. "Off" for a ticketed document = the Demo live status checkbox is visible and unchecked,
+no #docview g.node[data-live-appearance], no .pt-live-status .dv-live-panel-body.
+| T11 Paste JSON | Paste JSON of examples/live-status/live-status.spec.json (tickets, the same two panels) | off | every ticketed document opening with demo on; demo left on after the template |
+| T12 Open file | the browser has no writable-file picker (showOpenFilePicker undefined, as in working-file.spec "unsupported writable access"), so Open file uses the welcome file input: real click on #welcome-open, Playwright file chooser, setInputFiles(the same example) | off | Open file taking a demo-on path |
+| T13 other built-in template | Start new project, All examples, real click on Simple service flow. No other built-in template has tickets, so the checkbox is NOT SHOWN: count 0, no [data-live-appearance], no .pt-live-status | not shown, nothing painted | demo state leaking into the next template |
+| T14 ticketed team template | starters.json (routed) offers "Team delivery board": the worked example plus "demoLiveStatus": true in the manifest entry; real click in #welcome-company-grid | off | demo turned on for every template, or a team manifest able to set the built-in flag |
 */
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -116,15 +123,57 @@ test.describe('Epic status board template (#865)',()=>{
     await openTemplate(page);
     await expect(page.getByRole('checkbox',{name:'Demo live status',exact:true})).toBeChecked();
     await expect(page.locator('#docview g.node[data-live-appearance]').first()).toBeVisible();
+  });
 
-    // T11: Paste JSON of a ticketed document still opens with the demo off.
-    const example=await readFile(path.join(repo,'examples/live-status/live-status.spec.json'),'utf8');
-    await page.locator('#workspace-home').click();await expect(page.locator('#welcome-home')).toBeVisible();
-    await paste(page,example);await prepareEditorSurface(page);
-    const pasted=page.getByRole('checkbox',{name:'Demo live status',exact:true});
-    await expect(pasted).toBeVisible();await expect(pasted).not.toBeChecked();
-    await expect(page.locator('#docview .pwidget.pt-live-status')).toBeVisible();
-    await expect(page.locator('#docview g.node[data-live-appearance]')).toHaveCount(0);
-    await expect(page.locator('#docview .pt-live-status .dv-live-panel-body')).toHaveCount(0);
+  test('Paste JSON, Open file and other templates open with Demo live status off after the Epic status board',async({page,server})=>{
+    test.setTimeout(90000);
+    const examplePath=path.join(repo,'examples/live-status/live-status.spec.json'),example=await readFile(examplePath,'utf8');
+    await page.addInitScript(()=>{window.showOpenFilePicker=undefined;window.showDirectoryPicker=undefined;});
+    await page.route('**/starters.json',route=>route.fulfill({json:[{name:'Team delivery board',desc:'A team copy of the worked status board.',demoLiveStatus:true,spec:JSON.parse(example)}]}));
+    await page.setViewportSize({width:1440,height:1000});
+    await page.goto(server.origin+'/workbench.html');
+    const demo=()=>page.getByRole('checkbox',{name:'Demo live status',exact:true}),view=page.locator('#docview');
+    const home=async()=>{await page.locator('#workspace-home').click();await expect(page.locator('#welcome-home')).toBeVisible();};
+    async function boardWithDemoOn(){
+      await openTemplate(page);
+      await expect(demo()).toBeChecked();await expect(view.locator('g.node[data-live-appearance]').first()).toBeVisible();
+      await home();
+    }
+    async function expectOff(label){
+      await prepareEditorSurface(page);
+      await expect(demo(),label).toBeVisible();await expect(demo(),label).not.toBeChecked();
+      await expect(view.locator('.pwidget.pt-live-status'),label).toBeVisible();
+      await expect(view.locator('g.node[data-live-appearance]'),label).toHaveCount(0);
+      await expect(view.locator('.pt-live-status .dv-live-panel-body'),label).toHaveCount(0);
+    }
+
+    // T11 Paste JSON
+    await boardWithDemoOn();
+    await paste(page,example);await expectOff('Paste JSON');
+
+    // T12 Open file
+    await home();await boardWithDemoOn();
+    const chooser=page.waitForEvent('filechooser');await page.locator('#welcome-open').click();
+    await (await chooser).setInputFiles(examplePath);
+    await expect(page.locator('#workbench-workspace')).toBeVisible();await expect(page.locator('#src')).toHaveValue(example);
+    await expectOff('Open file');
+
+    // T13 another built-in template (no tickets: the checkbox is not shown)
+    await home();await boardWithDemoOn();
+    await page.locator('#welcome-new').click();
+    await page.locator('#welcome-template-filters').getByRole('button',{name:'All examples',exact:true}).click();
+    await card(page,'Simple service flow').click();
+    await expect(page.locator('#workbench-workspace')).toBeVisible();await prepareEditorSurface(page);
+    expect(JSON.parse(await page.locator('#src').inputValue()).page.title).toBe('Simple service flow');
+    await expect(demo()).toHaveCount(0);
+    await expect(view.locator('[data-live-appearance]')).toHaveCount(0);await expect(view.locator('.pt-live-status')).toHaveCount(0);
+
+    // T14 a ticketed team template whose manifest entry claims the flag
+    await home();await boardWithDemoOn();
+    await page.locator('#welcome-new').click();
+    await page.locator('#welcome-company-grid .welcome-template-card').filter({has:page.locator('.welcome-template-title',{hasText:'Team delivery board'})}).click();
+    await expect(page.locator('#workbench-workspace')).toBeVisible();
+    expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(JSON.parse(example));
+    await expectOff('team template');
   });
 });

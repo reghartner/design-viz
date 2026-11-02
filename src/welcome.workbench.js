@@ -548,6 +548,12 @@ function initWorkbenchWelcome(opts){
   if (typeof WORKBENCH_EXAMPLES === 'string' && WORKBENCH_EXAMPLES){
     document.querySelectorAll('[data-examples-gallery]').forEach(function(link){ link.href = WORKBENCH_EXAMPLES; link.hidden = false; });
   }
+  /* Likewise "liveStatusExample" (an https URL the build validated) reveals the
+     Live Feature Delivery Status Board row; without it the row stays hidden. */
+  if (typeof WORKBENCH_LIVE_STATUS_EXAMPLE === 'string' && WORKBENCH_LIVE_STATUS_EXAMPLE){
+    el('welcome-live-status').querySelector('[data-live-status-example]').href = WORKBENCH_LIVE_STATUS_EXAMPLE;
+    el('welcome-live-status').hidden = false;
+  }
   var repositoryInput = el('welcome-repository'), revisionInput = el('welcome-revision');
   var repositoryKey = 'dv-workbench-authoring-repository-v1', config;
   try { config = JSON.parse(localStorage.getItem(repositoryKey)); } catch (ex){}

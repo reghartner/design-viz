@@ -7,10 +7,9 @@
 {{STYLE_CORE}}
 </style>
 <script>
-/* Hide the page until the Workbench script below has run (it is synchronous, so
-   DOMContentLoaded follows it even if it throws). Without scripts the class is never set. */
+/* Hide the page until the Workbench script at the end has chosen Home or the editor.
+   The script block after it shows the page again. Without scripts the class is never set. */
 document.documentElement.classList.add('workbench-booting');
-document.addEventListener('DOMContentLoaded',function(){document.documentElement.classList.remove('workbench-booting');});
 </script>
 
 {{ICONS}}
@@ -764,4 +763,8 @@ var WORKBENCH_LANDING = {{WORKBENCH_LANDING}};
 var WORKBENCH_EXAMPLES = {{WORKBENCH_EXAMPLES}};
 {{JS}}
 })();
+</script>
+<script>
+/* A separate block, so the page is shown even when the Workbench script above throws. */
+document.documentElement.classList.remove('workbench-booting');
 </script>

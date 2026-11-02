@@ -764,9 +764,12 @@ var WORKBENCH_ONBOARDING = {{WORKBENCH_ONBOARDING}};
 var WORKBENCH_LANDING = {{WORKBENCH_LANDING}};
 var WORKBENCH_EXAMPLES = {{WORKBENCH_EXAMPLES}};
 {{JS}}
+/* Show the page from inside this script too: the practice tour copies the document while
+   this script runs, before the block below exists, so its copy relies on this line. */
+document.documentElement.classList.remove('workbench-booting');
 })();
 </script>
 <script>
-/* A separate block, so the page is shown when the Workbench script above finishes or throws. */
+/* A separate block, so the page is shown even when the Workbench script above throws. */
 document.documentElement.classList.remove('workbench-booting');
 </script>

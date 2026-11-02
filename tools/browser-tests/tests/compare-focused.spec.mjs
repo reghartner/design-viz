@@ -137,6 +137,8 @@ const currentStep=(host,s)=>side(host,s).locator('button.compare-focus-step[aria
 const rows=host=>host.locator('.compare-focus-row');
 const cell=(row,s)=>row.locator('.compare-focus-cell[data-side="'+s+'"]');
 const items=host=>host.locator('.compare-rail button.compare-rail-item');
+/* The compare view's own mode bar: each pane's reader toolbar also has a "Zoom out" button. */
+const modeBar=host=>host.getByRole('group',{name:'Compare mode'});
 async function bothAt(host,n,captions){
   for(const s of ['before','after']){
     await expect(currentStep(host,s),s+' side is on step '+n).toHaveText(String(n));
@@ -250,8 +252,8 @@ test('F7 F9 added panels and removed steps show placeholders; a node change show
   await expect(host.getByRole('button',{name:'Focused',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(host.locator('.compare-focus')).toBeHidden();
   await expect(host.locator('.compare-mode-note')).toBeHidden();
-  await expect(host.getByRole('button',{name:'Zoom out',exact:true}).first()).toBeVisible();
-  await expect(host.getByRole('button',{name:'Whole section',exact:true})).toBeVisible();
+  await expect(modeBar(host).getByRole('button',{name:'Zoom out',exact:true})).toBeVisible();
+  await expect(modeBar(host).getByRole('button',{name:'Whole section',exact:true})).toBeVisible();
   await expect(host.locator('.compare-pane[data-side="after"] [data-dv-node="c"]:visible').first()).toContainText('Gamma renamed');
   await expect(host.locator('.compare-pane[data-side="before"] [data-dv-node="c"]:visible').first()).toContainText('Gamma');
   /* F7: added panel */
@@ -350,10 +352,10 @@ test('F9b imported nodes, edges and added nodes show the cropped panes; a sectio
     await expect(host.locator('.compare-focus'),labels[i]+': no focused rows').toBeHidden();
     if(/^Modified · Section /.test(labels[i])){
       await expect(host.locator('.compare-mode-note'),labels[i]).toHaveText('This change shows in the full diagram.');
-      await expect(host.getByRole('button',{name:'Whole section',exact:true}),labels[i]+': no crop controls').toBeHidden();
+      await expect(modeBar(host).getByRole('button',{name:'Whole section',exact:true}),labels[i]+': no crop controls').toBeHidden();
     }else{
       await expect(host.locator('.compare-mode-note'),labels[i]+': no fallback note').toBeHidden();
-      await expect(host.getByRole('button',{name:'Whole section',exact:true}),labels[i]+': crop controls').toBeVisible();
+      await expect(modeBar(host).getByRole('button',{name:'Whole section',exact:true}),labels[i]+': crop controls').toBeVisible();
     }
     await expect(host.locator('.compare-pane[data-side="after"] [data-dv-node="a"]:visible').first(),labels[i]+': the After pane is shown').toBeVisible();
     await expect(host.locator('.compare-pane[data-side="before"] [data-dv-node="a"]:visible').first(),labels[i]+': the Before pane is shown').toBeVisible();
@@ -401,14 +403,14 @@ async function exerciseCrop(host,cfg){
   }
   const count={},w={};
   for(const s of ['before','after']){count[s]=await shownCount(host,s,cfg.all);w[s]=await width(host,s,cfg.ref);expect(w[s],'precondition: '+s+' shows the reference node').toBeGreaterThan(0);}
-  await host.getByRole('button',{name:'Zoom out',exact:true}).click();
+  await modeBar(host).getByRole('button',{name:'Zoom out',exact:true}).click();
   for(const s of ['before','after'])await expect.poll(()=>shownCount(host,s,cfg.all),{message:s+': Zoom out shows more nodes'}).toBeGreaterThan(count[s]);
   for(const s of ['before','after'])for(const id of cfg.keep[s])await expect.poll(()=>shown(host,s,id),{message:s+': still shows '+id}).toBe(true);
   const ratio={};
   for(const s of ['before','after']){await expect.poll(async()=>(await width(host,s,cfg.ref))/w[s],{message:s+': zoomed out by 1/1.6'}).toBeLessThan(.75);ratio[s]=(await width(host,s,cfg.ref))/w[s];}
   expect(ratio.before,'both panes zoom out by the same factor '+JSON.stringify(ratio)).toBeGreaterThan(.5);
   expect(Math.abs(ratio.before-ratio.after),'both panes zoom out by the same factor '+JSON.stringify(ratio)).toBeLessThan(.05);
-  await host.getByRole('button',{name:'Whole section',exact:true}).click();
+  await modeBar(host).getByRole('button',{name:'Whole section',exact:true}).click();
   for(const s of ['before','after'])await cropped(host,s,Array.isArray(cfg.ends)?cfg.ends:cfg.ends[s],[]);
 }
 const provided=(c,c2)=>`function side(c,p){var raw=JSON.parse(JSON.stringify(c));return {authored:FlowviewCompare.normalize(JSON.parse(JSON.stringify(c))),resolved:FlowviewCompare.normalize(FlowviewCompare.resolve(raw,{version:1,id:'consumer',specs:[p,c]})),ledger:null};}

@@ -116,10 +116,10 @@ stress('S1 S2: 50 Compare navigations keep one live view, leave no git/gh proces
   const {shas}=clone;
   await page.setViewportSize({width:1440,height:900});
   await page.goto(clone.url);
-  const comparison=page.getByRole('region',{name:'Comparison'}),views=comparison.locator('.compare-view');
-  await expect(page.getByLabel('Document')).toHaveValue(docName(0));
-  await expect(page.getByLabel('Document').locator('option[value="all"]')).toHaveText('All changed documents');
-  await page.getByLabel('Document').selectOption('all');
+  const comparison=page.getByRole('region',{name:'Comparison',exact:true}),views=comparison.locator('.compare-view');
+  await expect(page.getByLabel('Document',{exact:true})).toHaveValue(docName(0));
+  await expect(page.getByLabel('Document',{exact:true}).locator('option[value="all"]')).toHaveText('All changed documents');
+  await page.getByLabel('Document',{exact:true}).selectOption('all');
   async function choose(side,i){
     await page.getByRole('button',{name:'Choose '+side+' revision'}).click();
     const dialog=page.getByRole('dialog',{name:side+' revisions'});await expect(dialog).toBeVisible();

@@ -138,7 +138,8 @@ const test=base.extend({
       const response=await page.goto('http://127.0.0.1:'+server.address().port+'/');
       return response;
     });
-    for(const s of servers)await new Promise(resolve=>s.close(resolve));
+    /* The page is still open; its keep-alive or in-flight requests must not hold the close. */
+    for(const s of servers){s.closeAllConnections();await new Promise(resolve=>s.close(resolve));}
   },
   /* Page errors, console errors, failed requests, HTTP errors and any request that leaves the
      compare server's origin all fail the test. */
@@ -184,7 +185,7 @@ async function choose(page,side,tab,sha){
 }
 const choice=(page,side)=>page.getByTestId(side.toLowerCase()+'-choice');
 const choiceText=r=>[r.sha,r.date,r.author,r.subject].join(' · ');
-const documentOptions=page=>page.getByLabel('Document').locator('option').evaluateAll(els=>els.map(e=>[e.value,e.textContent]));
+const documentOptions=page=>page.getByLabel('Document',{exact:true}).locator('option').evaluateAll(els=>els.map(e=>[e.value,e.textContent]));
 const between=page=>page.getByRole('region',{name:'Between these revisions'});
 const betweenRows=page=>between(page).getByRole('listitem').evaluateAll(els=>els.map(e=>{
   const f=name=>{const el=e.querySelector('[data-field="'+name+'"]');return el?el.textContent:null;};
@@ -199,22 +200,22 @@ test('H0 H1 D0 D1 D2: header, Document list from the To revision, and the docume
   /* D0: nothing chosen yet, so the Document list is HEAD's (c7): new exists, old does not. */
   await expect(choice(page,'To')).toHaveText('No revision chosen');
   await expect.poll(()=>documentOptions(page)).toEqual([ALL_DOCS,[A,A],[NEW,NEW],[P,P]]);
-  await expect(page.getByLabel('Document')).toHaveValue(A);
+  await expect(page.getByLabel('Document',{exact:true})).toHaveValue(A);
   await choose(page,'To','All commits',c.c1);
   await expect.poll(()=>documentOptions(page)).toEqual([ALL_DOCS,[A,A],[OLD,OLD],[P,P]]);
-  await expect(page.getByLabel('Document')).toHaveValue(A);
+  await expect(page.getByLabel('Document',{exact:true})).toHaveValue(A);
   /* D1: a chosen document missing from To stays chosen and is marked. */
   await choose(page,'To','All commits',c.c7);
   await expect.poll(()=>documentOptions(page)).toEqual([ALL_DOCS,[A,A],[NEW,NEW],[P,P]]);
-  await page.getByLabel('Document').selectOption(NEW);
+  await page.getByLabel('Document',{exact:true}).selectOption(NEW);
   await choose(page,'To','All commits',c.c1);
   await expect.poll(()=>documentOptions(page)).toEqual([ALL_DOCS,[A,A],[NEW,NEW+' (not in To)'],[OLD,OLD],[P,P]]);
-  await expect(page.getByLabel('Document')).toHaveValue(NEW);
+  await expect(page.getByLabel('Document',{exact:true})).toHaveValue(NEW);
   /* D2: the document tab lists the commits that changed the chosen document. */
   let dialog=await openPicker(page,'From');
   await expect.poll(()=>shas(dialog)).toEqual([short(c.c7)]);
   await page.keyboard.press('Escape');await expect(dialog).toBeHidden();
-  await page.getByLabel('Document').selectOption(P);
+  await page.getByLabel('Document',{exact:true}).selectOption(P);
   dialog=await openPicker(page,'From');
   await expect(dialog.getByRole('tab',{name:'Revisions of this document'})).toHaveAttribute('aria-selected','true');
   await expect.poll(()=>options(dialog)).toEqual([
@@ -530,7 +531,7 @@ test('P9: after a page fails to load, Show more retries that page',async({page,r
 });
 
 /* ---------- PR 3: the comparison (rows 3 and 5) ---------- */
-const comparison=page=>page.getByRole('region',{name:'Comparison'});
+const comparison=page=>page.getByRole('region',{name:'Comparison',exact:true});
 const compareButton=page=>page.getByRole('button',{name:'Compare',exact:true});
 const views=page=>comparison(page).locator('.compare-view');
 const changeItems=page=>comparison(page).locator('.compare-view .compare-rail-item');
@@ -545,8 +546,8 @@ const paneHeading=(side,sha,subject)=>(side==='before'?'Before · ':'After · ')
 const A_CHANGES=['Modified · Node Alpha final · title','Modified · Step s1 · text','Modified · Imported node child::p2 · title'];
 /* Chooses "All changed documents"; the option must exist (an assertion, not a wait). */
 async function allDocuments(page){
-  await expect(page.getByLabel('Document').locator('option[value="all"]')).toHaveText('All changed documents');
-  await page.getByLabel('Document').selectOption('all');
+  await expect(page.getByLabel('Document',{exact:true}).locator('option[value="all"]')).toHaveText('All changed documents');
+  await page.getByLabel('Document',{exact:true}).selectOption('all');
 }
 const compareThisCommit=(page,subject)=>between(page).getByRole('listitem').filter({hasText:subject}).getByRole('button',{name:'Compare this commit'}).click();
 
@@ -627,7 +628,7 @@ test('C4 C5: each Compare replaces the previous view, and a changed choice or do
   await expect(changeItems(page)).toHaveText(A_CHANGES);
   await expect.poll(()=>liveOwners(page)).toBe(one);
   /* C5: choosing another document also removes it. */
-  await page.getByLabel('Document').selectOption(P);
+  await page.getByLabel('Document',{exact:true}).selectOption(P);
   await expect(views(page)).toHaveCount(0);
   await expect(comparison(page)).toContainText('The choices changed. Press Compare to update.');
   await expect.poll(()=>liveOwners(page)).toBe(0);

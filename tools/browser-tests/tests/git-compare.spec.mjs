@@ -82,9 +82,11 @@
                                                                                        step, imported node); node a "Alpha" in Before,
                                                                                        "Alpha final" in After
    C2   click through changes (row 3)        J (Focused), Full diagram, rail click, K  Focused aria-pressed by default; on the step change  panes that never follow the selection;
-                                                                                       each side's step strip [1] and caption "Start" /    Full-only or strip-less integration
-                                                                                       "Start the flow"; Full: aria-current moves 0->1->
-                                                                                       2->1, captions, child::p2 "P two"/"P two changed"
+                                                                                       each side's visible step strip [1] and caption      Full-only, strip-hidden or non-switching
+                                                                                       "Start" / "Start the flow"; Full hides the focused  integration
+                                                                                       view and shows both panes; aria-current moves
+                                                                                       0->1->2->1; pane captions; child::p2 "P two" /
+                                                                                       "P two changed"
    C3   Compare this commit loads the        From c1, To c7; Compare this commit on   titles c4 "Docs only" / c5 "Merge feature";         second parent (c3: no changes); choices
         comparison (row 4)                   c5                                       rail exactly ["Modified · Step s1 · text"]         set but nothing compared
    C4   each navigation replaces the view    Compare, then Compare again (same pair)  previous .compare-view detached; exactly one;       leaked instance (destroy() not run)
@@ -578,10 +580,17 @@ test('C0 C1 C2: Compare shows From as Before and To as After, and every change c
   await page.keyboard.press('j');await expect(items.nth(1)).toHaveAttribute('aria-current','true');
   const focusSide=side=>comparison(page).locator('.compare-focus-side[data-side="'+side+'"]');
   await expect(comparison(page).locator('.compare-focus')).toBeVisible();
-  for(const side of ['before','after'])await expect(focusSide(side).locator('.compare-focus-steps .compare-focus-step')).toHaveText(['1']);
+  for(const side of ['before','after']){
+    const steps=focusSide(side).locator('.compare-focus-steps .compare-focus-step');
+    await expect(steps).toHaveText(['1']);await expect(steps.first()).toBeVisible();
+    await expect(focusSide(side).locator('.compare-focus-caption')).toBeVisible();
+  }
   await expect(focusSide('before').locator('.compare-focus-caption')).toHaveText('Start');
   await expect(focusSide('after').locator('.compare-focus-caption')).toHaveText('Start the flow');
   await modeButton('Full diagram').click();await expect(modeButton('Full diagram')).toHaveAttribute('aria-pressed','true');
+  /* Full diagram: the focused view is hidden and both full panes are shown. */
+  await expect(comparison(page).locator('.compare-focus')).toBeHidden();
+  for(const side of ['before','after'])await expect(paneIn(page,side)).toBeVisible();
   await expect(items.nth(1)).toHaveAttribute('aria-current','true');
   const caption=side=>paneIn(page,side).locator('.stepline:not(.dv-caption-old)').first();
   await expect(caption('before')).toContainText('Start');await expect(caption('before')).not.toContainText('Start the flow');

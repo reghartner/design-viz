@@ -23,7 +23,8 @@
                   (refs, index and FETCH_HEAD unchanged)                   rejects: fetch that writes the work tree; CSRF
    S4 also covers every refusal (403/404/400) and the POST /api/fetch response.
    S6 paging      /api/revisions passes page through: 137 commits -> 100 + 37 rows, no overlap
-   S7 command     node tools/compare/serve.mjs --repo <clone> --port 0 prints "Git Compare: http://127.0.0.1:<port>/"
+   S7 command     node --max-semi-space-size=1 tools/compare/serve.mjs --repo <clone> --port 0 (the documented command, #849 PR 3)
+                  prints "Git Compare: http://127.0.0.1:<port>/"; the usage message names the same command
                   and serves the clone with the gh found on PATH; without --repo it prints the usage and
                   exits with status 2                                       rejects: CLI that ignores --repo */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),http=require('node:http');
@@ -134,7 +135,7 @@ test('S7 the command line serves the clone on 127.0.0.1 and prints its URL',asyn
   const f=await fixture();let child=null;
   try{
     const bin=await ghExecutable(f.root,f.c),env=Object.assign(cleanEnv(),{PATH:bin+path.delimiter+process.env.PATH});
-    child=spawn(process.execPath,[path.join(__dirname,'..','tools','compare','serve.mjs'),'--repo',f.dir,'--port','0'],{env,stdio:['ignore','pipe','pipe']});
+    child=spawn(process.execPath,['--max-semi-space-size=1',path.join(__dirname,'..','tools','compare','serve.mjs'),'--repo',f.dir,'--port','0'],{env,stdio:['ignore','pipe','pipe']});
     let out='';child.stdout.setEncoding('utf8');child.stdout.on('data',d=>out+=d);
     const url=await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(new Error('no URL printed: '+out)),15000);
       child.stdout.on('data',()=>{const m=/Git Compare: (http:\/\/127\.0\.0\.1:(\d+)\/)/.exec(out);if(m){clearTimeout(t);resolve(m);}});child.on('exit',c=>{clearTimeout(t);reject(new Error('exited '+c+' '+out));});});
@@ -146,6 +147,6 @@ test('S7 the command line serves the clone on 127.0.0.1 and prints its URL',asyn
     const usage=spawn(process.execPath,[path.join(__dirname,'..','tools','compare','serve.mjs')],{env,stdio:['ignore','pipe','pipe']});
     let err='';usage.stderr.setEncoding('utf8');usage.stderr.on('data',d=>err+=d);
     const code=await new Promise(r=>usage.on('exit',r));
-    assert.equal(code,2,'missing --repo exits with status 2');assert.match(err,/Usage: node tools\/compare\/serve\.mjs --repo/);
+    assert.equal(code,2,'missing --repo exits with status 2');assert.match(err,/Usage: node --max-semi-space-size=1 tools\/compare\/serve\.mjs --repo/);
   }finally{if(child)child.kill();await fs.rm(f.root,{recursive:true,force:true});}
 });

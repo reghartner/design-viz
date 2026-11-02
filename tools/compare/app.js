@@ -107,7 +107,7 @@
     if (!append){ list.replaceChildren(); error.hidden = true; more.hidden = true; }
     if (!state.doc) return;
     /* Show more stays disabled until this page arrives, so a second click cannot skip a page. */
-    more.disabled = true;
+    more.setAttribute('aria-disabled', 'true');
     let out;
     try{ out = await api('/api/revisions?' + q({doc:state.doc, tab:state.tab, q:state.query, page:state.page})); }
     catch(ex){ if (token === listToken){ error.textContent = ex.message; error.hidden = false; more.disabled = false; } return; }

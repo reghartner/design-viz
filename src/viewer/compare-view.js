@@ -767,6 +767,29 @@ function mountCompareView(host, opts){
     var pad = 16;
     return {x:x - pad, y:y - pad, w:r - x + 2 * pad, h:bt - y + 2 * pad};
   }
+  /* The viewport's fit scrolls its own board; in a compare pane the scrolling element can be an
+     ancestor (the pane), so centre the cropped elements in every scrolling container between them
+     and the pane, innermost first. */
+  function cropCentre(p, elements){
+    if (!elements.length) return;
+    function union(){
+      var r = null;
+      elements.forEach(function(el){ var b = el.getBoundingClientRect(); if (!b.width && !b.height) return;
+        r = r ? {left:Math.min(r.left, b.left), top:Math.min(r.top, b.top), right:Math.max(r.right, b.right), bottom:Math.max(r.bottom, b.bottom)} : {left:b.left, top:b.top, right:b.right, bottom:b.bottom}; });
+      return r;
+    }
+    var view = p.scroll.getBoundingClientRect();
+    for (var node = elements[0].parentElement; node; node = node.parentElement){
+      if (node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1){
+        var u = union(); if (!u) return;
+        var c = node.getBoundingClientRect();
+        var left = Math.max(c.left, view.left), right = Math.min(c.right, view.right), top = Math.max(c.top, view.top), bottom = Math.min(c.bottom, view.bottom);
+        if (right > left) node.scrollLeft += (u.left + u.right) / 2 - (left + right) / 2;
+        if (bottom > top) node.scrollTop += (u.top + u.bottom) / 2 - (top + bottom) / 2;
+      }
+      if (node === p.scroll) break;
+    }
+  }
   function applyCrop(){
     if (!cropCtx || mode !== 'focused' || destroyed) return;
     var token = selected, level = cropLevel;
@@ -781,9 +804,16 @@ function mountCompareView(host, opts){
         if (!got) return;
         var insets = {left:24, right:24, top:20, bottom:24};
         if (!got.viewport){ if (got.elements[0] && got.elements[0].scrollIntoView) got.elements[0].scrollIntoView({block:'center', inline:'center'}); return; }
-        if (level < 0 || !got.elements.length){ got.viewport.fitCanvas(insets); return; }
+        /* Whole section: fit, then centre the section's whole diagram. */
+        var whole = function(){
+          got.viewport.fitCanvas(insets);
+          var svg = got.elements[0] && (got.elements[0].closest && got.elements[0].closest('svg[aria-label="flow diagram"]') || got.elements[0].ownerSVGElement) ||
+            got.rec.sectionEl.querySelector('svg[aria-label="flow diagram"]');
+          if (svg) cropCentre(p, [svg]);
+        };
+        if (level < 0 || !got.elements.length){ whole(); return; }
         var b = cropBounds(got.elements);
-        if (!b){ got.viewport.fitCanvas(insets); return; }
+        if (!b){ whole(); return; }
         /* Never magnify past about 100%: the crop is at least the pane's free area (graph units are
            pixels at 100%), centred on the change. */
         var minW = Math.max(1, p.scroll.clientWidth - insets.left - insets.right), minH = Math.max(1, p.scroll.clientHeight - insets.top - insets.bottom);
@@ -794,6 +824,7 @@ function mountCompareView(host, opts){
           b = {x:cx - b.w * f / 2, y:cy - b.h * f / 2, w:b.w * f, h:b.h * f};
         }
         got.viewport.fitCanvas(insets, b);
+        cropCentre(p, got.elements);
       });
     }
     apply();

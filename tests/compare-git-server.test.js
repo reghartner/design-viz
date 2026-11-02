@@ -79,13 +79,11 @@ test('S3 traversal, repository files, wrong methods, foreign origins and bad rev
     server=await start(f);const port=server.address().port,c=f.c;
     for(const target of ['/../etc/passwd','/%2e%2e/%2e%2e/etc/passwd','/.git/config','/flows/a.spec.json','/README.md','/api/unknown','/tools/compare/serve.mjs'])
       assert.equal((await request(port,'GET',target)).status,404,target);
-    seen.length=0;
     const routes=['/api/status','/api/documents?rev='+c.c7,'/api/revisions?doc='+encodeURIComponent(A)+'&tab=all','/api/between?from='+c.c1+'&to='+c.c7+'&doc='+encodeURIComponent(A),'/api/compare?from='+c.c1+'&to='+c.c7+'&doc='+encodeURIComponent(A),'/'];
     for(const target of routes)for(const method of ['POST','PUT','DELETE'])assert.equal((await request(port,method,target)).status,403,method+' '+target);
     assert.equal((await request(port,'GET','/api/fetch')).status,403,'fetch is POST only');
     assert.equal((await request(port,'GET','/api/status',{Origin:'https://evil.example'})).status,403,'foreign Origin');
     assert.equal((await request(port,'GET','/api/status',{Host:'evil.example'})).status,403,'foreign Host');
-    assert.equal((await request(port,'POST','/api/fetch',{Origin:'https://evil.example'})).status,403,'foreign Origin cannot fetch');
     assert.equal((await request(port,'GET','/api/compare?from=main;id&to=main&doc='+encodeURIComponent(A))).status,400,'unknown revision');
     assert.equal((await request(port,'GET','/api/compare?from=main&to=main&doc='+encodeURIComponent('../secret.json'))).status,400,'document outside the repository');
     /* Fetch accepts only POST from this server's Host and Origin: refused requests run no fetch. */
@@ -94,9 +92,10 @@ test('S3 traversal, repository files, wrong methods, foreign origins and bad rev
     for(const method of ['GET','PUT','DELETE'])assert.equal((await request(port,method,'/api/fetch',{Origin:'http://127.0.0.1:'+port})).status,403,method+' /api/fetch');
     assert.equal((await request(port,'POST','/api/fetch',{Host:'evil.example',Origin:'http://127.0.0.1:'+port})).status,403,'foreign Host cannot fetch');
     assert.equal((await request(port,'POST','/api/fetch',{Host:'evil.example'})).status,403,'foreign Host without Origin cannot fetch');
+    assert.equal((await request(port,'POST','/api/fetch',{Origin:'https://evil.example'})).status,403,'foreign Origin cannot fetch');
     assert.deepEqual(snapshot(f.dir),before,'no refused request fetched');
     assert.equal(require('node:fs').statSync(path.join(f.dir,'.git','FETCH_HEAD')).mtimeMs,fetchHead,'FETCH_HEAD untouched');
-    assert.ok(seen.every(r=>r.status>=400),'precondition: the sweep below covers refusals');
+    assert.ok(seen.filter(r=>r.status===404).length>=7 && seen.filter(r=>r.status===403).length>=20 && seen.some(r=>r.status===400),'precondition: the sweep below covers the 404, 403 and 400 refusals');
     noToken();
   }finally{if(server)await new Promise(r=>server.close(r));await fs.rm(f.root,{recursive:true,force:true});}
 });

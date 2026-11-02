@@ -3,7 +3,7 @@
    table in tests/compare-git.test.js. */
 const fs=require('node:fs/promises'),fss=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {execFileSync}=require('node:child_process'),crypto=require('node:crypto');
-function git(dir,args,env){return execFileSync('git',['-C',dir,...args],{encoding:'utf8',env:Object.assign({},cleanEnv(),env||{})}).trim();}
+function git(dir,args,env){return execFileSync('git',args[0]==='--no-optional-locks'?['--no-optional-locks','-C',dir,...args.slice(1)]:['-C',dir,...args],{encoding:'utf8',env:Object.assign({},cleanEnv(),env||{})}).trim();}
 function cleanEnv(){const e={...process.env};for(const k of Object.keys(e))if(k.startsWith('GIT_'))delete e[k];return Object.assign(e,{GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:os.devNull});}
 const spec=(id,diagram,extra)=>({page:Object.assign({title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',heading:'Main',diagram}]},extra||{})});
 function provider(title){return spec('provider',{nodes:{p1:{title:'P one'},p2:{title}},rows:[['p1','p2']],edges:[{from:'p1',to:'p2'}],topologyExports:{public:{nodes:['p1','p2'],edges:['p1->p2']}}});}
@@ -54,7 +54,7 @@ function ghStub(c,{fail=false}={}){
 }
 function snapshot(dir){
   const gitDir=path.join(dir,'.git');
-  return {status:git(dir,['status','--porcelain=v2','--branch']),head:git(dir,['rev-parse','HEAD']),refs:git(dir,['for-each-ref','--format=%(refname) %(objectname)']),
+  return {status:git(dir,['--no-optional-locks','status','--porcelain=v2','--branch']),head:git(dir,['rev-parse','HEAD']),refs:git(dir,['for-each-ref','--format=%(refname) %(objectname)']),
     index:crypto.createHash('sha256').update(fss.readFileSync(path.join(gitDir,'index'))).digest('hex'),
     fetchHead:fss.existsSync(path.join(gitDir,'FETCH_HEAD'))?fss.readFileSync(path.join(gitDir,'FETCH_HEAD'),'utf8'):null};
 }

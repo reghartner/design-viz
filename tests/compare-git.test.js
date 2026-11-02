@@ -178,11 +178,17 @@ test('G6 every call is read-only; fetch changes only remote-tracking refs',async
   const f=await fixture();
   try{
     const r=await adapter(f),c=f.c,before=snapshot(f.dir);
-    /* A snapshot after EACH call: a call that writes and then restores still fails. */
+    /* The clone is read-only on disk during the read calls (chmod -R a-w), so any write - even one that
+       is later undone - makes the call fail; a snapshot is also taken after each call. */
+    const lock=mode=>execFileSync('chmod',['-R',mode,f.dir]);
     const calls=[['status',()=>r.status()],['documents',()=>r.documents(c.c7)],['changedDocuments',()=>r.changedDocuments(c.c1,c.c7)],
       ...['document','all','branches','tags','prs'].map(tab=>['revisions '+tab,()=>r.revisions({doc:A,tab})]),
       ['between',()=>r.between({from:c.c1,to:c.c7,doc:A})],['resolve',()=>r.resolve('main')],['side',()=>r.side(c.c7,A)],['compareRevisions',()=>r.compareRevisions(c.c1,c.c7,A)]];
-    for(const [name,call] of calls){await call();assert.deepEqual(snapshot(f.dir),before,name+' leaves the clone unchanged');}
+    lock('a-w');
+    try{
+      assert.throws(()=>fss.writeFileSync(path.join(f.dir,'.git','probe'),'x'),'precondition: the clone refuses writes');
+      for(const [name,call] of calls){await call();assert.deepEqual(snapshot(f.dir),before,name+' leaves the clone unchanged');}
+    }finally{lock('u+w');}
     /* A new branch on the remote: fetch brings it in as a remote-tracking ref only. */
     git(f.other,['push','-q','origin','HEAD:refs/heads/remote-only']);
     await r.fetch();

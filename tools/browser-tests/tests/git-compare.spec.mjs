@@ -55,6 +55,9 @@
         multi-commit PR                         refs/pull/11/head on the remote          this commit on two2 -> from-choice "<two1> ·     commits; no ref created
                                                                                        first parent of <two2>", between rows [two2];
                                                                                        no ref added
+   P7   latest PR click wins                    hold the availability replies for PR #8   after #8's reply: dialog open, from-choice        an earlier click's late check choosing
+                                                then PR #7 (clicked in that order);      unchanged; after #7's: from-choice = PR #7 row    the row the user did not pick last
+                                                release #8 first
    AU   every test, context-wide (all pages): no page/console error, failed request, HTTP >= 400, or request outside the compare server
    U1   page CSP                                response headers of "/"                 script-src 'self', no 'unsafe-inline'           inline script allowed
    Git refuses "<" and ">" in author names, so the hostile author comes from the PR author login. */
@@ -364,4 +367,31 @@ test('P5 P6: a pull request head that cannot be fetched is refused in the picker
   await expect(choice(page,'To')).toHaveText(choiceText({sha:short(two2),date:'2026-01-11 10:00',author:'Fork',subject:'Two second'}));
   await expect.poll(()=>betweenRows(page)).toEqual([{date:'2026-01-11 10:00',sha:short(two2),subject:'Two second',prs:['PR #11']}]);
   expect(refChanges(refsBefore,snapshot(repo.dir))).toEqual([]);
+});
+
+test('P7: when two pull request rows are clicked, the later click chooses even if the earlier check answers last',async({page,repo,open})=>{
+  const {c}=repo;
+  const release={},seen={};
+  await page.route(/\/api\/documents\?rev=pr%3A(7|8)$/,async route=>{
+    const n=route.request().url().match(/pr%3A(\d+)$/)[1];
+    if(seen[n]){await route.continue();return;}
+    seen[n]=true;await new Promise(resolve=>{release[n]=resolve;});await route.continue();
+  });
+  await open();
+  const dialog=await openPicker(page,'From');
+  await dialog.getByRole('tab',{name:'Pull requests'}).click();
+  await expect.poll(()=>shas(dialog)).toEqual([short(c.pr8),short(c.c3)]);
+  await dialog.getByRole('option').nth(0).click();
+  await expect.poll(()=>!!release['8']).toBe(true);
+  await dialog.getByRole('option').nth(1).click();
+  await expect.poll(()=>!!release['7']).toBe(true);
+  const answered8=page.waitForResponse(r=>/rev=pr%3A8$/.test(r.url()));
+  release['8']();await answered8;
+  /* One more task turn so a handler of #8's answer has run. */
+  await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,50)));
+  await expect(dialog).toBeVisible();
+  await expect(choice(page,'From')).toHaveText('No revision chosen');
+  release['7']();
+  await expect(dialog).toBeHidden();
+  await expect(choice(page,'From')).toHaveText(choiceText({sha:short(c.c3),date:'2026-01-03 12:00',author:'carol',subject:'Feature step'}));
 });

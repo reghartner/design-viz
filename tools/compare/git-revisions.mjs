@@ -16,6 +16,13 @@ export const PAGE_SIZE = 100;
 const PR_LIMIT = 1000000;
 const TABS = ['document', 'all', 'branches', 'tags', 'prs'];
 const NOT_SIGNED_IN = 'Not signed in to GitHub. Run: gh auth login';
+/* The Document value meaning every *.spec.json ("All changed documents"). */
+export const ALL_DOCUMENTS = 'all';
+const isSpec = file => file.endsWith('.spec.json');
+/* Whether a commit's changed files include the document (any spec for ALL_DOCUMENTS). */
+function touchesDocument(files, doc){ return doc === ALL_DOCUMENTS ? [...files].some(isSpec) : files.has(doc); }
+const canonId = spec => spec && spec.page && spec.page.canon && typeof spec.page.canon.id === 'string' && spec.page.canon.id ? spec.page.canon.id : null;
+function documentInput(doc){ return doc === ALL_DOCUMENTS ? doc : relativePath(doc); }
 
 function badInput(message){ return Object.assign(new Error(message), {code:'BAD_INPUT'}); }
 const immutable = value => typeof value === 'string' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
@@ -149,7 +156,7 @@ export class GitRevisions {
     return badges;
   }
   async revisions({doc, tab = 'document', q = '', page = 1} = {}){
-    relativePath(doc);
+    documentInput(doc);
     if (!TABS.includes(tab)) throw badInput('Unknown tab: ' + tab);
     page = Math.max(1, Number.parseInt(page, 10) || 1);
     let rows, error;
@@ -163,7 +170,7 @@ export class GitRevisions {
         for (const p of list){
           const sha = p.headRefOid, local = known.get(sha), available = await this.hasCommit(sha);
           /* A head present only as objects (a fetched pull request) is not on any ref: diff it directly. */
-          const touches = local ? local.files.has(doc) : available ? (await this.changedFiles(sha)).has(doc) : false;
+          const touches = local ? touchesDocument(local.files, doc) : available ? touchesDocument(await this.changedFiles(sha), doc) : false;
           rows.push({sha, short:sha.slice(0, 7), date:isoDate(p.updatedAt), author:String(p.author && p.author.login || ''), subject:String(p.title || ''),
             branches:deco.branches.get(sha) || [], tags:deco.tags.get(sha) || [], prs:[p.number], touches, available});
         }
@@ -171,9 +178,9 @@ export class GitRevisions {
     } else {
       const [commits, deco, prs] = await Promise.all([this.commits(), this.decorations(), this.prBadges()]);
       const row = c => ({sha:c.sha, short:c.sha.slice(0, 7), date:c.date, author:c.author, subject:c.subject,
-        branches:deco.branches.get(c.sha) || [], tags:deco.tags.get(c.sha) || [], prs:prs.get(c.sha) || [], touches:c.files.has(doc), available:true});
+        branches:deco.branches.get(c.sha) || [], tags:deco.tags.get(c.sha) || [], prs:prs.get(c.sha) || [], touches:touchesDocument(c.files, doc), available:true});
       if (tab === 'all') rows = commits.map(row);
-      else if (tab === 'document') rows = commits.filter(c => c.files.has(doc)).map(row);
+      else if (tab === 'document') rows = commits.filter(c => touchesDocument(c.files, doc)).map(row);
       else {
         const map = tab === 'branches' ? deco.branches : deco.tags, byName = new Map(commits.map(c => [c.sha, c]));
         rows = [...map.keys()].filter(sha => byName.has(sha)).map(sha => row(byName.get(sha))).sort((a, b) => (tab === 'branches' ? a.branches[0] : a.tags[0]).localeCompare(tab === 'branches' ? b.branches[0] : b.tags[0]));
@@ -188,10 +195,10 @@ export class GitRevisions {
   }
   /* Commits after From up to To whose first-parent diff changes the document, newest first. */
   async between({from, to, doc}){
-    relativePath(doc);
+    documentInput(doc);
     const a = await this.resolve(from), b = await this.resolve(to);
     const [commits, prs] = await Promise.all([this.commits(a + '..' + b), this.prBadges()]);
-    return commits.filter(c => c.files.has(doc)).map(c => ({sha:c.sha, short:c.sha.slice(0, 7), parent:c.parent, date:c.date, author:c.author, subject:c.subject, prs:prs.get(c.sha) || []}));
+    return commits.filter(c => touchesDocument(c.files, doc)).map(c => ({sha:c.sha, short:c.sha.slice(0, 7), parent:c.parent, date:c.date, author:c.author, subject:c.subject, prs:prs.get(c.sha) || []}));
   }
 
   /* ---------- documents ---------- */
@@ -210,12 +217,31 @@ export class GitRevisions {
     }
     return list.sort((x, y) => x.path.localeCompare(y.path));
   }
+  /* "All changed documents": every spec added, removed or edited from From to To, plus every spec whose
+     own file is unchanged but whose imported providers changed (its resolved document differs). Sorted by path. */
+  async changedDocumentList(from, to){
+    const a = await this.resolve(from), b = await this.resolve(to);
+    const list = (await this.changedDocuments(a, b)).map(d => ({path:d.path, status:d.status === 'modified' ? 'edited' : d.status}));
+    if (list.length){
+      const changed = new Set(list.map(d => d.path));
+      /* Only a spec that declares topologyImports can change through a provider. */
+      let importing = [];
+      try{ importing = (await this.git(['grep', '-l', '-z', '--fixed-strings', 'topologyImports', b, '--', '*.spec.json'])).split('\0').filter(Boolean).map(f => f.slice(b.length + 1)); }
+      catch(ex){ importing = []; /* git grep exits 1 when nothing matches */ }
+      for (const file of importing){
+        if (changed.has(file) || !(await this.gitOk(['cat-file', '-e', a + ':' + file]))) continue;
+        if ((await this.compareRevisions(a, b, file)).length) list.push({path:file, status:'edited', imported:true});
+      }
+    }
+    return list.sort((x, y) => x.path < y.path ? -1 : x.path > y.path ? 1 : 0);
+  }
   async blob(sha, file){
     if (!(await this.gitOk(['cat-file', '-e', sha + ':' + file]))) return null;
     return this.git(['cat-file', 'blob', sha + ':' + file]);
   }
-  /* One side of a comparison: the document at that commit and every spec of the same commit (the
-     import resolution context), or null when the document does not exist there. */
+  /* One side of a comparison: the document at that commit and every spec of the same commit that has a
+     canon id (the import resolution context; providers are found by canon id), or null when the document
+     does not exist there. A document without a canon id has no context: it resolves on its own. */
   async side(rev, doc){
     if (!immutable(rev)) throw badInput('Revision must be an immutable full commit SHA.');
     relativePath(doc);
@@ -223,11 +249,14 @@ export class GitRevisions {
     if (text == null) return null;
     let raw;
     try{ raw = JSON.parse(text); }catch(ex){ throw badInput('Document is not valid JSON at ' + rev.slice(0, 7) + ': ' + doc); }
+    const id = canonId(raw);
+    if (!id) return {raw, context:null};
     const specs = [];
     for (const file of await this.documents(rev)){
-      try{ specs.push(file === doc ? raw : JSON.parse(await this.blob(rev, file))); }catch(ex){ /* a spec that is not JSON cannot be a provider */ }
+      let spec;
+      try{ spec = file === doc ? raw : JSON.parse(await this.blob(rev, file)); }catch(ex){ continue; /* a spec that is not JSON cannot be a provider */ }
+      if (canonId(spec)) specs.push(spec);
     }
-    const id = raw && raw.page && raw.page.canon && raw.page.canon.id || doc;
     return {raw, context:{version:1, id, specs}};
   }
   /* The shared engine's change list for one document between two revisions. */
@@ -235,7 +264,7 @@ export class GitRevisions {
     const a = immutable(from) ? from : await this.resolve(from), b = immutable(to) ? to : await this.resolve(to);
     const [sa, sb] = await Promise.all([this.side(a, doc), this.side(b, doc)]);
     const C = engine(), copy = v => JSON.parse(JSON.stringify(v));
-    const build = s => s ? {authored:C.normalize(copy(s.raw)), resolved:C.normalize(C.FlowTopology.resolveSource(copy(s.raw), copy(s.context))), ledger:null} : null;
+    const build = s => s ? {authored:C.normalize(copy(s.raw)), resolved:C.normalize(C.FlowTopology.resolveSource(copy(s.raw), s.context && copy(s.context))), ledger:null} : null;
     return JSON.parse(JSON.stringify(C.compareDocuments(build(sa), build(sb))));
   }
 

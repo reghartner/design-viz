@@ -10,6 +10,8 @@
      ids           optional element ids for the pane scroll/view nodes
      onSelect      optional callback(entry, index, result) after each selection
      onRenderError optional callback({side, message}) when a pane cannot be rendered
+     titles        optional {before, after} pane headings
+     emptyText     optional {before, after} text for a side without the document
    returns {select(i), next(), previous(), selected(), setMode(m), mode(), setSkin(name), destroy()}
 
    Selecting a change frames BOTH panes on it (one-way: the selection drives the
@@ -247,7 +249,7 @@ function mountCompareView(host, opts){
     if (ids[side]){ if (ids[side].scroll) scroll.id = ids[side].scroll; if (ids[side].view) view.id = ids[side].view; }
     scroll.tabIndex = 0; scroll.appendChild(view); pane.appendChild(head); pane.appendChild(scroll); columns.appendChild(pane);
     panes[side] = {pane:pane, scroll:scroll, view:view, ctl:null, canvas:null, page:pages[side]};
-    if (!pages[side]){ view.appendChild(el('p', 'compare-pane-empty', side === 'before' ? 'Not in the current document.' : 'Not in the proposal.')); return; }
+    if (!pages[side]){ view.appendChild(el('p', 'compare-pane-empty', opts.emptyText && opts.emptyText[side] || (side === 'before' ? 'Not in the current document.' : 'Not in the proposal.'))); return; }
     var p = panes[side], first = side === 'before' && entries.length ? (entries[0].section || {}).before : null, partial = first != null ? comparePartialPage(pages.before, first) : null;
     if (partial){ p.partial = first; renderPane(p, partial); } else renderPane(p, pages[side]);
   }); });

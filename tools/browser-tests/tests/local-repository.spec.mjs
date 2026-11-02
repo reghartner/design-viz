@@ -300,8 +300,8 @@ test('Use site library leaves a selected local source repository with Undo, and 
    | C6 consumer reload restores the consumer document | reload the consumer tab after C5 | #src == consumer bytes; #docview .doc-title == "Local consumer"; node contains the accepted text | the shared dv-workbench-draft key restoring the provider tab's document; a reload restoring the pre-refresh snapshot |
    | N1 an agent-seeded provider is selectable at the root | the test writes diagrams/team/billing/billing.spec.json and its canon.json entry after both tabs loaded | provider-tab file picker offers billing.spec.json; provider #src == seed bytes | a picker that misses canon.json entries added after page load |
    | N2 its accepted exports are saved | propose adding topologyExports and renaming gateway; accept | billing.spec.json bytes == proposed; result applied | acceptance that skips the disk save |
-   | N3 consumer accepts an import of the new provider | consumer begin + propose adding a billing import; accept | review previews billing::gateway with no issues; result applied; saved consumer imports [middle, billing] and has no billing::gateway node | a review blocked because the consumer's frozen snapshot lacks the new provider (#883: the review acquires the proposal closure through the consumer's browser grant) |
-   | N4 refresh-sources renders the new provider | consumer helper refresh-sources --source-repo <repository root> | helper exits 0; consumer g.node[billing::gateway] contains "Accepted billing gateway" | a refresh limited to the providers frozen when the consumer connected |
+   | N3 consumer accepts an import of the new provider | consumer begin + propose adding a billing import; accept | review previews billing::gateway with no issues; result applied; saved consumer imports [middle, billing] and has no billing::gateway node; consumer billing::gateway contains the accepted title | a review blocked because the consumer's frozen snapshot lacks the new provider (#883: the review acquires the proposal closure through the consumer's browser grant) |
+   | N4 refresh-sources renders the provider's later accepted change | provider tab accepts a second proposal renaming gateway; then consumer helper refresh-sources --source-repo <repository root> | before: consumer billing::gateway still contains "Accepted billing gateway"; after: helper exits 0, receipt applied, billing::gateway contains "Refreshed billing gateway" | a refresh-sources that does nothing (the first title already renders after N3); a refresh limited to the closure frozen before the import |
    Excluded: phone/narrow-width editing (Chuck 2026-10-13, desktop only); cloud Workbench (later ticket). */
 const consumerLedger='# Consumer ledger\n\nImports the shared API through middle.\n';
 const registry=ids=>JSON.stringify({version:1,diagrams:ids.map(id=>({folder:'diagrams/team/'+id,owner:'group:default/local'}))});
@@ -379,7 +379,7 @@ test('two desktop tabs: an agent provider edit accepted in the provider tab reac
 });
 
 test('two desktop tabs: an agent-seeded new provider gains exports in its tab and the consumer imports it through refresh-sources',async({page,context,server})=>{
- test.setTimeout(90000); // Two Workbench tabs, two folder connections and five helper round trips.
+ test.setTimeout(120000); // Two Workbench tabs, two folder connections and seven helper round trips.
  const importer=await context.newPage(),repo=await twoTabRepository(page,importer),title='Accepted billing gateway';
  try{
   for(const tab of [page,importer]){await tab.goto(server.origin+'/workbench.html');await paste(tab,starter);}
@@ -400,7 +400,17 @@ test('two desktop tabs: an agent-seeded new provider gains exports in its tab an
   await expect.poll(()=>outcome(repo.support('consumer'),imported.request.id)).toBe('applied');
   const saved=JSON.parse(await repo.file('consumer','consumer.spec.json')).page.sections[0].diagram;
   expect(saved.topologyImports.map(item=>item.spec)).toEqual(['middle','billing']);expect(saved.nodes['billing::gateway']).toBeUndefined();
+  const gateway=importer.locator('#docview g.node[data-dv-node="billing::gateway"]');await expect(gateway,'the accepted import renders the new provider').toContainText(title);
+  // Provider tab: the agent changes the new provider again and a person accepts it.
+  await page.bringToFront();const renamed='Refreshed billing gateway';
+  const updated=await propose(repo.support('billing'),'Rename the billing gateway',seeded=>{const raw=JSON.parse(seeded);raw.page.sections[0].diagram.nodes.gateway.title=renamed;return JSON.stringify(raw,null,2);},'# Billing ledger\n\nExports the gateway for importing diagrams.\nRenamed the gateway.\n');
+  await acceptReview(page,page.locator('#agent-update-view [data-dv-node="gateway"]').filter({hasText:renamed}));
+  await expect.poll(()=>repo.file('billing','billing.spec.json'),{message:'the renamed provider is saved to its registered file'}).toBe(updated.proposed);
+  await expect.poll(()=>outcome(repo.support('billing'),updated.request.id)).toBe('applied');
+  // Consumer tab: still the first accepted title until the helper refreshes it.
+  await importer.bringToFront();await expect(gateway).toContainText(title);
   const refreshed=await agent(repo.support('consumer'),'refresh-sources','--source-repo',repo.folder);expect(refreshed.code,refreshed.stderr).toBe(0);
-  await expect(importer.locator('#docview g.node[data-dv-node="billing::gateway"]'),'the importing tab renders the new provider').toContainText(title);
+  await expect(gateway,'refresh-sources renders the provider\'s later accepted change').toContainText(renamed);
+  expect(JSON.parse(refreshed.stdout).status).toBe('applied');
  }finally{await importer.close();await page.close();await repo.close();}
 });

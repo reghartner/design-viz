@@ -43,12 +43,14 @@ function engine(){
 export class GitRevisions {
   constructor({directory, gh, remote = 'origin'}){
     if (typeof directory !== 'string' || !directory) throw new Error('GitRevisions needs the clone directory.');
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(remote)) throw new Error('Remote name must be a plain name.');
     this.directory = path.resolve(directory);
     this.ghRun = gh ? args => gh(args) : args => defaultGh(args, this.directory);
     this.remote = remote;
   }
   async git(args, options){
-    const {stdout} = await exec('git', ['--no-pager', '-C', this.directory, ...args],
+    /* core.quotePath=false: paths with non-ASCII characters are printed as-is, not quoted. */
+    const {stdout} = await exec('git', ['--no-pager', '-c', 'core.quotePath=false', '-C', this.directory, ...args],
       Object.assign({encoding:'utf8', maxBuffer:64_000_000, timeout:60000, env:localGitEnvironment()}, options || {}));
     return stdout;
   }
@@ -89,7 +91,8 @@ export class GitRevisions {
       if (!hit) throw badInput('Unknown revision: ' + name);
       const sha = hit.headRefOid;
       if (!(await this.hasCommit(sha))){
-        await this.git(['fetch', '--quiet', '--no-write-fetch-head', '--no-tags', this.remote, 'refs/pull/' + Number(pr[1]) + '/head']).catch(() => null);
+        /* No destination and an empty --refmap: objects only, no ref is created or updated. */
+        await this.git(['fetch', '--quiet', '--no-write-fetch-head', '--no-tags', '--refmap=', this.remote, 'refs/pull/' + Number(pr[1]) + '/head']).catch(() => null);
         if (!(await this.hasCommit(sha))) throw badInput('Pull request #' + pr[1] + ' is not available locally.');
       }
       return sha;
@@ -128,6 +131,11 @@ export class GitRevisions {
         files:new Set((files || '').split('\n').map(s => s.trim()).filter(Boolean))};
     });
   }
+  /* Files one commit's first-parent diff changes (all files for a root commit). */
+  async changedFiles(sha){
+    const out = await this.git(['diff-tree', '--root', '--no-commit-id', '-r', '--name-only', '--no-renames', '-z', '-m', '--first-parent', sha]);
+    return new Set(out.split('\0').filter(Boolean));
+  }
   async prBadges(){
     const badges = new Map();
     let list = [];
@@ -148,11 +156,13 @@ export class GitRevisions {
       rows = [];
       if (list){
         list.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)) || b.number - a.number);
-        const known = new Map((await this.commits()).map(c => [c.sha, c]));
+        const [commits, deco] = await Promise.all([this.commits(), this.decorations()]), known = new Map(commits.map(c => [c.sha, c]));
         for (const p of list){
-          const sha = p.headRefOid, local = known.get(sha);
+          const sha = p.headRefOid, local = known.get(sha), available = await this.hasCommit(sha);
+          /* A head present only as objects (a fetched pull request) is not on any ref: diff it directly. */
+          const touches = local ? local.files.has(doc) : available ? (await this.changedFiles(sha)).has(doc) : false;
           rows.push({sha, short:sha.slice(0, 7), date:isoDate(p.updatedAt), author:String(p.author && p.author.login || ''), subject:String(p.title || ''),
-            branches:[], tags:[], prs:[p.number], touches:!!(local && local.files.has(doc)), available:await this.hasCommit(sha)});
+            branches:deco.branches.get(sha) || [], tags:deco.tags.get(sha) || [], prs:[p.number], touches, available});
         }
       }
     } else {
@@ -228,7 +238,9 @@ export class GitRevisions {
 
   /* ---------- the one write ---------- */
   async fetch(){
-    await this.git(['fetch', '--quiet', '--prune', '--no-tags', this.remote]);
+    /* An explicit refspec into refs/remotes/<remote>/ and an empty --refmap, so a repository-configured
+       fetch refspec cannot write anywhere else. */
+    await this.git(['fetch', '--quiet', '--prune', '--no-tags', '--refmap=', this.remote, '+refs/heads/*:refs/remotes/' + this.remote + '/*']);
     return this.status();
   }
 }

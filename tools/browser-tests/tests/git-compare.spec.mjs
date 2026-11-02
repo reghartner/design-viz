@@ -591,6 +591,7 @@ test('C4 C5: each Compare replaces the previous view, and a changed choice or do
   const {c}=repo;await open();
   await choose(page,'From','Revisions of this document',c.c1);
   await choose(page,'To','Revisions of this document',c.c7);
+  await expect(compareButton(page)).toBeEnabled();
   await compareButton(page).click();
   await expect(changeItems(page)).toHaveText(A_CHANGES);
   const one=await liveOwners(page);expect(one,'precondition: a mounted view owns renders').toBeGreaterThan(0);
@@ -628,6 +629,7 @@ test('C6: when two comparisons are requested, the later one is shown even if the
   await open();
   await choose(page,'From','Revisions of this document',c.c1);
   await choose(page,'To','Revisions of this document',c.c7);
+  await expect(compareButton(page)).toBeEnabled();
   await compareButton(page).click();
   await expect.poll(()=>!!release).toBe(true);
   await expect(comparison(page)).toHaveAttribute('aria-busy','true');

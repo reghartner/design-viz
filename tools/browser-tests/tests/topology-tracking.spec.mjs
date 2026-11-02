@@ -462,7 +462,7 @@ own Test + flip plan. Local rows E16–E20 live in tests/board-edit.spec.mjs.
 | row | fixture | assertion (scoped) | rejects |
 |---|---|---|---|
 | I4 imported node Clear | overlay nodeTracking.api {tickets [LOC-1], missingWork} | canon::api is dv-live-missing; in Edit mode its popover's Clear Missing work → not missing; Save → only flowspec.json; nodeTracking == {api:{tickets:["LOC-1"]}}, edgeTracking untouched, nodes keys ["local"], no CAN-1 in the text; change {op clear-missing-work, path to the overlay entry, node "canon::api", label "API"} | writing to nodes["canon::api"]; dropping the overlay tickets with the marker |
-| I4 clear only, no Undo (test review c1) | same board: the unmarked imported edge canon::api → canon::store in Edit mode; after the clear | its popover has no button named /missing work/i and no checkbox; after the clear the Live status panel has no button named /undo/i | a Set/Mark Missing work control on imported carriers; an Undo control. Absence guards: they pass at the baseline |
+| I4 clear only, no Undo (test review c1, c2) | same board: the unmarked imported edge canon::api → canon::store and the unmarked imported node canon::store (its "No change needed" popover) in Edit mode; after the clear | both popovers have no button named /missing work/i and no checkbox; after the clear the Live status panel and canon::api's reopened popover (it lists CAN-1 and LOC-1) have no button named /undo/i, and that popover has no Clear button | a Set/Mark Missing work control on imported carriers; an Undo control. Absence guards: they pass at the baseline |
 | I5 imported edge, post-drop Clear | overlay edgeTracking["api->store"] {tickets [LOC-2], missingWork} | EX-1 dropped on the edge label → `.dv-live-question` "Does EX-1 cover the missing work?" → Clear → the live break is gone; Save 2 → edgeTracking == {"api->store":{tickets:["LOC-2","EX-1"]}}; changes [add, clear-missing-work] with edge ["canon::api","canon::store"], label "API → Store" | clearing only the add; writing to the resolved edge |
 | I6 provider-inherited markers | provider api and api → store marked; the consumer overlay repeats the node marker | outside Edit mode no `.dv-live-missing-source`; in Edit mode each popover's `.dv-live-missing-source` reads 'Missing work comes from the source diagram "provider" and must be cleared there.' and has no Clear button; drops of EX-1 on both add without opening a popover; Save → nodeTracking {api:{tickets ["EX-1"], missingWork}}, edgeTracking {"api->store":{tickets ["EX-1"]}}; both carriers still paint Missing | a Clear button for an inherited marker; removing the consumer copy of an inherited marker; a question after the drop |
 | I7 conflict replay after imports swap | imports "one" and "two", two's overlay marks api; clear on two::api; the winner swaps the imports | notice "1 of your changes were re-applied"; Save → overlay 0 (as "two") has no nodeTracking, overlay 1 (as "one") none; change path to topologyImports[0] | replay by stored import index |
@@ -543,13 +543,19 @@ test('I4 desktop board Clear Missing work on an imported node removes only the c
   await mockRuntime(page);const {root,panel}=await openBoard(page,board);
   await expect(liveNode(root,'canon::api')).toHaveClass(/\bdv-live-missing\b/);
   await startEditing(panel);
-  const unmarked=await editPopover(page,edgeLabel(root,0));
-  await expect(unmarked.getByRole('button',{name:/missing work/i})).toHaveCount(0);await expect(unmarked.getByRole('checkbox')).toHaveCount(0);
-  await page.keyboard.press('Escape');await expect(unmarked).toBeHidden();
+  for(const target of [edgeLabel(root,0),nodeCard(root,'canon::store')]){
+    const unmarked=await editPopover(page,target);
+    await expect(unmarked.getByRole('button',{name:/missing work/i})).toHaveCount(0);await expect(unmarked.getByRole('checkbox')).toHaveCount(0);
+    await page.keyboard.press('Escape');await expect(unmarked).toBeHidden();
+  }
   const pop=await editPopover(page,nodeCard(root,'canon::api'));
   const clear=clearMissing(pop);await expect(clear).toBeVisible();await clear.click();await expect(pop).toBeHidden();
   await expect(liveNode(root,'canon::api')).not.toHaveClass(/\bdv-live-missing\b/);
   await expect(panel.getByRole('button',{name:/undo/i})).toHaveCount(0);
+  const after=await editPopover(page,nodeCard(root,'canon::api'));
+  await expect(after.locator('.dv-live-ticket').filter({hasText:'LOC-1'})).toHaveCount(1);
+  await expect(after.getByRole('button',{name:/undo/i})).toHaveCount(0);await expect(clearMissing(after)).toHaveCount(0);
+  await page.keyboard.press('Escape');await expect(after).toBeHidden();
   const text=await saveBoard(page,panel,1),saved=JSON.parse(text);
   expect((await publishes(page))[0].paths).toEqual(['flowspec.json']);
   expect(overlay(saved).nodeTracking).toEqual({api:{tickets:['LOC-1']}});

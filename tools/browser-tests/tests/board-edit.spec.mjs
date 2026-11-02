@@ -39,6 +39,7 @@ validator and panel rows (H1c, H3c, H7c, H14) in the node tests, B3 in edit-hist
 | E18 post-drop question, clear | edge 0 marked; EX-1 dropped on its label | the question opens on the edge popover; Clear → break gone, "Save 2 changes"; saved edges[0] == {from,to,label,tickets ["EX-1"]}; one history entry with [add EX-1, clear-missing-work] on that edge | a clear that drops the add; two history entries |
 | E19 conflict replay | (a) twoSections with section "second"'s door marked, cleared, the winner swaps sections; (b) B cleared, the winner deletes B; (c) B cleared, the winner already cleared B | (a) notice "1 of your changes were re-applied; 0 could not be", no automatic publish, Save → sections[0] (id second) door == {title}, change path to sections[0]; (b)(c) notice "0 of your changes were re-applied; 1 could not be (…): Missing work cleared from Beta service", no Save | replay by numeric path; counting a clear with nothing to clear as applied |
 | E16 clear only, no Undo (Chuck 2026-11-01; test review c1) | same board: unmarked node A and unmarked edge 1 (b → c, which lists CC-1; an edge with no tickets has no popover at all) in Edit mode; after the clear | A's and edge 1's popovers have no button named /missing work/i and no checkbox; after the clear the Live status panel and B's reopened popover have no button named /undo/i | a Set/Mark Missing work control; an Undo control. Absence guards: they pass at the baseline |
+| E17/E18 no Undo on edges (test review c2) | E17 after its clear; E18 edge case after its clear (edge 0 then lists EX-1, so it has a popover) | no button named /undo/i in the Live status panel (both) or in edge 0's reopened popover (E18), which has no Clear button | an Undo control confined to the panel or an edge popover. Absence guards: they pass at the baseline |
 | E20 no Clear outside Edit mode or for read-only viewers | B and edge 0 marked; editor not editing; canEdit false | B's and edge 0's popovers show the Missing work explanation and no Clear or Keep button | a Clear control for every viewer |
 E20 guards today's behavior and passes at the baseline; every other row fails there on its own
 assertion (no Clear control, no question). Flip: make the clear a no-op → E16 publish assertions
@@ -361,6 +362,7 @@ test('E17 Clear Missing work on a local edge opened from its label records the e
  const pop=await openPopover(page,edgeLabel(root,0));await expect(pop).toHaveAttribute('aria-label',/ calls$/);
  await clickClear(pop);
  await expect(commBreak(root,0)).toHaveCount(0);await expect(saveButton(panel)).toHaveText('Save 1 change');
+ await expect(panel.getByRole('button',{name:/undo/i})).toHaveCount(0);
  const text=await save(page,panel,1),saved=JSON.parse(text);
  expect(diagramAt(saved).edges[0]).toEqual({from:'a',to:'b',label:'calls'});
  expect(saved.page.editHistory[0].changes).toEqual([{op:'clear-missing-work',path:['page','sections',0,'diagram','edges',0],edge:['a','b'],label:'Alpha service → Beta service'}]);
@@ -411,6 +413,10 @@ test('E18 Clear Missing work in the post-drop question on a marked edge saves th
  await expect(commBreak(root,0)).toBeVisible();await expect(saveButton(panel)).toHaveText('Save 1 change');
  await clickClear(pop);
  await expect(commBreak(root,0)).toHaveCount(0);await expect(saveButton(panel)).toHaveText('Save 2 changes');
+ await expect(panel.getByRole('button',{name:/undo/i})).toHaveCount(0);
+ const after=await openPopover(page,edgeLabel(root,0));await expect(popoverTicket(after,'EX-1')).toHaveCount(1);
+ await expect(after.getByRole('button',{name:/undo/i})).toHaveCount(0);await expect(clearButton(after)).toHaveCount(0);
+ await page.keyboard.press('Escape');await expect(after).toBeHidden();
  const saved=JSON.parse(await save(page,panel,2)),at=['page','sections',0,'diagram','edges',0];
  expect(diagramAt(saved).edges[0]).toEqual({from:'a',to:'b',label:'calls',tickets:['EX-1']});
  expect(saved.page.editHistory).toHaveLength(1);

@@ -96,8 +96,8 @@ def workbench_landing(config=None, *, no_config=False, runtime=None) -> str:
                               'footer': 'One story. System flow, Home map, App screens, and Device app—moving together.'})
     try:
         data = json.loads(path.read_text())
-        if not isinstance(data, dict) or set(data) - {'examples'} != {'version', 'landing'}:
-            raise ValueError('expected only version, landing and optional examples fields')
+        if not isinstance(data, dict) or set(data) - {'examples', 'liveStatusExample'} != {'version', 'landing'}:
+            raise ValueError('expected only version, landing and optional examples and liveStatusExample fields')
         if type(data['version']) is not int or data['version'] != 1:
             raise ValueError('version must be 1')
         landing = data['landing']
@@ -142,6 +142,31 @@ def workbench_examples(config=None, *, no_config=False) -> str:
         if (not isinstance(url, str) or not url or any(c <= ' ' or c == '\x7f' for c in url)
                 or re.match(r'[A-Za-z][A-Za-z0-9+.-]*:', url) or url.startswith('//') or '\\' in url):
             raise ValueError('examples must be a relative or same-site path to the examples gallery')
+        return embedded_json(url)
+    except (OSError, ValueError) as error:
+        raise SystemExit(f'Invalid site config {path}: {error}') from error
+
+
+def workbench_live_status_example(config=None, *, no_config=False) -> str:
+    """Optional live status board example URL from site config, or null (no Welcome row)."""
+    path = site_config_path(config)
+    if no_config or (config is None and not path.exists()):
+        return 'null'
+    try:
+        data = json.loads(path.read_text())
+        if not isinstance(data, dict) or 'liveStatusExample' not in data:
+            return 'null'
+        url = data['liveStatusExample']
+        invalid = ValueError('liveStatusExample must be an absolute https:// URL without credentials or whitespace')
+        # Unlike examples, the board may live on another host (a claude.ai artifact), but only
+        # as an absolute https URL with a host: no credentials, whitespace, controls or backslash.
+        if (not isinstance(url, str) or not url.startswith('https://')
+                or any(c.isspace() or c < ' ' or c == '\x7f' or c == '\\' for c in url)):
+            raise invalid
+        parts = urllib.parse.urlsplit(url)
+        # Reading .port raises ValueError for a malformed port.
+        if not parts.hostname or '@' in parts.netloc or parts.port == 0:
+            raise invalid
         return embedded_json(url)
     except (OSError, ValueError) as error:
         raise SystemExit(f'Invalid site config {path}: {error}') from error
@@ -290,6 +315,7 @@ def main() -> int:
     runtime = canon_runtime()
     landing = None if args.runtime_only or args.template_only else workbench_landing(args.config, no_config=args.no_config, runtime=runtime)
     examples = None if args.runtime_only or args.template_only else workbench_examples(args.config, no_config=args.no_config)
+    live_status_example = None if args.runtime_only or args.template_only else workbench_live_status_example(args.config, no_config=args.no_config)
     runtime_path = ROOT / "tools/canon/generated-runtime.cjs"
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
     runtime_path.write_text(runtime)
@@ -322,6 +348,7 @@ def main() -> int:
             mapping['WORKBENCH_ONBOARDING'] = json.dumps(json.loads(read('starters/onboarding.json')), ensure_ascii=True).replace('<', '\\u003c')
             mapping['WORKBENCH_LANDING'] = landing
             mapping['WORKBENCH_EXAMPLES'] = examples
+            mapping['WORKBENCH_LIVE_STATUS_EXAMPLE'] = live_status_example
             mapping['WORKBENCH_LIBRARY_HIDDEN'] = welcome_hidden(args.no_library)
             mapping['WORKBENCH_CATALOG_HIDDEN'] = welcome_hidden(args.no_catalog)
             mapping['HUMAN_GUIDE'] = human_guide()

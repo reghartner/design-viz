@@ -453,6 +453,19 @@ test('desktop inherited edge Missing work is read only while local additions rem
 | I2 imported edge | provider edge api → store holds CAN-2; overlay edgeTracking["api->store"] holds LOC-2 | same through the edge label: edgeTracking == {"api->store":{tickets:["EX-1"]}}; change edge ["canon::api","canon::store"], label "API → Store" | writing to the resolved edge; Remove on CAN-2 |
 | I3 conflict replay: imports swapped | two imports of core as "one" and "two"; editor drops on two::api; the winner swaps the imports | after the reload and Save, EX-1 is in the import whose `as` is "two" (now index 0) and not in "one" | replay by stored import index |
 Flip: write to the resolved imported carrier instead of the overlay → I1/I2 overlay assertions fail.
+
+#855 Clear Missing work on imported carriers. Contract source: #855 "How it should look and behave"
++ "Test + flip"; Chuck's rulings 2026-11-01 (imported carriers clear their consumer overlay marker;
+a provider-inherited marker, including one the consumer overlay repeats, shows an explanation naming
+the source diagram and no Clear control or post-drop question). §0 ruling: Chuck 2026-11-01: issue's
+own Test + flip plan. Local rows E16–E20 live in tests/board-edit.spec.mjs.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| I4 imported node Clear | overlay nodeTracking.api {tickets [LOC-1], missingWork} | canon::api is dv-live-missing; in Edit mode its popover's Clear Missing work → not missing; Save → only flowspec.json; nodeTracking == {api:{tickets:["LOC-1"]}}, edgeTracking untouched, nodes keys ["local"], no CAN-1 in the text; change {op clear-missing-work, path to the overlay entry, node "canon::api", label "API"} | writing to nodes["canon::api"]; dropping the overlay tickets with the marker |
+| I5 imported edge, post-drop Clear | overlay edgeTracking["api->store"] {tickets [LOC-2], missingWork} | EX-1 dropped on the edge label → `.dv-live-question` "Does EX-1 cover the missing work?" → Clear → the live break is gone; Save 2 → edgeTracking == {"api->store":{tickets:["LOC-2","EX-1"]}}; changes [add, clear-missing-work] with edge ["canon::api","canon::store"], label "API → Store" | clearing only the add; writing to the resolved edge |
+| I6 provider-inherited markers | provider api and api → store marked; the consumer overlay repeats the node marker | outside Edit mode no `.dv-live-missing-source`; in Edit mode each popover's `.dv-live-missing-source` reads 'Missing work comes from the source diagram "provider" and must be cleared there.' and has no Clear button; drops of EX-1 on both add without opening a popover; Save → nodeTracking {api:{tickets ["EX-1"], missingWork}}, edgeTracking {"api->store":{tickets ["EX-1"]}}; both carriers still paint Missing | a Clear button for an inherited marker; removing the consumer copy of an inherited marker; a question after the drop |
+| I7 conflict replay after imports swap | imports "one" and "two", two's overlay marks api; clear on two::api; the winner swaps the imports | notice "1 of your changes were re-applied"; Save → overlay 0 (as "two") has no nodeTracking, overlay 1 (as "one") none; change path to topologyImports[0] | replay by stored import index |
+Flip: drop the inherited check → I6 shows a Clear button.
 */
 import {buildBoard as buildEditBoard,serveWinner,mockRuntime,publishes,openBoard,showBoard,TRACKING,PANELS,cardPoint,nodeCard,edgeLabel,dragTicket,startEditing,saveButton,reloadRecordingDialogs,
  save as saveBoard} from '../helpers/board-edit.mjs';
@@ -514,4 +527,89 @@ test('I3 desktop board conflict replay finds a swapped topology import by its pr
   const saved=JSON.parse(await saveBoard(page,panel,1));
   expect(overlay(saved,0).as).toBe('two');expect(overlay(saved,0).nodeTracking).toEqual({api:{tickets:['EX-1']}});
   expect(overlay(saved,1).as).toBe('one');expect(overlay(saved,1).nodeTracking).toBeUndefined();
+});
+
+/* #855 rows I4–I7 above. */
+const liveNode=(root,id)=>root.locator('g.node[data-dv-node="'+id+'"]');
+const liveBreak=root=>root.locator('g.dv-live-comm-failure[data-dv-edge="0"]');
+const clearMissing=pop=>pop.getByRole('button',{name:'Clear Missing work',exact:true});
+const missingQuestion=page=>page.locator('.dv-live-popover .dv-live-question');
+const canonImport=(tracking={})=>[{spec:'provider',export:'core',as:'canon',position:{x:80,y:250},...tracking}];
+
+test('I4 desktop board Clear Missing work on an imported node removes only the consumer overlay marker',async({page,server})=>{
+  const {provider,consumer,context}=importedBoard(canonImport({nodeTracking:{api:{tickets:['LOC-1'],missingWork:true}},edgeTracking:{'api->store':{tickets:['LOC-2']}}}));
+  const board=await buildEditBoard(server,'imported-clear-node',consumer,{topology:context([provider,consumer])});
+  await mockRuntime(page);const {root,panel}=await openBoard(page,board);
+  await expect(liveNode(root,'canon::api')).toHaveClass(/\bdv-live-missing\b/);
+  await startEditing(panel);
+  const pop=await editPopover(page,nodeCard(root,'canon::api'));
+  const clear=clearMissing(pop);await expect(clear).toBeVisible();await clear.click();await expect(pop).toBeHidden();
+  await expect(liveNode(root,'canon::api')).not.toHaveClass(/\bdv-live-missing\b/);
+  const text=await saveBoard(page,panel,1),saved=JSON.parse(text);
+  expect((await publishes(page))[0].paths).toEqual(['flowspec.json']);
+  expect(overlay(saved).nodeTracking).toEqual({api:{tickets:['LOC-1']}});
+  expect(overlay(saved).edgeTracking).toEqual({'api->store':{tickets:['LOC-2']}});
+  expect(Object.keys(saved.page.sections[0].diagram.nodes)).toEqual(['local']);expect(text).not.toContain('CAN-1');
+  expect(saved.page.editHistory[0].changes).toEqual([{op:'clear-missing-work',path:['page','sections',0,'diagram','topologyImports',0,'nodeTracking','api'],node:'canon::api',label:'API'}]);
+});
+
+test('I5 desktop board post-drop Clear Missing work on an imported edge keeps the dropped ticket in the overlay',async({page,server})=>{
+  const {provider,consumer,context}=importedBoard(canonImport({nodeTracking:{api:{tickets:['LOC-1']}},edgeTracking:{'api->store':{tickets:['LOC-2'],missingWork:true}}}));
+  const board=await buildEditBoard(server,'imported-clear-edge',consumer,{topology:context([provider,consumer])});
+  await mockRuntime(page);const {root,panel}=await openBoard(page,board);
+  await expect(liveBreak(root)).toBeVisible();await startEditing(panel);
+  await dragTicket(page,panel,'EX-1',await cardPoint(edgeLabel(root,0)));
+  await expect(missingQuestion(page)).toHaveText('Does EX-1 cover the missing work?');
+  const pop=page.locator('.dv-live-popover'),clear=clearMissing(pop);await expect(clear).toBeVisible();await clear.click();await expect(pop).toBeHidden();
+  await expect(liveBreak(root)).toHaveCount(0);
+  const saved=JSON.parse(await saveBoard(page,panel,2)),at=['page','sections',0,'diagram','topologyImports',0,'edgeTracking','api->store'];
+  expect(overlay(saved).edgeTracking).toEqual({'api->store':{tickets:['LOC-2','EX-1']}});
+  expect(overlay(saved).nodeTracking).toEqual({api:{tickets:['LOC-1']}});expect(saved.page.sections[0].diagram.edges).toBeUndefined();
+  const edge=['canon::api','canon::store'];
+  expect(saved.page.editHistory[0].changes).toEqual([{op:'add',ticket:'EX-1',path:at,edge,label:'API → Store'},{op:'clear-missing-work',path:at,edge,label:'API → Store'}]);
+});
+
+test('I6 desktop board provider-inherited Missing work names the source diagram and offers no Clear or post-drop question',async({page,server})=>{
+  const {provider,consumer,context}=importedBoard(canonImport({nodeTracking:{api:{missingWork:true}}}));
+  diagram(provider).nodes.api.missingWork=true;diagram(provider).edges[0].missingWork=true;
+  const board=await buildEditBoard(server,'imported-inherited-missing',consumer,{topology:context([provider,consumer])});
+  await mockRuntime(page);const {root,panel}=await openBoard(page,board);
+  await expect(liveNode(root,'canon::api')).toHaveClass(/\bdv-live-missing\b/);await expect(liveBreak(root)).toBeVisible();
+  let pop=await editPopover(page,nodeCard(root,'canon::api'));
+  await expect(pop.locator('.dv-live-missing-source'),'outside Edit mode the popover is unchanged').toHaveCount(0);
+  await page.keyboard.press('Escape');await expect(pop).toBeHidden();
+  await startEditing(panel);
+  for(const target of [nodeCard(root,'canon::api'),edgeLabel(root,0)]){
+    pop=await editPopover(page,target);
+    await expect(pop.locator('.dv-live-missing-source')).toHaveText('Missing work comes from the source diagram "provider" and must be cleared there.');
+    await expect(clearMissing(pop)).toHaveCount(0);
+    await page.keyboard.press('Escape');await expect(pop).toBeHidden();
+  }
+  await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(root,'canon::api')));await expect(saveButton(panel)).toHaveText('Save 1 change');
+  await page.waitForTimeout(600);await expect(pop).toBeHidden();
+  await dragTicket(page,panel,'EX-1',await cardPoint(edgeLabel(root,0)));await expect(saveButton(panel)).toHaveText('Save 2 changes');
+  await page.waitForTimeout(600);await expect(pop).toBeHidden();
+  const saved=JSON.parse(await saveBoard(page,panel,2));
+  expect(overlay(saved).nodeTracking).toEqual({api:{tickets:['EX-1'],missingWork:true}});
+  expect(overlay(saved).edgeTracking).toEqual({'api->store':{tickets:['EX-1']}});
+  expect(saved.page.editHistory[0].changes.map(change=>change.op)).toEqual(['add','add']);
+  await expect(liveNode(root,'canon::api')).toHaveClass(/\bdv-live-missing\b/);await expect(liveBreak(root)).toBeVisible();
+});
+
+test('I7 desktop board conflict replay re-applies an imported clear onto a swapped import by its provider reference',async({page,server})=>{
+  const imports=[{spec:'provider',export:'core',as:'one',position:{x:80,y:250}},{spec:'provider',export:'core',as:'two',position:{x:80,y:450},nodeTracking:{api:{missingWork:true}}}];
+  const {provider,consumer,context}=importedBoard(imports),board=await buildEditBoard(server,'imported-clear-swap',consumer,{topology:context([provider,consumer])});
+  await mockRuntime(page,{reject:'conflict',rejectOnce:true});
+  let {root,panel}=await openBoard(page,board);await startEditing(panel);
+  const pop=await editPopover(page,nodeCard(root,'two::api')),clear=clearMissing(pop);await expect(clear).toBeVisible();await clear.click();
+  await expect(saveButton(panel)).toHaveText('Save 1 change');
+  await saveButton(panel).click();await expect.poll(()=>publishes(page).then(list=>list.length)).toBe(1);
+  const winner=structuredClone(consumer);winner.page.sections[0].diagram.topologyImports.reverse();
+  await serveWinner(board,winner);expect(await reloadRecordingDialogs(page)).toEqual([]);({root,panel}=await showBoard(page));
+  await expect(panel.locator('.dv-live-edit-notice')).toHaveText(/1 of your changes were re-applied; 0 could not be/);
+  await page.waitForTimeout(500);expect(await publishes(page)).toEqual([]);
+  const saved=JSON.parse(await saveBoard(page,panel,1));
+  expect(overlay(saved,0).as).toBe('two');expect(overlay(saved,0).nodeTracking).toBeUndefined();
+  expect(overlay(saved,1).as).toBe('one');expect(overlay(saved,1).nodeTracking).toBeUndefined();
+  expect(saved.page.editHistory[0].changes).toEqual([{op:'clear-missing-work',path:['page','sections',0,'diagram','topologyImports',0,'nodeTracking','api'],node:'two::api',label:'API'}]);
 });

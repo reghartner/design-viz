@@ -24,6 +24,24 @@
 | E14 conflict replay: carrier deleted | editor drops on B; the winner deletes B | op dropped and listed; no carrier gains EX-1 | applying to a same-titled or nearby carrier |
 | E15 inline fallback cannot save | two-file page whose flowspec.json is missing (inline copy, warning banner) | Edit is absent or disabled (the #828 comment allows hiding or disabling); the Live status panel shows a reason naming the latest version not loading; a drag of EX-1 onto B changes nothing (EX-1 stays NOT ON DIAGRAM, no Save); zero publishes | saving the fallback copy over the newer file; an enabled Edit; a silent lock with no reason |
 Flip: remove the drop handler → E2's publish count 0 ≠ 1.
+
+#855 Clear Missing work in Edit mode. Contract source: #855 "How it should look and behave" +
+"Test + flip"; Chuck's rulings 2026-11-01 (clear in the popover and in a post-drop question,
+never automatic; clear only; Keep / Escape / outside click keep the marker; history change
+{op "clear-missing-work", node|edge, path, label} with no ticket). §0 ruling: Chuck 2026-11-01:
+issue's own Test + flip plan. Imported carriers (I4–I7) live in tests/topology-tracking.spec.mjs;
+validator and panel rows (H1c, H3c, H7c, H14) in the node tests, B3 in edit-history.spec.mjs.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| E16 local node Clear | boardSpec with nodes.b.missingWork | B's `g.node` has dv-live-missing; in Edit mode B's popover (aria-label ends "Beta service") has a "Clear Missing work" button; click → popover closes, B loses dv-live-missing, "Save 1 change", zero publishes; Save → one publish whose nodes.b == {title}, the parsed spec equals the original minus that marker plus editHistory, the text differs only by the removed `"missingWork": true` line (and the comma before it) and the history entry; change == {op clear-missing-work, path to B, node b, label "Beta service"} with no ticket; the history row reads "Missing work cleared from Beta service"; expanded, its change line has data-edit-op clear-missing-work, no data-edit-ticket, no ticket span | a no-op clear (Save absent / marker kept); a re-serialized spec; a change carrying a ticket; ticket-first prose |
+| E17 local edge Clear | edges[0] (a → b "calls") marked | edge 0's live break visible; popover from its label (aria-label ends "calls") → Clear → the break is gone; saved edges[0] == {from,to,label}; change {edge ["a","b"], label "Alpha service → Beta service", path to edges[0]} | clearing a node; the edge label instead of endpoint titles |
+| E18 post-drop question, keep | B marked; EX-1, AA-1, CAN-1 dropped on B; EX-1 again on B; EX-1 on A | each add on B opens B's popover with `.dv-live-question` "Does <KEY> cover the missing work?", a Clear and a Keep button, B still dv-live-missing, still open after the live map repaints (1 s); Keep, Escape and an outside click each close it with the pending count unchanged; the repeat drop and the drop on unmarked A open no popover; Save 4 → B keeps missingWork and holds EX-1, AA-1, CAN-1; four add changes, no clear | an automatic clear on drop; a question on no-op or unmarked drops; a question closed by the next repaint |
+| E18 post-drop question, clear | edge 0 marked; EX-1 dropped on its label | the question opens on the edge popover; Clear → break gone, "Save 2 changes"; saved edges[0] == {from,to,label,tickets ["EX-1"]}; one history entry with [add EX-1, clear-missing-work] on that edge | a clear that drops the add; two history entries |
+| E19 conflict replay | (a) twoSections with section "second"'s door marked, cleared, the winner swaps sections; (b) B cleared, the winner deletes B; (c) B cleared, the winner already cleared B | (a) notice "1 of your changes were re-applied; 0 could not be", no automatic publish, Save → sections[0] (id second) door == {title}, change path to sections[0]; (b)(c) notice "0 of your changes were re-applied; 1 could not be (…): Missing work cleared from Beta service", no Save | replay by numeric path; counting a clear with nothing to clear as applied |
+| E20 no Clear outside Edit mode or for read-only viewers | B and edge 0 marked; editor not editing; canEdit false | B's and edge 0's popovers show the Missing work explanation and no Clear or Keep button | a Clear control for every viewer |
+E20 guards today's behavior and passes at the baseline; every other row fails there on its own
+assertion (no Clear control, no question). Flip: make the clear a no-op → E16 publish assertions
+fail; drop the post-drop question → E18 fails on the question assertion.
 */
 import {test,expect} from '../helpers/test.mjs';
 import {rm} from 'node:fs/promises';
@@ -286,4 +304,149 @@ test('E15 a board booted from its inline fallback copy cannot enter Edit mode or
  await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(root,'b')));
  await expect(saveButton(panel)).toHaveCount(0);await expect(coverageTag(panel,'EX-1')).toHaveText('NOT ON DIAGRAM');
  expect(await publishes(page)).toEqual([]);
+});
+
+/* #855 Clear Missing work (rows E16–E20 above). */
+const carrierNode=(root,id)=>root.locator('g.node[data-dv-node="'+id+'"]');
+const commBreak=(root,index)=>root.locator('g.dv-live-comm-failure[data-dv-edge="'+index+'"]');
+const clearButton=pop=>pop.getByRole('button',{name:'Clear Missing work',exact:true});
+const keepButton=pop=>pop.getByRole('button',{name:'Keep',exact:true});
+const question=page=>popover(page).locator('.dv-live-question');
+function marked(mark,spec=boardSpec()){mark(spec);return spec;}
+async function clickClear(pop){const clear=clearButton(pop);await expect(clear).toBeVisible();await clear.click();await expect(pop).toBeHidden();}
+
+test('E16 Clear Missing work in a local node popover removes only that marker and records one history change',async({page,server})=>{
+ const spec=marked(s=>{diagramAt(s).nodes.b.missingWork=true;}),board=await buildBoard(server,'clear-node',spec);await mockRuntime(page);
+ const {root,panel}=await openBoard(page,board);
+ await expect(carrierNode(root,'b')).toHaveClass(/\bdv-live-missing\b/);
+ await startEditing(panel);
+ const pop=await openPopover(page,nodeCard(root,'b'));await expect(pop).toHaveAttribute('aria-label',/ Beta service$/);
+ await clickClear(pop);
+ await expect(carrierNode(root,'b')).not.toHaveClass(/\bdv-live-missing\b/);
+ await expect(saveButton(panel)).toHaveText('Save 1 change');
+ expect(await publishes(page),'nothing is published before Save').toEqual([]);
+ const text=await save(page,panel,1),saved=JSON.parse(text);
+ expect(diagramAt(saved).nodes.b).toEqual({title:'Beta service'});
+ expect(saved.page.editHistory).toHaveLength(1);
+ expect(saved.page.editHistory[0].changes).toEqual([{op:'clear-missing-work',path:['page','sections',0,'diagram','nodes','b'],node:'b',label:'Beta service'}]);
+ expect(withoutEdits(saved,s=>{delete s.page.editHistory;})).toEqual(withoutEdits(spec,s=>{delete diagramAt(s).nodes.b.missingWork;}));
+ expectSurgical(board.text,text,{removed:['"missingWork": true']});
+ await expect(carrierNode(root,'b')).not.toHaveClass(/\bdv-live-missing\b/);
+ const row=root.locator('.pwidget.pt-edit-history li[data-edit-at]');await expect(row).toHaveCount(1);
+ await expect(row.locator('.dv-edit-first')).toHaveText('Missing work cleared from Beta service');
+ await row.locator('summary.dv-edit-summary').click();
+ const change=row.locator('li.dv-edit-change');await expect(change).toHaveCount(1);await expect(change).toBeVisible();
+ await expect(change).toHaveAttribute('data-edit-op','clear-missing-work');await expect(change).not.toHaveAttribute('data-edit-ticket',/.*/);
+ await expect(change.locator('.dv-edit-ticket')).toHaveCount(0);
+ await expect(change.locator('.dv-edit-op')).toHaveText('Missing work cleared from');await expect(change.locator('.dv-edit-carrier')).toHaveText('Beta service');
+});
+
+test('E17 Clear Missing work on a local edge opened from its label records the edge and its endpoint titles',async({page,server})=>{
+ const spec=marked(s=>{diagramAt(s).edges[0].missingWork=true;}),board=await buildBoard(server,'clear-edge',spec);await mockRuntime(page);
+ const {root,panel}=await openBoard(page,board);
+ await expect(commBreak(root,0)).toBeVisible();
+ await startEditing(panel);
+ const pop=await openPopover(page,edgeLabel(root,0));await expect(pop).toHaveAttribute('aria-label',/ calls$/);
+ await clickClear(pop);
+ await expect(commBreak(root,0)).toHaveCount(0);await expect(saveButton(panel)).toHaveText('Save 1 change');
+ const text=await save(page,panel,1),saved=JSON.parse(text);
+ expect(diagramAt(saved).edges[0]).toEqual({from:'a',to:'b',label:'calls'});
+ expect(saved.page.editHistory[0].changes).toEqual([{op:'clear-missing-work',path:['page','sections',0,'diagram','edges',0],edge:['a','b'],label:'Alpha service → Beta service'}]);
+ expect(withoutEdits(saved,s=>{delete s.page.editHistory;})).toEqual(withoutEdits(spec,s=>{delete diagramAt(s).edges[0].missingWork;}));
+ expectSurgical(board.text,text,{removed:['"missingWork": true']});
+});
+
+test('E18 a drop on a marked node asks whether the ticket covers the missing work; Keep, Escape and an outside click keep the marker',async({page,server})=>{
+ const spec=marked(s=>{diagramAt(s).nodes.b.missingWork=true;}),board=await buildBoard(server,'ask-keep',spec);await mockRuntime(page);
+ const {root,panel}=await openBoard(page,board);await precondition(root,panel);await startEditing(panel);
+ const pop=popover(page);
+ async function dropAndAsk(key,count){
+  await dragTicket(page,panel,key,await cardPoint(nodeCard(root,'b')));
+  await expect(saveButton(panel)).toHaveText('Save '+count+' change'+(count===1?'':'s'));
+  await expect(question(page)).toHaveText('Does '+key+' cover the missing work?');
+  await expect(pop).toHaveAttribute('aria-label',/ Beta service$/);
+  await expect(clearButton(pop)).toHaveCount(1);await expect(keepButton(pop)).toBeVisible();
+  await expect(carrierNode(root,'b')).toHaveClass(/\bdv-live-missing\b/);
+ }
+ await dropAndAsk('EX-1',1);
+ // the question outlives the live map's repaint of the new render
+ await page.waitForTimeout(1000);await expect(question(page)).toBeVisible();
+ await keepButton(pop).click();await expect(pop).toBeHidden();
+ await expect(saveButton(panel)).toHaveText('Save 1 change');await expect(carrierNode(root,'b')).toHaveClass(/\bdv-live-missing\b/);
+ await dropAndAsk('AA-1',2);
+ await page.keyboard.press('Escape');await expect(pop).toBeHidden();await expect(saveButton(panel)).toHaveText('Save 2 changes');
+ await dropAndAsk('CAN-1',3);
+ const title=await panel.locator('.ptitle').first().boundingBox();await page.mouse.click(title.x+8,title.y+title.height/2);
+ await expect(pop).toBeHidden();await expect(saveButton(panel)).toHaveText('Save 3 changes');
+ await expect(carrierNode(root,'b')).toHaveClass(/\bdv-live-missing\b/);
+ // a drop that changes nothing, and a drop on an unmarked carrier, ask nothing
+ await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(root,'b')));
+ await page.waitForTimeout(600);await expect(pop).toBeHidden();await expect(saveButton(panel)).toHaveText('Save 3 changes');
+ await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(root,'a')));await expect(saveButton(panel)).toHaveText('Save 4 changes');
+ await page.waitForTimeout(600);await expect(pop).toBeHidden();
+ const saved=JSON.parse(await save(page,panel,4)),d=diagramAt(saved);
+ expect(d.nodes.b).toEqual({title:'Beta service',missingWork:true,tickets:['EX-1','AA-1','CAN-1']});
+ expect(d.nodes.a.tickets).toEqual(['AA-1','EX-1']);
+ expect(saved.page.editHistory[0].changes.map(change=>[change.op,change.ticket,change.node])).toEqual([['add','EX-1','b'],['add','AA-1','b'],['add','CAN-1','b'],['add','EX-1','a']]);
+});
+
+test('E18 Clear Missing work in the post-drop question on a marked edge saves the add and the clear in one history entry',async({page,server})=>{
+ const spec=marked(s=>{diagramAt(s).edges[0].missingWork=true;}),board=await buildBoard(server,'ask-clear',spec);await mockRuntime(page);
+ const {root,panel}=await openBoard(page,board);await precondition(root,panel);await expect(commBreak(root,0)).toBeVisible();await startEditing(panel);
+ await dragTicket(page,panel,'EX-1',await cardPoint(edgeLabel(root,0)));
+ await expect(question(page)).toHaveText('Does EX-1 cover the missing work?');
+ const pop=popover(page);await expect(pop).toHaveAttribute('aria-label',/ calls$/);
+ await expect(commBreak(root,0)).toBeVisible();await expect(saveButton(panel)).toHaveText('Save 1 change');
+ await clickClear(pop);
+ await expect(commBreak(root,0)).toHaveCount(0);await expect(saveButton(panel)).toHaveText('Save 2 changes');
+ const saved=JSON.parse(await save(page,panel,2)),at=['page','sections',0,'diagram','edges',0];
+ expect(diagramAt(saved).edges[0]).toEqual({from:'a',to:'b',label:'calls',tickets:['EX-1']});
+ expect(saved.page.editHistory).toHaveLength(1);
+ expect(saved.page.editHistory[0].changes).toEqual([{op:'add',ticket:'EX-1',path:at,edge:['a','b'],label:'Alpha service → Beta service'},{op:'clear-missing-work',path:at,edge:['a','b'],label:'Alpha service → Beta service'}]);
+});
+
+test('E19 conflict replay re-applies a clear onto a swapped section by identity',async({page,server})=>{
+ const spec=marked(s=>{diagramAt(s,1).nodes.door.missingWork=true;},twoSections()),board=await buildBoard(server,'replay-clear-sections',spec);
+ await mockRuntime(page,{reject:'conflict',rejectOnce:true});
+ const winner=structuredClone(spec);winner.page.sections.reverse();
+ const {panel,notice}=await conflictThenReload(page,board,async(root,panel)=>{
+  await clickClear(await openPopover(page,nodeCard(sectionScope(root,'second'),'door')));
+  await expect(saveButton(panel)).toHaveText('Save 1 change');
+ },winner,{before:2,after:1});
+ await expect(notice).toHaveText(/1 of your changes were re-applied; 0 could not be/);
+ const saved=JSON.parse(await save(page,panel,1));
+ expect(saved.page.sections[0].id).toBe('second');
+ expect(diagramAt(saved,0).nodes.door).toEqual({title:'Door two'});expect(diagramAt(saved,1).nodes.door).toEqual({title:'Door one'});
+ expect(saved.page.editHistory[0].changes).toEqual([{op:'clear-missing-work',path:['page','sections',0,'diagram','nodes','door'],node:'door',label:'Door two'}]);
+});
+
+test('E19 conflict replay drops and lists a clear whose carrier is gone or whose marker the winner already cleared',async({page,server})=>{
+ const deleted=boardSpec(),gone=diagramAt(deleted);delete gone.nodes.b;gone.rows=[['a','c']];gone.edges=[{from:'a',to:'c',label:'writes'}];
+ for(const [name,winner] of [['deleted',deleted],['cleared',boardSpec()]]){
+  const tab=await page.context().newPage();
+  const spec=marked(s=>{diagramAt(s).nodes.b.missingWork=true;}),board=await buildBoard(server,'replay-clear-'+name,spec);
+  await mockRuntime(tab,{reject:'conflict',rejectOnce:true});
+  const {panel,notice}=await conflictThenReload(tab,board,async(root,panel)=>{
+   await clickClear(await openPopover(tab,nodeCard(root,'b')));await expect(saveButton(panel)).toHaveText('Save 1 change');
+  },winner);
+  await expect(notice,name).toHaveText(/0 of your changes were re-applied; 1 could not be \(carrier moved, removed or ambiguous\): Missing work cleared from Beta service/);
+  await expect(saveButton(panel),name).toHaveCount(0);
+  await tab.close();
+ }
+});
+
+test('E20 outside Edit mode and for read-only viewers a marked carrier popover has no Clear control',async({page,server})=>{
+ const spec=marked(s=>{diagramAt(s).nodes.b.missingWork=true;diagramAt(s).edges[0].missingWork=true;}),board=await buildBoard(server,'clear-readers',spec);
+ for(const canEdit of [true,false]){
+  const viewer=await page.context().newPage();await mockRuntime(viewer,{canEdit});
+  const {root,panel}=await openBoard(viewer,board);
+  if(canEdit)await expect(editButton(panel)).toBeVisible();else{await viewer.waitForTimeout(1500);await expect(editButton(panel)).toHaveCount(0);}
+  for(const target of [nodeCard(root,'b'),edgeLabel(root,0)]){
+   const pop=await openPopover(viewer,target);
+   await expect(pop.locator('.dv-live-coverage-detail')).toContainText('Missing work: additional work remains without a linked ticket.');
+   await expect(clearButton(pop),'canEdit '+canEdit).toHaveCount(0);await expect(keepButton(pop)).toHaveCount(0);await expect(pop.locator('.dv-live-question')).toHaveCount(0);
+   await viewer.keyboard.press('Escape');await expect(pop).toBeHidden();
+  }
+  await viewer.close();
+ }
 });

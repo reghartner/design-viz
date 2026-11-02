@@ -108,10 +108,13 @@
     if (!state.doc) return;
     /* Show more stays disabled until this page arrives, so a second click cannot skip a page. */
     more.disabled = true;
+    /* The page number advances only when its rows arrive, so a failed page is retried. */
+    const page = append ? state.page + 1 : 1;
     let out;
-    try{ out = await api('/api/revisions?' + q({doc:state.doc, tab:state.tab, q:state.query, page:state.page})); }
+    try{ out = await api('/api/revisions?' + q({doc:state.doc, tab:state.tab, q:state.query, page})); }
     catch(ex){ if (token === listToken){ error.textContent = ex.message; error.hidden = false; more.disabled = false; } return; }
     if (token !== listToken) return;
+    state.page = page;
     more.disabled = false;
     if (out.error){ error.textContent = out.error; error.hidden = false; } else error.hidden = true;
     list.append(...out.rows.map(rowNode));
@@ -197,7 +200,7 @@
     if ($('.picker').hidden) return;
     searchTimer = setTimeout(() => { state.query = ev.target.value; state.page = 1; loadRows(); }, 150);
   });
-  $('.picker .more').addEventListener('click', () => { state.page += 1; loadRows(true); });
+  $('.picker .more').addEventListener('click', () => loadRows(true));
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closePicker(); });
   document.addEventListener('mousedown', ev => {
     const picker = $('.picker');

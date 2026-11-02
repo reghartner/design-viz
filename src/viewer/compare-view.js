@@ -203,15 +203,22 @@ function mountCompareView(host, opts){
   var doc = host.ownerDocument || document, entries = opts.entries || [], pages = {before:opts.before || null, after:opts.after || null};
   var ids = opts.ids || {}, panes = {}, selected = -1, destroyed = false, skin = opts.skin, lastAfterView = null, renderErrors = [];
   var mode = opts.mode === 'full' ? 'full' : 'focused', focusCtx = null, displayOnlyCache = new Map(), ambientOnly = false;
+  /* Node and connection crop (#848 PR 3): the selection's crop, its zoom-out level (-1 = whole section). */
+  var cropCtx = null, cropLevel = 0, cropSelection = false;
   function el(tag, cls, text){ var n = doc.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
   host.replaceChildren();
   var root = el('div', 'compare-view'), rail = el('nav', 'compare-rail'), columns = el('div', 'compare-columns');
   var main = el('div', 'compare-main'), bar = el('div', 'compare-mode'), stage = el('div', 'compare-stage'), focus = el('section', 'compare-focus');
   var modeButtons = {focused:el('button', 'compare-mode-button', 'Focused'), full:el('button', 'compare-mode-button', 'Full diagram')};
   var modeNote = el('p', 'compare-mode-note', 'This change shows in the full diagram.');
+  var cropButtons = {out:el('button', 'compare-mode-button compare-crop-out', 'Zoom out'), whole:el('button', 'compare-mode-button compare-crop-whole', 'Whole section')};
   rail.setAttribute('aria-label', 'Changes');
   bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Compare mode');
   ['focused', 'full'].forEach(function(m){ var b = modeButtons[m]; b.type = 'button'; b.addEventListener('click', function(){ setMode(m); }); bar.appendChild(b); });
+  cropButtons.out.type = cropButtons.whole.type = 'button';
+  cropButtons.out.addEventListener('click', function(){ cropLevel = Math.max(0, cropLevel) + 1; applyCrop(); });
+  cropButtons.whole.addEventListener('click', function(){ cropLevel = -1; applyCrop(); });
+  bar.appendChild(cropButtons.out); bar.appendChild(cropButtons.whole);
   bar.appendChild(modeNote); focus.setAttribute('aria-label', 'Focused comparison'); focus.hidden = true;
   stage.appendChild(columns); stage.appendChild(focus); main.appendChild(bar); main.appendChild(stage);
   root.appendChild(rail); root.appendChild(main); host.appendChild(root);
@@ -286,6 +293,7 @@ function mountCompareView(host, opts){
     /* Then the Focused step and path (a panel change or a step clicked before completion). */
     if (selected >= 0) syncPaneSteps();
     if (selected >= 0 && ambientOnly) ambientPanes(entries[selected]);
+    if (selected >= 0) applyCrop();
   }
   function cancelCompletion(){
     if (win){
@@ -381,7 +389,7 @@ function mountCompareView(host, opts){
       var r = n.getBoundingClientRect(), area = r.width * r.height;
       if (!object || area > bestArea){ object = n; bestArea = area; }
     });
-    if (object) frame(p.ctl, object, t);
+    if (object && !cropSelection) frame(p.ctl, object, t);
     else if (rec.sectionEl && rec.sectionEl.scrollIntoView && (!rec.viewport || !rec.viewport.isExplore())) rec.sectionEl.scrollIntoView({block:'start'});
     var shownView = p.ctl.views && p.ctl.views.current ? p.ctl.views.current(rec) : null;
     var shownLayout = shownView && (shownView.legacyLayout || shownView.members && shownView.members[0] && shownView.members[0].layout);
@@ -683,32 +691,150 @@ function mountCompareView(host, opts){
     }catch(ex){ body.textContent = 'Could not render this panel: ' + ex.message; }
     return cell;
   }
+  /* ---------- Node and connection crop (#848 PR 3) ----------
+     In Focused mode a node or connection change frames both full panes on the changed node (with
+     its direct neighbours) or the connection's endpoints, local or imported. Zoom out widens both
+     frames by the same factor; Whole section fits the section. */
+  var CROP_ZOOM_OUT = 1.6;
+  function cropSideDiagram(entry, side){
+    var index = compareSectionOnSide(entries, pages, entry, side), rec = index >= 0 && pages[side] ? sectionRecords(pages[side])[index] : null;
+    return {section:index, d:rec && rec.section && rec.section.diagram || null};
+  }
+  function cropEdgeIndex(entry, side){
+    var path = side === 'before' ? entry.beforePath : entry.afterPath;
+    if (path == null) return null;
+    return entry.cause === 'provider' ? (entry.key ? entry.key[side] : null) : compareViewLastIndex(path);
+  }
+  function buildCrop(entry){
+    if (entry.kind !== 'node' && entry.kind !== 'edge') return null;
+    var holder = entry.afterPath != null ? 'after' : 'before', H = cropSideDiagram(entry, holder);
+    if (!H.d) return null;
+    var nodes = H.d.nodes || {}, edges = Array.isArray(H.d.edges) ? H.d.edges : [], ids = [];
+    function add(id){ if (id != null && Object.prototype.hasOwnProperty.call(nodes, id) && ids.indexOf(String(id)) < 0) ids.push(String(id)); }
+    function neighbours(key){ edges.forEach(function(e){ if (!e) return; if (e.from === key) add(e.to); else if (e.to === key) add(e.from); }); }
+    /* A node with its direct neighbours; a connection's endpoints with theirs. */
+    if (entry.kind === 'node'){
+      var key = entry.key ? entry.key[holder] : null;
+      add(key); neighbours(key);
+    } else {
+      var edge = edges[cropEdgeIndex(entry, holder)];
+      if (edge){ add(edge.from); add(edge.to); neighbours(edge.from); neighbours(edge.to); }
+    }
+    if (!ids.length) return null;
+    var out = {entry:entry, sides:{}};
+    ['before', 'after'].forEach(function(side){
+      var S = cropSideDiagram(entry, side);
+      out.sides[side] = {section:S.section, ids:S.d ? ids.filter(function(id){ return Object.prototype.hasOwnProperty.call(S.d.nodes || {}, id); }) : [],
+        edge:entry.kind === 'edge' ? cropEdgeIndex(entry, side) : null};
+    });
+    return out;
+  }
+  /* The largest rendered copy of each element inside the section, and the Explore viewport that holds them. */
+  function cropElements(p, side){
+    var c = cropCtx.sides[side], rec = recordFor(p, c.section), found = [];
+    if (!rec || !rec.sectionEl) return null;
+    function largest(attr, key){
+      var best = null, area = 0;
+      Array.prototype.forEach.call(rec.sectionEl.querySelectorAll('[' + attr + ']'), function(n){
+        if (n.getAttribute(attr) !== String(key) || !n.getClientRects().length) return;
+        var r = n.getBoundingClientRect();
+        if (!best || r.width * r.height > area){ best = n; area = r.width * r.height; }
+      });
+      return best;
+    }
+    c.ids.forEach(function(id){ var n = largest('data-dv-node', id); if (n) found.push(n); });
+    if (c.edge != null){ var e = largest('data-dv-edge', c.edge); if (e) found.push(e); }
+    var vp = null;
+    (p.ctl.sections || []).forEach(function(r){ if (r.viewport && r.viewport.isExplore && r.viewport.isExplore() && r.sectionEl && found[0] && r.sectionEl.contains(found[0])) vp = r.viewport; });
+    if (!vp && rec.viewport && rec.viewport.isExplore && rec.viewport.isExplore()) vp = rec.viewport;
+    return {elements:found, viewport:vp, rec:rec};
+  }
+  /* Bounds of the elements in the flow diagram's SVG coordinates (the viewport's fit space). */
+  function cropBounds(elements){
+    var boxes = [];
+    elements.forEach(function(el){
+      var svg = el.closest && el.closest('svg[aria-label="flow diagram"]') || el.ownerSVGElement, root = svg && svg.getCTM && svg.getCTM(), ctm = el.getCTM && el.getCTM();
+      if (!root || !ctm || !el.getBBox) return;
+      var b = el.getBBox(); if (!b.width && !b.height) return;
+      var m = root.inverse().multiply(ctm);
+      var pts = [[b.x, b.y], [b.x + b.width, b.y], [b.x, b.y + b.height], [b.x + b.width, b.y + b.height]].map(function(q){ return {x:m.a * q[0] + m.c * q[1] + m.e, y:m.b * q[0] + m.d * q[1] + m.f}; });
+      var xs = pts.map(function(q){ return q.x; }), ys = pts.map(function(q){ return q.y; });
+      boxes.push({x:Math.min.apply(null, xs), y:Math.min.apply(null, ys), w:Math.max.apply(null, xs) - Math.min.apply(null, xs), h:Math.max.apply(null, ys) - Math.min.apply(null, ys)});
+    });
+    if (!boxes.length) return null;
+    var x = Math.min.apply(null, boxes.map(function(b){ return b.x; })), y = Math.min.apply(null, boxes.map(function(b){ return b.y; }));
+    var r = Math.max.apply(null, boxes.map(function(b){ return b.x + b.w; })), bt = Math.max.apply(null, boxes.map(function(b){ return b.y + b.h; }));
+    var pad = 16;
+    return {x:x - pad, y:y - pad, w:r - x + 2 * pad, h:bt - y + 2 * pad};
+  }
+  function applyCrop(){
+    if (!cropCtx || mode !== 'focused' || destroyed) return;
+    var token = selected, level = cropLevel;
+    function apply(){
+      if (destroyed || token !== selected || level !== cropLevel || mode !== 'focused' || !cropCtx) return;
+      ['before', 'after'].forEach(function(side){
+        var p = panes[side], c = cropCtx.sides[side];
+        if (!p || c.section < 0) return;
+        if (p.partial != null && p.partial !== c.section) completeBefore();
+        if (!p.ctl) return;
+        var got = cropElements(p, side);
+        if (!got) return;
+        var insets = {left:24, right:24, top:20, bottom:24};
+        if (!got.viewport){ if (got.elements[0] && got.elements[0].scrollIntoView) got.elements[0].scrollIntoView({block:'center', inline:'center'}); return; }
+        if (level < 0 || !got.elements.length){ got.viewport.fitCanvas(insets); return; }
+        var b = cropBounds(got.elements);
+        if (!b){ got.viewport.fitCanvas(insets); return; }
+        /* Never magnify past about 100%: the crop is at least the pane's free area (graph units are
+           pixels at 100%), centred on the change. */
+        var minW = Math.max(1, p.scroll.clientWidth - insets.left - insets.right), minH = Math.max(1, p.scroll.clientHeight - insets.top - insets.bottom);
+        if (b.w < minW){ b.x -= (minW - b.w) / 2; b.w = minW; }
+        if (b.h < minH){ b.y -= (minH - b.h) / 2; b.h = minH; }
+        if (level > 0){
+          var f = Math.pow(CROP_ZOOM_OUT, level), cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+          b = {x:cx - b.w * f / 2, y:cy - b.h * f / 2, w:b.w * f, h:b.h * f};
+        }
+        got.viewport.fitCanvas(insets, b);
+      });
+    }
+    apply();
+    /* Again after the viewer's own deferred fit and layout. */
+    if (win && win.requestAnimationFrame) win.requestAnimationFrame(function(){ win.requestAnimationFrame(apply); });
+    if (win && win.setTimeout) win.setTimeout(apply, 150);
+  }
   function applyMode(){
     var entry = entries[selected], focused = mode === 'focused' && !!focusCtx;
     focus.hidden = !focused;
     columns.style.visibility = focused ? 'hidden' : '';
-    modeNote.hidden = !(mode === 'focused' && entry && !focusCtx);
+    modeNote.hidden = !(mode === 'focused' && entry && !focusCtx && !cropCtx);
+    cropButtons.out.hidden = cropButtons.whole.hidden = !(mode === 'focused' && cropCtx);
     modeButtons.focused.setAttribute('aria-pressed', String(mode === 'focused'));
     modeButtons.full.setAttribute('aria-pressed', String(mode === 'full'));
   }
   function setMode(m){
     if (destroyed || (m !== 'focused' && m !== 'full')) return mode;
-    mode = m; applyMode(); return mode;
+    var was = mode; mode = m; applyMode();
+    if (m === 'focused' && was !== 'focused') applyCrop();
+    return mode;
   }
   function select(index, initial){
     if (destroyed || !entries.length) return null;
     selected = ((index % entries.length) + entries.length) % entries.length;
     buttons.forEach(function(b, i){ if (b) b.setAttribute('aria-current', String(i === selected)); });
     if (buttons[selected] && buttons[selected].scrollIntoView) buttons[selected].scrollIntoView({block:'nearest'});
-    var entry = entries[selected], after = navigate('after', entry), before = navigate('before', entry, lastAfterView = after.view);
+    var entry = entries[selected];
+    cropLevel = 0; cropSelection = mode === 'focused' && (entry.kind === 'node' || entry.kind === 'edge');
+    var after = navigate('after', entry), before = navigate('before', entry, lastAfterView = after.view);
     var result = {before:before, after:after, label:compareEntryLabel(entry, pages), initial:!!initial};
     decorate();
     ambientOnly = false;
     try{ focusCtx = buildFocus(entry); }catch(ex){ focusCtx = null; }
     syncPaneSteps();
     if (ambientOnly) ambientPanes(entry);
-    renderFocus(); applyMode();
+    try{ cropCtx = focusCtx ? null : buildCrop(entry); }catch(ex){ cropCtx = null; }
+    if (!cropCtx) cropSelection = false;
+    renderFocus(); applyMode(); applyCrop();
     result.focused = mode === 'focused' && !!focusCtx;
+    result.cropped = mode === 'focused' && !!cropCtx;
     if (opts.onSelect) opts.onSelect(entry, selected, result);
     return result;
   }

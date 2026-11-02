@@ -344,11 +344,15 @@ caption change also shows a word diff. Dots on the step buttons mark edited step
 steps whose reader view differs because of an earlier edit. Clicking a step on either
 side moves the other side to its paired step (steps pair by id, content, caption, or
 as the one remaining step); when the other document has no paired step, that side
-shows "Step not in the current document" or "Step not in the proposal". Other changes
-(nodes, connections, sections, a step edit that only changes the highlighted node or
-connection, and a panel change seen only in Ambient mode) show both full diagrams with
-the note "This change shows in the full diagram." **Full diagram** shows both full
-diagrams for every change until **Focused** is chosen again.
+shows "Step not in the current document" or "Step not in the proposal". A node or
+connection change, local or imported, frames both full diagrams on the changed node and
+its direct neighbours (for a connection: both endpoints and their neighbours), with the
+change outlined; a side without the node frames its neighbours there. **Zoom out**
+widens both frames by the same factor and **Whole section** fits each section; the next
+change crops again. Other changes (sections, a step edit that only changes the
+highlighted node or connection, and a panel change seen only in Ambient mode) show both
+full diagrams with the note "This change shows in the full diagram." **Full diagram**
+shows both full diagrams for every change until **Focused** is chosen again.
 
 A refreshed proposal replaces the list and retires the previous navigation state;
 its separate acceptance guard still requires review of the refreshed version.

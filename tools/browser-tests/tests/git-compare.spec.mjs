@@ -81,9 +81,10 @@
                                                                                        items exactly the 3 engine labels (local node,    component
                                                                                        step, imported node); node a "Alpha" in Before,
                                                                                        "Alpha final" in After
-   C2   click through changes (row 3)        J, rail click, K (Full diagram)          aria-current moves 0->1->2->1; step caption         panes that never follow the selection
-                                                                                       "Start" / "Start the flow"; child::p2 "P two" /
-                                                                                       "P two changed"
+   C2   click through changes (row 3)        J (Focused), Full diagram, rail click, K  Focused aria-pressed by default; on the step change  panes that never follow the selection;
+                                                                                       each side's step strip [1] and caption "Start" /    Full-only or strip-less integration
+                                                                                       "Start the flow"; Full: aria-current moves 0->1->
+                                                                                       2->1, captions, child::p2 "P two"/"P two changed"
    C3   Compare this commit loads the        From c1, To c7; Compare this commit on   titles c4 "Docs only" / c5 "Merge feature";         second parent (c3: no changes); choices
         comparison (row 4)                   c5                                       rail exactly ["Modified · Step s1 · text"]         set but nothing compared
    C4   each navigation replaces the view    Compare, then Compare again (same pair)  previous .compare-view detached; exactly one;       leaked instance (destroy() not run)
@@ -106,7 +107,8 @@
    U2   untrusted text in the document list  commit with a hostile file name and       doc row path literal; rail labels and node text     innerHTML in the document list or rail
         and comparison                       node/section titles                      literal; no <img>/inline <script>; no __pwned
    AU   every test, context-wide (all pages): no page/console error, failed request, HTTP >= 400, or request outside the compare server
-   U1   page CSP                                response headers of "/"                 default-src 'none'; script-src exactly 'self';   inline or eval script allowed
+   U1   page CSP                                response headers of "/"                 no repeated directive; default-src 'none';       inline or eval script allowed; a repeated
+                                                                                       script-src exactly 'self';                         unsafe directive
                                                                                        no script-src-elem/-attr (PR 3: style-src may
                                                                                        allow inline style attributes for the viewer)
    Git refuses "<" and ">" in author names, so the hostile author comes from the PR author login. */
@@ -358,7 +360,10 @@ test('U0 U1: commit, branch, tag and pull request text renders literally under a
   const csp=response.headers()['content-security-policy'];
   /* Scripts only from the server: script-src is exactly 'self' and no other directive allows scripts. Inline
      style attributes may be allowed (PR 3: the viewer's panels set them); the issue forbids inline scripts. */
-  const directives=Object.fromEntries(csp.split(';').map(d=>d.trim().split(/\s+/)).filter(d=>d[0]).map(([k,...v])=>[k,v]));
+  const parsed=csp.split(';').map(d=>d.trim().split(/\s+/)).filter(d=>d[0]),names=parsed.map(d=>d[0].toLowerCase());
+  /* A repeated directive is ignored by browsers after its first occurrence; refuse any repeat. */
+  expect(names.filter((n,i)=>names.indexOf(n)!==i),'no repeated directive').toEqual([]);
+  const directives=Object.fromEntries(parsed.map(([k,...v])=>[k.toLowerCase(),v]));
   expect(directives['default-src']).toEqual(["'none'"]);
   expect(directives['script-src']).toEqual(["'self'"]);
   expect(Object.keys(directives).filter(k=>/^script-src-(elem|attr)$/.test(k))).toEqual([]);
@@ -565,9 +570,18 @@ test('C0 C1 C2: Compare shows From as Before and To as After, and every change c
   const node=(side,id)=>paneIn(page,side).locator('[data-dv-node="'+id+'"]').first();
   await expect(node('before','a')).toContainText('Alpha');await expect(node('before','a')).not.toContainText('Alpha final');
   await expect(node('after','a')).toContainText('Alpha final');
-  /* C2: click through with the keyboard and the rail. */
-  await comparison(page).getByRole('button',{name:'Full diagram'}).click();
+  /* C2: click through with the keyboard and the rail. Focused is the default mode: a step change shows each
+     side's step strip and caption only. */
+  const modeButton=name=>comparison(page).getByRole('group',{name:'Compare mode'}).getByRole('button',{name,exact:true});
+  await expect(modeButton('Focused')).toHaveAttribute('aria-pressed','true');
   await page.keyboard.press('j');await expect(items.nth(1)).toHaveAttribute('aria-current','true');
+  const focusSide=side=>comparison(page).locator('.compare-focus-side[data-side="'+side+'"]');
+  await expect(comparison(page).locator('.compare-focus')).toBeVisible();
+  for(const side of ['before','after'])await expect(focusSide(side).locator('.compare-focus-steps .compare-focus-step')).toHaveText(['1']);
+  await expect(focusSide('before').locator('.compare-focus-caption')).toHaveText('Start');
+  await expect(focusSide('after').locator('.compare-focus-caption')).toHaveText('Start the flow');
+  await modeButton('Full diagram').click();await expect(modeButton('Full diagram')).toHaveAttribute('aria-pressed','true');
+  await expect(items.nth(1)).toHaveAttribute('aria-current','true');
   const caption=side=>paneIn(page,side).locator('.stepline:not(.dv-caption-old)').first();
   await expect(caption('before')).toContainText('Start');await expect(caption('before')).not.toContainText('Start the flow');
   await expect(caption('after')).toContainText('Start the flow');

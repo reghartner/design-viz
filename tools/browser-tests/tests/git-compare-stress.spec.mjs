@@ -7,17 +7,20 @@
    S0   revision lists are paged and every page   GET /api/revisions tab=all (500 rows) and  every page <= 100 rows; all-commits pages     unpaged lists; a page cost that grows
         costs about the same                      tab=branches, document, tags; median of 3  together list each commit once (500);         with the page number (re-reading all
                                                   timings per page                          every page's median <= 2x page 1's median     earlier pages)
-   S1   50 Compare navigations leave one view     All changed documents, From = commit 1;   after each: exactly one .compare-view, the     a view whose destroy() never runs; a host
+   S1   50 Compare navigations leave one view     All changed documents, From = commit 1;   after each: the document list has one row per  a view whose destroy() never runs; a host
+                                                                                            spec changed in that range (git diff); exactly
+                                                                                            one .compare-view, the
                                                   To := 50 different commits in the picker,  previous root detached, liveOwners() equal    that keeps old content
                                                   Compare each time (real clicks/keys)      to its value after the first navigation
    S2   no leftover git/gh processes; memory      same 50 navigations                       server has no git/gh child process after the   leaked child processes; memory that grows
         stays flat                                                                          50th; server RSS after the 50th <= 1.2x RSS   with every navigation
                                                                                             after the 5th
    AU   no page/console error, failed request, HTTP >= 400 or request outside the server
-   Measurement condition for S2: the server runs with NODE_OPTIONS=--max-semi-space-size=1. By default V8 grows
-   its young generation (up to tens of MB) under any steady request load during the first ~50 navigations and
-   then levels off (measured: 103 MB after 5, 158 MB after 50, 164 MB after 200, with no leak), which alone
-   exceeds 1.2x. A fixed young generation makes RSS growth mean retained memory, which is what S2 is for. */
+   The server runs with the documented command, node --max-semi-space-size=1 tools/compare/serve.mjs (its header
+   says why: by default V8 grows its young generation by tens of MB under steady requests during the first ~50
+   navigations and then levels off, measured 103 MB after 5, 158 MB after 50, 164 MB after 200, with no leak;
+   the long-running local server keeps that fixed, so RSS growth means retained memory).
+   S0 also asserts the fixture's size: 60 documents at main and 41 branch rows (main + 40). */
 import {test,expect} from '@playwright/test';
 import {createRequire} from 'node:module';
 import {spawn,execFileSync} from 'node:child_process';
@@ -66,8 +69,9 @@ const stress=test.extend({
     execFileSync('mkdir',[dir]);
     const shas=generate(dir);
     const bin=await ghExecutable(top,{c3:shas[3],c5:shas[5]});
-    const server=spawn(process.execPath,[path.join(root,'tools/compare/serve.mjs'),'--repo',dir,'--port','0'],
-      {env:Object.assign(cleanEnv(),{PATH:bin+path.delimiter+process.env.PATH,NODE_OPTIONS:'--max-semi-space-size=1'}),stdio:['ignore','pipe','pipe']});
+    /* The documented command (tools/compare/serve.mjs header): node --max-semi-space-size=1 tools/compare/serve.mjs --repo <clone>. */
+    const server=spawn(process.execPath,['--max-semi-space-size=1',path.join(root,'tools/compare/serve.mjs'),'--repo',dir,'--port','0'],
+      {env:Object.assign(cleanEnv(),{PATH:bin+path.delimiter+process.env.PATH}),stdio:['ignore','pipe','pipe']});
     const url=await new Promise((resolve,reject)=>{let text='';server.stdout.on('data',d=>{text+=d;const m=/http:\/\/127\.0\.0\.1:\d+\//.exec(text);if(m)resolve(m[0]);});
       server.once('exit',code=>reject(new Error('server exited '+code)));});
     try{await use({dir,shas,url,pid:server.pid});}
@@ -89,6 +93,10 @@ const stress=test.extend({
 stress('S0: revision lists come in pages of at most 100 rows, each within 2x the first page time',async({clone})=>{
   stress.setTimeout(300000);
   const get=async query=>{const t=performance.now();const r=await fetch(clone.url+'api/revisions?'+query);const body=await r.json();expect(r.status,query).toBe(200);return {ms:performance.now()-t,body};};
+  const documents=await (await fetch(clone.url+'api/documents?rev=main')).json();
+  expect(documents,'precondition: 60 documents').toEqual(Array.from({length:DOCS},(_,i)=>docName(i)));
+  const branches=await (await fetch(clone.url+'api/revisions?doc='+encodeURIComponent(docName(0))+'&tab=branches&page=1')).json();
+  expect(branches.total,'precondition: 40 branches plus main').toBe(BRANCHES+1);
   for(const [tab,doc] of [['all',docName(0)],['branches',docName(0)],['document',docName(7)],['tags',docName(0)]]){
     const first=await get('doc='+encodeURIComponent(doc)+'&tab='+tab+'&page=1'),pages=first.body.pages,times=[],seen=[];
     if(tab==='all')expect([first.body.total,pages],'precondition: 500 commits in 5 pages').toEqual([COMMITS,5]);
@@ -130,6 +138,10 @@ stress('S1 S2: 50 Compare navigations keep one live view, leave no git/gh proces
     await expect(comparison.locator('.compare-pane[data-side="after"] .compare-pane-title')).toHaveText('After · '+shas[to].slice(0,7)+' · '+subject(to));
     await expect(comparison).not.toHaveAttribute('aria-busy','true');
     await expect(views).toHaveCount(1);
+    /* All changed documents: the document list holds every spec changed from commit 1 to this one. */
+    const changed=git(clone.dir,['diff','--name-only',shas[1],shas[to],'--','*.spec.json']).split('\n').filter(Boolean).length;
+    expect(changed,'precondition: several documents change').toBeGreaterThan(1);
+    await expect(comparison.getByRole('navigation',{name:'Changed documents'}).getByRole('button')).toHaveCount(changed);
     if(previous)expect(await previous.evaluate(el=>el.isConnected),'navigation '+(n+1)+': previous view removed').toBe(false);
     previous=await views.elementHandle();
     const live=await page.evaluate(()=>window.FlowviewCompare.liveOwners());

@@ -6,15 +6,19 @@
 | T1 card + thumbnail | All examples (precondition: Delivery status not pressed) | in #welcome-templates the Epic status board card is visible beside other categories' cards, its art svg differs from Simple service flow's | no card; a card that falls back to the default flow drawing |
 | T2 Delivery status filter | real click on the Delivery status filter button | the button is aria-pressed; visible titles in #welcome-templates are exactly [Blank diagram, Epic status board] | no filter; the card filed under Engineering too; a filter that shows every template |
 | T3 opens with demo on | real click on the card | the editor shows; the preview's Demo live status checkbox is checked | a template that opens like Paste JSON, demo off |
-| T4 authored source | #src after T3 | page.tracking.jira.epic, panels status:live-status and history:edit-history, sectionLayout.default equals Chuck's arrangement, backstage/confluence keep the example's | a copy of the worked example without Chuck's arrangement |
+| T4 authored source | #src after T3 | page.tracking.jira.epic, panels status:live-status and history:edit-history, sectionLayout.default equals Chuck's arrangement, backstage/confluence keep the example's; the text never contains demoLiveStatus (the flag is template metadata, Chuck 2026-11-02) | a copy of the worked example without Chuck's arrangement; the demo flag written into the saved document |
 | T5 diagram + attached steps | #docview after T3 | the diagram tile holds the .board and the one .termbar, whose box lies inside the tile; no separate steps tile | step controls in their own tile, or no steps |
 | T6 Epic status filled | the panel:status tile | .pwidget.pt-live-status shows .dv-live-panel-body and at least two visible "state N" counts | the panel showing only its title (demo off) |
 | T7 Edit history | the panel:history tile | .pwidget.pt-edit-history shows at least one details.dv-edit-details row | a template without the history panel or its entries |
 | T8 carriers painted | #docview | at least one g.node[data-live-appearance] is visible | the checkbox checked but no paint |
 | T9 Chuck's arrangement | tile bounding boxes | status right ≤ diagram left; status and diagram tops align; history top ≥ diagram bottom; history left ≥ status right; no other tile starts left of status's right edge | the worked example's default (history full width under everything) |
 | T10 demo comes from the template open | uncheck (real click; carriers lose paint), Home, Start new project, Delivery status, card again | Demo live status is checked and carriers are painted again | demo state carried over from the previous preview instead of set by the template open |
+| T11 other opens stay off | right after T10 (demo on), Home, Paste JSON of the worked example examples/live-status (tickets, same panels) | its Demo live status checkbox is visible and unchecked; no g.node[data-live-appearance]; no .dv-live-panel-body | every ticketed document opening with demo on, or demo left on after the template |
 */
-import {test,expect,prepareEditorSurface} from '../helpers/test.mjs';
+import {readFile} from 'node:fs/promises';
+import path from 'node:path';
+import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
+import {repo} from '../helpers/prepare.mjs';
 
 const ARRANGEMENT=[
   {x:12,y:0,w:12,h:21},
@@ -63,7 +67,8 @@ test.describe('Epic status board template (#865)',()=>{
     await expect(demo).toBeChecked();
 
     // T4
-    const source=JSON.parse(await page.locator('#src').inputValue()),d=source.page.sections[0].diagram;
+    const text=await page.locator('#src').inputValue(),source=JSON.parse(text),d=source.page.sections[0].diagram;
+    expect(text,'the demo flag never enters the document').not.toContain('demoLiveStatus');
     expect(source.page.tracking.jira.epic).toBeTruthy();
     expect(d.panels.map(p=>[p.id,p.type])).toEqual([['status','live-status'],['history','edit-history']]);
     expect(d.sectionLayout.default).toEqual(ARRANGEMENT);
@@ -111,5 +116,15 @@ test.describe('Epic status board template (#865)',()=>{
     await openTemplate(page);
     await expect(page.getByRole('checkbox',{name:'Demo live status',exact:true})).toBeChecked();
     await expect(page.locator('#docview g.node[data-live-appearance]').first()).toBeVisible();
+
+    // T11: Paste JSON of a ticketed document still opens with the demo off.
+    const example=await readFile(path.join(repo,'examples/live-status/live-status.spec.json'),'utf8');
+    await page.locator('#workspace-home').click();await expect(page.locator('#welcome-home')).toBeVisible();
+    await paste(page,example);await prepareEditorSurface(page);
+    const pasted=page.getByRole('checkbox',{name:'Demo live status',exact:true});
+    await expect(pasted).toBeVisible();await expect(pasted).not.toBeChecked();
+    await expect(page.locator('#docview .pwidget.pt-live-status')).toBeVisible();
+    await expect(page.locator('#docview g.node[data-live-appearance]')).toHaveCount(0);
+    await expect(page.locator('#docview .pt-live-status .dv-live-panel-body')).toHaveCount(0);
   });
 });

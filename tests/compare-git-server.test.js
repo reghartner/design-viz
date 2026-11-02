@@ -110,7 +110,7 @@ test('S5 POST /api/fetch from the page fetches remote branches without touching 
     assert.equal(r.status,200,r.body);assert.match(r.headers['content-type'],/^application\/json/);
     assert.equal(JSON.parse(r.body).path,f.dir,'fetch answers with the refreshed status');
     assert.deepEqual(refChanges(before,snapshot(f.dir)),['refs/remotes/origin/remote-only'],'only the new remote-tracking ref');
-    const after=snapshot(f.dir);assert.equal(after.head,before.head);assert.equal(after.index,before.index);assert.equal(after.status,before.status);
+    const after=snapshot(f.dir);assert.equal(after.head,before.head);assert.equal(after.index,before.index);assert.equal(after.status,before.status);assert.equal(after.config,before.config,'POST /api/fetch does not change the repository config');
     const branches=JSON.parse((await request(port,'GET','/api/revisions?doc='+encodeURIComponent(A)+'&tab=branches')).body).rows;
     assert.ok(branches.some(x=>x.branches.includes('origin/remote-only')));
     noToken();

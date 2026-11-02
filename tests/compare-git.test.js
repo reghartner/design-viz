@@ -208,6 +208,7 @@ test('G6 every call is read-only; fetch changes only remote-tracking refs',async
     await r.fetch();
     const after=snapshot(f.dir);
     assert.equal(after.status,before.status);assert.equal(after.head,before.head);assert.equal(after.index,before.index);
+    assert.equal(after.config,before.config,'fetch does not change the repository config');
     const changed=refChanges(before,after);
     assert.deepEqual(changed,['refs/remotes/origin/remote-only'],'fetch adds the new remote-tracking branch and adds, removes or changes no other ref');
     /* A repository-configured fetch refspec cannot make fetch write outside refs/remotes/origin/. */

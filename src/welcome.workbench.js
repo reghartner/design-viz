@@ -220,7 +220,7 @@ function initWorkbenchWelcome(opts){
   var json = document.getElementById('welcome-json');
   var templateGrid = document.getElementById('welcome-templates');
   var filter = 'all';
-  var categories = {all:'All examples', engineering:'Engineering', business:'Business & teams', devices:'Connected devices'};
+  var categories = {all:'All examples', engineering:'Engineering', business:'Business & teams', devices:'Connected devices', delivery:'Delivery status'};
   var blank = {name:'Blank diagram', category:'blank', desc:'A clean canvas for your own nodes, connections, and story.',
     spec:welcomeBlankSpec()};
   function el(id){ return document.getElementById(id); }
@@ -373,8 +373,13 @@ function initWorkbenchWelcome(opts){
       else { updateResume(); recoveryError('This draft is no longer available. Open a file or start a new project.'); }
     }catch(ex){recoveryError(ex);}
   }
-  function openSpec(spec, failureId){
-    try { builder.loadSpec(JSON.parse(JSON.stringify(spec))); error(failureId, ''); enterEditor(); }
+  /* demo: a built-in template's demoLiveStatus metadata (#865). It turns on the
+     preview's Demo live status exactly as the checkbox does; the document never holds it. */
+  function openSpec(spec, failureId, demo){
+    try {
+      var opened = builder.loadSpec(JSON.parse(JSON.stringify(spec))); error(failureId, ''); enterEditor();
+      if (opened && demo === true && opts.demoLiveStatus) opts.demoLiveStatus(true);
+    }
     catch (ex){
       if(ex && ex.code==='DRAFT_ARCHIVE_FAILED'){error(failureId, '');return;}
       error(failureId, ex.message || 'This project could not be opened.');el(failureId).scrollIntoView({block:'nearest'});
@@ -476,6 +481,9 @@ function initWorkbenchWelcome(opts){
       branch:'<path d="M61 59h73m28 0h78m-91-5V29h91m-91 35v25h91" stroke="#c2b9d4" stroke-width="1.7" fill="none"/><rect x="33" y="42" width="48" height="33" rx="7" fill="#fff" stroke="#c1b5d6"/><path d="m149 43 17 16-17 16-17-16Z" fill="#e6ddf2" stroke="#beaed4"/><rect x="212" y="16" width="50" height="27" rx="6" fill="#e5f0e8" stroke="#b7cabb"/><rect x="212" y="47" width="50" height="26" rx="6" fill="#f7eadb" stroke="#dec3a4"/><rect x="212" y="76" width="50" height="26" rx="6" fill="#f6e3e5" stroke="#d8b7be"/>',
       flow:'<path d="M63 61h174M150 53V29" stroke="#bcb5d1" stroke-width="1.7" stroke-dasharray="4 4"/><rect x="25" y="43" width="61" height="39" rx="8" fill="#fff" stroke="#c3bad7"/><rect x="119" y="43" width="61" height="39" rx="8" fill="#e9e3f6" stroke="#bcb0d7"/><rect x="213" y="43" width="61" height="39" rx="8" fill="#fff" stroke="#c3bad7"/><rect x="133" y="12" width="34" height="21" rx="5" fill="#e1ede6" stroke="#b3cabd"/><path d="M39 56h31M39 64h20M135 56h30M135 64h19M228 56h30M228 64h19" stroke="#c0b6d1" stroke-width="3"/>',
       layers:'<rect x="44" y="17" width="212" height="84" rx="9" fill="#fff" stroke="#c5bdd6"/><rect x="53" y="26" width="49" height="66" rx="5" fill="#e9e3f3"/><path d="M113 40h129M113 54h129M113 68h129M113 82h83" stroke="#e1dceb" stroke-width="5"/><rect x="131" y="33" width="47" height="14" rx="4" fill="#b8cfc6"/><rect x="177" y="60" width="46" height="14" rx="4" fill="#d5c2de"/>',
+      /* Epic status board: Epic status left; the diagram with its step strip and Edit history right.
+         Pastel tints of the live state colors: done, in progress, blocked, to do (dashed). */
+      status:'<rect x="44" y="12" width="96" height="93" rx="7" fill="#fff" stroke="#c3cbdc"/><circle cx="62" cy="31" r="8" fill="none" stroke="#e3e7f0" stroke-width="3"/><path d="M62 23a8 8 0 0 1 7.6 10.5" fill="none" stroke="#a6d39a" stroke-width="3"/><rect x="76" y="25" width="50" height="4" rx="2" fill="#d8dcea"/><rect x="76" y="33" width="34" height="3" rx="1.5" fill="#e3e6ef"/><rect x="54" y="50" width="3" height="7" fill="#a6d39a"/><rect x="54" y="62" width="3" height="7" fill="#8fc7ec"/><rect x="54" y="74" width="3" height="7" fill="#e3a9a9"/><rect x="54" y="86" width="3" height="7" fill="#c5d4f1"/><path d="M61 53.5h42m-42 12h42m-42 12h42m-42 12h42" stroke="#e4e7ef" stroke-width="4" stroke-linecap="round"/><rect x="110" y="50.5" width="20" height="6" rx="3" fill="#e0f3da"/><rect x="110" y="62.5" width="20" height="6" rx="3" fill="#d9eefc"/><rect x="110" y="74.5" width="20" height="6" rx="3" fill="#f9e0e0"/><rect x="110" y="86.5" width="20" height="6" rx="3" fill="#eef3ff"/><rect x="150" y="12" width="106" height="58" rx="7" fill="#fff" stroke="#c3cbdc"/><path d="M182 27h8m24 0h8m-20 6v6" stroke="#c7cddb" stroke-width="1.5" stroke-dasharray="3 2"/><rect x="158" y="21" width="24" height="12" rx="3" fill="#e0f3da" stroke="#a6d39a"/><rect x="190" y="21" width="24" height="12" rx="3" fill="#d9eefc" stroke="#8fc7ec"/><rect x="222" y="21" width="24" height="12" rx="3" fill="#eef3ff" stroke="#b5c9ee" stroke-dasharray="3 2"/><rect x="190" y="39" width="24" height="12" rx="3" fill="#f9e0e0" stroke="#e3a9a9"/><path d="M150 56h106" stroke="#e8eaf1"/><circle cx="160" cy="63" r="2.6" fill="#a6d39a"/><circle cx="168" cy="63" r="2.6" fill="#a6d39a"/><circle cx="176" cy="63" r="2.6" fill="#8fc7ec"/><circle cx="184" cy="63" r="2.6" fill="#e3a9a9"/><circle cx="192" cy="63" r="2.6" fill="#c5d4f1"/><rect x="200" y="61.5" width="48" height="3" rx="1.5" fill="#e3e6ef"/><rect x="150" y="75" width="106" height="30" rx="7" fill="#fff" stroke="#c3cbdc"/><path d="M158 84h56m-56 7h80m-80 6h64" stroke="#e1e4ed" stroke-width="3" stroke-linecap="round"/>',
       perspectives:'<rect x="29" y="23" width="106" height="70" rx="8" fill="#fff" stroke="#c2b8d4"/><rect x="165" y="23" width="106" height="70" rx="8" fill="#fff" stroke="#c2b8d4"/><path d="M135 58h30" stroke="#b3a6cb" stroke-width="2"/><path d="m49 53 33-19 33 19v25H49Z" fill="#dfede5" stroke="#b8cabb"/><path d="M181 58h73" stroke="#b8afd0"/><rect x="178" y="47" width="20" height="23" rx="4" fill="#e8def2"/><rect x="208" y="47" width="20" height="23" rx="4" fill="#e8def2"/><rect x="239" y="47" width="20" height="23" rx="4" fill="#e8def2"/>'
     };
     svg.innerHTML = drawings[mode] || drawings.flow;
@@ -496,7 +504,7 @@ function initWorkbenchWelcome(opts){
     line('welcome-template-meta', isBlank ? 'No sample nodes. All possibility.' : starterCountLine(entry.spec));
     button.appendChild(copy);
     button.dataset.search = diagramSearchText([eyebrow.textContent, entry.name, entry.desc, categories[entry.category]].concat((entry.categories || []).map(function(key){ return categories[key]; })), isBlank ? null : entry.spec);
-    button.addEventListener('click', function(){ openSpec(entry.spec, 'welcome-template-error'); });
+    button.addEventListener('click', function(){ openSpec(entry.spec, 'welcome-template-error', !isBlank && entry.demoLiveStatus); });
     return button;
   }
   function renderTemplates(){

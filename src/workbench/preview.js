@@ -299,15 +299,18 @@ function createWorkbenchPreviewController(opts){
       });
     }
   }
+  /* The Demo live status checkbox and a built-in template that opens with the
+     demo on (#865) share this one path. Demo state is preview state only. */
+  function setDemoLiveStatus(on){
+    if(!ctl || !page)return;
+    ctl.demoLiveStatus=on;
+    replace(page,renderedText,opts.skin(page),{origin:'demo-live-status'});
+  }
   function rebuild(next,text,skin,request){
     var replaced=false,previousPage=request.origin==='project' || request.origin==='import' ? null : page,previousCtl=ctl;
     try{
       var nextCtl=renderWorkbenchPreview(opts.view,next,skin,previousPage,previousCtl,{
-        demoLiveStatus:function(on){
-          if(!ctl || !page)return;
-          ctl.demoLiveStatus=on;
-          replace(page,renderedText,opts.skin(page),{origin:'demo-live-status'});
-        },
+        demoLiveStatus:setDemoLiveStatus,
         arrangementSection:opts.arrangementSection?opts.arrangementSection(request,next,page):null,
         beforeReplace:function(){
           if(opts.beforeReplace)opts.beforeReplace(request);
@@ -383,7 +386,7 @@ function createWorkbenchPreviewController(opts){
       if(!page)return {ok:false,replaced:false,text:renderedText,reason:'missing',origin:'skin'};
       return replace(page,renderedText,skin,{origin:'skin'});
     },
-    forgetDocument:function(){page=null;},
+    forgetDocument:function(){page=null;},setDemoLiveStatus:setDemoLiveStatus,
     controller:function(){return ctl;},page:function(){return page;},renderedText:function(){return renderedText;}
   };
 }

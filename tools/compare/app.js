@@ -1,11 +1,14 @@
-/* Git Compare picker page (issue #849). Talks only to the local server's JSON API. Every text
-   from git or GitHub (subjects, authors, branch, tag and pull request names) is untrusted and is
-   written with textContent only. */
+/* Git Compare page (issue #849). Talks only to the local server's JSON API and renders comparisons with
+   the shared side-by-side view (window.FlowviewCompare from viewer.js). Every text from git or GitHub
+   (subjects, authors, branch, tag and pull request names, file names, document content) is untrusted
+   and is written with textContent only. */
 'use strict';
 (function(){
   const $ = selector => document.querySelector(selector);
   const state = {doc:null, from:null, to:null, side:'from', tab:'document', query:'', page:1};
   let docToken = 0, listToken = 0, betweenToken = 0, pickToken = 0, choiceToken = 0, lookupToken = 0, searchTimer = 0;
+  /* The Document value for "All changed documents". */
+  const ALL = 'all';
 
   /* ---------- helpers ---------- */
   const minute = iso => iso ? String(iso).slice(0, 10) + ' ' + String(iso).slice(11, 16) : '';
@@ -39,11 +42,13 @@
     try{ list = await api('/api/documents?' + q({rev})); }catch(ex){ if (token === docToken) message(ex.message); return; }
     if (token !== docToken) return;
     const select = $('#document'), options = list.map(path => [path, path]);
-    if (state.doc && !list.includes(state.doc)) options.push([state.doc, state.doc + ' (not in To)']);
+    if (state.doc && state.doc !== ALL && !list.includes(state.doc)) options.push([state.doc, state.doc + ' (not in To)']);
     options.sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+    options.unshift([ALL, 'All changed documents']);
     select.replaceChildren(...options.map(([value, label]) => { const o = el('option', {value}, label); return o; }));
     if (!state.doc && list.length){ state.doc = list[0]; refreshAfterDocument(); }
     if (state.doc) select.value = state.doc;
+    compareState();
   }
   function refreshAfterDocument(){
     loadBetween();
@@ -55,9 +60,10 @@
     const chosen = state[side], node = document.querySelector('[data-testid="' + side + '-choice"]');
     node.textContent = !chosen ? 'No revision chosen' : chosen.label ? chosen.label
       : [chosen.row.short, minute(chosen.row.date), chosen.row.author, chosen.row.subject].join(' · ');
+    compareState();
   }
   function setChoice(side, choice){
-    ++choiceToken;
+    ++choiceToken; invalidate();
     state[side] = choice; renderChoice(side);
     if (side === 'to') loadDocuments();
     loadBetween();
@@ -156,7 +162,7 @@
     try{ rows = await api('/api/between?' + q({from:state.from.rev, to:state.to.rev, doc:state.doc})); }
     catch(ex){ if (token === betweenToken) note.textContent = ex.message; return; }
     if (token !== betweenToken) return;
-    note.textContent = rows.length ? 'Commits after From up to To that change ' + state.doc + ', newest first.' : 'No commits between these revisions change this document.';
+    note.textContent = rows.length ? 'Commits after From up to To that change ' + (state.doc === ALL ? 'any document' : state.doc) + ', newest first.' : 'No commits between these revisions change this document.';
     list.replaceChildren(...rows.map(row => {
       const li = el('li');
       li.append(el('span', {'data-field':'date', class:'date'}, minute(row.date)), el('span', {'data-field':'sha', class:'sha'}, row.short));
@@ -190,6 +196,80 @@
       : {rev:row.parent, label:row.parent.slice(0, 7) + ' · first parent of ' + row.short};
     renderChoice('from');
     setChoice('to', {rev:row.sha, row});
+    runCompare();
+  }
+
+  /* ---------- comparison ---------- */
+  /* compareToken changes whenever the shown comparison stops matching the choices (or a new one starts);
+     viewToken changes with every document shown. A reply for an older token is ignored. The region is
+     aria-busy while any request it sent is still being answered, stale ones included. */
+  let compareToken = 0, viewToken = 0, pending = 0, view = null, requested = false;
+  const region = () => $('.comparison'), docsNav = () => $('.comparison .documents');
+  const STATUS = {added:'Added', removed:'Removed', edited:'Edited'};
+  function note(text){ region().querySelector('.note').textContent = text; }
+  function compareState(){ $('#compare').disabled = !(state.from && state.to && state.doc); }
+  /* Every view is destroyed before another is mounted or the comparison is removed. */
+  function clearView(){
+    if (view){ const old = view; view = null; try{ old.destroy(); }catch(ex){} }
+    $('.comparison .host').replaceChildren();
+  }
+  function invalidate(){
+    ++compareToken; clearView();
+    docsNav().hidden = true; docsNav().querySelector('ul').replaceChildren();
+    if (requested) note('The choices changed. Press Compare to update.');
+    compareState();
+  }
+  async function busy(task){
+    pending++; region().setAttribute('aria-busy', 'true');
+    try{ return await task(); }
+    finally{ if (--pending === 0) region().removeAttribute('aria-busy'); }
+  }
+  const revisionLabel = choice => choice.row ? choice.row.short + ' · ' + choice.row.subject : choice.label;
+  function runCompare(){
+    if (!(state.from && state.to && state.doc)) return;
+    const token = ++compareToken, from = state.from, to = state.to, doc = state.doc;
+    requested = true; clearView();
+    docsNav().hidden = true; docsNav().querySelector('ul').replaceChildren();
+    note('Loading…');
+    return busy(async () => {
+      try{
+        if (doc !== ALL) return await showDocument(doc, token, from, to);
+        const list = await api('/api/changed?' + q({from:from.rev, to:to.rev}));
+        if (token !== compareToken) return;
+        renderDocuments(list, token, from, to);
+        if (!list.length){ note('No documents changed between these revisions.'); return; }
+        await showDocument(list[0].path, token, from, to);
+      }catch(ex){ if (token === compareToken) note(ex.message); }
+    });
+  }
+  function renderDocuments(list, token, from, to){
+    docsNav().querySelector('ul').replaceChildren(...list.map(d => {
+      const li = el('li'), button = el('button', {type:'button', 'data-path':d.path});
+      button.append(el('span', {'data-field':'path', class:'path'}, d.path),
+        el('span', {'data-field':'status', class:'status ' + d.status}, STATUS[d.status] + (d.imported ? ' · imported content' : '')));
+      button.addEventListener('click', () => busy(async () => {
+        try{ await showDocument(d.path, token, from, to); }catch(ex){ if (token === compareToken) note(ex.message); }
+      }));
+      li.append(button);
+      return li;
+    }));
+    docsNav().hidden = false;
+  }
+  /* Before = From, After = To; each side is resolved with the imports of its own revision. */
+  async function showDocument(path, token, from, to){
+    const mine = ++viewToken;
+    docsNav().querySelectorAll('button').forEach(b => { if (b.dataset.path === path) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); });
+    const out = await api('/api/compare?' + q({from:from.rev, to:to.rev, doc:path}));
+    if (token !== compareToken || mine !== viewToken) return;
+    const FC = window.FlowviewCompare, copy = v => JSON.parse(JSON.stringify(v));
+    const side = s => s ? {authored:FC.normalize(copy(s.raw)), resolved:FC.normalize(FC.resolve(copy(s.raw), copy(s.context))), ledger:null} : null;
+    const before = side(out.before), after = side(out.after), entries = FC.compare(before, after);
+    clearView();
+    note('Comparing ' + path + ': ' + entries.length + (entries.length === 1 ? ' change.' : ' changes.'));
+    view = FC.mount($('.comparison .host'), {before:before && before.resolved, after:after && after.resolved, entries,
+      titles:{before:'Before · ' + revisionLabel(from), after:'After · ' + revisionLabel(to)},
+      emptyText:{before:'This document is not in From.', after:'This document is not in To.'},
+      onRenderError:failure => note((failure.side === 'before' ? 'Before' : 'After') + ' could not be rendered: ' + failure.message)});
   }
 
   /* ---------- wiring ---------- */
@@ -207,11 +287,12 @@
     if (!picker.hidden && !picker.contains(ev.target) && !ev.target.closest('.trigger')) closePicker();
   });
   $('#swap').addEventListener('click', () => {
-    ++choiceToken;
+    ++choiceToken; invalidate();
     [state.from, state.to] = [state.to, state.from];
     renderChoice('from'); renderChoice('to'); loadDocuments(); loadBetween();
   });
-  $('#document').addEventListener('change', ev => { ++choiceToken; state.doc = ev.target.value; loadDocuments(); refreshAfterDocument(); });
+  $('#document').addEventListener('change', ev => { ++choiceToken; state.doc = ev.target.value; invalidate(); loadDocuments(); refreshAfterDocument(); });
+  $('#compare').addEventListener('click', () => runCompare());
   $('#fetch').addEventListener('click', async ev => {
     const button = ev.currentTarget;
     button.disabled = true; message('');

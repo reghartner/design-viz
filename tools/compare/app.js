@@ -95,7 +95,7 @@
         li.querySelector('.meta').append(el('span', {class:'unavailable'}, 'not available locally'));
         return;
       }finally{ li.removeAttribute('aria-busy'); }
-      if (click !== pickToken || token !== listToken || state.side !== side) return;
+      if (token !== listToken || state.side !== side) return;
     }
     closePicker();
     setChoice(side, {rev:pr || row.sha, row});

@@ -56,8 +56,9 @@
    R18 add/remove records     panel step path section node edge layout view   status, null absent path, effects = oracle   positional "modified" pairs
    R20 nested tabs            caption, tab view, section view    nested exact paths                         flat sections[i] paths
    R21 document / heading / layout / ledger   exact paths and hunks                                     coarse labels only
-   R21b large ledgers (5,000 lines)          one exact hunk for one changed line; one hunk for a full    a lines x lines LCS table
-                                             rewrite; each diff < 1 s
+   R21b large ledgers (5,000 lines)          one exact hunk for one changed line; two exact hunks for    a lines x lines LCS table; a coarse
+                                             edits 3,000 lines apart; one hunk for a full rewrite;        fallback that spans unchanged lines
+                                             each diff < 1 s
    R22 legacy steps[i].patch  alias edit                 path uses .patch, same effect as .panels          hard-coded .panels
    R23 absent document        compare(null, side)        exactly document + one per section; mirrored      extra record entries
    R24 identity / full mirror symmetry (fields, effects, scopes, resolved) / immutability                 invented entries; one-sided payloads
@@ -516,8 +517,12 @@ test('R21b large ledgers diff in bounded time: a single changed line gives one e
   const lines=k=>Array.from({length:N},(_,i)=>'- row '+i+' covered by step s'+(i%97)+k);
   const a=lines('').join('\n'),one=lines('');one[2999]='- row 2999 changed';
   const rewrite=lines(' (new)').join('\n');
+  /* Two edits 3,000 lines apart: two exact hunks, never one hunk spanning the unchanged lines between them. */
+  const two=lines('');two[999]='- row 999 changed';two.splice(4000,0,'- inserted after row 3999');
   for(const [name,after,expected] of [
     ['single changed line',one.join('\n'),[{beforePath:'ledger:3000-3000',afterPath:'ledger:3000-3000',before:lines('')[2999],after:'- row 2999 changed'}]],
+    ['two distant edits',two.join('\n'),[{beforePath:'ledger:1000-1000',afterPath:'ledger:1000-1000',before:lines('')[999],after:'- row 999 changed'},
+      {beforePath:'ledger:4001-4000',afterPath:'ledger:4001-4001',before:'',after:'- inserted after row 3999'}]],
     ['full rewrite',rewrite,[{beforePath:'ledger:1-'+N,afterPath:'ledger:1-'+N,before:a,after:rewrite}]]]){
     const t=performance.now(),out=compare(side(p0,{ledger:a}),side(p0,{ledger:after})),ms=performance.now()-t;
     assert.deepEqual(only(out,x=>x.kind==='ledger',name).fields,expected,name);

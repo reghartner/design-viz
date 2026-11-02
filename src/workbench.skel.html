@@ -6,6 +6,12 @@
 {{STYLE_PAGE}}
 {{STYLE_CORE}}
 </style>
+<script>
+/* Hide the page until the Workbench script below has run (it is synchronous, so
+   DOMContentLoaded follows it even if it throws). Without scripts the class is never set. */
+document.documentElement.classList.add('workbench-booting');
+document.addEventListener('DOMContentLoaded',function(){document.documentElement.classList.remove('workbench-booting');});
+</script>
 
 {{ICONS}}
 

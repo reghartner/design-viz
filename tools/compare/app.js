@@ -53,7 +53,8 @@
   /* ---------- choices ---------- */
   function renderChoice(side){
     const chosen = state[side], node = document.querySelector('[data-testid="' + side + '-choice"]');
-    node.textContent = chosen ? [chosen.row.short, minute(chosen.row.date), chosen.row.author, chosen.row.subject].join(' · ') : 'No revision chosen';
+    node.textContent = !chosen ? 'No revision chosen' : chosen.label ? chosen.label
+      : [chosen.row.short, minute(chosen.row.date), chosen.row.author, chosen.row.subject].join(' · ');
   }
   function setChoice(side, choice){
     state[side] = choice; renderChoice(side);
@@ -76,14 +77,27 @@
     line1.append(marks, el('span', {'data-field':'subject', class:'subject'}, row.subject));
     line2.append(el('span', {'data-field':'sha', class:'sha'}, row.short), el('span', {'data-field':'author'}, row.author));
     body.append(line1, line2); li.append(body);
-    li.addEventListener('click', () => pick(row));
-    li.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); pick(row); } });
+    li.addEventListener('click', () => pick(row, li));
+    li.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); pick(row, li); } });
     return li;
   }
-  function pick(row){
-    const side = state.side, rev = state.tab === 'prs' && row.prs.length ? 'pr:' + row.prs[0] : row.sha;
+  /* A pull request is chosen by number so the server can fetch a head the clone does not have.
+     If that fails, the row is marked and stays unchosen. */
+  async function pick(row, li){
+    if (li.getAttribute('aria-disabled') === 'true' || li.dataset.checking) return;
+    const side = state.side, token = listToken, pr = state.tab === 'prs' && row.prs.length ? 'pr:' + row.prs[0] : null;
+    if (pr){
+      li.dataset.checking = '1';
+      try{ await api('/api/documents?' + q({rev:pr})); }
+      catch(ex){
+        li.setAttribute('aria-disabled', 'true');
+        li.querySelector('.meta').append(el('span', {class:'unavailable'}, 'not available locally'));
+        return;
+      }finally{ delete li.dataset.checking; }
+      if (token !== listToken || state.side !== side) return;
+    }
     closePicker();
-    setChoice(side, {rev, row});
+    setChoice(side, {rev:pr || row.sha, row});
   }
   async function loadRows(append){
     const picker = $('.picker'), list = picker.querySelector('[role=listbox]'), error = picker.querySelector('.error'), more = picker.querySelector('.more');
@@ -158,8 +172,10 @@
       const out = await api('/api/revisions?' + q({doc:state.doc, tab:'all', q:row.parent, page:1}));
       parentRow = out.rows.find(r => r.sha === row.parent);
     }catch(ex){ message(ex.message); return; }
-    if (!parentRow){ message('The parent commit ' + row.parent.slice(0, 7) + ' was not found.'); return; }
-    state.from = {rev:row.parent, row:parentRow}; renderChoice('from');
+    /* A parent that no branch or tag reaches (inside a fetched pull request) is chosen by SHA. */
+    state.from = parentRow ? {rev:row.parent, row:parentRow}
+      : {rev:row.parent, label:row.parent.slice(0, 7) + ' · first parent of ' + row.short};
+    renderChoice('from');
     setChoice('to', {rev:row.sha, row});
   }
 

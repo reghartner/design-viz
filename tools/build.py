@@ -31,6 +31,7 @@ SRC = ROOT / "src"
 # Embed curated source specs: built-ins also work from a downloaded HTML file.
 # Keep metadata here, and the example itself in its existing authored location.
 WORKBENCH_TEMPLATES = [
+    {"name": "Epic status board", "desc": "A diagram, step controls, Epic status and edit history, already laid out. Add your epic key, or ask your agent for one.", "category": "delivery", "tag": "Live Jira status", "art": "status", "demoLiveStatus": True, "source": "starters/epic-status-board.json"},
     {"name": "Simple service flow", "desc": "A client, a service, and a store. Start with the essentials and make them yours.", "category": "engineering", "tag": "The essentials", "art": "flow", "source": "starters/minimal.json", "title": "Simple service flow"},
     {"name": "Messaging cost tradeoffs", "desc": "Compare an event bus with a queue and relay at 1M, 10M and 100M messages, including fixed costs and engineering nodes.", "category": "engineering", "categories": ["business"], "tag": "Cost & architecture · illustrative", "art": "branch", "source": "starters/messaging-cost.json"},
     {"name": "Retries & recovery", "desc": "Follow a request through retries, deadlines, and a circuit that opens and recovers.", "category": "engineering", "tag": "Alternate outcomes", "art": "branch", "source": "starters/resilience.json"},

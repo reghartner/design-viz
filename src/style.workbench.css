@@ -153,6 +153,7 @@ body.welcome-active{background:#f7f8fc;margin:0;}
 .welcome-template-meta{display:block;color:#7c8497;font:9px 'IBM Plex Mono',monospace;border-top:1px solid #ececf3;padding-top:11px;margin-top:14px;}
 .welcome-template-card[data-category="business"] .welcome-template-art{background:#f8f0e9;}
 .welcome-template-card[data-category="devices"] .welcome-template-art{background:#edf4f0;}
+.welcome-template-card[data-category="delivery"] .welcome-template-art{background:#ecf2f9;}
 .welcome-template-card.welcome-blank{border-style:dashed;border-color:#bab2d2;background:#fdfcfe;}
 .welcome-blank .welcome-template-art{background:#f7f5fb;}
 .welcome-blank .welcome-template-art>span{z-index:1;background:#fdfcfe;color:#9888bc;display:grid;place-items:center;width:48px;height:48px;border:1px dashed #bdb4d0;border-radius:12px;font-size:30px;font-weight:400;}

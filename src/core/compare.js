@@ -433,18 +433,30 @@ function compareTabViews(A, B, entries){
   });
   ob.forEach(function(b){ if (!used.has(b)) entries.push({kind:'tab', status:'added', cause:'document', beforePath:null, afterPath:b.path, section:{before:null, after:null}, key:{before:null, after:b.j}, fields:[], effects:[]}); });
 }
-/* Matched line pairs [i, j] (x[i] === y[j], increasing in both) for x[aLo..aHi) and y[bLo..bHi), appended to
-   pairs in order. Equal leading and trailing lines match first. A middle of at most COMPARE_LEDGER_CELLS cells
-   uses a longest-common-subsequence table; a larger middle is split at lines that occur exactly once on each
-   side, in the same order (the longest increasing run of them), and each part is matched the same way. A large
-   part with no such line stays unmatched (one hunk). Ledgers may reach 256 KiB: a table for thousands of lines
-   costs seconds and hundreds of MB. */
+/* Matched line pairs [i, j] (x[i] === y[j], increasing in both) of a longest common subsequence of
+   x[aLo..aHi) and y[bLo..bHi) (lines as integer ids), appended to pairs in order. Equal leading and trailing lines
+   match first. A middle of at most COMPARE_LEDGER_CELLS cells uses a full LCS table; a larger one is split at a
+   middle snake of Myers' linear-space diff, so time grows with lines x edits and memory stays linear: ledgers may
+   reach 256 KiB and a full table for thousands of lines costs seconds and hundreds of MB. */
 function compareLedgerMatch(x, y, aLo, aHi, bLo, bHi, pairs){
   while (aLo < aHi && bLo < bHi && x[aLo] === y[bLo]){ pairs.push([aLo, bLo]); aLo++; bLo++; }
   var tail = [];
   while (aHi > aLo && bHi > bLo && x[aHi - 1] === y[bHi - 1]){ aHi--; bHi--; tail.push([aHi, bHi]); }
   var rows = aHi - aLo, cols = bHi - bLo, i, j;
-  if (rows && cols && rows * cols <= COMPARE_LEDGER_CELLS){
+  if (rows && cols && rows * cols > COMPARE_LEDGER_CELLS){
+    /* Parts that share no line have nothing to match (a rewrite): one hunk without searching. */
+    var seen = new Set(x.subarray(aLo, aHi)), shared = false;
+    for (j = bLo; j < bHi && !shared; j++) shared = seen.has(y[j]);
+    if (!shared){ for (i = tail.length - 1; i >= 0; i--) pairs.push(tail[i]); return; }
+  }
+  var snake = rows && cols && rows * cols > COMPARE_LEDGER_CELLS ? compareLedgerSnake(x, y, aLo, aHi, bLo, bHi) : null;
+  /* A snake must leave two smaller parts; otherwise (never seen for large parts) the table is used. */
+  if (snake && ((snake.x0 === aLo && snake.y0 === bLo && snake.x1 === aLo) || (snake.x1 === aHi && snake.y1 === bHi && snake.x0 === aHi))) snake = null;
+  if (snake){
+    compareLedgerMatch(x, y, aLo, snake.x0, bLo, snake.y0, pairs);
+    for (i = 0; i < snake.x1 - snake.x0; i++) pairs.push([snake.x0 + i, snake.y0 + i]);
+    compareLedgerMatch(x, y, snake.x1, aHi, snake.y1, bHi, pairs);
+  } else if (rows && cols){
     var L = [];
     for (i = 0; i <= rows; i++) L.push(new Uint32Array(cols + 1));
     for (i = rows - 1; i >= 0; i--) for (j = cols - 1; j >= 0; j--) L[i][j] = x[aLo + i] === y[bLo + j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
@@ -454,33 +466,33 @@ function compareLedgerMatch(x, y, aLo, aHi, bLo, bHi, pairs){
       else if (L[i][j + 1] >= L[i + 1][j]) j++;
       else i++;
     }
-  } else if (rows && cols){
-    var anchors = compareLedgerAnchors(x, y, aLo, aHi, bLo, bHi), pa = aLo, pb = bLo;
-    anchors.forEach(function(p){ compareLedgerMatch(x, y, pa, p[0], pb, p[1], pairs); pairs.push(p); pa = p[0] + 1; pb = p[1] + 1; });
-    if (anchors.length) compareLedgerMatch(x, y, pa, aHi, pb, bHi, pairs);
   }
   for (i = tail.length - 1; i >= 0; i--) pairs.push(tail[i]);
 }
-/* Lines that occur exactly once in x[aLo..aHi) and once in y[bLo..bHi), as [i, j], keeping the longest run
-   increasing in both (patience sorting). */
-function compareLedgerAnchors(x, y, aLo, aHi, bLo, bHi){
-  var ca = new Map(), cb = new Map(), i, c;
-  for (i = aLo; i < aHi; i++){ c = ca.get(x[i]); ca.set(x[i], c ? -1 : i + 1); }
-  for (i = bLo; i < bHi; i++){ c = cb.get(y[i]); cb.set(y[i], c ? -1 : i + 1); }
-  var cand = [];
-  for (i = aLo; i < aHi; i++) if (ca.get(x[i]) > 0 && cb.get(x[i]) > 0) cand.push([i, cb.get(x[i]) - 1]);
-  var tails = [], prev = new Array(cand.length);
-  cand.forEach(function(p, k){
-    var lo = 0, hi = tails.length;
-    while (lo < hi){ var mid = (lo + hi) >> 1; if (cand[tails[mid]][1] < p[1]) lo = mid + 1; else hi = mid; }
-    prev[k] = lo ? tails[lo - 1] : -1; tails[lo] = k;
-  });
-  var out = [];
-  for (var k = tails.length ? tails[tails.length - 1] : -1; k >= 0; k = prev[k]) out.unshift(cand[k]);
-  return out;
+/* Myers' middle snake: a run of equal lines (x0,y0)-(x1,y1) on a shortest edit path of the part. */
+function compareLedgerSnake(x, y, aLo, aHi, bLo, bHi){
+  var N = aHi - aLo, M = bHi - bLo, delta = N - M, odd = (delta & 1) !== 0, max = Math.ceil((N + M) / 2), off = max + 1;
+  var vf = new Int32Array(2 * off + 1), vb = new Int32Array(2 * off + 1), d, k, px, py, sx, sy, kr;
+  for (d = 0; d <= max; d++){
+    for (k = -d; k <= d; k += 2){
+      px = k === -d || (k !== d && vf[off + k - 1] < vf[off + k + 1]) ? vf[off + k + 1] : vf[off + k - 1] + 1;
+      py = px - k; sx = px; sy = py;
+      while (px < N && py < M && x[aLo + px] === y[bLo + py]){ px++; py++; }
+      vf[off + k] = px; kr = delta - k;
+      if (odd && kr >= -(d - 1) && kr <= d - 1 && px + vb[off + kr] >= N) return {x0:aLo + sx, y0:bLo + sy, x1:aLo + px, y1:bLo + py};
+    }
+    for (k = -d; k <= d; k += 2){
+      px = k === -d || (k !== d && vb[off + k - 1] < vb[off + k + 1]) ? vb[off + k + 1] : vb[off + k - 1] + 1;
+      py = px - k; sx = px; sy = py;
+      while (px < N && py < M && x[aHi - 1 - px] === y[bHi - 1 - py]){ px++; py++; }
+      vb[off + k] = px; kr = delta - k;
+      if (!odd && kr >= -d && kr <= d && px + vf[off + kr] >= N) return {x0:aHi - px, y0:bHi - py, x1:aHi - sx, y1:bHi - sy};
+    }
+  }
+  return null;
 }
 /* Coverage ledger: line hunks from a longest-common-subsequence diff. */
-var COMPARE_LEDGER_CELLS = 1000000;
+var COMPARE_LEDGER_CELLS = 250000;
 function compareLedger(a, b, entries){
   a = typeof a === 'string' ? a : null; b = typeof b === 'string' ? b : null;
   if (a === b) return;
@@ -491,7 +503,12 @@ function compareLedger(a, b, entries){
     return;
   }
   var x = a.split('\n'), y = b.split('\n'), pairs = [], fields = [], pa = 0, pb = 0;
-  compareLedgerMatch(x, y, 0, x.length, 0, y.length, pairs);
+  /* Lines as integer ids; one fixed orientation (by text order) for both directions, so swapping the sides
+     swaps every hunk. */
+  var ids = new Map(), id = function(line){ var v = ids.get(line); if (v === undefined){ v = ids.size; ids.set(line, v); } return v; };
+  var xi = Int32Array.from(x, id), yi = Int32Array.from(y, id);
+  if (a <= b) compareLedgerMatch(xi, yi, 0, x.length, 0, y.length, pairs);
+  else { compareLedgerMatch(yi, xi, 0, y.length, 0, x.length, pairs); pairs = pairs.map(function(p){ return [p[1], p[0]]; }); }
   /* A hunk is the gap between two consecutive matched lines (the end of both ledgers closes the last one). */
   pairs.push([x.length, y.length]);
   pairs.forEach(function(p){

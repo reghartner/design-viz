@@ -7,8 +7,10 @@
 {{STYLE_CORE}}
 </style>
 <script>
-/* Hide the page until the Workbench script at the end has chosen Home or the editor.
-   The script block after it shows the page again. Without scripts the class is never set. */
+/* Hide the page while the Workbench script at the end runs; until then the markup shows both
+   Home and the editor toolbar unstyled. The block after that script shows the page when it
+   finishes or throws (a failed start stays visible instead of blank). Without scripts the
+   class is never set. */
 document.documentElement.classList.add('workbench-booting');
 </script>
 
@@ -765,6 +767,6 @@ var WORKBENCH_EXAMPLES = {{WORKBENCH_EXAMPLES}};
 })();
 </script>
 <script>
-/* A separate block, so the page is shown even when the Workbench script above throws. */
+/* A separate block, so the page is shown when the Workbench script above finishes or throws. */
 document.documentElement.classList.remove('workbench-booting');
 </script>

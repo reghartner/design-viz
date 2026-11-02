@@ -107,7 +107,6 @@
     if (!append){ list.replaceChildren(); error.hidden = true; more.hidden = true; }
     if (!state.doc) return;
     /* Show more stays disabled until this page arrives, so a second click cannot skip a page. */
-    more.disabled = true;
     let out;
     try{ out = await api('/api/revisions?' + q({doc:state.doc, tab:state.tab, q:state.query, page:state.page})); }
     catch(ex){ if (token === listToken){ error.textContent = ex.message; error.hidden = false; more.disabled = false; } return; }
@@ -181,7 +180,6 @@
       parentRow = out.rows.find(r => r.sha === row.parent);
     }catch(ex){ if (token === choiceToken) message(ex.message); return; }
     finally{ if (lookup === lookupToken) section.removeAttribute('aria-busy'); }
-    if (token !== choiceToken) return;
     /* A parent that no branch or tag reaches (inside a fetched pull request) is chosen by SHA. */
     state.from = parentRow ? {rev:row.parent, row:parentRow}
       : {rev:row.parent, label:row.parent.slice(0, 7) + ' · first parent of ' + row.short};

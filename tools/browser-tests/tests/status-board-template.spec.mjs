@@ -18,7 +18,7 @@ Epic status board is opened from Start new project and its checkbox is asserted 
 (precondition), then Home. "Off" for a ticketed document = the Demo live status checkbox is visible and unchecked,
 no #docview g.node[data-live-appearance], no .pt-live-status .dv-live-panel-body.
 | T11 Paste JSON | Paste JSON of examples/live-status/live-status.spec.json (tickets, the same two panels) | off | every ticketed document opening with demo on; demo left on after the template |
-| T12 Open file | the browser has no writable-file picker (showOpenFilePicker undefined, as in working-file.spec "unsupported writable access"), so Open file uses the welcome file input: real click on #welcome-open, Playwright file chooser, setInputFiles(the same example) | off | Open file taking a demo-on path |
+| T12 Open file | the browser has no writable-file picker (showOpenFilePicker undefined, as in working-file.spec "unsupported writable access"), so Open file uses the welcome file input: real click on #welcome-open, Playwright FileChooser.setFiles(the same example) | off | Open file taking a demo-on path |
 | T13 other built-in template | Start new project, All examples, real click on Simple service flow. No other built-in template has tickets, so the checkbox is NOT SHOWN: count 0, no [data-live-appearance], no .pt-live-status | not shown, nothing painted | demo state leaking into the next template |
 | T14 ticketed team template | starters.json (routed) offers "Team delivery board": the worked example plus "demoLiveStatus": true in the manifest entry; real click in #welcome-company-grid | off | demo turned on for every template, or a team manifest able to set the built-in flag |
 */
@@ -186,7 +186,7 @@ test.describe('Epic status board template (#865)',()=>{
     // T12 Open file
     await home();await boardWithDemoOn();
     const chooser=page.waitForEvent('filechooser');await page.locator('#welcome-open').click();
-    await (await chooser).setInputFiles(examplePath);
+    await (await chooser).setFiles(examplePath);
     await expect(page.locator('#workbench-workspace')).toBeVisible();await expect(page.locator('#src')).toHaveValue(example);
     await expectOff('Open file');
 

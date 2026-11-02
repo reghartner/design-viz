@@ -803,27 +803,36 @@ function mountCompareView(host, opts){
         var got = cropElements(p, side);
         if (!got) return;
         var insets = {left:24, right:24, top:20, bottom:24};
-        if (!got.viewport){ if (got.elements[0] && got.elements[0].scrollIntoView) got.elements[0].scrollIntoView({block:'center', inline:'center'}); return; }
-        /* Whole section: fit, then centre the section's whole diagram. */
-        var whole = function(){
-          got.viewport.fitCanvas(insets);
-          var svg = got.elements[0] && (got.elements[0].closest && got.elements[0].closest('svg[aria-label="flow diagram"]') || got.elements[0].ownerSVGElement) ||
-            got.rec.sectionEl.querySelector('svg[aria-label="flow diagram"]');
-          if (svg) cropCentre(p, [svg]);
-        };
-        if (level < 0 || !got.elements.length){ whole(); return; }
+        var svg = got.elements[0] && (got.elements[0].closest && got.elements[0].closest('svg[aria-label="flow diagram"]') || got.elements[0].ownerSVGElement) ||
+          got.rec.sectionEl.querySelector('svg[aria-label="flow diagram"]');
+        /* Explore panes fit with the canvas viewport; a section drawn inline in the document page fits
+           with its own board (Diagram zoom). Both take an extent in the diagram's SVG coordinates. */
+        var canvas = svg && svg.closest && svg.closest('.boardcanvas'), board = canvas && canvas.parentElement, fit = null, frameW = 0, frameH = 0;
+        if (got.viewport){ fit = function(ext){ if (ext) got.viewport.fitCanvas(insets, ext); else got.viewport.fitCanvas(insets); }; frameW = p.scroll.clientWidth; frameH = p.scroll.clientHeight; }
+        else if (got.rec.boardSize && got.rec.boardSize.fitSelection && svg && board){
+          /* The inline board keeps its height while zoomed, so it is fitted by width only: the extent's
+             height collapses to its centre line. */
+          fit = function(ext){
+            var vb = svg.viewBox.baseVal, e = ext || {x:vb.x, y:vb.y, w:vb.width, h:vb.height};
+            got.rec.boardSize.fitSelection({x:e.x, y:e.y + e.h / 2 - .5, w:e.w, h:1}, {left:insets.left, right:insets.right, top:0, bottom:0});
+          };
+          frameW = board.clientWidth; frameH = 0;
+        }
+        if (!fit){ if (got.elements[0] && got.elements[0].scrollIntoView) got.elements[0].scrollIntoView({block:'center', inline:'center'}); return; }
+        /* Whole section: fit the section's whole diagram and centre it. */
+        if (level < 0 || !got.elements.length){ fit(null); if (svg) cropCentre(p, [svg]); return; }
         var b = cropBounds(got.elements);
-        if (!b){ whole(); return; }
-        /* Never magnify past about 100%: the crop is at least the pane's free area (graph units are
+        if (!b){ fit(null); if (svg) cropCentre(p, [svg]); return; }
+        /* Never magnify past about 100%: the crop is at least the frame's free area (graph units are
            pixels at 100%), centred on the change. */
-        var minW = Math.max(1, p.scroll.clientWidth - insets.left - insets.right), minH = Math.max(1, p.scroll.clientHeight - insets.top - insets.bottom);
+        var minW = Math.max(1, frameW - insets.left - insets.right), minH = Math.max(1, frameH - insets.top - insets.bottom);
         if (b.w < minW){ b.x -= (minW - b.w) / 2; b.w = minW; }
         if (b.h < minH){ b.y -= (minH - b.h) / 2; b.h = minH; }
         if (level > 0){
           var f = Math.pow(CROP_ZOOM_OUT, level), cx = b.x + b.w / 2, cy = b.y + b.h / 2;
           b = {x:cx - b.w * f / 2, y:cy - b.h * f / 2, w:b.w * f, h:b.h * f};
         }
-        got.viewport.fitCanvas(insets, b);
+        fit(b);
         cropCentre(p, got.elements);
       });
     }

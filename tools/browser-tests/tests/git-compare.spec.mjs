@@ -1,8 +1,11 @@
-/* Git Compare picker page (issue #849, PR 2 of 3): tools/compare/index.html served by
+/* Git Compare page (issue #849, PRs 2 and 3 of 3): tools/compare/index.html served by
    tools/compare/serve.mjs on a temporary clone (tests/helpers/compare-git-fixture.cjs).
-   Contract: issue #849 "How it should look" + browser contract rows 0, 1, 2, 4, 6 and "Untrusted
-   text" (rows 3 and 5, the compare view and the all-documents rail, belong to PR 3). Chuck
-   2026-11-01: coverage "As written in #849"; the gh token stays in the server process.
+   Contract: issue #849 "How it should look" + browser contract rows 0-6 and "Untrusted text".
+   PR 2 added the pickers (rows 0, 1, 2, 4, 6); PR 3 adds the comparison (row 3, row 4's "loads
+   first parent vs merge") and "All changed documents" (row 5). The stress rows are in
+   git-compare-stress.spec.mjs. Chuck 2026-11-01: coverage "As written in #849"; the gh token
+   stays in the server process. Node rule (Chuck): node changes include imported nodes, so the
+   document list also lists a document whose imported provider changed (A3).
 
    Fixture history (all dates 2026-01-0N 10:00 UTC; doc = flows/a.spec.json):
      c1 Alice "Add flows" (a, p, old)     c2 Bob "Rename alpha" (a; tag v1)
@@ -69,6 +72,39 @@
         Compare this commit                     of Compare this commit on c5; then        release and busy cleared: from-choice c1 row,    user's newer choice
                                                                                        to-choice c3 row, between rows c3, c2
                                                 To := c3 in the picker; release
+   --- PR 3 (Document list gains a first option "All changed documents"; D0/D1 lists include it) ---
+   C0   Compare needs both sides            open page; choose From; choose To         region "Comparison" text "Choose From and To, then  a Compare that runs with one side
+                                                                                       press Compare."; button disabled until both,       missing
+                                                                                       then enabled; no view before the click
+   C1   Before = From, After = To (row 3)    From c1, To c7, doc a; click Compare     one .compare-view; pane titles "Before · <c1> ·    swapped sides; agent-preview titles;
+                                                                                       Add flows" / "After · <c7> · Final pass"; rail     a page-made rail instead of the shared
+                                                                                       items exactly the 3 engine labels (local node,    component
+                                                                                       step, imported node); node a "Alpha" in Before,
+                                                                                       "Alpha final" in After
+   C2   click through changes (row 3)        J, rail click, K (Full diagram)          aria-current moves 0->1->2->1; step caption         panes that never follow the selection
+                                                                                       "Start" / "Start the flow"; child::p2 "P two" /
+                                                                                       "P two changed"
+   C3   Compare this commit loads the        From c1, To c7; Compare this commit on   titles c4 "Docs only" / c5 "Merge feature";         second parent (c3: no changes); choices
+        comparison (row 4)                   c5                                       rail exactly ["Modified · Step s1 · text"]         set but nothing compared
+   C4   each navigation replaces the view    Compare, then Compare again (same pair)  previous .compare-view detached; exactly one;       leaked instance (destroy() not run)
+                                                                                       liveOwners() back to the one-view value
+   C5   a changed choice/document removes    after Compare: From := c2; later          no .compare-view, note "The choices changed. Press  a stale comparison labelled with the new
+        the shown comparison                 Document := p                            Compare to update.", liveOwners() 0, old root      choices
+                                                                                       detached
+   C6   the latest request wins              hold the c1..c7 reply; Compare this       region aria-busy while any request is answered;     a late reply overwriting the newer
+                                             commit on c5; release                    after release and busy cleared: one view, c4/c5    comparison
+                                                                                       titles, rail [Step s1]
+   A0   document list (row 5)               All changed documents, From c1, To c7     navigation "Changed documents" rows exactly          file list from one side; missing status
+                                                                                       [a Edited, new Added, old Removed, p Edited];
+                                                                                       first selected (aria-current), its changes shown
+   A1   choosing a document shows its        click new, old, p                        rail per document exactly (Added/Removed Document   rail stuck on the first document; agent
+        changes                                                                       + Section Main; P two changed); absent side text    wording "Not in the proposal."
+                                                                                       "This document is not in From." / "...in To."
+   A2   between list for all documents       same pair                               rows c7, c6, c5, c3, c2 (c4 changes README only)    between list still filtered to one file
+   A3   imported-only change is listed       From c5, To c6                           rows [a "Edited · imported content", p Edited];     file-diff-only list (misses a)
+                                                                                       a's rail [Imported node child::p2 · title]
+   U2   untrusted text in the document list  commit with a hostile file name and       doc row path literal; rail labels and node text     innerHTML in the document list or rail
+        and comparison                       node/section titles                      literal; no <img>/inline <script>; no __pwned
    AU   every test, context-wide (all pages): no page/console error, failed request, HTTP >= 400, or request outside the compare server
    U1   page CSP                                response headers of "/"                 script-src 'self', no 'unsafe-inline'           inline script allowed
    Git refuses "<" and ">" in author names, so the hostile author comes from the PR author login. */
@@ -83,6 +119,8 @@ const A='flows/a.spec.json',P='flows/p.spec.json',NEW='flows/new.spec.json',OLD=
 const HOSTILE='<img src=x onerror=window.__pwned=1><script>window.__pwned=1</script>';
 const HOSTILE_BRANCH='x<img/src=x/onerror=window.__pwned=1>',HOSTILE_TAG='<script>window.__pwned=1</script>';
 const FETCHED=new Date('2026-01-09T10:00:00Z');
+/* The Document list's first option (PR 3): compare every changed spec. */
+const ALL_DOCS=['all','All changed documents'];
 
 const test=base.extend({
   repo:async({},use)=>{const f=await fixture();try{await use(f);}finally{await rm(f.root,{recursive:true,force:true});}},
@@ -156,17 +194,17 @@ test('H0 H1 D0 D1 D2: header, Document list from the To revision, and the docume
   await expect(page.getByTestId('gh-state')).toHaveText('GitHub: signed in as octo');
   /* D0: nothing chosen yet, so the Document list is HEAD's (c7): new exists, old does not. */
   await expect(choice(page,'To')).toHaveText('No revision chosen');
-  await expect.poll(()=>documentOptions(page)).toEqual([[A,A],[NEW,NEW],[P,P]]);
+  await expect.poll(()=>documentOptions(page)).toEqual([ALL_DOCS,[A,A],[NEW,NEW],[P,P]]);
   await expect(page.getByLabel('Document')).toHaveValue(A);
   await choose(page,'To','All commits',c.c1);
-  await expect.poll(()=>documentOptions(page)).toEqual([[A,A],[OLD,OLD],[P,P]]);
+  await expect.poll(()=>documentOptions(page)).toEqual([ALL_DOCS,[A,A],[OLD,OLD],[P,P]]);
   await expect(page.getByLabel('Document')).toHaveValue(A);
   /* D1: a chosen document missing from To stays chosen and is marked. */
   await choose(page,'To','All commits',c.c7);
-  await expect.poll(()=>documentOptions(page)).toEqual([[A,A],[NEW,NEW],[P,P]]);
+  await expect.poll(()=>documentOptions(page)).toEqual([ALL_DOCS,[A,A],[NEW,NEW],[P,P]]);
   await page.getByLabel('Document').selectOption(NEW);
   await choose(page,'To','All commits',c.c1);
-  await expect.poll(()=>documentOptions(page)).toEqual([[A,A],[NEW,NEW+' (not in To)'],[OLD,OLD],[P,P]]);
+  await expect.poll(()=>documentOptions(page)).toEqual([ALL_DOCS,[A,A],[NEW,NEW+' (not in To)'],[OLD,OLD],[P,P]]);
   await expect(page.getByLabel('Document')).toHaveValue(NEW);
   /* D2: the document tab lists the commits that changed the chosen document. */
   let dialog=await openPicker(page,'From');
@@ -477,4 +515,191 @@ test('P9: after a page fails to load, Show more retries that page',async({page,r
   expect(numbers).toEqual(['PR #8','PR #7',...Array.from({length:150},(_,i)=>'PR #'+(249-i))]);
   await expect(dialog.getByRole('alert')).toHaveCount(0);
   await expect(more).toHaveCount(0);
+});
+
+/* ---------- PR 3: the comparison (rows 3 and 5) ---------- */
+const comparison=page=>page.getByRole('region',{name:'Comparison'});
+const compareButton=page=>page.getByRole('button',{name:'Compare',exact:true});
+const views=page=>comparison(page).locator('.compare-view');
+const changeItems=page=>comparison(page).locator('.compare-view .compare-rail-item');
+const paneIn=(page,side)=>comparison(page).locator('.compare-pane[data-side="'+side+'"]');
+const paneTitle=(page,side)=>paneIn(page,side).locator('.compare-pane-title');
+const docRail=page=>comparison(page).getByRole('navigation',{name:'Changed documents'});
+const docRows=page=>docRail(page).getByRole('button').evaluateAll(els=>els.map(e=>[e.querySelector('[data-field="path"]').textContent,e.querySelector('[data-field="status"]').textContent]));
+const docButton=(page,file)=>docRail(page).getByRole('button').filter({has:page.locator('[data-field="path"]',{hasText:file})});
+/* Render owners of compare views whose destroy() has not run (the component's public counter). */
+const liveOwners=page=>page.evaluate(()=>window.FlowviewCompare.liveOwners());
+const paneHeading=(side,sha,subject)=>(side==='before'?'Before · ':'After · ')+short(sha)+' · '+subject;
+const A_CHANGES=['Modified · Node Alpha final · title','Modified · Step s1 · text','Modified · Imported node child::p2 · title'];
+/* Chooses "All changed documents"; the option must exist (an assertion, not a wait). */
+async function allDocuments(page){
+  await expect(page.getByLabel('Document').locator('option[value="all"]')).toHaveText('All changed documents');
+  await page.getByLabel('Document').selectOption('all');
+}
+const compareThisCommit=(page,subject)=>between(page).getByRole('listitem').filter({hasText:subject}).getByRole('button',{name:'Compare this commit'}).click();
+
+test('C0 C1 C2: Compare shows From as Before and To as After, and every change can be clicked through',async({page,repo,open})=>{
+  const {c}=repo;await open();
+  await expect(comparison(page)).toContainText('Choose From and To, then press Compare.');
+  await expect(compareButton(page)).toBeDisabled();
+  await choose(page,'From','Revisions of this document',c.c1);
+  await expect(compareButton(page)).toBeDisabled();
+  await choose(page,'To','Revisions of this document',c.c7);
+  await expect(compareButton(page)).toBeEnabled();
+  await expect(views(page)).toHaveCount(0);
+  await compareButton(page).click();
+  /* C1: the shared component, Before = From (c1), After = To (c7). */
+  await expect(views(page)).toHaveCount(1);
+  await expect(paneTitle(page,'before')).toHaveText(paneHeading('before',c.c1,'Add flows'));
+  await expect(paneTitle(page,'after')).toHaveText(paneHeading('after',c.c7,'Final pass'));
+  const items=changeItems(page);
+  await expect(items).toHaveText(A_CHANGES);
+  await expect(items.nth(0)).toHaveAttribute('aria-current','true');
+  const node=(side,id)=>paneIn(page,side).locator('[data-dv-node="'+id+'"]').first();
+  await expect(node('before','a')).toContainText('Alpha');await expect(node('before','a')).not.toContainText('Alpha final');
+  await expect(node('after','a')).toContainText('Alpha final');
+  /* C2: click through with the keyboard and the rail. */
+  await comparison(page).getByRole('button',{name:'Full diagram'}).click();
+  await page.keyboard.press('j');await expect(items.nth(1)).toHaveAttribute('aria-current','true');
+  const caption=side=>paneIn(page,side).locator('.stepline:not(.dv-caption-old)').first();
+  await expect(caption('before')).toContainText('Start');await expect(caption('before')).not.toContainText('Start the flow');
+  await expect(caption('after')).toContainText('Start the flow');
+  await items.nth(2).click();await expect(items.nth(2)).toHaveAttribute('aria-current','true');
+  await expect(node('before','child::p2')).toContainText('P two');await expect(node('before','child::p2')).not.toContainText('P two changed');
+  await expect(node('after','child::p2')).toContainText('P two changed');
+  await page.keyboard.press('k');await expect(items.nth(1)).toHaveAttribute('aria-current','true');
+});
+
+test('C3: Compare this commit on the merge commit shows its first parent as Before and the merge as After',async({page,repo,open})=>{
+  const {c}=repo;await open();
+  await choose(page,'From','Revisions of this document',c.c1);
+  await choose(page,'To','Revisions of this document',c.c7);
+  await compareThisCommit(page,'Merge feature');
+  await expect(paneTitle(page,'before')).toHaveText(paneHeading('before',c.c4,'Docs only'));
+  await expect(paneTitle(page,'after')).toHaveText(paneHeading('after',c.c5,'Merge feature'));
+  await expect(changeItems(page)).toHaveText(['Modified · Step s1 · text']);
+});
+
+test('C4 C5: each Compare replaces the previous view, and a changed choice or document removes the shown comparison',async({page,repo,open})=>{
+  const {c}=repo;await open();
+  await choose(page,'From','Revisions of this document',c.c1);
+  await choose(page,'To','Revisions of this document',c.c7);
+  await compareButton(page).click();
+  await expect(changeItems(page)).toHaveText(A_CHANGES);
+  const one=await liveOwners(page);expect(one,'precondition: a mounted view owns renders').toBeGreaterThan(0);
+  const first=await views(page).elementHandle();
+  /* C5: a new From removes the comparison it no longer matches. */
+  await choose(page,'From','Revisions of this document',c.c2);
+  await expect(views(page)).toHaveCount(0);
+  await expect(comparison(page)).toContainText('The choices changed. Press Compare to update.');
+  await expect.poll(()=>liveOwners(page)).toBe(0);
+  expect(await first.evaluate(n=>n.isConnected)).toBe(false);
+  /* C4: a second Compare, then the same pair again: each replaces the previous instance. */
+  await compareButton(page).click();
+  await expect(paneTitle(page,'before')).toHaveText(paneHeading('before',c.c2,'Rename alpha'));
+  await expect(changeItems(page)).toHaveText(A_CHANGES);
+  const second=await views(page).elementHandle();
+  await compareButton(page).click();
+  await expect.poll(()=>second.evaluate(n=>n.isConnected)).toBe(false);
+  await expect(views(page)).toHaveCount(1);
+  await expect(changeItems(page)).toHaveText(A_CHANGES);
+  await expect.poll(()=>liveOwners(page)).toBe(one);
+  /* C5: choosing another document also removes it. */
+  await page.getByLabel('Document').selectOption(P);
+  await expect(views(page)).toHaveCount(0);
+  await expect(comparison(page)).toContainText('The choices changed. Press Compare to update.');
+  await expect.poll(()=>liveOwners(page)).toBe(0);
+});
+
+test('C6: when two comparisons are requested, the later one is shown even if the earlier answers last',async({page,repo,open})=>{
+  const {c}=repo;let release=null;
+  /* Hold the first comparison's reply (c1..c7) until the test releases it. */
+  await page.route(/\/api\/compare\?/,async route=>{
+    if(!release && route.request().url().includes(c.c1)){await new Promise(resolve=>{release=resolve;});}
+    await route.continue();
+  });
+  await open();
+  await choose(page,'From','Revisions of this document',c.c1);
+  await choose(page,'To','Revisions of this document',c.c7);
+  await compareButton(page).click();
+  await expect.poll(()=>!!release).toBe(true);
+  await expect(comparison(page)).toHaveAttribute('aria-busy','true');
+  await compareThisCommit(page,'Merge feature');
+  await expect(paneTitle(page,'after')).toHaveText(paneHeading('after',c.c5,'Merge feature'));
+  /* The region stays busy while the held request is still being answered. */
+  await expect(comparison(page)).toHaveAttribute('aria-busy','true');
+  release();
+  await expect(comparison(page)).not.toHaveAttribute('aria-busy','true');
+  await expect(views(page)).toHaveCount(1);
+  await expect(paneTitle(page,'before')).toHaveText(paneHeading('before',c.c4,'Docs only'));
+  await expect(paneTitle(page,'after')).toHaveText(paneHeading('after',c.c5,'Merge feature'));
+  await expect(changeItems(page)).toHaveText(['Modified · Step s1 · text']);
+});
+
+test('A0 A1 A2: All changed documents lists added, removed and edited documents; choosing one shows its changes',async({page,repo,open})=>{
+  const {c}=repo;await open();
+  await allDocuments(page);
+  await choose(page,'From','All commits',c.c1);
+  await choose(page,'To','All commits',c.c7);
+  /* A2: between lists every commit that changes any document (c4 changes only README.md). */
+  await expect.poll(()=>betweenRows(page)).toEqual([
+    {date:day(7),sha:short(c.c7),subject:'Final pass',prs:[]},
+    {date:day(6),sha:short(c.c6),subject:'Provider rename',prs:[]},
+    {date:day(5),sha:short(c.c5),subject:'Merge feature',prs:['PR #7']},
+    {date:day(3),sha:short(c.c3),subject:'Reword step',prs:['PR #7']},
+    {date:day(2),sha:short(c.c2),subject:'Rename alpha',prs:[]}]);
+  await compareButton(page).click();
+  /* A0 */
+  await expect.poll(()=>docRows(page)).toEqual([[A,'Edited'],[NEW,'Added'],[OLD,'Removed'],[P,'Edited']]);
+  await expect(docButton(page,A)).toHaveAttribute('aria-current','true');
+  await expect(changeItems(page)).toHaveText(A_CHANGES);
+  /* A1: each document's own changes; an absent side says so. */
+  await docButton(page,NEW).click();
+  await expect(docButton(page,NEW)).toHaveAttribute('aria-current','true');
+  await expect(docButton(page,A)).not.toHaveAttribute('aria-current','true');
+  await expect(changeItems(page)).toHaveText(['Added · Document','Added · Section Main']);
+  await expect(paneIn(page,'before').locator('.compare-pane-empty')).toHaveText('This document is not in From.');
+  await expect(paneIn(page,'after').locator('[data-dv-node="n"]').first()).toContainText('New');
+  await docButton(page,OLD).click();
+  await expect(changeItems(page)).toHaveText(['Removed · Document','Removed · Section Main']);
+  await expect(paneIn(page,'after').locator('.compare-pane-empty')).toHaveText('This document is not in To.');
+  await expect(paneIn(page,'before').locator('[data-dv-node="o"]').first()).toContainText('Old');
+  await docButton(page,P).click();
+  await expect(changeItems(page)).toHaveText(['Modified · Node P two changed · title']);
+  await expect(views(page)).toHaveCount(1);
+});
+
+test('A3: a document whose imported provider changed is listed as edited although its own file did not change',async({page,repo,open})=>{
+  const {c}=repo;await open();
+  await allDocuments(page);
+  await choose(page,'From','All commits',c.c5);
+  await choose(page,'To','All commits',c.c6);
+  await compareButton(page).click();
+  await expect.poll(()=>docRows(page)).toEqual([[A,'Edited · imported content'],[P,'Edited']]);
+  await expect(docButton(page,A)).toHaveAttribute('aria-current','true');
+  await expect(changeItems(page)).toHaveText(['Modified · Imported node child::p2 · title']);
+});
+
+test('U2: document paths and node titles render literally in the document list and the comparison',async({page,repo,open})=>{
+  const {c}=repo,{writeFile,readFile}=await import('node:fs/promises');
+  const hostileFile='flows/x<img src=x onerror=window.__pwned=1>.spec.json';
+  const doc=JSON.parse(await readFile(path.join(repo.dir,A),'utf8'));doc.page.sections[0].diagram.nodes.a.title=HOSTILE;
+  await writeFile(path.join(repo.dir,A),JSON.stringify(doc,null,2)+'\n');
+  await writeFile(path.join(repo.dir,hostileFile),JSON.stringify({page:{title:HOSTILE,sections:[{id:'main',heading:HOSTILE,diagram:{nodes:{h:{title:HOSTILE}},rows:[['h']]}}]}},null,2)+'\n');
+  git(repo.dir,['add','--',A,hostileFile]);
+  git(repo.dir,['commit','-q','-m','Hostile docs'],{GIT_AUTHOR_DATE:'2026-01-08T10:00:00Z',GIT_COMMITTER_DATE:'2026-01-08T10:00:00Z'});
+  const hostile=git(repo.dir,['rev-parse','HEAD']);
+  await open();
+  await allDocuments(page);
+  await choose(page,'From','All commits',c.c7);
+  await choose(page,'To','All commits',hostile);
+  await compareButton(page).click();
+  await expect.poll(()=>docRows(page)).toEqual([[A,'Edited'],[hostileFile,'Added']]);
+  await expect(changeItems(page)).toHaveText(['Modified · Node '+HOSTILE+' · title']);
+  await expect(paneIn(page,'after').locator('[data-dv-node="a"]').first()).toContainText(HOSTILE);
+  await docButton(page,'flows/x<img').click();
+  await expect(changeItems(page)).toHaveText(['Added · Document','Added · Section '+HOSTILE]);
+  await expect(paneIn(page,'after').locator('[data-dv-node="h"]').first()).toContainText(HOSTILE);
+  expect(await page.locator('img, script:not([src])').count()).toBe(0);
+  expect(await page.evaluate(()=>window.__pwned)).toBeUndefined();
 });

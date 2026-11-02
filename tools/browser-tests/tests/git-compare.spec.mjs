@@ -55,8 +55,10 @@
         multi-commit PR                         refs/pull/11/head on the remote          this commit on two2 -> from-choice "<two1> ·     commits; no ref created
                                                                                        first parent of <two2>", between rows [two2];
                                                                                        no ref added
-   P7   latest PR click wins                    hold the availability replies for PR #8   after #8's reply: dialog open, from-choice        an earlier click's late check choosing
-                                                then PR #7 (clicked in that order);      unchanged; after #7's: from-choice = PR #7 row    the row the user did not pick last
+   P7   latest PR click wins                    hold the availability replies for PR #8   rows aria-busy while checked; after #8's row is   an earlier click's late check choosing
+                                                                                       no longer busy (#7 still busy): dialog open,
+                                                then PR #7 (clicked in that order);      from-choice unchanged; after #7's: from-choice =  the row the user did not pick last
+                                                                                       PR #7 row
                                                 release #8 first
    AU   every test, context-wide (all pages): no page/console error, failed request, HTTP >= 400, or request outside the compare server
    U1   page CSP                                response headers of "/"                 script-src 'self', no 'unsafe-inline'           inline script allowed
@@ -381,14 +383,18 @@ test('P7: when two pull request rows are clicked, the later click chooses even i
   const dialog=await openPicker(page,'From');
   await dialog.getByRole('tab',{name:'Pull requests'}).click();
   await expect.poll(()=>shas(dialog)).toEqual([short(c.pr8),short(c.c3)]);
+  /* Rows by CSS so they stay addressable if a buggy page hides the dialog. */
+  const row8=page.locator('.picker [role=option]').nth(0),row7=page.locator('.picker [role=option]').nth(1);
   await dialog.getByRole('option').nth(0).click();
   await expect.poll(()=>!!release['8']).toBe(true);
+  await expect(row8).toHaveAttribute('aria-busy','true');
   await dialog.getByRole('option').nth(1).click();
   await expect.poll(()=>!!release['7']).toBe(true);
-  const answered8=page.waitForResponse(r=>/rev=pr%3A8$/.test(r.url()));
-  release['8']();await answered8;
-  /* One more task turn so a handler of #8's answer has run. */
-  await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,50)));
+  await expect(row7).toHaveAttribute('aria-busy','true');
+  /* #8's check is finished once its row is no longer busy; #7's is still held. */
+  release['8']();
+  await expect(row8).not.toHaveAttribute('aria-busy','true');
+  await expect(row7).toHaveAttribute('aria-busy','true');
   await expect(dialog).toBeVisible();
   await expect(choice(page,'From')).toHaveText('No revision chosen');
   release['7']();

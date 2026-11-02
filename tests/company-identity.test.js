@@ -13,7 +13,7 @@
       companyAgentContext() deepEqual {repository:'https://github.com/acme/design-viz',
       backstage} | omitting it, or the raw unnormalized '.git' value
    C2 CONNECT.md names the configured address | same config; assembled agent-chat.js,
-      external+embedded | the 'New exporting diagram:' paragraph names
+      external+embedded x pilotCapture true/false | the 'New exporting diagram:' paragraph names
       "https://github.com/acme/design-viz" and no reghartner address | an upstream-hardcoded
       address
    C3 shipped kit carries repository | branded tools/build.py | kit
@@ -77,11 +77,11 @@ test('company.json replaces the labels, repository links and brand in assembled 
   assert.deepEqual(loader.companyAgentContext(),{repository:'https://github.com/acme/design-viz',backstage:config.backstage});
   const canonRule=()=>{
     const chat={};vm.runInNewContext(loader.readSource('workbench/agent-chat.js'),chat);
-    return ['external','embedded'].map(mode=>{
-      const rules=chat.folderAgentInstructions('Story','mixed',false,{sessionId:'session',connectionId:'connection'},mode)
+    return ['external','embedded'].flatMap(mode=>[false,true].map(pilot=>{
+      const rules=chat.folderAgentInstructions('Story','mixed',false,{sessionId:'session',connectionId:'connection'},mode,pilot)
         .split('\n\n').filter(paragraph=>paragraph.startsWith('New exporting diagram:'));
-      assert.equal(rules.length,1,mode);return rules[0];
-    });
+      assert.equal(rules.length,1,mode+' pilot='+pilot);return rules[0];
+    }));
   };
   for(const rule of canonRule()){
     assert.ok(rule.includes('The company Flowview repository that holds canon.json is "https://github.com/acme/design-viz".'));

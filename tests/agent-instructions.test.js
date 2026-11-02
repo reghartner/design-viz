@@ -8,8 +8,9 @@
 
    row | fixture | assertion (scoped) | rejects
    A1 one rule paragraph in every setup | folderAgentInstructions, external+embedded x resume x
-      artifact/legacy identity | exactly one '\n\n' paragraph starts 'New exporting diagram:' |
-      text only in one workflow, or duplicated
+      artifact/legacy identity x pilotCapture true/false (production passes the checkbox
+      boolean, src/workbench/agent-chat.js:553,655) | exactly one '\n\n' paragraph starts
+      'New exporting diagram:' | text only in one workflow or pilot branch, or duplicated
    A2 folder + spec | same paragraph | 'diagrams/…/<id>/ folder with <id>.spec.json' | a rule
       naming only canon.json
    A3 canon.json entry | same | 'its root canon.json entry' | a rule omitting registration
@@ -253,9 +254,10 @@ test('every connected setup states the new-provider registration, clone and acce
   // A1-A11. The address is the configured company repository, else the upstream root.
   const repository=companyAgentContext().repository||UPSTREAM_REPOSITORY;
   const legacy={sessionId:'session',connectionId:'connection'};
-  for(const workflow of ['external','embedded'])for(const resume of [false,true])for(const owner of [identity,legacy]){
-    const label=`${workflow} resume=${resume} legacy=${!owner.artifacts}`;
-    const rules=context.folderAgentInstructions('Doorbell','mixed',resume,owner,workflow).split('\n\n')
+  for(const workflow of ['external','embedded'])for(const resume of [false,true])for(const owner of [identity,legacy])
+  for(const pilot of [false,true]){
+    const label=`${workflow} resume=${resume} legacy=${!owner.artifacts} pilot=${pilot}`;
+    const rules=context.folderAgentInstructions('Doorbell','mixed',resume,owner,workflow,pilot).split('\n\n')
       .filter(paragraph=>paragraph.startsWith('New exporting diagram:'));
     assert.equal(rules.length,1,label);
     const rule=rules[0];

@@ -434,6 +434,7 @@ function compareTabViews(A, B, entries){
   ob.forEach(function(b){ if (!used.has(b)) entries.push({kind:'tab', status:'added', cause:'document', beforePath:null, afterPath:b.path, section:{before:null, after:null}, key:{before:null, after:b.j}, fields:[], effects:[]}); });
 }
 /* Coverage ledger: line hunks from a longest-common-subsequence diff. */
+var COMPARE_LEDGER_CELLS = 4000000;
 function compareLedger(a, b, entries){
   a = typeof a === 'string' ? a : null; b = typeof b === 'string' ? b : null;
   if (a === b) return;
@@ -443,19 +444,31 @@ function compareLedger(a, b, entries){
       fields:[{beforePath:a == null ? 'ledger:' : 'ledger:1-' + n, afterPath:b == null ? 'ledger:' : 'ledger:1-' + n, before:a, after:b}]});
     return;
   }
-  var x = a.split('\n'), y = b.split('\n'), m = x.length, n2 = y.length, L = [];
-  for (var i = 0; i <= m; i++){ L.push(new Array(n2 + 1).fill(0)); }
-  for (i = m - 1; i >= 0; i--) for (var j = n2 - 1; j >= 0; j--) L[i][j] = x[i] === y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
-  var fields = [], ia = 0, ib = 0, hunk = null;
+  /* Equal leading and trailing lines are matched first; the LCS table covers only the lines in between, and only
+     while it stays under COMPARE_LEDGER_CELLS cells. A larger middle is reported as one hunk (ledgers may reach
+     256 KiB; a full table for thousands of lines costs seconds and hundreds of MB). */
+  var x = a.split('\n'), y = b.split('\n'), m = x.length, n2 = y.length;
+  var lo = 0; while (lo < m && lo < n2 && x[lo] === y[lo]) lo++;
+  var hiA = m, hiB = n2; while (hiA > lo && hiB > lo && x[hiA - 1] === y[hiB - 1]){ hiA--; hiB--; }
+  var rows = hiA - lo, cols = hiB - lo, table = rows * cols <= COMPARE_LEDGER_CELLS, L = null;
+  if (table){
+    L = [];
+    for (var i = 0; i <= rows; i++) L.push(new Uint32Array(cols + 1));
+    for (i = rows - 1; i >= 0; i--) for (var j = cols - 1; j >= 0; j--) L[i][j] = x[lo + i] === y[lo + j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  }
+  var fields = [], ia = lo, ib = lo, hunk = null;
   function flush(){ if (!hunk) return;
     fields.push({beforePath:'ledger:' + (hunk.a0 + 1) + '-' + hunk.a1, afterPath:'ledger:' + (hunk.b0 + 1) + '-' + hunk.b1,
       before:x.slice(hunk.a0, hunk.a1).join('\n'), after:y.slice(hunk.b0, hunk.b1).join('\n')}); hunk = null; }
-  while (ia < m || ib < n2){
-    if (ia < m && ib < n2 && x[ia] === y[ib]){ flush(); ia++; ib++; continue; }
-    if (!hunk) hunk = {a0:ia, a1:ia, b0:ib, b1:ib};
-    if (ib < n2 && (ia >= m || L[ia][ib + 1] >= L[ia + 1][ib])){ ib++; hunk.b1 = ib; }
-    else { ia++; hunk.a1 = ia; }
+  if (!table){ hunk = {a0:lo, a1:hiA, b0:lo, b1:hiB}; flush(); }
+  else {
+    while (ia < hiA || ib < hiB){
+      if (ia < hiA && ib < hiB && x[ia] === y[ib]){ flush(); ia++; ib++; continue; }
+      if (!hunk) hunk = {a0:ia, a1:ia, b0:ib, b1:ib};
+      if (ib < hiB && (ia >= hiA || L[ia - lo][ib - lo + 1] >= L[ia - lo + 1][ib - lo])){ ib++; hunk.b1 = ib; }
+      else { ia++; hunk.a1 = ia; }
+    }
+    flush();
   }
-  flush();
   entries.push({kind:'ledger', status:'modified', cause:'document', beforePath:'ledger', afterPath:'ledger', fields:fields, effects:[]});
 }

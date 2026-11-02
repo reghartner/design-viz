@@ -76,6 +76,23 @@ spec/ledger proposal, browser picker or per-refresh confirmation is needed.
 A provider helper targets that provider; a separate unconnected consumer must
 first establish its own folder-agent connection.
 
+An agent proposal that imports a provider the consumer draft does not import
+yet (for example a newly registered exporting diagram) needs no refresh first.
+Its providers load at review time from the source this consumer already uses,
+never from the deployed site library:
+
+- **Repository grant** (opened from the repository root, or selected with
+  **File → Use local source repository**): the Workbench reads the proposal's
+  closure from that grant.
+- **Helper-selected repository** (after `refresh-sources --source-repo`):
+  `folder-agent.py propose` attaches a snapshot of exactly the candidate's
+  closure when the candidate imports a provider ID the current draft does not
+  import directly. The Workbench validates it like a refresh snapshot.
+
+Providers already in the frozen snapshot stay frozen until the next refresh;
+only the newly imported providers join it. With neither source, the review
+reports the missing provider and nothing changes.
+
 Subsequent `refresh-sources` commands reuse this helper's selected repository.
 Use `--source-repo` again to switch or reconnect. The absolute path is retained
 only in `.flowview-agent/local-sources-selection.json`; do not commit that private

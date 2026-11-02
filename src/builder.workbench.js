@@ -1688,7 +1688,17 @@ function initWorkbenchBuilder(opts){
         !!(active && !(active.closest && active.closest('#editor-agent')) && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
     },
     normalize:normalizeWorkbenchAgentPlacement,
-    prepare:function(text){return prepareTopologyProposal(JSON.parse(text),session.topologyContext());},
+    prepare:function(text,proposal){
+      // #883: a local consumer's new import loads from its own source: the helper's
+      // snapshot for this consumer's selected repository, else the repository grant.
+      var context=session.topologyContext(),local=null;
+      if(context && context.local){
+        var selected=context.localSource && context.localSource.selectionId || null,binding=selectedLocalBinding(context);
+        if(proposal && proposal.sources && proposal.sources.selectionId===selected)local={sources:proposal.sources};
+        else if(binding && binding.handle)local={directory:binding.handle,path:binding.path,selectionId:binding.selectionId};
+      }
+      return prepareTopologyProposal(JSON.parse(text),context,local);
+    },
     prepareFolder:function(text,found){return prepareLocalFolderTopology(text,found,session.topologyContext());},
     validate:function(text,context){var findings=arguments.length>1?session.validate(JSON.parse(text),context):session.validate(JSON.parse(text));return findings.errors.join('\n');},
     apply:function(text,expected,proposal,context){

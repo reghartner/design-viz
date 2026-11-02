@@ -1144,13 +1144,14 @@ test('S1 host provider reports connecting, busy, connected with a checked time, 
  assert.equal(typeof api.status,'function','S1 status() exists');mountStatus(h);
  let value=plain(api.snapshot());assert.ok(value.connection,'S1 snapshot.connection');assert.equal(value.connection.state,'connecting');assert.equal(value.connection.source,'Host');assert.equal(value.connection.busy,false);
  h.flush();h.flush();await new Promise(setImmediate);value=plain(api.snapshot());
- assert.equal(value.connection.state,'connected');assert.equal(value.connection.busy,false);assert.ok(isFinite(Date.parse(value.connection.checkedAt)),'S1 checkedAt is a timestamp');assert.equal(value.connection.checkedText,'refreshed just now');assert.equal(h.view.querySelector('time.dv-live-updated'),null,'S1 no separate updated time');
+ assert.equal(value.connection.state,'connected');assert.equal(value.connection.busy,false);assert.ok(isFinite(Date.parse(value.connection.checkedAt)),'S1 checkedAt is a timestamp');const clock=at=>new Date(at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'});assert.equal(value.connection.checkedText,'refreshed '+clock(value.connection.checkedAt),'S1 refresh time is the local clock time');assert.equal(h.view.querySelector('time.dv-live-updated'),null,'S1 no separate updated time');
  const badge=h.view.querySelector('.dv-live-connection');assert.ok(badge,'S1 header connection element');assert.equal(badge.getAttribute('data-state'),'connected');assert.equal(badge.getAttribute('data-busy'),'false');
- const badgeText=()=>badge.querySelectorAll('span')[0].textContent;assert.equal(badgeText(),'Host connected, refreshed just now');assert.equal(badge.getAttribute('role'),'status');assert.ok(badge.querySelector('.dv-live-connection-dot'));
+ const badgeText=()=>badge.querySelectorAll('span')[0].textContent;assert.equal(badgeText(),'Host connected, refreshed '+clock(value.connection.checkedAt));assert.equal(badge.getAttribute('role'),'status');assert.ok(badge.querySelector('.dv-live-connection-dot'));
  fail=true;const tick=[...h.timers.values()][0];h.timers.clear();tick.fn();value=plain(api.snapshot());assert.equal(value.connection.busy,true);assert.equal(badge.getAttribute('data-busy'),'true');
  await new Promise(setImmediate);value=plain(api.snapshot());assert.equal(value.connection.state,'error');assert.equal(value.connection.busy,false);assert.equal(badge.getAttribute('data-state'),'error');
  api.status({state:'bogus',source:42});assert.equal(plain(api.snapshot()).connection.state,'error');assert.equal(plain(api.snapshot()).connection.source,'Host');
- api.status({state:'demo',source:'Demo',checkedAt:Date.now()});value=plain(api.snapshot());assert.equal(value.connection.state,'demo');assert.equal(value.connection.source,'Demo');assert.equal(badgeText(),'Demo, refreshed just now');
+ api.status({state:'demo',source:'Demo',checkedAt:Date.now()});value=plain(api.snapshot());assert.equal(value.connection.state,'demo');assert.equal(value.connection.source,'Demo');assert.equal(badgeText(),'Demo, refreshed '+clock(value.connection.checkedAt));
+ api.status({checkedAt:Date.UTC(2020,0,2,15,4,5)});value=plain(api.snapshot());assert.equal(badgeText(),'Demo, refreshed '+new Date(Date.UTC(2020,0,2,15,4,5)).toLocaleDateString([],{month:'short',day:'numeric'})+' '+clock(Date.UTC(2020,0,2,15,4,5)),'S1 an older refresh shows its date');
  api.destroy();
 });
 test('S2 the Jira adapter reports disconnected, connecting, connected and retrying error states',async()=>{

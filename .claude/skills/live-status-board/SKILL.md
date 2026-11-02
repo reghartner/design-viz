@@ -272,7 +272,7 @@ What the viewer sees on first open: a dialog "This artifact uses connectors"
 listing the connector with a toggle and Continue. After Continue the Live status panel header
 may read "Jira did not answer; retrying" for a few seconds on a cold start;
 the retry is automatic. Then the header's connector indicator reads
-"Jira connected, refreshed just now", the state counts fill in, and the body's
+"Jira connected, refreshed <local time>", the state counts fill in, and the body's
 ring shows carriers done.
 
 Republishing: pass the artifact's existing URL as `url` on the publish call,

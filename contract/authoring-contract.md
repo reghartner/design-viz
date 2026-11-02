@@ -707,10 +707,12 @@ state. See `docs/live-status.md` for that transport contract.
 Optional page-level `editHistory` is the board's save history: an array of
 `{"at": "<ISO-8601>", "by"?: {"id"?: "", "name"?: ""}, "changes": [{"op": "add"|"remove",
 "ticket": "EX-1", "node": "<id>" | "edge": ["<from>", "<to>"], "path"?: [...], "label"?: ""}]}`
-entries, hand-written today (the board's planned Edit mode, #828, will append
-one per Save) and shown by the `edit-history` panel. `at`, a non-empty `changes` array and each change's `op`,
+entries, appended one per Save by the board's Edit mode (#828) or hand-written, and
+shown by the `edit-history` panel. `at`, a non-empty `changes` array and each change's `op`,
 `ticket` and carrier are required; `by`, `by.id`, `by.name`, `path` and `label`
-are optional. `at` is an ISO-8601 date-time with seconds, an optional fraction
+are optional. A change `{"op": "clear-missing-work", "node" | "edge", "path"?, "label"?}`
+records a Missing work marker cleared in Edit mode (#855); it names only its carrier
+and must not carry a `ticket`. Any other `op` is malformed. `at` is an ISO-8601 date-time with seconds, an optional fraction
 of any length and `Z` or a `±hh:mm` offset (`2026-10-30T16:23:15.987Z`).
 Malformed entries warn and are ignored, a non-array warns once,
 and more than 200 entries warn once with only the newest 200 used. See

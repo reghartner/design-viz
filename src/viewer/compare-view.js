@@ -729,10 +729,24 @@ function mountCompareView(host, opts){
     ['before', 'after'].forEach(function(side){ own[side] = S[side].d ? cropIds(entry, side, S[side].d) : null; if (own[side] && own[side].length && !any) any = own[side]; });
     if (!any) return null;
     var out = {entry:entry, sides:{}};
+    var holder = own.after ? 'after' : 'before', holderEdge = entry.kind === 'edge' && S[holder].d ? (S[holder].d.edges || [])[cropEdgeIndex(entry, holder)] : null;
     ['before', 'after'].forEach(function(side){
-      var d = S[side].d, other = own[side === 'before' ? 'after' : 'before'];
-      /* A side without the object frames the other side's nodes that it has (a removed node's former neighbours). */
-      var ids = own[side] || (d && other ? other.filter(function(id){ return Object.prototype.hasOwnProperty.call(d.nodes || {}, id); }) : []);
+      var d = S[side].d, other = own[side === 'before' ? 'after' : 'before'], ids = own[side];
+      if (!ids && d){
+        var has = function(id){ return Object.prototype.hasOwnProperty.call(d.nodes || {}, id); };
+        if (holderEdge){
+          /* A side without the connection frames its endpoints with their neighbours in this side's diagram. */
+          ids = [];
+          var add = function(id){ if (id != null && has(id) && ids.indexOf(String(id)) < 0) ids.push(String(id)); };
+          [holderEdge.from, holderEdge.to].forEach(function(end){
+            add(end);
+            (d.edges || []).forEach(function(e){ if (!e) return; if (e.from === end) add(e.to); else if (e.to === end) add(e.from); });
+          });
+        }
+        /* A side without the node frames the node's neighbours that it has (its former neighbours). */
+        else ids = other ? other.filter(has) : [];
+      }
+      ids = ids || [];
       out.sides[side] = {section:S[side].section, ids:ids, edge:entry.kind === 'edge' && own[side] ? cropEdgeIndex(entry, side) : null};
     });
     return out;
@@ -849,6 +863,20 @@ function mountCompareView(host, opts){
     if (win && win.requestAnimationFrame) win.requestAnimationFrame(function(){ win.requestAnimationFrame(apply); });
     if (win && win.setTimeout) win.setTimeout(apply, 150);
   }
+  function uncrop(){
+    if (!cropCtx) return;
+    ['before', 'after'].forEach(function(side){
+      var p = panes[side], c = cropCtx.sides[side];
+      if (!p || !p.ctl || c.section < 0) return;
+      var rec = recordFor(p, c.section); if (!rec) return;
+      var vp = null;
+      (p.ctl.sections || []).forEach(function(r){ if (r.viewport && r.viewport.isExplore && r.viewport.isExplore() && r.sectionEl && rec.sectionEl && r.sectionEl.contains(rec.sectionEl.querySelector('[data-dv-node]'))) vp = r.viewport; });
+      try{
+        if (vp) vp.fitCanvas({left:24, right:24, top:20, bottom:24});
+        else if (rec.boardSize && rec.boardSize.setMode && rec.boardSize.mode) rec.boardSize.setMode(rec.boardSize.mode());
+      }catch(ex){}
+    });
+  }
   function applyMode(){
     var entry = entries[selected], focused = mode === 'focused' && !!focusCtx;
     focus.hidden = !focused;
@@ -862,8 +890,9 @@ function mountCompareView(host, opts){
     if (destroyed || (m !== 'focused' && m !== 'full')) return mode;
     var was = mode; mode = m; applyMode();
     if (m === 'focused' && was !== 'focused') applyCrop();
-    /* Leaving a crop: frame the change the Full way (legible node, both panes). */
-    else if (m === 'full' && was === 'focused' && cropCtx && selected >= 0) select(selected);
+    /* Leaving a crop: undo the crop's camera (Explore fits the whole diagram, an inline board returns
+       to its view mode), then frame the change the Full way (legible node, both panes). */
+    else if (m === 'full' && was === 'focused' && cropCtx && selected >= 0){ uncrop(); select(selected); }
     return mode;
   }
   function select(index, initial){

@@ -31,7 +31,7 @@ async function fixture(){
   c.pr8=git(other,['rev-parse','HEAD']);git(other,['push','-q','origin','HEAD:refs/pull/8/head']);
   return {root,dir,bare,other,c};
 }
-function ghStub(c,{fail=false}={}){
+function ghStub(c,{fail=false,extra=0}={}){
   const calls=[];
   const run=async args=>{
     calls.push(args.join(' '));
@@ -44,9 +44,12 @@ function ghStub(c,{fail=false}={}){
       const fields=String(flag('--json')||'').split(',');
       if(flag('--state')!=='all')throw new Error('gh pr list without --state all omits merged pull requests');
       if(!['number','title','headRefOid','headRefName','author','updatedAt','mergeCommit'].every(f=>fields.includes(f)))throw new Error('gh pr list without --json number,title,headRefOid,headRefName,author,updatedAt,mergeCommit prints a table');
-      return JSON.stringify([
+      /* Like gh: at most --limit pull requests (gh's default limit is 30). */
+      const limit=Number(flag('--limit')||30),list=([
       {number:7,title:'Feature step',headRefName:'feature',headRefOid:c.c3,author:{login:'carol'},updatedAt:'2026-01-03T12:00:00Z',state:'MERGED',mergeCommit:{oid:c.c5}},
-      {number:8,title:'Fork change',headRefName:'fork-change',headRefOid:c.pr8,author:{login:'fork'},updatedAt:'2026-01-08T12:00:00Z',state:'OPEN',mergeCommit:null}]);
+      {number:8,title:'Fork change',headRefName:'fork-change',headRefOid:c.pr8,author:{login:'fork'},updatedAt:'2026-01-08T12:00:00Z',state:'OPEN',mergeCommit:null}])
+        .concat(Array.from({length:extra},(_,i)=>({number:100+i,title:'Old PR '+i,headRefName:'old-'+i,headRefOid:c.c1,author:{login:'old'},updatedAt:'2025-12-01T12:00:00Z',state:'CLOSED',mergeCommit:null})));
+      return JSON.stringify(list.slice(0,limit));
     }
     throw new Error('unexpected gh '+args.join(' '));
   };

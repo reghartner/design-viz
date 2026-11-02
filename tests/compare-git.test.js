@@ -41,8 +41,11 @@
                   every call; fetch() changes only refs/remotes/origin/*, also when the repository
                   configures another fetch refspec (+refs/heads/*:refs/custom/*), and it never changes the
                   repository config (snapshots include a .git/config hash)          rejects: any write
-   G8 non-ASCII   a document path with non-ASCII characters (flows/café.spec.json) gets its document-tab
-                  and between rows                                  rejects: quoted paths from git log
+   G8 quoted path document paths git quotes by default (flows/café.spec.json, flows/quote"name.spec.json)
+                  get their document-tab and between rows             rejects: quoted paths from git log
+   G9 many PRs    with 252 pull requests (gh returns at most --limit, default 30) every one is listed (3
+                  pages), pr:349 resolves and commit badges include all 250 that share a head
+                                                     rejects: a 200 (or default 30) pull request cap
    G7 status      status(): clone path, last fetch time (FETCH_HEAD mtime; null when there is none), gh
                   signed in as <login>; a failing gh gives signedIn false and the command "gh auth login"
                                                      rejects: token in the status payload */
@@ -239,15 +242,27 @@ test('G7 status names the clone, the last fetch and the gh sign-in, never the to
   }finally{await fs.rm(f.root,{recursive:true,force:true});}
 });
 
-test('G8 a document path with non-ASCII characters has its revision history',async()=>{
+for(const doc of ['flows/café.spec.json','flows/quote"name.spec.json'])test('G8 a document path git would quote has its revision history: '+doc,async()=>{
   const f=await fixture();
   try{
-    const doc='flows/café.spec.json';
-    await fs.writeFile(path.join(f.dir,doc),'{"page":{"title":"Café","sections":[{"heading":"Main","diagram":{"nodes":{"a":{"title":"A"}},"rows":[["a"]]}}]}}\n');
-    git(f.dir,['add','-A']);git(f.dir,['commit','-q','-m','Add café'],{GIT_AUTHOR_DATE:'2026-01-09T10:00:00Z',GIT_COMMITTER_DATE:'2026-01-09T10:00:00Z'});
+    await fs.writeFile(path.join(f.dir,doc),'{"page":{"title":"Quoted","sections":[{"heading":"Main","diagram":{"nodes":{"a":{"title":"A"}},"rows":[["a"]]}}]}}\n');
+    git(f.dir,['add','-A']);git(f.dir,['commit','-q','-m','Add quoted path'],{GIT_AUTHOR_DATE:'2026-01-09T10:00:00Z',GIT_COMMITTER_DATE:'2026-01-09T10:00:00Z'});
     const sha=git(f.dir,['rev-parse','HEAD']),r=await adapter(f);
     assert.ok((await r.documents(sha)).includes(doc),'precondition: the document is listed');
     assert.deepEqual((await r.revisions({doc,tab:'document'})).rows.map(x=>x.sha),[sha],'its commit is listed');
     assert.deepEqual((await r.between({from:f.c.c7,to:sha,doc})).map(x=>x.sha),[sha]);
+  }finally{await fs.rm(f.root,{recursive:true,force:true});}
+});
+
+test('G9 every pull request is listed and resolvable, also past the first 200',async()=>{
+  const f=await fixture();
+  try{
+    const r=await adapter(f,{gh:ghStub(f.c,{extra:250})});
+    const p1=await r.revisions({doc:A,tab:'prs'}),p3=await r.revisions({doc:A,tab:'prs',page:3});
+    assert.deepEqual([p1.total,p1.pages],[252,3],'all 252 pull requests');
+    assert.deepEqual(p3.rows.map(x=>x.prs[0]).slice(-2),[101,100],'the oldest pull requests (same update time: lower numbers last) are on the last page');
+    assert.equal(await r.resolve('pr:349'),f.c.c1,'a pull request past the first 200 resolves');
+    const all=await r.revisions({doc:A,tab:'all'});
+    assert.equal(all.rows.find(x=>x.sha===f.c.c1).prs.length,250,'badges come from every pull request');
   }finally{await fs.rm(f.root,{recursive:true,force:true});}
 });

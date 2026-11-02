@@ -30,7 +30,13 @@
    G4 guard: malformed unlisted spec passes as today | diagrams/broken/broken.spec.json = '{broken'
       | same | parsing unlisted files strictly
    G5 guard: listed exporters pass | canon.json lists new and nested | canonLibrary entries are
-      [checkout,new,nested] | rejecting exporters regardless of listing */
+      [checkout,new,nested] | rejecting exporters regardless of listing
+   R6 present-but-empty declaration | unlisted diagrams/empty/empty.spec.json with
+      topologyExports: {} (the validator accepts {} for a listed spec: it loads and publishes with
+      exports []) | the rejection names that path and not the listed new/nested | an
+      Object.keys(topologyExports).length test instead of hasOwn
+   G6 guard: listed empty declaration passes | canon.json lists empty too | entries are
+      [checkout,new,nested,empty] | rejecting {} as malformed */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path'),vm=require('node:vm');
 const library=require('../tools/canon/manifest.cjs');
 const entry={folder:'diagrams/payments/checkout',owner:'group:default/checkout-team'};
@@ -87,11 +93,13 @@ test('missing files, malformed manifests and symlinks out of the folder fail vis
  await fs.writeFile(file,'{broken');await assert.rejects(canonLibrary(file),SyntaxError);
 });
 
-function exporter(title,laterSection=false){
+// variant 'later': exports only on a second section; 'empty': a present but empty declaration.
+function exporter(title,variant){
  const exported={heading:'Platform',diagram:{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],
    edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}}};
+ if(variant==='empty')exported.diagram.topologyExports={};
  const plain={heading:'Overview',diagram:{nodes:{intro:{title:'Intro'}},rows:[['intro']],edges:[]}};
- return {page:{title,sections:laterSection?[plain,exported]:[exported]}};
+ return {page:{title,sections:variant==='later'?[plain,exported]:[exported]}};
 }
 test('an unlisted exporting spec under diagrams/ fails the canon build and names the fix',async t=>{
  const {file,root}=await fixture(t),{canonLibrary,registry}=await import('../tools/canon/registry.mjs');
@@ -100,7 +108,7 @@ test('an unlisted exporting spec under diagrams/ fails the canon build and names
    await fs.writeFile(target,typeof value==='string'?value:JSON.stringify(value));};
  const list=folders=>fs.writeFile(file,JSON.stringify({version:1,diagrams:[entry,...folders.map(folder=>({folder,owner:entry.owner}))]}));
  const ids=async()=>(await canonLibrary(file)).entries.map(e=>e.id);
- const flat='diagrams/new/new.spec.json',nested='diagrams/team/nested/nested.spec.json';
+ const flat='diagrams/new/new.spec.json',nested='diagrams/team/nested/nested.spec.json',empty='diagrams/empty/empty.spec.json';
  const names=(present,absent=[])=>error=>{
    for(const name of present)assert.ok(error.message.includes(name),'names '+name+': '+error.message);
    for(const name of absent)assert.ok(!error.message.includes(name),'does not name '+name+': '+error.message);
@@ -119,13 +127,19 @@ test('an unlisted exporting spec under diagrams/ fails the canon build and names
  // R1, R2, R3: every unlisted exporter is named with its fix.
  await write(flat,exporter('New provider'));
  await assert.rejects(canonLibrary(file),names([flat]));
- await write(nested,exporter('Nested provider',true));
+ await write(nested,exporter('Nested provider','later'));
  await assert.rejects(canonLibrary(file),names([flat,nested]));
  // R4, G5: listing a provider clears it; listing both loads both.
  await list(['diagrams/new']);
  await assert.rejects(canonLibrary(file),names([nested],[flat]));
  await list(['diagrams/new','diagrams/team/nested']);
  assert.deepEqual(await ids(),['checkout','new','nested']);
+ // R6, G6: a present but empty topologyExports is a declaration; listed, it loads.
+ await write(empty,exporter('Empty exports','empty'));
+ assert.deepEqual(exporter('Empty exports','empty').page.sections[0].diagram.topologyExports,{});
+ await assert.rejects(canonLibrary(file),names([empty],[flat,nested]));
+ await list(['diagrams/new','diagrams/team/nested','diagrams/empty']);
+ assert.deepEqual(await ids(),['checkout','new','nested','empty']);
  // R5: publication, Backstage, drift and the build command all inherit the check.
  const output=path.join(root,'workbench/diagrams.json');
  await publishLibrary({registryPath:file,output});

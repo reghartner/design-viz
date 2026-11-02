@@ -56,6 +56,9 @@
    R18 add/remove records     panel step path section node edge layout view   status, null absent path, effects = oracle   positional "modified" pairs
    R20 nested tabs            caption, tab view, section view    nested exact paths                         flat sections[i] paths
    R21 document / heading / layout / ledger   exact paths and hunks                                     coarse labels only
+   R21c repeated lines; swapped sides       two exact hunks in a 5,000-line ledger of 50 distinct lines;  unique-line anchoring with a coarse
+                                             B->A hunks equal A->B hunks with sides swapped (block           fallback; direction-dependent tie breaks
+                                             reorder, repeated rows, small ambiguous ledgers)
    R21b large ledgers (5,000 lines)          one exact hunk for one changed line; two exact hunks for    a lines x lines LCS table; a coarse
                                              edits 3,000 lines apart; one hunk for a full rewrite;        fallback that spans unchanged lines
                                              each diff < 1 s
@@ -528,6 +531,23 @@ test('R21b large ledgers diff in bounded time: a single changed line gives one e
     assert.deepEqual(only(out,x=>x.kind==='ledger',name).fields,expected,name);
     assert.ok(ms<1000,name+': '+N+'-line ledgers diffed in '+ms.toFixed(0)+' ms (limit 1000 ms)');
   }
+});
+
+test('R21c ledger hunks stay exact with repeated lines and are side-swapped when the sides are swapped',()=>{
+  const N=5000,p0={page:{title:'T',sections:[{id:'s',heading:'S',diagram:base()}]}};
+  const ledger=text=>only(compare(side(p0,{ledger:text[0]}),side(p0,{ledger:text[1]})),x=>x.kind==='ledger','ledger entry').fields;
+  const swapped=f=>f.map(h=>({beforePath:h.afterPath,afterPath:h.beforePath,before:h.after,after:h.before}));
+  /* Repeated rows (50 distinct lines): two distant edits are still two exact hunks. */
+  const rows=Array.from({length:N},(_,i)=>'- covered by step s'+(i%50)),dup=rows.slice();dup[999]='- row 1000 changed';dup[3999]='- row 4000 changed';
+  const t=performance.now(),dupFields=ledger([rows.join('\n'),dup.join('\n')]),ms=performance.now()-t;
+  assert.deepEqual(dupFields,[{beforePath:'ledger:1000-1000',afterPath:'ledger:1000-1000',before:rows[999],after:'- row 1000 changed'},
+    {beforePath:'ledger:4000-4000',afterPath:'ledger:4000-4000',before:rows[3999],after:'- row 4000 changed'}]);
+  assert.ok(ms<1000,'repeated-row ledgers diffed in '+ms.toFixed(0)+' ms (limit 1000 ms)');
+  /* Mirror: swapping the sides swaps every hunk, for reordered blocks and for small ambiguous ledgers. */
+  const block=k=>Array.from({length:1002},(_,i)=>'- block '+k+' row '+i);
+  const reorder=[[0,1,2,3].flatMap(block).join('\n'),[2,0,3,1].flatMap(block).join('\n')];
+  const cases=[reorder,[rows.join('\n'),dup.join('\n')],['a\nb\na\nb','b\na\nb\na'],['x\ny\nx','y\nx\ny'],['a\na\nb','b\na\na'],['p\nq\nr\np','r\nq\np\nq']];
+  cases.forEach(([a,b],k)=>assert.deepEqual(ledger([b,a]),swapped(ledger([a,b])),'case '+k+': B->A hunks are the A->B hunks with sides swapped'));
 });
 
 test('R22 legacy steps[i].patch alias reports the .patch path and the same effect as .panels',()=>{

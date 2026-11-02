@@ -56,6 +56,8 @@
    R18 add/remove records     panel step path section node edge layout view   status, null absent path, effects = oracle   positional "modified" pairs
    R20 nested tabs            caption, tab view, section view    nested exact paths                         flat sections[i] paths
    R21 document / heading / layout / ledger   exact paths and hunks                                     coarse labels only
+   R21b large ledgers (5,000 lines)          one exact hunk for one changed line; one hunk for a full    a lines x lines LCS table
+                                             rewrite; each diff < 1 s
    R22 legacy steps[i].patch  alias edit                 path uses .patch, same effect as .panels          hard-coded .panels
    R23 absent document        compare(null, side)        exactly document + one per section; mirrored      extra record entries
    R24 identity / full mirror symmetry (fields, effects, scopes, resolved) / immutability                 invented entries; one-sided payloads
@@ -505,6 +507,22 @@ test('R21 document metadata, top-level block heading/layout/View, nested section
   const p0={page:{title:'T',sections:[{id:'s',heading:'S',diagram:base()}]}};
   const added=compare(side(p0,{ledger:null}),side(p0,{ledger:'x'}));assert.equal(added.length,1);
   assert.equal(added[0].status,'added');assert.deepEqual(added[0].fields,[{beforePath:'ledger:',afterPath:'ledger:1-1',before:null,after:'x'}]);
+});
+
+test('R21b large ledgers diff in bounded time: a single changed line gives one exact hunk, a full rewrite one hunk',()=>{
+  /* Accepted ledgers may reach 256 KiB. A diff that allocates a lines x lines table takes seconds and hundreds of
+     MB at 4,000 lines (whole-feature review, 2026-11-02). */
+  const N=5000,p0={page:{title:'T',sections:[{id:'s',heading:'S',diagram:base()}]}};
+  const lines=k=>Array.from({length:N},(_,i)=>'- row '+i+' covered by step s'+(i%97)+k);
+  const a=lines('').join('\n'),one=lines('');one[2999]='- row 2999 changed';
+  const rewrite=lines(' (new)').join('\n');
+  for(const [name,after,expected] of [
+    ['single changed line',one.join('\n'),[{beforePath:'ledger:3000-3000',afterPath:'ledger:3000-3000',before:lines('')[2999],after:'- row 2999 changed'}]],
+    ['full rewrite',rewrite,[{beforePath:'ledger:1-'+N,afterPath:'ledger:1-'+N,before:a,after:rewrite}]]]){
+    const t=performance.now(),out=compare(side(p0,{ledger:a}),side(p0,{ledger:after})),ms=performance.now()-t;
+    assert.deepEqual(only(out,x=>x.kind==='ledger',name).fields,expected,name);
+    assert.ok(ms<1000,name+': '+N+'-line ledgers diffed in '+ms.toFixed(0)+' ms (limit 1000 ms)');
+  }
 });
 
 test('R22 legacy steps[i].patch alias reports the .patch path and the same effect as .panels',()=>{

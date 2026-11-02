@@ -13,7 +13,11 @@
    S2   no leftover git/gh processes; memory      same 50 navigations                       server has no git/gh child process after the   leaked child processes; memory that grows
         stays flat                                                                          50th; server RSS after the 50th <= 1.2x RSS   with every navigation
                                                                                             after the 5th
-   AU   no page/console error, failed request, HTTP >= 400 or request outside the server */
+   AU   no page/console error, failed request, HTTP >= 400 or request outside the server
+   Measurement condition for S2: the server runs with NODE_OPTIONS=--max-semi-space-size=1. By default V8 grows
+   its young generation (up to tens of MB) under any steady request load during the first ~50 navigations and
+   then levels off (measured: 103 MB after 5, 158 MB after 50, 164 MB after 200, with no leak), which alone
+   exceeds 1.2x. A fixed young generation makes RSS growth mean retained memory, which is what S2 is for. */
 import {test,expect} from '@playwright/test';
 import {createRequire} from 'node:module';
 import {spawn,execFileSync} from 'node:child_process';
@@ -63,7 +67,7 @@ const stress=test.extend({
     const shas=generate(dir);
     const bin=await ghExecutable(top,{c3:shas[3],c5:shas[5]});
     const server=spawn(process.execPath,[path.join(root,'tools/compare/serve.mjs'),'--repo',dir,'--port','0'],
-      {env:Object.assign(cleanEnv(),{PATH:bin+path.delimiter+process.env.PATH}),stdio:['ignore','pipe','pipe']});
+      {env:Object.assign(cleanEnv(),{PATH:bin+path.delimiter+process.env.PATH,NODE_OPTIONS:'--max-semi-space-size=1'}),stdio:['ignore','pipe','pipe']});
     const url=await new Promise((resolve,reject)=>{let text='';server.stdout.on('data',d=>{text+=d;const m=/http:\/\/127\.0\.0\.1:\d+\//.exec(text);if(m)resolve(m[0]);});
       server.once('exit',code=>reject(new Error('server exited '+code)));});
     try{await use({dir,shas,url,pid:server.pid});}

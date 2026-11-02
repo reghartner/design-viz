@@ -60,6 +60,12 @@
                                                 then PR #7 (clicked in that order);      from-choice unchanged; after #7's: from-choice =  the row the user did not pick last
                                                                                        PR #7 row
                                                 release #8 first
+   P8   Show more while a page loads            150 extra PRs; hold the page-2 reply      Show more is disabled while page 2 loads; after   a second click that requests page 3 and
+                                                                                       release: 152 rows, numbers #8, #7, #249..#100    drops page 2 (rows 101-152 unreachable)
+   B3   a newer choice wins over a pending      From c1, To c7; hold the parent lookup    region aria-busy while the lookup runs; after     a late parent lookup overwriting the
+        Compare this commit                     of Compare this commit on c5; then        release and busy cleared: from-choice c1 row,    user's newer choice
+                                                                                       to-choice c3 row, between rows c3, c2
+                                                To := c3 in the picker; release
    AU   every test, context-wide (all pages): no page/console error, failed request, HTTP >= 400, or request outside the compare server
    U1   page CSP                                response headers of "/"                 script-src 'self', no 'unsafe-inline'           inline script allowed
    Git refuses "<" and ">" in author names, so the hostile author comes from the PR author login. */
@@ -400,4 +406,44 @@ test('P7: when two pull request rows are clicked, the later click chooses even i
   release['7']();
   await expect(dialog).toBeHidden();
   await expect(choice(page,'From')).toHaveText(choiceText({sha:short(c.c3),date:'2026-01-03 12:00',author:'carol',subject:'Feature step'}));
+});
+
+test('P8: Show more is disabled while the next page loads, so no page is skipped',async({page,repo,open})=>{
+  let release=null;
+  await page.route(/\/api\/revisions\?.*page=2(&|$)/,async route=>{await new Promise(resolve=>{release=resolve;});await route.continue();});
+  await open(ghStub(repo.c,{extra:150}));
+  const dialog=await openPicker(page,'From');
+  await dialog.getByRole('tab',{name:'Pull requests'}).click();
+  await expect.poll(()=>options(dialog)).toHaveLength(100);
+  const more=dialog.getByRole('button',{name:'Show more'});
+  await expect(more).toBeEnabled();
+  await more.click();
+  await expect.poll(()=>!!release).toBe(true);
+  await expect(more).toBeDisabled();
+  release();
+  await expect.poll(()=>options(dialog)).toHaveLength(152);
+  const numbers=await dialog.getByRole('option').evaluateAll(els=>els.map(e=>[...e.querySelectorAll('[data-field="badge"]')].map(b=>b.textContent).find(t=>t.startsWith('PR #'))));
+  expect(numbers).toEqual(['PR #8','PR #7',...Array.from({length:150},(_,i)=>'PR #'+(249-i))]);
+  await expect(more).toHaveCount(0);
+});
+
+test('B3: a revision chosen while Compare this commit is still looking up the parent is kept',async({page,repo,open})=>{
+  const {c}=repo;let release=null;
+  await page.route(url=>url.searchParams.get('q')===c.c4 && url.pathname==='/api/revisions',async route=>{await new Promise(resolve=>{release=resolve;});await route.continue();});
+  await open();
+  await choose(page,'From','Revisions of this document',c.c1);
+  await choose(page,'To','Revisions of this document',c.c7);
+  await expect.poll(()=>betweenRows(page)).toHaveLength(4);
+  await between(page).getByRole('listitem').filter({hasText:'Merge feature'}).getByRole('button',{name:'Compare this commit'}).click();
+  await expect.poll(()=>!!release).toBe(true);
+  await expect(between(page)).toHaveAttribute('aria-busy','true');
+  await choose(page,'To','All commits',c.c3);
+  /* The page has handled the lookup's answer once the section is no longer busy. */
+  release();
+  await expect(between(page)).not.toHaveAttribute('aria-busy','true');
+  await expect.poll(()=>betweenRows(page)).toEqual([
+    {date:day(3),sha:short(c.c3),subject:'Reword step',prs:['PR #7']},
+    {date:day(2),sha:short(c.c2),subject:'Rename alpha',prs:[]}]);
+  await expect(choice(page,'From')).toHaveText(choiceText(row(c,'c1','Alice','Add flows',1)));
+  await expect(choice(page,'To')).toHaveText(choiceText(row(c,'c3','Carol','Reword step',3)));
 });

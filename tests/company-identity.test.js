@@ -14,14 +14,16 @@
       backstage} | omitting it, or the raw unnormalized '.git' value
    C2 CONNECT.md names the configured address | same config; assembled agent-chat.js,
       external+embedded x pilotCapture true/false | the 'New exporting diagram:' paragraph names
-      "https://github.com/acme/design-viz" and no reghartner address | an upstream-hardcoded
-      address
+      "https://github.com/acme/design-viz", its only URL is that address, and it has no
+      reghartner address | an upstream-hardcoded address, or one naming both repositories
    C3 shipped kit carries repository | branded tools/build.py | kit
       tools/company-agent-context.json deepEqual {backstage, repository}; packet metadata
       companyContext from checkout and extracted kit deepEqual the same | a kit export that
       filters repository out
-   C4 identity off falls back to upstream | FLOWVIEW_COMPANY_IDENTITY=off | context {} and the
-      rule paragraph names "https://github.com/reghartner/design-viz" | a stale company address
+   C4 identity off falls back to upstream | FLOWVIEW_COMPANY_IDENTITY=off, same combinations |
+      context {} and the rule paragraph names "https://github.com/reghartner/design-viz", its
+      only URL is that address, and it has no acme address | a stale company address, or a
+      contradictory paragraph naming both repositories
    Guards (pass today): no company.json -> {}; site-only config -> {site} (no repository key);
    --no-config build ships no context file. */
 const test=require('node:test'),assert=require('node:assert/strict');
@@ -83,8 +85,10 @@ test('company.json replaces the labels, repository links and brand in assembled 
       assert.equal(rules.length,1,mode+' pilot='+pilot);return rules[0];
     }));
   };
+  const urls=rule=>rule.match(/https?:\/\/[^\s"]+/g)||[];
   for(const rule of canonRule()){
     assert.ok(rule.includes('The company Flowview repository that holds canon.json is "https://github.com/acme/design-viz".'));
+    assert.deepEqual(urls(rule),['https://github.com/acme/design-viz']);
     assert.doesNotMatch(rule,/reghartner/);
   }
   assert.deepEqual(config.brand,{companyName:'Acme',logo:'data:image/png;base64,'+PNG.toString('base64'),primaryColor:'#123456',secondaryColor:'#fff'});
@@ -114,8 +118,11 @@ test('company.json replaces the labels, repository links and brand in assembled 
   assert.deepEqual(loader.companyAgentContext(),{});
   assert.match(loader.readSource('workbench/inspector.js'),/frow\('Company service',picker\)/);
   // C4: without company identity the rule names the upstream repository.
-  for(const rule of canonRule())
+  for(const rule of canonRule()){
     assert.ok(rule.includes('The company Flowview repository that holds canon.json is "https://github.com/reghartner/design-viz".'));
+    assert.deepEqual(urls(rule),['https://github.com/reghartner/design-viz']);
+    assert.doesNotMatch(rule,/acme/i);
+  }
 });
 
 test('invalid company identity fails the build with the field to fix',t=>{

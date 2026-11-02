@@ -247,29 +247,32 @@
       const li = el('li'), button = el('button', {type:'button', 'data-path':d.path});
       button.append(el('span', {'data-field':'path', class:'path'}, d.path),
         el('span', {'data-field':'status', class:'status ' + d.status}, STATUS[d.status] + (d.imported ? ' · imported content' : '')));
-      button.addEventListener('click', () => busy(async () => {
-        try{ await showDocument(d.path, token, from, to); }catch(ex){ if (token === compareToken) note(ex.message); }
-      }));
+      button.addEventListener('click', () => busy(() => showDocument(d.path, token, from, to)));
       li.append(button);
       return li;
     }));
     docsNav().hidden = false;
   }
-  /* Before = From, After = To; each side is resolved with the imports of its own revision. */
+  /* Before = From, After = To; each side is resolved with the imports of its own revision. The previous
+     document's view is removed as soon as another document is chosen, so a document that fails to load never
+     leaves the previous one on screen. Only the latest selection writes its error. */
   async function showDocument(path, token, from, to){
-    const mine = ++viewToken;
+    const mine = ++viewToken, current = () => token === compareToken && mine === viewToken;
     docsNav().querySelectorAll('button').forEach(b => { if (b.dataset.path === path) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); });
-    const out = await api('/api/compare?' + q({from:from.rev, to:to.rev, doc:path}));
-    if (token !== compareToken || mine !== viewToken) return;
-    const FC = window.FlowviewCompare, copy = v => JSON.parse(JSON.stringify(v));
-    const side = s => s ? {authored:FC.normalize(copy(s.raw)), resolved:FC.normalize(FC.resolve(copy(s.raw), copy(s.context))), ledger:null} : null;
-    const before = side(out.before), after = side(out.after), entries = FC.compare(before, after);
-    clearView();
-    note('Comparing ' + path + ': ' + entries.length + (entries.length === 1 ? ' change.' : ' changes.'));
-    view = FC.mount($('.comparison .host'), {before:before && before.resolved, after:after && after.resolved, entries,
-      titles:{before:'Before · ' + revisionLabel(from), after:'After · ' + revisionLabel(to)},
-      emptyText:{before:'This document is not in From.', after:'This document is not in To.'},
-      onRenderError:failure => note((failure.side === 'before' ? 'Before' : 'After') + ' could not be rendered: ' + failure.message)});
+    clearView(); note('Loading ' + path + '…');
+    try{
+      const out = await api('/api/compare?' + q({from:from.rev, to:to.rev, doc:path}));
+      if (!current()) return;
+      const FC = window.FlowviewCompare, copy = v => JSON.parse(JSON.stringify(v));
+      const side = s => s ? {authored:FC.normalize(copy(s.raw)), resolved:FC.normalize(FC.resolve(copy(s.raw), copy(s.context))), ledger:null} : null;
+      const before = side(out.before), after = side(out.after), entries = FC.compare(before, after);
+      clearView();
+      note('Comparing ' + path + ': ' + entries.length + (entries.length === 1 ? ' change.' : ' changes.'));
+      view = FC.mount($('.comparison .host'), {before:before && before.resolved, after:after && after.resolved, entries,
+        titles:{before:'Before · ' + revisionLabel(from), after:'After · ' + revisionLabel(to)},
+        emptyText:{before:'This document is not in From.', after:'This document is not in To.'},
+        onRenderError:failure => note((failure.side === 'before' ? 'Before' : 'After') + ' could not be rendered: ' + failure.message)});
+    }catch(ex){ if (current()){ clearView(); note(path + ': ' + ex.message); } }
   }
 
   /* ---------- wiring ---------- */

@@ -39,6 +39,7 @@ html=build.fill(build.read('workbench.skel.html'),{
     'WORKBENCH_ONBOARDING':json.dumps(json.loads(build.read('starters/onboarding.json'))).replace('<', '\\u003c'),
     'WORKBENCH_LANDING':build.workbench_landing(no_config=True),
     'WORKBENCH_EXAMPLES':build.workbench_examples(no_config=True),
+    'WORKBENCH_LIVE_STATUS_EXAMPLE':build.workbench_live_status_example(no_config=True),
     'WORKBENCH_LIBRARY_HIDDEN':build.welcome_hidden(False),
     'WORKBENCH_CATALOG_HIDDEN':build.welcome_hidden(False),
     'HUMAN_GUIDE':build.human_guide(),

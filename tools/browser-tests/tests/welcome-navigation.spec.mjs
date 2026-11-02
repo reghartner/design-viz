@@ -327,11 +327,11 @@ async function gallerySite(server,html){
   const base=server.origin+'/'+path.basename(root);
   return {url:base+'/workbench/flowspec.html',gallery:base+'/examples/index.html',cleanup:()=>rm(root,{recursive:true,force:true})};
 }
-// Build with a site config naming the gallery; restore the shared build output after.
-async function configuredWorkbench(){
+// Build with a site config naming the gallery (or other optional fields); restore the shared build output after.
+async function configuredWorkbench(fields={examples:'../examples/index.html'}){
   const dir=await mkdtemp(path.join(tmpdir(),'flowview-gallery-config-')),target=path.join(repo,'workbench/flowspec.html'),original=await readFile(target);
   try{
-    await writeFile(path.join(dir,'site.json'),JSON.stringify({version:1,landing:{spec:path.join(repo,'src/starters/onboarding.json')},examples:'../examples/index.html'}));
+    await writeFile(path.join(dir,'site.json'),JSON.stringify({version:1,landing:{spec:path.join(repo,'src/starters/onboarding.json')},...fields}));
     execFileSync('python3',[path.join(repo,'tools/build.py'),'--config',path.join(dir,'site.json')],{cwd:dir,stdio:'pipe'});
     return await readFile(target,'utf8');
   }finally{await writeFile(target,original);await rm(dir,{recursive:true,force:true});}
@@ -381,4 +381,57 @@ test('without site config the examples gallery links stay hidden and nothing is 
     await page.waitForLoadState('networkidle');
     expect(requests).toEqual([]);
   }finally{await site.cleanup();}
+});
+
+// #866 — a full-width "Live Feature Delivery Status Board" row sits directly under Browse
+// diagrams when the build's site config names the example ("liveStatusExample"). The URL is a
+// fake https address; the audit fixture fails the test if anything requests it.
+// row | fixture                                                              | assertion (scoped)                                                                  | rejects
+// 1   | site/workbench/flowspec.html built with --config {liveStatusExample:LIVE_STATUS_URL}, 1440×900 | #welcome-home #welcome-live-status visible; its top is 0–24px below #welcome-library's bottom; its left and right edges equal #welcome-library's (±1px) | a row placed elsewhere (hero, bottom band) or narrower than the Browse diagrams row
+// 2   | same, after scrolling the link into view                             | document.elementFromPoint at the centre of the row's title and of its link lands inside that title / link | a row drawn under another layer
+// 3   | same                                                                 | inside the row: b reads exactly LIVE_STATUS_TITLE, b + span exactly LIVE_STATUS_TEXT, the link exactly "Click here for an example ↗" | copy drift
+// 4   | same                                                                 | the row's link: href attribute === LIVE_STATUS_URL; target="_blank"; rel tokens include noopener and noreferrer | a same-tab link, or one that leaks window.opener or the referrer
+// 5   | unconfigured build (--no-config, the shared workbench.html), 1440×900 | precondition #welcome-library visible; #welcome-home #welcome-live-status hidden and the title text inside #welcome-home hidden | an advertisement shown without a configured URL
+const LIVE_STATUS_URL='https://example.com/live-status-board';
+const LIVE_STATUS_TITLE='Live Feature Delivery Status Board';
+const LIVE_STATUS_TEXT='A living Claude Artifact which hydrates your diagram with live Jira ticket status, all sourced from a root Epic or Initiative.';
+async function settledWelcome(page,url){
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto(url);await expect(home(page)).toBeVisible();
+  await expect(home(page).locator('#welcome-library')).toBeVisible();
+  // The example preview sizes itself after it renders; measure the settled layout.
+  await expect(page.locator('#welcome-example-stage')).toBeAttached();
+  await expect.poll(()=>page.locator('#welcome-example-view').evaluate(view=>view.style.height)).not.toBe('');
+}
+
+test('a configured Live Feature Delivery Status Board row sits under Browse diagrams and links the example in a new tab',async({page,server})=>{
+  const site=await gallerySite(server,await configuredWorkbench({liveStatusExample:LIVE_STATUS_URL}));
+  try{
+    await settledWelcome(page,site.url);
+    const row=home(page).locator('#welcome-live-status'),link=row.getByRole('link');
+    await expect(row).toBeVisible();
+    await expect(row.locator('b')).toHaveText(LIVE_STATUS_TITLE);
+    await expect(row.locator('b + span')).toHaveText(LIVE_STATUS_TEXT);
+    await expect(link).toHaveText('Click here for an example ↗');
+    await expect(link).toHaveAttribute('href',LIVE_STATUS_URL);
+    await expect(link).toHaveAttribute('target','_blank');
+    expect((await link.getAttribute('rel')||'').split(/\s+/)).toEqual(expect.arrayContaining(['noopener','noreferrer']));
+    const rects=await page.evaluate(()=>Object.fromEntries(['welcome-library','welcome-live-status'].map(id=>{
+      const r=document.getElementById(id).getBoundingClientRect();return [id,{top:r.top,bottom:r.bottom,left:r.left,right:r.right}];})));
+    const library=rects['welcome-library'],live=rects['welcome-live-status'];
+    expect(live.top-library.bottom,'gap under Browse diagrams').toBeGreaterThanOrEqual(0);
+    expect(live.top-library.bottom,'gap under Browse diagrams').toBeLessThanOrEqual(24);
+    expect(Math.abs(live.left-library.left),'left edge matches Browse diagrams').toBeLessThanOrEqual(1);
+    expect(Math.abs(live.right-library.right),'right edge matches Browse diagrams').toBeLessThanOrEqual(1);
+    await link.scrollIntoViewIfNeeded();
+    const unobscured=await row.evaluate(row=>[row.querySelector('b'),row.querySelector('a')].map(target=>{
+      const r=target.getBoundingClientRect();return target.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));}));
+    expect(unobscured,'title and link are the topmost elements at their centres').toEqual([true,true]);
+  }finally{await site.cleanup();}
+});
+
+test('without liveStatusExample the Live Feature Delivery Status Board row stays hidden',async({page,server})=>{
+  await settledWelcome(page,server.origin+'/workbench.html');
+  await expect(home(page).locator('#welcome-live-status')).toBeHidden();
+  await expect(home(page).getByText(LIVE_STATUS_TITLE,{exact:true})).toBeHidden();
 });

@@ -1375,9 +1375,12 @@ test('desktop Jira cues retain node and edge authoring selection without opening
 | C6 (f) | Workbench, Paste JSON of C2, real check of Demo live status, Arrange selected section, Layout element = Epic status | the preview Epic status tile spans more than 6 rows while the Height spinbutton shows 6; #src never changes | writing measured rows into the saved document or the Height field |
 | C7 (f) | C6, real mouse down on Move Epic status, Escape | the tile spans its authored 6 rows while the pointer is down, and grows again after Escape | growth during drags; growth never re-applied after a cancelled drag |
 Geometry is read in the section grid's unzoomed CSS pixels: client rects divided by --section-layout-scale, as
-standard-layout.spec.mjs reads it. A row is 32px plus an 8px gap. The content height is measured independently of
-the tile (body top inside the card + the body's full scroll extent + the card's bottom padding and border), so it is
-the same number whether the body scrolls (today) or grows (#864). */
+standard-layout.spec.mjs reads it. A row is 32px plus an 8px gap. The content height never reads the card's or the
+body's own height (today both are stretched to the tile, and scrollHeight is never below clientHeight): it is the body's
+top inside the card + the bottom of the body's lowest rendered child (scroll offset added back) + the body's bottom
+padding, border and any horizontal scrollbar + the card's bottom padding and border. The body is a scroll container in
+both states, so its children's margins stay inside it, and the number is the same whether the body is stretched and
+scrolls (today) or takes its content height (#864). */
 import {arrangeChapter} from '../helpers/test.mjs';
 const CH_ROW=40,CH_GAP=8,CH_TOP=12,chPx=rows=>rows*CH_ROW-CH_GAP;
 const chSettle=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
@@ -1403,7 +1406,10 @@ async function contentBoard(root){
   const box=el=>{const r=el.getBoundingClientRect();return {top:(r.top-origin)/scale,bottom:(r.bottom-origin)/scale,height:r.height/scale};};
   const panel=key=>{
    const tile=grid.querySelector('.section-layout-tile[data-layout-key="panel:'+key+'"]'),card=tile.querySelector(':scope>.pwidget'),body=card.querySelector(':scope>.pbody'),style=getComputedStyle(card);
-   const content=(body.getBoundingClientRect().top-card.getBoundingClientRect().top)/scale+body.scrollHeight+(body.offsetHeight-body.clientHeight)+parseFloat(style.paddingBottom)+parseFloat(style.borderBottomWidth);
+   const bodyBox=body.getBoundingClientRect(),bodyStyle=getComputedStyle(body),px=value=>parseFloat(value) || 0;
+   const lowest=Array.from(body.children).filter(child=>child.getClientRects().length).reduce((bottom,child)=>Math.max(bottom,(child.getBoundingClientRect().bottom-bodyBox.top)/scale+body.scrollTop+px(getComputedStyle(child).marginBottom)),0);
+   const bodyChrome=px(bodyStyle.paddingBottom)+px(bodyStyle.borderBottomWidth)+Math.max(0,body.offsetHeight-body.clientHeight-px(bodyStyle.borderTopWidth)-px(bodyStyle.borderBottomWidth));
+   const content=(bodyBox.top-card.getBoundingClientRect().top)/scale+lowest+bodyChrome+px(style.paddingBottom)+px(style.borderBottomWidth);
    return {...box(tile),content,card:{scroll:card.scrollHeight,client:card.clientHeight},body:{scroll:body.scrollHeight,client:body.clientHeight}};
   };
   return {scale,status:panel('status'),history:panel('history'),section:box(grid.closest('.doc-sec'))};

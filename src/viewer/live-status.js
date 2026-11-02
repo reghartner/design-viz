@@ -583,7 +583,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       demo:demoControls?{playing:!!demoControls.playing,manual:!!demoControls.manual,ended:!!demoControls.ended}:null,verdict:verdict,
       editHistory:copy(editHistory),edit:editor?editor.state():null,
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
-      connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+relative(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}}};
+      connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+clockTime(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}}};
   }
   function hasMissingWork(){return sources().some(function(source){return sectionRecords(source).some(function(record){var d=record.section.diagram || {};return Object.values(d.nodes || {}).some(function(node){return !isTextBoxNode(node) && node.missingWork===true;}) || (d.edges || []).some(function(edge){return edge.missingWork===true;});});});}
   function presentationActive(){return applied || hasMissingWork();}
@@ -1152,6 +1152,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(!retired && editor)askPending();
   }
   function schedule(){if(retired || painting || frame)return;frame=requestAnimationFrame(function(){frame=0;paint();notify();});}
+  /* Last-refresh stamp in the viewer's local clock (Chuck, 2026-11-02): a relative
+     "just now" froze between repaints. The date is added only when it is not today. */
+  function clockTime(at){var d=new Date(at);if(!isFinite(d.getTime()))return '';var time=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'});
+    return d.toDateString()===new Date().toDateString()?time:d.toLocaleDateString([],{month:'short',day:'numeric'})+' '+time;}
   function relative(at){var seconds=Math.max(0,Math.floor((Date.now()-Date.parse(at))/1000));return seconds<60?'just now':seconds<3600?Math.floor(seconds/60)+'m ago':seconds<86400?Math.floor(seconds/3600)+'h ago':Math.floor(seconds/86400)+'d ago';}
   function visible(){return !document.hidden;}
   function stopTimer(){if(timer){clearTimeout(timer);timer=0;}}

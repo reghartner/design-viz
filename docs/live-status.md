@@ -308,7 +308,7 @@ The generic desktop Workbench picker lists **Delivery → Live status**; inserti
 and Export project preserve the panel. There are no authored state or patch fields.
 
 The panel header holds **Live**, distinct-ticket counts, a connector indicator
-(a dot plus “Jira connected, refreshed 12s ago”; the dot is grey when not connected,
+(a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
 amber while connecting or awaiting approval, green when connected or in demo mode,
 red on error, and it pulses while a fetch is in flight; the time is the last successful
 fetch, not a ticket's change time), provider note and action, **First blocker**, and

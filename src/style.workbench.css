@@ -23,6 +23,11 @@
   --accent:#43C8E0; --card:#151A21; --codebg:#12161C; --codeink:#B9C2CE;
   --selglow:rgba(67,200,224,.32);
 }
+/* While the Workbench script runs, paint nothing: the static markup holds both Home and the
+   editor toolbar, and neither is styled for its final state yet (#860). The practice tour
+   copy has its own startup concealment (workbenchPracticeSource), and its lessons measure
+   controls during boot, so this rule leaves it alone. */
+html.workbench-booting:not([data-flowview-practice]) body{visibility:hidden;}
 /* The welcome surface has its own quiet palette; project skins remain in the editor. */
 body.welcome-active{background:#f7f8fc;margin:0;}
 .workbench-header{display:flex;align-items:center;justify-content:space-between;max-width:1676px;margin:auto;padding:21px 30px;border-bottom:1px solid var(--line);gap:20px;}

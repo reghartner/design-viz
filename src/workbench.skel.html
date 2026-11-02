@@ -6,6 +6,13 @@
 {{STYLE_PAGE}}
 {{STYLE_CORE}}
 </style>
+<script>
+/* Hide the page while the Workbench script at the end runs; until then the markup shows both
+   Home and the editor toolbar unstyled. The block after that script shows the page when it
+   finishes or throws (a failed start stays visible instead of blank). Without scripts the
+   class is never set. */
+document.documentElement.classList.add('workbench-booting');
+</script>
 
 {{ICONS}}
 
@@ -757,5 +764,12 @@ var WORKBENCH_ONBOARDING = {{WORKBENCH_ONBOARDING}};
 var WORKBENCH_LANDING = {{WORKBENCH_LANDING}};
 var WORKBENCH_EXAMPLES = {{WORKBENCH_EXAMPLES}};
 {{JS}}
+/* Show the page from inside this script too: the practice tour copies the document while
+   this script runs, before the block below exists, so its copy relies on this line. */
+document.documentElement.classList.remove('workbench-booting');
 })();
+</script>
+<script>
+/* A separate block, so the page is shown even when the Workbench script above throws. */
+document.documentElement.classList.remove('workbench-booting');
 </script>

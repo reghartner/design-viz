@@ -18,7 +18,8 @@
    CONTRACT MATRIX
    G1 revisions   tabs for flows/a.spec.json: document = commits whose first-parent diff changes it
                   (c7 c5 c3 c2 c1, newest first); all = every commit (c7..c1); branches = main, feature;
-                  tags = v1; prs = #7 and #8 from gh. Each row: full sha, 7-char short, ISO author
+                  tags = v1; prs = #7 and #8 from gh (with their head's branch/tag badges; a PR head
+                  fetched as objects only decides "touches" by its own diff). Each row: full sha, 7-char short, ISO author
                   date, author, subject, branches (local and remote-tracking, sorted), tags, prs, touches (changes this document),
                   available (object present locally); search q filters rows; pages of <= 100
                                                      rejects: one undated list; wrong "changes" rule
@@ -36,7 +37,10 @@
    G5b unfetched  resolve('pr:8') fetches the PR head's objects only (no ref, FETCH_HEAD, index or
                   working-tree change) and the compare reads it              rejects: ref-creating fetch
    G6 read-only   status --porcelain=v2, HEAD, for-each-ref and the index hash are unchanged after
-                  every call; fetch() changes only refs/remotes/*          rejects: any write
+                  every call; fetch() changes only refs/remotes/origin/*, also when the repository
+                  configures another fetch refspec (+refs/heads/*:refs/custom/*)          rejects: any write
+   G8 non-ASCII   a document path with non-ASCII characters (flows/café.spec.json) gets its document-tab
+                  and between rows                                  rejects: quoted paths from git log
    G7 status      status(): clone path, last fetch time (FETCH_HEAD mtime; null when there is none), gh
                   signed in as <login>; a failing gh gives signedIn false and the command "gh auth login"
                                                      rejects: token in the status payload */
@@ -81,7 +85,11 @@ test('G1 revision tabs list dated, attributed rows with badges, search and pages
     assert.deepEqual(await rowsOf('tags'),[E.c2]);
     assert.deepEqual(await rowsOf('prs'),[
       {sha:c.pr8,short:c.pr8.slice(0,7),date:'2026-01-08T12:00:00Z',author:'fork',subject:'Fork change',branches:[],tags:[],prs:[8],touches:false,available:false},
-      {sha:c.c3,short:c.c3.slice(0,7),date:'2026-01-03T12:00:00Z',author:'carol',subject:'Feature step',branches:[],tags:[],prs:[7],touches:true,available:true}],'pull requests from gh, newest update first');
+      {sha:c.c3,short:c.c3.slice(0,7),date:'2026-01-03T12:00:00Z',author:'carol',subject:'Feature step',branches:['feature','origin/feature'],tags:[],prs:[7],touches:true,available:true}],'pull requests from gh, newest update first, with the branch badges of their head');
+    /* Once fetched (objects only, on no ref), PR #8's head is available and its own diff decides "touches". */
+    await r.resolve('pr:8');
+    assert.deepEqual(plain((await r.revisions({doc:A,tab:'prs'})).rows[0]),
+      {sha:c.pr8,short:c.pr8.slice(0,7),date:'2026-01-08T12:00:00Z',author:'fork',subject:'Fork change',branches:[],tags:[],prs:[8],touches:true,available:true});
     assert.deepEqual((await r.revisions({doc:A,tab:'all',q:'provider'})).rows.map(x=>x.sha),[c.c6],'search matches the subject');
     assert.deepEqual((await r.revisions({doc:A,tab:'all',q:'carol'})).rows.map(x=>x.sha),[c.c3],'search matches the author');
     assert.deepEqual((await r.revisions({doc:A,tab:'all',q:'v1'})).rows.map(x=>x.sha),[c.c2],'search matches a tag');
@@ -196,6 +204,11 @@ test('G6 every call is read-only; fetch changes only remote-tracking refs',async
     assert.equal(after.status,before.status);assert.equal(after.head,before.head);assert.equal(after.index,before.index);
     const changed=refChanges(before,after);
     assert.deepEqual(changed,['refs/remotes/origin/remote-only'],'fetch adds the new remote-tracking branch and adds, removes or changes no other ref');
+    /* A repository-configured fetch refspec cannot make fetch write outside refs/remotes/origin/. */
+    git(f.dir,['config','--add','remote.origin.fetch','+refs/heads/*:refs/custom/*']);
+    git(f.other,['push','-q','origin','HEAD:refs/heads/second-remote']);
+    const beforeCustom=snapshot(f.dir);await r.fetch();
+    assert.deepEqual(refChanges(beforeCustom,snapshot(f.dir)),['refs/remotes/origin/second-remote'],'no refs/custom/* ref is written');
     assert.ok((await r.revisions({doc:A,tab:'branches'})).rows.some(x=>x.branches.includes('origin/remote-only')),'the fetched branch is listed');
   }finally{await fs.rm(f.root,{recursive:true,force:true});}
 });
@@ -214,5 +227,18 @@ test('G7 status names the clone, the last fetch and the gh sign-in, never the to
     assert.deepEqual(plain(s2.gh),{signedIn:false,login:null,command:'gh auth login'});
     const local=await off.revisions({doc:A,tab:'document'});assert.equal(local.rows.length,5,'local tabs work without gh');
     const prs=await off.revisions({doc:A,tab:'prs'});assert.deepEqual(plain([prs.rows,prs.error]),[[],'Not signed in to GitHub. Run: gh auth login']);
+  }finally{await fs.rm(f.root,{recursive:true,force:true});}
+});
+
+test('G8 a document path with non-ASCII characters has its revision history',async()=>{
+  const f=await fixture();
+  try{
+    const doc='flows/café.spec.json';
+    await fs.writeFile(path.join(f.dir,doc),'{"page":{"title":"Café","sections":[{"heading":"Main","diagram":{"nodes":{"a":{"title":"A"}},"rows":[["a"]]}}]}}\n');
+    git(f.dir,['add','-A']);git(f.dir,['commit','-q','-m','Add café'],{GIT_AUTHOR_DATE:'2026-01-09T10:00:00Z',GIT_COMMITTER_DATE:'2026-01-09T10:00:00Z'});
+    const sha=git(f.dir,['rev-parse','HEAD']),r=await adapter(f);
+    assert.ok((await r.documents(sha)).includes(doc),'precondition: the document is listed');
+    assert.deepEqual((await r.revisions({doc,tab:'document'})).rows.map(x=>x.sha),[sha],'its commit is listed');
+    assert.deepEqual((await r.between({from:f.c.c7,to:sha,doc})).map(x=>x.sha),[sha]);
   }finally{await fs.rm(f.root,{recursive:true,force:true});}
 });

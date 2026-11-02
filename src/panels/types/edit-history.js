@@ -4,7 +4,7 @@
 (function(){
   var SAMPLE=[
     {at:'2026-10-30T16:23:15Z',by:{name:'Riley'},changes:[{op:'add',ticket:'BE-68',node:'backend',label:'Backend'},{op:'remove',ticket:'UX-90',node:'ux',label:'UX mobile app'}]},
-    {at:'2026-10-29T09:40:00Z',by:{name:'Sam'},changes:[{op:'add',ticket:'FW-46',edge:['hardware','firmware'],label:'Hardware → Firmware'}]}
+    {at:'2026-10-29T09:40:00Z',by:{name:'Sam'},changes:[{op:'add',ticket:'FW-46',edge:['hardware','firmware'],label:'Hardware → Firmware'},{op:'clear-missing-work',edge:['hardware','firmware'],label:'Hardware → Firmware'}]}
   ];
   function empty(){return {};}
   function carrierLabel(change){
@@ -12,8 +12,10 @@
     if(typeof change.node==='string')return change.node;
     return Array.isArray(change.edge)?change.edge[0]+' → '+change.edge[1]:'';
   }
-  function opText(change){return change.op==='remove'?'removed from':'added to';}
-  function changeText(change){return change.ticket+' '+opText(change)+' '+carrierLabel(change);}
+  // #855: a cleared Missing work marker has no ticket.
+  function clears(change){return change.op==='clear-missing-work';}
+  function opText(change){return clears(change)?'Missing work cleared from':change.op==='remove'?'removed from':'added to';}
+  function changeText(change){return (clears(change)?'':change.ticket+' ')+opText(change)+' '+carrierLabel(change);}
   function countText(n){return n+' '+(n===1?'change':'changes');}
   function whenText(at){
     var date=new Date(at);if(!isFinite(date.getTime()))return String(at);
@@ -32,7 +34,7 @@
         '<span class="dv-edit-who">'+esc(editorName(entry,null))+'</span><time class="dv-edit-when" datetime="'+esc(entry.at)+'">'+esc(whenText(entry.at))+'</time>'+
         '<span class="dv-edit-count">'+esc(countText(entry.changes.length))+'</span><span class="dv-edit-first">'+esc(changeText(entry.changes[0]))+'</span></summary>'+
         '<ul class="dv-edit-changes">'+entry.changes.map(function(change){
-          return '<li class="dv-edit-change" data-edit-op="'+esc(change.op)+'" data-edit-ticket="'+esc(change.ticket)+'"><span class="dv-edit-ticket">'+esc(change.ticket)+'</span>'+
+          return '<li class="dv-edit-change" data-edit-op="'+esc(change.op)+'"'+(clears(change)?'>':' data-edit-ticket="'+esc(change.ticket)+'"><span class="dv-edit-ticket">'+esc(change.ticket)+'</span>')+
             '<span class="dv-edit-op">'+esc(opText(change))+'</span><span class="dv-edit-carrier">'+esc(carrierLabel(change))+'</span></li>';
         }).join('')+'</ul></details></li>';
     }).join('')+'</ol>';
@@ -59,10 +61,12 @@
         el(summary,'span','dv-edit-first',changeText(entry.changes[0]));
         var changes=el(details,'ul','dv-edit-changes');
         entry.changes.forEach(function(change){
-          var row=el(changes,'li','dv-edit-change');row.setAttribute('data-edit-op',change.op);row.setAttribute('data-edit-ticket',change.ticket);
-          el(row,'span','dv-edit-ticket',change.ticket);
-          // The ticket title is live evidence from the status map; absent until a connector answers.
-          var title=states[change.ticket] && states[change.ticket].title;if(title)el(row,'span','dv-edit-ticket-title',title);
+          var row=el(changes,'li','dv-edit-change');row.setAttribute('data-edit-op',change.op);
+          if(!clears(change)){
+            row.setAttribute('data-edit-ticket',change.ticket);el(row,'span','dv-edit-ticket',change.ticket);
+            // The ticket title is live evidence from the status map; absent until a connector answers.
+            var title=states[change.ticket] && states[change.ticket].title;if(title)el(row,'span','dv-edit-ticket-title',title);
+          }
           el(row,'span','dv-edit-op',opText(change));
           el(row,'span','dv-edit-carrier',carrierLabel(change));
         });
@@ -129,7 +133,7 @@
     render:function(host,panel,state){return state && state.editSample?{html:rowsHTML(state.editSample)}:
       {html:'<p class="dv-edit-history-empty">No edits yet.</p>',mounted:function(){mount(host);}};},
     authoring:{template:{title:'Edit history'},setupFields:[],patchFields:[],
-      picker:{name:'Edit history',category:'Delivery',tagline:'See who changed the board and when',description:'List every save of the live board below the diagram: editor, time and a summary that expands to each ticket added or removed.'},
+      picker:{name:'Edit history',category:'Delivery',tagline:'See who changed the board and when',description:'List every save of the live board below the diagram: editor, time and a summary that expands to each ticket added or removed and each Missing work marker cleared.'},
       example:function(sample){sample.state.editSample=SAMPLE.map(function(entry){return JSON.parse(JSON.stringify(entry));});return sample;}},
     styles:EDIT_HISTORY_STYLES
   });

@@ -472,7 +472,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var destroyListeners=[],listeners=[],bindings=[],observer=null,frame=0,firstPaint=0,timer=0,pending=false,catchUp=false,painting=false;
   var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
-  var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
+  var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,asked=false,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
   var activity=[],seenKeys=Object.create(null),changedKeys=[],stepHooks=[],coverageRequest=0;
   // Connector evidence for the panel header (#769): who supplies the map, whether a fetch is in flight, when it last answered.
   var LIVE_STATUS_CONNECTIONS=['none','disconnected','approval','connecting','connected','error','demo'];
@@ -593,7 +593,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function link(parent,label,url){var el=element(url?'a':'span','nbacklink',label,parent);if(url){el.setAttribute('href',url);el.setAttribute('target','_blank');el.setAttribute('rel','noopener noreferrer');}return el;}
   function close(focus){
     if(!active)return;
-    var trigger=active;active=null;
+    // #855: closing the post-drop question (Keep, Escape, outside click) keeps the
+    // marker; a repaint or a re-render only redraws it, so the question stays pending.
+    if(asked && !painting && !retired && editor)editor.endQuestion();
+    var trigger=active;active=null;asked=false;
     document.removeEventListener('click',outside,true);document.removeEventListener('keydown',escape,true);
     if(trigger)trigger.setAttribute('aria-expanded','false');
     if(pop){if(pop.hidePopover && pop.matches(':popover-open'))pop.hidePopover();pop.hidden=true;}
@@ -601,7 +604,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function outside(ev){if(active && !active.contains(ev.target) && !pop.contains(ev.target) && carrierFrom(ev.target)!==active)close(true);}
   function escape(ev){if(ev.key==='Escape' && active){ev.preventDefault();ev.stopPropagation();close(true);}}
-  function show(trigger,value,tracking,label,waiting,availability,ref){
+  function show(trigger,value,tracking,label,waiting,availability,ref,asking){
     if(retired)return;
     if(active===trigger){close(true);return;}close(false);
     if(!pop){pop=element('div','nbackpop dv-live-popover',null,view);pop.setAttribute('role','dialog');pop.setAttribute('popover','manual');pop.hidden=true;}
@@ -611,6 +614,20 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var found=trackingRefs(value);
     if(value && value.missingWork===true)element('p','dv-live-coverage-detail','Missing work: additional work remains without a linked ticket. Clear this Missing work marker when covered.',pop);
     else if(!found.tickets.length)element('p','dv-live-coverage-detail','No change needed: no linked tickets or missing-work marker.',pop);
+    // #855 Edit mode: clear a marker set on this board; an inherited one names its source diagram.
+    var marker=ref && editing() && value && value.missingWork===true?editor.missingWork(ref):null;
+    if(asking && !(marker && marker.clearable)){editor.endQuestion();asking=null;}
+    if(marker && !marker.clearable)element('p','dv-live-missing-source','Missing work comes from the source diagram "'+marker.source+'" and must be cleared there.',pop);
+    if(marker && marker.clearable){
+      var choice=element('div','dv-live-clear',null,pop);
+      if(asking)element('p','dv-live-question','Does '+asking.ticket+' cover the missing work?',choice);
+      var clear=element('button','reader-button dv-live-clear-missing','Clear Missing work',choice);clear.type='button';
+      clear.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();editor.endQuestion();close(false);setTimeout(function(){editor.clearMissingWork(ref);},0);});
+      if(asking){
+        var keep=element('button','reader-button dv-live-keep','Keep',choice);keep.type='button';
+        keep.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();close(true);});
+      }
+    }
     if(availability){
       element('p','dv-live-availability-detail',liveStatusAvailabilityLabel(availability),pop);
       availability.forEach(function(cause){cause.tickets.forEach(function(key){
@@ -650,7 +667,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       }
     });
     found.prs.forEach(function(url){link(pop,url,url);});
-    active=trigger;trigger.setAttribute('aria-expanded','true');pop.hidden=false;if(pop.showPopover)pop.showPopover();
+    active=trigger;asked=!!(asking && marker && marker.clearable);trigger.setAttribute('aria-expanded','true');pop.hidden=false;if(pop.showPopover)pop.showPopover();
     var rect=trigger.getBoundingClientRect();
     pop.style.left=Math.max(8,Math.min(window.innerWidth-pop.offsetWidth-8,rect.left))+'px';
     pop.style.top=Math.max(8,Math.min(window.innerHeight-pop.offsetHeight-8,rect.bottom+6))+'px';
@@ -698,7 +715,19 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var node=target.closest('g.node[data-dv-node]');if(!node || !view.contains(node) || target.closest(CARRIER_SKIP))return null;
     return node.querySelector('.card.dv-live-target');
   }
-  function openCarrier(el){var c=el._liveCarrier;show(el,c.value,c.tracking,c.label,c.waiting,c.availability,c.ref);}
+  function openCarrier(el,asking){var c=el._liveCarrier;show(el,c.value,c.tracking,c.label,c.waiting,c.availability,c.ref,asking);}
+  /* #855: the drop re-renders the page, so the post-drop question is the editor's
+     until answered; each paint reopens it on the carrier's popover. */
+  function askPending(){
+    var q=editing() && editor.question();if(!q || asked)return;
+    var el=Array.prototype.find.call(view.querySelectorAll('.dv-live-target'),function(candidate){
+      var r=candidate._liveCarrier && candidate._liveCarrier.ref;
+      return !!r && r.section===q.ref.section && r.kind===q.ref.kind && (r.kind==='node'?r.id===q.ref.id:r.index===q.ref.index);
+    });
+    if(!el)return;
+    if(active)close(false);
+    openCarrier(el,q);
+  }
   function carrierClick(ev){
     if(authoring || retired || ev.defaultPrevented || ev.button>0)return;
     var el=carrierFrom(ev.target);if(!el || !el._liveCarrier)return;
@@ -1120,6 +1149,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }finally{
       painting=false;if(!retired)observeBindings();
     }
+    if(!retired && editor)askPending();
   }
   function schedule(){if(retired || painting || frame)return;frame=requestAnimationFrame(function(){frame=0;paint();notify();});}
   function relative(at){var seconds=Math.max(0,Math.floor((Date.now()-Date.parse(at))/1000));return seconds<60?'just now':seconds<3600?Math.floor(seconds/60)+'m ago':seconds<86400?Math.floor(seconds/3600)+'h ago':Math.floor(seconds/86400)+'d ago';}

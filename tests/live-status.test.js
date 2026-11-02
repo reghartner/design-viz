@@ -1782,6 +1782,24 @@ test('H7 H11 a panel mounted in the view lists rows newest first with collapsibl
  const capped=harness(historyFixture(many)),cappedPanel=mountHistory(capped);await historySettle();assert.equal(cappedPanel.rows().length,200);cappedPanel.destroy();capped.ctl.liveStatus.destroy();
  const empty=harness(historyFixture()),emptyPanel=mountHistory(empty);await historySettle();assert.equal(emptyPanel.rows().length,0);assert.equal(textOf(emptyPanel.body.querySelector('.dv-edit-history-empty')).trim(),'No edits yet.');emptyPanel.destroy();empty.ctl.liveStatus.destroy();
 });
+/* #855 H7c (contract source: #855 "Reuse plan" (Edit history panel), Chuck 2026-11-01; §0 ruling:
+   Chuck 2026-11-01: issue's own Test + flip plan):
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| H7c clear-missing-work rows have no ticket | one entry: clear on node b (label Node B), add AA-1, clear on edge a → b without label | summary first "Missing work cleared from Node B", "3 changes"; change lines [op attr, data-edit-ticket, ticket span, op text, carrier] == [clear-missing-work, null, none, "Missing work cleared from", "Node B"], [add, AA-1, AA-1, "added to", "Node B"], [clear-missing-work, null, none, "Missing work cleared from", "a → b"] | ticket-first prose ("undefined added to …"); a ticket span for a clear |
+*/
+test('H7c clear-missing-work rows read "Missing work cleared from <carrier>" with no ticket',async()=>{
+ const entries=[{at:'2026-11-01T10:00:00Z',by:{name:'Alex'},changes:[{op:'clear-missing-work',node:'b',label:'Node B'},{op:'add',ticket:'AA-1',node:'b',label:'Node B'},{op:'clear-missing-work',edge:['a','b']}]}];
+ const h=harness(historyFixture(entries)),status=mountHistory(h);await historySettle();
+ const rows=status.rows();assert.equal(rows.length,1);
+ assert.equal(textOf(rows[0].querySelector('.dv-edit-first')).trim(),'Missing work cleared from Node B');
+ assert.equal(textOf(rows[0].querySelector('.dv-edit-count')).trim(),'3 changes');
+ const changes=rows[0].querySelectorAll('li.dv-edit-change');assert.equal(changes.length,3);
+ const text=(row,cls)=>{const el=row.querySelector(cls);return el?textOf(el).trim():null;};
+ assert.deepEqual(changes.map(c=>[c.getAttribute('data-edit-op'),c.getAttribute('data-edit-ticket'),text(c,'.dv-edit-ticket'),text(c,'.dv-edit-op'),text(c,'.dv-edit-carrier')]),
+  [['clear-missing-work',null,null,'Missing work cleared from','Node B'],['add','AA-1','AA-1','added to','Node B'],['clear-missing-work',null,null,'Missing work cleared from','a → b']]);
+ status.destroy();h.ctl.liveStatus.destroy();
+});
 test('H7b a panel mounted before its controller connects through the pending bridge and retires with it',async()=>{
  const raw=historyFixture(HISTORY),h=harness(raw);h.ctl.liveStatus.destroy();
  const status=mountHistory(h);await historySettle();assert.equal(status.rows().length,0,'nothing to paint before a controller');

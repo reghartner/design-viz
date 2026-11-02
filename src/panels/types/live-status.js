@@ -273,6 +273,9 @@
 .dv-live-draggable{cursor:grab;}
 .dv-live-draggable:active{cursor:grabbing;}
 .dv-live-remove{justify-self:end;}
+.dv-live-clear{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:6px 0;}
+.dv-live-question{flex-basis:100%;margin:0;font-weight:600;color:var(--dtext);}
+.dv-live-missing-source{margin:6px 0;}
 .dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}
 
 .pwidget.pt-live-status{display:flex;flex-direction:column}

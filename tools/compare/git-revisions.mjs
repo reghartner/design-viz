@@ -13,6 +13,7 @@ import {localGitEnvironment} from '../canon/local-git.mjs';
 const exec = promisify(execFile);
 const require = createRequire(import.meta.url);
 export const PAGE_SIZE = 100;
+const PR_LIMIT = 1000000;
 const TABS = ['document', 'all', 'branches', 'tags', 'prs'];
 const NOT_SIGNED_IN = 'Not signed in to GitHub. Run: gh auth login';
 
@@ -73,7 +74,8 @@ export class GitRevisions {
 
   /* ---------- names ---------- */
   async pullRequests(){
-    const out = await this.ghRun(['pr', 'list', '--state', 'all', '--limit', '200', '--json', 'number,title,headRefName,headRefOid,author,updatedAt,state,mergeCommit']);
+    /* gh pages through every pull request up to --limit; the limit is far above any repository's count. */
+    const out = await this.ghRun(['pr', 'list', '--state', 'all', '--limit', String(PR_LIMIT), '--json', 'number,title,headRefName,headRefOid,author,updatedAt,state,mergeCommit']);
     const list = JSON.parse(out);
     if (!Array.isArray(list)) throw new Error('gh pr list returned no list.');
     return list.filter(p => p && Number.isInteger(p.number) && immutable(String(p.headRefOid || '')));
@@ -121,14 +123,15 @@ export class GitRevisions {
   /* Every commit (or those in a range) with author date, author, subject, first parent and the files
      its first-parent diff changes. */
   async commits(range){
-    const args = ['log', '--date-order', '--diff-merges=first-parent', '--name-only', '--no-renames',
+    /* -z: file names are NUL-terminated and never quoted (quotes, newlines, non-ASCII). */
+    const args = ['log', '-z', '--date-order', '--diff-merges=first-parent', '--name-only', '--no-renames',
       '--format=%x1e%H%x1f%P%x1f%aI%x1f%an%x1f%s%x1f'];
     if (range) args.push(range, '--'); else args.push('--all', '--');
     const out = await this.git(args);
     return out.split('\x1e').filter(Boolean).map(block => {
       const [sha, parents, date, author, subject, files] = block.split('\x1f');
       return {sha, parent:(parents || '').split(' ').filter(Boolean)[0] || null, date:isoDate(date), author, subject,
-        files:new Set((files || '').split('\n').map(s => s.trim()).filter(Boolean))};
+        files:new Set((files || '').split('\0').map(s => s.replace(/^\n/, '')).filter(Boolean))};
     });
   }
   /* Files one commit's first-parent diff changes (all files for a root commit). */

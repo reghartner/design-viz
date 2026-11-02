@@ -3,7 +3,7 @@
    Fixture: the built Workbench (--no-config build, empty starters.json), Start new project.
 | row | fixture | assertion (scoped) | rejects |
 |---|---|---|---|
-| T1 card + thumbnail | All examples (precondition: Delivery status not pressed) | in #welcome-templates the Epic status board card is visible beside other categories' cards, its art svg differs from Simple service flow's | no card; a card that falls back to the default flow drawing |
+| T1 card + thumbnail | All examples (precondition: Delivery status not pressed); the four live state colors read from the page's computed --dv-live-todo/-active/-done/-blocked | in #welcome-templates the Epic status board card is visible beside other categories' cards; among the computed fills of its art svg shapes, EACH state has a fill that is a light tint of that state's color and of no other state's (HSL hue within ±10°, saturation ≥ 0.4 so neutral greys never count, lightness ≥ max(0.8, the state color's lightness + 0.1)); at least four distinct fills | no card; the default flow drawing, a single-color or unrelated svg; the saturated state colors themselves; a schematic missing one state |
 | T2 Delivery status filter | real click on the Delivery status filter button | the button is aria-pressed; visible titles in #welcome-templates are exactly [Blank diagram, Epic status board] | no filter; the card filed under Engineering too; a filter that shows every template |
 | T3 opens with demo on | real click on the card | the editor shows; the preview's Demo live status checkbox is checked | a template that opens like Paste JSON, demo off |
 | T4 authored source | #src after T3 | page.tracking.jira.epic, panels status:live-status and history:edit-history, sectionLayout.default equals Chuck's arrangement, backstage/confluence keep the example's; the text never contains demoLiveStatus (the flag is template metadata, Chuck 2026-11-02) | a copy of the worked example without Chuck's arrangement; the demo flag written into the saved document |
@@ -43,6 +43,29 @@ const grid=page=>page.locator('#welcome-templates');
 const card=(page,name)=>grid(page).locator('.welcome-template-card').filter({has:page.locator('.welcome-template-title',{hasText:name})});
 const visibleTitles=page=>grid(page).locator('.welcome-template-card').evaluateAll(cards=>cards.filter(card=>card.checkVisibility()).map(card=>card.querySelector('.welcome-template-title').firstChild.textContent));
 const right=box=>box.x+box.width,bottom=box=>box.y+box.height;
+/* T1 colour check. rgb from "#rrggbb" or computed "rgb(r, g, b)"/"rgba(r, g, b, a)"; transparent fills are dropped. */
+function rgb(value){
+  const hex=/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(value);if(hex)return hex.slice(1).map(part=>parseInt(part,16));
+  const fn=/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/.exec(value);
+  return fn && (fn[4]===undefined || +fn[4]>0)?fn.slice(1,4).map(Number):null;
+}
+function hsl([r,g,b]){
+  r/=255;g/=255;b/=255;const max=Math.max(r,g,b),min=Math.min(r,g,b),l=(max+min)/2,d=max-min;
+  if(!d)return {h:0,s:0,l};
+  const h=max===r?((g-b)/d+6)%6:max===g?(b-r)/d+2:(r-g)/d+4;
+  return {h:h*60,s:d/(1-Math.abs(2*l-1)),l};
+}
+const HUE=10,SATURATION=0.4,LIGHT=0.8,LIGHTER=0.1;
+function isTint(fill,color){
+  const diff=Math.abs(fill.h-color.h),hue=Math.min(diff,360-diff);
+  return hue<=HUE && fill.s>=SATURATION && fill.l>=Math.max(LIGHT,color.l+LIGHTER);
+}
+function thumbnailTints(states,fills){
+  const distinct=[...new Set(fills.filter(fill=>rgb(fill)))],colors=states.map(s=>({state:s.state,hsl:hsl(rgb(s.hex) || [0,0,0])}));
+  const exclusive={};
+  for(const color of colors)exclusive[color.state]=distinct.filter(fill=>{const value=hsl(rgb(fill));return isTint(value,color.hsl) && colors.every(other=>other===color || !isTint(value,other.hsl));});
+  return {distinct,exclusive};
+}
 
 async function openTemplate(page){
   await page.locator('#welcome-new').click();
@@ -63,8 +86,17 @@ test.describe('Epic status board template (#865)',()=>{
     await expect(page.locator('#welcome-template-filters').getByRole('button',{name:'All examples',exact:true})).toHaveAttribute('aria-pressed','true');
     await expect(card(page,'Epic status board')).toBeVisible();await expect(card(page,'Simple service flow')).toBeVisible();
     expect((await visibleTitles(page)).length).toBeGreaterThan(2);
-    const art=name=>card(page,name).locator('.welcome-template-art svg').evaluate(svg=>svg.innerHTML);
-    expect(await art('Epic status board')).not.toBe(await art('Simple service flow'));
+    const states=await page.evaluate(()=>{
+      const root=getComputedStyle(document.documentElement),ctx=document.createElement('canvas').getContext('2d');
+      return ['todo','active','done','blocked'].map(state=>{const value=root.getPropertyValue('--dv-live-'+state).trim();ctx.fillStyle='#000';if(value)ctx.fillStyle=value;return {state,value,hex:ctx.fillStyle};});
+    });
+    const fills=await card(page,'Epic status board').locator('.welcome-template-art svg').evaluate(svg=>[...svg.querySelectorAll('rect,circle,ellipse,path,polygon')].map(el=>getComputedStyle(el).fill));
+    const tints=thumbnailTints(states,fills);
+    for(const {state,value,hex} of states){
+      expect(value,'--dv-live-'+state+' is defined').toBeTruthy();
+      expect(tints.exclusive[state],state+' ('+hex+') needs a light tint of its own among '+JSON.stringify(tints.distinct)).not.toEqual([]);
+    }
+    expect(tints.distinct.length,'at least four distinct fills').toBeGreaterThanOrEqual(4);
     await expect(delivery).toHaveAttribute('aria-pressed','false');
     await page.locator('[data-welcome-back]:visible').click();
 

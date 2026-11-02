@@ -48,6 +48,13 @@
    U0   untrusted text renders literally        commit subject, branch, tag, PR title    each field's textContent equals the payload;   innerHTML rendering anywhere
                                                 and PR author carry HTML payloads       no <img>/<script> in pickers or between list;
                                                                                        window.__pwned undefined
+   P5   PR head that cannot be fetched           gh lists PR #10 with a head SHA that      click PR #10: dialog stays open, that option has   picker that records an unusable choice
+                                                exists nowhere                          aria-disabled=true and "not available locally";  or hides the failure
+                                                                                       to-choice still "No revision chosen"
+   P6   Compare this commit inside a fetched     PR #11 = two commits only at              To := PR #11; between rows two2, two1; Compare   parent lookup limited to ref-reachable
+        multi-commit PR                         refs/pull/11/head on the remote          this commit on two2 -> from-choice "<two1> ·     commits; no ref created
+                                                                                       first parent of <two2>", between rows [two2];
+                                                                                       no ref added
    AU   every test, context-wide (all pages): no page/console error, failed request, HTTP >= 400, or request outside the compare server
    U1   page CSP                                response headers of "/"                 script-src 'self', no 'unsafe-inline'           inline script allowed
    Git refuses "<" and ">" in author names, so the hostile author comes from the PR author login. */
@@ -80,15 +87,17 @@ const test=base.extend({
   /* Page errors, console errors, failed requests, HTTP errors and any request that leaves the
      compare server's origin all fail the test. */
   errors:[async({context,page},use)=>{
-    const errors=[],origins=[];
+    const errors=[],origins=[],allowed=[];
+    /* A test may expect one HTTP error status for one URL pattern; only that is excused. */
+    const excused=(url,status)=>allowed.some(a=>a.re.test(url)&&(status===undefined||status===a.status));
     /* Context-wide: every page of the context, including popups. */
-    const watch=p=>{p.on('pageerror',e=>errors.push('page: '+e.message));p.on('console',m=>{if(m.type()==='error')errors.push('console: '+m.text());});};
+    const watch=p=>{p.on('pageerror',e=>errors.push('page: '+e.message));p.on('console',m=>{if(m.type()==='error'&&!(/^Failed to load resource/.test(m.text())&&excused(m.location()?.url||'')))errors.push('console: '+m.text());});};
     context.pages().forEach(watch);context.on('page',watch);
     context.on('request',r=>{const url=r.url();if(!origins.some(o=>url.startsWith(o+'/'))&&!/^(data|blob|about):/.test(url))errors.push('outbound: '+url);});
     context.on('requestfailed',r=>errors.push('request failed: '+r.url()+' '+(r.failure()?.errorText||'')));
-    context.on('response',r=>{if(r.status()>=400)errors.push('HTTP '+r.status()+': '+r.url());});
+    context.on('response',r=>{if(r.status()>=400&&!excused(r.url(),r.status()))errors.push('HTTP '+r.status()+': '+r.url());});
     await context.route(/^https?:/,route=>{const url=route.request().url();return origins.some(o=>url.startsWith(o+'/'))?route.continue():route.abort();});
-    errors.origins=origins;
+    errors.origins=origins;errors.allow=(status,re)=>allowed.push({status,re});
     await use(errors);
     expect([...errors],'no page/console/request errors or outbound requests').toEqual([]);
   },{auto:true}],
@@ -313,4 +322,46 @@ test('U0 U1: commit, branch, tag and pull request text renders literally under a
   await expect.poll(()=>betweenRows(page)).toEqual([{date:'2026-01-08 10:00',sha:short(hostile),subject:HOSTILE,prs:['PR #9']}]);
   expect(await page.locator('img, script:not([src])').count()).toBe(0);
   expect(await page.evaluate(()=>window.__pwned)).toBeUndefined();
+});
+
+test('P5 P6: a pull request head that cannot be fetched is refused in the picker; a fetched PR commit compares with its object-only parent',async({page,repo,open,errors})=>{
+  const {c}=repo,{writeFile}=await import('node:fs/promises');
+  /* PR #11: two commits on top of c7, only at refs/pull/11/head on the remote. */
+  git(repo.other,['checkout','-q','--detach',c.c7]);
+  const at=n=>({GIT_AUTHOR_DATE:'2026-01-1'+n+'T10:00:00Z',GIT_COMMITTER_DATE:'2026-01-1'+n+'T10:00:00Z'});
+  const doc=path.join(repo.other,A),base=JSON.parse(await (await import('node:fs/promises')).readFile(doc,'utf8'));
+  base.page.sections[0].diagram.nodes.b.title='B one';await writeFile(doc,JSON.stringify(base,null,2)+'\n');git(repo.other,['commit','-qam','Two first'],at(0));
+  const two1=git(repo.other,['rev-parse','HEAD']);
+  base.page.sections[0].diagram.nodes.b.title='B two';await writeFile(doc,JSON.stringify(base,null,2)+'\n');git(repo.other,['commit','-qam','Two second'],at(1));
+  const two2=git(repo.other,['rev-parse','HEAD']);
+  git(repo.other,['push','-q','origin','HEAD:refs/pull/11/head']);
+  const stub=ghStub(c),missing='f'.repeat(40);
+  const gh=async args=>{const out=await stub(args);if(args[0]==='pr' && args[1]==='list')return JSON.stringify(JSON.parse(out).concat([
+    {number:10,title:'Gone head',headRefName:'gone',headRefOid:missing,author:{login:'ghost'},updatedAt:'2026-01-12T12:00:00Z',state:'CLOSED',mergeCommit:null},
+    {number:11,title:'Two commits',headRefName:'two',headRefOid:two2,author:{login:'tess'},updatedAt:'2026-01-11T12:00:00Z',state:'OPEN',mergeCommit:null}]));return out;};
+  errors.allow(400,/\/api\/[a-z]+\?(.*&)?rev=pr%3A10(&|$)/);
+  await open(gh);
+  const refsBefore=snapshot(repo.dir);
+  await choose(page,'From','All commits',c.c7);
+  /* P5 */
+  const dialog=await openPicker(page,'To');
+  await dialog.getByRole('tab',{name:'Pull requests'}).click();
+  await expect.poll(()=>shas(dialog)).toEqual([short(missing),short(two2),short(c.pr8),short(c.c3)]);
+  const gone=dialog.getByRole('option').first();
+  await gone.click();
+  await expect(gone).toHaveAttribute('aria-disabled','true');
+  await expect(gone).toContainText('not available locally');
+  await expect(dialog).toBeVisible();
+  await expect(choice(page,'To')).toHaveText('No revision chosen');
+  /* P6 */
+  await dialog.getByRole('option').nth(1).click();await expect(dialog).toBeHidden();
+  await expect(choice(page,'To')).toHaveText(choiceText({sha:short(two2),date:'2026-01-11 12:00',author:'tess',subject:'Two commits'}));
+  await expect.poll(()=>betweenRows(page)).toEqual([
+    {date:'2026-01-11 10:00',sha:short(two2),subject:'Two second',prs:['PR #11']},
+    {date:'2026-01-10 10:00',sha:short(two1),subject:'Two first',prs:[]}]);
+  await between(page).getByRole('listitem').filter({hasText:'Two second'}).getByRole('button',{name:'Compare this commit'}).click();
+  await expect(choice(page,'From')).toHaveText(short(two1)+' · first parent of '+short(two2));
+  await expect(choice(page,'To')).toHaveText(choiceText({sha:short(two2),date:'2026-01-11 10:00',author:'Fork',subject:'Two second'}));
+  await expect.poll(()=>betweenRows(page)).toEqual([{date:'2026-01-11 10:00',sha:short(two2),subject:'Two second',prs:['PR #11']}]);
+  expect(refChanges(refsBefore,snapshot(repo.dir))).toEqual([]);
 });

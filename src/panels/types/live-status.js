@@ -311,7 +311,8 @@
     presentation:{ambientInitial:true},
     layout:{height:10,fallbackHeight:10,supporting:false,large:true,attachControls:false,
       canvasSizing:{mode:'content-fit',maxHeight:640,resizeAxis:'width'},
-      sectionSizing:{minWidth:480,preferredWidth:880,maxWidth:1200,aspectPolicy:'content',grow:1}},
+      // #864: Standard tiles grow to this panel's content; the authored h is the minimum.
+      sectionSizing:{minWidth:480,preferredWidth:880,maxWidth:1200,aspectPolicy:'content',grow:1,height:'content'}},
     render:function(host,panel,state){return state && state.liveSample?{html:sampleHTML(state.liveSample)}:
       {html:'<div class="dv-live-head"></div><p class="dv-live-empty">This page has no ticket references.</p>',mounted:function(){mount(host);}};},
     authoring:{template:{title:'Live status'},setupFields:[],patchFields:[],

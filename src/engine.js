@@ -2347,6 +2347,35 @@ function sectionLayoutWithoutFlow(items,controlsRows){
   kept.forEach(function(it){it.y-=empty.filter(function(row){return row<it.y;}).length;});
   return kept;
 }
+/* #864 A panel type whose sectionSizing declares height:'content' grows its
+   Standard tile to the whole rows that hold its card, never below the authored
+   h. This is a runtime copy of the shown tiles: grown tiles push the tiles below
+   them through the ordinary packing rule, and saved geometry never changes. */
+function sectionLayoutContentSized(type){
+  var sizing=panelCapability(type,'sectionSizing',null);
+  return !!(sizing && sizing.height==='content');
+}
+function sectionLayoutWithContentRows(items,rows){
+  if(!items.some(function(it){return rows[sectionLayoutKey(it)]>it.h;}))return items;
+  /* Every item here is a shown tile (docked controls are already excluded). */
+  return sectionLayoutPack(items.map(function(it){
+    var copy=Object.assign({},it);delete copy.hidden;delete copy.attachTo;
+    copy.h=Math.max(it.h,rows[sectionLayoutKey(it)] || 0);return copy;
+  }).sort(function(a,b){return a.y-b.y || a.x-b.x;}));
+}
+/* Rows of 32px plus an 8px gap, in the card's unzoomed CSS pixels. The card may
+   be stretched to its tile; its children keep their content height. */
+function sectionContentRows(card){
+  var rect=card.getBoundingClientRect(),style=getComputedStyle(card),bottom=0;
+  var zoom=card.currentCSSZoom || (card.offsetHeight?rect.height/card.offsetHeight:1);
+  Array.prototype.forEach.call(card.children,function(child){
+    if(!child.getClientRects().length)return;
+    bottom=Math.max(bottom,(child.getBoundingClientRect().bottom-rect.top)/zoom+(parseFloat(getComputedStyle(child).marginBottom) || 0));
+  });
+  var height=bottom+(parseFloat(style.paddingBottom) || 0)+(parseFloat(style.borderBottomWidth) || 0);
+  /* Half a pixel of rounding is not a row. */
+  return Math.ceil((height+8-.5)/40);
+}
 function setExploreIndicator(control,visible,description){
   var badge=control && control.querySelector(':scope > .explore-indicator-badge');
   if(!visible){
@@ -2599,12 +2628,47 @@ function createSectionComposition(box, layout, d, board, bar, target, changed, s
   }):null;
   if(layoutSizeObserver)layoutSizeObserver.observe(grid.parentNode);
   var active=false, saved=[], oldHidden,showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;}),boardHidden=board.hidden;
+  /* #864 Content-height tiles. The observer only schedules: one measurement and
+     at most one repaint per animation frame. A height-only change keeps content
+     width, so measuring cannot start a resize loop. Workbench tile drags mark the
+     grid layout-dragging and show authored heights; growth returns afterwards. */
+  var contentCards=Object.create(null),contentRows=Object.create(null),contentFrame=0,contentDragging=false;
+  var contentObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(scheduleContent):null;
+  function scheduleContent(){if(!contentFrame)contentFrame=requestAnimationFrame(measureContent);}
+  function measureContent(){
+    contentFrame=0;
+    if(!active || grid.hidden || grid.classList.contains('layout-dragging'))return;
+    var changed=false;
+    Object.keys(contentCards).forEach(function(key){
+      var card=contentCards[key],tile=card.parentNode;
+      var rows=tile && tile.parentNode===grid && !tile.hidden && card.getClientRects().length?sectionContentRows(card):0;
+      if(rows!==(contentRows[key] || 0)){contentRows[key]=rows;changed=true;}
+    });
+    if(changed)paintFlow();
+  }
+  function watchContent(key,tile,card){
+    tile.classList.add('layout-content-height');contentCards[key]=card;
+    if(contentObserver){contentObserver.observe(card);Array.prototype.forEach.call(card.children,function(child){contentObserver.observe(child);});}
+  }
+  function stopContent(){
+    if(contentObserver)contentObserver.disconnect();
+    if(contentFrame)cancelAnimationFrame(contentFrame);
+    contentFrame=0;contentCards=Object.create(null);contentRows=Object.create(null);
+  }
+  var dragObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){
+    var dragging=grid.classList.contains('layout-dragging');
+    if(dragging===contentDragging)return;
+    contentDragging=dragging;
+    if(active && Object.keys(contentCards).length){paintFlow();if(!dragging)scheduleContent();}
+  }):null;
+  if(dragObserver)dragObserver.observe(grid,{attributes:true,attributeFilter:['class']});
   function paintFlow(){
     viewport.setBoardHidden(active && !showDiagram ? true : boardHidden);
     if(!active)return;
     var controlsRows=bar && !bar.hidden && !separateSteps ? sectionLayoutControlsRows(d,items) : 0;
     var visible=items.filter(function(it){return !(dock && it.controls==='steps') && (!it.hidden || sectionLayoutKey(it)==='diagram');});
     if(!showDiagram)visible=sectionLayoutWithoutFlow(visible,controlsRows);
+    if(!grid.classList.contains('layout-dragging'))visible=sectionLayoutWithContentRows(visible,contentRows);
     grid.querySelectorAll('.section-layout-tile').forEach(function(tile){
       var key=tile.getAttribute('data-layout-key'),it=visible.find(function(v){return sectionLayoutKey(v)===key;});
       tile.hidden=!it;tile.classList.toggle('layout-controls-only',key==='diagram' && !showDiagram && !!it);
@@ -2621,7 +2685,7 @@ function createSectionComposition(box, layout, d, board, bar, target, changed, s
   }
   function restore(quiet){
     if(!active)return;
-    viewport.suspend();
+    viewport.suspend();stopContent();
     saved.forEach(function(rec){rec.node.classList.remove('layout-docked-card');if(rec.anchor.parentNode){rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);}});
     saved=[];grid.replaceChildren();grid.hidden=true;layout.grid.hidden=oldHidden;
     active=false;Object.keys(buttons).forEach(function(id){buttons[id].setAttribute('aria-pressed','false');});
@@ -2651,6 +2715,7 @@ function createSectionComposition(box, layout, d, board, bar, target, changed, s
         var index=(d.panels || []).indexOf(panel),card=cards.find(function(c){return Number(c.getAttribute('data-dv-panel'))===index;});
         move(card,tile);
         if(dock===key && bar && card){card.classList.add('layout-docked-card');move(bar,card);}
+        if(card && panel && sectionLayoutContentSized(panel.type))watchContent(key,tile,card);
       }else if(layout.diagramCol){
         move(layout.diagramCol,tile);
         if(!separateSteps && bar && !layout.diagramCol.contains(bar))move(bar,layout.diagramCol);
@@ -2703,7 +2768,7 @@ function createSectionComposition(box, layout, d, board, bar, target, changed, s
     },
     diagramVisible:function(){return active?showDiagram:true;},viewport:viewport,
     setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,adoptExploreLayout:viewport.adoptLayout,resetExplore:viewport.reset,
-    destroy:function(){if(layoutSizeObserver)layoutSizeObserver.disconnect();viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();}};
+    destroy:function(){if(layoutSizeObserver)layoutSizeObserver.disconnect();stopContent();if(dragObserver)dragObserver.disconnect();viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();}};
 }
 
 function sectionHasProse(sec){

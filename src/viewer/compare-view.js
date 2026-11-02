@@ -705,27 +705,35 @@ function mountCompareView(host, opts){
     if (path == null) return null;
     return entry.cause === 'provider' ? (entry.key ? entry.key[side] : null) : compareViewLastIndex(path);
   }
-  function buildCrop(entry){
-    if (entry.kind !== 'node' && entry.kind !== 'edge') return null;
-    var holder = entry.afterPath != null ? 'after' : 'before', H = cropSideDiagram(entry, holder);
-    if (!H.d) return null;
-    var nodes = H.d.nodes || {}, edges = Array.isArray(H.d.edges) ? H.d.edges : [], ids = [];
+  /* The nodes to frame on one side: the changed node with its direct neighbours, or a connection's
+     endpoints with theirs, from that side's own diagram; null when the side lacks the object. */
+  function cropIds(entry, side, d){
+    var nodes = d.nodes || {}, edges = Array.isArray(d.edges) ? d.edges : [], ids = [];
     function add(id){ if (id != null && Object.prototype.hasOwnProperty.call(nodes, id) && ids.indexOf(String(id)) < 0) ids.push(String(id)); }
     function neighbours(key){ edges.forEach(function(e){ if (!e) return; if (e.from === key) add(e.to); else if (e.to === key) add(e.from); }); }
-    /* A node with its direct neighbours; a connection's endpoints with theirs. */
+    if ((side === 'before' ? entry.beforePath : entry.afterPath) == null) return null;
     if (entry.kind === 'node'){
-      var key = entry.key ? entry.key[holder] : null;
+      var key = entry.key ? entry.key[side] : null;
+      if (key == null || !Object.prototype.hasOwnProperty.call(nodes, key)) return null;
       add(key); neighbours(key);
     } else {
-      var edge = edges[cropEdgeIndex(entry, holder)];
-      if (edge){ add(edge.from); add(edge.to); neighbours(edge.from); neighbours(edge.to); }
+      var edge = edges[cropEdgeIndex(entry, side)];
+      if (!edge) return null;
+      add(edge.from); add(edge.to); neighbours(edge.from); neighbours(edge.to);
     }
-    if (!ids.length) return null;
+    return ids;
+  }
+  function buildCrop(entry){
+    if (entry.kind !== 'node' && entry.kind !== 'edge') return null;
+    var S = {before:cropSideDiagram(entry, 'before'), after:cropSideDiagram(entry, 'after')}, own = {}, any = null;
+    ['before', 'after'].forEach(function(side){ own[side] = S[side].d ? cropIds(entry, side, S[side].d) : null; if (own[side] && own[side].length && !any) any = own[side]; });
+    if (!any) return null;
     var out = {entry:entry, sides:{}};
     ['before', 'after'].forEach(function(side){
-      var S = cropSideDiagram(entry, side);
-      out.sides[side] = {section:S.section, ids:S.d ? ids.filter(function(id){ return Object.prototype.hasOwnProperty.call(S.d.nodes || {}, id); }) : [],
-        edge:entry.kind === 'edge' ? cropEdgeIndex(entry, side) : null};
+      var d = S[side].d, other = own[side === 'before' ? 'after' : 'before'];
+      /* A side without the object frames the other side's nodes that it has (a removed node's former neighbours). */
+      var ids = own[side] || (d && other ? other.filter(function(id){ return Object.prototype.hasOwnProperty.call(d.nodes || {}, id); }) : []);
+      out.sides[side] = {section:S[side].section, ids:ids, edge:entry.kind === 'edge' && own[side] ? cropEdgeIndex(entry, side) : null};
     });
     return out;
   }
@@ -854,6 +862,8 @@ function mountCompareView(host, opts){
     if (destroyed || (m !== 'focused' && m !== 'full')) return mode;
     var was = mode; mode = m; applyMode();
     if (m === 'focused' && was !== 'focused') applyCrop();
+    /* Leaving a crop: frame the change the Full way (legible node, both panes). */
+    else if (m === 'full' && was === 'focused' && cropCtx && selected >= 0) select(selected);
     return mode;
   }
   function select(index, initial){

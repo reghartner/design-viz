@@ -853,7 +853,7 @@ test('R3 Workbench demo paint has no badges and a card click selects without the
 | row | required state or element | fixture | scoped assertion | broken implementation it rejects |
 |---|---|---|---|---|
 | V1a | Live, First blocker, Play and Next day header buttons | worked example with #live=demo on day 4, in each selectable theme picked from the reader's Contents Theme menu | inside the Epic status section, every visible `.pt-live-status .reader-button` equals that section's `.playback-button` in computed border width, border style, border radius, background color, font family, font size and padding, with no property skipped for any button; Live is asserted pressed, and Play is also its reference because inside the document no theme gives a pressed `tbtn` its own fill (the only such rule, style.core.css `:is(.mbtn,.tbtn,.schip,.pathbtn)[aria-pressed=true]` for Rose, Lavender and Lilac, is overridden by their later `.docview :is(.mbtn,.tbtn,.schip)` rule), and the reader renders no other pressed `tbtn` (its pressed mode toggles are `.mbtn`, with a different fill) | browser-default buttons (2px outset, radius 0, #efefef); a fixed pastel pill that is wrong in Aurora, Blueprint and Terminal; any special background on the pressed Live toggle |
-| V1b | the connector action button (Allow Jira) | frozen fixture with the claude connector stub in approval mode | the visible action button equals the section's Play button on the same properties | styling only the demo and Live buttons |
+| V1b | the connector action button (Allow Jira) | frozen fixture with the claude connector stub in approval mode, where the Flagged search already answered so Live shows beside it | the visible Live and Allow Jira buttons equal the section's Play button on the same properties | styling only the demo and Live buttons |
 | V2 | in-progress color word in the worked example | worked example with #live=demo on day 2 | the section's first prose paragraph names "blue in progress" and no orange or amber while an active edge renders --dv-live-active blue (the skill description is checked in tests/live-status-panel.test.js) | leaving "orange in progress" |
 | V3 | Workbench Demo live status connection label | frozen fixture pasted into the Workbench, Demo live status checked, then Next day | the Epic status `.dv-live-connection` has data-state demo and its text starts with the source label "Demo", as the reader's #live=demo does (the refresh wording after the comma is not pinned) | the provider labelled "Host"; relabelling only the source while the state stays connected ("Demo connected") |
 */
@@ -868,7 +868,7 @@ test.describe('#863 Epic status panel consistency',()=>{
  },LOOK);
  const differences=result=>result.buttons.flatMap(b=>LOOK.filter(p=>b.look[p]!==result.play[p]).map(p=>b.name+' '+p+': '+b.look[p]+' vs Play '+result.play[p]));
  test('V1 desktop demo header buttons match the section Play button in every reader theme',async({page,server})=>{
-  const root=await openStory(page,server),panel=root.locator('.pt-live-status'),section=root.locator('.doc-sec').filter({has:panel});
+  const root=await openStory(page,server),panel=root.locator('.pt-live-status'),section=root.locator('.doc-sec:has(.pt-live-status)');
   await expect(section).toHaveCount(1);await demoDay(root,4);await expect(panel.getByRole('button',{name:'First blocker',exact:true})).toBeVisible();
   const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','First blocker','Play','Next day']);
   // The pressed state is the one compared: Live is on throughout.
@@ -888,13 +888,14 @@ test.describe('#863 Epic status panel consistency',()=>{
  });
  test('V1 desktop connector action button matches the section Play button',async({page,server})=>{
   const {root}=await openClaude(page,server,'approval'),section=root.locator('#section-delivery'),panel=section.locator('.pt-live-status');
-  await expect(panel.getByRole('button',{name:'Allow Jira',exact:true})).toBeVisible();
-  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Allow Jira']);
+  // Approval mode: the Flagged search has answered, so Live shows beside the action.
+  await expect(panel.getByRole('button',{name:'Allow Jira',exact:true})).toBeVisible();await expect(panel.locator('.dv-live-toggle')).toBeVisible();
+  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','Allow Jira']);
   expect(first.play).toMatchObject({borderTopStyle:'solid',borderTopWidth:'1px',borderTopLeftRadius:'999px'});
   await expect.poll(async()=>differences(await looks(section)),{message:'Allow Jira matches Play'}).toEqual([]);
  });
  test('V2 desktop worked example prose names the rendered in-progress color',async({page,server})=>{
-  const root=await openStory(page,server),panel=root.locator('.pt-live-status'),section=root.locator('.doc-sec').filter({has:panel});
+  const root=await openStory(page,server),panel=root.locator('.pt-live-status'),section=root.locator('.doc-sec:has(.pt-live-status)');
   await demoDay(root,2);const edge=section.locator('path.edge[data-dv-edge="0"]');await expect(edge).toHaveClass(/dv-live-active/);await expect(edge).toHaveCSS('stroke',statusLine('active'));
   const prose=section.locator('.sec-text[data-dv-para="0"]');await expect(prose).toContainText('blue in progress');await expect(prose).not.toContainText(/orange|amber/i);
  });

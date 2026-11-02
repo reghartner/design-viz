@@ -5,7 +5,7 @@
 (function(){
   const $ = selector => document.querySelector(selector);
   const state = {doc:null, from:null, to:null, side:'from', tab:'document', query:'', page:1};
-  let docToken = 0, listToken = 0, betweenToken = 0, searchTimer = 0;
+  let docToken = 0, listToken = 0, betweenToken = 0, pickToken = 0, searchTimer = 0;
 
   /* ---------- helpers ---------- */
   const minute = iso => iso ? String(iso).slice(0, 10) + ' ' + String(iso).slice(11, 16) : '';
@@ -85,7 +85,8 @@
      If that fails, the row is marked and stays unchosen. */
   async function pick(row, li){
     if (li.getAttribute('aria-disabled') === 'true' || li.dataset.checking) return;
-    const side = state.side, token = listToken, pr = state.tab === 'prs' && row.prs.length ? 'pr:' + row.prs[0] : null;
+    /* Only the latest click may choose: an earlier row's check that finishes later is ignored. */
+    const side = state.side, token = listToken, click = ++pickToken, pr = state.tab === 'prs' && row.prs.length ? 'pr:' + row.prs[0] : null;
     if (pr){
       li.dataset.checking = '1';
       try{ await api('/api/documents?' + q({rev:pr})); }
@@ -94,7 +95,7 @@
         li.querySelector('.meta').append(el('span', {class:'unavailable'}, 'not available locally'));
         return;
       }finally{ delete li.dataset.checking; }
-      if (token !== listToken || state.side !== side) return;
+      if (click !== pickToken || token !== listToken || state.side !== side) return;
     }
     closePicker();
     setChoice(side, {rev:pr || row.sha, row});
@@ -133,7 +134,7 @@
   function closePicker(){
     const picker = $('.picker');
     if (picker.hidden) return;
-    picker.hidden = true; ++listToken;
+    picker.hidden = true; ++listToken; ++pickToken;
     document.querySelectorAll('.trigger').forEach(t => t.setAttribute('aria-expanded', 'false'));
   }
 

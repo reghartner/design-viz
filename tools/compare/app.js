@@ -5,7 +5,7 @@
 (function(){
   const $ = selector => document.querySelector(selector);
   const state = {doc:null, from:null, to:null, side:'from', tab:'document', query:'', page:1};
-  let docToken = 0, listToken = 0, betweenToken = 0, pickToken = 0, searchTimer = 0;
+  let docToken = 0, listToken = 0, betweenToken = 0, pickToken = 0, choiceToken = 0, lookupToken = 0, searchTimer = 0;
 
   /* ---------- helpers ---------- */
   const minute = iso => iso ? String(iso).slice(0, 10) + ' ' + String(iso).slice(11, 16) : '';
@@ -57,6 +57,7 @@
       : [chosen.row.short, minute(chosen.row.date), chosen.row.author, chosen.row.subject].join(' · ');
   }
   function setChoice(side, choice){
+    ++choiceToken;
     state[side] = choice; renderChoice(side);
     if (side === 'to') loadDocuments();
     loadBetween();
@@ -105,10 +106,13 @@
     const token = ++listToken;
     if (!append){ list.replaceChildren(); error.hidden = true; more.hidden = true; }
     if (!state.doc) return;
+    /* Show more stays disabled until this page arrives, so a second click cannot skip a page. */
+    more.disabled = true;
     let out;
     try{ out = await api('/api/revisions?' + q({doc:state.doc, tab:state.tab, q:state.query, page:state.page})); }
-    catch(ex){ if (token === listToken){ error.textContent = ex.message; error.hidden = false; } return; }
+    catch(ex){ if (token === listToken){ error.textContent = ex.message; error.hidden = false; more.disabled = false; } return; }
     if (token !== listToken) return;
+    more.disabled = false;
     if (out.error){ error.textContent = out.error; error.hidden = false; } else error.hidden = true;
     list.append(...out.rows.map(rowNode));
     more.hidden = !(out.page < out.pages);
@@ -167,12 +171,17 @@
     }));
   }
   /* First parent (for a merge, the branch merged into) against the commit. */
+  /* The section is aria-busy while the latest parent lookup runs; a choice made meanwhile wins. */
   async function compareCommit(row){
+    const token = ++choiceToken, lookup = ++lookupToken, section = $('.between');
     let parentRow;
+    section.setAttribute('aria-busy', 'true');
     try{
       const out = await api('/api/revisions?' + q({doc:state.doc, tab:'all', q:row.parent, page:1}));
       parentRow = out.rows.find(r => r.sha === row.parent);
-    }catch(ex){ message(ex.message); return; }
+    }catch(ex){ if (token === choiceToken) message(ex.message); return; }
+    finally{ if (lookup === lookupToken) section.removeAttribute('aria-busy'); }
+    if (token !== choiceToken) return;
     /* A parent that no branch or tag reaches (inside a fetched pull request) is chosen by SHA. */
     state.from = parentRow ? {rev:row.parent, row:parentRow}
       : {rev:row.parent, label:row.parent.slice(0, 7) + ' · first parent of ' + row.short};
@@ -195,10 +204,11 @@
     if (!picker.hidden && !picker.contains(ev.target) && !ev.target.closest('.trigger')) closePicker();
   });
   $('#swap').addEventListener('click', () => {
+    ++choiceToken;
     [state.from, state.to] = [state.to, state.from];
     renderChoice('from'); renderChoice('to'); loadDocuments(); loadBetween();
   });
-  $('#document').addEventListener('change', ev => { state.doc = ev.target.value; loadDocuments(); refreshAfterDocument(); });
+  $('#document').addEventListener('change', ev => { ++choiceToken; state.doc = ev.target.value; loadDocuments(); refreshAfterDocument(); });
   $('#fetch').addEventListener('click', async ev => {
     const button = ev.currentTarget;
     button.disabled = true; message('');

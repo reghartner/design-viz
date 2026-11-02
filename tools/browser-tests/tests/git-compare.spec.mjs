@@ -62,6 +62,8 @@
                                                 release #8 first
    P8   Show more while a page loads            150 extra PRs; hold the page-2 reply      Show more is disabled while page 2 loads; after   a second click that requests page 3 and
                                                                                        release: 152 rows, numbers #8, #7, #249..#100    drops page 2 (rows 101-152 unreachable)
+   P9   Show more after a failed page           150 extra PRs; page 2 answers 500 once    alert shows the error, Show more enabled; retry   retry that skips the failed page
+                                                                                       -> 152 rows, numbers #8, #7, #249..#100
    B3   a newer choice wins over a pending      From c1, To c7; hold the parent lookup    region aria-busy while the lookup runs; after     a late parent lookup overwriting the
         Compare this commit                     of Compare this commit on c5; then        release and busy cleared: from-choice c1 row,    user's newer choice
                                                                                        to-choice c3 row, between rows c3, c2
@@ -446,4 +448,28 @@ test('B3: a revision chosen while Compare this commit is still looking up the pa
     {date:day(2),sha:short(c.c2),subject:'Rename alpha',prs:[]}]);
   await expect(choice(page,'From')).toHaveText(choiceText(row(c,'c1','Alice','Add flows',1)));
   await expect(choice(page,'To')).toHaveText(choiceText(row(c,'c3','Carol','Reword step',3)));
+});
+
+test('P9: after a page fails to load, Show more retries that page',async({page,repo,open,errors})=>{
+  let failed=false;
+  errors.allow(500,/\/api\/revisions\?.*page=2(&|$)/);
+  await page.route(/\/api\/revisions\?.*page=2(&|$)/,async route=>{
+    if(failed){await route.continue();return;}
+    failed=true;await route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'The request could not be completed.'})});
+  });
+  await open(ghStub(repo.c,{extra:150}));
+  const dialog=await openPicker(page,'From');
+  await dialog.getByRole('tab',{name:'Pull requests'}).click();
+  await expect.poll(()=>options(dialog)).toHaveLength(100);
+  const more=dialog.getByRole('button',{name:'Show more'});
+  await more.click();
+  await expect(dialog.getByRole('alert')).toHaveText('The request could not be completed.');
+  await expect(more).toBeEnabled();
+  await expect.poll(()=>options(dialog)).toHaveLength(100);
+  await more.click();
+  await expect.poll(()=>options(dialog)).toHaveLength(152);
+  const numbers=await dialog.getByRole('option').evaluateAll(els=>els.map(e=>[...e.querySelectorAll('[data-field="badge"]')].map(b=>b.textContent).find(t=>t.startsWith('PR #'))));
+  expect(numbers).toEqual(['PR #8','PR #7',...Array.from({length:150},(_,i)=>'PR #'+(249-i))]);
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await expect(more).toHaveCount(0);
 });

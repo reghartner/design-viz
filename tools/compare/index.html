@@ -5,10 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Git Compare</title>
 <link rel="icon" href="data:,">
+<link rel="stylesheet" href="viewer.css">
 <link rel="stylesheet" href="app.css">
+<script src="viewer.js" defer></script>
 <script src="app.js" defer></script>
 </head>
 <body>
+<!--ICONS-->
 <header class="top">
   <h1>Git Compare</h1>
   <span class="state" data-testid="clone-state">Clone: loading…</span>
@@ -37,6 +40,7 @@
       </button>
     </section>
     <button type="button" id="swap">Swap</button>
+    <button type="button" id="compare" class="primary" disabled>Compare</button>
   </div>
   <div class="picker" role="dialog" aria-label="From revisions" hidden>
     <input type="search" aria-label="Search revisions" placeholder="Search subject, branch, tag, PR #, author, SHA">
@@ -55,6 +59,12 @@
     <h2>Between these revisions</h2>
     <p class="note">Choose From and To to list the commits between them.</p>
     <ul></ul>
+  </section>
+  <section class="comparison" aria-label="Comparison">
+    <h2>Comparison</h2>
+    <p class="note">Choose From and To, then press Compare.</p>
+    <nav class="documents" aria-label="Changed documents" hidden><ul></ul></nav>
+    <div class="host"></div>
   </section>
 </main>
 </body>

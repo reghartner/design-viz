@@ -42,3 +42,17 @@ main{padding:18px;display:flex;flex-direction:column;gap:14px;position:relative}
 .between li .body{flex:1}
 .picker [role=option][aria-disabled=true]{opacity:.6;cursor:not-allowed}
 .unavailable{color:#ffb3b9}
+/* Comparison: the document list, then the shared compare view on a light surface (the viewer's own colors). */
+#compare{align-self:center}
+#compare.primary:not(:disabled){background:#1f6f8b;border-color:#5ad1e8;color:#fff}
+.comparison{border:1px solid #22304d;border-radius:10px;background:#0e1628;padding:10px 14px}
+.comparison h2{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#7f8fb0;margin:0 0 6px}
+.comparison .note{color:#7f8fb0;margin:4px 0 8px}
+.comparison .documents ul{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.comparison .documents button{display:flex;gap:8px;align-items:baseline;background:#121c33}
+.comparison .documents button[aria-current=true]{border-color:#5ad1e8;background:#16233f}
+.comparison .documents .path{font-family:ui-monospace,Menlo,monospace;overflow-wrap:anywhere}
+.comparison .documents .status{font-size:11px;color:#9fb0cf}
+.comparison .documents .status.added{color:#7fe0a4}
+.comparison .documents .status.removed{color:#ffb3b9}
+.comparison .host:not(:empty){height:78vh;min-height:560px;background:#f4f6fa;color:#1b2333;border-radius:8px;overflow:hidden}

@@ -38,9 +38,16 @@ function ghStub(c,{fail=false}={}){
     if(fail)throw new Error('gh: not logged in');
     if(args[0]==='api' && args[1]==='user')return JSON.stringify({login:'octo'});
     if(args[0]==='auth' && args[1]==='token')return 'gho_SECRET_TOKEN_123\n';
-    if(args[0]==='pr' && args[1]==='list')return JSON.stringify([
+    if(args[0]==='pr' && args[1]==='list'){
+      /* The real gh needs --state all to include merged PRs and --json <fields> to print JSON. */
+      const flag=name=>{const i=args.indexOf(name);return i>=0?args[i+1]:undefined;};
+      const fields=String(flag('--json')||'').split(',');
+      if(flag('--state')!=='all')throw new Error('gh pr list without --state all omits merged pull requests');
+      if(!['number','title','headRefOid','headRefName','author','updatedAt','mergeCommit'].every(f=>fields.includes(f)))throw new Error('gh pr list without --json number,title,headRefOid,headRefName,author,updatedAt,mergeCommit prints a table');
+      return JSON.stringify([
       {number:7,title:'Feature step',headRefName:'feature',headRefOid:c.c3,author:{login:'carol'},updatedAt:'2026-01-03T12:00:00Z',state:'MERGED',mergeCommit:{oid:c.c5}},
       {number:8,title:'Fork change',headRefName:'fork-change',headRefOid:c.pr8,author:{login:'fork'},updatedAt:'2026-01-08T12:00:00Z',state:'OPEN',mergeCommit:null}]);
+    }
     throw new Error('unexpected gh '+args.join(' '));
   };
   run.calls=calls;return run;
@@ -51,4 +58,19 @@ function snapshot(dir){
     index:crypto.createHash('sha256').update(fss.readFileSync(path.join(gitDir,'index'))).digest('hex'),
     fetchHead:fss.existsSync(path.join(gitDir,'FETCH_HEAD'))?fss.readFileSync(path.join(gitDir,'FETCH_HEAD'),'utf8'):null};
 }
-module.exports={git,cleanEnv,fixture,ghStub,snapshot,spec,provider,docA};
+/* Refs whose value was added, removed or changed between two snapshots. */
+function refChanges(before,after){
+  const map=t=>new Map(t.split('\n').filter(Boolean).map(l=>{const [r,o]=l.split(' ');return [r,o];}));
+  const a=map(before.refs),b=map(after.refs),out=[];
+  for(const r of new Set([...a.keys(),...b.keys()]))if(a.get(r)!==b.get(r))out.push(r);
+  return out.sort();
+}
+/* A gh executable for the command-line test: a node script answering like ghStub. */
+async function ghExecutable(dir,c){
+  const bin=path.join(dir,'bin');await fs.mkdir(bin,{recursive:true});
+  const prs=JSON.stringify([{number:7,title:'Feature step',headRefName:'feature',headRefOid:c.c3,author:{login:'carol'},updatedAt:'2026-01-03T12:00:00Z',state:'MERGED',mergeCommit:{oid:c.c5}}]);
+  const script='#!'+process.execPath+'\nconst a=process.argv.slice(2);\nif(a[0]==="api"&&a[1]==="user"){console.log(JSON.stringify({login:"octo"}));process.exit(0);}\nif(a[0]==="pr"&&a[1]==="list"){console.log('+JSON.stringify(prs)+');process.exit(0);}\nif(a[0]==="auth"&&a[1]==="token"){console.log("gho_SECRET_TOKEN_123");process.exit(0);}\nprocess.exit(1);\n';
+  await fs.writeFile(path.join(bin,'gh'),script,{mode:0o755});
+  return bin;
+}
+module.exports={git,cleanEnv,fixture,ghStub,snapshot,refChanges,ghExecutable,spec,provider,docA};

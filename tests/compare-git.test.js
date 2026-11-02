@@ -37,15 +37,24 @@
                   working-tree change) and the compare reads it              rejects: ref-creating fetch
    G6 read-only   status --porcelain=v2, HEAD, for-each-ref and the index hash are unchanged after
                   every call; fetch() changes only refs/remotes/*          rejects: any write
-   G7 status      status(): clone path, last fetch time (FETCH_HEAD mtime or null), gh signed in as
-                  <login>; a failing gh gives signedIn false and the command "gh auth login"
+   G7 status      status(): clone path, last fetch time (FETCH_HEAD mtime; null when there is none), gh
+                  signed in as <login>; a failing gh gives signedIn false and the command "gh auth login"
                                                      rejects: token in the status payload */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),fss=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {execFileSync}=require('node:child_process'),crypto=require('node:crypto'),vm=require('node:vm');
 const {readSource}=require('../tools/source-loader.cjs');
 const plain=v=>JSON.parse(JSON.stringify(v));
 
-const {git,cleanEnv,fixture,ghStub,snapshot}=require('./helpers/compare-git-fixture.cjs');
+const {git,cleanEnv,fixture,ghStub,snapshot,refChanges}=require('./helpers/compare-git-fixture.cjs');
+/* The complete expected picker row of each fixture commit for flows/a.spec.json. */
+function expectedRows(c){
+  const meta={c1:['2026-01-01','Alice','Add flows',true],c2:['2026-01-02','Bob','Rename alpha',true],c3:['2026-01-03','Carol','Reword step',true],c4:['2026-01-04','Alice','Docs only',false],
+    c5:['2026-01-05','Bob','Merge feature',true],c6:['2026-01-06','Dana','Provider rename',false],c7:['2026-01-07','Alice','Final pass',true]};
+  const branches={c3:['feature','origin/feature'],c7:['main','origin/main']},tags={c2:['v1']},prs={c3:[7],c5:[7]},out={};
+  for(const k of Object.keys(meta)){const [day,author,subject,touches]=meta[k];
+    out[k]={sha:c[k],short:c[k].slice(0,7),date:day+'T10:00:00Z',author,subject,branches:branches[k]||[],tags:tags[k]||[],prs:prs[k]||[],touches,available:true};}
+  return out;
+}
 async function adapter(f,opts){
   /* Before #849 the module does not exist: fail on the export assertion below, not on the import. */
   const mod=await import('../tools/compare/git-revisions.mjs').catch(()=>({}));
@@ -63,18 +72,16 @@ test('G1 revision tabs list dated, attributed rows with badges, search and pages
   try{
     const r=await adapter(f),c=f.c;
     assert.equal(typeof r.revisions,'function','GitRevisions#revisions');
-    const doc=await r.revisions({doc:A,tab:'document'});
-    assert.deepEqual(doc.rows.map(x=>x.sha),[c.c7,c.c5,c.c3,c.c2,c.c1],'commits whose first-parent diff changes the document, newest first');
-    const row=x=>doc.rows.find(y=>y.sha===x);
-    assert.deepEqual(plain(row(c.c3)),{sha:c.c3,short:c.c3.slice(0,7),date:'2026-01-03T10:00:00Z',author:'Carol',subject:'Reword step',branches:['feature','origin/feature'],tags:[],prs:[7],touches:true,available:true});
-    assert.deepEqual(row(c.c2).tags,['v1']);assert.deepEqual(row(c.c7).branches,['main','origin/main']);assert.deepEqual(row(c.c5).subject,'Merge feature');
+    const E=expectedRows(c),rowsOf=async tab=>plain((await r.revisions({doc:A,tab})).rows);
+    /* Every row of every tab is checked in full. */
+    assert.deepEqual(await rowsOf('document'),[E.c7,E.c5,E.c3,E.c2,E.c1],'commits whose first-parent diff changes the document, newest first');
     const all=await r.revisions({doc:A,tab:'all'});
-    assert.deepEqual(all.rows.map(x=>x.sha),[c.c7,c.c6,c.c5,c.c4,c.c3,c.c2,c.c1]);
-    assert.deepEqual(all.rows.map(x=>x.touches),[true,false,true,false,true,true,true],'touches = the first-parent diff changes the document');
-    assert.deepEqual((await r.revisions({doc:A,tab:'branches'})).rows.map(x=>[x.branches,x.sha]),[[['feature','origin/feature'],c.c3],[['main','origin/main'],c.c7]],'one row per branch tip, local and remote-tracking names, sorted by name');
-    assert.deepEqual((await r.revisions({doc:A,tab:'tags'})).rows.map(x=>[x.tags,x.sha]),[[['v1'],c.c2]]);
-    const prs=(await r.revisions({doc:A,tab:'prs'})).rows;
-    assert.deepEqual(prs.map(x=>[x.prs,x.sha,x.subject,x.author,x.available]),[[[8],c.pr8,'Fork change','fork',false],[[7],c.c3,'Feature step','carol',true]]);
+    assert.deepEqual(plain(all.rows),[E.c7,E.c6,E.c5,E.c4,E.c3,E.c2,E.c1],'touches = the first-parent diff changes the document');
+    assert.deepEqual(await rowsOf('branches'),[E.c3,E.c7],'one row per branch tip, local and remote-tracking names, sorted by name');
+    assert.deepEqual(await rowsOf('tags'),[E.c2]);
+    assert.deepEqual(await rowsOf('prs'),[
+      {sha:c.pr8,short:c.pr8.slice(0,7),date:'2026-01-08T12:00:00Z',author:'fork',subject:'Fork change',branches:[],tags:[],prs:[8],touches:false,available:false},
+      {sha:c.c3,short:c.c3.slice(0,7),date:'2026-01-03T12:00:00Z',author:'carol',subject:'Feature step',branches:[],tags:[],prs:[7],touches:true,available:true}],'pull requests from gh, newest update first');
     assert.deepEqual((await r.revisions({doc:A,tab:'all',q:'provider'})).rows.map(x=>x.sha),[c.c6],'search matches the subject');
     assert.deepEqual((await r.revisions({doc:A,tab:'all',q:'carol'})).rows.map(x=>x.sha),[c.c3],'search matches the author');
     assert.deepEqual((await r.revisions({doc:A,tab:'all',q:'v1'})).rows.map(x=>x.sha),[c.c2],'search matches a tag');
@@ -115,9 +122,9 @@ test('G3 between lists the commits from From to To that change the document, mer
   const f=await fixture();
   try{
     const r=await adapter(f),c=f.c,rows=await r.between({from:c.c1,to:c.c7,doc:A});
-    assert.deepEqual(rows.map(x=>x.sha),[c.c7,c.c5,c.c3,c.c2]);
-    assert.deepEqual(plain(rows.find(x=>x.sha===c.c5)),{sha:c.c5,short:c.c5.slice(0,7),parent:c.c4,date:'2026-01-05T10:00:00Z',author:'Bob',subject:'Merge feature',prs:[7]});
-    assert.equal(rows.find(x=>x.sha===c.c3).parent,c.c2);assert.deepEqual(rows.find(x=>x.sha===c.c3).prs,[7]);
+    const b=(k,parent,day,author,subject,prs)=>({sha:c[k],short:c[k].slice(0,7),parent,date:day+'T10:00:00Z',author,subject,prs});
+    assert.deepEqual(plain(rows),[b('c7',c.c6,'2026-01-07','Alice','Final pass',[]),b('c5',c.c4,'2026-01-05','Bob','Merge feature',[7]),
+      b('c3',c.c2,'2026-01-03','Carol','Reword step',[7]),b('c2',c.c1,'2026-01-02','Bob','Rename alpha',[])],'every row in full; the merge\'s parent is its first parent');
     /* "Compare this commit" on the merge = first parent vs merge: the feature's step text change. */
     const entries=await r.compareRevisions(c.c4,c.c5,A);
     assert.ok(entries.some(e=>e.kind==='step' && e.status==='modified'),'the merge brings the step text change');
@@ -135,6 +142,11 @@ test('G4 documents and changed documents come from the commits, not the working 
     assert.equal(await r.side(c.c6,'flows/new.spec.json'),null,'a document absent at a revision is null');
     const added=await r.compareRevisions(c.c6,c.c7,'flows/new.spec.json');
     assert.deepEqual(plain(added.filter(e=>e.kind==='document').map(e=>e.status)),['added']);
+    const removed=await r.compareRevisions(c.c6,c.c7,'flows/old.spec.json');
+    assert.deepEqual(plain(removed.filter(e=>e.kind==='document').map(e=>e.status)),['removed']);
+    assert.equal(await r.side(c.c7,'flows/old.spec.json'),null);
+    const edited=await r.compareRevisions(c.c6,c.c7,A);
+    assert.ok(edited.some(e=>e.kind==='node' && e.status==='modified' && e.fields.some(x=>x.after==='Alpha final')),'the edited document lists its node change');
   }finally{await fs.rm(f.root,{recursive:true,force:true});}
 });
 
@@ -166,18 +178,18 @@ test('G6 every call is read-only; fetch changes only remote-tracking refs',async
   const f=await fixture();
   try{
     const r=await adapter(f),c=f.c,before=snapshot(f.dir);
-    await r.status();await r.documents(c.c7);await r.changedDocuments(c.c1,c.c7);
-    for(const tab of ['document','all','branches','tags','prs'])await r.revisions({doc:A,tab});
-    await r.between({from:c.c1,to:c.c7,doc:A});await r.resolve('main');await r.side(c.c7,A);await r.compareRevisions(c.c1,c.c7,A);
-    assert.deepEqual(snapshot(f.dir),before,'no call changes the clone');
+    /* A snapshot after EACH call: a call that writes and then restores still fails. */
+    const calls=[['status',()=>r.status()],['documents',()=>r.documents(c.c7)],['changedDocuments',()=>r.changedDocuments(c.c1,c.c7)],
+      ...['document','all','branches','tags','prs'].map(tab=>['revisions '+tab,()=>r.revisions({doc:A,tab})]),
+      ['between',()=>r.between({from:c.c1,to:c.c7,doc:A})],['resolve',()=>r.resolve('main')],['side',()=>r.side(c.c7,A)],['compareRevisions',()=>r.compareRevisions(c.c1,c.c7,A)]];
+    for(const [name,call] of calls){await call();assert.deepEqual(snapshot(f.dir),before,name+' leaves the clone unchanged');}
     /* A new branch on the remote: fetch brings it in as a remote-tracking ref only. */
     git(f.other,['push','-q','origin','HEAD:refs/heads/remote-only']);
     await r.fetch();
     const after=snapshot(f.dir);
     assert.equal(after.status,before.status);assert.equal(after.head,before.head);assert.equal(after.index,before.index);
-    const changed=after.refs.split('\n').filter(l=>!before.refs.split('\n').includes(l)).map(l=>l.split(' ')[0]);
-    assert.ok(changed.length>0,'fetch brought something in');
-    assert.ok(changed.every(ref=>ref.startsWith('refs/remotes/')),'only remote-tracking refs change: '+JSON.stringify(changed));
+    const changed=refChanges(before,after);
+    assert.deepEqual(changed,['refs/remotes/origin/remote-only'],'fetch adds the new remote-tracking branch and adds, removes or changes no other ref');
     assert.ok((await r.revisions({doc:A,tab:'branches'})).rows.some(x=>x.branches.includes('origin/remote-only')),'the fetched branch is listed');
   }finally{await fs.rm(f.root,{recursive:true,force:true});}
 });
@@ -190,6 +202,8 @@ test('G7 status names the clone, the last fetch and the gh sign-in, never the to
     const fetchHead=path.join(f.dir,'.git','FETCH_HEAD');
     assert.equal(s.lastFetch,new Date(fss.statSync(fetchHead).mtimeMs).toISOString());
     assert.ok(!JSON.stringify(s).includes('gho_SECRET_TOKEN_123'));
+    await fs.rm(fetchHead);
+    assert.equal((await r.status()).lastFetch,null,'no fetch yet: lastFetch is null');
     const off=await adapter(f,{gh:ghStub(f.c,{fail:true})}),s2=await off.status();
     assert.deepEqual(plain(s2.gh),{signedIn:false,login:null,command:'gh auth login'});
     const local=await off.revisions({doc:A,tab:'document'});assert.equal(local.rows.length,5,'local tabs work without gh');

@@ -38,6 +38,7 @@ validator and panel rows (H1c, H3c, H7c, H14) in the node tests, B3 in edit-hist
 | E18 post-drop question, keep | B marked; EX-1, AA-1, CAN-1 dropped on B; EX-1 again on B; EX-1 on A | each add on B opens B's popover with `.dv-live-question` "Does <KEY> cover the missing work?", a Clear and a Keep button, B still dv-live-missing, still open after the live map repaints (1 s); Keep, Escape and an outside click each close it with the pending count unchanged; the repeat drop and the drop on unmarked A open no popover; Save 4 → B keeps missingWork and holds EX-1, AA-1, CAN-1; four add changes, no clear | an automatic clear on drop; a question on no-op or unmarked drops; a question closed by the next repaint |
 | E18 post-drop question, clear | edge 0 marked; EX-1 dropped on its label | the question opens on the edge popover; Clear → break gone, "Save 2 changes"; saved edges[0] == {from,to,label,tickets ["EX-1"]}; one history entry with [add EX-1, clear-missing-work] on that edge | a clear that drops the add; two history entries |
 | E19 conflict replay | (a) twoSections with section "second"'s door marked, cleared, the winner swaps sections; (b) B cleared, the winner deletes B; (c) B cleared, the winner already cleared B | (a) notice "1 of your changes were re-applied; 0 could not be", no automatic publish, Save → sections[0] (id second) door == {title}, change path to sections[0]; (b)(c) notice "0 of your changes were re-applied; 1 could not be (…): Missing work cleared from Beta service", no Save | replay by numeric path; counting a clear with nothing to clear as applied |
+| E16 clear only, no Undo (Chuck 2026-11-01; test review c1) | same board: unmarked node A and unmarked edge 0 in Edit mode; after the clear | A's and edge 0's popovers have no button named /missing work/i and no checkbox; after the clear the Live status panel and B's reopened popover have no button named /undo/i | a Set/Mark Missing work control; an Undo control. Absence guards: they pass at the baseline |
 | E20 no Clear outside Edit mode or for read-only viewers | B and edge 0 marked; editor not editing; canEdit false | B's and edge 0's popovers show the Missing work explanation and no Clear or Keep button | a Clear control for every viewer |
 E20 guards today's behavior and passes at the baseline; every other row fails there on its own
 assertion (no Clear control, no question). Flip: make the clear a no-op → E16 publish assertions
@@ -320,10 +321,21 @@ test('E16 Clear Missing work in a local node popover removes only that marker an
  const {root,panel}=await openBoard(page,board);
  await expect(carrierNode(root,'b')).toHaveClass(/\bdv-live-missing\b/);
  await startEditing(panel);
+ // clear only: an unmarked carrier offers nothing that sets the marker
+ for(const target of [nodeCard(root,'a'),edgeLabel(root,0)]){
+  const unmarked=await openPopover(page,target);
+  await expect(unmarked.getByRole('button',{name:/missing work/i})).toHaveCount(0);await expect(unmarked.getByRole('checkbox')).toHaveCount(0);
+  await page.keyboard.press('Escape');await expect(unmarked).toBeHidden();
+ }
  const pop=await openPopover(page,nodeCard(root,'b'));await expect(pop).toHaveAttribute('aria-label',/ Beta service$/);
  await clickClear(pop);
  await expect(carrierNode(root,'b')).not.toHaveClass(/\bdv-live-missing\b/);
  await expect(saveButton(panel)).toHaveText('Save 1 change');
+ // no Undo: Discard is the only way back
+ await expect(panel.getByRole('button',{name:/undo/i})).toHaveCount(0);
+ const after=await openPopover(page,nodeCard(root,'b'));
+ await expect(after.getByRole('button',{name:/undo/i})).toHaveCount(0);await expect(clearButton(after)).toHaveCount(0);
+ await page.keyboard.press('Escape');await expect(after).toBeHidden();
  expect(await publishes(page),'nothing is published before Save').toEqual([]);
  const text=await save(page,panel,1),saved=JSON.parse(text);
  expect(diagramAt(saved).nodes.b).toEqual({title:'Beta service'});

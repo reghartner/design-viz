@@ -28,8 +28,11 @@
         SHA, subject, badges)                                                          subject and [data-field=badge] list exact        local-time dates, PR tab without gh
    P1   search filters rows                     All commits, type "rename"              options exactly c6, c2; clear restores 7        client ignoring the query
    P2   pick a row sets the side                From := c2 (All commits); To := PR #7   [data-testid=from-choice] / to-choice text      picker that never commits the choice
+   P2b  unfetched PR head is usable             From := c7, To := PR #8 (only on remote) between rows exactly [PR eight, PR #8]; no ref   choosing a PR by raw SHA (server cannot
+                                                                                       added                                            resolve an unfetched head)
    P3   Swap exchanges the sides                click Swap                              from-choice shows PR #7 row, to-choice c2 row   Swap that copies one side
-   P4   paging                                  gh stub with 150 extra PRs              100 options, "Show more" -> 152, button gone      unpaged list; dropped rows
+   P4   paging                                  gh stub with 150 extra PRs              100 options, "Show more" -> 152 with PR numbers  unpaged list; dropped or repeated rows
+                                                                                       exactly #8, #7, #249..#100; button gone
    B0   between rows exact                      From := c1 (document tab), To := c7      region "Between these revisions" items:          rows from both directions; missing PR
                                                                                        c7, c5, c3, c2 with date, sha, subject, PR     badge; touching-only filter missing
    B1   "Compare this commit" on the merge       click it on the c5 row                  from-choice = c4 row (first parent), to-choice   second parent; commit vs itself
@@ -44,6 +47,7 @@
    U0   untrusted text renders literally        commit subject, branch, tag, PR title    each field's textContent equals the payload;   innerHTML rendering anywhere
                                                 and PR author carry HTML payloads       no <img>/<script> in pickers or between list;
                                                                                        window.__pwned undefined
+   AU   every test: no page/console error, failed request, HTTP >= 400, or request outside the compare server
    U1   page CSP                                response headers of "/"                 script-src 'self', no 'unsafe-inline'           inline script allowed
    Git refuses "<" and ">" in author names, so the hostile author comes from the PR author login. */
 import {test as base,expect} from '@playwright/test';
@@ -61,20 +65,30 @@ const FETCHED=new Date('2026-01-09T10:00:00Z');
 const test=base.extend({
   repo:async({},use)=>{const f=await fixture();try{await use(f);}finally{await rm(f.root,{recursive:true,force:true});}},
   /* Opens the page on a server for the fixture clone; servers close after the test. */
-  open:async({page,repo},use)=>{
+  open:async({page,repo,errors},use)=>{
     const servers=[];
     await use(async(gh)=>{
       await utimes(path.join(repo.dir,'.git','FETCH_HEAD'),FETCHED,FETCHED);
       const server=await createCompareServer({directory:repo.dir,gh:gh||ghStub(repo.c)});servers.push(server);
+      errors.origins.push('http://127.0.0.1:'+server.address().port);
       const response=await page.goto('http://127.0.0.1:'+server.address().port+'/');
       return response;
     });
     for(const s of servers)await new Promise(resolve=>s.close(resolve));
   },
+  /* Page errors, console errors, failed requests, HTTP errors and any request that leaves the
+     compare server's origin all fail the test. */
   errors:[async({page},use)=>{
-    const errors=[];page.on('pageerror',e=>errors.push('page: '+e.message));
+    const errors=[],origins=[];
+    page.on('pageerror',e=>errors.push('page: '+e.message));
     page.on('console',m=>{if(m.type()==='error')errors.push('console: '+m.text());});
-    await use(errors);expect(errors,'no page or console errors').toEqual([]);
+    page.on('request',r=>{const url=r.url();if(!origins.some(o=>url.startsWith(o+'/'))&&!/^(data|blob|about):/.test(url))errors.push('outbound: '+url);});
+    page.on('requestfailed',r=>errors.push('request failed: '+r.url()+' '+(r.failure()?.errorText||'')));
+    page.on('response',r=>{if(r.status()>=400)errors.push('HTTP '+r.status()+': '+r.url());});
+    await page.route(/^https?:/,route=>{const url=route.request().url();return origins.some(o=>url.startsWith(o+'/'))?route.continue():route.abort();});
+    errors.origins=origins;
+    await use(errors);
+    expect([...errors],'no page/console/request errors or outbound requests').toEqual([]);
   },{auto:true}],
 });
 
@@ -181,6 +195,15 @@ test('P0 P1 P2 P3: every tab lists dated rows with badges; search filters; picks
   await page.getByRole('button',{name:'Swap'}).click();
   await expect(choice(page,'From')).toHaveText(pr7);
   await expect(choice(page,'To')).toHaveText(choiceText(r2));
+  /* P2b: PR #8's head is not in the clone; choosing it fetches its objects (no ref) and the
+     between list from c7 then shows its commit. */
+  const refsBefore=snapshot(repo.dir);
+  await choose(page,'From','All commits',c.c7);
+  await choose(page,'To','Pull requests',c.pr8);
+  await expect(choice(page,'To')).toHaveText(choiceText({sha:short(c.pr8),date:'2026-01-08 12:00',author:'fork',subject:'Fork change'}));
+  const pr8date=new Date(git(repo.other,['log','-1','--format=%aI'])).toISOString().slice(0,16).replace('T',' ');
+  await expect.poll(()=>betweenRows(page)).toEqual([{date:pr8date,sha:short(c.pr8),subject:'PR eight',prs:['PR #8']}]);
+  expect(refChanges(refsBefore,snapshot(repo.dir))).toEqual([]);
 });
 
 test('P4: a long list shows 100 rows, then the rest after Show more',async({page,repo,open})=>{
@@ -190,7 +213,9 @@ test('P4: a long list shows 100 rows, then the rest after Show more',async({page
   await expect.poll(()=>options(dialog)).toHaveLength(100);
   await dialog.getByRole('button',{name:'Show more'}).click();
   await expect.poll(()=>options(dialog)).toHaveLength(152);
-  const all=await shas(dialog);expect(new Set(all.slice(2)).size).toBe(1);
+  /* Every pull request once, in order: #8, #7 (newest), then the 150 older ones by number, highest first. */
+  const numbers=await dialog.getByRole('option').evaluateAll(els=>els.map(e=>[...e.querySelectorAll('[data-field="badge"]')].map(b=>b.textContent).find(t=>t.startsWith('PR #'))));
+  expect(numbers).toEqual(['PR #8','PR #7',...Array.from({length:150},(_,i)=>'PR #'+(249-i))]);
   await expect(dialog.getByRole('button',{name:'Show more'})).toHaveCount(0);
 });
 

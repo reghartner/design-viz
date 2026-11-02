@@ -106,7 +106,9 @@
    U2   untrusted text in the document list  commit with a hostile file name and       doc row path literal; rail labels and node text     innerHTML in the document list or rail
         and comparison                       node/section titles                      literal; no <img>/inline <script>; no __pwned
    AU   every test, context-wide (all pages): no page/console error, failed request, HTTP >= 400, or request outside the compare server
-   U1   page CSP                                response headers of "/"                 script-src 'self', no 'unsafe-inline'           inline script allowed
+   U1   page CSP                                response headers of "/"                 default-src 'none'; script-src exactly 'self';   inline or eval script allowed
+                                                                                       no script-src-elem/-attr (PR 3: style-src may
+                                                                                       allow inline style attributes for the viewer)
    Git refuses "<" and ">" in author names, so the hostile author comes from the PR author login. */
 import {test as base,expect} from '@playwright/test';
 import {createRequire} from 'node:module';
@@ -354,7 +356,12 @@ test('U0 U1: commit, branch, tag and pull request text renders literally under a
     {number:9,title:HOSTILE,headRefName:'h',headRefOid:hostile,author:{login:HOSTILE},updatedAt:'2026-01-09T12:00:00Z',state:'OPEN',mergeCommit:null}]));return out;};
   const response=await open(gh);
   const csp=response.headers()['content-security-policy'];
-  expect(csp).toMatch(/script-src 'self'/);expect(csp).not.toContain('unsafe-inline');
+  /* Scripts only from the server: script-src is exactly 'self' and no other directive allows scripts. Inline
+     style attributes may be allowed (PR 3: the viewer's panels set them); the issue forbids inline scripts. */
+  const directives=Object.fromEntries(csp.split(';').map(d=>d.trim().split(/\s+/)).filter(d=>d[0]).map(([k,...v])=>[k,v]));
+  expect(directives['default-src']).toEqual(["'none'"]);
+  expect(directives['script-src']).toEqual(["'self'"]);
+  expect(Object.keys(directives).filter(k=>/^script-src-(elem|attr)$/.test(k))).toEqual([]);
   const dialog=await openPicker(page,'From');
   await dialog.getByRole('tab',{name:'All commits'}).click();
   await expect.poll(()=>shas(dialog)).toHaveLength(8);

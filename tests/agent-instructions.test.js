@@ -1,6 +1,48 @@
+/* Contract matrix, #873 PR 1: registering a new exporting diagram (canon provider).
+   Source: issue #873 "How it should look and behave when it works" and Chuck's rulings of
+   2026-11-02 (one commit/one PR with consumers; provider-first allowed; canon.json edited
+   by hand only with the user's authorization; clone prompt naming the address; PR-access
+   prompt; refresh-sources preview needs no access; existing-edit guide stays <=6000 chars).
+   The configured company address is asserted in tests/company-identity.test.js (C2, C3);
+   this file uses the checkout's own context (no company/company.json upstream).
+
+   row | fixture | assertion (scoped) | rejects
+   A1 one rule paragraph in every setup | folderAgentInstructions, external+embedded x resume x
+      artifact/legacy identity | exactly one '\n\n' paragraph starts 'New exporting diagram:' |
+      text only in one workflow, or duplicated
+   A2 folder + spec | same paragraph | 'diagrams/…/<id>/ folder with <id>.spec.json' | a rule
+      naming only canon.json
+   A3 canon.json entry | same | 'its root canon.json entry' | a rule omitting registration
+   A4 consumers | same | 'every consumer topologyImports change that uses it' | provider-only rule
+   A5 one commit + one PR | same | 'When a consumer change uses a new provider, all of these go
+      in one commit and one PR' | "commit together" without the PR, or no grouping rule
+   A6 provider-first allowed | same | 'A provider registered before any consumer uses it may go
+      alone' | a rule forbidding provider-only PRs
+   A7 authorization | same | 'Edit canon.json only with my authorization' | a rule telling the
+      agent to register without asking
+   A8 clone prompt + address | same | names JSON.stringify(<configured repository, else the
+      upstream root>) and 'If I have no local copy of it, ask me to clone it from that address' |
+      no address, or an address the agent must guess
+   A9 PR-only | same | 'changes reach canon only through a PR to that repository' | push-to-main
+   A10 access request | same | 'if I lack push or PR access, I should request it' | silence
+   A11 local preview | same | 'local preview through refresh-sources works without that
+      access' | implying preview needs access
+   D1 local-repository-authoring.md | '## Register a new exporting diagram' section only |
+      A2-A7 in user terms + address from tools/company-agent-context.json repository + clone,
+      PR-only, access and preview text | a doc that only links elsewhere
+   D2 shared-topology.md | the 'For central canon' paragraph only | A2-A5 + A7 + link to the D1
+      anchor | "enroll both folders" without grouping or authorization
+   D3 folder-agent-session.md | '## Refresh saved repo providers' section only | A2-A5 + A7 + link
+      to the D1 anchor | session manual silent on registration
+   D4 folder-agent-existing-edit.md | the guide | links '[local sources and registration]
+      (local-repository-authoring.md)'; length <=6000 is guarded by tests/test_build.py:106 |
+      entry guide with no route to registration
+   D5 guard (passes today) | hld-to-page authoring-workflow.md Phase 7 | keeps "enroll the page
+      in canon.json without authorization" | dropping the existing authorization rule */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
-const {readSource}=require('../tools/source-loader.cjs');
+const {readSource,companyAgentContext}=require('../tools/source-loader.cjs');
 const context=vm.createContext({});vm.runInContext(readSource('workbench/agent-chat.js'),context);
+const UPSTREAM_REPOSITORY='https://github.com/reghartner/design-viz';
 const identity={sessionId:'session',connectionId:'connection',artifacts:{spec:'story.spec.json',ledger:'story.ledger.md',metadata:'.flowview-agent'}};
 test('recommended copy/paste setup never instructs starting or renewing a monitor',()=>{
   for(const resume of [false,true]){
@@ -205,4 +247,71 @@ test('shipped external handoffs finish accepted requests without a reply and kee
     assert.match(embedded,/Write the final answer using python3 [^\n]+ reply --request/);
     assert.doesNotMatch(embedded,/Accept changes automatically finishes/);
   }
+});
+
+test('every connected setup states the new-provider registration, clone and access rules once',()=>{
+  // A1-A11. The address is the configured company repository, else the upstream root.
+  const repository=companyAgentContext().repository||UPSTREAM_REPOSITORY;
+  const legacy={sessionId:'session',connectionId:'connection'};
+  for(const workflow of ['external','embedded'])for(const resume of [false,true])for(const owner of [identity,legacy]){
+    const label=`${workflow} resume=${resume} legacy=${!owner.artifacts}`;
+    const rules=context.folderAgentInstructions('Doorbell','mixed',resume,owner,workflow).split('\n\n')
+      .filter(paragraph=>paragraph.startsWith('New exporting diagram:'));
+    assert.equal(rules.length,1,label);
+    const rule=rules[0];
+    assert.match(rule,/a provider whose spec declares topologyExports/,label);
+    assert.match(rule,/its diagrams\/…\/<id>\/ folder with <id>\.spec\.json/,label);
+    assert.match(rule,/its root canon\.json entry/,label);
+    assert.match(rule,/every consumer topologyImports change that uses it/,label);
+    assert.match(rule,/When a consumer change uses a new provider, all of these go in one commit and one PR\./,label);
+    assert.match(rule,/A provider registered before any consumer uses it may go alone\./,label);
+    assert.match(rule,/Edit canon\.json only with my authorization\./,label);
+    assert.ok(rule.includes('The company Flowview repository that holds canon.json is '+JSON.stringify(repository)+'.'),label);
+    assert.match(rule,/If I have no local copy of it, ask me to clone it from that address\./,label);
+    assert.match(rule,/Before a permanent canon change, tell me that changes reach canon only through a PR to that repository/,label);
+    assert.match(rule,/if I lack push or PR access, I should request it/,label);
+    assert.match(rule,/local preview through refresh-sources works without that access\./,label);
+  }
+});
+
+test('bundled authoring docs state the new-provider registration rule where providers are explained',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const read=file=>fs.readFileSync(path.join(__dirname,'..',file),'utf8');
+  const flat=text=>text.replace(/[`*]/g,'').replace(/\s+/g,' ');
+  const section=(file,heading)=>{
+    const text=read(file),start=text.indexOf('\n'+heading+'\n');
+    assert.ok(start>=0,file+' has '+heading);
+    const body=text.slice(start+heading.length+2),end=body.search(/\n## /);
+    return flat(end<0?body:body.slice(0,end));
+  };
+  const parts=[/its diagrams\/…\/<id>\/ folder with <id>\.spec\.json/,/its root canon\.json entry/,
+    /every consumer topologyImports change that uses it/,
+    /When a consumer change uses a new provider, all of these go in one commit and one PR/,
+    /canon\.json only with the user's authorization/];
+  const anchor='(local-repository-authoring.md#register-a-new-exporting-diagram)';
+  // D1: the complete rule, including clone, access and local preview.
+  const local=section('docs/local-repository-authoring.md','## Register a new exporting diagram');
+  for(const part of parts)assert.match(local,part,'D1 '+part);
+  assert.match(local,/a provider whose spec declares topologyExports/);
+  assert.match(local,/A provider registered before any consumer uses it may go alone/);
+  assert.match(local,/repository in tools\/company-agent-context\.json/);
+  assert.match(local,/If the user has no local copy of that repository, ask them to clone it from that address/);
+  assert.match(local,/changes reach canon only through a PR to that repository/);
+  assert.match(local,/if they lack push or PR access, they should request it/);
+  assert.match(local,/local preview through refresh-sources works without that access/);
+  // D2: the shared-topology enrollment paragraph.
+  const central=read('docs/shared-topology.md').split(/\n\s*\n/).filter(paragraph=>paragraph.startsWith('For central canon'));
+  assert.equal(central.length,1);
+  const enrollment=flat(central[0]);
+  for(const part of parts)assert.match(enrollment,part,'D2 '+part);
+  assert.ok(central[0].includes(anchor),'D2 links the registration section');
+  // D3: the session manual's provider-refresh section.
+  const session=section('docs/folder-agent-session.md','## Refresh saved repo providers');
+  for(const part of parts)assert.match(session,part,'D3 '+part);
+  assert.ok(session.includes(anchor),'D3 links the registration section');
+  // D4: the bounded entry guide routes to it (its 6000-character limit: tests/test_build.py).
+  assert.ok(read('docs/folder-agent-existing-edit.md').includes('[local sources and registration](local-repository-authoring.md)'));
+  // D5 guard: the existing hand-edit authorization rule stays.
+  assert.match(flat(section('.claude/skills/hld-to-page/references/authoring-workflow.md','## Phase 7: Deliver')),
+    /enroll the page in canon\.json without authorization/);
 });

@@ -902,6 +902,9 @@ function mountCompareView(host, opts){
     if (buttons[selected] && buttons[selected].scrollIntoView) buttons[selected].scrollIntoView({block:'nearest'});
     var entry = entries[selected];
     cropLevel = 0; cropSelection = mode === 'focused' && (entry.kind === 'node' || entry.kind === 'edge');
+    /* A change that will not be cropped starts from an uncropped camera (the previous crop's zoom is undone). */
+    if (cropCtx && !cropSelection) uncrop();
+    cropCtx = null;
     var after = navigate('after', entry), before = navigate('before', entry, lastAfterView = after.view);
     var result = {before:before, after:after, label:compareEntryLabel(entry, pages), initial:!!initial};
     decorate();

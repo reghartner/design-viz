@@ -51,8 +51,9 @@
       return node;
     }
     function sweep(parent){Object.keys(parent._liveChildren || {}).forEach(function(key){var node=parent._liveChildren[key];if(node._liveEpoch!==epoch){node.remove();delete parent._liveChildren[key];}else sweep(node);});}
+    // Header buttons wear `tbtn`, the reader's per-theme button look shared with the section's Play and Present buttons (#863).
     function button(parent,key,cls,text,method){
-      var node=el(parent,'button',key,cls,text);node.type='button';node._liveMethod=method;
+      var node=el(parent,'button',key,cls+' tbtn',text);node.type='button';node._liveMethod=method;
       if(!node._liveClick){node._liveClick=function(){var owner=host._livePanelApi;if(owner && !node.disabled)owner[node._liveMethod](node._liveArgument);};node.addEventListener('click',node._liveClick);}
       return node;
     }
@@ -266,8 +267,11 @@
 .dv-live-chain-holds{font:11px/1.4 'IBM Plex Sans',sans-serif;color:var(--dfaint);}
 .dv-live-none{color:var(--dfaint);}
 .dv-live-suggest{margin:8px 0 0;font:11px/1.5 'IBM Plex Sans',sans-serif;color:var(--dfaint);}
-.dv-live-save{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#fff;font-weight:700;}
-.dv-live-save:disabled{opacity:.7;}
+/* Save keeps its fill over every theme's tbtn rules, hover included. */
+.pt-live-status .dv-live-head .tbtn.dv-live-save,.pt-live-status .dv-live-head .tbtn.dv-live-save:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#fff;font-weight:700;}
+.pt-live-status .dv-live-head .tbtn.dv-live-save:disabled{opacity:.7;}
+/* Paper has no controls: print hides these buttons as it hides the reader's other tbtn controls. */
+@media print{.pt-live-status .dv-live-head .tbtn{display:none;}}
 .dv-live-edit-reason,.dv-live-edit-notice{flex-basis:100%;font:12px/1.5 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .dv-live-edit-notice[data-kind="warn"],.dv-live-edit-notice[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-draggable{cursor:grab;}

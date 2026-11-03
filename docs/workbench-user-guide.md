@@ -323,6 +323,19 @@ fetched or opened for it.
 On desktop, right-click blank diagram or Explore canvas space to open **Add** at the pointer. **Text** inserts a box there and starts editing; **Node** inserts a gear-icon **New node** there and focuses its main title for direct typing. Enter or clicking outside saves; Escape keeps the default title. Later title edits and other fields use Inspect. **Panel…** opens the existing panel library. Canvas panels appear at the chosen point; Standard panels use the section layout. **Connection** starts the two-node connection gesture and **Step** adds to the current path. Escape or clicking elsewhere dismisses the menu. Cancelling a picker adds nothing; each insertion is one Undo action. Changing the source, project, section or view retires the pending destination. The toolbar **Add** remains available with its node presets.
 
 
+### Compare device properties and UX icons
+
+Choose **Add → Panel… → Truth table** on desktop. In Inspect, edit **Properties**
+for column headers and **Column kind** (`value` or `icons`), then **Cases and UX
+icons** for typed values and each case’s independent icon cells. Add multiple
+icon columns, such as Power icon and Battery icons. The visual picker uses the shared icon library; multiple outputs
+appear together in each cell, and removing all outputs displays **No icons**. Open
+**Starting state** to choose the initial **Active case**. Step controls can
+select another case, inherit the earlier highlight, or clear it with **No active
+case**. Every edit supports Undo/Redo. The table records authored mappings; it
+does not calculate charging or power behavior. See the
+[device power example](../examples/device-power-truth-table/device-power-truth-table.spec.json).
+
 ### Place play buttons above the steps
 
 In the desktop editor, select the step controls and open **Inspect → Play buttons**. Choose **Above steps** for a dedicated playback row, **Beside steps** for playback alongside the numbered steps or path tracks, or **Auto** for the existing automatic layout. The choice is saved per section arrangement in Standard and Explore. Explore's caption position and floating/on-canvas placement stay independent. See [play button placement](section-layouts.md#play-button-placement).

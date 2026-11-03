@@ -3,7 +3,9 @@
 
    mountCompareView(host, {before, after, entries, skin, mode, ids, onSelect})
      mode          'focused' (default) or 'full'; Focused shows step and panel changes as each
-                   side's step controls plus only the panels that differ (other changes show the
+                   side's step controls plus only the panels that differ; a diagram-only step edit
+                   or a path edit shows the step controls above both full panes at the affected
+                   step, #893 (other changes show the
                    full panes; a coverage-ledger or page-field change shows its changed lines as
                    text, #892); Full shows both full renders
      before/after  normalized pages to render (already topology-resolved), or null
@@ -66,7 +68,62 @@ function compareEntryLabel(entry, pages){
     return [status, name, compareEntryFields(entry)].filter(Boolean).join(' · ');
   }
   var title = (COMPARE_KIND_LABEL[entry.kind] || entry.kind) + (compareEntryName(entry, record) ? ' ' + compareEntryName(entry, record) : '');
-  return [status, title, compareEntryFields(entry)].filter(Boolean).join(' · ');
+  return [status, title, compareEntryFields(entry), compareAffectedText(entry, pages)].filter(Boolean).join(' · ');
+}
+/* ---------- Diagram-only step edits and path edits (#893) ----------
+   These change what the diagram shows at some steps but no caption or panel, so Focused mode keeps
+   both diagram panes at the affected step under each side's step strip, and the rail names the steps. */
+function compareDiagramEntry(entry){
+  if (entry.status !== 'modified') return false;
+  if (entry.kind === 'path') return true;
+  if (entry.kind !== 'step') return false;
+  var names = compareStepFieldNames(entry);
+  return names.length > 0 && !names.some(function(f){ return COMPARE_FOCUS_STEP_FIELD.test(f); });
+}
+/* The steps such an entry affects, per side, as {src, pos} on one path (pos is 0-based on that
+   path). A step edit: the edited step and every step the engine's reader effects name on its path.
+   A path edit: the positions where the path's step lists differ (a label-only edit affects none;
+   the engine's path effects also hold unrelated reader changes on the same path). */
+function compareAffected(entry, pages){
+  if (!compareDiagramEntry(entry)) return null;
+  var sec = entry.section || {}, out = {pathId:null, before:[], after:[]};
+  if (entry.kind === 'path'){
+    var rec = compareViewAt(pages.after, entry.afterPath) || compareViewAt(pages.before, entry.beforePath);
+    out.pathId = rec && typeof rec.id === 'string' ? rec.id : null;
+  } else if ((entry.effects || [])[0]) out.pathId = entry.effects[0].pathId;
+  ['before', 'after'].forEach(function(side){
+    var r = sec[side] != null && pages[side] ? sectionRecords(pages[side])[sec[side]] : null, d = r && r.section && r.section.diagram;
+    if (!d || !Array.isArray(d.steps) || !d.steps.length) return;
+    var own = entry.kind === 'step' && entry.step ? entry.step[side] : null, srcs = own != null ? [own] : [];
+    if (entry.kind === 'path'){
+      var pb = compareViewAt(pages.before, entry.beforePath), pa = compareViewAt(pages.after, entry.afterPath);
+      var sb = pb && Array.isArray(pb.steps) ? pb.steps : [], sa = pa && Array.isArray(pa.steps) ? pa.steps : [], mine = side === 'after' ? sa : sb;
+      var ids = new Map(); d.steps.forEach(function(st, i){ if (st && typeof st.id === 'string') ids.set(st.id, i); });
+      mine.forEach(function(id, k){ if (sb[k] !== sa[k] && ids.has(id)) srcs.push(ids.get(id)); });
+    }
+    else (entry.effects || []).forEach(function(e){
+      if (out.pathId != null && e.pathId !== out.pathId) return;
+      (e.changes || []).forEach(function(c){ var v = side === 'after' ? c.afterStep : c.beforeStep; if (typeof v === 'number' && srcs.indexOf(v) < 0) srcs.push(v); });
+    });
+    var paths = diagramPathList(d);
+    var path = paths.find(function(x){ return x.id === out.pathId; }) || (own != null ? paths.find(function(x){ return x.indices.indexOf(own) >= 0; }) : null) || paths[0];
+    out[side] = srcs.map(function(src){ return {src:src, pos:path.indices.indexOf(src)}; })
+      .filter(function(x){ return x.pos >= 0; }).sort(function(x, y){ return x.pos - y.pos; });
+  });
+  return out;
+}
+/* "affects step 3", "affects steps 3-4", "affects steps 2, 5-6" (After positions, else Before). */
+function compareAffectedText(entry, pages){
+  var aff = compareAffected(entry, pages);
+  if (!aff) return '';
+  var list = (aff.after.length ? aff.after : aff.before).map(function(x){ return x.pos + 1; });
+  if (!list.length) return '';
+  var parts = [], start = list[0], prev = list[0];
+  list.slice(1).concat([null]).forEach(function(n){
+    if (n === prev + 1){ prev = n; return; }
+    parts.push(start === prev ? String(start) : start + '-' + prev); start = prev = n;
+  });
+  return 'affects ' + (list.length === 1 ? 'step ' : 'steps ') + parts.join(', ');
 }
 function compareEntryFields(entry){
   if (entry.kind === 'ledger') return '';
@@ -485,10 +542,10 @@ function mountCompareView(host, opts){
   /* force: {before, after, pathBefore, pathAfter} opens the given source steps on paths that hold
      them (a step click whose paired step is on another path). */
   function buildFocus(entry, force){
-    if (entry.kind !== 'step' && entry.kind !== 'panel') return null;
-    /* A modified step whose edits are all diagram-only (highlighted node or edge) shows in the full diagram. */
+    /* A diagram-only step edit or a path edit (#893) keeps both panes under the step strips. */
+    var diagramMode = compareDiagramEntry(entry), aff = diagramMode ? compareAffected(entry, pages) : null;
+    if (entry.kind !== 'step' && entry.kind !== 'panel' && !diagramMode) return null;
     var stepFields = entry.kind === 'step' && entry.status === 'modified' ? compareStepFieldNames(entry) : [];
-    if (stepFields.length && !stepFields.some(function(f){ return COMPARE_FOCUS_STEP_FIELD.test(f); })) return null;
     /* A panel change that affects no numbered step (only the Ambient view before step 1) shows in
        the full diagram, which keeps its Ambient state. */
     if (entry.kind === 'panel' && entry.status === 'modified' && !force){
@@ -501,6 +558,7 @@ function mountCompareView(host, opts){
     var isNum = function(v){ return typeof v === 'number'; };
     var effect = (entry.effects || []).find(function(e){ return (e.changes || []).some(function(c){ return isNum(c.afterStep) || isNum(c.beforeStep); }); }) || (entry.effects || [])[0],
         pathId = effect ? effect.pathId : null;
+    if (aff && aff.pathId) pathId = aff.pathId;
     /* The step to open: the edited step; for a panel settings change, the first step where the
        panel is visible (the engine's scope), so it does not open where the panel is hidden. */
     var firstStep = function(list){ return (list || []).find(function(v){ return typeof v === 'number'; }); };
@@ -528,8 +586,9 @@ function mountCompareView(host, opts){
     if (!A || !B || !A.indices.length && !B.indices.length) return null;
     var aToB = new Map(), bToA = new Map();
     comparePairs(A.steps, B.steps, [COMPARE_CAPTION_KEY], true).pairs.forEach(function(p){ aToB.set(p[0], p[1]); bToA.set(p[1], p[0]); });
-    var ctx = {entry:entry, before:A, after:B, aToB:aToB, bToA:bToA,
-      diagramOnly:stepFields.filter(function(f){ return !COMPARE_FOCUS_STEP_FIELD.test(f); })};
+    var ctx = {entry:entry, before:A, after:B, aToB:aToB, bToA:bToA, diagram:diagramMode,
+      affected:{before:new Set(aff ? aff.before.map(function(x){ return x.src; }) : []), after:new Set(aff ? aff.after.map(function(x){ return x.src; }) : [])},
+      diagramOnly:diagramMode ? [] : stepFields.filter(function(f){ return !COMPARE_FOCUS_STEP_FIELD.test(f); })};
     var panelIds = [];
     [B, A].forEach(function(S){ (S.d.panels || []).forEach(function(p){ if (p && p.id && panelIds.indexOf(p.id) < 0) panelIds.push(p.id); }); });
     var nodeIds = Array.from(new Set(Object.keys(A.d.nodes || {}).concat(Object.keys(B.d.nodes || {}))));
@@ -579,6 +638,10 @@ function mountCompareView(host, opts){
     /* Starting step: the edited step, else the first step the change affects, else the first step. */
     var srcA = null, srcB = null;
     if (st.before != null || st.after != null){ srcA = st.before == null ? null : st.before; srcB = st.after == null ? null : st.after; }
+    else if (aff && entry.kind === 'path'){
+      /* A path edit opens each side on its own first affected step of that path. */
+      srcA = aff.before.length ? aff.before[0].src : null; srcB = aff.after.length ? aff.after[0].src : null;
+    }
     else {
       /* The first affected step present on both sides, else the first affected step on either side. */
       var changes = [];
@@ -664,7 +727,7 @@ function mountCompareView(host, opts){
       if (compareSectionOnSide(entries, pages, e, S.side) === S.section) edited.add(e.step[S.side]);
     });
     return S.indices.map(function(src, k){
-      if (edited.has(src)) return 'edited';
+      if (edited.has(src) || ctx.diagram && ctx.affected[S.side].has(src)) return 'edited';
       var kb = S.side === 'after' ? k : ctx.aToB.has(src) && ctx.posB.has(ctx.aToB.get(src)) ? ctx.posB.get(ctx.aToB.get(src)) : -1;
       var d = kb >= 0 ? ctx.diffAt[kb] : null;
       return d && (d.length || d.tone) ? 'carried' : '';
@@ -729,6 +792,8 @@ function mountCompareView(host, opts){
       head.appendChild(box);
     });
     focus.appendChild(head);
+    /* Diagram mode: the panes below show the change; no caption diff or panel rows. */
+    if (ctx.diagram) return;
     if (ctx.diagramOnly && ctx.diagramOnly.length)
       focus.appendChild(el('p', 'compare-focus-other', 'Also changed in the diagram: ' + ctx.diagramOnly.join(', ') + '. Use Full diagram to see it.'));
     var A = ctx.before, B = ctx.after;
@@ -972,9 +1037,10 @@ function mountCompareView(host, opts){
     });
   }
   function applyMode(){
-    var entry = entries[selected], focused = mode === 'focused' && !!(focusCtx || textCtx);
+    var entry = entries[selected], focused = mode === 'focused' && !!(focusCtx || textCtx), steps = focused && !!(focusCtx && focusCtx.diagram);
     focus.hidden = !focused;
-    columns.style.visibility = focused ? 'hidden' : '';
+    stage.classList.toggle('compare-stage-steps', steps);
+    columns.style.visibility = focused && !steps ? 'hidden' : '';
     modeNote.hidden = !(mode === 'focused' && entry && !focusCtx && !cropCtx && !textCtx);
     cropButtons.out.hidden = cropButtons.whole.hidden = !(mode === 'focused' && cropCtx);
     modeButtons.focused.setAttribute('aria-pressed', String(mode === 'focused'));

@@ -44,6 +44,8 @@ function initWorkbenchAgentReview(opts){
     var parts=[(index+1)+' of '+entries.length,result && result.label || (view && view.label?view.label(index):entry.kind)];
     /* The selection made when the preview opens never opens Details by itself. */
     var reveal=function(target){if(!(result && result.initial))showDetails(target);};
+    /* #892: in Focused mode a ledger or page-field change shows its changed lines in the view itself. */
+    if(result && result.text){navigationStatus(parts.join(' · '));return;}
     if(entry.kind==='ledger'){parts.push('Coverage ledger · Shown in Details');navigationStatus(parts.join(' · '));reveal('ledger');return;}
     var sectionless=!entry.section || entry.section.before==null && entry.section.after==null;
     if(entry.kind==='document' || sectionless && (entry.kind==='tab' || entry.kind==='view')){parts.push('Shown in Details; no rendered object');navigationStatus(parts.join(' · '));reveal('source');return;}

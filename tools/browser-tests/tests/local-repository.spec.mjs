@@ -5,6 +5,7 @@ import {publishLibrary} from '../../canon/library.mjs';
 import {spawn} from 'node:child_process';
 import path from 'node:path';
 import {source as starter} from '../fixtures/editor-spec.mjs';
+import {COPY_REMEDY,copySummary,bundledValidate,expectCopyMatches,exportOpfsSession} from '../helpers/provider-copy.mjs';
 const make=(title,diagram)=>({page:{title,sections:[{id:'main',diagram}]}});
 const specs={
   base:make('Base',{nodes:{api:{title:'Local shared API'},store:{title:'Local shared store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api'],edges:[]},storage:{nodes:['api','store'],edges:[]}}}),
@@ -89,15 +90,50 @@ test('late local provider reads preserve the current document during folder open
   expect(await disk(page)).toBe(consumer);
 });
 
+/* #878 PR 2: the connected folder holds the Workbench's provider copy. Contract: ticket
+   #878 "How it should look" (provider copy, when it is written, state.json
+   providersSha256) and "Test + flip" tests 2-5; Chuck 2026-11-02 (coverage = the
+   ticket's test plan; local repository + desktop Workbench first; desktop only).
+   "Copy matches" (helpers/provider-copy.mjs): providers.json hash == recomputed hash ==
+   state.json providersSha256; payload sourceKind is the source in use (local with
+   snapshotSha256, or site-library without); payload consumerId is the frozen consumer
+   identity ("consumer" when registered in canon.json, "workbench-draft" when
+   independent), so the canon-less consumer file validates; payload specs are exactly base and middle
+   (never the consumer) and base's api title is the text the page renders; the bundled
+   validate.js run without flags on the consumer exits 0 with "0 errors".
+   | row | fixture | assertion (scoped) | rejects |
+   | T2 root connect writes the copy | :92 agent connect at a repository root (OPFS), before any refresh | copy matches: local, base api "Local shared API" | no copy; a copy written only on refresh |
+   | T3a connected consumer at connect | connectedDiskRepository | copy matches: local, "Local shared API" | a copy holding the consumer or no snapshotSha256 |
+   | T3b after refresh-sources applied | same, receipt applied | copy matches: "CLI refreshed saved provider" | a copy not rewritten when topologyRevision changes |
+   | T3c after Undo / Redo | same | Undo: "Local shared API"; Redo: "CLI refreshed saved provider" | a copy that ignores history-driven context changes |
+   | T4a unresolved imports before refresh | separateLocalSources (empty site library), before refresh-sources | copy is whole and named (hash checks), specs []; bundled validate.js exits 1 naming COPY_REMEDY | an impl that writes no copy for an unresolved context |
+   | T4b after refresh-sources --source-repo first root | same | copy matches: local, "Unpublished API" | a copy left empty after the refresh |
+   | T5-guard connected consumer resolves from a populated site library at open (passes today) | separateLocalSources with the site library, connected | node shared::base::api shows "Site published API"; state.json source is the consumer | (makes T5's start discriminating) a fixture that never reaches the site library |
+   | T5 source switches with Undo/Redo | separateLocalSources with a populated site library (site "Site published API"), connected | start site-library/"Site published API" (no snapshotSha256); local first root "Unpublished API"; second root "Second root API"; Undo first; Redo second; edited second root after Refresh "Edited second root"; Use site library site; Undo edited; Redo site | a copy that tracks only refresh-sources; a sourceKind that does not follow the source |
+   Excluded: phone/narrow-width editing (Chuck 2026-10-13); cloud Workbench (later ticket). */
 test('agent folder connection retains the granted repository root and writes the selected diagram folder',async({page,server})=>{
   await setup(page,server);await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
   await page.locator('#folder-agent-file-picker').selectOption('diagrams/team/consumer/consumer.spec.json');await page.locator('#folder-agent-file-confirm').click();
   await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(consumer);await expect(node(page)).toBeVisible();
+  // #873 F6: the Workbench names a root-opened diagram by its repository-relative folder in the
+  // displayed instructions and in the CONNECT.md it writes beside the diagram.
+  const located='its direct child "./consumer", or, when the working directory is the repository root I connected (the folder that holds canon.json), its "diagrams/team/consumer" folder.';
+  await expect(page.locator('#folder-agent-instructions')).toHaveValue(new RegExp(located.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+  const connect=await page.evaluate(async()=>{let dir=await navigator.storage.getDirectory();for(const segment of ['diagrams','team','consumer','.flowview-agent'])dir=await dir.getDirectoryHandle(segment);return (await(await dir.getFileHandle('CONNECT.md')).getFile()).text();});
+  expect(connect.split('\n\n').filter(paragraph=>paragraph.startsWith('Locate the diagram folder')&&paragraph.includes(located))).toHaveLength(1);
   await expect.poll(()=>page.evaluate(()=>new Promise(resolve=>{
     const request=indexedDB.open('flowview-folder-recovery',1);request.onerror=()=>resolve(false);
     request.onsuccess=()=>{const db=request.result,read=db.transaction('handles').objectStore('handles').get('last');read.onsuccess=async()=>{db.close();try{await read.result.handle.getFileHandle('canon.json');resolve(true);}catch{resolve(false);}};};
   }))).toBe(true);
   expect(await disk(page)).toBe(consumer);
+  // T2 (#878): right after connecting, before any refresh, the copy matches.
+  const exported=[];
+  try{
+    await expect.poll(async()=>{const session=await exportOpfsSession(page,['diagrams','team','consumer'],'consumer.spec.json');exported.push(session.folder);return copySummary(session.support);},{message:'T2 copy matches',timeout:15000})
+      .toEqual({whole:true,named:true,sourceKind:'local',snapshotSha256:true,consumerId:'consumer',specs:['base','middle'],baseApi:'Local shared API'});
+    const session=await exportOpfsSession(page,['diagrams','team','consumer'],'consumer.spec.json');exported.push(session.folder);
+    const result=bundledValidate(session.support,session.consumer);expect(result.status,result.stdout+result.stderr).toBe(0);expect(result.stdout).toContain(session.consumer+': 0 errors');
+  }finally{for(const folder of exported)await rm(folder,{recursive:true,force:true});}
   const changed=structuredClone(specs.base);changed.page.sections[0].diagram.nodes.api.title='Agent root refresh';await writeDisk(page,'base',JSON.stringify(changed));await page.locator('#folder-agent-guide').evaluate(el=>el.close());await refresh(page);await expect(node(page)).toContainText('Agent root refresh');
 });
 
@@ -180,8 +216,9 @@ async function connectedDiskRepository(page,server){
    command:()=>new Promise((resolve,reject)=>{const proc=spawn('python3',[path.join(support,'folder-agent.py'),'refresh-sources'],{cwd:disk.folder});let stdout='',stderr='';proc.stdout.on('data',d=>stdout+=d);proc.stderr.on('data',d=>stderr+=d);proc.on('error',reject);proc.on('close',code=>resolve({code,stdout,stderr}));})};
 }
 test('agent CLI refresh updates the open consumer without begin or menu, preserves draft/overlays/ledger and exact Undo snapshots',async({page,server},info)=>{
- const disk=await connectedDiskRepository(page,server);
+ const disk=await connectedDiskRepository(page,server),consumerFile=path.join(disk.folder,'diagrams/team/consumer/consumer.spec.json');
  try{
+  await expectCopyMatches(disk.support,consumerFile,{sourceKind:'local',consumerId:'consumer',baseApi:'Local shared API'},'T3a at connect');
   expect(await readFile(path.join(disk.support,'CONNECT.md'),'utf8')).toContain('refresh-sources');
   await expect.poll(async()=>(await disk.readState()).localSources?.available).toBe(true);
   const draft=structuredClone(specs.consumer),imp=draft.page.sections[0].diagram.topologyImports[0];Object.assign(imp,{nodeTracking:{'base::api':{tickets:['API-10']}},edgeTracking:{'base::api->base::store':{tickets:['API-11']}},nodeOverrides:{'base::api':{style:'teal'}},edgeOverrides:{'base::api->base::store':{label:'My connection'}},nodePositions:{'base::api':{x:450,y:150}}});
@@ -189,10 +226,14 @@ test('agent CLI refresh updates the open consumer without begin or menu, preserv
   const changed=structuredClone(specs.base);changed.page.sections[0].diagram.nodes.api.title='CLI refreshed saved provider';await disk.provider(JSON.stringify(changed));
   const result=await disk.command();expect(result.code,result.stderr).toBe(0);const receipt=JSON.parse(result.stdout);expect(receipt.status).toBe('applied');expect(receipt.currentRevision).toBe((await disk.readState()).revision);expect(receipt.localSources.consumerId).toBe('consumer');
   await expect(node(page)).toContainText('CLI refreshed saved provider');await expect(page.locator('#src')).toHaveValue(exact);expect((await disk.readState()).ledger).toBe('# Exact ledger\r\nKeep evidence.\n');
+  await expectCopyMatches(disk.support,consumerFile,{sourceKind:'local',consumerId:'consumer',baseApi:'CLI refreshed saved provider'},'T3b after applied');
   await expect(readFile(path.join(disk.support,'request.json'))).rejects.toThrow(/ENOENT/);
   const rendered=await node(page).elementHandle(),unchanged=await disk.command();expect(unchanged.code,unchanged.stderr).toBe(0);expect(JSON.parse(unchanged.stdout).status).toBe('unchanged');expect(await rendered.evaluate(el=>el.isConnected)).toBe(true);
   await disk.provider('{unfinished nested provider');const invalid=await disk.command();expect(invalid.code).toBe(1);expect(JSON.parse(invalid.stdout).code).toBe('invalid_sources');expect(invalid.stderr).toContain('base');await expect(node(page)).toContainText('CLI refreshed saved provider');await expect(page.locator('#src')).toHaveValue(exact);
-  await page.locator('#undo-builder').click();await expect(node(page)).toContainText('Local shared API');await expect(page.locator('#src')).toHaveValue(exact);await page.locator('#redo-builder').click();await expect(node(page)).toContainText('CLI refreshed saved provider');await expect(page.locator('#src')).toHaveValue(exact);
+  await page.locator('#undo-builder').click();await expect(node(page)).toContainText('Local shared API');await expect(page.locator('#src')).toHaveValue(exact);
+  await expectCopyMatches(disk.support,consumerFile,{sourceKind:'local',consumerId:'consumer',baseApi:'Local shared API'},'T3c after Undo');
+  await page.locator('#redo-builder').click();await expect(node(page)).toContainText('CLI refreshed saved provider');await expect(page.locator('#src')).toHaveValue(exact);
+  await expectCopyMatches(disk.support,consumerFile,{sourceKind:'local',consumerId:'consumer',baseApi:'CLI refreshed saved provider'},'T3c after Redo');
   await page.screenshot({path:info.outputPath('agent-cli-refreshed-consumer.png')});
   await expect.poll(async()=>(await disk.readState()).topologyRevision).toBe(receipt.topologyRevision+2);
   await disk.provider(JSON.stringify(changed));await page.evaluate(()=>{window.localPermissionLost=true;});const denied=await disk.command();expect(denied.code).toBe(1);expect(JSON.parse(denied.stdout).code).toBe('reconnect_required');
@@ -224,7 +265,12 @@ test('ordinary file opens unpublished imports and separately selected provider r
 test('generated consumer CLI selects separate unpublished providers, repeats, repairs and switches without begin or menu',async({page,server},info)=>{
  const {separateLocalSources,localSourceSpecs}=await import('../helpers/local-source-repository.mjs');const disk=await separateLocalSources(page,server);
  try{
+  // T4a (#878): imports start unresolved; the copy is named but holds no providers.
+  const independent=path.join(disk.consumerFolder,'independent.spec.json');
+  await expect.poll(async()=>{const copy=await copySummary(disk.support);return copy.whole && copy.named?{specs:copy.specs}:copy;},{message:'T4a named copy without providers',timeout:15000}).toEqual({specs:[]});
+  const unresolved=bundledValidate(disk.support,independent);expect(unresolved.status,unresolved.stdout+unresolved.stderr).toBe(1);expect(unresolved.stdout).toContain(COPY_REMEDY);
   const command=await disk.command('--source-repo',disk.roots[0]);expect(command.code,command.stderr).toBe(0);const first=JSON.parse(command.stdout);expect(first.status).toBe('applied');expect(first.localSources.available).toBe(true);expect(first.localSources.code).toBe('ready');expect(first.localSources.mode).toBe('agent-snapshot');expect(first.localSources.needsSnapshot).toBe(true);expect(first.localSources.snapshotSha256).toMatch(/^[a-f0-9]{64}$/);expect(first.localSources.providerCount).toBe(2);expect(first.localSources.capturedAt).toMatch(/Z$/);await expect(node(page)).toContainText('Unpublished API');expect((await disk.readState()).localSources.sourceSelectionId).toBeTruthy();
+  await expectCopyMatches(disk.support,independent,{sourceKind:'local',consumerId:'workbench-draft',baseApi:'Unpublished API'},'T4b after refresh-sources');
   const extra=structuredClone(localSourceSpecs.base);extra.page.sections[0].diagram.nodes.api.title='New transitive dependency';await mkdir(path.join(disk.roots[0],'diagrams/extra'));await disk.provider(disk.roots[0],'extra',JSON.stringify(extra));
   const registry=JSON.parse(await readFile(path.join(disk.roots[0],'canon.json'),'utf8'));registry.diagrams.push({folder:'diagrams/extra',owner:'group:default/local'});await writeFile(path.join(disk.roots[0],'canon.json'),JSON.stringify(registry));
   const middle=structuredClone(localSourceSpecs.middle);middle.page.sections[0].diagram.topologyImports.push({spec:'extra',export:'core',as:'extra'});middle.page.sections[0].diagram.topologyExports.core.nodes.push('extra::api');await disk.provider(disk.roots[0],'middle',JSON.stringify(middle));const transitive=await disk.command();expect(transitive.code,transitive.stderr).toBe(0);await expect(page.locator('#docview g.node[data-dv-node="shared::extra::api"]')).toContainText('New transitive dependency');
@@ -276,4 +322,178 @@ test('Use site library leaves a selected local source repository with Undo, and 
   await page.locator('#redo-builder').click();await expect(node(page)).toContainText('Site published API');expect(!!(await saved()).local).toBe(false);
   await page.reload();await expect(node(page)).toContainText('Site published API');
  }finally{await page.close();await disk.close();await site.close();}
+});
+// T5-guard: today's behavior T5 starts from (the ticket marks it unverified), as its own
+// row so T5's RED is provably the copy: passes at the baseline, before any copy exists.
+test('#878 T5 guard: a connected consumer opened with a populated site library resolves its imports from it',async({page,server})=>{
+ const site=await siteLibrary(server),{separateLocalSources}=await import('../helpers/local-source-repository.mjs');
+ const disk=await separateLocalSources(page,server,{workbench:site.url,emptyLibrary:false});
+ try{
+  await expect(node(page)).toContainText('Site published API');
+  await expect.poll(async()=>(await disk.readState()).source).toBe(disk.exact);
+ }finally{await page.close();await disk.close();await site.close();}
+});
+test('#878 T5: the connected copy follows site library, local roots, Refresh, Use site library, Undo and Redo',async({page,server})=>{
+ const site=await siteLibrary(server),{separateLocalSources,localSourceSpecs}=await import('../helpers/local-source-repository.mjs');
+ const disk=await separateLocalSources(page,server,{workbench:site.url,emptyLibrary:false});
+ const independent=path.join(disk.consumerFolder,'independent.spec.json'),local=baseApi=>({sourceKind:'local',consumerId:'workbench-draft',baseApi}),siteCopy={sourceKind:'site-library',consumerId:'workbench-draft',baseApi:'Site published API'};
+ try{
+  await expect(node(page),'precondition: the connected consumer resolves from the site library').toContainText('Site published API');
+  const second=structuredClone(localSourceSpecs.base);second.page.sections[0].diagram.nodes.api.title='Second root API';await disk.provider(disk.roots[1],'base',JSON.stringify(second));
+  await expectCopyMatches(disk.support,independent,siteCopy,'T5 start');
+  await filePanel(page);await page.locator('#local-sources-select').click();await expect(node(page)).toContainText('Unpublished API');
+  await expectCopyMatches(disk.support,independent,local('Unpublished API'),'T5 first root');
+  await page.evaluate(()=>{window.providerPickerPath='/sources-b/worktree';});await filePanel(page);await page.locator('#local-sources-select').click();await expect(node(page)).toContainText('Second root API');
+  await expectCopyMatches(disk.support,independent,local('Second root API'),'T5 second root');
+  await page.locator('#undo-builder').click();await expect(node(page)).toContainText('Unpublished API');
+  await expectCopyMatches(disk.support,independent,local('Unpublished API'),'T5 Undo to first root');
+  await page.locator('#redo-builder').click();await expect(node(page)).toContainText('Second root API');
+  await expectCopyMatches(disk.support,independent,local('Second root API'),'T5 Redo to second root');
+  const edited=structuredClone(localSourceSpecs.base);edited.page.sections[0].diagram.nodes.api.title='Edited second root';await disk.provider(disk.roots[1],'base',JSON.stringify(edited));
+  await refresh(page);await expect(node(page)).toContainText('Edited second root');
+  await expectCopyMatches(disk.support,independent,local('Edited second root'),'T5 Refresh local sources');
+  await filePanel(page);await page.locator('#local-sources-site').click();await expect(node(page)).toContainText('Site published API');
+  await expectCopyMatches(disk.support,independent,siteCopy,'T5 Use site library');
+  await page.locator('#undo-builder').click();await expect(node(page)).toContainText('Edited second root');
+  await expectCopyMatches(disk.support,independent,local('Edited second root'),'T5 Undo to edited second root');
+  await page.locator('#redo-builder').click();await expect(node(page)).toContainText('Site published API');
+  await expectCopyMatches(disk.support,independent,siteCopy,'T5 Redo to site library');
+ }finally{await page.close();await disk.close();await site.close();}
+});
+
+/* #874 Two desktop Workbench tabs on one local repository: an agent's provider edit,
+   accepted in the provider tab, reaches the importing tab through the consumer
+   helper's refresh-sources. Contract: issue #874 (behaviour steps 1-5; Test + flip
+   cases 1 and 2); issue #883 (case 2 restored: design A, a local proposal acquires its
+   own provider closure); docs/local-repository-authoring.md (agent-connected consumer);
+   Chuck 2026-11-02 (local repository + desktop Workbench first; the agent writes a new
+   provider's seed spec and canon.json entry; the Start new default is unchanged).
+   Both tabs are pages of one browser context (one origin, one localStorage) bound to
+   one disk repository through cloudFolder. The test acts as the agent: it runs the
+   generated folder-agent.py helpers and writes only the files an agent writes.
+   | row | fixture | assertion (scoped) | rejects |
+   | P1 provider tab accepts the agent edit | provider tab connected at the repository root with base selected; begin + propose renaming base's api node | review previews [data-dv-node=api] with the new title, no issues; provider #src == proposed bytes | a review that cannot accept for a root-connected provider |
+   | P2 acceptance saves the registered provider file | same | diagrams/team/base/base.spec.json bytes == proposed; base.ledger.md == proposed ledger; result.json for the request is applied | acceptance applied in the browser that skips the disk save (flip 2) |
+   | C0 consumer unchanged until refresh (precondition) | consumer tab connected at the same root with consumer selected, before the edit | consumer g.node[shared::base::api] still reads "Local shared API" after P2 | (makes C1 discriminating) a consumer already showing the new title |
+   | C1 refresh-sources renders the accepted provider text | consumer helper refresh-sources --source-repo <repository root> | consumer g.node[shared::base::api] contains "Provider tab accepted API" | a refresh that reports unchanged without applying (flip 1); a refresh that rereads the frozen snapshot |
+   | C2 receipt is applied | same | helper exits 0; receipt.status == applied | an unchanged, rejected or busy receipt |
+   | C3 consumer source kept | same | consumer #src == original bytes; consumer.spec.json on disk == original bytes (authored topologyImports only, no copied provider nodes) | a refresh that rewrites or materializes the consumer source |
+   | C4 consumer ledger kept | same | state.json ledger and consumer.ledger.md == original ledger | a refresh that replaces the ledger |
+   | C5 consumer Undo history kept | Undo, then Redo, in the consumer tab | Undo: node reads "Local shared API", #src unchanged; Redo: node contains the accepted text | a refresh recorded outside Undo history |
+   | C6 consumer reload restores the consumer document | reload the consumer tab after C5 | #src == consumer bytes; #docview .doc-title == "Local consumer"; node contains the accepted text | the shared dv-workbench-draft key restoring the provider tab's document; a reload restoring the pre-refresh snapshot |
+   | N1 an agent-seeded provider is selectable at the root | the test writes diagrams/team/billing/billing.spec.json and its canon.json entry after both tabs loaded | provider-tab file picker offers billing.spec.json; provider #src == seed bytes | a picker that misses canon.json entries added after page load |
+   | N2 its accepted exports are saved | propose adding topologyExports and renaming gateway; accept | billing.spec.json bytes == proposed; result applied | acceptance that skips the disk save |
+   | N3 consumer accepts an import of the new provider | consumer begin + propose adding a billing import; accept | review previews billing::gateway with no issues; result applied; saved consumer imports [middle, billing] and has no billing::gateway node; consumer billing::gateway contains the accepted title | a review blocked because the consumer's frozen snapshot lacks the new provider (#883: the review acquires the proposal closure through the consumer's browser grant) |
+   | N4 refresh-sources renders the provider's later accepted change | provider tab accepts a second proposal renaming gateway; then consumer helper refresh-sources --source-repo <repository root> | before: consumer billing::gateway still contains "Accepted billing gateway"; after: helper exits 0, receipt applied, billing::gateway contains "Refreshed billing gateway" | a refresh-sources that does nothing (the first title already renders after N3); a refresh limited to the closure frozen before the import |
+   Excluded: phone/narrow-width editing (Chuck 2026-10-13, desktop only); cloud Workbench (later ticket). */
+const consumerLedger='# Consumer ledger\n\nImports the shared API through middle.\n';
+const registry=ids=>JSON.stringify({version:1,diagrams:ids.map(id=>({folder:'diagrams/team/'+id,owner:'group:default/local'}))});
+async function twoTabRepository(provider,importer){
+ const disk=await cloudFolder(provider);await cloudFolder(importer,{folder:disk.folder});
+ await writeFile(path.join(disk.folder,'canon.json'),registry(Object.keys(specs)));
+ for(const [id,spec] of Object.entries(specs)){const dir=path.join(disk.folder,'diagrams/team',id);await mkdir(dir,{recursive:true});await writeFile(path.join(dir,id+'.spec.json'),JSON.stringify(spec,null,2));}
+ await writeFile(path.join(disk.folder,'diagrams/team/consumer/consumer.ledger.md'),consumerLedger);
+ const support=id=>path.join(disk.folder,'diagrams/team',id,'.flowview-agent');
+ return {...disk,support,file:(id,name)=>readFile(path.join(disk.folder,'diagrams/team',id,name),'utf8'),
+  state:async id=>JSON.parse(await readFile(path.join(support(id),'state.json'),'utf8'))};
+}
+// The generated helper, run as the agent would run it. Asynchronous, so the page's
+// disk bindings keep serving the browser while a command waits for it.
+function agent(support,...args){
+ return new Promise((resolve,reject)=>{const child=spawn('python3',[path.join(support,'folder-agent.py'),...args]);let stdout='',stderr='';child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);child.on('error',reject);child.on('close',code=>resolve({code,stdout,stderr}));});
+}
+async function connectTab(page,spec){
+ await page.bringToFront();await closeTools(page);await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();
+ await page.locator('#folder-agent-setup-mode-external').click();await expect(page.locator('#folder-agent-setup-mode-external')).toHaveAttribute('aria-pressed','true');
+ await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
+ await expect(page.locator('#folder-agent-file-picker option[value="'+spec+'"]')).toHaveCount(1);
+ await page.locator('#folder-agent-file-picker').selectOption(spec);await page.locator('#folder-agent-file-confirm').click();
+ await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();await closeTools(page);
+}
+// begin registers the request; the agent edits the seeded candidate pair and proposes it.
+async function propose(support,text,edit,ledger){
+ const begun=await agent(support,'begin','--text',text);expect(begun.code,begun.stderr).toBe(0);
+ const request=JSON.parse(await readFile(path.join(support,'request.json'),'utf8')),candidate=request.candidate;
+ expect(request.id).toBe(JSON.parse(begun.stdout).id);expect(candidate.baseRevision).toBe(request.revision);
+ const seeded=await readFile(path.join(support,candidate.spec),'utf8'),proposed=edit(seeded);expect(proposed).not.toBe(seeded);
+ await writeFile(path.join(support,candidate.spec),proposed);await writeFile(path.join(support,candidate.ledger),ledger);
+ const sent=await agent(support,'propose','--request',request.id,'--revision',candidate.baseRevision,'--file',candidate.spec,'--ledger',candidate.ledger,'--summary',text);
+ expect(sent.code,sent.stderr).toBe(0);return {request,proposed};
+}
+async function acceptReview(page,changed){
+ await page.locator('#agent-update-open').click();const issues=page.locator('#agent-update-issues');
+ // A banner can announce a proposal before its review is blocked; judge the review
+ // only once it previews the change, and keep a blocked review's reason in the failure.
+ await expect.poll(async()=>await issues.isVisible()?'blocked: '+await page.locator('#agent-update-feedback').inputValue():await changed.first().isVisible(),{message:'the review previews the proposed change'}).toBe(true);
+ await expect(issues).toBeHidden();await expect(page.locator('#agent-update-banner-title')).toHaveText('Agent updates are ready');
+ await page.locator('#agent-update-commit').click();
+}
+async function outcome(support,id){try{const value=JSON.parse(await readFile(path.join(support,'result.json'),'utf8'));return value.requestId===id?value.status:null;}catch{return null;}}
+
+test('two desktop tabs: an agent provider edit accepted in the provider tab reaches the importing tab after refresh-sources and its reload',async({page,context,server},info)=>{
+ test.setTimeout(90000); // Two Workbench tabs, two folder connections and three helper round trips.
+ const importer=await context.newPage(),repo=await twoTabRepository(page,importer),before=JSON.stringify(specs.base,null,2),title='Provider tab accepted API';
+ const ledger='# Base ledger\n\nRenamed the shared API at the provider owner\'s request.\n';
+ try{
+  for(const tab of [page,importer]){await tab.goto(server.origin+'/workbench.html');await paste(tab,starter);}
+  await connectTab(page,'diagrams/team/base/base.spec.json');await expect(page.locator('#src')).toHaveValue(before);
+  await connectTab(importer,'diagrams/team/consumer/consumer.spec.json');await expect(importer.locator('#src')).toHaveValue(consumer);await expect(node(importer)).toContainText('Local shared API');
+  // Provider tab: the agent proposes the rename and a person accepts it.
+  await page.bringToFront();
+  const {request,proposed}=await propose(repo.support('base'),'Rename the shared API',seeded=>{const raw=JSON.parse(seeded);raw.page.sections[0].diagram.nodes.api.title=title;return JSON.stringify(raw,null,2);},ledger);
+  await acceptReview(page,page.locator('#agent-update-view [data-dv-node="api"]').filter({hasText:title}));
+  await expect(page.locator('#src')).toHaveValue(proposed);
+  await expect.poll(()=>repo.file('base','base.spec.json'),{message:'the accepted provider is saved to its registered file'}).toBe(proposed);
+  await expect.poll(()=>repo.file('base','base.ledger.md'),{message:'the accepted provider ledger is saved after its spec'}).toBe(ledger);await expect.poll(()=>outcome(repo.support('base'),request.id)).toBe('applied');
+  // Consumer tab: unchanged until the agent runs its helper's refresh-sources.
+  await importer.bringToFront();await expect(node(importer)).toContainText('Local shared API');
+  const refreshed=await agent(repo.support('consumer'),'refresh-sources','--source-repo',repo.folder);expect(refreshed.code,refreshed.stderr).toBe(0);
+  await expect(node(importer),'the importing tab shows the accepted provider text').toContainText(title);
+  expect(JSON.parse(refreshed.stdout).status).toBe('applied');
+  await expect(importer.locator('#src')).toHaveValue(consumer);await expect.poll(()=>repo.file('consumer','consumer.spec.json'),{message:'refresh-sources keeps the consumer spec on disk'}).toBe(consumer);
+  await expect.poll(async()=>(await repo.state('consumer')).ledger,{message:'the consumer state keeps its ledger'}).toBe(consumerLedger);await expect.poll(()=>repo.file('consumer','consumer.ledger.md'),{message:'refresh-sources keeps the consumer ledger on disk'}).toBe(consumerLedger);
+  await importer.locator('#undo-builder').click();await expect(node(importer)).toContainText('Local shared API');await expect(importer.locator('#src')).toHaveValue(consumer);
+  await importer.locator('#redo-builder').click();await expect(node(importer)).toContainText(title);
+  await importer.screenshot({path:info.outputPath('two-tab-consumer-refreshed.png')});
+  // Both tabs share this origin's browser recovery; reloading the consumer restores the consumer.
+  await importer.reload();
+  await expect(importer.locator('#src')).toHaveValue(consumer);await expect(importer.locator('#docview .doc-title')).toHaveText('Local consumer');await expect(node(importer)).toContainText(title);
+ }finally{await importer.close();await page.close();await repo.close();}
+});
+
+test('two desktop tabs: an agent-seeded new provider gains exports in its tab and the consumer imports it through refresh-sources',async({page,context,server})=>{
+ test.setTimeout(120000); // Two Workbench tabs, two folder connections and seven helper round trips.
+ const importer=await context.newPage(),repo=await twoTabRepository(page,importer),title='Accepted billing gateway';
+ try{
+  for(const tab of [page,importer]){await tab.goto(server.origin+'/workbench.html');await paste(tab,starter);}
+  await connectTab(importer,'diagrams/team/consumer/consumer.spec.json');await expect(node(importer)).toContainText('Local shared API');
+  // The agent registers a new exporting diagram: a seed <id>.spec.json and its canon.json entry (#873).
+  const seed=JSON.stringify(make('Billing',{nodes:{gateway:{title:'Billing gateway'}},rows:[['gateway']]}),null,2);
+  await mkdir(path.join(repo.folder,'diagrams/team/billing'));await writeFile(path.join(repo.folder,'diagrams/team/billing/billing.spec.json'),seed);
+  await writeFile(path.join(repo.folder,'canon.json'),registry([...Object.keys(specs),'billing']));
+  await connectTab(page,'diagrams/team/billing/billing.spec.json');await expect(page.locator('#src')).toHaveValue(seed);
+  const exported=await propose(repo.support('billing'),'Export the billing gateway',seeded=>{const raw=JSON.parse(seeded),diagram=raw.page.sections[0].diagram;diagram.nodes.gateway.title=title;diagram.topologyExports={public:{nodes:['gateway'],edges:[]}};return JSON.stringify(raw,null,2);},'# Billing ledger\n\nExports the gateway for importing diagrams.\n');
+  await acceptReview(page,page.locator('#agent-update-view [data-dv-node="gateway"]').filter({hasText:title}));
+  await expect.poll(()=>repo.file('billing','billing.spec.json'),{message:'the accepted new provider is saved to its registered file'}).toBe(exported.proposed);
+  await expect.poll(()=>outcome(repo.support('billing'),exported.request.id)).toBe('applied');
+  // Consumer tab: the agent adds the import, a person accepts it, then the helper refreshes.
+  await importer.bringToFront();
+  const imported=await propose(repo.support('consumer'),'Import the billing gateway',seeded=>{const raw=JSON.parse(seeded);raw.page.sections[0].diagram.topologyImports.push({spec:'billing',export:'public',as:'billing'});return JSON.stringify(raw,null,2);},consumerLedger+'\nImports the billing gateway.\n');
+  await acceptReview(importer,importer.locator('#agent-update-view [data-dv-node="billing::gateway"]'));
+  await expect.poll(()=>outcome(repo.support('consumer'),imported.request.id)).toBe('applied');
+  await expect.poll(async()=>{const saved=JSON.parse(await repo.file('consumer','consumer.spec.json')).page.sections[0].diagram;return {imports:saved.topologyImports.map(item=>item.spec),gateway:saved.nodes['billing::gateway']};},
+   {message:'the accepted consumer is saved with the billing import and no copied billing nodes'}).toEqual({imports:['middle','billing'],gateway:undefined});
+  const gateway=importer.locator('#docview g.node[data-dv-node="billing::gateway"]');await expect(gateway,'the accepted import renders the new provider').toContainText(title);
+  // Provider tab: the agent changes the new provider again and a person accepts it.
+  await page.bringToFront();const renamed='Refreshed billing gateway';
+  const updated=await propose(repo.support('billing'),'Rename the billing gateway',seeded=>{const raw=JSON.parse(seeded);raw.page.sections[0].diagram.nodes.gateway.title=renamed;return JSON.stringify(raw,null,2);},'# Billing ledger\n\nExports the gateway for importing diagrams.\nRenamed the gateway.\n');
+  await acceptReview(page,page.locator('#agent-update-view [data-dv-node="gateway"]').filter({hasText:renamed}));
+  await expect.poll(()=>repo.file('billing','billing.spec.json'),{message:'the renamed provider is saved to its registered file'}).toBe(updated.proposed);
+  await expect.poll(()=>outcome(repo.support('billing'),updated.request.id)).toBe('applied');
+  // Consumer tab: still the first accepted title until the helper refreshes it.
+  await importer.bringToFront();await expect(gateway).toContainText(title);
+  const refreshed=await agent(repo.support('consumer'),'refresh-sources','--source-repo',repo.folder);expect(refreshed.code,refreshed.stderr).toBe(0);
+  await expect(gateway,'refresh-sources renders the provider\'s later accepted change').toContainText(renamed);
+  expect(JSON.parse(refreshed.stdout).status).toBe('applied');
+ }finally{await importer.close();await page.close();await repo.close();}
 });

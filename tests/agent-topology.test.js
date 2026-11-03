@@ -4,7 +4,22 @@ const {composeSources,readSource}=require('../tools/source-loader.cjs');
 const copy=value=>JSON.parse(JSON.stringify(value));
 const diagram=spec=>spec.page.sections[0].diagram;
 function provider(id){return {page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{diagram:{nodes:{api:{title:id+' API'}},rows:[['api']],topologyExports:{public:{nodes:['api'],edges:[]}}}}]}};}
-async function harness(origin='https://test.invalid/flowspec.html',{missingIndex=false,localSnapshot=false}={}){
+// #883: a consumer's local provider repository, read the way the Workbench reads
+// one, either through a browser directory grant or as a helper-attached snapshot.
+const consumerPath='diagrams/team/consumer/consumer.spec.json';
+function localRepositoryFixture(providers,consumer){
+  const ids=[...providers.map(spec=>spec.page.canon.id),'unrelated','consumer'],files=new Map();
+  files.set('canon.json',JSON.stringify({version:1,diagrams:ids.map(id=>({folder:'diagrams/team/'+id,owner:'group:default/test'}))}));
+  for(const spec of [...providers,provider('unrelated')])files.set('diagrams/team/'+spec.page.canon.id+'/'+spec.page.canon.id+'.spec.json',JSON.stringify(spec));
+  files.set(consumerPath,consumer);
+  function handle(prefix){return {name:prefix?prefix.split('/').pop():'repository',
+    async getDirectoryHandle(name){const next=prefix?prefix+'/'+name:name;if(![...files.keys()].some(key=>key.startsWith(next+'/')))throw Object.assign(Error('Missing '+next),{name:'NotFoundError'});return handle(next);},
+    async getFileHandle(name){const next=prefix?prefix+'/'+name:name;if(!files.has(next))throw Object.assign(Error('Missing '+next),{name:'NotFoundError'});const text=files.get(next);return {async getFile(){return {size:Buffer.byteLength(text),text:async()=>text};}};}};}
+  // The helper's snapshot shape (tools/folder-agent.py local_provider_snapshot).
+  const snapshot=paths=>({version:1,manifest:files.get('canon.json'),providers:paths.map(path=>({path,source:files.get(path)})),rootLabel:'repository',capturedAt:'2026-11-02T00:00:00.000Z',selectionId:'selection-1'});
+  return {files,handle:handle(''),snapshot};
+}
+async function harness(origin='https://test.invalid/flowspec.html',{missingIndex=false,localSnapshot=false,localRepository=null}={}){
   const {digest}=await import('../tools/canon/drift.mjs'),leaf=provider('leaf'),nested=provider('nested');
   diagram(nested).topologyImports=[{spec:'leaf',export:'public',as:'inner'}];diagram(nested).topologyExports.public.nodes.push('inner::api');
   const providers=[leaf,nested],catalog={version:3,diagrams:providers.map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:1,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
@@ -14,20 +29,36 @@ async function harness(origin='https://test.invalid/flowspec.html',{missingIndex
     if(missingIndex && name==='diagrams.json')return new Response('',{status:404});
     return new Response(JSON.stringify(name==='diagrams.json'?catalog:providers.find(spec=>name===spec.page.canon.id+'.json')));
   }};
+  if(localRepository)c.crypto=webcrypto;
   vm.createContext(c);vm.runInContext(composeSources(['canon.js','validator.js','viewer/workspace-handoff.js','library.workbench.js','workbench/session.js','workbench/lifetime.js','workbench/agent-merge.js','workbench/agent-session.js','workbench/folder-agent.js']),c);
+  if(localRepository)for(const file of ['../tools/canon/manifest.cjs','workbench/local-repository.js'])vm.runInContext(readSource(file),c);
   const session=c.createBuilderSession({source:{read:()=>text,write:value=>text=value},persistence:{read:()=>({}),preserve(){},cancel(){},save:(source,baseline,artifacts)=>saved=copy(artifacts || {})},render(){session.resolve(JSON.parse(text));}});
   session.replaceProject(text);
   if(localSnapshot){const consumer=JSON.parse(text);consumer.page.canon={version:1,id:'consumer',kind:'canonical',owner:'group:default/test'};session.replaceProject(text,null,{topologyContext:{version:1,id:'consumer',local:true,specs:copy([...providers,consumer])}});}
+  // The local source the consumer already uses, as the Workbench passes it to preparation:
+  // 'grant' a directory handle on the repository root; 'snapshot' the proposal's helper
+  // snapshot; 'none' a frozen local context with no source to read. Without a source:
+  // 'grant-lost' a consumer opened from the repository root whose grant is gone;
+  // 'unresolved' a folder-connected consumer whose imports never resolved (#883 F3).
+  let repository=null,localSource=()=>undefined;
+  if(localRepository){
+    repository=localRepositoryFixture(providers,text);
+    const frozen=['grant','grant-lost'].includes(localRepository)?await c.readLocalRepositoryTopology(repository.handle,text,consumerPath):
+      localRepository==='unresolved'?c.unresolvedLocalTopology(JSON.parse(text)):await c.readSuppliedLocalTopology(text,repository.snapshot([]));
+    session.replaceProject(text,null,{topologyContext:frozen});
+    if(localRepository==='grant')localSource=()=>({directory:repository.handle,path:consumerPath});
+    if(localRepository==='snapshot')localSource=proposal=>proposal && proposal.sources?{sources:proposal.sources}:undefined;
+  }
   const files={read:async name=>disk.has(name)?copy(disk.get(name)):null,readText:async name=>disk.has(name)?String(disk.get(name)):null,write:async(name,value)=>disk.set(name,copy(value))};
   const client=c.createFolderAgentClient({files,uuid:()=>`id-${++number}`,now:()=>100000,requireLedger:true,
     snapshot(){const snap=session.snapshot();return {source:snap.text,ledger,project:snap.project,topologyRevision:snap.topologyRevision,open:true};},busy:()=>false,
-    prepare:source=>c.prepareTopologyProposal(JSON.parse(source),session.topologyContext()),
+    prepare:(source,proposal)=>c.prepareTopologyProposal(JSON.parse(source),session.topologyContext(),localSource(proposal)),
     validate:(source,context)=>session.validate(JSON.parse(source),context).errors.join('\n'),
     apply(source,expected,proposal,context){const ok=session.accept({text:source},{snapshot:session.snapshot(),topologyContext:context});if(ok){ledger=proposal.ledger;applies++;}return {ok};},changed:state=>updates.push(state)});
   await client.start();await client.send('Import nested provider');
   const original=text,raw=JSON.parse(text);diagram(raw).topologyImports=[{spec:'nested',export:'public',as:'shared'}];
   const proposal={...client.manifest(),id:'proposal',requestId:disk.get('request.json').id,baseRevision:disk.get('state.json').revision,source:JSON.stringify(raw),ledger:'After'};disk.set('proposal.json',proposal);
-  return {c,client,session,disk,hits,hosts,providers,catalog,proposal,original,updates,get saved(){return saved;},get applies(){return applies;},gate:fn=>gate=fn,
+  return {c,client,session,disk,hits,hosts,providers,catalog,proposal,original,updates,repository,get saved(){return saved;},get applies(){return applies;},gate:fn=>gate=fn,
     connect:async()=>session.connectTopology(await c.connectTopologyRepository(JSON.parse(session.text())),session.snapshot())};
 }
 /* #592 contract matrix (agent proposals on a deployed site)
@@ -52,6 +83,57 @@ test('a folder proposal on a deployed site pins the catalog automatically and st
   assert.equal(diagram(JSON.parse(h.session.text())).nodes['shared::api'],undefined);
   assert.equal(h.session.undo(),true);assert.equal(h.session.text(),h.original);assert.equal(h.session.redo(),true);
   assert.ok(diagram(h.session.resolve(JSON.parse(h.session.text()))).nodes['shared::inner::api']);
+});
+/* #883 contract matrix (design A, Chuck 2026-11-02): a local consumer's proposal that imports
+   a provider outside its frozen snapshot acquires the proposal's own closure from the source
+   the consumer already uses; never the deployed site library; unrelated bodies stay refused.
+   Fixture for every row: a registered local consumer with no imports, frozen from its
+   repository (canon.json: leaf, nested, unrelated, consumer); the agent proposal adds
+   topologyImports nested (which imports leaf).
+   row | fixture | assertion (scoped) | rejects
+   L1 browser grant acquires the closure | 'grant': preparation gets the consumer's repository directory handle | review ok; review context local with specs exactly consumer+leaf+nested; no site-library request | the frozen-snapshot refusal at src/library.workbench.js:226; a fallback to the deployed library
+   L2 helper snapshot acquires the closure | 'snapshot': the proposal carries the helper's snapshot of exactly leaf+nested | same, consumer is the ephemeral helper consumer | the same refusal; ignoring proposal.sources
+   L3 review stages only | L1, L2 | session context keeps only the consumer until Accept | publishing the acquired providers during review
+   L4 accepted context is exactly the accepted closure | L1, L2 after Accept | frozen specs exactly the review's ids; shared::inner::api resolves; localSource.selectionId unchanged | a context that keeps only the old snapshot; acquisition that drops the source binding
+   L5 unrelated provider bodies refused | 'snapshot' carrying leaf+nested+unrelated | review refused naming unrelated provider bodies; frozen context unchanged; Accept refused | relaxing readSuppliedLocalTopology's closure check
+   L6 no local source, no fallback | 'none': frozen local context, nothing to read | review refused with the frozen-snapshot message; no site-library request | any deployed-library fallback for a local context */
+for(const mode of ['grant','snapshot'])test('a local '+(mode==='grant'?'browser-grant':'helper-snapshot')+' proposal acquires a provider outside the frozen closure, stages it, and the accepted context is exactly its closure (#883)',async()=>{
+  const h=await harness('https://test.invalid/flowspec.html',{localRepository:mode});
+  if(mode==='snapshot')h.proposal.sources=h.repository.snapshot(['diagrams/team/leaf/leaf.spec.json','diagrams/team/nested/nested.spec.json']);
+  const before=h.session.topologyContext(),consumer=before.id;assert.equal(before.local,true);assert.deepEqual(copy(before.specs.map(spec=>spec.page.canon.id)),[consumer],'precondition: the frozen snapshot lacks nested and leaf');
+  await h.client.poll();const review=h.client.reviewSnapshot();
+  assert.equal(review.review.ok,true,'the review acquires the proposal closure: '+JSON.stringify(review.review.conflicts));
+  assert.deepEqual(h.hits,[],'a local consumer never asks the deployed site library');
+  assert.equal(review.topologyContext.local,true);assert.deepEqual(copy(review.topologyContext.specs.map(spec=>spec.page.canon.id)).sort(),[consumer,'leaf','nested'].sort());
+  assert.equal(JSON.stringify(h.session.topologyContext()),JSON.stringify(before),'review acquisition must not publish context');assert.equal(h.applies,0);
+  await h.client.acceptReview(review.review.version);assert.equal(h.applies,1);assert.equal(h.disk.get('result.json').status,'applied');
+  const frozen=h.session.topologyContext();assert.equal(frozen.local,true);assert.deepEqual(copy(frozen.specs.map(spec=>spec.page.canon.id)).sort(),[consumer,'leaf','nested'].sort());
+  assert.equal(frozen.localSource.selectionId,before.localSource.selectionId,'the consumer keeps its source binding');
+  assert.equal(diagram(h.session.resolve(JSON.parse(h.session.text()))).nodes['shared::inner::api'].title,'leaf API');
+});
+for(const mode of ['unrelated bodies','no local source'])test('a local proposal outside the frozen closure is refused for '+mode+' without a site-library fallback (#883)',async()=>{
+  const h=await harness('https://test.invalid/flowspec.html',{localRepository:mode==='unrelated bodies'?'snapshot':'none'});
+  if(mode==='unrelated bodies')h.proposal.sources=h.repository.snapshot(['diagrams/team/leaf/leaf.spec.json','diagrams/team/nested/nested.spec.json','diagrams/team/unrelated/unrelated.spec.json']);
+  const before=JSON.stringify(h.session.topologyContext());await h.client.poll();const review=h.client.reviewSnapshot();
+  assert.equal(review.review.ok,false);assert.match(review.review.conflicts[0].reason,mode==='unrelated bodies'?/unrelated provider bodies/:/frozen local repository snapshot is missing provider nested/);
+  assert.deepEqual(h.hits,[]);assert.equal(JSON.stringify(h.session.topologyContext()),before);assert.equal(h.session.text(),h.original);
+  assert.equal(await h.client.acceptReview(review.review.version),false);assert.equal(h.applies,0);
+});
+/* #883 F3 contract matrix (Chuck 2026-11-02: fix the consumer-import findings before
+   import-sync reaches main): a local consumer with no source for a new import is told the
+   remedy that fits how it is connected.
+   row | fixture | assertion (scoped) | rejects
+   R1 helper-mode consumer, frozen helper snapshot | 'none': frozen from a helper snapshot, no source | review conflict reason names refresh-sources --source-repo and not "Reopen the repository root" | root wording for a folder-connected consumer
+   R2 folder-connected consumer, imports never resolved | 'unresolved': unresolvedLocalTopology, no source | same | same
+   R3 consumer opened from the repository root, grant gone | 'grant-lost': registered consumer path, no source | reason keeps "Reopen the repository root containing canon.json" | helper wording where reopening the root is the remedy
+   Every row also keeps the first sentence ("…snapshot is missing provider nested"), never asks the site library and changes nothing. */
+for(const mode of ['none','unresolved','grant-lost'])test('a local proposal outside the frozen closure names the remedy for its connection: '+mode+' (#883 F3)',async()=>{
+  const h=await harness('https://test.invalid/flowspec.html',{localRepository:mode});
+  const before=JSON.stringify(h.session.topologyContext());await h.client.poll();const review=h.client.reviewSnapshot(),reason=review.review.conflicts[0].reason;
+  assert.equal(review.review.ok,false);assert.match(reason,/frozen local repository snapshot is missing provider nested\./);
+  if(mode==='grant-lost')assert.match(reason,/Reopen the repository root containing canon\.json/);
+  else{assert.match(reason,/refresh-sources --source-repo/,'a folder-connected consumer is told to select its source repository: '+reason);assert.doesNotMatch(reason,/Reopen the repository root/);}
+  assert.deepEqual(h.hits,[]);assert.equal(JSON.stringify(h.session.topologyContext()),before);assert.equal(h.session.text(),h.original);assert.equal(h.applies,0);
 });
 for(const failure of ['revision','missing provider','foreign catalog'])test('proposal preparation refuses '+failure+' without source, history or frozen context changes',async()=>{
   const h=await harness();await h.connect();

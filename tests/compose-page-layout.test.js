@@ -236,3 +236,118 @@ test('cost spacing reserve applies only to expanded route rows',()=>{
  assert.equal(E.panelSize(p,{},420).intrinsicHeight,E.panelSize({...p,density:'compact'},{},420).intrinsicHeight);
  assert.ok(expanded.intrinsicHeight>compact.intrinsicHeight);
 });
+
+// Topology declarations (#873). Fixtures form a canon.json repository whose specs
+// carry no page.canon (identity is folder-derived), as connected repositories do.
+// Contract matrix:
+// row | input                                        | options                                   | expected
+// a   | new exporting provider, no imports           | --section 0                               | exit 0; arranged like any new diagram; topologyExports and canon-less identity unchanged; result still resolves as a provider
+// b   | new importing consumer                       | --section 0                               | exit 1 naming the provider and --resolve-imports <repository folder or registry> (tools/validate.js remedy); nothing written; --help lists the option
+// c   | importing consumer (new, with semantic node  | --section 0 --resolve-imports <repo>      | exit 0; consumer keeps only its own nodes/edges/floats/steps plus the import; no provider content, provenance or canon
+//     | and edge overrides; and the stress-test file |   [--rearrange]                           |   written; provider file unchanged; finite position, a nodePositions entry per exported node and an edgeOverrides
+//     | with --rearrange), repository member         |                                           |   route per exported edge, which the resolved output renders; authored nodeOverrides and semantic edgeOverrides
+//     |                                              |                                           |   fields unchanged and rendered; every resolved card inside graphFrame, no overlaps
+// d   | consumer import carrying layout markers      | preflight, with and without --rearrange   | position, nodePositions and every edge-override geometry field require --rearrange; label and node overrides stay
+//     |                                              |                                           |   semantic; labelAt (not an edge-override field) is refused as invalid input with or without --rearrange
+const COMPOSE=path.resolve(__dirname,'../tools/compose-page-layout.cjs');
+const compose=args=>spawnSync(process.execPath,[COMPOSE,...args],{encoding:'utf8'});
+const PROVIDER_EXPORTS={public:{nodes:['payment-api','fraud-check'],edges:['payment-api->fraud-check']}};
+const providerNodes=()=>({'payment-api':{title:'Payment API'},'payments-db':{title:'Payments database'},'fraud-check':{title:'Fraud-check service'}});
+const providerEdges=()=>[{from:'payment-api',to:'payments-db',label:'Records payment'},{from:'payment-api',to:'fraud-check',label:'Checks payment for fraud'}];
+const newProvider=()=>({page:{title:'Billing',sections:[{id:'main',diagram:{nodes:providerNodes(),rows:[[]],floats:Object.keys(providerNodes()).map(id=>({id,side:'below'})),edges:providerEdges(),topologyExports:structuredClone(PROVIDER_EXPORTS)}}]}});
+// The provider and consumer committed by the import-sync stress test (runs/A-r1/repo-final).
+const arrangedProvider=()=>({page:{title:'Billing',sections:[{id:'main',diagram:{nodes:providerNodes(),rows:[['payment-api','payments-db']],edges:providerEdges(),topologyExports:structuredClone(PROVIDER_EXPORTS),floats:[{id:'fraud-check',side:'below',noSpread:true,x:296,y:69}]}}]}});
+const consumerEdges=()=>[{from:'storefront',to:'checkout-service',label:'Places order'},{from:'checkout-service',to:'billing::payment-api',label:'Charges card'}];
+const newConsumer=()=>({page:{title:'Checkout',sections:[{id:'main',diagram:{nodes:{storefront:{title:'Storefront'},'checkout-service':{title:'Checkout service'}},rows:[[]],floats:[{id:'storefront',side:'below'},{id:'checkout-service',side:'below'}],edges:consumerEdges(),steps:[{id:'charge',text:'Checkout charges the card through Billing.',edge:'checkout-service->billing::payment-api'}],topologyImports:[{spec:'billing',export:'public',as:'billing',nodeOverrides:{'payment-api':{title:'Card charges'}},edgeOverrides:{'payment-api->fraud-check':{label:'Screens the charge'}}}]}}]}});
+const stressConsumer=()=>({page:{title:'Checkout',sections:[{id:'main',diagram:{nodes:{storefront:{title:'Storefront'},'checkout-service':{title:'Checkout service'}},rows:[['storefront','checkout-service']],edges:consumerEdges(),topologyImports:[{spec:'billing',export:'public',as:'billing',position:{x:420,y:380}}]}}]}});
+function topologyRepository(t){
+ const base=fs.mkdtempSync(path.join(os.tmpdir(),'compose-topology-'));t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+ const repo=path.join(base,'repo'),work=path.join(base,'work');fs.mkdirSync(work);
+ const write=(name,value)=>{const file=path.join(repo,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify(value,null,2)+'\n');return file;};
+ write('canon.json',{version:1,diagrams:[{folder:'diagrams/payments/billing',owner:'group:default/payments'},{folder:'diagrams/shop/checkout',owner:'group:default/shop'}]});
+ return {repo,work,write,provider:write('diagrams/payments/billing/billing.spec.json',arrangedProvider())};
+}
+const topologyResolver=async()=>(await import('../tools/canon/local-imports.mjs')).resolveLocalImports;
+const finitePoint=f=>Number.isFinite(f.x)&&Number.isFinite(f.y);
+// The compose edge geometry set (preflight) minus labelAt: an import edge override can only
+// carry edgeLayoutFields (src/canon-topology.js), and labelAt is not one of them.
+const IMPORT_EDGE_GEOMETRY=['bend','curvePoints','curveControls','fromPort','toPort','fromDx','fromDy','toDx','toDy','labelDx','labelDy'];
+test('topology a: a new exporting provider arranges without providers and remains a valid export',async t=>{
+ const f=topologyRepository(t),spec=newProvider(),input=f.write('diagrams/payments/billing/billing.spec.json',spec),bytes=fs.readFileSync(input,'utf8'),output=path.join(f.work,'billing.json');
+ const result=compose(['--section','0',input,output]);
+ assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(input,'utf8'),bytes);
+ const out=JSON.parse(fs.readFileSync(output,'utf8')),d=out.page.sections[0].diagram,authored=spec.page.sections[0].diagram;
+ assert.equal(out.page.canon,undefined,'repository identity stays folder-derived');
+ assert.deepEqual(d.topologyExports,authored.topologyExports);assert.deepEqual(d.nodes,authored.nodes);
+ assert.deepEqual(d.edges.map(e=>[e.from,e.to,e.label]),authored.edges.map(e=>[e.from,e.to,e.label]));
+ assert.deepEqual(d.rows,[[]]);assert.deepEqual(d.floats.map(x=>x.id).sort(),Object.keys(authored.nodes).sort());assert.ok(d.floats.every(finitePoint),'every provider node is arranged');
+ assert.ok(d.graphFrame);assert.equal(d.sectionLayout.columns,24);assert.ok(d.sectionLayout.default.length);
+ // Exports are re-validated against the arranged placements by the shared resolver.
+ await (await topologyResolver())(output,f.repo);
+});
+test('topology b: an importing consumer without providers refuses, names --resolve-imports and writes nothing',t=>{
+ const f=topologyRepository(t),input=f.write('diagrams/shop/checkout/checkout.spec.json',newConsumer()),bytes=fs.readFileSync(input,'utf8'),output=path.join(f.work,'checkout.json');fs.writeFileSync(output,'retained');
+ const result=compose(['--section','0',input,output]);
+ assert.equal(result.status,1);assert.match(result.stderr,/billing/);assert.match(result.stderr,/--resolve-imports <repository folder or registry>/);
+ assert.equal(fs.readFileSync(output,'utf8'),'retained');assert.equal(fs.readFileSync(input,'utf8'),bytes);
+ const help=compose(['--help']);assert.equal(help.status,0);assert.match(help.stdout,/--resolve-imports/);
+});
+for(const [name,consumer,flags] of [['new consumer',newConsumer,[]],['stress-test consumer with --rearrange',stressConsumer,['--rearrange']]])
+test('topology c: --resolve-imports arranges the '+name+' with its providers and writes back only consumer-owned data',async t=>{
+ const f=topologyRepository(t),spec=consumer(),input=f.write('diagrams/shop/checkout/checkout.spec.json',spec),bytes=fs.readFileSync(input,'utf8'),providerBytes=fs.readFileSync(f.provider,'utf8'),output=path.join(f.work,'checkout.json');
+ const result=compose(['--section','0',...flags,'--resolve-imports',f.repo,input,output]);
+ assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(input,'utf8'),bytes);assert.equal(fs.readFileSync(f.provider,'utf8'),providerBytes);
+ const text=fs.readFileSync(output,'utf8'),out=JSON.parse(text),d=out.page.sections[0].diagram,authored=spec.page.sections[0].diagram;
+ for(const copied of ['Payment API','Payments database','Fraud-check service','Checks payment for fraud','topologyProvenance'])assert.equal(text.includes(copied),false,'provider content is not copied: '+copied);
+ assert.equal(out.page.canon,undefined,'repository identity stays folder-derived');
+ assert.deepEqual(d.nodes,authored.nodes);assert.deepEqual(d.steps,authored.steps);assert.equal(d.groups,undefined);
+ assert.deepEqual(d.edges.map(e=>[e.from,e.to,e.label]),authored.edges.map(e=>[e.from,e.to,e.label]));
+ assert.deepEqual(d.rows,[[]]);assert.deepEqual(d.floats.map(x=>x.id).sort(),['checkout-service','storefront']);assert.ok(d.floats.every(finitePoint),'consumer nodes are arranged');
+ assert.equal(d.topologyImports.length,1);const imp=d.topologyImports[0];assert.deepEqual([imp.spec,imp.export,imp.as],['billing','public','billing']);
+ // Imported geometry is written only as overlays keyed by provider-relative identity.
+ assert.ok(imp.position&&finitePoint(imp.position),'the import block has a finite origin');
+ assert.deepEqual(Object.keys(imp.nodePositions||{}).sort(),[...PROVIDER_EXPORTS.public.nodes].sort(),'every imported node has a saved position');
+ for(const key of PROVIDER_EXPORTS.public.nodes)assert.ok(finitePoint(imp.nodePositions[key]),'finite position for '+key);
+ assert.deepEqual(Object.keys(imp.edgeOverrides||{}),PROVIDER_EXPORTS.public.edges,'every imported connection has a saved route');
+ const route=imp.edgeOverrides['payment-api->fraud-check'],sides=['top','right','bottom','left'];
+ for(const port of ['fromPort','toPort'])assert.ok(route[port]&&sides.includes(route[port].side)&&(route[port].offset===undefined||Number.isFinite(route[port].offset)),'imported route '+port);
+ assert.ok(Array.isArray(route.curveControls)&&route.curveControls.length&&route.curveControls.every(p=>[p.t,p.dx,p.dy].every(Number.isFinite)),'imported route curveControls');
+ // Authored semantic import data survives write-back unchanged, beside the new geometry.
+ const authoredImp=authored.topologyImports[0];
+ for(const key of Object.keys(authoredImp).filter(key=>!['position','nodePositions','edgeOverrides'].includes(key)))assert.deepEqual(imp[key],authoredImp[key],'import '+key+' is preserved');
+ for(const [edge,fields] of Object.entries(authoredImp.edgeOverrides||{}))for(const field of Object.keys(fields).filter(field=>!IMPORT_EDGE_GEOMETRY.includes(field)))assert.deepEqual(imp.edgeOverrides[edge][field],fields[field],'edge override '+edge+' '+field+' is preserved');
+ assert.equal(d.sectionLayout.columns,24);assert.ok(d.sectionLayout.default.length);
+ // Providers stay attached by reference, render at the saved overlays and are framed together with consumer nodes.
+ const resolved=(await (await topologyResolver())(output,f.repo)).resolved.page.sections[0].diagram;
+ assert.deepEqual(Object.keys(resolved.nodes).sort(),['billing::fraud-check','billing::payment-api','checkout-service','storefront']);
+ const positions=require('../tools/arrange/core.cjs').viewerRouting().layout(resolved).pos;
+ for(const key of PROVIDER_EXPORTS.public.nodes)assert.deepEqual([positions['billing::'+key].cx,positions['billing::'+key].cy],[imp.position.x+imp.nodePositions[key].x,imp.position.y+imp.nodePositions[key].y],'billing::'+key+' renders at its saved overlay');
+ const rendered=resolved.edges.find(e=>e.from==='billing::payment-api'&&e.to==='billing::fraud-check');
+ for(const key of ['fromPort','toPort','curveControls'])assert.deepEqual(rendered[key],route[key],'imported route '+key+' renders from its overlay');
+ if(consumer===newConsumer){
+  assert.deepEqual(imp.nodeOverrides,{'payment-api':{title:'Card charges'}});assert.equal(route.label,'Screens the charge');
+  assert.equal(resolved.nodes['billing::payment-api'].title,'Card charges');assert.equal(rendered.label,'Screens the charge');
+ }
+ const frame=d.graphFrame,cards=Object.entries(positions);
+ for(const [id,p] of cards)assert.ok(p.cx-p.w/2>=frame.x&&p.cx+p.w/2<=frame.x+frame.w&&p.cy-p.h/2>=frame.y&&p.cy+p.h/2<=frame.y+frame.h,id+' lies inside the composed graph frame');
+ cards.forEach(([a,p],i)=>cards.slice(i+1).forEach(([b,q])=>assert.ok(Math.abs(p.cx-q.cx)>=(p.w+q.w)/2||Math.abs(p.cy-q.cy)>=(p.h+q.h)/2,a+' overlaps '+b)));
+});
+test('topology d: authored import layout markers require explicit rearrangement; semantic overrides do not',async t=>{
+ const markers={position:{x:420,y:380},nodePositions:{'payment-api':{x:0,y:0}}};
+ for(const key of IMPORT_EDGE_GEOMETRY)
+  markers['edgeOverrides.'+key]={'payment-api->fraud-check':{[key]:key.endsWith('Port')?{side:'right'}:key.startsWith('curve')?null:0}};
+ for(const [name,value] of Object.entries(markers))await t.test(name,()=>{
+  const d=newConsumer().page.sections[0].diagram;d.topologyImports[0][name.split('.')[0]]=value;
+  const before=JSON.stringify(d);assert.throws(()=>A.preflight(d,defaults),/already has geometry/);A.preflight(d,{...defaults,rearrange:true});assert.equal(JSON.stringify(d),before);
+ });
+ // newConsumer already carries a nodeOverrides title and an edgeOverrides label.
+ A.preflight(newConsumer().page.sections[0].diagram,defaults);
+ await t.test('edgeOverrides.labelAt is invalid input, not geometry',st=>{
+  const f=topologyRepository(st),spec=newConsumer();spec.page.sections[0].diagram.topologyImports[0].edgeOverrides={'payment-api->fraud-check':{labelAt:0.4}};
+  const input=f.write('diagrams/shop/checkout/checkout.spec.json',spec),output=path.join(f.work,'checkout.json');fs.writeFileSync(output,'retained');
+  for(const flags of [[],['--rearrange']]){
+   const result=compose(['--section','0',...flags,'--resolve-imports',f.repo,input,output]);
+   assert.equal(result.status,1);assert.match(result.stderr,/edgeOverrides payment-api->fraud-check: expected an object with fields/);assert.doesNotMatch(result.stderr,/already has geometry/);assert.equal(fs.readFileSync(output,'utf8'),'retained');
+  }
+ });
+});

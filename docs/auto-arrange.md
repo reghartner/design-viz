@@ -85,6 +85,23 @@ Input/output must be distinct files, including symlinks and hard links. All
 selected diagrams must succeed before one atomic output write. Validate and
 state-walk the result, then submit the full spec for paired Workbench preview.
 
+Shared topology needs no special handling for exports: a new diagram that only
+declares `topologyExports` is arranged like any other, and the export is checked
+against the arranged placements. A diagram with `topologyImports` needs its
+providers. Pass the same repository folder or registry that
+`tools/validate.js --resolve-imports` uses:
+
+```sh
+node tools/compose-page-layout.cjs --section 0 --resolve-imports <repository folder or registry> draft.spec.json arranged.spec.json
+```
+
+Without it the command refuses and names the option. Imported nodes and
+connections are arranged with local ones exactly as Workbench Auto arrange does
+(see above): the output keeps only the consumer's own content and the import
+reference, with imported geometry in `position`, `nodePositions` and
+`edgeOverrides`. Existing import `position`, `nodePositions` or `edgeOverrides`
+geometry counts as existing geometry and requires `--rearrange`.
+
 **No setup, browser, npm install or browser download is needed.** The command
 runs directly with Node in a source checkout or an exported authoring kit.
 The checkout compiles trusted repository sources in memory; the kit includes

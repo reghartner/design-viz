@@ -208,6 +208,9 @@ semantic edge edits are rejected. Provider refresh retains these consumer maps;
 removed identities require removing their saved entries. Saved source keeps only
 authored imports and overlays; resolved snapshots contain effective values.
 All layout data belongs to the consumer; provider structure stays read-only.
+`tools/compose-page-layout.cjs` arranges exporting diagrams without providers;
+for a consumer pass `--resolve-imports <repository folder or registry>`, which
+saves imported geometry only in these import overlays.
 Optional `nodes: [providerNodeId]` and `edges: ["from->to"]` on an import select
 within its named export; omission means the full corresponding array. Require
 at least one node, unique identities, and both endpoints of every selected edge.

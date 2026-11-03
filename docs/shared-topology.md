@@ -436,7 +436,15 @@ node --test tests/canon-topology.test.js
 ```
 
 For central canon, enroll both folders in root `canon.json`; its folder-derived
-IDs replace the legacy example registry's IDs. For local validation, pass the
+IDs replace the legacy example registry's IDs. A new exporting diagram needs its
+`diagrams/…/<id>/` folder with `<id>.spec.json`, its root `canon.json` entry, and
+every consumer `topologyImports` change that uses it. When a consumer change uses
+a new provider, all of these go in one commit and one PR. A request for a diagram
+other teams can import authorizes the agent to add that diagram's own
+`canon.json` entry. Editing or removing any other `canon.json` entry still needs
+the user's permission; see
+[registering a new exporting diagram](local-repository-authoring.md#register-a-new-exporting-diagram).
+For local validation, pass the
 authored consumer and its complete provider closure to `tools/validate.js` in one
 invocation. It resolves that batch in memory, reports results against the original
 filenames, and never writes a flattened source. The Canon publisher remains the

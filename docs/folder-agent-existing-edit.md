@@ -33,8 +33,8 @@ scope. Specified edits need no new questions/worksheet.
 After a provider batch, run the consumer helper (no `begin`/proposal):
 `python3 <consumer>/.flowview-agent/folder-agent.py refresh-sources --source-repo /repo`.
 Later calls reuse that repo. Wait for the matching receipt/current revision; repair
-failures before retrying. Reconnect via this flag or desktop File source selection.
-Cloud snapshots never read disk. See [local sources](local-repository-authoring.md).
+failures before retrying. Reconnect via this flag or File source selection.
+Cloud snapshots never read disk. See [local sources and registration](local-repository-authoring.md).
 
 ## Protocol
 

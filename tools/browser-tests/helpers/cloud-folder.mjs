@@ -4,8 +4,10 @@ import path from 'node:path';
 import {tmpdir} from 'node:os';
 // The real folder protocol/helper is exercised. Only native permission/picker
 // handles are substituted with a temporary directory, as in folder-agent.spec.
-export async function cloudFolder(page){
- const folder=await mkdtemp(path.join(tmpdir(),'flowview-cloud-folder-')),session=path.join(folder,'.flowview-agent');let counter=0;
+// A second page (another Workbench tab) may share an existing folder; only the
+// call that created the folder should close it.
+export async function cloudFolder(page,{folder:shared}={}){
+ const folder=shared || await mkdtemp(path.join(tmpdir(),'flowview-cloud-folder-')),session=path.join(folder,'.flowview-agent');let counter=0;
  await page.exposeBinding('cloudFolderDisk',async(_,op,name,value)=>{
   const target=path.resolve(folder,'.'+name);if(target!==folder && !target.startsWith(folder+path.sep))throw Error('Outside test folder');
   if(op==='entries')return (await readdir(target,{withFileTypes:true})).map(e=>({name:e.name,kind:e.isDirectory()?'directory':'file'}));

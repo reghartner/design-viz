@@ -195,7 +195,7 @@ value is invalid. Every field except `version` is optional.
 | Field | Used for | Without it |
 |---|---|---|
 | `companyName` | The workbench labels **Company repository** (File menu), its unavailable-catalog error, the imported snapshot origin and **Company service** (node inspector, onboarding tour, user guide) become **Acme repository** and **Acme service**. | "Company" |
-| `repository` | The header GitHub link, the welcome form's repository field, the **Read the authoring skill** link, the repository-root example in its validation message, and the reader-tour guide link in the inspector. An `https://` repository root; a trailing `.git` is removed. | `https://github.com/reghartner/design-viz` (the example message keeps `https://github.com/your-team/design-viz`) |
+| `repository` | The header GitHub link, the welcome form's repository field, the **Read the authoring skill** link, the repository-root example in its validation message, the reader-tour guide link in the inspector, and the agent context: the generated `CONNECT.md` names it as the repository to clone and send canon PRs to, and the offline kit carries it in `tools/company-agent-context.json`. An `https://` repository root; a trailing `.git` is removed. | `https://github.com/reghartner/design-viz` (the example message keeps `https://github.com/your-team/design-viz`) |
 | `revision` | The branch in the authoring-skill and tour-guide links and the welcome form's revision field. | `main` |
 | `brand` | A brand file path inside `company/`, relative to `company.json`, with `companyName`, `logo`, `primaryColor` and `secondaryColor` (the fields of `src/company-brand.config.js`). `logo` is a 1–4 character monogram, a PNG/JPEG/WebP data URI, or a relative path (inside `company/`) to a PNG/JPEG/WebP file of up to 512 KiB that the build embeds. The brand's `companyName` defaults to the top-level `companyName`. Every viewer, the workbench and the validator runtime use it as the global brand. | The placeholders in `src/company-brand.config.js` |
 | `package` | Backstage package identity; see below. | Upstream `package.json` values |
@@ -228,9 +228,9 @@ Agents receive this value as link context. It is not a catalog entity identity,
 an API endpoint or an authentication setting, and does not grant access.
 Explicit entity references and source URLs remain authoritative. Use a
 non-secret URL suitable for inclusion in generated Workbench files and prompts.
-The offline kit exports only this normalized context in
-`tools/company-agent-context.json`, without copying `company.json`, brand assets
-or package settings. Packet metadata records it as `companyContext`.
+The offline kit exports only the normalized agent context (`repository`,
+`backstage` and `site`) in `tools/company-agent-context.json`, without copying
+`company.json`, brand assets or package settings. Packet metadata records it as `companyContext`.
 
 `python3 tools/build.py --no-config` omits this context from the generated
 Workbench and kit. `FLOWVIEW_COMPANY_IDENTITY=off` also disables it for direct

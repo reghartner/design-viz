@@ -58,6 +58,9 @@
         multi-commit PR                         refs/pull/11/head on the remote          this commit on two2 -> from-choice "<two1> ·     commits; no ref created
                                                                                        first parent of <two2>", between rows [two2];
                                                                                        no ref added
+   P10  chosen PR stays at the shown commit   PR #12 head = twelve1 when chosen as To;  rail = exactly "Modified · Node B twelve ·      a choice kept as pr:<n> and re-resolved
+        after a force-push                    then force-pushed to forced12 (the gh     title"; the After pane's node b reads "B        on every request (compares a commit
+                                              list now reports forced12); Compare       twelve"; After title names twelve1           the picker no longer shows)
    P7   latest PR click wins                    hold the availability replies for PR #8   rows aria-busy while checked; after #8's row is   an earlier click's late check choosing
                                                                                        no longer busy (#7 still busy): dialog open,
                                                 then PR #7 (clicked in that order);      from-choice unchanged; after #7's: from-choice =  the row the user did not pick last
@@ -781,4 +784,35 @@ test('U2: document paths and node titles render literally in the document list a
   await expect(paneIn(page,'after').locator('[data-dv-node="h"]').first()).toContainText(HOSTILE);
   expect(await page.locator('img, script:not([src])').count()).toBe(0);
   expect(await page.evaluate(()=>window.__pwned)).toBeUndefined();
+});
+
+test('P10: a chosen pull request stays at the commit shown after the pull request is force-pushed',async({page,repo,open})=>{
+  const {c}=repo,{writeFile,readFile}=await import('node:fs/promises');
+  const at=n=>({GIT_AUTHOR_DATE:'2026-01-2'+n+'T10:00:00Z',GIT_COMMITTER_DATE:'2026-01-2'+n+'T10:00:00Z'});
+  const doc=path.join(repo.other,A);
+  const commitOnC7=async(title,subject,n)=>{
+    git(repo.other,['checkout','-q','--detach',c.c7]);
+    const spec=JSON.parse(await readFile(doc,'utf8'));spec.page.sections[0].diagram.nodes.b.title=title;
+    await writeFile(doc,JSON.stringify(spec,null,2)+'\n');git(repo.other,['commit','-qam',subject],at(n));
+    return git(repo.other,['rev-parse','HEAD']);
+  };
+  const first=await commitOnC7('B twelve','Twelve first',1);
+  git(repo.other,['push','-q','origin','HEAD:refs/pull/12/head']);
+  let head=first;
+  const stub=ghStub(c);
+  const gh=async args=>{const out=await stub(args);if(args[0]==='pr' && args[1]==='list')return JSON.stringify(JSON.parse(out).concat([
+    {number:12,title:'Twelve',headRefName:'twelve',headRefOid:head,author:{login:'tess'},updatedAt:'2026-01-22T12:00:00Z',state:'OPEN',mergeCommit:null}]));return out;};
+  await open(gh);
+  await choose(page,'From','All commits',c.c7);
+  await choose(page,'To','Pull requests',first);
+  await expect(choice(page,'To')).toHaveText(choiceText({sha:short(first),date:'2026-01-22 12:00',author:'tess',subject:'Twelve'}));
+  /* The pull request is force-pushed after it was chosen: gh now reports the new head. */
+  const forced=await commitOnC7('B forced','Twelve forced',2);
+  git(repo.other,['push','-q','-f','origin','HEAD:refs/pull/12/head']);head=forced;
+  expect(forced,'precondition: the force-push moved the head').not.toBe(first);
+  await compareButton(page).click();
+  await expect(views(page)).toHaveCount(1);
+  await expect(paneTitle(page,'after')).toHaveText(paneHeading('after',first,'Twelve'));
+  await expect(changeItems(page)).toHaveText(['Modified · Node B twelve · title']);
+  await expect(paneIn(page,'after').locator('[data-dv-node="b"]').first()).toContainText('B twelve');
 });

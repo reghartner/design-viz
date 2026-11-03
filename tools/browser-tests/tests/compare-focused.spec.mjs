@@ -117,6 +117,22 @@
                   path's strips (6 steps each) on step 5, only step 5 marked on both sides; the After
                   pane shows "Push is delivered" (s5), the Before pane "Stream ends" (s9)
                                                                               rejects: main path shown; one side without a step
+   D1 layout      in D1 both step strips are visible and each ends above the top of its side's pane;
+                  Full diagram hides the strips and keeps both panes; Focused shows them again
+                                                                              rejects: hidden or overlapping strips; strips stuck in Full mode
+   D1b carried    a tone edit at step 2 (reader effects at steps 2-12): rail "Modified · Step s2 ·
+                  tone.hub · affects steps 2-12"; strips on step 2, step 2 marked "edited" and steps
+                  3-12 "carried" on both sides                                 rejects: single-step label; unmarked carried steps
+   D3b path list  a path whose members change at positions 2, 5 and 6: rail "Modified · Path Short
+                  ring · steps · affects steps 2, 5-6"; strips open on step 2 (After "Camera streams",
+                  Before "Hub wakes the radio") with steps 2, 5, 6 marked on both sides
+                                                                              rejects: range-only formatting; first position only
+   D5 imported    a consumer step that changes its highlight to the imported node child::p1: rail
+                  "Modified · Step two · nodes · affects step 2"; strips on step 2; the After pane
+                  highlights child::p1, the Before pane b                     rejects: local-only node handling
+   D6 added path  an added path keeps today's view: rail "Added · Path Third ring" (no affected
+                  steps); no step strips, the full-diagram note shown, both panes visible
+                                                                              rejects: diagram mode for added records
    D4 path label  a path label edit (no reader effect): rail text exactly "Modified · Path Quick ring
                   · label" (no affected steps); the strips show that path (6 steps) on step 1 with no
                   marks; both panes visible                                    rejects: invented affected steps; wrong path
@@ -691,6 +707,14 @@ async function panesShown(host,label){
   for(const s of ['before','after'])
     await expect(host.locator('.compare-pane[data-side="'+s+'"] [data-dv-node="bell"]:visible').first(),label+': the '+s+' pane is shown').toBeVisible();
 }
+async function stripsAbovePanes(host,label){
+  for(const s of ['before','after']){
+    const strip=side(host,s).locator('.compare-focus-steps');
+    await expect(strip,label+': '+s+' strip visible').toBeVisible();
+    await expect.poll(async()=>{const a=await strip.boundingBox(),b=await host.locator('.compare-pane[data-side="'+s+'"]').boundingBox();
+      return !!(a && b && a.y+a.height<=b.y+1);},{message:label+': '+s+' strip ends above its pane'}).toBe(true);
+  }
+}
 function withPaths(){
   /* No panels: the path fixtures isolate step-strip marks from carried panel differences. */
   const {current}=doorbell(),d=current.page.blocks[0].diagram;delete d.panels;d.steps.forEach(st=>{delete st.panels;});
@@ -716,6 +740,13 @@ test('D1 D2 a diagram-only step edit keeps both panes on the step under each sid
   await expect(rows(host)).toHaveCount(0);
   await expect(host.locator('.compare-focus-other')).toHaveCount(0);
   await expect(host.locator('.compare-mode-note')).toBeHidden();
+  await stripsAbovePanes(host,'D1');
+  await modeBar(host).getByRole('button',{name:'Full diagram',exact:true}).click();
+  await expect(host.locator('.compare-focus-steps')).toHaveCount(2);
+  for(const s of ['before','after'])await expect(side(host,s).locator('.compare-focus-steps'),s+' strip hidden in Full').toBeHidden();
+  await panesShown(host,'D1 Full');
+  await modeBar(host).getByRole('button',{name:'Focused',exact:true}).click();
+  await stripsAbovePanes(host,'D1 Focused again');
   await stepButtons(host,'after').filter({hasText:/^4$/}).click();
   for(const s of ['before','after']){
     await expect(currentStep(host,s),s+' strip follows to step 4').toHaveText('4');
@@ -751,4 +782,67 @@ test('D4 a path label edit shows that path from step 1 with no affected steps',a
   }
   await panesShown(host,'D4');
   for(const s of ['before','after'])await expect(paneCaption(host,s)).toContainText('Resident presses the doorbell');
+});
+
+test('D1b a tone edit names every step it carries into and marks them',async({page,server})=>{
+  const {current}=doorbell(),proposed=plain(current);proposed.page.blocks[0].diagram.steps[1].tone={hub:'warn'};
+  const host=await mountPage(page,server,'step-tone-'+Date.now(),current,proposed);
+  await expect(items(host)).toHaveText(['Modified · Step s2 · tone.hub · affects steps 2-12']);
+  await items(host).nth(0).click();
+  const want=['2:edited'].concat([3,4,5,6,7,8,9,10,11,12].map(n=>n+':carried'));
+  for(const s of ['before','after']){
+    await expect(currentStep(host,s),s+' strip on step 2').toHaveText('2');
+    await expect.poll(()=>markedSteps(host,s),{message:s+' marks'}).toEqual(want);
+  }
+  await stripsAbovePanes(host,'D1b');await panesShown(host,'D1b');
+});
+
+test('D3b a path whose members change at several positions lists them and opens on the first',async({page,server})=>{
+  const current=withPaths(),proposed=plain(current);proposed.page.blocks[0].diagram.paths[1].steps=['s1','s7','s3','s4','s5','s11'];
+  const host=await mountPage(page,server,'path-list-'+Date.now(),current,proposed);
+  await expect(items(host)).toHaveText(['Modified · Path Short ring · steps · affects steps 2, 5-6']);
+  await items(host).nth(0).click();
+  for(const s of ['before','after']){
+    await expect(stepButtons(host,s)).toHaveCount(6);
+    await expect(currentStep(host,s),s+' strip on step 2').toHaveText('2');
+    expect(await markedSteps(host,s),s+' marks').toEqual(['2:edited','5:edited','6:edited']);
+  }
+  await expect(paneCaption(host,'after')).toContainText('Camera streams');
+  await expect(paneCaption(host,'before')).toContainText('Hub wakes the radio');
+  await stripsAbovePanes(host,'D3b');
+});
+
+test('D5 a step that now highlights an imported node shows it in both panes under the strips',async({page,server})=>{
+  const spec=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',heading:'Main',diagram:d}]}});
+  const provider=spec('provider',{nodes:{p1:{title:'Provider one'},p2:{title:'Provider two'}},rows:[['p1','p2']],edges:[{from:'p1',to:'p2'}],
+    topologyExports:{public:{nodes:['p1','p2'],edges:['p1->p2']}}});
+  const consumer=spec('consumer',{view:'step',autoplay:false,nodes:{a:{title:'Anchor'},b:{title:'Bee'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],
+    topologyImports:[{spec:'provider',export:'public',as:'child'}],
+    steps:[{id:'one',nodes:['a'],text:'One'},{id:'two',nodes:['b'],text:'Two'},{id:'three',nodes:['a'],text:'Three'}]});
+  const consumer2=plain(consumer);consumer2.page.sections[0].diagram.steps[1].nodes=['child::p1'];
+  const script=`function side(c,p){var raw=JSON.parse(JSON.stringify(c));return {authored:FlowviewCompare.normalize(JSON.parse(JSON.stringify(c))),resolved:FlowviewCompare.normalize(FlowviewCompare.resolve(raw,{version:1,id:'consumer',specs:[p,c]})),ledger:null};}
+  var A=side(${inline(consumer)},${inline(provider)}),B=side(${inline(consumer2)},${inline(provider)}),entries=FlowviewCompare.compare(A,B);
+  window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),{before:A.resolved,after:B.resolved,entries:entries});`;
+  const host=await mountPage(page,server,'step-imported-'+Date.now(),doorbell().current,null,null,script);
+  await expect(items(host)).toHaveText(['Modified · Step two · nodes · affects step 2']);
+  await items(host).nth(0).click();
+  for(const s of ['before','after']){
+    await expect(currentStep(host,s),s+' strip on step 2').toHaveText('2');
+    expect(await markedSteps(host,s),s+' marks').toEqual(['2:edited']);
+    await expect(paneCaption(host,s)).toContainText('Two');
+  }
+  await expect(host.locator('.compare-pane[data-side="after"] [data-dv-node="child::p1"]:visible').first(),'the After pane highlights the imported node').toHaveClass(/\blit\b/);
+  await expect(host.locator('.compare-pane[data-side="before"] [data-dv-node="b"]:visible').first(),'the Before pane highlights b').toHaveClass(/\blit\b/);
+  await stripsAbovePanes(host,'D5');
+});
+
+test('D6 an added path keeps the full panes with the full-diagram note and no step strips',async({page,server})=>{
+  const current=withPaths(),proposed=plain(current);proposed.page.blocks[0].diagram.paths.push({id:'third',label:'Third ring',steps:['s1','s12']});
+  const host=await mountPage(page,server,'path-added-'+Date.now(),current,proposed);
+  await expect(items(host)).toHaveText(['Added · Path Third ring']);
+  await items(host).nth(0).click();await expect(items(host).nth(0)).toHaveAttribute('aria-current','true');
+  await expect(host.locator('.compare-focus')).toBeHidden();
+  await expect(host.locator('.compare-focus-steps:visible')).toHaveCount(0);
+  await expect(host.locator('.compare-mode-note')).toHaveText('This change shows in the full diagram.');
+  await panesShown(host,'D6');
 });

@@ -61,6 +61,11 @@
    P10  chosen PR stays at the shown commit   PR #12 head = twelve1 when chosen as To;  rail = exactly "Modified · Node B twelve ·      a choice kept as pr:<n> and re-resolved
         after a force-push                    then force-pushed to forced12 (the gh     title"; the After pane's node b reads "B        on every request (compares a commit
                                               list now reports forced12); Compare       twelve"; After title names twelve1           the picker no longer shows)
+        (P10 also: choosing From again reloads "Between these revisions": exactly one row, twelve1
+        "Twelve first"; P10b: the picker lists PR #12 at twelve1, the PR is force-pushed before the
+        click: clicking the row marks it "not available locally", the dialog stays open, To stays
+        "No revision chosen")                 rejects: between list following the moved PR; a chooser that
+                                              fetches the moved head and accepts the row it no longer matches)
    P7   latest PR click wins                    hold the availability replies for PR #8   rows aria-busy while checked; after #8's row is   an earlier click's late check choosing
                                                                                        no longer busy (#7 still busy): dialog open,
                                                 then PR #7 (clicked in that order);      from-choice unchanged; after #7's: from-choice =  the row the user did not pick last
@@ -815,4 +820,40 @@ test('P10: a chosen pull request stays at the commit shown after the pull reques
   await expect(paneTitle(page,'after')).toHaveText(paneHeading('after',first,'Twelve'));
   await expect(changeItems(page)).toHaveText(['Modified · Node B twelve · title']);
   await expect(paneIn(page,'after').locator('[data-dv-node="b"]').first()).toContainText('B twelve');
+  /* The commits-between list, reloaded after the force-push, still ends at the chosen commit. */
+  await choose(page,'From','All commits',c.c7);
+  await expect.poll(async()=>(await betweenRows(page)).map(r=>[r.sha,r.subject])).toEqual([[short(first),'Twelve first']]);
+});
+
+test('P10b: a pull request force-pushed while the picker is open cannot be chosen at its listed commit',async({page,repo,open,errors})=>{
+  const {c}=repo,{writeFile,readFile}=await import('node:fs/promises');
+  const at=n=>({GIT_AUTHOR_DATE:'2026-01-2'+n+'T10:00:00Z',GIT_COMMITTER_DATE:'2026-01-2'+n+'T10:00:00Z'});
+  const doc=path.join(repo.other,A);
+  const commitOnC7=async(title,subject,n)=>{
+    git(repo.other,['checkout','-q','--detach',c.c7]);
+    const spec=JSON.parse(await readFile(doc,'utf8'));spec.page.sections[0].diagram.nodes.b.title=title;
+    await writeFile(doc,JSON.stringify(spec,null,2)+'\n');git(repo.other,['commit','-qam',subject],at(n));
+    return git(repo.other,['rev-parse','HEAD']);
+  };
+  const first=await commitOnC7('B twelve','Twelve first',1);
+  git(repo.other,['push','-q','origin','HEAD:refs/pull/12/head']);
+  let head=first;
+  const stub=ghStub(c);
+  const gh=async args=>{const out=await stub(args);if(args[0]==='pr' && args[1]==='list')return JSON.stringify(JSON.parse(out).concat([
+    {number:12,title:'Twelve',headRefName:'twelve',headRefOid:head,author:{login:'tess'},updatedAt:'2026-01-22T12:00:00Z',state:'OPEN',mergeCommit:null}]));return out;};
+  errors.allow(400,new RegExp('/api/documents\\?rev='+first+'(&|$)'));
+  await open(gh);
+  await choose(page,'From','All commits',c.c7);
+  const dialog=await openPicker(page,'To');
+  await dialog.getByRole('tab',{name:'Pull requests'}).click();
+  const row=dialog.getByRole('option').filter({has:page.locator('[data-field="sha"]',{hasText:short(first)})}).first();
+  await expect(row,'precondition: the list shows PR #12 at its first head').toBeVisible();
+  /* Force-pushed after the list loaded, before the click. */
+  const forced=await commitOnC7('B forced','Twelve forced',2);
+  git(repo.other,['push','-q','-f','origin','HEAD:refs/pull/12/head']);head=forced;
+  await row.click();
+  await expect(row).toHaveAttribute('aria-disabled','true');
+  await expect(row).toContainText('not available locally');
+  await expect(dialog).toBeVisible();
+  await expect(choice(page,'To')).toHaveText('No revision chosen');
 });

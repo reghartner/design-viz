@@ -711,7 +711,7 @@ function initWorkbenchBuilder(opts){
         flush:async function(){await startup;return client.flush();},close:function(){var closing=client.disconnect();client.destroy();return closing;}};
       // Home retires UI operations but keeps this same document association.
       // Replacement synchronously clears it before another source is published.
-      client=createFolderAgentClient({files:project.files,requireLedger:true,workflow:'external',
+      client=createFolderAgentClient({files:project.files,requireLedger:true,workflow:'external',topologyContext:agentOptions.topologyContext,
         snapshot:function(){var snap=agentOptions.snapshot();return Object.assign({},snap,{project:documentId,open:workingFile.attached()===binding,source:session.text()});},
         busy:function(){return true;},apply:function(){return {ok:false,error:'Connect an agent to review proposals.'};},validate:agentOptions.validate,
         artifactStatus:function(state,detail){workingFile.report(binding,state,detail);},
@@ -1651,6 +1651,8 @@ function initWorkbenchBuilder(opts){
   var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
   var agentOptions={document:document,practice:opts.practice,resolve:session.resolve,previewSkin:opts.previewSkin,
     refreshSources:refreshLocalSources,
+    // #878: the frozen provider context the folder session copies to providers.json.
+    topologyContext:function(){return session.topologyContext();},
     releaseWorking:function(){return workingFile.clear();},
     workingDestination:function(binding){workingFile.attach(binding);if(binding.localRepository)bindLocalRepository(binding.localRepository);},
     workingStatus:function(binding,state,detail){if(state==='disconnected'){if(workingFile.attached()===binding)workingFile.clear('Folder disconnected. Reopen its folder to resume autosave.');}else workingFile.report(binding,state,detail);},

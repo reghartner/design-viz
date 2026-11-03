@@ -587,7 +587,10 @@ function mountCompareView(host, opts){
     var aToB = new Map(), bToA = new Map();
     comparePairs(A.steps, B.steps, [COMPARE_CAPTION_KEY], true).pairs.forEach(function(p){ aToB.set(p[0], p[1]); bToA.set(p[1], p[0]); });
     var ctx = {entry:entry, before:A, after:B, aToB:aToB, bToA:bToA, diagram:diagramMode,
-      affected:{before:new Set(aff ? aff.before.map(function(x){ return x.src; }) : []), after:new Set(aff ? aff.after.map(function(x){ return x.src; }) : [])},
+      /* Steps marked "edited": a path edit's changed positions; for a step edit only the step itself
+         (steps it carries into are marked "carried" from the folded reader state below). */
+      affected:{before:new Set(aff ? aff.before.filter(function(x){ return entry.kind === 'path' || entry.step && x.src === entry.step.before; }).map(function(x){ return x.src; }) : []),
+        after:new Set(aff ? aff.after.filter(function(x){ return entry.kind === 'path' || entry.step && x.src === entry.step.after; }).map(function(x){ return x.src; }) : [])},
       diagramOnly:diagramMode ? [] : stepFields.filter(function(f){ return !COMPARE_FOCUS_STEP_FIELD.test(f); })};
     var panelIds = [];
     [B, A].forEach(function(S){ (S.d.panels || []).forEach(function(p){ if (p && p.id && panelIds.indexOf(p.id) < 0) panelIds.push(p.id); }); });

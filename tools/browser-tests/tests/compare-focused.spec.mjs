@@ -692,7 +692,8 @@ async function panesShown(host,label){
     await expect(host.locator('.compare-pane[data-side="'+s+'"] [data-dv-node="bell"]:visible').first(),label+': the '+s+' pane is shown').toBeVisible();
 }
 function withPaths(){
-  const {current}=doorbell(),d=current.page.blocks[0].diagram;
+  /* No panels: the path fixtures isolate step-strip marks from carried panel differences. */
+  const {current}=doorbell(),d=current.page.blocks[0].diagram;delete d.panels;d.steps.forEach(st=>{delete st.panels;});
   d.paths=[{id:'main',steps:d.steps.map(x=>x.id)},{id:'alt',label:'Short ring',steps:['s1','s2','s3','s4','s9','s10']}];
   return current;
 }

@@ -42,8 +42,9 @@ function compareWithout(value, keys){
   return out;
 }
 /* Field-level differences at leaf values (arrays and scalars are leaves). An
-   object present on one side only contributes one field per leaf, with a
-   null path and no value on the absent side. */
+   object present on one side only contributes one field per leaf (one field
+   for the object itself when it has no leaves), with a null path and no value
+   on the absent side. */
 function compareFields(a, b, pa, pb, out){
   out = out || [];
   var keys = [];

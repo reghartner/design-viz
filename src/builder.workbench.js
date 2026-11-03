@@ -519,7 +519,8 @@ function initWorkbenchBuilder(opts){
     else if(!binding){code='reconnect_required';message='Run the consumer helper refresh-sources --source-repo <repository>, or use desktop File → Use local source repository.';}
     else if(!binding.handle)message='Ready for the consumer helper to refresh its selected source repository. Desktop File refresh requires a separate browser directory grant.';
     function bounded(value,max){return typeof value==='string' && new TextEncoder().encode(value).length<=max?value:null;}
-    return {available:code==='ready',acceptsSnapshot:code!=='cloud_project',mode:binding?(binding.handle?'browser-grant':'agent-snapshot'):'unbound',needsSnapshot:!!(binding && !binding.handle),code:code,message:message,
+    // local tells the helper this consumer's providers come from a local repository (#883 F3).
+    return {available:code==='ready',acceptsSnapshot:code!=='cloud_project',local:!!(context && context.local),mode:binding?(binding.handle?'browser-grant':'agent-snapshot'):'unbound',needsSnapshot:!!(binding && !binding.handle),code:code,message:message,
       snapshotSha256:bounded(source && source.sha256,64),capturedAt:bounded(source && source.capturedAt,32),providerCount:source && source.providerCount!=null?source.providerCount:null,consumerId:bounded(context && context.id,512),
       sourceSelectionId:source && source.selectionId || null,sourcePath:bounded(source && source.path,2048),rootLabel:bounded(source && source.rootLabel,512)};
   }

@@ -480,19 +480,33 @@ def proposal_sources(folder, state, candidate):
 
     Only a consumer whose current snapshot came from this helper's selected repository
     gets one, and only when the candidate imports a provider ID that the current draft
-    does not import directly. Otherwise the proposal reuses the frozen providers.
+    does not import directly. Otherwise the proposal reuses the frozen providers. A
+    helper-mode local consumer with no selection is refused instead.
     """
     selection = pending_object(folder, 'local-sources-selection.json')
     capability = state.get('localSources') if isinstance(state.get('localSources'), dict) else {}
-    if (not isinstance(selection, dict) or not isinstance(selection.get('path'), str) or
-            not selection.get('selectionId') or selection.get('selectionId') != capability.get('sourceSelectionId')):
+    selected = (isinstance(selection, dict) and isinstance(selection.get('path'), str) and
+                bool(selection.get('selectionId')) and selection.get('selectionId') == capability.get('sourceSelectionId'))
+    # A local consumer without a browser grant can load a new provider only from a
+    # selected source repository; refuse before publishing a proposal the Workbench
+    # could only block (#883 F3). Grants, cloud projects and site-library consumers
+    # keep their own acquisition.
+    helper_mode = (capability.get('local') is True and capability.get('mode') != 'browser-grant' and
+                   capability.get('code') != 'cloud_project')
+    if not selected and not helper_mode:
         return None
     try:
         current = set(dependencies(json.loads(state.get('source') or 'null')))
     except ValueError:
         current = set()
-    if not set(dependencies(json.loads(candidate))) - current:
+    new = [ident for ident in dependencies(json.loads(candidate)) if ident not in current]
+    if not new:
         return None
+    if not selected:
+        raise ValueError('This proposal imports ' + ', '.join(new) + ', which this consumer cannot load yet: '
+                         'no source repository is selected for its current snapshot. Run python3 "' +
+                         str(folder / 'folder-agent.py') + '" refresh-sources --source-repo <repository> first, '
+                         'then propose again. No proposal was published.')
     try:
         return local_provider_snapshot(candidate, Path(selection['path']), selection['selectionId'])
     except (OSError, ValueError) as error:

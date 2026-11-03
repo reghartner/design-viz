@@ -91,6 +91,11 @@
                   Focused shows it again                                       rejects: line diff stuck in Full mode
    T5 untrusted   markup in a ledger line and in the title stays literal text (no element made,
                   no script run)                                               rejects: innerHTML rendering
+   T6 opening     a proposal that changes the page title and a step's panel opens on the step
+                  change (its rail item current, the Focused panel row shown), not on the title
+                  change listed first; a ledger-only comparison opens on the ledger change (T1's
+                  fixture: the first item is current on load)                  rejects: opening on a text-only change while a diagram change exists
+                  (the onboarding tour's preview step, workbench-onboarding.spec.mjs, needs both panes)
    excluded       section heading text diffs (issue row 7b): a heading change shows the full panes;
                   not in #892 */
 import {test,expect} from '../helpers/test.mjs';
@@ -621,4 +626,21 @@ test('T5 markup in a ledger line and in the page title stays literal text',async
   expect(await sideLines(textBlocks(host).nth(0),'after')).toEqual(['2 '+evil]);
   await expect(host.locator('.compare-focus img, .compare-focus b')).toHaveCount(0);
   expect(await page.evaluate(()=>window.pwned)).toBeUndefined();
+});
+
+test('T6 the view opens on the first diagram change when page-field changes are listed before it',async({page,server})=>{
+  const {current,proposed}=doorbell();proposed.page.title='Doorbell v2';
+  const host=await mountPage(page,server,'open-diagram-'+Date.now(),current,proposed);
+  const labels=await items(host).allInnerTexts();
+  expect(labels[0],'precondition: the title change is listed first').toBe('Modified · Document · title');
+  const step=labels.findIndex(l=>/^Modified · Step s6 · /.test(l));
+  expect(step,'precondition: the rail lists the step 6 change in '+JSON.stringify(labels)).toBeGreaterThan(0);
+  await expect(items(host).nth(step)).toHaveAttribute('aria-current','true');
+  await expect(items(host).nth(0)).toHaveAttribute('aria-current','false');
+  await expect(textBlocks(host)).toHaveCount(0);
+  await expect(rows(host).first()).toBeVisible();
+  const only=await mountPage(page,server,'open-ledger-'+Date.now(),current,current,null,ledgerScript(current,current,LEDGER_BEFORE,LEDGER_AFTER));
+  await expect(items(only)).toHaveText(['Modified · Coverage ledger']);
+  await expect(items(only).nth(0)).toHaveAttribute('aria-current','true');
+  await expect(textBlocks(only)).toHaveCount(2);
 });

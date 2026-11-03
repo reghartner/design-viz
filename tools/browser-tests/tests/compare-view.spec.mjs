@@ -32,6 +32,10 @@
                        and the document keydown listener count is back to its pre-open value; while
                        open there are 4 more (2 renders + 2 canvases); JS heap after GC grows <= 10%
                        from cycle 2 to 20                                                          rejects: leaked renders/listeners
+   V2c ledger diff     #892 (Chuck 2026-11-03 "Line diff in view"): selecting the coverage-ledger change
+                       shows its lines in the dialog's Focused area ("Compare fixture." on the After side
+                       as an added line); the Details panel stays closed and the position text no longer
+                       says "Shown in Details"                                                    rejects: ledger only in Details
    V9 stale gating     unchanged: covered by folder-agent.spec.mjs "an open review refreshes
                        visibly and cannot accept the new version as the old review" (kept as is) */
 /* The agent-folder fixture serves its own origin, so these tests use plain
@@ -115,6 +119,18 @@ test('V2b selecting an added change moves the side without it to that change\'s 
     await items.nth(0).click();await expect.poll(section,{message:'precondition: Before is on the first section'}).toBe('1');
     await expect(items.nth(4)).toHaveText(ITEMS[4]);await items.nth(4).click();
     await expect.poll(section,{message:'the Before pane moves to the Notes section of the added node'}).toBe('2');
+  });
+});
+test('V2c selecting the coverage-ledger change shows its lines in the dialog, not in Details',async({page})=>{
+  await withProposal(page,async()=>{
+    const host=page.locator('#agent-update-compare'),items=rail(host).locator('button.compare-rail-item');
+    await expect(items.nth(5)).toHaveText(ITEMS[5]);await items.nth(5).click();await expect(items.nth(5)).toHaveAttribute('aria-current','true');
+    const after=host.locator('.compare-focus .compare-text-side[data-side="after"]');
+    await expect(after.locator('.compare-text-body').filter({hasText:/^Compare fixture\.$/})).toHaveCount(1);
+    await expect(after.locator('ins').filter({hasText:/^Compare fixture\.$/})).toHaveCount(1);
+    await expect(page.locator('#agent-update-details-panel')).toBeHidden();
+    await expect(page.locator('#agent-update-position')).toContainText('6 of 6');
+    await expect(page.locator('#agent-update-position')).not.toContainText('Shown in Details');
   });
 });
 test('V3 Next/Previous and J/K move the selection in both directions with wrap-around and move both panes',async({page})=>{

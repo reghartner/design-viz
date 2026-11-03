@@ -4,7 +4,8 @@
    mountCompareView(host, {before, after, entries, skin, mode, ids, onSelect})
      mode          'focused' (default) or 'full'; Focused shows step and panel changes as each
                    side's step controls plus only the panels that differ (other changes show the
-                   full panes); Full shows both full renders
+                   full panes; a coverage-ledger or page-field change shows its changed lines as
+                   text, #892); Full shows both full renders
      before/after  normalized pages to render (already topology-resolved), or null
      entries       compareDocuments() output (src/core/compare.js)
      ids           optional element ids for the pane scroll/view nodes
@@ -200,6 +201,62 @@ function compareStepText(step){ return step && typeof step.text === 'string' ? s
 function compareCarriedText(title, from, to){
   return from === to ? title + ' differs at step ' + from + ' only' : title + ' differs from step ' + from + ' through step ' + to;
 }
+/* ---------- Line diff for text changes (#892) ----------
+   A coverage-ledger change or a page-level field change has no rendered object: Focused mode
+   shows it as text blocks, Before lines left and After lines right, only the changed lines. */
+function compareLedgerRange(path){
+  var m = /^ledger:(\d+)-(\d+)$/.exec(path || '');
+  return m ? {from:Number(m[1]), to:Number(m[2])} : null;
+}
+function compareRangeText(r){
+  if (!r) return 'no ledger';
+  return r.to < r.from ? 'no lines' : r.from === r.to ? 'line ' + r.from : 'lines ' + r.from + '-' + r.to;
+}
+function compareValueLines(v){
+  if (v === undefined) return null;
+  return (typeof v === 'string' ? v : JSON.stringify(v, null, 2)).split('\n');
+}
+/* Diff of two lines that keeps their exact text: words and whitespace runs are separate tokens, so
+   indentation, repeated spaces and whitespace-only edits survive. Runs concatenate back to each line. */
+function compareLineDiff(before, after){
+  var a = String(before).match(/\s+|\S+/g) || [], b = String(after).match(/\s+|\S+/g) || [], runs = [];
+  function push(op, text){ var last = runs[runs.length - 1]; if (last && last.op === op) last.text += text; else runs.push({op:op, text:text}); }
+  var start = 0, endA = a.length, endB = b.length, i, j;
+  while (start < endA && start < endB && a[start] === b[start]) start++;
+  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]){ endA--; endB--; }
+  for (i = 0; i < start; i++) push('same', a[i]);
+  var ma = a.slice(start, endA), mb = b.slice(start, endB), n = ma.length, m = mb.length;
+  if ((n + 1) * (m + 1) > COMPARE_WORD_DIFF_CELLS){ ma.forEach(function(t){ push('del', t); }); mb.forEach(function(t){ push('ins', t); }); }
+  else {
+    var L = [];
+    for (i = 0; i <= n; i++) L.push(new Int32Array(m + 1));
+    for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--) L[i][j] = ma[i] === mb[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    i = 0; j = 0;
+    while (i < n || j < m){
+      if (i < n && j < m && ma[i] === mb[j]){ push('same', ma[i]); i++; j++; }
+      else if (j < m && (i >= n || L[i][j + 1] > L[i + 1][j])){ push('ins', mb[j]); j++; }
+      else if (i < n){ push('del', ma[i]); i++; }
+    }
+  }
+  for (i = endA; i < a.length; i++) push('same', a[i]);
+  return runs;
+}
+/* Blocks for a text entry, or null when the entry is not one: [{title, numbered, before, after}]
+   where each side is {lines, from} or null (absent on that side). */
+function compareTextBlocks(entry){
+  if (entry.kind === 'ledger') return (entry.fields || []).map(function(f){
+    var rb = compareLedgerRange(f.beforePath), ra = compareLedgerRange(f.afterPath);
+    var part = function(r, text){ if (!r || typeof text !== 'string') return null; return {from:r.from, lines:r.to < r.from ? [] : text.split('\n')}; };
+    return {title:'Before ' + compareRangeText(rb) + ' · After ' + compareRangeText(ra), numbered:true, missing:'No coverage ledger',
+      before:part(rb, f.before), after:part(ra, f.after)};
+  });
+  if (entry.kind === 'document' && entry.status === 'modified' && (entry.fields || []).length) return entry.fields.map(function(f){
+    var b = f.beforePath == null ? null : compareValueLines(f.before), a = f.afterPath == null ? null : compareValueLines(f.after);
+    return {title:String(f.afterPath != null ? f.afterPath : f.beforePath), numbered:false, missing:'Not set',
+      before:b && {from:1, lines:b}, after:a && {from:1, lines:a}};
+  });
+  return null;
+}
 function mountCompareView(host, opts){
   opts = opts || {};
   var doc = host.ownerDocument || document, entries = opts.entries || [], pages = {before:opts.before || null, after:opts.after || null};
@@ -207,6 +264,8 @@ function mountCompareView(host, opts){
   var mode = opts.mode === 'full' ? 'full' : 'focused', focusCtx = null, displayOnlyCache = new Map(), ambientOnly = false;
   /* Node and connection crop (#848 PR 3): the selection's crop, its zoom-out level (-1 = whole section). */
   var cropCtx = null, cropLevel = 0, cropSelection = false;
+  /* Text blocks of the selected ledger or page-field change (#892), else null. */
+  var textCtx = null;
   function el(tag, cls, text){ var n = doc.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
   host.replaceChildren();
   var root = el('div', 'compare-view'), rail = el('nav', 'compare-rail'), columns = el('div', 'compare-columns');
@@ -226,6 +285,9 @@ function mountCompareView(host, opts){
   root.appendChild(rail); root.appendChild(main); host.appendChild(root);
   /* Rail: groups in first-appearance order (entries are in document order). */
   var groups = compareRailGroups(entries, pages);
+  /* The view opens on the first change with a rendered object; a ledger or page-field change (a
+     line diff only) is opened first only when every change is one. */
+  var opening = Math.max(0, entries.findIndex(function(e){ return !compareTextBlocks(e); }));
   var buttons = [];
   groups.forEach(function(g){
     var box = el('section', 'compare-rail-group'), list = el('ol', 'compare-rail-list');
@@ -250,11 +312,11 @@ function mountCompareView(host, opts){
     scroll.tabIndex = 0; scroll.appendChild(view); pane.appendChild(head); pane.appendChild(scroll); columns.appendChild(pane);
     panes[side] = {pane:pane, scroll:scroll, view:view, ctl:null, canvas:null, page:pages[side]};
     if (!pages[side]){ view.appendChild(el('p', 'compare-pane-empty', opts.emptyText && opts.emptyText[side] || (side === 'before' ? 'Not in the current document.' : 'Not in the proposal.'))); return; }
-    var p = panes[side], first = side === 'before' && entries.length ? (entries[0].section || {}).before : null, partial = first != null ? comparePartialPage(pages.before, first) : null;
+    var p = panes[side], first = side === 'before' && entries.length ? (entries[opening].section || {}).before : null, partial = first != null ? comparePartialPage(pages.before, first) : null;
     if (partial){ p.partial = first; renderPane(p, partial); } else renderPane(p, pages[side]);
   }); });
   decorate();
-  /* The Before pane opens with only the first change's section; the rest of
+  /* The Before pane opens with only the opening change's section; the rest of
      the document replaces it right after the first paint (or at once when a
      change in another section is selected). */
   var win = doc.defaultView, completion = 0, completionIdle = 0;
@@ -613,8 +675,38 @@ function mountCompareView(host, opts){
     focus.replaceChildren();
   }
   function addSkin(node, name){ if (typeof skinClasses === 'function') skinClasses(name).forEach(function(c){ node.classList.add(c); }); }
+  function renderText(){
+    var box = el('div', 'compare-text');
+    textCtx.forEach(function(block){
+      var node = el('section', 'compare-text-block'), cols = el('div', 'compare-text-cols');
+      node.appendChild(el('h3', 'compare-text-title', block.title));
+      var bl = block.before ? block.before.lines : [], al = block.after ? block.after.lines : [];
+      ['before', 'after'].forEach(function(side){
+        var part = block[side], col = el('div', 'compare-text-side');
+        col.setAttribute('data-side', side);
+        if (!part){ col.appendChild(el('p', 'compare-text-missing', block.missing)); cols.appendChild(col); return; }
+        part.lines.forEach(function(line, i){
+          var row = el('div', 'compare-text-line'), body = el('span', 'compare-text-body'), other = side === 'before' ? al[i] : bl[i];
+          if (block.numbered) row.appendChild(el('span', 'compare-text-num', String(part.from + i)));
+          /* A line with a counterpart at the same position marks its changed words; a line
+             without one is wholly removed or added. */
+          var mark = side === 'before' ? 'del' : 'ins';
+          if (other == null){ if (line !== '') body.appendChild(el(mark, null, line)); }
+          else compareLineDiff(side === 'before' ? line : other, side === 'before' ? other : line).forEach(function(run){
+            if (run.op !== 'same' && run.op !== mark) return;
+            body.appendChild(run.op === 'same' ? doc.createTextNode(run.text) : el(mark, null, run.text));
+          });
+          row.appendChild(body); col.appendChild(row);
+        });
+        cols.appendChild(col);
+      });
+      node.appendChild(cols); box.appendChild(node);
+    });
+    focus.appendChild(box);
+  }
   function renderFocus(){
     cleanFocus();
+    if (textCtx){ renderText(); return; }
     var ctx = focusCtx; if (!ctx) return;
     var head = el('div', 'compare-focus-head');
     ['before', 'after'].forEach(function(side){
@@ -880,10 +972,10 @@ function mountCompareView(host, opts){
     });
   }
   function applyMode(){
-    var entry = entries[selected], focused = mode === 'focused' && !!focusCtx;
+    var entry = entries[selected], focused = mode === 'focused' && !!(focusCtx || textCtx);
     focus.hidden = !focused;
     columns.style.visibility = focused ? 'hidden' : '';
-    modeNote.hidden = !(mode === 'focused' && entry && !focusCtx && !cropCtx);
+    modeNote.hidden = !(mode === 'focused' && entry && !focusCtx && !cropCtx && !textCtx);
     cropButtons.out.hidden = cropButtons.whole.hidden = !(mode === 'focused' && cropCtx);
     modeButtons.focused.setAttribute('aria-pressed', String(mode === 'focused'));
     modeButtons.full.setAttribute('aria-pressed', String(mode === 'full'));
@@ -911,13 +1003,16 @@ function mountCompareView(host, opts){
     var result = {before:before, after:after, label:compareEntryLabel(entry, pages), initial:!!initial};
     decorate();
     ambientOnly = false;
-    try{ focusCtx = buildFocus(entry); }catch(ex){ focusCtx = null; }
+    textCtx = compareTextBlocks(entry);
+    try{ focusCtx = textCtx ? null : buildFocus(entry); }catch(ex){ focusCtx = null; }
     syncPaneSteps();
     if (ambientOnly) ambientPanes(entry);
-    try{ cropCtx = focusCtx ? null : buildCrop(entry); }catch(ex){ cropCtx = null; }
+    try{ cropCtx = focusCtx || textCtx ? null : buildCrop(entry); }catch(ex){ cropCtx = null; }
     if (!cropCtx) cropSelection = false;
     renderFocus(); applyMode(); applyCrop();
     result.focused = mode === 'focused' && !!focusCtx;
+    /* A ledger or page-field change shown as a line diff (Focused mode only). */
+    result.text = mode === 'focused' && !!textCtx;
     result.cropped = mode === 'focused' && !!cropCtx;
     if (opts.onSelect) opts.onSelect(entry, selected, result);
     return result;
@@ -931,7 +1026,7 @@ function mountCompareView(host, opts){
   }
   doc.addEventListener('keydown', onKey);
   applyMode();
-  if (entries.length) withPathGeometryCache(geometry || new Map(), function(){ select(0, true); });
+  if (entries.length) withPathGeometryCache(geometry || new Map(), function(){ select(opening, true); });
   if (panes.before.partial == null) geometry = null;
   return {
     select:select,

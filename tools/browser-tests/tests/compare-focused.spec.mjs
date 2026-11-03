@@ -70,8 +70,38 @@
                   n0..n11 in Before                                            rejects: unframed added node
    C5 reset       selecting another node change after Whole section crops again (the zoom level
                   belongs to one selection)                                    rejects: sticky Whole section
-   excluded       section heading / ledger / document text diffs (issue row 2b's ledger and heading
-                  cases, row 7b): not in PR 2 per the issue's PR split; node/edge crop: PR 3 */
+   T1-T5: issue #892 (Chuck 2026-11-03: "Line diff in view": the Focused area shows Before lines
+   left, After lines right, only the changed lines, changed words marked; page-level fields as
+   Before/After values; coverage = extend this spec and compare-view.spec.mjs).
+   T1 ledger      a modified coverage ledger with two separate hunks: exactly two blocks headed
+                  "Before line 3 · After line 3" and "Before line 5 · After lines 5-6"; each side
+                  holds only its changed lines with their line numbers; removed words are <del> on
+                  the Before side only, added words <ins> on the After side only (a whole added line
+                  is one <ins>); unchanged lines (e.g. "Paths preserved.") are absent; no diagram
+                  node or edge is visible                                       rejects: whole ledger; one side; unmarked words
+   T2 page field  a changed page title and an added page description (page metadata): two blocks
+                  headed "title" and "description"; title Before "Doorbell", After "Doorbell v2" with
+                  "v2" as the only <ins>; description Before "Not set", After the whole text as one
+                  <ins>; no <del>, no line numbers                             rejects: raw JSON dump; Details-only; blank absent side
+   T3 added /     a ledger only in the proposal: heading "Before no ledger · After lines 1-2";
+      removed     Before shows "No coverage ledger"; After lists both lines, each one <ins>. A ledger
+                  only in the current document: "Before lines 1-2 · After no ledger"; After shows "No
+                  coverage ledger"; Before lists both lines, each one <del>    rejects: empty column; unmarked lines
+   T4 full        Full diagram on a ledger change hides the line diff and shows both panes;
+                  Focused shows it again                                       rejects: line diff stuck in Full mode
+   T5 untrusted   markup in a ledger line and in the title stays literal text (no element made,
+                  no script run)                                               rejects: innerHTML rendering
+   T7 whitespace  a ledger whose edits change only whitespace (indent "  - item" -> "    - item", a double
+                  space "a  b" -> "a b"): each line shows its exact text (indentation and repeated spaces
+                  kept, compared without normalization), the removed whitespace is a <del> on the Before
+                  side and the added whitespace an <ins> on the After side      rejects: whitespace collapsed; whitespace-only edits unmarked
+   T6 opening     a proposal that changes the page title and a step's panel opens on the step
+                  change (its rail item current, the Focused panel row shown), not on the title
+                  change listed first; a ledger-only comparison opens on the ledger change (T1's
+                  fixture: the first item is current on load)                  rejects: opening on a text-only change while a diagram change exists
+                  (the onboarding tour's preview step, workbench-onboarding.spec.mjs, needs both panes)
+   excluded       section heading text diffs (issue row 7b): a heading change shows the full panes;
+                  not in #892 */
 import {test,expect} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -495,4 +525,141 @@ test('C6 an added node crops the After pane to it and the Before pane to its nei
   await items(host).nth(i).click();await expect(items(host).nth(i)).toHaveAttribute('aria-current','true');
   await exerciseCrop(host,{inside:{before:['n11'],after:['n11','x']},far:['n0','n1'],all:IDS.concat(['x']),
     changed:{before:null,after:['data-dv-node','x','added']},neighbour:['data-dv-node','n11'],ref:'n11',keep:{before:['n11'],after:['x']},ends:{before:['n0','n11'],after:['n0','x']}});
+});
+
+/* ---------- #892: line diff for the coverage ledger and page-level fields ---------- */
+const LEDGER_BEFORE='# Coverage\n\nNode b is named API.\nPaths preserved.\nStep s3 confirms.\nEnd.';
+const LEDGER_AFTER='# Coverage\n\nNode b is named Gateway.\nPaths preserved.\nStep s3 confirms the write.\nNew line.\nEnd.';
+const ledgerScript=(current,proposed,ledgerA,ledgerB)=>`var a=FlowviewCompare.normalize(${inline(current)}),b=FlowviewCompare.normalize(${inline(proposed)});
+  var entries=FlowviewCompare.compare({authored:a,resolved:a,ledger:${inline(ledgerA)}},{authored:b,resolved:b,ledger:${inline(ledgerB)}});
+  window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),{before:a,after:b,entries:entries});`;
+const textBlocks=host=>host.locator('.compare-focus .compare-text-block');
+const textSide=(block,s)=>block.locator('.compare-text-side[data-side="'+s+'"]');
+async function selectItem(host,re){
+  const labels=await items(host).allInnerTexts(),i=labels.findIndex(l=>re.test(l));
+  expect(i,'precondition: the rail lists '+re+' in '+JSON.stringify(labels)).toBeGreaterThanOrEqual(0);
+  await items(host).nth(i).click();await expect(items(host).nth(i)).toHaveAttribute('aria-current','true');
+}
+async function sideLines(block,s){
+  return textSide(block,s).locator('.compare-text-line').evaluateAll(list=>list.map(l=>{
+    const n=l.querySelector('.compare-text-num');return (n?n.textContent+' ':'')+l.querySelector('.compare-text-body').textContent;}));
+}
+
+test('T1 a modified coverage ledger shows only its changed lines, Before left and After right, with marked words',async({page,server})=>{
+  const {current}=doorbell();
+  const host=await mountPage(page,server,'ledger-diff-'+Date.now(),current,current,null,ledgerScript(current,current,LEDGER_BEFORE,LEDGER_AFTER));
+  await selectItem(host,/^Modified · Coverage ledger$/);
+  await expect(modeBar(host).getByRole('button',{name:'Focused',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(host.locator('.compare-focus')).toBeVisible();await noGraphVisible(host);
+  const blocks=textBlocks(host);await expect(blocks).toHaveCount(2);
+  await expect(blocks.locator('.compare-text-title')).toHaveText(['Before line 3 · After line 3','Before line 5 · After lines 5-6']);
+  expect(await sideLines(blocks.nth(0),'before')).toEqual(['3 Node b is named API.']);
+  expect(await sideLines(blocks.nth(0),'after')).toEqual(['3 Node b is named Gateway.']);
+  expect(await sideLines(blocks.nth(1),'before')).toEqual(['5 Step s3 confirms.']);
+  expect(await sideLines(blocks.nth(1),'after')).toEqual(['5 Step s3 confirms the write.','6 New line.']);
+  await expect(textSide(blocks.nth(0),'before').locator('del')).toHaveText(['API.']);
+  await expect(textSide(blocks.nth(0),'after').locator('ins')).toHaveText(['Gateway.']);
+  await expect(textSide(blocks.nth(1),'before').locator('del')).toHaveText(['confirms.']);
+  await expect(textSide(blocks.nth(1),'after').locator('ins')).toHaveText(['confirms the write.','New line.']);
+  for(const b of [0,1]){
+    await expect(textSide(blocks.nth(b),'before').locator('ins'),'no added words on the Before side').toHaveCount(0);
+    await expect(textSide(blocks.nth(b),'after').locator('del'),'no removed words on the After side').toHaveCount(0);
+  }
+  await expect(host.locator('.compare-focus .compare-text')).not.toContainText('Paths preserved.');
+  await expect(host.locator('.compare-focus .compare-text')).not.toContainText('# Coverage');
+});
+
+test('T2 a changed page title and an added page description show their Before and After values',async({page,server})=>{
+  const {current}=doorbell(),proposed=plain(current);proposed.page.title='Doorbell v2';proposed.page.description='Ring flow for the front door';
+  const host=await mountPage(page,server,'title-diff-'+Date.now(),current,proposed);
+  await selectItem(host,/^Modified · Document · title, description$/);
+  await expect(host.locator('.compare-focus')).toBeVisible();await noGraphVisible(host);
+  const blocks=textBlocks(host);await expect(blocks).toHaveCount(2);
+  await expect(blocks.locator('.compare-text-title')).toHaveText(['title','description']);
+  expect(await sideLines(blocks.nth(0),'before')).toEqual(['Doorbell']);
+  expect(await sideLines(blocks.nth(0),'after')).toEqual(['Doorbell v2']);
+  await expect(textSide(blocks.nth(0),'after').locator('ins')).toHaveText(['v2']);
+  await expect(textSide(blocks.nth(1),'before').locator('.compare-text-missing')).toHaveText('Not set');
+  await expect(textSide(blocks.nth(1),'before').locator('.compare-text-line')).toHaveCount(0);
+  expect(await sideLines(blocks.nth(1),'after')).toEqual(['Ring flow for the front door']);
+  await expect(textSide(blocks.nth(1),'after').locator('ins')).toHaveText(['Ring flow for the front door']);
+  await expect(blocks.locator('del')).toHaveCount(0);
+  await expect(blocks.locator('.compare-text-num'),'page fields have no line numbers').toHaveCount(0);
+});
+
+test('T3 a ledger only on one side lists its lines as added or removed beside "No coverage ledger"',async({page,server})=>{
+  const {current}=doorbell();
+  const host=await mountPage(page,server,'ledger-added-'+Date.now(),current,current,null,ledgerScript(current,current,null,'First line\nSecond line'));
+  await selectItem(host,/^Added · Coverage ledger$/);
+  const blocks=textBlocks(host);await expect(blocks).toHaveCount(1);
+  await expect(blocks.locator('.compare-text-title')).toHaveText(['Before no ledger · After lines 1-2']);
+  await expect(textSide(blocks.nth(0),'before').locator('.compare-text-missing')).toHaveText('No coverage ledger');
+  await expect(textSide(blocks.nth(0),'before').locator('.compare-text-line')).toHaveCount(0);
+  expect(await sideLines(blocks.nth(0),'after')).toEqual(['1 First line','2 Second line']);
+  await expect(textSide(blocks.nth(0),'after').locator('ins')).toHaveText(['First line','Second line']);
+  const gone=await mountPage(page,server,'ledger-removed-'+Date.now(),current,current,null,ledgerScript(current,current,'Old one\nOld two',null));
+  await selectItem(gone,/^Removed · Coverage ledger$/);
+  const removed=textBlocks(gone);await expect(removed).toHaveCount(1);
+  await expect(removed.locator('.compare-text-title')).toHaveText(['Before lines 1-2 · After no ledger']);
+  await expect(textSide(removed.nth(0),'after').locator('.compare-text-missing')).toHaveText('No coverage ledger');
+  await expect(textSide(removed.nth(0),'after').locator('.compare-text-line')).toHaveCount(0);
+  expect(await sideLines(removed.nth(0),'before')).toEqual(['1 Old one','2 Old two']);
+  await expect(textSide(removed.nth(0),'before').locator('del')).toHaveText(['Old one','Old two']);
+  await expect(removed.locator('ins')).toHaveCount(0);
+});
+
+test('T4 Full diagram hides the line diff and shows both panes; Focused shows it again',async({page,server})=>{
+  const {current}=doorbell();
+  const host=await mountPage(page,server,'ledger-full-'+Date.now(),current,current,null,ledgerScript(current,current,LEDGER_BEFORE,LEDGER_AFTER));
+  await selectItem(host,/^Modified · Coverage ledger$/);
+  await expect(textBlocks(host)).toHaveCount(2);await expect(textBlocks(host).first()).toBeVisible();
+  await modeBar(host).getByRole('button',{name:'Full diagram',exact:true}).click();
+  await expect(host.locator('.compare-focus')).toBeHidden();
+  for(const s of ['before','after'])await expect(host.locator('.compare-pane[data-side="'+s+'"] [data-dv-node="bell"]:visible').first()).toBeVisible();
+  await modeBar(host).getByRole('button',{name:'Focused',exact:true}).click();
+  await expect(textBlocks(host).first()).toBeVisible();await noGraphVisible(host);
+});
+
+test('T5 markup in a ledger line and in the page title stays literal text',async({page,server})=>{
+  const {current}=doorbell(),proposed=plain(current),evil='<img src=x onerror="window.pwned=1"><b>bold</b>';proposed.page.title='Doorbell '+evil;
+  const host=await mountPage(page,server,'text-untrusted-'+Date.now(),current,proposed,null,ledgerScript(current,proposed,'Safe line','Safe line\n'+evil));
+  await selectItem(host,/^Modified · Document · title$/);
+  expect(await sideLines(textBlocks(host).nth(0),'after')).toEqual(['Doorbell '+evil]);
+  await expect(host.locator('.compare-focus img, .compare-focus b')).toHaveCount(0);
+  await selectItem(host,/^Modified · Coverage ledger$/);
+  expect(await sideLines(textBlocks(host).nth(0),'after')).toEqual(['2 '+evil]);
+  await expect(host.locator('.compare-focus img, .compare-focus b')).toHaveCount(0);
+  expect(await page.evaluate(()=>window.pwned)).toBeUndefined();
+});
+
+test('T6 the view opens on the first diagram change when page-field changes are listed before it',async({page,server})=>{
+  const {current,proposed}=doorbell();proposed.page.title='Doorbell v2';
+  const host=await mountPage(page,server,'open-diagram-'+Date.now(),current,proposed);
+  const labels=await items(host).allInnerTexts();
+  expect(labels[0],'precondition: the title change is listed first').toBe('Modified · Document · title');
+  const step=labels.findIndex(l=>/^Modified · Step s6 · /.test(l));
+  expect(step,'precondition: the rail lists the step 6 change in '+JSON.stringify(labels)).toBeGreaterThan(0);
+  await expect(items(host).nth(step)).toHaveAttribute('aria-current','true');
+  await expect(items(host).nth(0)).toHaveAttribute('aria-current','false');
+  await expect(textBlocks(host)).toHaveCount(0);
+  await expect(rows(host).first()).toBeVisible();
+  const only=await mountPage(page,server,'open-ledger-'+Date.now(),current,current,null,ledgerScript(current,current,LEDGER_BEFORE,LEDGER_AFTER));
+  await expect(items(only)).toHaveText(['Modified · Coverage ledger']);
+  await expect(items(only).nth(0)).toHaveAttribute('aria-current','true');
+  await expect(textBlocks(only)).toHaveCount(2);
+});
+
+test('T7 whitespace-only ledger edits keep their exact text and are marked',async({page,server})=>{
+  const {current}=doorbell();
+  const host=await mountPage(page,server,'ledger-space-'+Date.now(),current,current,null,
+    ledgerScript(current,current,'# Coverage\n  - item one\nkeep\na  b','# Coverage\n    - item one\nkeep\na b'));
+  await selectItem(host,/^Modified · Coverage ledger$/);
+  const blocks=textBlocks(host);await expect(blocks).toHaveCount(2);
+  const exact=(block,s)=>textSide(block,s).evaluate(col=>({
+    lines:[...col.querySelectorAll('.compare-text-body')].map(b=>b.textContent),
+    marks:[...col.querySelectorAll('del, ins')].map(m=>m.tagName.toLowerCase()+':'+JSON.stringify(m.textContent))}));
+  expect(await exact(blocks.nth(0),'before')).toEqual({lines:['  - item one'],marks:['del:"  "']});
+  expect(await exact(blocks.nth(0),'after')).toEqual({lines:['    - item one'],marks:['ins:"    "']});
+  expect(await exact(blocks.nth(1),'before')).toEqual({lines:['a  b'],marks:['del:"  "']});
+  expect(await exact(blocks.nth(1),'after')).toEqual({lines:['a b'],marks:['ins:" "']});
 });

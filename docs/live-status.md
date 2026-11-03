@@ -203,8 +203,10 @@ Export project preserves parent keys in `tracking.jira.epic`, exclusions in
 controls are desktop-only.
 
 When the document has tickets, **Demo live status** beside **Preview** supplies
-sample states in sorted ticket order. It starts off and stays preview-only across
-ordinary edits and skin changes; it never saves status to the spec or contacts Jira.
+sample states in sorted ticket order. It starts off when a project opens, except
+from the built-in **Epic status board** template (**Start new project → Delivery
+status**), which opens with it on. It stays preview-only across ordinary edits and
+skin changes; it never saves status to the spec or contacts Jira.
 This offline preview treats the configured parent as a direct Epic: an opaque
 Jira key alone cannot establish its type. Automatic initiative detection requires
 Jira metadata. A standalone demo timeline or host provider can supply the runtime
@@ -309,7 +311,7 @@ and Export project preserve the panel. There are no authored state or patch fiel
 
 The panel header holds **Live**, distinct-ticket counts, a connector indicator
 (a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
-amber while connecting or awaiting approval, green when connected or in demo mode,
+blue (`--dv-live-active`) while connecting or awaiting approval, green when connected or in demo mode,
 red on error, and it pulses while a fetch is in flight; the time is the last successful
 fetch, not a ticket's change time), provider note and action, **First blocker**, and
 demo **Play/Pause** and **Next day** when demo controls are supplied. The engine's panel title stays above this header.
@@ -482,7 +484,10 @@ Hosts and adapters may call `ctl.liveStatus.status({state, busy, checkedAt, sour
 to report their own transport state; invalid fields are ignored. The Atlassian adapter
 reports “Jira” (disconnected without a qualifying connector, approval while consent is
 pending, connected on each delivered watch with the cache time, error with `busy` while
-a retry is scheduled); the demo player reports “Demo”.
+a retry is scheduled). The demo player and the Workbench's **Demo live status** both
+report “Demo” with state `demo`: although the Workbench passes its sample states as a
+provider, its connection is labelled “Demo”, not “Host connected”. The checkbox keeps its
+**Demo live status** label.
 Counts are per distinct referenced ticket, independent
 of visibility and toggle state. `apply` replaces the map; `clear` empties it.
 Entries for stories without a carrier are accepted too. Set their `epic` to the

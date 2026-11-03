@@ -45,7 +45,9 @@ function createWorkbenchAgentExchange(opts){
       }
       // Remain synchronous for transports without asynchronous preparation.
       // This context comes only from the editor callback, never proposal fields.
-      if(outcome.ok && opts.prepare)return Promise.resolve().then(function(){return opts.prepare(outcome.source);}).then(validated,function(ex){return blocked('The combined story failed validation: '+ex.message);});
+      // The proposal itself goes along only for its helper provider snapshot (#883),
+      // raw bytes the editor validates; its closure is never trusted as resolved.
+      if(outcome.ok && opts.prepare)return Promise.resolve().then(function(){return opts.prepare(outcome.source,proposal);}).then(validated,function(ex){return blocked('The combined story failed validation: '+ex.message);});
       return validated();
     },
     request:function(){return {clientId:opts.clientId,snapshot:snapshot(),result:pending};},

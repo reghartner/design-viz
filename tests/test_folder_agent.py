@@ -149,6 +149,66 @@ class FolderAgentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'escapes'):
             helper.local_provider_snapshot(json.dumps(diagram), repository, 'selection')
 
+    # #883 contract matrix (design A, Chuck 2026-11-02): in helper mode, `propose` attaches a
+    # snapshot of exactly the candidate's local provider closure, read from the repository the
+    # consumer's helper already selected with refresh-sources --source-repo.
+    # row | fixture | assertion (scoped) | rejects
+    # H1 candidate outside the current closure | helper selection = provider_repository(), state
+    #    source imports nothing, candidate imports middle (which imports base) | proposal.json
+    #    sources: providers exactly base+middle with their bytes, manifest == canon.json,
+    #    selectionId == the selection's, keys == the snapshot shape, no absolute repository path |
+    #    a propose that attaches nothing (today); a snapshot of the whole registry (unrelated)
+    # H2 no helper selection (browser-grant consumer) | same candidate, no
+    #    local-sources-selection.json | proposal.json has no sources key | attaching a snapshot
+    #    from a repository the helper never selected
+    # H3 no new provider id (coordinator ruling 2026-11-02: attach only when the candidate
+    #    imports a provider id the current draft does not import directly) | helper selection;
+    #    state source and candidate both import middle, candidate also adds a local node |
+    #    proposal.json has no sources key | attaching a snapshot on every propose, which would
+    #    refresh frozen providers through an unrelated edit
+    def helper_selected_proposal(self, selection, current=None, nodes=None):
+        if selection:
+            self.put('local-sources-selection.json', selection)
+        self.refresh_ready(acceptsSnapshot=True, mode='agent-snapshot', needsSnapshot=True,
+                           sourceSelectionId=selection['selectionId'] if selection else None)
+        imports = [{'spec': 'middle', 'export': 'core', 'as': 'shared'}]
+        if current is not None:
+            state = helper.read(self.folder, 'state.json')
+            state['source'] = json.dumps({'page': {'sections': [{'diagram': {'topologyImports': current}}]}})
+            self.put('state.json', state)
+        self.put('request.json', {**self.owner, 'id': 'request', 'text': 'Import middle'})
+        (self.folder/'candidate.spec.json').write_text(json.dumps(
+            {'page': {'sections': [{'diagram': {**({'nodes': nodes} if nodes else {}), 'topologyImports': imports}}]}}))
+        return self.propose()
+
+    def test_propose_attaches_exactly_the_candidate_closure_from_the_helper_selected_repository(self):
+        repository = self.provider_repository()
+        result = self.helper_selected_proposal({'path': str(repository.resolve()), 'selectionId': 'selection-1'})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        proposal = helper.read(self.folder, 'proposal.json')
+        self.assertIn('sources', proposal, 'propose attaches the candidate closure snapshot (#883)')
+        sources = proposal['sources']
+        self.assertEqual(set(sources), {'version', 'manifest', 'providers', 'rootLabel', 'capturedAt', 'selectionId'})
+        self.assertEqual([item['path'] for item in sources['providers']], ['diagrams/base/base.spec.json', 'diagrams/middle/middle.spec.json'])
+        for item in sources['providers']:
+            self.assertEqual(item['source'], (repository/item['path']).read_text(encoding='utf-8'))
+        self.assertEqual(sources['manifest'], (repository/'canon.json').read_text(encoding='utf-8'))
+        self.assertEqual(sources['selectionId'], 'selection-1')
+        self.assertNotIn(str(repository.resolve()), json.dumps(proposal))
+
+    def test_propose_without_a_helper_selection_attaches_no_snapshot(self):
+        result = self.helper_selected_proposal(None)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('sources', helper.read(self.folder, 'proposal.json'))
+
+    def test_propose_importing_no_new_provider_attaches_no_snapshot(self):
+        repository = self.provider_repository()
+        result = self.helper_selected_proposal({'path': str(repository.resolve()), 'selectionId': 'selection-1'},
+                                               current=[{'spec': 'middle', 'export': 'core', 'as': 'shared'}],
+                                               nodes={'local': {'title': 'Local'}})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('sources', helper.read(self.folder, 'proposal.json'))
+
     def test_source_repo_selection_is_helper_private_repeatable_and_requires_reselection_after_undo(self):
         repository = self.provider_repository()
         self.refresh_ready(available=False, acceptsSnapshot=True, code='reconnect_required')

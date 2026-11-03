@@ -283,7 +283,8 @@ The helper grants no browser, installation, server or delegation permission.
 
 For a wholly new diagram, write semantic nodes, edges, panels and steps, then run
 `node tools/compose-page-layout.cjs --section <zero-based-section> <draft> <different-output>`
-from the authoring kit (or checkout) and propose its output. The command handles
+from the authoring kit (or checkout) and propose its output; for a diagram with
+`topologyImports`, add `--resolve-imports <repository folder or registry>`. The command handles
 the initial node placement, panel sizes and step controls. Preserve unrelated
 existing layouts and routes during ordinary edits; a new node uses
 `{id,side:"below",noSpread:true}`. User feedback that the rendered candidate

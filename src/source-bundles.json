@@ -284,6 +284,11 @@
       "sources": [
         "canon.js",
         "validator.js",
+        "core/arrange/placement.js",
+        "core/arrange/routing.js",
+        "core/arrange/graph.js",
+        "core/arrange/groups.js",
+        "workbench/auto-arrange-core.js",
         "workbench/source-edit.js",
         "workbench/targets.js",
         "workbench/commands/common.js",
@@ -291,7 +296,11 @@
       ],
       "exports": {
         "planPlaceOptimally": "planPlaceOptimally",
-        "normalizeAgentPlacement": "normalizeWorkbenchAgentPlacement"
+        "normalizeAgentPlacement": "normalizeWorkbenchAgentPlacement",
+        "planAutoArrange": "planAutoArrange",
+        "arrangementSource": "builderArrangementSource",
+        "autoArrangeCandidates": "autoArrangeCandidates",
+        "FlowTopology": "FlowTopology"
       }
     },
     "status-colors": {

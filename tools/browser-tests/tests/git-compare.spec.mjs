@@ -82,7 +82,8 @@
                                                                                        step, imported node); node a "Alpha" in Before,
                                                                                        "Alpha final" in After
    C2   click through changes (row 3)        J (Focused), Full diagram, rail click, K  Focused aria-pressed by default; on the step change  panes that never follow the selection;
-                                                                                       each side's visible step strip [1] and caption      Full-only, strip-hidden or non-switching
+                                                                                       each side's visible step strip [1], heading named   Full-only, strip-hidden or non-switching
+                                                                                       like the pane title (c1 / c7), and caption
                                                                                        "Start" / "Start the flow"; Full hides the focused  integration
                                                                                        view and shows both panes; aria-current moves
                                                                                        0->1->2->1; pane captions; child::p2 "P two" /
@@ -588,6 +589,9 @@ test('C0 C1 C2: Compare shows From as Before and To as After, and every change c
     await expect(steps).toHaveText(['1']);await expect(steps.first()).toBeVisible();
     await expect(focusSide(side).locator('.compare-focus-caption')).toBeVisible();
   }
+  /* The focused headings name the compared revisions, as the pane titles do. */
+  await expect(focusSide('before').locator('.compare-focus-title')).toHaveText(paneHeading('before',c.c1,'Add flows'));
+  await expect(focusSide('after').locator('.compare-focus-title')).toHaveText(paneHeading('after',c.c7,'Final pass'));
   await expect(focusSide('before').locator('.compare-focus-caption')).toHaveText('Start');
   await expect(focusSide('after').locator('.compare-focus-caption')).toHaveText('Start the flow');
   await modeButton('Full diagram').click();await expect(modeButton('Full diagram')).toHaveAttribute('aria-pressed','true');

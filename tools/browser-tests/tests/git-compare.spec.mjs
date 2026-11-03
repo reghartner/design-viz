@@ -64,7 +64,8 @@
         (P10 also: choosing From again reloads "Between these revisions": exactly one row, twelve1
         "Twelve first"; P10b: the picker lists PR #12 at twelve1, the PR is force-pushed before the
         click: clicking the row marks it "not available locally", the dialog stays open, To stays
-        "No revision chosen")                 rejects: between list following the moved PR; a chooser that
+        "No revision chosen"; P10c: the same when the listed commit is already in the clone (chosen
+        once before the force-push))          rejects: between list following the moved PR; a chooser that
                                               fetches the moved head and accepts the row it no longer matches)
    P7   latest PR click wins                    hold the availability replies for PR #8   rows aria-busy while checked; after #8's row is   an earlier click's late check choosing
                                                                                        no longer busy (#7 still busy): dialog open,
@@ -856,4 +857,37 @@ test('P10b: a pull request force-pushed while the picker is open cannot be chose
   await expect(row).toContainText('not available locally');
   await expect(dialog).toBeVisible();
   await expect(choice(page,'To')).toHaveText('No revision chosen');
+});
+
+test('P10c: a pull request force-pushed while the picker is open is refused even when its listed commit is in the clone',async({page,repo,open})=>{
+  const {c}=repo,{writeFile,readFile}=await import('node:fs/promises');
+  const at=n=>({GIT_AUTHOR_DATE:'2026-01-2'+n+'T10:00:00Z',GIT_COMMITTER_DATE:'2026-01-2'+n+'T10:00:00Z'});
+  const doc=path.join(repo.other,A);
+  const commitOnC7=async(title,subject,n)=>{
+    git(repo.other,['checkout','-q','--detach',c.c7]);
+    const spec=JSON.parse(await readFile(doc,'utf8'));spec.page.sections[0].diagram.nodes.b.title=title;
+    await writeFile(doc,JSON.stringify(spec,null,2)+'\n');git(repo.other,['commit','-qam',subject],at(n));
+    return git(repo.other,['rev-parse','HEAD']);
+  };
+  const first=await commitOnC7('B twelve','Twelve first',1);
+  git(repo.other,['push','-q','origin','HEAD:refs/pull/12/head']);
+  let head=first;
+  const stub=ghStub(c);
+  const gh=async args=>{const out=await stub(args);if(args[0]==='pr' && args[1]==='list')return JSON.stringify(JSON.parse(out).concat([
+    {number:12,title:'Twelve',headRefName:'twelve',headRefOid:head,author:{login:'tess'},updatedAt:'2026-01-22T12:00:00Z',state:'OPEN',mergeCommit:null}]));return out;};
+  await open(gh);
+  /* Choosing PR #12 once fetches its first head into the clone. */
+  await choose(page,'To','Pull requests',first);
+  await expect(choice(page,'To')).toHaveText(choiceText({sha:short(first),date:'2026-01-22 12:00',author:'tess',subject:'Twelve'}));
+  const dialog=await openPicker(page,'From');
+  await dialog.getByRole('tab',{name:'Pull requests'}).click();
+  const row=dialog.getByRole('option').filter({has:page.locator('[data-field="sha"]',{hasText:short(first)})}).first();
+  await expect(row,'precondition: the list shows PR #12 at its first head').toBeVisible();
+  const forced=await commitOnC7('B forced','Twelve forced',2);
+  git(repo.other,['push','-q','-f','origin','HEAD:refs/pull/12/head']);head=forced;
+  await row.click();
+  await expect(row).toHaveAttribute('aria-disabled','true');
+  await expect(row).toContainText('not available locally');
+  await expect(dialog).toBeVisible();
+  await expect(choice(page,'From')).toHaveText('No revision chosen');
 });

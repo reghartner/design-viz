@@ -46,6 +46,10 @@
    G9 many PRs    with 252 pull requests (gh returns at most --limit, default 30) every one is listed (3
                   pages), pr:349 resolves and commit badges include all 250 that share a head
                                                      rejects: a 200 (or default 30) pull request cap
+   G10 control    a commit whose subject and author name contain the bytes 0x1f and 0x1e (and a subject
+       chars      that names a file after 0x1f) keeps its exact subject and author in the revision rows
+                  and the between list, and its file list is exactly the files it changed
+                                                     rejects: git log fields split on a byte commit text can contain
    G7 status      status(): clone path, last fetch time (FETCH_HEAD mtime; null when there is none), gh
                   signed in as <login>; a failing gh gives signedIn false and the command "gh auth login"
                                                      rejects: token in the status payload */
@@ -264,5 +268,27 @@ test('G9 every pull request is listed and resolvable, also past the first 200',a
     assert.equal(await r.resolve('pr:349'),f.c.c1,'a pull request past the first 200 resolves');
     const all=await r.revisions({doc:A,tab:'all'});
     assert.equal(all.rows.find(x=>x.sha===f.c.c1).prs.length,250,'badges come from every pull request');
+  }finally{await fs.rm(f.root,{recursive:true,force:true});}
+});
+
+test('G10 commit text with 0x1f and 0x1e bytes keeps its subject, author and changed files',async()=>{
+  const f=await fixture();
+  try{
+    const when=d=>({GIT_AUTHOR_DATE:d,GIT_COMMITTER_DATE:d});
+    const subject='Split\x1fhere\x1eand here',author='Eve\x1fSep',decoy='Docs\x1fflows/a.spec.json\x1e';
+    const doc=path.join(f.dir,A),spec=JSON.parse(await fs.readFile(doc,'utf8'));spec.page.sections[0].diagram.nodes.a.title='Control';
+    await fs.writeFile(doc,JSON.stringify(spec,null,2)+'\n');git(f.dir,['add','-A']);
+    git(f.dir,['commit','-q','-m',subject],{...when('2026-01-10T10:00:00Z'),GIT_AUTHOR_NAME:author});
+    const one=git(f.dir,['rev-parse','HEAD']);
+    await fs.writeFile(path.join(f.dir,'README.md'),'control\n');git(f.dir,['add','-A']);
+    git(f.dir,['commit','-q','-m',decoy],when('2026-01-11T10:00:00Z'));
+    const two=git(f.dir,['rev-parse','HEAD']);
+    assert.equal(git(f.dir,['log','-1','--format=%s',one]),subject,'precondition: git keeps the bytes in the subject');
+    const r=await adapter(f),rows=(await r.revisions({doc:A,tab:'all'})).rows;
+    const a=rows.find(x=>x.sha===one),b=rows.find(x=>x.sha===two);
+    assert.deepEqual([a.subject,a.author,a.touches],[subject,author,true]);
+    assert.deepEqual([b.subject,b.touches],[decoy,false],'a subject naming a file does not make the commit change it');
+    assert.deepEqual((await r.revisions({doc:A,tab:'document'})).rows.map(x=>x.sha).slice(0,2),[one,f.c.c7]);
+    assert.deepEqual((await r.between({from:f.c.c7,to:two,doc:A})).map(x=>[x.sha,x.subject]),[[one,subject]]);
   }finally{await fs.rm(f.root,{recursive:true,force:true});}
 });

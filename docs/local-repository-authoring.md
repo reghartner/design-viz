@@ -49,7 +49,11 @@ identity; when its provider is missing, the error names both ways to load it:
 While a consumer is connected, the Workbench keeps one provider copy in the
 folder's `.flowview-agent/providers.json`: the provider specs of its frozen
 topology context (local snapshot or site library), as of its last `state.json`
-publication. The bundled validator uses it by default:
+publication. Its payload names the source kind (`local` or `site-library`), for
+a local snapshot its `snapshotSha256` (the selected repository's snapshot hash,
+`localSources.snapshotSha256`, or for a repository opened at its root the hash
+of its frozen provider specs), the consumer identity (`consumerId`) and the
+provider specs. The bundled validator uses it by default:
 
 ```sh
 node <consumer>/.flowview-agent/authoring/tools/validate.js candidate.spec.json

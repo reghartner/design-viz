@@ -144,11 +144,18 @@ function createFolderAgentClient(opts){
     if(!opts.topologyContext)return null;
     if(providerBuild && providerBuild.revision===snap.topologyRevision)return providerBuild;
     // Read the context synchronously with the snapshot whose revision it names.
-    return {revision:snap.topologyRevision,text:JSON.stringify(folderAgentProviderPayload(opts.topologyContext())),hash:null,copy:null};
+    return {revision:snap.topologyRevision,payload:folderAgentProviderPayload(opts.topologyContext()),hash:null,copy:null};
   }
   async function providerCopy(build){
     if(!build)return null;
-    if(build.hash===null){build.hash=await providerHash(build.text);build.copy=folderAgentProviderCopy(build.text,build.hash);}
+    if(build.hash===null){
+      var payload=build.payload;
+      // A selected repository's snapshot hash identifies it (localSources.snapshotSha256).
+      // A repository opened at its root has none; identify its frozen provider specs.
+      if(payload.sourceKind==='local' && typeof payload.snapshotSha256!=='string')
+        payload={sourceKind:'local',snapshotSha256:await providerHash(JSON.stringify(payload.specs)),consumerId:payload.consumerId,specs:payload.specs};
+      var text=JSON.stringify(payload);build.hash=await providerHash(text);build.copy=folderAgentProviderCopy(text,build.hash);build.payload=null;
+    }
     providerBuild=build;return build;
   }
   function stateWithProviders(snap,build){return build?Object.assign({},snap,{providersSha256:build.hash}):snap;}

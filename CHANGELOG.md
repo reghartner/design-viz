@@ -14,11 +14,12 @@
   its neighbours, a coverage ledger or page field change shows only the changed lines
   (#892), and a step edit that only changes highlighted nodes or connections, or a path
   edit, keeps both diagrams under the step controls at the affected step, which the list
-  names ("affects steps 3-4", #893). **Full diagram** shows both full diagrams. Accept
+  names ("affects steps 3-4"; a path label edit opens at step 1 and names none, #893). **Full diagram** shows both full diagrams. Accept
   still applies the whole proposal at once.
 - Git Compare (#849) is a local tool for the same view between two revisions of a git
-  clone (commits, branches, tags, pull requests): `node --max-semi-space-size=1
-  tools/compare/serve.mjs --repo <clone>`. See `docs/git-compare.md`.
+  clone (commits, branches, tags, pull requests): run `python3 tools/build.py`, then
+  `node --max-semi-space-size=1 tools/compare/serve.mjs --repo <clone>`. See
+  `docs/git-compare.md`.
 
 ## Registering a new exporting diagram (2026-11-02)
 

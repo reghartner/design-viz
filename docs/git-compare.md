@@ -23,7 +23,7 @@ The server prints `Git Compare: http://127.0.0.1:<port>/`; open that address. Wi
 `--port` it picks a free port. The flag keeps the server's memory flat under repeated
 comparisons; the server also works without it.
 
-Requirements: Node, `git`, and a local clone of a repository that holds
+Requirements: Node, Python 3 (for the build), `git`, and a local clone of a repository that holds
 `*.spec.json` documents. For pull request names and the **Pull requests** list, sign in
 once with `gh auth login`; the page header says whether `gh` is signed in. The clone
 path and the time of the last fetch are shown in the header too.
@@ -49,8 +49,10 @@ Changing From, To or the document removes the shown comparison and asks you to p
 
 ## What it does to the clone
 
-No request changes the working tree, local branches or tags. **Fetch** updates and
-prunes the `origin` remote-tracking refs (`refs/remotes/origin/*`). Choosing a pull
+No request changes the working tree, local branches or tags. **Fetch** downloads new
+objects from `origin`, updates and prunes the `origin` remote-tracking refs
+(`refs/remotes/origin/*`) and rewrites `.git/FETCH_HEAD`, whose time the header shows as
+the last fetch. Choosing a pull
 request whose commits are not in the clone fetches those commits as objects only, without creating a ref.
 
 ## Safety

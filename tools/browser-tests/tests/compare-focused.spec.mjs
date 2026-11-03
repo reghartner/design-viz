@@ -100,6 +100,26 @@
                   change listed first; a ledger-only comparison opens on the ledger change (T1's
                   fixture: the first item is current on load)                  rejects: opening on a text-only change while a diagram change exists
                   (the onboarding tour's preview step, workbench-onboarding.spec.mjs, needs both panes)
+   D1-D4: issue #893 (Chuck 2026-11-03: "Step strip + diagrams": a step edit that changes only the
+   diagram, and a path edit, keep both full diagram panes set to the affected step, with each side's
+   step strip above them, the affected steps marked; the rail names the affected steps
+   ("affects steps 3-4"); coverage = extend this spec).
+   D1 diagram     a step edit that changes only the highlighted node (s3 nodes app -> hub): rail text
+      step        exactly "Modified · Step s3 · nodes · affects step 3"; selecting it keeps Focused
+                  pressed and shows each side's step strip (12 steps) on step 3 with only step 3 marked
+                  "edited"; both panes stay visible and show step 3's caption ("Mailbox flag rises"),
+                  the After pane highlights (class lit) hub, the Before pane app; no panel rows, no "Use Full diagram" note, no
+                  fallback note                                                rejects: full panes without strips; strips hiding the panes
+   D2 stepping    clicking step 4 on the After strip moves both strips and both panes to step 4
+                  ("Hub checks the camera")                                    rejects: strip moves without the panes; one side only
+   D3 path        a path whose members change (alt: s9 -> s5 at step 5): rail text exactly
+      members     "Modified · Path Short ring · steps · affects step 5"; selecting it shows the alt
+                  path's strips (6 steps each) on step 5, only step 5 marked on both sides; the After
+                  pane shows "Push is delivered" (s5), the Before pane "Stream ends" (s9)
+                                                                              rejects: main path shown; one side without a step
+   D4 path label  a path label edit (no reader effect): rail text exactly "Modified · Path Quick ring
+                  · label" (no affected steps); the strips show that path (6 steps) on step 1 with no
+                  marks; both panes visible                                    rejects: invented affected steps; wrong path
    excluded       section heading text diffs (issue row 7b): a heading change shows the full panes;
                   not in #892 */
 import {test,expect} from '../helpers/test.mjs';
@@ -662,4 +682,72 @@ test('T7 whitespace-only ledger edits keep their exact text and are marked',asyn
   expect(await exact(blocks.nth(0),'after')).toEqual({lines:['    - item one'],marks:['ins:"    "']});
   expect(await exact(blocks.nth(1),'before')).toEqual({lines:['a  b'],marks:['del:"  "']});
   expect(await exact(blocks.nth(1),'after')).toEqual({lines:['a b'],marks:['ins:" "']});
+});
+
+/* ---------- #893: diagram-only step edits and path edits ---------- */
+const paneCaption=(host,s)=>host.locator('.compare-pane[data-side="'+s+'"] .stepline:not(.dv-caption-old)').first();
+const markedSteps=(host,s)=>stepButtons(host,s).evaluateAll(list=>list.filter(b=>b.getAttribute('data-step-mark')).map(b=>b.textContent+':'+b.getAttribute('data-step-mark')));
+async function panesShown(host,label){
+  for(const s of ['before','after'])
+    await expect(host.locator('.compare-pane[data-side="'+s+'"] [data-dv-node="bell"]:visible').first(),label+': the '+s+' pane is shown').toBeVisible();
+}
+function withPaths(){
+  const {current}=doorbell(),d=current.page.blocks[0].diagram;
+  d.paths=[{id:'main',steps:d.steps.map(x=>x.id)},{id:'alt',label:'Short ring',steps:['s1','s2','s3','s4','s9','s10']}];
+  return current;
+}
+
+test('D1 D2 a diagram-only step edit keeps both panes on the step under each side\'s step strip',async({page,server})=>{
+  const {current}=doorbell(),proposed=plain(current);proposed.page.blocks[0].diagram.steps[2].nodes=['hub'];
+  const host=await mountPage(page,server,'step-diagram-'+Date.now(),current,proposed);
+  await expect(items(host)).toHaveText(['Modified · Step s3 · nodes · affects step 3']);
+  await items(host).nth(0).click();await expect(items(host).nth(0)).toHaveAttribute('aria-current','true');
+  await expect(modeBar(host).getByRole('button',{name:'Focused',exact:true})).toHaveAttribute('aria-pressed','true');
+  for(const s of ['before','after']){
+    await expect(stepButtons(host,s)).toHaveCount(12);
+    await expect(currentStep(host,s),s+' strip on step 3').toHaveText('3');
+    expect(await markedSteps(host,s),s+' marks').toEqual(['3:edited']);
+  }
+  await panesShown(host,'D1');
+  for(const s of ['before','after'])await expect(paneCaption(host,s)).toContainText('Mailbox flag rises');
+  await expect(host.locator('.compare-pane[data-side="after"] [data-dv-node="hub"]:visible').first(),'the After pane highlights hub at step 3').toHaveClass(/\blit\b/);
+  await expect(host.locator('.compare-pane[data-side="before"] [data-dv-node="app"]:visible').first(),'the Before pane highlights app at step 3').toHaveClass(/\blit\b/);
+  await expect(rows(host)).toHaveCount(0);
+  await expect(host.locator('.compare-focus-other')).toHaveCount(0);
+  await expect(host.locator('.compare-mode-note')).toBeHidden();
+  await stepButtons(host,'after').filter({hasText:/^4$/}).click();
+  for(const s of ['before','after']){
+    await expect(currentStep(host,s),s+' strip follows to step 4').toHaveText('4');
+    await expect(paneCaption(host,s),s+' pane follows to step 4').toContainText('Hub checks the camera');
+  }
+  await panesShown(host,'D2');
+});
+
+test('D3 a path whose members change shows that path on the affected step in both panes',async({page,server})=>{
+  const current=withPaths(),proposed=plain(current);proposed.page.blocks[0].diagram.paths[1].steps=['s1','s2','s3','s4','s5','s10'];
+  const host=await mountPage(page,server,'path-steps-'+Date.now(),current,proposed);
+  await expect(items(host)).toHaveText(['Modified · Path Short ring · steps · affects step 5']);
+  await items(host).nth(0).click();await expect(items(host).nth(0)).toHaveAttribute('aria-current','true');
+  for(const s of ['before','after']){
+    await expect(stepButtons(host,s),s+' strip shows the 6-step path').toHaveCount(6);
+    await expect(currentStep(host,s),s+' strip on step 5').toHaveText('5');
+    expect(await markedSteps(host,s),s+' marks').toEqual(['5:edited']);
+  }
+  await panesShown(host,'D3');
+  await expect(paneCaption(host,'after')).toContainText('Push is delivered');
+  await expect(paneCaption(host,'before')).toContainText('Stream ends');
+});
+
+test('D4 a path label edit shows that path from step 1 with no affected steps',async({page,server})=>{
+  const current=withPaths(),proposed=plain(current);proposed.page.blocks[0].diagram.paths[1].label='Quick ring';
+  const host=await mountPage(page,server,'path-label-'+Date.now(),current,proposed);
+  await expect(items(host)).toHaveText(['Modified · Path Quick ring · label']);
+  await items(host).nth(0).click();await expect(items(host).nth(0)).toHaveAttribute('aria-current','true');
+  for(const s of ['before','after']){
+    await expect(stepButtons(host,s),s+' strip shows the 6-step path').toHaveCount(6);
+    await expect(currentStep(host,s),s+' strip on step 1').toHaveText('1');
+    expect(await markedSteps(host,s),s+' marks').toEqual([]);
+  }
+  await panesShown(host,'D4');
+  for(const s of ['before','after'])await expect(paneCaption(host,s)).toContainText('Resident presses the doorbell');
 });

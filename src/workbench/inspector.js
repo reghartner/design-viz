@@ -1495,7 +1495,7 @@ function panelPatchControl(pid, patch, decl, target, options){
         commit:function(value){return commitPatch(key,value,false,null,storage);}});
       if(customControl){
         var customWrap=document.createElement('div');customWrap.className='panel-state-assignment panel-state-object';
-        customWrap.appendChild(assignmentMode(customControl,null,{rememberDisabled:false}));customWrap.appendChild(customControl);
+        if(meta.assignment!==false)customWrap.appendChild(assignmentMode(customControl,null,{rememberDisabled:false}));customWrap.appendChild(customControl);
         var customNote=stateNote(meta,key,has);if(customNote)customWrap.appendChild(customNote);
         body.appendChild(frowBlock(stateLabel(key,meta),customWrap));
       } else if (f[1] === 'objf'){

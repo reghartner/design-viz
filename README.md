@@ -138,6 +138,15 @@ Open the [alternate paths example](src/starters/alternate-paths.json), or fork a
 dropped in transit or a communication that was never sent, using broken
 edges on the same diagram. Choose an outcome with each step's **Delivery** control.
 
+**[Live ticket status](docs/live-status.md):** put Jira ticket keys and PR links on
+nodes and connections with **Inspect → Tracking**; the spec stores only these
+references. Where a status provider is present, such as a page published as a
+claude.ai artifact and opened with the viewer's Atlassian connector, each node and
+connection with tickets takes the color of their Jira state. A `live-status` panel, titled
+**Epic status** in the examples, lists the Epic's tickets and progress.
+**Start new project → Epic status board** opens a laid-out board with
+**Demo live status** on.
+
 **New: [Honeycomb trace → diagram](docs/trace-import.md).** In the workbench,
 choose **import trace…**, paste or open event JSON, and **Build diagram**.
 The result is a service board, an offset-aware waterfall, and a step for each

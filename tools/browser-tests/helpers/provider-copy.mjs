@@ -1,6 +1,7 @@
 /* #878 provider copy checks for connected folders. "Copy matches" (ticket #878,
    Test + flip) means: providers.json providersSha256 == sha256(payloadText) ==
-   state.json providersSha256; its payload sourceKind is the source in use; its specs
+   state.json providersSha256; its payload sourceKind is the source in use and its
+   consumerId is the consumer's frozen identity (the candidate spec has no page.canon); its specs
    carry the provider text the consumer renders; and the bundled validate.js, run
    without flags on the consumer, exits 0. */
 import {expect} from './test.mjs';
@@ -21,7 +22,7 @@ export async function copySummary(support){
   if(typeof copy.payloadText!=='string')return {headerOnly:copy};
   const payload=JSON.parse(copy.payloadText),base=(payload.specs || []).find(spec=>spec.page?.canon?.id==='base');
   return {whole:copy.providersSha256===sha256(copy.payloadText),named:typeof state.providersSha256==='string' && state.providersSha256===copy.providersSha256,
-    sourceKind:payload.sourceKind,snapshotSha256:typeof payload.snapshotSha256==='string',
+    sourceKind:payload.sourceKind,snapshotSha256:typeof payload.snapshotSha256==='string',consumerId:payload.consumerId ?? null,
     specs:(payload.specs || []).map(spec=>spec.page?.canon?.id).sort(),baseApi:base?base.page.sections[0].diagram.nodes.api.title:null};
 }
 
@@ -33,9 +34,9 @@ export function bundledValidate(support,...files){
   return spawnSync(process.execPath,[tool,...files],{encoding:'utf8',timeout:30000});
 }
 
-export async function expectCopyMatches(support,consumer,{sourceKind,baseApi,specs=['base','middle'],snapshotSha256=sourceKind==='local'},label){
+export async function expectCopyMatches(support,consumer,{sourceKind,baseApi,consumerId,specs=['base','middle'],snapshotSha256=sourceKind==='local'},label){
   await expect.poll(()=>copySummary(support),{message:label+': copy matches',timeout:15000})
-    .toEqual({whole:true,named:true,sourceKind,snapshotSha256,specs,baseApi});
+    .toEqual({whole:true,named:true,sourceKind,snapshotSha256,consumerId,specs,baseApi});
   const result=bundledValidate(support,consumer);
   expect(result.status,label+': bundled validate.js\n'+result.stdout+result.stderr).toBe(0);
   expect(result.stdout).toContain(consumer+': 0 errors');

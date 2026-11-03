@@ -32,7 +32,7 @@ must fire on the seeded crowded fixture, and --quiet must suppress them.
 # so the tool under test is <consumer>/.flowview-agent/authoring/tools/validate.js.
 # Fixture "base session": .flowview-agent/providers.json = {version 1,
 # providersSha256 = sha256(payloadText), payloadText = JSON of {sourceKind local,
-# snapshotSha256, specs [platform]}}; state.json names that hash with revision
+# snapshotSha256, consumerId, specs [platform]}}; state.json names that hash with revision
 # "connection-7"; editor.json connected, same identity, heartbeat now. The consumer
 # is examples/canon/topology checkout.json (imports platform export core). Each
 # failure row changes exactly one thing in the base session (row 7 proves the base
@@ -58,6 +58,8 @@ must fire on the seeded crowded fixture, and --quiet must suppress them.
 # | 11c explicit file wins | copy's platform lacks export core (copy alone fails with missing export); positional platform.json has it | exit 0 with both files; copy alone: exit 1 "missing export core" | an impl where the copied provider replaces the positional one |
 # | 11d --resolve-imports ignores the copy (guard) | base session + registry listing only checkout | registry message unchanged: "missing spec platform in <registry>" | an impl that consults the copy in registry mode |
 # | 11e repository tools/validate.js ignores a copy (guard) | base session beside the candidate; run tools/validate.js | exit 1 with the files-passed-together message (names --resolve-imports) | an impl that looks for providers.json relative to the input spec |
+# | 13 canon-less candidate in a canon.json repository (stress test 2026-11-02) | "local repo": canon.json + base, middle, consumer spec files without page.canon (the local-repository.spec.mjs shapes); copy specs = base and middle as the Workbench writes them (FlowCanonLibrary.spec membership, tools/canon/manifest.cjs); consumerId "consumer" (registered) and "workbench-draft" (independent), one subtest each; candidate .flowview-agent/candidate.spec.json = consumer.spec.json bytes | exit 0; "<candidate>: 0 errors" | an impl that needs page.canon in the candidate ("specs require unique page.canon.id identities: undefined") |
+# | 14 canon-less consumer outside copy mode gets the #880 remedy | local repo consumer.spec.json run alone with tools/validate.js | exit 1; its ERROR line contains "missing spec middle", "--resolve-imports <repository folder or registry>" and "folder-agent.py refresh-sources --source-repo <repository>", and not "unique page.canon.id" | today's bare identity error |
 # | 12 Workbench writes / state.json / browser cases (tests 1b-1e, 2-5) | — | — | covered in tests/folder-agent.test.js and tools/browser-tests/tests/local-repository.spec.mjs |
 import hashlib
 import importlib.util
@@ -247,6 +249,20 @@ class ValidateCliTest(unittest.TestCase):
             ])
             self.assertEqual((consumer.read_bytes(), provider.read_bytes()), before)
 
+    # #878 PR 2 row 14.
+    def test_canonless_consumer_without_a_copy_names_both_remedies(self):
+        with tempfile.TemporaryDirectory() as temp:
+            consumer, _ = write_local_repository(pathlib.Path(temp))
+            result = run_cli(str(consumer))
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            lines = [line for line in result.stdout.splitlines() if line.startswith(f"{consumer}: ERROR ")]
+            self.assertEqual(len(lines), 1, result.stdout)
+            self.assertNotIn("unique page.canon.id", lines[0])
+            self.assertIn("missing spec middle", lines[0])
+            for remedy in MISSING_PROVIDER_REMEDIES:
+                with self.subTest(remedy=remedy):
+                    self.assertIn(remedy, lines[0])
+
     def test_invalid_first_then_valid_browse_url_import_batch(self):
         def model(identity, diagram):
             return {"page": {"title": identity, "canon": {"version": 1, "id": identity,
@@ -279,6 +295,43 @@ class ValidateCliTest(unittest.TestCase):
             self.assertIn(f"{paths[2]}: 0 errors", result.stdout)
             self.assertNotIn("tickets[0]:", result.stdout)
             self.assertEqual([file.read_bytes() for file in paths], before)
+
+
+# A canon.json repository whose spec files carry no page.canon: identity comes from
+# the registry folder (the shapes of tools/browser-tests/tests/local-repository.spec.mjs).
+LOCAL_SPECS = {
+    "base": {"page": {"title": "Base", "sections": [{"id": "main", "diagram": {
+        "nodes": {"api": {"title": "Local shared API"}, "store": {"title": "Local shared store"}},
+        "rows": [["api", "store"]], "edges": [{"from": "api", "to": "store", "label": "Persist"}],
+        "topologyExports": {"core": {"nodes": ["api", "store"], "edges": ["api->store"]}}}}]}},
+    "middle": {"page": {"title": "Middle", "sections": [{"id": "main", "diagram": {
+        "topologyImports": [{"spec": "base", "export": "core", "as": "base"}],
+        "topologyExports": {"core": {"nodes": ["base::api", "base::store"], "edges": ["base::api->base::store"]}}}}]}},
+    "consumer": {"page": {"title": "Local consumer", "sections": [{"id": "main", "diagram": {
+        "nodes": {"local": {"title": "Editable local"}}, "rows": [["local"]],
+        "topologyImports": [{"spec": "middle", "export": "core", "as": "shared", "position": {"x": 450, "y": 150}}]}}]}},
+}
+
+
+def write_local_repository(root):
+    """Write the repository; return (consumer spec path, providers as the Workbench writes them)."""
+    registry = {"version": 1, "diagrams": [{"folder": "diagrams/team/" + key, "owner": "group:default/local"}
+                                           for key in LOCAL_SPECS]}
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "canon.json").write_text(json.dumps(registry))
+    for key, spec in LOCAL_SPECS.items():
+        folder = root / "diagrams" / "team" / key
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / f"{key}.spec.json").write_text(json.dumps(spec, indent=2))
+    script = ("const m=require(process.argv[1]),fs=require('fs'),path=require('path'),root=process.argv[2];"
+              "const entries=m.entries(JSON.parse(fs.readFileSync(path.join(root,'canon.json'),'utf8')));"
+              "process.stdout.write(JSON.stringify(entries.filter(e=>e.id!=='consumer').map(e=>"
+              "m.spec(JSON.parse(fs.readFileSync(path.join(root,e.path),'utf8')),e))));")
+    providers = json.loads(subprocess.check_output(
+        ["node", "-e", script, str(ROOT / "tools/canon/manifest.cjs"), str(root)], text=True))
+    assert [spec["page"]["canon"]["id"] for spec in providers] == ["base", "middle"]
+    assert "canon" not in LOCAL_SPECS["consumer"]["page"]
+    return root / "diagrams" / "team" / "consumer" / "consumer.spec.json", providers
 
 
 def load_tool(name, relative):
@@ -332,7 +385,7 @@ class ConnectedFolderCopyTest(unittest.TestCase):
             (self.session / name).unlink(missing_ok=True)
 
     def payload_text(self, specs=None):
-        payload = {"sourceKind": "local", "snapshotSha256": "a" * 64,
+        payload = {"sourceKind": "local", "snapshotSha256": "a" * 64, "consumerId": "checkout",
                    "specs": [self.platform] if specs is None else specs}
         return json.dumps(payload)
 
@@ -482,6 +535,20 @@ class ConnectedFolderCopyTest(unittest.TestCase):
         result = self.bundled_run(str(self.consumer), str(positional))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(f"{self.consumer}: 0 errors", result.stdout)
+
+    # Row 13.
+    def test_canonless_candidate_uses_the_copy_identity(self):
+        consumer, providers = write_local_repository(self.root / "repo")
+        candidate = self.session / "candidate.spec.json"
+        shutil.copyfile(consumer, candidate)
+        for consumer_id in ("consumer", "workbench-draft"):
+            with self.subTest(consumerId=consumer_id):
+                text = json.dumps({"sourceKind": "local", "snapshotSha256": "a" * 64,
+                                   "consumerId": consumer_id, "specs": providers})
+                self.write_session(payload_text=text)
+                result = self.bundled_run(str(candidate))
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn(f"{candidate}: 0 errors", result.stdout)
 
     # Row 11d (guard).
     def test_resolve_imports_ignores_the_copy(self):

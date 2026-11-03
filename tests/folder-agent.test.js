@@ -11,9 +11,10 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
    "Copy matches C" = providers.json {version 1, providersSha256, payloadText} where
    providersSha256 == sha256(payloadText) == state.json providersSha256 and
    JSON.parse(payloadText) == payloadFor(C): {sourceKind 'local' + snapshotSha256 |
-   'site-library' | 'none', specs = C.specs without the consumer (C.id)}.
+   'site-library' | 'none', consumerId = C.id (the identity a canon-less candidate
+   validates under; stress test 2026-11-02), specs = C.specs without the consumer}.
    | row | fixture | assertion (scoped) | rejects |
-   | P1 connection writes the copy before state.json | harness start, for a local, a site-library and no context | providers.json precedes state.json in the write log; copy matches the context | no copy; a copy written after state.json; a copy holding the consumer; a missing or wrong sourceKind/snapshotSha256 |
+   | P1 connection always replaces an earlier copy before state.json | a stale providers.json from an earlier session (different content) seeded before start, for a local, a site-library and no context; then resume with a changed and with an identical context | providers.json written exactly once by the connection; copy matches the context and differs from the stale hash; the providers.json on disk when state.json is first written equals that copy | no copy; a copy written after state.json; an impl that keeps an earlier session's copy or skips an identical one; a copy holding the consumer; a missing or wrong sourceKind/snapshotSha256 |
    | 1b-1 escaped copy over 8 MiB is header-only | provider title of 2.5 Mi '"' (payloadText < 8 MiB, escaped providers.json > 8 MiB); real adapter limit in front of the harness disk | start() resolves; providers.json == {version 1, providersSha256 = sha256(JSON of payloadFor(C)), oversize true}, no payloadText; state.json names that hash | an impl that measures payloadText instead of the escaped file (adapter throws); one that drops the copy |
    | 1b-2 copy under 8 MiB is written whole | provider title of 512 Ki '"' | copy matches C | an impl that always writes the header |
    | 1c superseded publication is rejected; the next names the rewritten copy | send; read state.json revision R; change the provider context before the next publication; propose with baseRevision R | result.json rejected "Your document changed"; next state.json revision != R; copy matches the new context and differs from the first copy | (rejection: guard, passes today) a copy rewritten without a state.json that names it |
@@ -30,9 +31,9 @@ const localContext=(specs=[PLATFORM])=>({version:1,id:'checkout',local:true,loca
 const siteContext=(specs=[PLATFORM])=>({version:1,id:'checkout',ephemeral:true,catalogURL:'https://site.example/diagrams.json',catalog:{version:3,diagrams:[]},specs:[...specs,CHECKOUT]});
 function payloadFor(context){
   if(!context)return {sourceKind:'none',specs:[]};
-  const specs=context.specs.filter(spec=>spec.page.canon.id!==context.id);
-  if(!context.local)return {sourceKind:'site-library',specs};
-  return context.localSource && typeof context.localSource.sha256==='string'?{sourceKind:'local',snapshotSha256:context.localSource.sha256,specs}:{sourceKind:'local',specs};
+  const specs=context.specs.filter(spec=>spec.page.canon.id!==context.id),consumerId=context.id;
+  if(!context.local)return {sourceKind:'site-library',consumerId,specs};
+  return context.localSource && typeof context.localSource.sha256==='string'?{sourceKind:'local',snapshotSha256:context.localSource.sha256,consumerId,specs}:{sourceKind:'local',consumerId,specs};
 }
 function harness(extra={}){
   const timers=new Map();let timerId=0;
@@ -97,11 +98,28 @@ function assertNamedCopyOnly(h,label){
   else assert.match(result.stdout,/out of date/,label+': '+result.stdout+result.stderr);
 }
 
-test('#878 P1: connection writes a whole provider copy before the state.json that names it',async()=>{
+// Records the providers.json on disk at the moment state.json is first written.
+function copyAtStateWrite(h){
+  const seen={value:undefined};h.writeGate(name=>{if(name==='state.json' && seen.value===undefined)seen.value=h.disk.has('providers.json')?JSON.parse(serialized(h.disk.get('providers.json'))):null;});
+  return seen;
+}
+test('#878 P1: connection always replaces an earlier provider copy before writing the state.json that names it',async()=>{
+  // An earlier session's copy, for different provider content.
+  const earlier=structuredClone(PLATFORM);earlier.page.sections[0].diagram.nodes.api.title='Earlier session API';
+  const staleText=JSON.stringify(payloadFor(localContext([earlier]))),stale={version:1,providersSha256:sha256(staleText),payloadText:staleText};
   for(const [label,context] of [['local',localContext()],['site library',siteContext()],['no context',null]]){
-    const h=harness();h.topologyContext(context);await h.client.start();
-    assert.ok(h.fileLog.indexOf('providers.json')>=0 && h.fileLog.indexOf('providers.json')<h.fileLog.indexOf('state.json'),label+': copy precedes state.json: '+h.fileLog.join(', '));
-    assertCopyMatches(h,context,label);
+    const h=harness();h.topologyContext(context);h.disk.set('providers.json',stale);
+    const atState=copyAtStateWrite(h);await h.client.start();h.writeGate(null);
+    assert.equal(count(h,'providers.json'),1,label+': copy written once at connection');
+    const copy=assertCopyMatches(h,context,label);assert.notEqual(copy.providersSha256,stale.providersSha256,label+': earlier copy replaced');
+    assert.deepEqual(atState.value,copy,label+': the matching copy is on disk before state.json is written');
+  }
+  // Resume: a different earlier copy is replaced; an identical one is still rewritten.
+  for(const [label,next] of [['changed',localContext([earlier])],['identical',localContext()]]){
+    const h=harness();await h.client.start();await h.client.disconnect();h.topologyContext(next);
+    const before=count(h,'providers.json'),atState=copyAtStateWrite(h);await h.fresh().start(true);h.writeGate(null);
+    assert.equal(count(h,'providers.json'),before+1,'resume '+label+': copy written at connection');
+    const copy=assertCopyMatches(h,next,'resume '+label);assert.deepEqual(atState.value,copy,'resume '+label+': copy precedes state.json');
   }
 });
 test('#878 1b: a copy whose escaped providers.json exceeds 8 MiB is written header-only; a smaller one is written whole',async()=>{

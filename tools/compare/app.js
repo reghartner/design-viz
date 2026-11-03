@@ -88,15 +88,16 @@
     li.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); pick(row, li); } });
     return li;
   }
-  /* A pull request is chosen by number so the server can fetch a head the clone does not have.
-     If that fails, the row is marked and stays unchosen. */
+  /* A pull request row is checked by number so the server can fetch a head the clone does not have,
+     then chosen by the head SHA the row shows: a later force-push cannot change what is compared.
+     If either check fails (the head moved since the list loaded), the row is marked and stays unchosen. */
   async function pick(row, li){
     if (li.getAttribute('aria-disabled') === 'true' || li.getAttribute('aria-busy') === 'true') return;
     /* Only the latest click may choose: an earlier row's check that finishes later is ignored. */
     const side = state.side, token = listToken, click = ++pickToken, pr = state.tab === 'prs' && row.prs.length ? 'pr:' + row.prs[0] : null;
     if (pr){
       li.setAttribute('aria-busy', 'true');
-      try{ await api('/api/documents?' + q({rev:pr})); }
+      try{ await api('/api/documents?' + q({rev:pr})); await api('/api/documents?' + q({rev:row.sha})); }
       catch(ex){
         li.setAttribute('aria-disabled', 'true');
         li.querySelector('.meta').append(el('span', {class:'unavailable'}, 'not available locally'));
@@ -105,7 +106,7 @@
       if (click !== pickToken || token !== listToken || state.side !== side) return;
     }
     closePicker();
-    setChoice(side, {rev:pr || row.sha, row});
+    setChoice(side, {rev:row.sha, row});
   }
   async function loadRows(append){
     const picker = $('.picker'), list = picker.querySelector('[role=listbox]'), error = picker.querySelector('.error'), more = picker.querySelector('.more');

@@ -52,9 +52,30 @@ test('semantic cells, multiple inline icons, empty outputs and escaping are inde
   const p={id:'power',type:'truth-table',title:'<img onerror="bad">',columns:[{id:'a',label:'<b>A</b>'},{id:'b'},{id:'c'},{id:'d'},{id:'e'},{id:'power',kind:'icons'},{id:'battery',kind:'icons'}],cases:[{id:'row',label:'<script>bad</script>',cells:{a:0,b:false,c:null,d:'',power:[{icon:'solar',label:'<img>'}],battery:[{icon:'battery-charging'},{icon:'battery'}]}},{id:'none',cells:{power:[],battery:[]}}]};
   const html=definition.render(null,p,{active:'row'}).html;
   assert.ok(html.includes('scope="row"'));assert.ok(html.includes('aria-current="true"'));assert.ok(html.includes('>Active</span>'));
-  for(const text of ['>0</td>','>false</td>','>null</td>','>(empty)</td>','>—</td>','No icons','&lt;script&gt;','&lt;img&gt;'])assert.ok(html.includes(text),text);
+  for(const text of ['>0</td>','>false</td>','>null</td>','>(empty)</td>','>—</td>','&lt;script&gt;','&lt;img&gt;'])assert.ok(html.includes(text),text);
   assert.equal((html.match(/<svg/g)||[]).length,3);assert.ok(!html.includes('<script>'));assert.ok(!html.includes('<img'));
   assert.ok(!html.includes('<use'));assert.match(definition.styles,/@media print/);assert.match(definition.styles,/overflow:auto/);
+  // #921 slice 3: an empty icon list shows a small muted n/a unless its icons column sets `empty` text ("" shows nothing).
+  const cells=(markup,row)=>markup.split('<tbody>')[1].split('</tr>')[row].split('<td>').slice(1).map(cell=>cell.split('</td>')[0]);
+  const text=cell=>cell.replace(/<[^>]*>/g,'').trim(),muted=cell=>(cell.match(/<[a-z]+ class="[^"]*\btruth-table-empty\b[^"]*"[^>]*>([^<]*)</)||[])[1];
+  const none=cells(html,1);
+  assert.deepEqual([text(none[5]),muted(none[5]),text(none[6]),muted(none[6])],['n/a','n/a','n/a','n/a'],'default: both empty icon cells show muted n/a');
+  assert.ok(!html.includes('No icons'),'the old default text is gone');
+  assert.match(definition.styles,/\.truth-table-empty\{[^}]*font-size:[^}]*\}/,'n/a is small');assert.match(definition.styles,/\.truth-table-empty\{[^}]*color:var\(--dfaint\)[^}]*\}/,'n/a is muted');
+  const q={id:'power',type:'truth-table',columns:[{id:'power',kind:'icons',empty:'No icons'},{id:'battery',kind:'icons'},{id:'blank',kind:'icons',empty:''},{id:'tag',kind:'icons',empty:'<b>none</b>'},{id:'v',empty:'ignored'}],
+    cases:[{id:'none',cells:{power:[],battery:[],blank:[],tag:[],v:''}},{id:'other',cells:{power:[{icon:'nope'}],tag:'bad'}}]};
+  const qWarnings=[];definition.validateDeclaration(q,'panel',qWarnings);assert.ok(!qWarnings.some(w=>/\.empty:/.test(w)),'string overrides, including "", do not warn');
+  const qhtml=definition.render(null,q,{}).html,overridden=cells(qhtml,0),other=cells(qhtml,1);
+  assert.deepEqual(overridden.map(text),['No icons','n/a','','&lt;b&gt;none&lt;/b&gt;','(empty)'],'per-column override, default, blank, escaped text; value columns ignore empty');
+  assert.deepEqual([muted(overridden[0]),muted(overridden[1])],['No icons','n/a'],'override text uses the same muted style');
+  assert.ok(!qhtml.includes('<b>none'),'override text is escaped');
+  assert.deepEqual(other.slice(0,4).map(text),['—','—','—','—'],'invalid, missing and non-array icon cells keep —, not the empty text');
+  for(const bad of [5,true,null,{},['x']]){
+    const r={id:'power',type:'truth-table',columns:[{id:'a'},{id:'icons',kind:'icons',empty:bad}],cases:[{id:'x',cells:{icons:[]}}]},warnings=[];
+    definition.validateDeclaration(r,'panel',warnings);
+    assert.ok(warnings.some(w=>w.startsWith('panel.columns[1].empty: ')),JSON.stringify(bad)+' warns at its own path');
+    assert.equal(text(cells(definition.render(null,r,{}).html,0)[1]),'n/a',JSON.stringify(bad)+' falls back to n/a');
+  }
 });
 
 test('case editor projection retains scalar types, icons and unknown fields across reorder and rename',()=>{

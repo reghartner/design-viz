@@ -79,12 +79,14 @@
                   the Before side only, added words <ins> on the After side only (a whole added line
                   is one <ins>); unchanged lines (e.g. "Paths preserved.") are absent; no diagram
                   node or edge is visible                                       rejects: whole ledger; one side; unmarked words
-   T2 page field  a changed page title: one block headed "title", Before "Doorbell", After
-                  "Doorbell v2" with "v2" as the only <ins>, no <del>, no line numbers
-                                                                              rejects: raw JSON dump; Details-only
-   T3 added       a ledger only in the proposal: heading "Before no ledger · After lines 1-2";
-                  Before shows "No coverage ledger"; After lists both lines, each one <ins>
-                                                                              rejects: empty Before column; unmarked lines
+   T2 page field  a changed page title and an added page description (page metadata): two blocks
+                  headed "title" and "description"; title Before "Doorbell", After "Doorbell v2" with
+                  "v2" as the only <ins>; description Before "Not set", After the whole text as one
+                  <ins>; no <del>, no line numbers                             rejects: raw JSON dump; Details-only; blank absent side
+   T3 added /     a ledger only in the proposal: heading "Before no ledger · After lines 1-2";
+      removed     Before shows "No coverage ledger"; After lists both lines, each one <ins>. A ledger
+                  only in the current document: "Before lines 1-2 · After no ledger"; After shows "No
+                  coverage ledger"; Before lists both lines, each one <del>    rejects: empty column; unmarked lines
    T4 full        Full diagram on a ledger change hides the line diff and shows both panes;
                   Focused shows it again                                       rejects: line diff stuck in Full mode
    T5 untrusted   markup in a ledger line and in the title stays literal text (no element made,
@@ -558,21 +560,25 @@ test('T1 a modified coverage ledger shows only its changed lines, Before left an
   await expect(host.locator('.compare-focus .compare-text')).not.toContainText('# Coverage');
 });
 
-test('T2 a changed page title shows its Before and After values with the added word marked',async({page,server})=>{
-  const {current}=doorbell(),proposed=plain(current);proposed.page.title='Doorbell v2';
+test('T2 a changed page title and an added page description show their Before and After values',async({page,server})=>{
+  const {current}=doorbell(),proposed=plain(current);proposed.page.title='Doorbell v2';proposed.page.description='Ring flow for the front door';
   const host=await mountPage(page,server,'title-diff-'+Date.now(),current,proposed);
-  await selectItem(host,/^Modified · Document · title$/);
+  await selectItem(host,/^Modified · Document · title, description$/);
   await expect(host.locator('.compare-focus')).toBeVisible();await noGraphVisible(host);
-  const blocks=textBlocks(host);await expect(blocks).toHaveCount(1);
-  await expect(blocks.locator('.compare-text-title')).toHaveText(['title']);
+  const blocks=textBlocks(host);await expect(blocks).toHaveCount(2);
+  await expect(blocks.locator('.compare-text-title')).toHaveText(['title','description']);
   expect(await sideLines(blocks.nth(0),'before')).toEqual(['Doorbell']);
   expect(await sideLines(blocks.nth(0),'after')).toEqual(['Doorbell v2']);
   await expect(textSide(blocks.nth(0),'after').locator('ins')).toHaveText(['v2']);
+  await expect(textSide(blocks.nth(1),'before').locator('.compare-text-missing')).toHaveText('Not set');
+  await expect(textSide(blocks.nth(1),'before').locator('.compare-text-line')).toHaveCount(0);
+  expect(await sideLines(blocks.nth(1),'after')).toEqual(['Ring flow for the front door']);
+  await expect(textSide(blocks.nth(1),'after').locator('ins')).toHaveText(['Ring flow for the front door']);
   await expect(blocks.locator('del')).toHaveCount(0);
   await expect(blocks.locator('.compare-text-num'),'page fields have no line numbers').toHaveCount(0);
 });
 
-test('T3 a ledger only in the proposal lists its lines as added beside "No coverage ledger"',async({page,server})=>{
+test('T3 a ledger only on one side lists its lines as added or removed beside "No coverage ledger"',async({page,server})=>{
   const {current}=doorbell();
   const host=await mountPage(page,server,'ledger-added-'+Date.now(),current,current,null,ledgerScript(current,current,null,'First line\nSecond line'));
   await selectItem(host,/^Added · Coverage ledger$/);
@@ -582,6 +588,15 @@ test('T3 a ledger only in the proposal lists its lines as added beside "No cover
   await expect(textSide(blocks.nth(0),'before').locator('.compare-text-line')).toHaveCount(0);
   expect(await sideLines(blocks.nth(0),'after')).toEqual(['1 First line','2 Second line']);
   await expect(textSide(blocks.nth(0),'after').locator('ins')).toHaveText(['First line','Second line']);
+  const gone=await mountPage(page,server,'ledger-removed-'+Date.now(),current,current,null,ledgerScript(current,current,'Old one\nOld two',null));
+  await selectItem(gone,/^Removed · Coverage ledger$/);
+  const removed=textBlocks(gone);await expect(removed).toHaveCount(1);
+  await expect(removed.locator('.compare-text-title')).toHaveText(['Before lines 1-2 · After no ledger']);
+  await expect(textSide(removed.nth(0),'after').locator('.compare-text-missing')).toHaveText('No coverage ledger');
+  await expect(textSide(removed.nth(0),'after').locator('.compare-text-line')).toHaveCount(0);
+  expect(await sideLines(removed.nth(0),'before')).toEqual(['1 Old one','2 Old two']);
+  await expect(textSide(removed.nth(0),'before').locator('del')).toHaveText(['Old one','Old two']);
+  await expect(removed.locator('ins')).toHaveCount(0);
 });
 
 test('T4 Full diagram hides the line diff and shows both panes; Focused shows it again',async({page,server})=>{

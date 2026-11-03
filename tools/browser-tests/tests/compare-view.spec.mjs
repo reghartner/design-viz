@@ -36,6 +36,12 @@
                        shows its lines in the dialog's Focused area ("Compare fixture." on the After side
                        as an added line); the Details panel stays closed and the position text no longer
                        says "Shown in Details"                                                    rejects: ledger only in Details
+   V2d page fields     #892: a proposal that changes the page title and adds a page description: selecting the
+                       "Modified · Document" change shows a "title" and a "description" block in the dialog's
+                       Focused area; Details stays closed; the position text does not say "Shown in Details"
+                                                                                                  rejects: page fields only in Details
+                       (folder-agent.spec.mjs "agent change navigation" still expects Details for the ledger:
+                       that test switches to Full diagram first, where the line diff is not shown)
    V9 stale gating     unchanged: covered by folder-agent.spec.mjs "an open review refreshes
                        visibly and cannot accept the new version as the old review" (kept as is) */
 /* The agent-folder fixture serves its own origin, so these tests use plain
@@ -132,6 +138,19 @@ test('V2c selecting the coverage-ledger change shows its lines in the dialog, no
     await expect(page.locator('#agent-update-position')).toContainText('6 of 6');
     await expect(page.locator('#agent-update-position')).not.toContainText('Shown in Details');
   });
+});
+test('V2d selecting a page-field change shows its values in the dialog, not in Details',async({page})=>{
+  const h=await setup(page);
+  try{
+    const {current}=fixture(),proposed=plain(current);proposed.page.title='Compare fixture v2';proposed.page.description='Delivery flow notes';
+    await openProposal(page,h,current,proposed);
+    const host=page.locator('#agent-update-compare'),doc=rail(host).getByRole('button',{name:/^Modified · Document · /});
+    await expect(doc).toHaveCount(1);await doc.click();await expect(doc).toHaveAttribute('aria-current','true');
+    await expect(host.locator('.compare-focus .compare-text-title')).toHaveText(['title','description']);
+    await expect(host.locator('.compare-focus .compare-text-side[data-side="after"] ins')).toHaveText(['v2','Delivery flow notes']);
+    await expect(page.locator('#agent-update-details-panel')).toBeHidden();
+    await expect(page.locator('#agent-update-position')).not.toContainText('Shown in Details');
+  }finally{await h.cleanup();}
 });
 test('V3 Next/Previous and J/K move the selection in both directions with wrap-around and move both panes',async({page})=>{
   await withProposal(page,async()=>{

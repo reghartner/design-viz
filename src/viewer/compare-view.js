@@ -260,6 +260,9 @@ function mountCompareView(host, opts){
   root.appendChild(rail); root.appendChild(main); host.appendChild(root);
   /* Rail: groups in first-appearance order (entries are in document order). */
   var groups = compareRailGroups(entries, pages);
+  /* The view opens on the first change with a rendered object; a ledger or page-field change (a
+     line diff only) is opened first only when every change is one. */
+  var opening = Math.max(0, entries.findIndex(function(e){ return !compareTextBlocks(e); }));
   var buttons = [];
   groups.forEach(function(g){
     var box = el('section', 'compare-rail-group'), list = el('ol', 'compare-rail-list');
@@ -284,11 +287,11 @@ function mountCompareView(host, opts){
     scroll.tabIndex = 0; scroll.appendChild(view); pane.appendChild(head); pane.appendChild(scroll); columns.appendChild(pane);
     panes[side] = {pane:pane, scroll:scroll, view:view, ctl:null, canvas:null, page:pages[side]};
     if (!pages[side]){ view.appendChild(el('p', 'compare-pane-empty', opts.emptyText && opts.emptyText[side] || (side === 'before' ? 'Not in the current document.' : 'Not in the proposal.'))); return; }
-    var p = panes[side], first = side === 'before' && entries.length ? (entries[0].section || {}).before : null, partial = first != null ? comparePartialPage(pages.before, first) : null;
+    var p = panes[side], first = side === 'before' && entries.length ? (entries[opening].section || {}).before : null, partial = first != null ? comparePartialPage(pages.before, first) : null;
     if (partial){ p.partial = first; renderPane(p, partial); } else renderPane(p, pages[side]);
   }); });
   decorate();
-  /* The Before pane opens with only the first change's section; the rest of
+  /* The Before pane opens with only the opening change's section; the rest of
      the document replaces it right after the first paint (or at once when a
      change in another section is selected). */
   var win = doc.defaultView, completion = 0, completionIdle = 0;
@@ -999,7 +1002,7 @@ function mountCompareView(host, opts){
   }
   doc.addEventListener('keydown', onKey);
   applyMode();
-  if (entries.length) withPathGeometryCache(geometry || new Map(), function(){ select(0, true); });
+  if (entries.length) withPathGeometryCache(geometry || new Map(), function(){ select(opening, true); });
   if (panes.before.partial == null) geometry = null;
   return {
     select:select,

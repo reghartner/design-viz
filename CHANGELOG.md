@@ -1,5 +1,18 @@
 # Changelog
 
+## Registering a new exporting diagram (2026-11-02)
+
+- Connected agents and the bundled authoring docs now state what a new exporting
+  diagram needs (#873): its `diagrams/…/<id>/` folder with `<id>.spec.json`, its
+  root `canon.json` entry, and every consumer import change that uses it, all in
+  one commit and one PR when a consumer uses the new provider. Agents edit
+  `canon.json` only with the user's authorization, ask the user to clone the
+  company Flowview repository when there is no local copy, and explain that canon
+  changes need a PR (and push or PR access), while local preview through
+  `refresh-sources` does not. The repository address comes from
+  `company/company.json` `repository` and now ships in the kit's
+  `tools/company-agent-context.json`.
+
 ## Manually placed step circles (2026-10-30)
 
 - Workbench authors drag a step circle on the board to place it (#840). The

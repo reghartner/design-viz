@@ -513,6 +513,14 @@ busy. The command cannot replace consumer source or refresh a cloud project.
 See [local repository authoring](local-repository-authoring.md) for grants and
 manual fallback.
 
+A new exporting diagram needs its `diagrams/…/<id>/` folder with `<id>.spec.json`,
+its root `canon.json` entry, and every consumer `topologyImports` change that uses
+it. When a consumer change uses a new provider, all of these go in one commit and
+one PR. Edit `canon.json` only with the user's authorization. For the clone and
+access prompts, follow
+[registering a new exporting diagram](local-repository-authoring.md#register-a-new-exporting-diagram);
+local preview through `refresh-sources` needs no push or PR access.
+
 `state.json.localSources` reports bounded provenance and availability: `mode`
 distinguishes `browser-grant`, `agent-snapshot` and `unbound`; `needsSnapshot`
 means the helper must supply provider bytes. An accepted helper selection is

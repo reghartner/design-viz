@@ -217,13 +217,26 @@ function authoredTopologyDependencies(raw){
    Proposal JSON supplies provider IDs, never catalog addresses or snapshots.
    A draft without a context pins this site's index here, so an agent never
    receives an instruction that only a human at the UI could follow. */
-async function prepareTopologyProposal(raw,context){
+async function prepareTopologyProposal(raw,context,local){
   var dependencies=authoredTopologyDependencies(raw);
   if(!dependencies.length)return context;
   if(!context)context=await connectTopologyRepository({page:{sections:[{diagram:{nodes:{},rows:[[]]}}]}});
   var missing=dependencies.filter(function(id){return !context.specs.some(function(spec){return spec.page.canon.id===id;});});
   if(!missing.length)return context;
-  if(context.local)throw topologyUnavailable('The frozen local repository snapshot is missing provider '+missing.join(', ')+'. Reopen the repository root containing canon.json to load its complete import closure.');
+  if(context.local){
+    // #883: a local consumer reads and validates the proposal's whole provider closure
+    // from the source it already uses: the helper's attached snapshot (exactly that
+    // closure) or the repository grant. A local context never falls back to the
+    // deployed site library. Frozen providers stay frozen (only a refresh replaces
+    // them); the providers this proposal adds join the context, as a pinned catalog's do.
+    if(local && (local.sources || local.directory)){
+      var source=JSON.stringify(raw),acquired=local.sources?await readSuppliedLocalTopology(source,local.sources):
+        await readLocalRepositoryTopology(local.directory,source,local.path || null,null,local.selectionId || null);
+      var frozen=new Set(context.specs.map(function(spec){return spec.page.canon.id;}));
+      return Object.assign({},context,{specs:context.specs.concat(acquired.specs.filter(function(spec){var id=spec.page.canon.id;return id!==acquired.id && !frozen.has(id);}))});
+    }
+    throw topologyUnavailable('The frozen local repository snapshot is missing provider '+missing.join(', ')+'. Reopen the repository root containing canon.json to load its complete import closure.');
+  }
   var loader=createTopologyCatalogLoader(context),prepared=context;
   for(var id of missing)prepared=(await loader.load(id,prepared)).context;
   return prepared;

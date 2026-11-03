@@ -448,6 +448,57 @@ def watch(folder, interval=0.25, minutes=25):
             pass
 
 
+def dependencies(value):
+    """Provider IDs a page or diagram imports directly, including inactive tabs."""
+    page = value.get('page', value) if isinstance(value, dict) else {}
+    if not isinstance(page, dict):
+        raise ValueError('Consumer/provider must be a JSON page or diagram object.')
+    if any(key in page for key in ('nodes', 'rows', 'topologyImports', 'topologyExports')):
+        page = {'sections': [{'diagram': page}]}
+    result = []
+    def walk(items):
+        for section in items if isinstance(items, list) else []:
+            if not isinstance(section, dict):
+                continue
+            diagram = section.get('diagram')
+            if isinstance(diagram, dict):
+                imports = diagram.get('topologyImports', [])
+                if not isinstance(imports, list):
+                    raise ValueError('topologyImports must be an array.')
+                for item in imports:
+                    if isinstance(item, dict) and isinstance(item.get('spec'), str) and item['spec'] not in result:
+                        result.append(item['spec'])
+            for tab in section.get('tabs', []) if isinstance(section.get('tabs', []), list) else []:
+                if isinstance(tab, dict):
+                    walk(tab.get('sections', tab.get('blocks')))
+    walk(page.get('blocks', page.get('sections')))
+    return result
+
+
+def proposal_sources(folder, state, candidate):
+    """Snapshot of exactly the candidate's provider closure for a new import (#883).
+
+    Only a consumer whose current snapshot came from this helper's selected repository
+    gets one, and only when the candidate imports a provider ID that the current draft
+    does not import directly. Otherwise the proposal reuses the frozen providers.
+    """
+    selection = pending_object(folder, 'local-sources-selection.json')
+    capability = state.get('localSources') if isinstance(state.get('localSources'), dict) else {}
+    if (not isinstance(selection, dict) or not isinstance(selection.get('path'), str) or
+            not selection.get('selectionId') or selection.get('selectionId') != capability.get('sourceSelectionId')):
+        return None
+    try:
+        current = set(dependencies(json.loads(state.get('source') or 'null')))
+    except ValueError:
+        current = set()
+    if not set(dependencies(json.loads(candidate))) - current:
+        return None
+    try:
+        return local_provider_snapshot(candidate, Path(selection['path']), selection['selectionId'])
+    except (OSError, ValueError) as error:
+        raise ValueError('Could not read the providers this proposal imports from the selected source repository: ' + str(error)) from error
+
+
 def local_provider_snapshot(source, repository, selection_id):
     """Read a stable registered provider closure; the consumer may live anywhere.
 
@@ -456,30 +507,6 @@ def local_provider_snapshot(source, repository, selection_id):
     """
     repository = repository.resolve(strict=True)
     raw = json.loads(source)
-    def dependencies(value):
-        page = value.get('page', value) if isinstance(value, dict) else {}
-        if not isinstance(page, dict):
-            raise ValueError('Consumer/provider must be a JSON page or diagram object.')
-        if any(key in page for key in ('nodes', 'rows', 'topologyImports', 'topologyExports')):
-            page = {'sections': [{'diagram': page}]}
-        result = []
-        def walk(items):
-            for section in items if isinstance(items, list) else []:
-                if not isinstance(section, dict):
-                    continue
-                diagram = section.get('diagram')
-                if isinstance(diagram, dict):
-                    imports = diagram.get('topologyImports', [])
-                    if not isinstance(imports, list):
-                        raise ValueError('topologyImports must be an array.')
-                    for item in imports:
-                        if isinstance(item, dict) and isinstance(item.get('spec'), str) and item['spec'] not in result:
-                            result.append(item['spec'])
-                for tab in section.get('tabs', []) if isinstance(section.get('tabs', []), list) else []:
-                    if isinstance(tab, dict):
-                        walk(tab.get('sections', tab.get('blocks')))
-        walk(page.get('blocks', page.get('sections')))
-        return result
     def read_source(relative, diagram_folder=None):
         target = (repository / relative).resolve(strict=True)
         if not target.is_relative_to(repository) or (diagram_folder and not target.is_relative_to(repository / diagram_folder)):
@@ -816,6 +843,9 @@ def main():
         # It rejects unknown/expired revisions and asks for conflict resolution.
         json.loads(text)
         value.update(baseRevision=args.revision, source=text, summary=args.summary[:1000])
+        sources = proposal_sources(folder, state, text)
+        if sources is not None:
+            value['sources'] = sources
         if read(folder, 'session.json').get('pairedArtifacts') or args.ledger:
             if not args.ledger or not re.fullmatch(r'[A-Za-z0-9_.-]+', args.ledger) or args.ledger in ('.', '..'):
                 raise ValueError('Include --ledger candidate.ledger.md with the proposed spec.')
@@ -826,6 +856,8 @@ def main():
             if not ledger.strip():
                 raise ValueError('The proposed coverage ledger must not be empty.')
             value['ledger'] = ledger
+        if len(json.dumps(value, ensure_ascii=False).encode('utf-8')) > LIMIT - 4096:
+            raise ValueError('The proposal with its provider snapshot exceeds 8 MiB. Reduce the imported closure or the spec.')
         filename = 'proposal.json'
     else:
         if len(text) > 32000:

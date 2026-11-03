@@ -281,8 +281,10 @@ test('Use site library leaves a selected local source repository with Undo, and 
 /* #874 Two desktop Workbench tabs on one local repository: an agent's provider edit,
    accepted in the provider tab, reaches the importing tab through the consumer
    helper's refresh-sources. Contract: issue #874 (behaviour steps 1-5; Test + flip
-   case 1); docs/local-repository-authoring.md (agent-connected consumer);
-   Chuck 2026-11-02 (local repository + desktop Workbench first).
+   cases 1 and 2); issue #883 (case 2 restored: design A, a local proposal acquires its
+   own provider closure); docs/local-repository-authoring.md (agent-connected consumer);
+   Chuck 2026-11-02 (local repository + desktop Workbench first; the agent writes a new
+   provider's seed spec and canon.json entry; the Start new default is unchanged).
    Both tabs are pages of one browser context (one origin, one localStorage) bound to
    one disk repository through cloudFolder. The test acts as the agent: it runs the
    generated folder-agent.py helpers and writes only the files an agent writes.
@@ -296,7 +298,10 @@ test('Use site library leaves a selected local source repository with Undo, and 
    | C4 consumer ledger kept | same | state.json ledger and consumer.ledger.md == original ledger | a refresh that replaces the ledger |
    | C5 consumer Undo history kept | Undo, then Redo, in the consumer tab | Undo: node reads "Local shared API", #src unchanged; Redo: node contains the accepted text | a refresh recorded outside Undo history |
    | C6 consumer reload restores the consumer document | reload the consumer tab after C5 | #src == consumer bytes; #docview .doc-title == "Local consumer"; node contains the accepted text | the shared dv-workbench-draft key restoring the provider tab's document; a reload restoring the pre-refresh snapshot |
-   case 2 (new provider): moved to the bug ticket for the frozen-snapshot defect, per Chuck 2026-11-02.
+   | N1 an agent-seeded provider is selectable at the root | the test writes diagrams/team/billing/billing.spec.json and its canon.json entry after both tabs loaded | provider-tab file picker offers billing.spec.json; provider #src == seed bytes | a picker that misses canon.json entries added after page load |
+   | N2 its accepted exports are saved | propose adding topologyExports and renaming gateway; accept | billing.spec.json bytes == proposed; result applied | acceptance that skips the disk save |
+   | N3 consumer accepts an import of the new provider | consumer begin + propose adding a billing import; accept | review previews billing::gateway with no issues; result applied; saved consumer imports [middle, billing] and has no billing::gateway node; consumer billing::gateway contains the accepted title | a review blocked because the consumer's frozen snapshot lacks the new provider (#883: the review acquires the proposal closure through the consumer's browser grant) |
+   | N4 refresh-sources renders the provider's later accepted change | provider tab accepts a second proposal renaming gateway; then consumer helper refresh-sources --source-repo <repository root> | before: consumer billing::gateway still contains "Accepted billing gateway"; after: helper exits 0, receipt applied, billing::gateway contains "Refreshed billing gateway" | a refresh-sources that does nothing (the first title already renders after N3); a refresh limited to the closure frozen before the import |
    Excluded: phone/narrow-width editing (Chuck 2026-10-13, desktop only); cloud Workbench (later ticket). */
 const consumerLedger='# Consumer ledger\n\nImports the shared API through middle.\n';
 const registry=ids=>JSON.stringify({version:1,diagrams:ids.map(id=>({folder:'diagrams/team/'+id,owner:'group:default/local'}))});
@@ -370,5 +375,42 @@ test('two desktop tabs: an agent provider edit accepted in the provider tab reac
   // Both tabs share this origin's browser recovery; reloading the consumer restores the consumer.
   await importer.reload();
   await expect(importer.locator('#src')).toHaveValue(consumer);await expect(importer.locator('#docview .doc-title')).toHaveText('Local consumer');await expect(node(importer)).toContainText(title);
+ }finally{await importer.close();await page.close();await repo.close();}
+});
+
+test('two desktop tabs: an agent-seeded new provider gains exports in its tab and the consumer imports it through refresh-sources',async({page,context,server})=>{
+ test.setTimeout(120000); // Two Workbench tabs, two folder connections and seven helper round trips.
+ const importer=await context.newPage(),repo=await twoTabRepository(page,importer),title='Accepted billing gateway';
+ try{
+  for(const tab of [page,importer]){await tab.goto(server.origin+'/workbench.html');await paste(tab,starter);}
+  await connectTab(importer,'diagrams/team/consumer/consumer.spec.json');await expect(node(importer)).toContainText('Local shared API');
+  // The agent registers a new exporting diagram: a seed <id>.spec.json and its canon.json entry (#873).
+  const seed=JSON.stringify(make('Billing',{nodes:{gateway:{title:'Billing gateway'}},rows:[['gateway']]}),null,2);
+  await mkdir(path.join(repo.folder,'diagrams/team/billing'));await writeFile(path.join(repo.folder,'diagrams/team/billing/billing.spec.json'),seed);
+  await writeFile(path.join(repo.folder,'canon.json'),registry([...Object.keys(specs),'billing']));
+  await connectTab(page,'diagrams/team/billing/billing.spec.json');await expect(page.locator('#src')).toHaveValue(seed);
+  const exported=await propose(repo.support('billing'),'Export the billing gateway',seeded=>{const raw=JSON.parse(seeded),diagram=raw.page.sections[0].diagram;diagram.nodes.gateway.title=title;diagram.topologyExports={public:{nodes:['gateway'],edges:[]}};return JSON.stringify(raw,null,2);},'# Billing ledger\n\nExports the gateway for importing diagrams.\n');
+  await acceptReview(page,page.locator('#agent-update-view [data-dv-node="gateway"]').filter({hasText:title}));
+  await expect.poll(()=>repo.file('billing','billing.spec.json'),{message:'the accepted new provider is saved to its registered file'}).toBe(exported.proposed);
+  await expect.poll(()=>outcome(repo.support('billing'),exported.request.id)).toBe('applied');
+  // Consumer tab: the agent adds the import, a person accepts it, then the helper refreshes.
+  await importer.bringToFront();
+  const imported=await propose(repo.support('consumer'),'Import the billing gateway',seeded=>{const raw=JSON.parse(seeded);raw.page.sections[0].diagram.topologyImports.push({spec:'billing',export:'public',as:'billing'});return JSON.stringify(raw,null,2);},consumerLedger+'\nImports the billing gateway.\n');
+  await acceptReview(importer,importer.locator('#agent-update-view [data-dv-node="billing::gateway"]'));
+  await expect.poll(()=>outcome(repo.support('consumer'),imported.request.id)).toBe('applied');
+  const saved=JSON.parse(await repo.file('consumer','consumer.spec.json')).page.sections[0].diagram;
+  expect(saved.topologyImports.map(item=>item.spec)).toEqual(['middle','billing']);expect(saved.nodes['billing::gateway']).toBeUndefined();
+  const gateway=importer.locator('#docview g.node[data-dv-node="billing::gateway"]');await expect(gateway,'the accepted import renders the new provider').toContainText(title);
+  // Provider tab: the agent changes the new provider again and a person accepts it.
+  await page.bringToFront();const renamed='Refreshed billing gateway';
+  const updated=await propose(repo.support('billing'),'Rename the billing gateway',seeded=>{const raw=JSON.parse(seeded);raw.page.sections[0].diagram.nodes.gateway.title=renamed;return JSON.stringify(raw,null,2);},'# Billing ledger\n\nExports the gateway for importing diagrams.\nRenamed the gateway.\n');
+  await acceptReview(page,page.locator('#agent-update-view [data-dv-node="gateway"]').filter({hasText:renamed}));
+  await expect.poll(()=>repo.file('billing','billing.spec.json'),{message:'the renamed provider is saved to its registered file'}).toBe(updated.proposed);
+  await expect.poll(()=>outcome(repo.support('billing'),updated.request.id)).toBe('applied');
+  // Consumer tab: still the first accepted title until the helper refreshes it.
+  await importer.bringToFront();await expect(gateway).toContainText(title);
+  const refreshed=await agent(repo.support('consumer'),'refresh-sources','--source-repo',repo.folder);expect(refreshed.code,refreshed.stderr).toBe(0);
+  await expect(gateway,'refresh-sources renders the provider\'s later accepted change').toContainText(renamed);
+  expect(JSON.parse(refreshed.stdout).status).toBe('applied');
  }finally{await importer.close();await page.close();await repo.close();}
 });

@@ -77,9 +77,11 @@
       says 'just propose the import'; I: 'propose the import directly when this diagram was
       opened from the repository root or a local source repository is selected' and 'if this
       helper has no source repository yet, run python3 "<helper>" refresh-sources --source-repo
-      <repository> first, once, and then propose the import'; CON and SES say the same and CON
-      drops 'needs no refresh first' | #886's sentence, which leaves a folder-connected
-      consumer's review blocked on the missing provider
+      <repository> first, once, and then propose the import'; CON and SES say the same, with the
+      command verbatim ('runs python3 <consumer>/.flowview-agent/folder-agent.py refresh-sources
+      --source-repo <repository> first, once, and then proposes the import'), and CON drops 'needs
+      no refresh first' | #886's sentence, which leaves a folder-connected consumer's review
+      blocked on the missing provider; docs that name no command
    F5 providers are looked for only in named places | I: 'Look for providers only in this
       diagram folder, its repository (the nearest folder above it that holds canon.json), the
       source repository this helper already selected and source repositories I name; never
@@ -91,14 +93,23 @@
       clause; every L: 'If you created this diagram folder earlier in this conversation (for
       example a new diagram you seeded), use that path', 'If none matches, ask me for the full
       path' and 'Do not search unrelated folders'; LOC names the repository-relative path and a
-      folder the agent created | the resumed B sessions that could not place the sibling ledger
-      folder; a root-connected diagram the rule cannot reach
+      folder the agent created; the Workbench call site is covered in the browser:
+      tools/browser-tests/tests/local-repository.spec.mjs 'agent folder connection retains the
+      granted repository root…' (opened from the root: the displayed #folder-agent-instructions
+      and the diagram's .flowview-agent/CONNECT.md carry the 'diagrams/team/consumer' clause) and
+      tools/browser-tests/tests/folder-agent.spec.mjs 'seeded candidate pair is edited in
+      place…' (folder-connected: its CONNECT.md locate paragraph has no repository-root clause) |
+      the resumed B sessions that could not place the sibling ledger folder; a root-connected
+      diagram the rule cannot reach; a call site that never passes the location
    F7 the commit rule is part of the final message for a new provider's consumer | I: 'When this
       consumer change imports a newly registered provider, your final message must always
       include the commit rule: its diagrams/…/<id>/ folder with <id>.spec.json, its root
       canon.json entry, and every consumer topologyImports change that uses it go in one commit
-      and one PR'; CON and SES say the same in user terms | B3's consumer, which gave no
-      commit guidance */
+      and one PR'; CON and SES: 'When a consumer change imports a newly registered provider, the
+      agent's final message must always include the commit rule: the provider's diagrams/…/<id>/
+      folder with <id>.spec.json, its root canon.json entry, and every consumer topologyImports
+      change that uses it go in one commit and one PR' | B3's consumer, which gave no commit
+      guidance; docs that require "the commit rule" without stating it */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource,companyAgentContext}=require('../tools/source-loader.cjs');
 const context=vm.createContext({});vm.runInContext(readSource('workbench/agent-chat.js'),context);
@@ -459,7 +470,7 @@ test('F4: a folder-connected consumer selects a source repository before proposi
   assert.doesNotMatch(docs.CON,/needs no refresh first/);
   for(const name of ['CON','SES']){
     assert.match(docs[name],/proposes the import directly when the consumer was opened from the repository root or a local source repository is selected/,name);
-    assert.match(docs[name],/if the consumer's helper has no source repository yet, the agent runs refresh-sources --source-repo <repository> first, once, and then proposes the import/,name);
+    assert.match(docs[name],/if the consumer's helper has no source repository yet, the agent runs python3 <consumer>\/\.flowview-agent\/folder-agent\.py refresh-sources --source-repo <repository> first, once, and then proposes the import/,name);
   }
 });
 test('F5: providers are looked for only in the diagram folder, its repository and named source repositories',()=>{
@@ -489,5 +500,5 @@ test('F7: the final message for a consumer of a newly registered provider always
   }
   const docs=stressDocs();
   for(const name of ['CON','SES'])
-    assert.match(docs[name],/When a consumer change imports a newly registered provider, the agent's final message must always include the commit rule/,name);
+    assert.match(docs[name],/When a consumer change imports a newly registered provider, the agent's final message must always include the commit rule: the provider's diagrams\/…\/<id>\/ folder with <id>\.spec\.json, its root canon\.json entry, and every consumer topologyImports change that uses it go in one commit and one PR/,name);
 });

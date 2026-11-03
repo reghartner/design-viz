@@ -209,6 +209,55 @@ class FolderAgentTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn('sources', helper.read(self.folder, 'proposal.json'))
 
+    # #883 F3 contract matrix (helper fail-fast, Chuck 2026-11-02: fix before import-sync reaches main).
+    # A helper-mode local consumer with no selected source repository cannot supply a newly
+    # imported provider, so propose refuses before publishing and names the remedy.
+    # row | fixture | assertion (scoped) | rejects
+    # H4 helper-mode, nothing selected | localSources local, mode unbound, no
+    #    local-sources-selection.json; candidate imports middle, draft imports nothing | exit != 0;
+    #    stderr names refresh-sources --source-repo; no proposal.json | publishing a proposal the
+    #    Workbench can only block
+    # H5 helper-mode, stale selection | same, selection file whose selectionId differs from
+    #    localSources.sourceSelectionId | same | trusting a selection the consumer no longer views
+    # H6 unchanged consumers publish (guards) | browser grant (mode browser-grant); a candidate
+    #    importing nothing new; a site-library consumer (local false); a Workbench without the
+    #    local field | exit 0 and proposal.json without sources | fail-fast leaking into
+    #    consumers that #886 or the site library already serve
+    def local_proposal(self, capability, selection=None, current=None):
+        if selection:
+            self.put('local-sources-selection.json', selection)
+        state = {**self.owner, 'revision': 'connection-1',
+                 'source': json.dumps({'page': {'sections': [{'diagram': {'topologyImports': current or []}}]}}),
+                 'localSources': {'acceptsSnapshot': True, 'consumerId': 'workbench-draft', **capability}}
+        self.put('state.json', state)
+        (self.folder/'candidate.spec.json').write_text(json.dumps(
+            {'page': {'sections': [{'diagram': {'topologyImports': [{'spec': 'middle', 'export': 'core', 'as': 'shared'}]}}]}}))
+        return self.propose()
+
+    def test_propose_refuses_a_new_import_when_a_helper_consumer_has_no_selected_source_repository(self):
+        helper_mode = {'available': False, 'code': 'reconnect_required', 'mode': 'unbound', 'local': True, 'sourceSelectionId': None}
+        for name, selection, capability in [('nothing selected', None, helper_mode),
+                                            ('stale selection', {'path': '/elsewhere', 'selectionId': 'old'}, {**helper_mode, 'mode': 'agent-snapshot', 'sourceSelectionId': 'current'})]:
+            with self.subTest(name):
+                (self.folder/'proposal.json').unlink(missing_ok=True)
+                (self.folder/'local-sources-selection.json').unlink(missing_ok=True)
+                result = self.local_proposal(capability, selection)
+                self.assertNotEqual(result.returncode, 0, 'propose must refuse before publishing (#883 F3): ' + result.stdout)
+                self.assertIn('refresh-sources --source-repo', result.stderr)
+                self.assertFalse((self.folder/'proposal.json').exists())
+
+    def test_propose_still_publishes_for_grant_unchanged_imports_site_library_and_older_workbenches(self):
+        for name, capability, current in [
+                ('browser grant', {'available': True, 'code': 'ready', 'mode': 'browser-grant', 'local': True}, None),
+                ('no new provider', {'available': False, 'code': 'reconnect_required', 'mode': 'unbound', 'local': True}, [{'spec': 'middle', 'export': 'core', 'as': 'shared'}]),
+                ('site library consumer', {'available': False, 'code': 'reconnect_required', 'mode': 'unbound', 'local': False}, None),
+                ('workbench without the local field', {'available': False, 'code': 'reconnect_required', 'mode': 'unbound'}, None)]:
+            with self.subTest(name):
+                (self.folder/'proposal.json').unlink(missing_ok=True)
+                result = self.local_proposal(capability, current=current)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn('sources', helper.read(self.folder, 'proposal.json'))
+
     def test_source_repo_selection_is_helper_private_repeatable_and_requires_reselection_after_undo(self):
         repository = self.provider_repository()
         self.refresh_ready(available=False, acceptsSnapshot=True, code='reconnect_required')

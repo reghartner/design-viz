@@ -235,7 +235,11 @@ async function prepareTopologyProposal(raw,context,local){
       var frozen=new Set(context.specs.map(function(spec){return spec.page.canon.id;}));
       return Object.assign({},context,{specs:context.specs.concat(acquired.specs.filter(function(spec){var id=spec.page.canon.id;return id!==acquired.id && !frozen.has(id);}))});
     }
-    throw topologyUnavailable('The frozen local repository snapshot is missing provider '+missing.join(', ')+'. Reopen the repository root containing canon.json to load its complete import closure.');
+    // A consumer opened from the repository root reopens it; any other local consumer
+    // selects its source repository through its helper (#883 F3).
+    var missingMessage='The frozen local repository snapshot is missing provider '+missing.join(', ')+'. ';
+    if(context.localSource && context.localSource.path)throw topologyUnavailable(missingMessage+'Reopen the repository root containing canon.json to load its complete import closure.');
+    throw topologyUnavailable(missingMessage+'Run python3 "<diagram folder>/.flowview-agent/folder-agent.py" refresh-sources --source-repo <repository> first to select this consumer\'s provider repository, then propose again.');
   }
   var loader=createTopologyCatalogLoader(context),prepared=context;
   for(var id of missing)prepared=(await loader.load(id,prepared)).context;

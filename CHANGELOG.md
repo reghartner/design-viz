@@ -12,6 +12,15 @@
   `refresh-sources` does not. The repository address comes from
   `company/company.json` `repository` and now ships in the kit's
   `tools/company-agent-context.json`.
+- The build now fails when a spec under `diagrams/` declares `topologyExports`
+  (even an empty `{}`) but has no `canon.json` entry (#885). This covers a
+  normal `python3 tools/build.py`, CI and the Workbench Docker image. One error lists
+  every such spec path and says how to fix it: add its folder to `canon.json` in
+  the same commit and PR as the consumers that import it, or remove
+  `topologyExports`. A provider may still be registered before any consumer uses
+  it. Agent folders such as `.flowview-agent/` and files that are not valid JSON
+  are not checked. A fork that already has an unlisted exporting spec must list it
+  or remove its exports before its build passes again.
 
 ## Manually placed step circles (2026-10-30)
 

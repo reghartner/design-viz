@@ -17,6 +17,12 @@ const core = require('./canon/core.cjs');
 const fs = require('fs');
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 
+// A provider missing from the files passed together: name both ways to load it.
+// --resolve-imports keeps its own message, which names the registry it searched.
+const MISSING_PROVIDER = /^Topology .+: missing spec ./;
+const MISSING_PROVIDER_REMEDY = '. To load providers, pass --resolve-imports <repository folder or registry>, ' +
+  'or in a connected folder run folder-agent.py refresh-sources --source-repo <repository>.';
+
 function hasTopologyDeclarations(raw){
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
   if (own(raw, 'topologyImports') || own(raw, 'topologyExports')) return true;
@@ -76,7 +82,7 @@ async function main(argv){
     } catch (error){
       const file = topologyDiagnosticFile(entries, error);
       const message = error && error.message ? error.message : String(error);
-      console.log(file + ': ERROR ' + message);
+      console.log(file + ': ERROR ' + message + (MISSING_PROVIDER.test(message) ? MISSING_PROVIDER_REMEDY : ''));
       console.log(file + ': 1 errors, 0 warnings');
       return 1;
     }

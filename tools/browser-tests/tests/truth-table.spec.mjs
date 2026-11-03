@@ -164,15 +164,22 @@ test('truth table picker adds the panel and step controls carry, change and clea
   // #921 slice 2 (matrix above): one Active case control with case labels and No active case, in steps and Starting state.
   const diagram=async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram;
   const labels=['Solar charging','Mains connected','Battery operation','Low battery'],current=table.locator('[aria-current="true"]');
-  const activeCase=editor=>editor.getByLabel('Active case',{exact:true});
+  const activeCase=editor=>editor.getByLabel('Active case',{exact:true}),texts=control=>control.locator('option').allTextContents();
+  const checked=control=>control.evaluate(el=>el.selectedOptions[0]?el.selectedOptions[0].textContent:null);
   const open=async editor=>{await expect(editor).toHaveCount(1);if(await editor.getAttribute('open')===null)await editor.locator(':scope > summary').click();};
-  await expect(activeCase(patch).locator('option:checked'),'(H) step 1 shows its saved case by label').toHaveText('Low battery');
+  // Read-only rows first: one read each, soft, so one run reports every row; (A)'s option list is the hard gate before choosing by label.
+  expect.soft(await checked(activeCase(patch)),'(H) step 1 shows its saved case by label').toBe('Low battery');
+  await inspectPageElement(page,root.locator('.pt-truth-table .ptitle'));
+  const starting=guide.locator('.patchedit[data-panel-state="initial"]');await open(starting);
+  expect.soft(await texts(activeCase(starting)),'(B) Starting state options: panel default, case labels, No active case').toEqual(['Use panel default',...labels,'No active case']);
+  expect.soft(await checked(activeCase(starting)),'(H) Starting state shows Solar charging').toBe('Solar charging');
+  expect.soft(await starting.getByLabel('Active case assignment',{exact:true}).count(),'(B) no separate assignment dropdown').toBe(0);
   await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="2"]').click();await page.locator('#editor-tab-inspect').click();
   await expect(current,'precondition: step 2 inherits Low battery').toContainText('Low battery');
   const step2=guide.locator('.patchedit[data-panel-state="step"]');await open(step2);
-  expect(await activeCase(step2).locator('option').allTextContents(),'(A) step options: inherit, case labels, No active case').toEqual(['Inherit previous',...labels,'No active case']);
-  await expect(activeCase(step2).locator('option:checked'),'(H) an inheriting step shows Inherit previous').toHaveText('Inherit previous');
-  await expect(step2.getByLabel('Active case assignment',{exact:true}),'(A) no separate assignment dropdown').toHaveCount(0);
+  expect.soft(await checked(activeCase(step2)),'(H) an inheriting step shows Inherit previous').toBe('Inherit previous');
+  expect.soft(await step2.getByLabel('Active case assignment',{exact:true}).count(),'(A) no separate assignment dropdown').toBe(0);
+  expect(await texts(activeCase(step2)),'(A) step options: inherit, case labels, No active case').toEqual(['Inherit previous',...labels,'No active case']);
   await activeCase(step2).selectOption({label:'Battery operation'});
   await expect.poll(async()=>(await diagram()).steps[2].panels.power.active,'(E) a case label saves its ID').toBe('battery');
   await expect(current,'(E) step 2 highlights the chosen case').toContainText('Battery operation');
@@ -182,11 +189,7 @@ test('truth table picker adds the panel and step controls carry, change and clea
   await activeCase(step2).selectOption({label:'Inherit previous'});
   await expect.poll(async()=>Object.hasOwn((await diagram()).steps[2].panels.power,'active'),'(F) Inherit previous removes the assignment').toBe(false);
   await expect(current,'(F) step 2 inherits Low battery again').toContainText('Low battery');
-  await inspectPageElement(page,root.locator('.pt-truth-table .ptitle'));
-  const starting=guide.locator('.patchedit[data-panel-state="initial"]');await open(starting);
-  expect(await activeCase(starting).locator('option').allTextContents(),'(B) Starting state options: panel default, case labels, No active case').toEqual(['Use panel default',...labels,'No active case']);
-  await expect(activeCase(starting).locator('option:checked'),'(H) Starting state shows Solar charging').toHaveText('Solar charging');
-  await expect(starting.getByLabel('Active case assignment',{exact:true}),'(B) no separate assignment dropdown').toHaveCount(0);
+  await inspectPageElement(page,root.locator('.pt-truth-table .ptitle'));await open(starting);
   await activeCase(starting).selectOption({label:'No active case'});
   await expect.poll(async()=>{const initial=(await diagram()).panels[0].initial;return [Object.hasOwn(initial,'active'),initial.active];},'(D) Starting state saves active:null').toEqual([true,null]);
   await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();

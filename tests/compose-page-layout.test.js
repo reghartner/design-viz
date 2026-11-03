@@ -243,8 +243,9 @@ test('cost spacing reserve applies only to expanded route rows',()=>{
 // row | input                                        | options                                   | expected
 // a   | new exporting provider, no imports           | --section 0                               | exit 0; arranged like any new diagram; topologyExports and canon-less identity unchanged; result still resolves as a provider
 // b   | new importing consumer                       | --section 0                               | exit 1 naming the provider and --resolve-imports <repository folder or registry> (tools/validate.js remedy); nothing written; --help lists the option
-// c   | importing consumer (new, and the stress-test | --section 0 --resolve-imports <repo>      | exit 0; consumer keeps only its own nodes/edges/floats/steps plus the import and its position/overrides; no provider content,
-//     | file with --rearrange), repository member    |   [--rearrange]                           |   provenance or canon written; provider file unchanged; output resolves, every resolved card inside graphFrame, no overlaps
+// c   | importing consumer (new, and the stress-test | --section 0 --resolve-imports <repo>      | exit 0; consumer keeps only its own nodes/edges/floats/steps plus the import; no provider content, provenance or canon
+//     | file with --rearrange), repository member    |   [--rearrange]                           |   written; provider file unchanged; finite position, a nodePositions entry per exported node and an edgeOverrides
+//     |                                              |                                           |   route per exported edge, which the resolved output renders; every resolved card inside graphFrame, no overlaps
 // d   | consumer import carrying layout markers      | preflight, with and without --rearrange   | position, nodePositions and edgeOverrides geometry require --rearrange; label and node overrides stay semantic
 const COMPOSE=path.resolve(__dirname,'../tools/compose-page-layout.cjs');
 const compose=args=>spawnSync(process.execPath,[COMPOSE,...args],{encoding:'utf8'});
@@ -298,13 +299,23 @@ test('topology c: --resolve-imports arranges the '+name+' with its providers and
  assert.deepEqual(d.edges.map(e=>[e.from,e.to,e.label]),authored.edges.map(e=>[e.from,e.to,e.label]));
  assert.deepEqual(d.rows,[[]]);assert.deepEqual(d.floats.map(x=>x.id).sort(),['checkout-service','storefront']);assert.ok(d.floats.every(finitePoint),'consumer nodes are arranged');
  assert.equal(d.topologyImports.length,1);const imp=d.topologyImports[0];assert.deepEqual([imp.spec,imp.export,imp.as],['billing','public','billing']);
- assert.ok(Object.keys(imp.nodePositions||{}).every(key=>PROVIDER_EXPORTS.public.nodes.includes(key)),'imported positions use provider-relative identities');
- assert.ok(Object.keys(imp.edgeOverrides||{}).every(key=>PROVIDER_EXPORTS.public.edges.includes(key)),'imported routes use provider-relative identities');
+ // Imported geometry is written only as overlays keyed by provider-relative identity.
+ assert.ok(imp.position&&finitePoint(imp.position),'the import block has a finite origin');
+ assert.deepEqual(Object.keys(imp.nodePositions||{}).sort(),[...PROVIDER_EXPORTS.public.nodes].sort(),'every imported node has a saved position');
+ for(const key of PROVIDER_EXPORTS.public.nodes)assert.ok(finitePoint(imp.nodePositions[key]),'finite position for '+key);
+ assert.deepEqual(Object.keys(imp.edgeOverrides||{}),PROVIDER_EXPORTS.public.edges,'every imported connection has a saved route');
+ const route=imp.edgeOverrides['payment-api->fraud-check'],sides=['top','right','bottom','left'];
+ for(const port of ['fromPort','toPort'])assert.ok(route[port]&&sides.includes(route[port].side)&&(route[port].offset===undefined||Number.isFinite(route[port].offset)),'imported route '+port);
+ assert.ok(Array.isArray(route.curveControls)&&route.curveControls.length&&route.curveControls.every(p=>[p.t,p.dx,p.dy].every(Number.isFinite)),'imported route curveControls');
  assert.equal(d.sectionLayout.columns,24);assert.ok(d.sectionLayout.default.length);
- // Providers stay attached by reference and are framed together with consumer nodes.
+ // Providers stay attached by reference, render at the saved overlays and are framed together with consumer nodes.
  const resolved=(await (await topologyResolver())(output,f.repo)).resolved.page.sections[0].diagram;
  assert.deepEqual(Object.keys(resolved.nodes).sort(),['billing::fraud-check','billing::payment-api','checkout-service','storefront']);
- const frame=d.graphFrame,cards=Object.entries(require('../tools/arrange/core.cjs').viewerRouting().layout(resolved).pos);
+ const positions=require('../tools/arrange/core.cjs').viewerRouting().layout(resolved).pos;
+ for(const key of PROVIDER_EXPORTS.public.nodes)assert.deepEqual([positions['billing::'+key].cx,positions['billing::'+key].cy],[imp.position.x+imp.nodePositions[key].x,imp.position.y+imp.nodePositions[key].y],'billing::'+key+' renders at its saved overlay');
+ const rendered=resolved.edges.find(e=>e.from==='billing::payment-api'&&e.to==='billing::fraud-check');
+ for(const key of ['fromPort','toPort','curveControls'])assert.deepEqual(rendered[key],route[key],'imported route '+key+' renders from its overlay');
+ const frame=d.graphFrame,cards=Object.entries(positions);
  for(const [id,p] of cards)assert.ok(p.cx-p.w/2>=frame.x&&p.cx+p.w/2<=frame.x+frame.w&&p.cy-p.h/2>=frame.y&&p.cy+p.h/2<=frame.y+frame.h,id+' lies inside the composed graph frame');
  cards.forEach(([a,p],i)=>cards.slice(i+1).forEach(([b,q])=>assert.ok(Math.abs(p.cx-q.cx)>=(p.w+q.w)/2||Math.abs(p.cy-q.cy)>=(p.h+q.h)/2,a+' overlaps '+b)));
 });

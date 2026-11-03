@@ -22,11 +22,6 @@ python3 tools/authoring-packet.py --spec <candidate.spec.json> --mode edit --out
 
 Repeat `--panel` / `--feature`; `python3 tools/widget_doc.py --list`
 lists panels; [packet options](../../../docs/authoring-packets.md) lists features.
-For property combinations mapped to UX icons (for example solar, mains and
-battery states), select `--panel truth-table`. Columns can independently hold
-values or icon lists (including multiple icon columns); use the authored
-[device power example](../../../examples/device-power-truth-table/device-power-truth-table.spec.json).
-Keep combinations and outcomes source-backed or explicitly illustrative.
 Selections combine with inference. New/changed stories
 use `--mode new` (also with `--spec`) for source, question and worksheet phases
 before JSON. Fully specified scoped edits need no new questions or worksheet.

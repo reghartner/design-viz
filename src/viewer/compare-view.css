@@ -73,3 +73,6 @@
 .compare-text-body{white-space:pre-wrap;overflow-wrap:anywhere;min-width:0;}
 .compare-text-body del{background:#d1435b22;color:#a3253a;}.compare-text-body ins{background:#24a36b22;color:#17734a;text-decoration:none;}
 .compare-text-missing{margin:0;font-style:italic;color:var(--muted,#5b6578);font-family:inherit;}
+.compare-stage.compare-stage-steps{grid-template-rows:auto minmax(0,1fr);}
+.compare-stage.compare-stage-steps>.compare-focus{grid-area:1/1;overflow:visible;padding-bottom:4px;}
+.compare-stage.compare-stage-steps>.compare-columns{grid-area:2/1;}

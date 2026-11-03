@@ -29,12 +29,33 @@ read-only; choose **Edit in Workbench** to start a local edit at the reader's
 current chapter, playback mode, path, and step. Browser navigation also covers
 the library and its reader, including that reading position when you return from the editor.
 
+When the company site config sets `liveStatusExample`, a **Live Feature Delivery
+Status Board** row appears under **Browse diagrams**. It reads “A living Claude
+Artifact which hydrates your diagram with live Jira ticket status, all sourced
+from a root Epic or Initiative.” Its **Click here for an example** link opens the
+configured URL in a new tab; the rest of the row is not a control. Without that
+field, including upstream builds and `--no-config` builds, the row is hidden. See
+[homepage configuration](homepage-example.md#optional-link-a-live-status-board-example).
+
 Examples cover simple service requests, retries, traces, Backstage architecture,
 rollout decisions, a shared engineering/business story, a connected home, and
 an app’s backend sources. Category filters help narrow the choices. These specs
 are embedded in the built HTML; they also work when the workbench is opened from
 a downloaded file. Each new example uses the pastel skin by default. An explicit
 skin choice or hosting preference can override it.
+
+The **Delivery status** filter lists the **Epic status board** template, which
+also appears under **All examples**. It opens a diagram whose nodes and
+connections carry Jira ticket keys, with a Jira site and Epic set in
+`page.tracking` and two panels already arranged: **Epic status** on the left, the
+diagram with its step controls attached on the right, and **Edit history** below
+the diagram (the Backstage and Confluence profiles stack them full width). It is
+the only template that opens with **Demo live status**
+checked, so the diagram and **Epic status** show sample states at once;
+**Next day** in **Epic status** moves them along. **Paste JSON**, **Open file**,
+the other built-in examples and team templates open with the demo off. Replace
+the example Jira site, Epic and ticket keys with your own; see
+[live ticket status](live-status.md#workbench).
 
 Use **← New / open** in the workspace toolbar, or the Flowview wordmark, to return
 to welcome. **Continue** returns to the current project with its undo history.

@@ -11,8 +11,8 @@ CLI's existing sign-in for pull request names; nothing is uploaded.
 
 ## Start it
 
-Run the build once in this Flowview checkout (the server assembles its viewer from the
-build's generated files), then start the server:
+Run the build once in this Flowview checkout (the server's import resolution loads a
+runtime file the build generates), then start the server:
 
 ```
 python3 tools/build.py
@@ -61,8 +61,8 @@ request whose commits are not in the clone fetches those commits as objects only
   routes. A request must carry this server's `Host`, and a request with an `Origin`
   must come from this server.
 - The `gh` token stays in the server process; the page never receives it.
-- For each comparison the page receives the chosen document's JSON at both revisions
-  and, when that document has a canon id, the JSON of every spec with a canon id at
+- For each comparison the page receives the chosen document's JSON at each revision
+  where it exists and, when that document has a canon id, the JSON of every spec with a canon id at
   those revisions (the viewer uses them to resolve imported nodes). The page runs only
   in your browser on this machine.
 - Text from git and GitHub (commit messages, author, branch, tag and pull request

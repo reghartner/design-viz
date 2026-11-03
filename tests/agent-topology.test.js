@@ -37,11 +37,14 @@ async function harness(origin='https://test.invalid/flowspec.html',{missingIndex
   if(localSnapshot){const consumer=JSON.parse(text);consumer.page.canon={version:1,id:'consumer',kind:'canonical',owner:'group:default/test'};session.replaceProject(text,null,{topologyContext:{version:1,id:'consumer',local:true,specs:copy([...providers,consumer])}});}
   // The local source the consumer already uses, as the Workbench passes it to preparation:
   // 'grant' a directory handle on the repository root; 'snapshot' the proposal's helper
-  // snapshot; 'none' a frozen local context with no source to read.
+  // snapshot; 'none' a frozen local context with no source to read. Without a source:
+  // 'grant-lost' a consumer opened from the repository root whose grant is gone;
+  // 'unresolved' a folder-connected consumer whose imports never resolved (#883 F3).
   let repository=null,localSource=()=>undefined;
   if(localRepository){
     repository=localRepositoryFixture(providers,text);
-    const frozen=localRepository==='grant'?await c.readLocalRepositoryTopology(repository.handle,text,consumerPath):await c.readSuppliedLocalTopology(text,repository.snapshot([]));
+    const frozen=['grant','grant-lost'].includes(localRepository)?await c.readLocalRepositoryTopology(repository.handle,text,consumerPath):
+      localRepository==='unresolved'?c.unresolvedLocalTopology(JSON.parse(text)):await c.readSuppliedLocalTopology(text,repository.snapshot([]));
     session.replaceProject(text,null,{topologyContext:frozen});
     if(localRepository==='grant')localSource=()=>({directory:repository.handle,path:consumerPath});
     if(localRepository==='snapshot')localSource=proposal=>proposal && proposal.sources?{sources:proposal.sources}:undefined;
@@ -115,6 +118,22 @@ for(const mode of ['unrelated bodies','no local source'])test('a local proposal 
   assert.equal(review.review.ok,false);assert.match(review.review.conflicts[0].reason,mode==='unrelated bodies'?/unrelated provider bodies/:/frozen local repository snapshot is missing provider nested/);
   assert.deepEqual(h.hits,[]);assert.equal(JSON.stringify(h.session.topologyContext()),before);assert.equal(h.session.text(),h.original);
   assert.equal(await h.client.acceptReview(review.review.version),false);assert.equal(h.applies,0);
+});
+/* #883 F3 contract matrix (Chuck 2026-11-02: fix the consumer-import findings before
+   import-sync reaches main): a local consumer with no source for a new import is told the
+   remedy that fits how it is connected.
+   row | fixture | assertion (scoped) | rejects
+   R1 helper-mode consumer, frozen helper snapshot | 'none': frozen from a helper snapshot, no source | review conflict reason names refresh-sources --source-repo and not "Reopen the repository root" | root wording for a folder-connected consumer
+   R2 folder-connected consumer, imports never resolved | 'unresolved': unresolvedLocalTopology, no source | same | same
+   R3 consumer opened from the repository root, grant gone | 'grant-lost': registered consumer path, no source | reason keeps "Reopen the repository root containing canon.json" | helper wording where reopening the root is the remedy
+   Every row also keeps the first sentence ("…snapshot is missing provider nested"), never asks the site library and changes nothing. */
+for(const mode of ['none','unresolved','grant-lost'])test('a local proposal outside the frozen closure names the remedy for its connection: '+mode+' (#883 F3)',async()=>{
+  const h=await harness('https://test.invalid/flowspec.html',{localRepository:mode});
+  const before=JSON.stringify(h.session.topologyContext());await h.client.poll();const review=h.client.reviewSnapshot(),reason=review.review.conflicts[0].reason;
+  assert.equal(review.review.ok,false);assert.match(reason,/frozen local repository snapshot is missing provider nested\./);
+  if(mode==='grant-lost')assert.match(reason,/Reopen the repository root containing canon\.json/);
+  else{assert.match(reason,/refresh-sources --source-repo/,'a folder-connected consumer is told to select its source repository: '+reason);assert.doesNotMatch(reason,/Reopen the repository root/);}
+  assert.deepEqual(h.hits,[]);assert.equal(JSON.stringify(h.session.topologyContext()),before);assert.equal(h.session.text(),h.original);assert.equal(h.applies,0);
 });
 for(const failure of ['revision','missing provider','foreign catalog'])test('proposal preparation refuses '+failure+' without source, history or frozen context changes',async()=>{
   const h=await harness();await h.connect();

@@ -340,7 +340,7 @@ marked on the Before side and added words on the After side; a document metadata
 (title, description and other page fields) shows each changed field's Before and After
 value ("Not set" when one side has none). In **Full diagram** these changes open Details,
 which also shows the current document's ledger and JSON. The comparison opens on the
-first change that has a diagram object, and on a ledger or metadata change only when
+first change that is not a ledger or metadata change, and on one of those only when
 every change is one. A section
 excluded from all Views has a source fallback there. Pan and zoom in one pane
 do not move the other. These controls never edit or accept the proposal, and

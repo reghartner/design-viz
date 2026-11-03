@@ -216,6 +216,31 @@ function compareValueLines(v){
   if (v === undefined) return null;
   return (typeof v === 'string' ? v : JSON.stringify(v, null, 2)).split('\n');
 }
+/* Diff of two lines that keeps their exact text: words and whitespace runs are separate tokens, so
+   indentation, repeated spaces and whitespace-only edits survive. Runs concatenate back to each line. */
+function compareLineDiff(before, after){
+  var a = String(before).match(/\s+|\S+/g) || [], b = String(after).match(/\s+|\S+/g) || [], runs = [];
+  function push(op, text){ var last = runs[runs.length - 1]; if (last && last.op === op) last.text += text; else runs.push({op:op, text:text}); }
+  var start = 0, endA = a.length, endB = b.length, i, j;
+  while (start < endA && start < endB && a[start] === b[start]) start++;
+  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]){ endA--; endB--; }
+  for (i = 0; i < start; i++) push('same', a[i]);
+  var ma = a.slice(start, endA), mb = b.slice(start, endB), n = ma.length, m = mb.length;
+  if ((n + 1) * (m + 1) > COMPARE_WORD_DIFF_CELLS){ ma.forEach(function(t){ push('del', t); }); mb.forEach(function(t){ push('ins', t); }); }
+  else {
+    var L = [];
+    for (i = 0; i <= n; i++) L.push(new Int32Array(m + 1));
+    for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--) L[i][j] = ma[i] === mb[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    i = 0; j = 0;
+    while (i < n || j < m){
+      if (i < n && j < m && ma[i] === mb[j]){ push('same', ma[i]); i++; j++; }
+      else if (j < m && (i >= n || L[i][j + 1] > L[i + 1][j])){ push('ins', mb[j]); j++; }
+      else if (i < n){ push('del', ma[i]); i++; }
+    }
+  }
+  for (i = endA; i < a.length; i++) push('same', a[i]);
+  return runs;
+}
 /* Blocks for a text entry, or null when the entry is not one: [{title, numbered, before, after}]
    where each side is {lines, from} or null (absent on that side). */
 function compareTextBlocks(entry){
@@ -667,9 +692,8 @@ function mountCompareView(host, opts){
              without one is wholly removed or added. */
           var mark = side === 'before' ? 'del' : 'ins';
           if (other == null){ if (line !== '') body.appendChild(el(mark, null, line)); }
-          else compareWordDiff(side === 'before' ? line : other, side === 'before' ? other : line).forEach(function(run){
+          else compareLineDiff(side === 'before' ? line : other, side === 'before' ? other : line).forEach(function(run){
             if (run.op !== 'same' && run.op !== mark) return;
-            if (body.childNodes.length) body.appendChild(doc.createTextNode(' '));
             body.appendChild(run.op === 'same' ? doc.createTextNode(run.text) : el(mark, null, run.text));
           });
           row.appendChild(body); col.appendChild(row);

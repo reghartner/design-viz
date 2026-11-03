@@ -41,7 +41,7 @@ must fire on the seeded crowded fixture, and --quiet must suppress them.
 # | row | fixture | assertion (scoped) | rejects |
 # |---|---|---|---|
 # | 7 copy used by default | kit + base session; consumer outside .flowview-agent | exit 0; "<consumer>: 0 errors"; stdout names revision "connection-7" | today's validate.js, which ignores the copy; an impl that does not print the revision it validated against |
-# | 8 copy lacks the provider (mode table row 2) | base session with specs [] | exit 1; the consumer's ERROR line contains "missing spec platform" and "folder-agent.py refresh-sources --source-repo <repository>" and not "--resolve-imports" | the files-passed-together message (names --resolve-imports); an impl that ignores the copy |
+# | 8 copy lacks a provider the current draft imports (mode table row 2; stale or incomplete copy) | base session with specs []; state.json source = checkout.json (the current draft imports platform) | exit 1; the consumer's ERROR line contains "missing spec platform" and "folder-agent.py refresh-sources --source-repo <repository>" and not "--resolve-imports" | the files-passed-together message (names --resolve-imports); an impl that ignores the copy; an impl that sends every missing provider to --resolve-imports |
 # | 9a out of date: hashes differ | state.json providersSha256 = another hex | exit 1; ERROR line contains "out of date" | an impl that trusts the copy without comparing it to state.json |
 # | 9b out of date: no hash in state.json | state.json without providersSha256 | exit 1; ERROR line contains "out of date" | an impl that treats a missing hash as a match |
 # | 9c out of date: partial or edited copy | payloadText changed after hashing (state and copy still agree) | exit 1; ERROR line contains "out of date" | an impl that compares only the two stored hashes |
@@ -60,6 +60,8 @@ must fire on the seeded crowded fixture, and --quiet must suppress them.
 # | 11e repository tools/validate.js ignores a copy (guard) | base session beside the candidate; run tools/validate.js | exit 1 with the files-passed-together message (names --resolve-imports) | an impl that looks for providers.json relative to the input spec |
 # | 13 canon-less candidate in a canon.json repository (stress test 2026-11-02) | "local repo": canon.json + base, middle, consumer spec files without page.canon (the local-repository.spec.mjs shapes); copy specs = base and middle as the Workbench writes them (FlowCanonLibrary.spec membership, tools/canon/manifest.cjs); consumerId "consumer" (registered) and "workbench-draft" (independent), one subtest each; candidate .flowview-agent/candidate.spec.json = consumer.spec.json bytes | exit 0; "<candidate>: 0 errors" | an impl that needs page.canon in the candidate ("specs require unique page.canon.id identities: undefined") |
 # | 14 canon-less consumer outside copy mode gets the #880 remedy | local repo consumer.spec.json run alone with tools/validate.js | exit 1; its ERROR line contains "missing spec middle", "--resolve-imports <repository folder or registry>" and "folder-agent.py refresh-sources --source-repo <repository>", and not "unique page.canon.id" | today's bare identity error |
+# | 15 provider new in the candidate (stress X1, 2026-11-03) | base session (copy holds platform); state.json source = checkout.json (the current draft imports only platform); candidate = checkout plus an import of ledger | exit 1; the candidate's ERROR line contains "missing spec ledger", "new in this candidate", "when it reviews" and "--resolve-imports <repository folder or registry>", and not "refresh-sources" | today's refresh-sources remedy, which loops: refresh-sources loads only the current draft's closure, so the copy cannot hold a provider only the candidate imports |
+# | 16 provider the current draft imports transitively (stale copy) | local repo: copy holds middle only (not base); state.json source = consumer.spec.json (imports middle, which imports base); candidate = consumer.spec.json | exit 1; the candidate's ERROR line contains "missing spec base" and "folder-agent.py refresh-sources --source-repo <repository>" and not "--resolve-imports" | an impl that compares only the draft's direct imports |
 # | 12 Workbench writes / state.json / browser cases (tests 1b-1e, 2-5) | — | — | covered in tests/folder-agent.test.js and tools/browser-tests/tests/local-repository.spec.mjs |
 import hashlib
 import importlib.util
@@ -436,9 +438,38 @@ class ConnectedFolderCopyTest(unittest.TestCase):
 
     # Row 8.
     def test_copy_without_the_provider_names_refresh_sources(self):
-        self.write_session(payload_text=self.payload_text(specs=[]))
+        self.write_session(payload_text=self.payload_text(specs=[]), state={"source": self.consumer.read_text()})
         line = self.assert_rejected(COPY_REMEDY, absent="--resolve-imports")
         self.assertIn("missing spec platform", line)
+
+    # Row 15.
+    def test_provider_new_in_the_candidate_names_resolve_imports(self):
+        self.write_session(state={"source": self.consumer.read_text()})
+        raw = json.loads(self.consumer.read_text())
+        raw["page"]["sections"][0]["diagram"]["topologyImports"].append({"spec": "ledger", "export": "public", "as": "ledger"})
+        candidate = self.session / "candidate-new-import.spec.json"
+        candidate.write_text(json.dumps(raw))
+        result = self.bundled_run(str(candidate))
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        line = self.error_line(result, candidate)
+        for phrase in ("missing spec ledger", "new in this candidate", "when it reviews",
+                       "--resolve-imports <repository folder or registry>"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, line)
+        self.assertNotIn("refresh-sources", line)
+
+    # Row 16.
+    def test_provider_the_draft_imports_transitively_names_refresh_sources(self):
+        consumer, providers = write_local_repository(self.root / "repo-16")
+        middle = [spec for spec in providers if spec["page"]["canon"]["id"] == "middle"]
+        text = json.dumps({"sourceKind": "local", "snapshotSha256": "a" * 64, "consumerId": "consumer", "specs": middle})
+        self.write_session(payload_text=text, state={"source": consumer.read_text()})
+        result = self.bundled_run(str(consumer))
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        line = self.error_line(result, consumer)
+        self.assertIn("missing spec base", line)
+        self.assertIn(COPY_REMEDY, line)
+        self.assertNotIn("--resolve-imports", line)
 
     # Rows 9a-9c.
     def test_state_names_a_different_copy(self):

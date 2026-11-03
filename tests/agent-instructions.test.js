@@ -41,13 +41,18 @@
       in canon.json without authorization" | dropping the existing authorization rule
 
    Contract matrix, #873 stress fixes (Sonnet 5.5 stress test of import-sync, runs B-r1..3 and
-   C-r1..3 under .local/stress/import-sync/runs; Chuck's rulings 2026-11-02 relayed by the
-   coordinator). Fixture for every CONNECT row: folderAgentInstructions over external+embedded x
-   resume x artifact/legacy identity x pilotCapture true/false; R = the one 'New exporting
-   diagram:' paragraph, I = the one 'Importing a provider:' paragraph. Doc rows are scoped to
-   docs/local-repository-authoring.md '## Register a new exporting diagram' (REG) and '## Open a
-   consumer and choose its providers' (CON), docs/folder-agent-session.md '## Refresh saved
-   repo providers' (SES) and the docs/shared-topology.md 'For central canon' paragraph (CEN).
+   C-r1..3 under .local/stress/import-sync/runs, first run and KITE's rerun with the canon grant
+   and a non-public company address; Chuck's rulings 2026-11-02 relayed by the coordinator).
+   Fixture for every CONNECT row: folderAgentInstructions over external+embedded x resume x
+   artifact/legacy identity x pilotCapture true/false x location "diagrams/payments/billing"
+   (opened from the repository root; the Workbench passes the diagram's repository-relative
+   folder as the 7th argument) or null (folder-connected). R = the one 'New exporting diagram:'
+   paragraph, I = the one 'Importing a provider:' paragraph, L = the one 'Locate the
+   diagram folder' paragraph. Doc rows are scoped to docs/local-repository-authoring.md
+   '## Register a new exporting diagram' (REG) and '## Open a consumer and choose its
+   providers' (CON), docs/folder-agent-session.md '## Refresh saved repo providers' (SES) and its
+   'Copy the displayed instructions' paragraph (LOC), and the docs/shared-topology.md 'For
+   central canon' paragraph (CEN).
    row | assertion | rejects
    F1 the exporting-diagram request authorizes its own canon.json entry | R: 'My request for a
       diagram other teams can import authorizes you to add that diagram's own canon.json entry'
@@ -61,21 +66,39 @@
       Workbench', 'then propose the full content there so I review it before it is saved'; REG
       and SES say the same | the B providers writing the complete pair to disk and closing the
       request unreviewed
-   F3 a missing provider at import time leads to the company repository | I (not R): 'If a
-      provider I ask for is in no repository you can already read, do not search the disk for
-      it', 'ask me for the path of my local clone of the company Flowview repository
-      <JSON address>', 'or ask me to clone it from that address if I have none, then run
-      refresh-sources --source-repo on that clone', 'Before a permanent canon change, ask me to
-      request PR access to that repository if I lack it'; CON and SES say the same | the C
-      consumers asking only for "the billing provider repo path", or searching the disk; a
-      clone prompt found only inside the canon-edit paragraph
+   F3 a provider outside those places leads to the company repository | I (not R): 'If a
+      provider I ask for is not in those places, ask me for the path of my local clone of the
+      company Flowview repository <JSON address>, or ask me to clone it from that address if I
+      have none, then run refresh-sources --source-repo on that clone', 'Before a permanent
+      canon change, ask me to request PR access to that repository if I lack it'; CON and SES
+      say the same | the C consumers asking only for "the billing provider repo path"; a clone
+      prompt found only inside the canon-edit paragraph
    F4 a folder-connected consumer selects a source before proposing a new import | no paragraph
       says 'just propose the import'; I: 'propose the import directly when this diagram was
       opened from the repository root or a local source repository is selected' and 'if this
       helper has no source repository yet, run python3 "<helper>" refresh-sources --source-repo
       <repository> first, once, and then propose the import'; CON and SES say the same and CON
       drops 'needs no refresh first' | #886's sentence, which leaves a folder-connected
-      consumer's review blocked on the missing provider */
+      consumer's review blocked on the missing provider
+   F5 providers are looked for only in named places | I: 'Look for providers only in this
+      diagram folder, its repository (the nearest folder above it that holds canon.json), the
+      source repository this helper already selected and source repositories I name; never
+      search the disk elsewhere'; CON and SES say the same | C1's whole-disk search that
+      imported from an unrelated /private/tmp repository
+   F6 the folder rule covers the path the Workbench names | L with a location: 'its direct child
+      "./<name>", or, when the working directory is the repository root I connected (the folder
+      that holds canon.json), its <JSON location> folder'; L without one has no repository-root
+      clause; every L: 'If you created this diagram folder earlier in this conversation (for
+      example a new diagram you seeded), use that path', 'If none matches, ask me for the full
+      path' and 'Do not search unrelated folders'; LOC names the repository-relative path and a
+      folder the agent created | the resumed B sessions that could not place the sibling ledger
+      folder; a root-connected diagram the rule cannot reach
+   F7 the commit rule is part of the final message for a new provider's consumer | I: 'When this
+      consumer change imports a newly registered provider, your final message must always
+      include the commit rule: its diagrams/…/<id>/ folder with <id>.spec.json, its root
+      canon.json entry, and every consumer topologyImports change that uses it go in one commit
+      and one PR'; CON and SES say the same in user terms | B3's consumer, which gave no
+      commit guidance */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource,companyAgentContext}=require('../tools/source-loader.cjs');
 const context=vm.createContext({});vm.runInContext(readSource('workbench/agent-chat.js'),context);
@@ -352,13 +375,16 @@ test('bundled authoring docs state the new-provider registration rule where prov
     /enroll the page in canon\.json without authorization/);
 });
 
-// #873 stress fixes F1-F4: one test per finding; the matrix is in the header.
+// #873 stress fixes F1-F7: one test per finding; the matrix is in the header.
+const STRESS_LOCATION='diagrams/payments/billing';
 function stressSetups(){
   const legacy={sessionId:'session',connectionId:'connection'},setups=[];
-  for(const workflow of ['external','embedded'])for(const resume of [false,true])for(const owner of [identity,legacy])for(const pilot of [false,true]){
-    const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,owner,workflow,pilot),paragraphs=prompt.split('\n\n');
-    const one=prefix=>{const found=paragraphs.filter(paragraph=>paragraph.startsWith(prefix));assert.equal(found.length,1,prefix+' '+workflow+' resume='+resume+' legacy='+!owner.artifacts+' pilot='+pilot);return found[0];};
-    setups.push({label:`${workflow} resume=${resume} legacy=${!owner.artifacts} pilot=${pilot}`,prompt,one});
+  for(const workflow of ['external','embedded'])for(const resume of [false,true])for(const owner of [identity,legacy])
+  for(const pilot of [false,true])for(const location of [STRESS_LOCATION,null]){
+    const label=`${workflow} resume=${resume} legacy=${!owner.artifacts} pilot=${pilot} location=${location}`;
+    const prompt=context.folderAgentInstructions('billing','mixed',resume,owner,workflow,pilot,location),paragraphs=prompt.split('\n\n');
+    const one=prefix=>{const found=paragraphs.filter(paragraph=>paragraph.startsWith(prefix));assert.equal(found.length,1,prefix+' '+label);return found[0];};
+    setups.push({label,prompt,one,location});
   }
   return setups;
 }
@@ -372,11 +398,12 @@ function stressDocs(){
     const body=text.slice(start+heading.length+2),end=body.search(/\n## /);
     return flat(end<0?body:body.slice(0,end));
   };
-  const central=read('docs/shared-topology.md').split(/\n\s*\n/).filter(paragraph=>paragraph.startsWith('For central canon'));
-  assert.equal(central.length,1);
+  const paragraph=(file,prefix)=>{const found=read(file).split(/\n\s*\n/).filter(text=>text.startsWith(prefix));assert.equal(found.length,1,file+' '+prefix);return flat(found[0]);};
   return {REG:section('docs/local-repository-authoring.md','## Register a new exporting diagram'),
     CON:section('docs/local-repository-authoring.md','## Open a consumer and choose its providers'),
-    SES:section('docs/folder-agent-session.md','## Refresh saved repo providers'),CEN:flat(central[0])};
+    SES:section('docs/folder-agent-session.md','## Refresh saved repo providers'),
+    LOC:paragraph('docs/folder-agent-session.md','Copy the displayed instructions into the agent.'),
+    CEN:paragraph('docs/shared-topology.md','For central canon')};
 }
 test('F1: a request for an importable diagram authorizes only that diagram\'s own canon.json entry',()=>{
   for(const {label,prompt,one} of stressSetups()){
@@ -408,20 +435,16 @@ test('F2: a new exporting diagram starts as a seed and is reviewed in the Workbe
     assert.match(docs[name],/proposes the full content there, so the user reviews it before it is saved/,name);
   }
 });
-test('F3: a provider in no readable repository leads to the company repository clone and PR access',()=>{
+test('F3: a provider outside those places leads to the company repository clone and PR access',()=>{
   const repository=companyAgentContext().repository||UPSTREAM_REPOSITORY;
   for(const {label,one} of stressSetups()){
     const importing=one('Importing a provider:');
-    assert.match(importing,/If a provider I ask for is in no repository you can already read, do not search the disk for it/,label);
-    assert.ok(importing.includes('ask me for the path of my local clone of the company Flowview repository '+JSON.stringify(repository)),label);
-    assert.match(importing,/or ask me to clone it from that address if I have none, then run refresh-sources --source-repo on that clone/,label);
+    assert.ok(importing.includes('If a provider I ask for is not in those places, ask me for the path of my local clone of the company Flowview repository '+JSON.stringify(repository)+', or ask me to clone it from that address if I have none, then run refresh-sources --source-repo on that clone.'),label);
     assert.match(importing,/Before a permanent canon change, ask me to request PR access to that repository if I lack it/,label);
   }
   const docs=stressDocs();
   for(const name of ['CON','SES']){
-    assert.match(docs[name],/If a provider the user asks for is in no repository the agent can already read, the agent does not search the disk for it/,name);
-    assert.match(docs[name],/asks for the path of the user's local clone of the company Flowview repository/,name);
-    assert.match(docs[name],/or asks the user to clone it from the repository address if they have none, then runs refresh-sources --source-repo on that clone/,name);
+    assert.match(docs[name],/If a provider the user asks for is not in those places, the agent asks for the path of the user's local clone of the company Flowview repository, or asks the user to clone it from the repository address if they have none, then runs refresh-sources --source-repo on that clone/,name);
     assert.match(docs[name],/Before a permanent canon change, it asks the user to request PR access to that repository if they lack it/,name);
   }
 });
@@ -438,4 +461,33 @@ test('F4: a folder-connected consumer selects a source repository before proposi
     assert.match(docs[name],/proposes the import directly when the consumer was opened from the repository root or a local source repository is selected/,name);
     assert.match(docs[name],/if the consumer's helper has no source repository yet, the agent runs refresh-sources --source-repo <repository> first, once, and then proposes the import/,name);
   }
+});
+test('F5: providers are looked for only in the diagram folder, its repository and named source repositories',()=>{
+  for(const {label,one} of stressSetups()){
+    assert.match(one('Importing a provider:'),/Look for providers only in this diagram folder, its repository \(the nearest folder above it that holds canon\.json\), the source repository this helper already selected and source repositories I name; never search the disk elsewhere\./,label);
+  }
+  const docs=stressDocs();
+  for(const name of ['CON','SES'])
+    assert.match(docs[name],/The agent looks for providers only in the consumer's folder, its repository \(the nearest folder above it that holds canon\.json\), the source repository its helper already selected and source repositories the user names; it never searches the disk elsewhere/,name);
+});
+test('F6: the folder rule covers the path the Workbench names and a folder the agent created',()=>{
+  for(const {label,one,location} of stressSetups()){
+    const locate=one('Locate the diagram folder');
+    if(location)assert.ok(locate.includes('its direct child "./billing", or, when the working directory is the repository root I connected (the folder that holds canon.json), its '+JSON.stringify(location)+' folder.'),label);
+    else assert.doesNotMatch(locate,/repository root I connected/,label);
+    assert.match(locate,/If you created this diagram folder earlier in this conversation \(for example a new diagram you seeded\), use that path\./,label);
+    assert.match(locate,/If none matches, ask me for the full path\. Do not search unrelated folders\./,label);
+  }
+  const docs=stressDocs();
+  assert.match(docs.LOC,/the repository-relative path the Workbench names for a diagram opened from the repository root/);
+  assert.match(docs.LOC,/a folder it created earlier in the conversation/);
+  assert.match(docs.LOC,/it asks for the full path instead of searching unrelated folders/);
+});
+test('F7: the final message for a consumer of a newly registered provider always carries the commit rule',()=>{
+  for(const {label,one} of stressSetups()){
+    assert.match(one('Importing a provider:'),/When this consumer change imports a newly registered provider, your final message must always include the commit rule: its diagrams\/…\/<id>\/ folder with <id>\.spec\.json, its root canon\.json entry, and every consumer topologyImports change that uses it go in one commit and one PR\./,label);
+  }
+  const docs=stressDocs();
+  for(const name of ['CON','SES'])
+    assert.match(docs[name],/When a consumer change imports a newly registered provider, the agent's final message must always include the commit rule/,name);
 });

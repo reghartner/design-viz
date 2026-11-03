@@ -571,8 +571,8 @@ test('R21d a near-total rewrite of a 25,000-line ledger diffs in bounded time an
 test('R21e adding or removing an empty object is a change',()=>{
   const p0={page:{title:'T',sections:[{id:'s',heading:'S',diagram:base()}]}},p1=plain(p0);p1.page.tracking={};
   const added=compare(side(p0),side(p1)),removed=compare(side(p1),side(p0));
-  assert.deepEqual(only(added,x=>x.kind==='document','document entry').fields,[{beforePath:null,afterPath:'tracking',before:undefined,after:{}}]);
-  assert.deepEqual(only(removed,x=>x.kind==='document','document entry').fields,[{beforePath:'tracking',afterPath:null,before:{},after:undefined}]);
+  assert.deepEqual(only(added,x=>x.kind==='document','document entry').fields,[{beforePath:null,afterPath:'tracking',after:{}}]);
+  assert.deepEqual(only(removed,x=>x.kind==='document','document entry').fields,[{beforePath:'tracking',afterPath:null,before:{}}]);
 });
 
 test('R22 legacy steps[i].patch alias reports the .patch path and the same effect as .panels',()=>{

@@ -1,5 +1,26 @@
 import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
+import {readFile} from 'node:fs/promises';
+import path from 'node:path';
+import {repo} from '../helpers/prepare.mjs';
+
+/* #920 contract (Chuck, 2026-11-03): floating Inspect keeps its saved size. Automatic
+   placement may still move it to cover the least of the selection, and may overlap the
+   selection; it never shrinks Inspect (no 240px-tall or 300px-wide stand-in). Scoped to
+   Inspect; other tools keep today's placement. Desktop only. §0 ruling: extend existing tests.
+
+   | row | fixture | assertion (scoped) | rejects |
+   | 1 open over a section-wide panel keeps saved height | truth-table example at 1600x1000, saved 430x650 by keyboard resize, panel selected, Inspect closed then opened from its tab | #workspace-window-inspect box h == saved h | today's {h:240} candidates winning `place(…,opening)` |
+   | 2 open over a section-wide panel keeps saved width | same | box w == saved w | an impl that drops only the {h:240} candidates (a 300-wide full-height window overlaps less, so {w:300} wins) |
+   | 3 selecting a section-wide panel while Inspect is open keeps saved height | same viewport, Inspect open at saved size, then the panel title clicked | box h == saved h | a fix applied only on the open path (showTool), not on selection re-placement |
+   | 4 same, keeps saved width | same | box w == saved w | as row 2, on the selection path |
+   | 5 the saved size is the user's, not the default | keyboard resize to 430x650 before any selection | precondition box == 430x650 != default 380x700 | an impl that re-sizes Inspect to defaults() instead of the saved preference |
+   | 6 Inspect stays usable at its saved size | rows 1 and 3 | grip, close and resize hit-test to themselves | a placement that pushes the saved-size window's controls off-screen |
+   | 7 Inspect still avoids a selected node when it can | existing `desktop panel placement…` at 1280x720, 1440x900, 1920x1080 | clearSelectionOverlap (unchanged) | an impl that skips Inspect placement entirely |
+   | 8 Agent and Inspect controls both reachable together | existing `desktop panel placement…` (unchanged) | hit() on both windows' controls | a full-size Inspect left under Agent's title bar or resize handle |
+   | - may move / may overlap the selection | permission, not a requirement | not asserted | - |
+   Discriminating power: a loud precondition proves every saved-size position in the workspace
+   intersects the selected panel, so placement cannot avoid it without shrinking. */
 
 async function capture(page,testInfo,name){const path=testInfo.outputPath(name+'.png');await page.screenshot({path});await testInfo.attach(name,{path,contentType:'image/png'});}
 async function hit(locator){
@@ -59,6 +80,38 @@ for(const [width,height] of [[1280,720],[1440,900],[1920,1080]])test(`desktop pa
   await hit(inspect.getByRole('button',{name:'Float Inspect panel',exact:true}));await hit(inspect.locator('.workspace-window-close'));
   await inspect.getByRole('button',{name:'Float Inspect panel',exact:true}).click();
   for(const control of ['.workspace-window-grip','.workspace-window-close','.workspace-window-resize'])await hit(inspect.locator(control));
+});
+
+test('desktop floating Inspect keeps its saved size over a section-wide panel at 1600x1000',async({page,server},testInfo)=>{
+  await page.setViewportSize({width:1600,height:1000});
+  const source=JSON.stringify(JSON.parse(await readFile(path.join(repo,'examples/device-power-truth-table/device-power-truth-table.spec.json'),'utf8')),null,2);
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);
+  const inspect=page.locator('#workspace-window-inspect'),panel=page.locator('#docview .pwidget.pt-truth-table'),settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))));
+  const size=async()=>{const b=await inspect.boundingBox();return {w:Math.round(b.width),h:Math.round(b.height)};};
+  await expect(inspect).toBeHidden();await expect(page.locator('#docview .dv-sel')).toHaveCount(0);
+  // Row 5: the saved size comes from the user's own resize, not the 380x700 default.
+  await page.locator('#editor-tab-inspect').click();await expect(inspect).toBeVisible();await settle();
+  expect(await size()).toEqual({w:380,h:700});
+  await inspect.locator('.workspace-window-resize').focus();await page.keyboard.press('Shift+ArrowUp');await page.keyboard.press('Shift+ArrowRight');await settle();
+  const saved=await size();expect(saved).toEqual({w:430,h:650});
+  // Rows 3-4 and 6: selecting the section-wide panel re-places the open Inspect without shrinking it.
+  await panel.locator('.ptitle').click();await expect(panel).toHaveClass(/(^|\s)dv-sel(\s|$)/);
+  // Discriminating precondition: every saved-size position in the workspace intersects the panel.
+  expect(await panel.evaluate((el,{w,h})=>{
+    const s=el.getBoundingClientRect(),rail=document.querySelector('.workspace-rail').getBoundingClientRect(),header=document.querySelector('.workbench-header').getBoundingClientRect();
+    return {leftmost:s.left<rail.right+12+w,rightmost:s.right>innerWidth-12-w,topmost:s.top<header.bottom+10+h,bottommost:s.bottom>innerHeight-12-h};
+  },saved)).toEqual({leftmost:true,rightmost:true,topmost:true,bottommost:true});
+  await settle();
+  expect.soft(await size(),'selection re-placement keeps the saved Inspect size').toEqual(saved);
+  for(const control of ['.workspace-window-grip','.workspace-window-close','.workspace-window-resize'])await hit(inspect.locator(control));
+  await capture(page,testInfo,'inspect-selected-panel-1600');
+  // Rows 1-2 and 6: opening Inspect over the already-selected panel keeps the saved size.
+  await inspect.locator('.workspace-window-close').click();await expect(inspect).toBeHidden();await expect(panel).toHaveClass(/(^|\s)dv-sel(\s|$)/);
+  await page.locator('#editor-tab-inspect').click();await expect(inspect).toBeVisible();await settle();
+  expect.soft(await size(),'opening Inspect keeps the saved Inspect size').toEqual(saved);
+  for(const control of ['.workspace-window-grip','.workspace-window-close','.workspace-window-resize'])await hit(inspect.locator(control));
+  await capture(page,testInfo,'inspect-opened-over-panel-1600');
+  await expect(page.locator('#src')).toHaveValue(source);
 });
 
 test('Contents changes, tool restoration and the single dock keep desktop controls usable',async({page,server})=>{

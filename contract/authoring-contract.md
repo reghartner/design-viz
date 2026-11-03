@@ -1287,6 +1287,41 @@ perspectives" of one timeline). Types:
   column (when shown) share the remaining space. Long values wrap, and wide tables scroll
   horizontally. With all widths omitted, sizing stays content-driven.
   Optional `note` persists until replaced/cleared.
+- `truth-table` — authored property combinations and UX icon outputs.
+  Use this panel to compare authored device properties with the icons displayed
+  in a UX. It performs no boolean evaluation or electrical inference. The desktop
+  workbench panel picker includes **Truth table** with editable property headers,
+  typed case values and a shared visual icon picker for each icon cell's outputs.
+
+  - `columns`: up to 8 `{id,label?,kind?}` declarations with unique IDs.
+    `kind` is `value` (default) or `icons`; any number of columns may hold icons.
+  - `cases`: up to 24 `{id,label?,cells}` cases with unique IDs.
+    `cells` maps column IDs to values. Value columns accept strings, finite
+    numbers, booleans or null.
+    Missing values show `—`, null shows `null`, and an empty string shows `(empty)`.
+  - Each `icons` column cell contains an array of up to 8 `{icon,label?}`
+    outputs. `icon` is a shared icon ID;
+    `label` is optional accessible and visible text, defaulting to the library name.
+    An empty list explicitly displays **No icons**. All icons in a cell appear together; separate icon columns stay independent.
+  - `initial.active` or a step's `active`: a case ID to highlight, or `null` for no
+    highlight. Omission inherits the previous step; each alternate path folds
+    independently. `enterOnce.active` highlights only the current step.
+  - `initial.note` or step `note`: optional explanatory text; null clears it.
+
+  Properties and cases are fixed declarations; story steps change the highlight
+  and explanation. Invalid active IDs or non-object patches produce warnings and
+  leave the carried state intact. Invalid icons are skipped with warnings.
+  Unknown properties are preserved by desktop editing but ignored when rendering.
+  The desktop editor supports adding, reordering and removing cases and icon
+  outputs, editing typed values, starting/step state and ordinary Undo/Redo.
+  Rename property/case IDs with care: IDs identify stored cells and active-state
+  references; changing an ID does not rewrite those references.
+
+  See [device power truth table](../examples/device-power-truth-table/device-power-truth-table.spec.json)
+  for separate Power icon and Battery icons columns alongside solar charging,
+  mains power, battery operation and low battery, with
+  independent story paths. Inline shared SVGs remain self-contained offline.
+
 - `data-contract` — contract fields in rows, with up to 12 custom columns and
   64 fields. Add it from **Software & data → Data contract**. Declare
   `columns:[{id:"type",label:"Type",width:110},{id:"example",label:"Example",width:180}]`

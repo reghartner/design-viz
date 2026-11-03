@@ -113,6 +113,7 @@
    U2   untrusted text in the document list  commit with a hostile file name and       doc row path literal; rail labels and node text     innerHTML in the document list or rail
         and comparison                       node/section titles                      literal; no <img>/inline <script>; no __pwned
    AU   every test, context-wide (all pages): no page/console error, failed request, HTTP >= 400, or request outside the compare server
+        (recorded from page open until the test body ends; closing the servers afterwards ends open requests)
    U1   page CSP                                response headers of "/"                 no repeated directive; default-src 'none';       inline or eval script allowed; a repeated
                                                                                        script-src exactly 'self';                         unsafe directive
                                                                                        no script-src-elem/-attr (PR 3: style-src may
@@ -144,23 +145,28 @@ const test=base.extend({
       const response=await page.goto('http://127.0.0.1:'+server.address().port+'/');
       return response;
     });
-    /* The page is still open; its keep-alive or in-flight requests must not hold the close. */
+    /* The page is still open; its keep-alive or in-flight requests must not hold the close, and a request the
+       close ends is not a test failure. */
+    errors.stop();
     for(const s of servers){s.closeAllConnections();await new Promise(resolve=>s.close(resolve));}
   },
   /* Page errors, console errors, failed requests, HTTP errors and any request that leaves the
      compare server's origin all fail the test. */
   errors:[async({context,page},use)=>{
     const errors=[],origins=[],allowed=[];
+    /* Recording stops when the test body has finished: closing the servers then ends any request still
+       open, and that is not a page error. */
+    let recording=true;const record=m=>{if(recording)errors.push(m);};
     /* A test may expect one HTTP error status for one URL pattern; only that is excused. */
     const excused=(url,status)=>allowed.some(a=>a.re.test(url)&&(status===undefined||status===a.status));
     /* Context-wide: every page of the context, including popups. */
-    const watch=p=>{p.on('pageerror',e=>errors.push('page: '+e.message));p.on('console',m=>{if(m.type()==='error'&&!(/^Failed to load resource/.test(m.text())&&excused(m.location()?.url||'')))errors.push('console: '+m.text());});};
+    const watch=p=>{p.on('pageerror',e=>record('page: '+e.message));p.on('console',m=>{if(m.type()==='error'&&!(/^Failed to load resource/.test(m.text())&&excused(m.location()?.url||'')))record('console: '+m.text());});};
     context.pages().forEach(watch);context.on('page',watch);
-    context.on('request',r=>{const url=r.url();if(!origins.some(o=>url.startsWith(o+'/'))&&!/^(data|blob|about):/.test(url))errors.push('outbound: '+url);});
-    context.on('requestfailed',r=>errors.push('request failed: '+r.url()+' '+(r.failure()?.errorText||'')));
-    context.on('response',r=>{if(r.status()>=400&&!excused(r.url(),r.status()))errors.push('HTTP '+r.status()+': '+r.url());});
+    context.on('request',r=>{const url=r.url();if(!origins.some(o=>url.startsWith(o+'/'))&&!/^(data|blob|about):/.test(url))record('outbound: '+url);});
+    context.on('requestfailed',r=>record('request failed: '+r.url()+' '+(r.failure()?.errorText||'')));
+    context.on('response',r=>{if(r.status()>=400&&!excused(r.url(),r.status()))record('HTTP '+r.status()+': '+r.url());});
     await context.route(/^https?:/,route=>{const url=route.request().url();return origins.some(o=>url.startsWith(o+'/'))?route.continue():route.abort();});
-    errors.origins=origins;errors.allow=(status,re)=>allowed.push({status,re});
+    errors.origins=origins;errors.allow=(status,re)=>allowed.push({status,re});errors.stop=()=>{recording=false;};
     await use(errors);
     expect([...errors],'no page/console/request errors or outbound requests').toEqual([]);
   },{auto:true}],

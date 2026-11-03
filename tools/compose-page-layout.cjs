@@ -6,14 +6,21 @@ const fs=require('node:fs');
 const core=require('./arrange/core.cjs');
 const graph=require('./auto-arrange-spec.cjs');
 const {clone,stable}=require('./arrange/model.cjs');
-const HELP='Usage: node tools/compose-page-layout.cjs [--section INDEX ... | --all] [--width 800..1920] [--profile default|backstage|confluence] [--rearrange] input.json output.json\n'+
+const HELP='Usage: node tools/compose-page-layout.cjs [--section INDEX ... | --all] [--width 800..1920] [--profile default|backstage|confluence] [--rearrange] [--resolve-imports <repository folder or registry>] input.json output.json\n'+
  'Arranges nodes, panels and step controls; existing geometry requires --rearrange.\n'+
+ 'Exporting diagrams need no providers. Diagrams with topologyImports need --resolve-imports: imported nodes are arranged too, saved only as import position/nodePositions/edgeOverrides.\n'+
  'Input is preserved. Output refreshes system-owned compatibility metadata; bare diagrams become a page wrapper with the same diagram content. Failures write nothing.\n'+
  'No browser or package installation is needed. Sizes are estimates; see docs/auto-arrange.md for supported inputs and limits.\n';
+// Edge geometry replaced by arrangement. Import edge overrides carry the same
+// fields except labelAt, which is not an edgeLayoutFields override.
+const EDGE_GEOMETRY=['bend','curvePoints','curveControls','fromPort','toPort','fromDx','fromDy','toDx','toDy','labelDx','labelDy','labelAt'];
+const IMPORT_EDGE_GEOMETRY=EDGE_GEOMETRY.filter(key=>key!=='labelAt');
+const PROVIDER_REMEDY='To load providers, pass --resolve-imports <repository folder or registry>.';
 function parseArgs(args){
  const rest=[],options={width:1200,profile:'default',rearrange:false};
  for(let i=0;i<args.length;i++){
   const a=args[i];if(a==='--rearrange'){options.rearrange=true;continue;}
+  if(a==='--resolve-imports'){const value=args[++i];if(!value||value.startsWith('--'))throw Error('--resolve-imports requires a repository folder or registry JSON');options.resolveImports=value;continue;}
   if(['--width','--profile'].includes(a)){const value=args[++i];if(value==null)throw Error(a+' requires a value');options[a.slice(2)]=a==='--width'?Number(value):value;continue;}rest.push(a);
  }
  try{Object.assign(options,graph.parseArgs(rest));}catch(e){throw Error(e.message.replace('auto-arrange-spec.cjs','compose-page-layout.cjs'));}
@@ -35,7 +42,8 @@ function preflight(d,options){
  const owns=(value,keys)=>value&&keys.some(key=>Object.prototype.hasOwnProperty.call(value,key));
  const authoredGeometry=owns(d,['graphFrame','sectionLayout','routing'])||(d.rows||[]).some(r=>r.length)||
   (d.floats||[]).some(f=>owns(f,['x','y','dx','dy','noSpread']))||
-  (d.edges||[]).some(e=>owns(e,['bend','curvePoints','curveControls','fromPort','toPort','fromDx','fromDy','toDx','toDy','labelDx','labelDy','labelAt']));
+  (d.edges||[]).some(e=>owns(e,EDGE_GEOMETRY))||
+  (Array.isArray(d.topologyImports)?d.topologyImports:[]).some(imp=>owns(imp,['position','nodePositions'])||Object.values(imp?.edgeOverrides||{}).some(o=>owns(o,IMPORT_EDGE_GEOMETRY)));
  if(!options.rearrange&&authoredGeometry)throw Error('Selected diagram already has geometry; preserve existing edits, or pass --rearrange for an explicitly requested rearrangement');
  const section=d.sectionLayout;
  if(section&&(typeof section!=='object'||Array.isArray(section)||section.columns!=null&&![12,24].includes(section.columns)))throw Error('Unsupported: malformed sectionLayout or columns marker; expected an object with columns 12 or 24');
@@ -54,24 +62,60 @@ function seed(d,originalTiles){
  if(!Object.keys(d.nodes||{}).length)tiles[0].hidden=true;
  return {...clone(d),panels:clone(d.panels||[]),sectionLayout:{columns:24,default:tiles}};
 }
+const own=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
+function topology(raw,context){
+ const records=graph.diagramRecords(raw).filter(r=>own(r.diagram,'topologyImports')||own(r.diagram,'topologyExports'));
+ const importing=records.find(r=>(r.diagram.topologyImports||[]).length);
+ if(importing&&!context){
+  const providers=[...new Set(importing.diagram.topologyImports.map(imp=>imp?.spec))].join(', ');
+  throw Error(importing.path+': topologyImports from '+providers+' need their providers. '+PROVIDER_REMEDY);
+ }
+ return records.length?{context:context||null}:null;
+}
+// The production placement runtime: shared Workbench auto-arrange write-back and
+// topology resolution. Loaded only for specs that declare imports or exports.
+const runtime=()=>require('./place-nodes.cjs').runtime();
+// Resolved view used for arrangement inputs, estimates and validation. The
+// authored spec keeps its declarations; provider content never enters it.
+function resolved(raw,topo){return topo?runtime().FlowTopology.resolveSource(raw,topo.context):raw;}
+// Imported nodes are arranged with local ones through the Workbench write-back:
+// local floats/edges, plus import position, nodePositions and edgeOverrides only.
+function arrangeTopology(raw,selected,topo){
+ const R=runtime();let source=clone(raw);
+ for(const {section,path} of selected){
+  try{
+   const text=JSON.stringify(source),got=R.arrangementSource(text,source,section,topo.context);if(got.error)throw Error(got.error);
+   if(!Object.keys(got.effective.nodes||{}).length)continue;
+   const plan=R.planAutoArrange(text,source,section,R.autoArrangeCandidates(got.effective),topo.context);
+   if(plan.error)throw Error(plan.error);if(!plan.noop)source=JSON.parse(plan.text);
+  }catch(e){throw Error(path+': '+e.message);}
+ }
+ return source;
+}
 async function arrange(raw,options){
- const verdict=core.validateSpec(raw);if(verdict.errors.length)throw Error('Invalid input: '+verdict.errors.join('\n'));
+ const topo=topology(raw,options.context),view=resolved(raw,topo);
+ const verdict=core.validateSpec(view);if(verdict.errors.length)throw Error('Invalid input: '+verdict.errors.join('\n'));
  const metadataIssues=core.compatibility.metadataWarnings(raw);if(metadataIssues.length)throw Error('Invalid compatibility metadata: '+metadataIssues.join('; '));
  const original=clone(raw),selected=select(original,options.sections);
  for(const r of selected){try{preflight(r.diagram,options);}catch(e){throw Error(r.path+': '+e.message);}}
- const graphIds=selected.filter(r=>Object.keys(r.diagram.nodes||{}).length).map(r=>r.section);
- const output=graphIds.length?(await graph.arrangeSpec(original,graphIds)).raw:clone(original);
+ let output;
+ if(topo)output=arrangeTopology(original,selected,topo);
+ else{
+  const graphIds=selected.filter(r=>Object.keys(r.diagram.nodes||{}).length).map(r=>r.section);
+  output=graphIds.length?(await graph.arrangeSpec(original,graphIds)).raw:clone(original);
+ }
+ const arranged=resolved(output,topo),targets=new Map(select(output,options.sections).map(r=>[r.section,r.diagram]));
  const {createMeasurer}=require('./arrange/measure.cjs'),measurer=await createMeasurer(options.width),diagnostics=[];
  try{
   const originals=new Map(selected.map(r=>[r.section,r.diagram]));
-  for(const record of select(output,options.sections)){
+  for(const record of select(arranged,options.sections)){
    try{
-    const before=originals.get(record.section),layoutBefore=before.sectionLayout;
+    const before=originals.get(record.section),layoutBefore=before.sectionLayout,target=targets.get(record.section);
     const skin=(raw.page||raw).skin||'pastel';
     const work={diagram:seed(record.diagram,preflight(before,options))};
     const result=await measurer.arrange(work,skin);
-    if(result.spec.diagram.graphFrame!==undefined)record.diagram.graphFrame=clone(result.spec.diagram.graphFrame);
-    record.diagram.sectionLayout={...clone(layoutBefore||{}),columns:24,[options.profile]:result.spec.diagram.sectionLayout.default};
+    if(result.spec.diagram.graphFrame!==undefined)record.diagram.graphFrame=target.graphFrame=clone(result.spec.diagram.graphFrame);
+    target.sectionLayout={...clone(layoutBefore||{}),columns:24,[options.profile]:result.spec.diagram.sectionLayout.default};
     // Estimation works on a separate diagram; arbitrary semantic fields,
     // unselected profiles and panel/step declaration order cannot be rewritten.
     const expected=clone(record.diagram);delete expected.sectionLayout;
@@ -82,9 +126,12 @@ async function arrange(raw,options){
    }catch(e){throw Error(record.path+': '+e.message);}
   }
  }finally{await measurer.close();}
- const stamped=core.compatibility.stamp(output),final=core.validateSpec(stamped);if(final.errors.length)throw Error('Arranged spec invalid: '+final.errors.join('\n'));
+ const stamped=core.compatibility.stamp(output),final=core.validateSpec(resolved(stamped,topo));if(final.errors.length)throw Error('Arranged spec invalid: '+final.errors.join('\n'));
  return {raw:stamped,diagnostics};
 }
-async function main(args){if(args.length===1&&args[0]==='--help'){process.stdout.write(HELP);return;}const options=parseArgs(args),files=graph.distinctPaths(options.input,options.output),raw=JSON.parse(fs.readFileSync(files.source,'utf8'));const result=await arrange(raw,options);graph.atomicWrite(files.target,JSON.stringify(result.raw,null,2)+'\n');process.stdout.write(JSON.stringify({output:files.target,diagrams:result.diagnostics},null,2)+'\n');}
+async function main(args){if(args.length===1&&args[0]==='--help'){process.stdout.write(HELP);return;}const options=parseArgs(args),files=graph.distinctPaths(options.input,options.output),raw=JSON.parse(fs.readFileSync(files.source,'utf8'));
+ // The same registered dependency closure as tools/validate.js --resolve-imports.
+ if(options.resolveImports)options.context=await (await import('./canon/local-imports.mjs')).resolveLocalImports(files.source,options.resolveImports);
+ const result=await arrange(raw,options);graph.atomicWrite(files.target,JSON.stringify(result.raw,null,2)+'\n');process.stdout.write(JSON.stringify({output:files.target,diagrams:result.diagnostics},null,2)+'\n');}
 module.exports={parseArgs,select,preflight,seed,arrange};
 if(require.main===module)main(process.argv.slice(2)).catch(e=>{process.stderr.write(e.message+'\n');process.exitCode=1;});

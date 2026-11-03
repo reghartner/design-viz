@@ -37,6 +37,16 @@ node tools/validate.js --resolve-imports . diagrams/team/checkout/checkout.spec.
 ```
 
 Without `--resolve-imports`, both commands retain their existing behavior.
+
+To arrange a new consumer, pass the same context to the layout command:
+
+```sh
+node tools/compose-page-layout.cjs --section 0 --resolve-imports . draft.spec.json arranged.spec.json
+```
+
+It refuses a consumer without `--resolve-imports`. Provider nodes are arranged
+but saved only as the import's `position`, `nodePositions` and `edgeOverrides`;
+the output never copies provider content. Exporting-only diagrams need no option.
 Standalone validation can also receive an explicit batch of already identified
 provider and consumer specs as positional files.
 

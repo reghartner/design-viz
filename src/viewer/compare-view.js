@@ -620,7 +620,7 @@ function mountCompareView(host, opts){
     ['before', 'after'].forEach(function(side){
       var S = ctx[side], box = el('div', 'compare-focus-side'), strip = el('div', 'compare-focus-steps'), marks = stepMarks(ctx, S);
       box.setAttribute('data-side', side); addSkin(box, S.skin);
-      box.appendChild(el('h3', 'compare-focus-title', side === 'before' ? 'Before · current document' : 'After · agent proposal'));
+      box.appendChild(el('h3', 'compare-focus-title', opts.titles && opts.titles[side] || (side === 'before' ? 'Before · current document' : 'After · agent proposal')));
       strip.setAttribute('role', 'group'); strip.setAttribute('aria-label', (side === 'before' ? 'Before' : 'After') + ' steps');
       S.indices.forEach(function(src, k){
         var b = el('button', 'compare-focus-step', String(k + 1));

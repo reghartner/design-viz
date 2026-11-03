@@ -1,0 +1,246 @@
+{
+  "page": {
+    "title": "Device power → UX icons",
+    "subtitle": "Illustrative, authored combinations — no electrical behavior is inferred.",
+    "skin": "daylight",
+    "sections": [
+      {
+        "heading": "Power-state truth table",
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {},
+          "rows": [
+            []
+          ],
+          "panels": [
+            {
+              "id": "power",
+              "type": "truth-table",
+              "title": "Device power truth table",
+              "columns": [
+                {
+                  "id": "source",
+                  "label": "Power source"
+                },
+                {
+                  "id": "charge",
+                  "label": "Battery"
+                },
+                {
+                  "id": "charging",
+                  "label": "Charging"
+                },
+                {
+                  "id": "powerIcon",
+                  "label": "Power icon",
+                  "kind": "icons"
+                },
+                {
+                  "id": "batteryIcon",
+                  "label": "Battery icons",
+                  "kind": "icons"
+                }
+              ],
+              "cases": [
+                {
+                  "id": "solar",
+                  "label": "Solar charging",
+                  "cells": {
+                    "source": "Solar",
+                    "charge": "60%",
+                    "charging": true,
+                    "powerIcon": [
+                      {
+                        "icon": "solar"
+                      }
+                    ],
+                    "batteryIcon": [
+                      {
+                        "icon": "battery-charging",
+                        "label": "Charging"
+                      },
+                      {
+                        "icon": "battery",
+                        "label": "Battery available"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "mains",
+                  "label": "Mains connected",
+                  "cells": {
+                    "source": "Mains",
+                    "charge": "100%",
+                    "charging": false,
+                    "powerIcon": [
+                      {
+                        "icon": "plug",
+                        "label": "Mains"
+                      }
+                    ],
+                    "batteryIcon": [
+                      {
+                        "icon": "battery-full"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "battery",
+                  "label": "Battery operation",
+                  "cells": {
+                    "source": "Battery",
+                    "charge": "60%",
+                    "charging": false,
+                    "powerIcon": [],
+                    "batteryIcon": [
+                      {
+                        "icon": "battery"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "low",
+                  "label": "Low battery",
+                  "cells": {
+                    "source": "Battery",
+                    "charge": "10%",
+                    "charging": false,
+                    "powerIcon": [],
+                    "batteryIcon": [
+                      {
+                        "icon": "battery-low"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "initial": {
+                "active": "solar"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "solar",
+              "text": "Separate Power icon and Battery icons columns show independent UX outputs.",
+              "panels": {
+                "power": {
+                  "note": "Illustrative UX mapping; properties and icons are authored independently."
+                }
+              }
+            },
+            {
+              "id": "mains",
+              "text": "Mains power shows the plug and full-battery icons.",
+              "panels": {
+                "power": {
+                  "active": "mains"
+                }
+              }
+            },
+            {
+              "id": "carried",
+              "text": "The selected case carries forward.",
+              "panels": {
+                "power": {
+                  "note": "The mains case stays highlighted until another case is selected."
+                }
+              }
+            },
+            {
+              "id": "battery",
+              "text": "Battery operation has its own authored icon.",
+              "panels": {
+                "power": {
+                  "active": "battery"
+                }
+              }
+            },
+            {
+              "id": "low",
+              "text": "The alternate path highlights a low-battery warning.",
+              "panels": {
+                "power": {
+                  "active": "low"
+                }
+              }
+            },
+            {
+              "id": "overview",
+              "text": "Clear the highlight to compare every combination.",
+              "panels": {
+                "power": {
+                  "active": null
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "normal",
+              "label": "Mains to battery",
+              "steps": [
+                "solar",
+                "mains",
+                "carried",
+                "battery",
+                "overview"
+              ]
+            },
+            {
+              "id": "low",
+              "label": "Low battery",
+              "steps": [
+                "solar",
+                "low",
+                "overview"
+              ]
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 8,
+                "hidden": true
+              },
+              {
+                "panel": "power",
+                "x": 0,
+                "y": 7,
+                "w": 24,
+                "h": 12
+              },
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 7
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "flowview": {
+      "authoredWith": "0.2.0",
+      "minVersion": "0.2.0",
+      "features": [
+        "flow.alternates",
+        "layout.arranged",
+        "layout.grid-24",
+        "media.shared-icons",
+        "panel.truth-table"
+      ]
+    },
+    "contract": "1"
+  }
+}

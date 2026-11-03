@@ -19,8 +19,7 @@
       in one commit and one PR' | "commit together" without the PR, or no grouping rule
    A6 provider-first allowed | same | 'A provider registered before any consumer uses it may go
       alone' | a rule forbidding provider-only PRs
-   A7 authorization | same | 'Edit canon.json only with my authorization' | a rule telling the
-      agent to register without asking
+   A7 authorization: superseded by F1 below (Chuck 2026-11-02, after the stress test)
    A8 clone prompt + address | same | names JSON.stringify(<configured repository, else the
       upstream root>) and 'If I have no local copy of it, ask me to clone it from that address' |
       no address, or an address the agent must guess
@@ -29,17 +28,54 @@
    A11 local preview | same | 'local preview through refresh-sources works without that
       access' | implying preview needs access
    D1 local-repository-authoring.md | '## Register a new exporting diagram' section only |
-      A2-A7 in user terms + address from tools/company-agent-context.json repository + clone,
+      A2-A6 in user terms + address from tools/company-agent-context.json repository + clone,
       PR-only, access and preview text | a doc that only links elsewhere
-   D2 shared-topology.md | the 'For central canon' paragraph only | A2-A5 + A7 + link to the D1
+   D2 shared-topology.md | the 'For central canon' paragraph only | A2-A5 + link to the D1
       anchor | "enroll both folders" without grouping or authorization
-   D3 folder-agent-session.md | '## Refresh saved repo providers' section only | A2-A5 + A7 + link
+   D3 folder-agent-session.md | '## Refresh saved repo providers' section only | A2-A5 + link
       to the D1 anchor | session manual silent on registration
    D4 folder-agent-existing-edit.md | the guide | links '[local sources and registration]
       (local-repository-authoring.md)'; length <=6000 is guarded by tests/test_build.py:106 |
       entry guide with no route to registration
    D5 guard (passes today) | hld-to-page authoring-workflow.md Phase 7 | keeps "enroll the page
-      in canon.json without authorization" | dropping the existing authorization rule */
+      in canon.json without authorization" | dropping the existing authorization rule
+
+   Contract matrix, #873 stress fixes (Sonnet 5.5 stress test of import-sync, runs B-r1..3 and
+   C-r1..3 under .local/stress/import-sync/runs; Chuck's rulings 2026-11-02 relayed by the
+   coordinator). Fixture for every CONNECT row: folderAgentInstructions over external+embedded x
+   resume x artifact/legacy identity x pilotCapture true/false; R = the one 'New exporting
+   diagram:' paragraph, I = the one 'Importing a provider:' paragraph. Doc rows are scoped to
+   docs/local-repository-authoring.md '## Register a new exporting diagram' (REG) and '## Open a
+   consumer and choose its providers' (CON), docs/folder-agent-session.md '## Refresh saved
+   repo providers' (SES) and the docs/shared-topology.md 'For central canon' paragraph (CEN).
+   row | assertion | rejects
+   F1 the exporting-diagram request authorizes its own canon.json entry | R: 'My request for a
+      diagram other teams can import authorizes you to add that diagram's own canon.json entry'
+      and 'editing or removing any other canon.json entry still needs my permission'; no
+      paragraph says 'Edit canon.json only with my authorization'; REG, SES, CEN say the same in
+      user terms and drop "only with the user's authorization" | the blanket refusal all three
+      B providers quoted; a grant that also covers other entries
+   F2 a new exporting diagram is reviewed in the Workbench | R: 'Do not write the finished
+      diagram straight to disk', 'write only a minimal seed <id>.spec.json and <id>.ledger.md
+      with its canon.json entry', 'ask me to connect or select the new diagram in the
+      Workbench', 'then propose the full content there so I review it before it is saved'; REG
+      and SES say the same | the B providers writing the complete pair to disk and closing the
+      request unreviewed
+   F3 a missing provider at import time leads to the company repository | I (not R): 'If a
+      provider I ask for is in no repository you can already read, do not search the disk for
+      it', 'ask me for the path of my local clone of the company Flowview repository
+      <JSON address>', 'or ask me to clone it from that address if I have none, then run
+      refresh-sources --source-repo on that clone', 'Before a permanent canon change, ask me to
+      request PR access to that repository if I lack it'; CON and SES say the same | the C
+      consumers asking only for "the billing provider repo path", or searching the disk; a
+      clone prompt found only inside the canon-edit paragraph
+   F4 a folder-connected consumer selects a source before proposing a new import | no paragraph
+      says 'just propose the import'; I: 'propose the import directly when this diagram was
+      opened from the repository root or a local source repository is selected' and 'if this
+      helper has no source repository yet, run python3 "<helper>" refresh-sources --source-repo
+      <repository> first, once, and then propose the import'; CON and SES say the same and CON
+      drops 'needs no refresh first' | #886's sentence, which leaves a folder-connected
+      consumer's review blocked on the missing provider */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource,companyAgentContext}=require('../tools/source-loader.cjs');
 const context=vm.createContext({});vm.runInContext(readSource('workbench/agent-chat.js'),context);
@@ -267,7 +303,6 @@ test('every connected setup states the new-provider registration, clone and acce
     assert.match(rule,/every consumer topologyImports change that uses it/,label);
     assert.match(rule,/When a consumer change uses a new provider, all of these go in one commit and one PR\./,label);
     assert.match(rule,/A provider registered before any consumer uses it may go alone\./,label);
-    assert.match(rule,/Edit canon\.json only with my authorization\./,label);
     assert.ok(rule.includes('The company Flowview repository that holds canon.json is '+JSON.stringify(repository)+'.'),label);
     assert.match(rule,/If I have no local copy of it, ask me to clone it from that address\./,label);
     assert.match(rule,/Before a permanent canon change, tell me that changes reach canon only through a PR to that repository/,label);
@@ -288,8 +323,7 @@ test('bundled authoring docs state the new-provider registration rule where prov
   };
   const parts=[/its diagrams\/…\/<id>\/ folder with <id>\.spec\.json/,/its root canon\.json entry/,
     /every consumer topologyImports change that uses it/,
-    /When a consumer change uses a new provider, all of these go in one commit and one PR/,
-    /canon\.json only with the user's authorization/];
+    /When a consumer change uses a new provider, all of these go in one commit and one PR/];
   const anchor='(local-repository-authoring.md#register-a-new-exporting-diagram)';
   // D1: the complete rule, including clone, access and local preview.
   const local=section('docs/local-repository-authoring.md','## Register a new exporting diagram');
@@ -316,4 +350,92 @@ test('bundled authoring docs state the new-provider registration rule where prov
   // D5 guard: the existing hand-edit authorization rule stays.
   assert.match(flat(section('.claude/skills/hld-to-page/references/authoring-workflow.md','## Phase 7: Deliver')),
     /enroll the page in canon\.json without authorization/);
+});
+
+// #873 stress fixes F1-F4: one test per finding; the matrix is in the header.
+function stressSetups(){
+  const legacy={sessionId:'session',connectionId:'connection'},setups=[];
+  for(const workflow of ['external','embedded'])for(const resume of [false,true])for(const owner of [identity,legacy])for(const pilot of [false,true]){
+    const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,owner,workflow,pilot),paragraphs=prompt.split('\n\n');
+    const one=prefix=>{const found=paragraphs.filter(paragraph=>paragraph.startsWith(prefix));assert.equal(found.length,1,prefix+' '+workflow+' resume='+resume+' legacy='+!owner.artifacts+' pilot='+pilot);return found[0];};
+    setups.push({label:`${workflow} resume=${resume} legacy=${!owner.artifacts} pilot=${pilot}`,prompt,one});
+  }
+  return setups;
+}
+function stressDocs(){
+  const fs=require('node:fs'),path=require('node:path');
+  const read=file=>fs.readFileSync(path.join(__dirname,'..',file),'utf8');
+  const flat=text=>text.replace(/[`*]/g,'').replace(/\s+/g,' ');
+  const section=(file,heading)=>{
+    const text=read(file),start=text.indexOf('\n'+heading+'\n');
+    assert.ok(start>=0,file+' has '+heading);
+    const body=text.slice(start+heading.length+2),end=body.search(/\n## /);
+    return flat(end<0?body:body.slice(0,end));
+  };
+  const central=read('docs/shared-topology.md').split(/\n\s*\n/).filter(paragraph=>paragraph.startsWith('For central canon'));
+  assert.equal(central.length,1);
+  return {REG:section('docs/local-repository-authoring.md','## Register a new exporting diagram'),
+    CON:section('docs/local-repository-authoring.md','## Open a consumer and choose its providers'),
+    SES:section('docs/folder-agent-session.md','## Refresh saved repo providers'),CEN:flat(central[0])};
+}
+test('F1: a request for an importable diagram authorizes only that diagram\'s own canon.json entry',()=>{
+  for(const {label,prompt,one} of stressSetups()){
+    const rule=one('New exporting diagram:');
+    assert.match(rule,/My request for a diagram other teams can import authorizes you to add that diagram's own canon\.json entry/,label);
+    assert.match(rule,/editing or removing any other canon\.json entry still needs my permission/,label);
+    assert.doesNotMatch(prompt,/Edit canon\.json only with my authorization/,label);
+  }
+  const docs=stressDocs();
+  for(const name of ['REG','SES','CEN']){
+    assert.match(docs[name],/A request for a diagram other teams can import authorizes the agent to add that diagram's own canon\.json entry/,name);
+    assert.match(docs[name],/Editing or removing any other canon\.json entry still needs the user's permission/,name);
+    assert.doesNotMatch(docs[name],/canon\.json only with the user's authorization/,name);
+  }
+});
+test('F2: a new exporting diagram starts as a seed and is reviewed in the Workbench before it is saved',()=>{
+  for(const {label,one} of stressSetups()){
+    const rule=one('New exporting diagram:');
+    assert.match(rule,/Do not write the finished diagram straight to disk/,label);
+    assert.match(rule,/write only a minimal seed <id>\.spec\.json and <id>\.ledger\.md with its canon\.json entry/,label);
+    assert.match(rule,/ask me to connect or select the new diagram in the Workbench/,label);
+    assert.match(rule,/then propose the full content there so I review it before it is saved/,label);
+  }
+  const docs=stressDocs();
+  for(const name of ['REG','SES']){
+    assert.match(docs[name],/does not write the finished diagram straight to disk/,name);
+    assert.match(docs[name],/writes only a minimal seed <id>\.spec\.json and <id>\.ledger\.md with its canon\.json entry/,name);
+    assert.match(docs[name],/asks the user to connect or select the new diagram in the Workbench/,name);
+    assert.match(docs[name],/proposes the full content there, so the user reviews it before it is saved/,name);
+  }
+});
+test('F3: a provider in no readable repository leads to the company repository clone and PR access',()=>{
+  const repository=companyAgentContext().repository||UPSTREAM_REPOSITORY;
+  for(const {label,one} of stressSetups()){
+    const importing=one('Importing a provider:');
+    assert.match(importing,/If a provider I ask for is in no repository you can already read, do not search the disk for it/,label);
+    assert.ok(importing.includes('ask me for the path of my local clone of the company Flowview repository '+JSON.stringify(repository)),label);
+    assert.match(importing,/or ask me to clone it from that address if I have none, then run refresh-sources --source-repo on that clone/,label);
+    assert.match(importing,/Before a permanent canon change, ask me to request PR access to that repository if I lack it/,label);
+  }
+  const docs=stressDocs();
+  for(const name of ['CON','SES']){
+    assert.match(docs[name],/If a provider the user asks for is in no repository the agent can already read, the agent does not search the disk for it/,name);
+    assert.match(docs[name],/asks for the path of the user's local clone of the company Flowview repository/,name);
+    assert.match(docs[name],/or asks the user to clone it from the repository address if they have none, then runs refresh-sources --source-repo on that clone/,name);
+    assert.match(docs[name],/Before a permanent canon change, it asks the user to request PR access to that repository if they lack it/,name);
+  }
+});
+test('F4: a folder-connected consumer selects a source repository before proposing a new import',()=>{
+  for(const {label,prompt,one} of stressSetups()){
+    assert.doesNotMatch(prompt,/just propose the import/,label);
+    const importing=one('Importing a provider:');
+    assert.match(importing,/propose the import directly when this diagram was opened from the repository root or a local source repository is selected/,label);
+    assert.match(importing,/if this helper has no source repository yet, run python3 "[^"]+" refresh-sources --source-repo <repository> first, once, and then propose the import/,label);
+  }
+  const docs=stressDocs();
+  assert.doesNotMatch(docs.CON,/needs no refresh first/);
+  for(const name of ['CON','SES']){
+    assert.match(docs[name],/proposes the import directly when the consumer was opened from the repository root or a local source repository is selected/,name);
+    assert.match(docs[name],/if the consumer's helper has no source repository yet, the agent runs refresh-sources --source-repo <repository> first, once, and then proposes the import/,name);
+  }
 });

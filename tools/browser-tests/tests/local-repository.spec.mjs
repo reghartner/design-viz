@@ -361,14 +361,14 @@ test('two desktop tabs: an agent provider edit accepted in the provider tab reac
   await acceptReview(page,page.locator('#agent-update-view [data-dv-node="api"]').filter({hasText:title}));
   await expect(page.locator('#src')).toHaveValue(proposed);
   await expect.poll(()=>repo.file('base','base.spec.json'),{message:'the accepted provider is saved to its registered file'}).toBe(proposed);
-  expect(await repo.file('base','base.ledger.md')).toBe(ledger);await expect.poll(()=>outcome(repo.support('base'),request.id)).toBe('applied');
+  await expect.poll(()=>repo.file('base','base.ledger.md'),{message:'the accepted provider ledger is saved after its spec'}).toBe(ledger);await expect.poll(()=>outcome(repo.support('base'),request.id)).toBe('applied');
   // Consumer tab: unchanged until the agent runs its helper's refresh-sources.
   await importer.bringToFront();await expect(node(importer)).toContainText('Local shared API');
   const refreshed=await agent(repo.support('consumer'),'refresh-sources','--source-repo',repo.folder);expect(refreshed.code,refreshed.stderr).toBe(0);
   await expect(node(importer),'the importing tab shows the accepted provider text').toContainText(title);
   expect(JSON.parse(refreshed.stdout).status).toBe('applied');
-  await expect(importer.locator('#src')).toHaveValue(consumer);expect(await repo.file('consumer','consumer.spec.json')).toBe(consumer);
-  expect((await repo.state('consumer')).ledger).toBe(consumerLedger);expect(await repo.file('consumer','consumer.ledger.md')).toBe(consumerLedger);
+  await expect(importer.locator('#src')).toHaveValue(consumer);await expect.poll(()=>repo.file('consumer','consumer.spec.json'),{message:'refresh-sources keeps the consumer spec on disk'}).toBe(consumer);
+  await expect.poll(async()=>(await repo.state('consumer')).ledger,{message:'the consumer state keeps its ledger'}).toBe(consumerLedger);await expect.poll(()=>repo.file('consumer','consumer.ledger.md'),{message:'refresh-sources keeps the consumer ledger on disk'}).toBe(consumerLedger);
   await importer.locator('#undo-builder').click();await expect(node(importer)).toContainText('Local shared API');await expect(importer.locator('#src')).toHaveValue(consumer);
   await importer.locator('#redo-builder').click();await expect(node(importer)).toContainText(title);
   await importer.screenshot({path:info.outputPath('two-tab-consumer-refreshed.png')});
@@ -398,8 +398,8 @@ test('two desktop tabs: an agent-seeded new provider gains exports in its tab an
   const imported=await propose(repo.support('consumer'),'Import the billing gateway',seeded=>{const raw=JSON.parse(seeded);raw.page.sections[0].diagram.topologyImports.push({spec:'billing',export:'public',as:'billing'});return JSON.stringify(raw,null,2);},consumerLedger+'\nImports the billing gateway.\n');
   await acceptReview(importer,importer.locator('#agent-update-view [data-dv-node="billing::gateway"]'));
   await expect.poll(()=>outcome(repo.support('consumer'),imported.request.id)).toBe('applied');
-  const saved=JSON.parse(await repo.file('consumer','consumer.spec.json')).page.sections[0].diagram;
-  expect(saved.topologyImports.map(item=>item.spec)).toEqual(['middle','billing']);expect(saved.nodes['billing::gateway']).toBeUndefined();
+  await expect.poll(async()=>{const saved=JSON.parse(await repo.file('consumer','consumer.spec.json')).page.sections[0].diagram;return {imports:saved.topologyImports.map(item=>item.spec),gateway:saved.nodes['billing::gateway']};},
+   {message:'the accepted consumer is saved with the billing import and no copied billing nodes'}).toEqual({imports:['middle','billing'],gateway:undefined});
   const gateway=importer.locator('#docview g.node[data-dv-node="billing::gateway"]');await expect(gateway,'the accepted import renders the new provider').toContainText(title);
   // Provider tab: the agent changes the new provider again and a person accepts it.
   await page.bringToFront();const renamed='Refreshed billing gateway';

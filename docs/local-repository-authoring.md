@@ -37,8 +37,60 @@ node tools/validate.js --resolve-imports . diagrams/team/checkout/checkout.spec.
 ```
 
 Without `--resolve-imports`, both commands retain their existing behavior.
+
+To arrange a new consumer, pass the same context to the layout command:
+
+```sh
+node tools/compose-page-layout.cjs --section 0 --resolve-imports . draft.spec.json arranged.spec.json
+```
+
+It refuses a consumer without `--resolve-imports`. Provider nodes are arranged
+but saved only as the import's `position`, `nodePositions` and `edgeOverrides`;
+the output never copies provider content. Exporting-only diagrams need no option.
 Standalone validation can also receive an explicit batch of already identified
-provider and consumer specs as positional files.
+provider and consumer specs as positional files. A spec without `page.canon`
+(a `canon.json` member, or a consumer outside Canon) takes a validation-only
+identity; when its provider is missing, the error names both ways to load it:
+`--resolve-imports <repository folder or registry>`, or, in a connected folder,
+`folder-agent.py refresh-sources --source-repo <repository>`.
+
+### Validate in a connected consumer folder
+
+While a consumer is connected, the Workbench keeps one provider copy in the
+folder's `.flowview-agent/providers.json`: the provider specs of its frozen
+topology context (local snapshot or site library), as of its last `state.json`
+publication. Its payload names the source kind (`local` or `site-library`), for
+a local snapshot its `snapshotSha256` (the selected repository's snapshot hash,
+`localSources.snapshotSha256`, or for a repository opened at its root the hash
+of its frozen provider specs), the consumer identity (`consumerId`) and the
+provider specs. The bundled validator uses it by default:
+
+```sh
+node <consumer>/.flowview-agent/authoring/tools/validate.js candidate.spec.json
+```
+
+- It prints the `state.json` revision it validated against. Propose only when
+  that is the `--revision` you submit; if it differs, reread `state.json`,
+  reconcile and validate again. A proposal built on superseded providers is
+  rejected ("Your document changed").
+- Every input spec, wherever it lives, uses the same copy. A positional provider
+  file with the same ID replaces the copied one. `--resolve-imports` turns the
+  copy off.
+- The copy is used only while the Workbench is connected and the copy is the one
+  `state.json` names (`providersSha256`). Otherwise the validator exits 1 and
+  says the copy is out of date or missing (retry once the Workbench has finished updating,
+  or reconnect), the Workbench is not connected (reconnect), or the heartbeat is
+  paused (bring the Workbench tab to the front and retry).
+- A missing provider that the current draft already imports means the copy
+  lacks it: run `folder-agent.py refresh-sources --source-repo <repository>`.
+  A provider that only your candidate imports is new: `refresh-sources` loads
+  only the current draft's providers, so the copy cannot hold it yet. The
+  Workbench loads it when it reviews your proposal; to check it now, pass
+  `--resolve-imports <repository folder or registry>`.
+- A provider set too large to copy (over 8 MiB as written) is published as a
+  header only; validate it with `--resolve-imports <repository>` instead.
+
+The repository's own `tools/validate.js` never reads a provider copy.
 
 Company branding comes from `company/company.json` and its `brand` path. If
 `company/brand.json` exists but default branding is active, builds print a warning
@@ -75,6 +127,45 @@ exports, overlays and syntax before accepting. No provider code runs. No `begin`
 spec/ledger proposal, browser picker or per-refresh confirmation is needed.
 A provider helper targets that provider; a separate unconnected consumer must
 first establish its own folder-agent connection.
+
+An agent proposal can import a provider the consumer draft does not import yet
+(for example a newly registered exporting diagram). Its providers load at review
+time from the source this consumer already uses, never from the deployed site
+library:
+
+- **Repository grant** (opened from the repository root, or selected with
+  **File → Use local source repository**): the Workbench reads the proposal's
+  closure from that grant, so the agent proposes the import directly when the
+  consumer was opened from the repository root or a local source repository is
+  selected.
+- **Helper-selected repository**: if the consumer's helper has no source
+  repository yet, the agent runs
+  `python3 <consumer>/.flowview-agent/folder-agent.py refresh-sources --source-repo <repository>`
+  first, once, and then proposes the import. `folder-agent.py propose` attaches
+  a snapshot of exactly the candidate's closure when the candidate imports a
+  provider ID the current draft does not import directly. The Workbench
+  validates it like a refresh snapshot.
+
+Providers already in the frozen snapshot stay frozen until the next refresh;
+only the newly imported providers join it. With neither source, the helper
+refuses the proposal and names the `refresh-sources --source-repo <repository>`
+remedy; nothing changes.
+
+The agent looks for providers only in the consumer's folder, its repository (the
+nearest folder above it that holds `canon.json`), the source repository its
+helper already selected and source repositories the user names; it never
+searches the disk elsewhere. If a provider the user asks for is not in those
+places, the agent asks for the path of the user's local clone of the company
+Flowview repository, or asks the user to clone it from the repository address if
+they have none, then runs `refresh-sources --source-repo` on that clone. The
+repository address is the `repository` in `tools/company-agent-context.json`,
+which the generated `CONNECT.md` names. Before a permanent canon change, it asks
+the user to request PR access to that repository if they lack it.
+
+When a consumer change imports a newly registered provider, the agent's final
+message must always include the commit rule: the provider's `diagrams/…/<id>/`
+folder with `<id>.spec.json`, its root `canon.json` entry, and every consumer
+`topologyImports` change that uses it go in one commit and one PR.
 
 Subsequent `refresh-sources` commands reuse this helper's selected repository.
 Use `--source-repo` again to switch or reconnect. The absolute path is retained
@@ -128,3 +219,30 @@ Cloud-attached projects use their saved cloud provider snapshots and reject loca
 refresh even with a connected folder. Saving a repository preview online keeps
 its bounded provenance and frozen providers; it creates no live filesystem or
 cloud-project import link. Cloud-to-cloud provider acquisition is separate work.
+
+## Register a new exporting diagram
+
+A new exporting diagram is a provider whose spec declares `topologyExports`. It
+needs its `diagrams/…/<id>/` folder with `<id>.spec.json`, its root `canon.json`
+entry, and every consumer `topologyImports` change that uses it. When a consumer
+change uses a new provider, all of these go in one commit and one PR. A provider
+registered before any consumer uses it may go alone. A request for a diagram
+other teams can import authorizes the agent to add that diagram's own
+`canon.json` entry, by hand; there is no registration command. Editing or
+removing any other `canon.json` entry still needs the user's permission. Folder,
+ID and owner rules are in the [Canon library guide](workbench-canon-library.md).
+
+The agent does not write the finished diagram straight to disk. It writes only a
+minimal seed `<id>.spec.json` and `<id>.ledger.md` with its `canon.json` entry,
+asks the user to connect or select the new diagram in the Workbench, and then
+proposes the full content there, so the user reviews it before it is saved.
+
+The company Flowview repository holds `canon.json`. Agents find its address as the
+`repository` in `tools/company-agent-context.json` in the authoring kit (built from
+`company/company.json`), and the generated `CONNECT.md` names it. Without a
+configured repository it is `https://github.com/reghartner/design-viz`. If the
+user has no local copy of that repository, ask them to clone it from that address.
+Before a permanent canon change, tell the user that changes reach canon only
+through a PR to that repository, that if they lack push or PR access, they should
+request it, and that local preview through `refresh-sources` works without that
+access.

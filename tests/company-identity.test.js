@@ -1,7 +1,31 @@
 'use strict';
 /* Company identity from the fork-owned company/company.json: repository links,
    company labels and brand come from configuration, never from source edits.
-   Without the file (or with build.py --no-config) outputs are unchanged. */
+   Without the file (or with build.py --no-config) outputs are unchanged.
+
+   Contract matrix, #873 PR 1: the company repository travels in the agent context.
+   Source: issue #873 ("names the address from the kit's agent context") and Chuck's
+   ruling of 2026-11-02 ("Ship repository from company/company.json in the kit's agent
+   context"). CONNECT.md rule text rows A1-A11 live in tests/agent-instructions.test.js.
+
+   row | fixture | assertion (scoped) | rejects
+   C1 context carries repository | CONFIG with repository '…/acme/design-viz.git' | loader.
+      companyAgentContext() deepEqual {repository:'https://github.com/acme/design-viz',
+      backstage} | omitting it, or the raw unnormalized '.git' value
+   C2 CONNECT.md names the configured address | same config; assembled agent-chat.js,
+      external+embedded x pilotCapture true/false | the 'New exporting diagram:' paragraph names
+      "https://github.com/acme/design-viz", its only URL is that address, and it has no
+      reghartner address | an upstream-hardcoded address, or one naming both repositories
+   C3 shipped kit carries repository | branded tools/build.py | kit
+      tools/company-agent-context.json deepEqual {backstage, repository}; packet metadata
+      companyContext from checkout and extracted kit deepEqual the same | a kit export that
+      filters repository out
+   C4 identity off falls back to upstream | FLOWVIEW_COMPANY_IDENTITY=off, same combinations |
+      context {} and the rule paragraph names "https://github.com/reghartner/design-viz", its
+      only URL is that address, and it has no acme address | a stale company address, or a
+      contradictory paragraph naming both repositories
+   Guards (pass today): no company.json -> {}; site-only config -> {site} (no repository key);
+   --no-config build ships no context file. */
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),vm=require('node:vm');
 const {execFileSync}=require('node:child_process');
@@ -51,7 +75,22 @@ test('company.json replaces the labels, repository links and brand in assembled 
   assert.equal(config.repository,'https://github.com/acme/design-viz');
   assert.equal(config.revision,'release/2');
   assert.deepEqual(config.backstage,{baseUrl:'https://portal.acme.example/developer'});
-  assert.deepEqual(loader.companyAgentContext(),{backstage:config.backstage});
+  // C1, C2: the normalized repository reaches the agent context and the CONNECT.md rule.
+  assert.deepEqual(loader.companyAgentContext(),{repository:'https://github.com/acme/design-viz',backstage:config.backstage});
+  const canonRule=()=>{
+    const chat={};vm.runInNewContext(loader.readSource('workbench/agent-chat.js'),chat);
+    return ['external','embedded'].flatMap(mode=>[false,true].map(pilot=>{
+      const rules=chat.folderAgentInstructions('Story','mixed',false,{sessionId:'session',connectionId:'connection'},mode,pilot)
+        .split('\n\n').filter(paragraph=>paragraph.startsWith('New exporting diagram:'));
+      assert.equal(rules.length,1,mode+' pilot='+pilot);return rules[0];
+    }));
+  };
+  const urls=rule=>rule.match(/https?:\/\/[^\s"]+/g)||[];
+  for(const rule of canonRule()){
+    assert.ok(rule.includes('The company Flowview repository that holds canon.json is "https://github.com/acme/design-viz".'));
+    assert.deepEqual(urls(rule),['https://github.com/acme/design-viz']);
+    assert.doesNotMatch(rule,/reghartner/);
+  }
   assert.deepEqual(config.brand,{companyName:'Acme',logo:'data:image/png;base64,'+PNG.toString('base64'),primaryColor:'#123456',secondaryColor:'#fff'});
   const canon=loader.readSource('canon.workbench.js');
   assert.match(canon,/summary\.textContent="Acme repository"/);
@@ -78,6 +117,12 @@ test('company.json replaces the labels, repository links and brand in assembled 
   assert.equal(loader.companyConfig(),null);
   assert.deepEqual(loader.companyAgentContext(),{});
   assert.match(loader.readSource('workbench/inspector.js'),/frow\('Company service',picker\)/);
+  // C4: without company identity the rule names the upstream repository.
+  for(const rule of canonRule()){
+    assert.ok(rule.includes('The company Flowview repository that holds canon.json is "https://github.com/reghartner/design-viz".'));
+    assert.deepEqual(urls(rule),['https://github.com/reghartner/design-viz']);
+    assert.doesNotMatch(rule,/acme/i);
+  }
 });
 
 test('invalid company identity fails the build with the field to fix',t=>{
@@ -190,8 +235,10 @@ test('the built workbench shows configured links, labels and brand; without conf
   for(const file of ['template/flowview.html','workbench/flowspec.html','tools/canon/generated-runtime.cjs'])
     assert.ok(branded[file].includes(brand),file);
 
-  // The exact kit shipped in the Workbench carries only public authoring context.
-  const files=kitFiles(html),expected={backstage:{baseUrl:'https://portal.acme.example/developer'}};
+  // C3: the exact kit shipped in the Workbench carries only public authoring context: the
+  // company repository address and Backstage base URL, never company.json, brand files or
+  // the loader.
+  const files=kitFiles(html),expected={repository:'https://github.com/acme/design-viz',backstage:{baseUrl:'https://portal.acme.example/developer'}};
   assert.deepEqual(JSON.parse(files['tools/company-agent-context.json']),expected);
   for(const name of ['company/company.json','company/brand.json','company/acme.png','tools/source-loader.cjs'])
     assert.equal(files[name],undefined,name);

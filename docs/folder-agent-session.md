@@ -221,9 +221,13 @@ kit. It requires trace data or an authorized connector; a trace URL alone does
 not grant account access or provide the spans.
 
 Copy the displayed instructions into the agent. The browser knows the folder name,
-not its absolute path. The agent verifies the supplied connection IDs in that
-folder's metadata. If it cannot identify the folder as its working directory or
-a direct child, it asks for the full path instead of searching unrelated folders.
+not its absolute path; for a diagram opened from the repository root it also
+names the diagram's repository-relative folder. The agent verifies the supplied
+connection IDs in that folder's metadata. If it cannot identify the folder as its
+working directory, a direct child, the repository-relative path the Workbench
+names for a diagram opened from the repository root, or a folder it created
+earlier in the conversation, it asks for the full path instead of searching
+unrelated folders.
 The chosen diagram folder need not be the agent's working directory.
 
 ## Author and review both artifacts
@@ -279,7 +283,8 @@ The helper grants no browser, installation, server or delegation permission.
 
 For a wholly new diagram, write semantic nodes, edges, panels and steps, then run
 `node tools/compose-page-layout.cjs --section <zero-based-section> <draft> <different-output>`
-from the authoring kit (or checkout) and propose its output. The command handles
+from the authoring kit (or checkout) and propose its output; for a diagram with
+`topologyImports`, add `--resolve-imports <repository folder or registry>`. The command handles
 the initial node placement, panel sizes and step controls. Preserve unrelated
 existing layouts and routes during ordinary edits; a new node uses
 `{id,side:"below",noSpread:true}`. User feedback that the rendered candidate
@@ -528,6 +533,39 @@ outside Canon and the provider repository. A pending review or gesture returns
 busy. The command cannot replace consumer source or refresh a cloud project.
 See [local repository authoring](local-repository-authoring.md) for grants and
 manual fallback.
+
+A new exporting diagram needs its `diagrams/…/<id>/` folder with `<id>.spec.json`,
+its root `canon.json` entry, and every consumer `topologyImports` change that uses
+it. When a consumer change uses a new provider, all of these go in one commit and
+one PR. A request for a diagram other teams can import authorizes the agent to
+add that diagram's own `canon.json` entry. Editing or removing any other
+`canon.json` entry still needs the user's permission. The agent does not write
+the finished diagram straight to disk: it writes only a minimal seed
+`<id>.spec.json` and `<id>.ledger.md` with its `canon.json` entry, asks the user
+to connect or select the new diagram in the Workbench, and then proposes the full
+content there, so the user reviews it before it is saved. For the clone and
+access prompts, follow
+[registering a new exporting diagram](local-repository-authoring.md#register-a-new-exporting-diagram);
+local preview through `refresh-sources` needs no push or PR access.
+
+To import a provider the draft does not import yet, the agent proposes the import
+directly when the consumer was opened from the repository root or a local source
+repository is selected. Otherwise, if the consumer's helper has no source
+repository yet, the agent runs
+`python3 <consumer>/.flowview-agent/folder-agent.py refresh-sources --source-repo <repository>`
+first, once, and then proposes the import. The agent looks for providers only in
+the consumer's folder, its repository (the nearest folder above it that holds
+`canon.json`), the source repository its helper already selected and source
+repositories the user names; it never searches the disk elsewhere. If a provider
+the user asks for is not in those places, the agent asks for the path of the
+user's local clone of the company Flowview repository, or asks the user to clone
+it from the repository address if they have none, then runs
+`refresh-sources --source-repo` on that clone. Before a permanent canon change, it
+asks the user to request PR access to that repository if they lack it. When a
+consumer change imports a newly registered provider, the agent's final message
+must always include the commit rule: the provider's `diagrams/…/<id>/` folder
+with `<id>.spec.json`, its root `canon.json` entry, and every consumer
+`topologyImports` change that uses it go in one commit and one PR.
 
 `state.json.localSources` reports bounded provenance and availability: `mode`
 distinguishes `browser-grant`, `agent-snapshot` and `unbound`; `needsSnapshot`

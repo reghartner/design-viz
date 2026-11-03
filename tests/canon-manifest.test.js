@@ -1,3 +1,42 @@
+/* Contract matrix, #873 PR 2: the canon build rejects an unlisted exporting spec.
+   Source: issue #873 (fourth split case: "A spec under diagrams/ declares topologyExports but
+   is not in canon.json"; test plan item 3; "The error message should name the fix (add the
+   folder to canon.json, or remove topologyExports)") and Chuck's ruling of 2026-11-02
+   ("Fourth build check: yes"; provider-only registration allowed). Hosted by the test
+   'an unlisted exporting spec under diagrams/ fails the canon build and names the fix'.
+
+   row | fixture | assertion (scoped) | rejects
+   R1 flat unlisted exporter | diagrams/new/new.spec.json with topologyExports, canon.json
+      lists only checkout | canonLibrary() rejects; the error names the spec path, "not listed in
+      canon.json", "add its folder to canon.json" and "remove topologyExports" | no check, or an
+      error without the path or the fix
+   R2 nested exporter, exports in a later section | diagrams/team/nested/nested.spec.json, exports
+      on section 2 only | the rejection names that path | scanning one folder level, or only
+      sections[0]
+   R3 every unlisted exporter named | R1 + R2 present | one rejection names both paths | fail-fast
+      that hides the second split
+   R4 listing one leaves only the other | canon.json lists diagrams/new | rejection names nested and
+      not new | flagging listed specs
+   R5 build entry points inherit it | both unlisted again, after a good publish | publishLibrary
+      (build.py, CI, Docker) rejects and leaves the previous index bytes; loadCanonDiagrams
+      (Backstage) and registry(canon.json) (drift) reject; `node tools/canon/library.mjs
+      --registry canon.json` exits nonzero naming the path | a check outside canonLibrary
+   G1 guard: unlisted spec without exports passes | diagrams/draft/draft.spec.json | canonLibrary
+      entries stay [checkout] | flagging every unlisted spec
+   G2 guard: unlisted consumer passes | diagrams/consumer/consumer.spec.json with only
+      topologyImports | same | flagging imports (consumers need no registration)
+   G3 guard: agent candidates ignored | diagrams/payments/checkout/.flowview-agent/
+      candidate.spec.json with exports | same | breaking local builds while an agent is connected
+   G4 guard: malformed unlisted spec passes as today | diagrams/broken/broken.spec.json = '{broken'
+      | same | parsing unlisted files strictly
+   G5 guard: listed exporters pass | canon.json lists new and nested | canonLibrary entries are
+      [checkout,new,nested] | rejecting exporters regardless of listing
+   R6 present-but-empty declaration | unlisted diagrams/empty/empty.spec.json with
+      topologyExports: {} (the validator accepts {} for a listed spec: it loads and publishes with
+      exports []) | the rejection names that path and not the listed new/nested | an
+      Object.keys(topologyExports).length test instead of hasOwn
+   G6 guard: listed empty declaration passes | canon.json lists empty too | entries are
+      [checkout,new,nested,empty] | rejecting {} as malformed */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path'),vm=require('node:vm');
 const library=require('../tools/canon/manifest.cjs');
 const entry={folder:'diagrams/payments/checkout',owner:'group:default/checkout-team'};
@@ -52,6 +91,68 @@ test('missing files, malformed manifests and symlinks out of the folder fail vis
  await fs.symlink(path.join(root,'outside.json'),path.join(folder,'checkout.spec.json'));
  await assert.rejects(canonLibrary(file),/inside their diagram folder/);
  await fs.writeFile(file,'{broken');await assert.rejects(canonLibrary(file),SyntaxError);
+});
+
+// variant 'later': exports only on a second section; 'empty': a present but empty declaration.
+function exporter(title,variant){
+ const exported={heading:'Platform',diagram:{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],
+   edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}}};
+ if(variant==='empty')exported.diagram.topologyExports={};
+ const plain={heading:'Overview',diagram:{nodes:{intro:{title:'Intro'}},rows:[['intro']],edges:[]}};
+ return {page:{title,sections:variant==='later'?[plain,exported]:[exported]}};
+}
+test('an unlisted exporting spec under diagrams/ fails the canon build and names the fix',async t=>{
+ const {file,root}=await fixture(t),{canonLibrary,registry}=await import('../tools/canon/registry.mjs');
+ const {loadCanonDiagrams,publishLibrary}=await import('../tools/canon/library.mjs');
+ const write=async(relative,value)=>{const target=path.join(root,relative);await fs.mkdir(path.dirname(target),{recursive:true});
+   await fs.writeFile(target,typeof value==='string'?value:JSON.stringify(value));};
+ const list=folders=>fs.writeFile(file,JSON.stringify({version:1,diagrams:[entry,...folders.map(folder=>({folder,owner:entry.owner}))]}));
+ const ids=async()=>(await canonLibrary(file)).entries.map(e=>e.id);
+ const flat='diagrams/new/new.spec.json',nested='diagrams/team/nested/nested.spec.json',empty='diagrams/empty/empty.spec.json';
+ const names=(present,absent=[])=>error=>{
+   for(const name of present)assert.ok(error.message.includes(name),'names '+name+': '+error.message);
+   for(const name of absent)assert.ok(!error.message.includes(name),'does not name '+name+': '+error.message);
+   assert.match(error.message,/not listed in canon\.json/);
+   assert.match(error.message,/add its folder to canon\.json/i);
+   assert.match(error.message,/remove topologyExports/);
+   return true;
+ };
+ // G1-G4: unlisted specs that export nothing, or live in agent metadata, keep loading.
+ await write('diagrams/draft/draft.spec.json',spec());
+ await write('diagrams/consumer/consumer.spec.json',{page:{title:'Consumer',sections:[{heading:'Uses',
+   diagram:{topologyImports:[{spec:'new',export:'core',as:'platform'}],nodes:{},rows:[],edges:[]}}]}});
+ await write('diagrams/payments/checkout/.flowview-agent/candidate.spec.json',exporter('Candidate'));
+ await write('diagrams/broken/broken.spec.json','{broken');
+ assert.deepEqual(await ids(),['checkout']);
+ // R1, R2, R3: every unlisted exporter is named with its fix.
+ await write(flat,exporter('New provider'));
+ await assert.rejects(canonLibrary(file),names([flat]));
+ await write(nested,exporter('Nested provider','later'));
+ await assert.rejects(canonLibrary(file),names([flat,nested]));
+ // R4, G5: listing a provider clears it; listing both loads both.
+ await list(['diagrams/new']);
+ await assert.rejects(canonLibrary(file),names([nested],[flat]));
+ await list(['diagrams/new','diagrams/team/nested']);
+ assert.deepEqual(await ids(),['checkout','new','nested']);
+ // R6, G6: a present but empty topologyExports is a declaration; listed, it loads.
+ await write(empty,exporter('Empty exports','empty'));
+ assert.deepEqual(exporter('Empty exports','empty').page.sections[0].diagram.topologyExports,{});
+ await assert.rejects(canonLibrary(file),names([empty],[flat,nested]));
+ await list(['diagrams/new','diagrams/team/nested','diagrams/empty']);
+ assert.deepEqual(await ids(),['checkout','new','nested','empty']);
+ // R5: publication, Backstage, drift and the build command all inherit the check.
+ const output=path.join(root,'workbench/diagrams.json');
+ await publishLibrary({registryPath:file,output});
+ const published=await fs.readFile(output,'utf8');
+ await list([]);
+ await assert.rejects(publishLibrary({registryPath:file,output}),names([flat,nested]));
+ assert.equal(await fs.readFile(output,'utf8'),published);
+ await assert.rejects(loadCanonDiagrams(file),names([flat,nested]));
+ await assert.rejects(registry(file),names([flat,nested]));
+ const {spawnSync}=require('node:child_process');
+ const cli=spawnSync(process.execPath,[path.join(__dirname,'../tools/canon/library.mjs'),'--registry',file,'--out',output],{encoding:'utf8'});
+ assert.notEqual(cli.status,0);assert.ok(names([flat,nested])(new Error(cli.stderr)));
+ assert.equal(await fs.readFile(output,'utf8'),published);
 });
 
 test('the publisher snapshot and Backstage resolve identical membership and revisions',async t=>{

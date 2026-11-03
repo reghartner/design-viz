@@ -125,6 +125,12 @@ the authored JSON and its evidence. The central entry controls ID, owner and
 canonical status even when the source spec carries older metadata.
 
 Review membership and content changes through the normal repository process.
+A spec under `diagrams/` that declares `topologyExports` (even `{}`) must be
+listed: the canon build fails and names each unlisted exporting spec, with the fix
+(add its folder to `canon.json`, or remove `topologyExports`). Register a new
+provider in the same commit and PR as the consumers that import it; a provider
+may be registered before any consumer uses it. Dot folders such as
+`.flowview-agent/` and files that do not parse as JSON are not checked.
 The lightweight Python build generates `workbench/diagrams.json` without installing a browser. Production Docker and CI artifact publication also generate static screenshots:
 
 ```sh

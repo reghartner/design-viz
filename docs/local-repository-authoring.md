@@ -68,7 +68,7 @@ node <consumer>/.flowview-agent/authoring/tools/validate.js candidate.spec.json
   copy off.
 - The copy is used only while the Workbench is connected and the copy is the one
   `state.json` names (`providersSha256`). Otherwise the validator exits 1 and
-  says the copy is out of date (retry once the Workbench has finished updating,
+  says the copy is out of date or missing (retry once the Workbench has finished updating,
   or reconnect), the Workbench is not connected (reconnect), or the heartbeat is
   paused (bring the Workbench tab to the front and retry).
 - A missing provider means the copy lacks it: run `folder-agent.py

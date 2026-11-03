@@ -40,6 +40,8 @@ const NOT_CONNECTED = 'The Workbench is not connected to this folder: editor.jso
   'names another session. Reconnect the Workbench, then retry.';
 const HEARTBEAT_PAUSED = 'The Workbench heartbeat is temporarily paused. Bring the existing Workbench tab ' +
   'to the front and retry; do not reconnect just for a stale heartbeat.';
+const MISSING_COPY = 'The Workbench provider copy (providers.json) that state.json names is missing, so it is ' +
+  'out of date. Retry once the Workbench has finished updating, or reconnect.';
 const OVERSIZE = 'The Workbench provider set is too large to copy into this folder. Validate it with ' +
   '--resolve-imports <repository folder or registry> instead.';
 const HEARTBEAT_MAX_AGE_MS = 15000; // tools/folder-agent.py HEARTBEAT_MAX_AGE_MS
@@ -54,15 +56,20 @@ function readJson(file){
 }
 // The copy is used only while it is whole, named by state.json and the connection
 // is live (the folder helper's connected_editor() and heartbeat_fresh() rule).
+// Copy mode starts in a connected folder (state.json exists) when providers.json
+// exists or state.json names one; otherwise the plain rule applies.
 function providerCopy(session){
-  if (!session || !fs.existsSync(path.join(session, 'providers.json'))) return null;
-  const copy = readJson(path.join(session, 'providers.json')), state = readJson(path.join(session, 'state.json'));
+  if (!session || !fs.existsSync(path.join(session, 'state.json'))) return null;
+  const present = fs.existsSync(path.join(session, 'providers.json')), state = readJson(path.join(session, 'state.json'));
+  if (!present && !(isObject(state) && typeof state.providersSha256 === 'string')) return null;
+  const copy = present ? readJson(path.join(session, 'providers.json')) : undefined;
   const editor = readJson(path.join(session, 'editor.json'));
   if (!isObject(state) || typeof state.sessionId !== 'string' || typeof state.connectionId !== 'string') return {error: OUT_OF_DATE};
   if (!isObject(editor) || editor.connected !== true || editor.sessionId !== state.sessionId ||
       editor.connectionId !== state.connectionId) return {error: NOT_CONNECTED};
   const age = Date.now() - editor.at;
   if (typeof editor.at !== 'number' || !Number.isFinite(editor.at) || !(age >= 0 && age <= HEARTBEAT_MAX_AGE_MS)) return {error: HEARTBEAT_PAUSED};
+  if (!present) return {error: MISSING_COPY};
   if (!isObject(copy) || copy.version !== 1 || typeof copy.providersSha256 !== 'string' ||
       state.providersSha256 !== copy.providersSha256) return {error: OUT_OF_DATE};
   if (copy.oversize === true) return {error: OVERSIZE};

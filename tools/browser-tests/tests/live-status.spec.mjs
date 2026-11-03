@@ -601,7 +601,8 @@ test('E6 E10 E11 built epic Tickets table lists all children without diagram lin
  await expect(table.locator('th').nth(1)).toHaveAttribute('aria-sort','ascending');
  expect(await table.locator('tbody tr').evaluateAll(rows=>rows.findIndex(row=>row.dataset.liveCoverageFor==='UX-90')===rows.findIndex(row=>row.dataset.liveTicket==='UX-90')+1)).toBe(true);
  await expect(table.locator('tr[data-live-coverage-for="HW-124"],.dv-live-chip')).toHaveCount(0);await expect(panel.locator('.dv-live-epic-counts')).toHaveText(/^Ready to demo · /);await expect(panel.locator('.dv-live-epic-progress')).toHaveText('8 of 8 stories done · 7 of 8 on diagram');
- await page.setViewportSize({width:390,height:844});await expect(table).toBeVisible();expect(await panel.locator('.pbody').evaluate(el=>el.scrollHeight>el.clientHeight || el.scrollWidth>el.clientWidth)).toBe(true);
+ // #864: the Epic status body takes its content height in Standard layouts, so a narrow page clips no Ticket rows behind an inner scroll.
+ await page.setViewportSize({width:390,height:844});await expect(table).toBeVisible();await expect.poll(()=>panel.locator('.pbody').evaluate(el=>el.scrollHeight<=el.clientHeight+1),{message:'Epic status body shows every row without an inner scroll'}).toBe(true);
 });
 test('desktop Tickets sorting covers local and resolved imported nodes, refreshes and independent viewers',async({page,server},testInfo)=>{
  await page.setViewportSize({width:1440,height:1000});
@@ -847,6 +848,71 @@ test('R3 Workbench demo paint has no badges and a card click selects without the
  await expect(view.locator('g.node[data-dv-node="firmware"]')).toHaveClass(/\bdv-sel\b/);
  await expect(view.locator('.dv-live-pointer')).toHaveCount(0);await strokeClick(page,view.locator('path.edge[data-dv-edge="1"]'));await expect(view.locator('.dv-live-popover')).toBeHidden();
  await expect(view.locator('path.edge[data-dv-edge="1"]')).toHaveClass(/\bdv-sel\b/);
+});
+
+/* #863 Epic status panel consistency contract matrix (desktop reader and Workbench; no phone layouts):
+| row | required state or element | fixture | scoped assertion | broken implementation it rejects |
+|---|---|---|---|---|
+| V1a | Live, First blocker, Play and Next day header buttons | worked example with #live=demo on day 4, in each selectable theme picked from the reader's Contents Theme menu | inside the Epic status section, every visible `.pt-live-status .reader-button` equals that section's `.playback-button` in computed border width, border style, border radius, background color, font family, font size and padding, with no property skipped for any button; Live is asserted pressed, and Play is also its reference because inside the document no theme gives a pressed `tbtn` its own fill (the only such rule, style.core.css `:is(.mbtn,.tbtn,.schip,.pathbtn)[aria-pressed=true]` for Rose, Lavender and Lilac, is overridden by their later `.docview :is(.mbtn,.tbtn,.schip)` rule), and the reader renders no other pressed `tbtn` (its pressed mode toggles are `.mbtn`, with a different fill) | browser-default buttons (2px outset, radius 0, #efefef); a fixed pastel pill that is wrong in Aurora, Blueprint and Terminal; any special background on the pressed Live toggle |
+| V1b | the connector action button (Allow Jira) | frozen fixture with the claude connector stub in approval mode, where the Flagged search already answered so Live shows beside it | the visible Live and Allow Jira buttons equal the section's Play button on the same properties | styling only the demo and Live buttons |
+| V2 | in-progress color word in the worked example | worked example with #live=demo on day 2 | the section's first prose paragraph names "blue in progress" and no orange or amber while an active edge renders --dv-live-active blue (the skill description is checked in tests/live-status-panel.test.js) | leaving "orange in progress" |
+| V3 | Workbench Demo live status connection label | frozen fixture pasted into the Workbench, Demo live status checked, then Next day | the Epic status `.dv-live-connection` has data-state demo and its text starts with the source label "Demo", as the reader's #live=demo does (the refresh wording after the comma is not pinned) | the provider labelled "Host"; relabelling only the source while the state stays connected ("Demo connected") |
+*/
+test.describe('#863 Epic status panel consistency',()=>{
+ const sides=['Top','Right','Bottom','Left'];
+ const LOOK=[...sides.map(s=>'border'+s+'Width'),...sides.map(s=>'border'+s+'Style'),'borderTopLeftRadius','borderTopRightRadius','borderBottomRightRadius','borderBottomLeftRadius','backgroundColor','fontFamily','fontSize',...sides.map(s=>'padding'+s)];
+ // One read of the section's Play button and every visible Epic status header button.
+ const looks=section=>section.evaluate((sec,props)=>{
+  const read=el=>{const style=getComputedStyle(el);return Object.fromEntries(props.map(p=>[p,style[p]]));};
+  const shown=el=>el.getClientRects().length>0,plays=[...sec.querySelectorAll('.playback-button')].filter(shown),buttons=[...sec.querySelectorAll('.pt-live-status .reader-button')].filter(shown);
+  return {plays:plays.length,play:plays.length===1?read(plays[0]):null,buttons:buttons.map(el=>({name:el.textContent.trim(),pressed:el.getAttribute('aria-pressed')==='true',look:read(el)}))};
+ },LOOK);
+ const differences=result=>result.buttons.flatMap(b=>LOOK.filter(p=>b.look[p]!==result.play[p]).map(p=>b.name+' '+p+': '+b.look[p]+' vs Play '+result.play[p]));
+ test('V1 desktop demo header buttons match the section Play button in every reader theme',async({page,server})=>{
+  const root=await openStory(page,server),panel=root.locator('.pt-live-status'),section=root.locator('.doc-sec:has(.pt-live-status)');
+  await expect(section).toHaveCount(1);await demoDay(root,4);await expect(panel.getByRole('button',{name:'First blocker',exact:true})).toBeVisible();
+  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','First blocker','Play','Next day']);
+  // The pressed state is the one compared: Live is on throughout.
+  expect(first.buttons.map(b=>b.pressed)).toEqual([true,false,false,false]);
+  // Contrasting precondition: the reference is the default theme's pill, not a browser default.
+  expect(first.play).toMatchObject({borderTopStyle:'solid',borderTopWidth:'1px',borderTopLeftRadius:'999px'});
+  const toggle=root.locator('.reader-top>button'),plays=new Set();
+  for(const skin of ['pastel','aurora','blueprint','terminal','rose','lavender','lilac']){
+   if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.click();
+   await root.locator('.reader-theme-menu>summary').click();await root.locator('[data-reader-skin="'+skin+'"]').click();
+   await expect(root).toHaveClass(new RegExp('(^|\\s)sk-'+skin+'(\\s|$)'));await page.mouse.move(0,0);
+   // Theme transitions settle on both buttons before they are compared.
+   await expect.poll(async()=>differences(await looks(section)),{message:skin+' Epic status header buttons match Play'}).toEqual([]);
+   const settled=await looks(section);expect(settled.buttons.map(b=>b.name),skin).toEqual(['Live','First blocker','Play','Next day']);expect(settled.buttons.map(b=>b.pressed),skin+' Live stays pressed').toEqual([true,false,false,false]);plays.add(JSON.stringify(settled.play));
+  }
+  expect(plays.size,'the themes give Play different looks').toBeGreaterThanOrEqual(4);
+ });
+ test('V1 desktop connector action button matches the section Play button',async({page,server})=>{
+  const {root}=await openClaude(page,server,'approval'),section=root.locator('#section-delivery'),panel=section.locator('.pt-live-status');
+  // Approval mode: the Flagged search has answered, so Live shows beside the action.
+  await expect(panel.getByRole('button',{name:'Allow Jira',exact:true})).toBeVisible();await expect(panel.locator('.dv-live-toggle')).toBeVisible();
+  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','Allow Jira']);
+  expect(first.play).toMatchObject({borderTopStyle:'solid',borderTopWidth:'1px',borderTopLeftRadius:'999px'});
+  await expect.poll(async()=>differences(await looks(section)),{message:'Allow Jira matches Play'}).toEqual([]);
+ });
+ test('V2 desktop worked example prose names the rendered in-progress color',async({page,server})=>{
+  const root=await openStory(page,server),panel=root.locator('.pt-live-status'),section=root.locator('.doc-sec:has(.pt-live-status)');
+  await demoDay(root,2);const edge=section.locator('path.edge[data-dv-edge="0"]');await expect(edge).toHaveClass(/dv-live-active/);await expect(edge).toHaveCSS('stroke',statusLine('active'));
+  const prose=section.locator('.sec-text[data-dv-para="0"]');await expect(prose).toContainText('blue in progress');await expect(prose).not.toContainText(/orange|amber/i);
+ });
+ test('V3 desktop Workbench Demo live status names its source Demo like the reader demo',async({page,server})=>{
+  const reader=await openStory(page,server),readerConnection=reader.locator('.pt-live-status .dv-live-connection');
+  await expect(readerConnection).toHaveAttribute('data-state','demo');await expect(readerConnection).toHaveText(/^Demo(?=,|$)/);
+  await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);
+  const panel=page.locator('#docview .pt-live-status'),connection=panel.locator('.dv-live-connection');
+  // Contrasting precondition: without demo data the panel has no connection line.
+  await expect(connection).toBeHidden();
+  await page.getByRole('checkbox',{name:'Demo live status',exact:true}).check();
+  await expect(connection).toBeVisible();await expect(connection).toHaveAttribute('data-state','demo');await expect(connection).toHaveText(/^Demo(?=,|$)/);
+  // A real Next day click comes after the preview provider has answered; the label stays Demo.
+  await panel.getByRole('button',{name:'Next day',exact:true}).click();await expect(panel.locator('.dv-live-note')).toHaveText('Demo day 2');
+  await expect(connection).toHaveAttribute('data-busy','false');await expect(connection).toHaveAttribute('data-state','demo');await expect(connection).toHaveText(/^Demo(?=,|$)/);
+ });
 });
 
 test('R4 desktop status multi-selection stays visible on local and imported nodes after focus and live updates',async({page,server},testInfo)=>{
@@ -1296,4 +1362,124 @@ test('desktop Jira cues retain node and edge authoring selection without opening
  await root.locator('[data-dv-node="hardware"] .dv-jira-cue').click();await page.locator('#editor-tab-inspect').click();await expect(page.locator('#guide').getByLabel('Name',{exact:true})).toHaveValue('Hardware');
  await root.locator('.dv-jira-cue[data-dv-edge="0"]').click();await expect(page.locator('#guide').getByLabel('label',{exact:true})).toHaveValue('press');
  await expect(root.locator('.dv-live-popover')).toHaveCount(0);await expect(source).toHaveValue(before);await expect(root.locator('.dv-jira-cue[tabindex="0"]')).toHaveCount(0);
+});
+
+/* #864 Epic status panel grows to its content in Standard layouts. Contract matrix:
+| row | fixture | structurally scoped assertion | broken implementation it rejects |
+|---|---|---|---|
+| C1 (a) | worked board, Epic status tile x0 y12 w16 h40, Edit history directly below, 1440 wide (zoom 1), demo day 1; precondition: content shorter than 39 rows | Epic status tile height = 40*32+39*8 = 1592px; Edit history top stays at row 52 | sizing the tile to its content (shrinking below the authored h) |
+| C2 (b) | same board with Epic status h6, Edit history h3 at row 18; precondition: content taller than 7 rows | inside the Epic status tile: card and .pbody scrollHeight <= clientHeight+1; tile spans whole rows, holds the content and one row fewer would not; Edit history top - Epic status bottom = 8px and Edit history moved down by exactly the growth; the .doc-sec bottom is below both tiles | today's fixed tile with an inner scroll; growing the card but not the tile (overlap); growing without pushing the tile below; pixel instead of whole-row heights |
+| C3 (c) | C2, then real clicks on the panel's Next day until content grows by at least two rows | C2's invariants with the new content; the tile is taller than on day 1 | measuring once at load |
+| C4 (d) | C2's Edit history (another panel type) authored 3 rows; precondition: its content is taller than 4 rows | Edit history tile stays 3*32+2*8 = 112px and its body still scrolls | growing every panel type instead of the declaring type |
+| C5 (e) | C2 at 960 wide; precondition: --section-layout-scale < 1 | C2's invariants with every rect divided by the scale | mixing zoomed rects with unzoomed rows |
+| C6 (f) | Workbench, Paste JSON of C2, real check of Demo live status, Arrange selected section, Layout element = Epic status | the preview Epic status tile spans more than 6 rows while the Height spinbutton shows 6; #src never changes | writing measured rows into the saved document or the Height field |
+| C7 (f) | C6, real mouse down on Move Epic status, Escape | the tile spans its authored 6 rows while the pointer is down, and grows again after Escape | growth during drags; growth never re-applied after a cancelled drag |
+Geometry is read in the section grid's unzoomed CSS pixels: client rects divided by --section-layout-scale, as
+standard-layout.spec.mjs reads it. A row is 32px plus an 8px gap. The content height never reads the card's or the
+body's own height (today both are stretched to the tile, and scrollHeight is never below clientHeight): it is the body's
+top inside the card + the bottom of the body's lowest rendered child (scroll offset added back) + the body's bottom
+padding, border and any horizontal scrollbar + the card's bottom padding and border. The body is a scroll container in
+both states, so its children's margins stay inside it, and the number is the same whether the body is stretched and
+scrolls (today) or takes its content height (#864). */
+import {arrangeChapter} from '../helpers/test.mjs';
+const CH_ROW=40,CH_GAP=8,CH_TOP=12,chPx=rows=>rows*CH_ROW-CH_GAP;
+const chSettle=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+async function contentHeightSpec(statusRows){
+ const spec=JSON.parse(await readFile(path.join(repo,'examples/live-status/live-status.spec.json'),'utf8')),d=spec.page.sections[0].diagram,history=spec.page.editHistory;
+ d.sectionLayout={columns:24,default:[{x:0,y:0,w:24,h:CH_TOP},{panel:'status',x:0,y:CH_TOP,w:16,h:statusRows},{panel:'history',x:0,y:CH_TOP+statusRows,w:24,h:3},{controls:'steps',attachTo:'diagram',x:0,y:CH_TOP+statusRows+3,w:24,h:5}]};
+ // Eight Edit history entries: that panel's content is taller than its 3-row tile.
+ spec.page.editHistory=Array.from({length:8},(_,i)=>({...structuredClone(history[i%history.length]),at:'2026-10-'+(20+i)+'T10:00:00Z'}));
+ return spec;
+}
+async function openContentBoard(page,server,statusRows,width=1440){
+ await page.setViewportSize({width,height:1000});await page.emulateMedia({reducedMotion:'reduce'});
+ const name='content-height-'+statusRows+'-'+width,file=path.join(server.root,name+'.json'),out=path.join(server.root,name+'.html');
+ await writeFile(file,JSON.stringify(await contentHeightSpec(statusRows)));
+ execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out,'--timeline',path.join(repo,'examples/live-status/live-status.timeline.json')]);
+ await page.goto(server.origin+'/'+name+'.html#live=demo');const root=page.locator('#docview');
+ await expect(root.locator('.pt-live-status table.dv-live-tickets')).toBeVisible();await page.evaluate(()=>document.fonts.ready);
+ return root;
+}
+async function contentBoard(root){
+ return root.locator('.section-layout-grid').first().evaluate(grid=>{
+  const scale=parseFloat(getComputedStyle(grid).getPropertyValue('--section-layout-scale'))||1,origin=grid.getBoundingClientRect().top;
+  const box=el=>{const r=el.getBoundingClientRect();return {top:(r.top-origin)/scale,bottom:(r.bottom-origin)/scale,height:r.height/scale};};
+  const panel=key=>{
+   const tile=grid.querySelector('.section-layout-tile[data-layout-key="panel:'+key+'"]'),card=tile.querySelector(':scope>.pwidget'),body=card.querySelector(':scope>.pbody'),style=getComputedStyle(card);
+   const bodyBox=body.getBoundingClientRect(),bodyStyle=getComputedStyle(body),px=value=>parseFloat(value) || 0;
+   const lowest=Array.from(body.children).filter(child=>child.getClientRects().length).reduce((bottom,child)=>Math.max(bottom,(child.getBoundingClientRect().bottom-bodyBox.top)/scale+body.scrollTop+px(getComputedStyle(child).marginBottom)),0);
+   const bodyChrome=px(bodyStyle.paddingBottom)+px(bodyStyle.borderBottomWidth)+Math.max(0,body.offsetHeight-body.clientHeight-px(bodyStyle.borderTopWidth)-px(bodyStyle.borderBottomWidth));
+   const content=(bodyBox.top-card.getBoundingClientRect().top)/scale+lowest+bodyChrome+px(style.paddingBottom)+px(style.borderBottomWidth);
+   return {...box(tile),content,card:{scroll:card.scrollHeight,client:card.clientHeight},body:{scroll:body.scrollHeight,client:body.clientHeight}};
+  };
+  return {scale,status:panel('status'),history:panel('history'),section:box(grid.closest('.doc-sec'))};
+ });
+}
+async function grownBoard(root){
+ await expect.poll(async()=>{const s=(await contentBoard(root)).status;return s.body.scroll<=s.body.client+1 && s.height>=s.content-1;},{message:'the Epic status tile grows to its content without an inner scroll'}).toBe(true);
+ return contentBoard(root);
+}
+function expectGrown(m,authored,label){
+ const s=m.status;
+ expect(s.content,label+': precondition, demo content is taller than the authored tile').toBeGreaterThan(chPx(authored)+CH_ROW);
+ expect(s.body.scroll,label+': the Epic status body does not scroll').toBeLessThanOrEqual(s.body.client+1);
+ expect(s.card.scroll,label+': the Epic status card does not scroll').toBeLessThanOrEqual(s.card.client+1);
+ const rows=(s.height+CH_GAP)/CH_ROW;
+ expect(Math.abs(rows-Math.round(rows)),label+': the Epic status tile spans whole rows').toBeLessThan(.05);
+ expect(s.height,label+': the Epic status tile holds its content').toBeGreaterThanOrEqual(s.content-1);
+ expect(s.height-CH_ROW,label+': one row fewer would not hold the content').toBeLessThan(s.content+1);
+ expect(s.top,label+': the Epic status tile keeps its authored row').toBeCloseTo(CH_TOP*CH_ROW,0);
+ expect(m.history.top-s.bottom,label+': the tile below keeps the authored gap').toBeCloseTo(CH_GAP,0);
+ expect(m.history.top-(CH_TOP+authored)*CH_ROW,label+': the tile below moves down by the growth').toBeCloseTo(s.height-chPx(authored),0);
+ expect(m.section.bottom,label+': the section box holds the Epic status tile').toBeGreaterThanOrEqual(s.bottom-.5);
+ expect(m.section.bottom,label+': the section box holds the tile below').toBeGreaterThanOrEqual(m.history.bottom-.5);
+}
+test.describe('Epic status content height in Standard layouts (#864)',()=>{
+ test('C1 (a) demo content shorter than the authored tile keeps the authored height',async({page,server})=>{
+  const root=await openContentBoard(page,server,40);await chSettle(page);await chSettle(page);
+  const m=await contentBoard(root);expect(m.scale,'measured at section zoom 1').toBe(1);
+  expect(m.status.content,'precondition: day-one demo content is shorter than 39 rows').toBeLessThan(chPx(40)-CH_ROW);
+  expect(m.status.height,'the Epic status tile keeps its authored 40 rows').toBeCloseTo(chPx(40),0);
+  expect(m.history.top,'the tile below keeps its authored row').toBeCloseTo((CH_TOP+40)*CH_ROW,0);
+ });
+ test('C2 C3 C4 (b) (c) (d) taller demo content grows the tile, pushes the tile below, grows again on Next day; Edit history keeps its rows',async({page,server})=>{
+  const root=await openContentBoard(page,server,6),before=await grownBoard(root);
+  expect(before.scale,'measured at section zoom 1').toBe(1);expectGrown(before,6,'day 1');
+  expect(before.history.content,'precondition: Edit history content is taller than its 3-row tile').toBeGreaterThan(chPx(3)+CH_ROW);
+  expect(before.history.height,'Edit history keeps its authored 3 rows').toBeCloseTo(chPx(3),0);
+  expect(before.history.body.scroll,'Edit history still scrolls inside its tile').toBeGreaterThan(before.history.body.client);
+  const panel=root.locator('.pt-live-status'),next=panel.getByRole('button',{name:'Next day',exact:true});let day=1,after=before;
+  while(after.status.content<before.status.content+2*CH_ROW && day<8){
+   await next.click();day++;await expect(panel.locator('.dv-live-note')).toContainText('Day '+day+' —');after=await contentBoard(root);
+  }
+  expect(after.status.content,'precondition: Next day adds at least two rows of content').toBeGreaterThanOrEqual(before.status.content+2*CH_ROW);
+  after=await grownBoard(root);expectGrown(after,6,'day '+day);
+  expect(after.status.height,'the Epic status tile grows again').toBeGreaterThan(before.status.height);
+  expect(after.history.height,'Edit history still keeps its authored 3 rows').toBeCloseTo(chPx(3),0);
+ });
+ test('C5 (e) section zoom below 1 grows the tile in unzoomed rows',async({page,server})=>{
+  const root=await openContentBoard(page,server,6,960),m=await grownBoard(root);
+  expect(m.scale,'precondition: a layout width under 1000px zooms the section grid').toBeLessThan(1);
+  expectGrown(m,6,'zoom '+m.scale);
+ });
+ test('C6 C7 (f) Workbench Height shows the authored rows while the preview tile is grown; a drag shows authored rows',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');
+  const text=JSON.stringify(await contentHeightSpec(6));await paste(page,text);await prepareEditorSurface(page);
+  await page.getByRole('checkbox',{name:'Demo live status',exact:true}).check();
+  const view=page.locator('#docview'),tile=view.locator('.section-layout-tile[data-layout-key="panel:status"]');
+  const rows=()=>tile.evaluate(el=>{const scale=parseFloat(getComputedStyle(el.closest('.section-layout-grid')).getPropertyValue('--section-layout-scale'))||1;return Math.round((el.getBoundingClientRect().height/scale+8)/40);});
+  await expect(tile.locator('.dv-live-panel-body')).toBeVisible();
+  await expect.poll(rows,{message:'precondition: the preview Epic status tile grows past its authored 6 rows'}).toBeGreaterThan(6);
+  await arrangeChapter(page);
+  await page.getByRole('combobox',{name:'Layout element',exact:true}).selectOption('panel:status');
+  await expect(page.getByRole('spinbutton',{name:'Height',exact:true})).toHaveValue('6');
+  await expect.poll(rows,{message:'the preview tile stays grown while arranging'}).toBeGreaterThan(6);
+  const grip=tile.getByRole('button',{name:'Move Epic status',exact:true});await grip.scrollIntoViewIfNeeded();const box=await grip.boundingBox();
+  await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();
+  await expect.poll(rows,{message:'tiles show authored heights during a drag'}).toBe(6);
+  await page.keyboard.press('Escape');await page.mouse.up();
+  await expect.poll(rows,{message:'growth returns after the drag is cancelled'}).toBeGreaterThan(6);
+  await expect(page.getByRole('spinbutton',{name:'Height',exact:true})).toHaveValue('6');
+  await expect(page.locator('#src'),'the saved document never changes').toHaveValue(text);
+ });
 });

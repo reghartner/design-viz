@@ -1,6 +1,6 @@
 ---
 name: live-status-board
-description: Author a Flowview live-status board (an "Epic Status board"), a diagram whose nodes and edges carry Jira ticket keys and paint themselves from live Jira state (grey to do, amber in progress, green done, red blocked or missing) when opened as a claude.ai artifact with the viewer's Atlassian connector. Load only when the request explicitly asks for live Jira status, an Epic Status board, or ticket tracking on the diagram; a delivery or cross-team diagram without that ask, and all plain Flowview authoring, stays on hld-to-page.
+description: Author a Flowview live-status board (an "Epic Status board"), a diagram whose nodes and edges carry Jira ticket keys and paint themselves from live Jira state (grey to do, blue in progress, green done, red blocked or missing) when opened as a claude.ai artifact with the viewer's Atlassian connector. Load only when the request explicitly asks for live Jira status, an Epic Status board, or ticket tracking on the diagram; a delivery or cross-team diagram without that ask, and all plain Flowview authoring, stays on hld-to-page.
 ---
 
 # Live-status board

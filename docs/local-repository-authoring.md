@@ -145,3 +145,23 @@ Cloud-attached projects use their saved cloud provider snapshots and reject loca
 refresh even with a connected folder. Saving a repository preview online keeps
 its bounded provenance and frozen providers; it creates no live filesystem or
 cloud-project import link. Cloud-to-cloud provider acquisition is separate work.
+
+## Register a new exporting diagram
+
+A new exporting diagram is a provider whose spec declares `topologyExports`. It
+needs its `diagrams/…/<id>/` folder with `<id>.spec.json`, its root `canon.json`
+entry, and every consumer `topologyImports` change that uses it. When a consumer
+change uses a new provider, all of these go in one commit and one PR. A provider
+registered before any consumer uses it may go alone. Agents edit `canon.json`
+only with the user's authorization, by hand; there is no registration command.
+Folder, ID and owner rules are in the [Canon library guide](workbench-canon-library.md).
+
+The company Flowview repository holds `canon.json`. Agents find its address as the
+`repository` in `tools/company-agent-context.json` in the authoring kit (built from
+`company/company.json`), and the generated `CONNECT.md` names it. Without a
+configured repository it is `https://github.com/reghartner/design-viz`. If the
+user has no local copy of that repository, ask them to clone it from that address.
+Before a permanent canon change, tell the user that changes reach canon only
+through a PR to that repository, that if they lack push or PR access, they should
+request it, and that local preview through `refresh-sources` works without that
+access.

@@ -56,6 +56,14 @@
    R18 add/remove records     panel step path section node edge layout view   status, null absent path, effects = oracle   positional "modified" pairs
    R20 nested tabs            caption, tab view, section view    nested exact paths                         flat sections[i] paths
    R21 document / heading / layout / ledger   exact paths and hunks                                     coarse labels only
+   R21d 25,000-line near-total rewrite      < 1.5 s; hunk texts match the old ledger and rebuild the new one  search time quadratic in edits
+   R21e empty object added / removed         one document field each way (tracking: {})                    an empty object that leaves no leaf
+   R21c repeated lines; swapped sides       two exact hunks in a 5,000-line ledger of 50 distinct lines;  unique-line anchoring with a coarse
+                                             B->A hunks equal A->B hunks with sides swapped (block           fallback; direction-dependent tie breaks
+                                             reorder, repeated rows, small ambiguous ledgers)
+   R21b large ledgers (5,000 lines)          one exact hunk for one changed line; two exact hunks for    a lines x lines LCS table; a coarse
+                                             edits 3,000 lines apart; one hunk for a full rewrite;        fallback that spans unchanged lines
+                                             each diff < 1 s
    R22 legacy steps[i].patch  alias edit                 path uses .patch, same effect as .panels          hard-coded .panels
    R23 absent document        compare(null, side)        exactly document + one per section; mirrored      extra record entries
    R24 identity / full mirror symmetry (fields, effects, scopes, resolved) / immutability                 invented entries; one-sided payloads
@@ -505,6 +513,66 @@ test('R21 document metadata, top-level block heading/layout/View, nested section
   const p0={page:{title:'T',sections:[{id:'s',heading:'S',diagram:base()}]}};
   const added=compare(side(p0,{ledger:null}),side(p0,{ledger:'x'}));assert.equal(added.length,1);
   assert.equal(added[0].status,'added');assert.deepEqual(added[0].fields,[{beforePath:'ledger:',afterPath:'ledger:1-1',before:null,after:'x'}]);
+});
+
+test('R21b large ledgers diff in bounded time: a single changed line gives one exact hunk, a full rewrite one hunk',()=>{
+  /* Accepted ledgers may reach 256 KiB. A diff that allocates a lines x lines table takes seconds and hundreds of
+     MB at 4,000 lines (whole-feature review, 2026-11-02). */
+  const N=5000,p0={page:{title:'T',sections:[{id:'s',heading:'S',diagram:base()}]}};
+  const lines=k=>Array.from({length:N},(_,i)=>'- row '+i+' covered by step s'+(i%97)+k);
+  const a=lines('').join('\n'),one=lines('');one[2999]='- row 2999 changed';
+  const rewrite=lines(' (new)').join('\n');
+  /* Two edits 3,000 lines apart: two exact hunks, never one hunk spanning the unchanged lines between them. */
+  const two=lines('');two[999]='- row 999 changed';two.splice(4000,0,'- inserted after row 3999');
+  for(const [name,after,expected] of [
+    ['single changed line',one.join('\n'),[{beforePath:'ledger:3000-3000',afterPath:'ledger:3000-3000',before:lines('')[2999],after:'- row 2999 changed'}]],
+    ['two distant edits',two.join('\n'),[{beforePath:'ledger:1000-1000',afterPath:'ledger:1000-1000',before:lines('')[999],after:'- row 999 changed'},
+      {beforePath:'ledger:4001-4000',afterPath:'ledger:4001-4001',before:'',after:'- inserted after row 3999'}]],
+    ['full rewrite',rewrite,[{beforePath:'ledger:1-'+N,afterPath:'ledger:1-'+N,before:a,after:rewrite}]]]){
+    const t=performance.now(),out=compare(side(p0,{ledger:a}),side(p0,{ledger:after})),ms=performance.now()-t;
+    assert.deepEqual(only(out,x=>x.kind==='ledger',name).fields,expected,name);
+    assert.ok(ms<1000,name+': '+N+'-line ledgers diffed in '+ms.toFixed(0)+' ms (limit 1000 ms)');
+  }
+});
+
+test('R21c ledger hunks stay exact with repeated lines and are side-swapped when the sides are swapped',()=>{
+  const N=5000,p0={page:{title:'T',sections:[{id:'s',heading:'S',diagram:base()}]}};
+  const ledger=text=>only(compare(side(p0,{ledger:text[0]}),side(p0,{ledger:text[1]})),x=>x.kind==='ledger','ledger entry').fields;
+  const swapped=f=>f.map(h=>({beforePath:h.afterPath,afterPath:h.beforePath,before:h.after,after:h.before}));
+  /* Repeated rows (50 distinct lines): two distant edits are still two exact hunks. */
+  const rows=Array.from({length:N},(_,i)=>'- covered by step s'+(i%50)),dup=rows.slice();dup[999]='- row 1000 changed';dup[3999]='- row 4000 changed';
+  const t=performance.now(),dupFields=ledger([rows.join('\n'),dup.join('\n')]),ms=performance.now()-t;
+  assert.deepEqual(dupFields,[{beforePath:'ledger:1000-1000',afterPath:'ledger:1000-1000',before:rows[999],after:'- row 1000 changed'},
+    {beforePath:'ledger:4000-4000',afterPath:'ledger:4000-4000',before:rows[3999],after:'- row 4000 changed'}]);
+  assert.ok(ms<1000,'repeated-row ledgers diffed in '+ms.toFixed(0)+' ms (limit 1000 ms)');
+  /* Mirror: swapping the sides swaps every hunk, for reordered blocks and for small ambiguous ledgers. */
+  const block=k=>Array.from({length:1002},(_,i)=>'- block '+k+' row '+i);
+  const reorder=[[0,1,2,3].flatMap(block).join('\n'),[2,0,3,1].flatMap(block).join('\n')];
+  const cases=[reorder,[rows.join('\n'),dup.join('\n')],['a\nb\na\nb','b\na\nb\na'],['x\ny\nx','y\nx\ny'],['a\na\nb','b\na\na'],['p\nq\nr\np','r\nq\np\nq']];
+  cases.forEach(([a,b],k)=>assert.deepEqual(ledger([b,a]),swapped(ledger([a,b])),'case '+k+': B->A hunks are the A->B hunks with sides swapped'));
+});
+
+test('R21d a near-total rewrite of a 25,000-line ledger diffs in bounded time and its hunks rebuild the new ledger',()=>{
+  /* Whole-feature review 2026-11-02: one shared line in 25,000 took ~9 s synchronously (ledgers may reach 256 KiB). */
+  const N=25000,p0={page:{title:'T',sections:[{id:'s',heading:'S',diagram:base()}]}};
+  const a=Array.from({length:N},(_,i)=>'r'+i),b=a.map((l,i)=>i===12500?l:l+'x');
+  const t=performance.now(),out=compare(side(p0,{ledger:a.join('\n')}),side(p0,{ledger:b.join('\n')})),ms=performance.now()-t;
+  const fields=only(out,x=>x.kind==='ledger','ledger entry').fields,rebuilt=[];let at=0;
+  for(const h of fields){
+    const [a0,a1]=h.beforePath.slice(7).split('-').map(Number),[b0,b1]=h.afterPath.slice(7).split('-').map(Number);
+    assert.equal(h.before,a.slice(a0-1,a1).join('\n'),'hunk before text matches '+h.beforePath);
+    rebuilt.push(...a.slice(at,a0-1),...b.slice(b0-1,b1));at=a1;
+  }
+  rebuilt.push(...a.slice(at));
+  assert.deepEqual(rebuilt,b,'the hunks turn the old ledger into the new one');
+  assert.ok(ms<1500,N+'-line rewrite diffed in '+ms.toFixed(0)+' ms (limit 1500 ms)');
+});
+
+test('R21e adding or removing an empty object is a change',()=>{
+  const p0={page:{title:'T',sections:[{id:'s',heading:'S',diagram:base()}]}},p1=plain(p0);p1.page.tracking={};
+  const added=compare(side(p0),side(p1)),removed=compare(side(p1),side(p0));
+  assert.deepEqual(only(added,x=>x.kind==='document','document entry').fields,[{beforePath:null,afterPath:'tracking',after:{}}]);
+  assert.deepEqual(only(removed,x=>x.kind==='document','document entry').fields,[{beforePath:'tracking',afterPath:null,before:{}}]);
 });
 
 test('R22 legacy steps[i].patch alias reports the .patch path and the same effect as .panels',()=>{

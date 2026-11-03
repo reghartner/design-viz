@@ -173,14 +173,22 @@ export async function save(page,panel,count){
 }
 export const diagramAt=(spec,section=0)=>spec.page.sections[section].diagram;
 /* Every authored line survives except where a value was spliced: a line may
-   only change by gaining a trailing comma (a member inserted after it). */
-export function expectSurgical(before,after){
+   only change by gaining a trailing comma (a member inserted after it).
+   `removed` (#855) names member lines (trimmed) a removal took out; each must
+   be gone, and only then may a line lose its trailing comma (it preceded one). */
+export function expectSurgical(before,after,{removed=[]}={}){
  const remaining=after.split('\n');
- const lost=[];
+ const lost=[],dropped=removed.slice();
  before.split('\n').forEach(line=>{const at=remaining.indexOf(line);if(at>=0)remaining.splice(at,1);else lost.push(line);});
- lost.forEach(line=>expect(remaining.includes(line+','),'only gained a comma: '+line).toBe(true));
+ lost.forEach(line=>{
+  const at=dropped.indexOf(line.trim().replace(/,$/,''));
+  if(at>=0){dropped.splice(at,1);return;}
+  if(removed.length && line.endsWith(',') && remaining.includes(line.slice(0,-1)))return;
+  expect(remaining.includes(line+','),'only gained a comma: '+line).toBe(true);
+ });
+ expect(dropped,'every removed member line is gone').toEqual([]);
  // every added line belongs to a spliced member
- const added=remaining.filter(line=>!lost.some(old=>line===old+','));
+ const added=remaining.filter(line=>!lost.some(old=>line===old+',' || old===line+','));
  expect(added.length,'some lines were added').toBeGreaterThan(0);
  return added;
 }

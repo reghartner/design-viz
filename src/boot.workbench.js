@@ -425,7 +425,8 @@ if(workbenchPractice){
   initWorkbenchPractice({builder:workbenchBuilder,workspace:workspace,controller:workbenchPreview.controller,agent:workbenchPracticeAgent});
 }else{
 welcome=initWorkbenchWelcome({src:src,builder:workbenchBuilder,templates:WORKBENCH_TEMPLATES,canon:WORKBENCH_CANON,
-  workspace:workspace,skin:currentSkin,skipWelcome:new URLSearchParams(location.search).has('canon')});
+  workspace:workspace,skin:currentSkin,skipWelcome:new URLSearchParams(location.search).has('canon'),
+  demoLiveStatus:workbenchPreview.setDemoLiveStatus});
 canonContext=initCanonWorkbench({src:src,handoff:!!readWorkspaceHandoff(location.hash),catalogChanged:function(){workbenchBuilder.refreshCatalog();},loadSpec:function(raw,topologyContext){
   loadingCanon=true;
   try{var result=workbenchBuilder.loadSpec(raw,null,topologyContext);if(result)welcome.canonicalLoaded();return result;}

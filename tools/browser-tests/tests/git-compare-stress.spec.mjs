@@ -13,8 +13,8 @@
                                                   To := 50 different commits in the picker,  previous root detached, liveOwners() equal    that keeps old content
                                                   Compare each time (real clicks/keys)      to its value after the first navigation
    S2   no leftover git/gh processes; memory      same 50 navigations                       server has no git/gh child process after the   leaked child processes; memory that grows
-        stays flat                                                                          50th; server RSS after the 50th <= 1.2x RSS   with every navigation
-                                                                                            after the 5th
+        stays flat                                                                          50th; server RSS after two forced garbage     with every navigation
+                                                                                            collections, 50th <= 1.2x 5th
    AU   no page/console error, failed request, HTTP >= 400 or request outside the server
    The server runs with the documented command, node --max-semi-space-size=1 tools/compare/serve.mjs (its header
    says why: by default V8 grows its young generation by tens of MB under steady requests during the first ~50
@@ -62,6 +62,24 @@ const children=pid=>execFileSync('ps',['-A','-o','pid=,ppid=,comm='],{encoding:'
   .filter(f=>Number(f[1])===pid).map(f=>({pid:Number(f[0]),comm:f.slice(2).join(' ')}));
 const rss=pid=>Number(execFileSync('ps',['-o','rss=','-p',String(pid)],{encoding:'utf8'}).trim());
 const median=list=>[...list].sort((a,b)=>a-b)[Math.floor(list.length/2)];
+/* RSS (KB) of the server after two full garbage collections. SIGUSR1 turns on Node's inspector in the running
+   server (127.0.0.1:9229) without changing its start command (Chuck 2026-11-02: measure after collecting garbage,
+   keep 1.2x; raw RSS also counts garbage not yet collected, which varies run to run). */
+async function rssAfterGc(state,pid){
+  if(!state.send){
+    process.kill(pid,'SIGUSR1');
+    let list=null;
+    for(let i=0;i<100 && !list;i++){try{list=await (await fetch('http://127.0.0.1:9229/json/list')).json();}catch(ex){await new Promise(r=>setTimeout(r,100));}}
+    const target=(list||[]).find(t=>/compare\/serve\.mjs$/.test(t.url||''));
+    expect(target,'precondition: the inspector belongs to the compare server').toBeTruthy();
+    const ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{ws.onopen=resolve;ws.onerror=reject;});
+    let id=0;const waiting=new Map();
+    ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id && waiting.has(m.id)){waiting.get(m.id)(m);waiting.delete(m.id);}};
+    state.ws=ws;state.send=(method,params={})=>new Promise(resolve=>{const n=++id;waiting.set(n,resolve);ws.send(JSON.stringify({id:n,method,params}));});
+  }
+  for(let k=0;k<2;k++){const r=await state.send('HeapProfiler.collectGarbage');expect(r.error,'garbage collection ran').toBeUndefined();}
+  return rss(pid);
+}
 
 const stress=test.extend({
   clone:[async({},use)=>{
@@ -130,7 +148,7 @@ stress('S1 S2: 50 Compare navigations keep one live view, leave no git/gh proces
     await option.click();await expect(dialog).toBeHidden();
   }
   await choose('From',1);
-  let owners=null,previous=null,rss5=null;
+  let owners=null,previous=null,rss5=null;const gc={};
   for(let n=0;n<50;n++){
     const to=10+n*9;
     await choose('To',to);
@@ -147,10 +165,10 @@ stress('S1 S2: 50 Compare navigations keep one live view, leave no git/gh proces
     const live=await page.evaluate(()=>window.FlowviewCompare.liveOwners());
     if(owners===null){owners=live;expect(owners,'precondition: a mounted view owns renders').toBeGreaterThan(0);}
     else await expect.poll(()=>page.evaluate(()=>window.FlowviewCompare.liveOwners()),'navigation '+(n+1)+': one live view').toBe(owners);
-    if(n===4){await expect.poll(()=>children(clone.pid).length).toBe(0);rss5=rss(clone.pid);}
+    if(n===4){await expect.poll(()=>children(clone.pid).length).toBe(0);rss5=await rssAfterGc(gc,clone.pid);}
   }
   await expect.poll(()=>children(clone.pid).filter(p=>/(^|\/)(git|gh)$/.test(p.comm)),{message:'no git/gh child process after 50 navigations'}).toEqual([]);
   expect(children(clone.pid),'no child process at all').toEqual([]);
-  const rss50=rss(clone.pid);
-  expect(rss50,'server RSS after 50 navigations ('+rss50+' KB) vs after 5 ('+rss5+' KB)').toBeLessThanOrEqual(1.2*rss5);
+  const rss50=await rssAfterGc(gc,clone.pid);gc.ws.close();
+  expect(rss50,'server RSS after garbage collection, 50 navigations ('+rss50+' KB) vs 5 ('+rss5+' KB)').toBeLessThanOrEqual(1.2*rss5);
 });

@@ -82,7 +82,8 @@
                                                                                        step, imported node); node a "Alpha" in Before,
                                                                                        "Alpha final" in After
    C2   click through changes (row 3)        J (Focused), Full diagram, rail click, K  Focused aria-pressed by default; on the step change  panes that never follow the selection;
-                                                                                       each side's visible step strip [1] and caption      Full-only, strip-hidden or non-switching
+                                                                                       each side's visible step strip [1], heading named   Full-only, strip-hidden or non-switching
+                                                                                       like the pane title (c1 / c7), and caption
                                                                                        "Start" / "Start the flow"; Full hides the focused  integration
                                                                                        view and shows both panes; aria-current moves
                                                                                        0->1->2->1; pane captions; child::p2 "P two" /
@@ -112,6 +113,8 @@
    U2   untrusted text in the document list  commit with a hostile file name and       doc row path literal; rail labels and node text     innerHTML in the document list or rail
         and comparison                       node/section titles                      literal; no <img>/inline <script>; no __pwned
    AU   every test, context-wide (all pages): no page/console error, failed request, HTTP >= 400, or request outside the compare server
+        (recorded from page open until the test body ends, no element is aria-busy and no request is in flight;
+        only then are the servers closed)
    U1   page CSP                                response headers of "/"                 no repeated directive; default-src 'none';       inline or eval script allowed; a repeated
                                                                                        script-src exactly 'self';                         unsafe directive
                                                                                        no script-src-elem/-attr (PR 3: style-src may
@@ -143,23 +146,34 @@ const test=base.extend({
       const response=await page.goto('http://127.0.0.1:'+server.address().port+'/');
       return response;
     });
-    /* The page is still open; its keep-alive or in-flight requests must not hold the close. */
+    /* Work the page started (such as the comparison Compare this commit loads) finishes while the audit still
+       records it: first every aria-busy marker clears (the page sets one for the whole of each comparison, parent
+       lookup and pull request check, including work not yet sent), then no request is in flight. Only then does
+       recording stop, so closing the servers' idle connections is not a test failure. */
+    if(servers.length && !page.isClosed()){
+      await expect(page.locator('[aria-busy="true"]'),'page work finished before teardown').toHaveCount(0,{timeout:15000});
+      await page.waitForLoadState('networkidle',{timeout:15000});
+    }
+    errors.stop();
     for(const s of servers){s.closeAllConnections();await new Promise(resolve=>s.close(resolve));}
   },
   /* Page errors, console errors, failed requests, HTTP errors and any request that leaves the
      compare server's origin all fail the test. */
   errors:[async({context,page},use)=>{
     const errors=[],origins=[],allowed=[];
+    /* Recording stops when the test body has finished: closing the servers then ends any request still
+       open, and that is not a page error. */
+    let recording=true;const record=m=>{if(recording)errors.push(m);};
     /* A test may expect one HTTP error status for one URL pattern; only that is excused. */
     const excused=(url,status)=>allowed.some(a=>a.re.test(url)&&(status===undefined||status===a.status));
     /* Context-wide: every page of the context, including popups. */
-    const watch=p=>{p.on('pageerror',e=>errors.push('page: '+e.message));p.on('console',m=>{if(m.type()==='error'&&!(/^Failed to load resource/.test(m.text())&&excused(m.location()?.url||'')))errors.push('console: '+m.text());});};
+    const watch=p=>{p.on('pageerror',e=>record('page: '+e.message));p.on('console',m=>{if(m.type()==='error'&&!(/^Failed to load resource/.test(m.text())&&excused(m.location()?.url||'')))record('console: '+m.text());});};
     context.pages().forEach(watch);context.on('page',watch);
-    context.on('request',r=>{const url=r.url();if(!origins.some(o=>url.startsWith(o+'/'))&&!/^(data|blob|about):/.test(url))errors.push('outbound: '+url);});
-    context.on('requestfailed',r=>errors.push('request failed: '+r.url()+' '+(r.failure()?.errorText||'')));
-    context.on('response',r=>{if(r.status()>=400&&!excused(r.url(),r.status()))errors.push('HTTP '+r.status()+': '+r.url());});
+    context.on('request',r=>{const url=r.url();if(!origins.some(o=>url.startsWith(o+'/'))&&!/^(data|blob|about):/.test(url))record('outbound: '+url);});
+    context.on('requestfailed',r=>record('request failed: '+r.url()+' '+(r.failure()?.errorText||'')));
+    context.on('response',r=>{if(r.status()>=400&&!excused(r.url(),r.status()))record('HTTP '+r.status()+': '+r.url());});
     await context.route(/^https?:/,route=>{const url=route.request().url();return origins.some(o=>url.startsWith(o+'/'))?route.continue():route.abort();});
-    errors.origins=origins;errors.allow=(status,re)=>allowed.push({status,re});
+    errors.origins=origins;errors.allow=(status,re)=>allowed.push({status,re});errors.stop=()=>{recording=false;};
     await use(errors);
     expect([...errors],'no page/console/request errors or outbound requests').toEqual([]);
   },{auto:true}],
@@ -588,6 +602,9 @@ test('C0 C1 C2: Compare shows From as Before and To as After, and every change c
     await expect(steps).toHaveText(['1']);await expect(steps.first()).toBeVisible();
     await expect(focusSide(side).locator('.compare-focus-caption')).toBeVisible();
   }
+  /* The focused headings name the compared revisions, as the pane titles do. */
+  await expect(focusSide('before').locator('.compare-focus-title')).toHaveText(paneHeading('before',c.c1,'Add flows'));
+  await expect(focusSide('after').locator('.compare-focus-title')).toHaveText(paneHeading('after',c.c7,'Final pass'));
   await expect(focusSide('before').locator('.compare-focus-caption')).toHaveText('Start');
   await expect(focusSide('after').locator('.compare-focus-caption')).toHaveText('Start the flow');
   await modeButton('Full diagram').click();await expect(modeButton('Full diagram')).toHaveAttribute('aria-pressed','true');

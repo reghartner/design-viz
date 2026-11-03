@@ -616,8 +616,10 @@ function editHistoryEntryProblem(entry){
   for(var i=0;i<entry.changes.length;i++){
     var change=entry.changes[i],at='changes['+i+']';
     if(!specObject(change))return at+': must be an object';
-    if(change.op!=='add' && change.op!=='remove')return at+'.op: must be "add" or "remove"';
-    if(typeof change.ticket!=='string' || !trackingKeyPattern.test(change.ticket))return at+'.ticket: must be a Jira key';
+    if(change.op!=='add' && change.op!=='remove' && change.op!=='clear-missing-work')return at+'.op: must be "add", "remove" or "clear-missing-work"';
+    // #855: clearing a Missing work marker names only its carrier.
+    if(change.op==='clear-missing-work'){if(Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "clear-missing-work" change has no ticket';}
+    else if(typeof change.ticket!=='string' || !trackingKeyPattern.test(change.ticket))return at+'.ticket: must be a Jira key';
     var node=Object.prototype.hasOwnProperty.call(change,'node'),edge=Object.prototype.hasOwnProperty.call(change,'edge');
     var nodeOk=typeof change.node==='string' && change.node.length>0;
     var edgeOk=Array.isArray(change.edge) && change.edge.length===2 && change.edge.every(function(id){return typeof id==='string' && id.length>0;});

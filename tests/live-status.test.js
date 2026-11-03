@@ -1144,13 +1144,14 @@ test('S1 host provider reports connecting, busy, connected with a checked time, 
  assert.equal(typeof api.status,'function','S1 status() exists');mountStatus(h);
  let value=plain(api.snapshot());assert.ok(value.connection,'S1 snapshot.connection');assert.equal(value.connection.state,'connecting');assert.equal(value.connection.source,'Host');assert.equal(value.connection.busy,false);
  h.flush();h.flush();await new Promise(setImmediate);value=plain(api.snapshot());
- assert.equal(value.connection.state,'connected');assert.equal(value.connection.busy,false);assert.ok(isFinite(Date.parse(value.connection.checkedAt)),'S1 checkedAt is a timestamp');assert.equal(value.connection.checkedText,'refreshed just now');assert.equal(h.view.querySelector('time.dv-live-updated'),null,'S1 no separate updated time');
+ assert.equal(value.connection.state,'connected');assert.equal(value.connection.busy,false);assert.ok(isFinite(Date.parse(value.connection.checkedAt)),'S1 checkedAt is a timestamp');const clock=at=>new Date(at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'});assert.equal(value.connection.checkedText,'refreshed '+clock(value.connection.checkedAt),'S1 refresh time is the local clock time');assert.equal(h.view.querySelector('time.dv-live-updated'),null,'S1 no separate updated time');
  const badge=h.view.querySelector('.dv-live-connection');assert.ok(badge,'S1 header connection element');assert.equal(badge.getAttribute('data-state'),'connected');assert.equal(badge.getAttribute('data-busy'),'false');
- const badgeText=()=>badge.querySelectorAll('span')[0].textContent;assert.equal(badgeText(),'Host connected, refreshed just now');assert.equal(badge.getAttribute('role'),'status');assert.ok(badge.querySelector('.dv-live-connection-dot'));
+ const badgeText=()=>badge.querySelectorAll('span')[0].textContent;assert.equal(badgeText(),'Host connected, refreshed '+clock(value.connection.checkedAt));assert.equal(badge.getAttribute('role'),'status');assert.ok(badge.querySelector('.dv-live-connection-dot'));
  fail=true;const tick=[...h.timers.values()][0];h.timers.clear();tick.fn();value=plain(api.snapshot());assert.equal(value.connection.busy,true);assert.equal(badge.getAttribute('data-busy'),'true');
  await new Promise(setImmediate);value=plain(api.snapshot());assert.equal(value.connection.state,'error');assert.equal(value.connection.busy,false);assert.equal(badge.getAttribute('data-state'),'error');
  api.status({state:'bogus',source:42});assert.equal(plain(api.snapshot()).connection.state,'error');assert.equal(plain(api.snapshot()).connection.source,'Host');
- api.status({state:'demo',source:'Demo',checkedAt:Date.now()});value=plain(api.snapshot());assert.equal(value.connection.state,'demo');assert.equal(value.connection.source,'Demo');assert.equal(badgeText(),'Demo, refreshed just now');
+ api.status({state:'demo',source:'Demo',checkedAt:Date.now()});value=plain(api.snapshot());assert.equal(value.connection.state,'demo');assert.equal(value.connection.source,'Demo');assert.equal(badgeText(),'Demo, refreshed '+clock(value.connection.checkedAt));
+ api.status({checkedAt:Date.UTC(2020,0,2,15,4,5)});value=plain(api.snapshot());assert.equal(badgeText(),'Demo, refreshed '+new Date(Date.UTC(2020,0,2,15,4,5)).toLocaleDateString([],{month:'short',day:'numeric'})+' '+clock(Date.UTC(2020,0,2,15,4,5)),'S1 an older refresh shows its date');
  api.destroy();
 });
 test('S2 the Jira adapter reports disconnected, connecting, connected and retrying error states',async()=>{
@@ -1781,6 +1782,24 @@ test('H7 H11 a panel mounted in the view lists rows newest first with collapsibl
  const many=[];for(let i=0;i<201;i++)many.push({at:new Date(Date.UTC(2026,0,1,0,i)).toISOString(),changes:[{op:'add',ticket:'AA-1',node:'a'}]});
  const capped=harness(historyFixture(many)),cappedPanel=mountHistory(capped);await historySettle();assert.equal(cappedPanel.rows().length,200);cappedPanel.destroy();capped.ctl.liveStatus.destroy();
  const empty=harness(historyFixture()),emptyPanel=mountHistory(empty);await historySettle();assert.equal(emptyPanel.rows().length,0);assert.equal(textOf(emptyPanel.body.querySelector('.dv-edit-history-empty')).trim(),'No edits yet.');emptyPanel.destroy();empty.ctl.liveStatus.destroy();
+});
+/* #855 H7c (contract source: #855 "Reuse plan" (Edit history panel), Chuck 2026-11-01; §0 ruling:
+   Chuck 2026-11-01: issue's own Test + flip plan):
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| H7c clear-missing-work rows have no ticket | one entry: clear on node b (label Node B), add AA-1, clear on edge a → b without label | summary first "Missing work cleared from Node B", "3 changes"; change lines [op attr, data-edit-ticket, ticket span, op text, carrier] == [clear-missing-work, null, none, "Missing work cleared from", "Node B"], [add, AA-1, AA-1, "added to", "Node B"], [clear-missing-work, null, none, "Missing work cleared from", "a → b"] | ticket-first prose ("undefined added to …"); a ticket span for a clear |
+*/
+test('H7c clear-missing-work rows read "Missing work cleared from <carrier>" with no ticket',async()=>{
+ const entries=[{at:'2026-11-01T10:00:00Z',by:{name:'Alex'},changes:[{op:'clear-missing-work',node:'b',label:'Node B'},{op:'add',ticket:'AA-1',node:'b',label:'Node B'},{op:'clear-missing-work',edge:['a','b']}]}];
+ const h=harness(historyFixture(entries)),status=mountHistory(h);await historySettle();
+ const rows=status.rows();assert.equal(rows.length,1);
+ assert.equal(textOf(rows[0].querySelector('.dv-edit-first')).trim(),'Missing work cleared from Node B');
+ assert.equal(textOf(rows[0].querySelector('.dv-edit-count')).trim(),'3 changes');
+ const changes=rows[0].querySelectorAll('li.dv-edit-change');assert.equal(changes.length,3);
+ const text=(row,cls)=>{const el=row.querySelector(cls);return el?textOf(el).trim():null;};
+ assert.deepEqual(changes.map(c=>[c.getAttribute('data-edit-op'),c.getAttribute('data-edit-ticket'),text(c,'.dv-edit-ticket'),text(c,'.dv-edit-op'),text(c,'.dv-edit-carrier')]),
+  [['clear-missing-work',null,null,'Missing work cleared from','Node B'],['add','AA-1','AA-1','added to','Node B'],['clear-missing-work',null,null,'Missing work cleared from','a → b']]);
+ status.destroy();h.ctl.liveStatus.destroy();
 });
 test('H7b a panel mounted before its controller connects through the pending bridge and retires with it',async()=>{
  const raw=historyFixture(HISTORY),h=harness(raw);h.ctl.liveStatus.destroy();

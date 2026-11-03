@@ -110,6 +110,81 @@ class SiteConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, 'Invalid site config'):
             self.load()
 
+    # #866 — the Welcome "Live Feature Delivery Status Board" row links the example named by
+    # site config ("liveStatusExample"), an absolute https URL on any host (a claude.ai artifact).
+    # row | fixture                                                    | assertion (scoped)                                                       | rejects
+    # 1   | site.json with "liveStatusExample": LIVE_STATUS_URL         | workbench_live_status_example() embeds exactly that string; workbench_landing() still loads the same file | a field accepted but dropped; the top-level allow-list left closed (today: "expected only version, landing and optional examples")
+    # 2   | https URLs on other hosts with port, query, fragment        | embedded unchanged                                                       | reusing the examples same-site rule for this field
+    # 3   | no site.json, --no-config, config without the field, autodiscovered workbench/site.json | null without the field or with --no-config; the URL from autodiscovery | a default that shows the row everywhere, or autodiscovery ignored
+    # 4   | javascript:, http:, HTTP:, data:, ftp:, credentials (user:pass@, user@, :pass@), whitespace (lead, trail, inner, tab, newline, NBSP), "", "  ", relative, //host, https: without a host, backslash, non-string | "Invalid site config" | script, plaintext, credential-bearing or malformed URLs in the Welcome link
+    # 5   | the field set beside an unknown sibling ("liveStatusExampel") | workbench_landing() still fails                                        | loosening the allow-list wholesale
+    # 6   | CLI build --config with the field; then --no-config          | flowspec.html carries var WORKBENCH_LIVE_STATUS_EXAMPLE = "<url>"; --no-config carries null | config read but never embedded in the page
+    LIVE_STATUS_URL = 'https://example.com/live-status-board'
+
+    def live_status(self, **kwargs):
+        return json.loads(build.workbench_live_status_example(self.config, **kwargs))
+
+    def test_live_status_example_url_is_embedded_only_when_configured(self):
+        for url in [self.LIVE_STATUS_URL, 'https://boards.example.org:8443/a/b?c=1&d=%20#e']:
+            with self.subTest(url=url):
+                self.config.write_text(json.dumps({**self.data, 'liveStatusExample': url}))
+                self.assertEqual(self.live_status(), url)
+                self.assertEqual(json.loads(self.load())['spec'], self.raw)
+        self.config.write_text(json.dumps({**self.data, 'examples': '../examples/index.html', 'liveStatusExample': self.LIVE_STATUS_URL}))
+        self.assertEqual(self.live_status(), self.LIVE_STATUS_URL)
+        self.assertEqual(self.examples(), '../examples/index.html')
+        self.assertIsNone(self.live_status(no_config=True))
+        self.config.write_text(json.dumps({**self.data, 'examples': '../examples/index.html'}))
+        self.assertIsNone(self.live_status())
+        self.assertIsNone(json.loads(build.workbench_live_status_example(no_config=True)))
+        (self.directory / 'workbench').mkdir()
+        with patch.object(build, 'ROOT', self.directory):
+            self.assertIsNone(json.loads(build.workbench_live_status_example()))
+            (self.directory / 'workbench/site.json').write_text(json.dumps(
+                {'version': 1, 'landing': {'spec': '../story.json'}, 'liveStatusExample': self.LIVE_STATUS_URL}))
+            self.assertEqual(json.loads(build.workbench_live_status_example()), self.LIVE_STATUS_URL)
+            self.assertEqual(json.loads(build.workbench_landing(runtime=self.runtime))['spec'], self.raw)
+            self.assertIsNone(json.loads(build.workbench_live_status_example(no_config=True)))
+
+    def test_live_status_example_url_must_be_https_without_credentials_or_whitespace(self):
+        for url in ['javascript:alert(1)', 'http://example.com/live-status-board', 'HTTP://example.com/live-status-board',
+                    'data:text/html,hi', 'ftp://example.com/board',
+                    'https://user:pass@example.com/board', 'https://user@example.com/board', 'https://:pass@example.com/board',
+                    ' https://example.com/board', 'https://example.com/board ', 'https://example.com/a b',
+                    'https://example.com/\tboard', 'https://example.com/board\n', 'https://example.com/board ',
+                    '', '   ', 'live-status/index.html', '/live-status-board', '//example.com/board',
+                    'https:', 'https://', 'https:example.com/board', 'https:///board', 'https://example.com\\board',
+                    [self.LIVE_STATUS_URL], None, 1]:
+            with self.subTest(url=url):
+                self.config.write_text(json.dumps({**self.data, 'liveStatusExample': url}))
+                with self.assertRaisesRegex(SystemExit, 'Invalid site config'):
+                    self.live_status()
+        self.config.write_text(json.dumps({**self.data, 'liveStatusExample': self.LIVE_STATUS_URL, 'liveStatusExampel': 'x'}))
+        with self.assertRaisesRegex(SystemExit, 'Invalid site config'):
+            self.load()
+
+    def test_cli_build_embeds_live_status_example_only_from_config(self):
+        outputs = [ROOT / 'workbench/flowspec.html', ROOT / 'template/flowview.html']
+        original = {p: p.read_bytes() if p.exists() else None for p in outputs}
+        def restore():
+            for path, data in original.items():
+                if data is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    path.write_bytes(data)
+        self.addCleanup(restore)
+        def run(*args):
+            return subprocess.run([sys.executable, str(ROOT / 'tools/build.py'), *args], cwd=self.directory, capture_output=True, text=True)
+        def embedded():
+            return re.search(rb'var WORKBENCH_LIVE_STATUS_EXAMPLE = ([^\n]*);\n', outputs[0].read_bytes()).group(1)
+        self.config.write_text(json.dumps({**self.data, 'liveStatusExample': self.LIVE_STATUS_URL}))
+        configured = run('--config', 'site.json')
+        self.assertEqual(configured.returncode, 0, configured.stdout + configured.stderr)
+        self.assertEqual(json.loads(embedded()), self.LIVE_STATUS_URL)
+        upstream = run('--no-config')
+        self.assertEqual(upstream.returncode, 0, upstream.stdout + upstream.stderr)
+        self.assertEqual(embedded(), b'null')
+
     def test_invalid_spec_or_no_featured_diagram_fails(self):
         for raw in [None, [], {'page': {'sections': [{'heading': 'Prose only'}]}},
                     {'nodes': {}, 'rows': [['missing']]},

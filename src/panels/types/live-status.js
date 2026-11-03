@@ -51,8 +51,9 @@
       return node;
     }
     function sweep(parent){Object.keys(parent._liveChildren || {}).forEach(function(key){var node=parent._liveChildren[key];if(node._liveEpoch!==epoch){node.remove();delete parent._liveChildren[key];}else sweep(node);});}
+    // Header buttons wear `tbtn`, the reader's per-theme button look shared with the section's Play and Present buttons (#863).
     function button(parent,key,cls,text,method){
-      var node=el(parent,'button',key,cls,text);node.type='button';node._liveMethod=method;
+      var node=el(parent,'button',key,cls+' tbtn',text);node.type='button';node._liveMethod=method;
       if(!node._liveClick){node._liveClick=function(){var owner=host._livePanelApi;if(owner && !node.disabled)owner[node._liveMethod](node._liveArgument);};node.addEventListener('click',node._liveClick);}
       return node;
     }
@@ -266,13 +267,19 @@
 .dv-live-chain-holds{font:11px/1.4 'IBM Plex Sans',sans-serif;color:var(--dfaint);}
 .dv-live-none{color:var(--dfaint);}
 .dv-live-suggest{margin:8px 0 0;font:11px/1.5 'IBM Plex Sans',sans-serif;color:var(--dfaint);}
-.dv-live-save{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#fff;font-weight:700;}
-.dv-live-save:disabled{opacity:.7;}
+/* Save keeps its fill over every theme's tbtn rules, hover included. */
+.pt-live-status .dv-live-head .tbtn.dv-live-save,.pt-live-status .dv-live-head .tbtn.dv-live-save:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#fff;font-weight:700;}
+.pt-live-status .dv-live-head .tbtn.dv-live-save:disabled{opacity:.7;}
+/* Paper has no controls: print hides these buttons as it hides the reader's other tbtn controls. */
+@media print{.pt-live-status .dv-live-head .tbtn{display:none;}}
 .dv-live-edit-reason,.dv-live-edit-notice{flex-basis:100%;font:12px/1.5 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .dv-live-edit-notice[data-kind="warn"],.dv-live-edit-notice[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-draggable{cursor:grab;}
 .dv-live-draggable:active{cursor:grabbing;}
 .dv-live-remove{justify-self:end;}
+.dv-live-clear{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:6px 0;}
+.dv-live-question{flex-basis:100%;margin:0;font-weight:600;color:var(--dtext);}
+.dv-live-missing-source{margin:6px 0;}
 .dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}
 
 .pwidget.pt-live-status{display:flex;flex-direction:column}
@@ -304,7 +311,8 @@
     presentation:{ambientInitial:true},
     layout:{height:10,fallbackHeight:10,supporting:false,large:true,attachControls:false,
       canvasSizing:{mode:'content-fit',maxHeight:640,resizeAxis:'width'},
-      sectionSizing:{minWidth:480,preferredWidth:880,maxWidth:1200,aspectPolicy:'content',grow:1}},
+      // #864: Standard tiles grow to this panel's content; the authored h is the minimum.
+      sectionSizing:{minWidth:480,preferredWidth:880,maxWidth:1200,aspectPolicy:'content',grow:1,height:'content'}},
     render:function(host,panel,state){return state && state.liveSample?{html:sampleHTML(state.liveSample)}:
       {html:'<div class="dv-live-head"></div><p class="dv-live-empty">This page has no ticket references.</p>',mounted:function(){mount(host);}};},
     authoring:{template:{title:'Live status'},setupFields:[],patchFields:[],

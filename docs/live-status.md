@@ -308,7 +308,7 @@ The generic desktop Workbench picker lists **Delivery → Live status**; inserti
 and Export project preserve the panel. There are no authored state or patch fields.
 
 The panel header holds **Live**, distinct-ticket counts, a connector indicator
-(a dot plus “Jira connected, refreshed 12s ago”; the dot is grey when not connected,
+(a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
 amber while connecting or awaiting approval, green when connected or in demo mode,
 red on error, and it pulses while a fetch is in flight; the time is the last successful
 fetch, not a ticket's change time), provider note and action, **First blocker**, and
@@ -781,6 +781,17 @@ mode:
   that carrier. Tickets the popover lists because of an availability rule, and
   provider-inherited tickets on imported carriers, have none. A move is add +
   remove.
+- **Clear Missing work** (#855): a node or edge marked `missingWork: true` shows
+  **Clear Missing work** in its popover. Clicking it removes the marker (one
+  pending change) and the carrier repaints from its tickets alone. A drop that
+  adds a ticket to a marked carrier opens that carrier's popover asking "Does
+  EX-1 cover the missing work?" with **Clear Missing work** and **Keep**; Keep,
+  Escape, × or a click outside leave the marker. Nothing clears automatically,
+  and the board never sets a marker (that stays a Workbench step). A marker an
+  imported carrier inherits from its source diagram (the provider sets it, even
+  if the consumer overlay repeats it) shows "Missing work comes from the source
+  diagram "<spec>" and must be cleared there." instead, with no Clear and no
+  post-drop question.
 - Imported nodes and edges write the consumer overlay
   (`topologyImports[].nodeTracking` / `edgeTracking`, as the Workbench does); the
   provider spec never changes.
@@ -798,7 +809,7 @@ mode:
   carrier's identity (section id or heading, edge endpoints and label, the import's
   provider reference), never by position. A change whose carrier is gone, or was
   not unique when it was made (two identical unlabeled parallel edges), is dropped
-  and listed. Nothing is published until the editor saves again.
+  and listed, as is a clear whose carrier no longer has a marker set on this board. Nothing is published until the editor saves again.
 - A read-only answer (`not_writer`, `not_granted`, `capability_disabled`,
   `not_declared`) hides the edit controls and says the board is read-only here.
 - While the page shows the "couldn't load its latest version" warning (booted from
@@ -917,9 +928,9 @@ A tracked two-file page's declaration adds `artifact` and `user`
 
 ## Edit history
 
-`page.editHistory` is the board's save history: one entry per change set,
-hand-written today. The board's Edit mode (#828, planned) will append an
-entry on every Save. The panel shows them newest first:
+`page.editHistory` is the board's save history: one entry per change set. The
+board's Edit mode (#828) appends an entry on every Save; entries may also be
+hand-written. The panel shows them newest first:
 
 ```json
 "editHistory": [
@@ -928,7 +939,8 @@ entry on every Save. The panel shows them newest first:
    "changes": [
      {"op": "add", "ticket": "EX-1", "node": "payment-api", "label": "Payment API",
       "path": ["sections", 0, "diagram", "nodes", "payment-api"]},
-     {"op": "remove", "ticket": "AA-1", "edge": ["door", "cloud"], "label": "Door → Cloud"}]}
+     {"op": "remove", "ticket": "AA-1", "edge": ["door", "cloud"], "label": "Door → Cloud"},
+     {"op": "clear-missing-work", "edge": ["door", "cloud"], "label": "Door → Cloud"}]}
 ]
 ```
 
@@ -937,13 +949,15 @@ seconds, optional fraction of any length, and `Z` or a `±hh:mm` offset, such as
 `2026-10-30T16:23:15.987Z`; impossible calendar dates are rejected) and a
 non-empty `changes` array
 whose items carry `op` (`"add"` or `"remove"`), `ticket` (a Jira key) and the
-carrier (`node` id, or `edge: [from, to]`). Optional: `by` (`id` and `name`
+carrier (`node` id, or `edge: [from, to]`). A `"clear-missing-work"` change
+records a Missing work marker cleared in Edit mode (#855): it carries only the
+carrier (and the optional `path` and `label`), never a `ticket`. Optional: `by` (`id` and `name`
 strings, either may be empty), each change's `path` (array) and `label` (the
 carrier's display name at save time, so history stays readable after a rename).
 Validation follows the warning-only policy of the other tracking fields: a
 malformed entry warns and is ignored, a non-array warns once, and more than 200
-entries warn once with only the newest 200 used (the planned Edit mode will
-trim to 200 on save).
+entries warn once with only the newest 200 used (Edit mode trims to 200 on
+save).
 
 The **Edit history** panel shows those entries. Add it to the diagram's panels
 after the Live status panel and place it below the board in every host profile:
@@ -955,10 +969,11 @@ after the Live status panel and place it below the board in every host profile:
 In a section with an explicit `sectionLayout`, add a full-width tile for it to
 each profile (`{"panel": "history", "x": 0, "y": <below the other tiles>, "w": 24, "h": 8}`);
 a profile that does not name the panel does not show it. Each row reads
-editor · time · "N changes" · the first change ("EX-1 added to Payment API");
+editor · time · "N changes" · the first change ("EX-1 added to Payment API",
+or "Missing work cleared from Door → Cloud");
 clicking a row expands one line per change with the ticket key, its live title
 when the connector has answered, the operation and the carrier label (stored
-`label`, else the node id or `from → to`). The editor name is the viewer's live
+`label`, else the node id or `from → to`); a cleared marker's line has no ticket. The editor name is the viewer's live
 claude.ai profile name for `by.id` when it resolves, else the stored `by.name`,
 else "Someone". Everyone sees the panel; nobody edits it, on desktop or in
 read-only viewing. It has no authored state: `initial` and step patches warn
@@ -1065,7 +1080,8 @@ node or connection. This is authored coverage intent, not a Jira status. For exa
 ```
 
 The marker says additional unlinked work remains, even if AUDIT-42 is Done. Clear
-it when that work is covered. Blocked ticket evidence takes precedence over the
+it when that work is covered: here, or on a shared board in Edit mode
+(**Clear Missing work**, see "Edit mode on the shared board"). Blocked ticket evidence takes precedence over the
 marker; the marker takes precedence over active, done and todo. It participates
 in step appearance and readiness without inventing a ticket or increasing Jira counts.
 

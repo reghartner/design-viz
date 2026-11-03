@@ -71,6 +71,22 @@ test('L8 rework the panel reference is extractable by widget_doc and publishing 
  assert.match(skill,/After Continue the Live status panel header/);assert.doesNotMatch(skill,/Live chip/);
 });
 
+/* #863 V2 color words (the rendered prose is also checked in tools/browser-tests/tests/live-status.spec.mjs):
+| row | element | fixture | assertion | broken implementation it rejects |
+|---|---|---|---|---|
+| V2a | live-status-board skill description | .claude/skills/live-status-board/SKILL.md frontmatter | names "blue in progress", never amber or orange | keeping "amber in progress" |
+| V2b | worked example prose, source and built page | examples/live-status/live-status.spec.json first section paragraph; examples/live-status/live-status.html | names "blue in progress", never amber or orange | fixing only one of the two files |
+The reference is the default active paint, --dv-live-active #009dff (commit 2f685821). */
+test('#863 V2 the skill description and worked example name the rendered blue for in progress',()=>{
+ assert.match(fs.readFileSync('src/style.core.css','utf8'),/--dv-live-active:#009dff;/);
+ const description=/^description: (.*)$/m.exec(fs.readFileSync('.claude/skills/live-status-board/SKILL.md','utf8'))[1];
+ assert.match(description,/\bblue in progress\b/);assert.doesNotMatch(description,/\b(amber|orange)\b/i);
+ const prose=JSON.parse(fs.readFileSync('examples/live-status/live-status.spec.json','utf8')).page.sections[0].text[0];
+ assert.match(prose,/\bblue in progress\b/);assert.doesNotMatch(prose,/\b(amber|orange)\b/i);
+ const built=fs.readFileSync('examples/live-status/live-status.html','utf8');
+ assert.ok(built.includes(prose),'the built example carries the same prose');
+});
+
 test('import-local ticket refs participate in live-status panel warnings before provider resolution',()=>{
  for(const field of ['nodeTracking','edgeTracking']){
   const raw={page:{sections:[{diagram:{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'canon',[field]:{[field==='nodeTracking'?'api':'api->db']:{tickets:['AA-1']}}}]}}]}};
@@ -141,6 +157,49 @@ test('H3 editHistory: every malformed shape warns on its own index and only that
  bad.forEach((_,i)=>assert.match(warnings[i],new RegExp('^editHistory\\['+(i+1)+'\\].* — entry ignored$'),warnings[i]));
  assert.deepEqual(plain(C.editHistoryEntries(C.normalize(raw))),[good]);
  assert.deepEqual(plain(C.validate(C.normalize(raw)).errors),[],'warning-only policy');
+});
+/* #855 clear-missing-work change kind. Contract source: #855 "Reuse plan" (Edit history) and
+   Chuck's ruling 2026-11-01: {"op":"clear-missing-work","node"|"edge","path"?,"label"?} with no
+   ticket; add and remove keep the ticket requirement; unknown ops stay invalid. §0 ruling: Chuck
+   2026-11-01: issue's own Test + flip plan.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| H1c valid clear changes pass clean | node clear with path + label beside an add; minimal edge clear | no warnings; both entries returned intact | an impl that still requires a ticket on every op |
+| H3c clear carrying a ticket | {op clear-missing-work, ticket, node} | warning on that index naming `changes[0].ticket:`; entry ignored | an impl that accepts any extra ticket |
+| H3c clear without a carrier, with both, or a bad edge | no node/edge; node + edge; edge ["a"] | warning `changes[0]: needs a "node" id or an "edge"` | an impl that skips the carrier check for clears |
+| H3c clear with a wrong-typed path or label | path "x"; label 7 | `.path: must be an array` / `.label: must be a string` | an impl that skips optional checks for clears |
+| H3c add/remove without a ticket, unknown op | {op add, node}; {op remove, edge}; {op set-missing-work} | `.ticket: must be a Jira key`; `.op:` warning | an impl that drops the ticket requirement for every op; one accepting any op |
+| H14 contract + docs describe the change kind | contract/authoring-contract.md, docs/live-status.md | both name "clear-missing-work"; the docs' Edit history section shows the "Missing work cleared from" prose and the Edit mode section the Clear Missing work control | a validator change with no contract |
+*/
+test('H1c H3c editHistory: clear-missing-work changes carry a carrier and no ticket; add and remove still need one',()=>{
+ const node={at:'2026-11-01T10:00:00Z',by:{id:'u_alex',name:'Alex'},changes:[{op:'add',ticket:'AA-1',node:'b',label:'Node B'},{op:'clear-missing-work',node:'b',path:['sections',0,'diagram','nodes','b'],label:'Node B'}]};
+ const edge={at:'2026-11-01T09:00:00Z',changes:[{op:'clear-missing-work',edge:['a','b']}]};
+ const good=historyFixture([edge,node]);assert.deepEqual(plain(C.validate(C.normalize(good))),{errors:[],warnings:[]});
+ assert.deepEqual(plain(C.editHistoryEntries(C.normalize(good))),[node,edge],'newest first, entries intact');
+ const at='2026-11-01T08:00:00Z',bad=[
+  [{op:'clear-missing-work',ticket:'AA-1',node:'b'},/: changes\[0\]\.ticket: /],
+  [{op:'clear-missing-work'},/: changes\[0\]: needs a "node" id or an "edge"/],
+  [{op:'clear-missing-work',node:'b',edge:['a','b']},/: changes\[0\]: needs a "node" id or an "edge"/],
+  [{op:'clear-missing-work',edge:['a']},/: changes\[0\]: needs a "node" id or an "edge"/],
+  [{op:'clear-missing-work',node:'b',path:'x'},/: changes\[0\]\.path: must be an array/],
+  [{op:'clear-missing-work',node:'b',label:7},/: changes\[0\]\.label: must be a string/],
+  [{op:'add',node:'b'},/: changes\[0\]\.ticket: must be a Jira key/],
+  [{op:'remove',edge:['a','b']},/: changes\[0\]\.ticket: must be a Jira key/],
+  [{op:'set-missing-work',node:'b'},/: changes\[0\]\.op: /]];
+ const raw=historyFixture([node,...bad.map(([change])=>({at,changes:[change]}))]),warnings=historyWarnings(raw);
+ assert.equal(warnings.length,bad.length,warnings.join('\n'));
+ bad.forEach(([,pattern],i)=>{
+  assert.match(warnings[i],new RegExp('^editHistory\\['+(i+1)+'\\]: '),warnings[i]);
+  assert.match(warnings[i],pattern,warnings[i]);assert.match(warnings[i],/ — entry ignored$/,warnings[i]);
+ });
+ assert.deepEqual(plain(C.editHistoryEntries(C.normalize(raw))),[node]);
+});
+test('H14 the contract and the live-status docs describe the clear-missing-work change',()=>{
+ const contract=fs.readFileSync('contract/authoring-contract.md','utf8');assert.ok(contract.includes('"clear-missing-work"'),'contract names the change kind');
+ const docs=fs.readFileSync('docs/live-status.md','utf8'),history=docs.slice(docs.indexOf('\n## Edit history\n'),docs.indexOf('\n## Story mode\n'));
+ assert.ok(history.includes('"clear-missing-work"'),'Edit history docs name the change kind');assert.ok(history.includes('Missing work cleared from'),'Edit history docs show the row prose');
+ const edit=docs.slice(docs.indexOf('\n### Edit mode on the shared board'),docs.indexOf('\n## Pull requests from GitHub\n'));
+ assert.ok(edit.includes('Clear Missing work'),'Edit mode docs name the control');assert.ok(edit.includes('source diagram'),'Edit mode docs explain inherited markers');
 });
 test('H4 editHistory: more than 200 entries warns once and only the newest 200 are used',()=>{
  const entries=[];for(let i=0;i<201;i++)entries.push(entryAt(new Date(Date.UTC(2026,0,1,0,i)).toISOString()));

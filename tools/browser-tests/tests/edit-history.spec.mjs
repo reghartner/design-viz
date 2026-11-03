@@ -5,6 +5,7 @@
 |---|---|---|---|
 | B1 the example shows the panel below the board in every layout profile | examples/live-status spec built with inject.py, opened plain and with ?layout=backstage / confluence | `.pwidget.pt-edit-history` visible, its top at or below the board's and the status panel's bottom; at least one row from the hand-written history | a type registered but not placed, or placed beside the board; flip: drop it from one profile → that profile's assertion fails |
 | B2 three entries render three collapsed rows newest first; a click expands one | spec with entries dated 28, 30, 29 Oct | three `details.dv-edit-details`, `li[data-edit-at]` order 30, 29, 28; none open; a real click on the first summary opens only it and shows its two change lines | rows rendered without `<details>` (the open assertion fails); rows in authored order |
+| B3 (#855; Chuck 2026-11-01, §0: issue's own Test + flip plan) a clear-missing-work change has no ticket | one entry [clear-missing-work on door, add EX-1 on door] | summary first "Missing work cleared from Door"; expanded, the clear line has data-edit-op clear-missing-work, no data-edit-ticket, no `.dv-edit-ticket`, op "Missing work cleared from", carrier "Door"; the add line keeps its ticket | ticket-first prose for a clear; the entry rejected as malformed (no row) |
 */
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -66,4 +67,24 @@ test('B2 three entries render three collapsed rows newest first and a click expa
  await expect(rows.nth(2).locator('.dv-edit-first')).toHaveText('EX-3 removed from Door → Cloud');
  await expect(rows.nth(1).locator('.dv-edit-who')).toHaveText('Cam');await expect(rows.nth(1).locator('.dv-edit-first')).toHaveText('EX-2 added to door');
  await page.screenshot({path:info.outputPath('edit-history-expanded.png')});
+});
+
+test('B3 a clear-missing-work change reads "Missing work cleared from" its carrier with no ticket',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:1000});
+ const spec={page:{title:'Edit history clear',tracking:{jira:{site:'https://acme.atlassian.net'}},
+  editHistory:[{at:'2026-11-01T10:00:00Z',by:{name:'Alex'},changes:[{op:'clear-missing-work',node:'door',label:'Door'},{op:'add',ticket:'EX-1',node:'door',label:'Door'}]}],
+  sections:[{id:'board',heading:'Board',diagram:{nodes:{door:{title:'Door',tickets:['EX-1']},cloud:{title:'Cloud'}},rows:[['door','cloud']],edges:[{from:'door',to:'cloud',label:'sync'}],
+   panels:[{id:'status',type:'live-status',title:'Epic status'},{id:'history',type:'edit-history',title:'Edit history'}]}}]}};
+ await page.goto(await build(server,'edit-history-clear',spec));
+ const panel=page.locator('.docview .pwidget.pt-edit-history'),rows=panel.locator('details.dv-edit-details');
+ await expect(rows).toHaveCount(1);
+ const summary=rows.first().locator('summary.dv-edit-summary');
+ await expect(summary.locator('.dv-edit-first')).toHaveText('Missing work cleared from Door');await expect(summary.locator('.dv-edit-count')).toHaveText('2 changes');
+ await summary.click();await expect(rows.first()).toHaveAttribute('open',/.*/);
+ const changes=rows.first().locator('li.dv-edit-change');await expect(changes).toHaveCount(2);
+ const clear=changes.nth(0);await expect(clear).toBeVisible();
+ await expect(clear).toHaveAttribute('data-edit-op','clear-missing-work');await expect(clear).not.toHaveAttribute('data-edit-ticket',/.*/);
+ await expect(clear.locator('.dv-edit-ticket')).toHaveCount(0);
+ await expect(clear.locator('.dv-edit-op')).toHaveText('Missing work cleared from');await expect(clear.locator('.dv-edit-carrier')).toHaveText('Door');
+ await expect(changes.nth(1)).toHaveAttribute('data-edit-ticket','EX-1');await expect(changes.nth(1).locator('.dv-edit-op')).toHaveText('added to');
 });

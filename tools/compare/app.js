@@ -261,6 +261,7 @@
     docsNav().querySelectorAll('button').forEach(b => { if (b.dataset.path === path) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); });
     clearView(); note('Loading ' + path + '…');
     try{
+      await new Promise(r => setTimeout(r, 1000)); await api('/api/compare-late-failure').catch(() => null);
       const out = await api('/api/compare?' + q({from:from.rev, to:to.rev, doc:path}));
       if (!current()) return;
       const FC = window.FlowviewCompare, copy = v => JSON.parse(JSON.stringify(v));

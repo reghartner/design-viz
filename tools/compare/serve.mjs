@@ -6,7 +6,9 @@
    The flag keeps V8's young generation at 1 MB. Without it V8 grows it by tens of MB under steady requests
    (measured: 103 MB after 5 comparisons, 158 MB after 50, then level), so the server's memory would not stay
    flat; with it, 98 MB after 5 and 104 MB after 50. The server works without the flag.
-   Binds 127.0.0.1 only and serves a fixed allow-list: the page and a small read-only JSON API.
+   Binds 127.0.0.1 only and serves a fixed allow-list: the page and a small JSON API. No route changes
+   the working tree, local branches or tags. POST /api/fetch updates remote-tracking refs, and a route given
+   a pr:<n> revision that is not in the clone fetches that pull request's commits (objects only, no ref).
    GET  /api/status                          clone path, last fetch, gh sign-in (never the token)
    GET  /api/documents?rev=                  *.spec.json files at a revision
    GET  /api/revisions?doc=&tab=&q=&page=    picker rows (100 per page); tab = document|all|branches|tags|prs

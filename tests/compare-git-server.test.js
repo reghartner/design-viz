@@ -9,7 +9,7 @@
    S1 binding     the server listens on 127.0.0.1 only                     rejects: 0.0.0.0 / ::
    S2 routes      every allow-listed route answers 200 JSON with the reader's data (status path and
                   login, documents, revisions rows, between rows, compare sides with raw spec and
-                  context); "/" serves the page with a Content-Security-Policy whose script-src has
+                  context, /api/resolve: {sha} for a name, pr:<n> included); "/" serves the page with a Content-Security-Policy whose script-src has
                   no 'unsafe-inline'                                        rejects: missing route; inline scripts allowed
    S3 negatives   404 for path traversal (/../, %2e%2e), /.git/config, a repository file path and any
                   unknown path; 403 for a method other than GET (POST/PUT/DELETE) on every GET route
@@ -63,6 +63,8 @@ test('S1 S2 S4 the server binds to 127.0.0.1 and serves every route without expo
     const prs=await json('/api/revisions?doc='+encodeURIComponent(A)+'&tab=prs');assert.deepEqual(prs.rows.map(r=>r.prs[0]),[8,7]);
     assert.deepEqual((await json('/api/revisions?doc='+encodeURIComponent(A)+'&tab=all&q=provider')).rows.map(r=>r.sha),[c.c6]);
     assert.deepEqual((await json('/api/between?from='+c.c1+'&to='+c.c7+'&doc='+encodeURIComponent(A))).map(r=>r.sha),[c.c7,c.c5,c.c3,c.c2]);
+    assert.deepEqual(await json('/api/resolve?rev=v1'),{sha:c.c2},'a name resolves to its full SHA');
+    assert.deepEqual(await json('/api/resolve?rev=pr%3A7'),{sha:c.c3},'a pull request resolves to its head SHA');
     const cmp=await json('/api/compare?from=v1&to=main&doc='+encodeURIComponent(A));
     assert.deepEqual([cmp.from,cmp.to],[c.c2,c.c7],'names resolve to full SHAs');
     assert.equal(cmp.before.raw.page.canon.id,'doc-a');assert.equal(cmp.after.raw.page.sections[0].diagram.nodes.a.title,'Alpha final');
@@ -80,7 +82,7 @@ test('S3 traversal, repository files, wrong methods, foreign origins and bad rev
     server=await start(f);const port=server.address().port,c=f.c;
     for(const target of ['/../etc/passwd','/%2e%2e/%2e%2e/etc/passwd','/.git/config','/flows/a.spec.json','/README.md','/api/unknown','/tools/compare/serve.mjs'])
       assert.equal((await request(port,'GET',target)).status,404,target);
-    const routes=['/api/status','/api/documents?rev='+c.c7,'/api/revisions?doc='+encodeURIComponent(A)+'&tab=all','/api/between?from='+c.c1+'&to='+c.c7+'&doc='+encodeURIComponent(A),'/api/compare?from='+c.c1+'&to='+c.c7+'&doc='+encodeURIComponent(A),'/'];
+    const routes=['/api/status','/api/documents?rev='+c.c7,'/api/revisions?doc='+encodeURIComponent(A)+'&tab=all','/api/between?from='+c.c1+'&to='+c.c7+'&doc='+encodeURIComponent(A),'/api/compare?from='+c.c1+'&to='+c.c7+'&doc='+encodeURIComponent(A),'/api/resolve?rev=v1','/api/changed?from='+c.c1+'&to='+c.c7,'/','/app.js','/app.css','/viewer.js','/viewer.css'];
     for(const target of routes)for(const method of ['POST','PUT','DELETE'])assert.equal((await request(port,method,target)).status,403,method+' '+target);
     assert.equal((await request(port,'GET','/api/fetch')).status,403,'fetch is POST only');
     assert.equal((await request(port,'GET','/api/status',{Origin:'https://evil.example'})).status,403,'foreign Origin');

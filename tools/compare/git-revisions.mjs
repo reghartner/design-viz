@@ -130,16 +130,23 @@ export class GitRevisions {
   /* Every commit (or those in a range) with author date, author, subject, first parent and the files
      its first-parent diff changes. */
   async commits(range){
-    /* -z: file names are NUL-terminated and never quoted (quotes, newlines, non-ASCII). */
+    /* -z: file names are NUL-terminated and never quoted (quotes, newlines, non-ASCII). Every field is
+       NUL-separated too: commit text can hold any other byte, but never NUL. Each commit starts with an
+       empty field (file names are never empty), then five fields in a fixed order, then its files. */
     const args = ['log', '-z', '--date-order', '--diff-merges=first-parent', '--name-only', '--no-renames',
-      '--format=%x1e%H%x1f%P%x1f%aI%x1f%an%x1f%s%x1f'];
+      '--format=%x00%H%x00%P%x00%aI%x00%an%x00%s'];
     if (range) args.push(range, '--'); else args.push('--all', '--');
-    const out = await this.git(args);
-    return out.split('\x1e').filter(Boolean).map(block => {
-      const [sha, parents, date, author, subject, files] = block.split('\x1f');
-      return {sha, parent:(parents || '').split(' ').filter(Boolean)[0] || null, date:isoDate(date), author, subject,
-        files:new Set((files || '').split('\0').map(s => s.replace(/^\n/, '')).filter(Boolean))};
-    });
+    const fields = (await this.git(args)).split('\0'), list = [];
+    let i = 0;
+    while (i + 5 < fields.length){
+      if (fields[i] !== ''){ i++; continue; }
+      const [sha, parents, date, author, subject] = fields.slice(i + 1, i + 6), files = new Set();
+      i += 6;
+      /* The first file name follows the subject after a newline. */
+      while (i < fields.length && fields[i] !== ''){ files.add(fields[i].replace(/^\n/, '')); i++; }
+      list.push({sha, parent:parents.split(' ').filter(Boolean)[0] || null, date:isoDate(date), author, subject, files});
+    }
+    return list;
   }
   /* Files one commit's first-parent diff changes (all files for a root commit). */
   async changedFiles(sha){

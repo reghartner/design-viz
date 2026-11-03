@@ -82,7 +82,7 @@ test('S3 traversal, repository files, wrong methods, foreign origins and bad rev
     server=await start(f);const port=server.address().port,c=f.c;
     for(const target of ['/../etc/passwd','/%2e%2e/%2e%2e/etc/passwd','/.git/config','/flows/a.spec.json','/README.md','/api/unknown','/tools/compare/serve.mjs'])
       assert.equal((await request(port,'GET',target)).status,404,target);
-    const routes=['/api/status','/api/documents?rev='+c.c7,'/api/revisions?doc='+encodeURIComponent(A)+'&tab=all','/api/between?from='+c.c1+'&to='+c.c7+'&doc='+encodeURIComponent(A),'/api/compare?from='+c.c1+'&to='+c.c7+'&doc='+encodeURIComponent(A),'/'];
+    const routes=['/api/status','/api/documents?rev='+c.c7,'/api/revisions?doc='+encodeURIComponent(A)+'&tab=all','/api/between?from='+c.c1+'&to='+c.c7+'&doc='+encodeURIComponent(A),'/api/compare?from='+c.c1+'&to='+c.c7+'&doc='+encodeURIComponent(A),'/api/resolve?rev=v1','/api/changed?from='+c.c1+'&to='+c.c7,'/'];
     for(const target of routes)for(const method of ['POST','PUT','DELETE'])assert.equal((await request(port,method,target)).status,403,method+' '+target);
     assert.equal((await request(port,'GET','/api/fetch')).status,403,'fetch is POST only');
     assert.equal((await request(port,'GET','/api/status',{Origin:'https://evil.example'})).status,403,'foreign Origin');

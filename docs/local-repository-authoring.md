@@ -38,7 +38,45 @@ node tools/validate.js --resolve-imports . diagrams/team/checkout/checkout.spec.
 
 Without `--resolve-imports`, both commands retain their existing behavior.
 Standalone validation can also receive an explicit batch of already identified
-provider and consumer specs as positional files.
+provider and consumer specs as positional files. A spec without `page.canon`
+(a `canon.json` member, or a consumer outside Canon) takes a validation-only
+identity; when its provider is missing, the error names both ways to load it:
+`--resolve-imports <repository folder or registry>`, or, in a connected folder,
+`folder-agent.py refresh-sources --source-repo <repository>`.
+
+### Validate in a connected consumer folder
+
+While a consumer is connected, the Workbench keeps one provider copy in the
+folder's `.flowview-agent/providers.json`: the provider specs of its frozen
+topology context (local snapshot or site library), as of its last `state.json`
+publication. Its payload names the source kind (`local` or `site-library`), for
+a local snapshot its `snapshotSha256` (the selected repository's snapshot hash,
+`localSources.snapshotSha256`, or for a repository opened at its root the hash
+of its frozen provider specs), the consumer identity (`consumerId`) and the
+provider specs. The bundled validator uses it by default:
+
+```sh
+node <consumer>/.flowview-agent/authoring/tools/validate.js candidate.spec.json
+```
+
+- It prints the `state.json` revision it validated against. Propose only when
+  that is the `--revision` you submit; if it differs, reread `state.json`,
+  reconcile and validate again. A proposal built on superseded providers is
+  rejected ("Your document changed").
+- Every input spec, wherever it lives, uses the same copy. A positional provider
+  file with the same ID replaces the copied one. `--resolve-imports` turns the
+  copy off.
+- The copy is used only while the Workbench is connected and the copy is the one
+  `state.json` names (`providersSha256`). Otherwise the validator exits 1 and
+  says the copy is out of date or missing (retry once the Workbench has finished updating,
+  or reconnect), the Workbench is not connected (reconnect), or the heartbeat is
+  paused (bring the Workbench tab to the front and retry).
+- A missing provider means the copy lacks it: run `folder-agent.py
+  refresh-sources --source-repo <repository>`.
+- A provider set too large to copy (over 8 MiB as written) is published as a
+  header only; validate it with `--resolve-imports <repository>` instead.
+
+The repository's own `tools/validate.js` never reads a provider copy.
 
 Company branding comes from `company/company.json` and its `brand` path. If
 `company/brand.json` exists but default branding is active, builds print a warning

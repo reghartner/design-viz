@@ -1,5 +1,27 @@
 # Changelog
 
+## Registering a new exporting diagram (2026-11-02)
+
+- Connected agents and the bundled authoring docs now state what a new exporting
+  diagram needs (#873): its `diagrams/…/<id>/` folder with `<id>.spec.json`, its
+  root `canon.json` entry, and every consumer import change that uses it, all in
+  one commit and one PR when a consumer uses the new provider. Agents edit
+  `canon.json` only with the user's authorization, ask the user to clone the
+  company Flowview repository when there is no local copy, and explain that canon
+  changes need a PR (and push or PR access), while local preview through
+  `refresh-sources` does not. The repository address comes from
+  `company/company.json` `repository` and now ships in the kit's
+  `tools/company-agent-context.json`.
+- The build now fails when a spec under `diagrams/` declares `topologyExports`
+  (even an empty `{}`) but has no `canon.json` entry (#885). This covers a
+  normal `python3 tools/build.py`, CI and the Workbench Docker image. One error lists
+  every such spec path and says how to fix it: add its folder to `canon.json` in
+  the same commit and PR as the consumers that import it, or remove
+  `topologyExports`. A provider may still be registered before any consumer uses
+  it. Agent folders such as `.flowview-agent/` and files that are not valid JSON
+  are not checked. A fork that already has an unlisted exporting spec must list it
+  or remove its exports before its build passes again.
+
 ## Manually placed step circles (2026-10-30)
 
 - Workbench authors drag a step circle on the board to place it (#840). The

@@ -147,9 +147,10 @@ function companyConfig(root = sourceRoot) {
   }
   return config;
 }
-// Only public authoring context travels into prompts and the offline kit.
+// Only public authoring context travels into prompts and the offline kit: the
+// repository address agents clone and send canon PRs to, and link bases.
 function companyAgentContext(config = companyConfig()) {
-  return Object.assign({}, config && config.backstage ? {backstage: {baseUrl: config.backstage.baseUrl}} : {}, config && config.site ? {site: {baseUrl: config.site.baseUrl}} : {});
+  return Object.assign({}, config && config.repository ? {repository: config.repository} : {}, config && config.backstage ? {backstage: {baseUrl: config.backstage.baseUrl}} : {}, config && config.site ? {site: {baseUrl: config.site.baseUrl}} : {});
 }
 /* Marked literals keep today's text unless the company config replaces it:
    `/*@company:name*\/'Company service'` replaces the word Company,

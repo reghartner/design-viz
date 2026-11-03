@@ -1705,6 +1705,9 @@ test('seeded candidate pair is edited in place, proposed, previewed, committed a
     const connect=await readFile(path.join(h.session,'CONNECT.md'),'utf8'),guide='docs/folder-agent-existing-edit.md';
     expect(connect).toContain('/authoring/'+guide+' first');expect(connect).toContain('request.candidate names them');
     expect(connect).not.toMatch(/hld-to-page\/SKILL\.md|docs\/folder-agent-session\.md/);
+    // #873 F6: a folder-connected diagram has no repository-relative path, so its locate rule has no repository-root clause.
+    const locate=connect.split('\n\n').filter(paragraph=>paragraph.startsWith('Locate the diagram folder'));
+    expect(locate).toHaveLength(1);expect(locate[0]).not.toContain('repository root I connected');
     h.run('prepare');expect(await readFile(path.join(h.session,'authoring',guide),'utf8')).toBe(await readFile(path.join(root,guide),'utf8'));
     const seeded=await readFile(path.join(h.session,candidate.spec),'utf8');
     expect(seeded).toBe(source);expect(await readFile(path.join(h.session,candidate.ledger),'utf8')).toBe(beforeLedger);

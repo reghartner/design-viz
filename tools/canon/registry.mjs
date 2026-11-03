@@ -1,4 +1,4 @@
-import {readFile,writeFile,mkdir,rename,realpath,stat} from 'node:fs/promises';
+import {readFile,readdir,writeFile,mkdir,rename,realpath,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {initialState} from './drift.mjs';
 import library from './manifest.cjs';
@@ -12,6 +12,44 @@ export function materializeEntries(entries){
   const specs=C.materializeTopology(entries.map(entry=>entry.spec));
   return entries.map((entry,i)=>({...entry,resolvedSpec:specs[i]}));
 }
+// A present topologyExports (even {}) declares a provider, as in materializeEntries.
+function declaresExports(spec){
+  const own=(value,key)=>!!value && typeof value==='object' && Object.hasOwn(value,key);
+  return own(spec,'topologyExports') || C.sections(spec).some(section=>own(section.diagram,'topologyExports'));
+}
+/* An exporting spec outside canon.json splits a provider from its registration:
+   consumers can import an ID that canon never publishes. Walk diagrams/ without
+   following symlinks; agent metadata (dot folders), node_modules and files that do
+   not parse declare nothing, so they keep loading as before. */
+async function unlistedExporters(root,listed){
+  let top;
+  try{top=await realpath(path.join(root,'diagrams'));}catch(error){if(error.code==='ENOENT')return [];throw error;}
+  const found=[];
+  async function walk(folder){
+    const children=await readdir(folder,{withFileTypes:true});
+    children.sort((a,b)=>a.name<b.name?-1:a.name>b.name?1:0);
+    for(const child of children){
+      if(child.name.startsWith('.') || child.name==='node_modules')continue;
+      const filename=path.join(folder,child.name);
+      if(child.isDirectory()){await walk(filename);continue;}
+      if(!child.isFile() || !child.name.endsWith('.spec.json') || listed.has(filename))continue;
+      const text=await readFile(filename,'utf8');let spec;
+      try{spec=JSON.parse(text);}catch{continue;}
+      if(declaresExports(spec))found.push(path.relative(root,filename).split(path.sep).join('/'));
+    }
+  }
+  await walk(top);
+  return found;
+}
+function unlistedExporterError(paths){
+  return new Error('Every spec under diagrams/ that declares topologyExports must be listed in canon.json.\n'+paths.map(relative=>{
+    const folder=path.posix.dirname(relative),leaf=path.posix.basename(folder);
+    const fix=path.posix.basename(relative)===leaf+'.spec.json'?'Add its folder to canon.json ("folder": "'+folder+'", with its owner)':
+      'Give it its own diagrams/…/<id>/ folder as <id>.spec.json and add that folder to canon.json';
+    return relative+' declares topologyExports but is not listed in canon.json. '+fix+
+      ' in the same commit and PR as the consumers that import it, or remove topologyExports.';
+  }).join('\n'));
+}
 export async function canonLibrary(file='canon.json'){
   const root=await realpath(path.dirname(path.resolve(file))),manifest=await json(file),entries=[];
   for(const entry of library.entries(manifest)){
@@ -22,6 +60,8 @@ export async function canonLibrary(file='canon.json'){
     const spec=library.spec(await json(filename),entry);
     entries.push({...entry,filename,spec});
   }
+  const unlisted=await unlistedExporters(root,new Set(entries.map(entry=>entry.filename)));
+  if(unlisted.length)throw unlistedExporterError(unlisted);
   const resolved=materializeEntries(entries);
   for(const entry of resolved){
     const rendered=entry.resolvedSpec || entry.spec;

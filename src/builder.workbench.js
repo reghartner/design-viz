@@ -519,7 +519,8 @@ function initWorkbenchBuilder(opts){
     else if(!binding){code='reconnect_required';message='Run the consumer helper refresh-sources --source-repo <repository>, or use desktop File → Use local source repository.';}
     else if(!binding.handle)message='Ready for the consumer helper to refresh its selected source repository. Desktop File refresh requires a separate browser directory grant.';
     function bounded(value,max){return typeof value==='string' && new TextEncoder().encode(value).length<=max?value:null;}
-    return {available:code==='ready',acceptsSnapshot:code!=='cloud_project',mode:binding?(binding.handle?'browser-grant':'agent-snapshot'):'unbound',needsSnapshot:!!(binding && !binding.handle),code:code,message:message,
+    // local tells the helper this consumer's providers come from a local repository (#883 F3).
+    return {available:code==='ready',acceptsSnapshot:code!=='cloud_project',local:!!(context && context.local),mode:binding?(binding.handle?'browser-grant':'agent-snapshot'):'unbound',needsSnapshot:!!(binding && !binding.handle),code:code,message:message,
       snapshotSha256:bounded(source && source.sha256,64),capturedAt:bounded(source && source.capturedAt,32),providerCount:source && source.providerCount!=null?source.providerCount:null,consumerId:bounded(context && context.id,512),
       sourceSelectionId:source && source.selectionId || null,sourcePath:bounded(source && source.path,2048),rootLabel:bounded(source && source.rootLabel,512)};
   }
@@ -711,7 +712,7 @@ function initWorkbenchBuilder(opts){
         flush:async function(){await startup;return client.flush();},close:function(){var closing=client.disconnect();client.destroy();return closing;}};
       // Home retires UI operations but keeps this same document association.
       // Replacement synchronously clears it before another source is published.
-      client=createFolderAgentClient({files:project.files,requireLedger:true,workflow:'external',
+      client=createFolderAgentClient({files:project.files,requireLedger:true,workflow:'external',topologyContext:agentOptions.topologyContext,
         snapshot:function(){var snap=agentOptions.snapshot();return Object.assign({},snap,{project:documentId,open:workingFile.attached()===binding,source:session.text()});},
         busy:function(){return true;},apply:function(){return {ok:false,error:'Connect an agent to review proposals.'};},validate:agentOptions.validate,
         artifactStatus:function(state,detail){workingFile.report(binding,state,detail);},
@@ -1651,6 +1652,8 @@ function initWorkbenchBuilder(opts){
   var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
   var agentOptions={document:document,practice:opts.practice,resolve:session.resolve,previewSkin:opts.previewSkin,
     refreshSources:refreshLocalSources,
+    // #878: the frozen provider context the folder session copies to providers.json.
+    topologyContext:function(){return session.topologyContext();},
     releaseWorking:function(){return workingFile.clear();},
     workingDestination:function(binding){workingFile.attach(binding);if(binding.localRepository)bindLocalRepository(binding.localRepository);},
     workingStatus:function(binding,state,detail){if(state==='disconnected'){if(workingFile.attached()===binding)workingFile.clear('Folder disconnected. Reopen its folder to resume autosave.');}else workingFile.report(binding,state,detail);},
@@ -1688,7 +1691,17 @@ function initWorkbenchBuilder(opts){
         !!(active && !(active.closest && active.closest('#editor-agent')) && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
     },
     normalize:normalizeWorkbenchAgentPlacement,
-    prepare:function(text){return prepareTopologyProposal(JSON.parse(text),session.topologyContext());},
+    prepare:function(text,proposal){
+      // #883: a local consumer's new import loads from its own source: the helper's
+      // snapshot for this consumer's selected repository, else the repository grant.
+      var context=session.topologyContext(),local=null;
+      if(context && context.local){
+        var selected=context.localSource && context.localSource.selectionId || null,binding=selectedLocalBinding(context);
+        if(proposal && proposal.sources && proposal.sources.selectionId===selected)local={sources:proposal.sources};
+        else if(binding && binding.handle)local={directory:binding.handle,path:binding.path,selectionId:binding.selectionId};
+      }
+      return prepareTopologyProposal(JSON.parse(text),context,local);
+    },
     prepareFolder:function(text,found){return prepareLocalFolderTopology(text,found,session.topologyContext());},
     validate:function(text,context){var findings=arguments.length>1?session.validate(JSON.parse(text),context):session.validate(JSON.parse(text));return findings.errors.join('\n');},
     apply:function(text,expected,proposal,context){

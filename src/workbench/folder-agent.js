@@ -51,6 +51,29 @@ function createFolderAgentFiles(directory){
   };
 }
 
+// #878: the frozen provider copy, .flowview-agent/providers.json. The payload holds
+// the provider specs of the current topology context (never the consumer itself),
+// the source kind and the consumer identity that a canon-less candidate validates
+// under. Readers hash payloadText exactly as stored; nothing is re-serialized.
+function folderAgentProviderPayload(context){
+  if(!context)return {sourceKind:'none',specs:[]};
+  var payload={sourceKind:context.local?'local':'site-library'};
+  if(context.local && context.localSource && typeof context.localSource.sha256==='string')payload.snapshotSha256=context.localSource.sha256;
+  payload.consumerId=context.id;
+  payload.specs=(context.specs || []).filter(function(spec){return !(spec && spec.page && spec.page.canon && spec.page.canon.id===context.id);});
+  return payload;
+}
+// The folder adapter refuses files over 8 MiB after JSON escaping; such a provider
+// set is published as a header naming its hash, without payloadText.
+function folderAgentProviderCopy(payloadText,hash){
+  var copy={version:1,providersSha256:hash,payloadText:payloadText};
+  return new TextEncoder().encode(JSON.stringify(copy,null,2)+'\n').length>8*1024*1024?{version:1,providersSha256:hash,oversize:true}:copy;
+}
+async function folderAgentSha256(text){
+  var hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(hash)).map(function(byte){return byte.toString(16).padStart(2,'0');}).join('');
+}
+
 function folderAgentValidId(value){return typeof value==='string' && /^[\w-]{1,120}$/.test(value);}
 function folderAgentSavedMessages(saved,sessionId){
   return saved && saved.sessionId===sessionId && Array.isArray(saved.messages)?saved.messages.filter(function(item){
@@ -114,6 +137,28 @@ function createFolderAgentClient(opts){
   var heartbeatReady=false,life=createWorkbenchLifetime(),heartbeatTimer=null,heartbeatJob=null,heartbeatListeners=[],editorChain=Promise.resolve();
   var lastArtifactState='saved',lastState='',lastHeartbeat=-Infinity,pending=null,transcript=[],seen=new Set(),nativeSeen=new Set(),chain=Promise.resolve();
   var refreshSeen=new Set(),pendingRefreshResult=null;
+  // #878: the provider copy is rebuilt only when topologyRevision changes and
+  // written only when its hash differs from the last copy this connection wrote.
+  var providerBuild=null,writtenProviders=null,providerHash=opts.sha256 || folderAgentSha256;
+  function providerText(snap){
+    if(!opts.topologyContext)return null;
+    if(providerBuild && providerBuild.revision===snap.topologyRevision)return providerBuild;
+    // Read the context synchronously with the snapshot whose revision it names.
+    return {revision:snap.topologyRevision,payload:folderAgentProviderPayload(opts.topologyContext()),hash:null,copy:null};
+  }
+  async function providerCopy(build){
+    if(!build)return null;
+    if(build.hash===null){
+      var payload=build.payload;
+      // A selected repository's snapshot hash identifies it (localSources.snapshotSha256).
+      // A repository opened at its root has none; identify its frozen provider specs.
+      if(payload.sourceKind==='local' && typeof payload.snapshotSha256!=='string')
+        payload={sourceKind:'local',snapshotSha256:await providerHash(JSON.stringify(payload.specs)),consumerId:payload.consumerId,specs:payload.specs};
+      var text=JSON.stringify(payload);build.hash=await providerHash(text);build.copy=folderAgentProviderCopy(text,build.hash);build.payload=null;
+    }
+    providerBuild=build;return build;
+  }
+  function stateWithProviders(snap,build){return build?Object.assign({},snap,{providersSha256:build.hash}):snap;}
   var activity=[],activitySeen=new Set(),requestAt=null,lastAgentAt=null,turnEpoch=0,changes=[],preflight=null,changesDirty=false,reviewMode=opts.reviewMode!==false,reviewCandidate=null,reviewDecision=null,pendingReviewResult=null,pendingAcceptance=null,reviewVersion=0;
   function serial(action){var job=chain.then(action);chain=job.catch(function(){});return job;}
   // Heartbeats must not wait behind artifact saves or proposal preparation.
@@ -223,14 +268,21 @@ function createFolderAgentClient(opts){
     var current=await files.read('session.json');
     if(!alive(token))return null;
     if(!belongs(current)){retire('Another connection owns this folder. Reconnect explicitly.',false);return null;}
-    var sent=exchange.request();
+    var sent=exchange.request(),providers=providerText(sent.snapshot);
     if(sent.snapshot.project!==project || !sent.snapshot.open){
       await retire('Disconnected — open the same project and reconnect to continue.',true);return null;
     }
     if(files.checkArtifacts)await files.checkArtifacts();
     var serialized=JSON.stringify(sent.snapshot);
     if(serialized!==lastState){
-      await files.write('state.json',envelope(sent.snapshot),publicationGuard);if(!alive(token))return null;
+      // The copy precedes the state.json that names it, under the same guard; an
+      // interrupted state.json write leaves the two hashes different (out of date).
+      await providerCopy(providers);if(!alive(token))return null;
+      if(providers && providers.hash!==writtenProviders){
+        await files.write('providers.json',providers.copy,publicationGuard);if(!alive(token))return null;
+        writtenProviders=providers.hash;
+      }
+      await files.write('state.json',envelope(stateWithProviders(sent.snapshot,providers)),publicationGuard);if(!alive(token))return null;
       if(files.flushArtifacts){
         var invalid=sent.snapshot.parseError;try{if(!invalid && opts.validate)invalid=opts.validate(sent.snapshot.source);}catch(ex){invalid=ex.message;}
         if(invalid){lastArtifactState='paused';if(opts.artifactStatus)opts.artifactStatus('paused','Repair the JSON. The last valid spec and ledger are unchanged.');publish({status:'Your JSON needs repair. The last valid spec and ledger remain in the diagram folder; your unfinished draft stays in the workbench.'});}
@@ -565,12 +617,13 @@ function createFolderAgentClient(opts){
       manifest={protocol:'flowview-folder-v1',workflow:opts.workflow || 'embedded',sessionId:existing && !renewal?existing.sessionId:uuid(),connectionId:uuid(),createdAt:preview?preview.createdAt:now()};
       if(files.artifacts){manifest.artifacts=files.artifacts;manifest.pairedArtifacts=true;manifest.claimAt=now();}
       pilotStatus=null;project=snap.project;connected=true;epoch++;turnEpoch++;clearReview();pendingReviewResult=null;pendingAcceptance=null;pendingRefreshResult=null;refreshSeen.clear();lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
+      providerBuild=null;writtenProviders=null; // every connection rebuilds and rewrites its copy
       activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;preflight=null;
       exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,prepare:opts.prepare,normalize:opts.normalize,requireLedger:opts.requireLedger});
       var recoveryState='state-'+manifest.connectionId+'.json';
       manifest.recoveryState=recoveryState;
       try{
-        var token=epoch,initial=exchange.request();
+        var token=epoch,initial=exchange.request(),initialProviders=providerText(initial.snapshot);
         function checkInitial(){
           if(!alive(token))throw Error('Session was closed.');
           var current=opts.snapshot();
@@ -606,10 +659,13 @@ function createFolderAgentClient(opts){
               throw Error('The saved session changed before connection. Review recovery again.');
           }
         }
+        await providerCopy(initialProviders);checkInitial();
         await files.write(recoveryState,envelope(initial.snapshot),checkInitial);checkInitial();
         await checkClaim();
         await files.write('session.json',manifest,checkClaim);await checkOwner();
-        await files.write('state.json',envelope(initial.snapshot),checkOwner);await checkOwner();
+        // Always replace any copy an earlier session left, before the state.json naming it.
+        if(initialProviders){await files.write('providers.json',initialProviders.copy,checkOwner);await checkOwner();writtenProviders=initialProviders.hash;}
+        await files.write('state.json',envelope(stateWithProviders(initial.snapshot,initialProviders)),checkOwner);await checkOwner();
         if(files.flushArtifacts)await files.flushArtifacts(initial.snapshot.source,initial.snapshot.ledger,checkOwner);
         else await files.write('story.spec.json',initial.snapshot.source,checkOwner);await checkOwner();
         await editorSerial(function(){return files.write('editor.json',envelope({connected:true,at:now()}),checkOwner);});await checkOwner();

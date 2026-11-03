@@ -91,6 +91,10 @@
                   Focused shows it again                                       rejects: line diff stuck in Full mode
    T5 untrusted   markup in a ledger line and in the title stays literal text (no element made,
                   no script run)                                               rejects: innerHTML rendering
+   T7 whitespace  a ledger whose edits change only whitespace (indent "  - item" -> "    - item", a double
+                  space "a  b" -> "a b"): each line shows its exact text (indentation and repeated spaces
+                  kept, compared without normalization), the removed whitespace is a <del> on the Before
+                  side and the added whitespace an <ins> on the After side      rejects: whitespace collapsed; whitespace-only edits unmarked
    T6 opening     a proposal that changes the page title and a step's panel opens on the step
                   change (its rail item current, the Focused panel row shown), not on the title
                   change listed first; a ledger-only comparison opens on the ledger change (T1's
@@ -643,4 +647,19 @@ test('T6 the view opens on the first diagram change when page-field changes are 
   await expect(items(only)).toHaveText(['Modified · Coverage ledger']);
   await expect(items(only).nth(0)).toHaveAttribute('aria-current','true');
   await expect(textBlocks(only)).toHaveCount(2);
+});
+
+test('T7 whitespace-only ledger edits keep their exact text and are marked',async({page,server})=>{
+  const {current}=doorbell();
+  const host=await mountPage(page,server,'ledger-space-'+Date.now(),current,current,null,
+    ledgerScript(current,current,'# Coverage\n  - item one\nkeep\na  b','# Coverage\n    - item one\nkeep\na b'));
+  await selectItem(host,/^Modified · Coverage ledger$/);
+  const blocks=textBlocks(host);await expect(blocks).toHaveCount(2);
+  const exact=(block,s)=>textSide(block,s).evaluate(col=>({
+    lines:[...col.querySelectorAll('.compare-text-body')].map(b=>b.textContent),
+    marks:[...col.querySelectorAll('del, ins')].map(m=>m.tagName.toLowerCase()+':'+JSON.stringify(m.textContent))}));
+  expect(await exact(blocks.nth(0),'before')).toEqual({lines:['  - item one'],marks:['del:"  "']});
+  expect(await exact(blocks.nth(0),'after')).toEqual({lines:['    - item one'],marks:['ins:"    "']});
+  expect(await exact(blocks.nth(1),'before')).toEqual({lines:['a  b'],marks:['del:"  "']});
+  expect(await exact(blocks.nth(1),'after')).toEqual({lines:['a b'],marks:['ins:" "']});
 });

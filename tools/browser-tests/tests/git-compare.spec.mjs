@@ -113,8 +113,8 @@
    U2   untrusted text in the document list  commit with a hostile file name and       doc row path literal; rail labels and node text     innerHTML in the document list or rail
         and comparison                       node/section titles                      literal; no <img>/inline <script>; no __pwned
    AU   every test, context-wide (all pages): no page/console error, failed request, HTTP >= 400, or request outside the compare server
-        (recorded from page open until the test body ends and the page has no request in flight; only then are
-        the servers closed)
+        (recorded from page open until the test body ends, no element is aria-busy and no request is in flight;
+        only then are the servers closed)
    U1   page CSP                                response headers of "/"                 no repeated directive; default-src 'none';       inline or eval script allowed; a repeated
                                                                                        script-src exactly 'self';                         unsafe directive
                                                                                        no script-src-elem/-attr (PR 3: style-src may
@@ -146,10 +146,14 @@ const test=base.extend({
       const response=await page.goto('http://127.0.0.1:'+server.address().port+'/');
       return response;
     });
-    /* Every request the page started (such as the comparison Compare this commit loads) finishes while the
-       audit still records it; only then does recording stop, so closing the servers' idle connections is not a
-       test failure. */
-    if(servers.length && !page.isClosed())await page.waitForLoadState('networkidle',{timeout:15000});
+    /* Work the page started (such as the comparison Compare this commit loads) finishes while the audit still
+       records it: first every aria-busy marker clears (the page sets one for the whole of each comparison, parent
+       lookup and pull request check, including work not yet sent), then no request is in flight. Only then does
+       recording stop, so closing the servers' idle connections is not a test failure. */
+    if(servers.length && !page.isClosed()){
+      await expect(page.locator('[aria-busy="true"]'),'page work finished before teardown').toHaveCount(0,{timeout:15000});
+      await page.waitForLoadState('networkidle',{timeout:15000});
+    }
     errors.stop();
     for(const s of servers){s.closeAllConnections();await new Promise(resolve=>s.close(resolve));}
   },

@@ -175,7 +175,10 @@ function initWorkbenchWorkspace(){
     function clamp(value){return workspacePanelRect(value,availableWidth,innerHeight,b.top,b.bottom,b.left);}
     // In a crowded desktop, a temporary narrower/shorter window can expose
     // both windows' controls without discarding either saved floating size.
-    [preferred,Object.assign({},preferred,{w:300}),Object.assign({},preferred,{h:240}),Object.assign({},preferred,{w:300,h:240})].forEach(function(size){
+    // Inspect always keeps its saved size: it may move or overlap the
+    // selection, but a shrunk inspector over a large panel is unusable.
+    var sizes=name==='inspect'?[preferred]:[preferred,Object.assign({},preferred,{w:300}),Object.assign({},preferred,{h:240}),Object.assign({},preferred,{w:300,h:240})];
+    sizes.forEach(function(size){
       var xs=[b.left,innerWidth-size.w-12-(docked()?dockWidth()+12:0)],ys=[b.top,innerHeight-b.bottom-size.h];
       selected.forEach(function(r){xs.push(r.x-size.w-12,r.x+r.w+12);ys.push(r.y-size.h-12,r.y+r.h+12);});
       other.forEach(function(r){xs.push(r.x+r.w+12,r.x-size.w-12,r.x-36);ys.push(r.y+52);});

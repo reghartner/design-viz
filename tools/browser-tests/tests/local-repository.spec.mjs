@@ -115,6 +115,12 @@ test('agent folder connection retains the granted repository root and writes the
   await setup(page,server);await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
   await page.locator('#folder-agent-file-picker').selectOption('diagrams/team/consumer/consumer.spec.json');await page.locator('#folder-agent-file-confirm').click();
   await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(consumer);await expect(node(page)).toBeVisible();
+  // #873 F6: the Workbench names a root-opened diagram by its repository-relative folder in the
+  // displayed instructions and in the CONNECT.md it writes beside the diagram.
+  const located='its direct child "./consumer", or, when the working directory is the repository root I connected (the folder that holds canon.json), its "diagrams/team/consumer" folder.';
+  await expect(page.locator('#folder-agent-instructions')).toHaveValue(new RegExp(located.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+  const connect=await page.evaluate(async()=>{let dir=await navigator.storage.getDirectory();for(const segment of ['diagrams','team','consumer','.flowview-agent'])dir=await dir.getDirectoryHandle(segment);return (await(await dir.getFileHandle('CONNECT.md')).getFile()).text();});
+  expect(connect.split('\n\n').filter(paragraph=>paragraph.startsWith('Locate the diagram folder')&&paragraph.includes(located))).toHaveLength(1);
   await expect.poll(()=>page.evaluate(()=>new Promise(resolve=>{
     const request=indexedDB.open('flowview-folder-recovery',1);request.onerror=()=>resolve(false);
     request.onsuccess=()=>{const db=request.result,read=db.transaction('handles').objectStore('handles').get('last');read.onsuccess=async()=>{db.close();try{await read.result.handle.getFileHandle('canon.json');resolve(true);}catch{resolve(false);}};};

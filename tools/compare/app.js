@@ -89,15 +89,20 @@
     return li;
   }
   /* A pull request row is checked by number so the server can fetch a head the clone does not have,
-     then chosen by the head SHA the row shows: a later force-push cannot change what is compared.
-     If either check fails (the head moved since the list loaded), the row is marked and stays unchosen. */
+     then chosen by the head SHA the row shows, and only while the pull request's current head is that SHA:
+     a force-push before or after the click cannot change what is compared. If the check fails or the head
+     moved since the list loaded, the row is marked and stays unchosen. */
   async function pick(row, li){
     if (li.getAttribute('aria-disabled') === 'true' || li.getAttribute('aria-busy') === 'true') return;
     /* Only the latest click may choose: an earlier row's check that finishes later is ignored. */
     const side = state.side, token = listToken, click = ++pickToken, pr = state.tab === 'prs' && row.prs.length ? 'pr:' + row.prs[0] : null;
     if (pr){
       li.setAttribute('aria-busy', 'true');
-      try{ await api('/api/documents?' + q({rev:pr})); await api('/api/documents?' + q({rev:row.sha})); }
+      try{
+        await api('/api/documents?' + q({rev:pr}));
+        const now = await api('/api/resolve?' + q({rev:pr}));
+        if (!now || now.sha !== row.sha) throw new Error('moved');
+      }
       catch(ex){
         li.setAttribute('aria-disabled', 'true');
         li.querySelector('.meta').append(el('span', {class:'unavailable'}, 'not available locally'));

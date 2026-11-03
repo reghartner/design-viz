@@ -15,6 +15,7 @@
    GET  /api/between?from=&to=&doc=          commits after From up to To that change the document
    GET  /api/compare?from=&to=&doc=          both sides: {raw, context} or null
    GET  /api/changed?from=&to=               changed documents: [{path, status, imported?}]
+   GET  /api/resolve?rev=                    {sha}: the full commit SHA a name (pr:<n> included) stands for now
    POST /api/fetch                           git fetch (remote-tracking refs only)
    Requests must carry this server's Host; a request with an Origin must come from this server. */
 import http from 'node:http';
@@ -31,7 +32,7 @@ const API_CSP = "default-src 'none'; frame-ancestors 'none'";
 /* The static allow-list: request path -> [file under tools/compare, content type]. */
 const STATIC = {'/':['index.html', 'text/html; charset=utf-8'], '/app.js':['app.js', 'text/javascript; charset=utf-8'], '/app.css':['app.css', 'text/css; charset=utf-8']};
 const VIEWER = {'/viewer.js':['js', 'text/javascript; charset=utf-8'], '/viewer.css':['css', 'text/css; charset=utf-8']};
-const GET_ROUTES = new Set(['/', '/app.js', '/app.css', '/viewer.js', '/viewer.css', '/api/status', '/api/documents', '/api/revisions', '/api/between', '/api/compare', '/api/changed']);
+const GET_ROUTES = new Set(['/', '/app.js', '/app.css', '/viewer.js', '/viewer.css', '/api/status', '/api/documents', '/api/revisions', '/api/between', '/api/compare', '/api/changed', '/api/resolve']);
 
 /* The standalone viewer's sources without its boot script (which would render the demo page), its core
    styles and fonts, and its icon sprite (inserted into index.html). Assembled once per process. */
@@ -87,6 +88,7 @@ export async function createCompareServer({directory, gh, port = 0} = {}){
         const [before, after] = await Promise.all([reader.side(from, doc), reader.side(to, doc)]);
         return json(res, 200, {from, to, doc, before, after});
       }
+      if (route === '/api/resolve') return json(res, 200, {sha:await reader.resolve(q('rev'))});
       if (route === '/api/changed') return json(res, 200, await reader.changedDocumentList(q('from'), q('to')));
       return json(res, 404, {error:'Not found.'});
     }catch(ex){

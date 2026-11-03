@@ -277,3 +277,98 @@ test('Use site library leaves a selected local source repository with Undo, and 
   await page.reload();await expect(node(page)).toContainText('Site published API');
  }finally{await page.close();await disk.close();await site.close();}
 });
+
+/* #874 Two desktop Workbench tabs on one local repository: an agent's provider edit,
+   accepted in the provider tab, reaches the importing tab through the consumer
+   helper's refresh-sources. Contract: issue #874 (behaviour steps 1-5; Test + flip
+   case 1); docs/local-repository-authoring.md (agent-connected consumer);
+   Chuck 2026-11-02 (local repository + desktop Workbench first).
+   Both tabs are pages of one browser context (one origin, one localStorage) bound to
+   one disk repository through cloudFolder. The test acts as the agent: it runs the
+   generated folder-agent.py helpers and writes only the files an agent writes.
+   | row | fixture | assertion (scoped) | rejects |
+   | P1 provider tab accepts the agent edit | provider tab connected at the repository root with base selected; begin + propose renaming base's api node | review previews [data-dv-node=api] with the new title, no issues; provider #src == proposed bytes | a review that cannot accept for a root-connected provider |
+   | P2 acceptance saves the registered provider file | same | diagrams/team/base/base.spec.json bytes == proposed; base.ledger.md == proposed ledger; result.json for the request is applied | acceptance applied in the browser that skips the disk save (flip 2) |
+   | C0 consumer unchanged until refresh (precondition) | consumer tab connected at the same root with consumer selected, before the edit | consumer g.node[shared::base::api] still reads "Local shared API" after P2 | (makes C1 discriminating) a consumer already showing the new title |
+   | C1 refresh-sources renders the accepted provider text | consumer helper refresh-sources --source-repo <repository root> | consumer g.node[shared::base::api] contains "Provider tab accepted API" | a refresh that reports unchanged without applying (flip 1); a refresh that rereads the frozen snapshot |
+   | C2 receipt is applied | same | helper exits 0; receipt.status == applied | an unchanged, rejected or busy receipt |
+   | C3 consumer source kept | same | consumer #src == original bytes; consumer.spec.json on disk == original bytes (authored topologyImports only, no copied provider nodes) | a refresh that rewrites or materializes the consumer source |
+   | C4 consumer ledger kept | same | state.json ledger and consumer.ledger.md == original ledger | a refresh that replaces the ledger |
+   | C5 consumer Undo history kept | Undo, then Redo, in the consumer tab | Undo: node reads "Local shared API", #src unchanged; Redo: node contains the accepted text | a refresh recorded outside Undo history |
+   | C6 consumer reload restores the consumer document | reload the consumer tab after C5 | #src == consumer bytes; #docview .doc-title == "Local consumer"; node contains the accepted text | the shared dv-workbench-draft key restoring the provider tab's document; a reload restoring the pre-refresh snapshot |
+   case 2 (new provider): moved to the bug ticket for the frozen-snapshot defect, per Chuck 2026-11-02.
+   Excluded: phone/narrow-width editing (Chuck 2026-10-13, desktop only); cloud Workbench (later ticket). */
+const consumerLedger='# Consumer ledger\n\nImports the shared API through middle.\n';
+const registry=ids=>JSON.stringify({version:1,diagrams:ids.map(id=>({folder:'diagrams/team/'+id,owner:'group:default/local'}))});
+async function twoTabRepository(provider,importer){
+ const disk=await cloudFolder(provider);await cloudFolder(importer,{folder:disk.folder});
+ await writeFile(path.join(disk.folder,'canon.json'),registry(Object.keys(specs)));
+ for(const [id,spec] of Object.entries(specs)){const dir=path.join(disk.folder,'diagrams/team',id);await mkdir(dir,{recursive:true});await writeFile(path.join(dir,id+'.spec.json'),JSON.stringify(spec,null,2));}
+ await writeFile(path.join(disk.folder,'diagrams/team/consumer/consumer.ledger.md'),consumerLedger);
+ const support=id=>path.join(disk.folder,'diagrams/team',id,'.flowview-agent');
+ return {...disk,support,file:(id,name)=>readFile(path.join(disk.folder,'diagrams/team',id,name),'utf8'),
+  state:async id=>JSON.parse(await readFile(path.join(support(id),'state.json'),'utf8'))};
+}
+// The generated helper, run as the agent would run it. Asynchronous, so the page's
+// disk bindings keep serving the browser while a command waits for it.
+function agent(support,...args){
+ return new Promise((resolve,reject)=>{const child=spawn('python3',[path.join(support,'folder-agent.py'),...args]);let stdout='',stderr='';child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);child.on('error',reject);child.on('close',code=>resolve({code,stdout,stderr}));});
+}
+async function connectTab(page,spec){
+ await page.bringToFront();await closeTools(page);await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();
+ await page.locator('#folder-agent-setup-mode-external').click();await expect(page.locator('#folder-agent-setup-mode-external')).toHaveAttribute('aria-pressed','true');
+ await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
+ await expect(page.locator('#folder-agent-file-picker option[value="'+spec+'"]')).toHaveCount(1);
+ await page.locator('#folder-agent-file-picker').selectOption(spec);await page.locator('#folder-agent-file-confirm').click();
+ await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();await closeTools(page);
+}
+// begin registers the request; the agent edits the seeded candidate pair and proposes it.
+async function propose(support,text,edit,ledger){
+ const begun=await agent(support,'begin','--text',text);expect(begun.code,begun.stderr).toBe(0);
+ const request=JSON.parse(await readFile(path.join(support,'request.json'),'utf8')),candidate=request.candidate;
+ expect(request.id).toBe(JSON.parse(begun.stdout).id);expect(candidate.baseRevision).toBe(request.revision);
+ const seeded=await readFile(path.join(support,candidate.spec),'utf8'),proposed=edit(seeded);expect(proposed).not.toBe(seeded);
+ await writeFile(path.join(support,candidate.spec),proposed);await writeFile(path.join(support,candidate.ledger),ledger);
+ const sent=await agent(support,'propose','--request',request.id,'--revision',candidate.baseRevision,'--file',candidate.spec,'--ledger',candidate.ledger,'--summary',text);
+ expect(sent.code,sent.stderr).toBe(0);return {request,proposed};
+}
+async function acceptReview(page,changed){
+ await page.locator('#agent-update-open').click();const issues=page.locator('#agent-update-issues');
+ // A banner can announce a proposal before its review is blocked; judge the review
+ // only once it previews the change, and keep a blocked review's reason in the failure.
+ await expect.poll(async()=>await issues.isVisible()?'blocked: '+await page.locator('#agent-update-feedback').inputValue():await changed.first().isVisible(),{message:'the review previews the proposed change'}).toBe(true);
+ await expect(issues).toBeHidden();await expect(page.locator('#agent-update-banner-title')).toHaveText('Agent updates are ready');
+ await page.locator('#agent-update-commit').click();
+}
+async function outcome(support,id){try{const value=JSON.parse(await readFile(path.join(support,'result.json'),'utf8'));return value.requestId===id?value.status:null;}catch{return null;}}
+
+test('two desktop tabs: an agent provider edit accepted in the provider tab reaches the importing tab after refresh-sources and its reload',async({page,context,server},info)=>{
+ test.setTimeout(90000); // Two Workbench tabs, two folder connections and three helper round trips.
+ const importer=await context.newPage(),repo=await twoTabRepository(page,importer),before=JSON.stringify(specs.base,null,2),title='Provider tab accepted API';
+ const ledger='# Base ledger\n\nRenamed the shared API at the provider owner\'s request.\n';
+ try{
+  for(const tab of [page,importer]){await tab.goto(server.origin+'/workbench.html');await paste(tab,starter);}
+  await connectTab(page,'diagrams/team/base/base.spec.json');await expect(page.locator('#src')).toHaveValue(before);
+  await connectTab(importer,'diagrams/team/consumer/consumer.spec.json');await expect(importer.locator('#src')).toHaveValue(consumer);await expect(node(importer)).toContainText('Local shared API');
+  // Provider tab: the agent proposes the rename and a person accepts it.
+  await page.bringToFront();
+  const {request,proposed}=await propose(repo.support('base'),'Rename the shared API',seeded=>{const raw=JSON.parse(seeded);raw.page.sections[0].diagram.nodes.api.title=title;return JSON.stringify(raw,null,2);},ledger);
+  await acceptReview(page,page.locator('#agent-update-view [data-dv-node="api"]').filter({hasText:title}));
+  await expect(page.locator('#src')).toHaveValue(proposed);
+  await expect.poll(()=>repo.file('base','base.spec.json'),{message:'the accepted provider is saved to its registered file'}).toBe(proposed);
+  expect(await repo.file('base','base.ledger.md')).toBe(ledger);await expect.poll(()=>outcome(repo.support('base'),request.id)).toBe('applied');
+  // Consumer tab: unchanged until the agent runs its helper's refresh-sources.
+  await importer.bringToFront();await expect(node(importer)).toContainText('Local shared API');
+  const refreshed=await agent(repo.support('consumer'),'refresh-sources','--source-repo',repo.folder);expect(refreshed.code,refreshed.stderr).toBe(0);
+  await expect(node(importer),'the importing tab shows the accepted provider text').toContainText(title);
+  expect(JSON.parse(refreshed.stdout).status).toBe('applied');
+  await expect(importer.locator('#src')).toHaveValue(consumer);expect(await repo.file('consumer','consumer.spec.json')).toBe(consumer);
+  expect((await repo.state('consumer')).ledger).toBe(consumerLedger);expect(await repo.file('consumer','consumer.ledger.md')).toBe(consumerLedger);
+  await importer.locator('#undo-builder').click();await expect(node(importer)).toContainText('Local shared API');await expect(importer.locator('#src')).toHaveValue(consumer);
+  await importer.locator('#redo-builder').click();await expect(node(importer)).toContainText(title);
+  await importer.screenshot({path:info.outputPath('two-tab-consumer-refreshed.png')});
+  // Both tabs share this origin's browser recovery; reloading the consumer restores the consumer.
+  await importer.reload();
+  await expect(importer.locator('#src')).toHaveValue(consumer);await expect(importer.locator('#docview .doc-title')).toHaveText('Local consumer');await expect(node(importer)).toContainText(title);
+ }finally{await importer.close();await page.close();await repo.close();}
+});

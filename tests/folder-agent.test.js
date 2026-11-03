@@ -1,24 +1,159 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),crypto=require('node:crypto'),os=require('node:os'),{spawnSync}=require('node:child_process');
+/* #878 PR 2: the Workbench keeps one provider copy, .flowview-agent/providers.json.
+   Contract: ticket #878 ("The provider copy", "When it is written", "state.json gains
+   one field", "Out-of-date check", "Size limit", "Change between publications") and
+   "Test + flip" 1b-1e; Chuck 2026-11-02 (coverage = the ticket's test plan; desktop
+   only); coordinator 2026-11-02 (the copy follows the frozen context after an accepted
+   proposal grows it, #886). The harness passes the frozen topology context getter and a
+   counting SHA-256 (the injectable payload builder and hash). Its default context is a
+   local snapshot holding platform and the consumer checkout (examples/canon/topology).
+   "Copy matches C" = providers.json {version 1, providersSha256, payloadText} where
+   providersSha256 == sha256(payloadText) == state.json providersSha256 and
+   JSON.parse(payloadText) == payloadFor(C): {sourceKind 'local' + snapshotSha256 |
+   'site-library' | 'none', specs = C.specs without the consumer (C.id)}.
+   | row | fixture | assertion (scoped) | rejects |
+   | P1 connection writes the copy before state.json | harness start, for a local, a site-library and no context | providers.json precedes state.json in the write log; copy matches the context | no copy; a copy written after state.json; a copy holding the consumer; a missing or wrong sourceKind/snapshotSha256 |
+   | 1b-1 escaped copy over 8 MiB is header-only | provider title of 2.5 Mi '"' (payloadText < 8 MiB, escaped providers.json > 8 MiB); real adapter limit in front of the harness disk | start() resolves; providers.json == {version 1, providersSha256 = sha256(JSON of payloadFor(C)), oversize true}, no payloadText; state.json names that hash | an impl that measures payloadText instead of the escaped file (adapter throws); one that drops the copy |
+   | 1b-2 copy under 8 MiB is written whole | provider title of 512 Ki '"' | copy matches C | an impl that always writes the header |
+   | 1c superseded publication is rejected; the next names the rewritten copy | send; read state.json revision R; change the provider context before the next publication; propose with baseRevision R | result.json rejected "Your document changed"; next state.json revision != R; copy matches the new context and differs from the first copy | (rejection: guard, passes today) a copy rewritten without a state.json that names it |
+   | 1d no rebuild, rehash or rewrite on ordinary edits | counting builder and hash; three source+ledger edits; then a topology bump with the same context; then a changed context | after connect: builder 1, hash 1, providers.json writes 1; edits: state.json +3, builder/hash/copy unchanged; same-content bump: builder 2, hash 2, copy writes 1; changed context: builder 3, hash 3, copy writes 2 and matches | a copy rebuilt or rewritten on every publication; one rewritten when only topologyRevision changed |
+   | 1d-886 accepted proposal grows the frozen context | review mode; prepare returns the context grown by provider extra; accept | result.json applied; copy matches the grown context (holds extra) | a copy that follows only refresh-style context changes |
+   | 1e startup boundary order | the seven startup writes | write k is [staged state, claim session.json, providers.json, state.json, story.spec.json, editor.json, committed session.json][k] | a copy written after state.json or not at all |
+   | 1e failed / cancelled / uncertain / competing at each of the 7 boundaries; permission loss at providers.json and state.json; same-identity reactivation | the existing resume matrices (:289 :303 :313 :324 :358 :371) | existing assertions; the first connection wrote a copy; a competing or reactivated owner's providers.json is unchanged; the bundled validate.js run on a consumer importing platform either exits 0 with copy hash == state.json hash or reports "out of date" | a client that lost ownership committing providers.json; validation against a copy state.json does not name |
+   | 1e directory write guards (:348) | createFolderAgentFiles write of providers.json and state.json | buffered write aborts when ownership changes | (guard, passes today) |
+   Excluded: browser tests 2-5 live in tools/browser-tests/tests/local-repository.spec.mjs; validator messages in tests/test_validate_cli.py. */
+const TOPOLOGY=path.join(__dirname,'../examples/canon/topology');
+const PLATFORM=JSON.parse(fs.readFileSync(path.join(TOPOLOGY,'platform.json'),'utf8')),CHECKOUT=JSON.parse(fs.readFileSync(path.join(TOPOLOGY,'checkout.json'),'utf8'));
+const sha256=text=>crypto.createHash('sha256').update(text,'utf8').digest('hex');
+const localContext=(specs=[PLATFORM])=>({version:1,id:'checkout',local:true,localSource:{selectionId:'selection-1',sha256:'a'.repeat(64)},specs:[...specs,CHECKOUT]});
+const siteContext=(specs=[PLATFORM])=>({version:1,id:'checkout',ephemeral:true,catalogURL:'https://site.example/diagrams.json',catalog:{version:3,diagrams:[]},specs:[...specs,CHECKOUT]});
+function payloadFor(context){
+  if(!context)return {sourceKind:'none',specs:[]};
+  const specs=context.specs.filter(spec=>spec.page.canon.id!==context.id);
+  if(!context.local)return {sourceKind:'site-library',specs};
+  return context.localSource && typeof context.localSource.sha256==='string'?{sourceKind:'local',snapshotSha256:context.localSource.sha256,specs}:{sourceKind:'local',specs};
+}
 function harness(extra={}){
   const timers=new Map();let timerId=0;
   const context={TextEncoder,TextDecoder,SyntaxError,setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id)};vm.createContext(context);
   for(const file of ['lifetime.js','agent-merge.js','agent-session.js','folder-agent.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/workbench',file),'utf8'),context);
-  const disk=new Map(),writes=[],updates=[];let time=100000,number=0,source='{"title":"before"}',ledger,project=1,topologyRevision=0,busy=false,open=true,level='story',selection=[{kind:'node',id:'customer'}],views=[],failure=null,gate=null,writeGate=null;
+  const disk=new Map(),writes=[],updates=[],fileLog=[],counts={context:0,hash:0};let time=100000,number=0,source='{"title":"before"}',ledger,project=1,topologyRevision=0,topologyContext=localContext(),busy=false,open=true,level='story',selection=[{kind:'node',id:'customer'}],views=[],failure=null,gate=null,writeGate=null;
   const copy=value=>value===undefined?undefined:JSON.parse(JSON.stringify(value));
   // Like the directory adapter, guards learn whether this write created the file.
   const files={async read(name){if(gate)await gate(name);const value=disk.get(name);if(value instanceof Error)throw value;return copy(value)||null;},
     async readText(name){if(gate)await gate(name);return disk.has(name)?String(disk.get(name)):null;},
-    async write(name,value,guard){if(writeGate)await writeGate(name);if(guard)await guard({name,created:!disk.has(name),phase:'before-write'});if(failure===name){failure=null;throw Error('Disk unavailable');}disk.set(name,copy(value));}};
-  const options={reviewMode:false,...extra,files,level:()=>level,now:()=>time,uuid:()=>`id-${++number}`,snapshot:()=>({source,ledger,project,topologyRevision,open,selection,views}),busy:()=>busy,
-    apply(text){writes.push(text);source=text;return {ok:true,rendered:true};},changed:s=>updates.push(copy(s))};
+    async write(name,value,guard){if(writeGate)await writeGate(name);if(guard)await guard({name,created:!disk.has(name),phase:'before-write'});if(failure===name){failure=null;throw Error('Disk unavailable');}disk.set(name,copy(value));fileLog.push(name);}};
+  // #878: the frozen provider context getter and SHA-256 are injectable and counted.
+  const options={reviewMode:false,topologyContext:()=>{counts.context++;return copy(topologyContext);},sha256:async text=>{counts.hash++;return sha256(text);},...extra,files,level:()=>level,now:()=>time,uuid:()=>`id-${++number}`,snapshot:()=>({source,ledger,project,topologyRevision,open,selection,views}),busy:()=>busy,
+    apply(text,current,proposal,accepted){writes.push(text);source=text;if(accepted){topologyContext=copy(accepted);topologyRevision++;}return {ok:true,rendered:true};},changed:s=>updates.push(copy(s))};
   let client=context.createFolderAgentClient(options);
-  const h={disk,writes,updates,files,context,client,timers,async heartbeat(){const callbacks=[...timers.values()];timers.clear();callbacks.forEach(fn=>fn());for(let n=0;n<50;n++)await Promise.resolve();},get last(){return updates.at(-1);},fresh(){return context.createFolderAgentClient(options);},
-    level:s=>level=s,notes:s=>ledger=s,selection:s=>selection=s,views:s=>views=s,type:s=>source=s,project:()=>project++,topology:()=>topologyRevision++,busy:b=>busy=b,open:b=>open=b,advance:n=>time+=n,fail:n=>failure=n,gate:g=>gate=g,writeGate:g=>writeGate=g,
+  const h={disk,writes,updates,files,context,client,timers,fileLog,counts,async heartbeat(){const callbacks=[...timers.values()];timers.clear();callbacks.forEach(fn=>fn());for(let n=0;n<50;n++)await Promise.resolve();},get last(){return updates.at(-1);},fresh(){return context.createFolderAgentClient(options);},
+    level:s=>level=s,notes:s=>ledger=s,selection:s=>selection=s,views:s=>views=s,type:s=>source=s,project:()=>project++,topology:()=>topologyRevision++,topologyContext:c=>topologyContext=c,busy:b=>busy=b,open:b=>open=b,advance:n=>time+=n,fail:n=>failure=n,gate:g=>gate=g,writeGate:g=>writeGate=g,
     envelope:value=>({...client.manifest(),...value}),proposal:(extra={})=>h.disk.set('proposal.json',h.envelope({id:'proposal-1',requestId:h.disk.get('request.json').id,baseRevision:h.disk.get('state.json').revision,source:'{"title":"after"}',...extra})),
     reply:(extra={})=>h.disk.set('reply.json',h.envelope({id:'reply-1',requestId:h.disk.get('request.json').id,text:'Done <script>unsafe()</script>',...extra}))};
   return h;
 }
+// The bytes the folder adapter writes for a value (createFolderAgentFiles.write).
+const serialized=value=>typeof value==='string'?value:JSON.stringify(value,null,2)+'\n';
+function readCopy(h,label=''){
+  assert.ok(h.disk.has('providers.json'),label+' providers.json was written');
+  return JSON.parse(serialized(h.disk.get('providers.json')));
+}
+function assertCopyMatches(h,context,label=''){
+  const copy=readCopy(h,label),state=h.disk.get('state.json');
+  assert.equal(copy.version,1,label);assert.equal(typeof copy.payloadText,'string',label+' whole copy');assert.equal(copy.oversize,undefined,label);
+  assert.equal(copy.providersSha256,sha256(copy.payloadText),label+' copy hash is over the stored payloadText');
+  assert.equal(state.providersSha256,copy.providersSha256,label+' state.json names this copy');
+  assert.deepEqual(JSON.parse(copy.payloadText),payloadFor(context),label+' payload');
+  return copy;
+}
+const count=(h,name)=>h.fileLog.filter(item=>item===name).length;
+// Startup writes in order: staged recovery state, claim manifest, provider copy,
+// canonical state, source, lease, committed manifest.
+const STARTUP=[/^state-id-\d+\.json$/,'session.json','providers.json','state.json','story.spec.json','editor.json','session.json'];
+function assertBoundary(name,phase){
+  const expected=STARTUP[phase-1];
+  assert.ok(typeof expected==='string'?name===expected:expected.test(name || ''),'startup write '+phase+' is '+name+', expected '+expected);
+}
+// Run the bundled validate.js (the kit's authoring/tools layout) against the folder
+// files on the harness disk, with a live editor.json for state.json's identity, so
+// only the copy/state.json pairing decides the outcome.
+function bundledVerdict(h){
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-878-copy-')),session=path.join(dir,'.flowview-agent'),tools=path.join(session,'authoring','tools');
+  try{
+    fs.mkdirSync(path.join(tools,'canon'),{recursive:true});
+    for(const file of ['validate.js','canon/core.cjs','canon/generated-runtime.cjs'])fs.copyFileSync(path.join(__dirname,'../tools',file),path.join(tools,file));
+    for(const name of ['providers.json','state.json'])if(h.disk.has(name))fs.writeFileSync(path.join(session,name),serialized(h.disk.get(name)));
+    const state=h.disk.get('state.json');
+    fs.writeFileSync(path.join(session,'editor.json'),JSON.stringify({sessionId:state.sessionId,connectionId:state.connectionId,connected:true,at:Date.now()}));
+    fs.copyFileSync(path.join(TOPOLOGY,'checkout.json'),path.join(dir,'checkout.json'));
+    return spawnSync(process.execPath,[path.join(tools,'validate.js'),path.join(dir,'checkout.json')],{encoding:'utf8',timeout:20000});
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+}
+function assertNamedCopyOnly(h,label){
+  const result=bundledVerdict(h),state=h.disk.get('state.json'),copy=h.disk.has('providers.json')?JSON.parse(serialized(h.disk.get('providers.json'))):null;
+  if(result.status===0)assert.equal(copy && copy.providersSha256,state.providersSha256,label+': validated against a copy state.json names');
+  else assert.match(result.stdout,/out of date/,label+': '+result.stdout+result.stderr);
+}
+
+test('#878 P1: connection writes a whole provider copy before the state.json that names it',async()=>{
+  for(const [label,context] of [['local',localContext()],['site library',siteContext()],['no context',null]]){
+    const h=harness();h.topologyContext(context);await h.client.start();
+    assert.ok(h.fileLog.indexOf('providers.json')>=0 && h.fileLog.indexOf('providers.json')<h.fileLog.indexOf('state.json'),label+': copy precedes state.json: '+h.fileLog.join(', '));
+    assertCopyMatches(h,context,label);
+  }
+});
+test('#878 1b: a copy whose escaped providers.json exceeds 8 MiB is written header-only; a smaller one is written whole',async()=>{
+  for(const oversize of [true,false]){
+    const h=harness(),provider=structuredClone(PLATFORM);provider.page.title='"'.repeat(oversize?2.5*1024*1024:512*1024);
+    const context=localContext([provider]),payloadText=JSON.stringify(payloadFor(context));h.topologyContext(context);
+    assert.ok(Buffer.byteLength(payloadText)<8*1024*1024,'precondition: payloadText is under 8 MiB');
+    assert.equal(Buffer.byteLength(serialized({version:1,providersSha256:sha256(payloadText),payloadText}))>8*1024*1024,oversize,'precondition: escaped providers.json size');
+    // The real adapter's size limit stands in front of the harness disk.
+    const sink={async getFileHandle(){return {async createWritable(){return {async write(){},async close(){},async abort(){}};}};}},adapter=h.context.createFolderAgentFiles(sink),write=h.files.write;
+    h.files.write=async(name,value,guard)=>{await adapter.write(name,value);return write(name,value,guard);};
+    await h.client.start();
+    if(oversize){
+      assert.deepEqual(readCopy(h,'oversize'),{version:1,providersSha256:sha256(payloadText),oversize:true});
+      assert.equal(h.disk.get('state.json').providersSha256,sha256(payloadText));
+    }else assertCopyMatches(h,context,'under limit');
+  }
+});
+test('#878 1c: a proposal built on a superseded provider publication is rejected; the next state.json names the rewritten copy',async()=>{
+  const h=harness();await h.client.start();await h.client.send('Edit');
+  const published=h.disk.get('state.json'),first=h.disk.get('providers.json');
+  const changed=structuredClone(PLATFORM);changed.page.sections[0].diagram.nodes.api.title='Refreshed API';const next=localContext([changed]);
+  h.topologyContext(next);h.topology();
+  h.proposal({baseRevision:published.revision});await h.client.poll();await h.client.poll();
+  const result=h.disk.get('result.json');assert.equal(result.status,'rejected');assert.match(result.message,/Your document changed/);assert.equal(h.writes.length,0);
+  const state=h.disk.get('state.json');assert.notEqual(state.revision,published.revision);
+  const copy=assertCopyMatches(h,next,'after the provider change');
+  assert.ok(first,'the connection wrote a first copy');assert.notEqual(copy.providersSha256,JSON.parse(serialized(first)).providersSha256);
+});
+test('#878 1d: ordinary edits republish state.json without rebuilding, rehashing or rewriting the copy',async()=>{
+  const h=harness();await h.client.start();
+  assert.equal(count(h,'providers.json'),1,'copy written once at connection');assert.deepEqual([h.counts.context,h.counts.hash],[1,1],'built and hashed once at connection');
+  const states=count(h,'state.json');
+  for(let n=0;n<3;n++){h.type(`{"title":"edit ${n}"}`);h.notes(`ledger ${n}`);await h.client.poll();}
+  assert.equal(count(h,'state.json'),states+3,'state.json republished for each edit');
+  assert.equal(count(h,'providers.json'),1);assert.deepEqual([h.counts.context,h.counts.hash],[1,1]);
+  h.topology();await h.client.poll();
+  assert.deepEqual([h.counts.context,h.counts.hash],[2,2],'a topology bump rebuilds once');assert.equal(count(h,'providers.json'),1,'same content is not rewritten');
+  assertCopyMatches(h,localContext(),'same content');
+  const changed=structuredClone(PLATFORM);changed.page.sections[0].diagram.nodes.api.title='Changed API';const next=localContext([changed]);
+  h.topologyContext(next);h.topology();await h.client.poll();
+  assert.deepEqual([h.counts.context,h.counts.hash],[3,3]);assert.equal(count(h,'providers.json'),2);assertCopyMatches(h,next,'changed content');
+});
+test('#878/#886: an accepted proposal that grows the frozen provider context rewrites the copy',async()=>{
+  const extra={page:{title:'Extra',canon:{version:1,id:'extra',kind:'canonical',owner:'group:default/extra'},sections:[{id:'main',diagram:{nodes:{x:{}},rows:[['x']]}}]}};
+  const grown=localContext([PLATFORM,extra]);
+  const h=harness({reviewMode:true,prepare:async()=>structuredClone(grown)});await h.client.start();await h.client.send('Import extra');
+  h.proposal({source:'{"title":"imports extra"}'});await h.client.poll();assert.equal(h.last.review.ok,true,'precondition: the review is ready');
+  await h.client.acceptReview();assert.equal(h.disk.get('result.json').status,'applied');
+  await h.client.poll();
+  const copy=assertCopyMatches(h,grown,'grown context');assert.deepEqual(JSON.parse(copy.payloadText).specs.map(spec=>spec.page.canon.id),['platform','extra']);
+});
 test('conversation freezes selected context, applies once, and completes through explicit reply',async()=>{
   const h=harness();await h.client.start(false);assert.equal(h.disk.get('editor.json').connected,true);
   await h.client.send('Tell our customer story');assert.equal(h.disk.get('request.json').selection[0].id,'customer');
@@ -287,12 +422,14 @@ test('recovery detects a competing owner while saving its archive',async()=>{
 });
 
 test('every failed resume publication phase remains inspectable and explicitly resumable without replay',async()=>{
-  // Staged snapshot, claim manifest, canonical state, source, lease, committed manifest.
-  for(let failurePhase=1;failurePhase<=6;failurePhase++){
+  // Staged snapshot, claim manifest, provider copy (#878), canonical state, source, lease, committed manifest.
+  for(let failurePhase=1;failurePhase<=STARTUP.length;failurePhase++){
     const h=harness();await h.client.start();await h.client.send('Saved conversation');h.proposal();await h.client.disconnect();
-    let writes=0;h.writeGate(()=>{if(++writes===failurePhase)throw Error('Injected startup write failure');});
+    assert.ok(h.disk.has('providers.json'),'the first connection wrote its provider copy');
+    let writes=0,failedName=null;h.writeGate(name=>{if(++writes===failurePhase){failedName=name;throw Error('Injected startup write failure');}});
     const failed=h.fresh();await assert.rejects(failed.start(true),/startup write failure/,String(failurePhase));
-    await failed.disconnect();h.writeGate(null);
+    assertBoundary(failedName,failurePhase);
+    await failed.disconnect();h.writeGate(null);assertNamedCopyOnly(h,'failed at '+failedName);
     const preview=await h.context.inspectFolderAgentSession(h.files,{source:h.disk.get('story.spec.json')});
     assert.equal(preview.transcript[0].text,'Saved conversation',String(failurePhase));
     assert.equal(preview.lease.active,false,String(failurePhase));
@@ -301,36 +438,46 @@ test('every failed resume publication phase remains inspectable and explicitly r
   }
 });
 test('failed resume remains recoverable after persistent permission loss prevents all cleanup writes',async()=>{
-  const h=harness();await h.client.start();await h.client.send('Keep this intent');await h.client.disconnect();
-  const priorConnection=h.disk.get('state.json').connectionId;let blocked=false;
-  h.writeGate(name=>{if(name==='state.json' || blocked){blocked=true;throw Object.assign(Error('Permission lost'),{name:'NotAllowedError'});}});
-  const failed=h.fresh();await assert.rejects(failed.start(true),/Permission lost/);await assert.rejects(failed.disconnect(),/Permission lost/);
-  assert.equal(h.disk.get('state.json').connectionId,priorConnection);assert.notEqual(h.disk.get('session.json').connectionId,priorConnection);
-  h.writeGate(null);const preview=await h.context.inspectFolderAgentSession(h.files,{source:h.disk.get('story.spec.json')});
-  assert.equal(preview.identity.connectionId,h.disk.get('session.json').connectionId);assert.equal(preview.transcript[0].text,'Keep this intent');
-  await h.fresh().start(true);assert.equal(h.last.connected,true);
+  for(const lostAt of ['providers.json','state.json']){
+    const h=harness();await h.client.start();await h.client.send('Keep this intent');await h.client.disconnect();
+    const priorConnection=h.disk.get('state.json').connectionId,attempted=[];let blocked=false;
+    h.writeGate(name=>{attempted.push(name);if(name===lostAt || blocked){blocked=true;throw Object.assign(Error('Permission lost'),{name:'NotAllowedError'});}});
+    const failed=h.fresh(),outcome=await failed.start(true).then(()=>null,error=>error);
+    assert.ok(attempted.includes('providers.json'),lostAt+': the resume writes a provider copy: '+attempted.join(', '));
+    assert.match(String(outcome),/Permission lost/,lostAt);await assert.rejects(failed.disconnect(),/Permission lost/);
+    assert.equal(h.disk.get('state.json').connectionId,priorConnection);assert.notEqual(h.disk.get('session.json').connectionId,priorConnection);
+    h.writeGate(null);assertNamedCopyOnly(h,'permission lost at '+lostAt);
+    const preview=await h.context.inspectFolderAgentSession(h.files,{source:h.disk.get('story.spec.json')});
+    assert.equal(preview.identity.connectionId,h.disk.get('session.json').connectionId);assert.equal(preview.transcript[0].text,'Keep this intent');
+    await h.fresh().start(true);assert.equal(h.last.connected,true);
+  }
 });
 test('cancelled resume publication does not poison saved files at any write boundary',async()=>{
-  for(let phase=1;phase<=6;phase++){
+  for(let phase=1;phase<=STARTUP.length;phase++){
     const h=harness();await h.client.start();await h.client.send('Saved');await h.client.disconnect();
-    let writes=0,release,reached;const hit=new Promise(r=>reached=r);
-    h.writeGate(()=>++writes===phase?new Promise(r=>{release=r;reached();}):null);
-    const next=h.fresh(),starting=next.start(true);await hit;const closing=next.disconnect();release();
-    await assert.rejects(starting,/closed/);await closing;h.writeGate(null);
+    assert.ok(h.disk.has('providers.json'),'the first connection wrote its provider copy');
+    let writes=0,held=null,release,reached;const hit=new Promise(r=>reached=r);
+    h.writeGate(name=>++writes===phase?(held=name,new Promise(r=>{release=r;reached();})):null);
+    const next=h.fresh(),starting=next.start(true);await hit;assertBoundary(held,phase);const closing=next.disconnect();release();
+    await assert.rejects(starting,/closed/);await closing;h.writeGate(null);assertNamedCopyOnly(h,'cancelled at '+held);
     const preview=await h.context.inspectFolderAgentSession(h.files,{source:h.disk.get('story.spec.json')});
     assert.equal(preview.transcript[0].text,'Saved',String(phase));await h.fresh().start(true);assert.equal(h.last.connected,true);
   }
 });
 test('a competing owner wins at every delayed resume write without rollback or publication stomping its files',async()=>{
-  for(let phase=1;phase<=6;phase++){
-    const h=harness();await h.client.start();await h.client.disconnect();let writes=0,release,reached;const hit=new Promise(r=>reached=r);
-    h.writeGate(()=>++writes===phase?new Promise(r=>{release=r;reached();}):null);
-    const next=h.fresh(),starting=next.start(true);await hit;
-    const owner={protocol:'flowview-folder-v1',sessionId:'other-session',connectionId:'other-connection'},state={...owner,revision:'other-1',source:'{"owner":"new"}'};
-    h.disk.set('session.json',owner);h.disk.set('state.json',state);h.disk.set('story.spec.json',state.source);h.disk.set('editor.json',{...owner,connected:true,at:100000});
-    const protectedFiles=['session.json','state.json','story.spec.json','editor.json'].map(name=>[name,JSON.stringify(h.disk.get(name))]);
+  for(let phase=1;phase<=STARTUP.length;phase++){
+    const h=harness();await h.client.start();await h.client.disconnect();assert.ok(h.disk.has('providers.json'),'the first connection wrote its provider copy');
+    let writes=0,held=null,release,reached;const hit=new Promise(r=>reached=r);
+    h.writeGate(name=>++writes===phase?(held=name,new Promise(r=>{release=r;reached();})):null);
+    const next=h.fresh(),starting=next.start(true);await hit;assertBoundary(held,phase);
+    // The competing owner publishes its own consistent copy and state.json.
+    const ownerText=JSON.stringify({sourceKind:'local',specs:[PLATFORM]}),ownerCopy={version:1,providersSha256:sha256(ownerText),payloadText:ownerText};
+    const owner={protocol:'flowview-folder-v1',sessionId:'other-session',connectionId:'other-connection'},state={...owner,revision:'other-1',source:'{"owner":"new"}',providersSha256:ownerCopy.providersSha256};
+    h.disk.set('session.json',owner);h.disk.set('providers.json',ownerCopy);h.disk.set('state.json',state);h.disk.set('story.spec.json',state.source);h.disk.set('editor.json',{...owner,connected:true,at:100000});
+    const protectedFiles=['session.json','providers.json','state.json','story.spec.json','editor.json'].map(name=>[name,JSON.stringify(h.disk.get(name))]);
     release();await assert.rejects(starting,/ownership changed/,String(phase));await next.disconnect();h.writeGate(null);
     for(const [name,value] of protectedFiles)assert.equal(JSON.stringify(h.disk.get(name)),value,phase+': '+name);
+    assertNamedCopyOnly(h,'competing owner at '+held);
   }
 });
 test('recovery snapshots must match the exact manifest identity and never relax committed-session checks',async()=>{
@@ -351,16 +498,21 @@ test('directory write guards recheck after buffering and abort before commit whe
     async write(){owned=false;},async close(){committed=true;},async abort(){aborted=true;}
   };}};}};
   const files=h.context.createFolderAgentFiles(directory);
-  await assert.rejects(files.write('state.json',{},()=>{if(!owned)throw Error('Another owner');}),/Another owner/);
-  assert.equal(aborted,true);assert.equal(committed,false);
+  for(const name of ['providers.json','state.json']){
+    owned=true;aborted=false;committed=false;
+    await assert.rejects(files.write(name,{},()=>{if(!owned)throw Error('Another owner');}),/Another owner/,name);
+    assert.equal(aborted,true,name);assert.equal(committed,false,name);
+  }
 });
 
 test('uncertain write failures after publication also preserve an explicitly recoverable session',async()=>{
-  for(let phase=1;phase<=6;phase++){
+  for(let phase=1;phase<=STARTUP.length;phase++){
     const h=harness();await h.client.start();await h.client.send('Survive an uncertain close');await h.client.disconnect();
-    const originalWrite=h.files.write;let writes=0;
-    h.files.write=async function(name,value,guard){await originalWrite(name,value,guard);if(++writes===phase)throw Error('Write committed before error');};
-    const failed=h.fresh();await assert.rejects(failed.start(true),/committed before error/);await failed.disconnect();h.files.write=originalWrite;
+    assert.ok(h.disk.has('providers.json'),'the first connection wrote its provider copy');
+    const originalWrite=h.files.write;let writes=0,uncertain=null;
+    h.files.write=async function(name,value,guard){await originalWrite(name,value,guard);if(++writes===phase){uncertain=name;throw Error('Write committed before error');}};
+    const failed=h.fresh();await assert.rejects(failed.start(true),/committed before error/);assertBoundary(uncertain,phase);await failed.disconnect();h.files.write=originalWrite;
+    assertNamedCopyOnly(h,'uncertain at '+uncertain);
     const preview=await h.context.inspectFolderAgentSession(h.files,{source:h.disk.get('story.spec.json')});
     assert.equal(preview.transcript[0].text,'Survive an uncertain close',String(phase));
     await h.fresh().start(true);assert.equal(h.last.connected,true);assert.equal(h.last.pending,null);
@@ -371,6 +523,7 @@ test('uncertain write failures after publication also preserve an explicitly rec
 test('same-identity reactivation during staging or manifest buffering defeats the new claim',async()=>{
   for(const boundary of ['staged snapshot','buffered manifest'])for(const change of ['lease','source','revision','all']){
     const h=harness();await h.client.start();await h.client.send('Saved');await h.client.disconnect();
+    assert.ok(h.disk.has('providers.json'),'the first connection wrote its provider copy');
     const owner=h.disk.get('session.json'),originalWrite=h.files.write;let protectedFiles=null,changed=false;
     function reactivate(){
       changed=true;
@@ -380,7 +533,7 @@ test('same-identity reactivation during staging or manifest buffering defeats th
         h.disk.set('story.spec.json',h.disk.get('state.json').source);
       }
       if(change==='revision' || change==='all')h.disk.set('state.json',{...h.disk.get('state.json'),revision:'reactivated-revision'});
-      protectedFiles=['session.json','state.json','story.spec.json','editor.json'].map(name=>[name,JSON.stringify(h.disk.get(name))]);
+      protectedFiles=['session.json','providers.json','state.json','story.spec.json','editor.json'].map(name=>[name,JSON.stringify(h.disk.get(name))]);
     }
     h.files.write=async function(name,value,guard){
       if(!changed && boundary==='staged snapshot' && /^state-id-.*\.json$/.test(name)){
@@ -395,6 +548,7 @@ test('same-identity reactivation during staging or manifest buffering defeats th
     const next=h.fresh();await assert.rejects(next.start(true),/saved session changed/,boundary+': '+change);
     await next.disconnect();assert.equal(changed,true);
     for(const [name,value] of protectedFiles)assert.equal(JSON.stringify(h.disk.get(name)),value,boundary+': '+change+': '+name);
+    assertNamedCopyOnly(h,boundary+': '+change);
   }
 });
 

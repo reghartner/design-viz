@@ -5,6 +5,7 @@ import {publishLibrary} from '../../canon/library.mjs';
 import {spawn} from 'node:child_process';
 import path from 'node:path';
 import {source as starter} from '../fixtures/editor-spec.mjs';
+import {COPY_REMEDY,copySummary,bundledValidate,expectCopyMatches,exportOpfsSession} from '../helpers/provider-copy.mjs';
 const make=(title,diagram)=>({page:{title,sections:[{id:'main',diagram}]}});
 const specs={
   base:make('Base',{nodes:{api:{title:'Local shared API'},store:{title:'Local shared store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api'],edges:[]},storage:{nodes:['api','store'],edges:[]}}}),
@@ -89,6 +90,24 @@ test('late local provider reads preserve the current document during folder open
   expect(await disk(page)).toBe(consumer);
 });
 
+/* #878 PR 2: the connected folder holds the Workbench's provider copy. Contract: ticket
+   #878 "How it should look" (provider copy, when it is written, state.json
+   providersSha256) and "Test + flip" tests 2-5; Chuck 2026-11-02 (coverage = the
+   ticket's test plan; local repository + desktop Workbench first; desktop only).
+   "Copy matches" (helpers/provider-copy.mjs): providers.json hash == recomputed hash ==
+   state.json providersSha256; payload sourceKind is the source in use (local with
+   snapshotSha256, or site-library without); payload specs are exactly base and middle
+   (never the consumer) and base's api title is the text the page renders; the bundled
+   validate.js run without flags on the consumer exits 0 with "0 errors".
+   | row | fixture | assertion (scoped) | rejects |
+   | T2 root connect writes the copy | :92 agent connect at a repository root (OPFS), before any refresh | copy matches: local, base api "Local shared API" | no copy; a copy written only on refresh |
+   | T3a connected consumer at connect | connectedDiskRepository | copy matches: local, "Local shared API" | a copy holding the consumer or no snapshotSha256 |
+   | T3b after refresh-sources applied | same, receipt applied | copy matches: "CLI refreshed saved provider" | a copy not rewritten when topologyRevision changes |
+   | T3c after Undo / Redo | same | Undo: "Local shared API"; Redo: "CLI refreshed saved provider" | a copy that ignores history-driven context changes |
+   | T4a unresolved imports before refresh | separateLocalSources (empty site library), before refresh-sources | copy is whole and named (hash checks), specs []; bundled validate.js exits 1 naming COPY_REMEDY | an impl that writes no copy for an unresolved context |
+   | T4b after refresh-sources --source-repo first root | same | copy matches: local, "Unpublished API" | a copy left empty after the refresh |
+   | T5 source switches with Undo/Redo | separateLocalSources with a populated site library (site "Site published API"), connected | start site-library/"Site published API" (no snapshotSha256); local first root "Unpublished API"; second root "Second root API"; Undo first; Redo second; edited second root after Refresh "Edited second root"; Use site library site; Undo edited; Redo site | a copy that tracks only refresh-sources; a sourceKind that does not follow the source |
+   Excluded: phone/narrow-width editing (Chuck 2026-10-13); cloud Workbench (later ticket). */
 test('agent folder connection retains the granted repository root and writes the selected diagram folder',async({page,server})=>{
   await setup(page,server);await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
   await page.locator('#folder-agent-file-picker').selectOption('diagrams/team/consumer/consumer.spec.json');await page.locator('#folder-agent-file-confirm').click();
@@ -98,6 +117,14 @@ test('agent folder connection retains the granted repository root and writes the
     request.onsuccess=()=>{const db=request.result,read=db.transaction('handles').objectStore('handles').get('last');read.onsuccess=async()=>{db.close();try{await read.result.handle.getFileHandle('canon.json');resolve(true);}catch{resolve(false);}};};
   }))).toBe(true);
   expect(await disk(page)).toBe(consumer);
+  // T2 (#878): right after connecting, before any refresh, the copy matches.
+  const exported=[];
+  try{
+    await expect.poll(async()=>{const session=await exportOpfsSession(page,['diagrams','team','consumer'],'consumer.spec.json');exported.push(session.folder);return copySummary(session.support);},{message:'T2 copy matches',timeout:15000})
+      .toEqual({whole:true,named:true,sourceKind:'local',snapshotSha256:true,specs:['base','middle'],baseApi:'Local shared API'});
+    const session=await exportOpfsSession(page,['diagrams','team','consumer'],'consumer.spec.json');exported.push(session.folder);
+    const result=bundledValidate(session.support,session.consumer);expect(result.status,result.stdout+result.stderr).toBe(0);expect(result.stdout).toContain(session.consumer+': 0 errors');
+  }finally{for(const folder of exported)await rm(folder,{recursive:true,force:true});}
   const changed=structuredClone(specs.base);changed.page.sections[0].diagram.nodes.api.title='Agent root refresh';await writeDisk(page,'base',JSON.stringify(changed));await page.locator('#folder-agent-guide').evaluate(el=>el.close());await refresh(page);await expect(node(page)).toContainText('Agent root refresh');
 });
 
@@ -180,8 +207,9 @@ async function connectedDiskRepository(page,server){
    command:()=>new Promise((resolve,reject)=>{const proc=spawn('python3',[path.join(support,'folder-agent.py'),'refresh-sources'],{cwd:disk.folder});let stdout='',stderr='';proc.stdout.on('data',d=>stdout+=d);proc.stderr.on('data',d=>stderr+=d);proc.on('error',reject);proc.on('close',code=>resolve({code,stdout,stderr}));})};
 }
 test('agent CLI refresh updates the open consumer without begin or menu, preserves draft/overlays/ledger and exact Undo snapshots',async({page,server},info)=>{
- const disk=await connectedDiskRepository(page,server);
+ const disk=await connectedDiskRepository(page,server),consumerFile=path.join(disk.folder,'diagrams/team/consumer/consumer.spec.json');
  try{
+  await expectCopyMatches(disk.support,consumerFile,{sourceKind:'local',baseApi:'Local shared API'},'T3a at connect');
   expect(await readFile(path.join(disk.support,'CONNECT.md'),'utf8')).toContain('refresh-sources');
   await expect.poll(async()=>(await disk.readState()).localSources?.available).toBe(true);
   const draft=structuredClone(specs.consumer),imp=draft.page.sections[0].diagram.topologyImports[0];Object.assign(imp,{nodeTracking:{'base::api':{tickets:['API-10']}},edgeTracking:{'base::api->base::store':{tickets:['API-11']}},nodeOverrides:{'base::api':{style:'teal'}},edgeOverrides:{'base::api->base::store':{label:'My connection'}},nodePositions:{'base::api':{x:450,y:150}}});
@@ -189,10 +217,14 @@ test('agent CLI refresh updates the open consumer without begin or menu, preserv
   const changed=structuredClone(specs.base);changed.page.sections[0].diagram.nodes.api.title='CLI refreshed saved provider';await disk.provider(JSON.stringify(changed));
   const result=await disk.command();expect(result.code,result.stderr).toBe(0);const receipt=JSON.parse(result.stdout);expect(receipt.status).toBe('applied');expect(receipt.currentRevision).toBe((await disk.readState()).revision);expect(receipt.localSources.consumerId).toBe('consumer');
   await expect(node(page)).toContainText('CLI refreshed saved provider');await expect(page.locator('#src')).toHaveValue(exact);expect((await disk.readState()).ledger).toBe('# Exact ledger\r\nKeep evidence.\n');
+  await expectCopyMatches(disk.support,consumerFile,{sourceKind:'local',baseApi:'CLI refreshed saved provider'},'T3b after applied');
   await expect(readFile(path.join(disk.support,'request.json'))).rejects.toThrow(/ENOENT/);
   const rendered=await node(page).elementHandle(),unchanged=await disk.command();expect(unchanged.code,unchanged.stderr).toBe(0);expect(JSON.parse(unchanged.stdout).status).toBe('unchanged');expect(await rendered.evaluate(el=>el.isConnected)).toBe(true);
   await disk.provider('{unfinished nested provider');const invalid=await disk.command();expect(invalid.code).toBe(1);expect(JSON.parse(invalid.stdout).code).toBe('invalid_sources');expect(invalid.stderr).toContain('base');await expect(node(page)).toContainText('CLI refreshed saved provider');await expect(page.locator('#src')).toHaveValue(exact);
-  await page.locator('#undo-builder').click();await expect(node(page)).toContainText('Local shared API');await expect(page.locator('#src')).toHaveValue(exact);await page.locator('#redo-builder').click();await expect(node(page)).toContainText('CLI refreshed saved provider');await expect(page.locator('#src')).toHaveValue(exact);
+  await page.locator('#undo-builder').click();await expect(node(page)).toContainText('Local shared API');await expect(page.locator('#src')).toHaveValue(exact);
+  await expectCopyMatches(disk.support,consumerFile,{sourceKind:'local',baseApi:'Local shared API'},'T3c after Undo');
+  await page.locator('#redo-builder').click();await expect(node(page)).toContainText('CLI refreshed saved provider');await expect(page.locator('#src')).toHaveValue(exact);
+  await expectCopyMatches(disk.support,consumerFile,{sourceKind:'local',baseApi:'CLI refreshed saved provider'},'T3c after Redo');
   await page.screenshot({path:info.outputPath('agent-cli-refreshed-consumer.png')});
   await expect.poll(async()=>(await disk.readState()).topologyRevision).toBe(receipt.topologyRevision+2);
   await disk.provider(JSON.stringify(changed));await page.evaluate(()=>{window.localPermissionLost=true;});const denied=await disk.command();expect(denied.code).toBe(1);expect(JSON.parse(denied.stdout).code).toBe('reconnect_required');
@@ -224,7 +256,12 @@ test('ordinary file opens unpublished imports and separately selected provider r
 test('generated consumer CLI selects separate unpublished providers, repeats, repairs and switches without begin or menu',async({page,server},info)=>{
  const {separateLocalSources,localSourceSpecs}=await import('../helpers/local-source-repository.mjs');const disk=await separateLocalSources(page,server);
  try{
+  // T4a (#878): imports start unresolved; the copy is named but holds no providers.
+  const independent=path.join(disk.consumerFolder,'independent.spec.json');
+  await expect.poll(async()=>{const copy=await copySummary(disk.support);return copy.whole && copy.named?{specs:copy.specs}:copy;},{message:'T4a named copy without providers',timeout:15000}).toEqual({specs:[]});
+  const unresolved=bundledValidate(disk.support,independent);expect(unresolved.status,unresolved.stdout+unresolved.stderr).toBe(1);expect(unresolved.stdout).toContain(COPY_REMEDY);
   const command=await disk.command('--source-repo',disk.roots[0]);expect(command.code,command.stderr).toBe(0);const first=JSON.parse(command.stdout);expect(first.status).toBe('applied');expect(first.localSources.available).toBe(true);expect(first.localSources.code).toBe('ready');expect(first.localSources.mode).toBe('agent-snapshot');expect(first.localSources.needsSnapshot).toBe(true);expect(first.localSources.snapshotSha256).toMatch(/^[a-f0-9]{64}$/);expect(first.localSources.providerCount).toBe(2);expect(first.localSources.capturedAt).toMatch(/Z$/);await expect(node(page)).toContainText('Unpublished API');expect((await disk.readState()).localSources.sourceSelectionId).toBeTruthy();
+  await expectCopyMatches(disk.support,independent,{sourceKind:'local',baseApi:'Unpublished API'},'T4b after refresh-sources');
   const extra=structuredClone(localSourceSpecs.base);extra.page.sections[0].diagram.nodes.api.title='New transitive dependency';await mkdir(path.join(disk.roots[0],'diagrams/extra'));await disk.provider(disk.roots[0],'extra',JSON.stringify(extra));
   const registry=JSON.parse(await readFile(path.join(disk.roots[0],'canon.json'),'utf8'));registry.diagrams.push({folder:'diagrams/extra',owner:'group:default/local'});await writeFile(path.join(disk.roots[0],'canon.json'),JSON.stringify(registry));
   const middle=structuredClone(localSourceSpecs.middle);middle.page.sections[0].diagram.topologyImports.push({spec:'extra',export:'core',as:'extra'});middle.page.sections[0].diagram.topologyExports.core.nodes.push('extra::api');await disk.provider(disk.roots[0],'middle',JSON.stringify(middle));const transitive=await disk.command();expect(transitive.code,transitive.stderr).toBe(0);await expect(page.locator('#docview g.node[data-dv-node="shared::extra::api"]')).toContainText('New transitive dependency');
@@ -275,6 +312,33 @@ test('Use site library leaves a selected local source repository with Undo, and 
   await page.locator('#undo-builder').click();await expect(node(page)).toContainText('Unpublished API');expect((await saved()).local).toBe(true);
   await page.locator('#redo-builder').click();await expect(node(page)).toContainText('Site published API');expect(!!(await saved()).local).toBe(false);
   await page.reload();await expect(node(page)).toContainText('Site published API');
+ }finally{await page.close();await disk.close();await site.close();}
+});
+test('#878 T5: the connected copy follows site library, local roots, Refresh, Use site library, Undo and Redo',async({page,server})=>{
+ const site=await siteLibrary(server),{separateLocalSources,localSourceSpecs}=await import('../helpers/local-source-repository.mjs');
+ const disk=await separateLocalSources(page,server,{workbench:site.url,emptyLibrary:false});
+ const independent=path.join(disk.consumerFolder,'independent.spec.json'),local=baseApi=>({sourceKind:'local',baseApi}),siteCopy={sourceKind:'site-library',baseApi:'Site published API'};
+ try{
+  await expect(node(page),'precondition: the connected consumer resolves from the site library').toContainText('Site published API');
+  const second=structuredClone(localSourceSpecs.base);second.page.sections[0].diagram.nodes.api.title='Second root API';await disk.provider(disk.roots[1],'base',JSON.stringify(second));
+  await expectCopyMatches(disk.support,independent,siteCopy,'T5 start');
+  await filePanel(page);await page.locator('#local-sources-select').click();await expect(node(page)).toContainText('Unpublished API');
+  await expectCopyMatches(disk.support,independent,local('Unpublished API'),'T5 first root');
+  await page.evaluate(()=>{window.providerPickerPath='/sources-b/worktree';});await filePanel(page);await page.locator('#local-sources-select').click();await expect(node(page)).toContainText('Second root API');
+  await expectCopyMatches(disk.support,independent,local('Second root API'),'T5 second root');
+  await page.locator('#undo-builder').click();await expect(node(page)).toContainText('Unpublished API');
+  await expectCopyMatches(disk.support,independent,local('Unpublished API'),'T5 Undo to first root');
+  await page.locator('#redo-builder').click();await expect(node(page)).toContainText('Second root API');
+  await expectCopyMatches(disk.support,independent,local('Second root API'),'T5 Redo to second root');
+  const edited=structuredClone(localSourceSpecs.base);edited.page.sections[0].diagram.nodes.api.title='Edited second root';await disk.provider(disk.roots[1],'base',JSON.stringify(edited));
+  await refresh(page);await expect(node(page)).toContainText('Edited second root');
+  await expectCopyMatches(disk.support,independent,local('Edited second root'),'T5 Refresh local sources');
+  await filePanel(page);await page.locator('#local-sources-site').click();await expect(node(page)).toContainText('Site published API');
+  await expectCopyMatches(disk.support,independent,siteCopy,'T5 Use site library');
+  await page.locator('#undo-builder').click();await expect(node(page)).toContainText('Edited second root');
+  await expectCopyMatches(disk.support,independent,local('Edited second root'),'T5 Undo to edited second root');
+  await page.locator('#redo-builder').click();await expect(node(page)).toContainText('Site published API');
+  await expectCopyMatches(disk.support,independent,siteCopy,'T5 Redo to site library');
  }finally{await page.close();await disk.close();await site.close();}
 });
 

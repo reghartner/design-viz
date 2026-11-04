@@ -2017,3 +2017,55 @@ test('M8 a demo telemetry source shows Metrics, mounts only while on, reports de
  metrics.dispatchEvent({type:'click'});assert.equal(mounted,2);h.ctl.liveStatus.destroy();assert.equal(cleaned,2,'M8 destroy runs the demo cleanup');
  panel.destroy();
 });
+
+/* #943: the claude.ai Grafana adapter (src/viewer/telemetry-claude.js) names its connector.
+| M9 | With `telemetry.source` (the Grafana adapter passes 'Grafana') the metrics connector text reads "<source> not connected", "<source> connecting · <window> window", "<source> connected · <window> window · refreshed <time>" plus " · <note>" when the provider reported a note for that answer (third provider argument, `report.note(text)`; a clean answer clears it), "<source> needs approval · <window> window" with data-state approval for a rejection whose `state` is 'approval', and the error note (else "<source> did not answer") on error. The window is tracking.telemetry.window, default 24h. snapshot().metrics carries source and window. Without a source the "Metrics: …" text is unchanged (M6). |
+| M10 | The panel's action button (ctl.liveStatus.action) also shows on a page whose only live evidence is a telemetry provider, so "Allow Grafana" reaches viewers of a metrics-only board. |
+*/
+test('M9 a named telemetry source reads "<source> connected · <window> window · refreshed <time>", carries its note, approval and error',async()=>{
+ let mode='ok',reports=0;const sample={a:{signals:{lag:{value:3}}}};
+ const provider=(b,signal,report)=>{
+  if(report && typeof report.note==='function'){reports++;if(mode==='note')report.note('1 Grafana query failed: a lag: boom');}
+  if(mode==='approval')return Promise.reject(Object.assign(Error('Grafana access needs your approval'),{state:'approval'}));
+  if(mode==='error')return Promise.reject(Error('Reconnect Grafana in claude.ai Settings → Connectors'));
+  if(mode==='bare')return Promise.reject(Error(''));
+  return Promise.resolve(sample);
+ };
+ const h=harness(telemetryPage(),{},{telemetry:{source:'Grafana',provider}});
+ const panel=mountStatus(h);h.flush();h.flush();await settle();
+ const metrics=h.view.querySelector('button.dv-live-metrics'),conn=h.view.querySelector('.dv-live-metrics-connection'),text=()=>conn.querySelectorAll('span')[0].textContent;
+ assert.equal(text(),'Grafana not connected','M9 idle');assert.equal(conn.getAttribute('data-state'),'disconnected');
+ metrics.dispatchEvent({type:'click'});assert.equal(text(),'Grafana connecting · 24h window','M9 connecting names the default 24h window');
+ await settle();assert.ok(reports>0,'M9 the provider receives a report object with note()');
+ const clock=()=>metricsClock(h.ctl.telemetry.status().refreshedAt);
+ assert.equal(conn.getAttribute('data-state'),'connected');assert.equal(text(),'Grafana connected · 24h window · refreshed '+clock());
+ const snap=h.ctl.liveStatus.snapshot().metrics;assert.equal(snap.source,'Grafana');assert.equal(snap.window,'24h');
+ const tick=()=>{const entry=[...h.timers].find(([,x])=>x.ms===60000);assert.ok(entry,'M9 refresh armed');h.timers.delete(entry[0]);entry[1].fn();};
+ mode='note';tick();await settle();
+ assert.equal(h.ctl.telemetry.status().state,'ok');assert.equal(h.ctl.telemetry.status().note,'1 Grafana query failed: a lag: boom','M9 a reported note rides a good answer');
+ assert.equal(text(),'Grafana connected · 24h window · refreshed '+clock()+' · 1 Grafana query failed: a lag: boom');
+ mode='ok';tick();await settle();assert.equal(h.ctl.telemetry.status().note,'','M9 a clean answer clears the note');assert.equal(text(),'Grafana connected · 24h window · refreshed '+clock());
+ const kept=plain(h.ctl.telemetry.snapshot().map);mode='approval';tick();await settle();
+ assert.equal(h.ctl.telemetry.status().state,'approval','M9 a rejection with state approval');assert.equal(conn.getAttribute('data-state'),'approval');assert.equal(text(),'Grafana needs approval · 24h window');
+ assert.deepEqual(plain(h.ctl.telemetry.snapshot().map),kept,'M9 approval keeps the map like any rejection');
+ mode='error';tick();await settle();assert.equal(conn.getAttribute('data-state'),'error');assert.equal(text(),'Reconnect Grafana in claude.ai Settings → Connectors','M9 the error note names the fix');
+ mode='bare';tick();await settle();assert.equal(text(),'Grafana did not answer','M9 an error without a note');
+ panel.destroy();h.ctl.liveStatus.destroy();
+ const six=telemetryPage();six.page.tracking.telemetry.window='6h';
+ const w=harness(six,{},{telemetry:{source:'Grafana',provider:()=>new Promise(()=>{})}}),wp=mountStatus(w);
+ w.view.querySelector('button.dv-live-metrics').dispatchEvent({type:'click'});
+ assert.equal(w.view.querySelector('.dv-live-metrics-connection').querySelectorAll('span')[0].textContent,'Grafana connecting · 6h window','M9 the authored window');
+ wp.destroy();w.ctl.liveStatus.destroy();
+});
+
+test('M10 the action button shows on a metrics-only page so Allow Grafana reaches its viewers',()=>{
+ const page={page:{tracking:{telemetry:{grafana:{prometheus:'prom-main'}}},sections:[{id:'main',diagram:{nodes:{a:{title:'A',telemetry:TQUEUE()}},rows:[['a']]}}]}};
+ const h=harness(page,{},{telemetry:{source:'Grafana',provider:()=>Promise.resolve({})}}),panel=mountStatus(h);
+ assert.equal(h.ctl.liveStatus.snapshot().available,false,'M10 no Jira evidence on this page');
+ let ran=0;h.ctl.liveStatus.action('Allow Grafana',()=>ran++);
+ const action=h.view.querySelector('.dv-live-action');
+ assert.ok(action,'M10 the action button');assert.equal(action.hidden,false,'M10 visible beside Metrics');assert.equal(action.textContent,'Allow Grafana');
+ action.dispatchEvent({type:'click'});assert.equal(ran,1,'M10 it runs the adapter action');
+ h.ctl.liveStatus.action('',null);assert.equal(h.view.querySelector('.dv-live-action').hidden,true,'M10 cleared, it hides');
+ panel.destroy();h.ctl.liveStatus.destroy();
+});

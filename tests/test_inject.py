@@ -306,6 +306,45 @@ class InjectTests(unittest.TestCase):
         self.assertNotIn("searchJiraIssuesUsingJql", guide)
         self.assertEqual(json.loads(FLOWSPEC_BLOCK.search(out)[1]), SPEC)
 
+    def test_agent_guide_declares_the_grafana_connector_only_for_grafana_run_signals(self):
+        # #943: a page whose carriers (or page templates) bind grafana, loki or sql
+        # signals declares the Grafana connector beside Jira, with the five tools the
+        # adapter picks it by; tempo-only or honeycomb-only pages do not.
+        grafana_tools = ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]
+        jira = {"server": "Atlassian", "tools": ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}
+        grafana = {"server": "Grafana", "tools": grafana_tools}
+
+        def guide_for(page_extra=None, node_telemetry=None):
+            spec = tracked_spec()
+            spec["page"].update(page_extra or {})
+            if node_telemetry is not None:
+                spec["page"]["blocks"] = [{"heading": "h", "diagram": {"nodes": {"a": {"telemetry": node_telemetry}}, "rows": [["a"]]}}]
+            r, out = run_inject(TEMPLATE, json.dumps(spec))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            guide = GUIDE_BLOCK.search(out)[1]
+            self.assertLess(len(guide.encode("utf-8")), 6 * 1024)
+            return json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S)[1]), guide
+
+        for source in ("grafana", "loki", "sql"):
+            declaration, guide = guide_for(node_telemetry={"kind": "service", "signals": {"rate": {source: "q"}}})
+            self.assertEqual(declaration["mcp"]["servers"], [jira, grafana], source)
+            for needle in ("Grafana", "get_annotations", "query_sql", "at most once an hour"):
+                self.assertIn(needle, guide, needle)
+        # a template signal on the page counts too, even before a carrier uses it
+        templated = {"tracking": {"jira": {"site": "https://jira.test"}, "telemetry": {"templates": {"t": {"kind": "service", "signals": {"r": {"grafana": "up"}}}}}}}
+        self.assertEqual(guide_for(page_extra=templated)[0]["mcp"]["servers"], [jira, grafana])
+        for other in ({"tempo": "{ }"}, {"honeycomb": {"dataset": "d"}}):
+            declaration, guide = guide_for(node_telemetry={"kind": "service", "signals": {"x": other}})
+            self.assertEqual(declaration["mcp"]["servers"], [jira], other)
+            self.assertNotIn("get_annotations", guide)
+        # an untracked page with Grafana signals declares Grafana alone
+        spec = json.loads(json.dumps(SPEC))
+        spec["page"]["blocks"] = [{"heading": "h", "diagram": {"nodes": {"a": {"telemetry": {"kind": "service", "signals": {"r": {"grafana": "up"}}}}}, "rows": [["a"]]}}]
+        r, out = run_inject(TEMPLATE, json.dumps(spec))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        declaration = json.loads(re.search(r"```json\n(.*?)\n```", GUIDE_BLOCK.search(out)[1], re.S)[1])
+        self.assertEqual(declaration, {"mcp": {"servers": [grafana]}, "comments": {"composer_only": True, "customAnchors": True}})
+
     def test_agent_guide_replaces_a_stale_guide_when_reinjecting_a_built_page(self):
         built = TEMPLATE.replace("</script>\n" + BACKLINK_OPEN,
                                  '</script>\n<script type="text/markdown" id="dv-agent-guide">\nold guide\n</script>\n' + BACKLINK_OPEN, 1)

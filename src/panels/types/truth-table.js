@@ -34,13 +34,15 @@ function truthTableIconCell(outputs) {
   });
   return html + (icons.length ? '' : outputs.length ? '—' : '<span>No icons</span>') + '</div>';
 }
-// Active case choices by label; a label shared with another case or a reserved choice gets its ID.
+// Active case choices show each case's label, or its ID when unlabeled. A shown text that matches any other
+// visible choice (another case, the inherit/default choice or No active case) gets its ID, or "(case ID)".
 function truthTableCaseChoices(panel, reserved) {
   var rows = truthTableCases(panel), texts = rows.map(function (row) { return typeof row.label === 'string' && row.label.trim() ? row.label : String(row.id); });
+  var visible = (reserved || []).concat(texts);
   return rows.map(function (row, i) {
     var text = texts[i], labeled = typeof row.label === 'string' && row.label.trim();
-    var clash = labeled && ((reserved || []).indexOf(text) >= 0 || texts.some(function (other, j) { return j !== i && other === text; }));
-    return [row.id, clash ? text + ' (' + row.id + ')' : text];
+    var clash = visible.filter(function (other) { return other === text; }).length > 1;
+    return [row.id, !clash ? text : labeled ? text + ' (' + row.id + ')' : text + ' (case ID)'];
   });
 }
 function truthTableCaseRows(panel) {

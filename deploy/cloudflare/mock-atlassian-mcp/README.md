@@ -1,10 +1,13 @@
 # Mock Atlassian MCP
 
 A dependency-free Cloudflare Worker for exercising Flowview live ticket status
-without an Atlassian account. It serves fictional Jira data using the three
+without an Atlassian account. It serves fictional Jira data using five
 Atlassian tool names: `getAccessibleAtlassianResources`,
-`searchJiraIssuesUsingJql`, and `getJiraIssue`. It is a public, read-only mock,
-with no credentials or Jira connection. Document editing remains desktop-only.
+`searchJiraIssuesUsingJql`, `getJiraIssue`, `listJiraIssueChangelogs` and
+`listJiraStatuses`. The last two serve Over time history derived from the same
+story timeline, up to the story's current day, and the changelog tool returns at
+most three entries per page. It is a public, read-only mock, with no credentials
+or Jira connection. Document editing remains desktop-only.
 
 ## Deploy
 

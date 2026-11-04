@@ -6,6 +6,9 @@ import allDone from './fixtures/all-done.json' with { type: 'json' };
 
 const SITE = 'https://acme.atlassian.net';
 const EPOCH = Date.parse('2026-10-20T09:00:00Z');
+const DAY_MS = 86400000;
+// Small on purpose: at least one story ticket needs a second page, so clients must follow the cursor.
+const CHANGELOG_PAGE = 3;
 const CATEGORIES = {
   todo: { key: 'new', name: 'To Do' },
   active: { key: 'indeterminate', name: 'In Progress' },
@@ -24,7 +27,13 @@ const TOOL_INPUTS = {
     title: 'Get Jira issue', required: ['cloudId', 'issueIdOrKey'],
     properties: { cloudId: { type: 'string' }, issueIdOrKey: { type: 'string' },
       fields: { type: 'array', items: { type: 'string' } } }
-  }
+  },
+  listJiraIssueChangelogs: {
+    title: 'List Jira issue changelogs', required: ['cloudId', 'issueIdOrKey'],
+    properties: { cloudId: { type: 'string' }, issueIdOrKey: { type: 'string' },
+      maxResults: { type: 'integer', minimum: 1 }, nextPageToken: { type: 'string' } }
+  },
+  listJiraStatuses: { title: 'List Jira statuses', required: ['cloudId'], properties: { cloudId: { type: 'string' } } }
 };
 
 function unquote(value) {
@@ -136,11 +145,7 @@ export function jiraIssueFromStatus(key, entry, now = EPOCH, issues = null) {
   };
 }
 
-function issuesFor(env) {
-  const scenario = env.scenario ?? 'story';
-  if (scenario === 'all-done') return allDone.issues;
-  if (scenario !== 'story') return allTodo.issues;
-  const days = (env.timeline || story).days;
+function storyIndex(env, days) {
   let index;
   if (env.day !== undefined && env.day !== null && Number.isFinite(Number(env.day))) {
     index = Math.max(0, Math.min(days.length - 1, Math.floor(Number(env.day))));
@@ -150,7 +155,54 @@ function issuesFor(env) {
     // Positive modulo keeps future deployment epochs safe too.
     index = ((elapsed % days.length) + days.length) % days.length;
   }
-  return days[index].issues;
+  return index;
+}
+
+function issuesFor(env) {
+  const scenario = env.scenario ?? 'story';
+  if (scenario === 'all-done') return allDone.issues;
+  if (scenario !== 'story') return allTodo.issues;
+  const days = (env.timeline || story).days;
+  return days[storyIndex(env, days)].issues;
+}
+
+const jiraTime = ms => new Date(ms).toISOString().replace('Z', '+0000');
+const statusName = entry => entry.statusName || (entry.state === 'blocked' ? 'Blocked' : (CATEGORIES[entry.state] || CATEGORIES.todo).name);
+const isFlagged = entry => !!(entry.flagged || entry.state === 'blocked');
+
+// A ticket is created on the first story day that names it.
+function createdTime(key, env) {
+  const first = (env.timeline || story).days.findIndex(day => Object.hasOwn(day.issues, key));
+  return jiraTime(EPOCH + Math.max(0, first) * DAY_MS);
+}
+
+// One entry for each day a ticket's status or Flagged value changed, up to the story's current day.
+function changelogFor(key, env) {
+  if ((env.scenario ?? 'story') !== 'story') return [];
+  const days = (env.timeline || story).days, last = storyIndex(env, days), entries = [];
+  let previous = null;
+  for (let index = 0; index <= last; index++) {
+    const entry = days[index].issues[key];
+    if (!entry) continue;
+    const items = [];
+    if (previous && statusName(previous) !== statusName(entry)) {
+      items.push({ field: 'status', fieldtype: 'jira', fromString: statusName(previous), toString: statusName(entry) });
+    }
+    if (previous && isFlagged(previous) !== isFlagged(entry)) {
+      items.push({ field: 'Flagged', fieldtype: 'custom', fromString: isFlagged(previous) ? 'Impediment' : '', toString: isFlagged(entry) ? 'Impediment' : '' });
+    }
+    if (items.length) entries.push({ id: String(1000 + entries.length), created: jiraTime(EPOCH + index * DAY_MS), items });
+    previous = entry;
+  }
+  return entries;
+}
+
+function storyStatuses(env) {
+  const found = new Map();
+  for (const day of (env.timeline || story).days) {
+    for (const entry of Object.values(day.issues)) found.set(statusName(entry), CATEGORIES[entry.state] || CATEGORIES.todo);
+  }
+  return [...found].map(([name, category], index) => ({ id: String(10000 + index), name, statusCategory: { ...category } }));
 }
 
 function error(id, code, message) {
@@ -165,14 +217,32 @@ function toolResult(name, args, env, id) {
   if (name === 'getJiraIssue') {
     const key = args.issueIdOrKey;
     if (key === 'DOOR-100') {
-      return { data: { appliedContentFormat: 'markdown', ...jiraIssueFromStatus(key,
-        { state: epicState(key, issues), summary: 'Connected doorbell delivery', issueType: 'Epic' }, env.now) } };
+      const epic = jiraIssueFromStatus(key,
+        { state: epicState(key, issues), summary: 'Connected doorbell delivery', issueType: 'Epic' }, env.now);
+      epic.fields.created = createdTime(key, env);
+      return { data: { appliedContentFormat: 'markdown', ...epic } };
     }
     if (typeof key !== 'string' || !Object.hasOwn(issues, key)) {
       return error(id, -32602, 'Issue does not exist or you do not have permission to see it.');
     }
-    return { data: { appliedContentFormat: 'markdown', ...jiraIssueFromStatus(key, issues[key], env.now, issues) } };
+    const issue = jiraIssueFromStatus(key, issues[key], env.now, issues);
+    issue.fields.created = createdTime(key, env);
+    return { data: { appliedContentFormat: 'markdown', ...issue } };
   }
+  if (name === 'listJiraIssueChangelogs') {
+    const key = args.issueIdOrKey;
+    if (typeof key !== 'string' || !Object.hasOwn(issues, key)) {
+      return error(id, -32602, 'Issue does not exist or you do not have permission to see it.');
+    }
+    const entries = changelogFor(key, env);
+    const limit = typeof args.maxResults === 'number' && Number.isFinite(args.maxResults)
+      ? Math.max(1, Math.min(CHANGELOG_PAGE, Math.floor(args.maxResults))) : CHANGELOG_PAGE;
+    const offset = /^\d+$/.test(args.nextPageToken || '') ? Number(args.nextPageToken) : 0;
+    const values = entries.slice(offset, offset + limit), hasNextPage = offset + values.length < entries.length;
+    return { values, startAt: offset, maxResults: limit, total: entries.length, isLast: !hasNextPage,
+      pageInfo: { hasNextPage, endCursor: hasNextPage ? String(offset + values.length) : null } };
+  }
+  if (name === 'listJiraStatuses') return { values: storyStatuses(env), isLast: true };
   if (name === 'searchJiraIssuesUsingJql') {
     const parsed = parseJql(args.jql);
     const limit = typeof args.maxResults === 'number' && Number.isFinite(args.maxResults)
@@ -190,7 +260,11 @@ function toolResult(name, args, env, id) {
         (!parsed.statusCategory || CATEGORIES[entry.state]?.key === parsed.statusCategory);
     }) : [];
     const offset = /^\d+$/.test(args.nextPageToken || '') ? Number(args.nextPageToken) : 0;
-    const nodes = matches.slice(offset, offset + limit).map(([key, entry]) => jiraIssueFromStatus(key, entry, env.now, issues));
+    const nodes = matches.slice(offset, offset + limit).map(([key, entry]) => {
+      const issue = jiraIssueFromStatus(key, entry, env.now, issues);
+      issue.fields.created = createdTime(key, env);
+      return issue;
+    });
     const hasNextPage = limit > 0 && offset + nodes.length < matches.length;
     return { issues: { nodes, webUrl: SITE + '/issues/?jql=' + encodeURIComponent(typeof args.jql === 'string' ? args.jql : '') },
       pageInfo: { hasNextPage, endCursor: hasNextPage ? String(offset + nodes.length) : null } };

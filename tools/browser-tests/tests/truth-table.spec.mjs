@@ -134,6 +134,7 @@ test('desktop truth-table author edits properties, cases and shared icons with e
    | E a label commits its ID | choosing "Battery operation" saves "battery" and highlights Battery operation; selectOption('low') still saves "low" | committing the label text |
    | F Inherit previous removes the assignment | after null, choosing it deletes steps[2].panels.power.active and step 2 inherits Low battery again | treating inherit as null |
    | G IDs where needed | after real renames (solar -> "No active case", mains -> blank, battery -> "Low battery"): options read [Use panel default, No active case (solar), mains, Low battery (battery), Low battery (low), No active case] | duplicate or reserved texts left ambiguous; a blank label shown as "" |
+   | G2 every visible text compared | then unlabeled mains renamed to ID "No active case": options read [Use panel default, No active case (solar), No active case (case ID), Low battery (battery), Low battery (low), No active case] | checking only labeled cases, so an unlabeled ID reads exactly like the null choice (review c1) |
    | H shows the current choice | step 1 shows Low battery checked; Starting state shows Solar charging; an inheriting step shows Inherit previous | an unselected control after save |
    | active opts out of the shared selector; Explanation keeps it | Node (tests/truth-table-panel.test.js): merged initial and step presentation meta: active.assignment === false, note.assignment !== false | a global change to every panel's assignment selector |
    | template keeps initial.active "solar" | Node: picker example's initial is {active:"solar"} | changing the template default |
@@ -203,4 +204,10 @@ test('truth table picker adds the panel and step controls carry, change and clea
   }
   await open(starting);
   expect(await activeCase(starting).locator('option').allTextContents(),'(G) IDs tell duplicate, blank and reserved labels apart').toEqual(['Use panel default','No active case (solar)','mains','Low battery (battery)','Low battery (low)','No active case']);
+  // (G2) An unlabeled case shows its ID; an ID that reads like another choice is marked as a case ID.
+  const caseId=guide.locator('[data-truth-case="mains"]:not([data-truth-column])').getByLabel('Case ID',{exact:true});
+  await caseId.fill('No active case');await caseId.press('Tab');
+  await expect.poll(async()=>(await diagram()).panels[0].cases.map(row=>[row.id,row.label]),'precondition: unlabeled mains renamed to ID "No active case"').toEqual([['solar','No active case'],['No active case',undefined],['battery','Low battery'],['low','Low battery']]);
+  await open(starting);
+  expect(await activeCase(starting).locator('option').allTextContents(),'(G2) an unlabeled ID that matches another choice is told apart').toEqual(['Use panel default','No active case (solar)','No active case (case ID)','Low battery (battery)','Low battery (low)','No active case']);
 });

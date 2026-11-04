@@ -3,19 +3,19 @@
    Recorded payloads come from the mock Grafana MCP handler (deploy/cloudflare/mock-grafana-mcp/mcp.mjs)
    for pinned story days, wrapped in the claude.ai CallToolResult envelope (payload = structuredContent,
    else the first text block parsed as JSON, else that text).
-| row | rule |
-|---|---|
-| A1 | `viewer/telemetry-claude.js` ships in the standalone entrypoint only; the standalone boot builds the adapter with `createTelemetryGrafana(page, window)` when no `window.flowviewTelemetry` host provider is set. |
-| A2 | `createTelemetryGrafana(page, win)` is null without `win.claude.use` (absent or throwing getter) and on pages without a grafana, loki or sql signal; otherwise `{options: {provider, source: 'Grafana'}, attach(ctl, page)}`. Imported carriers count. Creating it never calls `use()`. |
-| A3 | The connector is picked by offered tools: all of query_prometheus, query_loki_logs, search_tempo_traces, get_annotations, generate_deeplink. A connector missing one (query_prometheus) is not picked; Jira-only and GitHub-only connectors are not picked; "Grafana" wins a tie, else the first qualifying one. None → the add-connector note and no tool call. |
-| A4 | One refresh (default 24h window) makes exactly: get_annotations first and alone, one query_prometheus range call per grafana signal, one query_loki_logs metric range call per loki signal, generate_deeplink once per carrier without an authored query link; relative times now-24h..now, stepSeconds 360, the page's datasource UIDs, the provider's AbortSignal on every call. tempo and honeycomb signals are not queried. A later refresh repeats the queries but not the deeplinks. |
-| A5 | Day 10 recorded payloads map to the provider shape: every Prometheus and Loki series as ascending [ms, number] points (several series added point by point), value = the last point, the authored unit; a query with no data is value 0 with no points; observedAt = the newest point; markers = the window's annotations ascending as {at, kind, label}; links = authored dashboard/query plus the generated Explore link. Imported carriers map by their resolved id. |
-| A6 | The page window drives the range and step (6h → now-6h, 90 s; 30m → 60 s floor); Day 11 shows the incident marker and the lagging queue; Day 12 the recovered queue and the still-silent push edge. |
-| A7 | Through ctl.telemetry: Metrics off makes no call; the refresh never runs faster than 60 s even when the page asks for less; a hidden document pauses and returns with one catch-up; Metrics off aborts the signal. |
-| A8 | A connector-level failure (server_unavailable) keeps the previous map and sets status().note; a tool_error on one query keeps the other carriers fresh, keeps that signal's previous sample and reports the failed query in status().note. |
-| A9 | approval_required → status `approval`, no further connector call in that Metrics session, an "Allow Grafana" action on ctl.liveStatus (re-shown after another connector clears the slot, never over another connector's action); Allow makes the same call once and restarts Metrics. Authorization denials clear the map, set the note and stop calls until Metrics is turned on again; user_changed retires the adapter. |
-| A10 | sql signals call query_sql at most once an hour (the value is reused in between); without query_sql on the connector there is no call and the note says so. |
-| A11 | docs/live-status.md declares the Grafana connector with its five tools and states the per-refresh call budget. |
+| row | rule | fixture | scoped assertion | broken implementation rejected |
+|---|---|---|---|---|
+| A1 | `viewer/telemetry-claude.js` ships in the standalone entrypoint only; the standalone boot builds the adapter with `createTelemetryGrafana(page, window)` when no `window.flowviewTelemetry` host provider is set. | Standalone/native/workbench/forge source records and boot source | Only A1 checks module existence, bundle placement and host-provider precedence | Missing adapter, adapter in another bundle, or unconditional boot provider |
+| A2 | `createTelemetryGrafana(page, win)` is null without `win.claude.use` (absent or throwing getter) and on pages without a grafana, loki or sql signal; otherwise `{options: {provider, source: 'Grafana'}, attach(ctl, page)}`. Imported carriers count. Creating it never calls `use()`. | Runtime gates, local grafana/loki/sql signals and imported edge binding; absence-tolerant loader | Named A2 gate, provider/source/attach shape and zero use() assertions | Ungated or eager adapter, ignored imported carriers |
+| A3 | The connector is picked by offered tools: all of query_prometheus, query_loki_logs, search_tempo_traces, get_annotations, generate_deeplink. A connector missing one (query_prometheus) is not picked; Jira-only and GitHub-only connectors are not picked; "Grafana" wins a tie, else the first qualifying one. None → the add-connector note and no tool call. | Partial, Jira, GitHub and competing qualifying connectors; inert provider if absent | Named A3 calls select the expected connector and missing tools produce the add-connector note | Name-only selection, wrong tie-break or calls without a qualifying connector |
+| A4 | One refresh (default 24h window) makes exactly: get_annotations first and alone (no other call starts until it settles), one query_prometheus range call per grafana signal, one query_loki_logs metric range call per loki signal, generate_deeplink once per carrier without an authored query link; relative times now-24h..now, stepSeconds 360, the page's datasource UIDs, the provider's AbortSignal on every call. tempo and honeycomb signals are not queried. A later refresh repeats the queries but not the deeplinks. | One-shot deferred get_annotations, start/settle event log, then a second refresh | Exactly one pending call, no query starts before annotation settlement; exact inputs, budget, signals and cached links | Annotations launched concurrently with queries, early queries, extra calls or repeated deeplinks |
+| A5 | Day 10 recorded payloads map to the provider shape: every Prometheus and Loki series as ascending [ms, number] points (several series added point by point), value = the last point, the authored unit; a query with no data is value 0 with no points; observedAt = the newest point; markers = the window's annotations ascending as {at, kind, label}; links = authored dashboard/query plus the generated Explore link. Imported carriers map by their resolved id. | Pinned Day 10 payloads, local and resolved imported carriers, pure mapper inputs; empty map if absent | Named A5 carrier ids, mapped values/series/units, markers, timestamps and links | Wrong Loki field, missing markers, lost imported ids or incorrect series aggregation |
+| A6 | The page window drives the range and step (6h → now-6h, 90 s; 30m → 60 s floor); Day 11 shows the incident marker and the lagging queue; Day 12 the recovered queue and the still-silent push edge. | 6h/30m/7d windows and pinned Day 11/12/all-todo story; missing calls read as undefined | Named A6 ranges, step floor, incident marker, lag/recovery and silent-edge values | Fixed window/step, missing incident marker or wrong recovery/silence values |
+| A7 | Through ctl.telemetry: Metrics off makes no call; the refresh never runs faster than 60 s even when the page asks for less; a hidden document pauses and returns with one catch-up; Metrics off aborts the signal. | Fake timers and document visibility through ctl.telemetry; page requests 1000 ms | Named A7 off/on calls, delivered map, 60000 ms floor, hidden pause, one catch-up and abort | Eager calls, sub-minute refresh, hidden polling, duplicate catch-up or no abort |
+| A8 | A connector-level failure (server_unavailable) keeps the previous map and sets status().note; a tool_error on one query keeps the other carriers fresh, keeps that signal's previous sample and reports the failed query in status().note. | Good sample then connector failure and per-query errors, plus missing datasource; inert provider if absent | Named A8 error status/note, retained previous map/sample, fresh peers and cleared note | Failure reported as success, erased previous map, stale peers or unreported query error |
+| A9 | approval_required → status `approval`, no further connector call in that Metrics session, an "Allow Grafana" action on ctl.liveStatus (re-shown after another connector clears the slot, never over another connector's action); Allow makes the same call once and restarts Metrics. Authorization denials clear the map, set the note and stop calls until Metrics is turned on again; user_changed retires the adapter. | Deferred approval/denial behavior and fake live-status action through ctl.telemetry | Named A9 approval status/text, one Allow retry, retracted map and retired adapter | Silent success, repeated unattended requests, overwritten action or retained unauthorized data |
+| A10 | sql signals call query_sql at most once an hour (the value is reused in between); without query_sql on the connector there is no call and the note says so. | SQL connector, controlled clock at 0/59/61 minutes, missing-tool case; no calls if absent | Named A10 SQL inputs/value, hourly cap/cache and missing-tool note | Missing SQL call, per-refresh SQL query, stale hourly cache or unsupported tool call |
+| A11 | docs/live-status.md declares the Grafana connector with its five tools and states the per-refresh call budget. | docs/live-status.md source | Declared connector, five tools and call-budget prose | Missing connector declaration or budget guidance |
 Flip: read the Loki metric result from the wrong field (A5 notify node and push edge fail). */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const {pathToFileURL}=require('node:url');
@@ -55,8 +55,23 @@ function boardPage(window){
   ]}}]};
 }
 
+/* While src/viewer/telemetry-claude.js does not exist (RED), an inert stand-in takes
+   its globals: a provider that resolves {} without a call, an attach() handle and
+   empty mappers. A1 alone asserts the module exists; every other row runs to its own
+   contract assertion and fails there (no call made, wrong map, no marker, null gate...). */
+const ABSENT_ADAPTER=['function createTelemetryGrafana(){return {options:{provider:function(){return Promise.resolve({});},source:""},attach:function(){return {destroy:function(){}};}};}',
+ 'function telemetryGrafanaServer(){return null;}','function telemetryGrafanaPrometheus(){return [];}','function telemetryGrafanaLoki(){return [];}',
+ 'function telemetryGrafanaMarkers(){return [];}','function telemetryGrafanaSql(){return null;}'].join('\n');
+/* Missing source is an ordinary RED fixture; syntax/runtime errors still surface.
+   Bundle placement and existence belong to A1 alone. */
+function loadAdapter(C){
+ let source;
+ try{source=fs.readFileSync(path.join(ROOT,'src/viewer/telemetry-claude.js'),'utf8');}
+ catch(error){if(error.code==='ENOENT')return null;throw error;}
+ vm.runInNewContext(source,C);return C;
+}
 /* A vm context with the engine (createTelemetry, telemetryBindings, normalize, FlowTopology)
-   and, when it exists, the adapter module taken from the standalone entrypoint. */
+   and the adapter module (or the inert RED stand-in above). */
 function context(){
  const timers=new Map(),listeners={};let serial=0;
  const doc={hidden:false,visibilityState:'visible',addEventListener:(t,f)=>{(listeners[t]??=new Set()).add(f);},removeEventListener:(t,f)=>listeners[t]?.delete(f),
@@ -64,15 +79,10 @@ function context(){
  const setTimer=(fn,ms)=>{const id=++serial;timers.set(id,{fn,ms});return id;},clearTimer=id=>timers.delete(id);
  const C={URL,console,AbortController,document:doc,setTimeout:setTimer,clearTimeout:clearTimer};
  vm.runInNewContext(entrypoint('native').source,C);
- const record=entrypoint('standalone').records.find(r=>r.file==='viewer/telemetry-claude.js');
- if(record)vm.runInNewContext(record.source,C);
+ if(!loadAdapter(C))vm.runInNewContext(ABSENT_ADAPTER,C);
  return {C,doc,timers,
   hide(on){doc.hidden=on;doc.visibilityState=on?'hidden':'visible';doc.dispatch('visibilitychange');},
   tick(ms){const entry=[...timers].find(([,x])=>ms===undefined || x.ms===ms);assert.ok(entry,'a refresh timer'+(ms?' of '+ms+' ms':'')+' is armed');timers.delete(entry[0]);entry[1].fn();}};
-}
-function adapterApi(C){
- assert.equal(typeof C.createTelemetryGrafana,'function','A1 createTelemetryGrafana comes from src/viewer/telemetry-claude.js in the standalone entrypoint');
- return C;
 }
 /* Every carrier of the normalized page, as ctl.liveStatus walks it (local and imported). */
 function carriersOf(C,page){
@@ -80,33 +90,41 @@ function carriersOf(C,page){
   Object.keys(d.nodes || {}).forEach(id=>fn(d.nodes[id],id,page));
   (Array.isArray(d.edges)?d.edges:[]).forEach(edge=>fn(edge,edge && typeof edge==='object'?edge.from+'->'+edge.to:null,page));});
 }
-/* The viewer's MCP namespace, answering through the mock handler for a pinned day. */
-async function mockMcp(env,servers,overrides={}){
- const {handleMcp}=await loadMock();const calls=[];
+/* The viewer's MCP namespace, answering through the mock handler for a pinned day.
+   events logs 'start:<tool>' when a call is made and 'settle:<tool>' when its promise
+   settles; the next call to each tool in holds waits for release(tool) before answering. */
+async function mockMcp(env,servers,overrides={},holds=[]){
+ const {handleMcp}=await loadMock();const calls=[],events=[],held=[],holdNext=new Set(holds);
+ function answer(call){
+  if(overrides[call.tool]){const given=overrides[call.tool](call.input,calls);if(given)return given;}
+  const reply=handleMcp({jsonrpc:'2.0',id:calls.length,method:'tools/call',params:{name:call.tool,arguments:call.input}},env);
+  if(reply.error)return Promise.reject({code:'bad_request',message:reply.error.message});
+  const result=reply.result,text=result.content[0].text;
+  if(result.isError)return Promise.reject({code:'tool_error',message:text,result});
+  let payload=result.structuredContent;if(payload===undefined){try{payload=JSON.parse(text);}catch{payload=text;}}
+  return Promise.resolve({content:result.content,structuredContent:result.structuredContent,payload});
+ }
  const mcp={
   listTools:()=>Promise.resolve({servers:plain(servers)}),
   callTool(server,tool,input,options){
-   const call={server,tool,input:plain(input),signal:options && options.signal};calls.push(call);
-   if(overrides[tool]){const answer=overrides[tool](call.input,calls);if(answer)return answer;}
-   const reply=handleMcp({jsonrpc:'2.0',id:calls.length,method:'tools/call',params:{name:tool,arguments:call.input}},env);
-   if(reply.error)return Promise.reject({code:'bad_request',message:reply.error.message});
-   const result=reply.result,text=result.content[0].text;
-   if(result.isError)return Promise.reject({code:'tool_error',message:text,result});
-   let payload=result.structuredContent;if(payload===undefined){try{payload=JSON.parse(text);}catch{payload=text;}}
-   return Promise.resolve({content:result.content,structuredContent:result.structuredContent,payload});
+   const call={server,tool,input:plain(input),signal:options && options.signal};calls.push(call);events.push('start:'+tool);
+   const gate=holdNext.delete(tool)?new Promise(resolve=>held.push({tool,resolve})):Promise.resolve();
+   const settled=gate.then(()=>answer(call));
+   settled.then(()=>events.push('settle:'+tool),()=>events.push('settle:'+tool));
+   return settled;
   }};
- return {mcp,calls,handleMcp};
+ function release(tool){held.filter(h=>h.tool===tool).forEach(h=>{held.splice(held.indexOf(h),1);h.resolve();});}
+ return {mcp,calls,events,release,handleMcp};
 }
 const GRAFANA_SERVER={server:'Ops Grafana',authStatus:'connected',tools:TOOLS.map(name=>({name,description:''}))};
 const JIRA_SERVER={server:'Atlassian',tools:[{name:'getAccessibleAtlassianResources'},{name:'searchJiraIssuesUsingJql'}]};
 function claudeWin(mcp){let used=0;return {win:{claude:{use:name=>{used++;return Promise.resolve(name==='mcp'?mcp:null);}}},used:()=>used};}
-async function setup({day=9,scenario,window,servers=[JIRA_SERVER,GRAFANA_SERVER],overrides,page,now}={}){
- const ctx=context(),C=adapterApi(ctx.C);
+async function setup({day=9,scenario,window,servers=[JIRA_SERVER,GRAFANA_SERVER],overrides,holds,page,now}={}){
+ const ctx=context(),C=ctx.C;
  const raw=page || boardPage(window),normalized=C.normalize(raw);
  const env={day};if(scenario)env.scenario=scenario;
- const net=await mockMcp(env,servers,overrides),host=claudeWin(net.mcp);
+ const net=await mockMcp(env,servers,overrides,holds),host=claudeWin(net.mcp);
  const adapter=C.createTelemetryGrafana(normalized,host.win,now);
- assert.ok(adapter && adapter.options && typeof adapter.options.provider==='function','A2 a page with Grafana signals in claude.ai gets the adapter');
  const bindings=()=>C.telemetryBindings(carriersOf(C,normalized));
  return {...ctx,C,page:normalized,net,host,adapter,bindings,
   async refresh(signal=new AbortController().signal){const notes=[];const map=await adapter.options.provider(bindings(),signal,{note:t=>notes.push(t)});return {map:plain(map),notes};}};
@@ -133,7 +151,7 @@ test('A1 the adapter ships in the standalone entrypoint only and the boot builds
 });
 
 test('A2 the adapter needs the claude.ai runtime and a grafana, loki or sql signal, local or imported; creating it never calls use()',async()=>{
- const {C}=context();adapterApi(C);
+ const {C}=context();
  const page=C.normalize(boardPage());let used=0;const win={claude:{use:()=>{used++;return Promise.resolve(null);}}};
  assert.equal(C.createTelemetryGrafana(page,{}),null,'A2 no window.claude');
  const throwing={};Object.defineProperty(throwing,'claude',{get(){throw Error('unavailable');}});
@@ -171,16 +189,25 @@ test('A3 the Grafana connector is picked by its offered tools; a connector missi
   await assert.rejects(s.refresh(),err=>{assert.equal(err.message,'Add a Grafana connector in claude.ai Settings → Connectors to see live metrics.');return true;},'A3 no qualifying connector');
   assert.equal(s.net.calls.length,0,'A3 no tool call without a qualifying connector');
  }
- const {C}=context();adapterApi(C);
+ const {C}=context();
  assert.equal(typeof C.telemetryGrafanaServer,'function','A3 the picker is a named helper');
  assert.equal(C.telemetryGrafanaServer({servers:[missing]}),null);assert.equal(C.telemetryGrafanaServer([GRAFANA_SERVER]),'Ops Grafana','A3 a bare server array is accepted');
 });
 
 test('A4 one refresh makes exactly the budgeted calls with relative 24h times and the page datasource UIDs; deeplinks are generated once',async()=>{
- const s=await setup(),signal=new AbortController().signal;
- await s.refresh(signal);
- const calls=s.net.calls;
- assert.equal(calls[0].tool,'get_annotations','A4 the annotation read goes first, alone');assert.deepEqual(calls[0].input,{type:'annotation',limit:100});
+ const s=await setup({holds:['get_annotations']}),signal=new AbortController().signal;
+ const pending=s.refresh(signal);await settled();
+ try{
+  assert.deepEqual(s.net.calls.map(c=>c.tool),['get_annotations'],'A4 get_annotations goes first and alone: no other call starts while it is unresolved');
+  assert.deepEqual(s.net.events,['start:get_annotations'],'A4 annotations remain pending and neither Prometheus nor Loki has started');
+ }finally{s.net.release('get_annotations');}
+ await pending;
+ const calls=s.net.calls,events=s.net.events,annotationsResolved=events.indexOf('settle:get_annotations');
+ for(const tool of ['query_prometheus','query_loki_logs']){
+  assert.ok(annotationsResolved>=0 && events.indexOf('start:'+tool)>annotationsResolved,'A4 '+tool+' starts only after get_annotations resolves: '+events.join(', '));
+  assert.ok(events.indexOf('settle:'+tool)>events.indexOf('start:'+tool),'A4 '+tool+' resolves after it starts');
+ }
+ assert.deepEqual(calls[0].input,{type:'annotation',limit:100},'A4 the annotation read input');
  const queries=calls.filter(c=>c.tool==='query_prometheus' || c.tool==='query_loki_logs').map(c=>[c.tool,c.input]);
  assert.deepEqual(queries,[
   ['query_prometheus',PROM(Q.ingestPerCode)],['query_loki_logs',LOKI(Q.consumed)],['query_prometheus',PROM(Q.press)],
@@ -244,7 +271,7 @@ test('A5 Day 10 recorded payloads map to the provider shape: series, values, uni
 });
 
 test('A5 imported carriers map by their resolved id, and the pure mappers read Prometheus, Loki and annotation payloads',async()=>{
- const ctx=context(),C=adapterApi(ctx.C);
+ const ctx=context(),C=ctx.C;
  const spec=(id,diagram,extra={})=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},...extra,sections:[{id:'main',diagram}]}});
  const provider=spec('provider',{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
  const consumer=spec('consumer',{nodes:{local:{title:'Local'}},rows:[['local']],topologyImports:[{spec:'provider',export:'core',as:'shared',
@@ -254,7 +281,7 @@ test('A5 imported carriers map by their resolved id, and the pure mappers read P
  const s=await setup({page:resolved});const {map}=await s.refresh();
  assert.deepEqual(Object.keys(map).sort(),['shared::api','shared::api->shared::store'],'A5 imported node and edge keep their resolved ids');
  assert.ok(map['shared::api->shared::store'].signals.rate.series.length>=100 && map['shared::api'].signals.rate.value>0,'A5 imported carriers carry data');
- assert.equal(typeof C.telemetryGrafanaPrometheus,'function');assert.equal(typeof C.telemetryGrafanaLoki,'function');assert.equal(typeof C.telemetryGrafanaMarkers,'function');
+ for(const name of ['telemetryGrafanaPrometheus','telemetryGrafanaLoki','telemetryGrafanaMarkers'])assert.equal(typeof C[name],'function','A5 '+name+' is a named mapper');
  assert.deepEqual(plain(C.telemetryGrafanaPrometheus({data:[{metric:{},values:[[100,'1'],[160,'NaN'],[220,'2.5']]},{metric:{},values:[[100,'2']]}]})),[[100000,3],[220000,2.5]],'A5 NaN points are dropped and series add by time');
  assert.deepEqual(plain(C.telemetryGrafanaPrometheus([{metric:{},value:[100,'7']}])),[[100000,7]],'A5 a bare instant vector');
  assert.deepEqual(plain(C.telemetryGrafanaPrometheus({data:[],hints:{}})),[]);assert.deepEqual(plain(C.telemetryGrafanaPrometheus('oops')),[]);
@@ -269,18 +296,18 @@ test('A5 imported carriers map by their resolved id, and the pure mappers read P
 test('A6 the page window drives range and step; Day 11 shows the incident and the lag, Day 12 the recovery and the silent push edge',async()=>{
  for(const [window,from,step] of [['6h','now-6h',90],['30m','now-30m',60],['7d','now-7d',2520]]){
   const s=await setup({window});await s.refresh();
-  const q=s.net.calls.find(c=>c.tool==='query_prometheus');assert.equal(q.input.startTime,from,'A6 '+window);assert.equal(q.input.stepSeconds,step,'A6 step for '+window);
-  const l=s.net.calls.find(c=>c.tool==='query_loki_logs');assert.equal(l.input.startRfc3339,from);assert.equal(l.input.stepSeconds,step);
+  const q=s.net.calls.find(c=>c.tool==='query_prometheus');assert.equal(q?.input.startTime,from,'A6 the '+window+' window starts the Prometheus range');assert.equal(q?.input.stepSeconds,step,'A6 step for '+window);
+  const l=s.net.calls.find(c=>c.tool==='query_loki_logs');assert.equal(l?.input.startRfc3339,from,'A6 the '+window+' window starts the Loki range');assert.equal(l?.input.stepSeconds,step,'A6 Loki step for '+window);
  }
  const day11=await setup({day:10}),{map:m11}=await day11.refresh();
- assert.deepEqual(m11.ingest.markers,[{at:'2026-10-30T18:00:00.000Z',kind:'incident',label:'notify-consumers rebalance'}],'A6 Day 11 incident marker');
- assert.ok(Math.max(...m11['ingest->notify'].signals.lag.series.map(p=>p[1]))>=2000,'A6 Day 11 the route queue lags');
+ assert.deepEqual(m11.ingest?.markers,[{at:'2026-10-30T18:00:00.000Z',kind:'incident',label:'notify-consumers rebalance'}],'A6 Day 11 incident marker');
+ assert.ok(Math.max(...(m11['ingest->notify']?.signals.lag?.series || []).map(p=>p[1]))>=2000,'A6 Day 11 the route queue lags');
  const day12=await setup({day:11}),{map:m12}=await day12.refresh();
- assert.ok(m12['ingest->notify'].signals.lag.value<100,'A6 Day 12 the queue has recovered');
- assert.deepEqual(m12['notify->app'].signals.rate,{value:0,series:[],unit:'req/h'},'A6 Day 12 push is still silent');
- assert.deepEqual(m12.ingest.markers,[],'A6 no annotation inside Day 12');
+ assert.ok(m12['ingest->notify']?.signals.lag?.value<100,'A6 Day 12 the queue has recovered');
+ assert.deepEqual(m12['notify->app']?.signals.rate,{value:0,series:[],unit:'req/h'},'A6 Day 12 push is still silent');
+ assert.deepEqual(m12.ingest?.markers,[],'A6 no annotation inside Day 12');
  const silent=await setup({scenario:'all-todo'}),{map:quiet}=await silent.refresh();
- assert.deepEqual(quiet['button->mcu'].signals.rate,{value:0,series:[],unit:'press/h'},'A6 a silent scenario reports zeros');
+ assert.deepEqual(quiet['button->mcu']?.signals.rate,{value:0,series:[],unit:'press/h'},'A6 a silent scenario reports zeros');
 });
 
 test('A7 through ctl.telemetry: off makes no call, refresh is floored at 60 s, hidden pauses with one catch-up, off aborts',async()=>{
@@ -305,9 +332,9 @@ test('A8 a connector failure keeps the previous map and sets the note; one faile
   get_annotations:()=>mode==='down'?Promise.reject({code:'server_unavailable',message:'upstream 502',retryable:true}):null,
   query_prometheus:input=>mode==='bad' && input.expr===Q.eventP95?Promise.reject({code:'tool_error',message:'bad_data: parse error at char 3'}):null}});
  const t=s.C.createTelemetry(s.page,s.adapter.options,{carriers:carriersOf(s.C,s.page)});
- t.setEnabled(true);await settled();const good=plain(t.snapshot().map);assert.equal(t.status().state,'ok');assert.equal(t.status().note,'');
+ t.setEnabled(true);await settled();const good=plain(t.snapshot().map);assert.equal(t.status().state,'ok','A8 the first refresh answers');assert.equal(t.status().note,'','A8 no note on a clean answer');
  mode='down';s.tick(60000);await settled();
- assert.equal(t.status().state,'error');assert.equal(t.status().note,'Grafana did not answer','A8 the connector note');
+ assert.equal(t.status().state,'error','A8 a connector failure reports error');assert.equal(t.status().note,'Grafana did not answer','A8 the connector note');
  assert.deepEqual(plain(t.snapshot().map),good,'A8 the previous map is kept');
  mode='bad';s.tick(60000);await settled();
  assert.equal(t.status().state,'ok','A8 one failed query does not fail the refresh');
@@ -379,7 +406,7 @@ test('A10 sql signals call query_sql at most hourly and reuse the value; without
  assert.equal(sqlAnswers.length,1,'A10 no query_sql call within the hour');assert.deepEqual(second.map.notify.signals.total,{value:148001,unit:'events'},'A10 the hourly value is reused');
  clock+=2*60000;const third=await s.refresh();
  assert.equal(sqlAnswers.length,2,'A10 query_sql again after an hour');assert.equal(third.map.notify.signals.total.value,148002);
- const {C}=context();adapterApi(C);assert.equal(typeof C.telemetryGrafanaSql,'function');
+ const {C}=context();assert.equal(typeof C.telemetryGrafanaSql,'function','A10 the query_sql reader is a named helper');
  for(const [payload,want] of [[{rows:[[null,'42']]},42],[{data:[{n:'7.5'}]},7.5],[[[3]],3],[[],null],['oops',null]])assert.equal(C.telemetryGrafanaSql(payload),want,'A10 '+JSON.stringify(payload));
  const without=await setup({page:raw,now:()=>clock});const {notes}=await without.refresh();
  assert.equal(without.net.calls.filter(c=>c.tool==='query_sql').length,0,'A10 no query_sql call when the connector does not offer it');

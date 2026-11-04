@@ -461,6 +461,36 @@ function liveStatusWhenReady(host,connect){
   var pending={host:host,connect:connect};liveStatusPending.push(pending);
   return function(){var i=liveStatusPending.indexOf(pending);if(i>=0)liveStatusPending.splice(i,1);};
 }
+/* One host provider loop, shared by the Jira map and the telemetry map (#939).
+   start() calls at once (callers defer it past first paint), then every `delay`
+   ms while the document is visible; a hidden document pauses the timer and
+   becoming visible runs one catch-up call. A request while a call is in flight
+   becomes one catch-up after it. stop() aborts the signal handed to `call`,
+   retires the timer and the visibility listener, and drops any late answer;
+   start() after stop() begins again with a fresh signal. hooks: busy() before
+   each call, result(value) and error(error) after it. */
+function liveStatusPoller(call,delay,hooks){
+  var abort=null,timer=0,pending=false,catchUp=false,running=false,generation=0;
+  function visible(){return !document.hidden;}
+  function stopTimer(){if(timer){clearTimeout(timer);timer=0;}}
+  function arm(){stopTimer();if(running && visible())timer=setTimeout(function(){timer=0;run();},delay);}
+  function run(){
+    if(!running || !visible())return;
+    if(pending){catchUp=true;return;}
+    pending=true;stopTimer();var current=generation,signal=abort.signal;hooks.busy();
+    Promise.resolve().then(function(){if(current===generation)return call(signal);}).then(function(value){
+      if(current===generation)hooks.result(value);
+    },function(error){if(current===generation)hooks.error(error);}).then(function(){
+      if(current!==generation)return;pending=false;
+      if(catchUp && visible()){catchUp=false;run();}else arm();
+    });
+  }
+  function visibility(){stopTimer();if(visible())run();}
+  return {
+    start:function(){if(running)return;running=true;abort=new AbortController();document.addEventListener('visibilitychange',visibility);run();},
+    stop:function(){if(!running)return;running=false;generation++;pending=catchUp=false;stopTimer();document.removeEventListener('visibilitychange',visibility);abort.abort();}
+  };
+}
 function createLiveStatus(ctl,page,options,renderOptions){
   options=options || {};page=page || {};
   var view=ctl.view,authoring=!!(renderOptions && renderOptions.authoring),records=sectionRecords(page),map=Object.create(null),on=true,retired=false,applied=false,availabilityOn=true;
@@ -469,8 +499,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // #828: the shared-board editor outlives this controller (each edit re-renders the page); Workbench authoring never edits here.
   var editor=!authoring && renderOptions && renderOptions.boardEditor || null;
   function editing(){return !!(editor && editor.state().active);}
-  var destroyListeners=[],listeners=[],bindings=[],observer=null,frame=0,firstPaint=0,timer=0,pending=false,catchUp=false,painting=false;
-  var provider=typeof options.provider==='function'?options.provider:null,abort=provider?new AbortController():null;
+  var destroyListeners=[],listeners=[],bindings=[],observer=null,frame=0,firstPaint=0,painting=false;
+  var provider=typeof options.provider==='function'?options.provider:null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
   var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,asked=false,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
   var activity=[],seenKeys=Object.create(null),changedKeys=[],stepHooks=[],coverageRequest=0;
@@ -527,17 +557,34 @@ function createLiveStatus(ctl,page,options,renderOptions){
     dependencyKeys=seen.filter(function(key){return coverage.onDiagram.indexOf(key)<0 && coverage.notOnDiagram.indexOf(key)<0 && !liveStatusContainer(key,map[key],refs().epics);});
     ticketWaiting=liveStatusTicketWaiting(dependencies,map);
   }
+  /* One walk over every carrier of the root page (resolved imported topology
+     included) and its loaded detail pages, in page order: fn(value, id, source).
+     refs() and the telemetry bindings (#939) share it. */
+  function eachCarrier(fn){sources().forEach(function(source){sectionRecords(source).forEach(function(record){
+    var d=record.section.diagram || {};
+    Object.keys(d.nodes || {}).forEach(function(id){fn(d.nodes[id],id,source);});
+    (Array.isArray(d.edges)?d.edges:[]).forEach(function(edge){fn(edge,edge && typeof edge==='object'?edge.from+'->'+edge.to:null,source);});
+  });});}
   // refs() collects the whole page; refs(key) narrows to the carriers that hold that ticket (their tickets are just the key).
   function refs(key){
     var byKey=typeof key==='string',out={tickets:[],prs:[],epics:[]};
-    function collect(source){if(!byKey)trackingEpics(source).forEach(function(key){if(out.epics.indexOf(key)<0)out.epics.push(key);});sectionRecords(source).forEach(function(record){
-      var d=record.section.diagram || {};
-      Object.keys(d.nodes || {}).map(function(id){return d.nodes[id];}).concat(d.edges || []).forEach(function(value){
-        var found=trackingRefs(value);if(byKey){if(found.tickets.indexOf(key)<0)return;found.tickets=[key];}
-        ['tickets','prs'].forEach(function(field){found[field].forEach(function(ref){if(out[field].indexOf(ref)<0)out[field].push(ref);});});
-      });
-    });}
-    collect(page);Object.keys(remotePages).forEach(function(key){collect(remotePages[key]);});return out;
+    if(!byKey)sources().forEach(function(source){trackingEpics(source).forEach(function(epic){if(out.epics.indexOf(epic)<0)out.epics.push(epic);});});
+    eachCarrier(function(value){
+      var found=trackingRefs(value);if(byKey){if(found.tickets.indexOf(key)<0)return;found.tickets=[key];}
+      ['tickets','prs'].forEach(function(field){found[field].forEach(function(ref){if(out[field].indexOf(ref)<0)out[field].push(ref);});});
+    });
+    return out;
+  }
+  /* ctl.telemetry (#939): the host telemetry provider behind the panel's Metrics
+     button, over the same carrier walk. Its changes repaint the panel header. */
+  var telemetryOptions=renderOptions && renderOptions.telemetry || null;
+  var telemetryDemo=!!(telemetryOptions && telemetryOptions.demo && typeof telemetryOptions.demo.mount==='function');
+  var telemetry=createTelemetry(page,telemetryOptions,{carriers:eachCarrier,changed:function(){if(!retired)notify();}});
+  ctl.telemetry=telemetry;
+  function metricsSnapshot(){
+    var status=telemetry.status();
+    return {available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
+      refreshedAt:status.refreshedAt,note:status.note,checkedText:status.refreshedAt?'refreshed '+clockTime(status.refreshedAt):''};
   }
   function snapshot(){
     refreshDependencies();
@@ -583,7 +630,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
       demo:demoControls?{playing:!!demoControls.playing,manual:!!demoControls.manual,ended:!!demoControls.ended}:null,verdict:verdict,
       editHistory:copy(editHistory),edit:editor?editor.state():null,
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
-      connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+clockTime(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}}};
+      connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+clockTime(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}},
+      metrics:metricsSnapshot()};
   }
   function hasMissingWork(){return sources().some(function(source){return sectionRecords(source).some(function(record){var d=record.section.diagram || {};return Object.values(d.nodes || {}).some(function(node){return !isTextBoxNode(node) && node.missingWork===true;}) || (d.edges || []).some(function(edge){return edge.missingWork===true;});});});}
   function presentationActive(){return applied || hasMissingWork();}
@@ -1157,20 +1205,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function clockTime(at){var d=new Date(at);if(!isFinite(d.getTime()))return '';var time=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'});
     return d.toDateString()===new Date().toDateString()?time:d.toLocaleDateString([],{month:'short',day:'numeric'})+' '+time;}
   function relative(at){var seconds=Math.max(0,Math.floor((Date.now()-Date.parse(at))/1000));return seconds<60?'just now':seconds<3600?Math.floor(seconds/60)+'m ago':seconds<86400?Math.floor(seconds/3600)+'h ago':Math.floor(seconds/86400)+'d ago';}
-  function visible(){return !document.hidden;}
-  function stopTimer(){if(timer){clearTimeout(timer);timer=0;}}
-  function arm(){stopTimer();if(provider && !retired && visible())timer=setTimeout(function(){timer=0;fetchMap();},delay);}
-  function fetchMap(){
-    if(retired || !provider || !visible())return;
-    if(pending){catchUp=true;return;}pending=true;stopTimer();setStatus({busy:true});
-    Promise.resolve().then(function(){if(!retired)return provider(refs(),abort.signal);}).then(function(value){
-      if(!retired){api.apply(value);if(noteKind==='error')api.note('','info');setStatus({state:demoMode?'demo':'connected',busy:false,checkedAt:Date.now()});}
-    },function(error){if(!retired){api.note(error && error.message || String(error),'error');setStatus({state:'error',busy:false});}}).then(function(){
-      pending=false;if(retired)return;
-      if(catchUp && visible()){catchUp=false;fetchMap();}else arm();
-    });
-  }
-  function visibility(){stopTimer();if(visible())fetchMap();}
+  var poller=provider?liveStatusPoller(function(signal){return provider(refs(),signal);},delay,{
+    busy:function(){setStatus({busy:true});},
+    result:function(value){api.apply(value);if(noteKind==='error')api.note('','info');setStatus({state:demoMode?'demo':'connected',busy:false,checkedAt:Date.now()});},
+    error:function(error){api.note(error && error.message || String(error),'error');setStatus({state:'error',busy:false});}
+  }):null;
   var events=['reader-skin-change','diagram-tab-change','tab-view-change','diagram-view-change','navigation-mounted','detail-navigation'];
   var api={
     refs:refs,
@@ -1223,6 +1262,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     clear:function(){if(retired)return;availabilityOn=false;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();},
     enabled:function(){return on;},
     setEnabled:function(value){if(retired)return;on=!!value;if(on)availabilityOn=true;paint();notify();},
+    // The panel's Metrics button (#939); Jira Live above is independent of it.
+    setMetricsEnabled:function(value){if(!retired)telemetry.setEnabled(value);},
     onDestroy:function(fn){if(typeof fn!=='function')return function(){};if(retired){fn();return function(){};}destroyListeners.push(fn);return function(){var i=destroyListeners.indexOf(fn);if(i>=0)destroyListeners.splice(i,1);};},
     onChange:function(fn){if(typeof fn!=='function' || retired)return function(){};listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
     note:function(text,kind){if(retired)return;noteText=typeof text==='string'?text:'';noteKind=['info','warn','error'].indexOf(kind)>=0?kind:'info';notify();},
@@ -1234,11 +1275,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
     editSave:function(){if(!retired && editor)editor.save();},
     editDiscard:function(){if(!retired && editor)editor.discard();},
     destroy:function(){
-      if(retired)return;on=false;paintLanes();retired=true;releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);stopTimer();if(abort)abort.abort();if(demoDestroy)demoDestroy();
+      if(retired)return;on=false;paintLanes();retired=true;releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];
-      events.forEach(function(type){view.removeEventListener(type,schedule);});if(provider)document.removeEventListener('visibilitychange',visibility);
+      events.forEach(function(type){view.removeEventListener(type,schedule);});
       if(pop)pop.remove();listeners=[];
       view.querySelectorAll('.dv-live-board-lane').forEach(function(el){el.classList.remove('dv-live-board-lane');});
       view.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').forEach(function(el){el.remove();});
@@ -1256,7 +1297,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   paint();events.forEach(function(type){view.addEventListener(type,schedule);});
   // An edit re-renders the page: the new controller starts from the last live map so colors never reset.
   if(editor && editor.lastMap())api.apply(editor.lastMap());
-  if(provider){document.addEventListener('visibilitychange',visibility);firstPaint=requestAnimationFrame(function(){firstPaint=requestAnimationFrame(function(){firstPaint=0;fetchMap();});});}
+  if(poller)firstPaint=requestAnimationFrame(function(){firstPaint=requestAnimationFrame(function(){firstPaint=0;poller.start();});});
   if(options.demo && typeof options.demo.mount==='function')demoDestroy=options.demo.mount(api);
   return api;
 }

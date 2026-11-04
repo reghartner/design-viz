@@ -95,6 +95,10 @@
       var toggle=button(head,'toggle','reader-button dv-live-toggle','Live','setEnabled');toggle.hidden=!hasData;
       toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled)));
       states.forEach(function(state){var count=el(head,'span','count-'+state,'dv-live-count'+(hasData && value && value.enabled && value.counts[state]?' dv-live-'+state:''),state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
+      // Metrics (#939): the telemetry switch beside Live, shown only with a telemetry provider or demo, off by default, never persisted.
+      var metrics=value && value.metrics || {available:false,enabled:false};
+      var metricsToggle=button(head,'metrics','reader-button dv-live-metrics','Metrics','setMetricsEnabled');metricsToggle.hidden=!metrics.available;
+      metricsToggle._liveArgument=!metrics.enabled;metricsToggle.setAttribute('aria-pressed',String(!!metrics.enabled));
       var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo'}[conn.state];
       var connection=el(head,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
       var connWho=(conn.source || '')+(connLabel && connLabel!==String(conn.source || '').toLowerCase()?' '+connLabel:'');
@@ -102,6 +106,13 @@
       var gh=conn.github || {state:'none'},ghLabel={disconnected:'GitHub not connected',connecting:'GitHub connecting',connected:'GitHub connected',error:'GitHub did not answer'}[gh.state];
       var github=el(connection,'span','github','dv-live-connection-github',ghLabel || '');github.setAttribute('data-state',gh.state);github.setAttribute('data-busy',String(!!gh.busy));github.hidden=!ghLabel;
       connection.hidden=!available || conn.state==='none';
+      // The telemetry connector beside the Jira one: same markup and dot tokens.
+      var metricsState=metrics.state==='ok'?(metrics.demo?'demo':'connected'):{loading:'connecting',error:'error'}[metrics.state] || 'disconnected';
+      var metricsLabel={connected:'connected',demo:'demo',connecting:'connecting',error:'did not answer'}[metricsState] || 'not connected';
+      var metricsConnection=el(head,'span','metrics-connection','dv-live-connection dv-live-metrics-connection');metricsConnection.setAttribute('data-state',metricsState);metricsConnection.setAttribute('data-busy',String(!!metrics.busy));metricsConnection.setAttribute('role','status');
+      el(metricsConnection,'i','dot','dv-live-connection-dot');
+      el(metricsConnection,'span','text','',metricsState==='error'?'Metrics: '+metricsLabel+(metrics.note?' · '+metrics.note:''):['Metrics: '+metricsLabel,metrics.checkedText].filter(Boolean).join(', '));
+      metricsConnection.hidden=!metrics.available;
       var note=el(head,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
       var action=button(head,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
       var first=button(head,'first','reader-button dv-live-first','First blocker','firstBlocker');first.hidden=!hasData || !value.firstBlocker;
@@ -115,7 +126,7 @@
       var reason=el(head,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
       var editNotice=el(head,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
       var editShown=!!(edit && (edit.editable || edit.notice));
-      head.hidden=!available || !(hasData || value.note.text || value.actionLabel || editShown);
+      head.hidden=!metrics.available && (!available || !(hasData || value.note.text || value.actionLabel || editShown));
       if(!available)el(host,'p','empty','dv-live-empty','This page has no ticket references.');
       if(hasData){
         var body=el(host,'div','body','dv-live-panel-body'),epic=value.epic || {keys:[]};

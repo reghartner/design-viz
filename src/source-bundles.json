@@ -46,6 +46,7 @@
     "viewer/step-coins.js",
     "viewer/status-colors.js",
     "viewer/live-status.js",
+    "viewer/telemetry.js",
     "engine.js",
     "viewer/detail-overview.js",
     "viewer/details.js",

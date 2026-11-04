@@ -175,7 +175,7 @@ test('T9 templates expand by pure $param substitution with per-name carrier over
   assert.equal(carrierTelemetry({telemetry:{use:'kafka-topic',topic:'a$&b',group:'g'}},templates).signals.in.query.includes('topic="a$&b"'),true,'values are literal');
   assert.equal(carrierTelemetry({telemetry:{use:'kafka-topic',topic:'t',group:'g',kind:'call'}},templates).kind,'call');
   for(const [telemetry,paths] of [[{use:'missing',topic:'t',group:'g'},['.use']],[{use:'kafka-topic',topic:'t'},['.group']],
-    [{use:'kafka-topic',topic:'t',group:7},['.group']],[{use:'kafka-topic',topic:'',group:'g'},['.topic']],[{use:'constructor'},['.use']],[{use:7},['.use']]]){
+    [{use:'kafka-topic',topic:'t',group:7},['.group']],[{use:'kafka-topic',topic:'',group:'g'},['.topic']],[{use:'constructor'},['.use']],[{use:'__proto__'},['.use']],[{use:7},['.use']]]){
     const r=recorder();assert.equal(carrierTelemetry({telemetry},templates,r.fn),null,JSON.stringify(telemetry));assert.deepEqual(r.paths,paths,JSON.stringify(telemetry));
   }
   const extra=recorder();assert.ok(carrierTelemetry({telemetry:{use:'kafka-topic',topic:'t',group:'g',region:'eu'}},templates,extra.fn));assert.deepEqual(extra.paths,['.region']);

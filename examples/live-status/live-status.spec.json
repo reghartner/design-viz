@@ -6,7 +6,8 @@
       "authoredWith": "0.2.0",
       "minVersion": "0.2.0",
       "features": [
-        "flow.live-status"
+        "flow.live-status",
+        "flow.telemetry"
       ]
     },
     "tracking": {
@@ -20,7 +21,16 @@
           "on": "BE-68",
           "reason": "needs the push payload contract"
         }
-      ]
+      ],
+      "telemetry": {
+        "grafana": {
+          "prometheus": "prom-main",
+          "loki": "loki-main",
+          "tempo": "tempo-main"
+        },
+        "window": "1h",
+        "refreshMs": 300000
+      }
     },
     "editHistory": [
       {
@@ -287,7 +297,29 @@
               "sub": "Backend: device events",
               "tickets": [
                 "BE-67"
-              ]
+              ],
+              "telemetry": {
+                "kind": "service",
+                "signals": {
+                  "rate": {
+                    "grafana": "sum(rate(http_server_requests_total{service=\"event-ingest\"}[5m]))*3600",
+                    "unit": "req/h"
+                  },
+                  "errors": {
+                    "grafana": "sum(rate(http_server_requests_total{service=\"event-ingest\",code=~\"5..\"}[5m]))*3600",
+                    "unit": "req/h"
+                  }
+                },
+                "proof": {
+                  "rate": {
+                    "min": 10
+                  },
+                  "errors": {
+                    "maxRatioOf": "rate",
+                    "max": 0.01
+                  }
+                }
+              }
             },
             "notify": {
               "title": "Notification service",
@@ -297,7 +329,21 @@
               ],
               "prs": [
                 "https://github.com/acme/backend/pull/91"
-              ]
+              ],
+              "telemetry": {
+                "kind": "service",
+                "signals": {
+                  "rate": {
+                    "loki": "sum(rate({app=\"notify\"} |= \"event consumed\" [5m]))*3600",
+                    "unit": "events/h"
+                  }
+                },
+                "proof": {
+                  "rate": {
+                    "min": 10
+                  }
+                }
+              }
             },
             "app": {
               "title": "Resident app",
@@ -337,7 +383,21 @@
                   "dx": 40.25,
                   "dy": 0
                 }
-              ]
+              ],
+              "telemetry": {
+                "kind": "device",
+                "signals": {
+                  "rate": {
+                    "grafana": "sum(rate(button_press_total{device=\"doorbell\"}[5m]))*3600",
+                    "unit": "presses/h"
+                  }
+                },
+                "proof": {
+                  "rate": {
+                    "min": 10
+                  }
+                }
+              }
             },
             {
               "from": "mcu",
@@ -365,7 +425,21 @@
                   "dx": 40.25,
                   "dy": 0
                 }
-              ]
+              ],
+              "telemetry": {
+                "kind": "device",
+                "signals": {
+                  "rate": {
+                    "grafana": "sum(rate(chime_ring_total{device=\"doorbell\"}[5m]))*3600",
+                    "unit": "rings/h"
+                  }
+                },
+                "proof": {
+                  "rate": {
+                    "min": 10
+                  }
+                }
+              }
             },
             {
               "from": "mcu",
@@ -394,7 +468,36 @@
                   "dx": 0,
                   "dy": -19.29
                 }
-              ]
+              ],
+              "telemetry": {
+                "kind": "call",
+                "signals": {
+                  "rate": {
+                    "grafana": "sum(rate(http_server_requests_total{service=\"event-ingest\",route=\"/v1/events\"}[5m]))*3600",
+                    "unit": "req/h"
+                  },
+                  "errors": {
+                    "grafana": "sum(rate(http_server_requests_total{service=\"event-ingest\",route=\"/v1/events\",code=~\"5..\"}[5m]))*3600",
+                    "unit": "req/h"
+                  },
+                  "p95": {
+                    "grafana": "histogram_quantile(0.95, sum by (le)(rate(http_server_request_duration_seconds_bucket{service=\"event-ingest\",route=\"/v1/events\"}[5m])))*1000",
+                    "unit": "ms"
+                  }
+                },
+                "proof": {
+                  "rate": {
+                    "min": 10
+                  },
+                  "errors": {
+                    "maxRatioOf": "rate",
+                    "max": 0.01
+                  },
+                  "p95": {
+                    "max": 300
+                  }
+                }
+              }
             },
             {
               "from": "ingest",
@@ -422,7 +525,38 @@
                   "dx": 0,
                   "dy": -19.29
                 }
-              ]
+              ],
+              "telemetry": {
+                "kind": "queue",
+                "signals": {
+                  "in": {
+                    "grafana": "sum(rate(kafka_server_brokertopicmetrics_messagesin_total{topic=\"device-events\"}[5m]))*3600",
+                    "unit": "msg/h"
+                  },
+                  "lag": {
+                    "grafana": "max(kafka_consumergroup_lag{topic=\"device-events\",group=\"notify-consumers\"})",
+                    "unit": "msgs"
+                  },
+                  "age": {
+                    "grafana": "max(kafka_consumergroup_lag_seconds{topic=\"device-events\",group=\"notify-consumers\"})",
+                    "unit": "s"
+                  }
+                },
+                "proof": {
+                  "in": {
+                    "min": 10
+                  },
+                  "lag": {
+                    "max": 500
+                  },
+                  "age": {
+                    "max": 60
+                  }
+                },
+                "links": {
+                  "dashboard": "https://acme.grafana.net/d/kafka/device-events"
+                }
+              }
             },
             {
               "from": "notify",
@@ -452,7 +586,36 @@
                   "dx": 0,
                   "dy": -19.29
                 }
-              ]
+              ],
+              "telemetry": {
+                "kind": "call",
+                "signals": {
+                  "rate": {
+                    "loki": "sum(rate({app=\"notify\"} |= \"push sent\" [5m]))*3600",
+                    "unit": "req/h"
+                  },
+                  "errors": {
+                    "loki": "sum(rate({app=\"notify\"} |= \"push failed\" [5m]))*3600",
+                    "unit": "req/h"
+                  },
+                  "p95": {
+                    "grafana": "histogram_quantile(0.95, sum by (le)(rate(push_latency_seconds_bucket{app=\"notify\"}[5m])))*1000",
+                    "unit": "ms"
+                  }
+                },
+                "proof": {
+                  "rate": {
+                    "min": 10
+                  },
+                  "errors": {
+                    "maxRatioOf": "rate",
+                    "max": 0.01
+                  },
+                  "p95": {
+                    "max": 500
+                  }
+                }
+              }
             }
           ],
           "steps": [

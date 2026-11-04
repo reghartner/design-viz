@@ -916,7 +916,7 @@ review without a GitHub account. Install it as a second custom connector and
 declare its name beside the Jira one.
 
 The [mock Grafana MCP server](../deploy/cloudflare/mock-grafana-mcp/README.md)
-serves fictional production telemetry on the same timeline through Grafana's
+serves the timeline's `days[].telemetry` blocks (see Demo mode) through Grafana's
 MCP tool names (`query_prometheus`, `query_loki_logs`, `search_tempo_traces`,
 `get_tempo_trace`, `get_annotations`, `generate_deeplink`, `list_datasources`).
 Traffic starts two hours after a carrier's tickets turn Done; the event edge
@@ -931,7 +931,7 @@ Open the [built story](../examples/live-status/live-status.html#live=demo) with
 embeds a demo timeline in a separate `live-timeline` JSON block when the page
 declares `tracking`. `tools/inject.py` picks it with `--timeline <path|none>`:
 a path embeds that file after checking its shape (`version`, `intervalSeconds`,
-`days[].issues`), and `none` embeds nothing. The default is
+`days[].issues`, and `days[].telemetry` when present), and `none` embeds nothing. The default is
 `examples/live-status/live-status.timeline.json` when the injected spec is
 `examples/live-status/live-status.spec.json`, and `none` for every other spec,
 so a board never inherits the doorbell example's keys. It works offline,
@@ -955,6 +955,38 @@ blocked HW-124), Day 7 light blue (HW-124 unblocked but unfinished), Day 8 clear
 example's `DOOR-100` gains `UX-90`, “Alert sound setting”, in the APP lane on Day 8.
 It is never assigned to a carrier. Without an embedded timeline, four days are synthesized
 from the page's ticket keys: todo, active, one blocker, then all done.
+
+A day may also carry production telemetry for the carriers the page binds (see
+Telemetry bindings), in `days[].telemetry`:
+
+```json
+{
+  "start": "2026-10-29T00:00:00Z",
+  "stepSeconds": 3600,
+  "carriers": {
+    "mcu->ingest": {
+      "rate": {"unit": "req/h", "values": [null, null, 512.4]},
+      "errors": {"unit": "req/h", "values": [null, null, 1.0]}
+    }
+  },
+  "annotations": [{"id": 5, "time": "2026-10-29T16:00:00Z", "text": "firmware 2.4.1 rollout", "tags": ["deploy", "firmware"]}]
+}
+```
+
+Carriers are keyed by node id or `from->to`. `values[k]` covers the step from
+`start + k·stepSeconds`; `null` is a step without a sample. All values arrays of a day
+have the same length. The injector rejects any other field, a non-RFC3339 `start` or
+annotation `time`, a non-positive or non-integer `stepSeconds`, and values that are not
+finite numbers or `null` (`NaN` and `Infinity` included), naming the path. Each demo day hands the page that day's map
+`{carrierId: {signals: {name: {value, series: [[t, v], ...], unit}}, observedAt}}`, the
+proof engine's input: every point is stamped at the end of its step, `null` reads as 0
+(as a connector reports a query that matched nothing), `value` is the last step and
+`observedAt` the end of the day. **Next day** and the timer move the Jira map and the
+telemetry map together. The page draws nothing from it yet; the Metrics overlay will.
+The example timeline holds the doorbell story the mock Grafana MCP server serves:
+traffic two hours after each carrier's tickets turn Done, the event edge degraded after
+the Day 10 firmware 2.4.1 deploy, the route queue lagging on Day 11, and the push edge
+silent after Done.
 
 ## Dependencies
 

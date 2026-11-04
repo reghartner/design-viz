@@ -16,6 +16,13 @@ test('truth table registers, inserts, previews and validates the authored exampl
   const sample=C.panelPickerExample('truth-table');assert.equal(sample.panel.cases[0].cells.batteryIcon.length,2);
   assert.equal(sample.panel.columns.filter(c=>c.kind==='icons').length,2);
   assert.equal(C.panelPatchFields(sample.panel).find(f=>f[0]==='active')[3].nullLabel,'No active case');
+  // #921 slice 2: the Active case control owns inherit/default, case and No active case choices itself.
+  for(const mode of ['initial','step']){
+    const meta=Object.fromEntries(C.panelPatchFields(sample.panel).map(f=>[f[0],C.panelFieldPresentation(sample.panel,f,mode)]));
+    assert.equal(meta.active.assignment,false,mode+': no separate assignment selector for active');
+    assert.notEqual(meta.note.assignment,false,mode+': Explanation keeps the shared assignment selector');
+  }
+  assert.deepEqual(plain(sample.panel.initial),{active:'solar'},'template keeps its starting highlight');
   assert.deepEqual(plain(C.panelPatchFields(sample.panel).map(f=>f[0])),['active','note']);
   assert.equal(definition.since,'0.2.0');assert.equal(definition.authoring.initialFields,true);
 });

@@ -331,9 +331,10 @@ and UX icons**: one card per case holds its typed values, each value’s type be
 it, and that case’s independent icon cells. Add multiple
 icon columns, such as Power icon and Battery icons. The visual picker uses the shared icon library; multiple outputs
 appear together in each cell, and removing all outputs displays **No icons**. Open
-**Starting state** to choose the initial **Active case**. Step controls can
-select another case, inherit the earlier highlight, or clear it with **No active
-case**. Every edit supports Undo/Redo. The table records authored mappings; it
+**Starting state** to choose the initial **Active case**. Its one dropdown lists
+cases by label (with the ID when labels would look alike) and **No active case**;
+step controls offer the same choices plus **Inherit previous** to keep the earlier
+highlight. **No active case** saves `null`. Every edit supports Undo/Redo. The table records authored mappings; it
 does not calculate charging or power behavior. See the
 [device power example](../examples/device-power-truth-table/device-power-truth-table.spec.json).
 

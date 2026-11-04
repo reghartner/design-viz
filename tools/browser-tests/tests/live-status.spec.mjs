@@ -267,6 +267,7 @@ test('S1 S2 S3 S4 S5 S6 built demo plays the story through blockers to completio
 | O6 | Back to today from a past day | returns to the player's day, removes the row and restores Over time | leaving the board on the past day |
 | O7 | fetch and XHR listener; embedded spec text | no request and an unchanged embedded spec after the whole flow | a demo that reaches the network or edits the spec |
 | O8 | fallback page without a timeline | Over time offers the four synthesized days | an embedded-timeline-only button |
+| O9 | playing demo on a fake clock | opening Over time and moving the slider each pause Play; Play carries on from the slider's day and moves the slider; Back to today returns to the day Play reached | a player that keeps running under the slider; Play restarting from its old day |
 */
 test('O1 O2 O3 O4 O5 O6 O7 demo Over time moves through days without changing anything but status',async({page,server})=>{
  const requests=[];page.on('request',request=>{if(['fetch','xhr'].includes(request.resourceType()))requests.push(request.url());});
@@ -304,6 +305,20 @@ test('O8 a demo page without a timeline offers the four synthesized days',async(
  await page.setViewportSize({width:1440,height:1000});await page.emulateMedia({reducedMotion:'reduce'});
  const spec=JSON.parse(await readFile(path.join(repo,'examples/live-status/live-status.spec.json'),'utf8')),file=path.join(server.root,'fallback-over.json'),out=path.join(server.root,'fallback-over.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/fallback-over.html#live=demo');
  const panel=page.locator('#docview .pt-live-status'),slider=panel.getByRole('slider',{name:'Day',exact:true}),overTime=panel.getByRole('button',{name:'Over time',exact:true});await expect(overTime).toHaveCount(1);await overTime.click();await expect(slider).toHaveValue('0');await expect(slider).toHaveAttribute('max','3');await slider.focus();await page.keyboard.press('End');await expect(panel.locator('.dv-live-note')).toContainText('Day 4 — delivery complete');await expect(page.locator('#docview path.edge').first()).toHaveClass(/dv-live-done/);
+});
+test('O9 opening or moving Over time pauses Play, and Play carries on from the slider day',async({page,server})=>{
+ await page.clock.install();await page.emulateMedia({reducedMotion:'no-preference'});await page.setViewportSize({width:1440,height:1000});
+ const spec={page:{title:'Over time play',sections:[{diagram:{nodes:{a:{title:'A',tickets:['AA-1']},b:{title:'B',tickets:['BB-1']}},rows:[['a','b']],edges:[{from:'a',to:'b'}],panels:[{id:'status',type:'live-status',title:'Live status'}]}}]}};
+ const file=path.join(server.root,'over-play.json'),out=path.join(server.root,'over-play.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/over-play.html#live=demo');
+ const panel=page.locator('#docview .pt-live-status'),note=panel.locator('.dv-live-note'),slider=panel.getByRole('slider',{name:'Day',exact:true}),overTime=panel.getByRole('button',{name:'Over time',exact:true}),play=panel.locator('.dv-live-demo').getByRole('button',{name:'Play',exact:true}),pause=panel.locator('.dv-live-demo').getByRole('button',{name:'Pause',exact:true}),back=panel.getByRole('button',{name:'Back to today',exact:true});
+ // Contrasting precondition: the demo is playing and reaches Day 2 on its own.
+ await expect(pause).toBeVisible();await page.clock.runFor(6000);await expect(note).toContainText('Day 2');await expect(overTime).toHaveCount(1);
+ await overTime.click();await expect(slider).toHaveValue('1');await expect(play).toBeVisible();await expect(pause).toHaveCount(0);await page.clock.runFor(12000);await expect(slider).toHaveValue('1');await expect(note).toContainText('Day 2');
+ // Play carries on from the slider's day and the slider follows.
+ await slider.focus();await page.keyboard.press('ArrowLeft');await expect(slider).toHaveValue('0');await expect(note).toContainText('Day 1');await play.click();await expect(pause).toBeVisible();await page.clock.runFor(6000);await expect(slider).toHaveValue('1');await expect(note).toContainText('Day 2');
+ // Moving the slider while playing pauses, and the day Play reached survives Back to today.
+ await slider.focus();await page.keyboard.press('ArrowRight');await expect(slider).toHaveValue('2');await expect(play).toBeVisible();await page.clock.runFor(12000);await expect(slider).toHaveValue('2');
+ await back.click();await expect(slider).toHaveCount(0);await expect(note).toContainText('Day 2');await expect(play).toBeVisible();await page.clock.runFor(12000);await expect(note).toContainText('Day 2');
 });
 test('S4 waiting follows ticket dependencies from the provider and the authored pairs, never the edges',async({page,server})=>{
  await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>Object.fromEntries(refs.tickets.map(key=>[key,Object.assign({state:key==='HW-123'?'blocked':key==='FW-45'?'done':'todo'},key==='FW-46'?{dependsOn:[{key:'HW-123',source:'jira',linkType:'is blocked by'}]}:{})]))};});
@@ -923,7 +938,7 @@ test.describe('#863 Epic status panel consistency',()=>{
   await expect(section).toHaveCount(1);await demoDay(root,4);await expect(panel.getByRole('button',{name:'First blocker',exact:true})).toBeVisible();
   const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','First blocker','Play','Next day','Over time']);
   // The pressed state is the one compared: Live is on throughout.
-  expect(first.buttons.map(b=>b.pressed)).toEqual([true,false,false,false]);
+  expect(first.buttons.map(b=>b.pressed)).toEqual([true,false,false,false,false]);
   // Contrasting precondition: the reference is the default theme's pill, not a browser default.
   expect(first.play).toMatchObject({borderTopStyle:'solid',borderTopWidth:'1px',borderTopLeftRadius:'999px'});
   const toggle=root.locator('.reader-top>button'),plays=new Set();

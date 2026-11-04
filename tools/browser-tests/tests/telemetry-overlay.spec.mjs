@@ -10,7 +10,7 @@
 | P7 | On: streams, ghost, seals; unbound unchanged; local and imported alike | click Metrics | 4 moving packets on the 1300 req/h local edge and 3 on the 500 req/h imported edge; a ghost on the silent Done edge, whose stroke is dimmed; proven seals on the local and imported bound nodes; the unbound node and edge carry nothing; Jira appearance unchanged |
 | P8 | Off removes every cue | click again | no cue element or attribute left; Jira appearance unchanged |
 | P9 | Reduced motion shows static packets | `reducedMotion: 'reduce'` | moving packets hidden, static packets visible |
-| P10 | Ordinary step packets and failure packets are untouched by Metrics | Metrics off, then on | the `circle.pkt` and `.comm-packet` counts are equal |
+| P10 | Ordinary step packets and failure packets are untouched by Metrics | Metrics off, then on | the `circle.pkt` count (non-zero: loop packets) and the `.comm-packet` count are equal |
 | P11 | `#live=demo` mounts the demo telemetry so Metrics follows the demo day | pending #976 (demo telemetry builder and timeline block) | pending #976 |
 */
 import {readFile,writeFile} from 'node:fs/promises';
@@ -155,7 +155,8 @@ test('P6 P7 P8 P10 Metrics cues stream, ghost and seal local and imported carrie
  const {root,metrics}=await mountCues(page,server),edge=i=>root.locator('path.edge[data-dv-edge="'+i+'"]'),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
  await expect(edge(0)).toHaveAttribute('data-live-appearance','done');
  await expect(root.locator(CUES),'P6 nothing while Metrics is off').toHaveCount(0);
- const before=await ordinary(root);expect(before.pkt,'P10 the page has ordinary packets').toBeGreaterThan(0);expect(before.comm,'P10 and a failure packet').toBeGreaterThan(0);
+ // Ordinary loop packets are always present; a failure packet exists only while a dropped step plays, so its count is compared as is.
+ const before=await ordinary(root);expect(before.pkt,'P10 the page has ordinary packets').toBeGreaterThan(0);
  await metrics.click();
  await expect(stream(root,0),'P7 1300 req/h is four packets').toHaveCount(4);
  await expect(root.locator('path.dv-metrics-ghost[data-metrics-edge="1"]'),'P7 the silent Done edge has a ghost').toHaveCount(1);

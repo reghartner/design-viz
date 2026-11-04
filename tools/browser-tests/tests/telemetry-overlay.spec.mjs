@@ -11,7 +11,7 @@
 | P8 | Off removes every cue | click again | no cue element or attribute left; Jira appearance unchanged |
 | P9 | Reduced motion shows static packets | `reducedMotion: 'reduce'` | moving packets hidden, static packets visible |
 | P10 | Ordinary step packets and failure packets are untouched by Metrics | Metrics off, then on | the `circle.pkt` count (non-zero: loop packets) and the `.comm-packet` count are equal |
-| P11 | `#live=demo` mounts the demo telemetry so Metrics follows the demo day | pending #976 (demo telemetry builder and timeline block) | pending #976 |
+| P11 | `#live=demo` mounts the demo telemetry so Metrics follows the demo day | built example with its timeline, `#live=demo` | Metrics visible and off; on is "Metrics: demo, refreshed …"; Day 8 has no stream; Day 10 streams 3 packets on the 530 req/h `mcu->ingest` call edge, ghosts the silent Done `notify->app` push edge and seals `ingest`; off removes every cue |
 */
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -180,4 +180,29 @@ test('P9 reduced motion shows static Metrics packets instead of moving ones',asy
  await expect(stream(root,0)).toHaveCount(4);
  await expect(stream(root,0).first()).toBeHidden();
  await expect(root.locator('g.dv-metrics-stream[data-metrics-edge="0"] circle.dv-metrics-static').first()).toBeVisible();
+});
+
+/* P11: the built example's #live=demo player feeds the Metrics cues day by day (#944 PR 2 timeline). */
+async function openDemo(page,server){
+ await page.setViewportSize({width:1440,height:1000});await page.emulateMedia({reducedMotion:'reduce'});
+ const out=path.join(server.root,'telemetry-demo.html');
+ execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(repo,'examples/live-status/live-status.spec.json'),path.join(repo,'template/flowview.html'),out,'--timeline',path.join(repo,'examples/live-status/live-status.timeline.json')]);
+ await page.goto(server.origin+'/telemetry-demo.html#live=demo');return page.locator('#docview');
+}
+async function demoDay(root,day){
+ const next=root.getByRole('button',{name:'Next day',exact:true});
+ for(;;){const note=await root.locator('.dv-live-note').textContent();const current=Number(/Day (\d+)/.exec(note)[1]);if(current>=day)return;await next.click();await expect(root.locator('.dv-live-note')).toContainText('Day '+(current+1)+' —');}
+}
+test('P11 #live=demo mounts the demo telemetry: Metrics reports Demo and the cues follow the demo day',async({page,server})=>{
+ const root=await openDemo(page,server),panel=root.locator('.pt-live-status'),metrics=metricsButton(panel),status=panel.locator('.dv-live-metrics-connection');
+ await expect(metrics,'P11 the demo telemetry source shows Metrics').toBeVisible();await expect(metrics).toHaveAttribute('aria-pressed','false');
+ await expect(root.locator(CUES)).toHaveCount(0);
+ await demoDay(root,8);await metrics.click();
+ await expect(status).toHaveAttribute('data-state','demo');await expect(status).toHaveText(/^Metrics: demo, refreshed /);
+ await expect(root.locator('g.dv-metrics-stream'),'P11 no traffic before Day 9').toHaveCount(0);
+ await demoDay(root,10);
+ await expect(stream(root,2),'P11 Day 10: about 530 req/h on mcu->ingest is three packets').toHaveCount(3);
+ await expect(root.locator('path.dv-metrics-ghost[data-metrics-edge="4"]'),'P11 the push edge stays silent after Done').toHaveCount(1);
+ await expect(root.locator('g.node[data-dv-node="ingest"] .dv-metrics-seal')).toHaveCount(1);
+ await metrics.click();await expect(root.locator(CUES),'P11 off removes every cue').toHaveCount(0);
 });

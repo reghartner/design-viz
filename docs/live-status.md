@@ -982,7 +982,9 @@ finite numbers or `null` (`NaN` and `Infinity` included), naming the path. Each 
 proof engine's input: every point is stamped at the end of its step, `null` reads as 0
 (as a connector reports a query that matched nothing), `value` is the last step and
 `observedAt` the end of the day. **Next day** and the timer move the Jira map and the
-telemetry map together. The page draws nothing from it yet; the Metrics overlay will.
+telemetry map together. The panel's **Metrics** button appears with the demo, reported
+as “Metrics: demo”, and while it is on the [Metrics cues](#metrics-cues) follow the
+demo day.
 The example timeline holds the doorbell story the mock Grafana MCP server serves:
 traffic two hours after each carrier's tickets turn Done, the event edge degraded after
 the Day 10 firmware 2.4.1 deploy, the route queue lagging on Day 11, and the push edge

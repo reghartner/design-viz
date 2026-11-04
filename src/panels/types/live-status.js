@@ -92,8 +92,11 @@
       if(!live)return;epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=doc.activeElement;
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
       var available=value && value.available,hasData=available && value.hasData;
-      var toggle=button(head,'toggle','reader-button dv-live-toggle','Live','setEnabled');toggle.hidden=!hasData;
-      toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled)));
+      // Live and Over time are the two modes (#929, Chuck 2026-11-04): first in the header, so changing Jira text cannot wrap them apart. The selected one is filled. Live returns from a past day; while selected it still turns colors off.
+      var over=value && value.overTime,past=!!(over && over.active);
+      var toggle=button(head,'toggle','reader-button dv-live-toggle','Live',past?'overTimeClose':'setEnabled');toggle.hidden=!hasData;
+      toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled) && !past));
+      var overTime=button(head,'over-time','reader-button dv-live-over-time',over && over.loading?'Loading history'+(over.progress?' '+over.progress:'')+'…':'Over time','overTime');overTime.hidden=!hasData || !over || !over.available;overTime.disabled=!!(over && (over.loading || over.disabled));overTime.setAttribute('aria-pressed',String(past));
       states.forEach(function(state){var count=el(head,'span','count-'+state,'dv-live-count'+(hasData && value && value.enabled && value.counts[state]?' dv-live-'+state:''),state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
       var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo'}[conn.state];
       var connection=el(head,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
@@ -106,9 +109,6 @@
       var action=button(head,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
       var first=button(head,'first','reader-button dv-live-first','First blocker','firstBlocker');first.hidden=!hasData || !value.firstBlocker;
       if(hasData && value.demo){var demo=el(head,'span','demo','dv-live-demo');var play=button(demo,'play','reader-button',value.demo.playing?'Pause':'Play','toggleDemo');play.disabled=value.demo.manual || value.demo.ended;button(demo,'next','reader-button','Next day','nextDemo').disabled=value.demo.ended;}
-      // Over time (#929): the click loads history; the slider row below the header moves through its days.
-      var over=value && value.overTime,past=!!(over && over.active);
-      var overTime=button(head,'over-time','reader-button dv-live-over-time',past?'Back to today':over && over.loading?'Loading history'+(over.progress?' '+over.progress:'')+'…':'Over time','overTime');overTime.hidden=!hasData || !over || !over.available;overTime.disabled=!!(over && (over.loading || over.disabled));
       var overStatus=el(head,'span','over-time-status','dv-live-over-time-status',hasData && over && over.error?over.error:'');overStatus.setAttribute('role','status');overStatus.hidden=!overStatus.textContent;
       // #828 shared-board Edit mode lives in this header: Edit for editors, then a prominent Save N changes and Discard.
       var edit=available && value.edit || null,pending=edit?edit.pending:0,editing=!!(edit && edit.active);
@@ -223,14 +223,18 @@
 .dv-live-note[data-kind="warn"],.dv-live-note[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-demo{display:inline-flex;gap:6px;}
 .dv-live-over-time-status{color:var(--dv-live-blocked);}
-.dv-live-over-time-row{display:grid;grid-template-columns:auto minmax(80px,1fr) auto;gap:2px 10px;align-items:center;padding:8px 0 0;font:11px/1.4 'IBM Plex Mono',monospace;color:var(--dtext);font-variant-numeric:tabular-nums;}
+/* Amber marks "not live": no ticket status uses it. */
+.pt-live-status{--dv-live-past:#f5a524;}
+.pt-live-status .dv-live-head .tbtn.dv-live-toggle[aria-pressed="true"],.pt-live-status .dv-live-head .tbtn.dv-live-toggle[aria-pressed="true"]:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#fff;}
+.pt-live-status .dv-live-head .tbtn.dv-live-over-time[aria-pressed="true"],.pt-live-status .dv-live-head .tbtn.dv-live-over-time[aria-pressed="true"]:hover{background:var(--dv-live-past);border-color:var(--dv-live-past);color:#2b1a00;}
+.dv-live-over-time-row{display:grid;grid-template-columns:auto minmax(80px,1fr) auto;gap:2px 10px;align-items:center;margin-top:10px;padding:8px 12px;border-left:3px solid var(--dv-live-past);border-radius:4px;background:color-mix(in srgb,var(--dv-live-past) 14%,transparent);font:11px/1.4 'IBM Plex Mono',monospace;color:var(--dtext);font-variant-numeric:tabular-nums;}
 .dv-live-over-time-slider{-webkit-appearance:none;appearance:none;width:100%;height:16px;margin:0;background:transparent;cursor:pointer;}
 .dv-live-over-time-slider::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:var(--dfaint,var(--explore-border));}
 .dv-live-over-time-slider::-moz-range-track{height:3px;border-radius:2px;background:var(--dfaint,var(--explore-border));}
-.dv-live-over-time-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;margin-top:-4.5px;border:0;border-radius:50%;background:var(--dv-live-active);}
-.dv-live-over-time-slider::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:var(--dv-live-active);}
+.dv-live-over-time-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;margin-top:-4.5px;border:0;border-radius:50%;background:var(--dv-live-past);}
+.dv-live-over-time-slider::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:var(--dv-live-past);}
 .dv-live-over-time-slider:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:2px;}
-.dv-live-over-time-note{grid-column:1/-1;margin:0;color:var(--dfaint,var(--dtext));}
+.dv-live-over-time-note{grid-column:1/-1;margin:0;color:var(--dtext);}
 .dv-live-epic{display:flex;gap:16px;align-items:center;padding:14px 16px;margin-top:12px;border:1px solid var(--explore-border);border-radius:10px;background:color-mix(in srgb,var(--dink) 4%,transparent);}
 .dv-live-epic-main{display:flex;flex-direction:column;gap:4px;min-width:0;}
 .dv-live-epic-keys{display:flex;align-items:baseline;gap:8px;font:700 20px/1.2 'IBM Plex Mono',monospace;letter-spacing:.02em;}

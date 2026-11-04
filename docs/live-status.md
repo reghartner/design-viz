@@ -597,11 +597,14 @@ historical version: its structure, the list of stories, titles, owners, PR icons
 and dependency links all stay as of today. Authors set nothing, and no spec field
 is involved.
 
-**Using it.** The Live status panel shows an **Over time** button once ticket
-status has loaded and a history source exists. Clicking it loads history, shows
-progress on the button, then adds a thin slider row to the panel and changes the
-button to **Back to today**. The slider moves one whole day at a time by pointer
-or arrow keys, and Home and End jump to the first and last day. Each day repaints
+**Using it.** **Live** and **Over time** are the two modes, side by side at the
+start of the Live status panel's header. The selected one is filled: blue for
+Live, amber for Over time. Over time appears once ticket status has loaded and a
+history source exists. Clicking it loads history, shows progress on the button,
+then adds a thin amber-tinted slider row to the panel. Clicking **Live** returns
+to today; while Live is already selected, clicking it turns colors off as it
+always has, and Over time turns them back on. The slider moves one whole day at a
+time by pointer or arrow keys, and Home and End jump to the first and last day. Each day repaints
 nodes and edges (local and imported), step coins and captions, lane rollups,
 panel counts, the progress ring, blockers, the Tickets table State column and
 planned-node treatment.
@@ -622,7 +625,7 @@ wait. A ticket missing today (deleted, renamed, or no permission) has no history
 it shows No status on past days and does not stop other tickets from loading.
 
 **While a past day shows.** Live refresh keeps running but does not change the
-display. **Back to today** applies the newest live status as a normal refresh,
+display. Returning to **Live** applies the newest live status as a normal refresh,
 including anything that changed meanwhile. Moving the slider adds nothing to
 Activity, causes no change pulse and shows no "no activity N d" mark. The Edit
 button is disabled with a stated reason, Over time is disabled while Edit mode
@@ -649,7 +652,7 @@ feature must be republished to get it. On `#live=demo` the button uses the
 embedded timeline's days, or the four synthesized days, with no network calls.
 The slider and **Next day** share one current day: opening Over time or moving
 the slider pauses Play, Play and Next day carry on from the slider's day, and
-Back to today returns to the day Play or Next day reached. There the timeline's
+Live returns to the day Play or Next day reached. There the timeline's
 last day supplies titles and the story list, so the total stays the same. There
 is no button on host-provider pages or in Workbench preview.
 

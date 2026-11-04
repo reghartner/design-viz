@@ -1829,3 +1829,190 @@ test('H12 Chuck 2026-10-30: history renders on a page without tracking, tickets 
  const rows=status.rows();assert.equal(rows.length,3);assert.equal(textOf(rows[0].querySelector('.dv-edit-first')).trim(),'AA-1 added to Node A');
  status.destroy();h.ctl.liveStatus.destroy();
 });
+
+/* #939 PR 1 of 2 (Metrics): the host telemetry provider, ctl.telemetry and the panel's Metrics button.
+   Nothing paints on the canvas in this PR; canvas cues follow in PR 2.
+| M1 | `ctl.telemetry` exists on every page with apply, clear, snapshot, onChange, setEnabled, status and bindings; without a provider or demo it reports `absent`, ignores setEnabled and the panel has no Metrics button or metrics connector text. |
+| M2 | `bindings()` and the provider's first argument list every bound carrier once, in page order, as `{id, kind, signals, proof, links, card}` from carrierTelemetry: local nodes and edges (template `use` expanded), imported topology nodes and edges (consumer overlay and provider-authored bindings), and loaded detail pages; unbound carriers and text boxes are absent; a repeated id keeps its first binding. |
+| M3 | Metrics is off by default (no call, no timer after first paint); setEnabled(true) calls the provider at once, then every max(refreshMs, 60000) ms while visible; hidden pauses and visible catches up once; a rejection sets `error` with the message and keeps the last map; setEnabled(false) aborts the signal, retires the timer, clears the map and returns to `idle`; a late answer after off is dropped; destroy aborts and stays off. |
+| M4 | Refresh cadence: the host `refreshMs` wins, else the page `tracking.telemetry.refreshMs`, else one minute; never below 60000. |
+| M5 | `apply(map)` keeps the provider result contract `{id: {signals: {name: {value, series, unit}}, observedAt, markers, links}}`, dropping malformed entries; snapshots are copies; `clear()` empties; onChange reports both and unsubscribes. |
+| M6 | The panel header shows a Metrics button after Live and its counts, before the Jira connector, off by default; clicking it turns the provider on, the metrics connector text moves from "Metrics: not connected" to "Metrics: connecting" to "Metrics: connected, refreshed <time>" ("Metrics: did not answer · <message>" on error); clicking again clears; Jira Live is untouched. |
+| M7 | A page with a telemetry provider and no Jira evidence still shows the header with Metrics while Live stays hidden. |
+| M8 | A demo telemetry source (`telemetry.demo.mount(api)`) shows Metrics, mounts only while Metrics is on, reports demo, and its cleanup runs when Metrics turns off or the page is destroyed. |
+*/
+const TQUEUE=()=>({kind:'queue',signals:{lag:{grafana:'max(kafka_consumergroup_lag)',unit:'msgs'}},proof:{lag:{max:500}}});
+const TCALL=()=>({kind:'call',signals:{rate:{grafana:'sum(rate(push_sent_total[5m]))*3600',unit:'req/h'},errors:{grafana:'sum(rate(push_failed_total[5m]))*3600',unit:'req/h'}},proof:{rate:{min:1},errors:{maxRatioOf:'rate',max:0.01}},links:{dashboard:'https://grafana.test/d/push'}});
+const TSERVICE=()=>({kind:'service',signals:{rate:{grafana:'sum(rate(http_requests_total{app="api"}[5m]))*3600',unit:'req/h'}},proof:{rate:{min:1}}});
+const bound=(id,kind,signals,proof={},links={},card=null)=>({id,kind,signals,proof,links,card});
+function telemetryPage(refreshMs){
+ const page={tracking:{jira:{site:'https://jira.test'},telemetry:{templates:{svc:{kind:'service',params:['app'],signals:{up:{grafana:'up{app="$app"}'}}}}}},sections:[{id:'main',diagram:{
+  nodes:{a:{tickets:['AA-1'],telemetry:TQUEUE()},b:{tickets:['BB-1']},c:{telemetry:{use:'svc',app:'notify'}},note:{type:'text',text:'Note',telemetry:TQUEUE()}},rows:[['a','b','c']],
+  edges:[{from:'a',to:'b',tickets:['EE-1'],telemetry:{...TCALL(),card:{side:'below'}}},{from:'b',to:'c',tickets:['EE-2']}]}}]};
+ if(refreshMs!==undefined)page.tracking.telemetry.refreshMs=refreshMs;
+ return {page};
+}
+const TQUEUE_BOUND=id=>bound(id,'queue',{lag:{source:'grafana',query:'max(kafka_consumergroup_lag)',unit:'msgs'}},{lag:{max:500}});
+const TCALL_BOUND=(id,card=null)=>bound(id,'call',{rate:{source:'grafana',query:'sum(rate(push_sent_total[5m]))*3600',unit:'req/h'},errors:{source:'grafana',query:'sum(rate(push_failed_total[5m]))*3600',unit:'req/h'}},{rate:{min:1},errors:{maxRatioOf:'rate',max:0.01}},{dashboard:'https://grafana.test/d/push'},card);
+const LOCAL_BINDINGS=[TQUEUE_BOUND('a'),bound('c','service',{up:{source:'grafana',query:'up{app="notify"}',unit:null}}),TCALL_BOUND('a->b',{side:'below'})];
+const metricsClock=at=>new Date(at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'});
+const IDLE={state:'idle',busy:false,refreshedAt:null,note:''};
+
+test('M1 ctl.telemetry exists without a provider, reports absent, ignores setEnabled and shows no Metrics control',()=>{
+ const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)}),t=h.ctl.telemetry;
+ assert.ok(t && typeof t==='object','M1 ctl.telemetry is attached to every controller');
+ for(const name of ['apply','clear','snapshot','onChange','setEnabled','status','bindings'])assert.equal(typeof t[name],'function','M1 ctl.telemetry.'+name);
+ assert.deepEqual(plain(t.status()),{state:'absent',busy:false,refreshedAt:null,note:''});
+ assert.equal(t.snapshot().available,false);assert.equal(t.snapshot().enabled,false);
+ t.setEnabled(true);assert.equal(t.snapshot().enabled,false,'M1 nothing to enable');assert.equal(t.status().state,'absent');
+ const panel=mountStatus(h);h.flush();h.flush();
+ const metrics=h.view.querySelector('button.dv-live-metrics'),conn=h.view.querySelector('.dv-live-metrics-connection');
+ assert.ok(!metrics || metrics.hidden,'M1 no Metrics button without a telemetry provider or demo');
+ assert.ok(!conn || conn.hidden,'M1 no metrics connector text without a telemetry provider or demo');
+ assert.equal(h.view.querySelector('.dv-live-toggle').hidden,false,'M1 Live is unaffected');
+ panel.destroy();h.ctl.liveStatus.destroy();
+});
+
+test('M2 bindings cover bound local, imported and loaded detail carriers once, in page order, as parsed bindings',async()=>{
+ let seen=null;
+ const local=harness(telemetryPage(),{},{telemetry:{provider:b=>{seen=b;return Promise.resolve({});}}});
+ assert.ok(local.ctl.telemetry,'M2 ctl.telemetry');
+ assert.deepEqual(plain(local.ctl.telemetry.bindings()),LOCAL_BINDINGS,'M2 local nodes, a template use and a carded edge; unbound carriers and the text box are absent');
+ local.ctl.telemetry.setEnabled(true);await settle();assert.deepEqual(plain(seen),LOCAL_BINDINGS,'M2 the provider receives the same list');
+ local.ctl.liveStatus.destroy();
+ const spec=(id,diagram,extra={})=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},...extra,sections:[{id:'main',diagram}]}});
+ const provider=spec('provider',{nodes:{api:{title:'API'},store:{title:'Store',telemetry:{use:'db',table:'events'}},cache:{title:'Cache'}},rows:[['api','store','cache']],
+  edges:[{from:'api',to:'store',label:'Persist'},{from:'api',to:'cache',label:'Warm'}],topologyExports:{core:{nodes:['api','store','cache'],edges:['api->store','api->cache']}}},
+  {tracking:{telemetry:{templates:{db:{kind:'service',params:['table'],signals:{writes:{sql:'select count(*) from $table'}}}}}}});
+ const consumer=spec('consumer',{nodes:{local:{title:'Local',telemetry:TQUEUE()}},rows:[['local']],
+  topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{tickets:['AA-1'],telemetry:TSERVICE()}},edgeTracking:{'api->store':{telemetry:TCALL()}}}]});
+ const resolved=local.C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]});
+ let resolveDetail;const renderOptions={loadDetail:()=>new Promise(r=>resolveDetail=r),telemetry:{provider:b=>{seen=b;return Promise.resolve({});}}};
+ const h=harness(resolved,{},renderOptions),t=h.ctl.telemetry;
+ const importedBindings=[TQUEUE_BOUND('local'),
+  bound('shared::api','service',{rate:{source:'grafana',query:'sum(rate(http_requests_total{app="api"}[5m]))*3600',unit:'req/h'}},{rate:{min:1}}),
+  bound('shared::store','service',{writes:{source:'sql',query:'select count(*) from events',unit:null}}),
+  TCALL_BOUND('shared::api->shared::store')];
+ assert.deepEqual(plain(t.bindings()),importedBindings,'M2 consumer overlay and provider-authored bindings reach imported nodes and edges; unbound imported carriers are absent');
+ const pending=renderOptions.loadDetail({spec:'approved-detail'},new AbortController().signal);
+ resolveDetail({nodes:{remote:{title:'Remote',telemetry:TQUEUE()},local:{title:'Shadow',telemetry:TSERVICE()}},rows:[['remote','local']]});await pending;
+ const withDetail=importedBindings.concat([TQUEUE_BOUND('remote')]);
+ assert.deepEqual(plain(t.bindings()),withDetail,'M2 a loaded detail page joins; a repeated id keeps its first binding');
+ t.setEnabled(true);await settle();assert.deepEqual(plain(seen),withDetail,'M2 the provider receives local, imported and detail carriers');
+ h.ctl.liveStatus.destroy();
+});
+
+test('M3 Metrics is off by default; on starts the provider loop with a 60 s floor, pauses hidden, catches up, keeps the last map on error; off and destroy abort',async()=>{
+ let calls=0,fail=false,hold=null;const signals=[];
+ const sample={a:{signals:{lag:{value:12,series:[[1,10],[2,12]],unit:'msgs'}},observedAt:'2026-11-03T10:00:00.000Z',markers:[],links:{}}};
+ const h=harness(telemetryPage(),{},{telemetry:{provider:(b,s)=>{calls++;signals.push(s);if(hold)return hold;return fail?Promise.reject(Error('Grafana timeout')):Promise.resolve(sample);},refreshMs:1}}),t=h.ctl.telemetry;
+ assert.ok(t,'M3 ctl.telemetry');
+ h.flush();h.flush();await settle();
+ assert.equal(calls,0,'M3 no provider call before Metrics is turned on');assert.equal(h.timers.size,0,'M3 no refresh timer while off');
+ assert.deepEqual(plain(t.status()),IDLE);assert.equal(t.snapshot().available,true);assert.equal(t.snapshot().enabled,false);
+ t.setEnabled(true);assert.equal(t.snapshot().enabled,true);assert.deepEqual(plain(t.status()),{state:'loading',busy:true,refreshedAt:null,note:''});
+ await settle();assert.equal(calls,1,'M3 on calls the provider at once');
+ const ok=plain(t.status());assert.equal(ok.state,'ok');assert.equal(ok.busy,false);assert.ok(isFinite(Date.parse(ok.refreshedAt)),'M3 refreshedAt is a timestamp');assert.equal(ok.note,'');
+ assert.deepEqual(plain(t.snapshot().map),sample);
+ assert.deepEqual([...h.timers.values()].map(x=>x.ms),[60000],'M3 refreshMs below a minute uses the 60 s floor');
+ h.doc.hidden=true;h.doc.visibilityState='hidden';h.doc.dispatchEvent({type:'visibilitychange'});assert.equal(h.timers.size,0,'M3 a hidden document pauses refresh');
+ h.doc.hidden=false;h.doc.visibilityState='visible';h.doc.dispatchEvent({type:'visibilitychange'});await settle();assert.equal(calls,2,'M3 one catch-up call on return');
+ fail=true;let next=[...h.timers.values()][0];h.timers.clear();next.fn();assert.equal(t.status().busy,true,'M3 busy during a refresh');await settle();
+ assert.equal(t.status().state,'error');assert.equal(t.status().note,'Grafana timeout');assert.equal(t.status().busy,false);
+ assert.deepEqual(plain(t.snapshot().map),sample,'M3 the last map survives a failed refresh');
+ fail=false;next=[...h.timers.values()][0];h.timers.clear();next.fn();await settle();assert.equal(t.status().state,'ok');assert.equal(t.status().note,'','M3 success clears the error note');
+ t.setEnabled(false);
+ assert.equal(signals[signals.length-1].aborted,true,'M3 off aborts the signal');assert.equal(h.timers.size,0,'M3 off retires the timer');
+ assert.deepEqual(plain(t.snapshot().map),{},'M3 off clears the map');assert.deepEqual(plain(t.status()),IDLE,'M3 off returns to idle');
+ const before=calls;h.doc.dispatchEvent({type:'visibilitychange'});await settle();assert.equal(calls,before,'M3 visibility never calls while off');
+ let release;hold=new Promise(r=>release=r);t.setEnabled(true);await settle();assert.equal(calls,before+1);t.setEnabled(false);release(sample);await settle();
+ assert.deepEqual(plain(t.snapshot().map),{},'M3 a late answer after off is dropped');assert.deepEqual(plain(t.status()),IDLE);
+ hold=null;t.setEnabled(true);await settle();assert.equal(t.status().state,'ok');const live=signals[signals.length-1];assert.equal(live.aborted,false,'M3 on again gets a fresh signal');
+ h.ctl.liveStatus.destroy();assert.equal(live.aborted,true,'M3 destroy aborts the signal');assert.equal(h.timers.size,0,'M3 destroy retires the timer');
+ const after=calls;t.setEnabled(true);await settle();assert.equal(t.snapshot().enabled,false,'M3 a destroyed controller stays off');assert.equal(calls,after);
+});
+
+test('M4 refresh cadence: host refreshMs wins, else the page tracking.telemetry.refreshMs, else one minute, never below it',async()=>{
+ for(const [pageMs,hostMs,want] of [[undefined,undefined,60000],[300000,undefined,300000],[300000,120000,120000],[undefined,30000,60000],[undefined,'soon',60000],[90000,0,90000]]){
+  const h=harness(telemetryPage(pageMs),{},{telemetry:{provider:()=>Promise.resolve({}),refreshMs:hostMs}});
+  assert.ok(h.ctl.telemetry,'M4 ctl.telemetry');h.ctl.telemetry.setEnabled(true);await settle();
+  assert.deepEqual([...h.timers.values()].map(x=>x.ms),[want],JSON.stringify({pageMs,hostMs}));h.ctl.liveStatus.destroy();
+ }
+});
+
+test('M5 apply keeps the provider result contract, snapshots are copies, clear empties, onChange reports and unsubscribes',()=>{
+ const h=harness(telemetryPage(),{},{telemetry:{provider:()=>new Promise(()=>{})}}),t=h.ctl.telemetry,seen=[];
+ assert.ok(t,'M5 ctl.telemetry');
+ const off=t.onChange(value=>seen.push(plain(value)));
+ t.apply({
+  a:{signals:{lag:{value:12,series:[[1,10],['2026-11-03T10:00:00Z',11],[NaN,1],[3,'x'],[4],'bad',['never',2]],unit:'msgs'},rate:{value:Infinity,unit:7},bad:'x','9bad':{value:1}},
+   observedAt:Date.UTC(2026,10,3,10),markers:[{at:'2026-11-03T09:00:00Z',kind:'deploy',label:'firmware 2.4.1'},{kind:'deploy'},'x',{at:'2026-11-03T09:30:00Z',kind:7}],
+   links:{query:'https://grafana.test/explore?x=1',dashboard:'javascript:alert(1)',other:'https://x.test/'}},
+  'a->b':{signals:{rate:{value:0}},observedAt:'not a time'},
+  b:'nope',c:null,d:[1]
+ });
+ const want={a:{signals:{lag:{value:12,series:[[1,10],['2026-11-03T10:00:00Z',11]],unit:'msgs'},rate:{}},observedAt:'2026-11-03T10:00:00.000Z',
+   markers:[{at:'2026-11-03T09:00:00.000Z',kind:'deploy',label:'firmware 2.4.1'},{at:'2026-11-03T09:30:00.000Z'}],links:{query:'https://grafana.test/explore?x=1'}},
+  'a->b':{signals:{rate:{value:0}},observedAt:null,markers:[],links:{}}};
+ assert.deepEqual(plain(t.snapshot().map),want);
+ assert.equal(seen.length,1,'M5 apply reports one change');assert.deepEqual(seen[0].map,want);assert.equal(seen[0].enabled,false);assert.deepEqual(seen[0].status,IDLE,'M5 apply while off leaves the connector idle');
+ const copy=t.snapshot().map;copy.a.signals.lag.value=99;assert.equal(t.snapshot().map.a.signals.lag.value,12,'M5 snapshot is a copy');
+ t.clear();assert.deepEqual(plain(t.snapshot().map),{});assert.equal(seen.length,2,'M5 clear reports a change');
+ off();t.apply(want);assert.equal(seen.length,2,'M5 unsubscribe stops change callbacks');assert.deepEqual(plain(t.snapshot().map),want);
+ h.ctl.liveStatus.destroy();
+});
+
+test('M6 Metrics sits beside Live, off by default; on calls the provider and updates its connector text; off clears; Live is untouched',async()=>{
+ let calls=0,seen=null,fail=false;const sample={a:{signals:{lag:{value:3}}}};
+ const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)},{telemetry:{provider:b=>{calls++;seen=b;return fail?Promise.reject(Error('Grafana timeout')):Promise.resolve(sample);}}});
+ const panel=mountStatus(h);h.flush();h.flush();await settle();
+ const head=h.view.querySelector('.dv-live-head'),live=head.querySelector('.dv-live-toggle'),metrics=head.querySelector('button.dv-live-metrics'),conn=head.querySelector('.dv-live-metrics-connection'),jira=head.querySelector('.dv-live-connection');
+ assert.ok(metrics,'M6 Metrics button in the panel header');assert.equal(metrics.hidden,false);assert.equal(metrics.textContent,'Metrics');assert.equal(metrics.getAttribute('type'),'button');
+ assert.ok(metrics.classList.contains('tbtn') && metrics.classList.contains('reader-button'),'M6 Metrics wears the header button look');
+ assert.equal(metrics.getAttribute('aria-pressed'),'false','M6 off by default');assert.equal(calls,0,'M6 no provider call while off');
+ const order=head.children;assert.ok(order.indexOf(live)<order.indexOf(metrics),'M6 Metrics follows Live');
+ assert.ok(order.slice(order.indexOf(live)+1,order.indexOf(metrics)).every(el=>el.classList.contains('dv-live-count')),'M6 only the Live counts sit between Live and Metrics');
+ assert.ok(order.indexOf(metrics)<order.indexOf(jira),'M6 Metrics precedes the connector text');
+ assert.ok(conn,'M6 metrics connector text');assert.ok(conn.classList.contains('dv-live-connection'),'M6 same markup as the Jira connector');
+ assert.equal(order.indexOf(conn),order.indexOf(jira)+1,'M6 the metrics connector sits beside the Jira one');
+ const text=()=>conn.querySelectorAll('span')[0].textContent;
+ assert.equal(conn.hidden,false);assert.equal(conn.getAttribute('role'),'status');assert.ok(conn.querySelector('.dv-live-connection-dot'));
+ assert.equal(conn.getAttribute('data-state'),'disconnected');assert.equal(conn.getAttribute('data-busy'),'false');assert.equal(text(),'Metrics: not connected');
+ const livePressed=live.getAttribute('aria-pressed');assert.equal(livePressed,'true');
+ metrics.dispatchEvent({type:'click'});
+ assert.equal(metrics.getAttribute('aria-pressed'),'true');assert.equal(conn.getAttribute('data-state'),'connecting');assert.equal(conn.getAttribute('data-busy'),'true');assert.equal(text(),'Metrics: connecting');
+ await settle();assert.equal(calls,1);assert.deepEqual(plain(seen),LOCAL_BINDINGS,'M6 the click hands the provider the bound carriers');
+ const at=h.ctl.telemetry.status().refreshedAt;
+ assert.equal(conn.getAttribute('data-state'),'connected');assert.equal(conn.getAttribute('data-busy'),'false');assert.equal(text(),'Metrics: connected, refreshed '+metricsClock(at));
+ assert.equal(h.ctl.liveStatus.snapshot().metrics.enabled,true,'M6 the panel snapshot carries the Metrics state');
+ fail=true;const tick=[...h.timers.values()].find(x=>x.ms===60000);assert.ok(tick,'M6 metrics refresh is armed');for(const [id,x] of h.timers)if(x===tick)h.timers.delete(id);tick.fn();await settle();
+ assert.equal(conn.getAttribute('data-state'),'error');assert.equal(text(),'Metrics: did not answer · Grafana timeout');
+ assert.equal(live.getAttribute('aria-pressed'),livePressed,'M6 Jira Live is untouched');assert.equal(h.ctl.liveStatus.enabled(),true);
+ metrics.dispatchEvent({type:'click'});
+ assert.equal(metrics.getAttribute('aria-pressed'),'false');assert.deepEqual(plain(h.ctl.telemetry.snapshot().map),{},'M6 off clears the map');
+ assert.equal(conn.getAttribute('data-state'),'disconnected');assert.equal(text(),'Metrics: not connected');
+ live.dispatchEvent({type:'click'});assert.equal(h.ctl.liveStatus.enabled(),false);assert.equal(h.ctl.telemetry.snapshot().enabled,false,'M6 Live does not drive Metrics');assert.equal(metrics.getAttribute('aria-pressed'),'false');
+ panel.destroy();h.ctl.liveStatus.destroy();
+});
+
+test('M7 a page with a telemetry provider and no Jira evidence still shows Metrics in the header',()=>{
+ const h=harness(telemetryPage(),{},{telemetry:{provider:()=>Promise.resolve({})}});
+ const panel=mountStatus(h),head=h.view.querySelector('.dv-live-head'),metrics=head && head.querySelector('button.dv-live-metrics');
+ assert.equal(head.hidden,false,'M7 the header shows for Metrics alone');assert.ok(metrics && !metrics.hidden,'M7 Metrics button');
+ assert.equal(head.querySelector('.dv-live-toggle').hidden,true,'M7 Live stays hidden without Jira evidence');
+ panel.destroy();h.ctl.liveStatus.destroy();
+});
+
+test('M8 a demo telemetry source shows Metrics, mounts only while on, reports demo, and is cleaned up on off and destroy',()=>{
+ let mounted=0,cleaned=0,given=null;
+ const h=harness(telemetryPage(),{},{telemetry:{demo:{mount:api=>{mounted++;given=api;api.apply({a:{signals:{lag:{value:1}}}});return ()=>cleaned++;}}}}),t=h.ctl.telemetry;
+ assert.ok(t,'M8 ctl.telemetry');assert.equal(t.snapshot().available,true);assert.deepEqual(plain(t.status()),IDLE);
+ const panel=mountStatus(h),metrics=h.view.querySelector('button.dv-live-metrics'),conn=h.view.querySelector('.dv-live-metrics-connection');
+ assert.ok(metrics && !metrics.hidden,'M8 a demo source shows Metrics');assert.equal(mounted,0,'M8 the demo waits for Metrics');
+ metrics.dispatchEvent({type:'click'});assert.equal(mounted,1);assert.equal(given,t,'M8 the demo drives ctl.telemetry');
+ assert.equal(t.status().state,'ok');assert.deepEqual(plain(t.snapshot().map.a.signals),{lag:{value:1}});
+ assert.equal(conn.getAttribute('data-state'),'demo');assert.match(conn.querySelectorAll('span')[0].textContent,/^Metrics: demo, refreshed /);
+ metrics.dispatchEvent({type:'click'});assert.equal(cleaned,1,'M8 off runs the demo cleanup');assert.deepEqual(plain(t.snapshot().map),{});assert.deepEqual(plain(t.status()),IDLE);
+ metrics.dispatchEvent({type:'click'});assert.equal(mounted,2);h.ctl.liveStatus.destroy();assert.equal(cleaned,2,'M8 destroy runs the demo cleanup');
+ panel.destroy();
+});

@@ -1,5 +1,15 @@
 # Changelog
 
+## Live status panel buttons stay in place (2026-11-04)
+
+- The Live status panel header now has a row of buttons that never move, with
+  counts, the connector line and notes on one fixed-height row below them (#986).
+  **First blocker** has one place and size, and reads **No blockers** greyed out
+  when there are none. The demo's Play button and automatic advance are gone. **<**
+  and **>** replace Next day and sit on the slider row, or on a row of their own for
+  a demo in Live mode. A timeline's `intervalSeconds` is still accepted and has no
+  effect.
+
 ## Live status Over time (2026-11-03)
 
 - Readers can move a slider through past days on a Live status board and see each

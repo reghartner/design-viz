@@ -599,7 +599,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       lanes:panelLanes(pages),blockers:panelBlockers(pages),tickets:tickets,excluded:excluded,
       dependencies:copy(dependencies),waiting:copy(boardWaiting),chains:liveStatusDependencyChains(boardWaiting),suggestions:suggestions,epic:epic,
       coverage:coverage,readiness:readiness,activity:copy(activity.filter(function(item){return storyKeys.indexOf(item.key)>=0;})).map(function(item){item.relative=item.at?relative(item.at):'time unavailable';return item;}),
-      demo:demoControls?{playing:!!demoControls.playing,manual:!!demoControls.manual,ended:!!demoControls.ended}:null,verdict:verdict,
+      demo:demoControls?{ended:!!demoControls.ended,first:!demoControls.prev || !!demoControls.first}:null,verdict:verdict,
       overTime:overTimeState(),
       editHistory:copy(editHistory),edit:editState(),
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
@@ -1240,7 +1240,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     firstBlocker:jumpFirstBlocker,
     focusCarrier:showCarrier,
     runAction:function(){if(!retired && actionFn)actionFn();},
-    toggleDemo:function(){if(!retired && demoControls)demoControls.toggle();},
+    prevDemo:function(){if(!retired && demoControls && demoControls.prev)demoControls.prev();},
     nextDemo:function(){if(!retired && demoControls)demoControls.next();},
     state:function(ref){return map[ref]?copy(map[ref]):null;},
     apply:function(value){
@@ -1278,6 +1278,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       Promise.resolve().then(function(){return overSource.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result);},function(){overLoad(request,null);});
     },
     overTimeClose:function(){if(!retired && over)overClose();},
+    overTimeStep:function(delta){if(!retired && over)api.overTimeDay(over.index+delta);},
     overTimeDay:function(index){
       if(retired || !over || typeof index!=='number' || !isFinite(index) || Math.floor(index)!==index)return;
       index=Math.max(0,Math.min(over.days.length-1,index));if(index===over.index)return;

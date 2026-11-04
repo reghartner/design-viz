@@ -228,7 +228,7 @@ test('S1 S2 S3 S4 S5 S6 built demo plays the story through blockers to completio
  const spec=await page.locator('#flowspec').evaluate(el=>JSON.parse(el.textContent));const d=spec.page.sections[0].diagram;
  expect(spec.page.title).toBe('Doorbell Delivery Live Status');expect(Object.keys(d.nodes)).toHaveLength(6);expect(d.edges).toHaveLength(5);expect(d.steps).toHaveLength(7);
  const timeline=await page.locator('#live-timeline').evaluate(el=>JSON.parse(el.textContent));expect(timeline.days).toHaveLength(12);
- await expect(root.locator('.dv-live-note')).toHaveText('Day 1 — kickoff');await expect(root.locator('.dv-live-demo').getByRole('button',{name:'Play',exact:true})).toBeDisabled();
+ await expect(root.locator('.dv-live-note')).toHaveText('Day 1 — kickoff');await expect(root.locator('.pt-live-status').getByRole('button',{name:/^(Play|Pause)$/})).toHaveCount(0);
  const edge=root.locator('path.edge[data-dv-edge="0"]'),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
  await expect(edge).toHaveClass(/dv-live-todo/);await expect(edge).toHaveCSS('stroke-dasharray','5px, 5px');
  const edgeDots=()=>root.locator('circle.pkt').filter({has:page.locator('mpath[href$="-e0"]')});
@@ -268,7 +268,8 @@ test('S1 S2 S3 S4 S5 S6 built demo plays the story through blockers to completio
 | O7 | fetch and XHR listener; embedded spec text | no request and an unchanged embedded spec after the whole flow | a demo that reaches the network or edits the spec |
 | O8 | fallback page without a timeline | Over time offers the four synthesized days | an embedded-timeline-only button |
 | O10 | Day 4 with long header text, each theme | Live and Over time are the first two header buttons, on one row with nothing between them; the selected one has a fill the other lacks; Over time's fill differs from Live's; the slider row is tinted | Over time wrapping to a new line; a mode only the label reveals |
-| O9 | playing demo on a fake clock | opening Over time and moving the slider each pause Play; Play carries on from the slider's day and moves the slider; Live returns to the day Play reached | a player that keeps running under the slider; Play restarting from its old day |
+| O9 | demo on Over time | `<` and `>` are on the slider's row, step one whole day, move the demo's own day and are disabled at each end | large word buttons elsewhere; a slider-only step that Live forgets |
+| O11 | very long status text, then a blocker (#986) | Live, Over time, the First blocker slot and Next day keep their exact box, and the content below keeps its top | dynamic text or a popping button moving static controls |
 */
 test('O1 O2 O3 O4 O5 O6 O7 demo Over time moves through days without changing anything but status',async({page,server})=>{
  const requests=[];page.on('request',request=>{if(['fetch','xhr'].includes(request.resourceType()))requests.push(request.url());});
@@ -308,7 +309,7 @@ test('O10 Live and Over time sit first on one row and the selected one is filled
  const names=await panel.locator('.dv-live-head .reader-button').evaluateAll(els=>els.filter(el=>el.getClientRects().length).map(el=>el.textContent.trim()));expect(names.slice(0,2)).toEqual(['Live','Over time']);
  const a=await live.boundingBox(),b=await overTime.boundingBox();expect(b.y).toBe(a.y);expect(b.x-(a.x+a.width)).toBeGreaterThanOrEqual(0);expect(b.x-(a.x+a.width)).toBeLessThanOrEqual(8);
  for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){
-  // Colors animate between themes and between states: wait until an unselected button reads like Next day, which never changes state here.
+  // Colors animate between themes and between states: wait until an unselected button reads like the next day button, which never changes state here.
   await page.evaluate(s=>window.dvSetSkin(s),skin);await panel.locator('.dv-live-epic').hover();
   await expect.poll(async()=>await fill(overTime)===await fill(next),{message:skin+' Over time starts unselected'}).toBe(true);
   const plain=await fill(next),selected=await fill(live);expect(selected,skin+' Live is filled').not.toBe(plain);
@@ -323,19 +324,26 @@ test('O8 a demo page without a timeline offers the four synthesized days',async(
  const spec=JSON.parse(await readFile(path.join(repo,'examples/live-status/live-status.spec.json'),'utf8')),file=path.join(server.root,'fallback-over.json'),out=path.join(server.root,'fallback-over.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/fallback-over.html#live=demo');
  const panel=page.locator('#docview .pt-live-status'),slider=panel.getByRole('slider',{name:'Day',exact:true}),overTime=panel.getByRole('button',{name:'Over time',exact:true});await expect(overTime).toHaveCount(1);await overTime.click();await expect(slider).toHaveValue('0');await expect(slider).toHaveAttribute('max','3');await slider.focus();await page.keyboard.press('End');await expect(panel.locator('.dv-live-note')).toContainText('Day 4 — delivery complete');await expect(page.locator('#docview path.edge').first()).toHaveClass(/dv-live-done/);
 });
-test('O9 opening or moving Over time pauses Play, and Play carries on from the slider day',async({page,server})=>{
- await page.clock.install();await page.emulateMedia({reducedMotion:'no-preference'});await page.setViewportSize({width:1440,height:1000});
- const spec={page:{title:'Over time play',sections:[{diagram:{nodes:{a:{title:'A',tickets:['AA-1']},b:{title:'B',tickets:['BB-1']}},rows:[['a','b']],edges:[{from:'a',to:'b'}],panels:[{id:'status',type:'live-status',title:'Live status'}]}}]}};
- const file=path.join(server.root,'over-play.json'),out=path.join(server.root,'over-play.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/over-play.html#live=demo');
- const panel=page.locator('#docview .pt-live-status'),note=panel.locator('.dv-live-note'),slider=panel.getByRole('slider',{name:'Day',exact:true}),overTime=panel.getByRole('button',{name:'Over time',exact:true}),play=panel.locator('.dv-live-demo').getByRole('button',{name:'Play',exact:true}),pause=panel.locator('.dv-live-demo').getByRole('button',{name:'Pause',exact:true}),live=panel.getByRole('button',{name:'Live',exact:true});
- // Contrasting precondition: the demo is playing and reaches Day 2 on its own.
- await expect(pause).toBeVisible();await page.clock.runFor(6000);await expect(note).toContainText('Day 2');await expect(overTime).toHaveCount(1);
- await overTime.click();await expect(slider).toHaveValue('1');await expect(play).toBeVisible();await expect(pause).toHaveCount(0);await page.clock.runFor(12000);await expect(slider).toHaveValue('1');await expect(note).toContainText('Day 2');
- // Play carries on from the slider's day and the slider follows.
- await slider.focus();await page.keyboard.press('ArrowLeft');await expect(slider).toHaveValue('0');await expect(note).toContainText('Day 1');await play.click();await expect(pause).toBeVisible();await page.clock.runFor(6000);await expect(slider).toHaveValue('1');await expect(note).toContainText('Day 2');
- // Moving the slider while playing pauses, and the day Play reached survives returning to Live.
- await slider.focus();await page.keyboard.press('ArrowRight');await expect(slider).toHaveValue('2');await expect(play).toBeVisible();await page.clock.runFor(12000);await expect(slider).toHaveValue('2');
- await live.click();await expect(slider).toHaveCount(0);await expect(note).toContainText('Day 2');await expect(play).toBeVisible();await page.clock.runFor(12000);await expect(note).toContainText('Day 2');
+test('O9 the < and > buttons sit on the slider row, step one day and stop at each end',async({page,server})=>{
+ const root=await openStory(page,server),panel=root.locator('.pt-live-status'),note=panel.locator('.dv-live-note'),slider=panel.getByRole('slider',{name:'Day',exact:true}),overTime=panel.getByRole('button',{name:'Over time',exact:true}),live=panel.getByRole('button',{name:'Live',exact:true}),prev=panel.getByRole('button',{name:'Previous day',exact:true}),next=panel.getByRole('button',{name:'Next day',exact:true}),middle=async locator=>{const box=await locator.boundingBox();return box.y+box.height/2;};
+ await expect(prev).toHaveText('<');await expect(next).toHaveText('>');await overTime.click();await expect(slider).toHaveValue('0');await expect(prev).toBeDisabled();await expect(next).toBeEnabled();
+ expect(Math.abs(await middle(prev)-await middle(slider))).toBeLessThanOrEqual(2);expect(Math.abs(await middle(next)-await middle(slider))).toBeLessThanOrEqual(2);
+ await next.click();await next.click();await expect(slider).toHaveValue('2');await expect(note).toContainText('Day 3');await prev.click();await expect(slider).toHaveValue('1');await expect(note).toContainText('Day 2');
+ // The buttons move the demo's own day, so Live stays there.
+ await live.click();await expect(slider).toHaveCount(0);await expect(note).toContainText('Day 2');
+ await overTime.click();await slider.focus();await page.keyboard.press('End');await expect(slider).toHaveValue('11');await expect(next).toBeDisabled();await expect(prev).toBeEnabled();
+});
+test('O11 buttons and the content below them stay in place when status text grows, a blocker appears or the day changes',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:1000});await page.emulateMedia({reducedMotion:'reduce'});
+ const timeline=JSON.parse(await readFile(path.join(repo,'examples/live-status/live-status.timeline.json'),'utf8'));timeline.days[1].label='Day 2 — '+'a very long status message that must not move anything on this panel '.repeat(6);
+ const file=path.join(server.root,'long-status.timeline.json'),out=path.join(server.root,'long-status.html');await writeFile(file,JSON.stringify(timeline));execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(repo,'examples/live-status/live-status.spec.json'),path.join(repo,'template/flowview.html'),out,'--timeline',file]);await page.goto(server.origin+'/long-status.html#live=demo');
+ const panel=page.locator('#docview .pt-live-status'),live=panel.getByRole('button',{name:'Live',exact:true}),overTime=panel.getByRole('button',{name:'Over time',exact:true}),slot=panel.locator('.dv-live-first'),next=panel.getByRole('button',{name:'Next day',exact:true}),status=panel.locator('.dv-live-status'),epic=panel.locator('.dv-live-epic');
+ const places=async()=>{const out={};for(const [name,item] of Object.entries({live,overTime,slot,next})){const box=await item.boundingBox();out[name]=[box.x,box.y,box.width,box.height];}const below=await epic.boundingBox();out.epicTop=below.y;return out;};
+ await expect(slot).toHaveText('No blockers');await expect(slot).toBeDisabled();const before=await places();
+ await next.click();await expect(status).toHaveAttribute('title',/very long status message/);await expect(status).toHaveCSS('white-space','nowrap');expect(await places(),'long status text').toEqual(before);
+ await next.click();await next.click();await expect(slot).toHaveText('First blocker');await expect(slot).toBeEnabled();expect(await places(),'a blocker appears').toEqual(before);
+ // The row is tall enough for what it holds: three count chips are not clipped.
+ expect(await status.evaluate(el=>el.scrollHeight<=el.clientHeight),'status row fits its contents').toBe(true);
 });
 test('S4 waiting follows ticket dependencies from the provider and the authored pairs, never the edges',async({page,server})=>{
  await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>Object.fromEntries(refs.tickets.map(key=>[key,Object.assign({state:key==='HW-123'?'blocked':key==='FW-45'?'done':'todo'},key==='FW-46'?{dependsOn:[{key:'HW-123',source:'jira',linkType:'is blocked by'}]}:{})]))};});
@@ -358,17 +366,16 @@ test('S2 S3 without hash there are no demo controls or live classes',async({page
 test('S2 host provider takes precedence over the demo hash',async({page,server})=>{
  await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>Object.fromEntries(refs.tickets.map(key=>[key,{state:'done'}]))};});const root=await openStory(page,server);await expect(root.locator('path.edge').first()).toHaveClass(/dv-live-done/);await expect(root.locator('.dv-live-demo')).toHaveCount(0);await expect(root.getByRole('button',{name:'Over time',exact:true})).toHaveCount(0);
 });
-test('S2 S3 fallback demo honors cadence, Pause and reduced motion',async({page,server})=>{
+test('S2 S3 fallback demo stays on its day until a step button moves it',async({page,server})=>{
  await page.clock.install();await page.emulateMedia({reducedMotion:'no-preference'});await page.setViewportSize({width:1440,height:1000});
  const spec={page:{title:'Fallback',sections:[{diagram:{nodes:{a:{title:'A',tickets:['AA-1']},b:{title:'B',tickets:['BB-1']}},rows:[['a','b']],edges:[{from:'a',to:'b'}]}}]}};
  spec.page.sections[0].diagram.panels=[{id:'status',type:'live-status',title:'Live status'}];
- const file=path.join(server.root,'fallback.json'),out=path.join(server.root,'fallback.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/fallback.html#live=demo');const root=page.locator('#docview'),demo=root.locator('.dv-live-demo');
- await expect(demo).toBeVisible();await expect(page.locator('#live-timeline')).toHaveCount(0);await expect(root.locator('.dv-live-note')).toContainText('Day 1');await page.clock.runFor(6000);await expect(root.locator('.dv-live-note')).toContainText('Day 2');
- await demo.getByRole('button',{name:'Pause',exact:true}).click();await page.clock.runFor(12000);await expect(root.locator('.dv-live-note')).toContainText('Day 2');await demo.getByRole('button',{name:'Play',exact:true}).click();await page.clock.runFor(6000);await expect(root.locator('.dv-live-note')).toContainText('Day 3');
- await page.emulateMedia({reducedMotion:'reduce'});
- // Wait for the media-change handler to cancel playback before advancing fake time.
- await expect(demo.getByRole('button',{name:'Play',exact:true})).toBeDisabled();
- await page.clock.runFor(12000);await expect(root.locator('.dv-live-note')).toContainText('Day 3');await demo.getByRole('button',{name:'Next day',exact:true}).click();await expect(root.locator('g.node.dv-live-done')).toHaveCount(2);
+ const file=path.join(server.root,'fallback.json'),out=path.join(server.root,'fallback.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/fallback.html#live=demo');const root=page.locator('#docview'),demo=root.locator('.dv-live-demo'),note=root.locator('.dv-live-note'),next=demo.getByRole('button',{name:'Next day',exact:true}),prev=demo.getByRole('button',{name:'Previous day',exact:true});
+ await expect(demo).toBeVisible();await expect(page.locator('#live-timeline')).toHaveCount(0);await expect(note).toContainText('Day 1');await expect(root.locator('.pt-live-status').getByRole('button',{name:/^(Play|Pause)$/})).toHaveCount(0);
+ // Nothing advances by itself: a minute of fake time leaves the demo on Day 1.
+ await page.clock.runFor(60000);await expect(note).toContainText('Day 1');await expect(prev).toBeDisabled();
+ await next.click();await expect(note).toContainText('Day 2');await prev.click();await expect(note).toContainText('Day 1');
+ for(const day of [2,3,4]){await next.click();await expect(note).toContainText('Day '+day);}await expect(next).toBeDisabled();await expect(root.locator('g.node.dv-live-done')).toHaveCount(2);
 });
 
 /* Claude provider contract matrix (these browser cases + tests/live-status.test.js):
@@ -464,11 +471,12 @@ test('P10 P11 P12 connector Over time loads on the click and repaints local and 
  const spec=JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(source,{version:1,id:'consumer',specs:[provider,source]})));
  await page.addInitScript(stubOverTimeClaude);const requests=[];await page.route('**/*',route=>{const request=route.request();if(['fetch','xhr'].includes(request.resourceType())){requests.push(request.url());return route.abort();}return route.continue();});
  const root=await open(page,server,spec,false),panel=root.locator('.pt-live-status'),local=root.locator('g.node[data-dv-node="a"]'),imported=root.locator('g.node[data-dv-node="imp::p"]'),edge=root.locator('path.edge[data-dv-edge="0"]'),overTime=panel.getByRole('button',{name:'Over time',exact:true}),live=panel.getByRole('button',{name:'Live',exact:true}),slider=panel.getByRole('slider',{name:'Day',exact:true}),history=()=>page.evaluate(()=>__mcpStub.calls.map(call=>call.tool).filter(tool=>tool==='listJiraIssueChangelogs' || tool==='listJiraStatuses').length);
- await expect(local).toHaveClass(/dv-live-done/);await expect(imported).toHaveClass(/dv-live-done/);await expect(edge).toHaveClass(/dv-live-active/);await expect(overTime).toBeVisible();expect(await history(),'P10 nothing before the click').toBe(0);expect(await page.evaluate(()=>__mcpStub.watches.filter(watch=>watch.tool!=='searchJiraIssuesUsingJql').length)).toBe(0);
+ await expect(local).toHaveClass(/dv-live-done/);await expect(imported).toHaveClass(/dv-live-done/);await expect(edge).toHaveClass(/dv-live-active/);await expect(overTime).toBeVisible();await expect(panel.getByRole('button',{name:'Next day',exact:true})).toHaveCount(0);expect(await history(),'P10 nothing before the click').toBe(0);expect(await page.evaluate(()=>__mcpStub.watches.filter(watch=>watch.tool!=='searchJiraIssuesUsingJql').length)).toBe(0);
  const embedded=await page.locator('#flowspec').textContent(),activity=()=>panel.locator('.dv-live-activity-entry').allTextContents(),before=await activity();
  await overTime.click();await expect(overTime).toHaveAttribute('aria-pressed','true');expect(await history(),'P10 one status list and three changelogs').toBe(4);
  await expect(slider).toHaveValue(await slider.getAttribute('max'));await slider.focus();await page.keyboard.press('Home');await expect(slider).toHaveValue('0');await expect(panel.locator('.dv-live-over-time-note')).toHaveText('Status as of Oct 20 · other columns show today');
  await expect(local).toHaveClass(/dv-live-todo/);await expect(imported).toHaveClass(/dv-live-todo/);await expect(edge).toHaveClass(/dv-live-todo/);await expect(local).not.toHaveClass(/dv-live-done/);await expect(imported).not.toHaveClass(/dv-live-done/);
+ await expect(panel.getByRole('button',{name:'Next day',exact:true})).toHaveCount(1);await panel.getByRole('button',{name:'Next day',exact:true}).click();await expect(slider).toHaveValue('1');await panel.getByRole('button',{name:'Previous day',exact:true}).click();await expect(slider).toHaveValue('0');
  await page.evaluate(()=>{__mcpStub.today['IE-1']='done';__mcpStub.watches.forEach(watch=>watch.deliver());});await page.waitForTimeout(100);
  await expect(edge).toHaveClass(/dv-live-todo/);expect(await activity(),'P11 a held refresh logs nothing yet').toEqual(before);
  await live.click();await expect(slider).toHaveCount(0);await expect(overTime).toHaveAttribute('aria-pressed','false');await expect(local).toHaveClass(/dv-live-done/);await expect(imported).toHaveClass(/dv-live-done/);await expect(edge).toHaveClass(/dv-live-done/);await expect(panel.locator('.dv-live-activity')).toContainText('IE-1 · active → done');
@@ -689,7 +697,7 @@ test('B1 B2 B3 B4 B5 B7 B8 story playback stops on blockers and details reach re
  }
  await expect.poll(async()=> (await panel.locator('.dv-live-epic-counts').textContent()).split(' · ')[0]).toBe('Ready to demo');
  // Completed upstream work wears the green check (Chuck, PR #784 review).
- const doneDep=panel.locator('tr[data-live-ticket="FW-46"] .dv-live-dep');await expect(doneDep).toHaveAttribute('data-tone','done');await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCount(1);await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCSS('color',statusLine('done'));await expect(panel.locator('.dv-live-epic-progress')).toHaveText('8 of 8 stories done · 7 of 8 on diagram');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(root.getByRole('button',{name:'First blocker',exact:true})).toBeHidden();await expect(panel.locator('.dv-live-completion')).toContainText('11/11');
+ const doneDep=panel.locator('tr[data-live-ticket="FW-46"] .dv-live-dep');await expect(doneDep).toHaveAttribute('data-tone','done');await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCount(1);await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCSS('color',statusLine('done'));await expect(panel.locator('.dv-live-epic-progress')).toHaveText('8 of 8 stories done · 7 of 8 on diagram');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(root.getByRole('button',{name:'First blocker',exact:true})).toHaveCount(0);await expect(root.getByRole('button',{name:'No blockers',exact:true})).toBeDisabled();await expect(panel.locator('.dv-live-completion')).toContainText('11/11');
  await page.keyboard.press('Escape');await expect(panel).toBeVisible();await expect(panel.locator('.pbody')).not.toBeEmpty();
 });
 test('B2 B3 automatic advancement pauses on the newly selected missing beat; manual navigation remains available',async({page,server})=>{
@@ -864,8 +872,8 @@ test('L3 L4 L5 L10 live-status panel is beside the diagram without a click and k
  await expect(head.locator('.dv-live-connection')).toHaveAttribute('data-state','demo');await expect(head.locator('.dv-live-connection')).toContainText('Demo, refreshed');await expect(root.locator('time.dv-live-updated')).toHaveCount(0);
  await expect(root.locator('.reader-navigation > .dv-live-control')).toHaveCount(0);await expect(root.locator('.dv-live-popover[popover],.dv-live-panel[popover],.dv-live-carrier-preview[popover]')).toHaveCount(0);
  await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-comm-failure')).toHaveCount(0);await expect(root.locator('.dv-jira-cue').first()).toBeVisible();await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-target').first()).toBeVisible();
- await head.getByRole('button',{name:'Next day',exact:true}).click();await expect(head.locator('.dv-live-note')).toContainText('Day 2');
- for(let day=3;day<=12;day++)await head.getByRole('button',{name:'Next day',exact:true}).click();
+ await body.getByRole('button',{name:'Next day',exact:true}).click();await expect(head.locator('.dv-live-note')).toContainText('Day 2');
+ for(let day=3;day<=12;day++)await body.getByRole('button',{name:'Next day',exact:true}).click();
  await expect(body.locator('tr[data-live-coverage-for="UX-90"]')).toContainText('NOT ON DIAGRAM');await expect(body.locator('.dv-live-epic-progress')).toContainText('7 of 8 on diagram');
  await expect(body.locator('tr[data-live-coverage-for="HW-124"],.dv-live-chip')).toHaveCount(0);
  await page.emulateMedia({media:'print'});await expect(body).not.toBeEmpty();await expect(body.locator('table.dv-live-tickets')).toBeVisible();
@@ -978,7 +986,7 @@ test('R3 Workbench demo paint has no badges and a card click selects without the
 /* #863 Epic status panel consistency contract matrix (desktop reader and Workbench; no phone layouts):
 | row | required state or element | fixture | scoped assertion | broken implementation it rejects |
 |---|---|---|---|---|
-| V1a | Live, Over time, First blocker, Play and Next day header buttons | worked example with #live=demo on day 4, in each selectable theme picked from the reader's Contents Theme menu | inside the Epic status section, every visible `.pt-live-status .reader-button` equals that section's `.playback-button` in computed border width, border style, border radius, background color, font family, font size and padding, with no property skipped except the background of the selected mode button; Live is asserted pressed, and Play is also its reference because inside the document no theme gives a pressed `tbtn` its own fill (the only such rule, style.core.css `:is(.mbtn,.tbtn,.schip,.pathbtn)[aria-pressed=true]` for Rose, Lavender and Lilac, is overridden by their later `.docview :is(.mbtn,.tbtn,.schip)` rule), and the reader renders no other pressed `tbtn` (its pressed mode toggles are `.mbtn`, with a different fill) | browser-default buttons (2px outset, radius 0, #efefef); a fixed pastel pill that is wrong in Aurora, Blueprint and Terminal; a special look on any button except the selected mode button, which alone may have its own background (Chuck, 2026-11-04) |
+| V1a | Live, Over time, First blocker, previous day and next day panel buttons | worked example with #live=demo on day 4, in each selectable theme picked from the reader's Contents Theme menu | inside the Epic status section, every visible `.pt-live-status .reader-button` equals that section's `.playback-button` in computed border width, border style, border radius, background color, font family, font size and padding, with no property skipped except the background of the selected mode button; Live is asserted pressed, and Play is also its reference because inside the document no theme gives a pressed `tbtn` its own fill (the only such rule, style.core.css `:is(.mbtn,.tbtn,.schip,.pathbtn)[aria-pressed=true]` for Rose, Lavender and Lilac, is overridden by their later `.docview :is(.mbtn,.tbtn,.schip)` rule), and the reader renders no other pressed `tbtn` (its pressed mode toggles are `.mbtn`, with a different fill) | browser-default buttons (2px outset, radius 0, #efefef); a fixed pastel pill that is wrong in Aurora, Blueprint and Terminal; a special look on any button except the selected mode button, which alone may have its own background (Chuck, 2026-11-04) |
 | V1b | the connector action button (Allow Jira) | frozen fixture with the claude connector stub in approval mode, where the Flagged search already answered so Live shows beside it | the visible Live and Allow Jira buttons equal the section's Play button on the same properties | styling only the demo and Live buttons |
 | V2 | in-progress color word in the worked example | worked example with #live=demo on day 2 | the section's first prose paragraph names "blue in progress" and no orange or amber while an active edge renders --dv-live-active blue (the skill description is checked in tests/live-status-panel.test.js) | leaving "orange in progress" |
 | V3 | Workbench Demo live status connection label | frozen fixture pasted into the Workbench, Demo live status checked, then Next day | the Epic status `.dv-live-connection` has data-state demo and its text starts with the source label "Demo", as the reader's #live=demo does (the refresh wording after the comma is not pinned) | the provider labelled "Host"; relabelling only the source while the state stays connected ("Demo connected") |
@@ -996,7 +1004,7 @@ test.describe('#863 Epic status panel consistency',()=>{
  test('V1 desktop demo header buttons match the section Play button in every reader theme',async({page,server})=>{
   const root=await openStory(page,server),panel=root.locator('.pt-live-status'),section=root.locator('.doc-sec:has(.pt-live-status)');
   await expect(section).toHaveCount(1);await demoDay(root,4);await expect(panel.getByRole('button',{name:'First blocker',exact:true})).toBeVisible();
-  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','Over time','First blocker','Play','Next day']);
+  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','Over time','First blocker','<','>']);
   // The pressed state is the one compared: Live is on throughout.
   expect(first.buttons.map(b=>b.pressed)).toEqual([true,false,false,false,false]);
   // Contrasting precondition: the reference is the default theme's pill, not a browser default.
@@ -1008,7 +1016,7 @@ test.describe('#863 Epic status panel consistency',()=>{
    await expect(root).toHaveClass(new RegExp('(^|\\s)sk-'+skin+'(\\s|$)'));await page.mouse.move(0,0);
    // Theme transitions settle on both buttons before they are compared.
    await expect.poll(async()=>differences(await looks(section)),{message:skin+' Epic status header buttons match Play'}).toEqual([]);
-   const settled=await looks(section);expect(settled.buttons.map(b=>b.name),skin).toEqual(['Live','Over time','First blocker','Play','Next day']);expect(settled.buttons.map(b=>b.pressed),skin+' Live stays pressed').toEqual([true,false,false,false,false]);plays.add(JSON.stringify(settled.play));
+   const settled=await looks(section);expect(settled.buttons.map(b=>b.name),skin).toEqual(['Live','Over time','First blocker','<','>']);expect(settled.buttons.map(b=>b.pressed),skin+' Live stays pressed').toEqual([true,false,false,false,false]);plays.add(JSON.stringify(settled.play));
   }
   expect(plays.size,'the themes give Play different looks').toBeGreaterThanOrEqual(4);
  });
@@ -1016,7 +1024,7 @@ test.describe('#863 Epic status panel consistency',()=>{
   const {root}=await openClaude(page,server,'approval'),section=root.locator('#section-delivery'),panel=section.locator('.pt-live-status');
   // Approval mode: the Flagged search has answered, so Live shows beside the action.
   await expect(panel.getByRole('button',{name:'Allow Jira',exact:true})).toBeVisible();await expect(panel.locator('.dv-live-toggle')).toBeVisible();
-  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','Allow Jira']);
+  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','No blockers','Allow Jira']);
   expect(first.play).toMatchObject({borderTopStyle:'solid',borderTopWidth:'1px',borderTopLeftRadius:'999px'});
   await expect.poll(async()=>differences(await looks(section)),{message:'Allow Jira matches Play'}).toEqual([]);
  });

@@ -46,7 +46,8 @@
     options.sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
     options.unshift([ALL, 'All changed documents']);
     select.replaceChildren(...options.map(([value, label]) => { const o = el('option', {value}, label); return o; }));
-    if (!state.doc && list.length){ state.doc = list[0]; refreshAfterDocument(); }
+    /* With no documents at this revision, All changed documents is the choice, so the pickers still list revisions. */
+    if (!state.doc){ state.doc = list.length ? list[0] : ALL; refreshAfterDocument(); }
     if (state.doc) select.value = state.doc;
     compareState();
   }

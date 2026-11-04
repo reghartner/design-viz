@@ -1161,9 +1161,9 @@ test('L2 L3 L4 panel paints synchronously, controls act, focus survives refresh 
  assert.equal(body.firstChild.className,'dv-live-head');assert.ok(body.querySelector('table.dv-live-tickets'));assert.ok(body.querySelector('.dv-live-epic'));assert.ok(body.querySelector('.dv-live-verdict')===null,'no verdict line');
  assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Tickets','Blockers and dependency chains','Activity']);
  const toggle=body.querySelector('.dv-live-toggle');assert.equal(toggle.textContent,'Live');toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),false);toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),true);
- let action=0,next=0,play=0;api.action('Retry',()=>action++);body.querySelector('.dv-live-action').dispatchEvent({type:'click'});assert.equal(action,1);
- api.setDemoControls({playing:false,manual:false,ended:false,next(){next++;},toggle(){play++;}});
- const demo=body.querySelector('.dv-live-demo');demo.children[0].dispatchEvent({type:'click'});demo.children[1].dispatchEvent({type:'click'});assert.equal(play,1);assert.equal(next,1);
+ let action=0,next=0,prev=0;api.action('Retry',()=>action++);body.querySelector('.dv-live-action').dispatchEvent({type:'click'});assert.equal(action,1);
+ api.setDemoControls({ended:false,first:false,prev(){prev++;},next(){next++;}});
+ const demo=body.querySelector('.dv-live-demo');assert.deepEqual(demo.children.map(el=>[el.textContent,el.getAttribute('aria-label')]),[['<','Previous day'],['>','Next day']]);demo.children[0].dispatchEvent({type:'click'});demo.children[1].dispatchEvent({type:'click'});assert.equal(prev,1);assert.equal(next,1);
  h.doc.activeElement=toggle;api.apply(fixed);assert.equal(h.doc.activeElement,toggle);assert.ok(body.contains(toggle));
  const before=textOf(body);body._panelMotionCleanup();api.note('After cleanup');assert.equal(textOf(body),before);mount.remount();assert.equal(body.querySelector('.dv-live-note').textContent,'After cleanup');
  mount.remount();api.note('Once');assert.equal(body.querySelectorAll('.dv-live-head').length,1);api.destroy();assert.equal(textOf(body).includes('Once'),true);
@@ -1189,11 +1189,14 @@ test('L4 keyed Tickets rows retain a focused control through reorder and update 
  const tbody=body.querySelector('tbody');assert.ok(tbody.children[0]===dataRow,'data row first after reorder');assert.equal(body.querySelector('tr[data-live-coverage-for="AA-1"]'),null);assert.ok(dataRow.querySelector('.dv-live-pr-link')===control);assert.ok(h.doc.activeElement===control);
  assert.equal(dataRow.querySelector('a').getAttribute('href'),'https://jira.test/browse/AA-1');api.destroy();
 });
-test('L3 First blocker header action uses the current path and hides when disabled',()=>{
+test('L3 First blocker has a fixed place: it uses the current path, and with nothing to reach it greys out and says why',()=>{
  const h=harness(fixture()),api=h.ctl.liveStatus;let jumped;
  h.ctl.sections[0].stepper={path:()=> 'happy',sourceIndex:()=>0,mode:()=> 'ambient',jumpSource:(index,path)=>jumped=[index,path]};
  api.apply(fixed);const {body}=mountStatus(h),first=body.querySelector('.dv-live-first');assert.equal(first.hidden,false);first.dispatchEvent({type:'click'});assert.deepEqual(jumped,[0,'happy']);
- api.setEnabled(false);assert.equal(first.hidden,true);api.destroy();
+ assert.equal(first.textContent,'First blocker');assert.equal(first.disabled,false);
+ // Colors off: blockers still exist, so the label stays true and the button only greys out.
+ api.setEnabled(false);assert.equal(first.hidden,false);assert.equal(first.disabled,true);assert.equal(first.textContent,'First blocker');api.setEnabled(true);
+ jumped=null;api.apply({'AA-1':{state:'done'}});assert.equal(first.hidden,false);assert.equal(first.textContent,'No blockers');assert.equal(first.disabled,true);first.dispatchEvent({type:'click'});assert.equal(jumped,null);api.destroy();
 });
 test('L2 detail panel mounted before attachment connects on navigation with the existing controller',()=>{
  const h=harness(fixture()),detached=new Element(),mount=mountStatus(h,detached);assert.match(textOf(mount.body),/no ticket references/);assert.equal(h.C.liveStatusPending.length,1);
@@ -1909,6 +1912,7 @@ test('H12 Chuck 2026-10-30: history renders on a page without tracking, tickets 
 | OT11 | clear() on a past day | mode ends and today's evidence is gone | a past day surviving a permission loss |
 | OT12 | demo timeline with a late ticket, a ticket that later disappears, and one never named | not created yet: no status entry; absent after existing: missing; epic state per day; last day matches the live demo | treating every absent ticket the same |
 | OT13 | provider entry without a state | apply() still drops it | widening the provider contract |
+| OT15 | status row and day buttons (#986) | counts, connection and notes are in `.dv-live-status` with their full text in its title; buttons are in `.dv-live-controls`; a board's `<` and `>` step the slider, are disabled at the ends, and are absent on Live | changing text beside static buttons; step buttons on a board with no slider |
 | OT14 | the two mode buttons (Chuck, 2026-11-04) | Live and Over time are the first two header controls, exactly one is pressed, the selected Over time click does nothing, Live returns to today without turning colors off, the selected Live click still turns colors off, and Over time turns colors back on | a Back to today button; a past day with colors off |
 */
 const overFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:'EP-1'}},lanes:{APP:{label:'App',color:'#34d399'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',tickets:['AA-1']},b:{title:'Beta',tickets:['BB-1']},planned:{title:'Planned',tickets:['AA-1'],existsWhen:'tickets-done'}},rows:[['a','b','planned']],edges:[{from:'a',to:'b',tickets:['EE-1']}],steps:[{id:'hop',edge:'a->b',lane:'APP'},{id:'beta',nodes:['b'],lane:'APP'}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
@@ -2174,11 +2178,22 @@ test('C12 created searches name at most ten keys each and at most six run at onc
 test('OT14 Live and Over time are two mode buttons: Live returns to today and the selected Over time stays',async()=>{
  const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);api.apply(overToday());let loads=0;api.setHistory({load(){loads++;return {days:overDays()};}});
  const pressed=()=>[overLiveButton(h).getAttribute('aria-pressed'),overButton(h).getAttribute('aria-pressed')];
- assert.deepEqual(h.view.querySelector('.dv-live-head').children.slice(0,2).map(el=>el.className.split(' ').find(name=>/^dv-live-(toggle|over-time)$/.test(name))),['dv-live-toggle','dv-live-over-time']);assert.deepEqual(pressed(),['true','false']);
+ assert.ok(h.view.querySelector('.dv-live-controls'),'#986 a row of static buttons');assert.deepEqual(h.view.querySelector('.dv-live-controls').children.slice(0,2).map(el=>el.className.split(' ').find(name=>/^dv-live-(toggle|over-time)$/.test(name))),['dv-live-toggle','dv-live-over-time']);assert.deepEqual(pressed(),['true','false']);
  overButton(h).dispatchEvent({type:'click'});await historySettle();assert.deepEqual(pressed(),['false','true']);assert.equal(overButton(h).textContent,'Over time');assert.equal(api.enabled(),true);
  assert.ok(!textOf(h.view.querySelector('.dv-live-head')).includes('Back to today'),'no separate return button');
  overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,true,'the selected mode stays');assert.equal(loads,1);
  overLiveButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,false);assert.equal(api.enabled(),true,'returning to Live keeps colors on');assert.deepEqual(pressed(),['true','false']);
  overLiveButton(h).dispatchEvent({type:'click'});assert.equal(api.enabled(),false,'the selected Live still turns colors off');assert.deepEqual(pressed(),['false','false']);
  overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,true);assert.equal(api.enabled(),true,'Over time shows colors');assert.deepEqual(pressed(),['false','true']);
+});
+test('OT15 changing text has its own row, and a board steps days with < and > only on the slider row',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);api.apply(overToday());api.note('A long note about the connector','warn');api.setHistory({load:()=>({days:overDays()})});
+ const controls=h.view.querySelector('.dv-live-controls'),status=h.view.querySelector('.dv-live-status');assert.ok(controls,'#986 a row of static buttons');assert.ok(status,'#986 a row of changing text');
+ assert.equal(controls.querySelectorAll('.dv-live-count,.dv-live-connection,.dv-live-note').length,0,'no changing text beside the buttons');assert.ok(status.querySelector('.dv-live-note'));assert.ok(status.querySelector('[data-live-count="active"]'));assert.match(status.getAttribute('title'),/A long note about the connector/);
+ assert.equal(h.view.querySelectorAll('.dv-live-step').length,0,'no step buttons on Live');
+ overButton(h).dispatchEvent({type:'click'});await historySettle();
+ const steps=h.view.querySelectorAll('.dv-live-over-time-row .dv-live-step');assert.deepEqual(steps.map(el=>[el.textContent,el.getAttribute('aria-label')]),[['<','Previous day'],['>','Next day']]);assert.equal(h.view.querySelector('.dv-live-demo'),null);
+ const [prev,next]=steps;assert.equal(api.snapshot().overTime.index,2);assert.equal(next.disabled,true);assert.equal(prev.disabled,false);
+ prev.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,1);prev.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,0);assert.equal(prev.disabled,true);assert.equal(next.disabled,false);
+ next.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,1);
 });

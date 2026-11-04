@@ -76,6 +76,12 @@ test('semantic cells, multiple inline icons, empty outputs and escaping are inde
     assert.ok(warnings.some(w=>w.startsWith('panel.columns[1].empty: ')),JSON.stringify(bad)+' warns at its own path');
     assert.equal(text(cells(definition.render(null,r,{}).html,0)[1]),'n/a',JSON.stringify(bad)+' falls back to n/a');
   }
+  // `empty` belongs to icons columns: value columns (unset, explicit or unknown kind) ignore it without a warning.
+  for(const bad of [5,true,null,{},['x']]){
+    const r={id:'power',type:'truth-table',columns:[{id:'a',empty:bad},{id:'b',kind:'value',empty:bad},{id:'c',kind:'other',empty:bad},{id:'icons',kind:'icons',empty:bad}],cases:[]},warnings=[];
+    definition.validateDeclaration(r,'panel',warnings);
+    assert.deepEqual(warnings.filter(w=>w.includes('.empty:')).map(w=>w.split(': ')[0]),['panel.columns[3].empty'],JSON.stringify(bad)+' warns on the icons column only');
+  }
 });
 
 test('case editor projection retains scalar types, icons and unknown fields across reorder and rename',()=>{

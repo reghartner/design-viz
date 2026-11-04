@@ -535,4 +535,6 @@ test('H6 a status id search finds one issue in that status even when no ticket h
   const reply = result(await call('searchJiraIssuesUsingJql', { cloudId: 'mock-cloud-id-0001', jql: 'status = ' + blocked + ' ORDER BY updated DESC', fields: ['status'], maxResults: 1 }, context));
   assert.equal(reply.issues.nodes.length, 1);assert.equal(reply.issues.nodes[0].fields.status.id, blocked);assert.equal(reply.issues.nodes[0].fields.status.name, 'Blocked');assert.equal(reply.issues.nodes[0].fields.status.statusCategory.key, 'indeterminate');
   assert.deepEqual(result(await call('searchJiraIssuesUsingJql', { cloudId: 'mock-cloud-id-0001', jql: 'status = 99999 ORDER BY updated DESC', fields: ['status'], maxResults: 1 }, context)).issues.nodes, []);
+  const { parseJql } = await load();assert.deepEqual(parseJql('status = 10001 ORDER BY updated DESC'), { statusId: '10001' });
+  for (const unsupported of ['status = 10001', 'key in (HW-124) ORDER BY updated DESC', 'project = HW ORDER BY updated DESC', 'status = 10001 AND project = HW ORDER BY updated DESC', 'status = abc ORDER BY updated DESC']) assert.equal(parseJql(unsupported), null, unsupported);
 });

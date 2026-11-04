@@ -43,14 +43,12 @@ function unquote(value) {
 // Deliberately small grammar. Null means unsupported; callers return no issues.
 export function parseJql(jql) {
   if (typeof jql !== 'string' || !jql.trim()) return null;
+  // The one ordered query the board sends: Over time's status lookup. Nothing else may carry ORDER BY.
+  const lookup = /^status\s*=\s*(\d+)\s+ORDER\s+BY\s+updated\s+DESC$/i.exec(jql.trim());
+  if (lookup) return { statusId: lookup[1] };
   const parsed = {};
-  for (const clause of jql.trim().replace(/\s+ORDER\s+BY\s+updated\s+DESC\s*$/i, '').split(/\s+AND\s+/i)) {
+  for (const clause of jql.trim().split(/\s+AND\s+/i)) {
     let match;
-    if ((match = /^status\s*=\s*(\d+)$/i.exec(clause.trim()))) {
-      if (parsed.statusId) return null;
-      parsed.statusId = match[1];
-      continue;
-    }
     if ((match = /^key\s+in\s*\(([^()]*)\)$/i.exec(clause.trim()))) {
       if (parsed.keys) return null;
       const keys = match[1].split(',').map(unquote);

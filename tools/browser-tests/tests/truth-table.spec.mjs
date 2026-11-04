@@ -1,3 +1,20 @@
+/* #919 contract (issue #919 "Expected" + "Test + flip", Chuck 2026-11-03; §0 ruling: "extend
+   existing tests", hosted in the first test below, scoped to the case icon editors
+   [data-truth-case]). Fixture: the shipped example's 7 case icons plus one fork icon id this
+   build does not ship (its "<id> (unknown)" name cannot fit), plus a guard node carrying the
+   same fork icon in a single Icon field, both applied through the JSON window, with Inspect
+   docked at its default width (<= 400px, the reported 380px repro).
+   | row | assertion (scoped to each [data-truth-case] .flow-icon-browse unless noted) | rejects |
+   | (a) name is one line high | its .flow-icon-value clientHeight <= computed line-height + 1 | today's 92px track with overflow-wrap:anywhere; a wider cell that still wraps a long name |
+   | name stays visible | .flow-icon-value has text and clientWidth > 0 | hiding the name to stay one line |
+   | (b) a name that cannot fit is ellipsized | fork icon: scrollWidth > clientWidth (loud precondition); every overflowing name: computed text-overflow ellipsis with overflow-x hidden/clip | overflow:hidden without ellipsis (silent clip); nowrap text spilling past the button |
+   | (b) full name stays in the accessible name | button accessible name contains its .flow-icon-value text; fork icon text is exactly "<id> (unknown)" | shortening the text in the DOM or dropping aria-label |
+   | (c) button stays compact | button height <= 48px | a one-line name with the preview or "Choose" stacked into extra rows |
+   | single icon fields outside row cards keep today's layout (guard, asserted before the case pickers) | the guard node's Icon field (.icon-row-controls>.flow-icon-control): its .flow-icon-value computes white-space normal and text-overflow clip, its long name still wraps to more than one line, the button fills its control, and the control keeps today's 55% share of the icon row | an unscoped .flow-icon-value nowrap/ellipsis rule; a picker width or layout change outside .rowcard |
+   | brand, step and Home map single icon fields | covered by the node guard: same unscoped .flow-icon-control CSS, none sits in a .rowcard |
+   | Device App icon list (same .rowcard layout, expected to change) | excluded — §0 ruling: extend existing tests (Chuck declined adding other icon panels) |
+   | Home map icon lists (same .rowcard layout, expected to change) | excluded — §0 ruling: extend existing tests (Chuck declined adding other icon panels) |
+   | phone width | excluded — desktop-only editing (CLAUDE.md) | */
 import {test,expect,pastePage,inspectPageElement,closeTools} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -139,6 +156,44 @@ test('desktop truth-table author edits properties, cases and shared icons with e
   expect((await declaration()).cases[0].cells.powerIcon).toEqual(powerBefore);
   await page.locator('#undo-builder').click();await page.locator('#undo-builder').click();
   await expect(table.locator('tbody tr').first().locator('svg')).toHaveCount(3);
+  // #919 (header matrix): case icon pickers in the docked Inspect stay one line; a name that cannot fit is ellipsized.
+  // One JSON-window apply adds the fork icon to case `low` and a guard node (diagram shown below the panel) whose single Icon field carries it too.
+  const beforeLong=await source.inputValue(),longId='acme-rooftop-solar-array-with-battery-backup-and-grid-tie-inverter',withLong=JSON.parse(beforeLong),longDiagram=withLong.page.sections[0].diagram;
+  longDiagram.panels[0].cases[3].cells.batteryIcon.push({icon:longId});
+  longDiagram.nodes={guard:{title:'Guard',icon:longId}};longDiagram.rows=[['guard']];
+  Object.assign(longDiagram.sectionLayout.default.find(item=>!item.panel && !item.controls),{x:0,y:19,w:24,h:8,hidden:false});
+  await page.locator('#editor-tab-json').click();await source.fill(JSON.stringify(withLong,null,2));await page.locator('#go').click();
+  await inspectPageElement(page,root.locator('.node[data-dv-node="guard"]'));
+  const inspect=page.locator('#workspace-window-inspect');
+  await inspect.getByRole('button',{name:'Dock Inspect panel',exact:true}).click();await expect(inspect).toHaveAttribute('data-docked','true');
+  expect((await inspect.boundingBox()).width,'precondition: Inspect docked at its default width').toBeLessThanOrEqual(400);
+  // Guard: a single icon field outside row cards keeps today's layout (wrapping name, 55% share of the icon row).
+  const single=guide.locator('.icon-row-controls>.flow-icon-control');await expect(single,'guard: the node Inspect shows one single Icon field').toHaveCount(1);
+  const guard=await single.evaluate(control=>{const button=control.querySelector('.flow-icon-browse'),name=button.querySelector('.flow-icon-value'),style=getComputedStyle(name);
+    const row=control.parentElement.getBoundingClientRect(),own=control.getBoundingClientRect(),box=button.getBoundingClientRect();
+    return {name:name.textContent,whiteSpace:style.whiteSpace,textOverflow:style.textOverflow,lines:name.clientHeight/parseFloat(style.lineHeight),fills:Math.abs(box.left-own.left)<=1 && Math.abs(box.right-own.right)<=1,share:own.width/row.width};});
+  expect(guard.name).toBe(longId+' (unknown)');
+  expect({whiteSpace:guard.whiteSpace,textOverflow:guard.textOverflow,fills:guard.fills},'guard: single Icon field keeps today\'s name style').toEqual({whiteSpace:'normal',textOverflow:'clip',fills:true});
+  expect(guard.lines,'guard: single Icon field still wraps a long name').toBeGreaterThan(1.5);
+  expect(guard.share,'guard: single Icon field keeps its 55% share of the icon row').toBeGreaterThan(0.5);expect(guard.share).toBeLessThan(0.6);
+  await inspectPageElement(page,panel.locator('.ptitle'));await expect(inspect).toHaveAttribute('data-docked','true');
+  const pickers=guide.locator('[data-truth-case] .flow-icon-browse');
+  await expect(pickers,'precondition: 7 shipped case icons plus the fork icon').toHaveCount(8);
+  const measure=button=>button.evaluate(el=>{const name=el.querySelector('.flow-icon-value'),style=getComputedStyle(name);
+    return {name:name.textContent,height:el.getBoundingClientRect().height,lineHeight:parseFloat(style.lineHeight),nameHeight:name.clientHeight,nameWidth:name.clientWidth,scrollWidth:name.scrollWidth,textOverflow:style.textOverflow,overflowX:style.overflowX};});
+  const literal=text=>new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+  for(let i=0;i<8;i++){
+    const button=pickers.nth(i),box=await measure(button);
+    expect(box.name.length>0 && box.nameWidth>0,`picker ${i} shows its icon name`).toBe(true);
+    expect(box.nameHeight,`(a) picker ${i} name "${box.name}" stays one line`).toBeLessThanOrEqual(box.lineHeight+1);
+    expect(box.height,`(c) picker ${i} button height`).toBeLessThanOrEqual(48);
+    if(box.scrollWidth>box.nameWidth)expect({textOverflow:box.textOverflow,clipped:['hidden','clip'].includes(box.overflowX)},`(b) picker ${i} overflowing name is ellipsized`).toEqual({textOverflow:'ellipsis',clipped:true});
+    await expect(button,`(b) picker ${i} accessible name keeps the full name`).toHaveAccessibleName(literal(box.name));
+  }
+  const longBox=await measure(guide.locator('[data-truth-case="low"][data-truth-column="batteryIcon"] .flow-icon-browse').nth(1));
+  expect(longBox.name).toBe(longId+' (unknown)');
+  expect(longBox.scrollWidth,'(b) precondition: the fork icon name cannot fit').toBeGreaterThan(longBox.nameWidth);
+  await page.locator('#editor-tab-json').click();await source.fill(beforeLong);await page.locator('#go').click();await expect(source).toHaveValue(beforeLong);
   await inspectPageElement(page,panel.locator('.ptitle'));
   await info.attach('desktop-truth-table-editor',{body:await guide.screenshot({path:info.outputPath('editor.png')}),contentType:'image/png'});
   await closeTools(page);

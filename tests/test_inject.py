@@ -345,6 +345,69 @@ class InjectTests(unittest.TestCase):
         declaration = json.loads(re.search(r"```json\n(.*?)\n```", GUIDE_BLOCK.search(out)[1], re.S)[1])
         self.assertEqual(declaration, {"mcp": {"servers": [grafana]}, "comments": {"composer_only": True, "customAnchors": True}})
 
+    def test_agent_guide_declares_grafana_for_imported_carriers_the_runtime_resolves(self):
+        # #943 review: the page's runtime resolves imported carriers from the
+        # `flowview-topology` context block of the page it boots in (src/boot.flowview.js),
+        # so a binding that only a provider carries must still declare the connector.
+        # The detection resolves the imports as the runtime does: only exported,
+        # selected carriers count, a consumer overlay replaces the provider binding,
+        # and provider templates expand.
+        grafana = {"server": "Grafana", "tools": ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]}
+        comments = {"composer_only": True, "customAnchors": True}
+
+        def spec(spec_id, diagram, **extra):
+            page = {"title": spec_id, "canon": {"version": 1, "id": spec_id, "kind": "canonical", "owner": "group:default/test"}}
+            page.update(extra)
+            page["sections"] = [{"id": "main", "diagram": diagram}]
+            return {"page": page}
+
+        def provider(api=None, hidden=None, templates=None):
+            nodes = {"api": {"title": "API"}, "store": {"title": "Store"}, "hidden": {"title": "Hidden"}}
+            if api is not None:
+                nodes["api"]["telemetry"] = api
+            if hidden is not None:
+                nodes["hidden"]["telemetry"] = hidden
+            extra = {"tracking": {"telemetry": {"templates": templates}}} if templates else {}
+            return spec("provider", {"nodes": nodes, "rows": [["api", "store", "hidden"]], "edges": [{"from": "api", "to": "store", "label": "Persist"}],
+                                     "topologyExports": {"core": {"nodes": ["api", "store"], "edges": ["api->store"]}}}, **extra)
+
+        def consumer(node_tracking=None):
+            imp = {"spec": "provider", "export": "core", "as": "shared"}
+            if node_tracking is not None:
+                imp["nodeTracking"] = node_tracking
+            return spec("consumer", {"nodes": {"local": {"title": "Local"}}, "rows": [["local"]], "topologyImports": [imp]})
+
+        def declaration(page_spec, provider_spec=None):
+            template = TEMPLATE
+            if provider_spec is not None:
+                context = {"version": 1, "id": "consumer", "specs": [provider_spec, page_spec]}
+                block = '<script type="application/json" id="flowview-topology">' + json.dumps(context).replace("<", "\\u003c") + "</script>\n"
+                template = TEMPLATE.replace(BLOCK_OPEN, block + BLOCK_OPEN, 1)
+            r, out = run_inject(template, json.dumps(page_spec))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            guide = GUIDE_BLOCK.search(out)[1]
+            self.assertLess(len(guide.encode("utf-8")), 6 * 1024)
+            return json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S)[1])
+
+        signal = {"kind": "service", "signals": {"rate": {"grafana": "sum(rate(http_requests_total[5m]))"}}}
+        # an imported node whose provider binding runs a grafana signal, no local telemetry
+        self.assertEqual(declaration(consumer(), provider(api=signal)), {"mcp": {"servers": [grafana]}, "comments": comments})
+        # the provider binding uses a provider template with a loki signal
+        templated = provider(api={"use": "svc", "app": "api"}, templates={"svc": {"kind": "service", "params": ["app"], "signals": {"logs": {"loki": 'sum(rate({app="$app"}[5m]))'}}}})
+        self.assertEqual(declaration(consumer(), templated)["mcp"]["servers"], [grafana])
+        # a provider carrier the import does not export never reaches the page
+        self.assertEqual(declaration(consumer(), provider(hidden=signal)), {"comments": comments})
+        # a consumer overlay replaces the provider binding as a whole (here with a tempo-only one)
+        tempo = {"kind": "service", "signals": {"t": {"tempo": "{ }"}}}
+        self.assertEqual(declaration(consumer({"api": {"telemetry": tempo}}), provider(api=signal)), {"comments": comments})
+        # a page with no telemetry anywhere, with or without a topology context
+        self.assertEqual(declaration(consumer(), provider()), {"comments": comments})
+        self.assertEqual(declaration(SPEC), {"comments": comments})
+        # a snapshot resolved before injection (page_build.py --resolve-imports) carries the imported binding itself
+        resolved = consumer()
+        resolved["page"]["sections"][0]["diagram"] = {"nodes": {"local": {"title": "Local"}, "shared::api": {"title": "API", "telemetry": signal}}, "rows": [["local", "shared::api"]]}
+        self.assertEqual(declaration(resolved)["mcp"]["servers"], [grafana])
+
     def test_agent_guide_replaces_a_stale_guide_when_reinjecting_a_built_page(self):
         built = TEMPLATE.replace("</script>\n" + BACKLINK_OPEN,
                                  '</script>\n<script type="text/markdown" id="dv-agent-guide">\nold guide\n</script>\n' + BACKLINK_OPEN, 1)

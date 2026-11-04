@@ -1206,7 +1206,7 @@ test('G2 G7 G11 GitHub icons carry state checks and review in the Tickets table 
 test('G2 G11 Jira-only connector retains plain PR links without GitHub evidence and says so on the connection line',async({page,server})=>{
  const {root}=await openClaude(page,server,'data');await expect(root.locator('g.node').first()).toHaveClass(/dv-live-active/);
  await expect(root.locator('.dv-live-tickets a[href="https://github.com/acme/firmware/pull/88"]').first()).toBeVisible();await expect(root.locator('a.dv-live-pr-link[data-pr-state]')).toHaveCount(0);await expect(root.locator('.dv-live-pr-checks')).toHaveCount(0);
- await expect(root.locator('.dv-live-connection-github')).toHaveText('GitHub not connected');await expect(root.locator('.dv-live-connection')).toHaveAttribute('data-state','connected');
+ await expect(root.locator('.dv-live-connection-github')).toBeHidden();await expect(root.locator('.dv-live-connection')).toHaveAttribute('data-state','connected');await expect(root.locator('.dv-live-connection')).not.toContainText('GitHub');
 });
 test('G12 desktop GitHub scope validates repos and org with one Undo Redo and export',async({page,server})=>{
  await page.setViewportSize({width:1440,height:1000});await useProjectDownloads({page});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);

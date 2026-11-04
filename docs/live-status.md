@@ -355,6 +355,49 @@ hierarchy metadata below to preview an initiative without contacting Jira.
 Live colors require a viewer with the live-status overlay and a status provider.
 PRs stay icons; the demo timeline supplies their GitHub detail.
 
+### Metrics bindings
+
+Select a node or connection on the desktop canvas and open **Inspect → Tracking →
+Metrics** to edit its `telemetry` binding (see [Telemetry bindings](#telemetry-bindings)).
+An unbound carrier says it has no metrics overlay and no proof verdict. Choose
+**Metrics kind**, fill **New signal name**, **New signal source** (Grafana, Loki,
+Tempo, SQL or Honeycomb), **New signal query** and an optional **New signal unit**,
+then press **Add signal** or Enter. A Honeycomb query is a JSON object such as
+`{"calc":"COUNT"}`. Each signal then has its own name, source, query and unit
+fields, proof limits (**min**, **max** and **ratio of** another signal) and a
+**Remove signal** button. Renaming a signal moves its limit and every ratio that
+names it. Removing the last signal removes the binding; **Remove metrics**
+removes it at once.
+
+When the page has templates, **Signals from** switches between raw signals and a
+template. A template binding gets one **Template parameter** input per declared
+`$param`. Its signals are listed read only and edited in Document settings. A
+proof limit set on the carrier overlays the template's limit for that signal
+only, and setting it back to the template value removes the override. Choosing
+**Raw signals** again expands the template, with the carrier's parameter values,
+into editable raw signals.
+
+**Dashboard link** and **Query link** take absolute http(s) URLs. On a connection,
+**Card side** (right, left, above or below) and **Card offset** (pixels, -1000 to
+1000) place its metrics card. The validator's warnings for the binding are listed
+under the controls with the same text. An imported node or connection shows the
+provider's binding read only. A binding saved there is stored in the consumer's
+`nodeTracking` or `edgeTracking` entry and replaces the inherited binding for this
+consumer only; **Remove metrics** restores the inherited one.
+
+With no node selected, **Document settings → Tracking → Metrics** edits the page
+`tracking.telemetry` block: the Grafana Prometheus, Loki, Tempo and SQL datasource
+UIDs, the Honeycomb environment and dataset, **Metrics window** (such as `1h`) and
+**Metrics refresh ms** (60000 or more). Clearing every value removes the block.
+**Add template** takes a name, an optional kind, parameter names separated by
+commas and a first signal. Each template then has its own kind, parameters,
+signals, proof limits and link fields. A template keeps at least one signal, and
+a template that a carrier still uses cannot be removed.
+
+Each change is one Undo/Redo step, and Export project keeps every binding,
+template and setting in its JSON. The Workbench stores queries only: it never runs
+them or contacts Grafana or Honeycomb. These authoring controls are desktop-only.
+
 ## State model
 
 The provider reports five runtime Jira evidence states. The spec stores references

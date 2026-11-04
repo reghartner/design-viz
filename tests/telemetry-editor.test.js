@@ -233,7 +233,6 @@ test('M8 M9 imported carriers show the inherited binding read only and edit the 
   assert.deepEqual(plain(C.telemetryCarrierState(raw,node,f.context).inherited),{kind:'service',signals:{up:{grafana:'up{job="api"}'}}},'the inherited binding stays visible');
   // The imported edge has no overlay entry yet; one is created.
   const edgeIndex=resolved.edges.findIndex(e=>e.from==='shared::api' && e.to==='shared::store'),edge={kind:'edge',section:0,index:edgeIndex};
-  apply(edge,{op:'link',key:'dashboard',value:'https://acme.grafana.net/d/x'});
   assert.match(C.planCarrierTelemetry(text,raw,edge,{op:'link',key:'dashboard',value:'https://acme.grafana.net/d/x'},f.context).error || '',/[Aa]dd a signal or choose a template/,'links need a binding first');
   apply(edge,{op:'addSignal',name:'rate',source:'grafana',query:PROM_RATE,kind:'call'});
   apply(edge,{op:'card',field:'side',value:'right'});

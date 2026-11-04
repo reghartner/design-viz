@@ -9,11 +9,12 @@ connected-doorbell story through seven Grafana MCP tool names:
 read-only mock, with no credentials and no Grafana connection. Document editing
 remains desktop-only.
 
-The telemetry follows the same 12-day
-[timeline](../../../examples/live-status/live-status.timeline.json) the
-[mock Atlassian MCP](../mock-atlassian-mcp/README.md) and
-[mock GitHub MCP](../mock-github-mcp/README.md) serve, so Jira status, pull
-requests and production traffic agree day by day.
+The telemetry is the `days[].telemetry` block of the shared 12-day
+[timeline](../../../examples/live-status/live-status.timeline.json), the file
+the [mock Atlassian MCP](../mock-atlassian-mcp/README.md) and
+[mock GitHub MCP](../mock-github-mcp/README.md) serve and the page's
+`#live=demo` replay plays. Jira status, pull requests and production traffic
+therefore agree day by day. Wrangler bundles the JSON into the Worker.
 
 ## Deploy
 
@@ -89,12 +90,45 @@ computed from the browser clock finds no data, so adapters should send relative
 times, which the real server accepts too. Every timestamp in a result is a story
 time, so it lines up with the Jira mock's `updated` stamps.
 
+## The shared timeline
+
+Each day of `examples/live-status/live-status.timeline.json` carries a
+`days[].telemetry` block:
+
+```json
+{
+  "start": "2026-10-29T00:00:00Z",
+  "stepSeconds": 3600,
+  "carriers": {
+    "mcu->ingest": {
+      "rate": {"unit": "req/h", "values": [null, "... 24 hourly values ..."]},
+      "errors": {"unit": "req/h", "values": ["..."]},
+      "p95": {"unit": "ms", "values": ["..."]}
+    }
+  },
+  "annotations": [{"id": 5, "time": "2026-10-29T16:00:00Z", "text": "firmware 2.4.1 rollout", "tags": ["deploy", "firmware"]}]
+}
+```
+
+Carriers are keyed as the proof engine keys them: a node id (`ingest`,
+`notify`) or `from->to` for an edge. Their signal names and units match the
+example spec's `telemetry` bindings. `values[k]` is the signal for the hour
+from `start + k` hours to `start + k + 1` hours; `null` is an hour without a
+sample, which the mock serves as no data. The mock reads every series and
+annotation from this block and models nothing itself. The `code="200"` request
+series is the event edge's `rate` minus its `errors`, and the ingest node's
+signals repeat the event edge's request totals. `tools/inject.py` checks the
+block's shape when it embeds the timeline. The demo replay hands each day's
+block to the page as a telemetry map, with `null` read as 0, as a connector
+reports a query that matched nothing.
+
 ## The story
 
 A carrier starts carrying traffic two hours after its last ticket turns Done on
 the timeline (merge at 09:00 UTC, deploy annotation at 10:00, traffic from
 11:00), and never before an upstream carrier flows. Rates follow a daily curve
-that peaks at 16:00 UTC.
+that peaks at 16:00 UTC. The numbers were generated once from a model of this
+story and now live in the timeline; edit the timeline to change the story.
 
 | day | what the telemetry shows |
 |---|---|
@@ -172,9 +206,9 @@ errors, as on the real server.
 - `search_tempo_traces {datasourceUid, query, start?, end?, limit?, spss?}`
   returns `{traces: [{traceID, rootServiceName, rootTraceName, startTimeMs, durationMs, spanSets: [{spans}]}]}`,
   newest first, from the past hour by default. The mock keeps one exemplar
-  trace per story hour on the event path: before the firmware 2.4.1 deploy it
-  reaches the notify consumer after the queue age; afterwards it is a 503 that
-  stops at ingest. No trace ever has a push span. TraceQL conditions understood
+  trace per story hour on the event path: while the hour's event error ratio is
+  at most 1 % it reaches the notify consumer after the queue age; above that (from
+  the firmware 2.4.1 deploy on) it is a 503 that stops at ingest. No trace ever has a push span. TraceQL conditions understood
   on one span: `resource.service.name`, `name`, `status = error|ok` and
   `duration > 300ms`; other conditions are ignored. Metrics queries
   (`| rate()`) are errors, as on the real server.
@@ -216,7 +250,6 @@ Run `node --test tests/mock-grafana-mcp.test.js` from the root. The pure
 `handleMcp(request, env)` in `mcp.mjs` uses no Cloudflare APIs: `env.now`
 supplies epoch milliseconds, `env.scenario` and `env.day` supply selection, and
 `env.DEPLOYED_AT` supplies the clock origin. An optional `env.timeline`
-replaces the shared timeline for tests. `story.mjs` holds the fixture: the
-carriers and their tickets (which must match the example spec), the series
-model, the annotations and the exemplar traces. A later change moves the
-per-day series into the timeline's `telemetry` block (#944).
+replaces the shared timeline for tests. `story.mjs` maps each served metric
+series to its timeline signal, reads the values and annotations, and builds the
+exemplar traces.

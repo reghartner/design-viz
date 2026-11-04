@@ -61,8 +61,9 @@ Open Settings → Connectors → Add custom connector → URL, paste the `/mcp` 
 choose Authentication **No sign-in**, and give it a name such as
 **Mock-grafana**. Publish a telemetry board with the `mcp` capability declaring
 that exact display name beside the Jira one (see `docs/live-status.md`,
-"Publishing as a claude.ai artifact"). The Grafana adapter planned in #943 is to
-pick the connector by the tools it offers, not by name. No Grafana account or OAuth is
+"Production metrics from Grafana"). The Grafana adapter (#943,
+`src/viewer/telemetry-claude.js`) picks the connector by the tools it offers, not by
+name, so the mock may carry any name. No Grafana account or OAuth is
 involved. The real server is [grafana/mcp-grafana](https://github.com/grafana/mcp-grafana).
 
 The endpoint uses stateless Streamable HTTP: JSON-RPC over `POST /mcp`, single

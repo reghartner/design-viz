@@ -3,7 +3,7 @@
    default and is never persisted. Nothing here paints the canvas.
 
    Host option, beside `liveStatus`:
-     renderPage(..., {telemetry: {provider: function(bindings, signal), refreshMs, demo}})
+     renderPage(..., {telemetry: {provider: function(bindings, signal, report), refreshMs, source, demo}})
 
    bindings  Every bound carrier of the page, its imported topology and its
              loaded detail pages, once each, in page order (a repeated id keeps
@@ -13,6 +13,9 @@
              other fields are carrierTelemetry(carrier, templates).
    signal    An AbortSignal, aborted when Metrics turns off or the page is
              destroyed. A late answer after that is dropped.
+   report    {note(text)}: a note for this answer, such as a query that failed
+             while the others answered. It rides that answer's status().note;
+             an answer without one clears the note.
    provider  Resolves the telemetry map, the contract every adapter implements
              (Grafana #943, mock Grafana #944, Honeycomb #946) and the
              telemetryMap input of proofVerdicts (src/core/proof.js):
@@ -31,6 +34,10 @@
    refreshMs The refresh interval while Metrics is on. Without it the page's
              tracking.telemetry.refreshMs applies, else one minute. Never
              below 60000.
+   source    Optional connector name for the panel's Metrics text
+             ('Grafana' from the claude.ai adapter, viewer/telemetry-claude.js).
+   A rejection keeps the map and sets status 'error' with its message as the
+   note; a rejection whose `state` is 'approval' sets status 'approval'.
    demo      Optional {mount(api) → cleanup}: a demo source mounted when Metrics
              turns on and cleaned up when it turns off. It feeds api.apply().
 
@@ -100,10 +107,14 @@ function createTelemetry(page,options,hooks){
     if(telemetryObject(value))Object.keys(value).forEach(function(id){var sample=telemetrySample(value[id]);if(id && sample)next[id]=sample;});
     map=next;
   }
-  var poller=provider?liveStatusPoller(function(signal){return provider(bindings(),signal);},delay,{
+  // Each call gets its own report; its note travels with that call's answer only.
+  var poller=provider?liveStatusPoller(function(signal){
+    var noted='',report={note:function(text){noted=typeof text==='string'?text:'';}};
+    return Promise.resolve(provider(bindings(),signal,report)).then(function(value){return {value:value,note:noted};});
+  },delay,{
     busy:function(){setStatus({busy:true});notify();},
-    result:function(value){store(value);setStatus({state:'ok',busy:false,refreshedAt:new Date().toISOString(),note:''});notify();},
-    error:function(error){setStatus({state:'error',busy:false,note:error && error.message || String(error)});notify();}
+    result:function(answer){store(answer.value);setStatus({state:'ok',busy:false,refreshedAt:new Date().toISOString(),note:answer.note});notify();},
+    error:function(error){setStatus({state:error && error.state==='approval'?'approval':'error',busy:false,note:error && typeof error.message==='string'?error.message:String(error)});notify();}
   }):null;
   function stopDemo(){var cleanup=demoCleanup;demoCleanup=null;if(typeof cleanup==='function'){try{cleanup();}catch(ex){}}}
   var api={

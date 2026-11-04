@@ -107,8 +107,13 @@ export interface NativeViewerOptions {
    * which is off by default. The provider runs only while Metrics is on, every
    * max(refreshMs, 60000) ms, paused while the document is hidden. */
   telemetry?: {
-    provider?: (bindings: TelemetryBinding[], signal: AbortSignal) => Promise<Record<string, TelemetrySample>>;
+    /** report.note(text) attaches a note to this answer (status().note), such as one
+     * failed query beside answered ones. A rejection with `state: 'approval'`
+     * reports the approval state instead of an error. */
+    provider?: (bindings: TelemetryBinding[], signal: AbortSignal, report: {note: (text: string) => void}) => Promise<Record<string, TelemetrySample>>;
     refreshMs?: number;
+    /** Connector name for the Metrics text: "<source> connected · <window> window · refreshed <time>". */
+    source?: string;
     /** A demo source mounted while Metrics is on; it feeds the controller's apply(). */
     demo?: {mount: (telemetry: {apply: (map: Record<string, TelemetrySample>) => void}) => (() => void) | void};
   };

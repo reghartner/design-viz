@@ -272,7 +272,8 @@ Shared settings live on the page beside the Jira settings, in
 
 `grafana` holds datasource UIDs for `prometheus`, `loki`, `tempo` and `sql`.
 `honeycomb` holds `environment` and `dataset`. `window` is the observation
-window, a duration such as `30m`, `1h` or `7d`; the default is `1h`. `refreshMs`
+window, a duration such as `30m`, `1h` or `7d`; the default is `24h`, the previous
+24 hours (Chuck, 2026-11-04). `refreshMs`
 is the connector refresh interval; values under one minute use 60000 and an
 absent value leaves the connector default. `templates` are named signal sets
 authored on the page; the repository ships none.
@@ -780,11 +781,12 @@ A host can supply telemetry transport beside `liveStatus`. It drives the panel's
 var ctl = renderPage(view, page, skin, backlinks, {
   liveStatus: {provider: hostTicketLookup},
   telemetry: {
-    provider: function(bindings, signal) {
+    provider: function(bindings, signal, report) {
       // bindings = [{id: "notify->app", kind: "call", signals: {...}, proof: {...}, links: {...}, card: null}, ...]
       return hostTelemetryLookup(bindings, signal);
     },
-    refreshMs: 300000
+    refreshMs: 300000,
+    source: "Grafana"
   }
 });
 ```
@@ -824,7 +826,14 @@ page's `tracking.telemetry.refreshMs`, else one minute, and never more often tha
 once a minute. A hidden document pauses refresh; returning to visible runs one
 catch-up call. A rejection reports the error and keeps the previous map. Turning
 Metrics off or destroying the page aborts the signal, stops the timer and drops any
-late answer; turning it off also clears the map. A demo source may stand in for a
+late answer; turning it off also clears the map. `report.note(text)` attaches a note
+to that answer, such as a query that failed while the others answered; it becomes
+`status().note` with state `ok`, and an answer without a note clears it. A rejection
+whose `state` is `"approval"` reports state `approval` instead of `error` (the panel
+dot turns amber). `source` names the connector in the panel's Metrics text: with it
+the text reads "Grafana connected · 24h window · refreshed 10:42:13" (the window is
+`tracking.telemetry.window`), "Grafana needs approval · 24h window", or the error
+note; without it the text keeps the "Metrics: connected, refreshed …" form. A demo source may stand in for a
 provider: `telemetry: {demo: {mount: function(api) {...; return cleanup;}}}` is
 mounted when Metrics turns on, receives `ctl.telemetry`, feeds it through `apply`,
 and its cleanup runs when Metrics turns off or the page is destroyed.
@@ -835,11 +844,12 @@ copy, `{available, enabled, map, status}`. `setEnabled` is ignored without a pro
 or demo. `onChange` returns an unsubscribe function; callbacks receive the snapshot
 after apply, clear, enable changes and connector changes. `status()` is `{state,
 busy, refreshedAt, note}`: `state` is `absent` without a provider or demo, `idle`
-while Metrics is off, `loading` until the first answer, then `ok` or `error`; `busy`
+while Metrics is off, `loading` until the first answer, then `ok`, `error` or
+`approval`; `busy`
 is true while a call is in flight; `refreshedAt` is the last successful answer;
 `note` holds the last error message. `ctl.liveStatus.snapshot().metrics` carries the
-same state for the panel, and `ctl.liveStatus.setMetricsEnabled(bool)` is the panel
-button's action. Standalone hosts set `window.flowviewTelemetry` before boot; native
+same state for the panel, plus `source` and `window`, and
+`ctl.liveStatus.setMetricsEnabled(bool)` is the panel button's action. Standalone hosts set `window.flowviewTelemetry` before boot; native
 hosts pass `telemetry` to `mountNativeViewer`, typed in `src/native/mount.d.ts`.
 Nothing is painted on the canvas yet.
 
@@ -1045,6 +1055,87 @@ behaves as before: authored PR links stay plain icons, Jira's Development count
 stays, and the header's connection line reads “GitHub not connected” on pages
 that carry GitHub PR URLs or a `tracking.github` scope.
 
+### Production metrics from Grafana
+
+A board whose nodes or edges bind `grafana`, `loki` or `sql` signals (see
+[Telemetry bindings](#telemetry-bindings)) reads them through the viewer's Grafana
+connector when it is published as a claude.ai artifact (#943,
+`src/viewer/telemetry-claude.js`). An existing `window.flowviewTelemetry` host
+provider takes precedence, and demo mode (`#live=demo`) does not use it. Declare
+the connector as one more `servers` entry, by its exact display name:
+
+```js
+capabilities: {mcp: {servers: [
+  {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]},
+  {server: "Grafana", tools: ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]}
+]}, comments: {"composer_only": true, "customAnchors": true}}
+```
+
+Add `"query_sql"` to the Grafana tools only when the page has `sql` signals and the
+server enables that tool; it is off by default in
+[grafana/mcp-grafana](https://github.com/grafana/mcp-grafana), the real server,
+which the viewer adds as a custom connector. The
+[mock Grafana MCP](../deploy/cloudflare/mock-grafana-mcp/README.md) serves the
+doorbell story without a Grafana account. `tools/inject.py` adds the Grafana entry
+to the embedded agent guide's declaration when the page has such signals.
+
+The adapter never matches the connector by name. From the listed connectors it
+takes any that offers all five tools above, preferring one named **Grafana**, then
+the first qualifying one; a connector missing one of them, such as
+`query_prometheus`, is not used. Jira and GitHub connectors are chosen as before.
+Without a qualifying connector the Metrics text reads "Add a Grafana connector in
+claude.ai Settings → Connectors to see live metrics."
+
+Nothing is called while Metrics is off. Turning Metrics on runs the first refresh,
+and claude.ai asks the viewer to allow the connector while that first call waits.
+If approval is still needed, the Metrics text reads "Grafana needs approval" and the
+panel shows **Allow Grafana**, which makes the same call once and restarts Metrics.
+Until then no further call is made. An authorization answer (reconnect, not
+allowed, not connected) also clears the map and stops calls until Metrics is
+turned on again. Refreshes follow the [telemetry provider](#telemetry-provider)
+loop: at most once a minute (the page's `refreshMs` when longer), paused while the
+document is hidden, aborted when Metrics turns off. The connector line reads
+"Grafana connected · 24h window · refreshed 10:42:13". Each refresh makes these
+calls:
+
+| tool | how often | input |
+|---|---|---|
+| `get_annotations` | once per refresh, first and alone | `{type: "annotation", limit: 100}` |
+| `query_prometheus` | once per refresh for each `grafana` signal | `{datasourceUid, expr, startTime: "now-24h", endTime: "now", stepSeconds, queryType: "range"}` |
+| `query_loki_logs` | once per refresh for each `loki` signal | `{datasourceUid, logql, startRfc3339: "now-24h", endRfc3339: "now", queryType: "range", stepSeconds}` |
+| `query_sql` | at most once an hour for each `sql` signal; the value is reused in between | `{datasourceUid, query}` |
+| `generate_deeplink` | once per carrier per page load, unless the carrier authors `links.query` | `{resourceType: "explore", datasourceUid, queries: [{refId, expr}], timeRange: {from: "now-24h", to: "now"}}` |
+
+`datasourceUid` is the viewed page's `tracking.telemetry.grafana.prometheus`,
+`.loki` or `.sql`, also for imported carriers. The window is
+`tracking.telemetry.window` (default `24h`). Times are relative, so the server's
+clock decides "now". `stepSeconds` divides the window into about 240 points, at
+least 60 seconds. The Explore link covers the carrier's signals of the same source
+as its first `grafana` or `loki` signal. `tempo` signals (exemplar traces) and
+`honeycomb` signals are not run by this adapter.
+
+Each query's series become ascending `[epoch ms, number]` points. Several series
+are added point by point, so write one aggregated series per signal. `NaN`
+samples are dropped. `value` is the last point. A query that matched nothing is
+`value: 0` with no points. `unit` is the authored one. A `sql` signal's value is
+the first number of the first returned row. `observedAt` is the newest point of
+the refresh. Every carrier carries the window's annotations as markers `{at, kind,
+label}`: kind `deploy` when tagged deploy, else `incident`, else the first tag.
+Links are the authored `dashboard` and `query`, with the Explore link standing in
+for a missing `query`.
+
+A query that fails on its own (`tool_error`, such as a PromQL parse error, or a
+missing datasource UID) leaves the other carriers fresh and keeps that signal's
+previous sample; the Metrics text adds "1 Grafana query failed: mcu->ingest p95:
+<message>". Any other failure keeps the previous map and shows its note, such as
+"Grafana did not answer". `user_changed` stops the adapter. Nothing is written
+back to the spec.
+
+Tool argument names and result shapes follow grafana/mcp-grafana's source as the
+mock mirrors it; they are unverified against a live Grafana server, and
+`query_sql`'s result shape is the least certain. Confirm with the connector's tool
+list before relying on a parameter name.
+
 ### Two-file publish: `index.html` + `flowspec.json`
 
 A board that will save its own edits from inside the artifact (#825) is
@@ -1230,8 +1321,9 @@ JSON, write it back into the same block and republish to the same URL. The
 guide is derived from the spec: it states the renderer version from
 `page.flowview.authoredWith` (or that none is stamped), the capability
 declaration to pass on every publish as a JSON block (the Jira connector entry
-only when the page has `page.tracking`; connector display names are per
-account), the compact tracking rules, the page's own `tracking` values, links
+only when the page has `page.tracking`, the Grafana entry only when a carrier or
+page template binds a `grafana`, `loki` or `sql` signal; connector display names
+are per account), the compact tracking rules, the page's own `tracking` values, links
 to `docs/live-status.md` and `contract/authoring-contract.md` in the public
 repo pinned to the commit the page was built from (`git rev-parse HEAD` of the
 checkout running `inject.py`; outside a checkout the links point at `main`

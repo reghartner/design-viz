@@ -97,6 +97,31 @@ GUIDE_BLOCK = re.compile(r'^<script type="text/markdown" id="dv-agent-guide">\n.
 GUIDE_LIMIT = 6 * 1024
 COMMENTS_CAPABILITY = {"composer_only": True, "customAnchors": True}
 JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]
+# #943: the claude.ai Grafana adapter picks the viewer's connector by these five tools.
+GRAFANA_TOOLS = ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]
+GRAFANA_SOURCES = ("grafana", "loki", "sql")
+
+
+def _grafana_binding(telemetry: dict) -> bool:
+    signals = telemetry.get("signals")
+    if isinstance(signals, dict) and any(isinstance(signal, dict) and any(source in signal for source in GRAFANA_SOURCES)
+                                         for signal in signals.values()):
+        return True
+    templates = telemetry.get("templates")
+    return isinstance(templates, dict) and any(isinstance(t, dict) and _grafana_binding(t) for t in templates.values())
+
+
+def grafana_signals(value) -> bool:
+    """True when any `telemetry` object of the page (a carrier, a topology tracking
+    overlay or the page's templates) holds a signal the Grafana connector runs."""
+    if isinstance(value, dict):
+        telemetry = value.get("telemetry")
+        if isinstance(telemetry, dict) and _grafana_binding(telemetry):
+            return True
+        return any(grafana_signals(item) for item in value.values())
+    if isinstance(value, list):
+        return any(grafana_signals(item) for item in value)
+    return False
 # #826: the spec file published beside a two-file page, and the line that tells
 # the standalone boot to fetch it. The name is fixed: the board's Edit mode and
 # the editor's agent both publish exactly this path.
@@ -139,11 +164,13 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False) -> str:
     tracking = page.get("tracking") if isinstance(page.get("tracking"), dict) else None
     jira = tracking.get("jira") if tracking and isinstance(tracking.get("jira"), dict) else {}
     tracked = tracking is not None
+    grafana = grafana_signals(page)
 
-    capabilities = {"comments": COMMENTS_CAPABILITY}
+    servers = ([{"server": "Atlassian", "tools": JIRA_TOOLS}] if tracked else []) + \
+        ([{"server": "Grafana", "tools": GRAFANA_TOOLS}] if grafana else [])
+    capabilities = {"mcp": {"servers": servers}} if servers else {}
+    capabilities["comments"] = COMMENTS_CAPABILITY
     if tracked:
-        capabilities = {"mcp": {"servers": [{"server": "Atlassian", "tools": JIRA_TOOLS}]},
-                        "comments": COMMENTS_CAPABILITY}
         if two_file:
             # The board's Edit mode republishes flowspec.json from inside the
             # artifact (files publish) and records who saved (profile name).
@@ -244,9 +271,18 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False) -> str:
         ]
     else:
         lines += [
-            "This page has no `page.tracking`, so it declares no connector (no `mcp` entry). Add "
+            "This page has no `page.tracking`, so it declares no Jira connector. Add "
             "the Jira connector declaration described in docs/live-status.md only after adding "
             "tracking; connector display names are per account.",
+        ]
+    if grafana:
+        lines += [
+            "",
+            "`Grafana` is the viewer's Grafana connector display name (grafana/mcp-grafana or a mock); "
+            "the page picks the connector by the five tool names. While Metrics is on, each refresh "
+            "(at most once a minute) makes one get_annotations call and one query per grafana or loki "
+            "signal, and generate_deeplink runs once per carrier. sql signals call query_sql at most "
+            "once an hour; add \"query_sql\" to the tools only when that server enables it.",
         ]
     lines += [
         "",

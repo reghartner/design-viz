@@ -154,6 +154,7 @@
         "viewer/live-status-demo.js",
         "viewer/artifact-comments.js",
         "viewer/live-status-claude.js",
+        "viewer/telemetry-claude.js",
         "workbench/source-edit.js",
         "workbench/targets.js",
         "workbench/commands/common.js",

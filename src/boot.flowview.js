@@ -185,8 +185,12 @@ function boot(raw, sourceText, sourceFallback){
     createBoardEditor({win: window, text: sourceText, specFile: specFile, fallback: sourceFallback || null, context: topologyContext,
                        render: function(text){ return rerender(text); }}) : null;
   /* window.flowviewTelemetry (#939): a host telemetry provider set before boot,
-     shaped like the renderPage telemetry option; the Metrics button stays off until clicked. */
-  var renderOptions = {layoutTarget:layoutTarget,liveStatus:liveOptions,telemetry:window.flowviewTelemetry,handoffHost:window.flowviewHandoffHost,sourceText:sourceText,sourceFallback:sourceFallback || null,boardEditor:editor};
+     shaped like the renderPage telemetry option; the Metrics button stays off until clicked.
+     Without one, a claude.ai artifact whose carriers bind grafana, loki or sql
+     signals reads them through the viewer's Grafana connector (#943). */
+  var telemetryHost = window.flowviewTelemetry;
+  var grafanaTelemetry = !telemetryHost && !(liveOptions && liveOptions.demo) && typeof createTelemetryGrafana === 'function' ? createTelemetryGrafana(page, window) : null;
+  var renderOptions = {layoutTarget:layoutTarget,liveStatus:liveOptions,telemetry:telemetryHost || (grafanaTelemetry ? grafanaTelemetry.options : undefined),handoffHost:window.flowviewHandoffHost,sourceText:sourceText,sourceFallback:sourceFallback || null,boardEditor:editor};
   var ctl = renderPage(view, page, bootSkin, backlinkData, renderOptions);
   if (sourceFallback && view.parentNode){
     var banner = sourceFallbackBanner(sourceFallback, page, specFile);
@@ -245,6 +249,9 @@ function boot(raw, sourceText, sourceFallback){
       if (typeof wireArtifactComments === 'function') wireArtifactComments(editor ? currentController() : ctl, view, window);
     }
     if (!(liveOptions && liveOptions.demo) && typeof wireLiveStatusClaude === 'function') wireLiveStatusClaude(ctl, page, window);
+    /* The Grafana adapter outlives an edit re-render; each render's controller
+       carries its Allow action and receives its map retractions. */
+    if (grafanaTelemetry) retire(grafanaTelemetry.attach(ctl, page));
     /* First-run guided tour: a page's own page.tour replaces the built-in
        default wholesale; an unusable override falls back to the default so a
        typo never costs the tour. wireTour itself refuses embeds and #tour=0.

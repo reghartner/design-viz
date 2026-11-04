@@ -167,7 +167,7 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
       function paintDemo(){
         Object.keys(initialDemo).forEach(function(key){demoMap[key]=Object.assign({},initialDemo[key],{state:demoStates[(demoStates.indexOf(initialDemo[key].state)+demoDay)%demoStates.length]});});
         live.apply(demoMap);live.note('Demo day '+(demoDay+1),'info');
-        live.setDemoControls({ended:demoDay===3,next:function(){if(demoDay<3){demoDay++;paintDemo();}}});
+        live.setDemoControls({ended:demoDay===3,first:demoDay===0,prev:function(){if(demoDay>0){demoDay--;paintDemo();}},next:function(){if(demoDay<3){demoDay++;paintDemo();}}});
       }
       paintDemo();
     }}};

@@ -310,8 +310,8 @@ The generic desktop Workbench picker lists **Delivery → Live status**; inserti
 and Export project preserve the panel. There are no authored state or patch fields.
 
 The panel header has two rows. The first holds only buttons, which keep their
-place: **Live**, **Over time**, and on the right **First blocker**, any provider
-action, and Edit. **First blocker** keeps one size; with no blockers it reads
+place: **Live**, **Over time**, any provider action, Edit, and on the far right
+**First blocker**. **First blocker** keeps one size; with no blockers it reads
 **No blockers** and is greyed out, and with blockers it cannot reach from here it
 stays **First blocker** and is greyed out. The second row holds everything that
 changes. Its height follows the panel's width, one line when the panel is wide and

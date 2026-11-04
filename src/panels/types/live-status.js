@@ -108,8 +108,6 @@
       var github=el(connection,'span','github','dv-live-connection-github',ghLabel || '');github.setAttribute('data-state',gh.state);github.setAttribute('data-busy',String(!!gh.busy));github.hidden=!ghLabel;
       connection.hidden=!available || conn.state==='none';
       var note=el(statusLine,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
-      // A fixed slot and size (#986). "No blockers" only when that is true: blockers off the current path, or with colors off, leave "First blocker" greyed out.
-      var first=button(controls,'first','reader-button dv-live-first',value && (value.firstBlocker || (value.blockers || []).length)?'First blocker':'No blockers','firstBlocker');first.hidden=!hasData;first.disabled=!(value && value.firstBlocker);
       var action=button(controls,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
       var overStatus=el(statusLine,'span','over-time-status','dv-live-over-time-status',hasData && over && over.error?over.error:'');overStatus.setAttribute('role','status');overStatus.hidden=!overStatus.textContent;
       // #828 shared-board Edit mode lives in this header: Edit for editors, then a prominent Save N changes and Discard.
@@ -118,6 +116,8 @@
       var saveControl=button(controls,'save','reader-button dv-live-save',edit && edit.saving?'Saving…':'Save '+pending+' change'+(pending===1?'':'s'),'editSave');saveControl.hidden=!(editing && pending);saveControl.disabled=!!(edit && edit.saving);
       var discardControl=button(controls,'discard','reader-button dv-live-discard','Discard','editDiscard');discardControl.hidden=!(editing && pending);discardControl.disabled=!!(edit && edit.saving);
       button(controls,'done','reader-button dv-live-edit-done','Done','editDone').hidden=!(editing && !pending);
+      // A fixed slot and size, last in the row so a button appearing to its left cannot move it (#986). "No blockers" only when that is true: blockers off the current path, or with colors off, leave "First blocker" greyed out.
+      var first=button(controls,'first','reader-button dv-live-first',value && (value.firstBlocker || (value.blockers || []).length)?'First blocker':'No blockers','firstBlocker');first.hidden=!hasData;first.disabled=!(value && value.firstBlocker);
       var reason=el(statusLine,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
       var editNotice=el(statusLine,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
       var editShown=!!(edit && (edit.editable || edit.notice));

@@ -558,11 +558,10 @@ test('P2 Jira map merges chunks, marks only requested missing keys and preserves
 const historyAt=(y,m,d,h=12,min=0)=>new Date(y,m-1,d,h,min).getTime(),HISTORY_CATEGORIES={'to do':'new','in progress':'indeterminate','blocked':'indeterminate','done':'done'};
 const historyChange=(at,from,to)=>({at,field:'status',from,to}),historyFlag=(at,from,to)=>({at,field:'flag',from,to});
 const historyTicket=(key,created,status,changes=[],flagged=false)=>({key,created,status,flagged,changes});
-function historyDays(C,tickets,today,now=historyAt(2026,10,24)){const value=C.liveStatusHistoryDays({tickets,today,categories:HISTORY_CATEGORIES,now,locale:'en-US'});return plain(value);}
+function historyDays(C,tickets,today,now=historyAt(2026,10,24)){assert.equal(typeof C.liveStatusHistoryDays,'function','#929 day reconstruction exists');const value=C.liveStatusHistoryDays({tickets,today,categories:HISTORY_CATEGORIES,now,locale:'en-US'});return plain(value);}
 const historyStates=(result,key)=>result.days.map(day=>day.states[key]?day.states[key].state:null);
 test('R1 R2 R4 the range runs from the oldest creation to today, or to the last Done, and days carry forward',()=>{
- const C=providerContext();assert.equal(typeof C.liveStatusHistoryDays,'function','#929 day reconstruction exists');
- const open=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20),'In Progress',[historyChange(historyAt(2026,10,21),'To Do','In Progress')]),historyTicket('BB-1',historyAt(2026,10,22),'To Do')],{'AA-1':{state:'active'},'BB-1':{state:'todo'}});
+ const C=providerContext(),open=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20),'In Progress',[historyChange(historyAt(2026,10,21),'To Do','In Progress')]),historyTicket('BB-1',historyAt(2026,10,22),'To Do')],{'AA-1':{state:'active'},'BB-1':{state:'todo'}});
  assert.deepEqual(open.days.map(day=>day.short),['Oct 20','Oct 21','Oct 22','Oct 23','Oct 24']);assert.equal(open.index,4);
  assert.deepEqual(historyStates(open,'AA-1'),['todo','active','active','active','active']);assert.deepEqual(historyStates(open,'BB-1'),[null,null,'todo','todo','todo']);
  const done=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20),'Done',[historyChange(historyAt(2026,10,21),'To Do','Done')]),historyTicket('BB-1',historyAt(2026,10,20),'Done',[historyChange(historyAt(2026,10,22),'To Do','In Progress'),historyChange(historyAt(2026,10,23),'In Progress','Done')])],{'AA-1':{state:'done'},'BB-1':{state:'done'}},historyAt(2026,11,3));

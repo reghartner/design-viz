@@ -72,14 +72,15 @@ function createFlowMetricsEditor(o){
   var d=flowMetricsDom(o),c=o.controls,s=o.state,commit=o.commit,b=s.binding,templateNames=Object.keys(s.templates || {});
   var box=d.el('fieldset','metrics-editor');box.appendChild(d.el('legend',null,'Metrics'));
   if(s.imported)d.note(box,'Inherited metrics (read only): '+(s.inherited?telemetrySummary(s.inherited)+'. A binding saved here replaces it in this consumer.':'none. A binding saved here applies only in this consumer.'),'metrics-inherited');
-  if(!b)d.note(box,'Unbound: no metrics overlay and no proof verdict. Choose a kind, then add a signal'+(templateNames.length?' or pick a template':'')+'.','metrics-status');
+  // An imported carrier that inherits a provider binding is bound; only a carrier with neither is unbound.
+  if(!b && !s.inherited)d.note(box,'Unbound: no metrics overlay and no proof verdict. Choose a kind, then add a signal'+(templateNames.length?' or pick a template':'')+'.','metrics-status');
   // An unbound carrier's kind is a draft: it is written with the first signal or template.
   var draftKind='call',template=s.mode==='template';
   var kind=c.select(TELEMETRY_KINDS,b?(typeof b.kind==='string'?b.kind:''):draftKind,function(v){
     if(!b){draftKind=v || 'call';return true;}
     return commit({op:'kind',value:v});
   },!!b && template);
-  d.row(box,'Metrics kind',d.relabel(kind,{'':'(template kind)'}));
+  d.row(box,'Metrics kind',d.relabel(kind,{'':'(template kind'+(s.templateBase && typeof s.templateBase.kind==='string'?': '+s.templateBase.kind:'')+')'}));
   if(templateNames.length || template){
     d.row(box,'Signals from',d.relabel(c.select(templateNames,template?s.template:'',function(v){return commit({op:'use',name:v,kind:draftKind});},true),{'':'Raw signals'}));
   }

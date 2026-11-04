@@ -657,6 +657,8 @@ function metricsControls(){
     var target=Object.assign({},session.target),state;
     try{state=telemetryCarrierState(snapshot.raw,target,session.topologyContext());}catch(ex){state={error:ex.message};}
     if(state.error)return null;
+    // Pin the connection's identity so a later commit cannot land on a different edge at the same index.
+    if(target.kind==='edge')target.key=state.id;
     return createFlowMetricsEditor({document:document,state:state,controls:metricsControlKit(),listen:listen,commit:function(edit){
       return commitTelemetry(function(text,raw){return planCarrierTelemetry(text,raw,target,edit,session.topologyContext());});
     }});

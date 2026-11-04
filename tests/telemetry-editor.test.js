@@ -171,6 +171,7 @@ test('M5 M7 Signals from switches to a page template with parameters and proof o
   oneStep(ui,()=>ui.set('lag max','500'));assert.equal(Object.hasOwn(edgeOf(ui).telemetry,'proof'),false,'back to the template value drops the override');
   {const before=ui.text;ui.set('in min','');assert.equal(ui.text,before);assert.match(ui.error(),/template/i);ui.select(EDGE);}
   oneStep(ui,()=>ui.set('Card side','below'));oneStep(ui,()=>ui.set('Card offset','12'));
+  assert.equal(ui.control('Metrics kind').options.find(o=>o.value==='').textContent,'(template kind: queue)');
   oneStep(ui,()=>ui.set('Metrics kind','call'));assert.equal(edgeOf(ui).telemetry.kind,'call');
   oneStep(ui,()=>ui.set('Metrics kind',''));assert.equal(Object.hasOwn(edgeOf(ui).telemetry,'kind'),false,'(template kind) removes the override');
   const templated=edgeOf(ui).telemetry;assert.deepEqual(templated,{use:'kafka-topic',topic:'device-events',group:'notify',card:{side:'below',offset:12}});
@@ -234,6 +235,7 @@ test('M8 M9 imported carriers show the inherited binding read only and edit the 
   // The imported edge has no overlay entry yet; one is created.
   const edgeIndex=resolved.edges.findIndex(e=>e.from==='shared::api' && e.to==='shared::store'),edge={kind:'edge',section:0,index:edgeIndex};
   assert.match(C.planCarrierTelemetry(text,raw,edge,{op:'link',key:'dashboard',value:'https://acme.grafana.net/d/x'},f.context).error || '',/[Aa]dd a signal or choose a template/,'links need a binding first');
+  assert.match(C.planCarrierTelemetry(text,raw,{...edge,key:'shared::store->shared::api'},{op:'addSignal',name:'rate',source:'grafana',query:PROM_RATE,kind:'call'},f.context).error || '',/changed/,'a stale connection identity is refused');
   apply(edge,{op:'addSignal',name:'rate',source:'grafana',query:PROM_RATE,kind:'call'});
   apply(edge,{op:'card',field:'side',value:'right'});
   assert.deepEqual(diagramOf(raw).topologyImports[0].edgeTracking,{'api->store':{telemetry:{kind:'call',signals:{rate:{grafana:PROM_RATE}},card:{side:'right'}}}});
@@ -255,7 +257,7 @@ test('M8 the inspector shows an imported carrier inherited binding read only and
   const node={kind:'node',section:0,id:'shared::api'};ui.select(node);
   const box=ui.metrics(),notes=box.querySelectorAll('p').map(p=>p.textContent).join(' ');
   assert.match(notes,/Inherited metrics \(read only\): service · up \(grafana\)/);
-  assert.match(notes,/replaces/);
+  assert.match(notes,/replaces/);assert.doesNotMatch(notes,/Unbound/,'an inherited binding is not unbound');
   ui.control('New signal name').value='rate';ui.control('New signal source').value='grafana';ui.control('New signal query').value=PROM_RATE;ui.set('Metrics kind','service');
   oneStep(ui,()=>ui.click('Add signal'),node);
   assert.deepEqual(diagramOf(ui.raw).topologyImports[0].nodeTracking.api,{tickets:['API-1'],telemetry:{kind:'service',signals:{rate:{grafana:PROM_RATE}}}});

@@ -7,6 +7,10 @@ jobs:
   windows:
     runs-on: windows-latest
     timeout-minutes: 30
+    env:
+      # Same setting as the m3 Windows test box. Without it, tools/build.py stops
+      # on a cp1252 decode error before any page build can run.
+      PYTHONUTF8: '1'
     defaults:
       run:
         shell: bash

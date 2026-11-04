@@ -66,7 +66,7 @@ PanelRegistry.define('truth-table', {
   validateDeclaration: function (panel, path, warnings) {
     panelCollectionWarnings(panel, path, warnings, 'columns', 8, function (col, at) {
       if (col.kind !== undefined && col.kind !== 'value' && col.kind !== 'icons') warnings.push(at + '.kind: expected value or icons — using value');
-      if (col.empty !== undefined && typeof col.empty !== 'string') warnings.push(at + '.empty: expected text — showing n/a');
+      if (col.kind === 'icons' && col.empty !== undefined && typeof col.empty !== 'string') warnings.push(at + '.empty: expected text — showing n/a');
     });
     var columns = softwarePanelItems(panel);
     panelCollectionWarnings(panel, path, warnings, 'cases', 24, function (row, at) {

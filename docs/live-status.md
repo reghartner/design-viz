@@ -483,8 +483,8 @@ panels. `connection` is `{state, busy, checkedAt, source, checkedText, github}`;
 `connection.github` is `{state, busy}` with `state` in `none`, `disconnected`,
 `connecting`, `connected`, `error`; adapters report it through
 `ctl.liveStatus.status({github: {state, busy}})` and the panel header appends
-“· GitHub connected”, “· GitHub not connected”, “· GitHub connecting” or
-“· GitHub did not answer” after the Jira text (hidden for `none`). A host
+“· GitHub connected”, “· GitHub connecting” or “· GitHub did not answer”
+after the Jira text. It shows nothing for `none` or `disconnected`. A host
 provider is reported as source “Host”: connecting until its first answer, busy during
 each call, connected with `checkedAt` after a successful call, error after a rejection.
 Hosts and adapters may call `ctl.liveStatus.status({state, busy, checkedAt, source})`
@@ -810,8 +810,7 @@ capabilities: {mcp: {servers: [
 
 Without the GitHub entry, or when the viewer has no such connector, the page
 behaves as before: authored PR links stay plain icons, Jira's Development count
-stays, and the header's connection line reads “GitHub not connected” on pages
-that carry GitHub PR URLs or a `tracking.github` scope.
+stays, and the header's connection line says nothing about GitHub.
 
 ### Two-file publish: `index.html` + `flowspec.json`
 

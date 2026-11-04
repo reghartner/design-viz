@@ -104,7 +104,7 @@
       var connection=el(statusLine,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
       var connWho=(conn.source || '')+(connLabel && connLabel!==String(conn.source || '').toLowerCase()?' '+connLabel:'');
       el(connection,'i','dot','dv-live-connection-dot');el(connection,'span','text','',[connWho,conn.checkedText].filter(Boolean).join(', '));
-      var gh=conn.github || {state:'none'},ghLabel={disconnected:'GitHub not connected',connecting:'GitHub connecting',connected:'GitHub connected',error:'GitHub did not answer'}[gh.state];
+      var gh=conn.github || {state:'none'},ghLabel={connecting:'GitHub connecting',connected:'GitHub connected',error:'GitHub did not answer'}[gh.state];
       var github=el(connection,'span','github','dv-live-connection-github',ghLabel || '');github.setAttribute('data-state',gh.state);github.setAttribute('data-busy',String(!!gh.busy));github.hidden=!ghLabel;
       connection.hidden=!available || conn.state==='none';
       var note=el(statusLine,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;

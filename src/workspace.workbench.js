@@ -190,7 +190,7 @@ function initWorkbenchWorkspace(){
     // now covers yields instead, through the same display-only placement.
     if(name==='inspect')neighbors.forEach(function(n){
       var o=rect(n);
-      if(overlap(best,{x:o.x,y:o.y,w:o.w,h:48})>0 || overlap(best,{x:o.x+o.w-24,y:o.y+o.h-24,w:24,h:24})>0)place(n,true);
+      if(overlap(best,{x:o.x,y:o.y,w:o.w,h:48})>0 || overlap(best,{x:o.x+o.w-24,y:o.y+o.h-24,w:24,h:24})>0){place(n,true);if(placements[n])Object.assign(prefs.windows[n],placements[n]);}
     });
   }
   function reserveCanvas(){

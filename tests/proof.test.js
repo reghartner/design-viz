@@ -82,15 +82,15 @@ const MATRIX = [
   ['todo', 'todo', 'todo-already-live', 'todo-failing', 'todo'],
   ['blocked', 'blocked', 'blocked', 'blocked', 'blocked'],
   ['missing', 'missing', 'missing', 'missing', 'missing'],
-  [null, 'silent', 'healthy', 'degraded', null],
+  [null, 'unobserved', 'healthy', 'degraded', null],
   ['unknown', null, null, null, null],
 ];
 const FAILING = {silent: ['rate'], flowing: [], degraded: ['errors'], unobserved: []};
 const LABELS = {
   proven: 'PROVEN', 'done-unproven': 'DONE · UNPROVEN', 'done-degraded': 'DONE · DEGRADED', done: 'DONE',
   active: 'IN PROGRESS', 'active-live-early': 'IN PROGRESS · LIVE EARLY', 'active-failing': 'IN PROGRESS · FAILING',
-  todo: 'TODO', 'todo-already-live': 'TODO · ALREADY LIVE', 'todo-failing': 'TODO · FAILING',
-  blocked: 'BLOCKED', missing: 'MISSING', healthy: 'HEALTHY', degraded: 'DEGRADED', silent: 'SILENT',
+  todo: 'TODO', 'todo-already-live': 'TODO · ALREADY LIVE?', 'todo-failing': 'TODO · FAILING',
+  blocked: 'BLOCKED', missing: 'MISSING', unobserved: 'UNOBSERVED', healthy: 'HEALTHY', degraded: 'DEGRADED',
 };
 
 function matrixPage() {

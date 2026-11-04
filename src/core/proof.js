@@ -71,13 +71,13 @@ var proofVerdicts = (function(){
     todo: {silent: 'todo', flowing: 'todo-already-live', degraded: 'todo-failing', unobserved: 'todo'},
     blocked: {silent: 'blocked', flowing: 'blocked', degraded: 'blocked', unobserved: 'blocked'},
     missing: {silent: 'missing', flowing: 'missing', degraded: 'missing', unobserved: 'missing'},
-    none: {silent: 'silent', flowing: 'healthy', degraded: 'degraded', unobserved: null}
+    none: {silent: 'unobserved', flowing: 'healthy', degraded: 'degraded', unobserved: null}
   };
   var PROOF_VERDICT_LABELS = {
     proven: 'PROVEN', 'done-unproven': 'DONE · UNPROVEN', 'done-degraded': 'DONE · DEGRADED', done: 'DONE',
     active: 'IN PROGRESS', 'active-live-early': 'IN PROGRESS · LIVE EARLY', 'active-failing': 'IN PROGRESS · FAILING',
-    todo: 'TODO', 'todo-already-live': 'TODO · ALREADY LIVE', 'todo-failing': 'TODO · FAILING',
-    blocked: 'BLOCKED', missing: 'MISSING', healthy: 'HEALTHY', degraded: 'DEGRADED', silent: 'SILENT'
+    todo: 'TODO', 'todo-already-live': 'TODO · ALREADY LIVE?', 'todo-failing': 'TODO · FAILING',
+    blocked: 'BLOCKED', missing: 'MISSING', unobserved: 'UNOBSERVED', healthy: 'HEALTHY', degraded: 'DEGRADED'
   };
   /* Rollup buckets are disjoint verdict sets; blocked, missing, pending and
      no-ticket healthy carriers count as bound only. */

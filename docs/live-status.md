@@ -264,9 +264,9 @@ input shapes; the page-reading wrapper, overlay and panel build on it.
 | --- | --- | --- | --- | --- |
 | `done` | DONE · UNPROVEN | **PROVEN** | DONE · DEGRADED | DONE |
 | `active` | IN PROGRESS | IN PROGRESS · LIVE EARLY | IN PROGRESS · FAILING | IN PROGRESS |
-| `todo` | TODO | TODO · ALREADY LIVE | TODO · FAILING | TODO |
+| `todo` | TODO | TODO · ALREADY LIVE? | TODO · FAILING | TODO |
 | `blocked`, `missing` | Jira state kept | Jira state kept | Jira state kept | Jira state kept |
-| no tickets | SILENT | HEALTHY | DEGRADED | no verdict |
+| no tickets | UNOBSERVED | HEALTHY | DEGRADED | no verdict |
 
 Linked tickets without Jira evidence give no verdict, as they give no paint.
 Three states keep the claims honest:

@@ -1293,11 +1293,8 @@ perspectives" of one timeline). Types:
   workbench panel picker includes **Truth table** with editable property headers,
   typed case values and a shared visual icon picker for each icon cell's outputs.
 
-  - `columns`: up to 8 `{id,label?,kind?,empty?}` declarations with unique IDs.
+  - `columns`: up to 8 `{id,label?,kind?}` declarations with unique IDs.
     `kind` is `value` (default) or `icons`; any number of columns may hold icons.
-    `empty` (icons columns) is the text an empty icon list shows, for example
-    `"No icons"`; omit it for a small muted **n/a**, or use `""` to show nothing.
-    A non-string `empty` warns and shows n/a; value columns ignore it.
   - `cases`: up to 24 `{id,label?,cells}` cases with unique IDs.
     `cells` maps column IDs to values. Value columns accept strings, finite
     numbers, booleans or null.
@@ -1305,7 +1302,7 @@ perspectives" of one timeline). Types:
   - Each `icons` column cell contains an array of up to 8 `{icon,label?}`
     outputs. `icon` is a shared icon ID;
     `label` is optional accessible and visible text, defaulting to the library name.
-    An empty list shows the column's `empty` text (default: a small muted **n/a**). All icons in a cell appear together; separate icon columns stay independent.
+    An empty list explicitly displays **No icons**. All icons in a cell appear together; separate icon columns stay independent.
   - `initial.active` or a step's `active`: a case ID to highlight, or `null` for no
     highlight. Omission inherits the previous step; each alternate path folds
     independently. `enterOnce.active` highlights only the current step.
@@ -1316,9 +1313,7 @@ perspectives" of one timeline). Types:
   leave the carried state intact. Invalid icons are skipped with warnings.
   Unknown properties are preserved by desktop editing but ignored when rendering.
   The desktop editor supports adding, reordering and removing cases and icon
-  outputs, editing typed values, each icons column's **Empty cell text** in
-  Properties (clearing it restores n/a; `""` is set in the Properties raw JSON),
-  starting/step state and ordinary Undo/Redo.
+  outputs, editing typed values, starting/step state and ordinary Undo/Redo.
   Rename property/case IDs with care: IDs identify stored cells and active-state
   references; changing an ID does not rewrite those references.
 

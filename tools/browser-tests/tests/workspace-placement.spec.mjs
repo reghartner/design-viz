@@ -6,8 +6,10 @@ import {repo} from '../helpers/prepare.mjs';
 
 /* #920 contract (Chuck, 2026-11-03): floating Inspect keeps its saved size. Automatic
    placement may still move it to cover the least of the selection, and may overlap the
-   selection; it never shrinks Inspect (no 240px-tall or 300px-wide stand-in). Scoped to
-   Inspect; other tools keep today's placement. Desktop only. §0 ruling: extend existing tests.
+   selection; it never shrinks Inspect (no 240px-tall or 300px-wide stand-in). Other tools keep
+   their own placement rules, except that (Chuck, 2026-11-03) an open tool window whose title
+   bar or resize handle Inspect covers moves aside, for display only. Desktop only. §0 ruling:
+   extend existing tests.
 
    | row | fixture | assertion (scoped) | rejects |
    | 1 open over a section-wide panel keeps saved height | truth-table example at 1600x1000, saved 430x650 by keyboard resize, panel selected, Inspect closed then opened from its tab | #workspace-window-inspect box h == saved h | today's {h:240} candidates winning `place(…,opening)` |
@@ -18,6 +20,9 @@ import {repo} from '../helpers/prepare.mjs';
    | 6 Inspect stays usable at its saved size | rows 1 and 3 | grip, close and resize hit-test to themselves | a placement that pushes the saved-size window's controls off-screen |
    | 7 Inspect still avoids a selected node when it can | existing `desktop panel placement…` at 1280x720, 1440x900, 1920x1080 | clearSelectionOverlap (unchanged) | an impl that skips Inspect placement entirely |
    | 8 Agent and Inspect controls both reachable together | existing `desktop panel placement…` (unchanged) | hit() on both windows' controls | a full-size Inspect left under Agent's title bar or resize handle |
+   | 9 a tool window Inspect displaces really moves and stays usable | editorSpec at 1280x720, Find objects keyboard-moved to a saved spot, Doorbell selected so Inspect lands on its close button | box moved > 15px; grip, close and resize hit-test to themselves | removing the neighbor move |
+   | 10 the displaced window's saved rect does not change | same, read after Inspect's close persists | windows.outline in localStorage byte-identical before and after | a neighbor move that writes prefs.windows |
+   | 11 reload puts the window back at its saved rect | same, Inspect closed, page reloaded | box == saved rect | a neighbor move that reaches saved geometry by any path |
    | - may move / may overlap the selection | permission, not a requirement | not asserted | - |
    Discriminating power: a loud precondition proves every saved-size position in the workspace
    intersects the selected panel, so placement cannot avoid it without shrinking. */
@@ -112,6 +117,35 @@ test('desktop floating Inspect keeps its saved size over a section-wide panel at
   for(const control of ['.workspace-window-grip','.workspace-window-close','.workspace-window-resize'])await hit(inspect.locator(control));
   await capture(page,testInfo,'inspect-opened-over-panel-1600');
   await expect(page.locator('#src')).toHaveValue(source);
+});
+
+test('a tool window that moves aside for Inspect keeps its saved position',async({page,server},testInfo)=>{
+  await page.setViewportSize({width:1280,height:720});
+  const raw=editorSpec();raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));
+  const inspect=page.locator('#workspace-window-inspect'),outline=page.locator('#workspace-window-outline');
+  const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))));
+  const savedRecord=()=>page.evaluate(()=>JSON.stringify(JSON.parse(localStorage.getItem('dv-workbench-floating-v1')).windows.outline));
+  const shown=async()=>{const b=await outline.boundingBox();return {x:Math.round(b.x),y:Math.round(b.y),w:Math.round(b.width),h:Math.round(b.height)};};
+  await page.locator('#docview [data-dv-node="c"]').first().click();await page.locator('#editor-tab-inspect').click();await expect(inspect).toBeVisible();await clearSelectionOverlap(page);
+  await page.locator('#editor-tab-outline').click();await expect(outline).toBeVisible();
+  // A keyboard move makes the saved rect the user's own, so display and preference start equal.
+  await outline.locator('.workspace-window-grip').focus();await page.keyboard.press('ArrowLeft');await settle();
+  const before=await savedRecord(),atSaved=await shown(),{x,y,w,h}=JSON.parse(before);expect({x,y,w,h}).toEqual(atSaved);
+  const close=await outline.locator('.workspace-window-close').boundingBox();
+  await page.locator('#outline-search').fill('Doorbell');await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();await page.locator('#outline-inspect').click();
+  await clearSelectionOverlap(page);await settle();
+  // Discriminating precondition: Inspect now covers the spot where the neighbor's close button was.
+  const cover=await inspect.boundingBox(),spot={x:close.x+close.width/2,y:close.y+close.height/2};
+  expect(spot.x>=cover.x && spot.x<=cover.x+cover.width && spot.y>=cover.y && spot.y<=cover.y+cover.height).toBe(true);
+  // Rows 9-11: the move is real on screen, and only on screen.
+  const moved=await shown();expect(Math.abs(moved.x-atSaved.x)+Math.abs(moved.y-atSaved.y),'the neighbor moves out from under Inspect').toBeGreaterThan(15);
+  for(const control of ['.workspace-window-grip','.workspace-window-close','.workspace-window-resize'])await hit(outline.locator(control));
+  await capture(page,testInfo,'neighbor-moved-1280');
+  await inspect.locator('.workspace-window-close').click();await expect(inspect).toBeHidden();
+  expect.soft(await savedRecord(),'the neighbor move leaves its saved rect byte-identical').toBe(before);
+  await page.reload();await expect(outline).toBeVisible();await expect(inspect).toBeHidden();
+  await expect.poll(shown,{message:'reload restores the saved rect'}).toEqual(atSaved);
 });
 
 test('Contents changes, tool restoration and the single dock keep desktop controls usable',async({page,server})=>{

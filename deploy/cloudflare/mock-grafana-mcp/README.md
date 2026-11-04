@@ -61,8 +61,8 @@ Open Settings → Connectors → Add custom connector → URL, paste the `/mcp` 
 choose Authentication **No sign-in**, and give it a name such as
 **Mock-grafana**. Publish a telemetry board with the `mcp` capability declaring
 that exact display name beside the Jira one (see `docs/live-status.md`,
-"Publishing as a claude.ai artifact"); the Grafana adapter (#943) picks the
-connector by the tools it offers, not by name. No Grafana account or OAuth is
+"Publishing as a claude.ai artifact"). The Grafana adapter planned in #943 is to
+pick the connector by the tools it offers, not by name. No Grafana account or OAuth is
 involved. The real server is [grafana/mcp-grafana](https://github.com/grafana/mcp-grafana).
 
 The endpoint uses stateless Streamable HTTP: JSON-RPC over `POST /mcp`, single
@@ -147,24 +147,28 @@ returns log lines.
 
 Parameter names were read from the grafana/mcp-grafana source (`tools/*.go` at
 commit a57860b5, 2026-11-04), not a captured `tools/list` from a running
-server. Unknown argument names are tool errors, as on the real server.
+server. Each signature below lists every parameter the real tool declares;
+required names are bare and optional names end in `?`. The served
+`inputSchema` declares exactly these names. Unknown argument names are tool
+errors, as on the real server.
 
 - `list_datasources {type?, name?, limit?, offset?}` returns
   `{datasources: [{id, uid, name, type, isDefault}], total, hasMore}`.
-- `query_prometheus {datasourceUid, expr, startTime?, endTime, stepSeconds?, queryType?}`:
+- `query_prometheus {datasourceUid, expr, startTime?, endTime, stepSeconds?, queryType?, projectName?}`:
   `queryType` is `range` (default; needs `startTime` and `stepSeconds`) or
-  `instant` (evaluated at `endTime`). Returns `{data, hints?, warnings?, exploreUrl}`
+  `instant` (evaluated at `endTime`). `projectName` (Cloud Monitoring only) is
+  accepted and ignored. Returns `{data, hints?, warnings?, exploreUrl}`
   where `data` is a Prometheus matrix (`[{metric, values: [[seconds, "value"]]}]`)
   or vector (`[{metric, value: [seconds, "value"]}]`). More than 11,000 points
   per series is an error, as in Prometheus.
-- `query_loki_logs {datasourceUid, logql, startRfc3339?, endRfc3339?, limit?, direction?, queryType?, stepSeconds?}`:
+- `query_loki_logs {datasourceUid, logql, startRfc3339?, endRfc3339?, limit?, direction?, queryType?, stepSeconds?, format?}`:
   the window defaults to `now-1h` to `now`. Metric queries return
   `data: [{values: [{timestamp: "seconds.mmm", value}], labels}]` (range) or
   `[{timestamp, value, labels}]` (instant). Log queries return
   `[{timestamp: "<nanoseconds>", line, labels}]`, newest first unless
   `direction: "forward"`, `limit` 10 by default and at most 100, with
-  `metadata.linesReturned` and `metadata.resultsTruncated`. `format: "compact"`
-  is not served.
+  `metadata.linesReturned` and `metadata.resultsTruncated`. `format` accepts
+  `full`; `compact` is a tool error because the mock does not group streams.
 - `search_tempo_traces {datasourceUid, query, start?, end?, limit?, spss?}`
   returns `{traces: [{traceID, rootServiceName, rootTraceName, startTimeMs, durationMs, spanSets: [{spans}]}]}`,
   newest first, from the past hour by default. The mock keeps one exemplar
@@ -176,16 +180,22 @@ server. Unknown argument names are tool errors, as on the real server.
   (`| rate()`) are errors, as on the real server.
 - `get_tempo_trace {datasourceUid, trace_id, start?, end?, focus_span_id?}`
   returns `{traceId, services: [{serviceName, resource, spans: [{spanId, parentSpanId?, name, kind, startTimeMs, durationMs, status, attributes}]}]}`.
-  A trace not recorded by the story's "now" is an error.
-- `get_annotations {from?, to?, limit?, tags?, matchAny?, type?, dashboardUid?, ...}`
+  `start` and `end` go together. `focus_span_id` must be 16 hex characters and
+  otherwise does not change the result. A trace not recorded by the story's
+  "now" is an error.
+- `get_annotations {from?, to?, limit?, alertUid?, dashboardUid?, panelId?, userId?, type?, tags?, matchAny?}`
   (`from` and `to` in epoch ms) returns `{Payload: [{id, time, timeEnd, text, tags, ...}]}`,
   newest first. The annotations are organization-wide deploy markers (`deploy`
-  plus `hardware`, `firmware` or `backend`) and one `incident` marker, so a
-  `dashboardUid`, `panelId` or `type: "alert"` filter returns none.
-- `generate_deeplink {resourceType, dashboardUid?, panelId?, datasourceUid?, queries?, timeRange?, queryParams?}`
+  plus `hardware`, `firmware` or `backend`) and one `incident` marker, so an
+  `alertUid`, `dashboardUid`, `panelId`, `userId` or `type: "alert"` filter
+  returns none.
+- `generate_deeplink {resourceType, dashboardUid?, provisioningPreview?, datasourceUid?, panelId?, queries?, queryParams?, timeRange?, shorten?}`
   returns the URL as plain text on the fictional Grafana at
   `https://acme.grafana.net`: `/d/<uid>` for dashboards, `?viewPanel=<id>` for
-  panels, and `/explore?panes=...&schemaVersion=1` for Explore.
+  panels, and `/explore?panes=...&schemaVersion=1` for Explore. `shorten` is
+  accepted and ignored, as in the real server's read-only mode, so the full URL
+  comes back. `provisioningPreview` on a dashboard or panel link is a tool error
+  because the mock has no provisioning repository.
 
 `query_sql` is not served (it is disabled by default on the real server too).
 

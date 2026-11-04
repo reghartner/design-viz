@@ -3,7 +3,7 @@
 // mock-github-mcp. It answers the Grafana MCP tools the telemetry adapter uses with
 // fixture telemetry computed from the shared 12-day doorbell timeline.
 // G1  layout, dependency-free imports, placeholder config with the RL binding.
-// G2  JSON-RPC discovery: exactly the seven read-only tools with Grafana parameter names.
+// G2  JSON-RPC discovery: exactly the seven read-only tools, each with its full Grafana parameter set and required list.
 // G3  list_datasources: the Prometheus, Loki and Tempo UIDs the example binds.
 // G4  traffic starts two hours after the carrier's tickets turn Done on the timeline.
 // G5  event edge degrades after the Day 10 deploy annotation and stays degraded on Day 12.
@@ -16,7 +16,7 @@
 // G12 story clock: pinned/clamped days, DEPLOYED_AT rotation, non-story scenarios.
 // G13 worker routes, batches, notifications, CORS and the per-IP rate limit (429).
 // G14 identity regexes and ignore rules (only the committed placeholder Worker name).
-// G15 fixture carriers exist in the example spec with the same tickets; README contract.
+// G15 fixture carriers exist in the example spec with the same tickets; README contract and tool signatures.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -67,6 +67,21 @@ const L = {
 };
 const TOOLS = ['generate_deeplink', 'get_annotations', 'get_tempo_trace', 'list_datasources', 'query_loki_logs',
   'query_prometheus', 'search_tempo_traces'];
+// Every parameter each tool declares in grafana/mcp-grafana (tools/*.go at a57860b5), and the required subset.
+// The served inputSchema and the README's tool signatures must both list exactly these names.
+const TOOL_PARAMS = {
+  list_datasources: { required: [], all: ['type', 'name', 'limit', 'offset'] },
+  query_prometheus: { required: ['datasourceUid', 'expr', 'endTime'],
+    all: ['datasourceUid', 'expr', 'startTime', 'endTime', 'stepSeconds', 'queryType', 'projectName'] },
+  query_loki_logs: { required: ['datasourceUid', 'logql'],
+    all: ['datasourceUid', 'logql', 'startRfc3339', 'endRfc3339', 'limit', 'direction', 'queryType', 'stepSeconds', 'format'] },
+  search_tempo_traces: { required: ['datasourceUid', 'query'], all: ['datasourceUid', 'query', 'start', 'end', 'limit', 'spss'] },
+  get_tempo_trace: { required: ['datasourceUid', 'trace_id'], all: ['datasourceUid', 'trace_id', 'start', 'end', 'focus_span_id'] },
+  get_annotations: { required: [],
+    all: ['from', 'to', 'limit', 'alertUid', 'dashboardUid', 'panelId', 'userId', 'type', 'tags', 'matchAny'] },
+  generate_deeplink: { required: ['resourceType'],
+    all: ['resourceType', 'dashboardUid', 'provisioningPreview', 'datasourceUid', 'panelId', 'queries', 'queryParams', 'timeRange', 'shorten'] }
+};
 
 const rpc = (method, params = {}, id = 1) => ({ jsonrpc: '2.0', id, method, params });
 async function call(name, args = {}, context = ctx(DAY12)) {
@@ -160,20 +175,16 @@ test('G2: initialize, tools/list with Grafana parameter names and read-only anno
   }
   const tools = handleMcp(rpc('tools/list'), ctx(DAY12)).result.tools;
   assert.deepEqual(tools.map(t => t.name).sort(), TOOLS);
-  const inputs = {
-    list_datasources: [[], ['type', 'name', 'limit', 'offset']],
-    query_prometheus: [['datasourceUid', 'expr', 'endTime'], ['startTime', 'stepSeconds', 'queryType']],
-    query_loki_logs: [['datasourceUid', 'logql'], ['startRfc3339', 'endRfc3339', 'limit', 'direction', 'queryType', 'stepSeconds']],
-    search_tempo_traces: [['datasourceUid', 'query'], ['start', 'end', 'limit', 'spss']],
-    get_tempo_trace: [['datasourceUid', 'trace_id'], ['start', 'end']],
-    get_annotations: [[], ['from', 'to', 'limit', 'dashboardUid', 'type', 'tags', 'matchAny']],
-    generate_deeplink: [['resourceType'], ['dashboardUid', 'datasourceUid', 'panelId', 'queries', 'timeRange']]
-  };
+  assert.deepEqual(Object.keys(TOOL_PARAMS).sort(), TOOLS);
   for (const tool of tools) {
-    const [required, optional] = inputs[tool.name];
+    const { required, all } = TOOL_PARAMS[tool.name];
     assert.equal(tool.inputSchema.type, 'object');
-    assert.deepEqual([...(tool.inputSchema.required || [])].sort(), [...required].sort(), tool.name);
-    for (const name of required.concat(optional)) assert.ok(tool.inputSchema.properties[name], tool.name + '.' + name);
+    assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), [...all].sort(), tool.name + ' parameters');
+    assert.ok(Array.isArray(tool.inputSchema.required), tool.name + ' required is a list');
+    assert.deepEqual([...tool.inputSchema.required].sort(), [...required].sort(), tool.name + ' required');
+    for (const [name, property] of Object.entries(tool.inputSchema.properties)) {
+      assert.ok(['string', 'integer', 'boolean', 'array', 'object'].includes(property.type), tool.name + '.' + name + ' type');
+    }
     assert.deepEqual(tool.annotations, { readOnlyHint: true, destructiveHint: false, title: tool.annotations.title });
     assert.ok(tool.annotations.title.length > 0);
     assert.match(tool.description, /mock/i);
@@ -533,6 +544,14 @@ test('G15: fixture carriers match the example spec, and the README documents the
     'kafka_server_brokertopicmetrics_messagesin_total', 'kafka_consumergroup_lag', 'kafka_consumergroup_lag_seconds',
     'push_latency_seconds_bucket', '{app="notify"}', 'push sent', 'push failed', 'event consumed', 'firmware 2.4.1',
     'isError', 'structuredContent', 'now-1h'].concat(TOOLS)) assert.ok(readme.includes(text), text);
+  // Each Tools bullet spells the full parameter list: required names bare, optional names with "?".
+  for (const [name, { required, all }] of Object.entries(TOOL_PARAMS)) {
+    const signature = new RegExp('^- `' + name + ' \\{([^}]*)\\}`', 'm').exec(readme);
+    assert.ok(signature, name + ' signature in the README');
+    const params = signature[1].split(',').map(param => param.trim());
+    assert.deepEqual(params.map(param => param.replace(/\?$/, '')).sort(), [...all].sort(), name + ' README parameters');
+    assert.deepEqual(params.filter(param => !param.endsWith('?')).sort(), [...required].sort(), name + ' README required');
+  }
   assert.match(read('docs/live-status.md'), /mock-grafana-mcp\/README\.md/);
   assert.match(read('deploy/cloudflare/README.md'), /mock-grafana-mcp/);
 });

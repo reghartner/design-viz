@@ -126,12 +126,13 @@ test('a tool window that moves aside for Inspect keeps its saved position',async
   const inspect=page.locator('#workspace-window-inspect'),outline=page.locator('#workspace-window-outline');
   const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))));
   const savedRecord=()=>page.evaluate(()=>JSON.stringify(JSON.parse(localStorage.getItem('dv-workbench-floating-v1')).windows.outline));
-  const shown=async()=>{const b=await outline.boundingBox();return {x:Math.round(b.x),y:Math.round(b.y),w:Math.round(b.width),h:Math.round(b.height)};};
+  const whole=({x,y,w,h})=>({x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h)});
+  const shown=async()=>{const b=await outline.boundingBox();return whole({x:b.x,y:b.y,w:b.width,h:b.height});};
   await page.locator('#docview [data-dv-node="c"]').first().click();await page.locator('#editor-tab-inspect').click();await expect(inspect).toBeVisible();await clearSelectionOverlap(page);
   await page.locator('#editor-tab-outline').click();await expect(outline).toBeVisible();
   // A keyboard move makes the saved rect the user's own, so display and preference start equal.
   await outline.locator('.workspace-window-grip').focus();await page.keyboard.press('ArrowLeft');await settle();
-  const before=await savedRecord(),atSaved=await shown(),{x,y,w,h}=JSON.parse(before);expect({x,y,w,h}).toEqual(atSaved);
+  const before=await savedRecord(),atSaved=await shown();expect(whole(JSON.parse(before))).toEqual(atSaved);
   const close=await outline.locator('.workspace-window-close').boundingBox();
   await page.locator('#outline-search').fill('Doorbell');await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();await page.locator('#outline-inspect').click();
   await clearSelectionOverlap(page);await settle();

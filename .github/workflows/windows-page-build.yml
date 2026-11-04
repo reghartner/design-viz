@@ -1,0 +1,44 @@
+# Temporary proof for #936. Removed before the PR is merged.
+name: windows-page-build
+on:
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.22.1'
+      - name: Report Python
+        run: |
+          which python; python --version; python -c "import sys; print(sys.platform, sys.getdefaultencoding())"
+          which python3 || echo "python3 not on PATH"
+      - name: Make python3 available
+        run: |
+          command -v python3 >/dev/null || cp "$(which python)" "$(dirname "$(which python)")/python3.exe"
+          python3 --version
+      - name: Build
+        run: python3 tools/build.py
+      - name: Page build tests
+        if: always()
+        run: python3 -m unittest tests.test_page_build -v
+      - name: Spec diff tests
+        if: always()
+        run: python3 -m unittest tests.test_spec_diff -v
+      - run: npm ci --prefix tools/browser-tests --no-fund --no-audit
+        if: always()
+      - run: npm ci --prefix apps/backstage --no-fund --no-audit
+        if: always()
+      - run: npm ci --prefix apps/confluence --no-fund --no-audit
+        if: always()
+      - run: npm exec --prefix tools/browser-tests -- playwright install chromium
+        if: always()
+      - name: Truth-table browser contract, including its export step
+        if: always()
+        run: npm test --prefix tools/browser-tests -- --config=playwright.ci.config.mjs truth-table.spec.mjs

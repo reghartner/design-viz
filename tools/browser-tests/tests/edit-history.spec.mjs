@@ -6,7 +6,7 @@
 | B1 the example shows the panel below the board in every layout profile | examples/live-status spec built with inject.py, opened plain and with ?layout=backstage / confluence | `.pwidget.pt-edit-history` visible, its top at or below the board's and the status panel's bottom; at least one row from the hand-written history | a type registered but not placed, or placed beside the board; flip: drop it from one profile → that profile's assertion fails |
 | B2 three entries render three collapsed rows newest first; a click expands one | spec with entries dated 28, 30, 29 Oct | three `details.dv-edit-details`, `li[data-edit-at]` order 30, 29, 28; none open; a real click on the first summary opens only it and shows its two change lines | rows rendered without `<details>` (the open assertion fails); rows in authored order |
 | B3 (#855; Chuck 2026-11-01, §0: issue's own Test + flip plan) a clear-missing-work change has no ticket | one entry [clear-missing-work on door, add EX-1 on door] | summary first "Missing work cleared from Door"; expanded, the clear line has data-edit-op clear-missing-work, no data-edit-ticket, no `.dv-edit-ticket`, op "Missing work cleared from", carrier "Door"; the add line keeps its ticket | ticket-first prose for a clear; the entry rejected as malformed (no row) |
-| B4 (#974; Chuck 2026-11-04: name + agent tag + time + summary, expands to its ticket changes) an agent entry row | entries: board edit 4 Nov 09:00 (Alex), agent entry 4 Nov 10:00 with two ticket changes, agent entry 4 Nov 11:00 with none | newest first; the 11:00 row is `li[data-edit-at]` with `.dv-edit-who` "Chuck", `.dv-edit-agent` "agent", `.dv-edit-first` its summary, no `.dv-edit-count` and no `details`; the 10:00 row is a collapsed `details` whose summary shows the same parts and a real click opens its two change lines; the board row keeps its count and no agent tag | rows that show the first change instead of the summary; an agent tag on board rows; an empty expandable row |
+| B4 (#974; Chuck 2026-11-04: name + agent tag + time + summary, expands to its ticket changes) an agent entry row | entries: board edit 4 Nov 09:00 (Alex), agent entry 4 Nov 10:00 with two ticket changes, agent entry 4 Nov 11:00 with none | newest first; the 11:00 row is `li[data-edit-at]` with `.dv-edit-who` "Chuck", `.dv-edit-agent` "agent", a visible `time.dv-edit-when` with text, `.dv-edit-first` its summary, no `.dv-edit-count` and no `details`; the 10:00 row is a collapsed `details` whose summary shows the same parts and a real click opens its two change lines; the board row keeps its count and no agent tag | rows that show the first change instead of the summary; an agent tag on board rows; an empty expandable row |
 */
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -107,11 +107,12 @@ test('B4 an agent entry shows the editor, an agent tag and its summary, and expa
  await expect(bare.locator('details')).toHaveCount(0);
  await expect(bare.locator('.dv-edit-who')).toHaveText('Chuck');await expect(bare.locator('.dv-edit-agent')).toHaveText('agent');
  await expect(bare.locator('.dv-edit-first')).toHaveText('Renamed the sync connection');await expect(bare.locator('.dv-edit-count')).toHaveCount(0);
- await expect(bare.locator('time.dv-edit-when')).toHaveAttribute('datetime','2026-11-04T11:00:00Z');
+ const when=bare.locator('time.dv-edit-when');await expect(when).toBeVisible();await expect(when).toHaveText(/\d/);await expect(when).toHaveAttribute('datetime','2026-11-04T11:00:00Z');
  const moved=items.nth(1),details=moved.locator('details.dv-edit-details'),summary=details.locator('summary.dv-edit-summary');
  await expect(details).toHaveCount(1);await expect(details).not.toHaveAttribute('open',/.*/);
  await expect(summary.locator('.dv-edit-who')).toHaveText('Chuck');await expect(summary.locator('.dv-edit-agent')).toHaveText('agent');
  await expect(summary.locator('.dv-edit-first')).toHaveText('Added 2 nodes, moved 1 ticket');await expect(summary.locator('.dv-edit-count')).toHaveCount(0);
+ await expect(summary.locator('time.dv-edit-when')).toBeVisible();await expect(summary.locator('time.dv-edit-when')).toHaveText(/\d/);
  await expect(moved.locator('li.dv-edit-change').first()).toBeHidden();
  await summary.click();await expect(details).toHaveAttribute('open',/.*/);
  const changes=moved.locator('li.dv-edit-change');await expect(changes).toHaveCount(2);await expect(changes.nth(0)).toBeVisible();

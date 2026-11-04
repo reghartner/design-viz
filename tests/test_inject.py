@@ -399,9 +399,32 @@ class InjectTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         guide = GUIDE_BLOCK.search(out)[1]
         self.assertLess(len(guide.encode("utf-8")), 6 * 1024)
-        for needle in ('"source": "agent"', '"summary"', "newest agent entry", "ask the editor",
-                       "tools/board-sync.js", "refused"):
+        for needle in ('"source": "agent"', '"summary"', "tools/board-sync.js pull", "tools/board-sync.js log"):
             self.assertIn(needle, guide, needle)
+        steps = re.findall(r"^\d+\. .*$", guide, re.M)
+        def step(needle):
+            found = [i for i, line in enumerate(steps) if needle in line]
+            self.assertEqual(len(found), 1, f"exactly one edit-loop step names {needle!r}")
+            return found[0], steps[found[0]]
+        # read and report board edits first, ask only about overriding board edits after the newest
+        # agent entry, log the change before republishing, and start again on a refused publish
+        report, report_line = step("one line each")
+        ask, ask_line = step("ask the editor")
+        log, log_line = step('"source": "agent"')
+        publish, publish_line = step("refused")
+        self.assertIn("flowspec.json", report_line)
+        self.assertIn("newest agent entry", report_line)
+        self.assertIn("after the newest agent entry", ask_line)
+        for needle in ("moves", "removes"):
+            self.assertIn(needle, ask_line, needle)
+        self.assertIn('"summary"', log_line)
+        self.assertIn("tools/board-sync.js log", log_line)
+        self.assertIn("same URL", publish_line)
+        self.assertIn("step 1", publish_line)
+        self.assertLess(report, ask)
+        self.assertLess(ask, log)
+        self.assertLess(log, publish)
+        self.assertLess(guide.index("tools/board-sync.js pull"), guide.index("tools/board-sync.js log"))
         # a single-file page has no board edits to fold in
         r, out = run_inject(TEMPLATE, json.dumps(tracked_spec()))
         self.assertEqual(r.returncode, 0, r.stderr)

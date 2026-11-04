@@ -205,19 +205,19 @@ test('H14 the contract and the live-status docs describe the clear-missing-work 
    (history row: editor name, agent tag, time, summary). §0 ruling: extend this file.
 | row | fixture | assertion (scoped) | rejects |
 |---|---|---|---|
-| H15 agent entries pass clean | {source agent, summary, changes []}; the same with two ticket changes; a summary on an entry without source | no warnings; all three returned intact, newest first | an impl that still requires a non-empty changes array |
-| H16 malformed agent fields warn on their own index | source "bot"; source agent without summary; summary "", "  ", 7, with a line break, 201 characters; summary + changes missing; changes [] without summary | one warning each naming `source:`, `summary:` or `changes:`; entry ignored | an impl accepting any source; a presence-only summary check; one dropping the changes requirement for every entry |
+| H15 agent entries pass clean | {source agent, summary, changes []}; the same with two ticket changes | no warnings; both returned intact, newest first | an impl that still requires a non-empty changes array |
+| H16 malformed agent fields warn on their own index | source "bot"; source agent without summary; a summary without source agent; summary "", "  ", 7, with a line break, 201 characters; summary + changes missing; changes [] without summary | one warning each naming `source:`, `summary:` or `changes:`; entry ignored; 200 characters accepted | an impl accepting any source; a summary on a board entry; a presence-only summary check; one dropping the changes requirement for every entry |
 | H17 contract, docs and skill describe agent entries and the sync tool | contract/authoring-contract.md, docs/live-status.md, the live-status-board skill | each names `"source": "agent"`, `summary` and tools/board-sync.js; the docs' Edit history section shows the agent row | a validator change with no contract |
 */
 test('H15 H16 editHistory: agent entries carry a one-line summary and may have no ticket changes',()=>{
  const bare={at:'2026-11-04T10:00:00Z',by:{name:'Chuck'},source:'agent',summary:'Added 5 nodes, moved 5 tickets',changes:[]};
  const moves={at:'2026-11-04T11:00:00Z',by:{name:'Chuck'},source:'agent',summary:'Moved 1 ticket',changes:[{op:'remove',ticket:'AA-1',node:'a',label:'Node A'},{op:'add',ticket:'AA-1',node:'b',label:'Node B'}]};
- const noted={at:'2026-11-04T09:00:00Z',summary:'Hand-written note',changes:[{op:'add',ticket:'AA-1',node:'a'}]};
- const good=historyFixture([bare,moves,noted]);assert.deepEqual(plain(C.validate(C.normalize(good))),{errors:[],warnings:[]});
- assert.deepEqual(plain(C.editHistoryEntries(C.normalize(good))),[moves,bare,noted],'newest first, entries intact');
+ const good=historyFixture([bare,moves]);assert.deepEqual(plain(C.validate(C.normalize(good))),{errors:[],warnings:[]});
+ assert.deepEqual(plain(C.editHistoryEntries(C.normalize(good))),[moves,bare],'newest first, entries intact');
  const at='2026-11-04T08:00:00Z',ticket=[{op:'add',ticket:'AA-1',node:'a'}],bad=[
   [{at,source:'bot',summary:'x',changes:ticket},/: source: must be "agent"/],
   [{at,source:'agent',changes:ticket},/: summary: /],
+  [{at,summary:'Hand-written note',changes:ticket},/: source: /],
   [{at,source:'agent',summary:'',changes:[]},/: summary: /],
   [{at,source:'agent',summary:'   ',changes:[]},/: summary: /],
   [{at,source:'agent',summary:7,changes:[]},/: summary: /],

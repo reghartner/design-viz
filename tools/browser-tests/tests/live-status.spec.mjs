@@ -489,11 +489,13 @@ test('P3 missing claude Atlassian connector shows setup note without paint or ca
  expect(await page.evaluate(()=>__mcpStub.calls)).toEqual([]);expect(requests).toEqual([]);
 });
 test('P6 claude Jira approval is an explicit click and repeats the search exactly once',async({page,server})=>{
- const {root,requests}=await openClaude(page,server,'approval'),action=root.getByRole('button',{name:'Allow Jira',exact:true});
- await expect(action).toBeVisible();await expect(root.locator('.dv-live-note')).toHaveText('Jira access needs your approval');
+ const {root,requests}=await openClaude(page,server,'approval'),action=root.getByRole('button',{name:'Allow Jira',exact:true}),slot=root.locator('.dv-live-first');
+ await expect(action).toBeVisible();await expect(root.locator('.dv-live-note')).toHaveText('Jira access needs your approval');const slotBefore=await slot.boundingBox();
  expect(await page.evaluate(()=>__mcpStub.calls.filter(c=>c.tool==='searchJiraIssuesUsingJql').length)).toBe(0);
  await action.click();await expect(root.locator('#section-delivery g.node[data-dv-node="hardware"]')).toHaveClass(/dv-live-active/);
  expect(await page.evaluate(()=>__mcpStub.calls.filter(c=>c.tool==='searchJiraIssuesUsingJql').length)).toBe(1);await expect(action).toBeHidden();expect(requests).toEqual([]);
+ // #986: Allow Jira going away does not move the First blocker slot.
+ const slotAfter=await slot.boundingBox();expect([slotAfter.x,slotAfter.width]).toEqual([slotBefore.x,slotBefore.width]);
 });
 
 
@@ -1024,7 +1026,7 @@ test.describe('#863 Epic status panel consistency',()=>{
   const {root}=await openClaude(page,server,'approval'),section=root.locator('#section-delivery'),panel=section.locator('.pt-live-status');
   // Approval mode: the Flagged search has answered, so Live shows beside the action.
   await expect(panel.getByRole('button',{name:'Allow Jira',exact:true})).toBeVisible();await expect(panel.locator('.dv-live-toggle')).toBeVisible();
-  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','No blockers','Allow Jira']);
+  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','Allow Jira','No blockers']);
   expect(first.play).toMatchObject({borderTopStyle:'solid',borderTopWidth:'1px',borderTopLeftRadius:'999px'});
   await expect.poll(async()=>differences(await looks(section)),{message:'Allow Jira matches Play'}).toEqual([]);
  });
@@ -1046,6 +1048,8 @@ test.describe('#863 Epic status panel consistency',()=>{
   await panel.getByRole('button',{name:'Next day',exact:true}).click();await expect(panel.locator('.dv-live-note')).toHaveText('Demo day 2');
   await expect(panel.getByRole('button',{name:'Over time',exact:true})).toHaveCount(0);
   await expect(connection).toHaveAttribute('data-busy','false');await expect(connection).toHaveAttribute('data-state','demo');await expect(connection).toHaveText(/^Demo(?=,|$)/);
+  // #986: the Workbench demo steps back as well as forward, and stops at its first day.
+  const previous=panel.getByRole('button',{name:'Previous day',exact:true});await expect(previous).toBeEnabled();await previous.click();await expect(panel.locator('.dv-live-note')).toHaveText('Demo day 1');await expect(previous).toBeDisabled();
  });
 });
 

@@ -23,7 +23,7 @@
        {KEY: {state: 'todo'|'active'|'done'|'blocked'|'missing', updatedAt, ...}}
 
    input.telemetryMap  One sample per bound carrier id:
-       {id: {signals: {name: {value, series: [[t, v], ...], unit}}, sampledAt}}
+       {id: {signals: {name: {value, series: [[t, v], ...], unit}}, observedAt}}
      value    The adapter's headline number for the window. Without it the
               last finite series point stands in.
      series   Points across the window in ascending time; t is epoch

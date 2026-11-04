@@ -57,9 +57,9 @@ const LOG = {kind: 'log-event',
   signals: {count: {source: 'loki', query: 'sum(count_over_time({app="ingest"} |= "event stored" [5m]))', unit: 'events/h'}},
   proof: {}};
 const SAMPLES = {
-  silent: {signals: {rate: {value: 0, series: [[T0, 0], [T0 + H, 0]]}, errors: {value: 0, series: [[T0, 0], [T0 + H, 0]]}}, sampledAt: at(1)},
-  flowing: {signals: {rate: {value: 1300, series: [[T0, 1200], [T0 + H, 1300]]}, errors: {value: 5}, p95: {value: 410}}, sampledAt: at(1)},
-  degraded: {signals: {rate: {value: 1300}, errors: {value: 60}, p95: {value: 410}}, sampledAt: at(1)},
+  silent: {signals: {rate: {value: 0, series: [[T0, 0], [T0 + H, 0]]}, errors: {value: 0, series: [[T0, 0], [T0 + H, 0]]}}, observedAt: at(1)},
+  flowing: {signals: {rate: {value: 1300, series: [[T0, 1200], [T0 + H, 1300]]}, errors: {value: 5}, p95: {value: 410}}, observedAt: at(1)},
+  degraded: {signals: {rate: {value: 1300}, errors: {value: 60}, p95: {value: 410}}, observedAt: at(1)},
   unobserved: undefined,
 };
 const JIRA = {

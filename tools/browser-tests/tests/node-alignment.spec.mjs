@@ -1,3 +1,37 @@
+/* #970 node rename through the object menu (desktop Workbench; ticket "Test + flip", Chuck's coverage
+   ruling 2026-11-04: the Test + flip section as written). Hosted by "object menu Rename ..." below;
+   the Shift+F10 order row is the existing "Standard object menu ..." test (changed on purpose: Rename
+   follows Inspect). Fixture fixture(): free nodes a 'First', b 'Second', c 'Stay' and row node 'row';
+   no history after paste. Editor = textbox "Node name" inside the node's own g.node; menu = "Object
+   actions". Double-click rows: inline-text.spec.mjs. Imported nodes: topology-connections.spec.mjs.
+
+   row | fixture / input | scoped assertion | rejects
+   M1 multi-selection has no Rename | select a + Shift b, right-click b | menu shows Inspect, no
+      Rename item | Rename offered for a set it cannot rename
+   M2 right-click -> Rename (FLIP) | right-click c | c is the only dv-sel node; menu has Rename;
+      clicking it closes the menu and focuses "Node name" inside g.node c, value 'Stay', all
+      selected | no Rename item (fails today); an editor opened elsewhere
+   M3 Escape writes nothing | Rename, type, Escape | editor gone; #src === original; c .t1 'Stay' |
+      Escape that saves
+   M4 save, ID, selection, one Undo | Rename, type, Enter | parsed #src equals the source with only
+      nodes.c.title = 'Renamed'; c .t1 shows it; c is the only dv-sel node; Undo: #src === original
+      exactly and Undo disabled; Redo: saved | an ID rename; a write to another node; two history
+      entries or none; a commit that drops the selection
+   M5 click outside saves | Rename, type, click the section heading | parsed #src has only
+      nodes.c.title = 'Clicked away'; Undo restores | click-away that discards
+   M6 keyboard: Shift+F10 -> Rename | focus b, Shift+F10, ArrowDown, Enter, type, Enter | Inspect then
+      Rename focused; "Node name" inside b focused with 'Second'; parsed #src changes only
+      nodes.b.title; b selected; Undo restores | Rename unreachable by keyboard or placed elsewhere
+   M7 double-click does not move a free node | dblclick a .t1, Escape | editor opened; a's transform
+      and #src unchanged | a double-click read as a drag
+   M8 dragging by the name still moves the node | mouse down on a .t1, move 50,50 graph units, up |
+      no editor; floats a moved to (310,260) within 2; nodes unchanged | a mousedown on the name
+      that opens the editor or swallows the drag
+   O1 Shift+F10 order (changed on purpose) | existing test | ArrowDown: Rename, Lock position,
+      Delete, Duplicate | -
+   O2 Explore keyboard order (changed on purpose; not named by the ticket) | explore-spatial-edit
+      "plain Explore nodes ..." | ArrowDown: Rename then Lock position; ContextMenu + 4 ArrowDown:
+      Duplicate | - */
 import {chooseAddDestination} from '../helpers/test.mjs';
 import {test,expect,pastePage as paste,closeTools} from '../helpers/test.mjs';
 import {writeFile} from 'node:fs/promises';
@@ -135,7 +169,7 @@ test('Standard object menu keeps a selected set, anchors the invoked node, and s
   await closeTools(page);await node(page,'c').click({button:'right'});await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(1);await expect(node(page,'c')).toHaveClass(/dv-sel/);
   await menu(page).getByRole('menuitem',{name:'Inspect',exact:true}).click();await expect(page.locator('#guide').getByLabel('Name',{exact:true})).toHaveValue('Stay');
   await node(page,'c').focus();await page.keyboard.press('Shift+F10');await expect(menu(page).getByRole('menuitem',{name:'Inspect',exact:true})).toBeFocused();
-  for(const name of ['Lock position','Delete','Duplicate']){await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name,exact:true})).toBeFocused();}await page.keyboard.press('Enter');
+  for(const name of ['Rename','Lock position','Delete','Duplicate']){await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name,exact:true})).toBeFocused();}await page.keyboard.press('Enter');
   changed=await source(page);expect(Object.keys((await diagram(page)).nodes)).toHaveLength(5);await history(page,aligned,changed);const duplicated=changed;
 
   await closeTools(page);await node(page,'c').click({button:'right'});await menu(page).getByRole('menuitem',{name:'Delete',exact:true}).click();changed=await source(page);expect((await diagram(page)).nodes.c).toBeUndefined();await history(page,duplicated,changed);
@@ -247,4 +281,50 @@ test('Standard keyboard decorations and menu retire with the builder',async({pag
   await expect(anchor).toHaveAttribute('tabindex','0');await anchor.focus();await page.keyboard.press('ContextMenu');await expect(menu(page)).toBeVisible();await page.keyboard.press('Escape');await expect(anchor).toBeFocused();
   await page.evaluate(()=>__editorTest.builder.destroy());await expect(menu(page)).toHaveCount(0);await expect(anchor).not.toHaveAttribute('tabindex','0');await expect(anchor).not.toHaveAttribute('aria-haspopup','menu');await expect(anchor).not.toHaveAttribute('role','group');
   await page.evaluate(()=>__editorTest.remount());await expect(anchor).toHaveAttribute('tabindex','0');
+});
+
+test('object menu Rename edits one node name by pointer and keyboard; double-click does not move a free node and dragging by its name still moves it',async({page,server})=>{
+  await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(),null,2));await closeTools(page);
+  const original=await source(page),src=page.locator('#src'),undo=page.locator('#undo-builder'),selected=page.locator('#docview g.node.dv-sel');
+  const edit=id=>node(page,id).getByRole('textbox',{name:'Node name',exact:true}),anyEdit=page.getByRole('textbox',{name:'Node name',exact:true});
+  const rename=menu(page).getByRole('menuitem',{name:'Rename',exact:true}),name=id=>node(page,id).locator('.t1');
+  const titled=(text,id,title)=>{const raw=JSON.parse(text);raw.page.blocks[0].diagram.nodes[id].title=title;return raw;};
+  await expect(name('c')).toHaveText('Stay');await expect(undo).toBeDisabled();
+  // M1: Rename is a single-node action.
+  await node(page,'a').click();await node(page,'b').click({modifiers:['Shift']});await expect(selected).toHaveCount(2);
+  await node(page,'b').click({button:'right'});await expect(menu(page).getByRole('menuitem',{name:'Inspect',exact:true})).toBeVisible();await expect(rename).toHaveCount(0);
+  await page.keyboard.press('Escape');await expect(menu(page)).toHaveCount(0);
+  // M2 (flip): right-click one node -> Rename opens the editor over its name.
+  await node(page,'c').click({button:'right'});await expect(selected).toHaveCount(1);await expect(node(page,'c')).toHaveClass(/dv-sel/);
+  await expect(rename).toBeVisible();await rename.click();await expect(menu(page)).toHaveCount(0);
+  await expect(edit('c')).toBeFocused();await expect(edit('c')).toHaveValue('Stay');expect(await edit('c').evaluate(el=>[el.selectionStart,el.selectionEnd])).toEqual([0,'Stay'.length]);
+  // M3: Escape writes nothing.
+  await edit('c').pressSequentially('Discarded');await edit('c').press('Escape');await expect(anyEdit).toHaveCount(0);await expect(src).toHaveValue(original);await expect(name('c')).toHaveText('Stay');
+  // M4: Enter saves only nodes.c.title; ID and selection stay; one Undo entry.
+  await node(page,'c').click({button:'right'});await rename.click();await expect(edit('c')).toBeFocused();await edit('c').pressSequentially('Renamed');await edit('c').press('Enter');await expect(anyEdit).toHaveCount(0);
+  const renamed=await source(page);expect(JSON.parse(renamed)).toEqual(titled(original,'c','Renamed'));
+  await expect(name('c')).toHaveText('Renamed');await expect(node(page,'c')).toHaveClass(/dv-sel/);await expect(selected).toHaveCount(1);
+  await undo.click();await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();await expect(name('c')).toHaveText('Stay');
+  await page.locator('#redo-builder').click();await expect(src).toHaveValue(renamed);
+  // M5: clicking outside saves.
+  await node(page,'c').click({button:'right'});await rename.click();await expect(edit('c')).toHaveValue('Renamed');await edit('c').pressSequentially('Clicked away');
+  await page.locator('#docview .sec-h').click();await expect(anyEdit).toHaveCount(0);expect(JSON.parse(await source(page))).toEqual(titled(original,'c','Clicked away'));
+  await undo.click();await expect(src).toHaveValue(renamed);
+  // M6: keyboard users reach Rename through Shift+F10, right after Inspect.
+  await node(page,'b').focus();await page.keyboard.press('Shift+F10');await expect(menu(page).getByRole('menuitem',{name:'Inspect',exact:true})).toBeFocused();
+  await page.keyboard.press('ArrowDown');await expect(rename).toBeFocused();await page.keyboard.press('Enter');await expect(menu(page)).toHaveCount(0);
+  await expect(edit('b')).toBeFocused();await expect(edit('b')).toHaveValue('Second');await page.keyboard.type('Keyed');await page.keyboard.press('Enter');await expect(anyEdit).toHaveCount(0);
+  const keyed=await source(page);expect(JSON.parse(keyed)).toEqual(titled(renamed,'b','Keyed'));await expect(name('b')).toHaveText('Keyed');await expect(node(page,'b')).toHaveClass(/dv-sel/);
+  await undo.click();await expect(src).toHaveValue(renamed);
+  // M7: a double-click without movement opens the editor and does not move the free node.
+  const transform=await node(page,'a').getAttribute('transform');
+  await name('a').dblclick();await expect(edit('a')).toBeFocused();await expect(edit('a')).toHaveValue('First');
+  await expect(node(page,'a')).toHaveAttribute('transform',transform);await expect(src).toHaveValue(renamed);
+  await edit('a').press('Escape');await expect(anyEdit).toHaveCount(0);await expect(src).toHaveValue(renamed);
+  // M8: dragging by the name still moves the node.
+  const box=await name('a').boundingBox(),scale=await node(page,'a').evaluate(n=>{const m=n.ownerSVGElement.getScreenCTM();return {x:m.a,y:m.d};});
+  const x=box.x+box.width/2,y=box.y+box.height/2;await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+50*scale.x,y+50*scale.y,{steps:8});await page.mouse.up();
+  await expect(src).not.toHaveValue(renamed);await expect(anyEdit).toHaveCount(0);
+  const moved=await diagram(page),float=moved.floats.find(f=>f.id==='a');expect(Math.abs(float.x-310)).toBeLessThan(2);expect(Math.abs(float.y-260)).toBeLessThan(2);
+  expect(moved.nodes).toEqual(JSON.parse(renamed).page.blocks[0].diagram.nodes);
 });

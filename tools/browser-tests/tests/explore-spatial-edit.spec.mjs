@@ -213,8 +213,9 @@ test('plain Explore nodes expose a keyboard entry point and return focus after m
  expect(reached).toBe(true);await expect(anchor).toBeFocused();
  expect(await anchor.locator('.card').evaluate(el=>getComputedStyle(el).strokeWidth)).toBe('4px');expect(await source(page)).toBe(original);await page.screenshot({path:'/tmp/explore-node-keyboard-focus-1280.png'});
  await page.keyboard.press('Shift+F10');await expect(menu(page)).toBeVisible();await expect(menu(page).getByRole('menuitem',{name:'Inspect',exact:true})).toBeFocused();await expect(anchor).toHaveClass(/dv-sel/);await page.screenshot({path:'/tmp/explore-node-keyboard-menu-1280.png'});
- await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name:'Lock position',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(menu(page)).toHaveCount(0);await expect(anchor).toBeFocused();
- await page.keyboard.press('ContextMenu');await expect(menu(page)).toBeVisible();await page.keyboard.press('ArrowDown');await page.keyboard.press('ArrowDown');await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name:'Duplicate',exact:true})).toBeFocused();await page.keyboard.press('Enter');
+ // #970 (changed on purpose): Rename follows Inspect in a single node's object menu.
+ await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name:'Rename',exact:true})).toBeFocused();await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name:'Lock position',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(menu(page)).toHaveCount(0);await expect(anchor).toBeFocused();
+ await page.keyboard.press('ContextMenu');await expect(menu(page)).toBeVisible();for(let i=0;i<4;i++)await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name:'Duplicate',exact:true})).toBeFocused();await page.keyboard.press('Enter');
  await expect(menu(page)).toHaveCount(0);const duplicated=await source(page);expect(Object.keys(JSON.parse(duplicated).page.sections[0].diagram.nodes)).toHaveLength(3);await history(page,original,duplicated);
  await expect(node(page)).toHaveAttribute('tabindex','0');
 });

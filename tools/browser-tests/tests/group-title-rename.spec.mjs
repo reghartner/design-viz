@@ -12,9 +12,9 @@
    row | fixture / input | scoped assertion | rejects
    P1 fixture discriminates | localFixture | edge-tier title reads 'Edge tier', data title 'Data',
       exactly two boundaries, no editor, #src === original | a fixture whose boundary shows its key
-   1 Rename offered on a local group | right-click edge-tier box | "Object actions" menuitem
-      'Rename' (exact) visible and not aria-disabled (FLIP: fails today, the menu has no Rename) |
-      no item; an item disabled for local groups
+   1 Rename offered on a local group | right-click edge-tier box | with the "Object actions" menu
+      open (its 'Inspect' item visible), menuitem 'Rename' (exact) visible and not aria-disabled
+      (FLIP: fails today, the menu has no Rename) | no item; an item disabled for local groups
    2 opens in place | click Rename | textbox "Group title" visible, focused, in the viewport,
       value 'Edge tier' (the source title, not the key), whole value selected, its box covers the
       boundary title's center; #src unchanged | an editor opened in Inspect or a dialog; an editor
@@ -40,13 +40,14 @@
       title; one deleting the group declaration or its key
    8 imported group: Rename disabled with the reason | importFixtures(): consumer imports the
       provider export as 'shared' (group shared::platform 'Provider platform') and owns local
-      group 'mine'; right-click the shared::platform box | menu "Reference actions for shared"
+      group 'mine'; right-click the shared::platform box | with menu "Reference actions for
+      shared" open (its 'Inspect imported member' item visible; no "Object actions" menu), it
       has one menuitem starting 'Rename' with aria-disabled="true", title and <small> text
       "Imported structure belongs to its provider."; clicking it opens no "Group title" editor;
       #src unchanged after the menu closes (FLIP: fails today, no Rename item) | an enabled
       Rename that edits provider structure; a missing item; a disabled item without the reason
-   8b contrast in the same consumer | right-click local 'mine' | "Object actions" 'Rename' not
-      aria-disabled | a Rename disabled for every group in a consumer with imports
+   8b contrast in the same consumer, after row 8 | right-click local 'mine' | "Object actions"
+      'Rename' not aria-disabled | a Rename disabled for every group in a consumer with imports
    excluded — §0 ruling ("the ticket's Test + flip section, as written"): Explore presentation,
       the Shift+F10 keyboard route and multi-selection menus, which the Test + flip section does
       not name. Group key rename stays in Inspect (unchanged by this ticket). */
@@ -76,7 +77,9 @@ async function rightClickGroup(page,key){
  await box.click({button:'right',position:{x:r.width-24*s,y:12*s}});
 }
 async function rename(page,key){
- await rightClickGroup(page,key);const item=objectMenu(page).getByRole('menuitem',{name:'Rename',exact:true});
+ // The group's object menu is open (its Inspect item shows) before Rename is looked up.
+ await rightClickGroup(page,key);await expect(objectMenu(page).getByRole('menuitem',{name:'Inspect',exact:true})).toBeVisible();
+ const item=objectMenu(page).getByRole('menuitem',{name:'Rename',exact:true});
  await expect(item).toBeVisible();await expect(item).not.toHaveAttribute('aria-disabled','true');await item.click();
  const edit=editor(page);await expect(edit).toBeFocused();return edit;
 }
@@ -129,17 +132,19 @@ test('imported group shows Rename disabled with the provider reason; a local gro
  // P: the imported boundary renders from the provider; the consumer source owns only 'mine'.
  await expect(title(page,'shared::platform')).toHaveText('Provider platform');await expect(title(page,'mine')).toHaveText('Consumer group');
  const original=await src.inputValue();expect(JSON.parse(original).page.sections[0].diagram.groups).toEqual({mine:{title:'Consumer group'}});
- // Row 8b: a local group beside the import offers an enabled Rename.
- await rightClickGroup(page,'mine');const local=objectMenu(page).getByRole('menuitem',{name:'Rename',exact:true});
- await expect(local).toBeVisible();await expect(local).not.toHaveAttribute('aria-disabled','true');
- await page.keyboard.press('Escape');await expect(objectMenu(page)).toBeHidden();await expect(src).toHaveValue(original);
- // Row 8 (flip): the imported group's reference menu shows Rename disabled with the reason.
+ // Row 8 (flip): the imported group's reference menu (open: its Inspect imported member item
+ // shows) has Rename, disabled with the reason.
  await rightClickGroup(page,'shared::platform');const reference=page.getByRole('menu',{name:'Reference actions for shared'});
- await expect(reference).toBeVisible();await expect(objectMenu(page)).toBeHidden();
+ await expect(reference.getByRole('menuitem',{name:'Inspect imported member',exact:true})).toBeVisible();await expect(objectMenu(page)).toBeHidden();
  const item=reference.getByRole('menuitem',{name:/^Rename/});await expect(item).toHaveCount(1);
  await expect(item).toHaveAttribute('aria-disabled','true');await expect(item).toHaveAttribute('title',reason);await expect(item.locator('small')).toHaveText(reason);
  // A real click on the disabled item (force: Playwright treats aria-disabled as not actionable) does nothing.
  await item.click({force:true});await expect(anyEditor).toHaveCount(0);await expect(src).toHaveValue(original);
  await page.keyboard.press('Escape');await expect(reference).toBeHidden();await expect(anyEditor).toHaveCount(0);await expect(src).toHaveValue(original);
  await expect(title(page,'shared::platform')).toHaveText('Provider platform');
+ // Row 8b: a local group beside the import offers an enabled Rename.
+ await rightClickGroup(page,'mine');await expect(objectMenu(page).getByRole('menuitem',{name:'Inspect',exact:true})).toBeVisible();
+ const local=objectMenu(page).getByRole('menuitem',{name:'Rename',exact:true});
+ await expect(local).toBeVisible();await expect(local).not.toHaveAttribute('aria-disabled','true');
+ await page.keyboard.press('Escape');await expect(objectMenu(page)).toBeHidden();await expect(src).toHaveValue(original);
 });

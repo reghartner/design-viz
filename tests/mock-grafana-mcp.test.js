@@ -20,6 +20,8 @@
 // G16 the shared timeline is the Worker's only source: rewriting one carrier signal (or the Day 10 annotation)
 //     changes that answer alone, for every signal the example binds (#944 PR 2).
 // G17 every signal the example spec binds, sent through the Worker, returns the timeline's value for that hour.
+// --  Playwright demo spec (ticket #944 "Test + flip": on Day 12 the push edge is silent and the event edge degraded):
+//     excluded — orchestrator ruling: no visible surface until #939 PR 2; moved to #939.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

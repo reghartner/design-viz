@@ -8,6 +8,8 @@
 // D4 the story: Day 12 push edge silent (rate series all zero), event edge error ratio above
 //    its authored limit, route queue lag above its limit on Day 11 only.
 // D5 the panel's demo day controls drive the Jira map and the telemetry map together.
+// -- Playwright demo spec (ticket #944 "Test + flip": on Day 12 the push edge is silent and the event edge degraded):
+//    excluded — orchestrator ruling: no visible surface until #939 PR 2; moved to #939.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');

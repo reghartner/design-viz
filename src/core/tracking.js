@@ -133,3 +133,252 @@ function trackingExistsWhen(value){
   var text=value && value.type==='text' && (Object.prototype.hasOwnProperty.call(value,'text') || Object.prototype.hasOwnProperty.call(value,'textStyle'));
   return value && !text && value.existsWhen==='tickets-done' && Array.isArray(value.tickets) && value.tickets.some(trackingTicket)?'tickets-done':null;
 }
+
+/* Telemetry signal bindings (#937). The spec stores queries and proof limits
+   only, never results. Nothing is inferred from ids, titles or service names:
+   a carrier without `telemetry` is unbound. Every parser reports problems through
+   invalid(path, message), where path is relative to the telemetry object
+   ('' for the object itself, '.signals.rate', '.templates.kafka-topic.params[0]'),
+   drops the offending entry and never throws or modifies its input.
+
+   carrierTelemetry(obj, templates, invalid) returns null (unbound) or:
+     {kind: 'call'|'queue'|'service'|'log-event'|'device',
+      signals: {<name>: {source: 'grafana'|'loki'|'tempo'|'sql'|'honeycomb',
+                         query: <string; a cloned query object for honeycomb>,
+                         unit: <string>|null}},
+      proof: {<signal name>: {min?: number, max?: number, maxRatioOf?: <other signal name>}},
+      links: {dashboard?: <absolute http(s) URL>, query?: <absolute http(s) URL>},
+      card: null | {side?: 'right'|'left'|'above'|'below', offset?: number}}
+   With maxRatioOf, max is the highest allowed ratio of this signal to the named one.
+
+   trackingTelemetry(page, invalid) always returns:
+     {grafana: {prometheus?, loki?, tempo?, sql?: <datasource UID>},
+      honeycomb: {environment?, dataset?},
+      window: <duration such as '1h'; default '1h'>,
+      refreshMs: <number of ms, at least 60000>|null,
+      templates: {<name>: {kind?, params: [<name>], signals, proof?, links?}}}
+   Templates keep their authored form so `use` can expand them by pure string
+   substitution of the declared $param / ${param} placeholders. */
+var TELEMETRY_KINDS=['call','queue','service','log-event','device'];
+var TELEMETRY_SOURCES=['grafana','loki','tempo','sql','honeycomb'];
+var TELEMETRY_CARD_SIDES=['right','left','above','below'];
+var TELEMETRY_LINKS=['dashboard','query'];
+var TELEMETRY_BINDING_FIELDS=['kind','signals','proof','links','card'];
+var TELEMETRY_RESERVED=TELEMETRY_BINDING_FIELDS.concat(['use','params']);
+var TELEMETRY_DEFAULT_WINDOW='1h',TELEMETRY_MIN_REFRESH_MS=60000,TELEMETRY_CARD_OFFSET_MAX=1000;
+var telemetryNamePattern=/^[A-Za-z][A-Za-z0-9_-]*$/;
+var telemetryParamPattern=/^[A-Za-z][A-Za-z0-9_]*$/;
+var telemetryWindowPattern=/^[1-9][0-9]*[smhdw]$/;
+function telemetryObject(v){return !!v && typeof v==='object' && !Array.isArray(v);}
+function telemetryOwn(v,key){return Object.prototype.hasOwnProperty.call(v,key);}
+function telemetryText(v){return typeof v==='string' && v.trim()!=='';}
+function telemetryClone(v){return JSON.parse(JSON.stringify(v));}
+function telemetryNumber(v){return typeof v==='number' && isFinite(v);}
+function telemetryTextBox(v){return !!(v && v.type==='text' && (telemetryOwn(v,'text') || telemetryOwn(v,'textStyle')));}
+function telemetryWarn(invalid){return function(path,message){if(invalid)invalid(path,message);};}
+function telemetryUnknown(value,allowed,warn,prefix){
+  Object.keys(value).forEach(function(key){if(allowed.indexOf(key)<0)warn((prefix || '')+'.'+key,'unknown field — ignored');});
+}
+/* One signal entry: exactly one source key plus an optional unit. Returns the
+   cleaned authored entry ({<source>: query, unit?}) or null. */
+function telemetrySignal(name,value,warn){
+  var at='.signals.'+name;
+  if(!telemetryNamePattern.test(name)){warn(at,'signal names start with a letter and use letters, digits, - and _ — signal ignored');return null;}
+  if(!telemetryObject(value)){warn(at,'must be an object with one source key ('+TELEMETRY_SOURCES.join(', ')+') — signal ignored');return null;}
+  var sources=TELEMETRY_SOURCES.filter(function(key){return telemetryOwn(value,key);});
+  if(sources.length!==1){warn(at,'use exactly one of '+TELEMETRY_SOURCES.join(', ')+' — signal ignored');return null;}
+  var source=sources[0],query=value[source];
+  if(source==='honeycomb'){
+    if(!telemetryObject(query) || !Object.keys(query).length){warn(at,'honeycomb must be a non-empty query object — signal ignored');return null;}
+  }else if(!telemetryText(query)){warn(at,source+' must be a non-empty query string — signal ignored');return null;}
+  var out={};out[source]=telemetryClone(query);
+  if(telemetryOwn(value,'unit')){
+    if(telemetryText(value.unit))out.unit=value.unit;
+    else warn(at+'.unit','must be non-empty text — unit ignored');
+  }
+  telemetryUnknown(value,[source,'unit'],warn,at);
+  return out;
+}
+/* One proof entry for a known signal. Returns the cleaned entry or null. */
+function telemetryProofEntry(name,value,signals,warn){
+  var at='.proof.'+name,out={},warned=false;
+  if(!telemetryOwn(signals,name)){warn(at,'names no signal of this binding — limit ignored');return null;}
+  if(!telemetryObject(value)){warn(at,'must be an object {min?, max?, maxRatioOf?} — limit ignored');return null;}
+  ['min','max'].forEach(function(key){
+    if(!telemetryOwn(value,key))return;
+    if(telemetryNumber(value[key]))out[key]=value[key];
+    else {warn(at+'.'+key,'must be a finite number — ignored');warned=true;}
+  });
+  if(telemetryOwn(value,'maxRatioOf')){
+    var other=value.maxRatioOf;
+    if(typeof other!=='string' || other===name || !telemetryOwn(signals,other)){warn(at+'.maxRatioOf','must name another signal of this binding — limit ignored');return null;}
+    if(!telemetryOwn(out,'max')){warn(at+'.maxRatioOf','needs max, the highest allowed ratio — limit ignored');return null;}
+    out.maxRatioOf=other;
+  }
+  Object.keys(value).forEach(function(key){if(['min','max','maxRatioOf'].indexOf(key)<0){warn(at+'.'+key,'unknown field — ignored');warned=true;}});
+  if(!out.maxRatioOf && telemetryOwn(out,'min') && telemetryOwn(out,'max') && out.min>out.max){warn(at,'min is above max, so the limit can never hold — limit ignored');return null;}
+  if(!Object.keys(out).length){if(!warned)warn(at,'needs min, max or maxRatioOf — limit ignored');return null;}
+  return out;
+}
+/* Validates an expanded authored binding (no `use`). template mode keeps the
+   authored form, makes kind optional, and checks links only as text because
+   their $param placeholders are not substituted yet. */
+function telemetryClean(raw,warn,template){
+  var allowed=template?['kind','params','signals','proof','links']:TELEMETRY_BINDING_FIELDS,ok=true,out={};
+  if(template && telemetryOwn(raw,'card'))warn('.card','card placement belongs on the carrier — ignored');
+  telemetryUnknown(raw,allowed.concat(template?['card']:[]),warn);
+  if(telemetryOwn(raw,'kind') || !template){
+    if(TELEMETRY_KINDS.indexOf(raw.kind)<0){warn('.kind','use one of '+TELEMETRY_KINDS.join(', ')+' — '+(template?'template':'binding')+' ignored');ok=false;}
+    else out.kind=raw.kind;
+  }
+  var signals={};
+  if(!telemetryObject(raw.signals)){
+    if(telemetryOwn(raw,'signals'))warn('.signals','must be an object of named signals — '+(template?'template':'binding')+' ignored');
+    else warn('.signals','needs at least one signal — '+(template?'template':'binding')+' ignored');
+    ok=false;
+  }else{
+    Object.keys(raw.signals).forEach(function(name){var signal=telemetrySignal(name,raw.signals[name],warn);if(signal)signals[name]=signal;});
+    if(!Object.keys(signals).length){warn('.signals','needs at least one valid signal — '+(template?'template':'binding')+' ignored');ok=false;}
+  }
+  out.signals=signals;
+  if(telemetryOwn(raw,'proof')){
+    out.proof={};
+    if(!telemetryObject(raw.proof))warn('.proof','must be an object of per-signal limits — ignored');
+    else Object.keys(raw.proof).forEach(function(name){var entry=telemetryProofEntry(name,raw.proof[name],signals,warn);if(entry)out.proof[name]=entry;});
+  }
+  if(telemetryOwn(raw,'links')){
+    out.links={};
+    if(!telemetryObject(raw.links))warn('.links','must be an object {dashboard?, query?} — ignored');
+    else Object.keys(raw.links).forEach(function(key){
+      var url=raw.links[key],at='.links.'+key;
+      if(TELEMETRY_LINKS.indexOf(key)<0)warn(at,'unknown link — ignored');
+      else if(template?!telemetryText(url):!deltaLinkUrl(url))warn(at,'must be an absolute http(s) URL — ignored');
+      else out.links[key]=template?url:deltaLinkUrl(url);
+    });
+  }
+  if(!template && telemetryOwn(raw,'card')){
+    var card=raw.card,placed={};
+    if(!telemetryObject(card))warn('.card','must be an object {side?, offset?} — ignored');
+    else{
+      if(telemetryOwn(card,'side')){if(TELEMETRY_CARD_SIDES.indexOf(card.side)>=0)placed.side=card.side;else warn('.card.side','use one of '+TELEMETRY_CARD_SIDES.join(', ')+' — ignored');}
+      if(telemetryOwn(card,'offset')){
+        if(telemetryNumber(card.offset) && Math.abs(card.offset)<=TELEMETRY_CARD_OFFSET_MAX)placed.offset=card.offset;
+        else warn('.card.offset','must be a number of pixels between -'+TELEMETRY_CARD_OFFSET_MAX+' and '+TELEMETRY_CARD_OFFSET_MAX+' — ignored');
+      }
+      telemetryUnknown(card,['side','offset'],warn,'.card');
+    }
+    if(Object.keys(placed).length)out.card=placed;
+  }
+  return ok?out:null;
+}
+/* Single pass over every string of a template: declared $name and ${name}
+   placeholders are replaced literally; anything else (Grafana's $__interval,
+   undeclared names) stays as authored. */
+function telemetrySubstitute(value,values){
+  if(typeof value==='string')return value.replace(/\$\{([A-Za-z][A-Za-z0-9_]*)\}|\$([A-Za-z][A-Za-z0-9_]*)/g,function(match,braced,bare){
+    var name=braced || bare;return Object.prototype.hasOwnProperty.call(values,name)?values[name]:match;
+  });
+  if(Array.isArray(value))return value.map(function(item){return telemetrySubstitute(item,values);});
+  if(telemetryObject(value)){var out={};Object.keys(value).forEach(function(key){out[key]=telemetrySubstitute(value[key],values);});return out;}
+  return value;
+}
+/* Authored form of a carrier binding with `use` expanded against templates:
+   the template with its params substituted, then the carrier's own kind and
+   card replacing, and its signals, proof and links laid over per name.
+   Returns raw itself (cloned) when there is no `use`, or null when the
+   template cannot be applied. */
+function telemetryExpand(raw,templates,invalid){
+  var warn=telemetryWarn(invalid);
+  if(!telemetryObject(raw))return null;
+  if(!telemetryOwn(raw,'use'))return telemetryClone(raw);
+  var name=raw.use,template=typeof name==='string' && telemetryObject(templates) && telemetryOwn(templates,name)?templates[name]:null;
+  if(!telemetryObject(template)){warn('.use','names no template in tracking.telemetry.templates — binding ignored');return null;}
+  var params=(Array.isArray(template.params)?template.params:[]).filter(function(p){return typeof p==='string' && telemetryParamPattern.test(p);});
+  var values=Object.create(null),missing=false;
+  params.forEach(function(p){
+    if(!telemetryOwn(raw,p)){warn('.'+p,'template "'+name+'" needs this parameter — binding ignored');missing=true;}
+    else if(!telemetryText(raw[p])){warn('.'+p,'must be a non-empty string — binding ignored');missing=true;}
+    else values[p]=raw[p];
+  });
+  Object.keys(raw).forEach(function(key){
+    if(key!=='use' && TELEMETRY_BINDING_FIELDS.indexOf(key)<0 && params.indexOf(key)<0)warn('.'+key,'not a parameter of template "'+name+'" — ignored');
+  });
+  if(missing)return null;
+  var base={};Object.keys(template).forEach(function(key){if(key!=='params' && key!=='card')base[key]=telemetryClone(template[key]);});
+  var out=telemetrySubstitute(base,values);
+  ['kind','card'].forEach(function(key){if(telemetryOwn(raw,key))out[key]=telemetryClone(raw[key]);});
+  ['signals','proof','links'].forEach(function(key){
+    if(!telemetryOwn(raw,key))return;
+    if(!telemetryObject(raw[key])){warn('.'+key,'must be an object — carrier '+key+' ignored');return;}
+    var merged=telemetryObject(out[key])?out[key]:{};
+    Object.keys(raw[key]).forEach(function(entry){merged[entry]=telemetryClone(raw[key][entry]);});
+    out[key]=merged;
+  });
+  return out;
+}
+function carrierTelemetry(obj,templates,invalid){
+  var warn=telemetryWarn(invalid);
+  if(!telemetryObject(obj) || !telemetryOwn(obj,'telemetry'))return null;
+  if(telemetryTextBox(obj)){warn('','text boxes do not carry telemetry — ignored');return null;}
+  var raw=obj.telemetry;
+  if(!telemetryObject(raw)){warn('','must be an object {kind, signals, proof?, links?, card?} or {use, ...params} — ignored');return null;}
+  var expanded=telemetryExpand(raw,templates,warn);
+  if(!expanded)return null;
+  var clean=telemetryClean(expanded,warn,false);
+  if(!clean)return null;
+  var signals={};
+  Object.keys(clean.signals).forEach(function(name){
+    var entry=clean.signals[name],source=TELEMETRY_SOURCES.filter(function(key){return telemetryOwn(entry,key);})[0];
+    signals[name]={source:source,query:entry[source],unit:telemetryOwn(entry,'unit')?entry.unit:null};
+  });
+  return {kind:clean.kind,signals:signals,proof:clean.proof || {},links:clean.links || {},card:clean.card || null};
+}
+function trackingTelemetry(page,invalid){
+  var warn=telemetryWarn(invalid),out={grafana:{},honeycomb:{},window:TELEMETRY_DEFAULT_WINDOW,refreshMs:null,templates:{}};
+  var tracking=page && page.tracking;
+  if(!telemetryObject(tracking) || !telemetryOwn(tracking,'telemetry'))return out;
+  var value=tracking.telemetry;
+  if(!telemetryObject(value)){warn('','must be an object {grafana?, honeycomb?, window?, refreshMs?, templates?} — ignored');return out;}
+  telemetryUnknown(value,['grafana','honeycomb','window','refreshMs','templates'],warn);
+  [['grafana',['prometheus','loki','tempo','sql'],'datasource UID'],['honeycomb',['environment','dataset'],'name']].forEach(function(group){
+    var key=group[0],given=value[key];
+    if(!telemetryOwn(value,key))return;
+    if(!telemetryObject(given)){warn('.'+key,'must be an object of '+group[1].join(', ')+' — ignored');return;}
+    Object.keys(given).forEach(function(field){
+      if(group[1].indexOf(field)<0)warn('.'+key+'.'+field,'unknown field — ignored');
+      else if(!telemetryText(given[field]))warn('.'+key+'.'+field,'use a non-empty '+group[2]+' — ignored');
+      else out[key][field]=given[field];
+    });
+  });
+  if(telemetryOwn(value,'window')){
+    if(typeof value.window==='string' && telemetryWindowPattern.test(value.window))out.window=value.window;
+    else warn('.window','use a duration such as "30m", "1h" or "7d" — using 1h');
+  }
+  if(telemetryOwn(value,'refreshMs')){
+    var ms=value.refreshMs;
+    if(!telemetryNumber(ms) || ms<=0)warn('.refreshMs','must be a positive number of milliseconds — using the connector default');
+    else if(ms<TELEMETRY_MIN_REFRESH_MS){out.refreshMs=TELEMETRY_MIN_REFRESH_MS;warn('.refreshMs','below one minute — using 60000');}
+    else out.refreshMs=ms;
+  }
+  if(telemetryOwn(value,'templates')){
+    if(!telemetryObject(value.templates))warn('.templates','must be an object of named signal sets — ignored');
+    else Object.keys(value.templates).forEach(function(name){
+      var at='.templates.'+name,raw=value.templates[name],twarn=function(path,message){warn(at+path,message);};
+      if(!telemetryNamePattern.test(name)){warn(at,'template names start with a letter and use letters, digits, - and _ — template ignored');return;}
+      if(!telemetryObject(raw)){warn(at,'must be an object {kind?, params?, signals, proof?, links?} — template ignored');return;}
+      var params=[],ok=true;
+      if(telemetryOwn(raw,'params')){
+        if(!Array.isArray(raw.params)){twarn('.params','must be an array of parameter names — template ignored');return;}
+        raw.params.forEach(function(p,index){
+          if(typeof p!=='string' || !telemetryParamPattern.test(p) || TELEMETRY_RESERVED.indexOf(p)>=0){twarn('.params['+index+']','use letters, digits and _ starting with a letter, other than '+TELEMETRY_RESERVED.join(', ')+' — template ignored');ok=false;}
+          else if(params.indexOf(p)>=0){twarn('.params['+index+']','duplicate parameter — template ignored');ok=false;}
+          else params.push(p);
+        });
+      }
+      var clean=telemetryClean(raw,twarn,true);
+      if(!ok || !clean)return;
+      clean.params=params;out.templates[name]=clean;
+    });
+  }
+  return out;
+}

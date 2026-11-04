@@ -90,7 +90,8 @@ var FlowTopology = (function(){
   }
 
   function validateTracking(value,at){
-    shape(value,['tickets','prs','existsWhen','missingWork'],at);
+    // telemetry content is warning-only (validator); the resolver only carries it.
+    shape(value,['tickets','prs','existsWhen','missingWork','telemetry'],at);
     if(Object.prototype.hasOwnProperty.call(value,'missingWork') && typeof value.missingWork!=='boolean')fail(at,'missingWork must be true or false');
     if(Object.prototype.hasOwnProperty.call(value,'existsWhen') && value.existsWhen!=='tickets-done')fail(at,'existsWhen must be tickets-done');
     trackingRefs(value,function(field,index){fail(at,'invalid '+field+(index===null?' array':' entry '+index));});
@@ -102,6 +103,22 @@ var FlowTopology = (function(){
     var inherited=trackingStoredRefs(value),local=trackingStoredRefs(addition);
     var merged=trackingStoredRefs({tickets:inherited.tickets.concat(local.tickets),prs:inherited.prs.concat(local.prs)});
     ['tickets','prs'].forEach(function(field){if(merged[field].length)value[field]=merged[field];});
+    // A consumer binding replaces the provider's whole binding; signals never merge across specs.
+    if(own(addition,'telemetry'))value.telemetry=clone(addition.telemetry);
+  }
+  // Provider `use` bindings name the provider page's templates and expand only
+  // with them, while that page is known. A binding the provider cannot expand
+  // (unknown template, missing parameter) is dropped, so a consumer template of
+  // the same name can never reinterpret it; the carrier stays unbound. Why it
+  // was dropped is kept per resolved diagram for the validator, never serialized.
+  var telemetryDrops=new WeakMap();
+  function inheritTelemetry(value,templates,overlay,record){
+    if(!object(value) || !object(value.telemetry) || !own(value.telemetry,'use'))return;
+    var problems=[],expanded=telemetryExpand(value.telemetry,templates,function(path,message){problems.push({path:path,message:message});});
+    if(expanded){value.telemetry=expanded;return;}
+    delete value.telemetry;
+    // A consumer binding replaces this one anyway; its problem is the provider's own.
+    if(!(object(overlay) && own(overlay,'telemetry')))problems.forEach(record);
   }
 
   function validateOverlaySelection(imp,nodes,edges,where){
@@ -203,7 +220,7 @@ var FlowTopology = (function(){
       states.set(id,'visiting');
       var spec=byId.get(id);
       sections(spec).forEach(function(sec,si){
-        var d=sec.diagram,at=id+' section '+(sec.id || si),imports=d.topologyImports || [],provenance=[],defaultPlacements=Object.create(null);
+        var d=sec.diagram,at=id+' section '+(sec.id || si),imports=d.topologyImports || [],provenance=[],defaultPlacements=Object.create(null),drops=[];
         imports.forEach(function(imp){
           var where=at+' import '+imp.as+' ('+imp.spec+' export '+imp.export+')',prefix=imp.as+'::';
           if(!byId.has(imp.spec))fail(where,'missing spec '+imp.spec);
@@ -219,6 +236,11 @@ var FlowTopology = (function(){
           var source=sources[0],provider=source.d;
           if(sources.some(function(other){return other.d!==provider;}))fail(where,'cannot merge exports from different provider sections; use separate imports and namespaces');
           var exp=Array.isArray(imp.export)?mergeExports(provider,names):clone(source.exp),nodes=provider.nodes || {};
+          var providerTemplates=trackingTelemetry(byId.get(imp.spec).page).templates;
+          var providerRecord=typeof sectionRecords==='function'?sectionRecords(byId.get(imp.spec).page).find(function(record){return record.section.diagram===provider;}):null;
+          var providerAt=(providerRecord?providerRecord.path:'section')+'.diagram';
+          function dropped(kind,id,path){return function(problem){drops.push({kind:kind,id:id,spec:imp.spec,path:path+'.telemetry'+problem.path,message:problem.message});};}
+          function importedEdge(key){var parts=key.split('->');return prefix+parts[0]+'->'+prefix+parts[1];}
           ['nodes','edges'].forEach(function(key){
             if(!own(imp,key))return;
             imp[key].forEach(function(identity){if(!exp[key].includes(identity))fail(where,'selected '+key+' identity is not exported: '+identity);});
@@ -250,7 +272,7 @@ var FlowTopology = (function(){
             if(!own(nodes,key) || !object(nodes[key]))fail(where,'missing exported node '+key);
             var value=clone(nodes[key]);if(value.group){group(value.group,new Set());value.group=prefix+value.group;}
             if(own(imp.nodeCodeRefs || {},key))value.codeRefs=(value.codeRefs || []).concat(clone(imp.nodeCodeRefs[key]));
-            applyTracking(value,(imp.nodeTracking || {})[key]);
+            inheritTelemetry(value,providerTemplates,(imp.nodeTracking || {})[key],dropped('nodes',prefix+key,providerAt+'.nodes.'+key));applyTracking(value,(imp.nodeTracking || {})[key]);
             if(imp.presentation)value.presentation=imp.presentation;
             Object.keys((imp.nodeOverrides || {})[key] || {}).forEach(function(field){var override=imp.nodeOverrides[key][field];if(override===null)delete value[field];else value[field]=clone(override);});
             // Reveal indices belong to the provider's story, not the consumer.
@@ -278,7 +300,7 @@ var FlowTopology = (function(){
           exp.edges.forEach(function(key){
             var matches=(provider.edges || []).filter(function(e){return e && edgeKey(e)===key;});
             if(matches.length!==1)fail(where,'missing or ambiguous exported edge '+key);
-            var edge=clone(matches[0]);applyTracking(edge,(imp.edgeTracking || {})[key]);if(imp.presentation)edge.presentation=imp.presentation;
+            var edge=clone(matches[0]);inheritTelemetry(edge,providerTemplates,(imp.edgeTracking || {})[key],dropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'));applyTracking(edge,(imp.edgeTracking || {})[key]);if(imp.presentation)edge.presentation=imp.presentation;
             if(!selected.has(edge.from) || !selected.has(edge.to))fail(where,'exported edge '+key+' must include both endpoints in exported nodes');
             Object.keys((imp.edgeOverrides || {})[key] || {}).forEach(function(field){var value=imp.edgeOverrides[key][field];if(value===null)delete edge[field];else edge[field]=clone(value);});
             edge.from=prefix+edge.from;edge.to=prefix+edge.to;delete edge.revealAt;delete edge.hideAt;
@@ -310,6 +332,13 @@ var FlowTopology = (function(){
           // Workbench can frame both the outer reference and its inner source
           // blocks. The direct import stays first and remains the authored
           // removal/placement owner for every member.
+          // Drops recorded while the provider resolved its own imports follow the
+          // carriers this import selects, unless a consumer binding replaces them.
+          (telemetryDrops.get(provider) || []).forEach(function(drop){
+            var id=drop.kind==='nodes'?prefix+drop.id:importedEdge(drop.id),overlay=((drop.kind==='nodes'?imp.nodeTracking:imp.edgeTracking) || {})[drop.id];
+            if(!(drop.kind==='nodes'?nodeIds:edgeIds).includes(id) || object(overlay) && own(overlay,'telemetry'))return;
+            drops.push({kind:drop.kind,id:id,spec:drop.spec,path:drop.path,message:drop.message});
+          });
           ((provider.topologyProvenance || {}).imports || []).forEach(function(nested){
             var nestedNodes=(nested.nodes || []).map(function(key){return prefix+key;}).filter(function(key){return nodeIds.includes(key);});
             var nestedEdges=(nested.edges || []).map(function(key){var parts=key.split('->');return prefix+parts[0]+'->'+prefix+parts[1];}).filter(function(key){return edgeIds.includes(key);});
@@ -318,6 +347,7 @@ var FlowTopology = (function(){
           });
         });
         if(provenance.length)d.topologyProvenance={version:1,imports:provenance};
+        if(drops.length)telemetryDrops.set(d,drops);
         if(provenance.length || d.topologyProvenance)checkReferences(d,at);
       });
       // Validate exports even when nobody imports them, so broken declarations
@@ -367,7 +397,7 @@ var FlowTopology = (function(){
   function snapshotTracking(value,node){
     var tracking={};if(!object(value))return tracking;
     var fields=['tickets','prs'];
-    if(!node || !isTextBoxNode(value))fields.push('existsWhen','missingWork');
+    if(!node || !isTextBoxNode(value))fields.push('existsWhen','missingWork','telemetry');
     fields.forEach(function(field){if(own(value,field))tracking[field]=value[field];});return tracking;
   }
   function protectedValue(value,node){
@@ -447,7 +477,8 @@ var FlowTopology = (function(){
     if(context.ephemeral){if(authoredIdentity)result.page.documentLinks.id=authoredIdentity;if(authoredCanon)result.page.canon=authoredCanon;else delete result.page.canon;}
     return mode==='wrapped'?result:mode==='diagram'?result.page.sections[0].diagram:result.page;
   }
-  return {validateDeclarations:function(specs){materializeSources(specs,true);},validateTracking:validateTracking,mergeExports:mergeExports,validateNodeOverride:validateNodeOverride,validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
+  return {validateDeclarations:function(specs){materializeSources(specs,true);},validateTracking:validateTracking,
+    telemetryDrops:function(d){return (telemetryDrops.get(d) || []).map(function(drop){return clone(drop);});},mergeExports:mergeExports,validateNodeOverride:validateNodeOverride,validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
 })();
 FlowCanon.materializeTopology=FlowTopology.materialize;
 FlowCanon.topologyDependencies=FlowTopology.dependencies;

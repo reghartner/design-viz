@@ -179,6 +179,147 @@ self-dependency and non-array fields warn individually and are ignored; a
 dependency on a key the status map never reports paints as a missing upstream
 (red waiting), in the same spirit as MISSING.
 
+### Telemetry bindings
+
+Jira says whether the work is done. Production telemetry says whether the
+finished hop carries real traffic without errors (PROVEN rather than only DONE).
+A node or edge opts in with a `telemetry` object that names its own signals.
+Nothing is inferred from node ids, titles or service names. A carrier without
+`telemetry` is **unbound**: it gets no metrics overlay and no proof verdict. The
+spec stores queries and limits only, never results.
+
+A `call` edge with a PromQL rate, an error ratio and a latency limit:
+
+```json
+{
+  "from": "notify", "to": "app", "label": "push", "tickets": ["BE-68"],
+  "telemetry": {
+    "kind": "call",
+    "signals": {
+      "rate":   {"grafana": "sum(rate(push_sent_total{app=\"notify\"}[5m]))*3600", "unit": "req/h"},
+      "errors": {"grafana": "sum(rate(push_failed_total{app=\"notify\"}[5m]))*3600", "unit": "req/h"},
+      "p95":    {"grafana": "histogram_quantile(0.95, sum by (le)(rate(push_latency_seconds_bucket{app=\"notify\"}[5m])))*1000", "unit": "ms"}
+    },
+    "proof": {"rate": {"min": 10}, "errors": {"maxRatioOf": "rate", "max": 0.01}, "p95": {"max": 500}},
+    "links": {"dashboard": "https://acme.grafana.net/d/notify/push"}
+  }
+}
+```
+
+A `queue` node that counts queued events from Loki and reads consumer lag and age
+from Prometheus:
+
+```json
+{
+  "nodes": {
+    "device-events": {
+      "title": "device-events", "sub": "Kafka topic", "tickets": ["BE-67"],
+      "telemetry": {
+        "kind": "queue",
+        "signals": {
+          "in":  {"loki": "sum(count_over_time({app=\"ingest\"} |= \"event queued\" [5m]))", "unit": "msgs"},
+          "lag": {"grafana": "max(kafka_consumergroup_lag{topic=\"device-events\",group=\"notify-consumers\"})", "unit": "msgs"},
+          "age": {"grafana": "max(kafka_consumergroup_lag_seconds{topic=\"device-events\",group=\"notify-consumers\"})", "unit": "s"}
+        },
+        "proof": {"in": {"min": 1}, "lag": {"max": 500}, "age": {"max": 60}}
+      }
+    }
+  }
+}
+```
+
+| field | value |
+|---|---|
+| `kind` | Required. `call`, `queue`, `service`, `log-event` or `device`. |
+| `signals` | Required. Named signals such as `rate`, `errors`, `p95`, `in`, `lag`, `age`. Names start with a letter and use letters, digits, `-` and `_`. Each signal has exactly one source key and an optional `unit` text. |
+| `signals.<name>.grafana` | A PromQL query string. |
+| `signals.<name>.loki` | A LogQL metric query string. |
+| `signals.<name>.tempo` | A TraceQL query string, used for exemplar traces. |
+| `signals.<name>.sql` | A SQL query string for a Grafana SQL datasource, such as a data lake. |
+| `signals.<name>.honeycomb` | A Honeycomb query object, kept as authored. |
+| `proof` | Optional per-signal limits: `min`, `max` (finite numbers) and `maxRatioOf`. With `maxRatioOf: "<other signal>"`, `max` is the highest allowed ratio of this signal to the other one, so `"errors": {"maxRatioOf": "rate", "max": 0.01}` means at most 1 % errors. `maxRatioOf` needs `max` and another signal of the same binding. `min` stays an absolute floor. |
+| `links` | Optional authored link-outs: `dashboard` and `query`, absolute HTTP(S) URLs. |
+| `card` | Optional edge-card placement: `side` (`right`, `left`, `above`, `below`) and `offset` (pixels, -1000 to 1000). |
+
+Shared settings live on the page beside the Jira settings, in
+`tracking.telemetry`:
+
+```json
+{
+  "tracking": {
+    "jira": {"site": "https://acme.atlassian.net", "epic": "DOOR-100"},
+    "telemetry": {
+      "grafana": {"prometheus": "prom-main", "loki": "loki-main", "tempo": "tempo-main", "sql": "lake"},
+      "honeycomb": {"environment": "prod", "dataset": "doorbell-prod"},
+      "window": "1h",
+      "refreshMs": 300000,
+      "templates": {
+        "kafka-topic": {
+          "kind": "queue",
+          "params": ["topic", "group"],
+          "signals": {
+            "in":  {"grafana": "sum(rate(kafka_server_brokertopicmetrics_messagesin_total{topic=\"$topic\"}[5m]))*3600", "unit": "msg/h"},
+            "lag": {"grafana": "max(kafka_consumergroup_lag{topic=\"${topic}\",group=\"$group\"})", "unit": "msgs"}
+          },
+          "proof": {"in": {"min": 10}, "lag": {"max": 500}},
+          "links": {"dashboard": "https://acme.grafana.net/d/kafka?var-topic=$topic"}
+        }
+      }
+    }
+  }
+}
+```
+
+`grafana` holds datasource UIDs for `prometheus`, `loki`, `tempo` and `sql`.
+`honeycomb` holds `environment` and `dataset`. `window` is the observation
+window, a duration such as `30m`, `1h` or `7d`; the default is `1h`. `refreshMs`
+is the connector refresh interval; values under one minute use 60000 and an
+absent value leaves the connector default. `templates` are named signal sets
+authored on the page; the repository ships none.
+
+A carrier applies a template with `"use"` plus a value for every declared
+parameter:
+
+```json
+{
+  "from": "ingest", "to": "notify", "label": "route",
+  "telemetry": {"use": "kafka-topic", "topic": "device-events", "group": "notify-consumers", "proof": {"lag": {"max": 100}}, "card": {"side": "below"}}
+}
+```
+
+Expansion is pure string substitution: each `$param` or `${param}` placeholder
+named in `params` is replaced with the carrier's string value, in one pass. Write
+`${topic}_total` when an identifier character follows the placeholder. Other
+`$` text, such as Grafana's `$__rate_interval`, stays as authored. The carrier's
+own `kind` and `card` replace the template's; its `signals`, `proof` and `links`
+lay over the template's entry by entry, so the example above keeps both signals
+and tightens only the `lag` limit. Parameter names start with a letter, use
+letters, digits and `_`, and cannot be `kind`, `signals`, `proof`, `links`,
+`card`, `use` or `params`.
+
+`trackingTelemetry(page)` returns `{grafana, honeycomb, window, refreshMs,
+templates}` with defaults when the field is absent. `carrierTelemetry(obj,
+templates)` returns `null` for an unbound carrier, otherwise `{kind, signals:
+{<name>: {source, query, unit}}, proof, links, card}`, with `unit` and `card`
+`null` when not authored and `templates` taken from `trackingTelemetry(page)`.
+Both parsers drop invalid entries and report each one through an optional
+`invalid(path, message)` callback; neither throws or modifies the spec. The
+validator reports the same problems as warnings, never errors: a malformed
+signal or limit is ignored on its own, and a binding without a valid `kind` or
+any valid signal leaves the carrier unbound. Text boxes never carry telemetry.
+A board with bindings needs a live-status panel, like a board with tickets.
+
+Imported Canon topology accepts the same field in
+`topologyImports[].nodeTracking` and `edgeTracking`. A consumer binding replaces
+the provider's binding for that carrier as a whole; signals never merge across
+specs. A provider binding that uses one of the provider page's templates is
+expanded with those templates before it reaches the consumer. When the provider
+cannot expand it (an unknown template or a missing parameter), the binding is
+dropped and the imported carrier is unbound, even if the consumer defines a
+template with the same name. Validating the resolved consumer warns at that
+carrier and names the provider path. Ticket edits in
+the Workbench or on the shared board keep the consumer binding as authored.
+
 ## Workbench
 
 Select a node or connection on the desktop canvas and open **Inspect → Tracking**,
@@ -258,6 +399,11 @@ The capability is `flow.live-status`, introduced in Flowview 0.2.0. Non-empty
 `tickets` or `prs` arrays on nodes or edges, or a page `tracking` field, cause
 compatibility stamping to declare it automatically. Existing specs without these
 fields keep their existing requirements.
+
+Telemetry bindings declare `flow.telemetry`, also introduced in Flowview 0.2.0.
+A `telemetry` field on any node or edge, in a `nodeTracking` or `edgeTracking`
+overlay entry, or a page `tracking.telemetry` field declares it automatically,
+even when its content is invalid.
 
 ## Rendering
 
@@ -1055,11 +1201,13 @@ All story features work with `#live=demo`; pages without tickets or epics show t
 
 A delivery board can reference a canonical diagram and own only tracking:
 `topologyImports[].nodeTracking` maps provider node IDs to tracking fields
-(`tickets`, `prs`, `missingWork`, `existsWhen`);
+(`tickets`, `prs`, `missingWork`, `existsWhen`, `telemetry`);
 `edgeTracking` maps provider `from->to` identities to the same shape. Add these
 references through the desktop imported-selection Inspector. Inherited references
 stay read-only; local additions can be removed, undone and redone. The maps use
 strict validation and full provider-relative identities, including nested paths.
+`telemetry` content is the exception: like every telemetry binding it only warns
+(see "Telemetry bindings").
 They do not change provider structure or presentation/geometry overrides.
 
 The resolver merges inherited and consumer references before rendering, so the

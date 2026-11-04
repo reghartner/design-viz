@@ -258,12 +258,15 @@ metadata object, or `authoring.fieldMeta[key]`, can declare `label`, `help`,
 and `step` objects override those values in one context. Dynamic fields should
 use tuple metadata so labels can come from the declaration, for example
 `[device.id, 'objf', fields, {label: device.label, group: 'Devices'}]`.
-`assignment: false` leaves assignment UX to a registered custom field adapter.
+`assignment: false` leaves assignment UX to a registered custom field adapter: the
+shared selector is not added beside an object sub-field or an `editor.patchControl`
+field that sets it, so that control offers omission and any `null` choice itself
+(Truth table's **Active case** lists inherit/default, each case and **No active case**).
 
 Collections can keep their schema and transformation in the panel module with
 `editor.patchControl(field, options)`. Return a DOM control for the matching
 field and call `options.commit(value)` with the authored value (or `undefined`
-to omit it); the shared inspector still supplies assignment modes, sparse merge,
+to omit it); unless the field sets `assignment: false`, the shared inspector still supplies assignment modes; it always supplies sparse merge,
 effective-value help, history and refresh. `options.panel` is the declaration
 even when a step is selected. `options.effective` is the complete folded field
 record (`value` and `origin`) when one is available, so snapshot composers can

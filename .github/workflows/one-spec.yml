@@ -1,0 +1,78 @@
+name: one-spec
+run-name: one-spec ${{ inputs.spec }} @ ${{ github.ref_name }}
+
+# Runs ONE browser-contract spec file on demand, with the same setup as the
+# ci browser shards. Use it to prove a single new test red (or green) without
+# queuing a full ci run. It is never a required check; ci.yml still runs the
+# full suites on every pull request and every push to main.
+#
+#   gh workflow run one-spec.yml -R reghartner/design-viz --ref <branch> \
+#     -f spec=<file>.spec.mjs [-f grep=<test title filter>]
+#
+# The run's head SHA is the commit the result applies to.
+on:
+  workflow_dispatch:
+    inputs:
+      spec:
+        description: Spec file name in tools/browser-tests/tests (for example inline-text.spec.mjs)
+        required: true
+        type: string
+      grep:
+        description: Optional Playwright --grep test title filter
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  one-spec:
+    name: One spec (${{ inputs.spec }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the spec input names one existing spec file
+        env:
+          SPEC: ${{ inputs.spec }}
+        run: |
+          case "$SPEC" in
+            ''|*/*|.*|*' '*) echo "spec must be a plain file name in tools/browser-tests/tests, got: $SPEC"; exit 1;;
+          esac
+          case "$SPEC" in
+            *.spec.mjs) ;;
+            *) echo "spec must end in .spec.mjs, got: $SPEC"; exit 1;;
+          esac
+          test -f "tools/browser-tests/tests/$SPEC" || { echo "no such spec file: tools/browser-tests/tests/$SPEC"; exit 1; }
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.22.1'
+          cache: npm
+          cache-dependency-path: |
+            tools/browser-tests/package-lock.json
+            apps/backstage/package-lock.json
+            apps/confluence/package-lock.json
+      - run: npm ci --prefix tools/browser-tests --no-fund --no-audit
+      - run: npm ci --prefix apps/backstage --no-fund --no-audit
+      - run: npm ci --prefix apps/confluence --no-fund --no-audit
+      - name: Install the lockfile-pinned Playwright Chromium and Linux dependencies
+        run: npm exec --prefix tools/browser-tests -- playwright install --with-deps chromium
+      - name: Run the one spec (same config as the ci shards, no retries)
+        working-directory: tools/browser-tests
+        env:
+          SPEC: ${{ inputs.spec }}
+          GREP: ${{ inputs.grep }}
+        run: |
+          set -- --config=playwright.ci.config.mjs "tests/$SPEC"
+          if [ -n "$GREP" ]; then set -- "$@" --grep "$GREP"; fi
+          npx playwright test "$@"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: one-spec-results
+          path: |
+            tools/browser-tests/blob-report/
+            tools/browser-tests/test-results/
+          if-no-files-found: ignore
+          retention-days: 14

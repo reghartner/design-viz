@@ -120,6 +120,7 @@ test('desktop truth-table author edits properties, cases and shared icons with e
   await page.locator('#undo-builder').click();
   await expect.poll(async()=>(await powerColumn()).empty,'(W4) Undo restores the override').toBe('No icons');
   await expect.poll(()=>emptyCell(cellAt(table,2,3)),'(W4) restored override renders').toEqual({text:'No icons',icons:0,muted:true});
+  await inspectPageElement(page,panel.locator('.ptitle'));
   const beforeIcon=await source.inputValue();await guide.locator('.flow-icon-browse').first().click();
   const dialog=page.locator('dialog.flow-icon-picker');await dialog.locator('.flow-icon-search').fill('plug');
   await dialog.locator('[data-icon-id="plug"]').click();

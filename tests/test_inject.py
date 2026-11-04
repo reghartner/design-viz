@@ -257,7 +257,7 @@ class InjectTests(unittest.TestCase):
         self.assertEqual(declaration["comments"], {"composer_only": True, "customAnchors": True})
         servers = declaration["mcp"]["servers"]
         self.assertEqual(len(servers), 1)
-        self.assertEqual(servers[0]["tools"], ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"])
+        self.assertEqual(servers[0]["tools"], ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"])
         self.assertIn("display name", guide)
         # the edit loop, the tracking rules, the pointers and the post-publish checks
         for needle in ("`flowspec`", "same URL", "node tools/validate.js",
@@ -366,7 +366,7 @@ class InjectTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         two_file, guide = declaration(out)
         self.assertEqual(two_file, {
-            "mcp": {"servers": [{"server": "Atlassian", "tools": ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]},
+            "mcp": {"servers": [{"server": "Atlassian", "tools": ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}]},
             "comments": {"composer_only": True, "customAnchors": True},
             "artifact": {},
             "user": {"scopes": ["profile"]},

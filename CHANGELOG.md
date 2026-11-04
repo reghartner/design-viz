@@ -1,5 +1,45 @@
 # Changelog
 
+## Over time shows missing tickets (2026-11-04)
+
+- On a past day, a ticket with no status on that day now shows as Missing instead of
+  uncolored (#1012): a ticket not created yet, or one missing today. Its node or edge
+  wears the Missing paint and the Tickets table says missing. It is not a blocker: the
+  blocked count, the blockers list and First blocker leave it out, and a ticket that
+  depends on it waits in grey. The story total is unchanged.
+
+## Live status Over time on real Atlassian connectors (2026-11-04)
+
+- Over time now loads history through `getJiraIssue` with `expand: "changelog"`
+  (#1009), because real Atlassian connectors do not offer `listJiraIssueChangelogs`
+  or `listJiraStatuses`. Each ticket costs one call, plus one
+  `searchJiraIssuesUsingJql` lookup per status no tracked ticket holds. `tools/inject.py`
+  declares only `getAccessibleAtlassianResources`, `searchJiraIssuesUsingJql` and
+  `getJiraIssue`, so a board must be republished to get this. The mock Atlassian
+  server serves the same reply shape and no longer offers the two old tools.
+
+## Live status panel buttons stay in place (2026-11-04)
+
+- The Live status panel header now has a row of buttons that never move, with
+  counts, the connector line and notes on one fixed-height row below them (#986).
+  **First blocker** has one place and size, and reads **No blockers** greyed out
+  when there are none. The demo's Play button and automatic advance are gone. **<**
+  and **>** replace Next day and sit on the slider row, or on a row of their own for
+  a demo in Live mode. A timeline's `intervalSeconds` is still accepted and has no
+  effect.
+
+## Live status Over time (2026-11-03)
+
+- Readers can move a slider through past days on a Live status board and see each
+  ticket's status on that day, overlaid on the current diagram (#929). The Over
+  time button in the Live status panel loads history as one batch on the click;
+  nothing polls, and results are cached for 7 days per viewer. It works on
+  claude.ai boards through a connector that offers `listJiraIssueChangelogs` and
+  `listJiraStatuses`, and on `#live=demo`. `tools/inject.py` now declares both
+  tools, so a board published earlier must be republished to get the button. The
+  mock Atlassian server serves both tools and a `created` field. Host providers
+  are unchanged.
+
 ## Live status connector refresh (2026-11-03)
 
 - Live status boards published as claude.ai artifacts now re-read the Jira and

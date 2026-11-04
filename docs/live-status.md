@@ -309,12 +309,19 @@ width. It appears immediately, with no menu click.
 The generic desktop Workbench picker lists **Delivery → Live status**; insertion
 and Export project preserve the panel. There are no authored state or patch fields.
 
-The panel header holds **Live**, distinct-ticket counts, a connector indicator
-(a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
+The panel header has two rows. The first holds only buttons, which keep their
+place: **Live**, **Over time**, and on the right **First blocker**, any provider
+action, and Edit. **First blocker** keeps one size; with no blockers it reads
+**No blockers** and is greyed out, and with blockers it cannot reach from here it
+stays **First blocker** and is greyed out. The second row holds everything that
+changes. Its height follows the panel's width, one line when the panel is wide and
+two when it is narrow, and never its text, so it cannot move the buttons or what is
+below: distinct-ticket counts, a connector indicator (a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
 blue (`--dv-live-active`) while connecting or awaiting approval, green when connected or in demo mode,
 red on error, and it pulses while a fetch is in flight; the time is the last successful
-fetch, not a ticket's change time), provider note and action, **First blocker**, and
-demo **Play/Pause** and **Next day** when demo controls are supplied. The engine's panel title stays above this header.
+fetch, not a ticket's change time), and the provider note. Text too long for the row
+is cut off and stays available in the row's tooltip and to screen readers. Demo
+controls supply **<** and **>** on a row below the header. The engine's panel title stays above this header.
 The body opens with the **epic header box**: the epic key (a Jira link), its
 summary, its state pill, “n of N stories done · m of N on diagram” and the
 blocked, waiting and outside-epic counts, with the carriers-done ring on the
@@ -572,10 +579,9 @@ including `file://`, without fetching or changing the spec. A host provider take
 precedence. An explicitly requested demo also takes precedence over the automatic
 claude.ai connector. Without the hash, no demo starts.
 
-The Live status panel header shows the current day and offers **Pause/Play** and **Next day**.
-Days advance at the timeline's `intervalSeconds` (6 seconds by default), ending
-on the final day. Reduced motion uses manual advancement only. Hidden pages pause
-the timer. Requested ticket keys absent from a day become `missing`; a day's
+The Live status panel shows the current day, and **<** and **>** move one day
+back or forward. Nothing advances by itself: the timeline's `intervalSeconds` is
+still accepted, and has no effect. Requested ticket keys absent from a day become `missing`; a day's
 `prs` may carry `links` in the host-provider shape, which the demo passes
 through so the Tickets table and popover show the same GitHub icons offline. Every key in a day's `issues` is included, even when no
 carrier references it; entries may include `kind`, `parent`, `initiatives`, `epic`, a lane ID in `lane`, and
@@ -588,6 +594,83 @@ blocked HW-124), Day 7 light blue (HW-124 unblocked but unfinished), Day 8 clear
 example's `DOOR-100` gains `UX-90`, “Alert sound setting”, in the APP lane on Day 8.
 It is never assigned to a carrier. Without an embedded timeline, four days are synthesized
 from the page's ticket keys: todo, active, one blocker, then all done.
+
+## Over time
+
+Over time lets a reader move through past days on a board. It overlays each
+ticket's status for the chosen day on the current diagram. The diagram is not a
+historical version: its structure, the list of stories, titles, owners, PR icons
+and dependency links all stay as of today. Authors set nothing, and no spec field
+is involved.
+
+**Using it.** **Live** and **Over time** are the two modes, side by side at the
+start of the Live status panel's header. The selected one is filled: blue for
+Live, amber for Over time. Over time appears once ticket status has loaded and a
+history source exists. Clicking it loads history, shows progress on the button,
+then adds a thin amber-tinted slider row to the panel. Clicking **Live** returns
+to today; while Live is already selected, clicking it turns colors off as it
+always has, and Over time turns them back on. The slider moves one whole day at a
+time by pointer or arrow keys, Home and End jump to the first and last day, and
+**<** and **>** on the same row step one day. Each day repaints
+nodes and edges (local and imported), step coins and captions, lane rollups,
+panel counts, the progress ring, blockers, the Tickets table State column and
+planned-node treatment.
+
+**Day range and day status.** The first day is the day the oldest ticket was
+created. The last day is today while any ticket is open, or the day the last
+ticket reached Done once all are Done. A day's status is the ticket's status at
+the end of that day in the viewer's local time. A day with no change keeps the
+previous day's status. Blocked uses the same rule as the live board: flagged as
+an impediment, or a status name containing "block". Parents roll up from their
+children, so they need no history calls. The last day is exactly the live map.
+
+**Before a ticket existed.** A ticket with no status on a day shows as Missing on
+that day: its node or edge wears the Missing paint, the Tickets table says missing,
+and its popover says "No ticket on this day". An uncolored carrier would hide the gap.
+It is not a blocker: it stays out of the blocked count and the blockers list, First
+blocker cannot reach it, and a ticket that depends on it waits with a grey tone. It
+keeps its title and row and stays in the total, so the total is the same on every day.
+This covers a ticket not created yet and a ticket missing today, which has no history.
+
+**While a past day shows.** Live refresh keeps running but does not change the
+display. Returning to **Live** applies the newest live status as a normal refresh,
+including anything that changed meanwhile. Moving the slider adds nothing to
+Activity, causes no change pulse and shows no "no activity N d" mark. The Edit
+button is disabled with a stated reason, Over time is disabled while Edit mode
+is active, and the saved spec never changes.
+
+**History source and call cost.** Only a click loads history, as one batch of
+one-shot `callTool` calls. Nothing polls, and no history call happens at page load
+or on a refresh. Each ticket costs one `getJiraIssue` call with `expand: "changelog"`,
+which returns its created time, current status and changelog. A changelog names
+statuses but not their categories, so any status no tracked ticket holds gets one
+`searchJiraIssuesUsingJql` lookup for `status = <id>`. The cost is about
+one call per ticket plus one per unknown status, at most six at once, so a 100-ticket
+board costs about 100 calls on a first click for each viewer. Each result is cached for 7 days for
+that viewer and artifact. A later click reads the cache and calls Jira again only for
+a ticket whose live `updated` time is newer than its cached result. The runtime cache
+is best-effort and size-bounded, and an older claude.ai shell keeps results for less
+time or not at all, so a repeat click can cost the full batch.
+
+If any call fails, or a ticket's changelog holds fewer entries than its `total`, the
+board stays on today, the panel says history could not load, and the button can be
+clicked again. A partial history is never shown. A status no ticket anywhere holds,
+such as one retired from a workflow, follows the live board's rule for an unknown
+category: To Do, unless its name contains "block".
+
+**Where it appears.** A claude.ai board needs a connector that offers
+`getJiraIssue` and a page that declares it, so a board published earlier must be
+republished to get it. On `#live=demo` the button uses the
+embedded timeline's days, or the four synthesized days, with no network calls.
+The slider and **<** and **>** share one current day: the buttons carry on from
+the slider's day, and Live returns to the day the buttons reached. There the timeline's
+last day supplies titles and the story list, so the total stays the same. There
+is no button on host-provider pages or in Workbench preview.
+
+The `getJiraIssue` reply shape was checked with one real call on a live Atlassian
+connector: the issue sits in `issues.nodes[0]`, and a plain top-level REST issue is
+also accepted. A ticket with a very long changelog has not been tested. Past-day
+Blocked from Flagged assumes Flagged changes appear in the changelog.
 
 ## Dependencies
 
@@ -660,7 +743,7 @@ Settings → Connectors, together with the two Jira tools and the comments
 capability. For Atlassian's own connector that is:
 
 ```js
-capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]}, comments: {"composer_only": true, "customAnchors": true}}
+capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}]}, comments: {"composer_only": true, "customAnchors": true}}
 ```
 
 For a custom connector (for example the mock server installed as
@@ -697,6 +780,9 @@ Jira status determines colors;
 Development PR summaries, when returned, are informational. All tool calls go
 through `window.claude.use("mcp")`; the artifact never fetches Jira directly.
 
+Clicking **Over time** adds `getJiraIssue` calls and status lookups; see
+[Over time](#over-time). A connector without `getJiraIssue` still paints live status.
+
 Without the connector, viewers see “Add the Atlassian connector in claude.ai
 Settings → Connectors to see live ticket status.” If approval is needed, the
 **Allow Jira** button makes one explicit retry. Account and policy errors clear
@@ -717,7 +803,7 @@ GitHub connector described next; declare it as a second `servers` entry:
 
 ```js
 capabilities: {mcp: {servers: [
-  {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]},
+  {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]},
   {server: "GitHub", tools: ["search_pull_requests", "pull_request_read"]}
 ]}, comments: {"composer_only": true, "customAnchors": true}}
 ```
@@ -770,7 +856,7 @@ board's Edit mode needs; single-file tracked pages keep the declaration above,
 untracked pages stay comments-only:
 
 ```js
-capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]},
+capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}]},
   comments: {"composer_only": true, "customAnchors": true}, artifact: {}, user: {scopes: ["profile"]}}
 ```
 

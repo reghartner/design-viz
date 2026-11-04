@@ -237,7 +237,7 @@ Publish only when asked. Steps:
    Use `#live=demo&tour=0` instead for a demo-only copy.
 3. Find the viewer's Jira connector name in claude.ai Settings → Connectors
    and declare it exactly:
-   `capabilities: {mcp: {servers: [{server: "<display name>", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]}, comments: {"composer_only": true, "customAnchors": true}}`.
+   `capabilities: {mcp: {servers: [{server: "<display name>", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}]}, comments: {"composer_only": true, "customAnchors": true}}`.
    Atlassian's own connector is named **Atlassian**. A custom connector (for
    example the mock server) uses whatever name the viewer gave it. Never use
    **Atlassian MCP** for a custom connector or in the declaration unless the

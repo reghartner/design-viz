@@ -90,7 +90,7 @@ test('M2: initialize echo, tools/list schemas and read-only annotations', async 
   }
   const tools = handleMcp(rpc('tools/list'), CONTEXT).result.tools;
   assert.deepEqual(tools.map(t => t.name).sort(), ['getAccessibleAtlassianResources', 'getJiraIssue', 'searchJiraIssuesUsingJql']);
-  const inputs = { getAccessibleAtlassianResources: [], getJiraIssue: ['cloudId', 'issueIdOrKey', 'fields'],
+  const inputs = { getAccessibleAtlassianResources: [], getJiraIssue: ['cloudId', 'issueIdOrKey', 'fields', 'expand'],
     searchJiraIssuesUsingJql: ['cloudId', 'jql', 'fields', 'maxResults', 'nextPageToken'] };
   for (const tool of tools) {
     assert.equal(tool.inputSchema.type, 'object');
@@ -291,7 +291,7 @@ test('M8: Jira conversion, stable IDs, category names, flagged and Development s
   for (const [state, key, name, status] of [['todo', 'new', 'To Do', 'To Do'], ['active', 'indeterminate', 'In Progress', 'In Progress'],
     ['blocked', 'indeterminate', 'In Progress', 'Blocked'], ['done', 'done', 'Done', 'Done']]) {
     const fields = jiraIssueFromStatus('HW-123', { state, summary: 'Button', assignee: 'Alex', prs: { count: 0, state: null } }, NOW).fields;
-    assert.deepEqual(fields.status, { name: status, statusCategory: { key, name } });
+    assert.deepEqual(fields.status, { id: fields.status.id, name: status, statusCategory: { key, name } });assert.match(fields.status.id, /^\d+$/);
     assert.deepEqual(fields.assignee, { displayName: 'Alex' });
     assert.equal(fields.summary, 'Button');
     assert.equal(typeof fields.priority.name, 'string');
@@ -489,4 +489,52 @@ test('parent metadata search resolves the same epic as getJiraIssue without addi
   assert.equal(issues.length,1);assert.equal(issues[0].key,single.key);assert.deepEqual(issues[0].fields,single.fields);
   assert.ok(result(await call('searchJiraIssuesUsingJql',{jql:'parent = DOOR-100'},context)).issues.nodes.every(issue=>issue.key!=='DOOR-100'));
  }
+});
+
+/* Over time history (#1009). Source: the reply shapes in issue #1009, checked on a live Atlassian connector.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| H1 | getJiraIssue with expand changelog for HW-124, whole story | issue is in `issues.nodes[0]` with created, status and statusCategory; changelog has startAt, maxResults, total and histories; a status item has from, fromString, to and toString; a Flagged item appears | a mock that does not match the real reply |
+| H2 | the same ticket with no expand | the `data` reply, with no changelog | changelogs on every read |
+| H3 | story pinned to an early day | no history after that day | a history that knows the future |
+| H4 | ticket absent from the current day, unknown key | the same not-found error | an empty history for a ticket Jira would refuse |
+| H5 | search and getJiraIssue | `created` is the first day the timeline names the ticket | a constant creation time |
+| H6 | `status = <id> ORDER BY updated DESC`, maxResults 1 | one issue in that status with its category, even when no ticket holds it today; an unused id finds nothing | a lookup that only sees today |
+| H7 | all-done scenario | history is empty and the call succeeds | a story-only tool |
+*/
+const historyArgs = key => ({ cloudId: 'mock-cloud-id-0001', issueIdOrKey: key, fields: ['status', 'created'], expand: 'changelog' });
+const historyIssue = reply => {assert.ok(reply.issues, '#1009 the issue sits in issues.nodes');return reply.issues.nodes[0];};
+test('H1 getJiraIssue with expand changelog answers in the real connector shape', async () => {
+  const day = timeline().days.length - 1, reply = result(await call('getJiraIssue', historyArgs('HW-124'), { ...CONTEXT, day }));
+  const issue = historyIssue(reply), { changelog } = issue;assert.equal(reply.data, undefined);assert.equal(reply.issues.nodes.length, 1);assert.equal(issue.key, 'HW-124');
+  assert.equal(issue.fields.created, '2026-10-20T09:00:00.000+0000');assert.equal(issue.fields.status.name, 'Done');assert.equal(issue.fields.status.statusCategory.key, 'done');assert.match(issue.fields.status.id, /^\d+$/);
+  assert.equal(changelog.startAt, 0);assert.equal(changelog.total, 4);assert.equal(changelog.histories.length, 4);assert.ok(changelog.maxResults >= 4);
+  const item = (entry, field) => entry.items.find(i => i.field === field), oldest = [...changelog.histories].sort((a, b) => Date.parse(a.created) - Date.parse(b.created));
+  assert.deepEqual(oldest.map(entry => entry.created), ['2026-10-21T09:00:00.000+0000', '2026-10-23T09:00:00.000+0000', '2026-10-26T09:00:00.000+0000', '2026-10-28T09:00:00.000+0000']);
+  assert.deepEqual(oldest.map(entry => item(entry, 'status').toString), ['In Progress', 'Blocked', 'In Progress', 'Done']);assert.deepEqual(oldest.map(entry => item(entry, 'status').fromString), ['To Do', 'In Progress', 'Blocked', 'In Progress']);
+  assert.ok(oldest.every(entry => /^\d+$/.test(item(entry, 'status').from) && /^\d+$/.test(item(entry, 'status').to)));assert.equal(item(oldest[3], 'status').to, issue.fields.status.id);
+  assert.equal(item(oldest[1], 'Flagged').toString, 'Impediment');assert.equal(item(oldest[2], 'Flagged').fromString, 'Impediment');assert.equal(item(oldest[0], 'Flagged'), undefined);
+});
+test('H2 H3 H4 H7 history needs expand, stops at the story day, refuses what Jira would refuse and answers other scenarios', async () => {
+  const days = timeline().days, plainIssue = result(await call('getJiraIssue', { cloudId: 'mock-cloud-id-0001', issueIdOrKey: 'HW-124' }, CONTEXT));assert.equal(plainIssue.data.changelog, undefined);
+  const changelog = async (context, key = 'HW-124') => historyIssue(result(await call('getJiraIssue', historyArgs(key), context))).changelog;
+  assert.deepEqual((await changelog({ ...CONTEXT, day: 0 })).histories, []);assert.equal((await changelog({ ...CONTEXT, day: 3 })).total, 2);
+  const missing = days.findIndex(d => !d.issues['UX-89']), notFound = { code: -32602, message: 'Issue does not exist or you do not have permission to see it.' };
+  assert.deepEqual((await call('getJiraIssue', historyArgs('UX-89'), { ...CONTEXT, day: missing })).error, notFound);assert.deepEqual((await call('getJiraIssue', historyArgs('HW-999'), CONTEXT)).error, notFound);
+  assert.deepEqual((await changelog({ scenario: 'all-done', now: NOW })).histories, []);
+});
+test('H5 created is the first day the story names a ticket', async () => {
+  const days = timeline().days, last = days.length - 1, created = (key, day = last) => call('searchJiraIssuesUsingJql', { jql: 'key in (' + key + ')' }, { ...CONTEXT, day });
+  assert.equal(result(await created('HW-124')).issues.nodes[0].fields.created, '2026-10-20T09:00:00.000+0000');
+  const first = days.findIndex(d => d.issues['UX-90']), expected = new Date(Date.parse('2026-10-20T09:00:00Z') + first * 86400000).toISOString().replace('Z', '+0000');assert.ok(first > 0);
+  assert.equal(result(await created('UX-90')).issues.nodes[0].fields.created, expected);assert.equal(historyIssue(result(await call('getJiraIssue', historyArgs('UX-90'), { ...CONTEXT, day: last }))).fields.created, expected);
+});
+test('H6 a status id search finds one issue in that status even when no ticket holds it today', async () => {
+  const days = timeline().days, day = days.length - 1, context = { ...CONTEXT, day }, changelog = historyIssue(result(await call('getJiraIssue', historyArgs('HW-124'), context))).changelog;
+  const blocked = changelog.histories.flatMap(entry => entry.items).find(item => item.field === 'status' && item.toString === 'Blocked').to;
+  const reply = result(await call('searchJiraIssuesUsingJql', { cloudId: 'mock-cloud-id-0001', jql: 'status = ' + blocked + ' ORDER BY updated DESC', fields: ['status'], maxResults: 1 }, context));
+  assert.equal(reply.issues.nodes.length, 1);assert.equal(reply.issues.nodes[0].fields.status.id, blocked);assert.equal(reply.issues.nodes[0].fields.status.name, 'Blocked');assert.equal(reply.issues.nodes[0].fields.status.statusCategory.key, 'indeterminate');
+  assert.deepEqual(result(await call('searchJiraIssuesUsingJql', { cloudId: 'mock-cloud-id-0001', jql: 'status = 99999 ORDER BY updated DESC', fields: ['status'], maxResults: 1 }, context)).issues.nodes, []);
+  const { parseJql } = await load();assert.deepEqual(parseJql('status = 10001 ORDER BY updated DESC'), { statusId: '10001' });
+  for (const unsupported of ['status = 10001', 'key in (HW-124) ORDER BY updated DESC', 'project = HW ORDER BY updated DESC', 'status = 10001 AND project = HW ORDER BY updated DESC', 'status = abc ORDER BY updated DESC']) assert.equal(parseJql(unsupported), null, unsupported);
 });

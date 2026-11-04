@@ -91,32 +91,56 @@
     function paint(value){
       if(!live)return;epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=doc.activeElement;
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
+      // #986: the first row holds buttons that never move. Everything that changes has a row of its own, whose height depends on the panel's width and never on its text, so it cannot move the buttons or what is below.
+      var controls=el(head,'div','controls','dv-live-controls'),statusRow=el(head,'div','status','dv-live-status'),countRow=el(statusRow,'div','counts','dv-live-counts'),statusLine=el(statusRow,'div','text','dv-live-status-text');
       var available=value && value.available,hasData=available && value.hasData;
-      var toggle=button(head,'toggle','reader-button dv-live-toggle','Live','setEnabled');toggle.hidden=!hasData;
-      toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled)));
-      states.forEach(function(state){var count=el(head,'span','count-'+state,'dv-live-count'+(hasData && value && value.enabled && value.counts[state]?' dv-live-'+state:''),state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
+      // Live and Over time are the two modes (#929, Chuck 2026-11-04): first in the header, so changing Jira text cannot wrap them apart. The selected one is filled. Live returns from a past day; while selected it still turns colors off.
+      var over=value && value.overTime,past=!!(over && over.active);
+      var toggle=button(controls,'toggle','reader-button dv-live-toggle','Live',past?'overTimeClose':'setEnabled');toggle.hidden=!hasData;
+      toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled) && !past));
+      var overTime=button(controls,'over-time','reader-button dv-live-over-time',over && over.loading?'Loading history'+(over.progress?' '+over.progress:'')+'…':'Over time','overTime');overTime.hidden=!hasData || !over || !over.available;overTime.disabled=!!(over && (over.loading || over.disabled));overTime.setAttribute('aria-pressed',String(past));
+      states.forEach(function(state){var count=el(countRow,'span','count-'+state,'dv-live-count'+(hasData && value && value.enabled && value.counts[state]?' dv-live-'+state:''),state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
       var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo'}[conn.state];
-      var connection=el(head,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
+      var connection=el(statusLine,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
       var connWho=(conn.source || '')+(connLabel && connLabel!==String(conn.source || '').toLowerCase()?' '+connLabel:'');
       el(connection,'i','dot','dv-live-connection-dot');el(connection,'span','text','',[connWho,conn.checkedText].filter(Boolean).join(', '));
       var gh=conn.github || {state:'none'},ghLabel={disconnected:'GitHub not connected',connecting:'GitHub connecting',connected:'GitHub connected',error:'GitHub did not answer'}[gh.state];
       var github=el(connection,'span','github','dv-live-connection-github',ghLabel || '');github.setAttribute('data-state',gh.state);github.setAttribute('data-busy',String(!!gh.busy));github.hidden=!ghLabel;
       connection.hidden=!available || conn.state==='none';
-      var note=el(head,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
-      var action=button(head,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
-      var first=button(head,'first','reader-button dv-live-first','First blocker','firstBlocker');first.hidden=!hasData || !value.firstBlocker;
-      if(hasData && value.demo){var demo=el(head,'span','demo','dv-live-demo');var play=button(demo,'play','reader-button',value.demo.playing?'Pause':'Play','toggleDemo');play.disabled=value.demo.manual || value.demo.ended;button(demo,'next','reader-button','Next day','nextDemo').disabled=value.demo.ended;}
+      var note=el(statusLine,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
+      // A fixed slot and size (#986). "No blockers" only when that is true: blockers off the current path, or with colors off, leave "First blocker" greyed out.
+      var first=button(controls,'first','reader-button dv-live-first',value && (value.firstBlocker || (value.blockers || []).length)?'First blocker':'No blockers','firstBlocker');first.hidden=!hasData;first.disabled=!(value && value.firstBlocker);
+      var action=button(controls,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
+      var overStatus=el(statusLine,'span','over-time-status','dv-live-over-time-status',hasData && over && over.error?over.error:'');overStatus.setAttribute('role','status');overStatus.hidden=!overStatus.textContent;
       // #828 shared-board Edit mode lives in this header: Edit for editors, then a prominent Save N changes and Discard.
       var edit=available && value.edit || null,pending=edit?edit.pending:0,editing=!!(edit && edit.active);
-      var editControl=button(head,'edit','reader-button dv-live-edit','Edit','editStart');editControl.hidden=!(edit && edit.editable && !editing);editControl.disabled=!!(edit && (edit.blocked || edit.saving));
-      var saveControl=button(head,'save','reader-button dv-live-save',edit && edit.saving?'Saving…':'Save '+pending+' change'+(pending===1?'':'s'),'editSave');saveControl.hidden=!(editing && pending);saveControl.disabled=!!(edit && edit.saving);
-      var discardControl=button(head,'discard','reader-button dv-live-discard','Discard','editDiscard');discardControl.hidden=!(editing && pending);discardControl.disabled=!!(edit && edit.saving);
-      button(head,'done','reader-button dv-live-edit-done','Done','editDone').hidden=!(editing && !pending);
-      var reason=el(head,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
-      var editNotice=el(head,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
+      var editControl=button(controls,'edit','reader-button dv-live-edit','Edit','editStart');editControl.hidden=!(edit && edit.editable && !editing);editControl.disabled=!!(edit && (edit.blocked || edit.saving));
+      var saveControl=button(controls,'save','reader-button dv-live-save',edit && edit.saving?'Saving…':'Save '+pending+' change'+(pending===1?'':'s'),'editSave');saveControl.hidden=!(editing && pending);saveControl.disabled=!!(edit && edit.saving);
+      var discardControl=button(controls,'discard','reader-button dv-live-discard','Discard','editDiscard');discardControl.hidden=!(editing && pending);discardControl.disabled=!!(edit && edit.saving);
+      button(controls,'done','reader-button dv-live-edit-done','Done','editDone').hidden=!(editing && !pending);
+      var reason=el(statusLine,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
+      var editNotice=el(statusLine,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
       var editShown=!!(edit && (edit.editable || edit.notice));
       head.hidden=!available || !(hasData || value.note.text || value.actionLabel || editShown);
+      controls.hidden=!available || !(hasData || value.actionLabel || editShown);statusRow.hidden=!available || !(hasData || value.note.text);
+      // Long text is cut off on screen; the tooltip and the status elements keep all of it.
+      var statusText=[connection.hidden?'':[connWho,conn.checkedText].filter(Boolean).concat(ghLabel?[ghLabel]:[]).join(', '),note.textContent,overStatus.textContent,reason.textContent,editNotice.textContent].filter(Boolean).join(' · ');
+      if(statusText)statusRow.setAttribute('title',statusText);else statusRow.removeAttribute('title');
       if(!available)el(host,'p','empty','dv-live-empty','This page has no ticket references.');
+      // Day buttons: on the slider row, and on a row of their own for a demo in Live mode, which has no slider. A demo's buttons move its own day.
+      if(hasData && (past || value.demo)){
+        var demoDays=value.demo,row=el(host,'div','day-row','dv-live-day-row'+(past?' dv-live-over-time-row':'')+(demoDays?' dv-live-demo':''));
+        var previousDay=button(row,'previous','reader-button dv-live-step','<',demoDays?'prevDemo':'overTimeStep');previousDay._liveArgument=-1;previousDay.setAttribute('aria-label','Previous day');previousDay.disabled=demoDays?demoDays.first:over.index<=0;
+        if(past){
+          el(row,'span','first','dv-live-over-time-end',over.first);
+          var slider=el(row,'input','slider','dv-live-over-time-slider');slider.type='range';slider.min='0';slider.max=String(over.count-1);slider.step='1';slider.setAttribute('aria-label','Day');
+          if(slider.value!==String(over.index))slider.value=String(over.index);slider.setAttribute('aria-valuetext',over.label);
+          if(!slider._liveInput){slider._liveInput=function(){var owner=host._livePanelApi;if(owner)owner.overTimeDay(Number(slider.value));};slider.addEventListener('input',slider._liveInput);}
+          el(row,'span','last','dv-live-over-time-end',over.last);
+        }
+        var nextDay=button(row,'next','reader-button dv-live-step','>',demoDays?'nextDemo':'overTimeStep');nextDay._liveArgument=1;nextDay.setAttribute('aria-label','Next day');nextDay.disabled=demoDays?demoDays.ended:over.index>=over.count-1;
+        if(past)el(row,'p','note','dv-live-over-time-note','Status as of '+over.label+' · other columns show today').setAttribute('role','status');
+      }
       if(hasData){
         var body=el(host,'div','body','dv-live-panel-body'),epic=value.epic || {keys:[]};
         // Epic header box (#765): the epic is shown large inside the panel, never in the title bar. The old verdict line is gone.
@@ -210,7 +234,21 @@
 @keyframes dv-live-connection-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.7);}}
 @media (prefers-reduced-motion: reduce){.dv-live-connection-dot{animation:none!important;}}
 .dv-live-note[data-kind="warn"],.dv-live-note[data-kind="error"]{color:var(--dv-live-blocked);}
-.dv-live-demo{display:inline-flex;gap:6px;}
+.dv-live-over-time-status{color:var(--dv-live-blocked);}
+/* Amber marks "not live": no ticket status uses it. */
+.pt-live-status{--dv-live-past:#f5a524;}
+.pt-live-status .dv-live-head .tbtn.dv-live-toggle[aria-pressed="true"],.pt-live-status .dv-live-head .tbtn.dv-live-toggle[aria-pressed="true"]:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#fff;}
+.pt-live-status .dv-live-head .tbtn.dv-live-over-time[aria-pressed="true"],.pt-live-status .dv-live-head .tbtn.dv-live-over-time[aria-pressed="true"]:hover{background:var(--dv-live-past);border-color:var(--dv-live-past);color:#2b1a00;}
+.dv-live-day-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:10px;font:11px/1.4 'IBM Plex Mono',monospace;color:var(--dtext);font-variant-numeric:tabular-nums;}
+.dv-live-over-time-row{padding:8px 12px;border-left:3px solid var(--dv-live-past);border-radius:4px;background:color-mix(in srgb,var(--dv-live-past) 14%,transparent);}
+.dv-live-step{min-width:34px;text-align:center;}
+.dv-live-over-time-slider{-webkit-appearance:none;appearance:none;flex:1 1 80px;min-width:80px;height:16px;margin:0;background:transparent;cursor:pointer;}
+.dv-live-over-time-slider::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:var(--dfaint,var(--explore-border));}
+.dv-live-over-time-slider::-moz-range-track{height:3px;border-radius:2px;background:var(--dfaint,var(--explore-border));}
+.dv-live-over-time-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;margin-top:-4.5px;border:0;border-radius:50%;background:var(--dv-live-past);}
+.dv-live-over-time-slider::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:var(--dv-live-past);}
+.dv-live-over-time-slider:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:2px;}
+.dv-live-over-time-note{flex:0 0 100%;margin:0;color:var(--dtext);}
 .dv-live-epic{display:flex;gap:16px;align-items:center;padding:14px 16px;margin-top:12px;border:1px solid var(--explore-border);border-radius:10px;background:color-mix(in srgb,var(--dink) 4%,transparent);}
 .dv-live-epic-main{display:flex;flex-direction:column;gap:4px;min-width:0;}
 .dv-live-epic-keys{display:flex;align-items:baseline;gap:8px;font:700 20px/1.2 'IBM Plex Mono',monospace;letter-spacing:.02em;}
@@ -270,8 +308,11 @@
 /* Save keeps its fill over every theme's tbtn rules, hover included. */
 .pt-live-status .dv-live-head .tbtn.dv-live-save,.pt-live-status .dv-live-head .tbtn.dv-live-save:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#fff;font-weight:700;}
 .pt-live-status .dv-live-head .tbtn.dv-live-save:disabled{opacity:.7;}
+/* Fixed slot and size: the width of the longer label, plus the button's padding and border (#986). */
+.pt-live-status .dv-live-head .tbtn.dv-live-first{margin-left:auto;width:calc(13ch + 24px);text-align:center;}
+.pt-live-status .dv-live-head .tbtn:disabled,.pt-live-status .dv-live-day-row .tbtn:disabled{opacity:.5;cursor:default;}
 /* Paper has no controls: print hides these buttons as it hides the reader's other tbtn controls. */
-@media print{.pt-live-status .dv-live-head .tbtn{display:none;}}
+@media print{.pt-live-status .dv-live-head .tbtn,.pt-live-status .dv-live-day-row .tbtn{display:none;}}
 .dv-live-edit-reason,.dv-live-edit-notice{flex-basis:100%;font:12px/1.5 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .dv-live-edit-notice[data-kind="warn"],.dv-live-edit-notice[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-draggable{cursor:grab;}
@@ -285,7 +326,16 @@
 .pwidget.pt-live-status{display:flex;flex-direction:column}
 .pt-live-status>.ptitle{flex:none}
 .pt-live-status .pbody{flex:1;min-width:0;min-height:0;overflow:auto;color:var(--dtext);font:13px/1.5 'IBM Plex Sans',sans-serif}
-.dv-live-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--explore-border);font:11px/1.5 'IBM Plex Mono',monospace}
+.dv-live-head{container-type:inline-size;display:flex;flex-direction:column;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--explore-border);font:11px/1.5 'IBM Plex Mono',monospace}
+.dv-live-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+.dv-live-status{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:0 8px;height:28px;overflow:hidden;white-space:nowrap;}
+.dv-live-counts{display:flex;align-items:center;gap:8px;}
+.dv-live-status-text{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden;}
+.dv-live-status-text>*{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.dv-live-connection>span{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.dv-live-controls[hidden],.dv-live-status[hidden]{display:none!important;}
+/* A narrow panel gives counts and text a line each: the height follows the panel's width, never its text. */
+@container (max-width:560px){.dv-live-status{grid-template-columns:minmax(0,1fr);height:56px;}}
 .pt-live-status [hidden]{display:none!important}
 .dv-live-panel-body{min-width:0;color:var(--dtext)}
 .dv-live-panel-body h3{margin:18px 0 8px;font:600 14px/1.4 'IBM Plex Sans',sans-serif;color:var(--dink)}

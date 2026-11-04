@@ -23,6 +23,7 @@ function truthTableState(raw, panel, path, warnings, allowOnce) {
 function truthTableScalar(value) { return value === null || ['string', 'boolean'].indexOf(typeof value) >= 0 || typeof value === 'number' && isFinite(value); }
 function truthTableCell(value) { return value === undefined ? '—' : value === null ? 'null' : value === '' ? '(empty)' : truthTableScalar(value) ? String(value) : '—'; }
 function truthTableValueColumns(panel) { return softwarePanelItems(panel).filter(function (col) { return col.kind !== 'icons'; }); }
+function truthTableIconColumns(panel) { return softwarePanelItems(panel).filter(function (col) { return col.kind === 'icons'; }); }
 function truthTableIconCell(outputs) {
   if (!Array.isArray(outputs)) return '—';
   var icons = outputs.slice(0, 8).filter(function (output) { return panelObject(output) && FlowIcons.has(output.icon); });
@@ -110,6 +111,20 @@ PanelRegistry.define('truth-table', {
 .truth-table-output{display:inline-flex;gap:5px;align-items:center;font-size:11px}.truth-table-output svg{width:24px;height:24px;flex:none}
 @media print{.pt-truth-table{background:#fff!important;--dtext:#222;--dink:#111;--dfaint:#555}.pt-truth-table .ptitle{color:#111!important}.truth-table-scroll{overflow:visible;max-height:none}.truth-table{font-size:10px}.truth-table th,.truth-table td{min-width:0;padding:6px;max-width:none}.truth-table-icons{min-width:0}.truth-table tr{break-inside:avoid}.truth-table-active>th{border-left:3px solid currentColor}}
 `,
+  // Inspect case cards: two-column ID/label row, full-width property pairs and icon lists.
+  editorStyles: String.raw`
+.rowline.rowcard.truth-case{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 8px;padding:8px}
+.truth-case-head,.truth-property,.truth-case-icons,.rowline.rowcard>.rowcell.truth-column-kind{grid-column:1/-1;min-width:0}
+.truth-case-head{display:flex;align-items:center;gap:8px}
+.truth-case-title{flex:1;min-width:0;font:600 12px/1.4 'IBM Plex Sans',sans-serif;color:var(--ink);overflow-wrap:anywhere}
+.truth-case-head>.rowcardacts{flex:none}
+.truth-property{display:flex;flex-direction:column;gap:2px}
+.truth-property-controls{display:flex;gap:6px;min-width:0}
+.truth-case .truth-property-controls>select.fctl{flex:0 0 108px;width:108px}
+.truth-case .truth-property-controls>input.fctl{flex:1 1 0;width:0;min-width:0}
+.truth-case-icons{display:flex;flex-direction:column;gap:4px;margin-top:2px;padding-top:6px;border-top:1px solid var(--line)}
+.truth-case-icons>.fnote{margin:0;overflow-wrap:anywhere}
+`,
   authoring: {
     initialFields: true,
     transientFields: ['active', 'note'],
@@ -125,43 +140,66 @@ PanelRegistry.define('truth-table', {
       ],
       initial: {active: 'solar'}
     },
-    setupFields: [['columns', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'kind', label: 'Column kind', kind: 'enum', options: ['value', 'icons']}], max: 8, wide: true}], ['cases', 'jsonArr'], ['initial', 'json']],
+    setupFields: [['columns', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'kind', label: 'Column kind', kind: 'enum', options: ['value', 'icons'], unsetLabel: 'value (default)'}], max: 8, wide: true}], ['cases', 'jsonArr'], ['initial', 'json']],
     patchFields: [['note', 'text']],
     expandPatchFields: function (panel) { return [['active', 'enum', truthTableCases(panel).map(function (row) { return row.id; }), {label: 'Active case', nullLabel: 'No active case', help: 'Highlight an authored case. Omitted steps inherit the previous highlight.'}], ['note', 'text']]; },
-    fieldMeta: {columns: {label: 'Properties', group: 'Content', help: 'Declare column IDs and headers. Value columns hold typed properties; Icons columns hold independent shared icon lists.'}, cases: {label: 'Cases and UX icons', group: 'Content', help: 'Authored combinations, not inferred device behavior. Edit typed values, then choose each case’s output icons below.'}, note: {label: 'Explanation', nullLabel: 'Clear explanation'}},
+    fieldMeta: {columns: {label: 'Properties', group: 'Content', help: 'Declare column IDs and headers. Value columns hold typed properties; Icons columns hold independent shared icon lists.'}, cases: {label: 'Cases and UX icons', group: 'Content', help: 'Authored combinations, not inferred device behavior. Each case card holds its typed property values and its output icons.'}, note: {label: 'Explanation', nullLabel: 'Clear explanation'}},
     editor: function (context) {
       return {patchField: function (field, input) {
         if (field[0] === 'active') input.setAttribute('aria-label', 'Active case');
         if (field[0] === 'note') input.setAttribute('aria-label', 'Explanation');
       }, setupField: function (field, panel) {
+        var doc = context.document;
+        function node(tag, className, text) { var el = doc.createElement(tag); el.className = className; if (text !== undefined) el.textContent = text; return el; }
+        // Same shared rows control as other setup fields; only the kind cell spans the card so "value (default)" stays readable.
+        if (field[0] === 'columns') return context.controls.block('Properties', context.controls.rows('columns', panel.columns, field[2], {cell: function (info) { if (info.column.k === 'kind') info.cell.classList.add('truth-column-kind'); return false; }}));
         if (field[0] !== 'cases') return;
         var rows = truthTableCaseRows(panel);
         if (rows === null) return; // Preserve malformed imports in Advanced JSON.
-        var columns = truthTableValueColumns(panel), cols = [{k: 'id', label: 'Case ID', req: true}, {k: 'label', label: 'Case label'}];
+        var columns = truthTableValueColumns(panel), iconColumns = truthTableIconColumns(panel), cols = [{k: 'id', label: 'Case ID', req: true}, {k: 'label', label: 'Case label'}];
         columns.forEach(function (col, i) {
           cols.push({k: 'type' + i, label: (col.label || col.id) + ' type', kind: 'enum', options: ['unset', 'string', 'number', 'boolean', 'null', 'advanced']});
           cols.push({k: 'value' + i, label: col.label || col.id});
         });
         function commit(value) { return context.commit('cases', JSON.stringify(value)); }
-        var wrap = context.document.createElement('div');
-        var title = context.document.createElement('h4');title.textContent = 'Cases and UX icons';wrap.appendChild(title);
-        wrap.appendChild(context.controls.rows('Cases', rows, {cols: cols, max: 24, wide: true}, {raw: false, commitValue: commit, collect: function (items) { return truthTableCollectCases(items, panel); }}));
-        (panel.cases || []).forEach(function (row, index) {
-          softwarePanelItems(panel).filter(function (col) { return col.kind === 'icons'; }).forEach(function (col) {
-            var heading = context.document.createElement('h4');heading.textContent = (row.label || row.id) + ' · ' + (col.label || col.id);wrap.appendChild(heading);
-            var value = panelOwn(row.cells, col.id) ? row.cells[col.id] : undefined;
-            function commitIcons(icons) {
-              var cases = panel.cases.slice(), cells = panelCollectionCopy(row.cells);
-              cells[col.id] = icons || [];cases[index] = Object.assign({}, row, {cells: cells});return commit(cases);
-            }
-            if (value !== undefined && (!Array.isArray(value) || value.some(function (icon) { return !panelObject(icon); }))) {
-              var warning = context.document.createElement('p');warning.textContent = 'This cell has a non-icon value. Keep it in Advanced JSON or replace it to choose icons.';wrap.appendChild(warning);
-              wrap.appendChild(context.controls.action('Replace with empty icon list', function () { if (commitIcons([])) context.refresh(); }));return;
-            }
-            var control = context.controls.rows('Icons for ' + row.id + ' / ' + col.id, value || [], {cols: [{k: 'icon', label: 'Icon', kind: 'icon', req: true}, {k: 'label', label: 'Accessible label'}], max: 8, wide: true}, {raw: false, commitValue: commitIcons});
-            control.setAttribute('data-truth-case', row.id);control.setAttribute('data-truth-column', col.id);wrap.appendChild(control);
+        function iconEditor(row, index, col) {
+          var section = node('div', 'truth-case-icons');
+          section.setAttribute('data-truth-case', row.id);section.setAttribute('data-truth-column', col.id);
+          section.appendChild(node('span', 'rowk', col.label || col.id));
+          var value = panelOwn(row.cells, col.id) ? row.cells[col.id] : undefined;
+          function commitIcons(icons) {
+            var cases = panel.cases.slice(), cells = panelCollectionCopy(row.cells);
+            cells[col.id] = icons || [];cases[index] = Object.assign({}, row, {cells: cells});return commit(cases);
+          }
+          if (value !== undefined && (!Array.isArray(value) || value.some(function (icon) { return !panelObject(icon); }))) {
+            section.appendChild(node('p', 'fnote', 'This cell has a non-icon value. Keep it in Advanced JSON or replace it to choose icons.'));
+            section.appendChild(context.controls.action('Replace with empty icon list', function () { if (commitIcons([])) context.refresh(); }));return section;
+          }
+          section.appendChild(context.controls.rows('Icons for ' + row.id + ' / ' + col.id, value || [], {cols: [{k: 'icon', label: 'Icon', kind: 'icon', req: true}, {k: 'label', label: 'Accessible label'}], max: 8, wide: true}, {raw: false, commitValue: commitIcons}));
+          return section;
+        }
+        // One card per case: case actions in its header, each value column's type and value on one row, then that case's icon lists.
+        function caseCard(info) {
+          var line = info.line, ref = info.ref, index = info.base ? info.base._sourceIndex : -1, row = index >= 0 ? panel.cases[index] : null;
+          var title = !row ? 'New case' : typeof row.label === 'string' && row.label ? row.label : typeof row.id === 'string' && row.id ? row.id : 'Case ' + (index + 1);
+          var head = node('div', 'truth-case-head');head.appendChild(node('span', 'truth-case-title', title));
+          head.appendChild(line.querySelector(':scope > .rowcardacts'));line.insertBefore(head, line.firstChild);
+          line.classList.add('truth-case');line.setAttribute('role', 'group');line.setAttribute('aria-label', title + ' case');
+          columns.forEach(function (col, i) {
+            var type = ref.inputs['type' + i], value = ref.inputs['value' + i], typeCell = type.closest('.rowcell'), valueCell = value.closest('.rowcell');
+            var pair = node('div', 'truth-property'), controls = node('div', 'truth-property-controls');
+            pair.setAttribute('data-truth-property', col.id);pair.appendChild(node('span', 'rowk', col.label || col.id));
+            controls.appendChild(type);controls.appendChild(value);pair.appendChild(controls);
+            line.replaceChild(pair, typeCell);line.removeChild(valueCell);
           });
-        });
+          if (!row) return line; // A new case gets icon lists once it is saved.
+          line.setAttribute('data-truth-case', row.id);
+          iconColumns.forEach(function (col) { line.appendChild(iconEditor(row, index, col)); });
+          return line;
+        }
+        var wrap = node('div', 'truth-cases');
+        wrap.appendChild(node('h4', '', 'Cases and UX icons'));
+        wrap.appendChild(context.controls.rows('Cases', rows, {cols: cols, max: 24, wide: true}, {raw: false, commitValue: commit, collect: function (items) { return truthTableCollectCases(items, panel); }, wrapRow: caseCard}));
         return wrap;
       }};
     },

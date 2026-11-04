@@ -1,5 +1,13 @@
 # Changelog
 
+## Live status connector refresh (2026-11-03)
+
+- Live status boards published as claude.ai artifacts now re-read the Jira and
+  GitHub connectors every 5 minutes instead of every 60 seconds (#930), which cuts
+  connector calls to one fifth. GitHub cohort rotation moves to 5 minutes as well.
+  A board already published keeps the old rate until it is republished. Host
+  providers set their own `refreshMs` and are unchanged.
+
 ## Side-by-side compare: agent update preview and Git Compare (2026-11-03)
 
 - A shared compare engine (#847) lists what changed between two Flowview documents

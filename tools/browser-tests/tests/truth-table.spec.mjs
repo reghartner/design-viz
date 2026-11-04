@@ -4,6 +4,19 @@ import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {repo} from '../helpers/prepare.mjs';
 const fixture=async()=>JSON.parse(await readFile(path.join(repo,'examples/device-power-truth-table/device-power-truth-table.spec.json'),'utf8'));
+/* #921 contract, slice 1 "editor layout" (issue #921 "How it should look" 1-4 + "Test + flip";
+   Chuck 2026-11-03 §0 ruling: "extend existing tests"; hosted in the first test below).
+   Fixture: the shipped device-power example (4 cases; value columns source/charge/charging;
+   icons columns powerIcon/batteryIcon), first column renamed to "Supply" by the test.
+   | row | assertion (scoped) | rejects |
+   | 1 one card per case | `[data-truth-case=<id>]:not([data-truth-column])` count 1 for EACH of the 4 cases, holding that case's Case ID input | today's separate icon blocks after the case list |
+   | 1 icons edited inside their case | inside each case card: exactly one `[data-truth-case=<id>][data-truth-column=<col>]` per icons column, with as many pickers as that case's cell has icons | icon lists attached to the wrong case or only to the first card |
+   | 1 no icon editor outside a card | every `[data-truth-column]` in Inspect (8) is inside a case card | duplicating the old blocks next to the new ones |
+   | 2 type + value together | each value column of each case: one `[data-truth-property=<col>]` holding "<label> type" and "<label>" with the case's type/value, vertical centers within 4px and the type left of the value | today's 3-column grid that puts "Supply type" and "Supply" on different rows; a pair offset by part of a row or stacked; pairing one column's type with another's value |
+   | 3 Column kind default | each unset Properties kind select shows "value (default)" with value "" and the text fits inside the select; icons columns still show "icons" | the cut-off "(Column kind)" placeholder; a label that still clips; saving kind "value" |
+   | 4 case editor full width (guard) | each case card's left and right edges within 2px of the Inspect content box (#guide inside border, padding and any scrollbar) | the 88px setup label column beside the cases; a card that leaves part of the width unused (already true at origin/main 53d7bca6: guard, not a flip) |
+   | phone width | excluded — desktop-only editing (CLAUDE.md) |
+   Slices 2 (No active case) and 3 (empty icon cell text) add their rows with their own RED. */
 
 test('desktop truth-table author edits properties, cases and shared icons with exact Undo/Redo',async({page,server},info)=>{
   const original=JSON.stringify(await fixture(),null,2);
@@ -21,6 +34,52 @@ test('desktop truth-table author edits properties, cases and shared icons with e
   const changedHeader=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(original);
   await page.locator('#redo-builder').click();await expect(source).toHaveValue(changedHeader);
   await inspectPageElement(page,panel.locator('.ptitle'));
+  // #921 slice 1 (matrix above): one card per case with its property pairs and its own icon lists.
+  const authored=await declaration(),valueColumns=authored.columns.filter(col=>col.kind!=='icons'),iconColumns=authored.columns.filter(col=>col.kind==='icons');
+  expect([authored.cases.length,valueColumns.map(col=>col.label),iconColumns.length],'precondition: 4 cases, renamed value columns, 2 icons columns').toEqual([4,['Supply','Battery','Charging'],2]);
+  // Rows 3 and 2 read the rendered form once (no retry waits) and assert softly, so one run reports each row; row 1 stops the test.
+  const kinds=guide.getByLabel('Column kind',{exact:true});await expect(kinds,'precondition: one kind select per column').toHaveCount(5);
+  await page.evaluate(()=>document.fonts.ready);
+  const kindState=await kinds.evaluateAll(els=>els.map(el=>{const cs=getComputedStyle(el),ctx=document.createElement('canvas').getContext('2d');ctx.font=[cs.fontStyle,cs.fontWeight,cs.fontSize,cs.fontFamily].join(' ');
+    const text=el.selectedOptions[0].textContent;return {value:el.value,text,need:Math.ceil(ctx.measureText(text).width+parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight)+20),box:el.clientWidth};}));
+  for(const [i,col] of authored.columns.entries()){
+    const kind=kindState[i];
+    if(col.kind==='icons'){expect.soft([kind.value,kind.text],`(3) ${col.id} kind`).toEqual(['icons','icons']);continue;}
+    expect.soft(kind.value,`(3) ${col.id} kind stays unset`).toBe('');
+    expect.soft(kind.text,`(3) ${col.id} unset kind names its default`).toBe('value (default)');
+    expect.soft(kind.need,`(3) ${col.id} "${kind.text}" fits its select (arrow included)`).toBeLessThanOrEqual(kind.box);
+  }
+  expect.soft((await declaration()).columns.map(col=>col.kind),'(3) showing the default saves nothing').toEqual([undefined,undefined,undefined,'icons','icons']);
+  expect.soft(await guide.locator('[data-truth-property]').count(),'(2) one property pair per case and value column').toBe(12);
+  const caseCards=guide.locator('[data-truth-case]:not([data-truth-column])');
+  await expect(caseCards,'(1) one card per case').toHaveCount(4);
+  await expect(guide.locator('[data-truth-column]'),'precondition: one icon editor per case and icons column').toHaveCount(8);
+  await expect(caseCards.locator('[data-truth-column]'),'(1) every icon editor sits inside a case card').toHaveCount(8);
+  // Inspect content box: inside #guide's border and padding; clientWidth already excludes a scrollbar.
+  const contentBox=()=>guide.evaluate(el=>{const r=el.getBoundingClientRect(),cs=getComputedStyle(el);const left=r.left+el.clientLeft+parseFloat(cs.paddingLeft);return {left,right:left+el.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)};});
+  for(const row of authored.cases){
+    const card=guide.locator(`[data-truth-case="${row.id}"]:not([data-truth-column])`);
+    await expect(card,`(1) ${row.id} has one case card`).toHaveCount(1);
+    await expect(card.getByLabel('Case ID',{exact:true}),`(1) ${row.id} card edits its own case`).toHaveValue(row.id);
+    for(const col of iconColumns){
+      const icons=card.locator(`[data-truth-case="${row.id}"][data-truth-column="${col.id}"]`);
+      await expect(icons,`(1) ${row.id} edits ${col.id} inside its card`).toHaveCount(1);
+      await expect(icons.locator('.flow-icon-browse'),`(1) ${row.id} ${col.id} shows its own icons`).toHaveCount(row.cells[col.id].length);
+    }
+    for(const col of valueColumns){
+      const pair=card.locator(`[data-truth-property="${col.id}"]`);
+      await expect(pair,`(2) ${row.id} ${col.id} has one property pair`).toHaveCount(1);
+      const type=pair.getByLabel(col.label+' type',{exact:true}),value=pair.getByLabel(col.label,{exact:true}),cell=row.cells[col.id];
+      await expect(type,`(2) ${row.id} ${col.id} pair holds the type`).toHaveValue(typeof cell);
+      await expect(value,`(2) ${row.id} ${col.id} pair holds the value`).toHaveValue(String(cell));
+      const a=await type.boundingBox(),b=await value.boundingBox();
+      expect(Math.abs((a.y+a.height/2)-(b.y+b.height/2)),`(2) ${row.id} ${col.id} type and value share one visual row (centers)`).toBeLessThanOrEqual(4);
+      expect(a.x+a.width,`(2) ${row.id} ${col.id} type sits left of its value`).toBeLessThanOrEqual(b.x+1);
+    }
+    const content=await contentBox(),box=await card.boundingBox();
+    expect(Math.abs(box.x-content.left),`(4) ${row.id} card starts at the Inspect content left edge`).toBeLessThanOrEqual(2);
+    expect(Math.abs(box.x+box.width-content.right),`(4) ${row.id} card ends at the Inspect content right edge`).toBeLessThanOrEqual(2);
+  }
   await guide.getByLabel('Case label',{exact:true}).first().fill('Solar input');await guide.getByLabel('Case label',{exact:true}).first().press('Tab');
   await expect.poll(async()=>(await declaration()).cases[0].label).toBe('Solar input');
   await guide.getByLabel('Supply',{exact:true}).first().fill('Roof panel');await guide.getByLabel('Supply',{exact:true}).first().press('Tab');

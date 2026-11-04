@@ -344,7 +344,7 @@ test('P1 P4 P5 P7 P9 claude connector paints Jira nodes and Flagged edges with c
  await expect(section.locator('g.node[data-dv-node="ux"]')).toHaveClass(/dv-live-missing/);
  await expect(root.locator('.dv-live-connection')).toHaveAttribute('data-state','connected');await expect(root.locator('.dv-live-connection')).toContainText('Jira connected, refreshed');
  const registrations=await page.evaluate(()=>__mcpStub.watches.map(({server,tool,input,opts})=>({server,tool,input,opts})));
- expect(registrations).toHaveLength(2);expect(registrations[0].server).toBe('Mock-atlassian');expect(registrations[0].opts).toEqual({refetchInterval:60000});expect(registrations[1].input.jql).toBe(registrations[0].input.jql+' AND Flagged = Impediment');
+ expect(registrations).toHaveLength(2);expect(registrations[0].server).toBe('Mock-atlassian');expect(registrations[0].opts).toEqual({refetchInterval:300000});expect(registrations[1].input.jql).toBe(registrations[0].input.jql+' AND Flagged = Impediment');
  await root.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-active,.dv-live-blocked,.dv-live-missing')).toHaveCount(0);
  await page.evaluate(()=>__mcpStub.watches.forEach(w=>w.deliver()));expect(await page.evaluate(()=>__mcpStub.watches.some(w=>w.stopped))).toBe(false);
  await root.locator('.dv-live-toggle').click();await expect(section.locator('g.node[data-dv-node="hardware"]')).toHaveClass(/dv-live-active/);expect(requests).toEqual([]);

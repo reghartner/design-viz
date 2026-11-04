@@ -546,6 +546,9 @@ issue links (`issuelinks`, from the timeline's `links`). Assignees carry fiction
 Atlassian `accountId`s so the Owner links render.
 Search with `parent = DOOR-100`, optionally followed by `AND Flagged = Impediment`,
 to retrieve that day's children. `getJiraIssue` can also return the epic itself.
+The mock advances one story day per minute and a board re-reads every 5 minutes,
+so a board on the mock shows every fifth story day unless the connector URL pins
+`?day=N`.
 
 The sibling [mock GitHub MCP server](../deploy/cloudflare/mock-github-mcp/README.md)
 serves the same timeline's pull requests through `search_pull_requests` and
@@ -673,7 +676,7 @@ manifest exposes it takes any one that offers both
 **Atlassian MCP**, then **Atlassian**, then the first other qualifying
 connector. It then selects the resource matching `page.tracking.jira.site`
 (or the first resource when no site is specified), and watches batches of ten
-keys every 60 seconds. A second Flagged Impediment query detects blockers.
+keys every 5 minutes. A second Flagged Impediment query detects blockers.
 Configured parent roots also get a key lookup watch for title, status and issue
 type, including when they have no children. Each parent gets a `parent = KEY`
 watch and a `parent = KEY AND Flagged = Impediment` watch. The fields requested
@@ -835,7 +838,7 @@ Its display name is free; declare that exact name in `capabilities.mcp.servers`
 as shown above. The adapter never matches the connector by name: from the
 listed connectors it takes any that offers both `search_pull_requests` and
 `pull_request_read`, preferring one named **GitHub**, then the first qualifying
-one. Both tools are `readOnlyHint: true`, so `watchTool` polls them at 60 s.
+one. Both tools are `readOnlyHint: true`, so `watchTool` polls them every 5 minutes.
 
 Shapes captured on 2026-10-27 from a real claude.ai custom connector (46 tools):
 
@@ -880,7 +883,7 @@ else `commented` when only comments exist, else `none`; a `DISMISSED` review
 withdraws that reviewer's decision.
 
 At most ten GitHub watches are subscribed at a time; a longer queue rotates in
-60-second cohorts so every ticket is eventually searched, which also keeps
+5-minute cohorts so every ticket is eventually searched, which also keeps
 automatic polling under the search rate limit. Pull-request reads (`get`,
 `get_check_runs`, `get_reviews`) go to the front of the queue. Each ticket's
 links merge authored URLs first (source `authored`, enriched by their `get`

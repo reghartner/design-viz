@@ -306,8 +306,9 @@ Open the artifact in a browser and check, in this order:
 - Screenshot for the author.
 
 With the mock server, the story clock advances one story day per minute from
-`DEPLOYED_AT` and loops; pin a day with `?day=N` on the connector URL when a
-fixed state is needed for a screenshot.
+`DEPLOYED_AT` and loops, and a board re-reads every 5 minutes, so it shows every
+fifth story day; pin a day with `?day=N` on the connector URL when a fixed state
+is needed for a screenshot.
 
 ## Out of scope here
 

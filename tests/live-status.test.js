@@ -542,6 +542,66 @@ test('P2 Jira map merges chunks, marks only requested missing keys and preserves
  const result=plain(C.liveStatusJiraMap(['AA-1','BB-1','CC-1'],[[jira('AA-1')],[jira('BB-1','done'),jira('EX-1')]],new Set(['BB-1']),'https://jira.test/',1793000000000));
  assert.deepEqual(Object.keys(result).sort(),['AA-1','BB-1','CC-1']);assert.equal(result['AA-1'].url,'https://jira.test/browse/AA-1');assert.equal(result['AA-1'].updatedAt,'2026-10-20T09:00:00Z');assert.equal(result['AA-1'].assignee,'Alex');assert.equal(result['BB-1'].state,'blocked');assert.equal(result['CC-1'].state,'missing');
 });
+/* Day reconstruction contract matrix (#929, PR 2 of 3). Source: issue behavior items 5-7 and Chuck's rulings of 2026-11-03.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| R1 | open ticket, then all Done | first day is the oldest creation; last day is today while any ticket is open, else the day the last ticket reached Done | a range that always ends today |
+| R2 | changes on two days | a day with no change keeps the previous day's status | filling gaps with today's status |
+| R3 | change late on one local day and early the next | counted at the end of its own local day | UTC day boundaries |
+| R4 | ticket created later | no status entry before its creation day | todo before creation |
+| R5 | Flagged on and off; status name holding "block"; flagged today with no change | blocked follows today's rule on each day | ignoring Flagged history |
+| R6 | ticket missing today, epic and initiative containers | last day equals the live map; container state rolls up per day; missing ticket has no past status | a last day that disagrees with the live board |
+| R7 | REST, list and connection envelopes; item with no toString | parsed in order, other fields ignored, Object.prototype.toString never read as a value | reading a function as a status name |
+| R8 | status list with object and string categories | name to category, case-insensitive | one envelope only |
+| R9 | a range over a new year | labels carry the year | ambiguous dates |
+*/
+const historyAt=(y,m,d,h=12,min=0)=>new Date(y,m-1,d,h,min).getTime(),HISTORY_CATEGORIES={'to do':'new','in progress':'indeterminate','blocked':'indeterminate','done':'done'};
+const historyChange=(at,from,to)=>({at,field:'status',from,to}),historyFlag=(at,from,to)=>({at,field:'flag',from,to});
+const historyTicket=(key,created,status,changes=[],flagged=false)=>({key,created,status,flagged,changes});
+function historyDays(C,tickets,today,now=historyAt(2026,10,24)){assert.equal(typeof C.liveStatusHistoryDays,'function','#929 day reconstruction exists');const value=C.liveStatusHistoryDays({tickets,today,categories:HISTORY_CATEGORIES,now,locale:'en-US'});return plain(value);}
+const historyStates=(result,key)=>result.days.map(day=>day.states[key]?day.states[key].state:null);
+test('R1 R2 R4 the range runs from the oldest creation to today, or to the last Done, and days carry forward',()=>{
+ const C=providerContext(),open=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20),'In Progress',[historyChange(historyAt(2026,10,21),'To Do','In Progress')]),historyTicket('BB-1',historyAt(2026,10,22),'To Do')],{'AA-1':{state:'active'},'BB-1':{state:'todo'}});
+ assert.deepEqual(open.days.map(day=>day.short),['Oct 20','Oct 21','Oct 22','Oct 23','Oct 24']);assert.equal(open.index,4);
+ assert.deepEqual(historyStates(open,'AA-1'),['todo','active','active','active','active']);assert.deepEqual(historyStates(open,'BB-1'),[null,null,'todo','todo','todo']);
+ const done=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20),'Done',[historyChange(historyAt(2026,10,21),'To Do','Done')]),historyTicket('BB-1',historyAt(2026,10,20),'Done',[historyChange(historyAt(2026,10,22),'To Do','In Progress'),historyChange(historyAt(2026,10,23),'In Progress','Done')])],{'AA-1':{state:'done'},'BB-1':{state:'done'}},historyAt(2026,11,3));
+ assert.deepEqual(done.days.map(day=>day.short),['Oct 20','Oct 21','Oct 22','Oct 23'],'all Done: the range ends on the last Done day');assert.deepEqual(historyStates(done,'BB-1'),['todo','todo','active','done']);assert.equal(done.days.at(-1).label,'Oct 23');
+});
+test('R3 a change belongs to the end of its own local day',()=>{
+ const C=providerContext(),result=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20,0,1),'Done',[historyChange(historyAt(2026,10,20,23,59),'To Do','In Progress'),historyChange(historyAt(2026,10,22,0,1),'In Progress','Done')])],{'AA-1':{state:'active'}},historyAt(2026,10,23));
+ assert.deepEqual(historyStates(result,'AA-1').slice(0,3),['active','active','done']);
+});
+test('R5 blocked follows the status name and Flagged on each day',()=>{
+ const C=providerContext(),result=historyDays(C,[
+  historyTicket('AA-1',historyAt(2026,10,20),'In Progress',[historyChange(historyAt(2026,10,20),'To Do','In Progress'),historyFlag(historyAt(2026,10,21),'','Impediment'),historyFlag(historyAt(2026,10,23),'Impediment','')]),
+  historyTicket('BB-1',historyAt(2026,10,20),'Done',[historyChange(historyAt(2026,10,21),'To Do','Blocked by supplier'),historyChange(historyAt(2026,10,22),'Blocked by supplier','Done')]),
+  historyTicket('CC-1',historyAt(2026,10,20),'In Progress',[],true)],{'AA-1':{state:'active'},'BB-1':{state:'done'},'CC-1':{state:'blocked'}});
+ assert.deepEqual(historyStates(result,'AA-1'),['active','blocked','blocked','active','active']);assert.deepEqual(historyStates(result,'BB-1'),['todo','blocked','done','done','done']);assert.deepEqual(historyStates(result,'CC-1'),['blocked','blocked','blocked','blocked','blocked']);
+});
+test('R6 the last day equals the live map, containers roll up and a missing ticket has no past status',()=>{
+ const C=providerContext(),today={'IN-1':{state:'active',kind:'initiative'},'EP-1':{state:'active',kind:'epic',initiatives:['IN-1']},'AA-1':{state:'done',epic:'EP-1',initiatives:['IN-1']},'BB-1':{state:'active',epic:'EP-1',initiatives:['IN-1']},'GONE-1':{state:'missing',epic:'EP-1'}};
+ const result=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20),'Done',[historyChange(historyAt(2026,10,23),'To Do','Done')]),historyTicket('BB-1',historyAt(2026,10,20),'In Progress',[historyChange(historyAt(2026,10,22),'To Do','In Progress')])],today);
+ assert.deepEqual(historyStates(result,'EP-1'),['todo','todo','active','active','active']);assert.deepEqual(historyStates(result,'IN-1'),['todo','todo','active','active','active']);
+ assert.deepEqual(historyStates(result,'GONE-1'),[null,null,null,null,'missing'],'item 7: no history, and today stays as today');
+ assert.deepEqual(result.days.at(-1).states,{'IN-1':{state:'active'},'EP-1':{state:'active'},'AA-1':{state:'done'},'BB-1':{state:'active'},'GONE-1':{state:'missing'}});
+ const empty=C.liveStatusHistoryDays({tickets:[],today:{},categories:{},now:historyAt(2026,10,24)});assert.equal(empty.days.length,0);
+});
+test('R7 changelog envelopes parse to ordered status and Flagged changes',()=>{
+ const C=providerContext();assert.equal(typeof C.liveStatusHistoryChanges,'function');
+ const entry={created:'2026-10-21T09:00:00.000+0000',items:[{field:'status',fromString:'To Do',toString:'In Progress'},{field:'assignee',fromString:'A',toString:'B'},{field:'Flagged',fromString:null,toString:'Impediment'},{field:'status'}]};
+ for(const payload of [{values:[entry]},{histories:[entry]},{changelogs:[entry]},{nodes:[entry]},{data:{values:[entry]}},[entry]])assert.deepEqual(plain(C.liveStatusHistoryChanges(payload)),[{at:Date.parse('2026-10-21T09:00:00.000+0000'),field:'status',from:'To Do',to:'In Progress'},{at:Date.parse('2026-10-21T09:00:00.000+0000'),field:'flag',from:'',to:'Impediment'}]);
+ for(const payload of [null,{},'bad',{values:[{created:'not a time',items:[{field:'status',fromString:'a',toString:'b'}]}]},{values:[null]}])assert.deepEqual(plain(C.liveStatusHistoryChanges(payload)),[]);
+});
+test('R8 status lists read object and string categories',()=>{
+ const C=providerContext();assert.equal(typeof C.liveStatusHistoryCategories,'function');
+ const expected={'to do':'new','doing':'indeterminate','done':'done'};
+ for(const statuses of [[{name:'To Do',statusCategory:{key:'new'}},{name:'Doing',statusCategory:{key:'indeterminate'}},{name:'DONE',statusCategory:{key:'done'}}],[{name:'To Do',statusCategory:'TODO'},{name:'Doing',statusCategory:'IN_PROGRESS'},{name:'Done',statusCategory:'DONE'}]])
+  for(const payload of [statuses,{values:statuses},{statuses},{data:statuses},{nodes:statuses}])assert.deepEqual(plain(C.liveStatusHistoryCategories(payload)),expected);
+ assert.deepEqual(plain(C.liveStatusHistoryCategories(null)),{});assert.deepEqual(plain(C.liveStatusHistoryCategories([{name:'No category'},null])),{});
+});
+test('R9 a range over a new year labels days with the year',()=>{
+ const C=providerContext(),result=historyDays(C,[historyTicket('AA-1',historyAt(2026,12,31),'To Do')],{'AA-1':{state:'todo'}},historyAt(2027,1,1));assert.deepEqual(result.days.map(day=>day.short),['Dec 31, 2026','Jan 1, 2027']);
+});
 test('P2 chunks of 25 keys preserve order in three batches of at most ten',()=>{
  const C=providerContext();assert.equal(typeof C.liveStatusJiraChunks,'function');const keys=Array.from({length:25},(_,i)=>'AA-'+i);
  const chunks=plain(C.liveStatusJiraChunks(keys));assert.deepEqual(chunks.map(c=>c.length),[10,10,5]);assert.deepEqual(chunks.flat(),keys);assert.deepEqual(plain(C.liveStatusJiraChunks([])),[]);

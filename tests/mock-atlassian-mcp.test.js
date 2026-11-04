@@ -89,9 +89,10 @@ test('M2: initialize echo, tools/list schemas and read-only annotations', async 
     });
   }
   const tools = handleMcp(rpc('tools/list'), CONTEXT).result.tools;
-  assert.deepEqual(tools.map(t => t.name).sort(), ['getAccessibleAtlassianResources', 'getJiraIssue', 'searchJiraIssuesUsingJql']);
+  assert.deepEqual(tools.map(t => t.name).sort(), ['getAccessibleAtlassianResources', 'getJiraIssue', 'listJiraIssueChangelogs', 'listJiraStatuses', 'searchJiraIssuesUsingJql']);
   const inputs = { getAccessibleAtlassianResources: [], getJiraIssue: ['cloudId', 'issueIdOrKey', 'fields'],
-    searchJiraIssuesUsingJql: ['cloudId', 'jql', 'fields', 'maxResults', 'nextPageToken'] };
+    searchJiraIssuesUsingJql: ['cloudId', 'jql', 'fields', 'maxResults', 'nextPageToken'],
+    listJiraIssueChangelogs: ['cloudId', 'issueIdOrKey', 'maxResults', 'nextPageToken'], listJiraStatuses: ['cloudId'] };
   for (const tool of tools) {
     assert.equal(tool.inputSchema.type, 'object');
     for (const name of inputs[tool.name]) assert.ok(tool.inputSchema.properties[name], name);
@@ -357,7 +358,7 @@ test('M12: rate limit binding denies with 429 JSON-RPC error and keys by client 
   const allowed = { RL: { limit: async ({ key }) => { keys.push(key); return { success: true }; } } };
   response = await fetchMock('/mcp', { ...post(rpc('tools/list')), headers }, allowed);
   assert.equal(response.status, 200);
-  assert.equal((await response.json()).result.tools.length, 3);
+  assert.equal((await response.json()).result.tools.length, 5);
   assert.equal(keys.length, 3);
   assert.equal((await fetchMock('/healthz', {}, limited)).status, 200);
   assert.equal((await fetchMock('/', {}, limited)).status, 200);
@@ -372,7 +373,7 @@ test('M13: optional MCP_PATH_TOKEN moves the endpoint under /<token>/mcp', async
   const env = { MCP_PATH_TOKEN: token };
   let response = await fetchMock('/' + token + '/mcp', post(rpc('tools/list')), env);
   assert.equal(response.status, 200);
-  assert.equal((await response.json()).result.tools.length, 3);
+  assert.equal((await response.json()).result.tools.length, 5);
   response = await fetchMock('/' + token + '/mcp?scenario=all-done', post(rpc('tools/call',
     { name: 'getJiraIssue', arguments: { issueIdOrKey: 'HW-123' } })), env);
   assert.equal(result(await response.json()).data.fields.status.statusCategory.key, 'done');
@@ -489,4 +490,51 @@ test('parent metadata search resolves the same epic as getJiraIssue without addi
   assert.equal(issues.length,1);assert.equal(issues[0].key,single.key);assert.deepEqual(issues[0].fields,single.fields);
   assert.ok(result(await call('searchJiraIssuesUsingJql',{jql:'parent = DOOR-100'},context)).issues.nodes.every(issue=>issue.key!=='DOOR-100'));
  }
+});
+
+/* Over time (#929, PR 2 of 3). Source: issue "History source (real connector)".
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| H1 | HW-124 through the whole story | entries oldest first, one for each status or Flagged change, with Jira item fields and the day's time | a tool that returns current status only |
+| H2 | HW-124 spans more than one page | page 1 holds three entries and a cursor, page 2 holds the rest, and only page 2 holds the Done change | a single-page mock that never exercises paging |
+| H3 | story pinned to an early day | no entry after that day | a history that knows the future |
+| H4 | ticket absent from the current day and an unknown key | the same not-found error as getJiraIssue | an empty history for a ticket Jira would refuse |
+| H5 | search and getJiraIssue | `created` is the first day the timeline names the ticket | a constant creation time |
+| H6 | listJiraStatuses | every status name in the timeline with its category | a list that omits Blocked |
+| H7 | all-done scenario | changelog is empty and the call succeeds | a story-only tool |
+*/
+test('H1 H2 changelog is oldest first and spans pages with the last change on page 2', async () => {
+  const day = timeline().days.length - 1, context = { ...CONTEXT, day }, args = { cloudId: 'mock-cloud-id-0001', issueIdOrKey: 'HW-124' };
+  const first = result(await call('listJiraIssueChangelogs', args, context));
+  assert.equal(first.values.length, 3);assert.equal(first.pageInfo.hasNextPage, true);assert.ok(first.pageInfo.endCursor);assert.equal(first.isLast, false);assert.equal(first.total, 4);
+  const second = result(await call('listJiraIssueChangelogs', { ...args, nextPageToken: first.pageInfo.endCursor }, context));
+  assert.equal(second.values.length, 1);assert.equal(second.pageInfo.hasNextPage, false);assert.equal(second.pageInfo.endCursor, null);assert.equal(second.isLast, true);
+  const entries = [...first.values, ...second.values], item = (entry, field) => entry.items.find(i => i.field === field);
+  assert.deepEqual(entries.map(entry => entry.created), ['2026-10-21T09:00:00.000+0000', '2026-10-23T09:00:00.000+0000', '2026-10-26T09:00:00.000+0000', '2026-10-28T09:00:00.000+0000']);
+  assert.deepEqual(entries.map(entry => item(entry, 'status').toString), ['In Progress', 'Blocked', 'In Progress', 'Done']);
+  assert.deepEqual(entries.map(entry => item(entry, 'status').fromString), ['To Do', 'In Progress', 'Blocked', 'In Progress']);
+  assert.equal(item(entries[0], 'Flagged'), undefined);assert.equal(item(entries[1], 'Flagged').toString, 'Impediment');assert.equal(item(entries[1], 'Flagged').fromString, '');assert.equal(item(entries[2], 'Flagged').toString, '');assert.equal(item(entries[2], 'Flagged').fromString, 'Impediment');
+  assert.ok(first.values.every(entry => item(entry, 'status').toString !== 'Done'), 'H2 the Done change is only on page 2');assert.equal(item(second.values[0], 'status').toString, 'Done');
+  const small = result(await call('listJiraIssueChangelogs', { ...args, maxResults: 1 }, context));assert.equal(small.values.length, 1);assert.equal(small.pageInfo.endCursor, '1');
+});
+test('H3 H4 H7 changelog stops at the story day, refuses tickets Jira would refuse and answers other scenarios', async () => {
+  const days = timeline().days, args = { cloudId: 'mock-cloud-id-0001', issueIdOrKey: 'HW-124' };
+  assert.deepEqual(result(await call('listJiraIssueChangelogs', args, { ...CONTEXT, day: 0 })).values, []);
+  const third = result(await call('listJiraIssueChangelogs', args, { ...CONTEXT, day: 3 }));assert.equal(third.total, 2);assert.equal(third.pageInfo.hasNextPage, false);
+  const missing = days.findIndex(d => !d.issues['UX-89']), notFound = { code: -32602, message: 'Issue does not exist or you do not have permission to see it.' };
+  assert.deepEqual((await call('listJiraIssueChangelogs', { ...args, issueIdOrKey: 'UX-89' }, { ...CONTEXT, day: missing })).error, notFound);
+  assert.deepEqual((await call('listJiraIssueChangelogs', { ...args, issueIdOrKey: 'HW-999' }, CONTEXT)).error, notFound);
+  assert.deepEqual(result(await call('listJiraIssueChangelogs', args, { scenario: 'all-done', now: NOW })).values, []);
+});
+test('H5 created is the first day the story names a ticket', async () => {
+  const days = timeline().days, last = days.length - 1, created = (key, day = last) => call('searchJiraIssuesUsingJql', { jql: 'key in (' + key + ')' }, { ...CONTEXT, day });
+  assert.equal(result(await created('HW-124')).issues.nodes[0].fields.created, '2026-10-20T09:00:00.000+0000');
+  const first = days.findIndex(d => d.issues['UX-90']);assert.ok(first > 0);
+  assert.equal(result(await created('UX-90')).issues.nodes[0].fields.created, new Date(Date.parse('2026-10-20T09:00:00Z') + first * 86400000).toISOString().replace('Z', '+0000'));
+  assert.equal(result(await call('getJiraIssue', { issueIdOrKey: 'UX-90' }, { ...CONTEXT, day: last })).data.fields.created, new Date(Date.parse('2026-10-20T09:00:00Z') + first * 86400000).toISOString().replace('Z', '+0000'));
+});
+test('H6 statuses list every name in the story with its category', async () => {
+  const { values, isLast } = result(await call('listJiraStatuses', { cloudId: 'mock-cloud-id-0001' }));assert.equal(isLast, true);
+  assert.deepEqual(Object.fromEntries(values.map(status => [status.name, status.statusCategory.key])), { 'To Do': 'new', 'In Progress': 'indeterminate', Blocked: 'indeterminate', Done: 'done' });
+  assert.ok(values.every(status => /^\d+$/.test(status.id)));
 });

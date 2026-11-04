@@ -62,6 +62,84 @@ function liveStatusJiraDependencies(issue,linkTypes){
   });
   return out;
 }
+/* Over time (#929): rebuild each ticket's status by local day from its creation time and
+   change history. The real connector's output for these two tools has not been captured,
+   so both public REST shapes are accepted here. */
+function liveStatusHistoryList(payload,names){
+  if(Array.isArray(payload))return payload;
+  if(!payload || typeof payload!=='object')return [];
+  for(var i=0;i<names.length;i++)if(Array.isArray(payload[names[i]]))return payload[names[i]];
+  return liveStatusHistoryList(payload.data,names);
+}
+function liveStatusHistoryChanges(payload){
+  var out=[];
+  liveStatusHistoryList(payload,['values','histories','changelogs','nodes']).forEach(function(entry){
+    if(!entry || !Array.isArray(entry.items))return;
+    var at=Date.parse(entry.created);if(!isFinite(at))return;
+    entry.items.forEach(function(item){
+      var name=item && typeof item.field==='string'?item.field.toLowerCase():'',field=name==='status'?'status':name==='flagged'?'flag':null;
+      // A plain object inherits a toString function, so only an own value counts.
+      if(!field || !Object.prototype.hasOwnProperty.call(item,'toString'))return;
+      var from=typeof item.fromString==='string'?item.fromString:'',to=typeof item.toString==='string'?item.toString:'';
+      if(field==='flag' || to)out.push({at:at,field:field,from:from,to:to});
+    });
+  });
+  return out;
+}
+function liveStatusHistoryCategories(payload){
+  var out=Object.create(null),known=Object.assign(Object.create(null),{'new':'new',todo:'new',indeterminate:'indeterminate',in_progress:'indeterminate',done:'done'});
+  liveStatusHistoryList(payload,['values','statuses','nodes']).forEach(function(status){
+    var category=status && status.statusCategory,key=category && typeof category==='object'?category.key:category,mapped=typeof key==='string' && known[key.toLowerCase()];
+    if(mapped && typeof status.name==='string')out[status.name.toLowerCase()]=mapped;
+  });
+  return out;
+}
+/* tickets: [{key,created,status,flagged,changes}], today: the live map. A ticket's status before its
+   first change comes from that change's old value. Days run from the oldest creation to today, or to
+   the last Done once every ticket is done; the last day is exactly the live map. */
+function liveStatusHistoryDays(input){
+  var tickets=input.tickets || [],today=input.today || {},categories=input.categories || {},keys=Object.keys(today);
+  function container(key){return today[key].kind==='epic' || today[key].kind==='initiative';}
+  function state(key,name,flagged){return liveStatusJiraState({key:key,fields:{status:{name:name,statusCategory:{key:categories[String(name).toLowerCase()]}}}},flagged?[key]:null);}
+  var open=keys.some(function(key){return !container(key) && today[key].state!=='done';}),first=Infinity,finished=-Infinity;
+  var lines=tickets.map(function(ticket){
+    var changes=ticket.changes.slice().sort(function(a,b){return a.at-b.at;});
+    function earliest(field){return changes.filter(function(change){return change.field===field;})[0];}
+    var status=earliest('status'),flag=earliest('flag'),name=status?status.from:ticket.status,flagged=flag?!!flag.from:!!ticket.flagged;
+    var points=[{at:ticket.created,state:state(ticket.key,name,flagged)}];first=Math.min(first,ticket.created);
+    if(points[0].state==='done')finished=Math.max(finished,ticket.created);
+    changes.forEach(function(change){
+      if(change.field==='status')name=change.to;else flagged=!!change.to;
+      var next=state(ticket.key,name,flagged);
+      if(next==='done' && points[points.length-1].state!=='done')finished=Math.max(finished,change.at);
+      points.push({at:change.at,state:next});
+    });
+    return {key:ticket.key,created:ticket.created,points:points,at:0};
+  });
+  if(!isFinite(first))return {days:[],index:-1};
+  var start=new Date(first),last=new Date(open || !isFinite(finished)?input.now:finished);
+  var year=start.getFullYear(),month=start.getMonth(),date=start.getDate(),count=Math.max(1,Math.round((new Date(last.getFullYear(),last.getMonth(),last.getDate())-new Date(year,month,date))/86400000)+1);
+  var format=year===last.getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'},days=[];
+  for(var i=0;i<count;i++){
+    var end=new Date(year,month,date+i+1).getTime(),states=Object.create(null);
+    if(i===count-1)keys.forEach(function(key){states[key]={state:today[key].state};if(typeof today[key].detail==='string')states[key].detail=today[key].detail;});
+    else{
+      lines.forEach(function(line){
+        if(line.created>=end)return;
+        while(line.at+1<line.points.length && line.points[line.at+1].at<end)line.at++;
+        states[line.key]={state:line.points[line.at].state};
+      });
+      // Containers follow the demo's epic rule, so they need no history calls.
+      keys.filter(container).forEach(function(key){
+        var children=keys.filter(function(child){return !container(child) && states[child] && (today[child].epic===key || (today[child].initiatives || []).indexOf(key)>=0);}).map(function(child){return states[child].state;});
+        states[key]={state:children.length && children.every(function(item){return item==='done';})?'done':children.some(function(item){return item==='active' || item==='blocked' || item==='done';})?'active':'todo'};
+      });
+    }
+    var text=new Date(year,month,date+i).toLocaleDateString(input.locale || [],format);
+    days.push({label:text,short:text,states:states});
+  }
+  return {days:days,index:days.length-1};
+}
 function liveStatusJiraChunks(keys){
   var chunks=[];for(var i=0;i<keys.length;i+=10)chunks.push(keys.slice(i,i+10));return chunks;
 }

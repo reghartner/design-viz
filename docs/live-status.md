@@ -848,7 +848,8 @@ asks the author only about a real conflict.
      where the author says).
    - Exit 3, nothing written: the live board was republished by an agent from another
      copy, so its structure may differ. Start again from `live.json`: copy it over the
-     local file and redo the requested change.
+     local file and redo the requested change. If the local file has changes of its own
+     that were never published, ask the author before replacing it.
 3. Make the requested change in the local file and validate it.
 4. `node tools/board-sync.js log <local.json> live.json --by "<author name>"` appends one
    agent entry: `"source": "agent"`, a counted one-line `summary` ("Added 5 nodes, moved

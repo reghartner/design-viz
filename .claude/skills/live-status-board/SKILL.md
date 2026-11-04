@@ -311,7 +311,9 @@ and carry on. Every time you change a published board:
      to keep, then rerun with `--resolve KEY=live` or `--resolve KEY=local`.
    - Exit 3, nothing written: another agent republished the board from a
      different copy. Copy `live.json` over your local spec and redo the
-     requested change on it.
+     requested change on it. If your local spec has changes of its own that
+     were never published (the author's Workbench edits), ask the author before
+     replacing it.
 2. Make the requested change and validate it.
 3. `node tools/board-sync.js log <local spec> live.json --by "<author name>"`
    appends one agent entry to `page.editHistory`: `"source": "agent"` and a

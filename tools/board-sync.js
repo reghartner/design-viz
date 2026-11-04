@@ -385,7 +385,7 @@ function main(argv){
     if(out.status==='republished'){
       print('The live board was republished by an agent after your local copy was made:');
       out.republished.forEach(item=>print('  '+when(item.at)+'  '+item.by+': '+item.summary));
-      print('Its structure may differ from your copy. Nothing was written. Start again from the live file: copy '+liveFile+' over '+localFile+' and redo the requested change.');
+      print('Its structure may differ from your copy. Nothing was written. Start again from the live file: copy '+liveFile+' over '+localFile+' and redo the requested change. If '+localFile+' has changes of its own that were never published, ask the author before replacing it.');
       return 3;
     }
     if(out.edits.length){

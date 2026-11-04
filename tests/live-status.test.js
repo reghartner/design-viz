@@ -2209,6 +2209,7 @@ test('OT15 changing text has its own row, and a board steps days with < and > on
  const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);api.apply(overToday());api.note('A long note about the connector','warn');api.setHistory({load:()=>({days:overDays()})});
  const controls=h.view.querySelector('.dv-live-controls'),status=h.view.querySelector('.dv-live-status');assert.ok(controls,'#986 a row of static buttons');assert.ok(status,'#986 a row of changing text');
  assert.equal(controls.querySelectorAll('.dv-live-count,.dv-live-connection,.dv-live-note').length,0,'no changing text beside the buttons');assert.ok(status.querySelector('.dv-live-note'));assert.ok(status.querySelector('[data-live-count="active"]'));assert.match(status.getAttribute('title'),/A long note about the connector/);
+ assert.ok(controls.children.at(-1).classList.contains('dv-live-first'),'First blocker is last, so a button appearing beside it cannot move it');
  assert.equal(h.view.querySelectorAll('.dv-live-step').length,0,'no step buttons on Live');
  overButton(h).dispatchEvent({type:'click'});await historySettle();
  const steps=h.view.querySelectorAll('.dv-live-over-time-row .dv-live-step');assert.deepEqual(steps.map(el=>[el.textContent,el.getAttribute('aria-label')]),[['<','Previous day'],['>','Next day']]);assert.equal(h.view.querySelector('.dv-live-demo'),null);

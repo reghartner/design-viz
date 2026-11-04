@@ -18,6 +18,23 @@ const fixture=async()=>JSON.parse(await readFile(path.join(repo,'examples/device
    | phone width | excluded — desktop-only editing (CLAUDE.md) |
    Slices 2 (No active case) and 3 (empty icon cell text) add their rows with their own RED. */
 
+/* #921 contract, slice 3 "empty icon cells" (issue #921 "How it should look" 6 + "Test + flip"; Chuck
+   2026-11-03 rulings: empty icon cells show "n/a" by default with a per-icons-column override; §0
+   "extend existing tests"; hosted in the test below and tests/truth-table-panel.test.js). Fixture: the
+   shipped example; rows battery and low have an empty Power icon list; the test empties solar's
+   Battery icons. Cells are located by row and column index (columns: source, charge, charging,
+   powerIcon, batteryIcon) and read as {text, icons, muted}: muted = the text's own element has a
+   smaller font-size and a different color than its cell.
+   | row | assertion (scoped to that cell / that column's field / saved column) | rejects |
+   | N1 default | battery Power icon (before any override) and solar Battery icons (after removing both) read {n/a, 0 icons, muted} | today's "No icons"; plain unstyled n/a |
+   | W1 author the override | the Power icon column's "Power icon empty cell text" field exists; typing "No icons" + Tab saves columns powerIcon.empty "No icons" | no field; a field that saves elsewhere |
+   | W2 override renders per column | battery and low Power icon cells read {No icons, 0, muted} while solar Battery icons later still reads n/a | applying the text to every icons column |
+   | W3 clearing restores the default | clearing the field deletes powerIcon.empty and the battery cell reads n/a | saving "" (blank) on clear |
+   | W4 Undo | Undo restores empty "No icons" and its rendering | a commit outside history |
+   | W5 field only on icons columns | exactly 2 visible "<column> empty cell text" fields (the 2 icons columns) | the field on value columns |
+   | X exported reader | the page_build export shows {No icons, 0, muted} in battery and low Power icon cells | a Workbench-only rendering |
+   | Node: blank, escaping, validation, guards | see tests/truth-table-panel.test.js "semantic cells" test | |
+   | phone width | excluded — desktop-only editing (CLAUDE.md) | */
 test('desktop truth-table author edits properties, cases and shared icons with exact Undo/Redo',async({page,server},info)=>{
   const original=JSON.stringify(await fixture(),null,2);
   await page.goto(server.origin+'/workbench.html');await pastePage(page,original);
@@ -85,6 +102,25 @@ test('desktop truth-table author edits properties, cases and shared icons with e
   await guide.getByLabel('Supply',{exact:true}).first().fill('Roof panel');await guide.getByLabel('Supply',{exact:true}).first().press('Tab');
   await expect.poll(async()=>(await declaration()).cases[0].cells.source).toBe('Roof panel');
   expect((await declaration()).cases[0].cells.charging).toBe(true);
+  // #921 slice 3 (matrix above): empty icon cells show a small muted n/a unless the icons column sets Empty cell text.
+  const cellAt=(scope,row,col)=>scope.locator('tbody tr').nth(row).locator('td').nth(col);
+  const emptyCell=td=>td.evaluate(el=>{const text=el.textContent.trim(),leaf=text?[...el.querySelectorAll('*')].find(node=>!node.children.length && node.textContent.trim()===text):null;
+    const a=leaf && getComputedStyle(leaf),b=getComputedStyle(el);return {text,icons:el.querySelectorAll('svg').length,muted:!!leaf && parseFloat(a.fontSize)<parseFloat(b.fontSize) && a.color!==b.color};});
+  const powerColumn=async()=>(await declaration()).columns.find(col=>col.id==='powerIcon');
+  expect.soft(await emptyCell(cellAt(table,2,3)),'(N1) battery Power icon defaults to a muted n/a').toEqual({text:'n/a',icons:0,muted:true});
+  expect.soft(await guide.getByLabel(/ empty cell text$/).filter({visible:true}).count(),'(W5) one Empty cell text field per icons column only').toBe(2);
+  const powerEmpty=guide.getByLabel('Power icon empty cell text',{exact:true});
+  await expect(powerEmpty,'(W1) the Power icon column has an Empty cell text field').toHaveCount(1);
+  await powerEmpty.fill('No icons');await powerEmpty.press('Tab');
+  await expect.poll(async()=>(await powerColumn()).empty,'(W1) typing saves the column override').toBe('No icons');
+  for(const row of [2,3])await expect.poll(()=>emptyCell(cellAt(table,row,3)),`(W2) row ${row} Power icon shows the column text`).toEqual({text:'No icons',icons:0,muted:true});
+  await powerEmpty.fill('');await powerEmpty.press('Tab');
+  await expect.poll(async()=>Object.hasOwn(await powerColumn(),'empty'),'(W3) clearing removes the override').toBe(false);
+  await expect.poll(()=>emptyCell(cellAt(table,2,3)),'(W3) cleared column shows n/a').toEqual({text:'n/a',icons:0,muted:true});
+  await page.locator('#undo-builder').click();
+  await expect.poll(async()=>(await powerColumn()).empty,'(W4) Undo restores the override').toBe('No icons');
+  await expect.poll(()=>emptyCell(cellAt(table,2,3)),'(W4) restored override renders').toEqual({text:'No icons',icons:0,muted:true});
+  await inspectPageElement(page,panel.locator('.ptitle'));
   const beforeIcon=await source.inputValue();await guide.locator('.flow-icon-browse').first().click();
   const dialog=page.locator('dialog.flow-icon-picker');await dialog.locator('.flow-icon-search').fill('plug');
   await dialog.locator('[data-icon-id="plug"]').click();
@@ -99,7 +135,7 @@ test('desktop truth-table author edits properties, cases and shared icons with e
   await expect.poll(async()=>(await declaration()).cases[0].cells.batteryIcon.length).toBe(1);
   await icons.locator('.rowline').first().getByTitle('remove this item',{exact:true}).click();
   await expect.poll(async()=>(await declaration()).cases[0].cells.batteryIcon).toEqual([]);
-  await expect(table.locator('tbody tr').first()).toContainText('No icons');
+  await expect.poll(()=>emptyCell(cellAt(table,0,4)),'(N1, W2) solar Battery icons without an override shows a muted n/a').toEqual({text:'n/a',icons:0,muted:true});
   expect((await declaration()).cases[0].cells.powerIcon).toEqual(powerBefore);
   await page.locator('#undo-builder').click();await page.locator('#undo-builder').click();
   await expect(table.locator('tbody tr').first().locator('svg')).toHaveCount(3);
@@ -114,6 +150,7 @@ test('desktop truth-table author edits properties, cases and shared icons with e
   await page.context().addCookies([{name:'dv_skin',value:'aurora',url:server.origin}]);
   await page.goto(server.origin+'/truth-table-export.html');
   const exported=page.locator('.pt-truth-table');
+  for(const row of [2,3])await expect.poll(()=>emptyCell(cellAt(exported,row,3)),`(X) exported row ${row} Power icon shows the column text`).toEqual({text:'No icons',icons:0,muted:true});
   await info.attach('truth-table-dark',{body:await exported.screenshot({path:info.outputPath('dark.png')}),contentType:'image/png'});
   const scroll=exported.locator('.truth-table-scroll');
   await scroll.evaluate(el=>el.style.maxWidth='300px');expect(await scroll.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);

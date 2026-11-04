@@ -1903,12 +1903,13 @@ test('H12 Chuck 2026-10-30: history renders on a page without tracking, tickets 
 | OT5 | imported carriers | imported node and edge classes follow the day | a local-only slice |
 | OT6 | tickets absent from the day, one of them upstream of another | keeps its row and title, stays in the total, state reads No status, never done, no dv-live-missing, dependent's upstream reads No status with a grey tone, and the absent ticket itself does not wait | dropping the ticket from the map; a false Missing dependency |
 | OT7 | overdue active ticket with a live change pulse available | moving days logs no Activity, adds no dv-live-changed, shows no dv-live-stale | moving days through apply() |
-| OT8 | live apply while a past day shows | display, Activity and the editor's remembered map stay put; Back to today shows the newest map and logs its change once | a refresh that overwrites the past day; a past day saved as the last live map |
+| OT8 | live apply while a past day shows | display, Activity and the editor's remembered map stay put; Live shows the newest map and logs its change once | a refresh that overwrites the past day; a past day saved as the last live map |
 | OT9 | fake board editor | Edit disabled with the stated reason on a past day, enabled after; Over time disabled while Edit is active | an editable past day |
 | OT10 | index out of range and not whole | clamped to the range, or ignored | a fractional or undefined day |
 | OT11 | clear() on a past day | mode ends and today's evidence is gone | a past day surviving a permission loss |
 | OT12 | demo timeline with a late ticket, a ticket that later disappears, and one never named | not created yet: no status entry; absent after existing: missing; epic state per day; last day matches the live demo | treating every absent ticket the same |
 | OT13 | provider entry without a state | apply() still drops it | widening the provider contract |
+| OT14 | the two mode buttons (Chuck, 2026-11-04) | Live and Over time are the first two header controls, exactly one is pressed, the selected Over time click does nothing, Live returns to today without turning colors off, the selected Live click still turns colors off, and Over time turns colors back on | a Back to today button; a past day with colors off |
 */
 const overFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:'EP-1'}},lanes:{APP:{label:'App',color:'#34d399'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',tickets:['AA-1']},b:{title:'Beta',tickets:['BB-1']},planned:{title:'Planned',tickets:['AA-1'],existsWhen:'tickets-done'}},rows:[['a','b','planned']],edges:[{from:'a',to:'b',tickets:['EE-1']}],steps:[{id:'hop',edge:'a->b',lane:'APP'},{id:'beta',nodes:['b'],lane:'APP'}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
 const overStale='2000-01-01T00:00:00Z';
@@ -1918,8 +1919,9 @@ const overDays=()=>[
  {label:'Oct 20',short:'Oct 20',states:{'EP-1':{state:'todo'},'BB-1':{state:'todo'},'EE-1':{state:'todo'}}},
  {label:'Oct 21',short:'Oct 21',states:{'EP-1':{state:'active'},'AA-1':{state:'blocked',detail:'Flagged then'},'BB-1':{state:'todo'},'EE-1':{state:'active'},'ZZ-2':{state:'todo'}}},
  {label:'Oct 22',short:'Oct 22',states:{'EP-1':{state:'active'},'AA-1':{state:'done'},'BB-1':{state:'active'},'EE-1':{state:'active'},'ZZ-2':{state:'done'}}}];
-const overButton=h=>h.view.querySelector('button.dv-live-over-time');
+const overButton=h=>h.view.querySelector('button.dv-live-over-time'),overLiveButton=h=>h.view.querySelector('button.dv-live-toggle');
 function overReady(api){assert.equal(typeof api.setHistory,'function','#929: the controller accepts a history source');return api;}
+function overBackToLive(api){assert.equal(typeof api.overTimeClose,'function','#929: Live returns to today');api.overTimeClose();}
 async function overOpen(h,index){const api=overReady(h.ctl.liveStatus);api.setHistory({load:()=>({days:overDays()})});api.overTime();await historySettle();if(index!=null)api.overTimeDay(index);return api;}
 const overRow=(h,key)=>h.view.querySelector('tr[data-live-ticket="'+key+'"]');
 const overState=(h,key)=>overRow(h,key).querySelector('.dv-live-state-pill');
@@ -1930,13 +1932,13 @@ test('OT1 OT2 Over time shows with a history source and evidence, and only the c
  assert.ok(!overButton(h) || overButton(h).hidden,'no evidence, no button');
  api.apply(overToday());assert.equal(overButton(h).hidden,false);assert.equal(overButton(h).textContent,'Over time');assert.equal(loads,0);
  api.apply(overToday());h.flush();assert.equal(loads,0,'repaints and refreshes load nothing');
- overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(loads,1);assert.equal(overButton(h).textContent,'Back to today');
+ overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(loads,1);assert.equal(overButton(h).textContent,'Over time');assert.equal(overButton(h).getAttribute('aria-pressed'),'true');
  assert.equal(api.snapshot().overTime.active,true);assert.equal(api.snapshot().overTime.count,3);assert.equal(api.snapshot().overTime.index,2,'a board opens on its last day');
  const slider=h.view.querySelector('input.dv-live-over-time-slider');assert.equal(slider.type,'range');assert.equal(slider.min,'0');assert.equal(slider.max,'2');assert.equal(slider.step,'1');assert.equal(slider.getAttribute('aria-label'),'Day');
  assert.deepEqual(h.view.querySelectorAll('.dv-live-over-time-end').map(el=>el.textContent),['Oct 20','Oct 22']);
  assert.equal(h.view.querySelector('.dv-live-over-time-note').textContent,'Status as of Oct 22 · other columns show today');
  slider.value='1';slider.dispatchEvent({type:'input'});assert.equal(api.snapshot().overTime.index,1);assert.equal(slider.getAttribute('aria-valuetext'),'Oct 21');
- overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,false);assert.equal(h.view.querySelector('input.dv-live-over-time-slider'),null);assert.equal(loads,1,'closing loads nothing');
+ overLiveButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,false);assert.equal(h.view.querySelector('input.dv-live-over-time-slider'),null);assert.equal(loads,1,'closing loads nothing');
 });
 test('OT3 a day overlay takes status from the day and everything else from today',()=>{
  const C=harness().C,today=overToday();assert.equal(typeof C.liveStatusDayMap,'function');
@@ -1991,16 +1993,16 @@ test('OT7 moving days logs no Activity, adds no change pulse and shows no stale 
  assert.equal(rows().length,1);assert.ok(edge.classList.contains('dv-live-changed'));edge.dispatchEvent({type:'animationend'});assert.equal(h.view.querySelectorAll('.dv-live-changed').length,0);assert.ok(b.classList.contains('dv-live-stale'));const before=rows();
  await overOpen(h,1);h.flush();
  for(const index of [0,1,2,0]){api.overTimeDay(index);h.flush();assert.deepEqual(rows(),before);assert.equal(h.view.querySelectorAll('.dv-live-changed').length,0,'day '+index);assert.equal(h.view.querySelectorAll('.dv-live-stale').length,0,'day '+index);}
- api.overTimeDay(2);api.overTime();await historySettle();h.flush();assert.ok(b.classList.contains('dv-live-stale'),'the stale mark returns with today');assert.deepEqual(rows(),before);
+ api.overTimeDay(2);overBackToLive(api);await historySettle();h.flush();assert.ok(b.classList.contains('dv-live-stale'),'the stale mark returns with today');assert.deepEqual(rows(),before);
 });
-test('OT8 a refresh during a past day waits, then Back to today shows the newest status once',async()=>{
+test('OT8 a refresh during a past day waits, then Live shows the newest status once',async()=>{
  const remembered=[],editor={state:()=>({editable:false,blocked:'',active:false,pending:0,saving:false,readOnly:false,notice:null}),onChange:()=>()=>{},rememberMap(map){remembered.push(map);},lastMap:()=>null,question:()=>null};
  const h=harness(overFixture(),{},{boardEditor:editor});mountStatus(h);const api=h.ctl.liveStatus,today=overToday();api.apply(today);assert.equal(remembered.length,1);
  await overOpen(h,1);h.flush();const a=h.view.querySelector('[data-dv-node="a"]'),b=h.view.querySelector('[data-dv-node="b"]'),rows=()=>h.view.querySelectorAll('.dv-live-activity-entry').map(el=>el.textContent);
  assert.ok(a.classList.contains('dv-live-blocked'));assert.equal(remembered.length,1,'a past day is never remembered as live');
  const newer=overToday();newer['BB-1'].state='done';delete newer['BB-1'].updatedAt;newer['BB-1'].title='Newest title';api.apply(newer);h.flush();
  assert.ok(a.classList.contains('dv-live-blocked'),'the refresh leaves the day on screen');assert.ok(!b.classList.contains('dv-live-done'));assert.equal(rows().length,0);assert.equal(overRow(h,'BB-1').querySelector('.dv-live-ticket-title').textContent,'Beta work');assert.equal(api.snapshot().overTime.active,true);
- api.overTime();await historySettle();h.flush();
+ overBackToLive(api);await historySettle();h.flush();
  assert.equal(api.snapshot().overTime.active,false);assert.ok(a.classList.contains('dv-live-done'));assert.ok(b.classList.contains('dv-live-done'));assert.equal(overRow(h,'BB-1').querySelector('.dv-live-ticket-title').textContent,'Newest title');
  assert.equal(rows().length,1);assert.match(rows()[0],/^BB-1 · active → done/);assert.equal(remembered.at(-1),newer,'the newest live map is what an edit re-render restores');
 });
@@ -2009,7 +2011,7 @@ test('OT9 Edit is disabled with a reason on a past day and Over time waits for E
  const h=harness(overFixture(),{},{boardEditor:editor});mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());const edit=()=>h.view.querySelector('button.dv-live-edit'),reason=()=>h.view.querySelector('.dv-live-edit-reason');
  assert.equal(edit().disabled,false);assert.equal(reason().hidden,true);await overOpen(h,1);
  assert.equal(edit().disabled,true);assert.equal(reason().hidden,false);assert.equal(reason().textContent,'Editing is off while a past day is shown.');
- api.overTime();await historySettle();assert.equal(edit().disabled,false);assert.equal(reason().hidden,true);
+ overBackToLive(api);await historySettle();assert.equal(edit().disabled,false);assert.equal(reason().hidden,true);
  active=true;api.note('repaint');assert.equal(overButton(h).disabled,true);let loads=0;api.setHistory({load(){loads++;return {days:overDays()};}});api.overTime();await historySettle();assert.equal(loads,0,'Edit mode refuses the click as well');
 });
 test('OT10 only whole days inside the range are accepted',async()=>{
@@ -2098,11 +2100,11 @@ test('C2 the click is the only thing that calls history, as one batch through ca
  const search=h.upstream.find(call=>call.tool==='searchJiraIssuesUsingJql');assert.equal(search.input.jql,'key in (AA-1, BB-1)');assert.deepEqual(search.input.fields,['created','status']);assert.equal(search.input.cloudId,'cloud');
  assert.deepEqual(h.upstream.filter(call=>call.tool==='listJiraIssueChangelogs').map(call=>call.input).sort((a,b)=>a.issueIdOrKey<b.issueIdOrKey?-1:1),[{cloudId:'cloud',issueIdOrKey:'AA-1'},{cloudId:'cloud',issueIdOrKey:'BB-1'}]);
  for(const [,tool,,opts] of h.calls.filter(call=>call[1]!=='getAccessibleAtlassianResources'))assert.deepEqual(opts.cache,{staleTime:OVER_WEEK,gcTime:OVER_WEEK},tool);
- assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true);assert.equal(overButton(h).textContent,'Back to today');
+ assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true);assert.equal(overButton(h).getAttribute('aria-pressed'),'true');
 });
 test('C3 repeat clicks reuse the cache and refetch only a ticket whose updated time moved',async()=>{
- const h=historyProvider();await overLive(h,overLiveIssues());await overClick(h);overButton(h).dispatchEvent({type:'click'});await historySettle();
- h.upstream.length=0;await overClick(h);assert.deepEqual(h.upstream,[],'nothing changed, nothing reaches Jira');assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true);overButton(h).dispatchEvent({type:'click'});await historySettle();
+ const h=historyProvider();await overLive(h,overLiveIssues());await overClick(h);overLiveButton(h).dispatchEvent({type:'click'});await historySettle();
+ h.upstream.length=0;await overClick(h);assert.deepEqual(h.upstream,[],'nothing changed, nothing reaches Jira');assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true);overLiveButton(h).dispatchEvent({type:'click'});await historySettle();
  const later=jira('AA-1');later.fields.updated='2026-10-26T00:00:00Z';h.data(0,[later,jira('BB-1')]);h.data(1,[]);await historySettle();
  await overClick(h);assert.deepEqual(h.upstream,[{tool:'listJiraIssueChangelogs',input:{cloudId:'cloud',issueIdOrKey:'AA-1'},refresh:true}]);
 });
@@ -2134,7 +2136,7 @@ test('C9 the panel shows loaded count of total and at most six changelog calls r
  await overLive(h,keys.map(key=>jira(key)));overButton(h).dispatchEvent({type:'click'});for(let i=0;i<8;i++)await historySettle();
  assert.equal(overButton(h).textContent,'Loading history 0 of 9…');assert.equal(overButton(h).disabled,true);assert.equal(waiting.length,6);
  for(let done=1;done<=9;done++){waiting.shift()();for(let i=0;i<8;i++)await historySettle();if(done<9)assert.equal(overButton(h).textContent,'Loading history '+done+' of 9…');}
- assert.equal(peak,6);assert.equal(overButton(h).textContent,'Back to today');
+ assert.equal(peak,6);assert.equal(overButton(h).textContent,'Over time');assert.equal(overButton(h).getAttribute('aria-pressed'),'true');
 });
 test('C10 an adapter that retires on a past day ends the mode and removes the source',async()=>{
  const h=historyProvider();await overLive(h,overLiveIssues());await overClick(h);const api=h.ctl.liveStatus;assert.equal(api.snapshot().overTime?.active,true);
@@ -2168,4 +2170,15 @@ test('C12 created searches name at most ten keys each and at most six run at onc
  for(let i=0;i<8;i++)await historySettle();assert.equal(peak,6);assert.equal(waiting.length,0);
  const searches=h.upstream.filter(call=>call.tool==='searchJiraIssuesUsingJql').map(call=>/^key in \(([^)]+)\)$/.exec(call.input.jql)[1].split(', '));
  assert.equal(searches.length,8);assert.ok(searches.every(list=>list.length<=10));assert.deepEqual(searches.flat().sort(),keys.slice().sort());assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true);
+});
+test('OT14 Live and Over time are two mode buttons: Live returns to today and the selected Over time stays',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);api.apply(overToday());let loads=0;api.setHistory({load(){loads++;return {days:overDays()};}});
+ const pressed=()=>[overLiveButton(h).getAttribute('aria-pressed'),overButton(h).getAttribute('aria-pressed')];
+ assert.deepEqual(h.view.querySelector('.dv-live-head').children.slice(0,2).map(el=>el.className.split(' ').find(name=>/^dv-live-(toggle|over-time)$/.test(name))),['dv-live-toggle','dv-live-over-time']);assert.deepEqual(pressed(),['true','false']);
+ overButton(h).dispatchEvent({type:'click'});await historySettle();assert.deepEqual(pressed(),['false','true']);assert.equal(overButton(h).textContent,'Over time');assert.equal(api.enabled(),true);
+ assert.ok(!textOf(h.view.querySelector('.dv-live-head')).includes('Back to today'),'no separate return button');
+ overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,true,'the selected mode stays');assert.equal(loads,1);
+ overLiveButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,false);assert.equal(api.enabled(),true,'returning to Live keeps colors on');assert.deepEqual(pressed(),['true','false']);
+ overLiveButton(h).dispatchEvent({type:'click'});assert.equal(api.enabled(),false,'the selected Live still turns colors off');assert.deepEqual(pressed(),['false','false']);
+ overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,true);assert.equal(api.enabled(),true,'Over time shows colors');assert.deepEqual(pressed(),['false','true']);
 });

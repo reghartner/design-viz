@@ -40,6 +40,7 @@ function createBuilderInteractions(opts){
 
   var inlineEditor=createInlineTextEditor({view:view,document:document,window:window,src:src,session:session,
     disabled:function(){return !!(addToStep || connect) || opts.isActive && !opts.isActive();},pause:pausePreview,targetFromEvent:targetFromEvent,findTargetEl:findTargetEl,
+    currentStep:function(el){return currentStepTarget(el.closest('.stepline'));},
     commit:function(plan,snapshot,target,nextTarget){
       if(plan.error){inspectorMessage(plan.error);return;}
       if(!session.accept(plan,{snapshot:snapshot,beforePublish:clearMultiSelect}))return;
@@ -136,6 +137,22 @@ function createBuilderInteractions(opts){
     var rec = null;
     ctl.sections.forEach(function(s){ if (!rec && s.number === sectionOrdinal + 1) rec = s; });
     return rec ? rec.stepper : null;
+  }
+  /* The step a caption line is showing: its section's current step chip names
+     the source step, in Standard and Explore alike. */
+  function currentStepTarget(line){
+    var lineSec = line && line.closest('.doc-sec');
+    var chipsBox = lineSec && lineSec.querySelector('.schips');
+    if (!lineSec || !chipsBox || !lineSec.hasAttribute('data-dv-section')) return null;
+    var cur = -1, currentChip = null;
+    Array.prototype.forEach.call(chipsBox.querySelectorAll('.schip'), function(c){
+      if (cur < 0 && c.getAttribute('aria-current') === 'true'){
+        cur = Number(c.getAttribute('data-step-source')); currentChip = c;
+      }
+    });
+    if (cur < 0) return null;
+    return {section: parseInt(lineSec.getAttribute('data-dv-section'), 10),
+            kind: 'step', index: cur, el: currentChip};
   }
   function pausePreview(){
     var ctl = opts.ctl ? opts.ctl() : null;
@@ -570,17 +587,7 @@ function createBuilderInteractions(opts){
         section:parseInt(lineSec.getAttribute('data-dv-section'),10),kind:'step-controls',
         layoutId:explorePlayer.getAttribute('data-explore-layout'),el:explorePlayer
       };
-      var chipsBox = lineSec && lineSec.querySelector('.schips');
-      if (!lineSec || !chipsBox || !lineSec.hasAttribute('data-dv-section')) return null;
-      var cur = -1, currentChip = null;
-      Array.prototype.forEach.call(chipsBox.querySelectorAll('.schip'), function(c){
-        if (cur < 0 && c.getAttribute('aria-current') === 'true'){
-          cur = Number(c.getAttribute('data-step-source')); currentChip = c;
-        }
-      });
-      if (cur < 0) return null;
-      return {section: parseInt(lineSec.getAttribute('data-dv-section'), 10),
-              kind: 'step', index: cur, el: currentChip};
+      return currentStepTarget(line);
     }
     var secEl = ev.target.closest('.doc-sec');
     if (!secEl || !secEl.hasAttribute('data-dv-section')) return null;

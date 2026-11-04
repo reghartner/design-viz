@@ -1771,6 +1771,10 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 .dv-inline-node-editor{overflow:visible;}
 .dv-inline-node-editor .dv-inline-input{height:36px;padding:4px 6px;font:16px/1.4 system-ui,sans-serif;color:var(--dtext,#202938);}
 .dv-inline-editing>[hidden]{display:none!important;}
+/* The step caption editor takes its own line under the STEP number, lane and
+   links, which stay visible and keep their actions. */
+.stepline .step-text.dv-inline-editing{display:block;margin:4px 0;}
+.stepline .dv-inline-input{max-height:160px;overflow-y:auto;}
 #docview [data-dv-para]:focus-visible,#docview [data-dv-bullet-path]:focus-visible{outline:2px solid #2563eb;outline-offset:3px;}
 
 /* Keep hidden nodes selectable on the desktop authoring canvas for restoration. */

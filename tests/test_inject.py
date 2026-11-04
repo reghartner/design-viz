@@ -246,6 +246,25 @@ class InjectTests(unittest.TestCase):
             self.assertIn(path.strip(), r.stderr, path)
             self.assertIsNone(out, path)
 
+    def test_timeline_telemetry_rejects_non_finite_values(self):
+        # json.loads accepts NaN and Infinity tokens; a browser's JSON.parse does not, so the
+        # injector must refuse them instead of embedding them.
+        template = TEMPLATE + "<!-- LIVE_TIMELINE -->\n"
+        spec = json.dumps(tracked_spec())
+        timeline = custom_timeline()
+        block = telemetry_block()
+        block["carriers"]["a->b"]["rate"]["values"] = [None, "__TOKEN__", 12.5]
+        timeline["days"][1]["telemetry"] = block
+        for token in ("NaN", "Infinity", "-Infinity"):
+            text = json.dumps(timeline).replace('"__TOKEN__"', token)
+            self.assertIn(token, text)
+            r, out = run_inject(template, spec, ["--timeline", "{td}/tl.json"], {"tl.json": text})
+            self.assertNotEqual(r.returncode, 0, token)
+            self.assertIn("tl.json", r.stderr, token)
+            self.assertIn("days[1].telemetry.carriers.a->b.rate.values", r.stderr, token)
+            self.assertIn("finite", r.stderr, token)
+            self.assertIsNone(out, token)
+
     def test_example_timeline_carries_telemetry_on_every_day(self):
         inject = load_inject()
         timeline = inject.load_timeline(str(EXAMPLE_TIMELINE))

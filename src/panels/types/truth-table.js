@@ -34,6 +34,17 @@ function truthTableIconCell(outputs) {
   });
   return html + (icons.length ? '' : outputs.length ? '—' : '<span>No icons</span>') + '</div>';
 }
+// Active case choices show each case's label, or its ID when unlabeled. A shown text that matches any other
+// visible choice (another case, the inherit/default choice or No active case) gets its ID, or "(case ID)".
+function truthTableCaseChoices(panel, reserved) {
+  var rows = truthTableCases(panel), texts = rows.map(function (row) { return typeof row.label === 'string' && row.label.trim() ? row.label : String(row.id); });
+  var visible = (reserved || []).concat(texts);
+  return rows.map(function (row, i) {
+    var text = texts[i], labeled = typeof row.label === 'string' && row.label.trim();
+    var clash = visible.filter(function (other) { return other === text; }).length > 1;
+    return [row.id, !clash ? text : labeled ? text + ' (' + row.id + ')' : text + ' (case ID)'];
+  });
+}
 function truthTableCaseRows(panel) {
   var rows = panelTableEditorRows(panel.cases, truthTableValueColumns(panel));
   if (rows) rows.forEach(function (row, i) { row.label = panel.cases[i].label; });
@@ -142,12 +153,26 @@ PanelRegistry.define('truth-table', {
     },
     setupFields: [['columns', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'kind', label: 'Column kind', kind: 'enum', options: ['value', 'icons'], unsetLabel: 'value (default)'}], max: 8, wide: true}], ['cases', 'jsonArr'], ['initial', 'json']],
     patchFields: [['note', 'text']],
-    expandPatchFields: function (panel) { return [['active', 'enum', truthTableCases(panel).map(function (row) { return row.id; }), {label: 'Active case', nullLabel: 'No active case', help: 'Highlight an authored case. Omitted steps inherit the previous highlight.'}], ['note', 'text']]; },
+    expandPatchFields: function (panel) { return [['active', 'enum', truthTableCases(panel).map(function (row) { return row.id; }), {label: 'Active case', nullLabel: 'No active case', assignment: false, help: 'Highlight an authored case. Omitted steps inherit the previous highlight.'}], ['note', 'text']]; },
     fieldMeta: {columns: {label: 'Properties', group: 'Content', help: 'Declare column IDs and headers. Value columns hold typed properties; Icons columns hold independent shared icon lists.'}, cases: {label: 'Cases and UX icons', group: 'Content', help: 'Authored combinations, not inferred device behavior. Each case card holds its typed property values and its output icons.'}, note: {label: 'Explanation', nullLabel: 'Clear explanation'}},
     editor: function (context) {
       return {patchField: function (field, input) {
-        if (field[0] === 'active') input.setAttribute('aria-label', 'Active case');
         if (field[0] === 'note') input.setAttribute('aria-label', 'Explanation');
+      }, patchControl: function (field, options) {
+        // One Active case dropdown (assignment: false): inherit/panel default, each case by label, or No active case (null).
+        if (field[0] !== 'active') return null;
+        var meta = panelFieldPresentation(options.panel, field, options.initial ? 'initial' : 'step');
+        var choices = [[undefined, meta.unsetLabel]].concat(truthTableCaseChoices(options.panel, [meta.unsetLabel, meta.nullLabel]), [[null, meta.nullLabel]]);
+        var current = options.assigned ? options.value : undefined, selected = -1;
+        choices.forEach(function (choice, i) { if (choice[0] === current) selected = i; });
+        if (selected < 0) { choices.push([current, (typeof current === 'string' ? current : JSON.stringify(current)) + ' (unknown case)']); selected = choices.length - 1; }
+        var input = context.document.createElement('select');input.className = 'fctl';input.setAttribute('aria-label', 'Active case');
+        choices.forEach(function (choice) {
+          var option = context.document.createElement('option');option.value = typeof choice[0] === 'string' ? choice[0] : '';option.textContent = choice[1];input.appendChild(option);
+        });
+        input.selectedIndex = selected;
+        context.listen(input, 'change', function () { if (!options.commit(choices[input.selectedIndex][0])) input.selectedIndex = selected; });
+        return input;
       }, setupField: function (field, panel) {
         var doc = context.document;
         function node(tag, className, text) { var el = doc.createElement(tag); el.className = className; if (text !== undefined) el.textContent = text; return el; }

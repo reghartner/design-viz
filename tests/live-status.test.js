@@ -2031,11 +2031,11 @@ test('M8 a demo telemetry source shows Metrics, mounts only while on, reports de
 */
 const CUE_SERVICE=()=>({kind:'service',signals:{rate:{grafana:'sum(rate(http_requests_total[5m]))*3600',unit:'req/h'}},proof:{rate:{min:10}}});
 function cuePage(){return {page:{tracking:{jira:{site:'https://jira.test'}},sections:[{id:'main',diagram:{
- nodes:{a:{tickets:['A-1'],telemetry:TQUEUE()},b:{tickets:['B-1'],telemetry:CUE_SERVICE()},c:{tickets:['C-1'],telemetry:CUE_SERVICE()},d:{tickets:['D-1']},f:{tickets:['F-1'],telemetry:CUE_SERVICE()},note:{type:'text',text:'Note',telemetry:TQUEUE()}},
+ nodes:{a:{tickets:['AA-1'],telemetry:TQUEUE()},b:{tickets:['BB-1'],telemetry:CUE_SERVICE()},c:{tickets:['CC-1'],telemetry:CUE_SERVICE()},d:{tickets:['DD-1']},f:{tickets:['FF-1'],telemetry:CUE_SERVICE()},note:{type:'text',text:'Note',telemetry:TQUEUE()}},
  rows:[['a','b','c','d','f']],
- edges:[{from:'a',to:'b',tickets:['E-0'],telemetry:TCALL()},{from:'b',to:'c',tickets:['E-1'],telemetry:TCALL()},{from:'c',to:'d',tickets:['E-2'],telemetry:TCALL()},{from:'d',to:'a',tickets:['E-3']},{from:'a',to:'c',tickets:['E-4'],telemetry:TQUEUE()}],
+ edges:[{from:'a',to:'b',tickets:['EE-10'],telemetry:TCALL()},{from:'b',to:'c',tickets:['EE-11'],telemetry:TCALL()},{from:'c',to:'d',tickets:['EE-12'],telemetry:TCALL()},{from:'d',to:'a',tickets:['EE-13']},{from:'a',to:'c',tickets:['EE-14'],telemetry:TQUEUE()}],
  steps:[{id:'s1',edge:'a->b'},{id:'s2',edge:'b->c'},{id:'s3',nodes:['f','b']}]}}]}};}
-const CUE_JIRA={'A-1':{state:'done'},'B-1':{state:'active'},'C-1':{state:'done'},'D-1':{state:'todo'},'F-1':{state:'done'},'E-0':{state:'done'},'E-1':{state:'done'},'E-2':{state:'active'},'E-3':{state:'todo'},'E-4':{state:'done'}};
+const CUE_JIRA={'AA-1':{state:'done'},'BB-1':{state:'active'},'CC-1':{state:'done'},'DD-1':{state:'todo'},'FF-1':{state:'done'},'EE-10':{state:'done'},'EE-11':{state:'done'},'EE-12':{state:'active'},'EE-13':{state:'todo'},'EE-14':{state:'done'}};
 const CUE_MAP=()=>({a:{signals:{lag:{value:10}}},b:{signals:{rate:{value:50,series:[[1,40],[2,45],[3,50]]}}},c:{signals:{rate:{value:0,series:[[1,0],[2,0]]}}},f:{signals:{rate:{value:5,series:[[1,5],[2,5]]}}},
  'a->b':{signals:{rate:{value:1300,series:[[1,1200],[2,1300]]},errors:{value:4}}},'b->c':{signals:{rate:{value:0,series:[[1,0],[2,0]]},errors:{value:0}}},'c->d':{signals:{rate:{value:100},errors:{value:30}}},'a->c':{signals:{lag:{value:3}}}});
 const CUE_VERDICTS={a:'proven',b:'active-live-early',c:'done-unproven',d:null,f:'done-degraded','a->b':'proven','b->c':'done-unproven','c->d':'active-failing','d->a':null,'a->c':'proven'};
@@ -2065,7 +2065,7 @@ test('W1 W2 verdicts() judges every page carrier with the Jira and telemetry map
 
 test('W3 verdicts follow Jira and telemetry changes and reach change subscribers',async()=>{
  const h=cueHarness();await h.on();const t=h.ctl.telemetry,seen=[];t.onChange(value=>seen.push(plain(value)));
- h.ctl.liveStatus.apply({...CUE_JIRA,'A-1':{state:'active'}});
+ h.ctl.liveStatus.apply({...CUE_JIRA,'AA-1':{state:'active'}});
  assert.equal(t.verdicts().carriers.a.verdict,'active-live-early','W3 a Jira change re-judges');
  assert.ok(seen.length>=1,'W3 a Jira change notifies telemetry subscribers');assert.equal(seen[seen.length-1].verdicts.carriers.a.verdict,'active-live-early');
  t.apply({...CUE_MAP(),a:{signals:{lag:{value:900}}}});
@@ -2077,7 +2077,8 @@ test('W3 verdicts follow Jira and telemetry changes and reach change subscribers
 test('C1 Metrics on paints packet streams, red error packets, amber degraded edges and a ghost on the silent Done edge',async()=>{
  const h=cueHarness();await h.on();
  assert.equal(h.stream(0).length,1,'C1 flowing call edge has a stream');assert.equal(h.moving(0).length,4,'C1 1300 req/h is four packets');assert.equal(h.still(0).length,4,'C1 a static copy for reduced motion and print');
- assert.ok(h.moving(0).every(c=>c.querySelector('animateMotion')),'C1 moving packets animate');assert.ok(h.still(0).every(c=>!c.querySelector('animateMotion')),'C1 static packets do not');
+ const animated=c=>c.children.some(x=>x.tagName==='animateMotion');
+ assert.ok(h.moving(0).every(animated),'C1 moving packets animate');assert.ok(h.still(0).every(c=>!animated(c)),'C1 static packets do not');
  assert.equal(h.moving(0).filter(c=>c.classList.contains('dv-metrics-packet-error')).length,0,'C1 0.3 % errors leave no red packet');
  assert.equal(h.edge(0).getAttribute('data-metrics-state'),'flowing');assert.equal(h.edge(0).getAttribute('data-metrics-verdict'),'proven');
  assert.equal(h.edge(0).getAttribute('data-live-appearance'),'done','C1 Jira paint is untouched');
@@ -2105,7 +2106,7 @@ test('C2 Metrics on gives bound nodes a sparkline strip and a proof seal, and le
  assert.ok(points.every(([x,y])=>x>=0 && x<=120 && y>=55-12 && y<=55),'C2 the strip runs along the card bottom');
  assert.ok(points[0][1]>points[2][1],'C2 a rising series rises');
  for(const id of ['d','note']){assert.equal(h.node(id).querySelector('.dv-metrics-node'),null,'C2 '+id+' unchanged');assert.equal(h.node(id).getAttribute('data-metrics-state'),null);}
- assert.equal(h.view.querySelectorAll('.dv-metrics-node text,.dv-metrics-stream text').length,0,'C2 no text on the canvas');
+ assert.equal(h.view.querySelectorAll('.dv-metrics-node,.dv-metrics-stream').flatMap(g=>g.querySelectorAll('text')).length,0,'C2 no text on the canvas');
  h.ctl.liveStatus.destroy();
 });
 

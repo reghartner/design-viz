@@ -680,6 +680,13 @@ function validate(page){
     }
     if(specObject(d.nodes))Object.keys(d.nodes).forEach(function(id){bound(d.nodes[id],DP+'.nodes.'+id);});
     (Array.isArray(d.edges)?d.edges:[]).forEach(function(e,i){bound(e,DP+'.edges['+i+']');});
+    // Provider bindings the resolver dropped because the provider's own templates
+    // could not expand them; the carrier is unbound and the provider path is named.
+    if(typeof FlowTopology!=='undefined' && FlowTopology.telemetryDrops)FlowTopology.telemetryDrops(d).forEach(function(drop){
+      var at=DP+'.nodes.'+drop.id;
+      if(drop.kind==='edges')(Array.isArray(d.edges)?d.edges:[]).some(function(e,i){if(e && e.from+'->'+e.to===drop.id){at=DP+'.edges['+i+']';return true;}return false;});
+      warnings.push(at+'.telemetry: provider "'+drop.spec+'" '+drop.path+': '+drop.message);
+    });
     // A resolved snapshot already carries overlay bindings on its imported carriers.
     if(!d.topologyProvenance)(Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp,i){
       if(!specObject(imp))return;

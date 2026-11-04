@@ -16,6 +16,7 @@
 | T12 | Imported topology: nodeTracking/edgeTracking accept `telemetry`, the overlay replaces the provider binding, provider `use` expands with provider templates, Workbench ticket edits keep it, snapshot edits are tracking. |
 | T13 | Export round-trip: stamped export text keeps every authored telemetry field and declares `flow.telemetry`. |
 | T14 | docs/live-status.md documents the field family; its call and queue examples parse without warnings. |
+| T15 | A provider `use` binding that its own templates cannot expand (unknown template, missing parameter) is dropped in the resolver: the imported carrier is unbound even when the consumer defines the same template name, and validation of the resolved consumer warns at the carrier, naming the provider path. Nested imports keep the drop; a consumer overlay binding replaces it silently. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 const loader=require('../tools/source-loader.cjs');
@@ -275,6 +276,41 @@ test('T12 imported topology carries overlay telemetry, expands provider template
   const after=plain(resolved);diagramOf(after).nodes['shared::api'].telemetry=CALL();
   assert.equal(C.FlowTopology.editError(resolved,after),null);
   diagramOf(after).nodes['shared::api'].title='Structure change';assert.match(C.FlowTopology.editError(resolved,after),/read only/);
+});
+
+test('T15 a provider binding its own templates cannot expand is dropped, never re-expanded by a consumer template',()=>{
+  const {carrierTelemetry,trackingTelemetry}=api(),f=topologyFixtures(),pd=diagramOf(f.provider);
+  pd.nodes.store.telemetry={use:'x'};pd.edges[0].telemetry={use:'svc'};
+  f.consumer.page.tracking={telemetry:{templates:{x:{kind:'call',signals:{rate:{grafana:'consumer_x'}}},svc:{kind:'service',params:['name'],signals:{rate:{grafana:'consumer_$name'}}}}}};
+  delete diagramOf(f.consumer).topologyImports[0].edgeTracking;
+  const before=plain(f.context),resolved=C.FlowTopology.resolveSource(f.consumer,f.context),d=diagramOf(resolved);
+  assert.deepEqual(f.context,before,'providers and the consumer source are not modified');
+  const tpl=trackingTelemetry(resolved.page).templates;assert.deepEqual(Object.keys(plain(tpl)).sort(),['svc','x'],'the consumer defines both names');
+  const store=d.nodes['shared::store'],edge=d.edges.find(e=>e.from==='shared::api' && e.to==='shared::store');
+  assert.equal(store.telemetry,undefined,'unknown provider template: dropped');assert.equal(edge.telemetry,undefined,'missing provider parameter: dropped');
+  assert.equal(carrierTelemetry(store,tpl),null);assert.equal(carrierTelemetry(edge,tpl),null);
+  const warned=resolvedDoc=>plain(C.validate(C.normalize(resolvedDoc))).warnings.filter(w=>/telemetry/.test(w));
+  const warnings=warned(resolved);
+  assert.deepEqual(warnings.map(w=>w.split(': ')[0]),['sections[0].diagram.nodes.shared::store.telemetry','sections[0].diagram.edges[0].telemetry']);
+  assert.match(warnings[0],/provider "provider" sections\[0\]\.diagram\.nodes\.store\.telemetry\.use: .*binding ignored/);
+  assert.match(warnings[1],/provider "provider" sections\[0\]\.diagram\.edges\[0\]\.telemetry\.name: .*binding ignored/);
+  // A consumer binding replaces the broken provider binding; nothing is reported for it.
+  const replaced=plain(f.consumer);diagramOf(replaced).topologyImports[0].nodeTracking.store={telemetry:CALL()};
+  const own=C.FlowTopology.resolveSource(replaced,f.context);
+  assert.deepEqual(plain(diagramOf(own).nodes['shared::store'].telemetry),CALL());
+  assert.deepEqual(warned(own).map(w=>w.split(': ')[0]),['sections[0].diagram.edges[0].telemetry']);
+  // Through a middle spec that also defines both names, the binding stays dropped and the original provider path is named.
+  const middle=plain(f.consumer);middle.page.canon.id='middle';
+  diagramOf(middle).topologyExports={nested:{nodes:['shared::api','shared::store'],edges:['shared::api->shared::store']}};
+  const outer=plain(f.consumer);diagramOf(outer).topologyImports=[{spec:'middle',export:'nested',as:'outer'}];
+  const nested=C.FlowTopology.resolveSource(outer,{version:1,id:'consumer',specs:[f.provider,middle,outer]}),nd=diagramOf(nested);
+  assert.equal(nd.nodes['outer::shared::store'].telemetry,undefined);
+  assert.equal(nd.edges.find(e=>e.from==='outer::shared::api' && e.to==='outer::shared::store').telemetry,undefined);
+  const nestedWarnings=warned(nested);
+  assert.deepEqual(nestedWarnings.map(w=>w.split(': ')[0]),['sections[0].diagram.nodes.outer::shared::store.telemetry','sections[0].diagram.edges[0].telemetry']);
+  assert.match(nestedWarnings[0],/provider "provider" sections\[0\]\.diagram\.nodes\.store\.telemetry\.use: /);
+  // The record lives with the resolved document only; saved JSON stays free of it.
+  assert.doesNotMatch(JSON.stringify(resolved),/binding ignored/);
 });
 
 test('T13 export stamping keeps every authored telemetry field and declares flow.telemetry',()=>{

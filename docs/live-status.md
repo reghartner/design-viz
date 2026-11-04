@@ -313,7 +313,11 @@ Imported Canon topology accepts the same field in
 `topologyImports[].nodeTracking` and `edgeTracking`. A consumer binding replaces
 the provider's binding for that carrier as a whole; signals never merge across
 specs. A provider binding that uses one of the provider page's templates is
-expanded with those templates before it reaches the consumer. Ticket edits in
+expanded with those templates before it reaches the consumer. When the provider
+cannot expand it (an unknown template or a missing parameter), the binding is
+dropped and the imported carrier is unbound, even if the consumer defines a
+template with the same name. Validating the resolved consumer warns at that
+carrier and names the provider path. Ticket edits in
 the Workbench or on the shared board keep the consumer binding as authored.
 
 ## Workbench

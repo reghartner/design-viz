@@ -1908,7 +1908,8 @@ test('H12 Chuck 2026-10-30: history renders on a page without tracking, tickets 
 | OT3 | `liveStatusDayMap` over a full entry | status and detail from the day; title, owner, PRs, dependencies and epic from today; no updatedAt; a ticket the day does not name is missing | an overlay that copies the day's metadata; an overlay that keeps today's status name |
 | OT4 | local nodes, an edge, a step, a lane and a planned node | carrier classes, coin, counts, ring, lanes, blockers, Tickets State and availability follow the day | repainting nodes only |
 | OT5 | imported carriers | imported node and edge classes follow the day | a local-only slice |
-| OT6 | tickets absent from the day, one of them upstream of another (#1012) | keeps its row and title, stays in the total, state reads missing, never done, its carrier wears dv-live-missing, it is listed as a blocker with text that fits a past day, and its dependent reports a Missing upstream with a red tone | dropping the ticket from the map; an uncolored carrier that hides the gap |
+| OT6 | tickets absent from the day, one of them upstream of another (#1012) | keeps its row and title, stays in the total, state reads missing, never done, its carrier wears dv-live-missing, it is not a blocker (Chuck, 2026-11-04), and its dependent reports a Missing upstream with a grey tone | dropping the ticket from the map; an uncolored carrier that hides the gap; a gap in the record counted as a blocker |
+| OT16 | a step whose only ticket has no status on one day and is blocked on the next | First blocker cannot reach it on the first day and reads No blockers; the blocked day is a real blocker | First blocker jumping to a ticket that did not exist |
 | OT7 | overdue active ticket with a live change pulse available | moving days logs no Activity, adds no dv-live-changed, shows no dv-live-stale | moving days through apply() |
 | OT8 | live apply while a past day shows | display, Activity and the editor's remembered map stay put; Live shows the newest map and logs its change once | a refresh that overwrites the past day; a past day saved as the last live map |
 | OT9 | fake board editor | Edit disabled with the stated reason on a past day, enabled after; Over time disabled while Edit is active | an editable past day |
@@ -1988,9 +1989,9 @@ test('OT6 a ticket with no status on a day shows as Missing there, keeps its row
  assert.equal(snap.epic.stories,total,'the total is the same on every day');assert.equal(snap.epic.done,0);
  assert.equal(overState(h,'ZZ-2').textContent,'missing');assert.equal(overRow(h,'ZZ-2').querySelector('.dv-live-ticket-title').textContent,'Epic only story');assert.match(textOf(overRow(h,'ZZ-2').querySelector('.dv-live-ticket-owner')),/Unassigned/);
  assert.equal(overState(h,'AA-1').textContent,'missing');assert.match(textOf(overRow(h,'AA-1').querySelector('.dv-live-ticket-owner')),/Alex/,'owner stays as of today');
- assert.ok(a.classList.contains('dv-live-missing'),'#1012 the carrier is painted, not left uncolored');assert.equal(snap.counts.missing,2);assert.deepEqual(plain(snap.blockers).map(item=>item.key).sort(),['AA-1','ZZ-2']);
- assert.ok(h.view.querySelectorAll('.dv-live-missing-detail').every(el=>el.textContent==='no ticket on this day'),'the Jira wording would be false for a ticket that exists today');
- const up=plain(snap.tickets.find(item=>item.key==='BB-1').dependsOn[0]);assert.equal(up.key,'AA-1');assert.equal(up.state,'missing');assert.equal(up.tone,'red');assert.equal(snap.waiting['BB-1'].tone,'red');
+ assert.ok(a.classList.contains('dv-live-missing'),'#1012 the carrier is painted, not left uncolored');assert.equal(snap.counts.missing,2);
+ assert.deepEqual(plain(snap.blockers),[],'a ticket that did not exist yet is not a blocker');assert.equal(snap.epic.blocked,0);assert.equal(snap.readiness.blockers,0);assert.equal(h.view.querySelectorAll('.dv-live-blocker').length,0);
+ const up=plain(snap.tickets.find(item=>item.key==='BB-1').dependsOn[0]);assert.equal(up.key,'AA-1');assert.equal(up.state,'missing');assert.equal(up.tone,'grey');assert.equal(snap.waiting['BB-1'].tone,'grey');
  assert.equal(overCaption(h,1),'TODO · 1 tickets · waiting on AA-1');
  // Back on today the ticket is not missing any more.
  api.overTimeClose();await historySettle();h.flush();assert.ok(!a.classList.contains('dv-live-missing'));assert.equal(api.snapshot().counts.missing,0);
@@ -2214,4 +2215,12 @@ test('OT15 changing text has its own row, and a board steps days with < and > on
  const [prev,next]=steps;assert.equal(api.snapshot().overTime.index,2);assert.equal(next.disabled,true);assert.equal(prev.disabled,false);
  prev.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,1);prev.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,0);assert.equal(prev.disabled,true);assert.equal(next.disabled,false);
  next.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,1);
+});
+test('OT16 First blocker cannot reach a ticket that has no status on the day, and a real blocker on another day still counts',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);h.ctl.sections[0].stepper={path:()=>'happy',sourceIndex:()=>0,mode:()=>'ambient',jumpSource(){}};api.apply(overToday());
+ const rest={'EP-1':{state:'active'},'AA-1':{state:'todo'},'BB-1':{state:'todo'},'ZZ-2':{state:'todo'}},first=()=>h.view.querySelector('.dv-live-first'),edge=h.view.querySelector('path.edge');
+ api.setHistory({load:()=>({days:[{label:'One',short:'One',states:{...rest}},{label:'Two',short:'Two',states:{...rest,'EE-1':{state:'blocked'}}}]})});api.overTime();await historySettle();h.flush();
+ assert.equal(api.snapshot().firstBlocker,true,'contrasting day: EE-1 is really blocked');assert.equal(first().textContent,'First blocker');assert.equal(first().disabled,false);assert.equal(api.snapshot().epic.blocked,1);
+ api.overTimeDay(0);h.flush();assert.ok(edge.classList.contains('dv-live-missing'),'the step edge wears the Missing paint');
+ assert.equal(api.snapshot().firstBlocker,false);assert.equal(first().textContent,'No blockers');assert.equal(first().disabled,true);assert.equal(api.snapshot().epic.blocked,0);
 });

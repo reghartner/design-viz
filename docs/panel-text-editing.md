@@ -13,7 +13,7 @@ so the imported-nodes rule does not apply.
 - Panel renderers receive the panel declaration and one folded state snapshot.
   They do not know where each string came from, and the markup does not
   record it (`src/panels/shared.js:430-452`).
-- 33 of the 38 panel types show at least one authored string that can be edited
+- 34 of the 38 panel types show at least one authored string that can be edited
   in place. These are item labels in the declaration, and free-text state such
   as `note`, `incident` or log lines. The rest of the text stays in Inspect:
   computed text (counts, totals, story time), enum labels, numbers, live data,
@@ -93,7 +93,7 @@ another file is named.
 | cost | `period` :131, `routes[i].label` :142/:185, `items[k].label` :162/:187, `routes[i].tradeoff` :190, `assumptions` :192 | `note` :193 [carry] | Totals, amounts and deltas :142-181. Volume line merges number and unit :130. Rate line merges three values :188. | Rates, tradeoffs, assumptions and note sit in a collapsed `<details>` :183 |
 | data-contract | `fieldLabel` :76, `columns[j].label` :77, `fields[i].label` :83, `fields[i].cells[col]` :86 | `highlights[id].label` :84 [snapshot]; shell note. A step can replace `columns`, `fields` and `fieldLabel` (`content()` :22-30) | "—" for a missing cell :86 | The source of a header or cell depends on whether a step replaced the declaration array. `tr[data-contract-field]` |
 | deviceapp | `device` :456, `subtitle` :456, `fields[i].label` :478-480, `sources[i].label` / `.endpoint` / `.detail` :521-525 | `note` :428/:500/:539 [carry]; notification cards [append, as phone] | Card `detail` :495 shows freshness text derived from story time unless pinned (:236-253). `clock` / `date` :449-450 (story time). Status badge :493. Value and unit merged :483-488. `appName` has a three-level fallback :397. | Mapped field cards are `<button data-da-source>` (:440, :468) with click handlers (:542-585) |
-| dispatch | `agency` :127, `responders[i].label` :122, `responders[i].callsign` :122 | `dispatcher` :128, `incident` :133, `detail` :135, `location` :110 [carry]; `state[unit].detail` :125 [snapshot per unit]; shell note | Status and priority labels :10-12, :127-128. Counts :136. SVG vehicle label is a truncated copy :88, :108. | Returns `patch` (:142-154). `li[data-responder-id]` |
+| dispatch | `agency` :127, `responders[i].label` :122, `responders[i].callsign` :122 | `dispatcher` :128, `incident` :133, `detail` :135, `location` :110 [carry]; `state[unit].detail` :125 [snapshot per unit]; shell note | Status and priority labels :10-12, :127-128. Counts :136. SVG vehicle label is a copy that falls back across two fields (`callsign || label || id`, :88, :108), so its source is not one field. | Returns `patch` (:142-154). `li[data-responder-id]` |
 | edit-history | — | — | All text is runtime evidence: who, when, changes (:18-71) | Rows are `<details>` that take clicks. Exclude. |
 | funnel | `stages[i].label` :205 | shell note | Counts are numbers [merge, `funnelFold` :119-132] :208. Percentages and deltas :193-197. "N unit in" merges number and unit :213. | |
 | gauge | `unit` :10 (setup :100) | — | `value` is a number :9 | `level` tween |
@@ -116,7 +116,7 @@ another file is named.
 | table | `columns[i].label` :116 | shell note; `rows[r].cells[col]` :122 [snapshot of the `rows` array] | Change badge :124-129 | Rows carry no id attribute |
 | thermo | `unit` :139-140 | — | Value is a number :133-138. Zone chip shows `label` or a computed zone label :143-147. Scale numbers are clamped :207-233. | `level` tween |
 | tiles | `tiles[i].label` :82 | `state[tile].sub` :89 [snapshot per tile] | State chip :83-88 | |
-| timeline | — | — | `lanes[i].label` :539-547 is shown truncated to 13 characters. Event labels merge declared `panel.events` and appended `state.events`, then sort and truncate them (:427-431, :256). Ticks, badges and the meta line :884-893. | SVG. Event labels show only in some modes. |
+| timeline | `lanes[i].label` :539-547 (the renderer shortens it to 13 characters) | — | Event labels merge declared `panel.events` and appended `state.events` into one list and sort it (:427-431), and a label is dropped when it collides with another (:267). Ticks, badges and the meta line :884-893. | SVG. Event labels show only in some modes. |
 | trace | `spans[sel].name` :248 | — | Service names are shared by many spans :240. Span ids and parent ids are references :250-252. Metrics are computed. | Step buttons and the service select navigate (`src/engine.js:2243-2265`) |
 | truth-table | `columns[i].label` :101, `cases[r].label` :105 | shell note [carry or once; `transientFields` :146] | "Active" :105. Typed cell values :108. `columns[i].empty` is shared by every empty cell in the column :30, :37. | |
 | waterfall | `spans[i].label` :100-101 | — | `total` is a number :115-116. Duration and unit share a node :108-109. | |
@@ -124,19 +124,46 @@ another file is named.
 | zoneframe | `zones[i].label` :85-91 | — | Verdict banner enum :101-108 | SVG |
 
 The two text columns list only strings that meet the four rules in section 2.
-Totals: 33 of 38 types show at least one such string. 27 types have declaration
-text and 25 have free-text state. Five types have none: edit-history and
-live-status (runtime data), state (tokens), and orbit and timeline (only
-prefixed, truncated or merged text).
+Totals: 34 of 38 types show at least one such string. 28 types have declaration
+text and 25 have free-text state. Four types have none: edit-history and
+live-status (runtime data), state (tokens), and orbit (tokens, and `via` shares
+its text node with a prefix).
+
+**Shortened display.** Many editable strings can be shown shortened. Rule 1 in
+section 2 allows this, because the editor opens with the full source value,
+not the displayed text. Known cases:
+
+- CSS ellipsis on one line: battery `.btnote` (`battery.js:332`), buffer
+  `.bfnote` (`buffer.js:195`), funnel `.funnel-label` (`funnel.js:235`), grid row
+  and column heads (`.grid-table th`, `grid.js:294`), inflight `.iflabel` and
+  `.ifbar` (`inflight.js:332`, `:340`), phone `.phoneapp` and `.phonetitle`
+  (`phone.js:299`) and `.phonecallsource` (`:322`), queue `.qmsg`
+  (`queue.js:120`) and `.qside` (`:163`), screen `.cliptitle` (`screen.js:791`),
+  security `.secmon-feed-label` (`security.js:252`), signal `.sglabel`
+  (`signal.js:164`) and `.sgnote` (`:189`), tiles `.tllabel` (`tiles.js:115`)
+  and `.tlsub` (`:122`), waterfall `.wflabel` (`waterfall.js:139`, `:148`).
+- Line clamp: queue `.qreason` (`queue.js:175`), phone `.phonecallreason`
+  (`phone.js:323`).
+- Shortened by the renderer: timeline lane labels (`timeline.js:539`).
+
+The search covered `text-overflow: ellipsis` and `line-clamp` in the panel type
+styles and `src/style.core.css`. Clipping by a fixed height with
+`overflow: hidden` alone was not searched exhaustively. The classification does
+not depend on this list, because rule 1 treats every kind of shortened display
+the same way.
 
 ## 2. What is directly editable and what stays in Inspect
 
 A string is directly editable when all four rules hold:
 
-1. **One authored string, shown whole.** The element's text is exactly one
-   authored string value. It is not truncated, not rendered as Markdown, and not
-   joined with a prefix, a suffix, a unit or another value in the same text
-   node. CSS case changes are allowed.
+1. **One authored string, not joined with other text.** The element shows one
+   authored string value and nothing else. It is not rendered as Markdown, and
+   it is not joined with a prefix, a suffix, a unit or another value in the same
+   text node. Shortened display is allowed: CSS ellipsis, line clamp, or a
+   renderer that shortens the value (timeline lanes). The resolver reads the
+   value from the source, never from the DOM, so the editor always opens with
+   the full value. The editor box widens to show it (section 5). CSS case
+   changes are allowed.
 2. **The source can be found.** It is a declaration path, or a state value whose
    provenance is `initial`, `step`, `inherited` or `transient`, or a default-fold
    `log` entry, or a value the type's `textSource` facet resolves.
@@ -160,7 +187,7 @@ Stays in Inspect:
 | Placeholders shown when a state field is unset | "No incident recorded", "Waiting for the next ring." | The text is a constant in code. Typing over it would create a new value with no obvious target. See Decision 5. |
 | Text in images and scene art | appscreens images, Screen scene SVG text | Not authored text |
 | Text inside existing controls | deviceapp mapped cards, trace rows, `summary` lines | Rule 4 |
-| Merged or truncated text | timeline labels, the "via …" prefix, value + unit nodes | Rule 1. A renderer change can split some of these later (see section 6). |
+| Merged text | timeline event labels (two lists merged), the "via …" prefix, value + unit nodes | Rule 1. A renderer change can split some of these later (see section 6). |
 
 A declaration string that shows a fallback while it is unset is editable. The
 fallback is either the item id (`label || id`, used by most row types) or a
@@ -183,7 +210,7 @@ possible locations. Provenance from `builderEffectivePanelStates` (path-aware,
 | `initial` | "Starting state (shows until step 3)" / "From this step on: step 4" | two |
 | `transient` (`enterOnce` at this step) | "This step only (enterOnce)" | none |
 | `history`, default `log` append | "The entry added at step 2" | none |
-| `engine` (unset), `story` | not editable (no marker is emitted, or the marker resolves to "Edit in Inspect") | — |
+| `engine` (unset), `story` | not editable: the renderer emits no marker, or the resolver returns a reason (resolver rule 5) | — |
 
 "Shows on steps 2–5" runs from the source step up to the step before the next
 assignment of the same key on the current path. It is computed from the same
@@ -266,7 +293,13 @@ pathId, marker)` in a new `src/workbench/panel-text.js` returns either
    (`inspector-model.js:115`). The facet returns a source path or `null`.
    Phone and deviceapp notifications and inflight bars need it. Timeline events
    would need it if a later renderer change shows their labels whole.
-5. No marker, or a `null` result: no editor. The tooltip says "Edit in Inspect".
+5. No marker: nothing new happens. The two clicks of the double-click select
+   as they do today, and Inspect shows the panel. A marker whose resolver result
+   is `{reason}` (for example the source value is no longer a string, or
+   `textSource` returned `null`): no editor opens, and the reason is shown
+   through the existing inspector message line (`inspectorMessage`, which the
+   inline editor already uses for save errors at `interactions.js:44`). No
+   tooltip is added.
 
 **Why not reuse `visibilityEvidence`.** That facet answers whether a whole card
 is visible, and its address names one card
@@ -285,7 +318,7 @@ These follow the epic's shared rules (#959).
 | Behavior | Rule for panel text |
 | --- | --- |
 | Open | Double-click a marked string. The editor opens over the text and takes focus. Single click is unchanged: it selects the panel, or the Home element, or keeps the panel's own click behavior. |
-| Editor host | New overlay host: an absolutely positioned element appended to the panel card (`.pwidget`, outside `.pbody`) at the marked element's box. It is needed because `.pbody` innerHTML is replaced on repaint (`shared.js:449-451`), Screen, Security and Dispatch `patch` rebuild sub-trees (for example `screen.js:543-578`), settling removes animated elements (`shared.js:325-329`), and SVG text has no HTML container. The editor keeps the marker path, not the element. On save it finds the element again by path. |
+| Editor host | New overlay host: an absolutely positioned element appended to the panel card (`.pwidget`, outside `.pbody`) at the marked element's box. Its width is at least the element's width and grows to fit the full value, up to the card's width; past that the input scrolls. This shows the whole value of a string that is displayed shortened. The overlay is needed because `.pbody` innerHTML is replaced on repaint (`shared.js:449-451`), Screen, Security and Dispatch `patch` rebuild sub-trees (for example `screen.js:543-578`), settling removes animated elements (`shared.js:325-329`), and SVG text has no HTML container. The editor keeps the marker path, not the element. On save it finds the element again by path. |
 | Playback | Opening the editor pauses playback through the existing `opts.pause` (`inline-text.js:53`; `interactions.js:42`). |
 | Save | Single-line: Enter or click outside. v1 has no multi-line panel text. |
 | Save location | When section 3 offers two choices, they are two radio buttons inside the editor, below the input. Tab moves from the input to them, the arrow keys change the choice, and Enter saves. Clicking a choice does not count as clicking outside. |
@@ -334,7 +367,8 @@ previous source. Browser tests run at desktop width only.
    buffer, cost); device panels (deviceapp, security, dispatch, appscreens,
    thermo, gauge unit); the others (tiles, signal, inflight lanes, trace span
    name).
-6. **SVG labels:** radar, zoneframe and Home map rooms, devices and subjects.
+6. **SVG labels:** radar, zoneframe, timeline lanes, and Home map rooms,
+   devices and subjects.
    Home map keeps its single-click selection (`homemap.js:2905-2919`).
 7. **`textSource` facet:** phone and deviceapp notification `app` / `title`,
    and inflight bar labels.

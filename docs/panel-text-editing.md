@@ -93,7 +93,7 @@ another file is named.
 | chime | — | `text` :34, :39 [carry or once; `transientFields` :49] | Playback label :38. Default message when unset :34. | |
 | cost | `period` :131, `routes[i].label` :142/:185, `items[k].label` :162/:187, `routes[i].tradeoff` :190, `assumptions` :192 | `note` :193 [carry] | Totals, amounts and deltas :142-181. Volume line merges number and unit :130. Rate line merges three values :188. | Rates, tradeoffs, assumptions and note sit in a collapsed `<details>` :183 |
 | data-contract | `fieldLabel` :76, `columns[j].label` :77, `fields[i].label` :83, `fields[i].cells[col]` :86 | `highlights[id].label` :84 [snapshot]; shell note. A step can replace `columns`, `fields` and `fieldLabel` (`content()` :22-30) | "—" for a missing cell :86 | The source of a header or cell depends on whether a step replaced the declaration array. `tr[data-contract-field]` |
-| deviceapp | `device` :456, `subtitle` :456, `fields[i].label` :478-480, `sources[i].label` / `.endpoint` / `.detail` :521-525 | `note` :428/:500/:539 [carry]; notification `app` and `title` [append, as phone] | Card `detail` :495 shows freshness text derived from story time unless pinned (:236-253). `clock` / `date` :449-450 (story time). Status badge :493. Value and unit merged :483-488. `appName` has a three-level fallback :397. | Mapped field cards are `<button data-da-source>` (:440, :468) with click handlers (:542-585) |
+| deviceapp | `device` :456, `subtitle` :456, `fields[i].label` :478-480 (only while the card renders as a `<div>`; see Notes) | `note` :428/:500/:539 [carry]; notification `app` and `title` [append, as phone] | `sources[i].label`, `.endpoint` and `.detail` :517-528 are always inside `<button class="da-source">`, whose click selects that source (:542-585): rule 4. A card label inside a mapped card button: rule 4. Card `detail` :495 shows freshness text derived from story time unless pinned (:236-253). `clock` / `date` :449-450 (story time). Status badge :493. Value and unit merged :483-488. `appName` has a three-level fallback :397. | When sources are shown, a mapped field card is a `<button data-da-source>` (:461, :468) with click handlers (:542-585); otherwise it is a `<div>`. The renderer emits the label marker only for the `<div>` form. |
 | dispatch | `agency` :127, `responders[i].label` :122, `responders[i].callsign` :122 | `dispatcher` :128, `incident` :133, `detail` :135, `location` :110 [carry]; `state[unit].detail` :125 [snapshot per unit]; shell note | Status and priority labels :10-12, :127-128. Counts :136. SVG vehicle label is a copy that falls back across two fields (`callsign || label || id`, :88, :108), so its source is not one field. | Returns `patch` (:142-154). `li[data-responder-id]` |
 | edit-history | — | — | All text is runtime evidence: who, when, changes (:18-71) | Rows are `<details>` that take clicks. Exclude. |
 | funnel | `stages[i].label` :205 | shell note | Counts are numbers [merge, `funnelFold` :119-132] :208. Percentages and deltas :193-197. "N unit in" merges number and unit :213. | |
@@ -102,7 +102,7 @@ another file is named.
 | homemap | `rooms[i].label` :798-805, `devices[i].label` :679-687 / :1030-1037, `subjects[i].label` :1085-1093 (only with `showSubjectLabels`) | `state[id].audio.source` / `.text` / `.reason` [snapshot] (`src/panels/audio.js:76-79`) | Audio enum labels (`audio.js:73-78`). "No devices configured" :1096-1100. | SVG. Single click already selects the Home element (:2905-2919). Builds an animated string and a settled baseline string; settling removes the animated elements (:1118-1133, `shared.js:315-329`). Audio captions carry no owner id. |
 | image | `caption` :28 | — | "Open reference" :30-34. Placeholder :27. | |
 | inflight | `lanes[i].label` :213 | Bar `label` :243 [once: comes from one step's `start` operation; fold :65-110] | Ticks :204. Axis label :196. | The bar label needs `textSource` to find its step and operation |
-| leds | `leds[i].label` :12 | — | The LED mode is shown only as a colour | The label is a bare text node beside `.leddot`; it needs a wrapping element |
+| leds | `leds[i].label` :12 | — | The LED mode is shown only as a colour | The label is its own text node beside the empty `.leddot`, so the marker goes on `.led` (rule 1) |
 | live-status | — | — | Ticket keys, titles and states are fetched from Jira and GitHub at view time | Buttons, sorting and drag throughout the body (:95-156). Exclude. |
 | log | — | `log[k].text` :21 [append, `shared.js:142-146`] | `log[k].tag` :17 is a key of `panel.tags`, chosen from a list in Inspect (`src/workbench/panel-collections.js:128`). Tag colour comes from `panel.tags`. | A log entry may be a plain string or `{tag,text}` |
 | orbit | — | — | `states[i]` :57-68 are tokens that `state.state` and `colors` refer to. Current state :70-75. `via` :76-80 [carry] shares its text node with the "via " prefix. | SVG |
@@ -119,7 +119,7 @@ another file is named.
 | tiles | `tiles[i].label` :82 | `state[tile].sub` :89 [snapshot per tile] | State chip :83-88 | |
 | timeline | `lanes[i].label` :539-547 (the renderer shortens it to 13 characters) | — | Event labels merge declared `panel.events` and appended `state.events` into one list and sort it (:427-431), and a label is dropped when it collides with another (:267). Ticks, badges and the meta line :884-893. | SVG. Event labels show only in some modes. |
 | trace | `spans[sel].name` :248 | — | Service names are shared by many spans :240. Span ids and parent ids are references :250-252. Metrics are computed. | Step buttons and the service select navigate (`src/engine.js:2243-2265`) |
-| truth-table | `columns[i].label` :101, `cases[r].label` :105 | shell note [carry or once; `transientFields` :146] | "Active" :105. Typed cell values :108. `columns[i].empty` is shared by every empty cell in the column :30, :37. | |
+| truth-table | `columns[i].label` :101, `cases[r].label` :105 | shell note [carry or once; `transientFields` :146] | "Active" :105. Typed cell values :108. `columns[i].empty` is shared by every empty cell in the column :30, :37. | The case label is its own text node, but the active row's `<th>` also holds the "Active" badge (:105), so the renderer wraps the label in its own element for the marker |
 | waterfall | `spans[i].label` :100-101 | — | `total` is a number :115-116. Duration and unit share a node :108-109. | |
 | xray | `layers[i].label` :44 | `hop` :58-64 [carry] | OPEN / SEALED :41. The "key: " prefix shares the node with `holder` :46. | The `layers` state is a whole snapshot |
 | zoneframe | `zones[i].label` :85-91 | — | Verdict banner enum :101-108 | SVG |
@@ -153,14 +153,31 @@ styles and `src/style.core.css`. Clipping by a fixed height with
 not depend on this list, because rule 1 treats every kind of shortened display
 the same way.
 
+**Rule sweep.** Every string in the two text columns was checked against rules
+1–4 by reading the code that renders its element. Controls found inside panel
+bodies: deviceapp mapped card buttons (`deviceapp.js:461`) and source buttons
+(`:517`); trace step buttons (`trace.js:319`), service `<label>`/`<select>`
+(`:225`) and child-span `<summary>` (`:353`); reference links in image
+(`image.js:32`) and appscreens (`appscreens.js:47`); `<summary>` lines in cost
+(`cost.js:183`) and security (`security.js:145`). No body uses
+`role="button"`. Of these, only the deviceapp source label, endpoint and detail
+had been listed as editable; they are now Inspect-only, and the deviceapp card
+label is editable only in its `<div>` form. The truth-table case label needs a
+wrapping element (rule 1). Every other listed string passes all four rules.
+
 ## 2. What is directly editable and what stays in Inspect
 
 A string is directly editable when all four rules hold:
 
-1. **One authored string, not joined with other text.** The element shows one
-   authored string value and nothing else. It is not rendered as Markdown, and
-   it is not joined with a prefix, a suffix, a unit or another value in the same
-   text node. Shortened display is allowed: CSS ellipsis, line clamp, or a
+1. **One authored string, not joined with other text.** The value is its own
+   DOM text node. It is not rendered as Markdown, and it is not joined with a
+   prefix, a suffix, a unit or another value inside the same text node (orbit
+   "via ", xray "key: ", replicas "Sequence: ", value + unit). The marked
+   element's visible text is that value only: elements without text (icons,
+   dots) may sit beside it, and a hover `<title>` does not count. When the value
+   is its own text node but shares its parent with other text (truth-table case
+   label and "Active" badge), the renderer wraps it in its own element and marks
+   that element. Shortened display is allowed: CSS ellipsis, line clamp, or a
    renderer that shortens the value (timeline lanes). The resolver reads the
    value from the source, never from the DOM, so the editor always opens with
    the full value. The editor box widens to show it (section 5). CSS case
@@ -171,8 +188,14 @@ A string is directly editable when all four rules hold:
 3. **It is not an identifier or a key that other data refers to.** Examples:
    span ids, orbit and state tokens, node references.
 4. **It is not inside a control that already takes clicks:** `button`, `a`,
-   `select` or `summary`. The current double-click guard already skips
-   `a,button,input,textarea` (`src/workbench/inline-text.js:111`).
+   `input`, `select`, `textarea`, `label`, `summary` or `[role="button"]`. The
+   current double-click guard skips `a,button,input,textarea`
+   (`src/workbench/inline-text.js:111`); the panel field entry adds `select`,
+   `label`, `summary` and `[role="button"]`, and renderers do not emit a marker
+   inside any of these. Containers with `role="img"`, `role="region"`,
+   `role="list"` or `tabindex="0"` (for example `.da-screen`, `deviceapp.js:452`;
+   `.secmon-video`, `security.js:99`) are not controls. Text inside an open
+   `<details>` body is allowed; text inside its `<summary>` is not.
 
 Stays in Inspect:
 
@@ -187,7 +210,7 @@ Stays in Inspect:
 | Live or runtime data | live-status, edit-history | Not stored in the spec |
 | Placeholders shown when a state field is unset | "No incident recorded", "Waiting for the next ring." | The text is a constant in code. Typing over it would create a new value with no obvious target. See Decision 5. |
 | Text in images and scene art | appscreens images, Screen scene SVG text | Not authored text |
-| Text inside existing controls | deviceapp mapped cards, trace rows, `summary` lines | Rule 4 |
+| Text inside existing controls | deviceapp source buttons and mapped card buttons, trace step buttons and service picker, image and appscreens reference links, cost and security `<summary>` lines | Rule 4 |
 | Merged text | timeline event labels (two lists merged), the "via …" prefix, value + unit nodes | Rule 1. A renderer change can split some of these later (see section 6). |
 
 A declaration string that shows a fallback while it is unset is editable. The
@@ -374,7 +397,7 @@ previous source. Browser tests run at desktop width only.
 
 1. **Contract and declaration pilot: leds and image.** Add `panelTextMark`, the
    resolver for `decl:` paths, the overlay host and the field entry. Mark
-   `leds[i].label` (wrap the bare text node) and `image.caption`. Test (new
+   `leds[i].label` (on `.led`, whose only text is the label) and `image.caption`. Test (new
    `tools/browser-tests/tests/panel-text-inline.spec.mjs`): double-click the LED
    label; the editor is focused with the source value; type, then Enter;
    `panels[i].leds[0].label` changes; the label renders; Undo restores the
@@ -427,9 +450,8 @@ previous source. Browser tests run at desktop width only.
      xray `layers[i].label`; buffer `capacity`; cost `period`,
      `routes[i].label`, `items[k].label`, `routes[i].tradeoff` and
      `assumptions`.
-   - 6b, device panels: deviceapp `device`, `subtitle`, `fields[i].label` (only
-     while the card is not a source button, rule 4) and `sources[i].label`,
-     `.endpoint` and `.detail`; security `site`, `videoLabel`,
+   - 6b, device panels: deviceapp `device`, `subtitle` and `fields[i].label`
+     (marker only on the `<div>` card form, rule 4); security `site`, `videoLabel`,
      `sensors[i].label` and `sensors[i].zone`; dispatch `agency`,
      `responders[i].label` and `responders[i].callsign`; appscreens
      `screens[i].label` and `.caption`; thermo `unit`; gauge `unit`.
@@ -463,7 +485,7 @@ step 4's append mapping.
 | chime | — | `text` → 3 |
 | cost | `period`, route labels, item labels, tradeoffs, `assumptions` → 6a | `note` → 3 |
 | data-contract | `fieldLabel`, column labels, field labels, string cells → 5 | `highlights[id].label` → 5; shell note → 2 |
-| deviceapp | `device`, `subtitle`, card labels, source label / endpoint / detail → 6b | `note` → 3; notification `app` / `title` → 8 |
+| deviceapp | `device`, `subtitle`, card labels (`<div>` cards only) → 6b | `note` → 3; notification `app` / `title` → 8 |
 | dispatch | `agency`, unit labels, callsigns → 6b | `dispatcher`, `incident`, `detail`, `location` → 3; unit `detail` → 5; shell note → 2 |
 | funnel | stage labels → 6a | shell note → 2 |
 | gauge | `unit` → 6b | — |

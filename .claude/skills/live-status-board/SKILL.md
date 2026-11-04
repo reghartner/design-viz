@@ -147,7 +147,8 @@ controls; no reader menu is needed. Use all three host profiles.
 ```
 
 The `edit-history` panel (#827) lists the entries of `page.editHistory`
-(hand-written today; the planned Edit mode, #828, will append one per Save)
+(the board's Edit mode appends one per Save; your own change adds one agent
+entry, section 4b)
 newest first, below the board in every profile; a profile that does not name
 it hides it. It needs no authored state. See `docs/live-status.md` § Edit history.
 
@@ -280,15 +281,57 @@ after reading that artifact with the Artifact tool's read action in the
 current conversation; a publish without `url` creates a new artifact with a
 new link and none of the old comments. For a two-file board only
 `flowspec.json` changes, but the publish call still needs the page (a call
-with `url` and `files` alone is refused): read the artifact's current
-`flowspec.json` first (the board saves viewers' edits into it under
-`page.editHistory`, which the republished file must keep), read its
-`index.html` to a local file, then publish with `url`, that saved page as
-`file_path` unchanged, and the edited file in `files`. The
+with `url` and `files` alone is refused): first bring the board's own edits
+into your local spec and log your change (section 4b), then read its
+`index.html` to a local file and publish with `url`, that saved page as
+`file_path` unchanged, and your local spec as `flowspec.json` in `files`. The
 same steps are in the page's embedded agent guide, so an editor's agent that
 has only the artifact URL can run this loop too. Do this after every accepted
 spec change the author has authorized publishing for; the author is working in
 the Workbench and sees no live state there.
+
+## 4b. Board edits: fold them in, ask only on a conflict, log your change
+
+A published two-file board changes without you: editors move tickets on it in
+Edit mode (add a ticket to a node or edge, remove one, clear a Missing work
+marker). Each Save rewrites the artifact's `flowspec.json` and appends one
+`page.editHistory` entry. Those are the only edits the board allows, so a local
+spec that lacks them is not broken or out of date in any other way: fold them in
+and carry on. Every time you change a published board:
+
+1. Read the artifact's current `flowspec.json` (read action with `path`), save it
+   as `live.json` in your scratch directory, and run
+   `node tools/board-sync.js pull <local spec> live.json`.
+   - Exit 0: the board edits are now in your local spec, with their history
+     entries. Tell the author the printed lines, one line each ("Bo: DOOR-104
+     moved from Door API to Cloud sync"), and go on.
+   - Exit 2, nothing written: the same ticket was placed differently on the
+     board and in your local spec, or a board edit's node or edge no longer
+     exists locally. Show the author the printed conflict, ask which placement
+     to keep, then rerun with `--resolve KEY=live` or `--resolve KEY=local`.
+   - Exit 3, nothing written: another agent republished the board from a
+     different copy. Copy `live.json` over your local spec and redo the
+     requested change on it.
+2. Make the requested change and validate it.
+3. `node tools/board-sync.js log <local spec> live.json --by "<author name>"`
+   appends one agent entry to `page.editHistory`: `"source": "agent"` and a
+   counted one-line `summary` such as "Added 5 nodes, moved 5 tickets" (pass
+   `--summary "<one line>"` only to say what the counts cannot). The board's Edit
+   history panel shows it with an agent tag, so everyone sees that an agent
+   changed the board. Exit 2 means your change overrides a board edit saved
+   after the newest agent entry: someone moved a ticket and the request moves
+   it elsewhere, removes it, or deletes its node or edge. This is the one case
+   to stop and ask the author, quoting the printed line. Rerun with
+   `--confirm KEY` once they agree; if they do not, put that ticket back where
+   the board has it and rerun. Do not ask about board edits older than the
+   newest agent entry.
+4. Republish (section 4) with your local spec as `flowspec.json`. If the publish
+   is refused because the artifact changed after your read, read
+   `flowspec.json` again and rerun step 1 (pull) only, then publish; the agent
+   entry is already in your file.
+
+Without a local spec (only the artifact URL), edit `live.json` directly and
+follow the page's embedded agent guide, which states the same rules.
 
 ## 5. Verify after publishing
 

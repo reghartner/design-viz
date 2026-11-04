@@ -90,7 +90,8 @@ var FlowTopology = (function(){
   }
 
   function validateTracking(value,at){
-    shape(value,['tickets','prs','existsWhen','missingWork'],at);
+    // telemetry content is warning-only (validator); the resolver only carries it.
+    shape(value,['tickets','prs','existsWhen','missingWork','telemetry'],at);
     if(Object.prototype.hasOwnProperty.call(value,'missingWork') && typeof value.missingWork!=='boolean')fail(at,'missingWork must be true or false');
     if(Object.prototype.hasOwnProperty.call(value,'existsWhen') && value.existsWhen!=='tickets-done')fail(at,'existsWhen must be tickets-done');
     trackingRefs(value,function(field,index){fail(at,'invalid '+field+(index===null?' array':' entry '+index));});
@@ -102,6 +103,14 @@ var FlowTopology = (function(){
     var inherited=trackingStoredRefs(value),local=trackingStoredRefs(addition);
     var merged=trackingStoredRefs({tickets:inherited.tickets.concat(local.tickets),prs:inherited.prs.concat(local.prs)});
     ['tickets','prs'].forEach(function(field){if(merged[field].length)value[field]=merged[field];});
+    // A consumer binding replaces the provider's whole binding; signals never merge across specs.
+    if(own(addition,'telemetry'))value.telemetry=clone(addition.telemetry);
+  }
+  // Provider `use` bindings name the provider page's templates. Expand them while
+  // that page is known; an unknown template stays as authored for the validator.
+  function inheritTelemetry(value,templates){
+    if(!object(value) || !object(value.telemetry) || !own(value.telemetry,'use') || !own(templates,value.telemetry.use))return;
+    var expanded=telemetryExpand(value.telemetry,templates);if(expanded)value.telemetry=expanded;
   }
 
   function validateOverlaySelection(imp,nodes,edges,where){
@@ -219,6 +228,7 @@ var FlowTopology = (function(){
           var source=sources[0],provider=source.d;
           if(sources.some(function(other){return other.d!==provider;}))fail(where,'cannot merge exports from different provider sections; use separate imports and namespaces');
           var exp=Array.isArray(imp.export)?mergeExports(provider,names):clone(source.exp),nodes=provider.nodes || {};
+          var providerTemplates=trackingTelemetry(byId.get(imp.spec).page).templates;
           ['nodes','edges'].forEach(function(key){
             if(!own(imp,key))return;
             imp[key].forEach(function(identity){if(!exp[key].includes(identity))fail(where,'selected '+key+' identity is not exported: '+identity);});
@@ -250,7 +260,7 @@ var FlowTopology = (function(){
             if(!own(nodes,key) || !object(nodes[key]))fail(where,'missing exported node '+key);
             var value=clone(nodes[key]);if(value.group){group(value.group,new Set());value.group=prefix+value.group;}
             if(own(imp.nodeCodeRefs || {},key))value.codeRefs=(value.codeRefs || []).concat(clone(imp.nodeCodeRefs[key]));
-            applyTracking(value,(imp.nodeTracking || {})[key]);
+            inheritTelemetry(value,providerTemplates);applyTracking(value,(imp.nodeTracking || {})[key]);
             if(imp.presentation)value.presentation=imp.presentation;
             Object.keys((imp.nodeOverrides || {})[key] || {}).forEach(function(field){var override=imp.nodeOverrides[key][field];if(override===null)delete value[field];else value[field]=clone(override);});
             // Reveal indices belong to the provider's story, not the consumer.
@@ -278,7 +288,7 @@ var FlowTopology = (function(){
           exp.edges.forEach(function(key){
             var matches=(provider.edges || []).filter(function(e){return e && edgeKey(e)===key;});
             if(matches.length!==1)fail(where,'missing or ambiguous exported edge '+key);
-            var edge=clone(matches[0]);applyTracking(edge,(imp.edgeTracking || {})[key]);if(imp.presentation)edge.presentation=imp.presentation;
+            var edge=clone(matches[0]);inheritTelemetry(edge,providerTemplates);applyTracking(edge,(imp.edgeTracking || {})[key]);if(imp.presentation)edge.presentation=imp.presentation;
             if(!selected.has(edge.from) || !selected.has(edge.to))fail(where,'exported edge '+key+' must include both endpoints in exported nodes');
             Object.keys((imp.edgeOverrides || {})[key] || {}).forEach(function(field){var value=imp.edgeOverrides[key][field];if(value===null)delete edge[field];else edge[field]=clone(value);});
             edge.from=prefix+edge.from;edge.to=prefix+edge.to;delete edge.revealAt;delete edge.hideAt;
@@ -367,7 +377,7 @@ var FlowTopology = (function(){
   function snapshotTracking(value,node){
     var tracking={};if(!object(value))return tracking;
     var fields=['tickets','prs'];
-    if(!node || !isTextBoxNode(value))fields.push('existsWhen','missingWork');
+    if(!node || !isTextBoxNode(value))fields.push('existsWhen','missingWork','telemetry');
     fields.forEach(function(field){if(own(value,field))tracking[field]=value[field];});return tracking;
   }
   function protectedValue(value,node){

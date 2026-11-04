@@ -668,7 +668,7 @@ test('P8 publishing docs and skill declare the connector by its display name and
  assert.match(fs.readFileSync('deploy/cloudflare/mock-atlassian-mcp/README.md','utf8'),/directory connector/);
  assert.match(fs.readFileSync('docs/tab-views.md','utf8'),/live-status.md#publishing-as-a-claudeai-artifact/);
  assert.match(fs.readFileSync('.claude/skills/live-status-board/SKILL.md','utf8'),/"listJiraIssueChangelogs", "listJiraStatuses"/);
- const overTime=fs.readFileSync('docs/live-status.md','utf8');assert.ok(overTime.includes('## Over time'),'#929 docs section');for(const claim of ['one batch','7 days','republish'])assert.ok(overTime.includes(claim),claim);
+ const statusDocs=fs.readFileSync('docs/live-status.md','utf8');assert.ok(statusDocs.includes('\n## Over time\n'),'#929 docs section');const overTime=statusDocs.split('\n## Over time\n')[1].split('\n## ')[0];for(const claim of ['one batch','7 days','republish'])assert.ok(overTime.includes(claim),claim);
 });
 
 test('P6 P7 resource-call failures follow the same policy; toggles and late searches stay bounded',async()=>{
@@ -2054,6 +2054,7 @@ test('OT13 apply still drops a provider entry without a valid state',()=>{
 | C8 | flagged today with no Flagged history | blocked on past days | losing today's flag |
 | C9 | batch waiting on Jira | panel shows loaded count of total; at most six changelog calls at once | an unbounded batch of calls |
 | C10 | adapter retires on a past day | mode ends and the source is gone | a past day surviving an account change |
+| C12 | 75 tickets, searches held open | each created search names at most ten keys, together they name every ticket once, and at most six run at once | one search per ticket; an unbounded search batch |
 | C11 | the real adapter load over the real mock handler, final story day | every ticket on every day equals the story timeline; a ticket before its first day has no status; the range ends on the last Done day | an adapter and a mock that disagree on shape |
 */
 const OVER_WEEK=604800000,OVER_STORED=Date.parse('2026-10-25T00:00:00Z');
@@ -2156,4 +2157,15 @@ test('C11 the adapter load over the real mock handler rebuilds the story timelin
   assert.equal(day.states[key]?.state ?? null,source?source.state:null,key+' on day '+(index+1));
  }});
  assert.equal(result.days[0].states['UX-90'],undefined,'UX-90 does not exist on day 1');assert.equal(result.days[3].states['HW-124'].state,'blocked','Flagged and Blocked');
+});
+test('C12 created searches name at most ten keys each and at most six run at once',async()=>{
+ const keys=Array.from({length:75},(_,i)=>'AA-'+(i+1)),waiting=[];let running=0,peak=0;
+ const h=historyProvider({keys,gate:async tool=>{if(tool!=='searchJiraIssuesUsingJql')return;running++;peak=Math.max(peak,running);await new Promise(done=>waiting.push(done));running--;}});
+ await h.start();await historySettle();
+ h.watches.forEach((watch,i)=>{const listed=/^key in \(([^)]+)\)$/.exec(watch.input.jql);h.data(i,listed?listed[1].split(', ').map(key=>jira(key)):[]);});await historySettle();
+ overButton(h).dispatchEvent({type:'click'});for(let i=0;i<8;i++)await historySettle();assert.equal(waiting.length,6,'six searches are open');
+ for(let released=0;released<8;released++){waiting.shift()();for(let i=0;i<8;i++)await historySettle();}
+ for(let i=0;i<8;i++)await historySettle();assert.equal(peak,6);assert.equal(waiting.length,0);
+ const searches=h.upstream.filter(call=>call.tool==='searchJiraIssuesUsingJql').map(call=>/^key in \(([^)]+)\)$/.exec(call.input.jql)[1].split(', '));
+ assert.equal(searches.length,8);assert.ok(searches.every(list=>list.length<=10));assert.deepEqual(searches.flat().sort(),keys.slice().sort());assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true);
 });

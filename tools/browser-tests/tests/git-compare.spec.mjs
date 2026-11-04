@@ -121,6 +121,12 @@
                                              that commit; Compare, then click broken    no .compare-view, liveOwners() 0
    U2   untrusted text in the document list  commit with a hostile file name and       doc row path literal; rail labels and node text     innerHTML in the document list or rail
         and comparison                       node/section titles                      literal; no <img>/inline <script>; no __pwned
+   E0   no documents at HEAD (#917)          commit c8 removes every spec (HEAD    Document options exactly [All changed documents];  state.doc left empty (list shows the
+                                             = c8); page opens                      From picker's All commits tab lists c8 and c7      option but nothing is chosen)
+   E1   compare a range with no documents   From c7, To c8                          between rows exactly [c8]; Compare enabled;        Compare left disabled; between list
+        on one side                                                                  rows exactly [a Removed, new Removed, p Removed]   empty because no document is chosen
+   E2   a To with documents keeps All        then Swap (To := c7)                   options exactly [All, a, new, p]; value "all";      switching to the first listed document
+        changed documents                                                            Compare enabled                                    once the To revision has documents
    AU   every test, context-wide (all pages): no page/console error, failed request, HTTP >= 400, or request outside the compare server
         (recorded from page open until the test body ends, no element is aria-busy and no request is in flight;
         only then are the servers closed)
@@ -890,4 +896,33 @@ test('P10c: a pull request force-pushed while the picker is open is refused even
   await expect(row).toContainText('not available locally');
   await expect(dialog).toBeVisible();
   await expect(choice(page,'From')).toHaveText('No revision chosen');
+});
+
+test('E0 E1 E2: with no documents at HEAD, All changed documents is chosen and a range can be compared (#917)',async({page,repo,open})=>{
+  const {c}=repo;
+  for(const f of [A,NEW,P])git(repo.dir,['rm','-q',f]);
+  git(repo.dir,['commit','-q','-m','Remove flows'],{GIT_AUTHOR_NAME:'Erin',GIT_AUTHOR_EMAIL:'erin@example.test',GIT_AUTHOR_DATE:'2026-01-08T10:00:00Z',GIT_COMMITTER_NAME:'Erin',GIT_COMMITTER_EMAIL:'erin@example.test',GIT_COMMITTER_DATE:'2026-01-08T10:00:00Z'});
+  const c8=git(repo.dir,['rev-parse','HEAD']);
+  /* Precondition: HEAD (c8) holds no *.spec.json; c7 holds a, new and p. */
+  expect(git(repo.dir,['ls-tree','-r','--name-only',c8]).split('\n').filter(f=>f.endsWith('.spec.json'))).toEqual([]);
+  await open();
+  /* E0 */
+  await expect.poll(()=>documentOptions(page)).toEqual([ALL_DOCS]);
+  const dialog=await openPicker(page,'From');
+  await dialog.getByRole('tab',{name:'All commits'}).click();
+  await expect(dialog.getByRole('tab',{name:'All commits'})).toHaveAttribute('aria-selected','true');
+  await expect.poll(()=>shas(dialog)).toEqual(expect.arrayContaining([short(c8),short(c.c7)]));
+  await dialog.getByRole('option').filter({has:page.locator('[data-field="sha"]',{hasText:short(c.c7)})}).first().click();
+  await expect(dialog).toBeHidden();
+  await choose(page,'To','All commits',c8);
+  /* E1 */
+  await expect.poll(()=>betweenRows(page)).toEqual([{date:'2026-01-08 10:00',sha:short(c8),subject:'Remove flows',prs:[]}]);
+  await expect(compareButton(page)).toBeEnabled();
+  await compareButton(page).click();
+  await expect.poll(()=>docRows(page)).toEqual([[A,'Removed'],[NEW,'Removed'],[P,'Removed']]);
+  /* E2 */
+  await page.getByRole('button',{name:'Swap'}).click();
+  await expect.poll(()=>documentOptions(page)).toEqual([ALL_DOCS,[A,A],[NEW,NEW],[P,P]]);
+  await expect(page.getByLabel('Document',{exact:true})).toHaveValue('all');
+  await expect(compareButton(page)).toBeEnabled();
 });

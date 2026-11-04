@@ -19,7 +19,8 @@ so the imported-nodes rule does not apply.
   computed text (counts, totals, story time), enum labels, numbers, live data,
   and text merged with other values.
 - New contract: a renderer marks each editable string with
-  `data-dv-text="decl:<path>"` or `data-dv-text="state:<path>"`. A new
+  `data-dv-text` holding `decl:` or `state:` followed by a JSON array of path
+  segments, for example `state:["rows",3,"label"]`. A new
   Workbench resolver turns that marker into a source location. Declaration
   paths resolve directly. State paths resolve through the existing provenance
   model (`builderEffectivePanelStates`). Panel types with special folds add an
@@ -250,13 +251,46 @@ This is a new contract. Nothing today records which field a rendered panel
 string came from.
 
 **Markup.** The element whose whole text is the editable string carries one
-attribute:
+attribute, `data-dv-text`. Its value (after normal HTML attribute decoding) is
+a scope, a colon, and a JSON array of path segments:
+
+| Element | Attribute value | Source it names |
+| --- | --- | --- |
+| tiles label | `decl:["tiles",2,"label"]` | `panels[i].tiles[2].label` |
+| shell note | `state:["note"]` | the snapshot's `note` |
+| log line | `state:["log",4,"text"]` | the snapshot's `log[4].text` |
+| key containing `.` | `state:["highlights","user.email","label"]` | `highlights["user.email"].label` |
+| key containing `%` | `state:["results","p95%","detail"]` | `results["p95%"].detail` |
+| object key that looks like a number | `state:["values","3"]` | `values["3"]`, not array index 3 |
+
+In the HTML the renderer writes, the quotes are escaped by the existing `esc()`
+(`src/validator.js:49`), which escapes `&`, `<`, `>` and `"`, so the attribute
+must be double-quoted:
 
 ```html
-<span class="tllabel" data-dv-text="decl:tiles.2.label">North door</span>
-<div class="swnote" data-dv-text="state:note">Retry scheduled</div>
-<span data-dv-text="state:log.4.text">Event received · 200 OK</span>
+<span class="tllabel" data-dv-text="decl:[&quot;tiles&quot;,2,&quot;label&quot;]">North door</span>
+<div class="swnote" data-dv-text="state:[&quot;note&quot;]">Retry scheduled</div>
 ```
+
+Encode and decode rules:
+
+- **Encode:** `scope + ':' + JSON.stringify(segments)`, then `esc()` the whole
+  value. `scope` is `decl` or `state`. `segments` is a non-empty array. Each
+  segment is a string (an object key, written exactly as the key, with no
+  escaping beyond what JSON itself does) or a non-negative integer (an array
+  index). No separator character is reserved, so `.`, `%`, `/`, `~` and `:` in
+  keys need no extra rule.
+- **Decode:** read the attribute (the browser has already undone the HTML
+  escaping). Split at the first `:` only. The part before it must be `decl` or
+  `state`. Pass the rest to `JSON.parse`. The result must be a non-empty array
+  whose items are strings or non-negative integers. Anything else (bad scope,
+  JSON that does not parse, a wrong item type) means the element is treated as
+  unmarked.
+- A string segment always names an object key, and an integer segment always
+  names an array index. The resolver refuses a path where an integer meets an
+  object or a string meets an array.
+
+Path rules:
 
 - `decl:` paths are relative to the panel declaration (`diagram.panels[i]`).
   Array indices are declaration indices, not rendered positions. Renderers that
@@ -264,12 +298,12 @@ attribute:
   does (`panel.rooms.indexOf(room)`, `homemap.js:775`). Radar, timeline, signal,
   grid and inflight filter their lists.
 - `state:` paths are relative to the folded snapshot the renderer received.
-- Segments are object keys and array indices joined by `.`. Keys that contain
-  `.` are percent-encoded. The shared helper below does this.
 - SVG `<text>` elements carry the same attribute.
 
-**Shared helper.** `panelTextMark(scope, path)` in `src/panels/shared.js`
-returns the escaped attribute string, so renderers do not build it by hand.
+**Shared helper.** `panelTextMark(scope, segments)` in `src/panels/shared.js`
+applies the encode rule above and returns the complete
+` data-dv-text="…"` attribute string, so renderers never build it by hand. The
+Workbench resolver owns the matching decode.
 `softwarePanelShell` (`shared.js:269-275`) uses it for `.swnote`, which covers
 eight types in one change.
 
@@ -284,7 +318,7 @@ pathId, marker)` in a new `src/workbench/panel-text.js` returns either
 2. `state:` with a top-level key whose provenance is `initial`, `step`,
    `inherited` or `transient`: the provenance input path plus the rest of the
    marker path. The section 3 choices are added.
-3. `state:log.k…` with the default fold: entry `k` is mapped to `initial.log`
+3. `state:["log",k,…]` with the default fold: entry `k` is mapped to `initial.log`
    or one step's `log` array by adding up the lengths of earlier arrays on the
    current path. A string entry is replaced whole. An object entry has its
    `text` set.
@@ -347,14 +381,16 @@ previous source. Browser tests run at desktop width only.
    source. Also cover: Escape writes nothing; empty removes `label` and the id
    shows; a single click still selects the panel. Flip: today a double-click
    opens nothing. Pure test (new `tests/panel-text-source.test.js`): decl paths,
-   filtered index, non-string refusal.
+   filtered index, non-string refusal, and the marker encode/decode round trip
+   for keys containing `.` and `%`, a numeric-looking key versus an array index,
+   and malformed markers treated as unmarked.
 2. **Carried state: `.swnote` (eight types) and queue.** Add the `state:` rule,
    the "Saves to" line with both choices, and `planStepPanelField`. Test: a note
    set at step 1 and shown at step 3. The default save edits step 1. The other
    choice adds `steps[3].panels[id].note`, including when step 3 did not list
    the panel, and both cases take one Undo. Add an `enterOnce` case (truth-table)
    and a shared-step case (two paths).
-3. **Appended entries: log.** Add the `log.k` mapping. Test: lines from `initial`
+3. **Appended entries: log.** Add the `["log",k]` mapping. Test: lines from `initial`
    and from two steps. Editing a step-2 line while step 4 is shown writes to
    `steps[2].panels[id].log[j]`. String entries and object entries are both
    covered.

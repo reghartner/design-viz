@@ -539,6 +539,19 @@ blue (`--dv-live-active`) while connecting or awaiting approval, green when conn
 red on error, and it pulses while a fetch is in flight; the time is the last successful
 fetch, not a ticket's change time), provider note and action, **First blocker**, and
 demo **Play/Pause** and **Next day** when demo controls are supplied. The engine's panel title stays above this header.
+
+**Metrics** sits beside Live, after its counts, when the host supplies a telemetry
+provider or a demo telemetry source (see [Telemetry provider](#telemetry-provider));
+without one it is hidden. It is off on every load and its state is never saved.
+Turning it on calls the telemetry provider at once and keeps it refreshing; turning
+it off stops the provider and clears the telemetry map. It never changes Live or the
+Jira paint, and Live never changes it. A second connector indicator follows the Jira
+one, with the same dot colors: “Metrics: not connected” while off, “Metrics:
+connecting” until the first answer, “Metrics: connected, refreshed 3:42:15 PM” (“Metrics:
+demo, …” for a demo source) and “Metrics: did not answer · <message>” after a failed
+call. The header shows whenever Metrics is available, even on a page without Jira
+evidence. The canvas does not change yet: packet streams, silent-edge ghosts, node
+sparklines and proof seals are #939's second part.
 The body opens with the **epic header box**: the epic key (a Jira link), its
 summary, its state pill, “n of N stories done · m of N on diagram” and the
 blocked, waiting and outside-epic counts, with the carriers-done ring on the
@@ -687,15 +700,15 @@ can also use the Atlassian adapter described below.
 that ticket and their authored `prs`), `apply(map)`, `clear()`, `state(key)` (entry or
 null), `snapshot()`, `enabled()`, `setEnabled(bool)`, and `onChange(fn)` (returns an unsubscribe
 function). Change callbacks receive `{states, counts, updatedAt}` after apply,
-clear, enable changes, notes, actions, demo changes, and loaded details that change the collected references.
+clear, enable changes, notes, actions, demo changes, Metrics changes, and loaded details that change the collected references.
 `snapshot()` also exposes enabled state, note, action label, lanes, blockers,
 Tickets rows (each with `dependsOn`, `waiting` tone and `epicLabel`), `dependencies`
 (merged by provenance), `waiting` (per displayed story: tone and direct upstreams), `chains`,
 `suggestions`, `epic` (keys, title, state, stories, done, onDiagram, blocked, waiting,
 outside, ready), `excluded` audit rows (key, URL, title, state, included, reason),
 coverage (including excluded keys and additional displayed dependency keys),
-activity, demo state, verdict and `connection` for subscribed
-panels. `connection` is `{state, busy, checkedAt, source, checkedText, github}`; `state` is one of
+activity, demo state, verdict, `connection` and `metrics` (the Metrics button
+state, see [Telemetry provider](#telemetry-provider)) for subscribed panels. `connection` is `{state, busy, checkedAt, source, checkedText, github}`; `state` is one of
 `none`, `disconnected`, `approval`, `connecting`, `connected`, `error`, `demo`.
 `connection.github` is `{state, busy}` with `state` in `none`, `disconnected`,
 `connecting`, `connected`, `error`; adapters report it through
@@ -757,6 +770,78 @@ Standalone hosts set `window.flowviewLiveStatus` before boot. Native hosts pass
 `src/native/mount.d.ts`. All renderer entrypoints include the overlay. Approved
 external detail pages join reference collection once loaded; local detail-only
 sections are included from the start.
+
+### Telemetry provider
+
+A host can supply telemetry transport beside `liveStatus`. It drives the panel's
+**Metrics** button and runs only while Metrics is on:
+
+```js
+var ctl = renderPage(view, page, skin, backlinks, {
+  liveStatus: {provider: hostTicketLookup},
+  telemetry: {
+    provider: function(bindings, signal) {
+      // bindings = [{id: "notify->app", kind: "call", signals: {...}, proof: {...}, links: {...}, card: null}, ...]
+      return hostTelemetryLookup(bindings, signal);
+    },
+    refreshMs: 300000
+  }
+});
+```
+
+`bindings` lists every bound carrier once, in page order: local nodes and edges,
+imported topology carriers and the carriers of loaded detail pages. Each entry is
+`carrierTelemetry(carrier, templates)` (see [Telemetry bindings](#telemetry-bindings))
+plus its `id`: a node id, an edge identity `from->to`, or a resolved imported
+identity such as `shared::api->shared::store`. A repeated id keeps its first
+binding; unbound carriers and text boxes are absent. The provider resolves one map
+keyed by carrier id:
+
+```json
+{
+  "notify->app": {
+    "signals": {
+      "rate":   {"value": 1300, "series": [[1793696400000, 1180], [1793700000000, 1300]], "unit": "req/h"},
+      "errors": {"value": 4, "series": [[1793696400000, 2], [1793700000000, 4]], "unit": "req/h"}
+    },
+    "observedAt": "2026-11-03T10:00:00Z",
+    "markers": [{"at": "2026-11-03T08:12:00Z", "kind": "deploy", "label": "notify 2.4.1"}],
+    "links": {"query": "https://acme.grafana.net/explore", "dashboard": "https://acme.grafana.net/d/notify/push"}
+  }
+}
+```
+
+`value` is the headline number for the window. `series` points ascend in time,
+with `t` in epoch milliseconds or ISO text. Every field is optional. This map is
+the contract every telemetry adapter implements and the `telemetryMap` input of the
+proof verdict engine. `apply` keeps exactly this shape: it drops malformed carriers,
+signals, series points and markers and any link that is not an absolute HTTP(S) URL,
+turns `observedAt` and marker times into ISO text, and gives every kept carrier
+`signals`, `observedAt` (or `null`), `markers` and `links`.
+
+The first call runs when Metrics turns on. Calls repeat every `refreshMs`, else the
+page's `tracking.telemetry.refreshMs`, else one minute, and never more often than
+once a minute. A hidden document pauses refresh; returning to visible runs one
+catch-up call. A rejection reports the error and keeps the previous map. Turning
+Metrics off or destroying the page aborts the signal, stops the timer and drops any
+late answer; turning it off also clears the map. A demo source may stand in for a
+provider: `telemetry: {demo: {mount: function(api) {...; return cleanup;}}}` is
+mounted when Metrics turns on, receives `ctl.telemetry`, feeds it through `apply`,
+and its cleanup runs when Metrics turns off or the page is destroyed.
+
+`ctl.telemetry` exposes `bindings()`, `apply(map)`, `clear()`, `snapshot()`,
+`enabled()`, `setEnabled(bool)`, `status()` and `onChange(fn)`. `snapshot()` returns a
+copy, `{available, enabled, map, status}`. `setEnabled` is ignored without a provider
+or demo. `onChange` returns an unsubscribe function; callbacks receive the snapshot
+after apply, clear, enable changes and connector changes. `status()` is `{state,
+busy, refreshedAt, note}`: `state` is `absent` without a provider or demo, `idle`
+while Metrics is off, `loading` until the first answer, then `ok` or `error`; `busy`
+is true while a call is in flight; `refreshedAt` is the last successful answer;
+`note` holds the last error message. `ctl.liveStatus.snapshot().metrics` carries the
+same state for the panel, and `ctl.liveStatus.setMetricsEnabled(bool)` is the panel
+button's action. Standalone hosts set `window.flowviewTelemetry` before boot; native
+hosts pass `telemetry` to `mountNativeViewer`, typed in `src/native/mount.d.ts`.
+Nothing is painted on the canvas yet.
 
 The [live-status example](../examples/live-status/live-status.spec.json) connects
 hardware, firmware, a mobile app and backend with node and edge references.

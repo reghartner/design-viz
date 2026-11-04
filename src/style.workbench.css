@@ -736,6 +736,12 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .rowcell{display:flex; flex-direction:column; gap:2px; min-width:0;}
 .rowk{font:600 9px 'IBM Plex Mono',monospace; color:var(--sub);}
 .rowcardacts{grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end;}
+/* Icon pickers in item cards take two tracks, so the name has room beside the
+   preview and Choose. :where keeps this at zero specificity: a panel that sizes
+   its own icon cell (Home map's full-row .home-icon-cell) keeps that width.
+   A name that still does not fit ends in an ellipsis; aria-label keeps it whole. */
+:where(.rowline.rowcard>.rowcell:has(.flow-icon-control)){grid-column:span 2;}
+.rowline.rowcard .flow-icon-value{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 /* @panel-style-order:489 */
 .rowx{flex:none; padding:4px 7px;}
 .rowadd{justify-self:start; padding:4px 9px;}

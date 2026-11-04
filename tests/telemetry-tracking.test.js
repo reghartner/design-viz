@@ -188,28 +188,28 @@ test('T10 validator reports telemetry problems as warnings at spec paths, never 
     sections:[{diagram:{nodes:{a:{title:'A',telemetry:QUEUE()},b:{title:'B'},note:{type:'text',text:'Note'}},rows:[['a','b','note']],
       edges:[{from:'a',to:'b',telemetry:CALL()},{from:'b',to:'a',telemetry:{use:'kafka-topic',topic:'t',group:'g'}}],
       panels:[{id:'status',type:'live-status'}],...over}}]}});
-  const clean=C.validate(C.normalize(page()));assert.deepEqual(plain(clean.errors),[]);
+  const clean=plain(C.validate(C.normalize(page())));assert.deepEqual(plain(clean.errors),[]);
   assert.deepEqual(clean.warnings.filter(w=>/telemetry/.test(w)),[]);
   const bad=page();const d=bad.page.sections[0].diagram;
   bad.page.tracking.telemetry.grafana.loki=7;bad.page.tracking.telemetry.window='soon';
   d.nodes.b.telemetry={kind:'pipe',signals:{rate:{grafana:'up'}}};d.nodes.note.telemetry=CALL();
   d.edges[0].telemetry.signals.bad={};d.edges[1].telemetry.use='nope';
-  const result=C.validate(C.normalize(bad));assert.deepEqual(plain(result.errors),[]);
+  const result=plain(C.validate(C.normalize(bad)));assert.deepEqual(plain(result.errors),[]);
   assert.deepEqual(result.warnings.filter(w=>/telemetry/.test(w)).map(w=>w.split(': ')[0]),[
     'tracking.telemetry.grafana.loki','tracking.telemetry.window',
     'sections[0].diagram.nodes.b.telemetry.kind','sections[0].diagram.nodes.note.telemetry',
     'sections[0].diagram.edges[0].telemetry.signals.bad','sections[0].diagram.edges[1].telemetry.use']);
   assert.ok(result.warnings.every(w=>!/telemetry/.test(w) || /ignored|using/.test(w)),'every telemetry warning says what happens');
-  const tabs=C.validate(C.normalize({page:{tracking:{telemetry:7},blocks:[{tabs:[{label:'T',sections:[{diagram:{nodes:{x:{telemetry:{kind:'call'}}},rows:[['x']],panels:[{type:'live-status'}]}}]}]}]}}));
+  const tabs=plain(C.validate(C.normalize({page:{tracking:{telemetry:7},blocks:[{tabs:[{label:'T',sections:[{diagram:{nodes:{x:{telemetry:{kind:'call'}}},rows:[['x']],panels:[{id:'status',type:'live-status'}]}}]}]}]}})));
   assert.deepEqual(plain(tabs.errors),[]);
   assert.deepEqual(tabs.warnings.filter(w=>/telemetry/.test(w)).map(w=>w.split(': ')[0]),['tracking.telemetry','blocks[0].tabs[0].sections[0].diagram.nodes.x.telemetry.signals']);
-  const overlay=C.validate(C.normalize({page:{tracking:{},sections:[{diagram:{nodes:{},rows:[[]],panels:[{type:'live-status'}],
-    topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{telemetry:{kind:'call',signals:{}}}},edgeTracking:{'api->store':{telemetry:{use:'kafka-topic',topic:'t'}}}}]}}]}}));
+  const overlay=plain(C.validate(C.normalize({page:{tracking:{},sections:[{diagram:{nodes:{},rows:[[]],panels:[{id:'status',type:'live-status'}],
+    topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{telemetry:{kind:'call',signals:{}}}},edgeTracking:{'api->store':{telemetry:{use:'kafka-topic',topic:'t'}}}}]}}]}})));
   assert.deepEqual(overlay.warnings.filter(w=>/telemetry/.test(w)).map(w=>w.split(': ')[0]),[
     'sections[0].diagram.topologyImports[0].nodeTracking.api.telemetry.signals','sections[0].diagram.topologyImports[0].edgeTracking.api->store.telemetry.use']);
-  const telemetryOnly=C.validate(C.normalize({nodes:{a:{telemetry:QUEUE()}},rows:[['a']]}));
+  const telemetryOnly=plain(C.validate(C.normalize({nodes:{a:{telemetry:QUEUE()}},rows:[['a']]})));
   assert.ok(telemetryOnly.warnings.some(w=>/no live-status panel/.test(w)),'telemetry bindings need the live-status panel that holds the Metrics button');
-  const withPanel=C.validate(C.normalize({nodes:{a:{telemetry:QUEUE()}},rows:[['a']],panels:[{id:'s',type:'live-status'}]}));
+  const withPanel=plain(C.validate(C.normalize({nodes:{a:{telemetry:QUEUE()}},rows:[['a']],panels:[{id:'s',type:'live-status'}]})));
   assert.ok(!withPanel.warnings.some(w=>/no ticket references/.test(w)),'a telemetry-only board panel is not empty');
 });
 

@@ -237,9 +237,10 @@ test('A5 Day 10 recorded payloads map to the provider shape: series, values, uni
   assert.ok(points.length>=100,'A5 '+id+' '+name+' recorded the hours since traffic began');
   assert.deepEqual(map[id].signals[name],{value:points.at(-1)[1],series:points,unit},'A5 '+id+' '+name);
  }
- // Several series (an unaggregated query: one per code) are added point by point.
- const byCode=rec('query_prometheus',PROM(Q.ingestPerCode));assert.equal(byCode.data.length,2,'the recorded ingest payload has a 200 and a 503 series');
- const added=byCode.data[0].values.map(([t,v],i)=>[Math.round(t*1000),Number(v)+Number(byCode.data[1].values[i][1])]);
+ // Several series (an unaggregated query: one per label set) are added point by point.
+ const byCode=rec('query_prometheus',PROM(Q.ingestPerCode));assert.ok(byCode.data.length>=2,'the recorded ingest payload has several series: '+byCode.data.length);
+ const totals=new Map();for(const entry of byCode.data)for(const [t,v] of entry.values){const ms=Math.round(t*1000);totals.set(ms,(totals.get(ms) || 0)+Number(v));}
+ const added=[...totals].sort((a,b)=>a[0]-b[0]);
  assert.deepEqual(map.ingest.signals.rate,{value:added.at(-1)[1],series:added,unit:'req/h'},'A5 several series are added point by point');
  // Loki metric queries: data[].values[] of {timestamp, value}. The flip mis-maps this field.
  const consumed=lokiPoints(rec('query_loki_logs',LOKI(Q.consumed)));

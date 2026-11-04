@@ -1770,6 +1770,8 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 .dv-inline-preview .prose-code{white-space:pre;overflow:auto;}
 .dv-inline-node-editor{overflow:visible;}
 .dv-inline-node-editor .dv-inline-input{height:36px;padding:4px 6px;font:16px/1.4 system-ui,sans-serif;color:var(--dtext,#202938);}
+.dv-inline-group-editor{overflow:visible;}
+.dv-inline-group-editor .dv-inline-input{height:30px;padding:3px 6px;font:600 13px/1.4 system-ui,sans-serif;color:var(--dtext,#202938);}
 .dv-inline-editing>[hidden]{display:none!important;}
 /* The step caption editor takes its own line under the STEP number, lane and
    links, which stay visible and keep their actions. */

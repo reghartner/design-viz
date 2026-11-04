@@ -613,7 +613,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var days=over.days;base.index=over.index;base.count=days.length;base.first=days[0].short;base.last=days[days.length-1].short;base.label=days[over.index].label;return base;
   }
   function overShow(){map=liveStatusDayMap(over.today,over.days[over.index].states);changedKeys=[];paint();notify();}
-  // Back to today restores the live map, then applies any evidence that arrived meanwhile as a normal refresh.
+  // Returning to Live restores the live map, then applies any evidence that arrived meanwhile as a normal refresh.
   function overClose(){
     var left=over;over=null;map=left.live;changedKeys=[];
     if(overSource.close)overSource.close();
@@ -645,7 +645,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var days=result && Array.isArray(result.days)?result.days:[];
     if(!days.length){overError='History could not load. Try Over time again.';notify();return;}
     var index=result.index;if(typeof index!=='number' || index<0 || index>=days.length)index=days.length-1;
-    over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null};overShow();
+    over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null};on=true;availabilityOn=true;overShow();
   }
   function hasMissingWork(){return sources().some(function(source){return sectionRecords(source).some(function(record){var d=record.section.diagram || {};return Object.values(d.nodes || {}).some(function(node){return !isTextBoxNode(node) && node.missingWork===true;}) || (d.edges || []).some(function(edge){return edge.missingWork===true;});});});}
   function presentationActive(){return applied || hasMissingWork();}
@@ -1245,7 +1245,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     state:function(ref){return map[ref]?copy(map[ref]):null;},
     apply:function(value){
       if(retired)return;
-      // A past day is on screen: this evidence waits for Back to today.
+      // A past day is on screen: this evidence waits for the return to Live.
       if(over){over.held=true;over.value=value;return;}
       if(editor)editor.rememberMap(value);
       var next=cleanMap(value);
@@ -1272,12 +1272,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
     setHistory:function(source){if(retired)return;if(over)overClose();overRequest++;overLoading=false;overError='';overSource=source && typeof source.load==='function'?source:null;notify();},
     // The reader's click is the only thing that loads history.
     overTime:function(){
-      if(retired || overLoading)return;
-      if(over){overClose();return;}
+      if(retired || overLoading || over)return;
       if(!overSource || !applied || !Object.keys(map).length || editing())return;
       var request=++overRequest;overLoading=true;overError='';overProgress='';notify();
       Promise.resolve().then(function(){return overSource.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result);},function(){overLoad(request,null);});
     },
+    overTimeClose:function(){if(!retired && over)overClose();},
     overTimeDay:function(index){
       if(retired || !over || typeof index!=='number' || !isFinite(index) || Math.floor(index)!==index)return;
       index=Math.max(0,Math.min(over.days.length-1,index));if(index===over.index)return;

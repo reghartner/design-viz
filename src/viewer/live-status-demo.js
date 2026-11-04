@@ -58,7 +58,7 @@ function createLiveStatusDemo(doc){
   function paint(){
     if(retired)return;
     if(typeof api.status==='function')api.status({state:'demo',source:'Demo',busy:false,checkedAt:Date.now()});
-    // While a past day shows, the controller holds this map until Back to today.
+    // While a past day shows, the controller holds this map until the return to Live.
     api.apply(liveStatusDemoMap(timeline.days[day],api.refs().tickets,timeline.epics));
     if(shown!==null)api.overTimeDay(shown);
     announce();

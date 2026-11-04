@@ -207,7 +207,8 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False) -> str:
             f"with `url`, `file_path` = that saved page unchanged, and `files` = "
             f'{{"{SPEC_FILE_NAME}": <the edited file>}}. The page HTML is never regenerated. '
             "A new URL loses every comment and the artifact's version history. If the publish is "
-            "refused because the artifact changed after your read, start again from step 1.",
+            "refused because the artifact changed after your read, start again from step 1 with the "
+            "new file and append your entry once: the new file has none of yours yet.",
             "6. Pass the capability declaration below on every publish; it is not recoverable from "
             "the files.",
         ]

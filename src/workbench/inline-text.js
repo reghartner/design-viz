@@ -1,3 +1,19 @@
+/* The field entry an element opens, with its authored target. A creation entry
+   opens only from its Add command and needs no selector; every other entry opens
+   only on an element matching its own selector, so entries of one target kind
+   (a node's name and subtitle) stay distinct. The first entry whose target, from
+   its own resolver or else targetOf(el), has the entry's kind wins. */
+function inlineTextField(fields,el,creation,targetOf){
+  var generic;
+  for(var i=0;i<fields.length;i++){
+    var f=fields[i];
+    if(f.creation?!creation:f.selector && !el.matches(f.selector))continue;
+    var target=f.target?f.target(el):generic===undefined?(generic=targetOf(el)):generic;
+    if(target && target.kind===f.kind)return {entry:f,target:target};
+  }
+  return null;
+}
+
 /* Local native drafts: never replace the focused input (or publish source) while
    typing. Only its sibling preview renders Markdown. One commit owns one Undo. */
 function createInlineTextEditor(opts){
@@ -25,19 +41,9 @@ function createInlineTextEditor(opts){
   ];
   function selectorOf(test){return fields.filter(function(f){return f.selector && !f.creation && test(f);}).map(function(f){return f.selector;}).join(',');}
   var openSelector=selectorOf(function(){return true;}),keySelector=selectorOf(function(f){return f.keyboard;});
-  function resolve(el,creation){
-    var generic;
-    for(var i=0;i<fields.length;i++){
-      var f=fields[i];if(f.creation && !creation)continue;
-      if(f.target && !el.matches(f.selector))continue;
-      var target=f.target?f.target(el):generic===undefined?(generic=opts.targetFromEvent({target:el})):generic;
-      if(target && target.kind===f.kind)return {entry:f,target:target};
-    }
-    return null;
-  }
   function context(el,creation){
     if(!el || !el.isConnected || el.closest('[data-dv-detail-preview]') || opts.disabled())return null;
-    var found=resolve(el,creation);if(!found)return null;
+    var found=inlineTextField(fields,el,creation,function(el){return opts.targetFromEvent({target:el});});if(!found)return null;
     var f=found.entry,target=found.target;
     delete target.el;
     var snapshot=opts.session.snapshot();

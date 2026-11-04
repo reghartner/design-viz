@@ -342,6 +342,8 @@ test('O11 buttons and the content below them stay in place when status text grow
  await expect(slot).toHaveText('No blockers');await expect(slot).toBeDisabled();const before=await places();
  await next.click();await expect(status).toHaveAttribute('title',/very long status message/);await expect(status).toHaveCSS('white-space','nowrap');expect(await places(),'long status text').toEqual(before);
  await next.click();await next.click();await expect(slot).toHaveText('First blocker');await expect(slot).toBeEnabled();expect(await places(),'a blocker appears').toEqual(before);
+ // The row is tall enough for what it holds: three count chips are not clipped.
+ expect(await status.evaluate(el=>el.scrollHeight<=el.clientHeight),'status row fits its contents').toBe(true);
 });
 test('S4 waiting follows ticket dependencies from the provider and the authored pairs, never the edges',async({page,server})=>{
  await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>Object.fromEntries(refs.tickets.map(key=>[key,Object.assign({state:key==='HW-123'?'blocked':key==='FW-45'?'done':'todo'},key==='FW-46'?{dependsOn:[{key:'HW-123',source:'jira',linkType:'is blocked by'}]}:{})]))};});
@@ -870,8 +872,8 @@ test('L3 L4 L5 L10 live-status panel is beside the diagram without a click and k
  await expect(head.locator('.dv-live-connection')).toHaveAttribute('data-state','demo');await expect(head.locator('.dv-live-connection')).toContainText('Demo, refreshed');await expect(root.locator('time.dv-live-updated')).toHaveCount(0);
  await expect(root.locator('.reader-navigation > .dv-live-control')).toHaveCount(0);await expect(root.locator('.dv-live-popover[popover],.dv-live-panel[popover],.dv-live-carrier-preview[popover]')).toHaveCount(0);
  await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-comm-failure')).toHaveCount(0);await expect(root.locator('.dv-jira-cue').first()).toBeVisible();await head.locator('.dv-live-toggle').click();await expect(root.locator('.dv-live-target').first()).toBeVisible();
- await head.getByRole('button',{name:'Next day',exact:true}).click();await expect(head.locator('.dv-live-note')).toContainText('Day 2');
- for(let day=3;day<=12;day++)await head.getByRole('button',{name:'Next day',exact:true}).click();
+ await body.getByRole('button',{name:'Next day',exact:true}).click();await expect(head.locator('.dv-live-note')).toContainText('Day 2');
+ for(let day=3;day<=12;day++)await body.getByRole('button',{name:'Next day',exact:true}).click();
  await expect(body.locator('tr[data-live-coverage-for="UX-90"]')).toContainText('NOT ON DIAGRAM');await expect(body.locator('.dv-live-epic-progress')).toContainText('7 of 8 on diagram');
  await expect(body.locator('tr[data-live-coverage-for="HW-124"],.dv-live-chip')).toHaveCount(0);
  await page.emulateMedia({media:'print'});await expect(body).not.toBeEmpty();await expect(body.locator('table.dv-live-tickets')).toBeVisible();

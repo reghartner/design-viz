@@ -313,9 +313,10 @@ The panel header has two rows. The first holds only buttons, which keep their
 place: **Live**, **Over time**, and on the right **First blocker**, any provider
 action, and Edit. **First blocker** keeps one size; with no blockers it reads
 **No blockers** and is greyed out, and with blockers it cannot reach from here it
-stays **First blocker** and is greyed out. The second row is one line tall and
-holds everything that changes, so it cannot move the buttons or what is below:
-distinct-ticket counts, a connector indicator (a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
+stays **First blocker** and is greyed out. The second row holds everything that
+changes. Its height follows the panel's width, one line when the panel is wide and
+two when it is narrow, and never its text, so it cannot move the buttons or what is
+below: distinct-ticket counts, a connector indicator (a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
 blue (`--dv-live-active`) while connecting or awaiting approval, green when connected or in demo mode,
 red on error, and it pulses while a fetch is in flight; the time is the last successful
 fetch, not a ticket's change time), and the provider note. Text too long for the row

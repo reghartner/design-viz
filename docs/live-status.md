@@ -800,7 +800,7 @@ Carriers are keyed by node id or `from->to`. `values[k]` covers the step from
 `start + k·stepSeconds`; `null` is a step without a sample. All values arrays of a day
 have the same length. The injector rejects any other field, a non-RFC3339 `start` or
 annotation `time`, a non-positive or non-integer `stepSeconds`, and values that are not
-numbers or `null`, naming the path. Each demo day hands the page that day's map
+finite numbers or `null` (`NaN` and `Infinity` included), naming the path. Each demo day hands the page that day's map
 `{carrierId: {signals: {name: {value, series: [[t, v], ...], unit}}, observedAt}}`, the
 proof engine's input: every point is stamped at the end of its step, `null` reads as 0
 (as a connector reports a query that matched nothing), `value` is the last step and

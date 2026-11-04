@@ -34,6 +34,7 @@ every other spec.
 import argparse
 from datetime import datetime
 import json
+import math
 from pathlib import Path
 import re
 import subprocess
@@ -82,6 +83,7 @@ def telemetry_problems(at: str, block) -> list:
      carriers: {carrierId: {signal: {unit?: text, values: [number | null, ...]}}},
      annotations?: [{time: RFC3339, text, id?: integer, tags?: [text]}]}
     All values arrays of one day have the same length; null is an hour without a sample.
+    Values must be finite: json.loads reads NaN and Infinity, a browser's JSON.parse does not.
     """
     if not isinstance(block, dict):
         return [f"{at} must be an object"]
@@ -111,8 +113,9 @@ def telemetry_problems(at: str, block) -> list:
                 if "unit" in signal and not isinstance(signal["unit"], str):
                     problems.append(f"{here}.unit must be text")
                 values = signal["values"]
-                if any(v is not None and (isinstance(v, bool) or not isinstance(v, (int, float))) for v in values):
-                    problems.append(f"{here}.values must hold numbers or null")
+                if any(v is not None and (isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v))
+                       for v in values):
+                    problems.append(f"{here}.values must hold finite numbers or null")
                 lengths.add(len(values))
                 if len(lengths) > 1:
                     problems.append(f"{here}.values must have as many entries as the day's other signals")

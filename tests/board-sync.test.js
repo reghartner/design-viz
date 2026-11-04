@@ -27,6 +27,7 @@
 | L6 a local copy missing live entries is refused | live has an entry local lacks | status not-pulled; CLI exit 3 | an impl that logs over unmerged board edits |
 | L7 no difference, no entry | local equals live | status unchanged, text identical | an impl appending an empty entry |
 | L8 the 200-entry cap | 200 old entries | 200 after log, the oldest gone, the new entry last | an impl growing the list past the cap |
+| T (test review c3) every conflict message names who made the board edit and when | S6 S7 L3 L5 L9 L10 | each message includes the editor and the edit time as `YYYY-MM-DD HH:MM UTC` | an impl that names the editor but not the time |
 | L10 (test review c2; node changes include imported nodes) log covers imported carriers | local adds SH-3 to the overlay of imported node api and clears its Missing work marker; separately Bo (after the newest agent entry) removed SH-2 from imported edge api->store and the local copy puts it back | entry summary "Assigned 1 ticket, cleared 1 Missing work marker" with changes add SH-3 and clear-missing-work on node shared::api at the overlay path; the re-add is a conflict naming SH-2 and Bo | an impl that inventories section nodes and edges only |
 | L9 (diff review c1) placing a ticket that a recent board edit took off the board is a conflict | agent entry 10:00; Bo removed CC-1 from edge 0 at 11:00; local assigns CC-1 to gamma | status conflict, conflicts[0] ticket CC-1, message names Bo; with confirm [CC-1] → logged | a check limited to the carriers the board edit named |
 */
@@ -155,7 +156,7 @@ test('S6 a ticket placed differently on the board and in the local copy stops th
  const out=S().pull(local,live);
  assert.equal(out.status,'conflict');
  assert.equal(out.conflicts.length,1);assert.equal(out.conflicts[0].kind,'both-changed');assert.equal(out.conflicts[0].ticket,'AA-1');
- for(const name of ['Bo','Beta service','Gamma'])assert.ok(out.conflicts[0].message.includes(name),out.conflicts[0].message);
+ for(const name of ['Bo','2026-11-03 15:10 UTC','Beta service','Gamma'])assert.ok(out.conflicts[0].message.includes(name),out.conflicts[0].message);
  const dir=tmp({'local.json':local,'live.json':live}),cli=run(dir,['pull','local.json','live.json']);
  assert.equal(cli.status,2,cli.stdout+cli.stderr);assert.match(cli.stdout,/AA-1/);
  assert.equal(fs.readFileSync(path.join(dir,'local.json'),'utf8'),local,'nothing written on a conflict');
@@ -173,7 +174,7 @@ test('S7 a board edit on a node the local copy deleted stops the pull',()=>{
  const local=JSON.stringify(spec,null,2);
  const out=S().pull(local,live);
  assert.equal(out.status,'conflict');
- assert.equal(out.conflicts[0].kind,'carrier-missing');assert.equal(out.conflicts[0].ticket,'EX-1');assert.ok(out.conflicts[0].message.includes('Beta service'),out.conflicts[0].message);
+ assert.equal(out.conflicts[0].kind,'carrier-missing');assert.equal(out.conflicts[0].ticket,'EX-1');for(const name of ['Bo','2026-11-03 14:02 UTC','Beta service'])assert.ok(out.conflicts[0].message.includes(name),out.conflicts[0].message);
  const dropped=S().pull(local,live,{resolve:{'EX-1':'local'}});
  assert.equal(dropped.status,'merged');assert.ok(!JSON.stringify(JSON.parse(dropped.text).page.sections).includes('EX-1'),'EX-1 is placed nowhere');
  assert.deepEqual(JSON.parse(dropped.text).page.editHistory,[BO_ADD],'the board entry is still recorded');
@@ -248,7 +249,7 @@ test('L3 moving a ticket a board edit placed after the newest agent entry needs 
  const {live,local}=pulled(onBeta,[agentEntry('2026-11-03T10:00:00Z','Initial board'),MOVE_TO_BETA('2026-11-03T11:00:00Z')],toGamma);
  const out=S().log(local,live,{by:'Chuck',now:NOW});
  assert.equal(out.status,'conflict');assert.equal(out.conflicts.length,1);assert.equal(out.conflicts[0].ticket,'AA-1');
- for(const name of ['Bo','Beta service'])assert.ok(out.conflicts[0].message.includes(name),out.conflicts[0].message);
+ for(const name of ['Bo','2026-11-03 11:00 UTC','Beta service'])assert.ok(out.conflicts[0].message.includes(name),out.conflicts[0].message);
  const dir=tmp({'local.json':local,'live.json':live}),cli=run(dir,['log','local.json','live.json','--by','Chuck']);
  assert.equal(cli.status,2,cli.stdout+cli.stderr);assert.equal(fs.readFileSync(path.join(dir,'local.json'),'utf8'),local,'nothing written on a conflict');
  assert.equal(S().log(local,live,{by:'Chuck',now:NOW,confirm:['AA-1']}).status,'logged');
@@ -267,6 +268,7 @@ test('L5 deleting the node that holds a board-placed ticket is a conflict',()=>{
  const {live,local}=pulled(s=>{d(s).nodes.beta.tickets=['EX-1'];},[BO_ADD],spec=>{delete d(spec).nodes.beta;d(spec).rows=[['alpha','gamma']];d(spec).edges=[];});
  const out=S().log(local,live,{by:'Chuck',now:NOW});
  assert.equal(out.status,'conflict');assert.equal(out.conflicts[0].ticket,'EX-1');
+ for(const name of ['Bo','2026-11-03 14:02 UTC'])assert.ok(out.conflicts[0].message.includes(name),out.conflicts[0].message);
 });
 
 test('L6 a local copy missing live entries must pull first',()=>{
@@ -294,7 +296,7 @@ test('L9 placing a ticket that a board edit after the newest agent entry took of
  const {live,local}=pulled(s=>{delete d(s).edges[0].tickets;},[agentEntry('2026-11-03T10:00:00Z','Initial board'),bo],spec=>{d(spec).nodes.gamma.tickets=['CC-1'];});
  const out=S().log(local,live,{by:'Chuck',now:NOW});
  assert.equal(out.status,'conflict');assert.equal(out.conflicts.length,1);assert.equal(out.conflicts[0].ticket,'CC-1');
- assert.ok(out.conflicts[0].message.includes('Bo'),out.conflicts[0].message);
+ for(const name of ['Bo','2026-11-03 11:00 UTC'])assert.ok(out.conflicts[0].message.includes(name),out.conflicts[0].message);
  assert.equal(S().log(local,live,{by:'Chuck',now:NOW,confirm:['CC-1']}).status,'logged');
 });
 
@@ -307,5 +309,5 @@ test('L10 log covers imported nodes and edges: their ticket changes, cleared mar
  const bo=entry('2026-11-03T11:00:00Z','Bo',[{op:'remove',ticket:'SH-2',path:IMP.concat(['edgeTracking','api->store']),edge:['shared::api','shared::store'],label:'API → Store'}]);
  const back=pulled(s=>{delete overlay(s).edgeTracking;},[agentEntry('2026-11-03T10:00:00Z','Initial board'),bo],spec=>{overlay(spec).edgeTracking={'api->store':{tickets:['SH-2']}};});
  const conflict=S().log(back.local,back.live,{by:'Chuck',now:NOW});
- assert.equal(conflict.status,'conflict');assert.equal(conflict.conflicts[0].ticket,'SH-2');assert.ok(conflict.conflicts[0].message.includes('Bo'),conflict.conflicts[0].message);
+ assert.equal(conflict.status,'conflict');assert.equal(conflict.conflicts[0].ticket,'SH-2');for(const name of ['Bo','2026-11-03 11:00 UTC'])assert.ok(conflict.conflicts[0].message.includes(name),conflict.conflicts[0].message);
 });

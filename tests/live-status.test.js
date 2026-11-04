@@ -662,11 +662,13 @@ test('P7 destruction before namespace or resource resolution abandons late work'
 });
 test('P8 publishing docs and skill declare the connector by its display name and comments',()=>{
  for(const file of ['docs/live-status.md','.claude/skills/hld-to-page/references/integrations.md']){
-  const text=fs.readFileSync(file,'utf8');assert.match(text,/server: "Atlassian"/);assert.match(text,/"getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"/);assert.match(text,/comments: \{"composer_only": true, "customAnchors": true\}/);
+  const text=fs.readFileSync(file,'utf8');assert.match(text,/server: "Atlassian"/);assert.match(text,/"getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "listJiraIssueChangelogs", "listJiraStatuses"/);assert.match(text,/comments: \{"composer_only": true, "customAnchors": true\}/);
   assert.match(text,/exact display name/);assert.doesNotMatch(text,/name it exactly \*\*Atlassian MCP\*\*/);
  }
  assert.match(fs.readFileSync('deploy/cloudflare/mock-atlassian-mcp/README.md','utf8'),/directory connector/);
  assert.match(fs.readFileSync('docs/tab-views.md','utf8'),/live-status.md#publishing-as-a-claudeai-artifact/);
+ assert.match(fs.readFileSync('.claude/skills/live-status-board/SKILL.md','utf8'),/"listJiraIssueChangelogs", "listJiraStatuses"/);
+ const statusDocs=fs.readFileSync('docs/live-status.md','utf8');assert.ok(statusDocs.includes('\n## Over time\n'),'#929 docs section');const overTime=statusDocs.split('\n## Over time\n')[1].split('\n## ')[0];for(const claim of ['one batch','7 days','republish'])assert.ok(overTime.includes(claim),claim);
 });
 
 test('P6 P7 resource-call failures follow the same policy; toggles and late searches stay bounded',async()=>{
@@ -2035,4 +2037,135 @@ test('OT12 demo days separate tickets not created yet from tickets that later di
 });
 test('OT13 apply still drops a provider entry without a valid state',()=>{
  const h=harness(overFixture()),api=h.ctl.liveStatus;api.apply({'AA-1':{title:'No state'},'BB-1':{state:'nope'},'EE-1':{state:'todo'}});assert.equal(api.state('AA-1'),null);assert.equal(api.state('BB-1'),null);assert.equal(api.state('EE-1').state,'todo');
+});
+
+/* Over time through the connector (#929, PR 3 of 3). Source: issue behavior items 2, 5, 7, 9, 10, 12 and 13, the
+   Paging and Call budget tests, and Chuck's rulings of 2026-11-03. `historyProvider` keeps the runtime's cache
+   rules: an entry is served only inside staleTime, carries cache.storedAt only when served, and refresh skips the read.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| C1 | connector with neither, one, or both history tools | Over time shows only with both tools | a button that fails on click |
+| C2 | load, watch refreshes, then clicks | no history tool before the click; first click makes one status list, one created search per ten keys and one changelog per ticket, through callTool with a 7-day cache; no new watch | periodic hydration; history through watchTool |
+| C3 | second click, then one ticket's updated time moves | second click reaches Jira zero times; third reaches Jira once, for that ticket, with refresh | refetching the whole board; never noticing a change |
+| C4 | status change only on page 2 | the day after it shows the new status | reading page 1 only |
+| C5 | page 2 fails, then succeeds | board stays on today, panel says history could not load, Over time can be clicked again and then works | showing a partial history |
+| C6 | other failures: status list, created search, empty status list, more pages with no cursor, repeated cursor | same outcome as C5 | wrong days from incomplete data |
+| C7 | ticket missing today | no history call for it, No status on past days, other tickets load | one missing ticket stopping the batch |
+| C8 | flagged today with no Flagged history | blocked on past days | losing today's flag |
+| C9 | batch waiting on Jira | panel shows loaded count of total; at most six changelog calls at once | an unbounded batch of calls |
+| C10 | adapter retires on a past day | mode ends and the source is gone | a past day surviving an account change |
+| C12 | 75 tickets, searches held open | each created search names at most ten keys, together they name every ticket once, and at most six run at once | one search per ticket; an unbounded search batch |
+| C11 | the real adapter load over the real mock handler, final story day | every ticket on every day equals the story timeline; a ticket before its first day has no status; the range ends on the last Done day | an adapter and a mock that disagree on shape |
+*/
+const OVER_WEEK=604800000,OVER_STORED=Date.parse('2026-10-25T00:00:00Z');
+const overRaw=(keys=['AA-1','BB-1','ZZ-1'])=>({page:{tracking:{jira:{site:'https://jira.test'}},sections:[{id:'main',diagram:{nodes:Object.fromEntries(keys.map((key,i)=>['n'+i,{title:key,tickets:[key]}])),rows:[keys.map((_,i)=>'n'+i)],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
+const overChange=(created,from,to)=>({created,items:[{field:'status',fromString:from,toString:to}]});
+const OVER_STATUSES={values:[{name:'To Do',statusCategory:{key:'new'}},{name:'In Progress',statusCategory:{key:'indeterminate'}},{name:'Done',statusCategory:{key:'done'}}]};
+function historyProvider({tools=['listJiraIssueChangelogs','listJiraStatuses'],keys=['AA-1','BB-1','ZZ-1'],gate=null}={}){
+ const h=providerHarness(overRaw(keys));tools.forEach(name=>h.servers[0].tools.push({name}));
+ const stored=new Map(),upstream=[];Object.assign(h,{upstream,changelogs:{},statuses:OVER_STATUSES,fail:()=>false,created:null});
+ const issue=key=>({key,fields:{created:'2026-10-20T12:00:00.000Z',status:{name:'In Progress',statusCategory:{key:'indeterminate'}}}});
+ const execute=(tool,input)=>{
+  if(tool==='listJiraStatuses')return h.statuses;
+  if(tool==='searchJiraIssuesUsingJql'){const found=/^key in \(([^)]+)\)$/.exec(input.jql)[1].split(', ');return {issues:{nodes:(h.created || found).map(issue)}};}
+  const pages=h.changelogs[input.issueIdOrKey] || [{values:[]}];return pages[input.nextPageToken?Number(input.nextPageToken):0];
+ };
+ h.mcp.callTool=async(server,tool,input,opts)=>{
+  h.calls.push(plain([server,tool,input,opts]));
+  if(tool==='getAccessibleAtlassianResources')return {payload:[{id:'cloud',url:'https://jira.test'}]};
+  const id=JSON.stringify([tool,input]),cache=opts && opts.cache,hit=stored.get(id);
+  if(cache && !cache.refresh && hit && cache.staleTime>0)return {payload:hit.payload,cache:{storedAt:hit.at,revalidating:false}};
+  upstream.push({tool,input:plain(input),refresh:!!(cache && cache.refresh)});
+  if(gate)await gate(tool,input);
+  if(h.fail(tool,input))throw {code:'upstream_error',message:'Jira failed'};
+  const payload=execute(tool,input);if(cache && cache.gcTime>0)stored.set(id,{payload,at:OVER_STORED});return {payload};
+ };
+ return h;
+}
+async function overLive(h,issues,flagged=[]){await h.start();await historySettle();h.data(0,issues);h.data(1,flagged);await historySettle();}
+async function overClick(h){overButton(h).dispatchEvent({type:'click'});for(let i=0;i<8;i++)await historySettle();}
+const overLiveIssues=()=>[jira('AA-1'),jira('BB-1')];
+const overStatesAt=(h,index)=>{const api=h.ctl.liveStatus;api.overTimeDay(index);return api.snapshot().states;};
+test('C1 Over time needs both history tools on the connector',async()=>{
+ for(const tools of [[],['listJiraStatuses'],['listJiraIssueChangelogs']]){const h=historyProvider({tools});await overLive(h,overLiveIssues());assert.equal(h.ctl.liveStatus.snapshot().overTime,null,tools.join());assert.ok(!overButton(h) || overButton(h).hidden);}
+ const h=historyProvider();await overLive(h,overLiveIssues());assert.equal(overButton(h).hidden,false);assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,false);
+});
+test('C2 the click is the only thing that calls history, as one batch through callTool',async()=>{
+ const h=historyProvider();await overLive(h,overLiveIssues());const watches=h.watches.length;
+ h.data(0,overLiveIssues());h.data(1,[]);await historySettle();assert.deepEqual(h.upstream,[],'no history call at load or on a watch refresh');
+ await overClick(h);
+ assert.deepEqual(h.upstream.map(call=>call.tool).sort(),['listJiraIssueChangelogs','listJiraIssueChangelogs','listJiraStatuses','searchJiraIssuesUsingJql']);assert.equal(h.watches.length,watches,'no watch added');
+ const search=h.upstream.find(call=>call.tool==='searchJiraIssuesUsingJql');assert.equal(search.input.jql,'key in (AA-1, BB-1)');assert.deepEqual(search.input.fields,['created','status']);assert.equal(search.input.cloudId,'cloud');
+ assert.deepEqual(h.upstream.filter(call=>call.tool==='listJiraIssueChangelogs').map(call=>call.input).sort((a,b)=>a.issueIdOrKey<b.issueIdOrKey?-1:1),[{cloudId:'cloud',issueIdOrKey:'AA-1'},{cloudId:'cloud',issueIdOrKey:'BB-1'}]);
+ for(const [,tool,,opts] of h.calls.filter(call=>call[1]!=='getAccessibleAtlassianResources'))assert.deepEqual(opts.cache,{staleTime:OVER_WEEK,gcTime:OVER_WEEK},tool);
+ assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true);assert.equal(overButton(h).textContent,'Back to today');
+});
+test('C3 repeat clicks reuse the cache and refetch only a ticket whose updated time moved',async()=>{
+ const h=historyProvider();await overLive(h,overLiveIssues());await overClick(h);overButton(h).dispatchEvent({type:'click'});await historySettle();
+ h.upstream.length=0;await overClick(h);assert.deepEqual(h.upstream,[],'nothing changed, nothing reaches Jira');assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true);overButton(h).dispatchEvent({type:'click'});await historySettle();
+ const later=jira('AA-1');later.fields.updated='2026-10-26T00:00:00Z';h.data(0,[later,jira('BB-1')]);h.data(1,[]);await historySettle();
+ await overClick(h);assert.deepEqual(h.upstream,[{tool:'listJiraIssueChangelogs',input:{cloudId:'cloud',issueIdOrKey:'AA-1'},refresh:true}]);
+});
+test('C4 C5 every page is read, and a failed page leaves the board on today until a retry works',async()=>{
+ const h=historyProvider();await overLive(h,overLiveIssues());const api=h.ctl.liveStatus,note={created:'2026-10-21T12:00:00.000Z',items:[{field:'assignee',fromString:'A',toString:'B'}]};
+ h.changelogs['AA-1']=[{values:[note],pageInfo:{hasNextPage:true,endCursor:'1'}},{values:[overChange('2026-10-23T12:00:00.000Z','To Do','Done')],pageInfo:{hasNextPage:false,endCursor:null}}];
+ h.fail=(tool,input)=>tool==='listJiraIssueChangelogs' && input.nextPageToken==='1';await overClick(h);
+ assert.equal(api.snapshot().overTime?.active,false);assert.equal(h.view.querySelector('input.dv-live-over-time-slider'),null);assert.equal(api.state('AA-1').state,'active','today stays on the board');
+ assert.equal(h.view.querySelector('.dv-live-over-time-status').textContent,'History could not load. Try Over time again.');assert.equal(overButton(h).textContent,'Over time');assert.equal(overButton(h).disabled,false);
+ h.fail=()=>false;await overClick(h);assert.equal(api.snapshot().overTime?.active,true);assert.equal(h.view.querySelector('.dv-live-over-time-status').hidden,true);
+ assert.equal(overStatesAt(h,2)['AA-1'].state,'todo','Oct 22');assert.equal(overStatesAt(h,3)['AA-1'].state,'done','Oct 23: the only status change is on page 2');
+});
+test('C6 incomplete history never shows',async()=>{
+ const cases=[['status list fails',h=>{h.fail=tool=>tool==='listJiraStatuses';}],['created search fails',h=>{h.fail=tool=>tool==='searchJiraIssuesUsingJql';}],['status list is empty',h=>{h.statuses={values:[]};}],['a ticket has no created time',h=>{h.created=['AA-1'];}],
+  ['more pages with no cursor',h=>{h.changelogs['AA-1']=[{values:[],isLast:false}];}],['a repeated cursor',h=>{h.changelogs['AA-1']=[{values:[],pageInfo:{hasNextPage:true,endCursor:'0'}}];h.changelogs['AA-1'].push(h.changelogs['AA-1'][0]);}]];
+ for(const [name,arrange] of cases){const h=historyProvider();await overLive(h,overLiveIssues());arrange(h);await overClick(h);assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,false,name);assert.match(h.view.querySelector('.dv-live-over-time-status').textContent,/could not load/,name);assert.equal(h.ctl.liveStatus.state('AA-1').state,'active',name);}
+});
+test('C7 a ticket missing today gets no history call and has no status on past days',async()=>{
+ const h=historyProvider();await overLive(h,overLiveIssues());assert.equal(h.ctl.liveStatus.state('ZZ-1').state,'missing');await overClick(h);assert.ok(h.upstream.length>0,'the click reached Jira');
+ assert.ok(!h.upstream.some(call=>call.input.issueIdOrKey==='ZZ-1'));assert.ok(!h.upstream.find(call=>call.tool==='searchJiraIssuesUsingJql').input.jql.includes('ZZ-1'));
+ const first=overStatesAt(h,0);assert.equal(first['ZZ-1'].state,undefined);assert.equal(first['ZZ-1'].title,undefined);assert.equal(first['AA-1'].state,'active');assert.equal(h.view.querySelectorAll('.dv-live-missing').length,0);
+});
+test('C8 a ticket flagged today with no Flagged history is blocked on past days',async()=>{
+ const h=historyProvider();await overLive(h,overLiveIssues(),[jira('AA-1')]);assert.equal(h.ctl.liveStatus.state('AA-1').state,'blocked');await overClick(h);assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true,'history opened');assert.equal(overStatesAt(h,0)['AA-1'].state,'blocked');assert.equal(overStatesAt(h,0)['BB-1'].state,'active');
+});
+test('C9 the panel shows loaded count of total and at most six changelog calls run at once',async()=>{
+ const keys=Array.from({length:9},(_,i)=>'AA-'+(i+1)),waiting=[];let running=0,peak=0;
+ const h=historyProvider({keys,gate:async tool=>{if(tool!=='listJiraIssueChangelogs')return;running++;peak=Math.max(peak,running);await new Promise(done=>waiting.push(done));running--;}});
+ await overLive(h,keys.map(key=>jira(key)));overButton(h).dispatchEvent({type:'click'});for(let i=0;i<8;i++)await historySettle();
+ assert.equal(overButton(h).textContent,'Loading history 0 of 9…');assert.equal(overButton(h).disabled,true);assert.equal(waiting.length,6);
+ for(let done=1;done<=9;done++){waiting.shift()();for(let i=0;i<8;i++)await historySettle();if(done<9)assert.equal(overButton(h).textContent,'Loading history '+done+' of 9…');}
+ assert.equal(peak,6);assert.equal(overButton(h).textContent,'Back to today');
+});
+test('C10 an adapter that retires on a past day ends the mode and removes the source',async()=>{
+ const h=historyProvider();await overLive(h,overLiveIssues());await overClick(h);const api=h.ctl.liveStatus;assert.equal(api.snapshot().overTime?.active,true);
+ h.watches[0].handler({type:'error',error:{code:'user_changed'}});await historySettle();assert.equal(api.snapshot().overTime,null);assert.equal(h.view.querySelector('input.dv-live-over-time-slider'),null);assert.ok(!overButton(h) || overButton(h).hidden);
+});
+test('C11 the adapter load over the real mock handler rebuilds the story timeline day by day',async()=>{
+ const C=providerContext(),{handleMcp}=await import('../deploy/cloudflare/mock-atlassian-mcp/mcp.mjs'),story=JSON.parse(fs.readFileSync('examples/live-status/live-status.timeline.json','utf8'));
+ assert.equal(typeof C.liveStatusHistoryLoad,'function','#929 connector load exists');
+ const last=story.days.length-1,env={scenario:'story',day:last,now:Date.parse('2026-11-03T12:00:00Z')},calls=[];
+ const mcp={callTool:async(server,tool,input)=>{calls.push(tool);const response=handleMcp({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:tool,arguments:input}},env);assert.equal(response.error,undefined,tool);return {payload:response.result.structuredContent};}};
+ const keys=Object.keys(story.days[last].issues),found=(await mcp.callTool('Mock','searchJiraIssuesUsingJql',{cloudId:'mock-cloud-id-0001',jql:'key in ('+keys.join(', ')+')',maxResults:50})).payload.issues.nodes;
+ const flagged=(await mcp.callTool('Mock','searchJiraIssuesUsingJql',{cloudId:'mock-cloud-id-0001',jql:'key in ('+keys.join(', ')+') AND Flagged = Impediment',maxResults:50})).payload.issues.nodes;assert.equal(found.length,keys.length);assert.deepEqual(flagged,[]);
+ const today=plain(C.liveStatusJiraMap(keys,[found],new Set(),'https://acme.atlassian.net',null)),issues=Object.fromEntries(found.map(issue=>[issue.key,issue]));calls.length=0;
+ const result=plain(await C.liveStatusHistoryLoad({mcp,server:'Mock',cloudId:'mock-cloud-id-0001',today,issues,flagged:{}},()=>{}));
+ assert.equal(calls.filter(tool=>tool==='listJiraStatuses').length,1);assert.equal(calls.filter(tool=>tool==='searchJiraIssuesUsingJql').length,1);assert.ok(calls.filter(tool=>tool==='listJiraIssueChangelogs').length>keys.length,'at least one ticket needs a second page');
+ const lastDone=story.days.findIndex(day=>keys.every(key=>day.issues[key] && day.issues[key].state==='done'));assert.equal(result.days.length,lastDone+1,'the range ends on the last Done day');
+ result.days.forEach((day,index)=>{for(const key of keys){
+  let source=null;for(let i=index;i>=0 && !source;i--)source=story.days[i].issues[key] || null;
+  // A ticket absent from the story on a later day carries its previous status: history has no "unavailable" day.
+  assert.equal(day.states[key]?.state ?? null,source?source.state:null,key+' on day '+(index+1));
+ }});
+ assert.equal(result.days[0].states['UX-90'],undefined,'UX-90 does not exist on day 1');assert.equal(result.days[3].states['HW-124'].state,'blocked','Flagged and Blocked');
+});
+test('C12 created searches name at most ten keys each and at most six run at once',async()=>{
+ const keys=Array.from({length:75},(_,i)=>'AA-'+(i+1)),waiting=[];let running=0,peak=0;
+ const h=historyProvider({keys,gate:async tool=>{if(tool!=='searchJiraIssuesUsingJql')return;running++;peak=Math.max(peak,running);await new Promise(done=>waiting.push(done));running--;}});
+ await h.start();await historySettle();
+ h.watches.forEach((watch,i)=>{const listed=/^key in \(([^)]+)\)$/.exec(watch.input.jql);h.data(i,listed?listed[1].split(', ').map(key=>jira(key)):[]);});await historySettle();
+ overButton(h).dispatchEvent({type:'click'});for(let i=0;i<8;i++)await historySettle();assert.equal(waiting.length,6,'six searches are open');
+ for(let released=0;released<8;released++){waiting.shift()();for(let i=0;i<8;i++)await historySettle();}
+ for(let i=0;i<8;i++)await historySettle();assert.equal(peak,6);assert.equal(waiting.length,0);
+ const searches=h.upstream.filter(call=>call.tool==='searchJiraIssuesUsingJql').map(call=>/^key in \(([^)]+)\)$/.exec(call.input.jql)[1].split(', '));
+ assert.equal(searches.length,8);assert.ok(searches.every(list=>list.length<=10));assert.deepEqual(searches.flat().sort(),keys.slice().sort());assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true);
 });

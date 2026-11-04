@@ -71,7 +71,7 @@ function flowMetricsDom(o){
 function createFlowMetricsEditor(o){
   var d=flowMetricsDom(o),c=o.controls,s=o.state,commit=o.commit,b=s.binding,templateNames=Object.keys(s.templates || {});
   var box=d.el('fieldset','metrics-editor');box.appendChild(d.el('legend',null,'Metrics'));
-  if(s.imported)d.note(box,'Inherited metrics (read only): '+(s.inherited?telemetrySummary(s.inherited)+'. A binding saved here replaces it in this consumer.':'none. A binding saved here applies only in this consumer.'),'metrics-inherited');
+  if(s.imported)d.note(box,'Inherited metrics from '+s.provider+' (read only): '+(s.inherited?telemetrySummary(s.inherited)+'. A binding saved here replaces it in this consumer.':'none. A binding saved here applies only in this consumer.'),'metrics-inherited');
   // An imported carrier that inherits a provider binding is bound; only a carrier with neither is unbound.
   if(!b && !s.inherited)d.note(box,'Unbound: no metrics overlay and no proof verdict. Choose a kind, then add a signal'+(templateNames.length?' or pick a template':'')+'.','metrics-status');
   // An unbound carrier's kind is a draft: it is written with the first signal or template.

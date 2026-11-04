@@ -2,24 +2,24 @@
 /* #941 PR 1 of 2 contract matrix: desktop Workbench Inspect → Tracking → Metrics editor,
    Document settings telemetry block, Undo/Redo and Export project. The field family is #937
    (docs/live-status.md "Telemetry bindings"). The Preview metrics layout toggle is PR 2.
-| row | rule |
-|---|---|
-| M1 | A node or connection shows a Metrics sub-section inside Inspect → Tracking. Unbound: a note says no overlay and no verdict; Metrics kind + New signal name/source/query/unit + Add signal create `{kind, signals:{<name>:{<source>:query, unit?}}}` on the authored carrier and keep its tickets. |
-| M2 | Raw signal rows edit name (proof keys and maxRatioOf references follow), source (string sources ↔ Honeycomb JSON object), query and unit. Bad names, duplicates, empty queries and non-object Honeycomb queries are refused with a message and no history. |
-| M3 | Per-signal proof limits: min and max (finite numbers), ratio of (another signal of the binding). An emptied entry is removed; an emptied proof is removed; min above max is refused. |
-| M4 | Removing the last raw signal removes the `telemetry` object; Remove metrics removes it too. |
-| M5 | Signals from switches between raw signals and a page template: a template writes `{use}` (card and links kept), one Template parameter input per declared $param, proof limits overlay per signal (back to the template value drops the override); switching back to raw expands the template into raw signals. |
-| M6 | Link-outs Dashboard link and Query link take absolute http(s) URLs (normalized); invalid refused; empty removes the key, then `links`. |
-| M7 | Card side (right/left/above/below) and Card offset (-1000..1000) only for connections; invalid refused; empty removes the key, then `card`. |
-| M8 | Imported carriers: inherited bindings are read only and named; local edits write the consumer overlay `topologyImports[i].nodeTracking/edgeTracking[key].telemetry` (tickets kept, provider unchanged); removing it restores the inherited binding. |
-| M9 | Inline validation lists the #937 parser warnings for the carrier, the same text the validator emits at that carrier, including provider bindings the resolver dropped. |
-| M10 | Document settings → Tracking → Metrics edits page `tracking.telemetry`: Grafana Prometheus/Loki/Tempo/SQL UIDs, Honeycomb environment/dataset, window (duration) and refresh (≥ 60000 ms). Empty values remove keys; an empty block removes `tracking.telemetry`; Jira settings are untouched. Page warnings are listed. |
-| M11 | Templates editor: add (name, kind, parameters, first signal), edit kind/parameters/signals/proof/links, remove a signal (never the last), remove a template (refused while a carrier uses it). |
-| M12 | Each edit is one Undo step; Undo and Redo restore the exact prior and next source text. A no-op edit adds no history. |
-| M13 | Export project round-trip: the stamped export keeps carrier, overlay and page telemetry exactly and declares flow.telemetry. |
-| M14 | Text boxes show no Metrics sub-section and the planner refuses them. |
-| M15 | docs/live-status.md "Workbench" describes the Metrics editor and the Document settings block. |
-| P1 | Preview metrics layout toggle: excluded — orchestrator ruling: PR 2. |
+| row | rule | fixture | structurally scoped assertion | plausible broken implementation it rejects |
+|---|---|---|---|---|
+| M1 | A node or connection shows a Metrics sub-section inside Inspect → Tracking. Unbound: a note says no overlay and no verdict; Metrics kind + New signal name/source/query/unit + Add signal bind the first signal and keep the carrier's tickets. | `board()`: connection ingest->notify with tickets, no telemetry; node ingest | `fieldset.metrics-editor` is inside `fieldset.tracking-editor`; choosing a kind alone leaves the source unchanged; after Add signal the edge deepEquals the original plus `telemetry:{kind:'queue',signals:{in:{loki,unit}}}` | writing `{kind}` on kind change (a binding without signals); rewriting the edge and dropping tickets; controls outside Tracking |
+| M2 | Raw signal rows edit name (proof keys and maxRatioOf references follow), source (string sources ↔ Honeycomb JSON object), query and unit; bad names, duplicates, empty queries and non-object Honeycomb queries are refused with a message and no history. | connection with `rate`, `errors` and `errors.maxRatioOf:'rate'` | rename keeps signal order and moves `proof.rate` and `errors.maxRatioOf`; Honeycomb stores an object; each refusal leaves the text and canUndo unchanged and fills `.ierr` | a rename that leaves stale proof keys or references; storing a Honeycomb query as a string; accepting `[]`, `{}` or invalid JSON |
+| M3 | Per-signal proof limits: min and max are finite numbers, ratio of names another signal; an emptied entry is removed, an emptied proof is removed, min above max is refused. Infinity, -Infinity, NaN and numeric strings are refused. | same connection; pure `telemetryEditBinding` calls | `proof.requests` deepEquals `{min:10,max:5000}`; refusals leave the text unchanged; the pure edit returns an error for each non-finite value and for `'10'` | accepting `Infinity` (Number('Infinity')) or NaN; storing a numeric string; leaving `{}` entries the parser warns on |
+| M4 | Removing the last raw signal removes the `telemetry` object; Remove metrics removes it too. | bound connection | `Object.hasOwn(edge,'telemetry')===false`; Undo restores the exact bound text | leaving `{kind, signals:{}}` |
+| M5 | Signals from switches between raw signals and a page template: a template writes `{use}` (card and links kept), one Template parameter input per declared $param, proof limits overlay per signal (back to the template value drops the override); switching back to raw expands the template into raw signals. | page template `kafka-topic` (queue, params topic/group, in/lag, limits, dashboard link) | `{use:'kafka-topic'}`; inputs for topic and group; `proof:{lag:{max:100}}` then no proof; raw expansion deepEquals the substituted template plus card, and `carrierTelemetry` matches the template binding | copying the whole template proof onto the carrier; losing card on a mode switch; writing the draft kind over the template kind |
+| M6 | Link-outs Dashboard link and Query link take absolute http(s) URLs (normalized); invalid refused; empty removes the key, then `links`. | connection with one raw signal | `links` deepEquals the normalized URLs; refusals leave the text unchanged; clearing both removes `links` | storing raw text; accepting `javascript:` or relative URLs; leaving `links:{}` |
+| M7 | Card side (right/left/above/below) and Card offset (-1000..1000) only for connections; invalid refused; empty removes the key, then `card`. | same connection; node ingest | Card side options are exactly `['',right,left,above,below]`; offset 2000 refused; node form has no Card side row | showing edge placement on nodes; an unbounded offset |
+| M8 | Imported carriers (node and connection): the inherited binding is read only and names its provider; local edits write the consumer overlay `topologyImports[i].nodeTracking/edgeTracking[key].telemetry` (tickets kept, provider unchanged); removing it restores the inherited binding. | provider with node `api` and edge `api->store` bindings; consumer importing them as `shared` with node overlay tickets | state `inherited` deepEquals the provider binding; the inspector note names `provider / core` and the binding; overlay entries deepEqual the edits; the resolved carrier carries the inherited binding again after Remove metrics; provider JSON unchanged | writing into the provider; dropping overlay tickets; copying the inherited binding into the overlay; showing an inherited carrier as Unbound |
+| M9 | Inline validation lists the #937 parser warnings for the carrier, the same text the validator emits at that carrier, including provider bindings the resolver dropped. | connection with a two-source signal, an unknown limit, a non-http link; provider node with an unexpandable `use` | the `Metrics warnings` list deepEquals the validator warnings at that carrier with the carrier prefix removed | hand-written messages that drift from the validator; missing provider drops |
+| M10 | Document settings → Tracking → Metrics edits page `tracking.telemetry`: Grafana Prometheus/Loki/Tempo/SQL UIDs, Honeycomb environment/dataset, window (duration) and refresh (≥ 60000 ms). Empty values remove keys; an empty block removes `tracking.telemetry`; Jira settings are untouched. Page warnings are listed. | page with `tracking.jira`; a page with an invalid window and UID | each field lands at its key and `tracking.jira` is deepEqual-unchanged; bad window/refresh refused; clearing all leaves `tracking` deepEqual `{jira}`; warnings deepEqual the validator's `tracking.telemetry` warnings | rewriting `tracking.jira`; leaving `telemetry:{}`; accepting `refreshMs:1000` |
+| M11 | Templates editor: add (name, kind, parameters, first signal); rename a template signal (its limit follows), change its source and query; edit kind/parameters/proof/links; remove a signal (never the last); remove a template (refused while a carrier uses it). Every edit is undoable and preserved by export. | document target on `board()` | the template deepEquals the expected object after each step; export `templates` deepEquals the source; the last-signal and in-use removals are refused with messages | orphaned limits after a rename; a source change that drops the query; templates the parser would drop; orphaning carriers |
+| M12 | Each edit is one Undo step; Undo and Redo restore the exact prior and next source text. A no-op edit adds no history. | every edit above | `oneStep`: text changes, Undo restores the exact prior text, Redo the exact next text; a trimmed no-op then Undo reverts the previous real edit | multi-step edits; phantom history entries |
+| M13 | Export project round-trip: the stamped export keeps carrier, overlay and page telemetry exactly and declares flow.telemetry. | editor-written edge template binding, node Honeycomb signal, page window, consumer overlay | `stampText` export deepEquals authored `tracking` and `sections`; `flow.telemetry` declared | an export that strips `telemetry` or template parameters |
+| M14 | Text boxes show no Metrics sub-section and the planner refuses them. | text-box node `note` | no `fieldset.metrics-editor`; the plan error names text boxes | binding telemetry to text boxes |
+| M15 | docs/live-status.md "Workbench" describes the Metrics editor and the Document settings block. | docs file | the Workbench section contains every control name | missing docs |
+| P1 | Preview metrics layout toggle: excluded — orchestrator ruling: PR 2. | n/a | n/a | n/a |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -138,6 +138,13 @@ test('M2 M3 M12 raw signal rows rename, change source, query and unit, and edit 
   oneStep(ui,()=>ui.set('requests max','5000'));assert.deepEqual(edgeOf(ui).telemetry.proof.requests,{min:10,max:5000});
   {const before=ui.text;ui.set('requests min','6000');assert.equal(ui.text,before);assert.match(ui.error(),/above max/);ui.select(EDGE);}
   {const before=ui.text;ui.set('requests min','ten');assert.equal(ui.text,before);ui.select(EDGE);}
+  // Limits are finite numbers: Number('Infinity') and NaN never reach the source, through the control or the pure edit.
+  for(const bad of ['Infinity','-Infinity','NaN']){
+    for(const field of ['min','max']){const before=ui.text;ui.set('requests '+field,bad);assert.equal(ui.text,before,'M3: '+bad+' is not a finite '+field);assert.ok(ui.error(),bad+' explains the refusal');ui.select(EDGE);}
+  }
+  const C=api(ui.e.C);
+  for(const bad of [Infinity,-Infinity,NaN,'10'])for(const field of ['min','max'])
+    assert.match(C.telemetryEditBinding(edgeOf(ui).telemetry,{op:'proof',signal:'requests',field,value:bad},{}).error || '',/finite number/,'M3: the pure edit refuses '+String(bad)+' as '+field);
   oneStep(ui,()=>ui.set('requests min',''));oneStep(ui,()=>ui.set('requests max',''));
   assert.deepEqual(edgeOf(ui).telemetry.proof,{errors:{maxRatioOf:'requests',max:0.01}},'an emptied entry is removed');
   oneStep(ui,()=>ui.set('errors ratio of',''));assert.deepEqual(edgeOf(ui).telemetry.proof,{errors:{max:0.01}});
@@ -192,6 +199,7 @@ test('M6 M7 link-outs and card placement validate, normalize and remove empty ob
     const before=ui.text;ui.set(label,value);assert.equal(ui.text,before,label+' '+value+' is refused');assert.ok(ui.error(),label+' explains the refusal');ui.select(EDGE);
   }
   assert.deepEqual(ui.control('Card side').options.map(o=>o.value),['','right','left','above','below']);
+  for(const bad of [Infinity,-Infinity,NaN,'12'])assert.match(api(ui.e.C).telemetryEditBinding(edgeOf(ui).telemetry,{op:'card',field:'offset',value:bad},{}).error || '',/between/,'card offset refuses '+String(bad));
   oneStep(ui,()=>ui.set('Card side','left'));oneStep(ui,()=>ui.set('Card offset','-12'));
   assert.deepEqual(edgeOf(ui).telemetry.card,{side:'left',offset:-12});
   oneStep(ui,()=>ui.set('Card side',''));oneStep(ui,()=>ui.set('Card offset',''));assert.equal(Object.hasOwn(edgeOf(ui).telemetry,'card'),false);
@@ -223,7 +231,7 @@ test('M8 M9 imported carriers show the inherited binding read only and edit the 
   const C=api(harness(board()).e.C),f=topologyFixtures(),providerBefore=JSON.stringify(f.provider);
   const node={kind:'node',section:0,id:'shared::api'};
   const state=C.telemetryCarrierState(f.consumer,node,f.context);
-  assert.equal(state.imported,true);assert.equal(state.binding,null);
+  assert.equal(state.imported,true);assert.equal(state.binding,null);assert.equal(state.provider,'provider / core','the inherited binding names its provider');
   assert.deepEqual(plain(state.inherited),{kind:'service',signals:{up:{grafana:'up{job="api"}'}}});
   let text=JSON.stringify(f.consumer,null,2),raw=JSON.parse(text);
   const apply=(target,edit)=>{const plan=C.planCarrierTelemetry(text,raw,target,edit,f.context);assert.equal(plan.error,undefined,plan.error);text=plan.text;raw=JSON.parse(text);};
@@ -256,13 +264,33 @@ test('M8 the inspector shows an imported carrier inherited binding read only and
   ui.h.session.replaceProject(JSON.stringify(f.consumer,null,2),null,{topologyContext:f.context});
   const node={kind:'node',section:0,id:'shared::api'};ui.select(node);
   const box=ui.metrics(),notes=box.querySelectorAll('p').map(p=>p.textContent).join(' ');
-  assert.match(notes,/Inherited metrics \(read only\): service · up \(grafana\)/);
+  assert.match(notes,/Inherited metrics from provider \/ core \(read only\): service · up \(grafana\)/);
   assert.match(notes,/replaces/);assert.doesNotMatch(notes,/Unbound/,'an inherited binding is not unbound');
   ui.control('New signal name').value='rate';ui.control('New signal source').value='grafana';ui.control('New signal query').value=PROM_RATE;ui.set('Metrics kind','service');
   oneStep(ui,()=>ui.click('Add signal'),node);
   assert.deepEqual(diagramOf(ui.raw).topologyImports[0].nodeTracking.api,{tickets:['API-1'],telemetry:{kind:'service',signals:{rate:{grafana:PROM_RATE}}}});
   assert.ok(ui.button('Remove metrics'));oneStep(ui,()=>ui.click('Remove metrics'),node);
   assert.deepEqual(diagramOf(ui.raw).topologyImports[0].nodeTracking.api,{tickets:['API-1']});
+  // The imported connection: the provider binding is read only and named; the local overlay is editable.
+  const C=ui.e.C,providerBefore=JSON.stringify(f.provider),resolvedEdge=()=>diagramOf(C.FlowTopology.resolveSource(ui.raw,f.context)).edges.find(e=>e.from==='shared::api' && e.to==='shared::store');
+  const edge={kind:'edge',section:0,index:diagramOf(C.FlowTopology.resolveSource(ui.raw,f.context)).edges.findIndex(e=>e.from==='shared::api' && e.to==='shared::store')};
+  assert.ok(edge.index>=0,'the imported connection resolves');
+  ui.select(edge);
+  const inherited=()=>ui.metrics().querySelectorAll('p').map(p=>p.textContent).join(' ');
+  assert.match(inherited(),/Inherited metrics from provider \/ core \(read only\): call · rate \(loki\)\. A binding saved here replaces it in this consumer\./);
+  assert.doesNotMatch(inherited(),/Unbound/);assert.equal(ui.button('Remove metrics'),null,'the inherited binding is not removable here');
+  assert.equal(ui.row('rate query'),null,'inherited signals are not editable rows');
+  ui.control('New signal name').value='rate';ui.control('New signal source').value='grafana';ui.control('New signal query').value=PROM_RATE;ui.set('Metrics kind','call');
+  oneStep(ui,()=>ui.click('Add signal'),edge);
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking,{'api->store':{telemetry:{kind:'call',signals:{rate:{grafana:PROM_RATE}}}}});
+  assert.match(inherited(),/Inherited metrics from provider \/ core \(read only\): call · rate \(loki\)/,'the inherited binding stays visible beside the local one');
+  oneStep(ui,()=>ui.set('Card side','below'),edge);oneStep(ui,()=>ui.set('rate min','5'),edge);
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking['api->store'].telemetry,{kind:'call',signals:{rate:{grafana:PROM_RATE}},card:{side:'below'},proof:{rate:{min:5}}});
+  assert.deepEqual(plain(resolvedEdge().telemetry),{kind:'call',signals:{rate:{grafana:PROM_RATE}},card:{side:'below'},proof:{rate:{min:5}}},'the local binding replaces the inherited one');
+  oneStep(ui,()=>ui.click('Remove metrics'),edge);
+  assert.equal(Object.hasOwn(diagramOf(ui.raw).topologyImports[0],'edgeTracking'),false,'the empty overlay entry is removed');
+  assert.deepEqual(plain(resolvedEdge().telemetry),{kind:'call',signals:{rate:{loki:LOKI_IN}}},'the inherited binding applies again');
+  assert.equal(JSON.stringify(f.provider),providerBefore,'the provider spec is untouched');
 });
 
 test('M10 M12 Document settings edit the page telemetry block, validate window and refresh, and leave Jira untouched',()=>{
@@ -275,6 +303,7 @@ test('M10 M12 Document settings edit the page telemetry block, validate window a
   for(const [label,value,message] of [['Metrics window','90x',/duration/],['Metrics window','0h',/duration/],['Metrics refresh ms','1000',/60000/],['Metrics refresh ms','-5',/60000/]]){
     const before=ui.text;ui.set(label,value);assert.equal(ui.text,before,label+' '+value+' is refused');assert.match(ui.error(),message);ui.select(DOC);
   }
+  for(const bad of [Infinity,NaN,'300000'])assert.match(api(ui.e.C).telemetryEditPage({},{op:'refreshMs',value:bad}).error || '',/60000/,'refresh refuses '+String(bad));
   oneStep(ui,()=>ui.set('Metrics window','6h'),DOC);oneStep(ui,()=>ui.set('Metrics refresh ms','300000'),DOC);
   assert.deepEqual(tracking().telemetry,{grafana:{prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'lake'},honeycomb:{environment:'prod',dataset:'doorbell-prod'},window:'6h',refreshMs:300000});
   assert.deepEqual(plain(ui.e.C.trackingTelemetry(ui.raw.page)),{grafana:{prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'lake'},honeycomb:{environment:'prod',dataset:'doorbell-prod'},window:'6h',refreshMs:300000,templates:{}});
@@ -307,9 +336,23 @@ test('M11 M12 the templates editor adds, edits and removes templates; a template
   {const before=ui.text;ui.set('kafka-topic template parameters','topic, use');assert.equal(ui.text,before);assert.match(ui.error(),/use/);ui.select(DOC);}
   oneStep(ui,()=>ui.set('kafka-topic template kind',''),DOC);assert.equal(Object.hasOwn(tpl()['kafka-topic'],'kind'),false,'a template kind is optional');
   oneStep(ui,()=>ui.set('kafka-topic template kind','queue'),DOC);
-  oneStep(ui,()=>ui.click('Remove kafka-topic signal in'),DOC);assert.deepEqual(Object.keys(tpl()['kafka-topic'].signals),['lag']);
+  // An existing template signal: rename (its limit follows, order kept), change source, change query; each undoable.
+  const BACKLOG='sum(count_over_time({topic="$topic"} |= "consumer lag" [5m]))';
+  oneStep(ui,()=>ui.set('kafka-topic lag name','backlog'),DOC);
+  assert.deepEqual(Object.keys(tpl()['kafka-topic'].signals),['backlog','in']);assert.deepEqual(tpl()['kafka-topic'].proof,{in:{min:10},backlog:{max:500}});
+  {const before=ui.text;ui.set('kafka-topic backlog name','in');assert.equal(ui.text,before);assert.match(ui.error(),/already/);ui.select(DOC);}
+  oneStep(ui,()=>ui.set('kafka-topic backlog source','loki'),DOC);assert.deepEqual(tpl()['kafka-topic'].signals.backlog,{loki:LAG,unit:'msgs'});
+  oneStep(ui,()=>ui.set('kafka-topic backlog query',BACKLOG),DOC);assert.deepEqual(tpl()['kafka-topic'].signals.backlog,{loki:BACKLOG,unit:'msgs'});
+  {const before=ui.text;ui.set('kafka-topic backlog query','');assert.equal(ui.text,before);assert.match(ui.error(),/query/);ui.select(DOC);}
+  const edited={kind:'queue',params:['topic','group','cluster'],signals:{backlog:{loki:BACKLOG,unit:'msgs'},in:{grafana:'sum(rate(kafka_messagesin_total{topic="$topic"}[5m]))*3600',unit:'msg/h'}},
+    proof:{in:{min:10},backlog:{max:500}},links:{dashboard:'https://acme.grafana.net/d/kafka?var-topic=$topic'}};
+  assert.deepEqual(tpl()['kafka-topic'],edited);
+  const exported=JSON.parse(ui.e.C.FlowviewCompatibility.stampText(ui.text,ui.raw));
+  assert.deepEqual(exported.page.tracking.telemetry.templates,{'kafka-topic':edited},'M11: Export project keeps the renamed signal, its source and its query');
+  assert.deepEqual(plain(ui.e.C.trackingTelemetry(exported.page).templates['kafka-topic'].signals.backlog),{loki:BACKLOG,unit:'msgs'},'the exported template parses');
+  oneStep(ui,()=>ui.click('Remove kafka-topic signal in'),DOC);assert.deepEqual(Object.keys(tpl()['kafka-topic'].signals),['backlog']);
   assert.equal(Object.hasOwn(tpl()['kafka-topic'].proof,'in'),false,'the removed signal takes its limit with it');
-  {const before=ui.text;ui.click('Remove kafka-topic signal lag');assert.equal(ui.text,before);assert.match(ui.error(),/at least one signal/);ui.select(DOC);}
+  {const before=ui.text;ui.click('Remove kafka-topic signal backlog');assert.equal(ui.text,before);assert.match(ui.error(),/at least one signal/);ui.select(DOC);}
   // A carrier uses the template; removing it is refused until the carrier stops using it.
   ui.select(EDGE);ui.set('Signals from','kafka-topic');assert.equal(edgeOf(ui).telemetry.use,'kafka-topic');
   ui.select(DOC);{const before=ui.text;ui.click('Remove template kafka-topic');assert.equal(ui.text,before);assert.match(ui.error(),/1 carrier uses template "kafka-topic"/);ui.select(DOC);}

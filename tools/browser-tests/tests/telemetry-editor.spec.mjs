@@ -1,10 +1,10 @@
 /* #941 PR 1 of 2: desktop Workbench Inspect → Tracking → Metrics editor and Document settings telemetry block.
    Node-level rows M1–M15 live in tests/telemetry-editor.test.js; this spec proves the real Workbench path.
-| row | rule |
-|---|---|
-| W1 | Desktop: select a connection label, Inspect → Tracking → Metrics shows it unbound; choosing Metrics kind and typing New signal name/source/query/unit, then Enter, binds one raw signal; one Undo restores the exact source and one Redo the edit; a proof limit is added; Export project keeps the binding and declares flow.telemetry. |
-| W2 | Document settings → Tracking → Metrics: Add template with name, kind, parameters and a first signal; one Undo/Redo; Metrics window; a connection uses the template through Signals from + Template parameter inputs; Export project keeps the page block and the carrier binding. |
-| P1 | Preview metrics layout toggle (placeholder edge cards): excluded — orchestrator ruling: PR 2. |
+| row | rule | fixture | structurally scoped assertion | plausible broken implementation it rejects |
+|---|---|---|---|---|
+| W1 | Desktop: select a connection label; once its Tracking fieldset is visible, exactly one Metrics sub-section is in it (immediate count) and it shows the connection unbound; choosing Metrics kind and typing New signal name/source/query/unit, then Enter, binds one raw signal; one Undo restores the exact source and one Redo the edit; a proof limit is added; Export project keeps the binding and declares flow.telemetry. | `raw`: two connections, page `tracking.jira`, a live-status panel; viewport 1440×1000 | `#guide fieldset.tracking-editor fieldset.metrics-editor` count is 1; the source's `edges[0]` equals the original plus the binding; Undo/Redo give exact text; the exported `edges[0]` equals the original plus binding and proof, `edges[1]` and `tracking` unchanged | controls missing or outside Tracking; UI-only state that never reaches the source; a kind change that writes a half binding; an export that drops telemetry |
+| W2 | Document settings → Tracking: once GitHub scope is visible, exactly one Metrics block is in it (immediate count); Add template with name, kind, parameters and a first signal; one Undo/Redo; Metrics window; a connection uses the template through Signals from + Template parameter inputs; Export project keeps the page block and the carrier binding. | same `raw` | `#guide fieldset.tracking-editor fieldset.metrics-settings` count is 1; `tracking.telemetry` equals `{templates:{kafka-topic}}`, then gains `window`; `edges[1].telemetry` equals `{use,topic,group}`; the export keeps both and `edges[0]` unchanged | a settings block that is not wired to `tracking.telemetry`; a template picker not fed by page templates; settings lost on export |
+| P1 | Preview metrics layout toggle (placeholder edge cards): excluded — orchestrator ruling: PR 2. | n/a | n/a | n/a |
 */
 import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
 import {projectFiles,useProjectDownloads} from '../helpers/project-export.mjs';
@@ -30,6 +30,9 @@ test('W1 desktop connection gets a raw metrics signal with one Undo Redo, a proo
   await open(page,server);
   const source=page.locator('#src'),guide=page.locator('#guide'),label=page.locator('#docview text.lbl[data-dv-edge="0"]');
   await label.click();await page.locator('#editor-tab-inspect').click();
+  // The connection form has rendered: its Tracking fieldset predates #941 and is built in the same pass as Metrics.
+  await expect(guide.getByRole('checkbox',{name:'Exists when tickets are complete',exact:true})).toBeVisible();
+  expect(await page.locator('#guide fieldset.tracking-editor fieldset.metrics-editor').count(),'Metrics sub-section rendered in Inspect → Tracking').toBe(1);
   const metrics=guide.locator('fieldset.tracking-editor fieldset.metrics-editor');
   await expect(metrics).toBeVisible();await expect(metrics).toContainText('Unbound: no metrics overlay and no proof verdict');
   const before=await source.inputValue();
@@ -61,6 +64,9 @@ test('W2 Document settings templates round-trip through Undo Redo, a connection 
   const source=page.locator('#src'),guide=page.locator('#guide');
   const settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();};
   await settings();
+  // Document settings → Tracking has rendered: GitHub scope predates #941 and is built in the same pass as the Metrics block.
+  await expect(guide.getByLabel('GitHub scope',{exact:true})).toBeVisible();
+  expect(await page.locator('#guide fieldset.tracking-editor fieldset.metrics-settings').count(),'Document settings → Tracking → Metrics block rendered').toBe(1);
   const block=guide.locator('fieldset.tracking-editor fieldset.metrics-settings');await expect(block).toBeVisible();
   const before=await source.inputValue();
   await guide.getByLabel('New template name',{exact:true}).fill('kafka-topic');

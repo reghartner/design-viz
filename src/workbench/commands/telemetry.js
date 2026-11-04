@@ -355,7 +355,7 @@ function telemetryCarrierState(raw,target,context){
     if(drop.kind===(target.kind==='node'?'nodes':'edges') && drop.id===t.id)warnings.push('telemetry: provider "'+drop.spec+'" '+drop.path+': '+drop.message);
   });
   var template=binding && telemetryOwn(binding,'use')?binding.use:null;
-  return {id:t.id,imported:!!t.owner,edge:target.kind==='edge',binding:binding,inherited:inherited,templates:templates,
+  return {id:t.id,imported:!!t.owner,provider:t.owner?t.owner.spec+' / '+t.owner.export:null,edge:target.kind==='edge',binding:binding,inherited:inherited,templates:templates,
     mode:template!=null?'template':'raw',template:template,
     templateBase:template!=null?telemetryTemplateBase(binding,templates):null,
     effective:telemetryEffectiveBinding(binding,templates),warnings:warnings};

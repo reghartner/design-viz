@@ -188,10 +188,6 @@ function initWorkbenchWorkspace(){
     placements[name]=best;
     // Inspect cannot shrink, so a neighbor whose title bar or resize handle it
     // now covers yields instead, through the same display-only placement.
-    if(name==='inspect')neighbors.forEach(function(n){
-      var o=rect(n);
-      if(overlap(best,{x:o.x,y:o.y,w:o.w,h:48})>0 || overlap(best,{x:o.x+o.w-24,y:o.y+o.h-24,w:24,h:24})>0)place(n,true);
-    });
   }
   function reserveCanvas(){
     document.body.style.setProperty('--workspace-dock-width',docked()?(dockWidth()+12)+'px':'0px');

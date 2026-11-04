@@ -20,9 +20,9 @@ function liveStatusDemoMap(day,keys,epics){
   });return map;
 }
 function liveStatusDemoLabel(day,index){var label=String(day.label || '');return /^Day \d+\s*[—-]/.test(label)?label:'Day '+(index+1)+' — '+label;}
-/* Over time (#929): each timeline day as status only. A ticket first named on a later day
-   does not exist yet, so it has no status. One absent after that, or on the last day, is
-   what the live demo shows: missing. */
+/* Over time (#929): each timeline day as status only. A ticket first named on a later day is
+   left out of the day, and the overlay shows it as Missing. One absent after that, or on the
+   last day, is what the live demo shows: missing. */
 function liveStatusDemoDays(timeline,keys){
   var seen=Object.create(null),last=timeline.days.length-1;
   return timeline.days.map(function(day,index){

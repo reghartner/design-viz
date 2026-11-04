@@ -2140,7 +2140,7 @@ test('C6 incomplete history never shows',async()=>{
  const cases=[['a ticket call fails',h=>{h.fail=tool=>tool==='getJiraIssue';}],['a status lookup fails',h=>{unknown(h);h.fail=tool=>tool==='searchJiraIssuesUsingJql';}],['a ticket has no created time',h=>{h.shape=issue=>({issues:{nodes:[{...issue,fields:{status:issue.fields.status}}]}});}],['a ticket has no changelog',h=>{h.shape=issue=>({issues:{nodes:[{key:issue.key,fields:issue.fields}]}});}],['a reply has no issue',h=>{h.shape=()=>({issues:{nodes:[]}});}]];
  for(const [name,arrange] of cases){const h=historyProvider();await overLive(h,overLiveIssues());arrange(h);await overClick(h);assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,false,name);assert.match(h.view.querySelector('.dv-live-over-time-status')?.textContent || '',/could not load/,name);assert.equal(h.ctl.liveStatus.state('AA-1').state,'active',name);}
 });
-test('C7 a ticket missing today gets no history call and has no status on past days',async()=>{
+test('C7 a ticket missing today gets no history call and stays Missing on past days',async()=>{
  const h=historyProvider();await overLive(h,overLiveIssues());assert.equal(h.ctl.liveStatus.state('ZZ-1').state,'missing');await overClick(h);assert.ok(h.upstream.length>0,'the click reached Jira');
  assert.ok(!h.upstream.some(call=>call.input.issueIdOrKey==='ZZ-1'));
  const first=overStatesAt(h,0);assert.equal(first['ZZ-1'].state,'missing','#1012 still missing on past days');assert.equal(first['ZZ-1'].title,undefined);assert.equal(first['AA-1'].state,'active');

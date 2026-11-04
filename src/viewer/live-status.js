@@ -259,10 +259,10 @@ function liveStatusTicketWaiting(dependencies,map){
   if(!map || !Object.keys(map).length)return out;
   Object.keys(dependencies || {}).forEach(function(ticket){
     var own=map[ticket] && map[ticket].state;
-    if(own==='active' || own==='done' || liveStatusNoStatus(map[ticket]))return;
+    if(own==='active' || own==='done')return;
     var on=[];
     dependencies[ticket].forEach(function(dep){
-      var state=liveStatusUpstreamState(map[dep.key]);
+      var state=map[dep.key] && LIVE_STATUS_STATES.indexOf(map[dep.key].state)>=0?map[dep.key].state:'missing';
       if(state==='done')return;
       on.push({key:dep.key,state:state,tone:liveStatusWaitingTone(state)});
     });
@@ -397,12 +397,9 @@ function liveStatusCaption(diagram,step,map,waiting){
   }
   return text;
 }
-/* Over time (#929): on a past day a ticket with no status keeps an entry without a state,
-   so its row, title and place in the total survive. Only the day overlay makes these;
-   apply() still requires a state from every provider. */
-function liveStatusNoStatus(entry){return !!entry && LIVE_STATUS_STATES.indexOf(entry.state)<0;}
-function liveStatusUpstreamState(entry){return liveStatusNoStatus(entry)?'No status':entry?entry.state:'missing';}
-/* One past day over today's map: status from the day, everything else as of today.
+/* Over time (#929, #1012): one past day over today's map. Status comes from the day and everything
+   else stays as of today, so a ticket keeps its row, title and place in the total. A ticket the day
+   does not name is Missing, because an uncolored carrier would hide that it did not exist.
    updatedAt is dropped because it describes today, not that day. */
 function liveStatusDayMap(today,states){
   var out=Object.create(null);
@@ -410,6 +407,7 @@ function liveStatusDayMap(today,states){
     var entry=Object.assign({},today[key]),day=states && states[key];
     delete entry.state;delete entry.detail;delete entry.updatedAt;
     if(day && LIVE_STATUS_STATES.indexOf(day.state)>=0){entry.state=day.state;if(typeof day.detail==='string')entry.detail=day.detail;}
+    else{entry.state='missing';entry.detail='No ticket on this day';}
     out[key]=entry;
   });
   return out;
@@ -563,7 +561,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var coverage=liveStatusCoverage(page,map,refs(),sources()),storyKeys=coverage.onDiagram.concat(coverage.notOnDiagram,dependencyKeys);
     coverage.dependencies=dependencyKeys.slice();
     var counts={todo:0,active:0,done:0,blocked:0,missing:0},latest=null,stamp=-Infinity;
-    storyKeys.forEach(function(key){var entry=map[key];if(!entry)return;if(!liveStatusNoStatus(entry))counts[entry.state]++;
+    storyKeys.forEach(function(key){var entry=map[key];if(!entry)return;counts[entry.state]++;
       var at=Date.parse(entry.updatedAt);if(isFinite(at) && at>stamp){stamp=at;latest=entry.updatedAt;}
     });
     var pages=laneRecords(),readiness=liveStatusReadiness(page,map,ticketWaiting);
@@ -718,7 +716,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         remove.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();close(false);setTimeout(function(){editor.remove(ref,key);},0);});
       }
       link(row,key,liveStatusTicketURL(tracking,key,entry,trackingTicketURL(value,key) || (availability || []).map(function(cause){return trackingTicketURL(cause.value,key);}).filter(Boolean)[0]));
-      var pill=element('span','dv-live-ticket-state dv-live-state-pill',entry && entry.state || 'No status',row);liveStatusClass(pill,entry && entry.state || null);
+      var pill=element('span','dv-live-ticket-state dv-live-state-pill',entry?entry.state:'No status',row);liveStatusClass(pill,entry?entry.state:null);
       if(entry){
         if(entry.title)element('span','dv-live-ticket-title',entry.title,row);
         if(entry.assignee)element('span','dv-live-ticket-assignee',entry.assignee,row);
@@ -999,7 +997,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var lane=record.lanes[id],enabled=on && applied && refs().tickets.length>0;
       lanes.push({id:id,label:laneLabel(id,record.page),done:lane.done,total:lane.total,state:enabled?lane.state:null,
         text:laneLabel(id,record.page)+(enabled?' · '+lane.done+'/'+lane.total+' done':''),
-        title:enabled?lane.keys.map(function(key){return key+' · '+(map[key] && map[key].state || 'No status');}).join('\n'):''});
+        title:enabled?lane.keys.map(function(key){return key+' · '+(map[key]?map[key].state:'No status');}).join('\n'):''});
     });});return lanes;
   }
   function panelBlockers(pages){
@@ -1033,7 +1031,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // Use the same extra upstream stories as the summary counts.
     var linked=dependencyKeys;
     return coverage.onDiagram.concat(coverage.notOnDiagram,linked).filter(function(key,index,all){return all.indexOf(key)===index && !liveStatusContainer(key,map[key],refs().epics);}).sort(function(a,b){
-      var order=function(key){return liveStatusNoStatus(map[key])?rank.length:rank.indexOf(map[key]?map[key].state:'missing');},diff=order(a)-order(b);return diff || (a<b?-1:a>b?1:0);
+      var diff=rank.indexOf(map[a]?map[a].state:'missing')-rank.indexOf(map[b]?map[b].state:'missing');return diff || (a<b?-1:a>b?1:0);
     }).map(function(key){
       var entry=map[key] || {},owners=carriers[key] || [],laneColor=null,urls=[];
       pages.some(function(record){return Object.keys(record.lanes).some(function(id){
@@ -1043,7 +1041,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var source=owners.length?owners[0].page:pages.filter(function(record){return trackingEpics(record.page).some(function(root){return root===entry.epic || (entry.initiatives || []).indexOf(root)>=0;});}).map(function(record){return record.page;})[0] || page;
       owners.forEach(function(carrier){trackingRefs(carrier.value).prs.forEach(function(url){if(urls.indexOf(url)<0)urls.push(url);});});
       var dependsOn=(dependencies[key] || []).map(function(dep){
-        var up=map[dep.key],state=liveStatusUpstreamState(up);
+        var up=map[dep.key],state=up && LIVE_STATUS_STATES.indexOf(up.state)>=0?up.state:'missing';
         return {key:dep.key,state:state,tone:state==='done'?'done':liveStatusWaitingTone(state),sources:dep.sources.slice(),linkType:dep.linkType || '',reason:dep.reason || '',url:liveStatusTicketURL(source.tracking,dep.key,up,liveStatusPageTicketURL(source,dep.key))};
       });
       return {key:key,url:liveStatusTicketURL(source.tracking,key,entry,liveStatusPageTicketURL(source,key)),title:entry.title || '—',state:entry.state || 'No status',

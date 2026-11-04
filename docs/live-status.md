@@ -624,12 +624,13 @@ previous day's status. Blocked uses the same rule as the live board: flagged as
 an impediment, or a status name containing "block". Parents roll up from their
 children, so they need no history calls. The last day is exactly the live map.
 
-**Before a ticket existed.** The ticket shows **No status** with no red, keeps
-its title and row, and stays in the total, so the total is the same on every day.
-It is never counted as done, a ticket that depends on it waits with a grey tone
-and does not report it as Missing, and a ticket with no status does not itself
-wait. A ticket missing today (deleted, renamed, or no permission) has no history:
-it shows No status on past days and does not stop other tickets from loading.
+**Before a ticket existed.** A ticket with no status on a day shows as Missing on
+that day: its node or edge wears the Missing paint, the Tickets table says missing,
+and it counts and is listed as a blocker with the text "no ticket on this day". An
+uncolored carrier would hide the gap. The ticket keeps its title and row and stays in
+the total, so the total is the same on every day. A ticket that depends on it reports
+a Missing upstream. This covers a ticket not created yet and a ticket missing today,
+which has no history.
 
 **While a past day shows.** Live refresh keeps running but does not change the
 display. Returning to **Live** applies the newest live status as a normal refresh,

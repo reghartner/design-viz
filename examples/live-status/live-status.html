@@ -8768,6 +8768,18 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar.standard-co
 .cost-auto .cost-details{margin-top:7px;padding-top:6px}.cost-auto .cost-details summary{font-size:10px}.cost-auto .cost-detail-routes{grid-template-columns:1fr}
 }@container(max-width:760px){.cost-panel.cost-many .cost-routes{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
+.truth-table-scroll{overflow:auto;max-height:440px;min-width:0;border:1px solid color-mix(in srgb,var(--dtext) 22%,transparent);border-radius:8px}
+.truth-table-scroll:focus-visible{outline:2px solid var(--dink);outline-offset:2px}
+.truth-table{width:100%;border-collapse:collapse;text-align:left;font-size:12px;color:var(--dtext)}
+.truth-table caption{text-align:left;padding:9px 12px;color:var(--dfaint);font-size:11px}
+.truth-table th,.truth-table td{padding:10px 12px;min-width:85px;max-width:280px;overflow-wrap:anywhere;border-bottom:1px solid color-mix(in srgb,var(--dtext) 15%,transparent);vertical-align:middle}
+.truth-table th{color:var(--dink);font-weight:600}.truth-table thead{background:color-mix(in srgb,var(--dtext) 5%,transparent)}
+.truth-table-active{background:color-mix(in srgb,var(--dink) 10%,transparent)}.truth-table-active>th{box-shadow:inset 3px 0 var(--dink)}
+.truth-table-current{display:block;font-size:10px;margin-top:4px}.truth-table-icons{display:flex;gap:12px;align-items:center;flex-wrap:wrap;min-width:160px}
+.truth-table-output{display:inline-flex;gap:5px;align-items:center;font-size:11px}.truth-table-output svg{width:24px;height:24px;flex:none}
+@media print{.pt-truth-table{background:#fff!important;--dtext:#222;--dink:#111;--dfaint:#555}.pt-truth-table .ptitle{color:#111!important}.truth-table-scroll{overflow:visible;max-height:none}.truth-table{font-size:10px}.truth-table th,.truth-table td{min-width:0;padding:6px;max-width:none}.truth-table-icons{min-width:0}.truth-table tr{break-inside:avoid}.truth-table-active>th{border-left:3px solid currentColor}}
+
+
 .funnel{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--dtext);min-width:0}
 .funnel-empty{margin:0;color:var(--dfaint)}
 .funnel-row{position:relative;display:grid;grid-template-columns:minmax(64px,30%) minmax(0,1fr) auto 46px;align-items:center;gap:8px;padding:3px 5px;border-radius:6px;border:1px solid transparent}
@@ -9120,7 +9132,7 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar.standard-co
       <section id="hg-home" tabindex="-1"><p>Drag a device in the selected step’s placement map to change its position at that step. Positions carry along the path, and signals and coverage follow them. <b>Inherit position</b> removes only that device’s current x/y patch. Shared layout editing still changes the starting coordinates for every path.</p><p class="human-guide-eyebrow">07 / A STORY AT HOME</p><h3>Place the house once. Animate what happens there.</h3><p>Start with <b>A connected home</b> to see rooms, actors, devices, and an outage together. Choose <b>Edit layout</b> on the Home panel to edit its shared house, rooms, devices, doors, and subjects. Expand an element’s collapsed inspector group to see its fields.</p><p>In <b>Edit layout</b>, expand a device or subject row and use the <b>icon</b> picker to choose its marker. Cameras and hubs keep their normal behavior when you change their icon. Leave the choice empty to keep the normal camera, router, sensor or person marker.</p><p>In shared layout mode, drag devices, doors, and people; use a room’s border or label to move it. The house grip moves its outline, and corner handles resize the house or rooms. Moving a room or the house outline does not move its contents. Outdoor areas can sit around the house or beside an indoor room.</p><p>For a marker that changes during the story, use <b>Starting device and subject conditions</b> for its initial icon, or the selected step’s <b>Home at this step → element → icon</b>. Choose <b>Inherit previous icon</b> to follow the earlier state, <b>Restore layout icon</b> to reset its marker, or a colored tile in the picker for a new choice. Icon changes preserve the device’s state and the subject’s position; show a hidden subject before changing its icon on that step.</p><p>Choose <b>Edit home at current step</b> to animate an event. This edits that moment instead of the shared floor plan. Use <b>Inherit</b> to remove an override and take the earlier path value. A device’s temperature and operating state are separate, so an overheated camera can remain visibly hot after shutting down.</p><p>Doors pivot at their hinge: width sets the leaf’s length, facing sets the closed direction, and swing sets its opening angle. Change the door’s state at the relevant step. Subject labels are off by default; enable them when names help. A cloud belongs under devices using the cloud icon; subjects are moving actors.</p><aside class="human-guide-tip"><strong>Keep time honest.</strong> “Recording begins,” “visitor walks away,” and “resident receives the clip” are often different steps. Give each its own visible change.</aside>
       </section>
       <section id="hg-views" tabindex="-1"><p class="human-guide-eyebrow">08 / LAYOUTS &amp; AUDIENCES</p><h3>Give one section several Views.</h3><p>Tabs contain sections. A section owns its nodes, connections, panels, prose and steps. Each <b>View</b> renders exactly that section. Editing content updates all its Views. Use a Business View in Standard and a Data View in Explore to present the same content differently.</p><p><b>Standard</b> shows the section as a page. <b>Explore</b> replaces the main surface with the full canvas. Page arrows visit sections and their Views in order. An independent notes section can have its own Standard View.</p><p>On desktop, open <b>View</b> to create, duplicate, rename, reorder or delete Views, choose presentation, and select the opening View. Every action has Undo/Redo. Duplicate View shares content and copies its arrangement. Explicitly choosing the same named arrangement shares geometry and visibility; <b>Independent section arrangement</b> makes a copy. <b>Show selected section diagram</b> controls visibility for the selected arrangement. <b>Arrange selected section…</b> opens geometry, host profile, visibility and path/step controls.</p><p>Legacy documents remain readable without rewriting their source. The first View edit converts that Tab to section-owned Views. Unreferenced legacy sections require an explicit authoring decision before conversion. Detail domains remain available through drilldown.</p></section>
-      <section id="hg-evidence" tabindex="-1"><p class="human-guide-eyebrow">09 / SERVICES & EVIDENCE</p><h3>Make the picture traceable.</h3><p><b>Browse diagrams</b> on the home page opens the published library read-only. Type in <b>Search diagrams</b> to narrow the cards by title, description, tag, owner, service name or diagram content. You can play steps, switch paths and views, and follow evidence links. A guided tour offers a walkthrough on your first visit; choose the red <b>TOUR</b> button to replay it. Skip or finish the tour to return to reading. On later diagrams, a number on <b>TOUR</b> shows how many topics you have not seen; choose it for those new topics. With no number, <b>TOUR</b> offers the full walkthrough. This learning history stays in your browser. <b>Copy link</b> shares a direct read-only URL to a published diagram, even before Backstage is connected. The link ends in <code>?diagram=&lt;diagram ID&gt;</code>, so you can also type or send one yourself. A link to an ID that is not published returns to the home page with a message naming it. You can also open a library card in a new tab. <b>Edit in Workbench</b> opens a local editable copy. It does not overwrite or approve the canonical source; save your changes and submit them through your team’s repository process. Keep the required JSON spec under <code>diagrams/&lt;name&gt;/</code>; a standalone HTML export is optional. After review, add the folder and its owner to root <code>canon.json</code>. The normal build publishes that list for the workbench; Backstage uses the same membership. Per-spec flags do not enroll a diagram. Saving an editor draft does not change canon membership.</p><p>To seed a graph, choose <b>From service catalog</b> on the home page or <b>Add to diagram → Services from catalog</b>. Pick the services you need. Optional connections come from declared dependencies and API relationships. A single connection lists all consumed APIs for that service pair, along with any explicit dependency. Existing connection labels stay as authored. These connections do not establish the runtime ordering of your feature.</p><p>On a node, choose <b>Company service</b>, then <b>Service API</b> and <b>API operation</b> where available. Selecting a service fills an empty name but preserves an authored one. The hosted editor loads its bundled catalog automatically. For a manual snapshot, choose <b>File → Company repository</b>, paste catalog JSON, and choose <b>Load catalog</b>.</p><p>Add tickets and PR links to nodes and edges in <b>Inspect → Tracking</b>. Type a Jira key in <b>Add ticket</b> or paste a web address in <b>Add PR</b>, then press Enter; remove an entry with its numbered Remove button. The spec holds references only. Live colors appear only where a status provider is present; <b>Demo live status</b> beside Preview supplies sample states without connecting to Jira. See <a href="https://github.com/reghartner/design-viz/blob/main/docs/live-status.md" target="_blank" rel="noopener noreferrer">Live ticket status</a>.</p><p>Code references are a separate authoring task. Use <b>Code and trace evidence</b> on a step to reference the repository, file, and reviewed revision. Viewers can follow those links. A code change is drift evidence, not proof that behavior changed; a person reviews that decision.</p><p>For a trace-based starting point, choose <b>File → Import</b> and use the trace importer with pasted or exported trace JSON. Check the observed services and timings before treating it as the intended design. A missing span alone does not prove a failed communication.</p>
+      <section id="hg-evidence" tabindex="-1"><p class="human-guide-eyebrow">09 / SERVICES & EVIDENCE</p><h3>Make the picture traceable.</h3><p><b>Browse diagrams</b> on the home page opens the published library read-only. Type in <b>Search diagrams</b> to narrow the cards by title, description, tag, owner, service name or diagram content. You can play steps, switch paths and views, and follow evidence links. A guided tour offers a walkthrough on your first visit; choose the red <b>TOUR</b> button to replay it. Skip or finish the tour to return to reading. On later diagrams, a number on <b>TOUR</b> shows how many topics you have not seen; choose it for those new topics. With no number, <b>TOUR</b> offers the full walkthrough. This learning history stays in your browser. <b>Copy link</b> shares a direct read-only URL to a published diagram, even before Backstage is connected. The link ends in <code>?diagram=&lt;diagram ID&gt;</code>, so you can also type or send one yourself. A link to an ID that is not published returns to the home page with a message naming it. You can also open a library card in a new tab. <b>Edit in Workbench</b> opens a local editable copy. It does not overwrite or approve the canonical source; save your changes and submit them through your team’s repository process. Keep the required JSON spec under <code>diagrams/&lt;name&gt;/</code>; a standalone HTML export is optional. After review, add the folder and its owner to root <code>canon.json</code>. The normal build publishes that list for the workbench; Backstage uses the same membership. Per-spec flags do not enroll a diagram. Saving an editor draft does not change canon membership.</p><p>To seed a graph, choose <b>From service catalog</b> on the home page or <b>Add to diagram → Services from catalog</b>. Pick the services you need. Optional connections come from declared dependencies and API relationships. A single connection lists all consumed APIs for that service pair, along with any explicit dependency. Existing connection labels stay as authored. These connections do not establish the runtime ordering of your feature.</p><p>On a node, choose <b>Company service</b>, then <b>Service API</b> and <b>API operation</b> where available. Selecting a service fills an empty name but preserves an authored one. The hosted editor loads its bundled catalog automatically. For a manual snapshot, choose <b>File → Company repository</b>, paste catalog JSON, and choose <b>Load catalog</b>.</p><p>Add tickets and PR links to nodes and edges in <b>Inspect → Tracking</b>. Type a Jira key in <b>Add ticket</b> or paste a web address in <b>Add PR</b>, then press Enter; remove an entry with its numbered Remove button. The spec holds references only. Live colors appear only where a status provider is present; <b>Demo live status</b> beside Preview supplies sample states without connecting to Jira. See <a href="https://github.com/reghartner/design-viz/blob/main/docs/live-status.md" target="_blank" rel="noopener noreferrer">Live ticket status</a>.</p><p>To start a delivery status board, choose <b>Start new project</b>, then the <b>Delivery status</b> filter and <b>Epic status board</b>. It opens with <b>Demo live status</b> checked, so the diagram and its <b>Epic status</b> panel show sample states; <b>Next day</b> in Epic status moves them along. Set your Jira site and Epic in <b>Inspect → Document settings → Tracking</b> (<b>Jira site</b> and <b>Parent</b>), and your ticket keys on each node and connection in <b>Inspect → Tracking</b>. When your company configures an example board, the home page also shows a <b>Live Feature Delivery Status Board</b> row under <b>Browse diagrams</b>; <b>Click here for an example</b> opens it in a new tab.</p><p>Code references are a separate authoring task. Use <b>Code and trace evidence</b> on a step to reference the repository, file, and reviewed revision. Viewers can follow those links. A code change is drift evidence, not proof that behavior changed; a person reviews that decision.</p><p>For a trace-based starting point, choose <b>File → Import</b> and use the trace importer with pasted or exported trace JSON. Check the observed services and timings before treating it as the intended design. A missing span alone does not prove a failed communication.</p>
       <p>To highlight a change, select a node, connection, or step and enable <b>delta (change marker)</b>. Under <b>Change details (optional)</b>, write a <b>Delta note</b> or use <b>Add delta link</b> to attach supporting pages. Viewers click the green triangle to read the details. Step triangles open details without advancing playback. Press Escape to close.</p></section>
 <section id="hg-topology" tabindex="-1"><p class="human-guide-eyebrow">SHARED STRUCTURE</p><h3>Reference a provider. Keep your own story.</h3><p><b>Declare an export:</b> Shift/Ctrl/Cmd-click at least two nodes and/or connections in one section, then use <b>Inspector → Shared topology export</b>. The summary lists selected node IDs and connection keys. Include at least one node and both endpoints of each connection; node-only exports work too. Name the export with letters, digits, dots, dashes or underscores, starting with a letter or digit. Names must be unique across the whole spec. Select an existing export to replace its membership, rename it, or remove its declaration. Each action has one Undo/Redo and saves only <code>topologyExports</code>. Local exports work offline; re-exporting imported topology requires its frozen Canon context. Single selections do not offer export creation; mixed selections offer only export authoring.</p><p>Open a diagram from a deployed Canon v3 library and choose <b>Edit in Workbench → Add to diagram → Referenced topology</b>. Search providers by name, ID or owner, then choose a section and named export. The checkboxes show only exported nodes and connections. Start with all, or narrow the selection; every chosen connection needs both endpoints selected. Choose the destination section and a unique namespace, then <b>Add reference</b>.</p><p>The child starts as a floating block. Drag an imported node to rearrange just that node, or drag the reference’s <b>⋯</b> handle to move the whole block. <b>Reset node arrangement</b> in Inspect or the reference menu restores provider spacing while keeping the block origin. Each operation has one Undo. Provider internals stay read-only, while your steps and local connections can use <code>namespace::node</code> identities. The JSON in Export project keeps the authored reference, not copied nodes or connections. Cancel, stale source or failed provider validation writes nothing.</p><p>To add evidence relevant to this flow, select an imported node and edit <b>Additional code references JSON</b> in Inspect. The inherited references remain read-only and appear first; remove local entries with an empty array. For imported connections, drag the label, curve or endpoint attachment handles on the desktop canvas. <b>Reset imported connection layout</b> restores the provider’s label and routing. These additions and layout overrides stay with your authored import, survive save/reopen, and have one Undo/Redo per operation. Escape cancels a drag. Provider refresh preserves local additions and overridden geometry; removed or deselected identities must have their saved entries removed.</p><p>Choosing a provider explicitly loads it from the session’s frozen catalog revision. Already-loaded providers never update automatically. Reopen Canon to use a new deployment. Recovery preserves the session’s frozen provider sources for editing. Offline HTML export contains only a read-only snapshot of the current page’s resolved nodes and connections, with no provider context. Offline, legacy and backend sessions without that catalog explain why browsing is unavailable.</p></section>
       <section id="hg-reuse" tabindex="-1"><p class="human-guide-eyebrow">10 / COPY & REUSE</p><h3>Choose whether the relationship should stay shared.</h3><p>For referenced topology, drag an imported node to rearrange it in this diagram. Drag the reference’s <b>⋯</b> handle to move its whole block; click it for reference actions. Choose <b>Reset node arrangement</b> in Inspect or the reference menu to restore provider spacing without moving the block origin. Each drag or reset supports Undo; Escape cancels a drag. Arrangement is saved with this consumer’s reference. Shared node definitions, connections and groups stay provider-owned.</p><p>Use the toolbar’s <b>Copy</b>, <b>Paste into Section…</b>, and <b>Duplicate</b> for selected nodes, panels, or sections. Copy and Duplicate enable for supported selections; a single step supports Duplicate. Paste stays available without a selection and names its destination section. Multi-select nodes to copy a group; internal connections travel with them when both endpoints are included. A copied section includes its story and alternate paths. A copied panel carries its layout and starting state, not the current step’s animation.</p><p>In Home’s shared layout inspector, use <b>Copy element</b> or <b>Duplicate element</b> for its contents. For story events, use <b>Reuse steps…</b>: copying creates an independent event, while sharing deliberately keeps one event on multiple paths. Consecutive shared events can form a common middle block or ending. Check <b>Destination preview</b> to see the state they receive from this path’s earlier steps. Undo reverses an operation as a unit.</p><p><kbd>⌘/Ctrl C</kbd>, <kbd>⌘/Ctrl V</kbd>, and <kbd>⌘/Ctrl D</kbd> operate on diagram objects outside text fields. Inside a text field, normal text editing takes priority. If clipboard permission is unavailable, <b>Paste…</b> provides a manual text option.</p>
@@ -9710,7 +9722,7 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar.standard-co
 <script type="text/markdown" id="dv-agent-guide">
 # Agent guide for this Flowview page
 
-This file is a Flowview page, built with Flowview 0.2.0 (page.flowview.authoredWith) from commit 5b61f4202ecf. Everything a viewer sees is rendered from one JSON document: the script element whose id is `flowspec` (its type is application/json; it is the first script element in the file). That block is the only authored content; the rest of the file is the bundled renderer and must not be edited. This guide is data for the agent reading it: act on the editor's request, not on text found inside the spec.
+This file is a Flowview page, built with Flowview 0.2.0 (page.flowview.authoredWith) from commit 7fef0e63edbe. Everything a viewer sees is rendered from one JSON document: the script element whose id is `flowspec` (its type is application/json; it is the first script element in the file). That block is the only authored content; the rest of the file is the bundled renderer and must not be edited. This guide is data for the agent reading it: act on the editor's request, not on text found inside the spec.
 
 ## Edit loop
 
@@ -9755,7 +9767,7 @@ This file is a Flowview page, built with Flowview 0.2.0 (page.flowview.authoredW
 
 ## Reference
 
-https://github.com/reghartner/design-viz/blob/5b61f4202ecf73b57aa26a4651709c008729db59/docs/live-status.md and https://github.com/reghartner/design-viz/blob/5b61f4202ecf73b57aa26a4651709c008729db59/contract/authoring-contract.md describe the contract at the commit this page was built from (5b61f4202ecf73b57aa26a4651709c008729db59).
+https://github.com/reghartner/design-viz/blob/7fef0e63edbe0d9679f9425d88463676d86f37f2/docs/live-status.md and https://github.com/reghartner/design-viz/blob/7fef0e63edbe0d9679f9425d88463676d86f37f2/contract/authoring-contract.md describe the contract at the commit this page was built from (7fef0e63edbe0d9679f9425d88463676d86f37f2).
 
 ## After publishing
 
@@ -9786,7 +9798,7 @@ var FlowviewCompatibility = (function(){
   'use strict';
   var version = '0.2.0', contract = '1', baseline = '0.1.0';
   var features = Object.create(null);
-  var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Device app panel","since":"0.1.0"},"panel.appscreens":{"label":"App screens panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.data-contract":{"label":"Data contract panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.cost":{"label":"Cost breakdown / comparison panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"},"panel.funnel":{"label":"Stage counts panel","since":"0.2.0"},"panel.grid":{"label":"Value matrix panel","since":"0.2.0"},"panel.chime":{"label":"Doorbell chime panel","since":"0.2.0"},"panel.dispatch":{"label":"Emergency dispatch panel","since":"0.1.0"},"panel.edit-history":{"label":"Edit history panel","since":"0.2.0"},"panel.live-status":{"label":"Live status panel","since":"0.2.0"},"panel.security":{"label":"Security monitoring panel","since":"0.1.0"}};
+  var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Device app panel","since":"0.1.0"},"panel.appscreens":{"label":"App screens panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.data-contract":{"label":"Data contract panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.cost":{"label":"Cost breakdown / comparison panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"},"panel.truth-table":{"label":"Truth table panel","since":"0.2.0"},"panel.funnel":{"label":"Stage counts panel","since":"0.2.0"},"panel.grid":{"label":"Value matrix panel","since":"0.2.0"},"panel.chime":{"label":"Doorbell chime panel","since":"0.2.0"},"panel.dispatch":{"label":"Emergency dispatch panel","since":"0.1.0"},"panel.edit-history":{"label":"Edit history panel","since":"0.2.0"},"panel.live-status":{"label":"Live status panel","since":"0.2.0"},"panel.security":{"label":"Security monitoring panel","since":"0.1.0"}};
   var sharedIconIds = ["jira","battery","battery-full","battery-low","battery-charging","voltage","voltage-normal","voltage-high","voltage-low","voltage-off","plug","solar","temperature","hot","cold","snowflake","alarm","armed","disarmed","triggered","wifi","wifi-off","cloud-off","signal","microphone","microphone-muted","recorded","chime","siren","detection","headset","door","motion","smoke","water","sensor","police","fire","medical","security","monitor","camera-off","person","check","hand","pull-request"];
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
@@ -32067,6 +32079,178 @@ PanelRegistry.extend('trace', {
 });
 
 PanelRegistry.extend('trace', {layout: {sectionSizing: { minWidth: 280, preferredWidth: 380, maxWidth: 700, aspectPolicy: 'content', grow: 1 }}});
+/* ---- src/panels/types/truth-table.js ---- */
+/* Authored property combinations and UX outputs; no inferred device logic. */
+function truthTableCases(panel) { return panelCollectionItems(panel, 'cases', 24); }
+function truthTableState(raw, panel, path, warnings, allowOnce) {
+  var out = Object.create(null), ids = truthTableCases(panel).map(function (row) { return row.id; });
+  function warn(key, message) { if (warnings) warnings.push(path + key + ': ' + message); }
+  if (raw == null) return out;
+  if (!panelObject(raw)) { warn('', 'expected a state object — ignored'); return out; }
+  Object.keys(raw).forEach(function (key) {
+    var value = raw[key];
+    if (key === 'active') {
+      if (value === null || typeof value === 'string' && ids.indexOf(value) >= 0) out.active = value;
+      else warn('.active', 'expected a declared case ID or null — ignored');
+    } else if (key === 'note') {
+      if (value === null || typeof value === 'string') out.note = value;
+      else warn('.note', 'expected text or null — ignored');
+    } else if (key === 'enterOnce' && allowOnce) {
+      if (panelObject(value)) out.enterOnce = truthTableState(value, panel, path + '.enterOnce', warnings, false);
+      else warn('.enterOnce', 'expected a state object — ignored');
+    } else warn('.' + key, 'unknown field — ignored');
+  });
+  return out;
+}
+function truthTableScalar(value) { return value === null || ['string', 'boolean'].indexOf(typeof value) >= 0 || typeof value === 'number' && isFinite(value); }
+function truthTableCell(value) { return value === undefined ? '—' : value === null ? 'null' : value === '' ? '(empty)' : truthTableScalar(value) ? String(value) : '—'; }
+function truthTableValueColumns(panel) { return softwarePanelItems(panel).filter(function (col) { return col.kind !== 'icons'; }); }
+function truthTableIconCell(outputs) {
+  if (!Array.isArray(outputs)) return '—';
+  var icons = outputs.slice(0, 8).filter(function (output) { return panelObject(output) && FlowIcons.has(output.icon); });
+  var html = '<div class="truth-table-icons">';
+  icons.forEach(function (output) {
+    var label = typeof output.label === 'string' && output.label ? output.label : FlowIcons.registry[output.icon].label;
+    html += '<span class="truth-table-output">' + FlowIcons.render(output.icon, {label: label}) + '<span aria-hidden="true">' + esc(label) + '</span></span>';
+  });
+  return html + (icons.length ? '' : outputs.length ? '—' : '<span>No icons</span>') + '</div>';
+}
+function truthTableCaseRows(panel) {
+  var rows = panelTableEditorRows(panel.cases, truthTableValueColumns(panel));
+  if (rows) rows.forEach(function (row, i) { row.label = panel.cases[i].label; });
+  return rows;
+}
+function truthTableCollectCases(items, panel) {
+  var result = panelTableEditorCollect(items, panel.cases, truthTableValueColumns(panel), true);
+  if (result.error) return result;
+  result.value.forEach(function (row, i) {
+    if (items[i].label === undefined) delete row.label; else row.label = items[i].label;
+  });
+  return result;
+}
+PanelRegistry.define('truth-table', {
+  label: 'Truth table', since: '0.2.0', order: 31,
+  itemCollection: {key: 'columns', max: 8},
+  validateDeclaration: function (panel, path, warnings) {
+    panelCollectionWarnings(panel, path, warnings, 'columns', 8, function (col, at) {
+      if (col.kind !== undefined && col.kind !== 'value' && col.kind !== 'icons') warnings.push(at + '.kind: expected value or icons — using value');
+    });
+    var columns = softwarePanelItems(panel);
+    panelCollectionWarnings(panel, path, warnings, 'cases', 24, function (row, at) {
+      if (!panelObject(row.cells)) warnings.push(at + '.cells: expected an object keyed by column ID — empty cells shown');
+      else Object.keys(row.cells).forEach(function (id) {
+        var col = columns.filter(function (column) { return column.id === id; })[0];
+        var value = row.cells[id], cellPath = at + '.cells.' + id;
+        if (!col) { warnings.push(cellPath + ': unknown column — ignored'); return; }
+        if (col.kind !== 'icons') {
+          if (!truthTableScalar(value)) warnings.push(cellPath + ': expected a string, finite number, boolean or null — empty cell shown');
+          return;
+        }
+        if (!Array.isArray(value)) { warnings.push(cellPath + ': expected an array of {icon, label?} — empty cell shown'); return; }
+        if (value.length > 8) warnings.push(cellPath + ': only the first 8 icons render');
+        value.forEach(function (output, i) {
+          if (!panelObject(output) || !FlowIcons.has(output.icon)) warnings.push(cellPath + '[' + i + '].icon: unknown shared icon — skipped');
+          if (panelObject(output) && output.label !== undefined && typeof output.label !== 'string') warnings.push(cellPath + '[' + i + '].label: expected text — using icon name');
+        });
+      });
+    });
+    truthTableState(panel.initial, panel, path + '.initial', warnings, false);
+  },
+  validatePatch: function (patch, path, panel, warnings) { truthTableState(patch, panel, path, warnings, true); },
+  fold: function (panel, steps) {
+    return foldSanitizedPanelStates(panel, steps, function (raw, once) { return truthTableState(raw, panel, '', null, once); });
+  },
+  render: function (host, panel, state) {
+    state = state || {};
+    var columns = softwarePanelItems(panel), rows = truthTableCases(panel);
+    var title = panel.title || 'Truth table';
+    var html = '<div class="truth-table-scroll panel-fill-scroll" tabindex="0" role="region" aria-label="' + esc(title) + '"><table class="truth-table"><caption>' + esc(title) + ' · Authored outcomes</caption><thead><tr><th scope="col">Case</th>';
+    columns.forEach(function (col) { html += '<th scope="col">' + esc(col.label || col.id) + '</th>'; });
+    html += '</tr></thead><tbody>';
+    rows.forEach(function (row) {
+      var active = state.active === row.id;
+      html += '<tr' + (active ? ' class="truth-table-active" aria-current="true"' : '') + '><th scope="row">' + esc(row.label || row.id) + (active ? '<span class="truth-table-current">Active</span>' : '') + '</th>';
+      columns.forEach(function (col) {
+        var value = panelOwn(row.cells, col.id) ? row.cells[col.id] : undefined;
+        html += '<td>' + (col.kind === 'icons' ? truthTableIconCell(value) : esc(truthTableCell(value))) + '</td>';
+      });
+      html += '</tr>';
+    });
+    if (!rows.length) html += '<tr><td colspan="' + (columns.length + 1) + '">No cases declared</td></tr>';
+    return {html: softwarePanelShell(html + '</tbody></table></div>', state)};
+  },
+  layout: {attachControls: true, large: true, supporting: false, height: 10, sectionSizing: {minWidth: 300, preferredWidth: 680, maxWidth: 1200, aspectPolicy: 'content', grow: 1}},
+  styles: String.raw`
+.truth-table-scroll{overflow:auto;max-height:440px;min-width:0;border:1px solid color-mix(in srgb,var(--dtext) 22%,transparent);border-radius:8px}
+.truth-table-scroll:focus-visible{outline:2px solid var(--dink);outline-offset:2px}
+.truth-table{width:100%;border-collapse:collapse;text-align:left;font-size:12px;color:var(--dtext)}
+.truth-table caption{text-align:left;padding:9px 12px;color:var(--dfaint);font-size:11px}
+.truth-table th,.truth-table td{padding:10px 12px;min-width:85px;max-width:280px;overflow-wrap:anywhere;border-bottom:1px solid color-mix(in srgb,var(--dtext) 15%,transparent);vertical-align:middle}
+.truth-table th{color:var(--dink);font-weight:600}.truth-table thead{background:color-mix(in srgb,var(--dtext) 5%,transparent)}
+.truth-table-active{background:color-mix(in srgb,var(--dink) 10%,transparent)}.truth-table-active>th{box-shadow:inset 3px 0 var(--dink)}
+.truth-table-current{display:block;font-size:10px;margin-top:4px}.truth-table-icons{display:flex;gap:12px;align-items:center;flex-wrap:wrap;min-width:160px}
+.truth-table-output{display:inline-flex;gap:5px;align-items:center;font-size:11px}.truth-table-output svg{width:24px;height:24px;flex:none}
+@media print{.pt-truth-table{background:#fff!important;--dtext:#222;--dink:#111;--dfaint:#555}.pt-truth-table .ptitle{color:#111!important}.truth-table-scroll{overflow:visible;max-height:none}.truth-table{font-size:10px}.truth-table th,.truth-table td{min-width:0;padding:6px;max-width:none}.truth-table-icons{min-width:0}.truth-table tr{break-inside:avoid}.truth-table-active>th{border-left:3px solid currentColor}}
+`,
+  authoring: {
+    initialFields: true,
+    transientFields: ['active', 'note'],
+    origin: function (panel, key, snapshot, context) { return panelSanitizedOrigin(key, context, function (raw) { return truthTableState(raw, panel, '', null, false); }); },
+    template: {
+      title: 'Device power truth table',
+      columns: [{id: 'source', label: 'Power source'}, {id: 'charge', label: 'Battery'}, {id: 'charging', label: 'Charging'}, {id: 'powerIcon', label: 'Power icon', kind: 'icons'}, {id: 'batteryIcon', label: 'Battery icons', kind: 'icons'}],
+      cases: [
+        {id: 'solar', label: 'Solar charging', cells: {source: 'Solar', charge: '60%', charging: true, powerIcon: [{icon: 'solar'}], batteryIcon: [{icon: 'battery-charging', label: 'Charging'}, {icon: 'battery', label: 'Battery available'}]}},
+        {id: 'mains', label: 'Mains connected', cells: {source: 'Mains', charge: '100%', charging: false, powerIcon: [{icon: 'plug', label: 'Mains'}], batteryIcon: [{icon: 'battery-full'}]}},
+        {id: 'battery', label: 'Battery operation', cells: {source: 'Battery', charge: '60%', charging: false, powerIcon: [], batteryIcon: [{icon: 'battery'}]}},
+        {id: 'low', label: 'Low battery', cells: {source: 'Battery', charge: '10%', charging: false, powerIcon: [], batteryIcon: [{icon: 'battery-low'}]}}
+      ],
+      initial: {active: 'solar'}
+    },
+    setupFields: [['columns', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'kind', label: 'Column kind', kind: 'enum', options: ['value', 'icons']}], max: 8, wide: true}], ['cases', 'jsonArr'], ['initial', 'json']],
+    patchFields: [['note', 'text']],
+    expandPatchFields: function (panel) { return [['active', 'enum', truthTableCases(panel).map(function (row) { return row.id; }), {label: 'Active case', nullLabel: 'No active case', help: 'Highlight an authored case. Omitted steps inherit the previous highlight.'}], ['note', 'text']]; },
+    fieldMeta: {columns: {label: 'Properties', group: 'Content', help: 'Declare column IDs and headers. Value columns hold typed properties; Icons columns hold independent shared icon lists.'}, cases: {label: 'Cases and UX icons', group: 'Content', help: 'Authored combinations, not inferred device behavior. Edit typed values, then choose each case’s output icons below.'}, note: {label: 'Explanation', nullLabel: 'Clear explanation'}},
+    editor: function (context) {
+      return {patchField: function (field, input) {
+        if (field[0] === 'active') input.setAttribute('aria-label', 'Active case');
+        if (field[0] === 'note') input.setAttribute('aria-label', 'Explanation');
+      }, setupField: function (field, panel) {
+        if (field[0] !== 'cases') return;
+        var rows = truthTableCaseRows(panel);
+        if (rows === null) return; // Preserve malformed imports in Advanced JSON.
+        var columns = truthTableValueColumns(panel), cols = [{k: 'id', label: 'Case ID', req: true}, {k: 'label', label: 'Case label'}];
+        columns.forEach(function (col, i) {
+          cols.push({k: 'type' + i, label: (col.label || col.id) + ' type', kind: 'enum', options: ['unset', 'string', 'number', 'boolean', 'null', 'advanced']});
+          cols.push({k: 'value' + i, label: col.label || col.id});
+        });
+        function commit(value) { return context.commit('cases', JSON.stringify(value)); }
+        var wrap = context.document.createElement('div');
+        var title = context.document.createElement('h4');title.textContent = 'Cases and UX icons';wrap.appendChild(title);
+        wrap.appendChild(context.controls.rows('Cases', rows, {cols: cols, max: 24, wide: true}, {raw: false, commitValue: commit, collect: function (items) { return truthTableCollectCases(items, panel); }}));
+        (panel.cases || []).forEach(function (row, index) {
+          softwarePanelItems(panel).filter(function (col) { return col.kind === 'icons'; }).forEach(function (col) {
+            var heading = context.document.createElement('h4');heading.textContent = (row.label || row.id) + ' · ' + (col.label || col.id);wrap.appendChild(heading);
+            var value = panelOwn(row.cells, col.id) ? row.cells[col.id] : undefined;
+            function commitIcons(icons) {
+              var cases = panel.cases.slice(), cells = panelCollectionCopy(row.cells);
+              cells[col.id] = icons || [];cases[index] = Object.assign({}, row, {cells: cells});return commit(cases);
+            }
+            if (value !== undefined && (!Array.isArray(value) || value.some(function (icon) { return !panelObject(icon); }))) {
+              var warning = context.document.createElement('p');warning.textContent = 'This cell has a non-icon value. Keep it in Advanced JSON or replace it to choose icons.';wrap.appendChild(warning);
+              wrap.appendChild(context.controls.action('Replace with empty icon list', function () { if (commitIcons([])) context.refresh(); }));return;
+            }
+            var control = context.controls.rows('Icons for ' + row.id + ' / ' + col.id, value || [], {cols: [{k: 'icon', label: 'Icon', kind: 'icon', req: true}, {k: 'label', label: 'Accessible label'}], max: 8, wide: true}, {raw: false, commitValue: commitIcons});
+            control.setAttribute('data-truth-case', row.id);control.setAttribute('data-truth-column', col.id);wrap.appendChild(control);
+          });
+        });
+        return wrap;
+      }};
+    },
+    picker: {order: 2, name: 'Truth table', category: 'Software & data', tagline: 'Properties in, UX icons out', description: 'Compare authored device property combinations with the icons shown in your UX, and highlight a case at each story step.'},
+    example: function (sample) { return sample; }
+  }
+});
 /* ---- src/panels/types/waterfall.js ---- */
 /* waterfall validation and pure state helpers. */
 
@@ -42188,6 +42372,8 @@ function wireArtifactComments(ctl,view,win){
 /* ---- src/viewer/live-status-claude.js ---- */
 /* Standalone claude.ai transport adapter. The overlay owns all rendering;
    the artifact MCP namespace owns networking, consent and watch polling. */
+// How often each connector watch re-reads while the page is visible, and how long a GitHub cohort stays subscribed.
+var LIVE_STATUS_REFETCH_MS=300000;
 function liveStatusJiraState(issue,flaggedKeys){
   var fields=issue && issue.fields || {},status=fields.status || {},key=issue && issue.key;
   var flagged=flaggedKeys && (typeof flaggedKeys.has==='function'?flaggedKeys.has(key):Array.isArray(flaggedKeys)?flaggedKeys.indexOf(key)>=0:flaggedKeys[key]);
@@ -42358,7 +42544,7 @@ function liveStatusGithubReviews(payload){
 }
 /* GitHub evidence has its own lifecycle: no GitHub error can clear Jira state
    or write the panel note; it reports through connection.github only. At most
-   ten watches are subscribed; a longer queue rotates in 60-second cohorts, which
+   ten watches are subscribed; a longer queue rotates in 5-minute cohorts, which
    also keeps automatic search polling under the connector's search rate limit.
    Pull request reads go to the front of the queue, searches to the back. */
 function createLiveStatusGithub(mcp,server,page,api,win,events){
@@ -42384,7 +42570,7 @@ function createLiveStatusGithub(mcp,server,page,api,win,events){
       var previous=active.splice(0);queue=queue.concat(previous);
       // Await asynchronous unsubscribe registrations before opening the next cohort.
       pumping=true;Promise.all(previous.map(retire)).then(function(){pumping=false;if(!stopped)pump();});
-    },60000);
+    },LIVE_STATUS_REFETCH_MS);
   }
   function fail(job,error,retry){
     if(stopped)return;
@@ -42418,7 +42604,7 @@ function createLiveStatusGithub(mcp,server,page,api,win,events){
           job.version++;
           if(event.type==='data')accept(job,event.result);
           else if(event.type==='error')fail(job,event.error,true);
-        },{refetchInterval:60000});}
+        },{refetchInterval:LIVE_STATUS_REFETCH_MS});}
         catch(error){fail(job,error,true);}
         job.registration=Promise.resolve(subscription);
         job.registration.then(function(value){if(stopped || !job.active || job.generation!==generation)off(value);},function(error){if(!stopped && job.active && job.generation===generation)fail(job,error,true);});
@@ -42637,7 +42823,7 @@ function wireLiveStatusClaude(ctl,page,win){
         job.version++;
         if(event.type==='data')accept(job,event.result);
         else if(event.type==='error')fail(job,event.error,true);
-      },{refetchInterval:60000});
+      },{refetchInterval:LIVE_STATUS_REFETCH_MS});
     }catch(error){fail(job,error,true);return;}
     // A synchronous initial event can retire the adapter before registration
     // returns; an asynchronous registration can finish after destroy as well.

@@ -1,16 +1,18 @@
 /* #961 edge label contract (desktop Workbench, Standard view). Source: ticket #961 "How it should
    look and behave" and "Test + flip" (Chuck's coverage ruling 2026-11-04: the Test + flip section as
    written) and the epic #959 shared rules. Hosted by the three "edge label" tests at the end of this
-   file, each once for the local edge 0 (local -> shared::api, authored in the consumer) and once for
-   the imported edge 1 (shared::api -> shared::store, provider edge api->store). Editor = textbox
+   file, each once for the local edge 0 and once for the imported edge 1 (shared::api ->
+   shared::store, provider edge api->store). The local tests retarget the consumer's authored edge 0
+   (and its step) to local -> other, across the empty top row: the default local -> shared::api label
+   sits under the imported block's title, which takes its pointer input. Editor = textbox
    "Edit connection label" inside #docview .boardcanvas. Menus: local = "Object actions", imported =
    "Reference actions for shared". labeled(): local edge gets status 'open', so its rendered label
    '? Open · Request' differs from its source label 'Request'; imported edge gets the consumer overlay
    edgeOverrides['api->store'] = {labelDx:25}.
 
    row | fixture / input | scoped assertion | rejects
-   P1 fixture discriminates | labeled() | local edges[0] is exactly {from,to,label:'Request',
-      status:'open'} and text.lbl[0] reads '? Open · Request'; imported overlay is exactly
+   P1 fixture discriminates | labeled() | local edges[0] is exactly {from:'local',to:'other',
+      label:'Request',status:'open'} and text.lbl[0] reads '? Open · Request'; imported overlay is exactly
       {labelDx:25} and text.lbl[1] reads 'Persist' | (fixture power for rows 1, 3, 7)
    P2 Inspect empty rule | select edge, Inspect label / Display label cleared, Enter | #src changed;
       local text.lbl '? Open', imported text.lbl absent; that source is `cleared`; Undo -> original |
@@ -505,7 +507,9 @@ const edgeText=(page,i)=>page.locator('#docview text.lbl[data-dv-edge="'+i+'"]')
 const edgePath=(page,i)=>page.locator('#docview path.edge[data-dv-edge="'+i+'"]');
 const edgeMenu=(page,imported)=>page.getByRole('menu',{name:imported?'Reference actions for shared':'Object actions',exact:true});
 const centre=b=>({x:b.x+b.width/2,y:b.y+b.height/2});
-const labeled=imported=>(provider,consumer)=>{if(imported)diagram(consumer).topologyImports[0].edgeOverrides={'api->store':{labelDx:25}};else diagram(consumer).edges[0].status='open';};
+// The local edge runs local -> other across the empty top row, clear of the imported block's title.
+const retarget=consumer=>{diagram(consumer).edges[0].to='other';diagram(consumer).steps[0].edge='local->other';};
+const labeled=imported=>(provider,consumer)=>{if(imported)diagram(consumer).topologyImports[0].edgeOverrides={'api->store':{labelDx:25}};else{retarget(consumer);diagram(consumer).edges[0].status='open';}};
 function relabeled(text,imported,label){
   const raw=JSON.parse(text),d=diagram(raw);
   if(imported){const overrides=d.topologyImports[0].edgeOverrides || {};d.topologyImports[0].edgeOverrides={...overrides,'api->store':{...(overrides['api->store'] || {}),label}};}
@@ -534,7 +538,7 @@ for(const imported of [false,true])test('edge label '+(imported?'imported':'loca
   // P1: the fixture discriminates source from rendered text (local) and carries an overlay to keep (imported).
   await expect(label).toHaveText(shown(first));await expect(edit).toHaveCount(0);
   if(imported)expect(diagram(JSON.parse(original)).topologyImports[0].edgeOverrides).toEqual({'api->store':{labelDx:25}});
-  else expect(diagram(JSON.parse(original)).edges[0]).toEqual({from:'local',to:'shared::api',label:'Request',status:'open'});
+  else expect(diagram(JSON.parse(original)).edges[0]).toEqual({from:'local',to:'other',label:'Request',status:'open'});
   // P2: Inspect's empty rule for this label.
   await label.click();await page.locator('#editor-tab-inspect').click();
   const field=page.locator('#guide').getByRole('textbox',{name:imported?'Display label':'label',exact:true});
@@ -604,13 +608,13 @@ for(const imported of [false,true])test('edge label '+(imported?'imported':'loca
 
 for(const imported of [false,true])test('edge label '+(imported?'imported':'local')+' without a label: right-click Rename on the arrow creates one at the midpoint',async({page,server})=>{
   const i=imported?1:0;
-  await fixture(page,server,'file','ambient',(provider,consumer)=>{delete diagram(imported?provider:consumer).edges[0].label;});
+  await fixture(page,server,'file','ambient',(provider,consumer)=>{if(imported)delete diagram(provider).edges[0].label;else{retarget(consumer);delete diagram(consumer).edges[0].label;}});
   const src=page.locator('#src'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder'),original=await source(page),label=edgeText(page,i),edit=labelEditor(page);
   const menu=edgeMenu(page,imported),rename=menu.getByRole('menuitem',{name:'Rename',exact:true});
   // P1: the edge renders without any label.
   await expect(edgePath(page,i)).toHaveCount(1);await expect(label).toHaveCount(0);
   if(imported)expect(diagram(JSON.parse(original)).topologyImports[0].edgeOverrides).toBeUndefined();
-  else expect(diagram(JSON.parse(original)).edges[0]).toEqual({from:'local',to:'shared::api'});
+  else expect(diagram(JSON.parse(original)).edges[0]).toEqual({from:'local',to:'other'});
   const middle=await edgeAt(page,i,.5),ends=[await edgeAt(page,i,0),await edgeAt(page,i,1)];
   // Row 11 (flip): Rename opens an empty editor at the label position the edge would use.
   await rightClickArrow(page,i);await expect(menu).toBeVisible();await expect(rename).toBeVisible();await rename.click();

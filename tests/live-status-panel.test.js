@@ -201,6 +201,48 @@ test('H14 the contract and the live-status docs describe the clear-missing-work 
  const edit=docs.slice(docs.indexOf('\n### Edit mode on the shared board'),docs.indexOf('\n## Pull requests from GitHub\n'));
  assert.ok(edit.includes('Clear Missing work'),'Edit mode docs name the control');assert.ok(edit.includes('source diagram'),'Edit mode docs explain inherited markers');
 });
+/* #974 agent entries. Contract source: #974 "What changes" item 2 and Chuck's ruling 2026-11-04
+   (history row: editor name, agent tag, time, summary). §0 ruling: extend this file.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| H15 agent entries pass clean | {source agent, summary, changes []}; the same with two ticket changes; a summary on an entry without source | no warnings; all three returned intact, newest first | an impl that still requires a non-empty changes array |
+| H16 malformed agent fields warn on their own index | source "bot"; source agent without summary; summary "", "  ", 7, with a line break, 201 characters; summary + changes missing; changes [] without summary | one warning each naming `source:`, `summary:` or `changes:`; entry ignored | an impl accepting any source; a presence-only summary check; one dropping the changes requirement for every entry |
+| H17 contract, docs and skill describe agent entries and the sync tool | contract/authoring-contract.md, docs/live-status.md, the live-status-board skill | each names `"source": "agent"`, `summary` and tools/board-sync.js; the docs' Edit history section shows the agent row | a validator change with no contract |
+*/
+test('H15 H16 editHistory: agent entries carry a one-line summary and may have no ticket changes',()=>{
+ const bare={at:'2026-11-04T10:00:00Z',by:{name:'Chuck'},source:'agent',summary:'Added 5 nodes, moved 5 tickets',changes:[]};
+ const moves={at:'2026-11-04T11:00:00Z',by:{name:'Chuck'},source:'agent',summary:'Moved 1 ticket',changes:[{op:'remove',ticket:'AA-1',node:'a',label:'Node A'},{op:'add',ticket:'AA-1',node:'b',label:'Node B'}]};
+ const noted={at:'2026-11-04T09:00:00Z',summary:'Hand-written note',changes:[{op:'add',ticket:'AA-1',node:'a'}]};
+ const good=historyFixture([bare,moves,noted]);assert.deepEqual(plain(C.validate(C.normalize(good))),{errors:[],warnings:[]});
+ assert.deepEqual(plain(C.editHistoryEntries(C.normalize(good))),[moves,bare,noted],'newest first, entries intact');
+ const at='2026-11-04T08:00:00Z',ticket=[{op:'add',ticket:'AA-1',node:'a'}],bad=[
+  [{at,source:'bot',summary:'x',changes:ticket},/: source: must be "agent"/],
+  [{at,source:'agent',changes:ticket},/: summary: /],
+  [{at,source:'agent',summary:'',changes:[]},/: summary: /],
+  [{at,source:'agent',summary:'   ',changes:[]},/: summary: /],
+  [{at,source:'agent',summary:7,changes:[]},/: summary: /],
+  [{at,source:'agent',summary:'Added 2 nodes\nmoved 1 ticket',changes:[]},/: summary: /],
+  [{at,source:'agent',summary:'x'.repeat(201),changes:[]},/: summary: /],
+  [{at,source:'agent',summary:'Added 2 nodes'},/: changes: must be an array/],
+  [{at,changes:[]},/: changes: must be a non-empty array/]];
+ const raw=historyFixture([bare,...bad.map(([item])=>item)]),warnings=historyWarnings(raw);
+ assert.equal(warnings.length,bad.length,warnings.join('\n'));
+ bad.forEach(([,pattern],i)=>{
+  assert.match(warnings[i],new RegExp('^editHistory\\['+(i+1)+'\\]: '),warnings[i]);
+  assert.match(warnings[i],pattern,warnings[i]);assert.match(warnings[i],/ — entry ignored$/,warnings[i]);
+ });
+ assert.deepEqual(plain(C.editHistoryEntries(C.normalize(raw))),[bare]);
+ assert.equal(C.editHistoryEntries(C.normalize(historyFixture([{at,source:'agent',summary:'x'.repeat(200),changes:[]}]))).length,1,'200 characters is the limit');
+});
+test('H17 the contract, the live-status docs and the skill describe agent entries and the sync tool',()=>{
+ const contract=fs.readFileSync('contract/authoring-contract.md','utf8'),docs=fs.readFileSync('docs/live-status.md','utf8'),skill=fs.readFileSync('.claude/skills/live-status-board/SKILL.md','utf8');
+ for(const [name,text] of [['contract',contract],['docs',docs],['skill',skill]]){
+  for(const needle of ['"source": "agent"','summary','tools/board-sync.js'])assert.ok(text.includes(needle),name+' names '+needle);
+ }
+ const history=docs.slice(docs.indexOf('\n## Edit history\n'),docs.indexOf('\n## Story mode\n'));
+ assert.ok(history.includes('"source": "agent"'),'the Edit history section shows an agent entry');assert.ok(history.includes('agent tag'),'and describes its row');
+ for(const needle of ['board-sync.js pull','board-sync.js log','--confirm'])assert.ok(skill.includes(needle),'skill names '+needle);
+});
 test('H4 editHistory: more than 200 entries warns once and only the newest 200 are used',()=>{
  const entries=[];for(let i=0;i<201;i++)entries.push(entryAt(new Date(Date.UTC(2026,0,1,0,i)).toISOString()));
  const raw=historyFixture(entries),warnings=historyWarnings(raw);

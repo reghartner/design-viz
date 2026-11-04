@@ -391,6 +391,24 @@ class InjectTests(unittest.TestCase):
         self.assertEqual(untracked, {"comments": {"composer_only": True, "customAnchors": True}})
         self.assertIn("flowspec.json", guide)
 
+    def test_two_file_guide_lists_board_edits_asks_before_overriding_and_logs_agent_changes(self):
+        # #974 (Chuck 2026-11-04): an agent that edits the published flowspec.json reports the board
+        # edits since the newest agent entry, asks the editor before overriding one of them, appends
+        # one agent entry with a summary, and starts again when the publish is refused.
+        r, out = run_inject(TEMPLATE, json.dumps(tracked_spec()), ["--two-file"])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        guide = GUIDE_BLOCK.search(out)[1]
+        self.assertLess(len(guide.encode("utf-8")), 6 * 1024)
+        for needle in ('"source": "agent"', '"summary"', "newest agent entry", "ask the editor",
+                       "tools/board-sync.js", "refused"):
+            self.assertIn(needle, guide, needle)
+        # a single-file page has no board edits to fold in
+        r, out = run_inject(TEMPLATE, json.dumps(tracked_spec()))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        guide = GUIDE_BLOCK.search(out)[1]
+        self.assertNotIn("board-sync", guide)
+        self.assertNotIn('"source": "agent"', guide)
+
     def test_reinjecting_a_two_file_page_without_the_flag_drops_the_marker(self):
         # P7: a built two-file page used as the template loses its marker, as it loses its stale guide
         r, built = run_inject(TEMPLATE, json.dumps(SPEC), ["--two-file"])

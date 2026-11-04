@@ -1953,7 +1953,7 @@ test('OT3 a day overlay takes status from the day and everything else from today
  const C=harness().C,today=overToday();assert.equal(typeof C.liveStatusDayMap,'function');
  const map=plain(C.liveStatusDayMap(today,{'AA-1':{state:'blocked',detail:'Flagged then',title:'Old title'},'BB-1':{state:'unknown'}}));
  assert.deepEqual(map['AA-1'],{state:'blocked',title:'Alpha work',assignee:'Alex',epic:'EP-1',detail:'Flagged then',prs:{count:1,state:'merged'}});
- assert.deepEqual(map['BB-1'],{title:'Beta work',assignee:'Sam',epic:'EP-1',dependsOn:[{key:'AA-1',source:'jira',linkType:'is blocked by'}],state:'missing',detail:'No ticket on this day'});
+ assert.deepEqual(map['BB-1'],{title:'Beta work',assignee:'Sam',epic:'EP-1',dependsOn:[{key:'AA-1',source:'jira',linkType:'is blocked by'}],state:'missing',noTicket:true,detail:'No ticket on this day'});
  assert.equal(map['EE-1'].state,'missing');assert.equal(today['BB-1'].updatedAt,overStale,'today is not modified');assert.equal(today['AA-1'].state,'done');
 });
 test('OT4 moving days repaints carriers, coins, counts, ring, lanes, blockers, Tickets and availability',async()=>{

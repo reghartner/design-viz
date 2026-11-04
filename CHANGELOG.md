@@ -4,8 +4,9 @@
 
 - On a past day, a ticket with no status on that day now shows as Missing instead of
   uncolored (#1012): a ticket not created yet, or one missing today. Its node or edge
-  wears the Missing paint, the Tickets table says missing, and it is listed as a
-  blocker with the text "no ticket on this day". The story total is unchanged.
+  wears the Missing paint and the Tickets table says missing. It is not a blocker: the
+  blocked count, the blockers list and First blocker leave it out, and a ticket that
+  depends on it waits in grey. The story total is unchanged.
 
 ## Live status Over time on real Atlassian connectors (2026-11-04)
 

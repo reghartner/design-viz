@@ -626,11 +626,11 @@ children, so they need no history calls. The last day is exactly the live map.
 
 **Before a ticket existed.** A ticket with no status on a day shows as Missing on
 that day: its node or edge wears the Missing paint, the Tickets table says missing,
-and it counts and is listed as a blocker with the text "no ticket on this day". An
-uncolored carrier would hide the gap. The ticket keeps its title and row and stays in
-the total, so the total is the same on every day. A ticket that depends on it reports
-a Missing upstream. This covers a ticket not created yet and a ticket missing today,
-which has no history.
+and its popover says "No ticket on this day". An uncolored carrier would hide the gap.
+It is not a blocker: it stays out of the blocked count and the blockers list, First
+blocker cannot reach it, and a ticket that depends on it waits with a grey tone. It
+keeps its title and row and stays in the total, so the total is the same on every day.
+This covers a ticket not created yet and a ticket missing today, which has no history.
 
 **While a past day shows.** Live refresh keeps running but does not change the
 display. Returning to **Live** applies the newest live status as a normal refresh,

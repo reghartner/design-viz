@@ -223,8 +223,12 @@ function liveStatusNodeConstruction(el,value,state,causes){
   }
   svg('text',{'class':'dv-live-reservation-tickets',x:10,y:body+25},art).textContent=summary;
 }
+/* Over time (#1012): a ticket with no status on a past day has the Missing paint, but it is a gap in the
+   record, not a blocker. Only the day overlay sets noTicket; a ticket missing today still blocks. */
+function liveStatusBlocks(entry){return !!entry && !entry.noTicket && ['blocked','missing'].indexOf(entry.state)>=0;}
+function liveStatusWithoutGaps(map){var out=Object.create(null);Object.keys(map).forEach(function(key){if(!map[key].noTicket)out[key]=map[key];});return out;}
 function liveStatusBlockingKeys(value,map){
-  return trackingRefs(value).tickets.filter(function(key){return map[key] && ['blocked','missing'].indexOf(map[key].state)>=0;});
+  return trackingRefs(value).tickets.filter(function(key){return liveStatusBlocks(map[key]);});
 }
 /* Dependencies are ticket -> ticket (#765), never carrier -> carrier, and never
    inferred from edge direction: edges are data flow. Two sources merge by
@@ -253,6 +257,7 @@ function liveStatusDependencies(pages,map){
    Tone from the DIRECT upstream: unfinished grey; blocked or missing (including
    no entry) red. */
 function liveStatusWaitingTone(state){return state==='blocked' || state==='missing'?'red':'grey';}
+function liveStatusUpstreamTone(entry,state){return entry && entry.noTicket?'grey':liveStatusWaitingTone(state);}
 function liveStatusTicketWaiting(dependencies,map){
   var out=Object.create(null);
   // An empty map is no evidence at all: nothing waits before the first answer or after clear().
@@ -264,7 +269,7 @@ function liveStatusTicketWaiting(dependencies,map){
     dependencies[ticket].forEach(function(dep){
       var state=map[dep.key] && LIVE_STATUS_STATES.indexOf(map[dep.key].state)>=0?map[dep.key].state:'missing';
       if(state==='done')return;
-      on.push({key:dep.key,state:state,tone:liveStatusWaitingTone(state)});
+      on.push({key:dep.key,state:state,tone:liveStatusUpstreamTone(map[dep.key],state)});
     });
     if(!on.length)return;
     on.sort(function(a,b){return a.key<b.key?-1:a.key>b.key?1:0;});
@@ -407,7 +412,7 @@ function liveStatusDayMap(today,states){
     var entry=Object.assign({},today[key]),day=states && states[key];
     delete entry.state;delete entry.detail;delete entry.updatedAt;
     if(day && LIVE_STATUS_STATES.indexOf(day.state)>=0){entry.state=day.state;if(typeof day.detail==='string')entry.detail=day.detail;}
-    else{entry.state='missing';entry.detail='No ticket on this day';}
+    else{entry.state='missing';entry.noTicket=true;entry.detail='No ticket on this day';}
     out[key]=entry;
   });
   return out;
@@ -566,7 +571,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });
     var pages=laneRecords(),readiness=liveStatusReadiness(page,map,ticketWaiting);
     var initiatives=coverage.initiatives || [],scopeKeys=initiatives.concat(refs().epics.filter(function(key){return initiatives.indexOf(key)<0;}));
-    var blocked=storyKeys.filter(function(key){return map[key] && ['blocked','missing'].indexOf(map[key].state)>=0;}).length;
+    var blocked=storyKeys.filter(function(key){return liveStatusBlocks(map[key]);}).length;
     // Board waiting describes visible story dependents. Keep direct upstream
     // container evidence, but never present a hidden container as a waiting row.
     var boardWaiting=Object.create(null);storyKeys.forEach(function(key){if(ticketWaiting[key])boardWaiting[key]=ticketWaiting[key];});
@@ -919,11 +924,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function firstBlocker(){
     if(!on)return null;
-    var activeStepper=ctl.activeStepper && ctl.activeStepper(),candidates=bindings.filter(function(binding){return binding.stepper && (!activeStepper || binding.stepper===activeStepper);});
+    var evidence=liveStatusWithoutGaps(map),activeStepper=ctl.activeStepper && ctl.activeStepper(),candidates=bindings.filter(function(binding){return binding.stepper && (!activeStepper || binding.stepper===activeStepper);});
     for(var b=0;b<candidates.length;b++){
       var binding=candidates[b],stepper=binding.stepper,d=binding.section.diagram;
       var path=diagramPathList(d).find(function(path){return path.id===stepper.path();});
-      var index=path && path.indices.find(function(index){return ['blocked','missing'].indexOf(liveStatusStep(d,d.steps[index],map))>=0;});
+      var index=path && path.indices.find(function(index){return ['blocked','missing'].indexOf(liveStatusStep(d,d.steps[index],evidence))>=0;});
       if(index!=null)return {binding:binding,index:index};
     }return null;
   }
@@ -1002,7 +1007,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function panelBlockers(pages){
     var coverage=liveStatusCoverage(page,map,refs(),sources());
-    return coverage.onDiagram.concat(coverage.notOnDiagram,dependencyKeys).filter(function(key){return map[key] && ['blocked','missing'].indexOf(map[key].state)>=0;}).map(function(key){
+    return coverage.onDiagram.concat(coverage.notOnDiagram,dependencyKeys).filter(function(key){return liveStatusBlocks(map[key]);}).map(function(key){
       var entry=map[key],labels=[],carriers=0,steps=0;
       pages.forEach(function(record){Object.keys(record.lanes).forEach(function(id){
         var label=laneLabel(id,record.page);if(record.lanes[id].keys.indexOf(key)>=0 && labels.indexOf(label)<0)labels.push(label);
@@ -1042,7 +1047,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       owners.forEach(function(carrier){trackingRefs(carrier.value).prs.forEach(function(url){if(urls.indexOf(url)<0)urls.push(url);});});
       var dependsOn=(dependencies[key] || []).map(function(dep){
         var up=map[dep.key],state=up && LIVE_STATUS_STATES.indexOf(up.state)>=0?up.state:'missing';
-        return {key:dep.key,state:state,tone:state==='done'?'done':liveStatusWaitingTone(state),sources:dep.sources.slice(),linkType:dep.linkType || '',reason:dep.reason || '',url:liveStatusTicketURL(source.tracking,dep.key,up,liveStatusPageTicketURL(source,dep.key))};
+        return {key:dep.key,state:state,tone:state==='done'?'done':liveStatusUpstreamTone(up,state),sources:dep.sources.slice(),linkType:dep.linkType || '',reason:dep.reason || '',url:liveStatusTicketURL(source.tracking,dep.key,up,liveStatusPageTicketURL(source,dep.key))};
       });
       return {key:key,url:liveStatusTicketURL(source.tracking,key,entry,liveStatusPageTicketURL(source,key)),title:entry.title || '—',state:entry.state || 'No status',
         owner:entry.assignee || 'Unassigned',ownerUrl:entry.assignee?liveStatusOwnerURL(source.tracking,entry):null,dependsOn:dependsOn,waiting:ticketWaiting[key]?ticketWaiting[key].tone:null,

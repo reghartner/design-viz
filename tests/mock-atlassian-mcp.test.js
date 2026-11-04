@@ -291,7 +291,7 @@ test('M8: Jira conversion, stable IDs, category names, flagged and Development s
   for (const [state, key, name, status] of [['todo', 'new', 'To Do', 'To Do'], ['active', 'indeterminate', 'In Progress', 'In Progress'],
     ['blocked', 'indeterminate', 'In Progress', 'Blocked'], ['done', 'done', 'Done', 'Done']]) {
     const fields = jiraIssueFromStatus('HW-123', { state, summary: 'Button', assignee: 'Alex', prs: { count: 0, state: null } }, NOW).fields;
-    assert.deepEqual(fields.status, { name: status, statusCategory: { key, name } });
+    assert.deepEqual(fields.status, { id: fields.status.id, name: status, statusCategory: { key, name } });assert.match(fields.status.id, /^\d+$/);
     assert.deepEqual(fields.assignee, { displayName: 'Alex' });
     assert.equal(fields.summary, 'Button');
     assert.equal(typeof fields.priority.name, 'string');

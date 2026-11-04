@@ -639,36 +639,37 @@ button is disabled with a stated reason, Over time is disabled while Edit mode
 is active, and the saved spec never changes.
 
 **History source and call cost.** Only a click loads history, as one batch of
-one-shot `callTool` calls. Nothing polls, and no history call happens at page
-load or on a refresh. The batch runs at most six calls at once: one
-`listJiraStatuses`, one `searchJiraIssuesUsingJql` per ten tickets for `created`
-and `status`, and `listJiraIssueChangelogs` for each ticket, following every page.
-A 100-ticket board costs about 111 calls on a first click for each viewer. Each
-result is cached for 7 days for that viewer and artifact. A later click reads the
-cache and calls Jira again only for a ticket whose live `updated` time is newer
-than its cached result. The runtime cache is best-effort and size-bounded, and an
-older claude.ai shell keeps results for less time or not at all, so a repeat click
-can cost the full batch.
+one-shot `callTool` calls. Nothing polls, and no history call happens at page load
+or on a refresh. Each ticket costs one `getJiraIssue` call with `expand: "changelog"`,
+which returns its created time, current status and changelog. A changelog names
+statuses but not their categories, so any status no tracked ticket holds gets one
+`searchJiraIssuesUsingJql` lookup for `status = <id>`. The cost is about
+one call per ticket plus one per unknown status, at most six at once, so a 100-ticket
+board costs about 100 calls on a first click for each viewer. Each result is cached for 7 days for
+that viewer and artifact. A later click reads the cache and calls Jira again only for
+a ticket whose live `updated` time is newer than its cached result. The runtime cache
+is best-effort and size-bounded, and an older claude.ai shell keeps results for less
+time or not at all, so a repeat click can cost the full batch.
 
-If any call fails, the board stays on today, the panel says history could not
-load, and the button can be clicked again. A partial history is never shown.
+If any call fails, or a ticket's changelog holds fewer entries than its `total`, the
+board stays on today, the panel says history could not load, and the button can be
+clicked again. A partial history is never shown. A status no ticket anywhere holds,
+such as one retired from a workflow, follows the live board's rule for an unknown
+category: To Do, unless its name contains "block".
 
-**Where it appears.** A claude.ai board needs a connector that offers both
-history tools and a page that declares them, so a board published before this
-feature must be republished to get it. On `#live=demo` the button uses the
+**Where it appears.** A claude.ai board needs a connector that offers
+`getJiraIssue` and a page that declares it, so a board published earlier must be
+republished to get it. On `#live=demo` the button uses the
 embedded timeline's days, or the four synthesized days, with no network calls.
 The slider and **<** and **>** share one current day: the buttons carry on from
 the slider's day, and Live returns to the day the buttons reached. There the timeline's
 last day supplies titles and the story list, so the total stays the same. There
 is no button on host-provider pages or in Workbench preview.
 
-The output of `listJiraIssueChangelogs` and `listJiraStatuses` has not been
-captured from a real connector. The adapter accepts the public Jira REST shapes
-and the mock server serves one of them. Atlassian lists these tools for Rovo MCP
-v2, where most tools are deferred, so a real connector may not list them; the
-board then shows no button. The status list is required because a changelog item
-names a status but not its category. Past-day Blocked from Flagged assumes
-Flagged changes appear in the changelog.
+The `getJiraIssue` reply shape was checked with one real call on a live Atlassian
+connector: the issue sits in `issues.nodes[0]`, and a plain top-level REST issue is
+also accepted. A ticket with a very long changelog has not been tested. Past-day
+Blocked from Flagged assumes Flagged changes appear in the changelog.
 
 ## Dependencies
 
@@ -741,7 +742,7 @@ Settings → Connectors, together with the two Jira tools and the comments
 capability. For Atlassian's own connector that is:
 
 ```js
-capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "listJiraIssueChangelogs", "listJiraStatuses"]}]}, comments: {"composer_only": true, "customAnchors": true}}
+capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}]}, comments: {"composer_only": true, "customAnchors": true}}
 ```
 
 For a custom connector (for example the mock server installed as
@@ -778,9 +779,8 @@ Jira status determines colors;
 Development PR summaries, when returned, are informational. All tool calls go
 through `window.claude.use("mcp")`; the artifact never fetches Jira directly.
 
-Clicking **Over time** adds `listJiraIssueChangelogs` and `listJiraStatuses`
-calls; see [Over time](#over-time). A connector without them still paints live
-status.
+Clicking **Over time** adds `getJiraIssue` calls and status lookups; see
+[Over time](#over-time). A connector without `getJiraIssue` still paints live status.
 
 Without the connector, viewers see “Add the Atlassian connector in claude.ai
 Settings → Connectors to see live ticket status.” If approval is needed, the
@@ -802,7 +802,7 @@ GitHub connector described next; declare it as a second `servers` entry:
 
 ```js
 capabilities: {mcp: {servers: [
-  {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "listJiraIssueChangelogs", "listJiraStatuses"]},
+  {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]},
   {server: "GitHub", tools: ["search_pull_requests", "pull_request_read"]}
 ]}, comments: {"composer_only": true, "customAnchors": true}}
 ```
@@ -855,7 +855,7 @@ board's Edit mode needs; single-file tracked pages keep the declaration above,
 untracked pages stay comments-only:
 
 ```js
-capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "listJiraIssueChangelogs", "listJiraStatuses"]}]},
+capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}]},
   comments: {"composer_only": true, "customAnchors": true}, artifact: {}, user: {scopes: ["profile"]}}
 ```
 

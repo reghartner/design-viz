@@ -1,5 +1,15 @@
 # Changelog
 
+## Live status Over time on real Atlassian connectors (2026-11-04)
+
+- Over time now loads history through `getJiraIssue` with `expand: "changelog"`
+  (#1009), because real Atlassian connectors do not offer `listJiraIssueChangelogs`
+  or `listJiraStatuses`. Each ticket costs one call, plus one
+  `searchJiraIssuesUsingJql` lookup per status no tracked ticket holds. `tools/inject.py`
+  declares only `getAccessibleAtlassianResources`, `searchJiraIssuesUsingJql` and
+  `getJiraIssue`, so a board must be republished to get this. The mock Atlassian
+  server serves the same reply shape and no longer offers the two old tools.
+
 ## Live status panel buttons stay in place (2026-11-04)
 
 - The Live status panel header now has a row of buttons that never move, with

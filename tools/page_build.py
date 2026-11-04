@@ -143,6 +143,7 @@ def lock_exclusive(lock) -> None:
     if fcntl:
         fcntl.flock(lock, fcntl.LOCK_EX)
         return
+    return  # Mutation: Windows takes no lock.
     lock.seek(0)
     while True:
         try:

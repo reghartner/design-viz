@@ -542,6 +542,66 @@ test('P2 Jira map merges chunks, marks only requested missing keys and preserves
  const result=plain(C.liveStatusJiraMap(['AA-1','BB-1','CC-1'],[[jira('AA-1')],[jira('BB-1','done'),jira('EX-1')]],new Set(['BB-1']),'https://jira.test/',1793000000000));
  assert.deepEqual(Object.keys(result).sort(),['AA-1','BB-1','CC-1']);assert.equal(result['AA-1'].url,'https://jira.test/browse/AA-1');assert.equal(result['AA-1'].updatedAt,'2026-10-20T09:00:00Z');assert.equal(result['AA-1'].assignee,'Alex');assert.equal(result['BB-1'].state,'blocked');assert.equal(result['CC-1'].state,'missing');
 });
+/* Day reconstruction contract matrix (#929, PR 2 of 3). Source: issue behavior items 5-7 and Chuck's rulings of 2026-11-03.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| R1 | open ticket, then all Done | first day is the oldest creation; last day is today while any ticket is open, else the day the last ticket reached Done | a range that always ends today |
+| R2 | changes on two days | a day with no change keeps the previous day's status | filling gaps with today's status |
+| R3 | change late on one local day and early the next | counted at the end of its own local day | UTC day boundaries |
+| R4 | ticket created later | no status entry before its creation day | todo before creation |
+| R5 | Flagged on and off; status name holding "block"; flagged today with no change | blocked follows today's rule on each day | ignoring Flagged history |
+| R6 | ticket missing today, epic and initiative containers | last day equals the live map; container state rolls up per day; missing ticket has no past status | a last day that disagrees with the live board |
+| R7 | REST, list and connection envelopes; item with no toString | parsed in order, other fields ignored, Object.prototype.toString never read as a value | reading a function as a status name |
+| R8 | status list with object and string categories | name to category, case-insensitive | one envelope only |
+| R9 | a range over a new year | labels carry the year | ambiguous dates |
+*/
+const historyAt=(y,m,d,h=12,min=0)=>new Date(y,m-1,d,h,min).getTime(),HISTORY_CATEGORIES={'to do':'new','in progress':'indeterminate','blocked':'indeterminate','done':'done'};
+const historyChange=(at,from,to)=>({at,field:'status',from,to}),historyFlag=(at,from,to)=>({at,field:'flag',from,to});
+const historyTicket=(key,created,status,changes=[],flagged=false)=>({key,created,status,flagged,changes});
+function historyDays(C,tickets,today,now=historyAt(2026,10,24)){assert.equal(typeof C.liveStatusHistoryDays,'function','#929 day reconstruction exists');const value=C.liveStatusHistoryDays({tickets,today,categories:HISTORY_CATEGORIES,now,locale:'en-US'});return plain(value);}
+const historyStates=(result,key)=>result.days.map(day=>day.states[key]?day.states[key].state:null);
+test('R1 R2 R4 the range runs from the oldest creation to today, or to the last Done, and days carry forward',()=>{
+ const C=providerContext(),open=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20),'In Progress',[historyChange(historyAt(2026,10,21),'To Do','In Progress')]),historyTicket('BB-1',historyAt(2026,10,22),'To Do')],{'AA-1':{state:'active'},'BB-1':{state:'todo'}});
+ assert.deepEqual(open.days.map(day=>day.short),['Oct 20','Oct 21','Oct 22','Oct 23','Oct 24']);assert.equal(open.index,4);
+ assert.deepEqual(historyStates(open,'AA-1'),['todo','active','active','active','active']);assert.deepEqual(historyStates(open,'BB-1'),[null,null,'todo','todo','todo']);
+ const done=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20),'Done',[historyChange(historyAt(2026,10,21),'To Do','Done')]),historyTicket('BB-1',historyAt(2026,10,20),'Done',[historyChange(historyAt(2026,10,22),'To Do','In Progress'),historyChange(historyAt(2026,10,23),'In Progress','Done')])],{'AA-1':{state:'done'},'BB-1':{state:'done'}},historyAt(2026,11,3));
+ assert.deepEqual(done.days.map(day=>day.short),['Oct 20','Oct 21','Oct 22','Oct 23'],'all Done: the range ends on the last Done day');assert.deepEqual(historyStates(done,'BB-1'),['todo','todo','active','done']);assert.equal(done.days.at(-1).label,'Oct 23');
+});
+test('R3 a change belongs to the end of its own local day',()=>{
+ const C=providerContext(),result=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20,0,1),'Done',[historyChange(historyAt(2026,10,20,23,59),'To Do','In Progress'),historyChange(historyAt(2026,10,22,0,1),'In Progress','Done')])],{'AA-1':{state:'active'}},historyAt(2026,10,23));
+ assert.deepEqual(historyStates(result,'AA-1').slice(0,3),['active','active','done']);
+});
+test('R5 blocked follows the status name and Flagged on each day',()=>{
+ const C=providerContext(),result=historyDays(C,[
+  historyTicket('AA-1',historyAt(2026,10,20),'In Progress',[historyChange(historyAt(2026,10,20),'To Do','In Progress'),historyFlag(historyAt(2026,10,21),'','Impediment'),historyFlag(historyAt(2026,10,23),'Impediment','')]),
+  historyTicket('BB-1',historyAt(2026,10,20),'Done',[historyChange(historyAt(2026,10,21),'To Do','Blocked by supplier'),historyChange(historyAt(2026,10,22),'Blocked by supplier','Done')]),
+  historyTicket('CC-1',historyAt(2026,10,20),'In Progress',[],true)],{'AA-1':{state:'active'},'BB-1':{state:'done'},'CC-1':{state:'blocked'}});
+ assert.deepEqual(historyStates(result,'AA-1'),['active','blocked','blocked','active','active']);assert.deepEqual(historyStates(result,'BB-1'),['todo','blocked','done','done','done']);assert.deepEqual(historyStates(result,'CC-1'),['blocked','blocked','blocked','blocked','blocked']);
+});
+test('R6 the last day equals the live map, containers roll up and a missing ticket has no past status',()=>{
+ const C=providerContext(),today={'IN-1':{state:'active',kind:'initiative'},'EP-1':{state:'active',kind:'epic',initiatives:['IN-1']},'AA-1':{state:'done',epic:'EP-1',initiatives:['IN-1']},'BB-1':{state:'active',epic:'EP-1',initiatives:['IN-1']},'GONE-1':{state:'missing',epic:'EP-1'}};
+ const result=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20),'Done',[historyChange(historyAt(2026,10,23),'To Do','Done')]),historyTicket('BB-1',historyAt(2026,10,20),'In Progress',[historyChange(historyAt(2026,10,22),'To Do','In Progress')])],today);
+ assert.deepEqual(historyStates(result,'EP-1'),['todo','todo','active','active','active']);assert.deepEqual(historyStates(result,'IN-1'),['todo','todo','active','active','active']);
+ assert.deepEqual(historyStates(result,'GONE-1'),[null,null,null,null,'missing'],'item 7: no history, and today stays as today');
+ assert.deepEqual(result.days.at(-1).states,{'IN-1':{state:'active'},'EP-1':{state:'active'},'AA-1':{state:'done'},'BB-1':{state:'active'},'GONE-1':{state:'missing'}});
+ const empty=C.liveStatusHistoryDays({tickets:[],today:{},categories:{},now:historyAt(2026,10,24)});assert.equal(empty.days.length,0);
+});
+test('R7 changelog envelopes parse to ordered status and Flagged changes',()=>{
+ const C=providerContext();assert.equal(typeof C.liveStatusHistoryChanges,'function');
+ const entry={created:'2026-10-21T09:00:00.000+0000',items:[{field:'status',fromString:'To Do',toString:'In Progress'},{field:'assignee',fromString:'A',toString:'B'},{field:'Flagged',fromString:null,toString:'Impediment'},{field:'status'}]};
+ for(const payload of [{values:[entry]},{histories:[entry]},{changelogs:[entry]},{nodes:[entry]},{data:{values:[entry]}},[entry]])assert.deepEqual(plain(C.liveStatusHistoryChanges(payload)),[{at:Date.parse('2026-10-21T09:00:00.000+0000'),field:'status',from:'To Do',to:'In Progress'},{at:Date.parse('2026-10-21T09:00:00.000+0000'),field:'flag',from:'',to:'Impediment'}]);
+ for(const payload of [null,{},'bad',{values:[{created:'not a time',items:[{field:'status',fromString:'a',toString:'b'}]}]},{values:[null]}])assert.deepEqual(plain(C.liveStatusHistoryChanges(payload)),[]);
+});
+test('R8 status lists read object and string categories',()=>{
+ const C=providerContext();assert.equal(typeof C.liveStatusHistoryCategories,'function');
+ const expected={'to do':'new','doing':'indeterminate','done':'done'};
+ for(const statuses of [[{name:'To Do',statusCategory:{key:'new'}},{name:'Doing',statusCategory:{key:'indeterminate'}},{name:'DONE',statusCategory:{key:'done'}}],[{name:'To Do',statusCategory:'TODO'},{name:'Doing',statusCategory:'IN_PROGRESS'},{name:'Done',statusCategory:'DONE'}]])
+  for(const payload of [statuses,{values:statuses},{statuses},{data:statuses},{nodes:statuses}])assert.deepEqual(plain(C.liveStatusHistoryCategories(payload)),expected);
+ assert.deepEqual(plain(C.liveStatusHistoryCategories(null)),{});assert.deepEqual(plain(C.liveStatusHistoryCategories([{name:'No category'},null])),{});
+});
+test('R9 a range over a new year labels days with the year',()=>{
+ const C=providerContext(),result=historyDays(C,[historyTicket('AA-1',historyAt(2026,12,31),'To Do')],{'AA-1':{state:'todo'}},historyAt(2027,1,1));assert.deepEqual(result.days.map(day=>day.short),['Dec 31, 2026','Jan 1, 2027']);
+});
 test('P2 chunks of 25 keys preserve order in three batches of at most ten',()=>{
  const C=providerContext();assert.equal(typeof C.liveStatusJiraChunks,'function');const keys=Array.from({length:25},(_,i)=>'AA-'+i);
  const chunks=plain(C.liveStatusJiraChunks(keys));assert.deepEqual(chunks.map(c=>c.length),[10,10,5]);assert.deepEqual(chunks.flat(),keys);assert.deepEqual(plain(C.liveStatusJiraChunks([])),[]);
@@ -602,11 +662,13 @@ test('P7 destruction before namespace or resource resolution abandons late work'
 });
 test('P8 publishing docs and skill declare the connector by its display name and comments',()=>{
  for(const file of ['docs/live-status.md','.claude/skills/hld-to-page/references/integrations.md']){
-  const text=fs.readFileSync(file,'utf8');assert.match(text,/server: "Atlassian"/);assert.match(text,/"getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"/);assert.match(text,/comments: \{"composer_only": true, "customAnchors": true\}/);
+  const text=fs.readFileSync(file,'utf8');assert.match(text,/server: "Atlassian"/);assert.match(text,/"getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "listJiraIssueChangelogs", "listJiraStatuses"/);assert.match(text,/comments: \{"composer_only": true, "customAnchors": true\}/);
   assert.match(text,/exact display name/);assert.doesNotMatch(text,/name it exactly \*\*Atlassian MCP\*\*/);
  }
  assert.match(fs.readFileSync('deploy/cloudflare/mock-atlassian-mcp/README.md','utf8'),/directory connector/);
  assert.match(fs.readFileSync('docs/tab-views.md','utf8'),/live-status.md#publishing-as-a-claudeai-artifact/);
+ assert.match(fs.readFileSync('.claude/skills/live-status-board/SKILL.md','utf8'),/"listJiraIssueChangelogs", "listJiraStatuses"/);
+ const statusDocs=fs.readFileSync('docs/live-status.md','utf8');assert.ok(statusDocs.includes('\n## Over time\n'),'#929 docs section');const overTime=statusDocs.split('\n## Over time\n')[1].split('\n## ')[0];for(const claim of ['one batch','7 days','republish'])assert.ok(overTime.includes(claim),claim);
 });
 
 test('P6 P7 resource-call failures follow the same policy; toggles and late searches stay bounded',async()=>{
@@ -1828,4 +1890,295 @@ test('H12 Chuck 2026-10-30: history renders on a page without tracking, tickets 
  const status=mountHistory(h);await historySettle();
  const rows=status.rows();assert.equal(rows.length,3);assert.equal(textOf(rows[0].querySelector('.dv-edit-first')).trim(),'AA-1 added to Node A');
  status.destroy();h.ctl.liveStatus.destroy();
+});
+
+/* Over time contract matrix (#929, PR 1 of 3). Source: issue behavior items 1-4, 6, 8 and 11 and
+   Chuck's rulings of 2026-11-03. Real slider input and the demo player are in live-status.spec.mjs.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| OT1 | board with and without a history source, before and after evidence | `button.dv-live-over-time` hidden unless a source exists and evidence applied; `snapshot().overTime` null without a source | a button on every board; a button that shows before status has loaded |
+| OT2 | source that counts load calls | load count 0 before the click, 1 after it | loading history at page load or on any repaint |
+| OT3 | `liveStatusDayMap` over a full entry | status and detail from the day; title, owner, PRs, dependencies and epic from today; no updatedAt | an overlay that copies the day's metadata; an overlay that keeps today's status name |
+| OT4 | local nodes, an edge, a step, a lane and a planned node | carrier classes, coin, counts, ring, lanes, blockers, Tickets State and availability follow the day | repainting nodes only |
+| OT5 | imported carriers | imported node and edge classes follow the day | a local-only slice |
+| OT6 | tickets absent from the day, one of them upstream of another | keeps its row and title, stays in the total, state reads No status, never done, no dv-live-missing, dependent's upstream reads No status with a grey tone, and the absent ticket itself does not wait | dropping the ticket from the map; a false Missing dependency |
+| OT7 | overdue active ticket with a live change pulse available | moving days logs no Activity, adds no dv-live-changed, shows no dv-live-stale | moving days through apply() |
+| OT8 | live apply while a past day shows | display, Activity and the editor's remembered map stay put; Live shows the newest map and logs its change once | a refresh that overwrites the past day; a past day saved as the last live map |
+| OT9 | fake board editor | Edit disabled with the stated reason on a past day, enabled after; Over time disabled while Edit is active | an editable past day |
+| OT10 | index out of range and not whole | clamped to the range, or ignored | a fractional or undefined day |
+| OT11 | clear() on a past day | mode ends and today's evidence is gone | a past day surviving a permission loss |
+| OT12 | demo timeline with a late ticket, a ticket that later disappears, and one never named | not created yet: no status entry; absent after existing: missing; epic state per day; last day matches the live demo | treating every absent ticket the same |
+| OT13 | provider entry without a state | apply() still drops it | widening the provider contract |
+| OT14 | the two mode buttons (Chuck, 2026-11-04) | Live and Over time are the first two header controls, exactly one is pressed, the selected Over time click does nothing, Live returns to today without turning colors off, the selected Live click still turns colors off, and Over time turns colors back on | a Back to today button; a past day with colors off |
+*/
+const overFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:'EP-1'}},lanes:{APP:{label:'App',color:'#34d399'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',tickets:['AA-1']},b:{title:'Beta',tickets:['BB-1']},planned:{title:'Planned',tickets:['AA-1'],existsWhen:'tickets-done'}},rows:[['a','b','planned']],edges:[{from:'a',to:'b',tickets:['EE-1']}],steps:[{id:'hop',edge:'a->b',lane:'APP'},{id:'beta',nodes:['b'],lane:'APP'}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
+const overStale='2000-01-01T00:00:00Z';
+const overToday=()=>({'EP-1':{state:'active',kind:'epic',title:'Epic'},'AA-1':{state:'done',title:'Alpha work',assignee:'Alex',epic:'EP-1',detail:'Done today',prs:{count:1,state:'merged'}},'BB-1':{state:'active',title:'Beta work',assignee:'Sam',epic:'EP-1',updatedAt:overStale,dependsOn:[{key:'AA-1',source:'jira',linkType:'is blocked by'}]},'EE-1':{state:'active',title:'Edge work',epic:'EP-1'},'ZZ-2':{state:'done',title:'Epic only story',epic:'EP-1'}});
+// Day 0: AA-1 and ZZ-2 do not exist yet. Day 1: AA-1 is blocked. Day 2 is today.
+const overDays=()=>[
+ {label:'Oct 20',short:'Oct 20',states:{'EP-1':{state:'todo'},'BB-1':{state:'todo'},'EE-1':{state:'todo'}}},
+ {label:'Oct 21',short:'Oct 21',states:{'EP-1':{state:'active'},'AA-1':{state:'blocked',detail:'Flagged then'},'BB-1':{state:'todo'},'EE-1':{state:'active'},'ZZ-2':{state:'todo'}}},
+ {label:'Oct 22',short:'Oct 22',states:{'EP-1':{state:'active'},'AA-1':{state:'done'},'BB-1':{state:'active'},'EE-1':{state:'active'},'ZZ-2':{state:'done'}}}];
+const overButton=h=>h.view.querySelector('button.dv-live-over-time'),overLiveButton=h=>h.view.querySelector('button.dv-live-toggle');
+function overReady(api){assert.equal(typeof api.setHistory,'function','#929: the controller accepts a history source');return api;}
+function overBackToLive(api){assert.equal(typeof api.overTimeClose,'function','#929: Live returns to today');api.overTimeClose();}
+async function overOpen(h,index){const api=overReady(h.ctl.liveStatus);api.setHistory({load:()=>({days:overDays()})});api.overTime();await historySettle();if(index!=null)api.overTimeDay(index);return api;}
+const overRow=(h,key)=>h.view.querySelector('tr[data-live-ticket="'+key+'"]');
+const overState=(h,key)=>overRow(h,key).querySelector('.dv-live-state-pill');
+test('OT1 OT2 Over time shows with a history source and evidence, and only the click loads',async()=>{
+ const none=harness(overFixture()),noneApi=none.ctl.liveStatus;mountStatus(none);noneApi.apply(overToday());
+ assert.equal(noneApi.snapshot().overTime,null,'no source, no mode');assert.ok(!overButton(none) || overButton(none).hidden,'no source, no button');
+ const h=harness(overFixture()),api=overReady(h.ctl.liveStatus);let loads=0;mountStatus(h);api.setHistory({load(){loads++;return {days:overDays()};}});
+ assert.ok(!overButton(h) || overButton(h).hidden,'no evidence, no button');
+ api.apply(overToday());assert.equal(overButton(h).hidden,false);assert.equal(overButton(h).textContent,'Over time');assert.equal(loads,0);
+ api.apply(overToday());h.flush();assert.equal(loads,0,'repaints and refreshes load nothing');
+ overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(loads,1);assert.equal(overButton(h).textContent,'Over time');assert.equal(overButton(h).getAttribute('aria-pressed'),'true');
+ assert.equal(api.snapshot().overTime.active,true);assert.equal(api.snapshot().overTime.count,3);assert.equal(api.snapshot().overTime.index,2,'a board opens on its last day');
+ const slider=h.view.querySelector('input.dv-live-over-time-slider');assert.equal(slider.type,'range');assert.equal(slider.min,'0');assert.equal(slider.max,'2');assert.equal(slider.step,'1');assert.equal(slider.getAttribute('aria-label'),'Day');
+ assert.deepEqual(h.view.querySelectorAll('.dv-live-over-time-end').map(el=>el.textContent),['Oct 20','Oct 22']);
+ assert.equal(h.view.querySelector('.dv-live-over-time-note').textContent,'Status as of Oct 22 · other columns show today');
+ slider.value='1';slider.dispatchEvent({type:'input'});assert.equal(api.snapshot().overTime.index,1);assert.equal(slider.getAttribute('aria-valuetext'),'Oct 21');
+ overLiveButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,false);assert.equal(h.view.querySelector('input.dv-live-over-time-slider'),null);assert.equal(loads,1,'closing loads nothing');
+});
+test('OT3 a day overlay takes status from the day and everything else from today',()=>{
+ const C=harness().C,today=overToday();assert.equal(typeof C.liveStatusDayMap,'function');
+ const map=plain(C.liveStatusDayMap(today,{'AA-1':{state:'blocked',detail:'Flagged then',title:'Old title'},'BB-1':{state:'unknown'}}));
+ assert.deepEqual(map['AA-1'],{state:'blocked',title:'Alpha work',assignee:'Alex',epic:'EP-1',detail:'Flagged then',prs:{count:1,state:'merged'}});
+ assert.deepEqual(map['BB-1'],{title:'Beta work',assignee:'Sam',epic:'EP-1',dependsOn:[{key:'AA-1',source:'jira',linkType:'is blocked by'}]});
+ assert.equal(map['EE-1'].state,undefined);assert.equal(today['BB-1'].updatedAt,overStale,'today is not modified');assert.equal(today['AA-1'].state,'done');
+});
+test('OT4 moving days repaints carriers, coins, counts, ring, lanes, blockers, Tickets and availability',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());
+ const a=h.view.querySelector('[data-dv-node="a"]'),planned=h.view.querySelector('[data-dv-node="planned"]'),edge=h.view.querySelector('path.edge'),coin=h.view.querySelector('g.coin[data-dv-step="1"]');
+ // Contrasting precondition: today AA-1 is done and the planned node is available.
+ assert.ok(a.classList.contains('dv-live-done'));assert.ok(!planned.classList.contains('dv-live-unavailable'));assert.equal(api.snapshot().counts.blocked,0);assert.equal(api.snapshot().readiness.done,2);
+ await overOpen(h,1);h.flush();
+ assert.ok(a.classList.contains('dv-live-blocked'));assert.ok(!a.classList.contains('dv-live-done'));assert.ok(edge.classList.contains('dv-live-active'));assert.ok(coin.classList.contains('dv-live-todo'));assert.ok(planned.classList.contains('dv-live-unavailable'),'availability follows the day');
+ const snap=api.snapshot();assert.equal(snap.counts.blocked,1);assert.equal(snap.counts.todo,2);assert.equal(snap.readiness.done,0);assert.deepEqual(plain(snap.blockers).map(item=>item.key),['AA-1']);
+ assert.equal(snap.lanes[0].state,'blocked');assert.equal(snap.lanes[0].done,0);assert.equal(overState(h,'AA-1').textContent,'blocked');assert.equal(overState(h,'ZZ-2').textContent,'todo');assert.equal(h.view.querySelector('.dv-live-blocker').querySelector('.nbacklink').textContent,'AA-1');
+ assert.match(overCaption(h,0),/^IN PROGRESS/);
+ api.overTimeDay(0);h.flush();assert.ok(edge.classList.contains('dv-live-todo'));assert.ok(!edge.classList.contains('dv-live-active'));
+ api.overTimeDay(2);h.flush();assert.ok(a.classList.contains('dv-live-done'));assert.ok(!planned.classList.contains('dv-live-unavailable'));assert.equal(api.snapshot().counts.blocked,0);assert.equal(overState(h,'ZZ-2').textContent,'done');
+});
+function overCaption(h,step){const d=h.ctl.page.sections[0].diagram,snap=h.ctl.liveStatus.snapshot();return h.C.liveStatusCaption(d,d.steps[step],snap.states,snap.waiting);}
+test('OT5 imported carriers follow the same day map as local ones',async()=>{
+ const seed=harness(),C=seed.C;seed.ctl.liveStatus.destroy();
+ const model=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}});
+ const provider=model('provider',{nodes:{api:{title:'API'},db:{title:'DB'}},rows:[['api','db']],edges:[{from:'api',to:'db',label:'Persist'}],topologyExports:{core:{nodes:['api','db'],edges:['api->db']}}});
+ const consumer=model('consumer',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'canon',nodeTracking:{api:{tickets:['AA-1']}},edgeTracking:{'api->db':{tickets:['AA-2']}}}],steps:[{id:'persist',edge:'canon::api->canon::db'}]});
+ consumer.page.tracking={jira:{site:'https://jira.test'}};
+ const h=harness(C.FlowTopology.materialize([provider,consumer])[1]),api=h.ctl.liveStatus;api.apply({'AA-1':{state:'done',title:'One'},'AA-2':{state:'done',title:'Two'}});
+ const node=h.view.querySelector('[data-dv-node="canon::api"]'),edge=h.view.querySelector('path.edge');assert.ok(node.classList.contains('dv-live-done'));assert.ok(edge.classList.contains('dv-live-done'));
+ overReady(api).setHistory({load:()=>({days:[{label:'One',short:'One',states:{'AA-1':{state:'blocked'},'AA-2':{state:'active'}}},{label:'Two',short:'Two',states:{'AA-1':{state:'done'},'AA-2':{state:'done'}}}]})});api.overTime();await historySettle();api.overTimeDay(0);h.flush();
+ assert.ok(node.classList.contains('dv-live-blocked'));assert.ok(edge.classList.contains('dv-live-active'));assert.ok(!edge.classList.contains('dv-live-done'));
+ assert.equal(api.state('AA-1').title,'One','imported ticket metadata stays as of today');api.destroy();
+});
+test('OT6 a ticket before creation keeps its row, stays in the total and is never Missing or done',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());const total=api.snapshot().epic.stories;assert.equal(total,4);
+ await overOpen(h,0);h.flush();const snap=api.snapshot();
+ assert.equal(snap.epic.stories,total,'the total is the same on every day');assert.equal(snap.epic.done,0);
+ assert.equal(overState(h,'ZZ-2').textContent,'No status');assert.equal(overRow(h,'ZZ-2').querySelector('.dv-live-ticket-title').textContent,'Epic only story');assert.match(textOf(overRow(h,'ZZ-2').querySelector('.dv-live-ticket-owner')),/Unassigned/);
+ assert.equal(overState(h,'AA-1').textContent,'No status');assert.match(textOf(overRow(h,'AA-1').querySelector('.dv-live-ticket-owner')),/Alex/,'owner stays as of today');
+ assert.equal(h.view.querySelectorAll('.dv-live-missing').length,0,'no red anywhere');assert.equal(snap.counts.missing,0);assert.deepEqual(plain(snap.blockers),[]);
+ const a=h.view.querySelector('[data-dv-node="a"]');for(const state of ['todo','active','done','blocked','missing'])assert.ok(!a.classList.contains('dv-live-'+state),state);
+ const up=plain(snap.tickets.find(item=>item.key==='BB-1').dependsOn[0]);assert.equal(up.key,'AA-1');assert.equal(up.state,'No status');assert.equal(up.tone,'grey');
+ assert.equal(snap.waiting['BB-1'].tone,'grey');assert.equal(snap.waiting['AA-1'],undefined);assert.equal(snap.waiting['ZZ-2'],undefined);
+ assert.equal(Object.keys(plain(snap.counts)).length,5,'No status adds no count');
+ assert.equal(overCaption(h,1),'TODO · 1 tickets · waiting on AA-1');
+});
+test('OT7 moving days logs no Activity, adds no change pulse and shows no stale mark',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus,today=overToday();api.apply(today);today['EE-1'].state='todo';api.apply(today);
+ const b=h.view.querySelector('[data-dv-node="b"]'),edge=h.view.querySelector('path.edge'),rows=()=>h.view.querySelectorAll('.dv-live-activity-entry').map(el=>el.textContent);
+ // Contrasting precondition: a real change pulsed and logged one row, and BB-1 is overdue and active today.
+ assert.equal(rows().length,1);assert.ok(edge.classList.contains('dv-live-changed'));edge.dispatchEvent({type:'animationend'});assert.equal(h.view.querySelectorAll('.dv-live-changed').length,0);assert.ok(b.classList.contains('dv-live-stale'));const before=rows();
+ await overOpen(h,1);h.flush();
+ for(const index of [0,1,2,0]){api.overTimeDay(index);h.flush();assert.deepEqual(rows(),before);assert.equal(h.view.querySelectorAll('.dv-live-changed').length,0,'day '+index);assert.equal(h.view.querySelectorAll('.dv-live-stale').length,0,'day '+index);}
+ api.overTimeDay(2);overBackToLive(api);await historySettle();h.flush();assert.ok(b.classList.contains('dv-live-stale'),'the stale mark returns with today');assert.deepEqual(rows(),before);
+});
+test('OT8 a refresh during a past day waits, then Live shows the newest status once',async()=>{
+ const remembered=[],editor={state:()=>({editable:false,blocked:'',active:false,pending:0,saving:false,readOnly:false,notice:null}),onChange:()=>()=>{},rememberMap(map){remembered.push(map);},lastMap:()=>null,question:()=>null};
+ const h=harness(overFixture(),{},{boardEditor:editor});mountStatus(h);const api=h.ctl.liveStatus,today=overToday();api.apply(today);assert.equal(remembered.length,1);
+ await overOpen(h,1);h.flush();const a=h.view.querySelector('[data-dv-node="a"]'),b=h.view.querySelector('[data-dv-node="b"]'),rows=()=>h.view.querySelectorAll('.dv-live-activity-entry').map(el=>el.textContent);
+ assert.ok(a.classList.contains('dv-live-blocked'));assert.equal(remembered.length,1,'a past day is never remembered as live');
+ const newer=overToday();newer['BB-1'].state='done';delete newer['BB-1'].updatedAt;newer['BB-1'].title='Newest title';api.apply(newer);h.flush();
+ assert.ok(a.classList.contains('dv-live-blocked'),'the refresh leaves the day on screen');assert.ok(!b.classList.contains('dv-live-done'));assert.equal(rows().length,0);assert.equal(overRow(h,'BB-1').querySelector('.dv-live-ticket-title').textContent,'Beta work');assert.equal(api.snapshot().overTime.active,true);
+ overBackToLive(api);await historySettle();h.flush();
+ assert.equal(api.snapshot().overTime.active,false);assert.ok(a.classList.contains('dv-live-done'));assert.ok(b.classList.contains('dv-live-done'));assert.equal(overRow(h,'BB-1').querySelector('.dv-live-ticket-title').textContent,'Newest title');
+ assert.equal(rows().length,1);assert.match(rows()[0],/^BB-1 · active → done/);assert.equal(remembered.at(-1),newer,'the newest live map is what an edit re-render restores');
+});
+test('OT9 Edit is disabled with a reason on a past day and Over time waits for Edit to finish',async()=>{
+ let active=false;const editor={state:()=>({editable:true,blocked:'',active,pending:0,saving:false,readOnly:false,notice:null}),onChange:()=>()=>{},rememberMap(){},lastMap:()=>null,question:()=>null,start(){active=true;}};
+ const h=harness(overFixture(),{},{boardEditor:editor});mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());const edit=()=>h.view.querySelector('button.dv-live-edit'),reason=()=>h.view.querySelector('.dv-live-edit-reason');
+ assert.equal(edit().disabled,false);assert.equal(reason().hidden,true);await overOpen(h,1);
+ assert.equal(edit().disabled,true);assert.equal(reason().hidden,false);assert.equal(reason().textContent,'Editing is off while a past day is shown.');
+ overBackToLive(api);await historySettle();assert.equal(edit().disabled,false);assert.equal(reason().hidden,true);
+ active=true;api.note('repaint');assert.equal(overButton(h).disabled,true);let loads=0;api.setHistory({load(){loads++;return {days:overDays()};}});api.overTime();await historySettle();assert.equal(loads,0,'Edit mode refuses the click as well');
+});
+test('OT10 only whole days inside the range are accepted',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());await overOpen(h,1);
+ api.overTimeDay(99);assert.equal(api.snapshot().overTime.index,2);api.overTimeDay(-4);assert.equal(api.snapshot().overTime.index,0);
+ api.overTimeDay(1);for(const bad of [1.5,NaN,'x',undefined])api.overTimeDay(bad);assert.equal(api.snapshot().overTime.index,1);
+});
+test('OT11 clear on a past day ends the mode and leaves no evidence',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());await overOpen(h,1);h.flush();api.apply(overToday());api.clear();h.flush();
+ assert.equal(api.snapshot().overTime.active,false);assert.equal(h.view.querySelector('input.dv-live-over-time-slider'),null);assert.equal(api.state('AA-1'),null);assert.equal(h.view.querySelectorAll('.dv-live-blocked').length,0);
+ api.overTime();await historySettle();assert.equal(api.state('AA-1'),null,'a held refresh does not return after clear');
+});
+test('OT11 destroy while history loads leaves the board alone',async()=>{
+ const h=harness(overFixture());const api=overReady(h.ctl.liveStatus);api.apply(overToday());let resolve;let loads=0;api.setHistory({load:()=>{loads++;return new Promise(done=>{resolve=done;});}});api.overTime();api.overTime();assert.equal(api.snapshot().overTime.loading,true);await historySettle();assert.equal(loads,1,'a second click while loading starts nothing');api.destroy();resolve({days:overDays()});await historySettle();assert.equal(api.snapshot().overTime.active,false);
+});
+test('OT12 demo days separate tickets not created yet from tickets that later disappear',()=>{
+ const C=storyContext();assert.equal(typeof C.liveStatusDemoDays,'function');
+ const timeline={epics:{'EP-1':{summary:'Epic'}},days:[{label:'Day 1 — start',issues:{'AA-1':{state:'todo',epic:'EP-1',statusName:'To Do'}}},{label:'second',issues:{'AA-1':{state:'done',epic:'EP-1'},'BB-1':{state:'active',epic:'EP-1'}}},{label:'Day 3 — gone',issues:{'BB-1':{state:'done',epic:'EP-1'}}}]};
+ const days=plain(C.liveStatusDemoDays(timeline,['AA-1','BB-1','CC-1']));assert.equal(days.length,3);
+ assert.deepEqual(days.map(day=>day.label),['Day 1 — start','Day 2 — second','Day 3 — gone']);assert.deepEqual(days.map(day=>day.short),['Day 1','Day 2','Day 3']);
+ assert.equal(days[0].states['BB-1'],undefined,'not created yet');assert.equal(days[0].states['AA-1'].state,'todo');assert.equal(days[0].states['AA-1'].detail,'To Do');
+ assert.equal(days[0].states['EP-1'].state,'todo');assert.equal(days[1].states['EP-1'].state,'active');
+ assert.equal(days[2].states['AA-1'].state,'missing','absent after it existed: the story says it became unavailable');assert.equal(days[1].states['CC-1'],undefined,'never named before the last day');
+ assert.equal(days[2].states['CC-1'].state,'missing','the last day matches the live demo');
+});
+test('OT13 apply still drops a provider entry without a valid state',()=>{
+ const h=harness(overFixture()),api=h.ctl.liveStatus;api.apply({'AA-1':{title:'No state'},'BB-1':{state:'nope'},'EE-1':{state:'todo'}});assert.equal(api.state('AA-1'),null);assert.equal(api.state('BB-1'),null);assert.equal(api.state('EE-1').state,'todo');
+});
+
+/* Over time through the connector (#929, PR 3 of 3). Source: issue behavior items 2, 5, 7, 9, 10, 12 and 13, the
+   Paging and Call budget tests, and Chuck's rulings of 2026-11-03. `historyProvider` keeps the runtime's cache
+   rules: an entry is served only inside staleTime, carries cache.storedAt only when served, and refresh skips the read.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| C1 | connector with neither, one, or both history tools | Over time shows only with both tools | a button that fails on click |
+| C2 | load, watch refreshes, then clicks | no history tool before the click; first click makes one status list, one created search per ten keys and one changelog per ticket, through callTool with a 7-day cache; no new watch | periodic hydration; history through watchTool |
+| C3 | second click, then one ticket's updated time moves | second click reaches Jira zero times; third reaches Jira once, for that ticket, with refresh | refetching the whole board; never noticing a change |
+| C4 | status change only on page 2 | the day after it shows the new status | reading page 1 only |
+| C5 | page 2 fails, then succeeds | board stays on today, panel says history could not load, Over time can be clicked again and then works | showing a partial history |
+| C6 | other failures: status list, created search, empty status list, more pages with no cursor, repeated cursor | same outcome as C5 | wrong days from incomplete data |
+| C7 | ticket missing today | no history call for it, No status on past days, other tickets load | one missing ticket stopping the batch |
+| C8 | flagged today with no Flagged history | blocked on past days | losing today's flag |
+| C9 | batch waiting on Jira | panel shows loaded count of total; at most six changelog calls at once | an unbounded batch of calls |
+| C10 | adapter retires on a past day | mode ends and the source is gone | a past day surviving an account change |
+| C12 | 75 tickets, searches held open | each created search names at most ten keys, together they name every ticket once, and at most six run at once | one search per ticket; an unbounded search batch |
+| C11 | the real adapter load over the real mock handler, final story day | every ticket on every day equals the story timeline; a ticket before its first day has no status; the range ends on the last Done day | an adapter and a mock that disagree on shape |
+*/
+const OVER_WEEK=604800000,OVER_STORED=Date.parse('2026-10-25T00:00:00Z');
+const overRaw=(keys=['AA-1','BB-1','ZZ-1'])=>({page:{tracking:{jira:{site:'https://jira.test'}},sections:[{id:'main',diagram:{nodes:Object.fromEntries(keys.map((key,i)=>['n'+i,{title:key,tickets:[key]}])),rows:[keys.map((_,i)=>'n'+i)],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
+const overChange=(created,from,to)=>({created,items:[{field:'status',fromString:from,toString:to}]});
+const OVER_STATUSES={values:[{name:'To Do',statusCategory:{key:'new'}},{name:'In Progress',statusCategory:{key:'indeterminate'}},{name:'Done',statusCategory:{key:'done'}}]};
+function historyProvider({tools=['listJiraIssueChangelogs','listJiraStatuses'],keys=['AA-1','BB-1','ZZ-1'],gate=null}={}){
+ const h=providerHarness(overRaw(keys));tools.forEach(name=>h.servers[0].tools.push({name}));
+ const stored=new Map(),upstream=[];Object.assign(h,{upstream,changelogs:{},statuses:OVER_STATUSES,fail:()=>false,created:null});
+ const issue=key=>({key,fields:{created:'2026-10-20T12:00:00.000Z',status:{name:'In Progress',statusCategory:{key:'indeterminate'}}}});
+ const execute=(tool,input)=>{
+  if(tool==='listJiraStatuses')return h.statuses;
+  if(tool==='searchJiraIssuesUsingJql'){const found=/^key in \(([^)]+)\)$/.exec(input.jql)[1].split(', ');return {issues:{nodes:(h.created || found).map(issue)}};}
+  const pages=h.changelogs[input.issueIdOrKey] || [{values:[]}];return pages[input.nextPageToken?Number(input.nextPageToken):0];
+ };
+ h.mcp.callTool=async(server,tool,input,opts)=>{
+  h.calls.push(plain([server,tool,input,opts]));
+  if(tool==='getAccessibleAtlassianResources')return {payload:[{id:'cloud',url:'https://jira.test'}]};
+  const id=JSON.stringify([tool,input]),cache=opts && opts.cache,hit=stored.get(id);
+  if(cache && !cache.refresh && hit && cache.staleTime>0)return {payload:hit.payload,cache:{storedAt:hit.at,revalidating:false}};
+  upstream.push({tool,input:plain(input),refresh:!!(cache && cache.refresh)});
+  if(gate)await gate(tool,input);
+  if(h.fail(tool,input))throw {code:'upstream_error',message:'Jira failed'};
+  const payload=execute(tool,input);if(cache && cache.gcTime>0)stored.set(id,{payload,at:OVER_STORED});return {payload};
+ };
+ return h;
+}
+async function overLive(h,issues,flagged=[]){await h.start();await historySettle();h.data(0,issues);h.data(1,flagged);await historySettle();}
+async function overClick(h){overButton(h).dispatchEvent({type:'click'});for(let i=0;i<8;i++)await historySettle();}
+const overLiveIssues=()=>[jira('AA-1'),jira('BB-1')];
+const overStatesAt=(h,index)=>{const api=h.ctl.liveStatus;api.overTimeDay(index);return api.snapshot().states;};
+test('C1 Over time needs both history tools on the connector',async()=>{
+ for(const tools of [[],['listJiraStatuses'],['listJiraIssueChangelogs']]){const h=historyProvider({tools});await overLive(h,overLiveIssues());assert.equal(h.ctl.liveStatus.snapshot().overTime,null,tools.join());assert.ok(!overButton(h) || overButton(h).hidden);}
+ const h=historyProvider();await overLive(h,overLiveIssues());assert.equal(overButton(h).hidden,false);assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,false);
+});
+test('C2 the click is the only thing that calls history, as one batch through callTool',async()=>{
+ const h=historyProvider();await overLive(h,overLiveIssues());const watches=h.watches.length;
+ h.data(0,overLiveIssues());h.data(1,[]);await historySettle();assert.deepEqual(h.upstream,[],'no history call at load or on a watch refresh');
+ await overClick(h);
+ assert.deepEqual(h.upstream.map(call=>call.tool).sort(),['listJiraIssueChangelogs','listJiraIssueChangelogs','listJiraStatuses','searchJiraIssuesUsingJql']);assert.equal(h.watches.length,watches,'no watch added');
+ const search=h.upstream.find(call=>call.tool==='searchJiraIssuesUsingJql');assert.equal(search.input.jql,'key in (AA-1, BB-1)');assert.deepEqual(search.input.fields,['created','status']);assert.equal(search.input.cloudId,'cloud');
+ assert.deepEqual(h.upstream.filter(call=>call.tool==='listJiraIssueChangelogs').map(call=>call.input).sort((a,b)=>a.issueIdOrKey<b.issueIdOrKey?-1:1),[{cloudId:'cloud',issueIdOrKey:'AA-1'},{cloudId:'cloud',issueIdOrKey:'BB-1'}]);
+ for(const [,tool,,opts] of h.calls.filter(call=>call[1]!=='getAccessibleAtlassianResources'))assert.deepEqual(opts.cache,{staleTime:OVER_WEEK,gcTime:OVER_WEEK},tool);
+ assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true);assert.equal(overButton(h).getAttribute('aria-pressed'),'true');
+});
+test('C3 repeat clicks reuse the cache and refetch only a ticket whose updated time moved',async()=>{
+ const h=historyProvider();await overLive(h,overLiveIssues());await overClick(h);overLiveButton(h).dispatchEvent({type:'click'});await historySettle();
+ h.upstream.length=0;await overClick(h);assert.deepEqual(h.upstream,[],'nothing changed, nothing reaches Jira');assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true);overLiveButton(h).dispatchEvent({type:'click'});await historySettle();
+ const later=jira('AA-1');later.fields.updated='2026-10-26T00:00:00Z';h.data(0,[later,jira('BB-1')]);h.data(1,[]);await historySettle();
+ await overClick(h);assert.deepEqual(h.upstream,[{tool:'listJiraIssueChangelogs',input:{cloudId:'cloud',issueIdOrKey:'AA-1'},refresh:true}]);
+});
+test('C4 C5 every page is read, and a failed page leaves the board on today until a retry works',async()=>{
+ const h=historyProvider();await overLive(h,overLiveIssues());const api=h.ctl.liveStatus,note={created:'2026-10-21T12:00:00.000Z',items:[{field:'assignee',fromString:'A',toString:'B'}]};
+ h.changelogs['AA-1']=[{values:[note],pageInfo:{hasNextPage:true,endCursor:'1'}},{values:[overChange('2026-10-23T12:00:00.000Z','To Do','Done')],pageInfo:{hasNextPage:false,endCursor:null}}];
+ h.fail=(tool,input)=>tool==='listJiraIssueChangelogs' && input.nextPageToken==='1';await overClick(h);
+ assert.equal(api.snapshot().overTime?.active,false);assert.equal(h.view.querySelector('input.dv-live-over-time-slider'),null);assert.equal(api.state('AA-1').state,'active','today stays on the board');
+ assert.equal(h.view.querySelector('.dv-live-over-time-status').textContent,'History could not load. Try Over time again.');assert.equal(overButton(h).textContent,'Over time');assert.equal(overButton(h).disabled,false);
+ h.fail=()=>false;await overClick(h);assert.equal(api.snapshot().overTime?.active,true);assert.equal(h.view.querySelector('.dv-live-over-time-status').hidden,true);
+ assert.equal(overStatesAt(h,2)['AA-1'].state,'todo','Oct 22');assert.equal(overStatesAt(h,3)['AA-1'].state,'done','Oct 23: the only status change is on page 2');
+});
+test('C6 incomplete history never shows',async()=>{
+ const cases=[['status list fails',h=>{h.fail=tool=>tool==='listJiraStatuses';}],['created search fails',h=>{h.fail=tool=>tool==='searchJiraIssuesUsingJql';}],['status list is empty',h=>{h.statuses={values:[]};}],['a ticket has no created time',h=>{h.created=['AA-1'];}],
+  ['more pages with no cursor',h=>{h.changelogs['AA-1']=[{values:[],isLast:false}];}],['a repeated cursor',h=>{h.changelogs['AA-1']=[{values:[],pageInfo:{hasNextPage:true,endCursor:'0'}}];h.changelogs['AA-1'].push(h.changelogs['AA-1'][0]);}]];
+ for(const [name,arrange] of cases){const h=historyProvider();await overLive(h,overLiveIssues());arrange(h);await overClick(h);assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,false,name);assert.match(h.view.querySelector('.dv-live-over-time-status').textContent,/could not load/,name);assert.equal(h.ctl.liveStatus.state('AA-1').state,'active',name);}
+});
+test('C7 a ticket missing today gets no history call and has no status on past days',async()=>{
+ const h=historyProvider();await overLive(h,overLiveIssues());assert.equal(h.ctl.liveStatus.state('ZZ-1').state,'missing');await overClick(h);assert.ok(h.upstream.length>0,'the click reached Jira');
+ assert.ok(!h.upstream.some(call=>call.input.issueIdOrKey==='ZZ-1'));assert.ok(!h.upstream.find(call=>call.tool==='searchJiraIssuesUsingJql').input.jql.includes('ZZ-1'));
+ const first=overStatesAt(h,0);assert.equal(first['ZZ-1'].state,undefined);assert.equal(first['ZZ-1'].title,undefined);assert.equal(first['AA-1'].state,'active');assert.equal(h.view.querySelectorAll('.dv-live-missing').length,0);
+});
+test('C8 a ticket flagged today with no Flagged history is blocked on past days',async()=>{
+ const h=historyProvider();await overLive(h,overLiveIssues(),[jira('AA-1')]);assert.equal(h.ctl.liveStatus.state('AA-1').state,'blocked');await overClick(h);assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true,'history opened');assert.equal(overStatesAt(h,0)['AA-1'].state,'blocked');assert.equal(overStatesAt(h,0)['BB-1'].state,'active');
+});
+test('C9 the panel shows loaded count of total and at most six changelog calls run at once',async()=>{
+ const keys=Array.from({length:9},(_,i)=>'AA-'+(i+1)),waiting=[];let running=0,peak=0;
+ const h=historyProvider({keys,gate:async tool=>{if(tool!=='listJiraIssueChangelogs')return;running++;peak=Math.max(peak,running);await new Promise(done=>waiting.push(done));running--;}});
+ await overLive(h,keys.map(key=>jira(key)));overButton(h).dispatchEvent({type:'click'});for(let i=0;i<8;i++)await historySettle();
+ assert.equal(overButton(h).textContent,'Loading history 0 of 9…');assert.equal(overButton(h).disabled,true);assert.equal(waiting.length,6);
+ for(let done=1;done<=9;done++){waiting.shift()();for(let i=0;i<8;i++)await historySettle();if(done<9)assert.equal(overButton(h).textContent,'Loading history '+done+' of 9…');}
+ assert.equal(peak,6);assert.equal(overButton(h).textContent,'Over time');assert.equal(overButton(h).getAttribute('aria-pressed'),'true');
+});
+test('C10 an adapter that retires on a past day ends the mode and removes the source',async()=>{
+ const h=historyProvider();await overLive(h,overLiveIssues());await overClick(h);const api=h.ctl.liveStatus;assert.equal(api.snapshot().overTime?.active,true);
+ h.watches[0].handler({type:'error',error:{code:'user_changed'}});await historySettle();assert.equal(api.snapshot().overTime,null);assert.equal(h.view.querySelector('input.dv-live-over-time-slider'),null);assert.ok(!overButton(h) || overButton(h).hidden);
+});
+test('C11 the adapter load over the real mock handler rebuilds the story timeline day by day',async()=>{
+ const C=providerContext(),{handleMcp}=await import('../deploy/cloudflare/mock-atlassian-mcp/mcp.mjs'),story=JSON.parse(fs.readFileSync('examples/live-status/live-status.timeline.json','utf8'));
+ assert.equal(typeof C.liveStatusHistoryLoad,'function','#929 connector load exists');
+ const last=story.days.length-1,env={scenario:'story',day:last,now:Date.parse('2026-11-03T12:00:00Z')},calls=[];
+ const mcp={callTool:async(server,tool,input)=>{calls.push(tool);const response=handleMcp({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:tool,arguments:input}},env);assert.equal(response.error,undefined,tool);return {payload:response.result.structuredContent};}};
+ const keys=Object.keys(story.days[last].issues),found=(await mcp.callTool('Mock','searchJiraIssuesUsingJql',{cloudId:'mock-cloud-id-0001',jql:'key in ('+keys.join(', ')+')',maxResults:50})).payload.issues.nodes;
+ const flagged=(await mcp.callTool('Mock','searchJiraIssuesUsingJql',{cloudId:'mock-cloud-id-0001',jql:'key in ('+keys.join(', ')+') AND Flagged = Impediment',maxResults:50})).payload.issues.nodes;assert.equal(found.length,keys.length);assert.deepEqual(flagged,[]);
+ const today=plain(C.liveStatusJiraMap(keys,[found],new Set(),'https://acme.atlassian.net',null)),issues=Object.fromEntries(found.map(issue=>[issue.key,issue]));calls.length=0;
+ const result=plain(await C.liveStatusHistoryLoad({mcp,server:'Mock',cloudId:'mock-cloud-id-0001',today,issues,flagged:{}},()=>{}));
+ assert.equal(calls.filter(tool=>tool==='listJiraStatuses').length,1);assert.equal(calls.filter(tool=>tool==='searchJiraIssuesUsingJql').length,1);assert.ok(calls.filter(tool=>tool==='listJiraIssueChangelogs').length>keys.length,'at least one ticket needs a second page');
+ const lastDone=story.days.findIndex(day=>keys.every(key=>day.issues[key] && day.issues[key].state==='done'));assert.equal(result.days.length,lastDone+1,'the range ends on the last Done day');
+ result.days.forEach((day,index)=>{for(const key of keys){
+  let source=null;for(let i=index;i>=0 && !source;i--)source=story.days[i].issues[key] || null;
+  // A ticket absent from the story on a later day carries its previous status: history has no "unavailable" day.
+  assert.equal(day.states[key]?.state ?? null,source?source.state:null,key+' on day '+(index+1));
+ }});
+ assert.equal(result.days[0].states['UX-90'],undefined,'UX-90 does not exist on day 1');assert.equal(result.days[3].states['HW-124'].state,'blocked','Flagged and Blocked');
+});
+test('C12 created searches name at most ten keys each and at most six run at once',async()=>{
+ const keys=Array.from({length:75},(_,i)=>'AA-'+(i+1)),waiting=[];let running=0,peak=0;
+ const h=historyProvider({keys,gate:async tool=>{if(tool!=='searchJiraIssuesUsingJql')return;running++;peak=Math.max(peak,running);await new Promise(done=>waiting.push(done));running--;}});
+ await h.start();await historySettle();
+ h.watches.forEach((watch,i)=>{const listed=/^key in \(([^)]+)\)$/.exec(watch.input.jql);h.data(i,listed?listed[1].split(', ').map(key=>jira(key)):[]);});await historySettle();
+ overButton(h).dispatchEvent({type:'click'});for(let i=0;i<8;i++)await historySettle();assert.equal(waiting.length,6,'six searches are open');
+ for(let released=0;released<8;released++){waiting.shift()();for(let i=0;i<8;i++)await historySettle();}
+ for(let i=0;i<8;i++)await historySettle();assert.equal(peak,6);assert.equal(waiting.length,0);
+ const searches=h.upstream.filter(call=>call.tool==='searchJiraIssuesUsingJql').map(call=>/^key in \(([^)]+)\)$/.exec(call.input.jql)[1].split(', '));
+ assert.equal(searches.length,8);assert.ok(searches.every(list=>list.length<=10));assert.deepEqual(searches.flat().sort(),keys.slice().sort());assert.equal(h.ctl.liveStatus.snapshot().overTime?.active,true);
+});
+test('OT14 Live and Over time are two mode buttons: Live returns to today and the selected Over time stays',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);api.apply(overToday());let loads=0;api.setHistory({load(){loads++;return {days:overDays()};}});
+ const pressed=()=>[overLiveButton(h).getAttribute('aria-pressed'),overButton(h).getAttribute('aria-pressed')];
+ assert.deepEqual(h.view.querySelector('.dv-live-head').children.slice(0,2).map(el=>el.className.split(' ').find(name=>/^dv-live-(toggle|over-time)$/.test(name))),['dv-live-toggle','dv-live-over-time']);assert.deepEqual(pressed(),['true','false']);
+ overButton(h).dispatchEvent({type:'click'});await historySettle();assert.deepEqual(pressed(),['false','true']);assert.equal(overButton(h).textContent,'Over time');assert.equal(api.enabled(),true);
+ assert.ok(!textOf(h.view.querySelector('.dv-live-head')).includes('Back to today'),'no separate return button');
+ overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,true,'the selected mode stays');assert.equal(loads,1);
+ overLiveButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,false);assert.equal(api.enabled(),true,'returning to Live keeps colors on');assert.deepEqual(pressed(),['true','false']);
+ overLiveButton(h).dispatchEvent({type:'click'});assert.equal(api.enabled(),false,'the selected Live still turns colors off');assert.deepEqual(pressed(),['false','false']);
+ overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,true);assert.equal(api.enabled(),true,'Over time shows colors');assert.deepEqual(pressed(),['false','true']);
 });

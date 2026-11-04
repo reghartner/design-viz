@@ -259,10 +259,10 @@ function liveStatusTicketWaiting(dependencies,map){
   if(!map || !Object.keys(map).length)return out;
   Object.keys(dependencies || {}).forEach(function(ticket){
     var own=map[ticket] && map[ticket].state;
-    if(own==='active' || own==='done')return;
+    if(own==='active' || own==='done' || liveStatusNoStatus(map[ticket]))return;
     var on=[];
     dependencies[ticket].forEach(function(dep){
-      var state=map[dep.key] && LIVE_STATUS_STATES.indexOf(map[dep.key].state)>=0?map[dep.key].state:'missing';
+      var state=liveStatusUpstreamState(map[dep.key]);
       if(state==='done')return;
       on.push({key:dep.key,state:state,tone:liveStatusWaitingTone(state)});
     });
@@ -397,6 +397,23 @@ function liveStatusCaption(diagram,step,map,waiting){
   }
   return text;
 }
+/* Over time (#929): on a past day a ticket with no status keeps an entry without a state,
+   so its row, title and place in the total survive. Only the day overlay makes these;
+   apply() still requires a state from every provider. */
+function liveStatusNoStatus(entry){return !!entry && LIVE_STATUS_STATES.indexOf(entry.state)<0;}
+function liveStatusUpstreamState(entry){return liveStatusNoStatus(entry)?'No status':entry?entry.state:'missing';}
+/* One past day over today's map: status from the day, everything else as of today.
+   updatedAt is dropped because it describes today, not that day. */
+function liveStatusDayMap(today,states){
+  var out=Object.create(null);
+  Object.keys(today || {}).forEach(function(key){
+    var entry=Object.assign({},today[key]),day=states && states[key];
+    delete entry.state;delete entry.detail;delete entry.updatedAt;
+    if(day && LIVE_STATUS_STATES.indexOf(day.state)>=0){entry.state=day.state;if(typeof day.detail==='string')entry.detail=day.detail;}
+    out[key]=entry;
+  });
+  return out;
+}
 function liveStatusStale(entry,now,staleDays){
   var days=typeof staleDays==='number' && isFinite(staleDays) && staleDays>0?staleDays:7;
   var at=entry && Date.parse(entry.updatedAt);
@@ -474,6 +491,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
   var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,asked=false,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
   var activity=[],seenKeys=Object.create(null),changedKeys=[],stepHooks=[],coverageRequest=0;
+  // Over time (#929): while `over` is set, `map` is the chosen day and `over.live` is the map to return to.
+  var overSource=null,over=null,overLoading=false,overProgress='',overError='',overRequest=0;
   // Connector evidence for the panel header (#769): who supplies the map, whether a fetch is in flight, when it last answered.
   var LIVE_STATUS_CONNECTIONS=['none','disconnected','approval','connecting','connected','error','demo'];
   var demoMode=!!(options.demo && typeof options.demo.mount==='function');
@@ -544,7 +563,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var coverage=liveStatusCoverage(page,map,refs(),sources()),storyKeys=coverage.onDiagram.concat(coverage.notOnDiagram,dependencyKeys);
     coverage.dependencies=dependencyKeys.slice();
     var counts={todo:0,active:0,done:0,blocked:0,missing:0},latest=null,stamp=-Infinity;
-    storyKeys.forEach(function(key){var entry=map[key];if(!entry)return;counts[entry.state]++;
+    storyKeys.forEach(function(key){var entry=map[key];if(!entry)return;if(!liveStatusNoStatus(entry))counts[entry.state]++;
       var at=Date.parse(entry.updatedAt);if(isFinite(at) && at>stamp){stamp=at;latest=entry.updatedAt;}
     });
     var pages=laneRecords(),readiness=liveStatusReadiness(page,map,ticketWaiting);
@@ -581,9 +600,52 @@ function createLiveStatus(ctl,page,options,renderOptions){
       dependencies:copy(dependencies),waiting:copy(boardWaiting),chains:liveStatusDependencyChains(boardWaiting),suggestions:suggestions,epic:epic,
       coverage:coverage,readiness:readiness,activity:copy(activity.filter(function(item){return storyKeys.indexOf(item.key)>=0;})).map(function(item){item.relative=item.at?relative(item.at):'time unavailable';return item;}),
       demo:demoControls?{playing:!!demoControls.playing,manual:!!demoControls.manual,ended:!!demoControls.ended}:null,verdict:verdict,
-      editHistory:copy(editHistory),edit:editor?editor.state():null,
+      overTime:overTimeState(),
+      editHistory:copy(editHistory),edit:editState(),
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
       connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+clockTime(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}}};
+  }
+  function editState(){var state=editor?editor.state():null;return state && over && !state.blocked?Object.assign({},state,{blocked:'Editing is off while a past day is shown.'}):state;}
+  function overTimeState(){
+    if(!overSource)return null;
+    var base={active:!!over,loading:overLoading,progress:overProgress,error:overError,available:!!(applied && Object.keys(map).length),disabled:editing()};
+    if(!over)return base;
+    var days=over.days;base.index=over.index;base.count=days.length;base.first=days[0].short;base.last=days[days.length-1].short;base.label=days[over.index].label;return base;
+  }
+  function overShow(){map=liveStatusDayMap(over.today,over.days[over.index].states);changedKeys=[];paint();notify();}
+  // Returning to Live restores the live map, then applies any evidence that arrived meanwhile as a normal refresh.
+  function overClose(){
+    var left=over;over=null;map=left.live;changedKeys=[];
+    if(overSource.close)overSource.close();
+    if(left.held)api.apply(left.value);else{paint();notify();}
+  }
+  /* Every provider map, and a history source's today map, passes this one check. */
+  function cleanMap(value){
+    var next=Object.create(null);
+    Object.keys(value || {}).forEach(function(key){
+        var entry=value[key];if(!trackingKeyPattern.test(key) || !entry || LIVE_STATUS_STATES.indexOf(entry.state)<0)return;
+        var item={state:entry.state};if(['initiative','epic','story'].indexOf(entry.kind)>=0)item.kind=entry.kind;
+        if(Array.isArray(entry.initiatives))item.initiatives=entry.initiatives.filter(function(key,index,all){return typeof key==='string' && trackingKeyPattern.test(key) && all.indexOf(key)===index;});
+        ['title','assignee','assigneeId','detail','updatedAt','epic','parent','lane'].forEach(function(field){if(typeof entry[field]==='string')item[field]=entry[field];});
+        var url=deltaLinkUrl(entry.url);if(url)item.url=url;
+        var links=liveStatusPRLinks(entry.prs && entry.prs.links);
+        if(Array.isArray(entry.dependsOn)){var deps=[];entry.dependsOn.forEach(function(dep){
+          if(!dep || typeof dep!=='object' || typeof dep.key!=='string' || !trackingKeyPattern.test(dep.key) || ['jira','authored'].indexOf(dep.source)<0)return;
+          var link={key:dep.key,source:dep.source};if(typeof dep.linkType==='string' && dep.linkType)link.linkType=dep.linkType;if(typeof dep.reason==='string' && dep.reason)link.reason=dep.reason;deps.push(link);
+        });if(deps.length)item.dependsOn=deps;}
+        if(entry.prs && typeof entry.prs.count==='number' && isFinite(entry.prs.count) && entry.prs.count>=0 && ['open','merged','declined'].indexOf(entry.prs.state)>=0)item.prs={count:entry.prs.count,state:entry.prs.state};
+        else if(links.length)item.prs=liveStatusPRSummary(links);
+        if(links.length)item.prs.links=links;
+        next[key]=item;
+    });
+    return next;
+  }
+  function overLoad(request,result){
+    if(retired || request!==overRequest)return;overLoading=false;
+    var days=result && Array.isArray(result.days)?result.days:[];
+    if(!days.length){overError='History could not load. Try Over time again.';notify();return;}
+    var index=result.index;if(typeof index!=='number' || index<0 || index>=days.length)index=days.length-1;
+    over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null};on=true;availabilityOn=true;overShow();
   }
   function hasMissingWork(){return sources().some(function(source){return sectionRecords(source).some(function(record){var d=record.section.diagram || {};return Object.values(d.nodes || {}).some(function(node){return !isTextBoxNode(node) && node.missingWork===true;}) || (d.edges || []).some(function(edge){return edge.missingWork===true;});});});}
   function presentationActive(){return applied || hasMissingWork();}
@@ -656,7 +718,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         remove.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();close(false);setTimeout(function(){editor.remove(ref,key);},0);});
       }
       link(row,key,liveStatusTicketURL(tracking,key,entry,trackingTicketURL(value,key) || (availability || []).map(function(cause){return trackingTicketURL(cause.value,key);}).filter(Boolean)[0]));
-      var pill=element('span','dv-live-ticket-state dv-live-state-pill',entry?entry.state:'No status',row);liveStatusClass(pill,entry?entry.state:null);
+      var pill=element('span','dv-live-ticket-state dv-live-state-pill',entry && entry.state || 'No status',row);liveStatusClass(pill,entry && entry.state || null);
       if(entry){
         if(entry.title)element('span','dv-live-ticket-title',entry.title,row);
         if(entry.assignee)element('span','dv-live-ticket-assignee',entry.assignee,row);
@@ -937,7 +999,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var lane=record.lanes[id],enabled=on && applied && refs().tickets.length>0;
       lanes.push({id:id,label:laneLabel(id,record.page),done:lane.done,total:lane.total,state:enabled?lane.state:null,
         text:laneLabel(id,record.page)+(enabled?' · '+lane.done+'/'+lane.total+' done':''),
-        title:enabled?lane.keys.map(function(key){return key+' · '+(map[key]?map[key].state:'No status');}).join('\n'):''});
+        title:enabled?lane.keys.map(function(key){return key+' · '+(map[key] && map[key].state || 'No status');}).join('\n'):''});
     });});return lanes;
   }
   function panelBlockers(pages){
@@ -971,7 +1033,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // Use the same extra upstream stories as the summary counts.
     var linked=dependencyKeys;
     return coverage.onDiagram.concat(coverage.notOnDiagram,linked).filter(function(key,index,all){return all.indexOf(key)===index && !liveStatusContainer(key,map[key],refs().epics);}).sort(function(a,b){
-      var diff=rank.indexOf(map[a]?map[a].state:'missing')-rank.indexOf(map[b]?map[b].state:'missing');return diff || (a<b?-1:a>b?1:0);
+      var order=function(key){return liveStatusNoStatus(map[key])?rank.length:rank.indexOf(map[key]?map[key].state:'missing');},diff=order(a)-order(b);return diff || (a<b?-1:a>b?1:0);
     }).map(function(key){
       var entry=map[key] || {},owners=carriers[key] || [],laneColor=null,urls=[];
       pages.some(function(record){return Object.keys(record.lanes).some(function(id){
@@ -981,7 +1043,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var source=owners.length?owners[0].page:pages.filter(function(record){return trackingEpics(record.page).some(function(root){return root===entry.epic || (entry.initiatives || []).indexOf(root)>=0;});}).map(function(record){return record.page;})[0] || page;
       owners.forEach(function(carrier){trackingRefs(carrier.value).prs.forEach(function(url){if(urls.indexOf(url)<0)urls.push(url);});});
       var dependsOn=(dependencies[key] || []).map(function(dep){
-        var up=map[dep.key],state=up && LIVE_STATUS_STATES.indexOf(up.state)>=0?up.state:'missing';
+        var up=map[dep.key],state=liveStatusUpstreamState(up);
         return {key:dep.key,state:state,tone:state==='done'?'done':liveStatusWaitingTone(state),sources:dep.sources.slice(),linkType:dep.linkType || '',reason:dep.reason || '',url:liveStatusTicketURL(source.tracking,dep.key,up,liveStatusPageTicketURL(source,dep.key))};
       });
       return {key:key,url:liveStatusTicketURL(source.tracking,key,entry,liveStatusPageTicketURL(source,key)),title:entry.title || '—',state:entry.state || 'No status',
@@ -1182,24 +1244,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
     nextDemo:function(){if(!retired && demoControls)demoControls.next();},
     state:function(ref){return map[ref]?copy(map[ref]):null;},
     apply:function(value){
-      if(retired)return;var next=Object.create(null);
+      if(retired)return;
+      // A past day is on screen: this evidence waits for the return to Live.
+      if(over){over.held=true;over.value=value;return;}
       if(editor)editor.rememberMap(value);
-      Object.keys(value || {}).forEach(function(key){
-        var entry=value[key];if(!trackingKeyPattern.test(key) || !entry || LIVE_STATUS_STATES.indexOf(entry.state)<0)return;
-        var item={state:entry.state};if(['initiative','epic','story'].indexOf(entry.kind)>=0)item.kind=entry.kind;
-        if(Array.isArray(entry.initiatives))item.initiatives=entry.initiatives.filter(function(key,index,all){return typeof key==='string' && trackingKeyPattern.test(key) && all.indexOf(key)===index;});
-        ['title','assignee','assigneeId','detail','updatedAt','epic','parent','lane'].forEach(function(field){if(typeof entry[field]==='string')item[field]=entry[field];});
-        var url=deltaLinkUrl(entry.url);if(url)item.url=url;
-        var links=liveStatusPRLinks(entry.prs && entry.prs.links);
-        if(Array.isArray(entry.dependsOn)){var deps=[];entry.dependsOn.forEach(function(dep){
-          if(!dep || typeof dep!=='object' || typeof dep.key!=='string' || !trackingKeyPattern.test(dep.key) || ['jira','authored'].indexOf(dep.source)<0)return;
-          var link={key:dep.key,source:dep.source};if(typeof dep.linkType==='string' && dep.linkType)link.linkType=dep.linkType;if(typeof dep.reason==='string' && dep.reason)link.reason=dep.reason;deps.push(link);
-        });if(deps.length)item.dependsOn=deps;}
-        if(entry.prs && typeof entry.prs.count==='number' && isFinite(entry.prs.count) && entry.prs.count>=0 && ['open','merged','declined'].indexOf(entry.prs.state)>=0)item.prs={count:entry.prs.count,state:entry.prs.state};
-        else if(links.length)item.prs=liveStatusPRSummary(links);
-        if(links.length)item.prs.links=links;
-        next[key]=item;
-      });
+      var next=cleanMap(value);
       // Cache age describes the lookup, independently of issue modification
       // times. Preserve it before filtering the map down to ticket entries.
       var storedAt=value && value.storedAt;
@@ -1220,7 +1269,21 @@ function createLiveStatus(ctl,page,options,renderOptions){
       activity=activity.slice(0,20);Object.keys(next).forEach(function(key){seenKeys[key]=true;});
       map=next;applied=true;availabilityOn=true;paint();notify();
     },
-    clear:function(){if(retired)return;availabilityOn=false;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();},
+    setHistory:function(source){if(retired)return;if(over)overClose();overRequest++;overLoading=false;overError='';overSource=source && typeof source.load==='function'?source:null;notify();},
+    // The reader's click is the only thing that loads history.
+    overTime:function(){
+      if(retired || overLoading || over)return;
+      if(!overSource || !applied || !Object.keys(map).length || editing())return;
+      var request=++overRequest;overLoading=true;overError='';overProgress='';notify();
+      Promise.resolve().then(function(){return overSource.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result);},function(){overLoad(request,null);});
+    },
+    overTimeClose:function(){if(!retired && over)overClose();},
+    overTimeDay:function(index){
+      if(retired || !over || typeof index!=='number' || !isFinite(index) || Math.floor(index)!==index)return;
+      index=Math.max(0,Math.min(over.days.length-1,index));if(index===over.index)return;
+      over.index=index;if(overSource.day)overSource.day(index);overShow();
+    },
+    clear:function(){if(retired)return;overRequest++;overLoading=false;overError='';if(over){over=null;if(overSource.close)overSource.close();}availabilityOn=false;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();},
     enabled:function(){return on;},
     setEnabled:function(value){if(retired)return;on=!!value;if(on)availabilityOn=true;paint();notify();},
     onDestroy:function(fn){if(typeof fn!=='function')return function(){};if(retired){fn();return function(){};}destroyListeners.push(fn);return function(){var i=destroyListeners.indexOf(fn);if(i>=0)destroyListeners.splice(i,1);};},
@@ -1229,7 +1292,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     action:function(label,fn){if(retired)return;actionLabel=typeof label==='string'?label:'';actionFn=actionLabel && typeof fn==='function'?fn:null;notify();},
     setDemoControls:function(value){if(retired)return;demoControls=value;notify();},
     status:function(value){setStatus(value);},
-    editStart:function(){if(!retired && editor)editor.start();},
+    editStart:function(){if(!retired && editor && !over)editor.start();},
     editDone:function(){if(!retired && editor)editor.done();},
     editSave:function(){if(!retired && editor)editor.save();},
     editDiscard:function(){if(!retired && editor)editor.discard();},

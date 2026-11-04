@@ -589,6 +589,81 @@ example's `DOOR-100` gains `UX-90`, “Alert sound setting”, in the APP lane o
 It is never assigned to a carrier. Without an embedded timeline, four days are synthesized
 from the page's ticket keys: todo, active, one blocker, then all done.
 
+## Over time
+
+Over time lets a reader move through past days on a board. It overlays each
+ticket's status for the chosen day on the current diagram. The diagram is not a
+historical version: its structure, the list of stories, titles, owners, PR icons
+and dependency links all stay as of today. Authors set nothing, and no spec field
+is involved.
+
+**Using it.** **Live** and **Over time** are the two modes, side by side at the
+start of the Live status panel's header. The selected one is filled: blue for
+Live, amber for Over time. Over time appears once ticket status has loaded and a
+history source exists. Clicking it loads history, shows progress on the button,
+then adds a thin amber-tinted slider row to the panel. Clicking **Live** returns
+to today; while Live is already selected, clicking it turns colors off as it
+always has, and Over time turns them back on. The slider moves one whole day at a
+time by pointer or arrow keys, and Home and End jump to the first and last day. Each day repaints
+nodes and edges (local and imported), step coins and captions, lane rollups,
+panel counts, the progress ring, blockers, the Tickets table State column and
+planned-node treatment.
+
+**Day range and day status.** The first day is the day the oldest ticket was
+created. The last day is today while any ticket is open, or the day the last
+ticket reached Done once all are Done. A day's status is the ticket's status at
+the end of that day in the viewer's local time. A day with no change keeps the
+previous day's status. Blocked uses the same rule as the live board: flagged as
+an impediment, or a status name containing "block". Parents roll up from their
+children, so they need no history calls. The last day is exactly the live map.
+
+**Before a ticket existed.** The ticket shows **No status** with no red, keeps
+its title and row, and stays in the total, so the total is the same on every day.
+It is never counted as done, a ticket that depends on it waits with a grey tone
+and does not report it as Missing, and a ticket with no status does not itself
+wait. A ticket missing today (deleted, renamed, or no permission) has no history:
+it shows No status on past days and does not stop other tickets from loading.
+
+**While a past day shows.** Live refresh keeps running but does not change the
+display. Returning to **Live** applies the newest live status as a normal refresh,
+including anything that changed meanwhile. Moving the slider adds nothing to
+Activity, causes no change pulse and shows no "no activity N d" mark. The Edit
+button is disabled with a stated reason, Over time is disabled while Edit mode
+is active, and the saved spec never changes.
+
+**History source and call cost.** Only a click loads history, as one batch of
+one-shot `callTool` calls. Nothing polls, and no history call happens at page
+load or on a refresh. The batch runs at most six calls at once: one
+`listJiraStatuses`, one `searchJiraIssuesUsingJql` per ten tickets for `created`
+and `status`, and `listJiraIssueChangelogs` for each ticket, following every page.
+A 100-ticket board costs about 111 calls on a first click for each viewer. Each
+result is cached for 7 days for that viewer and artifact. A later click reads the
+cache and calls Jira again only for a ticket whose live `updated` time is newer
+than its cached result. The runtime cache is best-effort and size-bounded, and an
+older claude.ai shell keeps results for less time or not at all, so a repeat click
+can cost the full batch.
+
+If any call fails, the board stays on today, the panel says history could not
+load, and the button can be clicked again. A partial history is never shown.
+
+**Where it appears.** A claude.ai board needs a connector that offers both
+history tools and a page that declares them, so a board published before this
+feature must be republished to get it. On `#live=demo` the button uses the
+embedded timeline's days, or the four synthesized days, with no network calls.
+The slider and **Next day** share one current day: opening Over time or moving
+the slider pauses Play, Play and Next day carry on from the slider's day, and
+Live returns to the day Play or Next day reached. There the timeline's
+last day supplies titles and the story list, so the total stays the same. There
+is no button on host-provider pages or in Workbench preview.
+
+The output of `listJiraIssueChangelogs` and `listJiraStatuses` has not been
+captured from a real connector. The adapter accepts the public Jira REST shapes
+and the mock server serves one of them. Atlassian lists these tools for Rovo MCP
+v2, where most tools are deferred, so a real connector may not list them; the
+board then shows no button. The status list is required because a changelog item
+names a status but not its category. Past-day Blocked from Flagged assumes
+Flagged changes appear in the changelog.
+
 ## Dependencies
 
 Edge direction is data flow and infers nothing about delivery. A dependency is
@@ -660,7 +735,7 @@ Settings → Connectors, together with the two Jira tools and the comments
 capability. For Atlassian's own connector that is:
 
 ```js
-capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]}, comments: {"composer_only": true, "customAnchors": true}}
+capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "listJiraIssueChangelogs", "listJiraStatuses"]}]}, comments: {"composer_only": true, "customAnchors": true}}
 ```
 
 For a custom connector (for example the mock server installed as
@@ -697,6 +772,10 @@ Jira status determines colors;
 Development PR summaries, when returned, are informational. All tool calls go
 through `window.claude.use("mcp")`; the artifact never fetches Jira directly.
 
+Clicking **Over time** adds `listJiraIssueChangelogs` and `listJiraStatuses`
+calls; see [Over time](#over-time). A connector without them still paints live
+status.
+
 Without the connector, viewers see “Add the Atlassian connector in claude.ai
 Settings → Connectors to see live ticket status.” If approval is needed, the
 **Allow Jira** button makes one explicit retry. Account and policy errors clear
@@ -717,7 +796,7 @@ GitHub connector described next; declare it as a second `servers` entry:
 
 ```js
 capabilities: {mcp: {servers: [
-  {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]},
+  {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "listJiraIssueChangelogs", "listJiraStatuses"]},
   {server: "GitHub", tools: ["search_pull_requests", "pull_request_read"]}
 ]}, comments: {"composer_only": true, "customAnchors": true}}
 ```
@@ -770,7 +849,7 @@ board's Edit mode needs; single-file tracked pages keep the declaration above,
 untracked pages stay comments-only:
 
 ```js
-capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]},
+capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "listJiraIssueChangelogs", "listJiraStatuses"]}]},
   comments: {"composer_only": true, "customAnchors": true}, artifact: {}, user: {scopes: ["profile"]}}
 ```
 

@@ -252,6 +252,41 @@ GitHub detail that may colour that icon (open, draft, merged, closed, checks,
 review) stays on the icon and in its tooltip. Jira's Development summary is
 informational; neither determines a carrier's status or color.
 
+### Proof verdicts
+
+Jira says whether the work is done. Telemetry says whether the carrier carries
+healthy production traffic. `src/core/proof.js` combines the Jira map with a
+telemetry map into one verdict per carrier. It is pure: no DOM, timers or clock,
+and the spec never stores samples or verdicts. Its header documents the three
+input shapes; the page-reading wrapper, overlay and panel build on it.
+
+| Jira \ telemetry | silent | flowing, healthy | degraded | unobserved |
+| --- | --- | --- | --- | --- |
+| `done` | DONE · UNPROVEN | **PROVEN** | DONE · DEGRADED | DONE |
+| `active` | IN PROGRESS | IN PROGRESS · LIVE EARLY | IN PROGRESS · FAILING | IN PROGRESS |
+| `todo` | TODO | TODO · ALREADY LIVE | TODO · FAILING | TODO |
+| `blocked`, `missing` | Jira state kept | Jira state kept | Jira state kept | Jira state kept |
+| no tickets | SILENT | HEALTHY | DEGRADED | no verdict |
+
+Linked tickets without Jira evidence give no verdict, as they give no paint.
+Three states keep the claims honest:
+
+- **Unbound.** The carrier names no signals. It never gets a verdict and is
+  counted separately; only bound carriers enter the proof denominator.
+- **Unobserved.** The carrier is bound but no sample has arrived, or a limit
+  still waits for its data. The verdict keeps the Jira state and claims nothing.
+- **Silent.** Every rate-like signal returned 0 across the window. That means no
+  traffic was observed, never that the path does not exist.
+
+A signal is healthy when its `proof` limit holds: `min` (value ≥ min), `max`
+(value ≤ max) or `maxRatioOf` another signal (value ÷ other ≤ max). Rate-like
+signals are those with a `min`, either side of a `maxRatioOf` ratio, or a
+per-time unit such as `req/h`. Degraded means a limit fails while traffic flows.
+Rollups count bound carriers as proven, degraded (including FAILING), unproven
+and live early (including ALREADY LIVE). A step takes the live-status rollup of
+its directly selected carriers' Jira states, then the worst telemetry state
+(degraded, silent, unobserved, flowing), joined by the same matrix.
+
 ## Compatibility
 
 The capability is `flow.live-status`, introduced in Flowview 0.2.0. Non-empty

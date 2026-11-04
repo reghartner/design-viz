@@ -11,6 +11,7 @@
     "core/paths.js",
     "core/design-review.js",
     "core/story-time.js",
+    "core/proof.js",
     "core/section-layout.js",
     "core/state.js",
     "core/visibility-evidence.js",

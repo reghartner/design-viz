@@ -326,8 +326,9 @@ On desktop, right-click blank diagram or Explore canvas space to open **Add** at
 ### Compare device properties and UX icons
 
 Choose **Add → Panel… → Truth table** on desktop. In Inspect, edit **Properties**
-for column headers and **Column kind** (`value` or `icons`), then **Cases and UX
-icons** for typed values and each case’s independent icon cells. Add multiple
+for column headers and **Column kind** (**value (default)** or `icons`), then **Cases
+and UX icons**: one card per case holds its typed values, each value’s type beside
+it, and that case’s independent icon cells. Add multiple
 icon columns, such as Power icon and Battery icons. The visual picker uses the shared icon library; multiple outputs
 appear together in each cell, and removing all outputs displays **No icons**. Open
 **Starting state** to choose the initial **Active case**. Step controls can

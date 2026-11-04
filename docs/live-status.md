@@ -703,6 +703,15 @@ serves the same timeline's pull requests through `search_pull_requests` and
 review without a GitHub account. Install it as a second custom connector and
 declare its name beside the Jira one.
 
+The [mock Grafana MCP server](../deploy/cloudflare/mock-grafana-mcp/README.md)
+serves fictional production telemetry on the same timeline through Grafana's
+MCP tool names (`query_prometheus`, `query_loki_logs`, `search_tempo_traces`,
+`get_tempo_trace`, `get_annotations`, `generate_deeplink`, `list_datasources`).
+Traffic starts two hours after a carrier's tickets turn Done; the event edge
+degrades after a Day 10 firmware deploy annotation, the route queue lags on
+Day 11, and the push edge stays silent after Done. Its README lists the metric
+names, Loki streams and datasource UIDs it recognizes.
+
 ## Demo mode
 
 Open the [built story](../examples/live-status/live-status.html#live=demo) with

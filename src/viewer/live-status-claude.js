@@ -140,6 +140,67 @@ function liveStatusHistoryDays(input){
   }
   return {days:days,index:days.length-1};
 }
+var LIVE_STATUS_HISTORY_TOOLS=['listJiraIssueChangelogs','listJiraStatuses'],LIVE_STATUS_HISTORY_CACHE_MS=604800000,LIVE_STATUS_HISTORY_CALLS=6,LIVE_STATUS_HISTORY_PAGES=100;
+/* One batch of one-shot calls, made only by the reader's click: callTool, never watchTool, so nothing polls.
+   Each result is cached for 7 days per viewer and artifact. A cached changelog older than the ticket's live
+   `updated` time is fetched again, so a repeat click costs one call for each changed ticket. Any failure
+   rejects the whole batch: a partial history is never shown. */
+function liveStatusHistoryLoad(context,progress){
+  var mcp=context.mcp,server=context.server,cloudId=context.cloudId,today=context.today,cache={staleTime:LIVE_STATUS_HISTORY_CACHE_MS,gcTime:LIVE_STATUS_HISTORY_CACHE_MS};
+  var keys=Object.keys(today).filter(function(key){var entry=today[key];return entry.state!=='missing' && entry.kind!=='epic' && entry.kind!=='initiative';});
+  function call(tool,input,refresh){return mcp.callTool(server,tool,input,{cache:refresh?Object.assign({},cache,{refresh:true}):cache});}
+  function pool(items,work){
+    var next=0,failed=false,workers=[];
+    function worker(){
+      if(failed || next>=items.length)return Promise.resolve();
+      return work(items[next++]).then(worker,function(error){failed=true;throw error;});
+    }
+    for(var i=0;i<Math.min(LIVE_STATUS_HISTORY_CALLS,items.length);i++)workers.push(worker());
+    return Promise.all(workers);
+  }
+  function changelog(key){
+    var updated=Date.parse(today[key].updatedAt),changes=[],seen=Object.create(null),pages=0;
+    function page(token){
+      var input={cloudId:cloudId,issueIdOrKey:key};if(token)input.nextPageToken=token;
+      return call('listJiraIssueChangelogs',input).then(function(result){
+        var stored=result && result.cache && result.cache.storedAt;
+        return typeof stored==='number' && updated>stored?call('listJiraIssueChangelogs',input,true):result;
+      }).then(function(result){
+        var payload=result && result.payload,info=payload && payload.pageInfo,cursor=payload && payload.nextPageToken || info && info.hasNextPage && info.endCursor;
+        changes=changes.concat(liveStatusHistoryChanges(payload));
+        if(cursor){
+          if(seen[cursor] || ++pages>=LIVE_STATUS_HISTORY_PAGES)throw new Error('Jira repeated a history page');
+          seen[cursor]=true;return page(cursor);
+        }
+        if(payload && (payload.isLast===false || info && info.hasNextPage))throw new Error('Jira has more history with no cursor');
+        return changes;
+      });
+    }
+    return page(null);
+  }
+  var issues=Object.create(null),categories,tickets=[],finished=0;
+  progress(0,keys.length);
+  return call('listJiraStatuses',{cloudId:cloudId}).then(function(result){
+    categories=liveStatusHistoryCategories(result && result.payload);
+    if(!Object.keys(categories).length)throw new Error('Jira listed no statuses');
+    return pool(liveStatusJiraChunks(keys),function(chunk){
+      return call('searchJiraIssuesUsingJql',{cloudId:cloudId,jql:'key in ('+chunk.join(', ')+')',fields:['created','status']}).then(function(found){
+        liveStatusJiraIssues(found && found.payload).forEach(function(issue){if(issue && typeof issue.key==='string')issues[issue.key]=issue;});
+      });
+    });
+  }).then(function(){
+    return pool(keys,function(key){
+      return changelog(key).then(function(changes){
+        var issue=issues[key],fields=issue && issue.fields || {},live=context.issues[key],created=Date.parse(fields.created),status=(live && live.fields && live.fields.status || fields.status || {}).name;
+        if(!isFinite(created) || typeof status!=='string')throw new Error('Jira gave no creation time for '+key);
+        tickets.push({key:key,created:created,status:status,flagged:!!context.flagged[key],changes:changes});
+        progress(++finished,keys.length);
+      });
+    });
+  }).then(function(){
+    return liveStatusHistoryDays({tickets:tickets,today:today,categories:categories,now:Date.now()});
+  });
+}
 function liveStatusJiraChunks(keys){
   var chunks=[];for(var i=0;i<keys.length;i+=10)chunks.push(keys.slice(i,i+10));return chunks;
 }
@@ -392,7 +453,7 @@ function wireLiveStatusClaude(ctl,page,win){
     removeWaitingDestroy=api.onDestroy(stopWaiting);
     return null;
   }
-  var stopped=false,mcp=null,server=null,site='',cloudId=null,chunks=[],jobs=[],subscriptions=[],timers=[];
+  var stopped=false,mcp=null,server=null,site='',cloudId=null,chunks=[],jobs=[],subscriptions=[],timers=[],historyOffered=false;
   var syncing=false,resync=false,linkTypes=typeof trackingDependencyLinks==='function'?trackingDependencyLinks(page):null;
   var dirty=false,publishing=false,removeChange=null,removeDestroy=null,github=null;
   var addConnector='Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.';
@@ -404,6 +465,7 @@ function wireLiveStatusClaude(ctl,page,win){
   function unsubscribe(value){try{if(typeof value==='function')value();else if(value && typeof value.unsubscribe==='function')value.unsubscribe();}catch(ex){}}
   function stop(){
     if(stopped)return;stopped=true;if(github)github.stop();
+    if(typeof api.setHistory==='function')api.setHistory(null);
     subscriptions.splice(0).forEach(unsubscribe);timers.splice(0).forEach(function(id){win.clearTimeout(id);});
     if(removeChange)removeChange();if(removeDestroy)removeDestroy();
   }
@@ -601,6 +663,15 @@ function wireLiveStatusClaude(ctl,page,win){
     var resource=desired?list.filter(function(item){return item && host(item.url) && host(item.url)===host(desired);})[0]:list[0];
     if(!resource || !resource.id){api.note('No Atlassian site is available to this account.','warn');status({state:'disconnected',busy:false});stop();return;}
     site=resource.url;cloudId=resource.id;syncWatches();status({busy:busy()});
+    if(historyOffered)api.setHistory({load:function(progress){
+      if(stopped)return Promise.reject(new Error('Jira connection ended'));
+      var issues=Object.create(null),flagged=Object.create(null);
+      chunks.forEach(function(chunk){
+        (chunk.issues || []).forEach(function(issue){if(issue && issue.key)issues[issue.key]=issue;});
+        (chunk.flagged || []).forEach(function(issue){if(issue && issue.key)flagged[issue.key]=true;});
+      });
+      return liveStatusHistoryLoad({mcp:mcp,server:server,cloudId:cloudId,today:api.snapshot().states,issues:issues,flagged:flagged},progress);
+    }});
   }
   var pending;
   try{pending=use.call(claude,'mcp');}catch(ex){status({state:'disconnected',busy:false});return null;}
@@ -628,6 +699,12 @@ function wireLiveStatusClaude(ctl,page,win){
       ['Atlassian MCP','Atlassian'].some(function(name){if(qualified.indexOf(name)>=0)server=name;return !!server;});
       if(!server && qualified.length)server=qualified[0];
       if(!server){api.note(addConnector,'info');status({state:'disconnected',busy:false});stop();return null;}
+      // Over time needs both history tools. A connector without them keeps today's board and shows no button.
+      listed.forEach(function(candidate){
+        if(!candidate || (candidate.server || candidate.name)!==server || !Array.isArray(candidate.tools))return;
+        var offered=candidate.tools.map(function(tool){return typeof tool==='string'?tool:tool && tool.name;});
+        historyOffered=LIVE_STATUS_HISTORY_TOOLS.every(function(tool){return offered.indexOf(tool)>=0;});
+      });
       // GitHub is optional and also chosen by offered tools. "GitHub" is only a tie-break.
       var githubServers=[];
       listed.forEach(function(candidate){

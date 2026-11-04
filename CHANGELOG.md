@@ -1,5 +1,17 @@
 # Changelog
 
+## Live status Over time (2026-11-03)
+
+- Readers can move a slider through past days on a Live status board and see each
+  ticket's status on that day, overlaid on the current diagram (#929). The Over
+  time button in the Live status panel loads history as one batch on the click;
+  nothing polls, and results are cached for 7 days per viewer. It works on
+  claude.ai boards through a connector that offers `listJiraIssueChangelogs` and
+  `listJiraStatuses`, and on `#live=demo`. `tools/inject.py` now declares both
+  tools, so a board published earlier must be republished to get the button. The
+  mock Atlassian server serves both tools and a `created` field. Host providers
+  are unchanged.
+
 ## Live status connector refresh (2026-11-03)
 
 - Live status boards published as claude.ai artifacts now re-read the Jira and

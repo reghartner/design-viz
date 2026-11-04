@@ -27,6 +27,7 @@
 | L6 a local copy missing live entries is refused | live has an entry local lacks | status not-pulled; CLI exit 3 | an impl that logs over unmerged board edits |
 | L7 no difference, no entry | local equals live | status unchanged, text identical | an impl appending an empty entry |
 | L8 the 200-entry cap | 200 old entries | 200 after log, the oldest gone, the new entry last | an impl growing the list past the cap |
+| L9 (diff review c1) placing a ticket that a recent board edit took off the board is a conflict | agent entry 10:00; Bo removed CC-1 from edge 0 at 11:00; local assigns CC-1 to gamma | status conflict, conflicts[0] ticket CC-1, message names Bo; with confirm [CC-1] → logged | a check limited to the carriers the board edit named |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {spawnSync}=require('node:child_process');
@@ -285,4 +286,13 @@ test('L8 the history keeps the newest 200 entries',()=>{
  const {live,local}=pulled(null,old,spec=>{d(spec).nodes.delta={title:'Delta'};});
  const history=JSON.parse(S().log(local,live,{by:'Chuck',now:NOW}).text).page.editHistory;
  assert.equal(history.length,200);assert.equal(history[0].summary,'Step 1');assert.equal(history[199].summary,'Added 1 node');
+});
+
+test('L9 placing a ticket that a board edit after the newest agent entry took off the board needs the author to confirm',()=>{
+ const bo=entry('2026-11-03T11:00:00Z','Bo',[edgeChange('remove','CC-1',EDGE(0),'alpha','beta','Alpha service → Beta service')]);
+ const {live,local}=pulled(s=>{delete d(s).edges[0].tickets;},[agentEntry('2026-11-03T10:00:00Z','Initial board'),bo],spec=>{d(spec).nodes.gamma.tickets=['CC-1'];});
+ const out=S().log(local,live,{by:'Chuck',now:NOW});
+ assert.equal(out.status,'conflict');assert.equal(out.conflicts.length,1);assert.equal(out.conflicts[0].ticket,'CC-1');
+ assert.ok(out.conflicts[0].message.includes('Bo'),out.conflicts[0].message);
+ assert.equal(S().log(local,live,{by:'Chuck',now:NOW,confirm:['CC-1']}).status,'logged');
 });

@@ -571,7 +571,7 @@ test('P3 P4 connector preference, site host, resource cache and unavailable note
 });
 test('P5 P7 watches omit unanswered chunks, preserve cache age, pause applies and dispose',async()=>{
  const keys=Array.from({length:25},(_,i)=>'AA-'+i),h=providerHarness({nodes:{a:{tickets:keys}},rows:[['a']]});await h.start();assert.equal(h.watches.length,6);
- for(let i=0;i<6;i++){const w=h.watches[i];assert.equal(w.tool,'searchJiraIssuesUsingJql');assert.equal(w.input.maxResults,10);assert.deepEqual(w.input.fields,['summary','status','assignee','updated','issuelinks','parent','issuetype']);assert.deepEqual(w.opts,{refetchInterval:60000});assert.equal(w.input.jql,'key in ('+keys.slice(Math.floor(i/2)*10,Math.floor(i/2)*10+10).join(', ')+')'+(i%2?' AND Flagged = Impediment':''));}
+ for(let i=0;i<6;i++){const w=h.watches[i];assert.equal(w.tool,'searchJiraIssuesUsingJql');assert.equal(w.input.maxResults,10);assert.deepEqual(w.input.fields,['summary','status','assignee','updated','issuelinks','parent','issuetype']);assert.deepEqual(w.opts,{refetchInterval:300000});assert.equal(w.input.jql,'key in ('+keys.slice(Math.floor(i/2)*10,Math.floor(i/2)*10+10).join(', ')+')'+(i%2?' AND Flagged = Impediment':''));}
  h.data(0,[jira('AA-0')]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'active');assert.equal(h.ctl.liveStatus.state('AA-1').state,'missing');assert.equal(h.ctl.liveStatus.state('AA-10'),null);
  assert.equal(h.ctl.liveStatus.state('AA-0').updatedAt,'2026-10-20T09:00:00Z');assert.equal(h.ctl.liveStatus.snapshot().updatedAt,new Date(1793000000000).toISOString());assert.equal(h.view.querySelector('time'),null);
  h.data(1,[jira('AA-0')]);assert.equal(h.ctl.liveStatus.state('AA-0').state,'blocked');
@@ -1276,7 +1276,7 @@ test('G3 search scopes use separate repo queries org or authored repos only and 
  for(const [scope,expected,authored] of [[{repos:['acme/a','acme/b'],org:'ignored'},[' repo:acme/a',' repo:acme/b'],true],[{org:'acme'},[' org:acme'],true],[undefined,[' repo:acme/firmware'],true],[undefined,[],false]]){
   const raw=ghFixture();raw.page.tracking.github=scope;if(!authored)for(const node of Object.values(raw.page.sections[0].diagram.nodes))delete node.prs;
   const h=githubHarness(raw);await h.start();const watches=h.github().filter(w=>w.tool==='search_pull_requests');assert.deepEqual(watches.filter(w=>w.input.query.startsWith('"AA-1"')).map(w=>w.input.query),expected.map(s=>'"AA-1" in:title,body'+s));
-  if(expected.length){assert.ok(watches.length);for(const w of watches){assert.equal(w.input.perPage,20);assert.deepEqual(w.input.fields,GH_FIELDS);assert.deepEqual(w.opts,{refetchInterval:60000});}}
+  if(expected.length){assert.ok(watches.length);for(const w of watches){assert.equal(w.input.perPage,20);assert.deepEqual(w.input.fields,GH_FIELDS);assert.deepEqual(w.opts,{refetchInterval:300000});}}
   h.ctl.liveStatus.destroy();
  }
  const h=githubHarness();await h.start();h.data(0,[jira('AA-1')]);h.deliver(h.search('AA-1'),{items:[searchPR(755,'closed',{pull_request:{html_url:ghURL(755),merged_at:'2026-10-27T10:00:00Z'}}),searchPR(700,'open',{draft:true}),searchPR(701,'closed'),searchPR(743)]});
@@ -1331,9 +1331,9 @@ test('G8 GitHub rate-limit tool error retries once preserves PR evidence keeps n
  w.handler({type:'error',error:{code:'blocked_by_policy'}});assert.equal(h.ctl.liveStatus.state('AA-1').state,'active');assert.equal(h.timers.size,0);assert.equal(h.ghConnection().getAttribute('data-state'),'disconnected');assert.equal(h.ghConnection().textContent,'GitHub not connected');
  await settle();assert.ok(h.github().every(w=>w.stopped===1),'policy answers retire every GitHub watch');assert.deepEqual(plain(h.ctl.liveStatus.state('AA-1').prs),before,'evidence already shown stays');h.ctl.liveStatus.destroy();
 });
-test('G8 queues GitHub watches at ten rotates fairly at 60 seconds and retires late callbacks',async()=>{
+test('G8 queues GitHub watches at ten rotates fairly at 5 minutes and retires late callbacks',async()=>{
  const raw=ghFixture();raw.page.sections[0].diagram.nodes={a:{tickets:Array.from({length:25},(_,i)=>'AA-'+i)}};const h=githubHarness(raw);await h.start();assert.equal(h.github().filter(w=>!w.stopped).length,10);assert.equal(h.github().length,10);
- for(let i=0;i<3;i++){const timer=[...h.timers.entries()].find(([,t])=>t.ms===60000);assert.ok(timer);h.timers.delete(timer[0]);timer[1].fn();await settle();assert.ok(h.github().filter(w=>!w.stopped).length<=10);}
+ for(let i=0;i<3;i++){const timer=[...h.timers.entries()].find(([,t])=>t.ms===300000);assert.ok(timer);h.timers.delete(timer[0]);timer[1].fn();await settle();assert.ok(h.github().filter(w=>!w.stopped).length<=10);}
  assert.equal(new Set(h.github().map(w=>w.input.query)).size,25,'queued tickets must eventually be watched');h.ctl.liveStatus.destroy();await settle();assert.ok(h.github().every(w=>w.stopped===1));assert.equal(h.timers.size,0);h.deliver(h.github()[0],{items:[searchPR(742)]});assert.equal(h.ctl.liveStatus.state('AA-0'),null);
 });
 test('G9 demo links survive mapping and G10 G12 docs scope and rebuilt example expose GitHub enrichment',()=>{

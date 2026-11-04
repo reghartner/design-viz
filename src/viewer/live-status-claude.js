@@ -1,5 +1,7 @@
 /* Standalone claude.ai transport adapter. The overlay owns all rendering;
    the artifact MCP namespace owns networking, consent and watch polling. */
+// How often each connector watch re-reads while the page is visible, and how long a GitHub cohort stays subscribed.
+var LIVE_STATUS_REFETCH_MS=300000;
 function liveStatusJiraState(issue,flaggedKeys){
   var fields=issue && issue.fields || {},status=fields.status || {},key=issue && issue.key;
   var flagged=flaggedKeys && (typeof flaggedKeys.has==='function'?flaggedKeys.has(key):Array.isArray(flaggedKeys)?flaggedKeys.indexOf(key)>=0:flaggedKeys[key]);
@@ -196,7 +198,7 @@ function createLiveStatusGithub(mcp,server,page,api,win,events){
       var previous=active.splice(0);queue=queue.concat(previous);
       // Await asynchronous unsubscribe registrations before opening the next cohort.
       pumping=true;Promise.all(previous.map(retire)).then(function(){pumping=false;if(!stopped)pump();});
-    },60000);
+    },LIVE_STATUS_REFETCH_MS);
   }
   function fail(job,error,retry){
     if(stopped)return;
@@ -230,7 +232,7 @@ function createLiveStatusGithub(mcp,server,page,api,win,events){
           job.version++;
           if(event.type==='data')accept(job,event.result);
           else if(event.type==='error')fail(job,event.error,true);
-        },{refetchInterval:60000});}
+        },{refetchInterval:LIVE_STATUS_REFETCH_MS});}
         catch(error){fail(job,error,true);}
         job.registration=Promise.resolve(subscription);
         job.registration.then(function(value){if(stopped || !job.active || job.generation!==generation)off(value);},function(error){if(!stopped && job.active && job.generation===generation)fail(job,error,true);});
@@ -449,7 +451,7 @@ function wireLiveStatusClaude(ctl,page,win){
         job.version++;
         if(event.type==='data')accept(job,event.result);
         else if(event.type==='error')fail(job,event.error,true);
-      },{refetchInterval:60000});
+      },{refetchInterval:LIVE_STATUS_REFETCH_MS});
     }catch(error){fail(job,error,true);return;}
     // A synchronous initial event can retire the adapter before registration
     // returns; an asynchronous registration can finish after destroy as well.

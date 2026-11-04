@@ -7,8 +7,8 @@ import allDone from './fixtures/all-done.json' with { type: 'json' };
 const SITE = 'https://acme.atlassian.net';
 const EPOCH = Date.parse('2026-10-20T09:00:00Z');
 const DAY_MS = 86400000;
-// Small on purpose: at least one story ticket needs a second page, so clients must follow the cursor.
-const CHANGELOG_PAGE = 3;
+// Real connectors give numeric status ids; changelog items carry these, not categories.
+const STATUS_IDS = { 'To Do': '10000', 'In Progress': '10001', Blocked: '10002', Done: '10003' };
 const CATEGORIES = {
   todo: { key: 'new', name: 'To Do' },
   active: { key: 'indeterminate', name: 'In Progress' },
@@ -26,14 +26,8 @@ const TOOL_INPUTS = {
   getJiraIssue: {
     title: 'Get Jira issue', required: ['cloudId', 'issueIdOrKey'],
     properties: { cloudId: { type: 'string' }, issueIdOrKey: { type: 'string' },
-      fields: { type: 'array', items: { type: 'string' } } }
-  },
-  listJiraIssueChangelogs: {
-    title: 'List Jira issue changelogs', required: ['cloudId', 'issueIdOrKey'],
-    properties: { cloudId: { type: 'string' }, issueIdOrKey: { type: 'string' },
-      maxResults: { type: 'integer', minimum: 1 }, nextPageToken: { type: 'string' } }
-  },
-  listJiraStatuses: { title: 'List Jira statuses', required: ['cloudId'], properties: { cloudId: { type: 'string' } } }
+      fields: { type: 'array', items: { type: 'string' } }, expand: { type: 'string' } }
+  }
 };
 
 function unquote(value) {
@@ -49,6 +43,9 @@ function unquote(value) {
 // Deliberately small grammar. Null means unsupported; callers return no issues.
 export function parseJql(jql) {
   if (typeof jql !== 'string' || !jql.trim()) return null;
+  // The one ordered query the board sends: Over time's status lookup. Nothing else may carry ORDER BY.
+  const lookup = /^status\s*=\s*(\d+)\s+ORDER\s+BY\s+updated\s+DESC$/i.exec(jql.trim());
+  if (lookup) return { statusId: lookup[1] };
   const parsed = {};
   for (const clause of jql.trim().split(/\s+AND\s+/i)) {
     let match;
@@ -101,6 +98,9 @@ function issueLinks(entry, issues) {
   });
 }
 
+const statusName = entry => entry.statusName || (entry.state === 'blocked' ? 'Blocked' : (CATEGORIES[entry.state] || CATEGORIES.todo).name);
+const statusId = name => STATUS_IDS[name] || '10099';
+
 function epicState(epic, issues) {
   const children = Object.values(issues || {}).filter(entry => entry.epic === epic);
   return children.length && children.every(entry => entry.state === 'done') ? 'done'
@@ -134,7 +134,7 @@ export function jiraIssueFromStatus(key, entry, now = EPOCH, issues = null) {
     id: numericId.toString(), key,
     fields: {
       summary: entry.summary || key,
-      status: { name: entry.statusName || (entry.state === 'blocked' ? 'Blocked' : category.name), statusCategory: { ...category } },
+      status: { id: statusId(statusName(entry)), name: statusName(entry), statusCategory: { ...category } },
       assignee: entry.assignee ? { displayName: entry.assignee, ...(entry.assigneeId ? { accountId: entry.assigneeId } : {}) } : null,
       priority: { name: entry.priority || 'Medium' }, issuetype: { name: entry.issueType || 'Task' },
       ...(entry.epic ? { parent: { key: entry.epic, fields: { summary: 'Connected doorbell delivery', issuetype: { name: 'Epic' },
@@ -167,7 +167,6 @@ function issuesFor(env) {
 }
 
 const jiraTime = ms => new Date(ms).toISOString().replace('Z', '+0000');
-const statusName = entry => entry.statusName || (entry.state === 'blocked' ? 'Blocked' : (CATEGORIES[entry.state] || CATEGORIES.todo).name);
 const isFlagged = entry => !!(entry.flagged || entry.state === 'blocked');
 
 // A ticket is created on the first story day that names it.
@@ -176,33 +175,39 @@ function createdTime(key, env) {
   return jiraTime(EPOCH + Math.max(0, first) * DAY_MS);
 }
 
-// One entry for each day a ticket's status or Flagged value changed, up to the story's current day.
+// One entry for each day a ticket's status or Flagged value changed, up to the story's current day, newest first as Jira's expand gives them.
 function changelogFor(key, env) {
-  if ((env.scenario ?? 'story') !== 'story') return [];
-  const days = (env.timeline || story).days, last = storyIndex(env, days), entries = [];
-  let previous = null;
-  for (let index = 0; index <= last; index++) {
-    const entry = days[index].issues[key];
-    if (!entry) continue;
-    const items = [];
-    if (previous && statusName(previous) !== statusName(entry)) {
-      items.push({ field: 'status', fieldtype: 'jira', fromString: statusName(previous), toString: statusName(entry) });
+  const histories = [];
+  if ((env.scenario ?? 'story') === 'story') {
+    const days = (env.timeline || story).days, last = storyIndex(env, days);
+    let previous = null;
+    for (let index = 0; index <= last; index++) {
+      const entry = days[index].issues[key];
+      if (!entry) continue;
+      const items = [];
+      if (previous && statusName(previous) !== statusName(entry)) {
+        items.push({ field: 'status', fieldtype: 'jira', from: statusId(statusName(previous)), fromString: statusName(previous),
+          to: statusId(statusName(entry)), toString: statusName(entry) });
+      }
+      if (previous && isFlagged(previous) !== isFlagged(entry)) {
+        items.push({ field: 'Flagged', fieldtype: 'custom', from: null, fromString: isFlagged(previous) ? 'Impediment' : '', to: null, toString: isFlagged(entry) ? 'Impediment' : '' });
+      }
+      if (items.length) histories.unshift({ id: String(1000 + index), created: jiraTime(EPOCH + index * DAY_MS), items });
+      previous = entry;
     }
-    if (previous && isFlagged(previous) !== isFlagged(entry)) {
-      items.push({ field: 'Flagged', fieldtype: 'custom', fromString: isFlagged(previous) ? 'Impediment' : '', toString: isFlagged(entry) ? 'Impediment' : '' });
-    }
-    if (items.length) entries.push({ id: String(1000 + entries.length), created: jiraTime(EPOCH + index * DAY_MS), items });
-    previous = entry;
   }
-  return entries;
+  return { startAt: 0, maxResults: 100, total: histories.length, histories };
 }
 
-function storyStatuses(env) {
-  const found = new Map();
-  for (const day of (env.timeline || story).days) {
-    for (const entry of Object.values(day.issues)) found.set(statusName(entry), CATEGORIES[entry.state] || CATEGORIES.todo);
+// A status id search finds an issue on any story day, as Jira finds one anywhere in the site.
+function issueInStatus(id, env, issues) {
+  const days = (env.scenario ?? 'story') === 'story' ? (env.timeline || story).days : [{ issues }];
+  for (const day of days) {
+    for (const [key, entry] of Object.entries(day.issues)) {
+      if (statusId(statusName(entry)) === id) return jiraIssueFromStatus(key, entry, env.now, day.issues);
+    }
   }
-  return [...found].map(([name, category], index) => ({ id: String(10000 + index), name, statusCategory: { ...category } }));
+  return null;
 }
 
 function error(id, code, message) {
@@ -227,24 +232,18 @@ function toolResult(name, args, env, id) {
     }
     const issue = jiraIssueFromStatus(key, issues[key], env.now, issues);
     issue.fields.created = createdTime(key, env);
+    if ([].concat(args.expand ?? []).join(',').includes('changelog')) {
+      issue.changelog = changelogFor(key, env);
+      return { issues: { nodes: [issue] } };
+    }
     return { data: { appliedContentFormat: 'markdown', ...issue } };
   }
-  if (name === 'listJiraIssueChangelogs') {
-    const key = args.issueIdOrKey;
-    if (typeof key !== 'string' || !Object.hasOwn(issues, key)) {
-      return error(id, -32602, 'Issue does not exist or you do not have permission to see it.');
-    }
-    const entries = changelogFor(key, env);
-    const limit = typeof args.maxResults === 'number' && Number.isFinite(args.maxResults)
-      ? Math.max(1, Math.min(CHANGELOG_PAGE, Math.floor(args.maxResults))) : CHANGELOG_PAGE;
-    const offset = /^\d+$/.test(args.nextPageToken || '') ? Number(args.nextPageToken) : 0;
-    const values = entries.slice(offset, offset + limit), hasNextPage = offset + values.length < entries.length;
-    return { values, startAt: offset, maxResults: limit, total: entries.length, isLast: !hasNextPage,
-      pageInfo: { hasNextPage, endCursor: hasNextPage ? String(offset + values.length) : null } };
-  }
-  if (name === 'listJiraStatuses') return { values: storyStatuses(env), isLast: true };
   if (name === 'searchJiraIssuesUsingJql') {
     const parsed = parseJql(args.jql);
+    if (parsed?.statusId) {
+      const found = issueInStatus(parsed.statusId, env, issues);
+      return { issues: { nodes: found ? [found] : [], webUrl: SITE + '/issues/' }, pageInfo: { hasNextPage: false, endCursor: null } };
+    }
     const limit = typeof args.maxResults === 'number' && Number.isFinite(args.maxResults)
       ? Math.max(0, Math.min(100, Math.floor(args.maxResults))) : 50;
     // The viewer resolves parent metadata through the search tool too, so an

@@ -87,6 +87,15 @@ def custom_timeline():
     ]}
 
 
+def telemetry_block():
+    """#944: one day's telemetry, hourly values per carrier signal (null = no sample) and annotations."""
+    return {"start": "2026-10-20T00:00:00Z", "stepSeconds": 3600,
+            "carriers": {"a->b": {"rate": {"unit": "req/h", "values": [None, 0, 12.5]},
+                                  "errors": {"unit": "req/h", "values": [None, 0, 0.1]}},
+                         "b": {"lag": {"unit": "msgs", "values": [None, 3, 4]}}},
+            "annotations": [{"id": 1, "time": "2026-10-20T01:30:00Z", "text": "deploy 1.0", "tags": ["deploy"]}]}
+
+
 class InjectTests(unittest.TestCase):
     def test_non_example_spec_embeds_no_timeline_by_default(self):
         # #753: only the example spec ships the doorbell timeline by default; any other
@@ -179,6 +188,92 @@ class InjectTests(unittest.TestCase):
         r, out = run_inject(template, spec, ["--timeline", "{td}/absent.json"])
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("absent.json", r.stderr)
+
+    def test_timeline_telemetry_block_is_accepted_and_embedded_unchanged(self):
+        # #944: days[].telemetry (hourly carrier signals and annotations) rides the live-timeline block.
+        template = TEMPLATE + "<!-- LIVE_TIMELINE -->\n"
+        timeline = custom_timeline()
+        timeline["days"][0]["telemetry"] = telemetry_block()
+        minimal = telemetry_block()
+        del minimal["annotations"]
+        timeline["days"][1]["telemetry"] = minimal
+        r, out = run_inject(template, json.dumps(tracked_spec()), ["--timeline", "{td}/tl.json"],
+                            {"tl.json": json.dumps(timeline)})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        matches = TIMELINE_BLOCK.findall(out)
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(json.loads(matches[0]), timeline)
+
+    def test_timeline_telemetry_shape_is_validated(self):
+        template = TEMPLATE + "<!-- LIVE_TIMELINE -->\n"
+        spec = json.dumps(tracked_spec())
+
+        def with_block(change):
+            block = telemetry_block()
+            change(block)
+            timeline = custom_timeline()
+            timeline["days"][1]["telemetry"] = block
+            return timeline
+
+        def set_signal(block, key, value):
+            block["carriers"]["a->b"]["rate"][key] = value
+
+        not_an_object = custom_timeline()
+        not_an_object["days"][1]["telemetry"] = []
+        bad_cases = {
+            "days[1].telemetry must be an object": not_an_object,
+            "days[1].telemetry.start": with_block(lambda b: b.update(start="yesterday")),
+            "days[1].telemetry.stepSeconds": with_block(lambda b: b.update(stepSeconds=0)),
+            "days[1].telemetry.stepSeconds ": with_block(lambda b: b.update(stepSeconds=True)),
+            "days[1].telemetry.carriers": with_block(lambda b: b.pop("carriers")),
+            "days[1].telemetry.carriers.a->b": with_block(lambda b: b["carriers"].update({"a->b": []})),
+            "days[1].telemetry.carriers.a->b.rate": with_block(lambda b: b["carriers"]["a->b"].update(rate={"unit": "req/h"})),
+            "days[1].telemetry.carriers.a->b.rate.values": with_block(lambda b: set_signal(b, "values", [1, "2", None])),
+            "days[1].telemetry.carriers.a->b.rate.values ": with_block(lambda b: set_signal(b, "values", [1, True, None])),
+            "days[1].telemetry.carriers.a->b.rate.unit": with_block(lambda b: set_signal(b, "unit", 5)),
+            "days[1].telemetry.carriers.b.lag.values": with_block(lambda b: b["carriers"]["b"]["lag"].update(values=[1, 2])),
+            "days[1].telemetry.annotations": with_block(lambda b: b.update(annotations={"id": 1})),
+            "days[1].telemetry.annotations[0].time": with_block(lambda b: b["annotations"][0].update(time="soon")),
+            "days[1].telemetry.annotations[0].text": with_block(lambda b: b["annotations"][0].pop("text")),
+            "days[1].telemetry.annotations[0].tags": with_block(lambda b: b["annotations"][0].update(tags=["deploy", 3])),
+            "days[1].telemetry.colour": with_block(lambda b: b.update(colour="red")),
+        }
+        for path, timeline in bad_cases.items():
+            r, out = run_inject(template, spec, ["--timeline", "{td}/tl.json"],
+                                {"tl.json": json.dumps(timeline)})
+            self.assertNotEqual(r.returncode, 0, path)
+            self.assertIn("tl.json", r.stderr, path)
+            self.assertIn(path.strip(), r.stderr, path)
+            self.assertIsNone(out, path)
+
+    def test_timeline_telemetry_rejects_non_finite_values(self):
+        # json.loads accepts NaN and Infinity tokens; a browser's JSON.parse does not, so the
+        # injector must refuse them instead of embedding them.
+        template = TEMPLATE + "<!-- LIVE_TIMELINE -->\n"
+        spec = json.dumps(tracked_spec())
+        timeline = custom_timeline()
+        block = telemetry_block()
+        block["carriers"]["a->b"]["rate"]["values"] = [None, "__TOKEN__", 12.5]
+        timeline["days"][1]["telemetry"] = block
+        for token in ("NaN", "Infinity", "-Infinity"):
+            text = json.dumps(timeline).replace('"__TOKEN__"', token)
+            self.assertIn(token, text)
+            r, out = run_inject(template, spec, ["--timeline", "{td}/tl.json"], {"tl.json": text})
+            self.assertNotEqual(r.returncode, 0, token)
+            self.assertIn("tl.json", r.stderr, token)
+            self.assertIn("days[1].telemetry.carriers.a->b.rate.values", r.stderr, token)
+            self.assertIn("finite", r.stderr, token)
+            self.assertIsNone(out, token)
+
+    def test_example_timeline_carries_telemetry_on_every_day(self):
+        inject = load_inject()
+        timeline = inject.load_timeline(str(EXAMPLE_TIMELINE))
+        self.assertEqual(len(timeline["days"]), 12)
+        for index, day in enumerate(timeline["days"]):
+            self.assertIn("telemetry", day, f"days[{index}]")
+            self.assertTrue(day["telemetry"]["carriers"], f"days[{index}] carriers")
+        texts = [a["text"] for a in timeline["days"][9]["telemetry"]["annotations"]]
+        self.assertTrue(any("firmware 2.4.1" in text for text in texts), texts)
 
     def test_replaces_only_the_real_block(self):
         r, out = run_inject(TEMPLATE, json.dumps(SPEC))

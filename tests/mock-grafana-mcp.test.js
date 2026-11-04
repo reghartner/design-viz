@@ -17,7 +17,8 @@
 // G13 worker routes, batches, notifications, CORS and the per-IP rate limit (429).
 // G14 identity regexes and ignore rules (only the committed placeholder Worker name).
 // G15 timeline telemetry carriers exist in the example spec; README contract and tool signatures.
-// G16 the shared timeline's days[].telemetry block is the Worker's only source of series and annotations (#944 PR 2).
+// G16 the shared timeline is the Worker's only source: rewriting one carrier signal (or the Day 10 annotation)
+//     changes that answer alone, for every signal the example binds (#944 PR 2).
 // G17 every signal the example spec binds, sent through the Worker, returns the timeline's value for that hour.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -552,28 +553,62 @@ test('G15: timeline carriers exist in the example spec, and the README documents
   assert.match(read('deploy/cloudflare/README.md'), /mock-grafana-mcp/);
 });
 
-test('G16: the shared timeline telemetry block is the Worker\'s only source of series and annotations', async () => {
+// Every carrier signal the example spec binds, with the query that reads it through the Worker.
+function boundSignals() {
+  const d = diagram(), out = [];
+  const carriers = Object.entries(d.nodes).concat(d.edges.map(edge => [edge.from + '->' + edge.to, edge]));
+  for (const [id, carrier] of carriers) {
+    for (const [name, signal] of Object.entries(carrier.telemetry?.signals || {})) out.push({ id, name, signal });
+  }
+  return out;
+}
+// The Worker's whole answer for one bound signal across one story day, as text.
+async function dayAnswer({ signal }, context) {
+  if (signal.grafana) {
+    return JSON.stringify((await call('query_prometheus', { datasourceUid: PROM, expr: signal.grafana, startTime: 'now-24h', endTime: 'now', stepSeconds: 3600 }, context)).result);
+  }
+  return JSON.stringify((await call('query_loki_logs', { datasourceUid: LOKI, logql: signal.loki, startRfc3339: 'now-24h', endRfc3339: 'now', stepSeconds: 3600 }, context)).result);
+}
+async function allAnswers(signals, context) {
+  const out = {};
+  for (const bound of signals) out[bound.id + '.' + bound.name] = await dayAnswer(bound, context);
+  return out;
+}
+
+test('G16: the shared timeline is the Worker\'s only source: each carrier signal and the Day 10 annotation answer for themselves', async () => {
+  const signals = boundSignals();
+  const block = timeline().days[DAY12].telemetry;
+  assert.ok(block, 'the example timeline carries days[].telemetry');
+  // The table covers every carrier signal the timeline holds, and nothing else.
+  const served = Object.entries(block.carriers).flatMap(([id, entry]) => Object.keys(entry).map(name => id + '.' + name)).sort();
+  assert.deepEqual(signals.map(b => b.id + '.' + b.name).sort(), served);
+  const baseline = await allAnswers(signals, ctx(DAY12, { timeline: structuredClone(timeline()) }));
+  assert.deepEqual(baseline, await allAnswers(signals, ctx(DAY12)), 'a copy of the shared timeline answers like the shared timeline');
+  for (const target of signals) {
+    const key = target.id + '.' + target.name;
+    // Rewrite this one series on Day 12 to distinct numbers; only its own answer may change.
+    const custom = structuredClone(timeline());
+    custom.days[DAY12].telemetry.carriers[target.id][target.name].values = Array.from({ length: 24 }, (_, k) => 1000 + k);
+    const answers = await allAnswers(signals, ctx(DAY12, { timeline: custom }));
+    for (const [other, text] of Object.entries(answers)) {
+      if (other === key) assert.notEqual(text, baseline[other], key + ' answers from its own timeline series');
+      else assert.equal(text, baseline[other], other + ' is unchanged when only ' + key + ' changes');
+    }
+    if (target.signal.grafana) assert.equal(await instant(target.signal.grafana, ctx(DAY12, { timeline: custom })), 1023, key + ' at now');
+  }
+  // Rewrite the Day 10 deploy annotation: the annotation answer changes, no series answer does.
   const custom = structuredClone(timeline());
-  const day = custom.days[DAY12].telemetry;
-  assert.ok(day, 'the example timeline carries days[].telemetry');
-  // Rewrite the Day 12 event edge and its annotations; the Worker must serve exactly the rewrite.
-  day.carriers['mcu->ingest'].rate.values = Array(24).fill(77);
-  day.carriers['mcu->ingest'].errors.values = Array(24).fill(0);
-  day.carriers['mcu->ingest'].p95.values = Array(24).fill(123);
-  day.carriers['button->mcu'].rate.values = Array(24).fill(null);
-  day.annotations = [{ id: 99, time: '2026-10-31T12:00:00Z', text: 'custom marker', tags: ['deploy'] }];
-  const custom12 = ctx(DAY12, { timeline: custom });
-  assert.equal(await instant(Q.eventRate, custom12), 77);
-  assert.equal(await instant(Q.eventErrors, custom12), 0);
-  assert.equal(await instant(Q.eventP95, custom12), 123);
-  assert.equal(await instant(Q.ingestRate, custom12), 77, 'the ingest node sums the same request series');
-  assert.equal(await instant(Q.press, custom12), null, 'null values are absent samples');
-  const markers = payload(await call('get_annotations', {}, custom12)).Payload;
-  assert.ok(markers.some(a => a.id === 99 && a.text === 'custom marker' && a.time === Date.parse('2026-10-31T12:00:00Z')));
-  assert.ok(markers.some(a => /firmware 2\.4\.1/.test(a.text)), 'earlier days keep their annotations');
-  const failing = payload(await call('search_tempo_traces', { datasourceUid: TEMPO, query: '{ status = error }' }, custom12));
-  assert.deepEqual(failing.traces, [], 'a healthy hour has a healthy exemplar');
-  // A timeline without telemetry blocks serves no data at all.
+  const deploy = custom.days[DAY10].telemetry.annotations.find(a => /firmware 2\.4\.1/.test(a.text));
+  assert.ok(deploy, 'Day 10 carries the firmware 2.4.1 annotation');
+  deploy.text = 'firmware 9.9.9 rollout';
+  deploy.time = '2026-10-29T16:30:00Z';
+  const before = payload(await call('get_annotations', {}, ctx(DAY12))).Payload;
+  const after = payload(await call('get_annotations', {}, ctx(DAY12, { timeline: custom }))).Payload;
+  assert.deepEqual(after.find(a => a.id === deploy.id), { ...before.find(a => a.id === deploy.id), text: 'firmware 9.9.9 rollout',
+    time: Date.parse('2026-10-29T16:30:00Z'), timeEnd: Date.parse('2026-10-29T16:30:00Z'), created: Date.parse('2026-10-29T16:30:00Z'), updated: Date.parse('2026-10-29T16:30:00Z') });
+  assert.deepEqual(after.filter(a => a.id !== deploy.id), before.filter(a => a.id !== deploy.id));
+  assert.deepEqual(await allAnswers(signals, ctx(DAY12, { timeline: custom })), baseline, 'series answers ignore annotations');
+  // A timeline without telemetry blocks serves no data and no annotations.
   const bare = structuredClone(timeline());
   for (const d of bare.days) delete d.telemetry;
   assert.equal(await instant(Q.eventRate, ctx(DAY12, { timeline: bare })), null);

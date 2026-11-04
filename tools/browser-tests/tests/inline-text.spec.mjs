@@ -13,7 +13,8 @@
       'Start **first**' (Standard) / "Step controls placement" (Explore), absent before; no editor;
       #src unchanged | a click handler that opens the editor or stops selecting
    2 link and copy keep their actions | dblclick a.steplink, dblclick "Copy link to this diagram
-      step" | no editor; #src unchanged; the stubbed clipboard got this Workbench URL with s=start |
+      step" | no editor; #src unchanged; the link opened its (local) source page; the stubbed
+      clipboard got this Workbench URL with s=start |
       a handler keyed on the whole .stepline, or one that swallows the copy click
    P2 Inspect empty rule | Steps -> step 1 -> Inspect text cleared + Tab | steps[0] has no `text`
       (removed, not "") | (precondition for row 5)
@@ -39,6 +40,8 @@
    excluded — §0 ruling ("the ticket's Test + flip section, as written"): lane pill and step
       number double-click (named only in "How it should look"), node/edge/other entries
       (children #961-#971). */
+import {writeFile} from 'node:fs/promises';
+import path from 'node:path';
 import {test,expect,pastePage,closeTools,inspectPageElement} from '../helpers/test.mjs';
 const fixture=(explore=false)=>({page:{title:'Inline writing',skin:'pastel',sections:[{heading:'Notes',text:['Start here'],bullets:[{text:'Parent',revealAt:0,custom:'keep',sub:[{text:'Child',custom:true}]}],diagram:{nodes:{a:{title:'Existing',sub:'Keep details'}},rows:[['a']],steps:[{text:'First',nodes:['a']}],layouts:[{id:'main',name:'Main',presentation:explore?'explore':'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:14}]}}],defaultLayout:'main'}}]}});
 const input=page=>page.getByRole('textbox',{name:'Edit section text',exact:true});
@@ -93,15 +96,17 @@ test('new prose accepts direct typing and new node cancellation keeps its creati
  await page.locator('#diagram-add').click();await page.locator('#add-node').click();await page.locator('#diagram-add-presets').getByRole('button',{name:'Console',exact:true}).click();const created=await src.inputValue(),edit=page.getByRole('textbox',{name:'New node title',exact:true});await edit.pressSequentially('Discarded');await edit.press('Escape');await expect(src).toHaveValue(created);await expect(edit).toHaveCount(0);
 });
 
-const stepFixture=explore=>({page:{title:'Inline steps',skin:'pastel',sections:[{heading:'Notes',text:['Start here'],diagram:{view:'step',autoplay:false,
+const stepFixture=(explore,link)=>({page:{title:'Inline steps',skin:'pastel',sections:[{heading:'Notes',text:['Start here'],diagram:{view:'step',autoplay:false,
  nodes:{a:{title:'Alpha'},b:{title:'Beta'},c:{title:'Gamma'}},rows:[['a','b','c']],
- steps:[{id:'start',text:'Start **first**',nodes:['a'],link:'https://example.test/step-source'},{id:'alt',text:'Alternate start',nodes:['b']},{id:'shared',text:'Both paths finish here',nodes:['c']}],
+ steps:[{id:'start',text:'Start **first**',nodes:['a'],link},{id:'alt',text:'Alternate start',nodes:['b']},{id:'shared',text:'Both paths finish here',nodes:['c']}],
  paths:[{id:'main',label:'Main route',steps:['start','shared']},{id:'other',label:'Other route',steps:['alt','shared']}],
  layouts:[{id:'main',name:'Main',presentation:explore?'explore':'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:14}]}}],defaultLayout:'main'}}]}});
-for(const explore of [false,true])test('step caption '+(explore?'Explore':'Standard')+' double-click edits the current step text in place: Markdown, Escape, empty rule, one Undo, shared step',async({page,server,context})=>{
+for(const explore of [false,true])test('step caption '+(explore?'Explore':'Standard')+' double-click edits the current step text in place: Markdown, Escape, empty rule, one Undo, shared step',async({page,server})=>{
  await page.addInitScript(()=>{window.__copied=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__copied.push(text);}}});});
- await context.route('https://example.test/**',route=>route.fulfill({status:200,contentType:'text/html',body:'step source'}));page.on('popup',popup=>popup.close().catch(()=>{}));
- await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(stepFixture(explore),null,2);await pastePage(page,original);await closeTools(page);
+ // The step's source link opens a local page: the browser audit forbids outbound requests.
+ const link=server.origin+'/inline-step-source.html';await writeFile(path.join(server.root,'inline-step-source.html'),'<!doctype html><title>Step source</title><p>Step source</p>');
+ const popups=[];page.on('popup',popup=>popups.push(popup));
+ await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(stepFixture(explore,link),null,2);await pastePage(page,original);await closeTools(page);
  const src=page.locator('#src'),bar=page.locator('#docview .termbar'),line=bar.locator('.stepline:not(.dv-caption-old)'),caption=line.locator('.step-text'),stepN=line.locator(':scope > b');
  const edit=line.getByRole('textbox',{name:'Edit step text',exact:true}),draft=line.getByRole('region',{name:'Live Markdown preview',exact:true});
  const next=bar.getByRole('button',{name:'Next step',exact:true}),route=id=>bar.locator('.path-chip[data-dv-path="'+id+'"]');
@@ -121,6 +126,7 @@ for(const explore of [false,true])test('step caption '+(explore?'Explore':'Stand
  await expect(edit).toHaveCount(0);await expect(src).toHaveValue(original);await closeTools(page);
  // Row 2: the caption's source link and copy button keep their own actions.
  await line.locator('a.steplink').dblclick();await expect(edit).toHaveCount(0);await expect(src).toHaveValue(original);
+ await expect.poll(()=>popups.length).toBeGreaterThan(0);for(const popup of popups){await popup.waitForLoadState();expect(popup.url()).toBe(link);await popup.close();}
  await line.getByRole('button',{name:'Copy link to this diagram step',exact:true}).dblclick();await expect(edit).toHaveCount(0);await expect(src).toHaveValue(original);
  await expect.poll(()=>page.evaluate(()=>window.__copied.length)).toBeGreaterThan(0);
  const copied=new URL(await page.evaluate(()=>window.__copied.at(-1)));expect(copied.origin+copied.pathname).toBe(server.origin+'/workbench.html');expect(new URLSearchParams(copied.hash.slice(1)).get('s')).toBe('start');
@@ -143,7 +149,7 @@ for(const explore of [false,true])test('step caption '+(explore?'Explore':'Stand
  await caption.dblclick();await expect(edit).toBeFocused();await edit.selectText();await edit.pressSequentially('Edited `step`');await edit.press('Enter');await edit.pressSequentially('text');
  await expect(edit).toHaveValue('Edited `step`\ntext');await expect(draft.locator('code')).toHaveText('step');await expect(src).toHaveValue(original);
  await edit.press('ControlOrMeta+Enter');await expect(edit).toHaveCount(0);
- const saved=await src.inputValue(),want=stepFixture(explore);want.page.sections[0].diagram.steps[0].text='Edited `step`\ntext';expect(JSON.parse(saved)).toEqual(want);
+ const saved=await src.inputValue(),want=stepFixture(explore,link);want.page.sections[0].diagram.steps[0].text='Edited `step`\ntext';expect(JSON.parse(saved)).toEqual(want);
  await expect(caption.locator('code')).toHaveText('step');await expect(caption.locator('strong')).toHaveCount(0);
  // Row 7: one save is one Undo entry; Redo reapplies it.
  await undo.click();await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();await expect(caption.locator('strong')).toHaveText('first');

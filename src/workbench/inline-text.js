@@ -30,14 +30,26 @@ function createInlineTextEditor(opts){
      'raw' saves the draft as typed; 'trimmed' trims it and removes the field when
      empty (Inspect text controls, inspector.js textControl). keyboard: Enter on
      the focused text also opens it. A save is planSetField (field) or
-     planReplaceValue, through one opts.commit. */
+     planReplaceValue, through one opts.commit, unless the entry's source(snapshot,
+     target) reads the text itself and returns its own save plan (and the
+     topology context the draft depends on). mount: the element a single-line
+     host joins (default: the edited element). */
+  /* A connection label: double-click the label text, or Rename (opens through
+     the creation route, from the label or from the arrow when it has none).
+     Local connections write their label; imported ones write this consumer's
+     Display label override. Both match their Inspect field. */
+  var edgeLabel={kind:'edge',selector:'text.lbl[data-dv-edge]',field:'label',value:'trimmed',label:'Edit connection label',help:'Enter or click outside saves. Escape cancels.',
+    source:edgeLabelSource,place:edgeLabelHost,mount:function(c){return c.el.ownerSVGElement;},hostClass:'dv-inline-edge-editor'};
   var fields=[
     {kind:'para',selector:'[data-dv-para]',field:null,markdown:true,value:'raw',keyboard:true,label:'Edit section text',help:help},
     {kind:'bullet',selector:'[data-dv-bullet-path]',field:'text',bare:true,markdown:true,value:'raw',keyboard:true,label:'Edit section text',help:help},
     {kind:'node',creation:true,field:'title',value:'raw',label:'New node title',help:'Enter or click outside saves. Escape cancels. Later changes use Inspect.',
       accept:function(value){return !isTextBoxNode(value);},place:nodeTitleHost,hostClass:'dv-inline-node-editor'},
     // One step text serves every path that uses the step.
-    {kind:'step',selector:'.stepline .step-text',target:function(el){return opts.currentStep?opts.currentStep(el):null;},field:'text',markdown:true,value:'trimmed',label:'Edit step text',help:help}
+    {kind:'step',selector:'.stepline .step-text',target:function(el){return opts.currentStep?opts.currentStep(el):null;},field:'text',markdown:true,value:'trimmed',label:'Edit step text',help:help},
+    edgeLabel,
+    // Rename on a connection that has no label yet opens from its arrow.
+    Object.assign({},edgeLabel,{selector:null,creation:true})
   ];
   function selectorOf(test){return fields.filter(function(f){return f.selector && !f.creation && test(f);}).map(function(f){return f.selector;}).join(',');}
   var openSelector=selectorOf(function(){return true;}),keySelector=selectorOf(function(f){return f.keyboard;});
@@ -48,6 +60,7 @@ function createInlineTextEditor(opts){
     delete target.el;
     var snapshot=opts.session.snapshot();
     if(snapshot.error || snapshot.renderedText!=null && snapshot.renderedText!==snapshot.text)return null;
+    if(f.source){var got=f.source(snapshot,target);return got && {el:el,entry:f,target:target,text:got.text || '',source:got,snapshot:snapshot};}
     var path=builderTargetPath(snapshot.raw,target),value=path && specValueAt(snapshot.raw,path),field=null;
     if(f.field && specObject(value)){
       if(f.accept && !f.accept(value))return null;
@@ -63,7 +76,32 @@ function createInlineTextEditor(opts){
     host.setAttribute('x','4');host.setAttribute('y',String(Math.max(4,(p.h-36)/2)));host.setAttribute('width',String(Math.max(40,p.w-8)));host.setAttribute('height','36');
     return host;
   }
-  function fresh(c){var now=opts.session.snapshot();return c.el.isConnected && !opts.disabled() && now.project===c.snapshot.project && now.text===c.snapshot.text;}
+  function topologyKey(){return JSON.stringify(opts.session.topologyContext?opts.session.topologyContext():null);}
+  function edgeLabelSource(s,target){
+    var context=opts.session.topologyContext?opts.session.topologyContext():null,t=builderEdgeLayoutTarget(s.text,s.raw,target.section,target.index,null,context);
+    if(t.error || t.edge.label!=null && typeof t.edge.label!=='string' || !t.owner && t.localIndex<0)return null;
+    return {text:t.edge.label,edge:t.edge,contextKey:JSON.stringify(context),plan:function(value){
+      return t.owner?planEdgeLayout(s.text,s.raw,target.section,target.index,t.key,{label:value},context):
+        planSetField(s.text,s.raw,t.got.path.concat(['edges',t.localIndex]),'label',value==null?null:JSON.stringify(value));
+    }};
+  }
+  /* Over the rendered label; without one, where the engine would draw it:
+     above the arrow's midpoint, higher when a step circle sits there. */
+  function edgeLabelHost(c){
+    var svg=c.el.ownerSVGElement,index=c.target.index,label=svg && svg.querySelector('text.lbl[data-dv-edge="'+index+'"]'),path=svg && svg.querySelector('path.edge[data-dv-edge="'+index+'"]'),x,y,w=160;
+    try{
+      if(label){var b=label.getBBox();x=b.x+b.width/2;y=b.y+b.height/2;w=Math.max(w,b.width+40);}
+      else if(path){
+        var mid=path.getPointAtLength(path.getTotalLength()/2),edge=c.source.edge;
+        x=mid.x+(edge.labelDx || 0);y=mid.y-(svg.querySelector('[data-dv-coin-edge="'+index+'"]')?16:9)+(edge.labelDy || 0)-4;
+      }
+    }catch(ex){return null;}
+    if(!Number.isFinite(x) || !Number.isFinite(y))return null;
+    var host=document.createElementNS('http://www.w3.org/2000/svg','foreignObject');
+    host.setAttribute('x',String(x-w/2));host.setAttribute('y',String(y-15));host.setAttribute('width',String(w));host.setAttribute('height','30');
+    return host;
+  }
+  function fresh(c){var now=opts.session.snapshot();return c.el.isConnected && !opts.disabled() && now.project===c.snapshot.project && now.text===c.snapshot.text && (!c.source || topologyKey()===c.source.contextKey);}
   function clear(){
     if(!active)return;var a=active;active=null;a.life.destroy();a.host.remove();
     if(a.original){while(a.original.firstChild)a.c.el.insertBefore(a.original.firstChild,a.original);a.original.remove();}
@@ -73,7 +111,7 @@ function createInlineTextEditor(opts){
     if(!active)return;var a=active,c=a.c,valid=fresh(c),plan;
     if(save && valid && a.input.value!==c.text){
       var value=c.entry.value==='trimmed'?a.input.value.trim() || null:a.input.value,json=value==null?null:JSON.stringify(value);
-      plan=c.field?planSetField(c.snapshot.text,c.snapshot.raw,c.path,c.field,json):
+      plan=c.source?c.source.plan(value):c.field?planSetField(c.snapshot.text,c.snapshot.raw,c.path,c.field,json):
         planReplaceValue(c.snapshot.text,c.snapshot.raw,c.path,json);
       if(plan.error){a.error.textContent=plan.error;return false;}
     }
@@ -117,7 +155,7 @@ function createInlineTextEditor(opts){
       preview=document.createElement('div');preview.className='dv-inline-preview';preview.setAttribute('role','region');preview.setAttribute('aria-label','Live Markdown preview');host.appendChild(preview);
     }
     var error=document.createElement('span');error.setAttribute('role','status');host.appendChild(error);
-    if(single)el.appendChild(host);else el.insertBefore(host,original.nextSibling);
+    if(single)(f.mount?f.mount(c):el).appendChild(host);else el.insertBefore(host,original.nextSibling);
     el.classList.add('dv-inline-editing');
     var editing=createWorkbenchLifetime();active={c:c,input:input,host:host,original:original,preview:preview,error:error,life:editing,composing:false};
     ['pointerdown','mousedown','click','dblclick'].forEach(function(type){editing.listen(host,type,function(e){e.stopPropagation();if(e.target.closest('a')){e.preventDefault();if(type==='click' && active){active.input.focus();active.input.scrollIntoView({block:'nearest',inline:'nearest'});}}});});

@@ -206,11 +206,21 @@ function topologyTrackingTarget(text,raw,section,kind,id,context,index){
     var resolved=FlowTopology.resolveSource(base,context),d=specValueAt(resolved,t.got.path);
     var inherited=kind==='node'?d.nodes[id]:d.edges.find(function(edge){return builderEdgeKey(edge)===id;});
     t.inherited=trackingRefs(inherited);if(inherited.missingWork===true)t.inherited.missingWork=true;if(inherited.existsWhen==='tickets-done')t.inherited.existsWhen=inherited.existsWhen;
+    // The provider binding, already expanded by the provider's templates; a consumer binding replaces it whole.
+    if(Object.prototype.hasOwnProperty.call(inherited,'telemetry'))t.inherited.telemetry=builderClone(inherited.telemetry);
   }catch(ex){return {error:ex.message};}
   return t;
 }
 function planTopologyTracking(text,raw,section,kind,id,field,ref,remove,context,index){
-  if(field!=='tickets' && field!=='prs' && field!=='existsWhen' && field!=='missingWork')return {error:'Choose tickets, pull requests, availability or Missing work.'};
+  if(field!=='tickets' && field!=='prs' && field!=='existsWhen' && field!=='missingWork' && field!=='telemetry')return {error:'Choose tickets, pull requests, availability, Missing work or metrics.'};
+  if(field==='telemetry'){
+    // ref is the whole consumer binding (#941); its content is warning-only, like the resolver.
+    var bound=topologyTrackingTarget(text,raw,section,kind,id,context,index);if(bound.error)return bound;
+    if(remove)delete bound.local.telemetry;
+    else if(!ref || typeof ref!=='object' || Array.isArray(ref))return {error:'A metrics binding is an object.'};
+    else bound.local.telemetry=builderClone(ref);
+    return topologyTrackingPlan(text,raw,bound,context);
+  }
   if(field==='missingWork'){
     var marker=topologyTrackingTarget(text,raw,section,kind,id,context,index);if(marker.error)return marker;
     if(marker.inherited.missingWork)return {error:'Missing work is inherited from the provider.'};

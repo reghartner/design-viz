@@ -1973,10 +1973,11 @@ test('M6 Metrics sits beside Live, off by default; on calls the provider and upd
  const order=head.children;assert.ok(order.indexOf(live)<order.indexOf(metrics),'M6 Metrics follows Live');
  assert.ok(order.slice(order.indexOf(live)+1,order.indexOf(metrics)).every(el=>el.classList.contains('dv-live-count')),'M6 only the Live counts sit between Live and Metrics');
  assert.ok(order.indexOf(metrics)<order.indexOf(jira),'M6 Metrics precedes the connector text');
- assert.ok(conn,'M6 metrics connector text');assert.ok(conn.classList.contains('dv-live-connection'),'M6 same markup as the Jira connector');
+ assert.ok(conn,'M6 metrics connector text');assert.ok(!conn.classList.contains('dv-live-connection'),'M6 .dv-live-connection keeps naming the Jira connector alone');
+ assert.equal(head.querySelectorAll('.dv-live-connection').length,1,'M6 one Jira connector');
  assert.equal(order.indexOf(conn),order.indexOf(jira)+1,'M6 the metrics connector sits beside the Jira one');
  const text=()=>conn.querySelectorAll('span')[0].textContent;
- assert.equal(conn.hidden,false);assert.equal(conn.getAttribute('role'),'status');assert.ok(conn.querySelector('.dv-live-connection-dot'));
+ assert.equal(conn.hidden,false);assert.equal(conn.tagName,jira.tagName,'M6 same markup as the Jira connector');assert.equal(conn.getAttribute('role'),'status');assert.ok(conn.querySelector('i.dv-live-metrics-dot'),'M6 its own status dot');
  assert.equal(conn.getAttribute('data-state'),'disconnected');assert.equal(conn.getAttribute('data-busy'),'false');assert.equal(text(),'Metrics: not connected');
  const livePressed=live.getAttribute('aria-pressed');assert.equal(livePressed,'true');
  metrics.dispatchEvent({type:'click'});

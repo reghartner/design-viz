@@ -31,6 +31,26 @@ The stable `browser-contracts` job merges their blob reports, uploads the merged
 HTML/JSON plus each shard's traces and screenshots, and fails unless every shard
 passed; use that aggregate as the required check.
 
+## One spec on demand
+
+To prove one new or changed test red (or green) without queuing a full `ci`
+run, start the `one-spec` workflow (`.github/workflows/one-spec.yml`) on the
+branch:
+
+```sh
+gh workflow run one-spec.yml -R reghartner/design-viz --ref <branch> \
+  -f spec=<file>.spec.mjs [-f grep=<test title filter>]
+gh run list -R reghartner/design-viz --workflow one-spec.yml --branch <branch>
+```
+
+It runs one file from `tests/` in one job with the same setup and
+`playwright.ci.config.mjs` as the CI shards, and uploads `test-results/` as the
+`one-spec-results` artifact. The run's head SHA is the commit the result
+applies to. It is not a required check; full CI still runs on every pull request and
+every push to `main`. The
+branch must contain the workflow file, so a long-lived branch picks it up by
+merging `main`.
+
 ## What runs
 
 | Case | Production boundary and assertions |

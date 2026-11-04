@@ -400,7 +400,7 @@ function main(argv){
     }
     if(out.status==='up-to-date'){print(localFile+' already has every board edit.');return 0;}
     fs.writeFileSync(localFile,out.text);
-    print('Merged into '+localFile+'. Tell the author about these board edits, one line each, before making the requested change.');
+    print('Merged into '+localFile+'. Tell the author about these board edits, one line each.');
     return 0;
   }
   if(out.status==='not-pulled'){print('The live board has '+out.missing+' edit history entr'+(out.missing===1?'y':'ies')+' '+localFile+' does not have. Nothing was written. Run first: node tools/board-sync.js pull '+localFile+' '+liveFile);return 3;}

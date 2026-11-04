@@ -30,7 +30,8 @@ path and the time of the last fetch are shown in the header too.
 
 ## Use it
 
-1. Choose a **Document**, or **All changed documents**.
+1. Choose a **Document**, or **All changed documents**. When the To revision (or HEAD,
+   before To is chosen) holds no Flowview documents, **All changed documents** is chosen.
 2. Choose **From (before)** and **To (after)**. Each picker lists the revisions of the
    document, all commits, branches, tags and pull requests, 100 per page (**Show more**
    loads the next page). Search matches the subject, branch, tag, PR number, author or SHA. A commit row shows the commit's

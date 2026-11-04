@@ -4,7 +4,7 @@ run-name: one-spec ${{ inputs.spec }} @ ${{ github.ref_name }}
 # Runs ONE browser-contract spec file on demand, with the same setup as the
 # ci browser shards. Use it to prove a single new test red (or green) without
 # queuing a full ci run. It is never a required check; ci.yml still runs the
-# full suites on every push and pull request.
+# full suites on every pull request and every push to main.
 #
 #   gh workflow run one-spec.yml -R reghartner/design-viz --ref <branch> \
 #     -f spec=<file>.spec.mjs [-f grep=<test title filter>]

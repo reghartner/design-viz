@@ -253,12 +253,16 @@ in the usable canvas, preserving its screen position where it fits. They never
 automatically fit the diagram; use **Fit** when you want to reframe it.
 
 Tools stay clear of the measured Contents, rail, navigation and canvas controls.
-Inspect temporarily chooses a nearby position away from the selected object when
-space allows, including when the selection changes while it is open. Crowded
-layouts may temporarily narrow or shorten a window to keep controls reachable.
-These adjustments do not replace saved floating preferences or move the camera.
-Very large objects or crowded workspaces may still overlap; close other tools
-or use Dock and Fit.
+Inspect always keeps its saved size. It temporarily chooses a nearby position
+away from the selected object when space allows, including when the selection
+changes while it is open and when you finish moving or resizing a canvas object
+under it. An open window whose title bar or resize handle Inspect covers moves
+aside, and crowded layouts may temporarily narrow or shorten windows other than
+Inspect to keep controls reachable. These adjustments are display only: saved
+sizes and positions stay as they were, and the camera does not move.
+Very large objects or crowded workspaces may still overlap, and Inspect can
+cover a large object's resize handle; move Inspect, close other tools, or use
+Dock and Fit.
 Saved editor-window positions and docking return on reload.
 
 Open **Agent** in the left rail to see the current connection. There are no tabs.

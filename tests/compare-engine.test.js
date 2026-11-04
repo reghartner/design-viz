@@ -56,7 +56,7 @@
    R18 add/remove records     panel step path section node edge layout view   status, null absent path, effects = oracle   positional "modified" pairs
    R20 nested tabs            caption, tab view, section view    nested exact paths                         flat sections[i] paths
    R21 document / heading / layout / ledger   exact paths and hunks                                     coarse labels only
-   R21d 25,000-line near-total rewrite      < 1.5 s; hunk texts match the old ledger and rebuild the new one  search time quadratic in edits
+   R21d 25,000-line near-total rewrite      < 4 s;   hunk texts match the old ledger and rebuild the new one  search time quadratic in edits
    R21e empty object added / removed         one document field each way (tracking: {})                    an empty object that leaves no leaf
    R21c repeated lines; swapped sides       two exact hunks in a 5,000-line ledger of 50 distinct lines;  unique-line anchoring with a coarse
                                              B->A hunks equal A->B hunks with sides swapped (block           fallback; direction-dependent tie breaks
@@ -565,7 +565,9 @@ test('R21d a near-total rewrite of a 25,000-line ledger diffs in bounded time an
   }
   rebuilt.push(...a.slice(at));
   assert.deepEqual(rebuilt,b,'the hunks turn the old ledger into the new one');
-  assert.ok(ms<1500,N+'-line rewrite diffed in '+ms.toFixed(0)+' ms (limit 1500 ms)');
+  /* About 0.5 s on a developer laptop; shared CI runners are several times slower. 4 s still rejects the
+     ~9 s synchronous diff this test was written against. */
+  assert.ok(ms<4000,N+'-line rewrite diffed in '+ms.toFixed(0)+' ms (limit 4000 ms)');
 });
 
 test('R21e adding or removing an empty object is a change',()=>{

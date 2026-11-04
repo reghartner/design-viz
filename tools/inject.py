@@ -191,10 +191,10 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False) -> str:
             "tell the editor, one line each, which board edits were saved after the newest agent "
             "entry (entries with a `source`). With the public repo and an older local copy of the "
             "spec, `node tools/board-sync.js pull <copy> <the file you read>` folds them into it.",
-            "2. Change the JSON. Keep every field you do not understand. If the request moves or "
-            "removes a ticket that a board edit saved after the newest agent entry placed, or "
-            "deletes its node or edge, ask the editor first and say who moved it and when; older "
-            "board edits need no question.",
+            "2. Change the JSON. Keep every field you do not understand. If the request moves, "
+            "removes or re-adds a ticket that a board edit saved after the newest agent entry "
+            "touched, or deletes its node or edge, ask the editor first and say who changed it and "
+            "when; older board edits need no question.",
             "3. " + validate_step,
             '4. Append one `page.editHistory` entry for your change: `{"at": "<now, ISO-8601>", '
             '"by": {"name": "<editor>"}, "source": "agent", "summary": "Added 5 nodes, moved 5 '

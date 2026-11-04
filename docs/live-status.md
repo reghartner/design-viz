@@ -842,8 +842,10 @@ asks the author only about a real conflict.
    written and changes made only in the local copy are kept. Tell the author the listed
    lines.
    - Exit 2, nothing written: a conflict. The same ticket was placed differently on the
-     board and in the local copy, or a board edit's node or edge no longer exists in the
-     local copy. Ask the author, then rerun with `--resolve KEY=live` (keep the board's
+     board and in the local copy, or a board edit added a ticket to a node or edge the
+     local copy no longer has. (A board edit that removed a ticket from, or cleared the
+     marker of, a node or edge the local copy deleted needs no question: both sides agree
+     the ticket is not there.) Ask the author, then rerun with `--resolve KEY=live` (keep the board's
      placement) or `--resolve KEY=local` (keep the local one, after placing the ticket
      where the author says).
    - Exit 3, nothing written: the live board was republished by an agent from another
@@ -854,9 +856,10 @@ asks the author only about a real conflict.
 4. `node tools/board-sync.js log <local.json> live.json --by "<author name>"` appends one
    agent entry: `"source": "agent"`, a counted one-line `summary` ("Added 5 nodes, moved
    5 tickets"; `--summary "<one line>"` replaces it) and the ticket changes. It refuses
-   with exit 2 when the change moves or removes a ticket that a board edit placed after
-   the newest agent entry, puts one back where such an edit removed it, or deletes the
-   node or edge holding it; the message names who made the board edit and when. Ask the
+   with exit 2 when the change alters where a ticket sits (moves it, removes it, adds it
+   anywhere, or deletes the node or edge holding it) and a board edit saved after the
+   newest agent entry added, moved or removed that ticket; the message names who made the
+   board edit, when, and what it did. Ask the
    author and rerun with `--confirm KEY` once they agree. Board edits older than the
    newest agent entry were already in front of the author and need no question
    (Chuck 2026-11-04). Exit 3: pull first.

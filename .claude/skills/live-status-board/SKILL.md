@@ -306,8 +306,8 @@ and carry on. Every time you change a published board:
      entries. Tell the author the printed lines, one line each ("Bo: DOOR-104
      moved from Door API to Cloud sync"), and go on.
    - Exit 2, nothing written: the same ticket was placed differently on the
-     board and in your local spec, or a board edit's node or edge no longer
-     exists locally. Show the author the printed conflict, ask which placement
+     board and in your local spec, or a board edit added a ticket to a node or
+     edge your local spec no longer has. Show the author the printed conflict, ask which placement
      to keep, then rerun with `--resolve KEY=live` or `--resolve KEY=local`.
    - Exit 3, nothing written: another agent republished the board from a
      different copy. Copy `live.json` over your local spec and redo the
@@ -321,8 +321,9 @@ and carry on. Every time you change a published board:
    `--summary "<one line>"` only to say what the counts cannot). The board's Edit
    history panel shows it with an agent tag, so everyone sees that an agent
    changed the board. Exit 2 means your change overrides a board edit saved
-   after the newest agent entry: someone moved a ticket and the request moves
-   it elsewhere, removes it, or deletes its node or edge. This is the one case
+   after the newest agent entry: a board edit added, moved or removed a ticket,
+   and your change puts that ticket somewhere else, removes it, puts it back,
+   or deletes its node or edge. This is the one case
    to stop and ask the author, quoting the printed line. Rerun with
    `--confirm KEY` once they agree; if they do not, put that ticket back where
    the board has it and rerun. Do not ask about board edits older than the

@@ -318,21 +318,21 @@ function log(localText,liveText,options){
   live.map.forEach((carrier,key)=>{const now=mine.get(key);if(carrier.missingWork && now && !now.missingWork){markers.cleared++;changes.push(changeFor('clear-missing-work',null,now));}});
   mine.forEach((carrier,key)=>{const was=live.map.get(key);if(carrier.missingWork && !(was && was.missingWork))markers.set++;});
 
-  // Chuck 2026-11-04: board edits saved after the newest agent entry are the author's to override.
+  /* Chuck 2026-11-04: board edits saved after the newest agent entry are the author's to
+     override. Any change to where a ticket sits that such an edit added, moved or removed
+     needs the author's confirmation, newest board edit first. */
   const entries=history(liveRaw),newest=Math.max(-Infinity,...entries.filter(isAgent).map(entry=>Date.parse(entry.at)).filter(isFinite));
-  const conflicts=[],flagged=new Set();
+  const recent=new Map();
   sortedByTime(entries.filter(entry=>!isAgent(entry) && Date.parse(entry.at)>newest)).reverse().forEach(entry=>{
-    (Array.isArray(entry.changes)?entry.changes:[]).forEach(change=>{
-      if(!isObject(change) || typeof change.ticket!=='string' || flagged.has(change.ticket) || confirm.has(change.ticket))return;
-      const key=changeKey(liveRaw,live.map,change);if(key===null)return;
-      const onLive=(inLive.get(change.ticket) || []).includes(key),onMine=(inMine.get(change.ticket) || []).includes(key);
-      if(onLive===onMine)return;
-      flagged.add(change.ticket);
-      const now=inMine.get(change.ticket) || [];
-      conflicts.push({ticket:change.ticket,message:change.ticket+': on the board '+who(entry)+' put it on '+labels(inLive.get(change.ticket) || [],live.map)+' on '+when(entry.at)+
-        ', after the newest agent entry; this change '+(now.length?'puts it on '+labels(now,mine):'removes it from the board')+
-        '. Ask the author; rerun with --confirm '+change.ticket+' once they agree.'});
-    });
+    (Array.isArray(entry.changes)?entry.changes:[]).forEach(change=>{if(isObject(change) && typeof change.ticket==='string' && !recent.has(change.ticket))recent.set(change.ticket,entry);});
+  });
+  const conflicts=[];
+  recent.forEach((entry,ticket)=>{
+    const l=inLive.get(ticket) || [],o=inMine.get(ticket) || [];
+    if(confirm.has(ticket) || sameSet(l,o))return;
+    const done=describe({changes:entry.changes.filter(change=>isObject(change) && change.ticket===ticket)}).join('; ');
+    conflicts.push({ticket,message:ticket+': on the board '+who(entry)+' changed it on '+when(entry.at)+', after the newest agent entry ('+done+
+      '); this change '+(o.length?'puts it on '+labels(o,mine):'removes it from the board')+'. Ask the author; rerun with --confirm '+ticket+' once they agree.'});
   });
   if(conflicts.length)return {status:'conflict',text:localText,conflicts};
 

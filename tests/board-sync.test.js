@@ -27,6 +27,7 @@
 | L6 a local copy missing live entries is refused | live has an entry local lacks | status not-pulled; CLI exit 3 | an impl that logs over unmerged board edits |
 | L7 no difference, no entry | local equals live | status unchanged, text identical | an impl appending an empty entry |
 | L8 the 200-entry cap | 200 old entries | 200 after log, the oldest gone, the new entry last | an impl growing the list past the cap |
+| L10 (test review c2; node changes include imported nodes) log covers imported carriers | local adds SH-3 to the overlay of imported node api and clears its Missing work marker; separately Bo (after the newest agent entry) removed SH-2 from imported edge api->store and the local copy puts it back | entry summary "Assigned 1 ticket, cleared 1 Missing work marker" with changes add SH-3 and clear-missing-work on node shared::api at the overlay path; the re-add is a conflict naming SH-2 and Bo | an impl that inventories section nodes and edges only |
 | L9 (diff review c1) placing a ticket that a recent board edit took off the board is a conflict | agent entry 10:00; Bo removed CC-1 from edge 0 at 11:00; local assigns CC-1 to gamma | status conflict, conflicts[0] ticket CC-1, message names Bo; with confirm [CC-1] → logged | a check limited to the carriers the board edit named |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
@@ -295,4 +296,16 @@ test('L9 placing a ticket that a board edit after the newest agent entry took of
  assert.equal(out.status,'conflict');assert.equal(out.conflicts.length,1);assert.equal(out.conflicts[0].ticket,'CC-1');
  assert.ok(out.conflicts[0].message.includes('Bo'),out.conflicts[0].message);
  assert.equal(S().log(local,live,{by:'Chuck',now:NOW,confirm:['CC-1']}).status,'logged');
+});
+
+test('L10 log covers imported nodes and edges: their ticket changes, cleared markers and recent board edits',()=>{
+ const IMP=['page','sections',1,'diagram','topologyImports',0],api=IMP.concat(['nodeTracking','api']),overlay=s=>d(s,1).topologyImports[0];
+ const {live,local}=pulled(s=>{overlay(s).nodeTracking={api:{missingWork:true}};},[agentEntry('2026-11-03T10:00:00Z','Initial board')],spec=>{overlay(spec).nodeTracking={api:{tickets:['SH-3']}};});
+ const out=S().log(local,live,{by:'Chuck',now:NOW});
+ assert.equal(out.status,'logged');assert.equal(out.entry.summary,'Assigned 1 ticket, cleared 1 Missing work marker');
+ assert.deepEqual(plain(out.entry.changes),[{op:'add',ticket:'SH-3',path:api,node:'shared::api',label:'shared::api'},{op:'clear-missing-work',path:api,node:'shared::api',label:'shared::api'}]);
+ const bo=entry('2026-11-03T11:00:00Z','Bo',[{op:'remove',ticket:'SH-2',path:IMP.concat(['edgeTracking','api->store']),edge:['shared::api','shared::store'],label:'API → Store'}]);
+ const back=pulled(s=>{delete overlay(s).edgeTracking;},[agentEntry('2026-11-03T10:00:00Z','Initial board'),bo],spec=>{overlay(spec).edgeTracking={'api->store':{tickets:['SH-2']}};});
+ const conflict=S().log(back.local,back.live,{by:'Chuck',now:NOW});
+ assert.equal(conflict.status,'conflict');assert.equal(conflict.conflicts[0].ticket,'SH-2');assert.ok(conflict.conflicts[0].message.includes('Bo'),conflict.conflicts[0].message);
 });

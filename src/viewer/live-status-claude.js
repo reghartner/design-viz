@@ -172,7 +172,7 @@ function liveStatusGithubReviews(payload){
 }
 /* GitHub evidence has its own lifecycle: no GitHub error can clear Jira state
    or write the panel note; it reports through connection.github only. At most
-   ten watches are subscribed; a longer queue rotates in 60-second cohorts, which
+   ten watches are subscribed; a longer queue rotates in 5-minute cohorts, which
    also keeps automatic search polling under the connector's search rate limit.
    Pull request reads go to the front of the queue, searches to the back. */
 function createLiveStatusGithub(mcp,server,page,api,win,events){

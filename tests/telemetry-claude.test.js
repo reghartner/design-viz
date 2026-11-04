@@ -12,7 +12,7 @@
 | A5 | Day 10 recorded payloads map to the provider shape: every Prometheus and Loki series as ascending [ms, number] points (several series added point by point), value = the last point, the authored unit; a query with no data is value 0 with no points; observedAt = the newest point; markers = the window's annotations ascending as {at, kind, label}; links = authored dashboard/query plus the generated Explore link. Imported carriers map by their resolved id. | Pinned Day 10 payloads, local and resolved imported carriers, pure mapper inputs; empty map if absent | Named A5 carrier ids, mapped values/series/units, markers, timestamps and links | Wrong Loki field, missing markers, lost imported ids or incorrect series aggregation |
 | A6 | The page window drives the range and step (6h → now-6h, 90 s; 30m → 60 s floor); Day 11 shows the incident marker and the lagging queue; Day 12 the recovered queue and the still-silent push edge. | 6h/30m/7d windows and pinned Day 11/12/all-todo story; missing calls read as undefined | Named A6 ranges, step floor, incident marker, lag/recovery and silent-edge values | Fixed window/step, missing incident marker or wrong recovery/silence values |
 | A7 | Through ctl.telemetry: Metrics off makes no call; the refresh never runs faster than 60 s even when the page asks for less; a hidden document pauses and returns with one catch-up; Metrics off aborts the signal. | Fake timers and document visibility through ctl.telemetry; page requests 1000 ms | Named A7 off/on calls, delivered map, 60000 ms floor, hidden pause, one catch-up and abort | Eager calls, sub-minute refresh, hidden polling, duplicate catch-up or no abort |
-| A8 | A connector-level failure (server_unavailable) keeps the previous map and sets status().note; a tool_error on one query keeps the other carriers fresh, keeps that signal's previous sample and reports the failed query in status().note. | Good sample then connector failure and per-query errors, plus missing datasource; inert provider if absent | Named A8 error status/note, retained previous map/sample, fresh peers and cleared note | Failure reported as success, erased previous map, stale peers or unreported query error |
+| A8 | A connector-level failure (server_unavailable) keeps the previous map and sets status().note; a tool_error on one query keeps the other carriers fresh, keeps that signal's previous sample and reports the failed query in status().note. | Good sample then connector failure and per-query error with distinct second-refresh Prometheus/Loki peer series, plus missing datasource; inert provider if absent | Named A8 error status/note, retained previous map/failed sample, every successful peer equals the new series and differs from its first sample, and cleared note | Failure reported as success, erased previous map, an implementation that keeps the whole stale map after one failure, or unreported query error |
 | A9 | approval_required → status `approval`, no further connector call in that Metrics session, an "Allow Grafana" action on ctl.liveStatus (re-shown after another connector clears the slot, never over another connector's action); Allow makes the same call once and restarts Metrics. Authorization denials clear the map, set the note and stop calls until Metrics is turned on again; user_changed retires the adapter. | Deferred approval/denial behavior and fake live-status action through ctl.telemetry | Named A9 approval status/text, one Allow retry, retracted map and retired adapter | Silent success, repeated unattended requests, overwritten action or retained unauthorized data |
 | A10 | sql signals call query_sql at most once an hour (the value is reused in between); without query_sql on the connector there is no call and the note says so. | SQL connector, controlled clock at 0/59/61 minutes, missing-tool case; no calls if absent | Named A10 SQL inputs/value, hourly cap/cache and missing-tool note | Missing SQL call, per-refresh SQL query, stale hourly cache or unsupported tool call |
 | A11 | docs/live-status.md declares the Grafana connector with its five tools and states the per-refresh call budget. | docs/live-status.md source | Declared connector, five tools and call-budget prose | Missing connector declaration or budget guidance |
@@ -329,9 +329,14 @@ test('A7 through ctl.telemetry: off makes no call, refresh is floored at 60 s, h
 
 test('A8 a connector failure keeps the previous map and sets the note; one failed query keeps the others fresh and names itself',async()=>{
  let mode=null;
+ const peerSeries=[[DAY10_NOW+3600000,12345],[DAY10_NOW+7200000,23456]];
  const s=await setup({overrides:{
   get_annotations:()=>mode==='down'?Promise.reject({code:'server_unavailable',message:'upstream 502',retryable:true}):null,
-  query_prometheus:input=>mode==='bad' && input.expr===Q.eventP95?Promise.reject({code:'tool_error',message:'bad_data: parse error at char 3'}):null}});
+  query_prometheus:input=>mode!=='bad'?null:input.expr===Q.eventP95
+   ?Promise.reject({code:'tool_error',message:'bad_data: parse error at char 3'})
+   :Promise.resolve({payload:{data:[{values:peerSeries.map(([ms,value])=>[ms/1000,String(value)])}]}}),
+  query_loki_logs:()=>mode==='bad'
+   ?Promise.resolve({payload:{data:[{values:peerSeries.map(([ms,value])=>({timestamp:String(ms/1000),value:String(value)}))}]}}):null}});
  const t=s.C.createTelemetry(s.page,s.adapter.options,{carriers:carriersOf(s.C,s.page)});
  t.setEnabled(true);await settled();const good=plain(t.snapshot().map);assert.equal(t.status().state,'ok','A8 the first refresh answers');assert.equal(t.status().note,'','A8 no note on a clean answer');
  mode='down';s.tick(60000);await settled();
@@ -342,7 +347,12 @@ test('A8 a connector failure keeps the previous map and sets the note; one faile
  assert.equal(t.status().note,'1 Grafana query failed: mcu->ingest p95: bad_data: parse error at char 3','A8 the note names the carrier, signal and message');
  const map=plain(t.snapshot().map);
  assert.deepEqual(map['mcu->ingest'].signals.p95,good['mcu->ingest'].signals.p95,'A8 the failed signal keeps its previous sample');
- assert.deepEqual(map['mcu->ingest'].signals.rate,good['mcu->ingest'].signals.rate,'A8 the other signals are fresh (same pinned day)');
+ for(const [id,carrier] of Object.entries(good))for(const [name,previous] of Object.entries(carrier.signals)){
+  if(id==='mcu->ingest' && name==='p95')continue;
+  const expected={value:peerSeries.at(-1)[1],series:peerSeries,unit:previous.unit};
+  assert.notDeepEqual(expected,previous,'A8 the second-refresh fixture differs for '+id+' '+name);
+  assert.deepEqual(map[id]?.signals[name],expected,'A8 the successful peer has the new value and series: '+id+' '+name);
+ }
  mode=null;s.tick(60000);await settled();assert.equal(t.status().note,'','A8 a clean refresh clears the note');
  // A first refresh with a failed query and no previous sample leaves that signal out.
  const fresh=await setup({overrides:{query_prometheus:input=>input.expr===Q.eventP95?Promise.reject({code:'tool_error',message:'boom'}):null}});

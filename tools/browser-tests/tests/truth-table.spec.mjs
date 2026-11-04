@@ -122,6 +122,23 @@ test('desktop truth-table author edits properties, cases and shared icons with e
   await expect(exported).toBeVisible();await expect(exported).toHaveCSS('background-color','rgb(255, 255, 255)');await info.attach('truth-table-print',{body:await exported.screenshot({path:info.outputPath('print.png')}),contentType:'image/png'});
 });
 
+/* #921 contract, slice 2 "No active case" (issue #921 "How it should look" 5 + "Test + flip";
+   Chuck 2026-11-03 §0 ruling: "extend existing tests"; hosted in the test below). Fixture: the
+   shipped example (cases solar/mains/battery/low; initial.active "solar"; step 2 only sets a
+   note and inherits). Every choice is made with real input in the visible Active case control.
+   | row | assertion (scoped to that editor's Active case control and the saved JSON) | rejects |
+   | A step control: one dropdown | step 2 control options exactly [Inherit previous, 4 case labels, No active case]; no "Active case assignment" control in that editor | today's raw IDs plus the separate assignment dropdown; adding labels but keeping the second dropdown |
+   | B Starting state control: one dropdown | Starting state options exactly [Use panel default, 4 case labels, No active case]; no assignment control | a fix applied to steps only |
+   | C step No active case | choosing it saves steps[2].panels.power.active === null (key present, note kept) and step 2 highlights no row (was Low battery) | saving omission (inherits Low battery); dropping the note |
+   | D Starting state No active case | saves initial.active === null (key present) and step 0 highlights no row (was Solar charging) | omitting initial.active; a step-only fix |
+   | E a label commits its ID | choosing "Battery operation" saves "battery" and highlights Battery operation; selectOption('low') still saves "low" | committing the label text |
+   | F Inherit previous removes the assignment | after null, choosing it deletes steps[2].panels.power.active and step 2 inherits Low battery again | treating inherit as null |
+   | G IDs where needed | after real renames (solar -> "No active case", mains -> blank, battery -> "Low battery"): options read [Use panel default, No active case (solar), mains, Low battery (battery), Low battery (low), No active case] | duplicate or reserved texts left ambiguous; a blank label shown as "" |
+   | G2 every visible text compared | then unlabeled mains renamed to ID "No active case": options read [Use panel default, No active case (solar), No active case (case ID), Low battery (battery), Low battery (low), No active case] | checking only labeled cases, so an unlabeled ID reads exactly like the null choice (review c1) |
+   | H shows the current choice | step 1 shows Low battery checked; Starting state shows Solar charging; an inheriting step shows Inherit previous | an unselected control after save |
+   | active opts out of the shared selector; Explanation keeps it | Node (tests/truth-table-panel.test.js): merged initial and step presentation meta: active.assignment === false, note.assignment !== false | a global change to every panel's assignment selector |
+   | template keeps initial.active "solar" | Node: picker example's initial is {active:"solar"} | changing the template default |
+   | phone width | excluded — desktop-only editing (CLAUDE.md) | */
 test('truth table picker adds the panel and step controls carry, change and clear the active case',async({page,server},info)=>{
   await page.goto(server.origin+'/workbench.html');await pastePage(page,JSON.stringify(await fixture(),null,2));
   const root=page.locator('#docview'),source=page.locator('#src');
@@ -133,6 +150,7 @@ test('truth table picker adds the panel and step controls carry, change and clea
   await page.locator('#undo-builder').click();
   await closeTools(page);
   const table=root.locator('.truth-table');
+  await expect(table.locator('[aria-current="true"]'),'precondition: step 0 starts on Solar charging').toContainText('Solar charging');
   await root.getByRole('button',{name:'Next step',exact:true}).click();await expect(table.locator('[aria-current="true"]')).toContainText('Mains connected');
   await root.getByRole('button',{name:'Next step',exact:true}).click();await expect(table.locator('[aria-current="true"]')).toContainText('Mains connected');
   await root.getByRole('button',{name:'Next step',exact:true}).click();await expect(table.locator('[aria-current="true"]')).toContainText('Battery operation');
@@ -144,4 +162,52 @@ test('truth table picker adds the panel and step controls carry, change and clea
   await patch.getByLabel('Explanation',{exact:true}).fill('Low battery shown deliberately');await patch.getByLabel('Explanation',{exact:true}).press('Tab');
   await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.steps[1].panels.power.note).toBe('Low battery shown deliberately');
   await info.attach('truth-table-step-editor',{body:await guide.screenshot({path:info.outputPath('editor.png')}),contentType:'image/png'});
+  // #921 slice 2 (matrix above): one Active case control with case labels and No active case, in steps and Starting state.
+  const diagram=async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram;
+  const labels=['Solar charging','Mains connected','Battery operation','Low battery'],current=table.locator('[aria-current="true"]');
+  const activeCase=editor=>editor.getByLabel('Active case',{exact:true}),texts=control=>control.locator('option').allTextContents();
+  const checked=control=>control.evaluate(el=>el.selectedOptions[0]?el.selectedOptions[0].textContent:null);
+  const open=async editor=>{await expect(editor).toHaveCount(1);if(await editor.getAttribute('open')===null)await editor.locator(':scope > summary').click();};
+  // Read-only rows first: one read each, soft, so one run reports every row; (A)'s option list is the hard gate before choosing by label.
+  expect.soft(await checked(activeCase(patch)),'(H) step 1 shows its saved case by label').toBe('Low battery');
+  await inspectPageElement(page,root.locator('.pt-truth-table .ptitle'));
+  const starting=guide.locator('.patchedit[data-panel-state="initial"]');await open(starting);
+  expect.soft(await texts(activeCase(starting)),'(B) Starting state options: panel default, case labels, No active case').toEqual(['Use panel default',...labels,'No active case']);
+  expect.soft(await checked(activeCase(starting)),'(H) Starting state shows Solar charging').toBe('Solar charging');
+  expect.soft(await starting.getByLabel('Active case assignment',{exact:true}).count(),'(B) no separate assignment dropdown').toBe(0);
+  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="2"]').click();await page.locator('#editor-tab-inspect').click();
+  await expect(current,'precondition: step 2 inherits Low battery').toContainText('Low battery');
+  const step2=guide.locator('.patchedit[data-panel-state="step"]');await open(step2);
+  expect.soft(await checked(activeCase(step2)),'(H) an inheriting step shows Inherit previous').toBe('Inherit previous');
+  expect.soft(await step2.getByLabel('Active case assignment',{exact:true}).count(),'(A) no separate assignment dropdown').toBe(0);
+  expect(await texts(activeCase(step2)),'(A) step options: inherit, case labels, No active case').toEqual(['Inherit previous',...labels,'No active case']);
+  await activeCase(step2).selectOption({label:'Battery operation'});
+  await expect.poll(async()=>(await diagram()).steps[2].panels.power.active,'(E) a case label saves its ID').toBe('battery');
+  await expect(current,'(E) step 2 highlights the chosen case').toContainText('Battery operation');
+  await activeCase(step2).selectOption({label:'No active case'});
+  await expect.poll(async()=>{const p=(await diagram()).steps[2].panels.power;return [Object.hasOwn(p,'active'),p.active,p.note];},'(C) step 2 saves active:null and keeps its note').toEqual([true,null,'The mains case stays highlighted until another case is selected.']);
+  await expect(current,'(C) step 2 highlights no case').toHaveCount(0);
+  await activeCase(step2).selectOption({label:'Inherit previous'});
+  await expect.poll(async()=>Object.hasOwn((await diagram()).steps[2].panels.power,'active'),'(F) Inherit previous removes the assignment').toBe(false);
+  await expect(current,'(F) step 2 inherits Low battery again').toContainText('Low battery');
+  await inspectPageElement(page,root.locator('.pt-truth-table .ptitle'));await open(starting);
+  await activeCase(starting).selectOption({label:'No active case'});
+  await expect.poll(async()=>{const initial=(await diagram()).panels[0].initial;return [Object.hasOwn(initial,'active'),initial.active];},'(D) Starting state saves active:null').toEqual([true,null]);
+  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();
+  await expect(current,'(D) step 0 starts with no highlighted case').toHaveCount(0);
+  // (G) Labels that collide, are blank or reuse a reserved choice are told apart by ID.
+  await inspectPageElement(page,root.locator('.pt-truth-table .ptitle'));
+  for(const [id,label] of [['solar','No active case'],['mains',''],['battery','Low battery']]){
+    const field=guide.locator(`[data-truth-case="${id}"]:not([data-truth-column])`).getByLabel('Case label',{exact:true});
+    await field.fill(label);await field.press('Tab');
+    await expect.poll(async()=>(await diagram()).panels[0].cases.find(row=>row.id===id).label,`precondition: ${id} renamed`).toBe(label||undefined);
+  }
+  await open(starting);
+  expect(await activeCase(starting).locator('option').allTextContents(),'(G) IDs tell duplicate, blank and reserved labels apart').toEqual(['Use panel default','No active case (solar)','mains','Low battery (battery)','Low battery (low)','No active case']);
+  // (G2) An unlabeled case shows its ID; an ID that reads like another choice is marked as a case ID.
+  const caseId=guide.locator('[data-truth-case="mains"]:not([data-truth-column])').getByLabel('Case ID',{exact:true});
+  await caseId.fill('No active case');await caseId.press('Tab');
+  await expect.poll(async()=>(await diagram()).panels[0].cases.map(row=>[row.id,row.label]),'precondition: unlabeled mains renamed to ID "No active case"').toEqual([['solar','No active case'],['No active case',undefined],['battery','Low battery'],['low','Low battery']]);
+  await open(starting);
+  expect(await activeCase(starting).locator('option').allTextContents(),'(G2) an unlabeled ID that matches another choice is told apart').toEqual(['Use panel default','No active case (solar)','No active case (case ID)','Low battery (battery)','Low battery (low)','No active case']);
 });

@@ -1891,7 +1891,7 @@ test('OT4 moving days repaints carriers, coins, counts, ring, lanes, blockers, T
  await overOpen(h,1);h.flush();
  assert.ok(a.classList.contains('dv-live-blocked'));assert.ok(!a.classList.contains('dv-live-done'));assert.ok(edge.classList.contains('dv-live-active'));assert.ok(coin.classList.contains('dv-live-todo'));assert.ok(planned.classList.contains('dv-live-unavailable'),'availability follows the day');
  const snap=api.snapshot();assert.equal(snap.counts.blocked,1);assert.equal(snap.counts.todo,2);assert.equal(snap.readiness.done,0);assert.deepEqual(plain(snap.blockers).map(item=>item.key),['AA-1']);
- assert.equal(snap.lanes[0].state,'blocked');assert.equal(snap.lanes[0].done,0);assert.equal(overState(h,'AA-1').textContent,'blocked');assert.equal(overState(h,'ZZ-2').textContent,'todo');assert.equal(h.view.querySelector('.dv-live-blocker .nbacklink').textContent,'AA-1');
+ assert.equal(snap.lanes[0].state,'blocked');assert.equal(snap.lanes[0].done,0);assert.equal(overState(h,'AA-1').textContent,'blocked');assert.equal(overState(h,'ZZ-2').textContent,'todo');assert.equal(h.view.querySelector('.dv-live-blocker').querySelector('.nbacklink').textContent,'AA-1');
  assert.match(overCaption(h,0),/^IN PROGRESS/);
  api.overTimeDay(0);h.flush();assert.ok(edge.classList.contains('dv-live-todo'));assert.ok(!edge.classList.contains('dv-live-active'));
  api.overTimeDay(2);h.flush();assert.ok(a.classList.contains('dv-live-done'));assert.ok(!planned.classList.contains('dv-live-unavailable'));assert.equal(api.snapshot().counts.blocked,0);assert.equal(overState(h,'ZZ-2').textContent,'done');
@@ -1913,8 +1913,8 @@ test('OT6 a ticket before creation keeps its row, stays in the total and is neve
  const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());const total=api.snapshot().epic.stories;assert.equal(total,4);
  await overOpen(h,0);h.flush();const snap=api.snapshot();
  assert.equal(snap.epic.stories,total,'the total is the same on every day');assert.equal(snap.epic.done,0);
- assert.equal(overState(h,'ZZ-2').textContent,'No status');assert.equal(overRow(h,'ZZ-2').querySelector('.dv-live-ticket-title').textContent,'Epic only story');assert.equal(overRow(h,'ZZ-2').querySelector('.dv-live-ticket-owner').textContent,'Unassigned');
- assert.equal(overState(h,'AA-1').textContent,'No status');assert.equal(overRow(h,'AA-1').querySelector('.dv-live-ticket-owner').textContent,'Alex','owner stays as of today');
+ assert.equal(overState(h,'ZZ-2').textContent,'No status');assert.equal(overRow(h,'ZZ-2').querySelector('.dv-live-ticket-title').textContent,'Epic only story');assert.match(textOf(overRow(h,'ZZ-2').querySelector('.dv-live-ticket-owner')),/Unassigned/);
+ assert.equal(overState(h,'AA-1').textContent,'No status');assert.match(textOf(overRow(h,'AA-1').querySelector('.dv-live-ticket-owner')),/Alex/,'owner stays as of today');
  assert.equal(h.view.querySelectorAll('.dv-live-missing').length,0,'no red anywhere');assert.equal(snap.counts.missing,0);assert.deepEqual(plain(snap.blockers),[]);
  const a=h.view.querySelector('[data-dv-node="a"]');for(const state of ['todo','active','done','blocked','missing'])assert.ok(!a.classList.contains('dv-live-'+state),state);
  const up=plain(snap.tickets.find(item=>item.key==='BB-1').dependsOn[0]);assert.equal(up.key,'AA-1');assert.equal(up.state,'No status');assert.equal(up.tone,'grey');
@@ -1924,9 +1924,9 @@ test('OT6 a ticket before creation keeps its row, stays in the total and is neve
 });
 test('OT7 moving days logs no Activity, adds no change pulse and shows no stale mark',async()=>{
  const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus,today=overToday();api.apply(today);today['EE-1'].state='todo';api.apply(today);
- const b=h.view.querySelector('[data-dv-node="b"]'),rows=()=>h.view.querySelectorAll('.dv-live-activity-entry').map(el=>el.textContent);
- // Contrasting precondition: a real change logged one row and BB-1 is overdue and active today.
- assert.equal(rows().length,1);assert.ok(b.classList.contains('dv-live-stale'));const before=rows();
+ const b=h.view.querySelector('[data-dv-node="b"]'),edge=h.view.querySelector('path.edge'),rows=()=>h.view.querySelectorAll('.dv-live-activity-entry').map(el=>el.textContent);
+ // Contrasting precondition: a real change pulsed and logged one row, and BB-1 is overdue and active today.
+ assert.equal(rows().length,1);assert.ok(edge.classList.contains('dv-live-changed'));edge.dispatchEvent({type:'animationend'});assert.equal(h.view.querySelectorAll('.dv-live-changed').length,0);assert.ok(b.classList.contains('dv-live-stale'));const before=rows();
  await overOpen(h,1);h.flush();
  for(const index of [0,1,2,0]){api.overTimeDay(index);h.flush();assert.deepEqual(rows(),before);assert.equal(h.view.querySelectorAll('.dv-live-changed').length,0,'day '+index);assert.equal(h.view.querySelectorAll('.dv-live-stale').length,0,'day '+index);}
  api.overTimeDay(2);api.overTime();await historySettle();h.flush();assert.ok(b.classList.contains('dv-live-stale'),'the stale mark returns with today');assert.deepEqual(rows(),before);

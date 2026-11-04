@@ -1889,3 +1889,150 @@ test('H12 Chuck 2026-10-30: history renders on a page without tracking, tickets 
  const rows=status.rows();assert.equal(rows.length,3);assert.equal(textOf(rows[0].querySelector('.dv-edit-first')).trim(),'AA-1 added to Node A');
  status.destroy();h.ctl.liveStatus.destroy();
 });
+
+/* Over time contract matrix (#929, PR 1 of 3). Source: issue behavior items 1-4, 6, 8 and 11 and
+   Chuck's rulings of 2026-11-03. Real slider input and the demo player are in live-status.spec.mjs.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| OT1 | board with and without a history source, before and after evidence | `button.dv-live-over-time` hidden unless a source exists and evidence applied; `snapshot().overTime` null without a source | a button on every board; a button that shows before status has loaded |
+| OT2 | source that counts load calls | load count 0 before the click, 1 after it | loading history at page load or on any repaint |
+| OT3 | `liveStatusDayMap` over a full entry | status and detail from the day; title, owner, PRs, dependencies and epic from today; no updatedAt | an overlay that copies the day's metadata; an overlay that keeps today's status name |
+| OT4 | local nodes, an edge, a step, a lane and a planned node | carrier classes, coin, counts, ring, lanes, blockers, Tickets State and availability follow the day | repainting nodes only |
+| OT5 | imported carriers | imported node and edge classes follow the day | a local-only slice |
+| OT6 | tickets absent from the day, one of them upstream of another | keeps its row and title, stays in the total, state reads No status, never done, no dv-live-missing, dependent's upstream reads No status with a grey tone, and the absent ticket itself does not wait | dropping the ticket from the map; a false Missing dependency |
+| OT7 | overdue active ticket with a live change pulse available | moving days logs no Activity, adds no dv-live-changed, shows no dv-live-stale | moving days through apply() |
+| OT8 | live apply while a past day shows | display, Activity and the editor's remembered map stay put; Back to today shows the newest map and logs its change once | a refresh that overwrites the past day; a past day saved as the last live map |
+| OT9 | fake board editor | Edit disabled with the stated reason on a past day, enabled after; Over time disabled while Edit is active | an editable past day |
+| OT10 | index out of range and not whole | clamped to the range, or ignored | a fractional or undefined day |
+| OT11 | clear() on a past day | mode ends and today's evidence is gone | a past day surviving a permission loss |
+| OT12 | demo timeline with a late ticket, a ticket that later disappears, and one never named | not created yet: no status entry; absent after existing: missing; epic state per day; last day matches the live demo | treating every absent ticket the same |
+| OT13 | provider entry without a state | apply() still drops it | widening the provider contract |
+*/
+const overFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:'EP-1'}},lanes:{APP:{label:'App',color:'#34d399'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',tickets:['AA-1']},b:{title:'Beta',tickets:['BB-1']},planned:{title:'Planned',tickets:['AA-1'],existsWhen:'tickets-done'}},rows:[['a','b','planned']],edges:[{from:'a',to:'b',tickets:['EE-1']}],steps:[{id:'hop',edge:'a->b',lane:'APP'},{id:'beta',nodes:['b'],lane:'APP'}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
+const overStale='2000-01-01T00:00:00Z';
+const overToday=()=>({'EP-1':{state:'active',kind:'epic',title:'Epic'},'AA-1':{state:'done',title:'Alpha work',assignee:'Alex',epic:'EP-1',detail:'Done today',prs:{count:1,state:'merged'}},'BB-1':{state:'active',title:'Beta work',assignee:'Sam',epic:'EP-1',updatedAt:overStale,dependsOn:[{key:'AA-1',source:'jira',linkType:'is blocked by'}]},'EE-1':{state:'active',title:'Edge work',epic:'EP-1'},'ZZ-2':{state:'done',title:'Epic only story',epic:'EP-1'}});
+// Day 0: AA-1 and ZZ-2 do not exist yet. Day 1: AA-1 is blocked. Day 2 is today.
+const overDays=()=>[
+ {label:'Oct 20',short:'Oct 20',states:{'EP-1':{state:'todo'},'BB-1':{state:'todo'},'EE-1':{state:'todo'}}},
+ {label:'Oct 21',short:'Oct 21',states:{'EP-1':{state:'active'},'AA-1':{state:'blocked',detail:'Flagged then'},'BB-1':{state:'todo'},'EE-1':{state:'active'},'ZZ-2':{state:'todo'}}},
+ {label:'Oct 22',short:'Oct 22',states:{'EP-1':{state:'active'},'AA-1':{state:'done'},'BB-1':{state:'active'},'EE-1':{state:'active'},'ZZ-2':{state:'done'}}}];
+const overButton=h=>h.view.querySelector('button.dv-live-over-time');
+function overReady(api){assert.equal(typeof api.setHistory,'function','#929: the controller accepts a history source');return api;}
+async function overOpen(h,index){const api=overReady(h.ctl.liveStatus);api.setHistory({load:()=>({days:overDays()})});api.overTime();await historySettle();if(index!=null)api.overTimeDay(index);return api;}
+const overRow=(h,key)=>h.view.querySelector('tr[data-live-ticket="'+key+'"]');
+const overState=(h,key)=>overRow(h,key).querySelector('.dv-live-state-pill');
+test('OT1 OT2 Over time shows with a history source and evidence, and only the click loads',async()=>{
+ const none=harness(overFixture()),noneApi=none.ctl.liveStatus;mountStatus(none);noneApi.apply(overToday());
+ assert.equal(noneApi.snapshot().overTime,null,'no source, no mode');assert.ok(!overButton(none) || overButton(none).hidden,'no source, no button');
+ const h=harness(overFixture()),api=overReady(h.ctl.liveStatus);let loads=0;mountStatus(h);api.setHistory({load(){loads++;return {days:overDays()};}});
+ assert.ok(!overButton(h) || overButton(h).hidden,'no evidence, no button');
+ api.apply(overToday());assert.equal(overButton(h).hidden,false);assert.equal(overButton(h).textContent,'Over time');assert.equal(loads,0);
+ api.apply(overToday());h.flush();assert.equal(loads,0,'repaints and refreshes load nothing');
+ overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(loads,1);assert.equal(overButton(h).textContent,'Back to today');
+ assert.equal(api.snapshot().overTime.active,true);assert.equal(api.snapshot().overTime.count,3);assert.equal(api.snapshot().overTime.index,2,'a board opens on its last day');
+ const slider=h.view.querySelector('input.dv-live-over-time-slider');assert.equal(slider.type,'range');assert.equal(slider.min,'0');assert.equal(slider.max,'2');assert.equal(slider.step,'1');assert.equal(slider.getAttribute('aria-label'),'Day');
+ assert.deepEqual(h.view.querySelectorAll('.dv-live-over-time-end').map(el=>el.textContent),['Oct 20','Oct 22']);
+ assert.equal(h.view.querySelector('.dv-live-over-time-note').textContent,'Status as of Oct 22 · other columns show today');
+ slider.value='1';slider.dispatchEvent({type:'input'});assert.equal(api.snapshot().overTime.index,1);assert.equal(slider.getAttribute('aria-valuetext'),'Oct 21');
+ overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,false);assert.equal(h.view.querySelector('input.dv-live-over-time-slider'),null);assert.equal(loads,1,'closing loads nothing');
+});
+test('OT3 a day overlay takes status from the day and everything else from today',()=>{
+ const C=harness().C,today=overToday();assert.equal(typeof C.liveStatusDayMap,'function');
+ const map=plain(C.liveStatusDayMap(today,{'AA-1':{state:'blocked',detail:'Flagged then',title:'Old title'},'BB-1':{state:'unknown'}}));
+ assert.deepEqual(map['AA-1'],{state:'blocked',title:'Alpha work',assignee:'Alex',epic:'EP-1',detail:'Flagged then',prs:{count:1,state:'merged'}});
+ assert.deepEqual(map['BB-1'],{title:'Beta work',assignee:'Sam',epic:'EP-1',dependsOn:[{key:'AA-1',source:'jira',linkType:'is blocked by'}]});
+ assert.equal(map['EE-1'].state,undefined);assert.equal(today['BB-1'].updatedAt,overStale,'today is not modified');assert.equal(today['AA-1'].state,'done');
+});
+test('OT4 moving days repaints carriers, coins, counts, ring, lanes, blockers, Tickets and availability',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());
+ const a=h.view.querySelector('[data-dv-node="a"]'),planned=h.view.querySelector('[data-dv-node="planned"]'),edge=h.view.querySelector('path.edge'),coin=h.view.querySelector('g.coin[data-dv-step="1"]');
+ // Contrasting precondition: today AA-1 is done and the planned node is available.
+ assert.ok(a.classList.contains('dv-live-done'));assert.ok(!planned.classList.contains('dv-live-unavailable'));assert.equal(api.snapshot().counts.blocked,0);assert.equal(api.snapshot().readiness.done,2);
+ await overOpen(h,1);h.flush();
+ assert.ok(a.classList.contains('dv-live-blocked'));assert.ok(!a.classList.contains('dv-live-done'));assert.ok(edge.classList.contains('dv-live-active'));assert.ok(coin.classList.contains('dv-live-todo'));assert.ok(planned.classList.contains('dv-live-unavailable'),'availability follows the day');
+ const snap=api.snapshot();assert.equal(snap.counts.blocked,1);assert.equal(snap.counts.todo,2);assert.equal(snap.readiness.done,0);assert.deepEqual(plain(snap.blockers).map(item=>item.key),['AA-1']);
+ assert.equal(snap.lanes[0].state,'blocked');assert.equal(snap.lanes[0].done,0);assert.equal(overState(h,'AA-1').textContent,'blocked');assert.equal(overState(h,'ZZ-2').textContent,'todo');assert.equal(h.view.querySelector('.dv-live-blocker').querySelector('.nbacklink').textContent,'AA-1');
+ assert.match(overCaption(h,0),/^IN PROGRESS/);
+ api.overTimeDay(0);h.flush();assert.ok(edge.classList.contains('dv-live-todo'));assert.ok(!edge.classList.contains('dv-live-active'));
+ api.overTimeDay(2);h.flush();assert.ok(a.classList.contains('dv-live-done'));assert.ok(!planned.classList.contains('dv-live-unavailable'));assert.equal(api.snapshot().counts.blocked,0);assert.equal(overState(h,'ZZ-2').textContent,'done');
+});
+function overCaption(h,step){const d=h.ctl.page.sections[0].diagram,snap=h.ctl.liveStatus.snapshot();return h.C.liveStatusCaption(d,d.steps[step],snap.states,snap.waiting);}
+test('OT5 imported carriers follow the same day map as local ones',async()=>{
+ const seed=harness(),C=seed.C;seed.ctl.liveStatus.destroy();
+ const model=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}});
+ const provider=model('provider',{nodes:{api:{title:'API'},db:{title:'DB'}},rows:[['api','db']],edges:[{from:'api',to:'db',label:'Persist'}],topologyExports:{core:{nodes:['api','db'],edges:['api->db']}}});
+ const consumer=model('consumer',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'canon',nodeTracking:{api:{tickets:['AA-1']}},edgeTracking:{'api->db':{tickets:['AA-2']}}}],steps:[{id:'persist',edge:'canon::api->canon::db'}]});
+ consumer.page.tracking={jira:{site:'https://jira.test'}};
+ const h=harness(C.FlowTopology.materialize([provider,consumer])[1]),api=h.ctl.liveStatus;api.apply({'AA-1':{state:'done',title:'One'},'AA-2':{state:'done',title:'Two'}});
+ const node=h.view.querySelector('[data-dv-node="canon::api"]'),edge=h.view.querySelector('path.edge');assert.ok(node.classList.contains('dv-live-done'));assert.ok(edge.classList.contains('dv-live-done'));
+ overReady(api).setHistory({load:()=>({days:[{label:'One',short:'One',states:{'AA-1':{state:'blocked'},'AA-2':{state:'active'}}},{label:'Two',short:'Two',states:{'AA-1':{state:'done'},'AA-2':{state:'done'}}}]})});api.overTime();await historySettle();api.overTimeDay(0);h.flush();
+ assert.ok(node.classList.contains('dv-live-blocked'));assert.ok(edge.classList.contains('dv-live-active'));assert.ok(!edge.classList.contains('dv-live-done'));
+ assert.equal(api.state('AA-1').title,'One','imported ticket metadata stays as of today');api.destroy();
+});
+test('OT6 a ticket before creation keeps its row, stays in the total and is never Missing or done',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());const total=api.snapshot().epic.stories;assert.equal(total,4);
+ await overOpen(h,0);h.flush();const snap=api.snapshot();
+ assert.equal(snap.epic.stories,total,'the total is the same on every day');assert.equal(snap.epic.done,0);
+ assert.equal(overState(h,'ZZ-2').textContent,'No status');assert.equal(overRow(h,'ZZ-2').querySelector('.dv-live-ticket-title').textContent,'Epic only story');assert.match(textOf(overRow(h,'ZZ-2').querySelector('.dv-live-ticket-owner')),/Unassigned/);
+ assert.equal(overState(h,'AA-1').textContent,'No status');assert.match(textOf(overRow(h,'AA-1').querySelector('.dv-live-ticket-owner')),/Alex/,'owner stays as of today');
+ assert.equal(h.view.querySelectorAll('.dv-live-missing').length,0,'no red anywhere');assert.equal(snap.counts.missing,0);assert.deepEqual(plain(snap.blockers),[]);
+ const a=h.view.querySelector('[data-dv-node="a"]');for(const state of ['todo','active','done','blocked','missing'])assert.ok(!a.classList.contains('dv-live-'+state),state);
+ const up=plain(snap.tickets.find(item=>item.key==='BB-1').dependsOn[0]);assert.equal(up.key,'AA-1');assert.equal(up.state,'No status');assert.equal(up.tone,'grey');
+ assert.equal(snap.waiting['BB-1'].tone,'grey');assert.equal(snap.waiting['AA-1'],undefined);assert.equal(snap.waiting['ZZ-2'],undefined);
+ assert.equal(Object.keys(plain(snap.counts)).length,5,'No status adds no count');
+ assert.equal(overCaption(h,1),'TODO · 1 tickets · waiting on AA-1');
+});
+test('OT7 moving days logs no Activity, adds no change pulse and shows no stale mark',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus,today=overToday();api.apply(today);today['EE-1'].state='todo';api.apply(today);
+ const b=h.view.querySelector('[data-dv-node="b"]'),edge=h.view.querySelector('path.edge'),rows=()=>h.view.querySelectorAll('.dv-live-activity-entry').map(el=>el.textContent);
+ // Contrasting precondition: a real change pulsed and logged one row, and BB-1 is overdue and active today.
+ assert.equal(rows().length,1);assert.ok(edge.classList.contains('dv-live-changed'));edge.dispatchEvent({type:'animationend'});assert.equal(h.view.querySelectorAll('.dv-live-changed').length,0);assert.ok(b.classList.contains('dv-live-stale'));const before=rows();
+ await overOpen(h,1);h.flush();
+ for(const index of [0,1,2,0]){api.overTimeDay(index);h.flush();assert.deepEqual(rows(),before);assert.equal(h.view.querySelectorAll('.dv-live-changed').length,0,'day '+index);assert.equal(h.view.querySelectorAll('.dv-live-stale').length,0,'day '+index);}
+ api.overTimeDay(2);api.overTime();await historySettle();h.flush();assert.ok(b.classList.contains('dv-live-stale'),'the stale mark returns with today');assert.deepEqual(rows(),before);
+});
+test('OT8 a refresh during a past day waits, then Back to today shows the newest status once',async()=>{
+ const remembered=[],editor={state:()=>({editable:false,blocked:'',active:false,pending:0,saving:false,readOnly:false,notice:null}),onChange:()=>()=>{},rememberMap(map){remembered.push(map);},lastMap:()=>null,question:()=>null};
+ const h=harness(overFixture(),{},{boardEditor:editor});mountStatus(h);const api=h.ctl.liveStatus,today=overToday();api.apply(today);assert.equal(remembered.length,1);
+ await overOpen(h,1);h.flush();const a=h.view.querySelector('[data-dv-node="a"]'),b=h.view.querySelector('[data-dv-node="b"]'),rows=()=>h.view.querySelectorAll('.dv-live-activity-entry').map(el=>el.textContent);
+ assert.ok(a.classList.contains('dv-live-blocked'));assert.equal(remembered.length,1,'a past day is never remembered as live');
+ const newer=overToday();newer['BB-1'].state='done';delete newer['BB-1'].updatedAt;newer['BB-1'].title='Newest title';api.apply(newer);h.flush();
+ assert.ok(a.classList.contains('dv-live-blocked'),'the refresh leaves the day on screen');assert.ok(!b.classList.contains('dv-live-done'));assert.equal(rows().length,0);assert.equal(overRow(h,'BB-1').querySelector('.dv-live-ticket-title').textContent,'Beta work');assert.equal(api.snapshot().overTime.active,true);
+ api.overTime();await historySettle();h.flush();
+ assert.equal(api.snapshot().overTime.active,false);assert.ok(a.classList.contains('dv-live-done'));assert.ok(b.classList.contains('dv-live-done'));assert.equal(overRow(h,'BB-1').querySelector('.dv-live-ticket-title').textContent,'Newest title');
+ assert.equal(rows().length,1);assert.match(rows()[0],/^BB-1 · active → done/);assert.equal(remembered.at(-1),newer,'the newest live map is what an edit re-render restores');
+});
+test('OT9 Edit is disabled with a reason on a past day and Over time waits for Edit to finish',async()=>{
+ let active=false;const editor={state:()=>({editable:true,blocked:'',active,pending:0,saving:false,readOnly:false,notice:null}),onChange:()=>()=>{},rememberMap(){},lastMap:()=>null,question:()=>null,start(){active=true;}};
+ const h=harness(overFixture(),{},{boardEditor:editor});mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());const edit=()=>h.view.querySelector('button.dv-live-edit'),reason=()=>h.view.querySelector('.dv-live-edit-reason');
+ assert.equal(edit().disabled,false);assert.equal(reason().hidden,true);await overOpen(h,1);
+ assert.equal(edit().disabled,true);assert.equal(reason().hidden,false);assert.equal(reason().textContent,'Editing is off while a past day is shown.');
+ api.overTime();await historySettle();assert.equal(edit().disabled,false);assert.equal(reason().hidden,true);
+ active=true;api.note('repaint');assert.equal(overButton(h).disabled,true);let loads=0;api.setHistory({load(){loads++;return {days:overDays()};}});api.overTime();await historySettle();assert.equal(loads,0,'Edit mode refuses the click as well');
+});
+test('OT10 only whole days inside the range are accepted',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());await overOpen(h,1);
+ api.overTimeDay(99);assert.equal(api.snapshot().overTime.index,2);api.overTimeDay(-4);assert.equal(api.snapshot().overTime.index,0);
+ api.overTimeDay(1);for(const bad of [1.5,NaN,'x',undefined])api.overTimeDay(bad);assert.equal(api.snapshot().overTime.index,1);
+});
+test('OT11 clear on a past day ends the mode and leaves no evidence',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());await overOpen(h,1);h.flush();api.apply(overToday());api.clear();h.flush();
+ assert.equal(api.snapshot().overTime.active,false);assert.equal(h.view.querySelector('input.dv-live-over-time-slider'),null);assert.equal(api.state('AA-1'),null);assert.equal(h.view.querySelectorAll('.dv-live-blocked').length,0);
+ api.overTime();await historySettle();assert.equal(api.state('AA-1'),null,'a held refresh does not return after clear');
+});
+test('OT11 destroy while history loads leaves the board alone',async()=>{
+ const h=harness(overFixture());const api=overReady(h.ctl.liveStatus);api.apply(overToday());let resolve;let loads=0;api.setHistory({load:()=>{loads++;return new Promise(done=>{resolve=done;});}});api.overTime();api.overTime();assert.equal(api.snapshot().overTime.loading,true);await historySettle();assert.equal(loads,1,'a second click while loading starts nothing');api.destroy();resolve({days:overDays()});await historySettle();assert.equal(api.snapshot().overTime.active,false);
+});
+test('OT12 demo days separate tickets not created yet from tickets that later disappear',()=>{
+ const C=storyContext();assert.equal(typeof C.liveStatusDemoDays,'function');
+ const timeline={epics:{'EP-1':{summary:'Epic'}},days:[{label:'Day 1 — start',issues:{'AA-1':{state:'todo',epic:'EP-1',statusName:'To Do'}}},{label:'second',issues:{'AA-1':{state:'done',epic:'EP-1'},'BB-1':{state:'active',epic:'EP-1'}}},{label:'Day 3 — gone',issues:{'BB-1':{state:'done',epic:'EP-1'}}}]};
+ const days=plain(C.liveStatusDemoDays(timeline,['AA-1','BB-1','CC-1']));assert.equal(days.length,3);
+ assert.deepEqual(days.map(day=>day.label),['Day 1 — start','Day 2 — second','Day 3 — gone']);assert.deepEqual(days.map(day=>day.short),['Day 1','Day 2','Day 3']);
+ assert.equal(days[0].states['BB-1'],undefined,'not created yet');assert.equal(days[0].states['AA-1'].state,'todo');assert.equal(days[0].states['AA-1'].detail,'To Do');
+ assert.equal(days[0].states['EP-1'].state,'todo');assert.equal(days[1].states['EP-1'].state,'active');
+ assert.equal(days[2].states['AA-1'].state,'missing','absent after it existed: the story says it became unavailable');assert.equal(days[1].states['CC-1'],undefined,'never named before the last day');
+ assert.equal(days[2].states['CC-1'].state,'missing','the last day matches the live demo');
+});
+test('OT13 apply still drops a provider entry without a valid state',()=>{
+ const h=harness(overFixture()),api=h.ctl.liveStatus;api.apply({'AA-1':{title:'No state'},'BB-1':{state:'nope'},'EE-1':{state:'todo'}});assert.equal(api.state('AA-1'),null);assert.equal(api.state('BB-1'),null);assert.equal(api.state('EE-1').state,'todo');
+});

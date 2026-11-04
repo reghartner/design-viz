@@ -52,6 +52,13 @@
       edges[0].label (local) / edgeOverrides {'api->store':{label}} (imported); text.lbl appears; Undo
       -> original (no text.lbl); Redo -> saved | an editor that needs an existing text.lbl; an editor
       placed at an endpoint node
+   12 provider source unchanged (every case; the contract names imported) | the provider document
+      this test serves (fixture's provider object, the file's existing provider-identity mechanism),
+      snapshotted after load; every request the page sends for provider.json | after each save and
+      each Undo: JSON.stringify(provider) === the snapshot and no request other than GET/HEAD went to
+      provider.json; the post-Undo rendering shows the provider's own label ('Persist' / no label),
+      i.e. the provider as the Workbench holds it | an imported rename that writes or mutates the
+      provider instead of the consumer's Display label overlay
    excluded — §0 ruling ("the ticket's Test + flip section, as written"): double-clicking a curve
       handle still removes that point (neighbor tools/browser-tests/tests/edge-curves.spec.mjs stays
       green); stale-source draft drop (shared editor behavior from #960); keyboard Shift+F10 route to
@@ -525,6 +532,13 @@ async function rightClickArrow(page,i){
   expect(await page.evaluate(({x,y})=>{const hit=document.elementFromPoint(x,y),edge=hit && hit.closest('[data-dv-edge]');return edge?{edge:edge.getAttribute('data-dv-edge'),text:edge.tagName.toLowerCase()==='text'}:null;},p)).toEqual({edge:String(i),text:false});
   await page.mouse.click(p.x,p.y,{button:'right'});
 }
+// The provider document exactly as this test serves it, and every request the page sends for it: no
+// edge label edit may write the provider.
+function watchProvider(page,provider){
+  const bytes=JSON.stringify(provider),writes=[];
+  page.on('request',request=>{if(new URL(request.url()).pathname.endsWith('/provider.json') && !['GET','HEAD'].includes(request.method()))writes.push(request.method()+' '+request.url());});
+  return ()=>{expect(JSON.stringify(provider)).toBe(bytes);expect(writes).toEqual([]);};
+}
 async function covers(locator,p,slack=4){
   const b=await locator.boundingBox();expect(b).not.toBeNull();
   expect(p.x).toBeGreaterThanOrEqual(b.x-slack);expect(p.x).toBeLessThanOrEqual(b.x+b.width+slack);
@@ -533,7 +547,7 @@ async function covers(locator,p,slack=4){
 
 for(const imported of [false,true])test('edge label '+(imported?'imported':'local')+' double-click edits in place: Escape, click outside, empty rule, one Undo, drag still moves',async({page,server})=>{
   const i=imported?1:0,first=imported?'Persist':'Request',shown=value=>imported?value:'? Open · '+value;
-  await fixture(page,server,'file','ambient',labeled(imported));
+  const {provider}=await fixture(page,server,'file','ambient',labeled(imported)),providerUnchanged=watchProvider(page,provider);
   const src=page.locator('#src'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder'),original=await source(page),label=edgeText(page,i),edit=labelEditor(page);
   // P1: the fixture discriminates source from rendered text (local) and carries an overlay to keep (imported).
   await expect(label).toHaveText(shown(first));await expect(edit).toHaveCount(0);
@@ -557,9 +571,9 @@ for(const imported of [false,true])test('edge label '+(imported?'imported':'loca
   await label.dblclick();await expect(edit).toBeFocused();await edit.selectText();await edit.pressSequentially('Clicked away');await expect(src).toHaveValue(original);
   await node(page,'other').click();await expect(edit).toHaveCount(0);
   const saved=await source(page);expect(JSON.parse(saved)).toEqual(relabeled(original,imported,'Clicked away'));
-  await expect(label).toHaveText(shown('Clicked away'));
+  await expect(label).toHaveText(shown('Clicked away'));providerUnchanged();
   // Row 4: one save is one Undo entry; Redo reapplies it.
-  await undo.click();await expect(src).toHaveValue(original);await expect(label).toHaveText(shown(first));
+  await undo.click();await expect(src).toHaveValue(original);await expect(label).toHaveText(shown(first));providerUnchanged();
   await redo.click();await expect(src).toHaveValue(saved);await expect(label).toHaveText(shown('Clicked away'));
   await undo.click();await expect(src).toHaveValue(original);
   // Row 5: an empty draft saves exactly what clearing the Inspect field saves.
@@ -576,12 +590,12 @@ for(const imported of [false,true])test('edge label '+(imported?'imported':'loca
     const e=diagram(moved).edges[0];expect(e.labelDx).toBeGreaterThan(0);expect(e.labelDy).toBeLessThan(0);
     Object.assign(diagram(want).edges[0],{labelDx:e.labelDx,labelDy:e.labelDy});
   }
-  expect(moved).toEqual(want);await expect(label).toHaveText(shown(first));
+  expect(moved).toEqual(want);await expect(label).toHaveText(shown(first));providerUnchanged();
 });
 
 for(const imported of [false,true])test('edge label '+(imported?'imported':'local')+' right-click Rename on the label and on the arrow saves with Enter and one Undo',async({page,server})=>{
   const i=imported?1:0,first=imported?'Persist':'Request',shown=value=>imported?value:'? Open · '+value;
-  await fixture(page,server,'file','ambient',labeled(imported));
+  const {provider}=await fixture(page,server,'file','ambient',labeled(imported)),providerUnchanged=watchProvider(page,provider);
   const src=page.locator('#src'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder'),original=await source(page),label=edgeText(page,i),edit=labelEditor(page);
   const menu=edgeMenu(page,imported),rename=menu.getByRole('menuitem',{name:'Rename',exact:true}),route=await edgePath(page,i).getAttribute('d');
   await expect(label).toHaveText(shown(first));await expect(menu).toHaveCount(0);await expect(edit).toHaveCount(0);
@@ -593,22 +607,23 @@ for(const imported of [false,true])test('edge label '+(imported?'imported':'loca
   // Row 8: Enter saves only the label; an imported connection keeps its layout.
   await edit.selectText();await edit.pressSequentially('Renamed hop');await expect(src).toHaveValue(original);await edit.press('Enter');await expect(edit).toHaveCount(0);
   const saved=await source(page);expect(JSON.parse(saved)).toEqual(relabeled(original,imported,'Renamed hop'));
-  await expect(label).toHaveText(shown('Renamed hop'));if(imported)await expect(edgePath(page,i)).toHaveAttribute('d',route);
+  await expect(label).toHaveText(shown('Renamed hop'));if(imported)await expect(edgePath(page,i)).toHaveAttribute('d',route);providerUnchanged();
   // Row 9: one Undo restores the exact source; Redo reapplies it.
-  await undo.click();await expect(src).toHaveValue(original);await expect(label).toHaveText(shown(first));
+  await undo.click();await expect(src).toHaveValue(original);await expect(label).toHaveText(shown(first));providerUnchanged();
   await redo.click();await expect(src).toHaveValue(saved);await expect(label).toHaveText(shown('Renamed hop'));
   // Row 10: right-click the arrow itself -> Rename, holding the current label.
   at=centre(await label.boundingBox());
   await rightClickArrow(page,i);await expect(menu).toBeVisible();await expect(rename).toBeVisible();await rename.click();
   await expect(edit).toBeFocused();await expect(edit).toHaveValue('Renamed hop');await covers(edit,at);
   await edit.selectText();await edit.pressSequentially('Arrow rename');await edit.press('Enter');await expect(edit).toHaveCount(0);
-  expect(JSON.parse(await source(page))).toEqual(relabeled(original,imported,'Arrow rename'));await expect(label).toHaveText(shown('Arrow rename'));
-  await undo.click();await expect(src).toHaveValue(saved);await expect(label).toHaveText(shown('Renamed hop'));
+  expect(JSON.parse(await source(page))).toEqual(relabeled(original,imported,'Arrow rename'));await expect(label).toHaveText(shown('Arrow rename'));providerUnchanged();
+  await undo.click();await expect(src).toHaveValue(saved);await expect(label).toHaveText(shown('Renamed hop'));providerUnchanged();
 });
 
 for(const imported of [false,true])test('edge label '+(imported?'imported':'local')+' without a label: right-click Rename on the arrow creates one at the midpoint',async({page,server})=>{
   const i=imported?1:0;
-  await fixture(page,server,'file','ambient',(provider,consumer)=>{if(imported)delete diagram(provider).edges[0].label;else{retarget(consumer);delete diagram(consumer).edges[0].label;}});
+  const {provider}=await fixture(page,server,'file','ambient',(provider,consumer)=>{if(imported)delete diagram(provider).edges[0].label;else{retarget(consumer);delete diagram(consumer).edges[0].label;}});
+  const providerUnchanged=watchProvider(page,provider);
   const src=page.locator('#src'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder'),original=await source(page),label=edgeText(page,i),edit=labelEditor(page);
   const menu=edgeMenu(page,imported),rename=menu.getByRole('menuitem',{name:'Rename',exact:true});
   // P1: the edge renders without any label.
@@ -623,7 +638,7 @@ for(const imported of [false,true])test('edge label '+(imported?'imported':'loca
   expect(middle.x).toBeGreaterThanOrEqual(box.x);expect(middle.x).toBeLessThanOrEqual(box.x+box.width);
   for(const end of ends)expect(distance(c,middle)).toBeLessThan(distance(c,end));
   await edit.pressSequentially('Created label');await edit.press('Enter');await expect(edit).toHaveCount(0);
-  const saved=await source(page);expect(JSON.parse(saved)).toEqual(relabeled(original,imported,'Created label'));await expect(label).toHaveText('Created label');
-  await undo.click();await expect(src).toHaveValue(original);await expect(label).toHaveCount(0);
+  const saved=await source(page);expect(JSON.parse(saved)).toEqual(relabeled(original,imported,'Created label'));await expect(label).toHaveText('Created label');providerUnchanged();
+  await undo.click();await expect(src).toHaveValue(original);await expect(label).toHaveCount(0);providerUnchanged();
   await redo.click();await expect(src).toHaveValue(saved);await expect(label).toHaveText('Created label');
 });

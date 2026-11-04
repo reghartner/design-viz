@@ -1,8 +1,8 @@
 // Pure JSON-RPC handler: no network, filesystem, clock or Cloudflare APIs.
 // Tool names, parameter names and result shapes follow grafana/mcp-grafana's source
 // (tools/*.go, read 2026-11-04), not a captured tools/list. The data is the doorbell
-// story's fixture telemetry from ./story.mjs on the shared 12-day timeline.
-import { HOUR, DAY, STORY_START, SERIES, ANNOTATIONS, createStory, storyNow, hourOf, traceFor, hash } from './story.mjs';
+// story's telemetry block on the shared 12-day timeline, read through ./story.mjs.
+import { HOUR, DAY, STORY_START, SERIES, createStory, storyNow, hourOf, traceFor, hash } from './story.mjs';
 
 const EPOCH = Date.parse('2026-10-20T09:00:00Z');
 const GRAFANA = 'https://acme.grafana.net';
@@ -72,7 +72,7 @@ function worldFor(env) {
   const index = dayIndex(env, model.days);
   const now = storyNow(index);
   const silent = (env.scenario ?? 'story') !== 'story';
-  return { now, silent, valueAt: model.valueAt,
+  return { now, silent, valueAt: model.valueAt, sample: model.sample, annotations: silent ? [] : model.annotations,
     at(series, t) { const hour = hourOf(t, now); return silent || hour === null ? null : model.valueAt(series.id, hour); } };
 }
 
@@ -394,7 +394,7 @@ function getAnnotations(args, world) {
   const from = args.from == null ? -Infinity : Number(integer(args.from)), to = args.to == null ? Infinity : Number(integer(args.to));
   const tags = Array.isArray(args.tags) ? args.tags : [];
   const limit = integer(args.limit) > 0 ? integer(args.limit) : 100;
-  const payload = ANNOTATIONS.filter(a => a.time <= world.now && a.time >= from && a.time <= to &&
+  const payload = world.annotations.filter(a => a.time <= world.now && a.time >= from && a.time <= to &&
     (!tags.length || (args.matchAny ? tags.some(tag => a.tags.includes(tag)) : tags.every(tag => a.tags.includes(tag)))))
     .sort((a, b) => b.time - a.time || b.id - a.id).slice(0, limit)
     .map(a => ({ created: a.time, id: a.id, login: 'deploy-bot', tags: [...a.tags], text: a.text, time: a.time, timeEnd: a.time, updated: a.time }));

@@ -19,6 +19,32 @@ function liveStatusDemoMap(day,keys,epics){
     map[key]=entry;
   });return map;
 }
+/* One story day's telemetry block (#944) as the proof engine's telemetry map (#938):
+   {carrierId: {signals: {name: {value, series: [[t, v], ...], unit}}, observedAt}}.
+   The block holds values per carrier signal from `start` every `stepSeconds`; each
+   point is stamped at the end of its step and the value is the last step. A null step
+   becomes 0, as a connector reports a query that ran and matched nothing. */
+function liveStatusDemoTelemetry(day){
+  var map=Object.create(null),block=day && day.telemetry;
+  if(!block || typeof block!=='object' || !block.carriers || typeof block.carriers!=='object')return map;
+  var start=typeof block.start==='string'?Date.parse(block.start):NaN,step=Number(block.stepSeconds)*1000,end=start;
+  if(!isFinite(start) || !(step>0))return map;
+  Object.keys(block.carriers).forEach(function(id){
+    var signals=block.carriers[id],out=Object.create(null),any=false;
+    if(!signals || typeof signals!=='object')return;
+    Object.keys(signals).forEach(function(name){
+      var signal=signals[name],values=signal && Array.isArray(signal.values)?signal.values:null;
+      if(!values || !values.length)return;
+      var series=values.map(function(v,k){return [start+(k+1)*step,typeof v==='number' && isFinite(v)?v:0];});
+      out[name]={value:series[series.length-1][1],series:series,unit:typeof signal.unit==='string'?signal.unit:null};
+      end=Math.max(end,start+values.length*step);any=true;
+    });
+    if(any)map[id]={signals:out};
+  });
+  var observedAt=new Date(end).toISOString();
+  Object.keys(map).forEach(function(id){map[id].observedAt=observedAt;});
+  return map;
+}
 function liveStatusDemoTimeline(keys){
   var labels=['kickoff','work starts','dependency blocked','delivery complete'];
   return {version:1,intervalSeconds:6,days:labels.map(function(label,index){
@@ -41,6 +67,8 @@ function createLiveStatusDemo(doc){
     var current=timeline.days[day],label=String(current.label || '');
     if(typeof api.status==='function')api.status({state:'demo',source:'Demo',busy:false,checkedAt:Date.now()});
     api.apply(liveStatusDemoMap(current,api.refs().tickets,timeline.epics));
+    // The same day's telemetry goes to a telemetry sink when the host offers one (#939 draws it).
+    if(api.telemetry && typeof api.telemetry.apply==='function')api.telemetry.apply(liveStatusDemoTelemetry(current));
     api.note(/^Day \d+\s*[—-]/.test(label)?label:'Day '+(day+1)+' — '+label,'info');controls();
   }
   function arm(){
@@ -54,6 +82,7 @@ function createLiveStatusDemo(doc){
   function visibility(){arm();}
   return {
     provider:function(refs){var t=ensure(refs.tickets);return liveStatusDemoMap(t.days[day],refs.tickets,t.epics);},
+    telemetry:{provider:function(){return timeline?liveStatusDemoTelemetry(timeline.days[day]):Object.create(null);}},
     demo:{mount:function(live){
       api=live;ensure(api.refs().tickets);playing=!manual();paint();arm();
       doc.addEventListener('visibilitychange',visibility);if(media)media.addEventListener('change',motionChanged);

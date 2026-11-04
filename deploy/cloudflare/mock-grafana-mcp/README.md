@@ -115,10 +115,25 @@ Carriers are keyed as the proof engine keys them: a node id (`ingest`,
 example spec's `telemetry` bindings. `values[k]` is the signal for the hour
 from `start + k` hours to `start + k + 1` hours; `null` is an hour without a
 sample, which the mock serves as no data. The mock reads every series and
-annotation from this block and models nothing itself. The `code="200"` request
-series is the event edge's `rate` minus its `errors`, and the ingest node's
-signals repeat the event edge's request totals. `tools/inject.py` checks the
-block's shape when it embeds the timeline. The demo replay hands each day's
+annotation from this block and models nothing itself. Every signal a binding
+queries answers from that carrier's own entry. Change one carrier's series and
+only that carrier's answers change. Both the event edge and the ingest node
+count `http_server_requests_total`, so its series are signed sums of the two
+entries:
+
+| request series | value |
+|---|---|
+| `route="/v1/events", code="200"` | event edge `rate` minus `errors` |
+| `route="/v1/events", code="503"` | event edge `errors` |
+| `route="other", code="200"` | ingest node `rate` minus `errors`, minus the event edge's `rate` minus `errors` |
+| `route="other", code="503"` | ingest node `errors` minus the event edge's `errors` |
+
+The edge's queries match `route="/v1/events"` and sum back to the edge's own
+entry; the node's queries match every route and sum back to the node's own
+entry. In the story the node's totals equal the edge's, so the `route="other"`
+series are 0. The one thing not stored is the exemplar traces. The mock builds
+them from the event edge, route and notify entries (see `search_tempo_traces`).
+`tools/inject.py` checks the block's shape when it embeds the timeline. The demo replay hands each day's
 block to the page as a telemetry map, with `null` read as 0, as a connector
 reports a query that matched nothing.
 
@@ -172,7 +187,8 @@ Datasources: `prom-main` (Prometheus), `loki-main` (Loki), `tempo-main` (Tempo).
 | node ingest | rate, errors | Prometheus | the event expressions without the `route` matcher |
 | node notify | rate | Loki | `sum(rate({app="notify"} \|= "event consumed" [5m]))*3600` |
 
-Request series carry the labels `service`, `route` and `code` (`200` or `503`).
+Request series carry the labels `service`, `route` (`/v1/events` or `other`) and
+`code` (`200` or `503`).
 Histograms are served only as `histogram_quantile(0.95, ...)` over a `_bucket`
 metric. A LogQL query without a range function, such as `{app="notify"}`,
 returns log lines.
@@ -251,5 +267,5 @@ Run `node --test tests/mock-grafana-mcp.test.js` from the root. The pure
 supplies epoch milliseconds, `env.scenario` and `env.day` supply selection, and
 `env.DEPLOYED_AT` supplies the clock origin. An optional `env.timeline`
 replaces the shared timeline for tests. `story.mjs` maps each served metric
-series to its timeline signal, reads the values and annotations, and builds the
+series to its timeline signals, reads the values and annotations, and builds the
 exemplar traces.

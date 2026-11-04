@@ -13,17 +13,28 @@ export const STORY_START = Date.parse('2026-10-20T00:00:00Z');
 export const storyNow = index => STORY_START + (index + 1) * DAY;
 
 // Every metric series the mock serves (a Prometheus metric with labels, or a Loki stream
-// with a line phrase) and the timeline signal it reads, as `carrier.signal` with carriers
-// keyed like the proof engine: a node id, or from->to for an edge. The request counter
-// with code="200" is the event edge's rate minus its errors. `quantile` marks a histogram
-// served as its p95 in ms.
+// with a line phrase) and the timeline signals it reads, as `carrier.signal` with carriers
+// keyed like the proof engine: a node id, or from->to for an edge. Most series read one
+// signal. `terms` makes a series a signed sum of signals, so that every query a binding
+// sends sums back to exactly that carrier's own timeline values:
+//   route="/v1/events" code="200"  event edge rate - errors
+//   route="other"      code="200"  (ingest rate - errors) - (event rate - errors)
+//   route="other"      code="503"  ingest errors - event errors
+// The event edge's queries match route="/v1/events" only and return the edge's signals;
+// the ingest node's queries match every route and return the node's own signals. The
+// first term decides presence: when it is null the series has no sample that hour.
+// `quantile` marks a histogram served as its p95 in ms.
 export const SERIES = [
   { id: 'press', metric: 'button_press_total', labels: { device: 'doorbell' }, carrier: 'button->mcu', signal: 'rate' },
   { id: 'ring', metric: 'chime_ring_total', labels: { device: 'doorbell' }, carrier: 'mcu->chime', signal: 'rate' },
   { id: 'event-ok', metric: 'http_server_requests_total', labels: { service: 'event-ingest', route: '/v1/events', code: '200' },
-    carrier: 'mcu->ingest', signal: 'rate', minus: 'errors' },
+    terms: [[1, 'mcu->ingest', 'rate'], [-1, 'mcu->ingest', 'errors']] },
   { id: 'event-err', metric: 'http_server_requests_total', labels: { service: 'event-ingest', route: '/v1/events', code: '503' },
     carrier: 'mcu->ingest', signal: 'errors' },
+  { id: 'ingest-other-ok', metric: 'http_server_requests_total', labels: { service: 'event-ingest', route: 'other', code: '200' },
+    terms: [[1, 'ingest', 'rate'], [-1, 'ingest', 'errors'], [-1, 'mcu->ingest', 'rate'], [1, 'mcu->ingest', 'errors']] },
+  { id: 'ingest-other-err', metric: 'http_server_requests_total', labels: { service: 'event-ingest', route: 'other', code: '503' },
+    terms: [[1, 'ingest', 'errors'], [-1, 'mcu->ingest', 'errors']] },
   { id: 'event-p95', metric: 'http_server_request_duration_seconds_bucket', quantile: 0.95,
     labels: { service: 'event-ingest', route: '/v1/events' }, carrier: 'mcu->ingest', signal: 'p95' },
   { id: 'route-in', metric: 'kafka_server_brokertopicmetrics_messagesin_total', labels: { topic: 'device-events' },
@@ -67,9 +78,11 @@ export function createStory(timeline = story) {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
   }
   function valueAt(id, hour) {
-    const series = BY_ID[id], value = sample(series.carrier, series.signal, hour);
-    if (value === null || !series.minus) return value;
-    return round(value - (sample(series.carrier, series.minus, hour) ?? 0));
+    const series = BY_ID[id];
+    if (!series.terms) return sample(series.carrier, series.signal, hour);
+    const [[, carrier, signal]] = series.terms;
+    if (sample(carrier, signal, hour) === null) return null;
+    return round(series.terms.reduce((sum, [sign, c, s]) => sum + sign * (sample(c, s, hour) ?? 0), 0));
   }
   const annotations = days.flatMap(day => Array.isArray(day?.telemetry?.annotations) ? day.telemetry.annotations : [])
     .map(a => ({ id: a.id, time: Date.parse(a.time), text: a.text, tags: Array.isArray(a.tags) ? a.tags : [] }))

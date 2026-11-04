@@ -25,14 +25,16 @@ editor's agent to edit that file, and the declaration of a tracked page adds
 the artifact and user capabilities the board's Edit mode needs.
 
 --timeline <path> embeds that demo timeline JSON (version, intervalSeconds,
-days[].issues) in the separate live-timeline block of a page that declares
+days[].issues, optional days[].telemetry) in the separate live-timeline block of a page that declares
 page.tracking; --timeline none embeds nothing, so #live=demo synthesizes four
 days from the page's own ticket keys. The default is the example timeline for
 the example spec (examples/live-status/live-status.spec.json) and none for
 every other spec.
 """
 import argparse
+from datetime import datetime
 import json
+import math
 from pathlib import Path
 import re
 import subprocess
@@ -58,6 +60,86 @@ def default_timeline(spec_path: str) -> str:
     except OSError:
         same = False
     return str(EXAMPLE_TIMELINE) if same else TIMELINE_NONE
+
+
+TELEMETRY_KEYS = {"start", "stepSeconds", "carriers", "annotations"}
+RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$", re.I)
+
+
+def is_time(value) -> bool:
+    if not isinstance(value, str) or not RFC3339.match(value):
+        return False
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00").replace("z", "+00:00"))
+    except ValueError:
+        return False
+    return True
+
+
+def telemetry_problems(at: str, block) -> list:
+    """Shape of one day's telemetry (#944): hourly carrier signals and annotations.
+
+    {start: RFC3339, stepSeconds: positive integer,
+     carriers: {carrierId: {signal: {unit?: text, values: [number | null, ...]}}},
+     annotations?: [{time: RFC3339, text, id?: integer, tags?: [text]}]}
+    All values arrays of one day have the same length; null is an hour without a sample.
+    Values must be finite: json.loads reads NaN and Infinity, a browser's JSON.parse does not.
+    """
+    if not isinstance(block, dict):
+        return [f"{at} must be an object"]
+    problems = [f"{at}.{key} is not a telemetry field" for key in block if key not in TELEMETRY_KEYS]
+    if not is_time(block.get("start")):
+        problems.append(f"{at}.start must be an RFC3339 time")
+    step = block.get("stepSeconds")
+    if isinstance(step, bool) or not isinstance(step, int) or step <= 0:
+        problems.append(f"{at}.stepSeconds must be a positive integer")
+    carriers = block.get("carriers")
+    lengths = set()
+    if not isinstance(carriers, dict):
+        problems.append(f"{at}.carriers must be an object keyed by carrier")
+    else:
+        for carrier, signals in carriers.items():
+            where = f"{at}.carriers.{carrier}"
+            if not isinstance(signals, dict) or not signals:
+                problems.append(f"{where} must be a non-empty object keyed by signal")
+                continue
+            for name, signal in signals.items():
+                here = f"{where}.{name}"
+                if not isinstance(signal, dict) or not isinstance(signal.get("values"), list) or not signal["values"]:
+                    problems.append(f"{here} must be an object with a non-empty values array")
+                    continue
+                if set(signal) - {"unit", "values"}:
+                    problems.append(f"{here} takes only unit and values")
+                if "unit" in signal and not isinstance(signal["unit"], str):
+                    problems.append(f"{here}.unit must be text")
+                values = signal["values"]
+                if any(v is not None and (isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v))
+                       for v in values):
+                    problems.append(f"{here}.values must hold finite numbers or null")
+                lengths.add(len(values))
+                if len(lengths) > 1:
+                    problems.append(f"{here}.values must have as many entries as the day's other signals")
+                    lengths = {len(values)}
+    if "annotations" in block:
+        notes = block["annotations"]
+        if not isinstance(notes, list):
+            problems.append(f"{at}.annotations must be an array")
+        else:
+            for i, note in enumerate(notes):
+                here = f"{at}.annotations[{i}]"
+                if not isinstance(note, dict):
+                    problems.append(f"{here} must be an object")
+                    continue
+                if not is_time(note.get("time")):
+                    problems.append(f"{here}.time must be an RFC3339 time")
+                if not isinstance(note.get("text"), str) or not note["text"]:
+                    problems.append(f"{here}.text must be non-empty text")
+                if "id" in note and (isinstance(note["id"], bool) or not isinstance(note["id"], int)):
+                    problems.append(f"{here}.id must be an integer")
+                tags = note.get("tags", [])
+                if not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
+                    problems.append(f"{here}.tags must be an array of text")
+    return problems
 
 
 def load_timeline(path: str) -> dict:
@@ -86,6 +168,8 @@ def load_timeline(path: str) -> dict:
             for i, day in enumerate(days):
                 if not isinstance(day, dict) or not isinstance(day.get("issues"), dict):
                     problems.append(f"days[{i}].issues must be an object keyed by ticket")
+                if isinstance(day, dict) and "telemetry" in day:
+                    problems.extend(telemetry_problems(f"days[{i}].telemetry", day["telemetry"]))
     if problems:
         raise TimelineError(f"timeline {path} has the wrong shape: " + "; ".join(problems))
     return timeline

@@ -1,4 +1,4 @@
-/* Contract matrix: #939 PR 1 of 2 (the Metrics button and the host telemetry provider). Nothing paints on the canvas in this PR.
+/* Contract matrix: #939, the Metrics button and the host telemetry provider (PR 1), and the canvas cues (PR 2).
 | row | rule | fixture | assertion |
 |---|---|---|---|
 | P1 | Metrics is hidden without a telemetry provider or demo | native mount of an imported-topology consumer with Jira evidence and no `telemetry` option | Live is visible; no visible Metrics button and no metrics connector text |
@@ -6,11 +6,12 @@
 | P3 | Turning Metrics on calls the provider with every bound carrier, local and imported | click Metrics | one call with local node + edge and imported node + edge ids (unbound carriers absent); "Metrics: connected, refreshed <time>"; ctl.telemetry holds the map; Live stays pressed |
 | P4 | Turning Metrics off stops and clears | click Metrics again | aria-pressed false, "Metrics: not connected", map empty, the signal aborted, no further call |
 | P5 | Standalone boot hands `window.flowviewTelemetry` to the page | built template with an init script provider | Metrics visible; on calls the provider with the bound carrier |
-| C1 | Packet streams on bound flowing edges | excluded — orchestrator ruling: PR 2 |
-| C2 | Silent Done edge ghost | excluded — orchestrator ruling: PR 2 |
-| C3 | Node sparklines and proof seals | excluded — orchestrator ruling: PR 2 |
-| C4 | Unbound carriers unchanged; off removes every cue | excluded — orchestrator ruling: PR 2 |
-| C5 | The same canvas cues on imported carriers | excluded — orchestrator ruling: PR 2 |
+| P6 | Metrics streams local and imported flowing edges; ordinary packets and Jira paint stay unchanged | independent native mount, no required ordinary-packet count; Metrics off then on | no cue before on; named stream counts (4 local, 3 imported), no cue on the unbound edge; ordinary packet counts equal before/after. Rejects missing streams or replacing ordinary/Jira paint |
+| P7 | Silent Done edge gets a ghost over a dimmed stroke | independent native mount; click Metrics with no cue precondition | first contract assertion is named `P7 the silent Done edge has a ghost`; dimmed stroke and no stream follow. Rejects omitting the silent-edge ghost |
+| P8 | Bound local and imported nodes get seals; unbound nodes stay unchanged | independent native mount; click Metrics with no stream/ghost precondition | first contract assertion is named `P8 the bound local node has a proven seal`; imported seal/sparkline present, unbound node has no cue. Rejects missing seals or skipping imported nodes |
+| P9 | Reduced motion shows static packets | `reducedMotion: 'reduce'` | moving packets hidden, static packets visible |
+| P10 | Off removes every cue | independent native mount; wait for the existing provider connection, record cues on, then click off | named `P10 off removes every cue painted while on` assertion checks both nonempty on and empty off after both clicks, so absent cues fail this row without a feature-dependent precondition; off also clears carrier verdicts/classes and preserves Jira paint. Rejects missing cues or incomplete cleanup |
+| P11 | `#live=demo` mounts the demo telemetry so Metrics follows the demo day | built example with its timeline, `#live=demo` | Metrics visible and off; on is "Metrics: demo, refreshed …"; Day 8 has no stream; Day 10 streams 3 packets on the 530 req/h `mcu->ingest` call edge, ghosts the silent Done `notify->app` push edge and seals `ingest`; off removes every cue |
 */
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -113,4 +114,115 @@ test('P5 standalone boot passes window.flowviewTelemetry to the page',async({pag
  await metrics.click();
  await expect(panel.locator('.dv-live-metrics-connection')).toHaveText(/^Metrics: connected, refreshed /);
  expect(await page.evaluate(()=>window.telemetryCalls)).toEqual([['ingest']]);
+});
+
+/* PR 2: canvas cues. Edge indices: 0 ingest->app (flowing call), 1 app->push (silent Done call),
+   2 ingest->push (unbound), 3 shared::api->shared::store (imported flowing call). */
+const CUE_JIRA={'LOC-1':{state:'done'},'LOC-2':{state:'active'},'LOC-3':{state:'done'},'LOC-4':{state:'done'},'LOC-5':{state:'done'},'IMP-1':{state:'done'},'IMP-2':{state:'done'}};
+const T1=Date.UTC(2026,10,3,9),T2=Date.UTC(2026,10,3,10);
+const CUE_SAMPLES={ingest:{signals:{lag:{value:10}}},'ingest->app':{signals:{rate:{value:1300,series:[[T1,1200],[T2,1300]]},errors:{value:4}}},
+ 'app->push':{signals:{rate:{value:0,series:[[T1,0],[T2,0]]},errors:{value:0}}},'shared::api':{signals:{rate:{value:50,series:[[T1,40],[T2,50]]}}},
+ 'shared::api->shared::store':{signals:{rate:{value:500},errors:{value:1}}}};
+const CUES='.dv-metrics-stream,.dv-metrics-ghost,.dv-metrics-node,[data-metrics-state]';
+function cueSpec(){
+ const spec=(id,diagram,extra={})=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},...extra,sections:[{diagram}]}});
+ const provider=spec('provider',{nodes:{api:{title:'Imported API'},store:{title:'Imported store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+ const consumer=spec('consumer',{nodes:{ingest:{title:'Ingest',tickets:['LOC-1'],telemetry:QUEUE()},app:{title:'Resident app',tickets:['LOC-2']},push:{title:'Push gateway'}},rows:[['ingest','app','push']],
+  edges:[{from:'ingest',to:'app',label:'notify',tickets:['LOC-3'],telemetry:CALL()},{from:'app',to:'push',label:'push',tickets:['LOC-4'],telemetry:CALL()},{from:'ingest',to:'push',label:'fallback',tickets:['LOC-5']}],panels:[PANEL],
+  steps:[{id:'notify',edge:'ingest->app',text:'Notify'},{id:'retry',edge:'app->push',failures:{'ingest->push':'dropped'},text:'Retry'}],
+  topologyImports:[{spec:'provider',export:'core',as:'shared',position:{x:80,y:300},nodeTracking:{api:{tickets:['IMP-1'],telemetry:SERVICE()}},edgeTracking:{'api->store':{tickets:['IMP-2'],telemetry:CALL()}}}]});
+ consumer.page.tracking={jira:{site:'https://jira.test'}};
+ const context=vm.createContext({});vm.runInContext(sourceLoader.composeSources(['validator.js','canon.js']),context);
+ return JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]})));
+}
+async function mountCues(page,server){
+ await page.setViewportSize({width:1440,height:1000});
+ await writeFile(path.join(server.root,'telemetry-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'telemetry-native.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./telemetry-native.js";window.mount=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/telemetry-native.html');await page.waitForFunction(()=>!!window.mount);
+ await page.evaluate(({spec,jira,samples})=>{
+  window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:()=>Promise.resolve(JSON.parse(JSON.stringify(samples)))}});
+  window.viewer.controller.liveStatus.apply(jira);
+ },{spec:cueSpec(),jira:CUE_JIRA,samples:CUE_SAMPLES});
+ const root=page.locator('#host'),panel=root.locator('.pt-live-status');
+ await expect(panel.getByRole('button',{name:'Live',exact:true})).toBeVisible();
+ return {root,metrics:metricsButton(panel)};
+}
+const stream=(root,i)=>root.locator('g.dv-metrics-stream[data-metrics-edge="'+i+'"] circle.dv-metrics-moving');
+const ordinary=async root=>({pkt:await root.locator('circle.pkt').count(),comm:await root.locator('.comm-packet').count()});
+
+test('P6 Metrics streams local and imported edges and preserves ordinary packets and Jira paint',async({page,server})=>{
+ const {root,metrics}=await mountCues(page,server),edge=i=>root.locator('path.edge[data-dv-edge="'+i+'"]');
+ await expect(root.locator(CUES),'P6 nothing while Metrics is off').toHaveCount(0);
+ // Ordinary packet counts can be zero outside step playback; no cue depends on their presence.
+ const before=await ordinary(root);
+ await metrics.click();
+ await expect(stream(root,0),'P6 1300 req/h is four packets').toHaveCount(4);
+ await expect(stream(root,3),'P6 imported edge, 500 req/h is three packets').toHaveCount(3);
+ await expect(edge(2),'P6 unbound edge has no Metrics state').not.toHaveAttribute('data-metrics-state',/./);
+ await expect(root.locator('[data-metrics-edge="2"]'),'P6 unbound edge unchanged').toHaveCount(0);
+ await expect(edge(0),'P6 Jira appearance unchanged').toHaveAttribute('data-live-appearance','done');
+ expect(await ordinary(root),'P6 ordinary step and failure packets are untouched').toEqual(before);
+});
+
+test('P7 Metrics ghosts the silent Done edge and dims its stroke',async({page,server})=>{
+ const {root,metrics}=await mountCues(page,server);await metrics.click();
+ await expect(root.locator('path.dv-metrics-ghost[data-metrics-edge="1"]'),'P7 the silent Done edge has a ghost').toHaveCount(1);
+ await expect(root.locator('path.edge[data-dv-edge="1"]'),'P7 the silent stroke is dimmed').toHaveClass(/dv-metrics-silent/);
+ await expect(stream(root,1),'P7 the silent edge has no stream').toHaveCount(0);
+});
+
+test('P8 Metrics seals bound local and imported nodes and leaves unbound nodes unchanged',async({page,server})=>{
+ const {root,metrics}=await mountCues(page,server),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');await metrics.click();
+ await expect(node('ingest').locator('.dv-metrics-seal'),'P8 the bound local node has a proven seal').toHaveAttribute('data-seal','proven');
+ await expect(node('shared::api').locator('.dv-metrics-seal'),'P8 the bound imported node has a proven seal').toHaveAttribute('data-seal','proven');
+ await expect(node('shared::api').locator('polyline.dv-metrics-sparkline'),'P8 imported node sparkline').toHaveCount(1);
+ for(const id of ['app','push','shared::store']){
+  await expect(node(id).locator('.dv-metrics-node'),'P8 unbound '+id+' has no seal or sparkline').toHaveCount(0);
+  await expect(node(id),'P8 unbound '+id+' has no Metrics state').not.toHaveAttribute('data-metrics-state',/./);
+ }
+});
+
+test('P10 turning Metrics off removes every cue and preserves Jira paint',async({page,server})=>{
+ const {root,metrics}=await mountCues(page,server);await metrics.click();
+ // The connection contract already exists on the base; wait for samples without requiring any canvas cue.
+ await expect(root.locator('.dv-live-metrics-connection')).toHaveAttribute('data-state','connected');
+ const paintedWhileOn=await root.locator(CUES).count();
+ await metrics.click();
+ await expect.poll(async()=>({paintedWhileOn:paintedWhileOn>0,remainingAfterOff:await root.locator(CUES).count()}),{message:'P10 off removes every cue painted while on'}).toEqual({paintedWhileOn:true,remainingAfterOff:0});
+ await expect(root.locator('[data-metrics-verdict],.dv-metrics-bound,.dv-metrics-flowing,.dv-metrics-degraded,.dv-metrics-silent,.dv-metrics-unobserved,.dv-metrics-ghosted'),'P10 off removes carrier verdicts and classes').toHaveCount(0);
+ await expect(root.locator('path.edge[data-dv-edge="0"]'),'P10 Jira appearance unchanged').toHaveAttribute('data-live-appearance','done');
+});
+
+test('P9 reduced motion shows static Metrics packets instead of moving ones',async({page,server})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});
+ const {root,metrics}=await mountCues(page,server);await metrics.click();
+ await expect(stream(root,0)).toHaveCount(4);
+ await expect(stream(root,0).first()).toBeHidden();
+ await expect(root.locator('g.dv-metrics-stream[data-metrics-edge="0"] circle.dv-metrics-static').first()).toBeVisible();
+});
+
+/* P11: the built example's #live=demo player feeds the Metrics cues day by day (#944 PR 2 timeline). */
+async function openDemo(page,server){
+ await page.setViewportSize({width:1440,height:1000});await page.emulateMedia({reducedMotion:'reduce'});
+ const out=path.join(server.root,'telemetry-demo.html');
+ execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(repo,'examples/live-status/live-status.spec.json'),path.join(repo,'template/flowview.html'),out,'--timeline',path.join(repo,'examples/live-status/live-status.timeline.json')]);
+ await page.goto(server.origin+'/telemetry-demo.html#live=demo');return page.locator('#docview');
+}
+async function demoDay(root,day){
+ const next=root.getByRole('button',{name:'Next day',exact:true});
+ for(;;){const note=await root.locator('.dv-live-note').textContent();const current=Number(/Day (\d+)/.exec(note)[1]);if(current>=day)return;await next.click();await expect(root.locator('.dv-live-note')).toContainText('Day '+(current+1)+' —');}
+}
+test('P11 #live=demo mounts the demo telemetry: Metrics reports Demo and the cues follow the demo day',async({page,server})=>{
+ const root=await openDemo(page,server),panel=root.locator('.pt-live-status'),metrics=metricsButton(panel),status=panel.locator('.dv-live-metrics-connection');
+ await expect(metrics,'P11 the demo telemetry source shows Metrics').toBeVisible();await expect(metrics).toHaveAttribute('aria-pressed','false');
+ await expect(root.locator(CUES)).toHaveCount(0);
+ await demoDay(root,8);await metrics.click();
+ await expect(status).toHaveAttribute('data-state','demo');await expect(status).toHaveText(/^Metrics: demo, refreshed /);
+ await expect(root.locator('g.dv-metrics-stream'),'P11 no traffic before Day 9').toHaveCount(0);
+ await demoDay(root,10);
+ await expect(stream(root,2),'P11 Day 10: about 530 req/h on mcu->ingest is three packets').toHaveCount(3);
+ await expect(root.locator('path.dv-metrics-ghost[data-metrics-edge="4"]'),'P11 the push edge stays silent after Done').toHaveCount(1);
+ await expect(root.locator('g.node[data-dv-node="ingest"] .dv-metrics-seal')).toHaveCount(1);
+ await metrics.click();await expect(root.locator(CUES),'P11 off removes every cue').toHaveCount(0);
 });

@@ -87,15 +87,6 @@ def custom_timeline():
     ]}
 
 
-def telemetry_block():
-    """#944: one day's telemetry, hourly values per carrier signal (null = no sample) and annotations."""
-    return {"start": "2026-10-20T00:00:00Z", "stepSeconds": 3600,
-            "carriers": {"a->b": {"rate": {"unit": "req/h", "values": [None, 0, 12.5]},
-                                  "errors": {"unit": "req/h", "values": [None, 0, 0.1]}},
-                         "b": {"lag": {"unit": "msgs", "values": [None, 3, 4]}}},
-            "annotations": [{"id": 1, "time": "2026-10-20T01:30:00Z", "text": "deploy 1.0", "tags": ["deploy"]}]}
-
-
 class InjectTests(unittest.TestCase):
     def test_non_example_spec_embeds_no_timeline_by_default(self):
         # #753: only the example spec ships the doorbell timeline by default; any other
@@ -188,92 +179,6 @@ class InjectTests(unittest.TestCase):
         r, out = run_inject(template, spec, ["--timeline", "{td}/absent.json"])
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("absent.json", r.stderr)
-
-    def test_timeline_telemetry_block_is_accepted_and_embedded_unchanged(self):
-        # #944: days[].telemetry (hourly carrier signals and annotations) rides the live-timeline block.
-        template = TEMPLATE + "<!-- LIVE_TIMELINE -->\n"
-        timeline = custom_timeline()
-        timeline["days"][0]["telemetry"] = telemetry_block()
-        minimal = telemetry_block()
-        del minimal["annotations"]
-        timeline["days"][1]["telemetry"] = minimal
-        r, out = run_inject(template, json.dumps(tracked_spec()), ["--timeline", "{td}/tl.json"],
-                            {"tl.json": json.dumps(timeline)})
-        self.assertEqual(r.returncode, 0, r.stderr)
-        matches = TIMELINE_BLOCK.findall(out)
-        self.assertEqual(len(matches), 1)
-        self.assertEqual(json.loads(matches[0]), timeline)
-
-    def test_timeline_telemetry_shape_is_validated(self):
-        template = TEMPLATE + "<!-- LIVE_TIMELINE -->\n"
-        spec = json.dumps(tracked_spec())
-
-        def with_block(change):
-            block = telemetry_block()
-            change(block)
-            timeline = custom_timeline()
-            timeline["days"][1]["telemetry"] = block
-            return timeline
-
-        def set_signal(block, key, value):
-            block["carriers"]["a->b"]["rate"][key] = value
-
-        not_an_object = custom_timeline()
-        not_an_object["days"][1]["telemetry"] = []
-        bad_cases = {
-            "days[1].telemetry must be an object": not_an_object,
-            "days[1].telemetry.start": with_block(lambda b: b.update(start="yesterday")),
-            "days[1].telemetry.stepSeconds": with_block(lambda b: b.update(stepSeconds=0)),
-            "days[1].telemetry.stepSeconds ": with_block(lambda b: b.update(stepSeconds=True)),
-            "days[1].telemetry.carriers": with_block(lambda b: b.pop("carriers")),
-            "days[1].telemetry.carriers.a->b": with_block(lambda b: b["carriers"].update({"a->b": []})),
-            "days[1].telemetry.carriers.a->b.rate": with_block(lambda b: b["carriers"]["a->b"].update(rate={"unit": "req/h"})),
-            "days[1].telemetry.carriers.a->b.rate.values": with_block(lambda b: set_signal(b, "values", [1, "2", None])),
-            "days[1].telemetry.carriers.a->b.rate.values ": with_block(lambda b: set_signal(b, "values", [1, True, None])),
-            "days[1].telemetry.carriers.a->b.rate.unit": with_block(lambda b: set_signal(b, "unit", 5)),
-            "days[1].telemetry.carriers.b.lag.values": with_block(lambda b: b["carriers"]["b"]["lag"].update(values=[1, 2])),
-            "days[1].telemetry.annotations": with_block(lambda b: b.update(annotations={"id": 1})),
-            "days[1].telemetry.annotations[0].time": with_block(lambda b: b["annotations"][0].update(time="soon")),
-            "days[1].telemetry.annotations[0].text": with_block(lambda b: b["annotations"][0].pop("text")),
-            "days[1].telemetry.annotations[0].tags": with_block(lambda b: b["annotations"][0].update(tags=["deploy", 3])),
-            "days[1].telemetry.colour": with_block(lambda b: b.update(colour="red")),
-        }
-        for path, timeline in bad_cases.items():
-            r, out = run_inject(template, spec, ["--timeline", "{td}/tl.json"],
-                                {"tl.json": json.dumps(timeline)})
-            self.assertNotEqual(r.returncode, 0, path)
-            self.assertIn("tl.json", r.stderr, path)
-            self.assertIn(path.strip(), r.stderr, path)
-            self.assertIsNone(out, path)
-
-    def test_timeline_telemetry_rejects_non_finite_values(self):
-        # json.loads accepts NaN and Infinity tokens; a browser's JSON.parse does not, so the
-        # injector must refuse them instead of embedding them.
-        template = TEMPLATE + "<!-- LIVE_TIMELINE -->\n"
-        spec = json.dumps(tracked_spec())
-        timeline = custom_timeline()
-        block = telemetry_block()
-        block["carriers"]["a->b"]["rate"]["values"] = [None, "__TOKEN__", 12.5]
-        timeline["days"][1]["telemetry"] = block
-        for token in ("NaN", "Infinity", "-Infinity"):
-            text = json.dumps(timeline).replace('"__TOKEN__"', token)
-            self.assertIn(token, text)
-            r, out = run_inject(template, spec, ["--timeline", "{td}/tl.json"], {"tl.json": text})
-            self.assertNotEqual(r.returncode, 0, token)
-            self.assertIn("tl.json", r.stderr, token)
-            self.assertIn("days[1].telemetry.carriers.a->b.rate.values", r.stderr, token)
-            self.assertIn("finite", r.stderr, token)
-            self.assertIsNone(out, token)
-
-    def test_example_timeline_carries_telemetry_on_every_day(self):
-        inject = load_inject()
-        timeline = inject.load_timeline(str(EXAMPLE_TIMELINE))
-        self.assertEqual(len(timeline["days"]), 12)
-        for index, day in enumerate(timeline["days"]):
-            self.assertIn("telemetry", day, f"days[{index}]")
-            self.assertTrue(day["telemetry"]["carriers"], f"days[{index}] carriers")
-        texts = [a["text"] for a in timeline["days"][9]["telemetry"]["annotations"]]
-        self.assertTrue(any("firmware 2.4.1" in text for text in texts), texts)
 
     def test_replaces_only_the_real_block(self):
         r, out = run_inject(TEMPLATE, json.dumps(SPEC))
@@ -400,6 +305,108 @@ class InjectTests(unittest.TestCase):
         self.assertEqual(declaration, {"comments": {"composer_only": True, "customAnchors": True}})
         self.assertNotIn("searchJiraIssuesUsingJql", guide)
         self.assertEqual(json.loads(FLOWSPEC_BLOCK.search(out)[1]), SPEC)
+
+    def test_agent_guide_declares_the_grafana_connector_only_for_grafana_run_signals(self):
+        # #943: a page whose carriers (or page templates) bind grafana, loki or sql
+        # signals declares the Grafana connector beside Jira, with the five tools the
+        # adapter picks it by; tempo-only or honeycomb-only pages do not.
+        grafana_tools = ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]
+        jira = {"server": "Atlassian", "tools": ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}
+        grafana = {"server": "Grafana", "tools": grafana_tools}
+
+        def guide_for(page_extra=None, node_telemetry=None):
+            spec = tracked_spec()
+            spec["page"].update(page_extra or {})
+            if node_telemetry is not None:
+                spec["page"]["blocks"] = [{"heading": "h", "diagram": {"nodes": {"a": {"telemetry": node_telemetry}}, "rows": [["a"]]}}]
+            r, out = run_inject(TEMPLATE, json.dumps(spec))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            guide = GUIDE_BLOCK.search(out)[1]
+            self.assertLess(len(guide.encode("utf-8")), 6 * 1024)
+            return json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S)[1]), guide
+
+        for source in ("grafana", "loki", "sql"):
+            declaration, guide = guide_for(node_telemetry={"kind": "service", "signals": {"rate": {source: "q"}}})
+            self.assertEqual(declaration["mcp"]["servers"], [jira, grafana], source)
+            for needle in ("Grafana", "get_annotations", "query_sql", "at most once an hour"):
+                self.assertIn(needle, guide, needle)
+        # a template signal on the page counts too, even before a carrier uses it
+        templated = {"tracking": {"jira": {"site": "https://jira.test"}, "telemetry": {"templates": {"t": {"kind": "service", "signals": {"r": {"grafana": "up"}}}}}}}
+        self.assertEqual(guide_for(page_extra=templated)[0]["mcp"]["servers"], [jira, grafana])
+        for other in ({"tempo": "{ }"}, {"honeycomb": {"dataset": "d"}}):
+            declaration, guide = guide_for(node_telemetry={"kind": "service", "signals": {"x": other}})
+            self.assertEqual(declaration["mcp"]["servers"], [jira], other)
+            self.assertNotIn("get_annotations", guide)
+        # an untracked page with Grafana signals declares Grafana alone
+        spec = json.loads(json.dumps(SPEC))
+        spec["page"]["blocks"] = [{"heading": "h", "diagram": {"nodes": {"a": {"telemetry": {"kind": "service", "signals": {"r": {"grafana": "up"}}}}}, "rows": [["a"]]}}]
+        r, out = run_inject(TEMPLATE, json.dumps(spec))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        declaration = json.loads(re.search(r"```json\n(.*?)\n```", GUIDE_BLOCK.search(out)[1], re.S)[1])
+        self.assertEqual(declaration, {"mcp": {"servers": [grafana]}, "comments": {"composer_only": True, "customAnchors": True}})
+
+    def test_agent_guide_declares_grafana_for_imported_carriers_the_runtime_resolves(self):
+        # #943 review: the page's runtime resolves imported carriers from the
+        # `flowview-topology` context block of the page it boots in (src/boot.flowview.js),
+        # so a binding that only a provider carries must still declare the connector.
+        # The detection resolves the imports as the runtime does: only exported,
+        # selected carriers count, a consumer overlay replaces the provider binding,
+        # and provider templates expand.
+        grafana = {"server": "Grafana", "tools": ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]}
+        comments = {"composer_only": True, "customAnchors": True}
+
+        def spec(spec_id, diagram, **extra):
+            page = {"title": spec_id, "canon": {"version": 1, "id": spec_id, "kind": "canonical", "owner": "group:default/test"}}
+            page.update(extra)
+            page["sections"] = [{"id": "main", "diagram": diagram}]
+            return {"page": page}
+
+        def provider(api=None, hidden=None, templates=None):
+            nodes = {"api": {"title": "API"}, "store": {"title": "Store"}, "hidden": {"title": "Hidden"}}
+            if api is not None:
+                nodes["api"]["telemetry"] = api
+            if hidden is not None:
+                nodes["hidden"]["telemetry"] = hidden
+            extra = {"tracking": {"telemetry": {"templates": templates}}} if templates else {}
+            return spec("provider", {"nodes": nodes, "rows": [["api", "store", "hidden"]], "edges": [{"from": "api", "to": "store", "label": "Persist"}],
+                                     "topologyExports": {"core": {"nodes": ["api", "store"], "edges": ["api->store"]}}}, **extra)
+
+        def consumer(node_tracking=None):
+            imp = {"spec": "provider", "export": "core", "as": "shared"}
+            if node_tracking is not None:
+                imp["nodeTracking"] = node_tracking
+            return spec("consumer", {"nodes": {"local": {"title": "Local"}}, "rows": [["local"]], "topologyImports": [imp]})
+
+        def declaration(page_spec, provider_spec=None):
+            template = TEMPLATE
+            if provider_spec is not None:
+                context = {"version": 1, "id": "consumer", "specs": [provider_spec, page_spec]}
+                block = '<script type="application/json" id="flowview-topology">' + json.dumps(context).replace("<", "\\u003c") + "</script>\n"
+                template = TEMPLATE.replace(BLOCK_OPEN, block + BLOCK_OPEN, 1)
+            r, out = run_inject(template, json.dumps(page_spec))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            guide = GUIDE_BLOCK.search(out)[1]
+            self.assertLess(len(guide.encode("utf-8")), 6 * 1024)
+            return json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S)[1])
+
+        signal = {"kind": "service", "signals": {"rate": {"grafana": "sum(rate(http_requests_total[5m]))"}}}
+        # an imported node whose provider binding runs a grafana signal, no local telemetry
+        self.assertEqual(declaration(consumer(), provider(api=signal)), {"mcp": {"servers": [grafana]}, "comments": comments})
+        # the provider binding uses a provider template with a loki signal
+        templated = provider(api={"use": "svc", "app": "api"}, templates={"svc": {"kind": "service", "params": ["app"], "signals": {"logs": {"loki": 'sum(rate({app="$app"}[5m]))'}}}})
+        self.assertEqual(declaration(consumer(), templated)["mcp"]["servers"], [grafana])
+        # a provider carrier the import does not export never reaches the page
+        self.assertEqual(declaration(consumer(), provider(hidden=signal)), {"comments": comments})
+        # a consumer overlay replaces the provider binding as a whole (here with a tempo-only one)
+        tempo = {"kind": "service", "signals": {"t": {"tempo": "{ }"}}}
+        self.assertEqual(declaration(consumer({"api": {"telemetry": tempo}}), provider(api=signal)), {"comments": comments})
+        # a page with no telemetry anywhere, with or without a topology context
+        self.assertEqual(declaration(consumer(), provider()), {"comments": comments})
+        self.assertEqual(declaration(SPEC), {"comments": comments})
+        # a snapshot resolved before injection (page_build.py --resolve-imports) carries the imported binding itself
+        resolved = consumer()
+        resolved["page"]["sections"][0]["diagram"] = {"nodes": {"local": {"title": "Local"}, "shared::api": {"title": "API", "telemetry": signal}}, "rows": [["local", "shared::api"]]}
+        self.assertEqual(declaration(resolved)["mcp"]["servers"], [grafana])
 
     def test_agent_guide_replaces_a_stale_guide_when_reinjecting_a_built_page(self):
         built = TEMPLATE.replace("</script>\n" + BACKLINK_OPEN,

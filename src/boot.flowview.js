@@ -184,7 +184,9 @@ function boot(raw, sourceText, sourceFallback){
   var editor = specFile && typeof sourceText === 'string' && !embedRequest && typeof createBoardEditor === 'function' ?
     createBoardEditor({win: window, text: sourceText, specFile: specFile, fallback: sourceFallback || null, context: topologyContext,
                        render: function(text){ return rerender(text); }}) : null;
-  var renderOptions = {layoutTarget:layoutTarget,liveStatus:liveOptions,handoffHost:window.flowviewHandoffHost,sourceText:sourceText,sourceFallback:sourceFallback || null,boardEditor:editor};
+  /* window.flowviewTelemetry (#939): a host telemetry provider set before boot,
+     shaped like the renderPage telemetry option; the Metrics button stays off until clicked. */
+  var renderOptions = {layoutTarget:layoutTarget,liveStatus:liveOptions,telemetry:window.flowviewTelemetry,handoffHost:window.flowviewHandoffHost,sourceText:sourceText,sourceFallback:sourceFallback || null,boardEditor:editor};
   var ctl = renderPage(view, page, bootSkin, backlinkData, renderOptions);
   if (sourceFallback && view.parentNode){
     var banner = sourceFallbackBanner(sourceFallback, page, specFile);

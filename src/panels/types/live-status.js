@@ -95,6 +95,10 @@
       var toggle=button(head,'toggle','reader-button dv-live-toggle','Live','setEnabled');toggle.hidden=!hasData;
       toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled)));
       states.forEach(function(state){var count=el(head,'span','count-'+state,'dv-live-count'+(hasData && value && value.enabled && value.counts[state]?' dv-live-'+state:''),state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
+      // Metrics (#939): the telemetry switch beside Live, shown only with a telemetry provider or demo, off by default, never persisted.
+      var metrics=value && value.metrics || {available:false,enabled:false};
+      var metricsToggle=button(head,'metrics','reader-button dv-live-metrics','Metrics','setMetricsEnabled');metricsToggle.hidden=!metrics.available;
+      metricsToggle._liveArgument=!metrics.enabled;metricsToggle.setAttribute('aria-pressed',String(!!metrics.enabled));
       var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo'}[conn.state];
       var connection=el(head,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
       var connWho=(conn.source || '')+(connLabel && connLabel!==String(conn.source || '').toLowerCase()?' '+connLabel:'');
@@ -102,6 +106,14 @@
       var gh=conn.github || {state:'none'},ghLabel={disconnected:'GitHub not connected',connecting:'GitHub connecting',connected:'GitHub connected',error:'GitHub did not answer'}[gh.state];
       var github=el(connection,'span','github','dv-live-connection-github',ghLabel || '');github.setAttribute('data-state',gh.state);github.setAttribute('data-busy',String(!!gh.busy));github.hidden=!ghLabel;
       connection.hidden=!available || conn.state==='none';
+      // The telemetry connector beside the Jira one: same markup and dot tokens, its own class
+      // names so `.dv-live-connection` keeps naming the Jira connector alone.
+      var metricsState=metrics.state==='ok'?(metrics.demo?'demo':'connected'):{loading:'connecting',error:'error'}[metrics.state] || 'disconnected';
+      var metricsLabel={connected:'connected',demo:'demo',connecting:'connecting',error:'did not answer'}[metricsState] || 'not connected';
+      var metricsConnection=el(head,'span','metrics-connection','dv-live-metrics-connection');metricsConnection.setAttribute('data-state',metricsState);metricsConnection.setAttribute('data-busy',String(!!metrics.busy));metricsConnection.setAttribute('role','status');
+      el(metricsConnection,'i','dot','dv-live-metrics-dot');
+      el(metricsConnection,'span','text','',metricsState==='error'?'Metrics: '+metricsLabel+(metrics.note?' · '+metrics.note:''):['Metrics: '+metricsLabel,metrics.checkedText].filter(Boolean).join(', '));
+      metricsConnection.hidden=!metrics.available;
       var note=el(head,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
       var action=button(head,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
       var first=button(head,'first','reader-button dv-live-first','First blocker','firstBlocker');first.hidden=!hasData || !value.firstBlocker;
@@ -115,7 +127,7 @@
       var reason=el(head,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
       var editNotice=el(head,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
       var editShown=!!(edit && (edit.editable || edit.notice));
-      head.hidden=!available || !(hasData || value.note.text || value.actionLabel || editShown);
+      head.hidden=!metrics.available && (!available || !(hasData || value.note.text || value.actionLabel || editShown));
       if(!available)el(host,'p','empty','dv-live-empty','This page has no ticket references.');
       if(hasData){
         var body=el(host,'div','body','dv-live-panel-body'),epic=value.epic || {keys:[]};
@@ -198,17 +210,17 @@
   var LIVE_STYLES=String.raw`.dv-live-toggle{display:flex;gap:4px;align-items:center;}
 .dv-live-count{border-radius:4px;padding:2px 4px;color:var(--dv-live-on);}
 .dv-live-note{color:var(--dtext);}
-.dv-live-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
-.dv-live-connection[hidden]{display:none!important;}
-.dv-live-connection-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
-.dv-live-connection[data-state="connected"] .dv-live-connection-dot,.dv-live-connection[data-state="demo"] .dv-live-connection-dot{background:var(--dv-live-done);}
-.dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot{background:var(--dv-live-active);}
-.dv-live-connection[data-state="error"] .dv-live-connection-dot{background:var(--dv-live-blocked);}
-.dv-live-connection[data-busy="true"] .dv-live-connection-dot{animation:dv-live-connection-pulse 1.2s ease-in-out infinite;}
+.dv-live-connection,.dv-live-metrics-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
+.dv-live-connection[hidden],.dv-live-metrics-connection[hidden]{display:none!important;}
+.dv-live-connection-dot,.dv-live-metrics-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
+.dv-live-connection[data-state="connected"] .dv-live-connection-dot,.dv-live-connection[data-state="demo"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="connected"] .dv-live-metrics-dot,.dv-live-metrics-connection[data-state="demo"] .dv-live-metrics-dot{background:var(--dv-live-done);}
+.dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="connecting"] .dv-live-metrics-dot{background:var(--dv-live-active);}
+.dv-live-connection[data-state="error"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="error"] .dv-live-metrics-dot{background:var(--dv-live-blocked);}
+.dv-live-connection[data-busy="true"] .dv-live-connection-dot,.dv-live-metrics-connection[data-busy="true"] .dv-live-metrics-dot{animation:dv-live-connection-pulse 1.2s ease-in-out infinite;}
 .dv-live-connection-github::before{content:'· ';}
 .dv-live-connection-github[data-state="error"]{color:var(--dv-live-blocked);}
 @keyframes dv-live-connection-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.7);}}
-@media (prefers-reduced-motion: reduce){.dv-live-connection-dot{animation:none!important;}}
+@media (prefers-reduced-motion: reduce){.dv-live-connection-dot,.dv-live-metrics-dot{animation:none!important;}}
 .dv-live-note[data-kind="warn"],.dv-live-note[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-demo{display:inline-flex;gap:6px;}
 .dv-live-epic{display:flex;gap:16px;align-items:center;padding:14px 16px;margin-top:12px;border:1px solid var(--explore-border);border-radius:10px;background:color-mix(in srgb,var(--dink) 4%,transparent);}

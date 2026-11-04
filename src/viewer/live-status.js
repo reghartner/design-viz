@@ -492,7 +492,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var noteText='',noteKind='info',actionLabel='',actionFn=null,pop=null,active=null,asked=false,demoControls=null,demoDestroy=null,cacheUpdatedAt=null;
   var activity=[],seenKeys=Object.create(null),changedKeys=[],stepHooks=[],coverageRequest=0;
   // Over time (#929): while `over` is set, `map` is the chosen day and `over.live` is the map to return to.
-  var overSource=null,over=null,overLoading=false,overError='',overRequest=0;
+  var overSource=null,over=null,overLoading=false,overProgress='',overError='',overRequest=0;
   // Connector evidence for the panel header (#769): who supplies the map, whether a fetch is in flight, when it last answered.
   var LIVE_STATUS_CONNECTIONS=['none','disconnected','approval','connecting','connected','error','demo'];
   var demoMode=!!(options.demo && typeof options.demo.mount==='function');
@@ -608,7 +608,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function editState(){var state=editor?editor.state():null;return state && over && !state.blocked?Object.assign({},state,{blocked:'Editing is off while a past day is shown.'}):state;}
   function overTimeState(){
     if(!overSource)return null;
-    var base={active:!!over,loading:overLoading,error:overError,available:!!(applied && Object.keys(map).length),disabled:editing()};
+    var base={active:!!over,loading:overLoading,progress:overProgress,error:overError,available:!!(applied && Object.keys(map).length),disabled:editing()};
     if(!over)return base;
     var days=over.days;base.index=over.index;base.count=days.length;base.first=days[0].short;base.last=days[days.length-1].short;base.label=days[over.index].label;return base;
   }
@@ -643,7 +643,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function overLoad(request,result){
     if(retired || request!==overRequest)return;overLoading=false;
     var days=result && Array.isArray(result.days)?result.days:[];
-    if(!days.length){overError='History could not load.';notify();return;}
+    if(!days.length){overError='History could not load. Try Over time again.';notify();return;}
     var index=result.index;if(typeof index!=='number' || index<0 || index>=days.length)index=days.length-1;
     over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null};overShow();
   }
@@ -1269,14 +1269,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
       activity=activity.slice(0,20);Object.keys(next).forEach(function(key){seenKeys[key]=true;});
       map=next;applied=true;availabilityOn=true;paint();notify();
     },
-    setHistory:function(source){if(retired)return;overSource=source && typeof source.load==='function'?source:null;notify();},
+    setHistory:function(source){if(retired)return;if(over)overClose();overRequest++;overLoading=false;overError='';overSource=source && typeof source.load==='function'?source:null;notify();},
     // The reader's click is the only thing that loads history.
     overTime:function(){
       if(retired || overLoading)return;
       if(over){overClose();return;}
       if(!overSource || !applied || !Object.keys(map).length || editing())return;
-      var request=++overRequest;overLoading=true;overError='';notify();
-      Promise.resolve().then(function(){return overSource.load();}).then(function(result){overLoad(request,result);},function(){overLoad(request,null);});
+      var request=++overRequest;overLoading=true;overError='';overProgress='';notify();
+      Promise.resolve().then(function(){return overSource.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result);},function(){overLoad(request,null);});
     },
     overTimeDay:function(index){
       if(retired || !over || typeof index!=='number' || !isFinite(index) || Math.floor(index)!==index)return;

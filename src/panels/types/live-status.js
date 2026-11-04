@@ -108,7 +108,7 @@
       if(hasData && value.demo){var demo=el(head,'span','demo','dv-live-demo');var play=button(demo,'play','reader-button',value.demo.playing?'Pause':'Play','toggleDemo');play.disabled=value.demo.manual || value.demo.ended;button(demo,'next','reader-button','Next day','nextDemo').disabled=value.demo.ended;}
       // Over time (#929): the click loads history; the slider row below the header moves through its days.
       var over=value && value.overTime,past=!!(over && over.active);
-      var overTime=button(head,'over-time','reader-button dv-live-over-time',past?'Back to today':over && over.loading?'Loading history…':'Over time','overTime');overTime.hidden=!hasData || !over || !over.available;overTime.disabled=!!(over && (over.loading || over.disabled));
+      var overTime=button(head,'over-time','reader-button dv-live-over-time',past?'Back to today':over && over.loading?'Loading history'+(over.progress?' '+over.progress:'')+'…':'Over time','overTime');overTime.hidden=!hasData || !over || !over.available;overTime.disabled=!!(over && (over.loading || over.disabled));
       var overStatus=el(head,'span','over-time-status','dv-live-over-time-status',hasData && over && over.error?over.error:'');overStatus.setAttribute('role','status');overStatus.hidden=!overStatus.textContent;
       // #828 shared-board Edit mode lives in this header: Edit for editors, then a prominent Save N changes and Discard.
       var edit=available && value.edit || null,pending=edit?edit.pending:0,editing=!!(edit && edit.active);

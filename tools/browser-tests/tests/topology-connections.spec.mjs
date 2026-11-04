@@ -1,3 +1,59 @@
+/* #961 edge label contract (desktop Workbench, Standard view). Source: ticket #961 "How it should
+   look and behave" and "Test + flip" (Chuck's coverage ruling 2026-11-04: the Test + flip section as
+   written) and the epic #959 shared rules. Hosted by the three "edge label" tests at the end of this
+   file, each once for the local edge 0 (local -> shared::api, authored in the consumer) and once for
+   the imported edge 1 (shared::api -> shared::store, provider edge api->store). Editor = textbox
+   "Edit connection label" inside #docview .boardcanvas. Menus: local = "Object actions", imported =
+   "Reference actions for shared". labeled(): local edge gets status 'open', so its rendered label
+   '? Open · Request' differs from its source label 'Request'; imported edge gets the consumer overlay
+   edgeOverrides['api->store'] = {labelDx:25}.
+
+   row | fixture / input | scoped assertion | rejects
+   P1 fixture discriminates | labeled() | local edges[0] is exactly {from,to,label:'Request',
+      status:'open'} and text.lbl[0] reads '? Open · Request'; imported overlay is exactly
+      {labelDx:25} and text.lbl[1] reads 'Persist' | (fixture power for rows 1, 3, 7)
+   P2 Inspect empty rule | select edge, Inspect label / Display label cleared, Enter | #src changed;
+      local text.lbl '? Open', imported text.lbl absent; that source is `cleared`; Undo -> original |
+      (precondition for row 5)
+   1 double-click opens in place (FLIP: "editor visible after double-click") | dblclick text.lbl |
+      editor visible, focused, value = the SOURCE label ('Request', not '? Open · Request'), its box
+      covers the label's centre; #src unchanged | no double-click route (today); the Inspect field;
+      a value read from rendered text; an editor at the SVG origin
+   2 Escape writes nothing | type, Escape | editor gone; #src === original; label unchanged |
+      Escape that saves
+   3 click outside saves; double-click does not move the label | dblclick, type, click node 'other' |
+      parsed #src equals the original with only the label changed (local edges[0].label; imported
+      edgeOverrides['api->store'] = {labelDx:25,label}); text.lbl shows it | click-outside that
+      discards; an imported write to authored edges or provider; an overlay replaced instead of
+      merged (drops labelDx); a double-click that also writes labelDx/labelDy
+   4 one save = one Undo; Redo | #undo-builder, #redo-builder | one Undo: #src === original exactly,
+      label restored; Redo: #src === saved | a save recording two entries or none
+   5 empty value = Inspect | select all, Backspace, Enter | #src === `cleared` exactly; Undo ->
+      original | saving "" (local) or a different overlay (imported) for an empty draft
+   6 label drag still moves the label | drag text.lbl (35,-25) | no editor; parsed #src differs from
+      the original only in labelDx/labelDy (local edges[0], imported overlay), labelDx grew and
+      labelDy < 0 | a mouse-down that opens the editor or blocks the drag
+   7 right-click label -> Rename (FLIP: "Rename menu item present") | right-click text.lbl | the
+      edge's menu has menuitem Rename; clicking it closes the menu and opens the editor, focused,
+      value = source label, covering the label's centre; #src unchanged | no Rename (today); Rename
+      that opens Inspect; Rename only in one of the two menus
+   8 Enter saves; imported layout unchanged | select all, type, Enter | parsed #src equals the
+      original with only the label changed; text.lbl shows it; imported path `d` unchanged | Enter
+      that does nothing; an imported rename that writes connection layout
+   9 Undo/Redo of the Rename | undo, redo | #src === original, then === saved | as row 4
+   10 right-click the arrow -> Rename | right-click a point at 30% of the path, asserted to hit the
+      edge (not its label, a node or a coin) | Rename opens the editor holding the current label; Enter
+      saves only the label; one Undo -> the previous save exactly | Rename reachable only from the label
+   11 unlabeled edge: right-click the arrow -> Rename creates a label (FLIP) | provider (imported) or
+      consumer (local) edge without label; no text.lbl | editor value ''; its box spans the path
+      midpoint's x and its centre is nearer the midpoint than either path end; Enter writes only
+      edges[0].label (local) / edgeOverrides {'api->store':{label}} (imported); text.lbl appears; Undo
+      -> original (no text.lbl); Redo -> saved | an editor that needs an existing text.lbl; an editor
+      placed at an endpoint node
+   excluded — §0 ruling ("the ticket's Test + flip section, as written"): double-clicking a curve
+      handle still removes that point (neighbor tools/browser-tests/tests/edge-curves.spec.mjs stays
+      green); stale-source draft drop (shared editor behavior from #960); keyboard Shift+F10 route to
+      Rename; Explore view. */
 import {readFile} from 'node:fs/promises';
 import {projectFiles,projectSource,useProjectDownloads} from '../helpers/project-export.mjs';
 import {test,expect,closeTools,pastePage} from '../helpers/test.mjs';
@@ -441,4 +497,129 @@ test('imported display label control saves only its overlay and resets without c
   const resetBefore=await source(page);await page.getByRole('button',{name:'Reset imported display label',exact:true}).click();
   await expect.poll(async()=> (await overlay(page)).edgeOverrides?.['api->store']).toEqual({labelDx:25});await roundtrip(page,resetBefore);
   await expect(page.locator('#docview text.lbl[data-dv-edge="1"]')).toContainText('Persist');
+});
+
+// #961 edge label: right-click Rename and double-click edit the label in place (contract matrix at the top).
+const labelEditor=page=>page.locator('#docview .boardcanvas').getByRole('textbox',{name:'Edit connection label',exact:true});
+const edgeText=(page,i)=>page.locator('#docview text.lbl[data-dv-edge="'+i+'"]');
+const edgePath=(page,i)=>page.locator('#docview path.edge[data-dv-edge="'+i+'"]');
+const edgeMenu=(page,imported)=>page.getByRole('menu',{name:imported?'Reference actions for shared':'Object actions',exact:true});
+const centre=b=>({x:b.x+b.width/2,y:b.y+b.height/2});
+const labeled=imported=>(provider,consumer)=>{if(imported)diagram(consumer).topologyImports[0].edgeOverrides={'api->store':{labelDx:25}};else diagram(consumer).edges[0].status='open';};
+function relabeled(text,imported,label){
+  const raw=JSON.parse(text),d=diagram(raw);
+  if(imported){const overrides=d.topologyImports[0].edgeOverrides || {};d.topologyImports[0].edgeOverrides={...overrides,'api->store':{...(overrides['api->store'] || {}),label}};}
+  else d.edges[0].label=label;
+  return raw;
+}
+async function edgeAt(page,i,at){
+  return edgePath(page,i).evaluate((el,at)=>{const p=el.getPointAtLength(el.getTotalLength()*at),q=new DOMPoint(p.x,p.y).matrixTransform(el.getScreenCTM());return {x:q.x,y:q.y};},at);
+}
+async function rightClickArrow(page,i){
+  const p=await edgeAt(page,i,.3);
+  // The pointer lands on the edge itself: not its label, a node or a step coin.
+  expect(await page.evaluate(({x,y})=>{const hit=document.elementFromPoint(x,y),edge=hit && hit.closest('[data-dv-edge]');return edge?{edge:edge.getAttribute('data-dv-edge'),text:edge.tagName.toLowerCase()==='text'}:null;},p)).toEqual({edge:String(i),text:false});
+  await page.mouse.click(p.x,p.y,{button:'right'});
+}
+async function covers(locator,p,slack=4){
+  const b=await locator.boundingBox();expect(b).not.toBeNull();
+  expect(p.x).toBeGreaterThanOrEqual(b.x-slack);expect(p.x).toBeLessThanOrEqual(b.x+b.width+slack);
+  expect(p.y).toBeGreaterThanOrEqual(b.y-slack);expect(p.y).toBeLessThanOrEqual(b.y+b.height+slack);
+}
+
+for(const imported of [false,true])test('edge label '+(imported?'imported':'local')+' double-click edits in place: Escape, click outside, empty rule, one Undo, drag still moves',async({page,server})=>{
+  const i=imported?1:0,first=imported?'Persist':'Request',shown=value=>imported?value:'? Open · '+value;
+  await fixture(page,server,'file','ambient',labeled(imported));
+  const src=page.locator('#src'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder'),original=await source(page),label=edgeText(page,i),edit=labelEditor(page);
+  // P1: the fixture discriminates source from rendered text (local) and carries an overlay to keep (imported).
+  await expect(label).toHaveText(shown(first));await expect(edit).toHaveCount(0);
+  if(imported)expect(diagram(JSON.parse(original)).topologyImports[0].edgeOverrides).toEqual({'api->store':{labelDx:25}});
+  else expect(diagram(JSON.parse(original)).edges[0]).toEqual({from:'local',to:'shared::api',label:'Request',status:'open'});
+  // P2: Inspect's empty rule for this label.
+  await label.click();await page.locator('#editor-tab-inspect').click();
+  const field=page.locator('#guide').getByRole('textbox',{name:imported?'Display label':'label',exact:true});
+  await expect(field).toHaveValue(first);await field.fill('');await field.press('Enter');await expect(src).not.toHaveValue(original);
+  if(imported)await expect(label).toHaveCount(0);else await expect(label).toHaveText('? Open');
+  const cleared=await source(page);
+  await undo.click();await expect(src).toHaveValue(original);await closeTools(page);await expect(label).toHaveText(shown(first));
+  // Row 1 (flip): double-click opens the single-line editor over the label, holding the source label.
+  const at=centre(await label.boundingBox());
+  await label.dblclick();await expect(edit).toBeVisible();await expect(edit).toBeFocused();await expect(edit).toHaveValue(first);
+  await covers(edit,at);await expect(src).toHaveValue(original);
+  // Row 2: Escape cancels and writes nothing.
+  await edit.selectText();await edit.pressSequentially('Discarded');await expect(edit).toHaveValue('Discarded');await edit.press('Escape');
+  await expect(edit).toHaveCount(0);await expect(src).toHaveValue(original);await expect(label).toHaveText(shown(first));
+  // Row 3: click outside saves only the label; the double-click did not move it.
+  await label.dblclick();await expect(edit).toBeFocused();await edit.selectText();await edit.pressSequentially('Clicked away');await expect(src).toHaveValue(original);
+  await node(page,'other').click();await expect(edit).toHaveCount(0);
+  const saved=await source(page);expect(JSON.parse(saved)).toEqual(relabeled(original,imported,'Clicked away'));
+  await expect(label).toHaveText(shown('Clicked away'));
+  // Row 4: one save is one Undo entry; Redo reapplies it.
+  await undo.click();await expect(src).toHaveValue(original);await expect(label).toHaveText(shown(first));
+  await redo.click();await expect(src).toHaveValue(saved);await expect(label).toHaveText(shown('Clicked away'));
+  await undo.click();await expect(src).toHaveValue(original);
+  // Row 5: an empty draft saves exactly what clearing the Inspect field saves.
+  await label.dblclick();await expect(edit).toHaveValue(first);await edit.selectText();await edit.press('Backspace');await expect(edit).toHaveValue('');
+  await edit.press('Enter');await expect(edit).toHaveCount(0);await expect(src).toHaveValue(cleared);
+  await undo.click();await expect(src).toHaveValue(original);await expect(label).toHaveText(shown(first));
+  // Row 6: dragging the label still moves it and changes nothing else.
+  await dragElement(page,label,35,-25);await expect(edit).toHaveCount(0);await expect(src).not.toHaveValue(original);
+  const moved=JSON.parse(await source(page)),want=JSON.parse(original);
+  if(imported){
+    const o=diagram(moved).topologyImports[0].edgeOverrides['api->store'];expect(o.labelDx).toBeGreaterThan(25);expect(o.labelDy).toBeLessThan(0);
+    diagram(want).topologyImports[0].edgeOverrides['api->store']={labelDx:o.labelDx,labelDy:o.labelDy};
+  }else{
+    const e=diagram(moved).edges[0];expect(e.labelDx).toBeGreaterThan(0);expect(e.labelDy).toBeLessThan(0);
+    Object.assign(diagram(want).edges[0],{labelDx:e.labelDx,labelDy:e.labelDy});
+  }
+  expect(moved).toEqual(want);await expect(label).toHaveText(shown(first));
+});
+
+for(const imported of [false,true])test('edge label '+(imported?'imported':'local')+' right-click Rename on the label and on the arrow saves with Enter and one Undo',async({page,server})=>{
+  const i=imported?1:0,first=imported?'Persist':'Request',shown=value=>imported?value:'? Open · '+value;
+  await fixture(page,server,'file','ambient',labeled(imported));
+  const src=page.locator('#src'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder'),original=await source(page),label=edgeText(page,i),edit=labelEditor(page);
+  const menu=edgeMenu(page,imported),rename=menu.getByRole('menuitem',{name:'Rename',exact:true}),route=await edgePath(page,i).getAttribute('d');
+  await expect(label).toHaveText(shown(first));await expect(menu).toHaveCount(0);await expect(edit).toHaveCount(0);
+  // Row 7 (flip): right-click the label -> Rename opens the editor over the label.
+  let at=centre(await label.boundingBox());
+  await label.click({button:'right'});await expect(menu).toBeVisible();await expect(rename).toBeVisible();
+  await rename.click();await expect(menu).toHaveCount(0);await expect(edit).toBeVisible();await expect(edit).toBeFocused();await expect(edit).toHaveValue(first);
+  await covers(edit,at);await expect(src).toHaveValue(original);
+  // Row 8: Enter saves only the label; an imported connection keeps its layout.
+  await edit.selectText();await edit.pressSequentially('Renamed hop');await expect(src).toHaveValue(original);await edit.press('Enter');await expect(edit).toHaveCount(0);
+  const saved=await source(page);expect(JSON.parse(saved)).toEqual(relabeled(original,imported,'Renamed hop'));
+  await expect(label).toHaveText(shown('Renamed hop'));if(imported)await expect(edgePath(page,i)).toHaveAttribute('d',route);
+  // Row 9: one Undo restores the exact source; Redo reapplies it.
+  await undo.click();await expect(src).toHaveValue(original);await expect(label).toHaveText(shown(first));
+  await redo.click();await expect(src).toHaveValue(saved);await expect(label).toHaveText(shown('Renamed hop'));
+  // Row 10: right-click the arrow itself -> Rename, holding the current label.
+  at=centre(await label.boundingBox());
+  await rightClickArrow(page,i);await expect(menu).toBeVisible();await expect(rename).toBeVisible();await rename.click();
+  await expect(edit).toBeFocused();await expect(edit).toHaveValue('Renamed hop');await covers(edit,at);
+  await edit.selectText();await edit.pressSequentially('Arrow rename');await edit.press('Enter');await expect(edit).toHaveCount(0);
+  expect(JSON.parse(await source(page))).toEqual(relabeled(original,imported,'Arrow rename'));await expect(label).toHaveText(shown('Arrow rename'));
+  await undo.click();await expect(src).toHaveValue(saved);await expect(label).toHaveText(shown('Renamed hop'));
+});
+
+for(const imported of [false,true])test('edge label '+(imported?'imported':'local')+' without a label: right-click Rename on the arrow creates one at the midpoint',async({page,server})=>{
+  const i=imported?1:0;
+  await fixture(page,server,'file','ambient',(provider,consumer)=>{delete diagram(imported?provider:consumer).edges[0].label;});
+  const src=page.locator('#src'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder'),original=await source(page),label=edgeText(page,i),edit=labelEditor(page);
+  const menu=edgeMenu(page,imported),rename=menu.getByRole('menuitem',{name:'Rename',exact:true});
+  // P1: the edge renders without any label.
+  await expect(edgePath(page,i)).toHaveCount(1);await expect(label).toHaveCount(0);
+  if(imported)expect(diagram(JSON.parse(original)).topologyImports[0].edgeOverrides).toBeUndefined();
+  else expect(diagram(JSON.parse(original)).edges[0]).toEqual({from:'local',to:'shared::api'});
+  const middle=await edgeAt(page,i,.5),ends=[await edgeAt(page,i,0),await edgeAt(page,i,1)];
+  // Row 11 (flip): Rename opens an empty editor at the label position the edge would use.
+  await rightClickArrow(page,i);await expect(menu).toBeVisible();await expect(rename).toBeVisible();await rename.click();
+  await expect(edit).toBeVisible();await expect(edit).toBeFocused();await expect(edit).toHaveValue('');await expect(src).toHaveValue(original);
+  const box=await edit.boundingBox(),c=centre(box),distance=(p,q)=>Math.hypot(p.x-q.x,p.y-q.y);
+  expect(middle.x).toBeGreaterThanOrEqual(box.x);expect(middle.x).toBeLessThanOrEqual(box.x+box.width);
+  for(const end of ends)expect(distance(c,middle)).toBeLessThan(distance(c,end));
+  await edit.pressSequentially('Created label');await edit.press('Enter');await expect(edit).toHaveCount(0);
+  const saved=await source(page);expect(JSON.parse(saved)).toEqual(relabeled(original,imported,'Created label'));await expect(label).toHaveText('Created label');
+  await undo.click();await expect(src).toHaveValue(original);await expect(label).toHaveCount(0);
+  await redo.click();await expect(src).toHaveValue(saved);await expect(label).toHaveText('Created label');
 });

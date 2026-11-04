@@ -1077,7 +1077,12 @@ server enables that tool; it is off by default in
 which the viewer adds as a custom connector. The
 [mock Grafana MCP](../deploy/cloudflare/mock-grafana-mcp/README.md) serves the
 doorbell story without a Grafana account. `tools/inject.py` adds the Grafana entry
-to the embedded agent guide's declaration when the page has such signals.
+to the embedded agent guide's declaration when the page has such signals. That
+includes imported carriers: when the page being injected into already carries a
+`flowview-topology` context block, the imports are resolved as the runtime
+resolves them (exported, selected carriers only; a consumer overlay replaces the
+provider binding; provider templates expand). A snapshot resolved before
+injection (`tools/page_build.py --resolve-imports`) carries those bindings itself.
 
 The adapter never matches the connector by name. From the listed connectors it
 takes any that offers all five tools above, preferring one named **Grafana**, then
@@ -1322,8 +1327,9 @@ guide is derived from the spec: it states the renderer version from
 `page.flowview.authoredWith` (or that none is stamped), the capability
 declaration to pass on every publish as a JSON block (the Jira connector entry
 only when the page has `page.tracking`, the Grafana entry only when a carrier or
-page template binds a `grafana`, `loki` or `sql` signal; connector display names
-are per account), the compact tracking rules, the page's own `tracking` values, links
+page template binds a `grafana`, `loki` or `sql` signal, imported carriers of an
+embedded `flowview-topology` context included; connector display names are per
+account), the compact tracking rules, the page's own `tracking` values, links
 to `docs/live-status.md` and `contract/authoring-contract.md` in the public
 repo pinned to the commit the page was built from (`git rev-parse HEAD` of the
 checkout running `inject.py`; outside a checkout the links point at `main`

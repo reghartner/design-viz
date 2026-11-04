@@ -36,10 +36,11 @@
              below 60000.
    source    Optional connector name for the panel's Metrics text
              ('Grafana' from the claude.ai adapter, viewer/telemetry-claude.js).
-   A rejection keeps the map and sets status 'error' with its message as the
-   note; a rejection whose `state` is 'approval' sets status 'approval'.
    demo      Optional {mount(api) → cleanup}: a demo source mounted when Metrics
              turns on and cleaned up when it turns off. It feeds api.apply().
+
+   A rejection keeps the map and sets status 'error' with its message as the
+   note; a rejection whose `state` is 'approval' sets status 'approval'.
 
    The first provider call runs when Metrics turns on; refresh pauses while
    the document is hidden and catches up once on return (liveStatusPoller). */

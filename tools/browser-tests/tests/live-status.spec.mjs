@@ -308,10 +308,12 @@ test('O10 Live and Over time sit first on one row and the selected one is filled
  const names=await panel.locator('.dv-live-head .reader-button').evaluateAll(els=>els.filter(el=>el.getClientRects().length).map(el=>el.textContent.trim()));expect(names.slice(0,2)).toEqual(['Live','Over time']);
  const a=await live.boundingBox(),b=await overTime.boundingBox();expect(b.y).toBe(a.y);expect(b.x-(a.x+a.width)).toBeGreaterThanOrEqual(0);expect(b.x-(a.x+a.width)).toBeLessThanOrEqual(8);
  for(const skin of ['aurora','terminal','pastel','blueprint','rose','lavender','lilac','daylight','editorial']){
+  // Colors animate between themes and between states: wait until an unselected button reads like Next day, which never changes state here.
   await page.evaluate(s=>window.dvSetSkin(s),skin);await panel.locator('.dv-live-epic').hover();
-  const selected=await fill(live),plain=await fill(overTime);expect(selected,skin+' Live is filled').not.toBe(plain);
+  await expect.poll(async()=>await fill(overTime)===await fill(next),{message:skin+' Over time starts unselected'}).toBe(true);
+  const plain=await fill(next),selected=await fill(live);expect(selected,skin+' Live is filled').not.toBe(plain);
   await overTime.click();await expect(overTime).toHaveAttribute('aria-pressed','true');await panel.locator('.dv-live-epic').hover();
-  const past=await fill(overTime);expect(past,skin+' Over time is filled').not.toBe(await fill(live));expect(past,skin+' Over time differs from Live').not.toBe(selected);expect(await fill(live),skin+' Live goes quiet').toBe(plain);
+  await expect.poll(()=>fill(overTime),{message:skin+' Over time is amber'}).toBe('rgb(245, 165, 36)');await expect.poll(()=>fill(live),{message:skin+' Live goes quiet'}).toBe(plain);expect('rgb(245, 165, 36)',skin+' Over time differs from Live').not.toBe(selected);
   expect(await fill(row),skin+' the slider row is tinted').not.toBe('rgba(0, 0, 0, 0)');
   await live.click();await expect(live).toHaveAttribute('aria-pressed','true');await expect(row).toHaveCount(0);
  }
@@ -840,7 +842,7 @@ test('E6 detail carrier has no panel link while authored detail navigation still
   await expect(child).toBeVisible();await expect(panel).toBeHidden();
   // The rendered back button includes the arrow in its accessible name.
   const back=root.locator('[data-dv-detail-preview] .detail-breadcrumb').getByRole('button',{name:/Overview$/});
-  await expect(back).toBeVisible();await live.click();
+  await expect(back).toBeVisible();await back.click();
   await expect(root.locator('[data-dv-detail-preview]')).toHaveCount(0);
  }
 });

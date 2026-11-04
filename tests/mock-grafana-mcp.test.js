@@ -5,7 +5,7 @@
 // G1  layout, dependency-free imports, placeholder config with the RL binding.
 // G2  JSON-RPC discovery: exactly the seven read-only tools, each with its full Grafana parameter set and required list.
 // G3  list_datasources: the Prometheus, Loki and Tempo UIDs the example binds.
-// G4  traffic starts two hours after the carrier's tickets turn Done on the timeline.
+// G4  traffic starts two hours after the carrier's tickets (from the example spec) turn Done on the timeline.
 // G5  event edge degrades after the Day 10 deploy annotation and stays degraded on Day 12.
 // G6  route queue lags on Day 11 and recovers by Day 12.
 // G7  push edge is silent on Day 12 although its tickets are Done.
@@ -16,7 +16,9 @@
 // G12 story clock: pinned/clamped days, DEPLOYED_AT rotation, non-story scenarios.
 // G13 worker routes, batches, notifications, CORS and the per-IP rate limit (429).
 // G14 identity regexes and ignore rules (only the committed placeholder Worker name).
-// G15 fixture carriers exist in the example spec with the same tickets; README contract and tool signatures.
+// G15 timeline telemetry carriers exist in the example spec; README contract and tool signatures.
+// G16 the shared timeline's days[].telemetry block is the Worker's only source of series and annotations (#944 PR 2).
+// G17 every signal the example spec binds, sent through the Worker, returns the timeline's value for that hour.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -37,6 +39,13 @@ const worker = async () => {
   return (await import(pathToFileURL(path.join(ROOT, DIR, 'worker.mjs')).href)).default;
 };
 const timeline = () => json('examples/live-status/live-status.timeline.json');
+const diagram = () => json('examples/live-status/live-status.spec.json').page.sections[0].diagram;
+// The proof engine's carrier ids: a node id, or from->to for an edge.
+function authoredCarrier(id) {
+  const d = diagram();
+  return id.includes('->') ? d.edges.find(edge => edge.from + '->' + edge.to === id) : d.nodes[id];
+}
+const specTickets = id => { const carrier = authoredCarrier(id); assert.ok(carrier, id + ' exists in the example spec'); return carrier.tickets; };
 
 const HOUR = 3600000;
 const DAY = 24 * HOUR;
@@ -143,7 +152,7 @@ test('G1: module exports, layout and placeholder config with the rate limit bind
   assert.equal(typeof mod.handleMcp, 'function');
   const story = await loadStory();
   assert.equal(typeof story.storyNow, 'function');
-  assert.equal(typeof story.CARRIERS, 'object');
+  assert.equal(typeof story.createStory, 'function');
   assert.equal(typeof (await worker()).fetch, 'function');
   for (const file of ['worker.mjs', 'mcp.mjs', 'story.mjs', 'README.md', 'wrangler.jsonc']) assert.ok(fs.existsSync(path.join(ROOT, DIR, file)), file);
   const config = json(DIR + '/wrangler.jsonc');
@@ -212,11 +221,10 @@ test('G3: list_datasources serves the three example datasources with type and na
 });
 
 test('G4: each carrier starts carrying traffic two hours after its tickets turn Done', async () => {
-  const story = await loadStory();
   const step = 300;
-  for (const [expr, carrier] of [[Q.press, 'edge:button->mcu'], [Q.ring, 'edge:mcu->chime'], [Q.eventRate, 'edge:mcu->ingest'],
-    [Q.routeIn, 'edge:ingest->notify'], [Q.ingestRate, 'node:ingest']]) {
-    const done = doneAt(story.CARRIERS[carrier].tickets);
+  for (const [expr, carrier] of [[Q.press, 'button->mcu'], [Q.ring, 'mcu->chime'], [Q.eventRate, 'mcu->ingest'],
+    [Q.routeIn, 'ingest->notify'], [Q.ingestRate, 'ingest']]) {
+    const done = doneAt(specTickets(carrier));
     assert.ok(done, carrier + ' turns Done on the timeline');
     const points = await range(expr, ctx(DAY12), done - HOUR, done + 4 * HOUR, step);
     const flowing = [...points.keys()].sort((a, b) => a - b);
@@ -229,12 +237,6 @@ test('G4: each carrier starts carrying traffic two hours after its tickets turn 
   assert.equal(await instant(Q.press, ctx(DAY9 - 1)), null);
   assert.ok((await instant(Q.press, ctx(DAY9))) >= 10);
   assert.equal(await instant(Q.eventRate, ctx(DAY9)), null);
-  // A timeline on which FW-45 never finishes keeps the event edge and everything downstream of it silent.
-  const custom = structuredClone(timeline());
-  for (const day of custom.days) if (day.issues['FW-45']) day.issues['FW-45'].state = 'active';
-  const stalled = ctx(DAY12, { timeline: custom });
-  assert.ok((await instant(Q.press, stalled)) >= 10);
-  for (const expr of [Q.eventRate, Q.routeIn]) assert.equal(await instant(expr, stalled), null, expr);
 });
 
 test('G5: the event edge degrades after the Day 10 deploy annotation and stays degraded on Day 12', async () => {
@@ -275,9 +277,8 @@ test('G6: the route queue lags on Day 11 and recovers by Day 12', async () => {
 });
 
 test('G7: the push edge is silent on Day 12 although both of its tickets are Done', async () => {
-  const story = await loadStory();
   const day12 = timeline().days[DAY12].issues;
-  for (const key of story.CARRIERS['edge:notify->app'].tickets) assert.equal(day12[key].state, 'done', key);
+  for (const key of specTickets('notify->app')) assert.equal(day12[key].state, 'done', key);
   for (const logql of [L.pushSent, L.pushFailed]) {
     const result = payload(await call('query_loki_logs', { datasourceUid: LOKI, logql, startRfc3339: 'now-24h', endRfc3339: 'now', stepSeconds: 3600 }));
     assert.deepEqual(result.data, [], logql);
@@ -524,17 +525,12 @@ test('G14: identity and recursive ignore rules protect the new deploy folder', (
   }
 });
 
-test('G15: fixture carriers match the example spec, and the README documents the contract', async () => {
-  const story = await loadStory();
-  const diagram = json('examples/live-status/live-status.spec.json').page.sections[0].diagram;
-  const carriers = Object.entries(story.CARRIERS);
-  assert.ok(carriers.length >= 5);
-  for (const [id, carrier] of carriers) {
-    const [, kind, rest] = /^(node|edge):(.+)$/.exec(id) || [];
-    const authored = kind === 'node' ? diagram.nodes[rest]
-      : diagram.edges.find(edge => edge.from + '->' + edge.to === rest);
-    assert.ok(authored, id + ' exists in the example spec');
-    assert.deepEqual([...carrier.tickets].sort(), [...authored.tickets].sort(), id + ' tickets');
+test('G15: timeline carriers exist in the example spec, and the README documents the contract', async () => {
+  for (const [index, day] of timeline().days.entries()) {
+    assert.ok(day.telemetry, 'days[' + index + '].telemetry');
+    const carriers = Object.keys(day.telemetry.carriers);
+    assert.ok(carriers.length >= 5, 'days[' + index + '] carriers');
+    for (const id of carriers) assert.ok(authoredCarrier(id), id + ' exists in the example spec');
   }
   const readme = read(DIR + '/README.md');
   for (const text of ['npx -y wrangler@4 deploy -c deploy/cloudflare/mock-grafana-mcp/wrangler.jsonc', 'https://<worker>.<subdomain>.workers.dev/mcp',
@@ -543,7 +539,7 @@ test('G15: fixture carriers match the example spec, and the README documents the
     'button_press_total', 'chime_ring_total', 'http_server_requests_total', 'http_server_request_duration_seconds_bucket',
     'kafka_server_brokertopicmetrics_messagesin_total', 'kafka_consumergroup_lag', 'kafka_consumergroup_lag_seconds',
     'push_latency_seconds_bucket', '{app="notify"}', 'push sent', 'push failed', 'event consumed', 'firmware 2.4.1',
-    'isError', 'structuredContent', 'now-1h'].concat(TOOLS)) assert.ok(readme.includes(text), text);
+    'isError', 'structuredContent', 'now-1h', 'live-status.timeline.json', '`days[].telemetry`'].concat(TOOLS)) assert.ok(readme.includes(text), text);
   // Each Tools bullet spells the full parameter list: required names bare, optional names with "?".
   for (const [name, { required, all }] of Object.entries(TOOL_PARAMS)) {
     const signature = new RegExp('^- `' + name + ' \\{([^}]*)\\}`', 'm').exec(readme);
@@ -554,4 +550,52 @@ test('G15: fixture carriers match the example spec, and the README documents the
   }
   assert.match(read('docs/live-status.md'), /mock-grafana-mcp\/README\.md/);
   assert.match(read('deploy/cloudflare/README.md'), /mock-grafana-mcp/);
+});
+
+test('G16: the shared timeline telemetry block is the Worker\'s only source of series and annotations', async () => {
+  const custom = structuredClone(timeline());
+  const day = custom.days[DAY12].telemetry;
+  assert.ok(day, 'the example timeline carries days[].telemetry');
+  // Rewrite the Day 12 event edge and its annotations; the Worker must serve exactly the rewrite.
+  day.carriers['mcu->ingest'].rate.values = Array(24).fill(77);
+  day.carriers['mcu->ingest'].errors.values = Array(24).fill(0);
+  day.carriers['mcu->ingest'].p95.values = Array(24).fill(123);
+  day.carriers['button->mcu'].rate.values = Array(24).fill(null);
+  day.annotations = [{ id: 99, time: '2026-10-31T12:00:00Z', text: 'custom marker', tags: ['deploy'] }];
+  const custom12 = ctx(DAY12, { timeline: custom });
+  assert.equal(await instant(Q.eventRate, custom12), 77);
+  assert.equal(await instant(Q.eventErrors, custom12), 0);
+  assert.equal(await instant(Q.eventP95, custom12), 123);
+  assert.equal(await instant(Q.ingestRate, custom12), 77, 'the ingest node sums the same request series');
+  assert.equal(await instant(Q.press, custom12), null, 'null values are absent samples');
+  const markers = payload(await call('get_annotations', {}, custom12)).Payload;
+  assert.ok(markers.some(a => a.id === 99 && a.text === 'custom marker' && a.time === Date.parse('2026-10-31T12:00:00Z')));
+  assert.ok(markers.some(a => /firmware 2\.4\.1/.test(a.text)), 'earlier days keep their annotations');
+  const failing = payload(await call('search_tempo_traces', { datasourceUid: TEMPO, query: '{ status = error }' }, custom12));
+  assert.deepEqual(failing.traces, [], 'a healthy hour has a healthy exemplar');
+  // A timeline without telemetry blocks serves no data at all.
+  const bare = structuredClone(timeline());
+  for (const d of bare.days) delete d.telemetry;
+  assert.equal(await instant(Q.eventRate, ctx(DAY12, { timeline: bare })), null);
+  assert.deepEqual(payload(await call('get_annotations', {}, ctx(DAY12, { timeline: bare }))).Payload, []);
+});
+
+test('G17: every signal the example spec binds returns, through the Worker, the timeline value for that hour', async () => {
+  const d = diagram();
+  const carriers = Object.entries(d.nodes).map(([id, node]) => [id, node]).concat(d.edges.map(edge => [edge.from + '->' + edge.to, edge]))
+    .filter(([, carrier]) => carrier.telemetry);
+  assert.ok(carriers.length >= 5, 'the example binds its served carriers');
+  for (const index of [DAY10, DAY11, DAY12]) {
+    const block = timeline().days[index].telemetry;
+    for (const [id, carrier] of carriers) {
+      for (const [name, signal] of Object.entries(carrier.telemetry.signals)) {
+        const expected = block.carriers[id][name].values[23];
+        let data;
+        if (signal.grafana) data = (await prom(signal.grafana, ctx(index))).data.map(entry => Number(entry.value[1]));
+        else if (signal.loki) data = payload(await call('query_loki_logs', { datasourceUid: LOKI, logql: signal.loki, queryType: 'instant', endRfc3339: 'now' }, ctx(index))).data.map(entry => entry.value);
+        else assert.fail(id + '.' + name + ' binds a source the mock does not serve');
+        assert.deepEqual(data, expected === null ? [] : [expected], id + '.' + name + ' on day index ' + index);
+      }
+    }
+  }
 });

@@ -248,7 +248,7 @@ Publish only when asked. Steps:
    entry under its exact display name, for example
    `{server: "GitHub", tools: ["search_pull_requests", "pull_request_read"]}`.
    Without it the board still works; PR icons stay plain and the header says
-   "GitHub not connected" when the page has GitHub links or a scope.
+   nothing about GitHub.
    For a tracked two-file page add the two capabilities the board's Edit mode
    needs: `artifact: {}, user: {scopes: ["profile"]}` (the page's agent guide
    prints the full declaration). Single-file pages keep the declaration above.

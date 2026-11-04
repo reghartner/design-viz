@@ -1,5 +1,10 @@
 # Changelog
 
+## Live status header without a GitHub connector (2026-11-04)
+
+- The Live status header no longer shows "GitHub not connected" (#1022). PR links
+  stay plain links when no GitHub connector is available.
+
 ## Over time shows missing tickets (2026-11-04)
 
 - On a past day, a ticket with no status on that day now shows as Missing instead of

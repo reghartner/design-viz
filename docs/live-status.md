@@ -909,7 +909,56 @@ mode:
   the inline copy), Edit is disabled with that reason: saving the old copy would
   overwrite newer changes and their history.
 
-Pulling the saved `flowspec.json` back into the repository stays the author's job.
+### Agents and board edits (#974)
+
+Board edits change only the artifact's `flowspec.json`. An agent that keeps its own copy
+of the spec (a repository file or a working copy) brings them in before it changes
+anything, with `tools/board-sync.js`. Board edits can only add a ticket to a node or edge,
+remove one, or clear a Missing work marker, so folding them in is mechanical; the agent
+asks the author only about a real conflict.
+
+1. Read the artifact's current `flowspec.json` (Artifact tool, read action with `path`)
+   and save it, for example as `live.json`.
+2. `node tools/board-sync.js pull <local.json> live.json` lists the board edits the local
+   copy does not have, one line each
+   (`2026-11-03 14:02 UTC  Bo: DOOR-104 moved from Door API to Cloud sync`), and writes
+   them into the local file: the tickets and Missing work markers on the nodes and edges
+   those edits touched, plus their `page.editHistory` entries. Every other line stays as
+   written and changes made only in the local copy are kept. Tell the author the listed
+   lines.
+   - Exit 2, nothing written: a conflict. The same ticket was placed differently on the
+     board and in the local copy, or a board edit added a ticket to a node or edge the
+     local copy no longer has. (A board edit that removed a ticket from, or cleared the
+     marker of, a node or edge the local copy deleted needs no question: both sides agree
+     the ticket is not there.) Ask the author, then rerun with `--resolve KEY=live` (keep the board's
+     placement) or `--resolve KEY=local` (keep the local one, after placing the ticket
+     where the author says).
+   - Exit 3, nothing written: the live board was republished by an agent from another
+     copy, so its structure may differ. Start again from `live.json`: copy it over the
+     local file and redo the requested change. If the local file has changes of its own
+     that were never published, ask the author before replacing it.
+3. Make the requested change in the local file.
+4. `node tools/board-sync.js log <local.json> live.json --by "<author name>"` appends one
+   agent entry: `"source": "agent"`, a counted one-line `summary` ("Added 5 nodes, moved
+   5 tickets"; `--summary "<one line>"` replaces it) and the ticket changes. It refuses
+   with exit 2 when the change alters where a ticket sits (moves it, removes it, adds it
+   anywhere, or deletes the node or edge holding it) and a board edit saved after the
+   newest agent entry added, moved or removed that ticket; the message names who made the
+   board edit, when, and what it did. Ask the
+   author and rerun with `--confirm KEY` once they agree. Board edits older than the
+   newest agent entry were already in front of the author and need no question
+   (Chuck 2026-11-04). Exit 3: pull first.
+5. Validate the local file (`node tools/validate.js <local.json>`) after logging, so the
+   file you publish, agent entry included, has no errors.
+6. Republish to the same URL with the edited file as `flowspec.json` (above). If the
+   publish is refused because the artifact changed after the read, someone saved in the
+   meantime: read `flowspec.json` again, repeat step 2, validate again, then publish; do
+   not log a second time, the agent entry is already in the local file.
+
+An agent without a checkout follows the same rules from the page's agent guide while it
+edits the live `flowspec.json` directly: it tells the author which board edits were saved
+after the newest agent entry, asks before overriding one of them, and appends the agent
+entry itself.
 
 ## Pull requests from GitHub
 
@@ -1014,7 +1063,11 @@ For a page injected with `--two-file` the guide's edit loop targets
 (always the current version, since the board saves its own edits into it and
 records each save under `page.editHistory`, which the agent keeps), change it,
 validate, and republish to the same URL with the artifact's own `index.html`
-read back as the page and the edited file in `files`. The inline block is
+read back as the page and the edited file in `files`. Its steps also carry the
+board-edit rules of "Agents and board edits" (#974): tell the editor which board
+edits were saved after the newest agent entry, ask before overriding one of them,
+append one agent entry for the change, and start again from the read when the
+publish is refused because the artifact changed. The inline block is
 described as the stale fallback and must not be edited.
 A tracked two-file page's declaration adds `artifact` and `user`
 (`{scopes: ["profile"]}`).
@@ -1051,6 +1104,24 @@ Validation follows the warning-only policy of the other tracking fields: a
 malformed entry warns and is ignored, a non-array warns once, and more than 200
 entries warn once with only the newest 200 used (Edit mode trims to 200 on
 save).
+
+An agent's change to the board is one agent entry (#974), written by
+`node tools/board-sync.js log` (see "Agents and board edits" above):
+
+```json
+{"at": "2026-11-04T15:00:00.000Z", "by": {"name": "Chuck"}, "source": "agent",
+ "summary": "Added 5 nodes, moved 5 tickets",
+ "changes": [{"op": "remove", "ticket": "DOOR-104", "node": "door-api", "label": "Door API"},
+             {"op": "add", "ticket": "DOOR-104", "node": "cloud-sync", "label": "Cloud sync"}]}
+```
+
+`"source": "agent"` and `summary` require each other: `summary` is one line of 1–200
+characters, and any other `source` is malformed. An agent entry's `changes` lists only its
+ticket changes and may be empty (a change to structure or text alone). Its row reads
+editor, an agent tag, the time and the summary, with no change count; it expands to its
+ticket changes when it has any and does not expand otherwise. Agent entries also mark where
+an agent last brought the board in line: board edits saved after the newest one are the
+ones an agent asks about before overriding.
 
 The **Edit history** panel shows those entries. Add it to the diagram's panels
 after the Live status panel and place it below the board in every host profile:

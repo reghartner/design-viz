@@ -604,6 +604,8 @@ function editHistoryTimestamp(value){
   if(+m[4]>23 || +m[5]>59 || +m[6]>59 || (m[7]!=null && (+m[7]>23 || +m[8]>59)))return false;
   return isFinite(Date.parse(value));
 }
+var EDIT_HISTORY_SUMMARY_MAX=200;
+function editHistorySummary(value){return typeof value==='string' && !!value.trim() && value.length<=EDIT_HISTORY_SUMMARY_MAX && !/[\r\n\u2028\u2029]/.test(value);}
 function editHistoryEntryProblem(entry){
   if(!specObject(entry))return 'must be an object';
   if(!editHistoryTimestamp(entry.at))return 'at: must be an ISO-8601 date-time such as 2026-10-30T16:23:15Z';
@@ -612,7 +614,15 @@ function editHistoryEntryProblem(entry){
     if(Object.prototype.hasOwnProperty.call(entry.by,'id') && typeof entry.by.id!=='string')return 'by.id: must be a string';
     if(Object.prototype.hasOwnProperty.call(entry.by,'name') && typeof entry.by.name!=='string')return 'by.name: must be a string';
   }
-  if(!Array.isArray(entry.changes) || !entry.changes.length)return 'changes: must be a non-empty array';
+  /* #974: an agent's change is logged with `source: "agent"` and a one-line `summary`
+     (each requires the other); its `changes` lists only ticket changes and may be empty. */
+  var summarized=Object.prototype.hasOwnProperty.call(entry,'summary');
+  if(Object.prototype.hasOwnProperty.call(entry,'source') && entry.source!=='agent')return 'source: must be "agent"';
+  if(entry.source==='agent' && !summarized)return 'summary: an agent entry needs a one-line summary';
+  if(summarized && entry.source!=='agent')return 'source: an entry with a summary must have "source": "agent"';
+  if(summarized && !editHistorySummary(entry.summary))return 'summary: must be one line of 1–'+EDIT_HISTORY_SUMMARY_MAX+' characters';
+  if(summarized){if(!Array.isArray(entry.changes))return 'changes: must be an array (it may be empty when the entry has a summary)';}
+  else if(!Array.isArray(entry.changes) || !entry.changes.length)return 'changes: must be a non-empty array';
   for(var i=0;i<entry.changes.length;i++){
     var change=entry.changes[i],at='changes['+i+']';
     if(!specObject(change))return at+': must be an object';

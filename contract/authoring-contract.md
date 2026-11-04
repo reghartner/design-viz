@@ -717,6 +717,11 @@ and carrier are required, and add/remove changes also require `ticket`; `by`, `b
 records a Missing work marker cleared in Edit mode (#855); it names only its carrier
 and must not carry a `ticket`. Any other `op` is malformed. `at` is an ISO-8601 date-time with seconds, an optional fraction
 of any length and `Z` or a `±hh:mm` offset (`2026-10-30T16:23:15.987Z`).
+An agent's change to the board is logged as one agent entry (#974):
+`{"at", "by"?, "source": "agent", "summary": "Added 5 nodes, moved 5 tickets", "changes": [...]}`.
+`"source": "agent"` and `summary` require each other; `summary` is one line of 1–200
+characters; an agent entry's `changes` is an array of the ticket changes above and may be
+empty. `node tools/board-sync.js log` writes it; any other `source` value is malformed.
 Malformed entries warn and are ignored, a non-array warns once,
 and more than 200 entries warn once with only the newest 200 used. See
 [Edit history](../docs/live-status.md#edit-history).
@@ -1098,7 +1103,9 @@ perspectives" of one timeline). Types:
   `{"id":"history","type":"edit-history","title":"Edit history"}`.
   Lists `page.editHistory` newest first: one collapsible row per entry with the
   editor (live claude.ai profile name, else the stored `by.name`, else
-  "Someone"), the time, "N changes" and the first change; expanding a row shows
+  "Someone"), the time, "N changes" and the first change (an agent entry shows an agent
+  tag and its `summary` instead of the count and first change, and a row without
+  ticket changes does not expand); expanding a row shows
   one line per change with ticket key, live ticket title when available, the
   operation and the carrier label (stored `label`, else node id or `from → to`).
   Add it after the `live-status` panel and, in a section with `sectionLayout`,

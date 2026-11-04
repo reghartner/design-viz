@@ -2054,6 +2054,7 @@ test('OT13 apply still drops a provider entry without a valid state',()=>{
 | C8 | flagged today with no Flagged history | blocked on past days | losing today's flag |
 | C9 | batch waiting on Jira | panel shows loaded count of total; at most six changelog calls at once | an unbounded batch of calls |
 | C10 | adapter retires on a past day | mode ends and the source is gone | a past day surviving an account change |
+| C11 | the real adapter load over the real mock handler, final story day | every ticket on every day equals the story timeline; a ticket before its first day has no status; the range ends on the last Done day | an adapter and a mock that disagree on shape |
 */
 const OVER_WEEK=604800000,OVER_STORED=Date.parse('2026-10-25T00:00:00Z');
 const overRaw=(keys=['AA-1','BB-1','ZZ-1'])=>({page:{tracking:{jira:{site:'https://jira.test'}},sections:[{id:'main',diagram:{nodes:Object.fromEntries(keys.map((key,i)=>['n'+i,{title:key,tickets:[key]}])),rows:[keys.map((_,i)=>'n'+i)],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
@@ -2137,4 +2138,22 @@ test('C9 the panel shows loaded count of total and at most six changelog calls r
 test('C10 an adapter that retires on a past day ends the mode and removes the source',async()=>{
  const h=historyProvider();await overLive(h,overLiveIssues());await overClick(h);const api=h.ctl.liveStatus;assert.equal(api.snapshot().overTime?.active,true);
  h.watches[0].handler({type:'error',error:{code:'user_changed'}});await historySettle();assert.equal(api.snapshot().overTime,null);assert.equal(h.view.querySelector('input.dv-live-over-time-slider'),null);assert.ok(!overButton(h) || overButton(h).hidden);
+});
+test('C11 the adapter load over the real mock handler rebuilds the story timeline day by day',async()=>{
+ const C=providerContext(),{handleMcp}=await import('../deploy/cloudflare/mock-atlassian-mcp/mcp.mjs'),story=JSON.parse(fs.readFileSync('examples/live-status/live-status.timeline.json','utf8'));
+ assert.equal(typeof C.liveStatusHistoryLoad,'function','#929 connector load exists');
+ const last=story.days.length-1,env={scenario:'story',day:last,now:Date.parse('2026-11-03T12:00:00Z')},calls=[];
+ const mcp={callTool:async(server,tool,input)=>{calls.push(tool);const response=handleMcp({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:tool,arguments:input}},env);assert.equal(response.error,undefined,tool);return {payload:response.result.structuredContent};}};
+ const keys=Object.keys(story.days[last].issues),found=(await mcp.callTool('Mock','searchJiraIssuesUsingJql',{cloudId:'mock-cloud-id-0001',jql:'key in ('+keys.join(', ')+')',maxResults:50})).payload.issues.nodes;
+ const flagged=(await mcp.callTool('Mock','searchJiraIssuesUsingJql',{cloudId:'mock-cloud-id-0001',jql:'key in ('+keys.join(', ')+') AND Flagged = Impediment',maxResults:50})).payload.issues.nodes;assert.equal(found.length,keys.length);assert.deepEqual(flagged,[]);
+ const today=plain(C.liveStatusJiraMap(keys,[found],new Set(),'https://acme.atlassian.net',null)),issues=Object.fromEntries(found.map(issue=>[issue.key,issue]));calls.length=0;
+ const result=plain(await C.liveStatusHistoryLoad({mcp,server:'Mock',cloudId:'mock-cloud-id-0001',today,issues,flagged:{}},()=>{}));
+ assert.equal(calls.filter(tool=>tool==='listJiraStatuses').length,1);assert.equal(calls.filter(tool=>tool==='searchJiraIssuesUsingJql').length,1);assert.ok(calls.filter(tool=>tool==='listJiraIssueChangelogs').length>keys.length,'at least one ticket needs a second page');
+ const lastDone=story.days.findIndex(day=>keys.every(key=>day.issues[key] && day.issues[key].state==='done'));assert.equal(result.days.length,lastDone+1,'the range ends on the last Done day');
+ result.days.forEach((day,index)=>{for(const key of keys){
+  let source=null;for(let i=index;i>=0 && !source;i--)source=story.days[i].issues[key] || null;
+  // A ticket absent from the story on a later day carries its previous status: history has no "unavailable" day.
+  assert.equal(day.states[key]?.state ?? null,source?source.state:null,key+' on day '+(index+1));
+ }});
+ assert.equal(result.days[0].states['UX-90'],undefined,'UX-90 does not exist on day 1');assert.equal(result.days[3].states['HW-124'].state,'blocked','Flagged and Blocked');
 });

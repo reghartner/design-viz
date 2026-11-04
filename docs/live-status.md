@@ -309,12 +309,18 @@ width. It appears immediately, with no menu click.
 The generic desktop Workbench picker lists **Delivery → Live status**; insertion
 and Export project preserve the panel. There are no authored state or patch fields.
 
-The panel header holds **Live**, distinct-ticket counts, a connector indicator
-(a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
+The panel header has two rows. The first holds only buttons, which keep their
+place: **Live**, **Over time**, and on the right **First blocker**, any provider
+action, and Edit. **First blocker** keeps one size; with no blockers it reads
+**No blockers** and is greyed out, and with blockers it cannot reach from here it
+stays **First blocker** and is greyed out. The second row is one line tall and
+holds everything that changes, so it cannot move the buttons or what is below:
+distinct-ticket counts, a connector indicator (a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
 blue (`--dv-live-active`) while connecting or awaiting approval, green when connected or in demo mode,
 red on error, and it pulses while a fetch is in flight; the time is the last successful
-fetch, not a ticket's change time), provider note and action, **First blocker**, and
-demo **Play/Pause** and **Next day** when demo controls are supplied. The engine's panel title stays above this header.
+fetch, not a ticket's change time), and the provider note. Text too long for the row
+is cut off and stays available in the row's tooltip and to screen readers. Demo
+controls supply **<** and **>** on a row below the header. The engine's panel title stays above this header.
 The body opens with the **epic header box**: the epic key (a Jira link), its
 summary, its state pill, “n of N stories done · m of N on diagram” and the
 blocked, waiting and outside-epic counts, with the carriers-done ring on the
@@ -572,10 +578,9 @@ including `file://`, without fetching or changing the spec. A host provider take
 precedence. An explicitly requested demo also takes precedence over the automatic
 claude.ai connector. Without the hash, no demo starts.
 
-The Live status panel header shows the current day and offers **Pause/Play** and **Next day**.
-Days advance at the timeline's `intervalSeconds` (6 seconds by default), ending
-on the final day. Reduced motion uses manual advancement only. Hidden pages pause
-the timer. Requested ticket keys absent from a day become `missing`; a day's
+The Live status panel shows the current day, and **<** and **>** move one day
+back or forward. Nothing advances by itself: the timeline's `intervalSeconds` is
+still accepted, and has no effect. Requested ticket keys absent from a day become `missing`; a day's
 `prs` may carry `links` in the host-provider shape, which the demo passes
 through so the Tickets table and popover show the same GitHub icons offline. Every key in a day's `issues` is included, even when no
 carrier references it; entries may include `kind`, `parent`, `initiatives`, `epic`, a lane ID in `lane`, and
@@ -604,7 +609,8 @@ history source exists. Clicking it loads history, shows progress on the button,
 then adds a thin amber-tinted slider row to the panel. Clicking **Live** returns
 to today; while Live is already selected, clicking it turns colors off as it
 always has, and Over time turns them back on. The slider moves one whole day at a
-time by pointer or arrow keys, and Home and End jump to the first and last day. Each day repaints
+time by pointer or arrow keys, Home and End jump to the first and last day, and
+**<** and **>** on the same row step one day. Each day repaints
 nodes and edges (local and imported), step coins and captions, lane rollups,
 panel counts, the progress ring, blockers, the Tickets table State column and
 planned-node treatment.
@@ -650,9 +656,8 @@ load, and the button can be clicked again. A partial history is never shown.
 history tools and a page that declares them, so a board published before this
 feature must be republished to get it. On `#live=demo` the button uses the
 embedded timeline's days, or the four synthesized days, with no network calls.
-The slider and **Next day** share one current day: opening Over time or moving
-the slider pauses Play, Play and Next day carry on from the slider's day, and
-Live returns to the day Play or Next day reached. There the timeline's
+The slider and **<** and **>** share one current day: the buttons carry on from
+the slider's day, and Live returns to the day the buttons reached. There the timeline's
 last day supplies titles and the story list, so the total stays the same. There
 is no button on host-provider pages or in Workbench preview.
 

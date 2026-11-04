@@ -1082,8 +1082,8 @@ perspectives" of one timeline). Types:
   Always add it when the page has tracking or carrier tickets, and place it with
   `sectionLayout` (the example: panel in the left half, diagram with attached step
   controls in the right half; stacked full width for Backstage and Confluence).
-  The header owns Live, counts, updated time, provider messages and actions,
-  First blocker, and demo Play/Pause and Next day when supplied by the host.
+  The header owns Live, Over time, First blocker, provider actions, counts,
+  updated time and provider messages; < and > sit below it when supplied by the host.
   The body shows the epic header box (key, summary, state, stories done and on
   diagram, blocked/waiting/outside-epic counts), the Tickets table with its
   Depends on column, Blockers and dependency chains, and Activity.

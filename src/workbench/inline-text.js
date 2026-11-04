@@ -29,15 +29,20 @@ function createInlineTextEditor(opts){
      hostClass. value: the empty-value rule of the matching Inspect control.
      'raw' saves the draft as typed; 'trimmed' trims it and removes the field when
      empty (Inspect text controls, inspector.js textControl). keyboard: Enter on
-     the focused text also opens it. A save is planSetField (field) or
-     planReplaceValue, through one opts.commit. */
+     the focused text also opens it. overlay: an imported (provider-owned) node
+     saves `field` in this consumer's display override, as Inspect's Display
+     controls do. A save is planSetField (field), planReplaceValue or
+     planTopologyNodeOverride (overlay), through one opts.commit. */
   var fields=[
     {kind:'para',selector:'[data-dv-para]',field:null,markdown:true,value:'raw',keyboard:true,label:'Edit section text',help:help},
     {kind:'bullet',selector:'[data-dv-bullet-path]',field:'text',bare:true,markdown:true,value:'raw',keyboard:true,label:'Edit section text',help:help},
     {kind:'node',creation:true,field:'title',value:'raw',label:'New node title',help:'Enter or click outside saves. Escape cancels. Later changes use Inspect.',
       accept:function(value){return !isTextBoxNode(value);},place:nodeTitleHost,hostClass:'dv-inline-node-editor'},
     // One step text serves every path that uses the step.
-    {kind:'step',selector:'.stepline .step-text',target:function(el){return opts.currentStep?opts.currentStep(el):null;},field:'text',markdown:true,value:'trimmed',label:'Edit step text',help:help}
+    {kind:'step',selector:'.stepline .step-text',target:function(el){return opts.currentStep?opts.currentStep(el):null;},field:'text',markdown:true,value:'trimmed',label:'Edit step text',help:help},
+    // Rename edits the display name only; the node ID stays in Inspect.
+    {kind:'node',selector:'[data-dv-node]:not([data-dv-text-box])',field:'title',value:'trimmed',overlay:true,label:'Node name',help:'Enter or click outside saves. Escape cancels.',
+      place:nodeTitleHost,hostClass:'dv-inline-node-editor'}
   ];
   function selectorOf(test){return fields.filter(function(f){return f.selector && !f.creation && test(f);}).map(function(f){return f.selector;}).join(',');}
   var openSelector=selectorOf(function(){return true;}),keySelector=selectorOf(function(f){return f.keyboard;});
@@ -48,22 +53,39 @@ function createInlineTextEditor(opts){
     delete target.el;
     var snapshot=opts.session.snapshot();
     if(snapshot.error || snapshot.renderedText!=null && snapshot.renderedText!==snapshot.text)return null;
-    var path=builderTargetPath(snapshot.raw,target),value=path && specValueAt(snapshot.raw,path),field=null;
+    var path=builderTargetPath(snapshot.raw,target),value=path && specValueAt(snapshot.raw,path),field=null,overlay=null;
+    if(value==null && f.overlay){overlay=importedNode(snapshot,target);if(!overlay)return null;value=overlay.value;}
     if(f.field && specObject(value)){
       if(f.accept && !f.accept(value))return null;
       field=f.field;
     }else if(f.field && !f.bare || typeof value!=='string')return null;
     var text=field?value[field]:value;
     if(text!=null && typeof text!=='string')return null;
-    return {el:el,entry:f,target:target,path:path,field:field,text:text || '',snapshot:snapshot};
+    return {el:el,entry:f,target:target,path:path,field:field,text:text || '',snapshot:snapshot,overlay:overlay};
+  }
+  /* A resolved node this consumer imports from an authored topology import:
+     its provider value and the topology context its display override uses. */
+  function importedNode(snapshot,target){
+    var context=opts.session.topologyContext?opts.session.topologyContext():null,resolved;
+    try{resolved=opts.session.resolve?opts.session.resolve(snapshot.raw):snapshot.raw;}catch(ex){return null;}
+    var rec=specSectionPaths(resolved)[target.section],d=rec && specValueAt(resolved,rec.diagram),value=d && (d.nodes || {})[target.id];
+    if(!specObject(value) || !FlowTopology.origin(d,'nodes',target.id))return null;
+    if(planTopologyNodeOverride(snapshot.text,snapshot.raw,target.section,target.id,{},context).error)return null;
+    return {value:value,diagram:d,context:context,key:JSON.stringify(context)};
   }
   function nodeTitleHost(c){
-    var got=builderDiagram(c.snapshot.text,c.snapshot.raw,c.target.section),p=!got.error && layout(got.d).pos[c.target.id];if(!p)return null;
+    var d=c.overlay && c.overlay.diagram;
+    if(!d){var got=builderDiagram(c.snapshot.text,c.snapshot.raw,c.target.section);if(got.error)return null;d=got.d;}
+    var p=layout(d).pos[c.target.id];if(!p)return null;
     var host=document.createElementNS('http://www.w3.org/2000/svg','foreignObject');
     host.setAttribute('x','4');host.setAttribute('y',String(Math.max(4,(p.h-36)/2)));host.setAttribute('width',String(Math.max(40,p.w-8)));host.setAttribute('height','36');
     return host;
   }
-  function fresh(c){var now=opts.session.snapshot();return c.el.isConnected && !opts.disabled() && now.project===c.snapshot.project && now.text===c.snapshot.text;}
+  function fresh(c){
+    var now=opts.session.snapshot();
+    return c.el.isConnected && !opts.disabled() && now.project===c.snapshot.project && now.text===c.snapshot.text &&
+      (!c.overlay || JSON.stringify(opts.session.topologyContext?opts.session.topologyContext():null)===c.overlay.key);
+  }
   function clear(){
     if(!active)return;var a=active;active=null;a.life.destroy();a.host.remove();
     if(a.original){while(a.original.firstChild)a.c.el.insertBefore(a.original.firstChild,a.original);a.original.remove();}
@@ -72,8 +94,9 @@ function createInlineTextEditor(opts){
   function finish(save,focus,nextTarget){
     if(!active)return;var a=active,c=a.c,valid=fresh(c),plan;
     if(save && valid && a.input.value!==c.text){
-      var value=c.entry.value==='trimmed'?a.input.value.trim() || null:a.input.value,json=value==null?null:JSON.stringify(value);
-      plan=c.field?planSetField(c.snapshot.text,c.snapshot.raw,c.path,c.field,json):
+      var value=c.entry.value==='trimmed'?a.input.value.trim() || null:a.input.value,json=value==null?null:JSON.stringify(value),patch={};
+      if(c.overlay){patch[c.field]=value;plan=planTopologyNodeOverride(c.snapshot.text,c.snapshot.raw,c.target.section,c.target.id,patch,c.overlay.context);}
+      else plan=c.field?planSetField(c.snapshot.text,c.snapshot.raw,c.path,c.field,json):
         planReplaceValue(c.snapshot.text,c.snapshot.raw,c.path,json);
       if(plan.error){a.error.textContent=plan.error;return false;}
     }
@@ -149,7 +172,7 @@ function createInlineTextEditor(opts){
   life.listen(document,'pointerdown',function(e){if(active && !inside(e.target) && finish(true,false,opts.targetFromEvent(e))===false){e.preventDefault();e.stopImmediatePropagation();}},true);
   life.listen(document,'focusin',function(e){if(active && !inside(e.target))finish(true,false,opts.targetFromEvent(e));});
   life.listen(view,'dblclick',function(e){
-    if(e.target.closest('.dv-inline-editor,a,button,input,textarea'))return;
+    if(e.target.closest('.dv-inline-editor,a,button,input,textarea,.nlink'))return;
     var el=e.target.closest(openSelector);if(el){e.preventDefault();e.stopPropagation();open(el);}
   },true);
   life.listen(view,'keydown',function(e){if(e.target.matches(keySelector) && e.key==='Enter' && !e.isComposing){e.preventDefault();e.stopImmediatePropagation();open(e.target);}},true);

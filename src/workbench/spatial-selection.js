@@ -216,6 +216,8 @@ function createBuilderSpatialSelection(opts){
       menuLife.listen(button,'click',function(e){e.stopPropagation();if(reason)return;close(false);if(opts.session.text()!==s.text || JSON.stringify(opts.session.topologyContext?opts.session.topologyContext():null)!==topologyKey)return;action();});menu.appendChild(button);return button;
     }
     item('Inspect',function(){opts.inspect();});
+    // One node's display name opens in place; text boxes keep their own editor.
+    if(opts.rename && targets.length===1 && t.kind==='node' && t.el && t.el.matches('[data-dv-node]:not([data-dv-text-box])'))item('Rename',function(){opts.rename(t);});
     if(selectedNodes.length && selectedNodes.length===targets.length){
       var lockIds=selectedNodes.map(function(target){return target.id;}),lockSection=selectedNodes[0].section;
       var lockReason=containsImported?'Imported structure belongs to its provider.':null;

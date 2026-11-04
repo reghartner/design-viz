@@ -1,8 +1,30 @@
 'use strict';
-/* #938: the pure proof verdict engine, src/core/proof.js. One carrier per
-   verdict-matrix cell, limit edges, silent vs unobserved vs unbound, rollups
-   and step rollups. Swapping any matrix cell, limit comparison or precedence
-   entry fails a named row below. */
+/* #938: the pure proof verdict engine, src/core/proof.js. Every row goes
+   through the public API, proofVerdicts({carriers, jiraMap, telemetryMap,
+   steps}, options), and asserts on its output only.
+
+| Row | Fixture | Structurally scoped assertion | Broken implementation it rejects |
+| --- | --- | --- | --- |
+| M1 matrix cells | matrixPage(): one CALL carrier per Jira row (done, active, todo, blocked, missing, no tickets, unknown) x sample (silent, flowing, degraded, none) | carriers[id] {bound, jira, telemetry, verdict, label} and failing, per cell | any swapped cell, e.g. done x silent read as proven, todo x flowing kept as todo, blocked x flowing read as live early |
+| M2 labels | matrixPage() | each cell's label is LABELS[verdict] (null without a verdict); the matrix reaches every label | a renamed or missing label; a label on a null verdict |
+| J1 carrier Jira | unbound carriers with eleven ticket combinations, plus an unrecognised state | carriers[id].jira | missing ranked before blocked; unknown evidence read as done; done plus todo read as todo |
+| L1 min | QUEUE in at 10 and 9 | telemetry, failing, verdict | strict > |
+| L2 max | QUEUE lag 500/501 and age 60/61 | flowing; failing ['lag', 'age'] | strict < |
+| L3 maxRatioOf | CALL errors 13 and 14 of 1300; 3 errors of 0 traffic | flowing; ['errors']; ['rate', 'errors'] | a ratio that ignores a zero denominator |
+| L4 min and max together | BAND in at 4000 and 6000 | flowing; ['in'] | only one bound checked |
+| L5 pending vs failure | CALL with p95 missing, with and without an errors failure | degraded; unobserved with verdict done | a pending limit ignored, which would claim proven |
+| L6 ratio typo | TYPO maxRatioOf 'requests' | unobserved | a ratio over an unbound signal silently skipped |
+| L7 headline value | series only; value plus series | last point, or value, is the headline | first point used; series preferred over value |
+| S1 unobserved | no sample, empty sample, non-finite readings | unobserved, verdict done | unobserved counted as done-unproven |
+| S2 silent across the window | LOG count 0 now with traffic earlier; all zeros | flowing vs silent | silence judged from the value alone |
+| S3 rate-like clauses | COUNTS numerator without a unit; RATIO_ONLY denominator without limit or unit; per-time unit; no rate-like signal | degraded; unobserved; silent; flowing | each rate-like clause dropped |
+| S4 unbound | empty signals and no binding, both with a sample present | exact UNBOUND result; rollups bound 0, unbound 2 | unbound carriers judged or put in the denominator |
+| T1 since | two Done tickets, active, unstamped Done, silent | exact {doneAt, firstTrafficAt} | earliest Done time; traffic before Done counted |
+| R1 rollups | rolePage(): sixteen bound carriers incl. imported node and edge, two unbound incl. one imported | exact rollups | degraded counting only done-degraded; liveEarly missing todo-already-live; blocked degraded counted |
+| P1 step rollup | rolePage() with twenty-two steps | steps[id] {verdict, label} per step | swapped worst order; done plus todo read as todo; unbound carriers voting |
+| U1 purity | source with comments stripped, input snapshot, bad inputs | no DOM, clock or timer tokens; input unchanged; empty result, no throw | Date.now or timers; input mutation; throwing on bad input |
+| B1 bundle | sourceFiles('validator.js'), whole bundle run in a VM | module listed; same output as standalone | module never shipped; a global name collision |
+*/
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
@@ -89,27 +111,30 @@ test('every verdict-matrix cell: Jira state x telemetry state', () => {
     assert.deepEqual({bound: got.bound, jira: got.jira, telemetry: got.telemetry, verdict: got.verdict},
       {bound: true, jira, telemetry: column, verdict: verdicts[index]}, cell);
     assert.deepEqual(got.failing, FAILING[column], cell + ': failing limits');
-    assert.equal(P.proofCell(jira, column), verdicts[index], cell + ': proofCell');
   });
 });
 
 test('verdict labels name every matrix verdict', () => {
-  assert.equal(typeof P.PROOF_VERDICT_LABELS, 'object', 'PROOF_VERDICT_LABELS is exported');
-  assert.deepEqual(plain(P.PROOF_VERDICT_LABELS), LABELS);
-  for (const [, ...verdicts] of MATRIX) for (const verdict of verdicts)
-    if (verdict !== null) assert.equal(typeof LABELS[verdict], 'string', verdict + ' has a label');
+  const out = judge(matrixPage()), seen = new Set();
+  for (const [jira, ...verdicts] of MATRIX) COLUMNS.forEach((column, index) => {
+    const verdict = verdicts[index], got = out.carriers[(jira || 'none') + ':' + column];
+    assert.equal(got.label, verdict === null ? null : LABELS[verdict], (jira || 'none') + ' x ' + column + ': label');
+    if (verdict !== null) seen.add(verdict);
+  });
+  assert.deepEqual([...seen].sort(), Object.keys(LABELS).sort(), 'the matrix reaches every verdict label');
 });
 
 test('a carrier\'s Jira state rolls up its tickets like liveStatusEvidence', () => {
-  assert.equal(typeof P.proofJira, 'function', 'proofJira(tickets, jiraMap) is exported');
   const rows = [
     [[], null], [['BE-1'], 'done'], [['BE-1', 'BE-6'], 'done'], [['BE-3'], 'todo'],
     [['BE-1', 'BE-3'], 'active'], [['BE-1', 'BE-2'], 'active'], [['BE-1', 'BE-5'], 'missing'],
     [['BE-5', 'BE-4', 'BE-2'], 'blocked'], [['BE-1', 'BE-404'], 'unknown'], [['BE-2', 'BE-404'], 'active'],
     [['BE-404'], 'unknown'],
   ];
-  for (const [tickets, expected] of rows) assert.equal(P.proofJira(tickets, JIRA), expected, tickets.join(',') || 'no tickets');
-  assert.equal(P.proofJira(['BE-9'], {'BE-9': {state: 'shipped'}}), 'unknown', 'an unrecognised state is not evidence');
+  const out = judge({carriers: rows.map(([tickets], index) => ({id: 'j' + index, tickets})), jiraMap: JIRA});
+  rows.forEach(([tickets, expected], index) => assert.equal(out.carriers['j' + index].jira, expected, tickets.join(',') || 'no tickets'));
+  const odd = judge({carriers: [{id: 'c', tickets: ['BE-9']}], jiraMap: {'BE-9': {state: 'shipped'}}});
+  assert.equal(odd.carriers.c.jira, 'unknown', 'an unrecognised state is not evidence');
 });
 
 const BAND = {kind: 'queue', signals: {in: QUEUE.signals.in}, proof: {in: {min: 10, max: 5000}}};
@@ -150,7 +175,7 @@ const COUNTS = {kind: 'service',
 const RATIO_ONLY = {kind: 'service',
   signals: {total: {source: 'honeycomb', query: {calc: 'COUNT'}}, fails: {source: 'honeycomb', query: {calc: 'COUNT', where: 'error = true'}}},
   proof: {fails: {maxRatioOf: 'total', max: 0.01}}};
-const UNBOUND = {bound: false, jira: 'done', telemetry: null, verdict: null, failing: [], since: {doneAt: at(0), firstTrafficAt: null}};
+const UNBOUND = {bound: false, jira: 'done', telemetry: null, verdict: null, label: null, failing: [], since: {doneAt: at(0), firstTrafficAt: null}};
 const PRESENCE = [
   ['no sample at all', CALL, undefined, 'unobserved'],
   ['a sample without signals', CALL, {signals: {}}, 'unobserved'],
@@ -248,9 +273,8 @@ const STEPS = [
 
 test('step rollup: worst verdict of the step\'s directly selected carriers', () => {
   const out = judge(rolePage(STEPS.map(([id, carriers]) => ({id, carriers}))));
-  for (const [id, , expected] of STEPS) assert.equal(out.steps[id], expected, id);
-  assert.equal(typeof P.proofStepVerdict, 'function', 'proofStepVerdict(results) is exported');
-  assert.equal(P.proofStepVerdict([out.carriers['proven-a'], out.carriers['done-degraded']]), 'done-degraded', 'proofStepVerdict matches the step map');
+  for (const [id, , expected] of STEPS)
+    assert.deepEqual(out.steps[id], {verdict: expected, label: expected === null ? null : LABELS[expected]}, id);
 });
 
 test('pure: no DOM, no clock, no timers; input untouched; bad input is empty', () => {

@@ -20,6 +20,27 @@
   A board already published keeps the old rate until it is republished. Host
   providers set their own `refreshMs` and are unchanged.
 
+## Side-by-side compare: agent update preview and Git Compare (2026-11-03)
+
+- A shared compare engine (#847) lists what changed between two Flowview documents
+  (sections, nodes, connections, panels, steps, paths, layouts, Views, tabs, imports,
+  page fields and the coverage ledger), with the step where each change shows, including
+  changes that arrive through an imported provider.
+- **Preview Agent Updates** (#848) shows the current document (**Before**) on the left
+  and the proposal (**After**) on the right with a list of changes; J / K or
+  **Next change** / **Previous change** step through them. **Focused** (the default)
+  shows only what changed: a step or panel change shows each side's step controls and
+  only the panels that differ, a node or connection change crops both diagrams to it and
+  its neighbours, a coverage ledger or page field change shows only the changed lines
+  (#892), and a step edit that only changes highlighted nodes or connections, or a path
+  edit, keeps both diagrams under the step controls at the affected step, which the list
+  names ("affects steps 3-4"; a path label edit opens at step 1 and names none, #893). **Full diagram** shows both full diagrams. Accept
+  still applies the whole proposal at once.
+- Git Compare (#849) is a local tool for the same view between two revisions of a git
+  clone (commits, branches, tags, pull requests): run `python3 tools/build.py`, then
+  `node --max-semi-space-size=1 tools/compare/serve.mjs --repo <clone>`. See
+  `docs/git-compare.md`.
+
 ## Registering a new exporting diagram (2026-11-02)
 
 - Connected agents and the bundled authoring docs now state what a new exporting

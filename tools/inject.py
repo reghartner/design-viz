@@ -195,12 +195,13 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False) -> str:
             "removes or re-adds a ticket that a board edit saved after the newest agent entry "
             "touched, or deletes its node or edge, ask the editor first and say who changed it and "
             "when; older board edits need no question.",
-            "3. " + validate_step,
-            '4. Append one `page.editHistory` entry for your change: `{"at": "<now, ISO-8601>", '
+            '3. Append one `page.editHistory` entry for your change: `{"at": "<now, ISO-8601>", '
             '"by": {"name": "<editor>"}, "source": "agent", "summary": "Added 5 nodes, moved 5 '
             'tickets", "changes": [<each ticket added or removed, shaped like the board\'s '
             "entries>]}`; `summary` is one line of at most 200 characters. With the public repo, "
             "`node tools/board-sync.js log <copy> <the file you read> --by <editor>` writes it.",
+            "4. " + validate_step + " Validate after step 3, so the file you publish is the "
+            "one you checked.",
             f"5. Republish to the same URL: the publish call needs the page too, so first read "
             "`index.html` from this artifact (read action, `path`) to a local file, then publish "
             f"with `url`, `file_path` = that saved page unchanged, and `files` = "

@@ -852,7 +852,7 @@ asks the author only about a real conflict.
      copy, so its structure may differ. Start again from `live.json`: copy it over the
      local file and redo the requested change. If the local file has changes of its own
      that were never published, ask the author before replacing it.
-3. Make the requested change in the local file and validate it.
+3. Make the requested change in the local file.
 4. `node tools/board-sync.js log <local.json> live.json --by "<author name>"` appends one
    agent entry: `"source": "agent"`, a counted one-line `summary` ("Added 5 nodes, moved
    5 tickets"; `--summary "<one line>"` replaces it) and the ticket changes. It refuses
@@ -863,10 +863,12 @@ asks the author only about a real conflict.
    author and rerun with `--confirm KEY` once they agree. Board edits older than the
    newest agent entry were already in front of the author and need no question
    (Chuck 2026-11-04). Exit 3: pull first.
-5. Republish to the same URL with the edited file as `flowspec.json` (above). If the
+5. Validate the local file (`node tools/validate.js <local.json>`) after logging, so the
+   file you publish, agent entry included, has no errors.
+6. Republish to the same URL with the edited file as `flowspec.json` (above). If the
    publish is refused because the artifact changed after the read, someone saved in the
-   meantime: read `flowspec.json` again and repeat step 2, then publish; do not log a
-   second time, the agent entry is already in the local file.
+   meantime: read `flowspec.json` again, repeat step 2, validate again, then publish; do
+   not log a second time, the agent entry is already in the local file.
 
 An agent without a checkout follows the same rules from the page's agent guide while it
 edits the live `flowspec.json` directly: it tells the author which board edits were saved

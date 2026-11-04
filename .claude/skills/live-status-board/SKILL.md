@@ -314,7 +314,7 @@ and carry on. Every time you change a published board:
      requested change on it. If your local spec has changes of its own that
      were never published (the author's Workbench edits), ask the author before
      replacing it.
-2. Make the requested change and validate it.
+2. Make the requested change.
 3. `node tools/board-sync.js log <local spec> live.json --by "<author name>"`
    appends one agent entry to `page.editHistory`: `"source": "agent"` and a
    counted one-line `summary` such as "Added 5 nodes, moved 5 tickets" (pass
@@ -328,10 +328,13 @@ and carry on. Every time you change a published board:
    `--confirm KEY` once they agree; if they do not, put that ticket back where
    the board has it and rerun. Do not ask about board edits older than the
    newest agent entry.
-4. Republish (section 4) with your local spec as `flowspec.json`. If the publish
+4. Validate the local spec with `node tools/validate.js <local spec>` after the
+   log step, so the file you publish, agent entry included, is the file you
+   checked: no errors.
+5. Republish (section 4) with your local spec as `flowspec.json`. If the publish
    is refused because the artifact changed after your read, read
-   `flowspec.json` again and rerun step 1 (pull) only, then publish; the agent
-   entry is already in your file.
+   `flowspec.json` again, rerun step 1 (pull) only, validate again, then
+   publish; the agent entry is already in your file.
 
 Without a local spec (only the artifact URL), edit `live.json` directly and
 follow the page's embedded agent guide, which states the same rules.

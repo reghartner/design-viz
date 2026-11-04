@@ -93,7 +93,7 @@ another file is named.
 | chime | — | `text` :34, :39 [carry or once; `transientFields` :49] | Playback label :38. Default message when unset :34. | |
 | cost | `period` :131, `routes[i].label` :142/:185, `items[k].label` :162/:187, `routes[i].tradeoff` :190, `assumptions` :192 | `note` :193 [carry] | Totals, amounts and deltas :142-181. Volume line merges number and unit :130. Rate line merges three values :188. | Rates, tradeoffs, assumptions and note sit in a collapsed `<details>` :183 |
 | data-contract | `fieldLabel` :76, `columns[j].label` :77, `fields[i].label` :83, `fields[i].cells[col]` :86 | `highlights[id].label` :84 [snapshot]; shell note. A step can replace `columns`, `fields` and `fieldLabel` (`content()` :22-30) | "—" for a missing cell :86 | The source of a header or cell depends on whether a step replaced the declaration array. `tr[data-contract-field]` |
-| deviceapp | `device` :456, `subtitle` :456, `fields[i].label` :478-480, `sources[i].label` / `.endpoint` / `.detail` :521-525 | `note` :428/:500/:539 [carry]; notification cards [append, as phone] | Card `detail` :495 shows freshness text derived from story time unless pinned (:236-253). `clock` / `date` :449-450 (story time). Status badge :493. Value and unit merged :483-488. `appName` has a three-level fallback :397. | Mapped field cards are `<button data-da-source>` (:440, :468) with click handlers (:542-585) |
+| deviceapp | `device` :456, `subtitle` :456, `fields[i].label` :478-480, `sources[i].label` / `.endpoint` / `.detail` :521-525 | `note` :428/:500/:539 [carry]; notification `app` and `title` [append, as phone] | Card `detail` :495 shows freshness text derived from story time unless pinned (:236-253). `clock` / `date` :449-450 (story time). Status badge :493. Value and unit merged :483-488. `appName` has a three-level fallback :397. | Mapped field cards are `<button data-da-source>` (:440, :468) with click handlers (:542-585) |
 | dispatch | `agency` :127, `responders[i].label` :122, `responders[i].callsign` :122 | `dispatcher` :128, `incident` :133, `detail` :135, `location` :110 [carry]; `state[unit].detail` :125 [snapshot per unit]; shell note | Status and priority labels :10-12, :127-128. Counts :136. SVG vehicle label is a copy that falls back across two fields (`callsign || label || id`, :88, :108), so its source is not one field. | Returns `patch` (:142-154). `li[data-responder-id]` |
 | edit-history | — | — | All text is runtime evidence: who, when, changes (:18-71) | Rows are `<details>` that take clicks. Exclude. |
 | funnel | `stages[i].label` :205 | shell note | Counts are numbers [merge, `funnelFold` :119-132] :208. Percentages and deltas :193-197. "N unit in" merges number and unit :213. | |
@@ -104,14 +104,14 @@ another file is named.
 | inflight | `lanes[i].label` :213 | Bar `label` :243 [once: comes from one step's `start` operation; fold :65-110] | Ticks :204. Axis label :196. | The bar label needs `textSource` to find its step and operation |
 | leds | `leds[i].label` :12 | — | The LED mode is shown only as a colour | The label is a bare text node beside `.leddot`; it needs a wrapping element |
 | live-status | — | — | Ticket keys, titles and states are fetched from Jira and GitHub at view time | Buttons, sorting and drag throughout the body (:95-156). Exclude. |
-| log | — | `log[k].text` :21, `log[k].tag` :17 [append, `shared.js:142-146`] | Tag colour comes from `panel.tags` | A log entry may be a plain string or `{tag,text}` |
+| log | — | `log[k].text` :21 [append, `shared.js:142-146`] | `log[k].tag` :17 is a key of `panel.tags`, chosen from a list in Inspect (`src/workbench/panel-collections.js:128`). Tag colour comes from `panel.tags`. | A log entry may be a plain string or `{tag,text}` |
 | orbit | — | — | `states[i]` :57-68 are tokens that `state.state` and `colors` refer to. Current state :70-75. `via` :76-80 [carry] shares its text node with the "via " prefix. | SVG |
 | phone | — | Notification `app`, `title` [append, newest first, `src/panels/notifications.js:22-31`]; `audio.source` :163, `audio.reason` :166 [snapshot or once] | Notification `text` is rendered Markdown (`notifications.js:50`). `audio.text` :164 shares its node with quote marks. `clock` / `date` :194-197 (story time). Audio enum labels :158-165. Badge count :211. Brand name and monogram are inherited brand text :207-209. | Only the newest three cards render (`notifications.js:36`) |
 | queue | — | `label` :64, `from` :78, `to` :81, `reason` :86-87 [carry; each is shown only in some states] | `state` token :83. "empty" :63. | |
 | radar | `zones[i].label` :333-342 | `banner` :453-458 [carry] | `status` :441-451 is authored or computed from `alert` | SVG. Zones are filtered (:164-223), so the rendered position differs from the array index. |
 | replicas | `replicas[i].label` :212 | `note` :242 [carry]; `replicas[id].role` :216 [snapshot] | Comparisons and scale :191-209. Reference line merges two fields :183. "Sequence:" / "Observed:" prefixes share the text node :220-232. | The note and the disclaimer share the class `rep-note` |
 | screen | — | `banner` :510-516, `reason` :524-528 [carry or once]; `audio.source` / `.text` / `.reason` [snapshot] (`audio.js:76-79`) | Mode chips, siren and spotlight labels :507-535. Scene SVG text :205, :236. | `patch` rebuilds the overlays and the audio slot at each step (:543-578) |
-| security | `site` :139, `videoLabel` :98, `sensors[i].label` :127, `sensors[i].zone` :130 | `operator` :140, `incident` :144, `detail` :144, `note` :148 [carry]; `state[id].detail` :131 [snapshot] | Status, alarm and assessment labels. Counts :141-145. | Returns `patch` (:162-181). `li[data-sensor-id]`. Sensors sit in a collapsed `<details>` :145. |
+| security | `site` :139, `videoLabel` :98, `sensors[i].label` :127, `sensors[i].zone` :130 | `operator` :140, `incident` :144, `detail` :144, `note` :148, `videoReason` :43 (drawn by `screen.js:523-528`) [carry]; `state[id].detail` :131 [snapshot]; `audio.source` / `.text` / `.reason` [snapshot] (`audio.js:76-79`) | Status, alarm and assessment labels. Counts :141-145. | Returns `patch` (:162-181). `li[data-sensor-id]`. Sensors sit in a collapsed `<details>` :145. |
 | signal | `links[i].label` :131 | `state[link].note` :138 [snapshot per link] | Transport tag :130. State token :137. | |
 | state | — | — | `states[i]` chips :14-15 and the readout :5, :11-12 are tokens that other fields refer to | |
 | table | `columns[i].label` :116 | shell note; `rows[r].cells[col]` :122 [snapshot of the `rows` array] | Change badge :124-129 | Rows carry no id attribute |
@@ -384,36 +384,116 @@ previous source. Browser tests run at desktop width only.
    filtered index, non-string refusal, and the marker encode/decode round trip
    for keys containing `.` and `%`, a numeric-looking key versus an array index,
    and malformed markers treated as unmarked.
-2. **Carried state: `.swnote` (eight types) and queue.** Add the `state:` rule,
-   the "Saves to" line with both choices, and `planStepPanelField`. Test: a note
-   set at step 1 and shown at step 3. The default save edits step 1. The other
-   choice adds `steps[3].panels[id].note`, including when step 3 did not list
-   the panel, and both cases take one Undo. Add an `enterOnce` case (truth-table)
-   and a shared-step case (two paths).
-3. **Appended entries: log.** Add the `["log",k]` mapping. Test: lines from `initial`
-   and from two steps. Editing a step-2 line while step 4 is shown writes to
-   `steps[2].panels[id].log[j]`. String entries and object entries are both
-   covered.
-4. **Snapshot sub-values:** checks `detail`, table string cells, tiles `sub`,
-   signal `note`, security and dispatch item `detail`, data-contract headers and
-   cells (declaration or step override). Test: "where it was set" edits inside the
-   snapshot. "From this step on" copies the effective snapshot with one change.
-5. **Declaration labels, remaining HTML types**, one PR per family: software
-   panels (budget, table, truth-table, funnel, grid, waterfall, replicas, xray,
-   buffer, cost); device panels (deviceapp, security, dispatch, appscreens,
-   thermo, gauge unit); the others (tiles, signal, inflight lanes, trace span
-   name).
-6. **SVG labels:** radar, zoneframe, timeline lanes, and Home map rooms,
-   devices and subjects.
-   Home map keeps its single-click selection (`homemap.js:2905-2919`).
-7. **`textSource` facet:** phone and deviceapp notification `app` / `title`,
-   and inflight bar labels.
-8. **Optional later, after the decisions below:** split merged text nodes (the
-   "via" prefix, value + unit); numbers; Markdown notification text; story-time
-   fields.
+2. **Carried state, mechanism: shell note (eight types) and queue.** Add the
+   `state:` rule, the "Saves to" line with both choices, and
+   `planStepPanelField`. Mark the shell note once in `softwarePanelShell`
+   (checks, budget, funnel, data-contract, dispatch, grid, table, truth-table)
+   and queue `label`, `from`, `to` and `reason`. Test: a note set at step 1 and
+   shown at step 3. The default save edits step 1. The other choice adds
+   `steps[3].panels[id].note`, including when step 3 did not list the panel, and
+   both cases take one Undo. Add an `enterOnce` case (truth-table note) and a
+   shared-step case (two paths).
+3. **Carried state, remaining types.** Mark: battery `note`; buffer `note` (or
+   the legacy `label` when that is what shows); chime `text`; cost `note`;
+   deviceapp `note`; dispatch `dispatcher`, `incident`, `detail` and `location`;
+   radar `banner` (SVG); replicas `note`; screen `banner` and `reason`; security
+   `operator`, `incident`, `detail`, `note` and `videoReason`; xray `hop`. All of
+   these resolve through rule 2, because their provenance is an assignment
+   (generic, or `panelSanitizedOrigin`, `src/panels/shared.js:124-131`). Tests:
+   one case for each fold family (default carry, sanitized carry with
+   `enterOnce` on chime), a Screen case where the step's `patch` repaint runs
+   while the editor is open (`screen.js:543-578`), and the radar SVG banner.
+4. **Appended entries: log.** Add the `["log",k]` mapping and mark `log[k].text`.
+   Test: lines from `initial` and from two steps. Editing a step-2 line while
+   step 4 is shown writes to `steps[2].panels[id].log[j]`. String entries and
+   object entries are both covered.
+5. **Snapshot sub-values.** Mark: checks `results[id].detail`; table string
+   cells `rows[r].cells[col]`; tiles `state[tile].sub`; signal
+   `state[link].note`; security `state[id].detail`; dispatch
+   `state[unit].detail`; replicas `replicas[id].role`; every data-contract
+   string (`fieldLabel`, column labels, field labels, string cells and
+   `highlights[id].label`), from the declaration or from a step override;
+   audio `source`, `text` and `reason` for screen and security
+   (`src/panels/audio.js:76-79` gains an optional path prefix so each caller
+   marks its own source); phone audio `source` and `reason` (`phone.js:163`,
+   `:166`). Test: "where it was set" edits inside the snapshot. "From this step
+   on" copies the effective snapshot with one change. Add a data-contract case
+   with a step override and a phone `enterOnce` audio case.
+6. **Declaration labels, HTML types**, one PR per family:
+   - 6a, software panels: checks `checks[i].label`; budget `metrics[i].label`;
+     table `columns[i].label`; truth-table `columns[i].label` and
+     `cases[r].label`; funnel `stages[i].label`; grid `cols[j].label` and
+     `rows[i].label`; waterfall `spans[i].label`; replicas `replicas[i].label`;
+     xray `layers[i].label`; buffer `capacity`; cost `period`,
+     `routes[i].label`, `items[k].label`, `routes[i].tradeoff` and
+     `assumptions`.
+   - 6b, device panels: deviceapp `device`, `subtitle`, `fields[i].label` (only
+     while the card is not a source button, rule 4) and `sources[i].label`,
+     `.endpoint` and `.detail`; security `site`, `videoLabel`,
+     `sensors[i].label` and `sensors[i].zone`; dispatch `agency`,
+     `responders[i].label` and `responders[i].callsign`; appscreens
+     `screens[i].label` and `.caption`; thermo `unit`; gauge `unit`.
+   - 6c, other panels: tiles `tiles[i].label`; signal `links[i].label`; inflight
+     `lanes[i].label`; trace `spans[sel].name`.
+7. **SVG declaration labels:** radar `zones[i].label`, zoneframe
+   `zones[i].label`, timeline `lanes[i].label`, and Home map `rooms[i].label`,
+   `devices[i].label` and `subjects[i].label`. Home map keeps its single-click
+   selection (`homemap.js:2905-2919`).
+8. **`textSource` facet:** phone and deviceapp notification `app` and `title`;
+   inflight bar labels; Home map audio `source`, `text` and `reason`. Home map
+   device and subject objects fold as a history (`homemap.js:1870-1873`), so
+   rule 2 cannot resolve them.
+9. **Optional later, outside the 34-type scope, after the decisions below:**
+   split merged text nodes (the "via" prefix, value + unit); numbers; Markdown
+   notification text; story-time fields.
 
-Steps 2, 3, 5 and 6 depend only on step 1 and can run in parallel after it.
-Step 4 reuses step 2's save choices. Step 7 reuses step 3's append mapping.
+Steps 2, 4, 6 and 7 depend only on step 1 and can run in parallel after it.
+Steps 3 and 5 reuse step 2's save choices. Step 8 reuses step 2's choices and
+step 4's append mapping.
+
+**Cross-check: every editable string in the inventory → one step.**
+
+| Type | Declaration text → step | State text → step |
+| --- | --- | --- |
+| appscreens | labels, captions → 6b | — |
+| battery | — | `note` → 3 |
+| budget | metric labels → 6a | shell note → 2 |
+| buffer | `capacity` → 6a | `note` → 3 |
+| checks | check labels → 6a | shell note → 2; `results[id].detail` → 5 |
+| chime | — | `text` → 3 |
+| cost | `period`, route labels, item labels, tradeoffs, `assumptions` → 6a | `note` → 3 |
+| data-contract | `fieldLabel`, column labels, field labels, string cells → 5 | `highlights[id].label` → 5; shell note → 2 |
+| deviceapp | `device`, `subtitle`, card labels, source label / endpoint / detail → 6b | `note` → 3; notification `app` / `title` → 8 |
+| dispatch | `agency`, unit labels, callsigns → 6b | `dispatcher`, `incident`, `detail`, `location` → 3; unit `detail` → 5; shell note → 2 |
+| funnel | stage labels → 6a | shell note → 2 |
+| gauge | `unit` → 6b | — |
+| grid | column and row labels → 6a | shell note → 2 |
+| homemap | room, device and subject labels → 7 | audio `source` / `text` / `reason` → 8 |
+| image | `caption` → 1 | — |
+| inflight | lane labels → 6c | bar labels → 8 |
+| leds | LED labels → 1 | — |
+| log | — | `log[k].text` → 4 |
+| phone | — | notification `app` / `title` → 8; audio `source` / `reason` → 5 |
+| queue | — | `label`, `from`, `to`, `reason` → 2 |
+| radar | zone labels → 7 | `banner` → 3 |
+| replicas | replica labels → 6a | `note` → 3; `role` → 5 |
+| screen | — | `banner`, `reason` → 3; audio `source` / `text` / `reason` → 5 |
+| security | `site`, `videoLabel`, sensor labels, sensor zones → 6b | `operator`, `incident`, `detail`, `note`, `videoReason` → 3; sensor `detail` → 5; audio `source` / `text` / `reason` → 5 |
+| signal | link labels → 6c | link `note` → 5 |
+| table | column labels → 6a | shell note → 2; string cells → 5 |
+| thermo | `unit` → 6b | — |
+| tiles | tile labels → 6c | tile `sub` → 5 |
+| timeline | lane labels → 7 | — |
+| trace | span name → 6c | — |
+| truth-table | column and case labels → 6a | shell note → 2 |
+| waterfall | span labels → 6a | — |
+| xray | layer labels → 6a | `hop` → 3 |
+| zoneframe | zone labels → 7 | — |
+
+34 types are listed, the same 34 as the inventory totals. Each string appears
+once. Data-contract declaration strings go to step 5, not 6a, because a step can
+replace them (`content()`, `data-contract.js:22-30`), so they need the snapshot
+rules.
 
 ## Decisions for Chuck
 

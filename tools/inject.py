@@ -96,7 +96,7 @@ GUIDE_OPEN = '<script type="text/markdown" id="dv-agent-guide">'
 GUIDE_BLOCK = re.compile(r'^<script type="text/markdown" id="dv-agent-guide">\n.*?\n</script>\n?', re.S | re.M)
 GUIDE_LIMIT = 6 * 1024
 COMMENTS_CAPABILITY = {"composer_only": True, "customAnchors": True}
-JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "listJiraIssueChangelogs", "listJiraStatuses"]
+JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]
 # #826: the spec file published beside a two-file page, and the line that tells
 # the standalone boot to fetch it. The name is fixed: the board's Edit mode and
 # the editor's agent both publish exactly this path.

@@ -23,7 +23,7 @@ with the Artifact tool. An ordinary page declares only
 `capabilities: {comments: {"composer_only": true, "customAnchors": true}}`.
 A tracked page (one with `page.tracking`, see the `live-status-board` skill)
 adds the viewer's Jira connector:
-`capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "listJiraIssueChangelogs", "listJiraStatuses"]}]}, comments: {"composer_only": true, "customAnchors": true}}`,
+`capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}]}, comments: {"composer_only": true, "customAnchors": true}}`,
 where `server` is the connector's exact display name in claude.ai Settings →
 Connectors: "Atlassian" (or "Atlassian MCP", whichever the viewer's copy of
 Atlassian's own directory connector shows), or the custom or mock connector's

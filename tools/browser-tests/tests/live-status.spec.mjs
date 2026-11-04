@@ -442,23 +442,23 @@ test('P1 P4 P5 P7 P9 claude connector paints Jira nodes and Flagged edges with c
 /* Connector Over time (#929, PR 3 of 3). Node rows C1-C10 in tests/live-status.test.js cover call budget, paging and failure.
 | row | fixture | assertion (scoped) | rejects |
 |---|---|---|---|
-| P10 | connector offering the history tools, one local and two imported carriers | no history call before the click; real click opens on the last day; Home moves local and imported carriers to the first day's status | a local-only slice; loading at page load |
+| P10 | connector offering getJiraIssue, one local and two imported carriers | no history call before the click; real click opens on the last day; Home moves local and imported carriers to the first day's status | a local-only slice; loading at page load |
 | P11 | live refresh while a past day shows | carriers and Activity stay on the day; Live shows the newest status and logs it | a refresh overwriting the past day |
 | P12 | embedded spec; fetch and XHR listener | spec unchanged; no transport outside mcp | mode that edits the spec |
 */
 function stubOverTimeClaude(){
  const log=window.__mcpStub={calls:[],watches:[],today:{'AA-1':'done','IP-1':'done','IE-1':'indeterminate'}};
- const issue=key=>({key,fields:{summary:'Work '+key,status:{name:log.today[key]==='done'?'Done':'In Progress',statusCategory:{key:log.today[key]}},assignee:{displayName:'Alex'},updated:'2026-10-20T09:00:00Z',created:'2026-10-20T12:00:00.000Z'}});
+ const statuses={new:{id:'1',name:'To Do',statusCategory:{key:'new'}},indeterminate:{id:'2',name:'In Progress',statusCategory:{key:'indeterminate'}},done:{id:'3',name:'Done',statusCategory:{key:'done'}}};
+ const issue=key=>({key,fields:{summary:'Work '+key,status:statuses[log.today[key]],assignee:{displayName:'Alex'},updated:'2026-10-20T09:00:00Z'}});
  const search=input=>({payload:{issues:{nodes:input.jql.includes('Flagged')?[]:/key in \(([^)]+)\)/.exec(input.jql)[1].split(', ').map(issue)}},cache:{storedAt:1793000000000}});
- const change=(when,from,to)=>({created:when,items:[{field:'status',fromString:from,toString:to}]});
- const history={'AA-1':[change('2026-10-22T12:00:00.000Z','To Do','Done')],'IP-1':[change('2026-10-22T12:00:00.000Z','To Do','Done')],'IE-1':[change('2026-10-22T12:00:00.000Z','To Do','In Progress')]};
+ const change=(when,from,to)=>({created:when,items:[{field:'status',from:from.id,fromString:from.name,to:to.id,toString:to.name}]});
+ const history={'AA-1':[change('2026-10-22T12:00:00.000Z',statuses.new,statuses.done)],'IP-1':[change('2026-10-22T12:00:00.000Z',statuses.new,statuses.done)],'IE-1':[change('2026-10-22T12:00:00.000Z',statuses.new,statuses.indeterminate)]};
  const mcp={
-  listTools:async()=>[{server:'Mock-atlassian',authStatus:'unknown',tools:['getAccessibleAtlassianResources','searchJiraIssuesUsingJql','listJiraIssueChangelogs','listJiraStatuses'].map(name=>({name}))}],
+  listTools:async()=>[{server:'Mock-atlassian',authStatus:'unknown',tools:['getAccessibleAtlassianResources','searchJiraIssuesUsingJql','getJiraIssue'].map(name=>({name}))}],
   callTool:async(server,tool,input,opts)=>{log.calls.push({tool,input,opts});
    if(tool==='getAccessibleAtlassianResources')return {payload:[{id:'cloud',url:'https://jira.test'}]};
-   if(tool==='listJiraStatuses')return {payload:{values:[{name:'To Do',statusCategory:{key:'new'}},{name:'In Progress',statusCategory:{key:'indeterminate'}},{name:'Done',statusCategory:{key:'done'}}]}};
-   if(tool==='listJiraIssueChangelogs')return {payload:{values:history[input.issueIdOrKey]}};
-   return search(input);},
+   if(tool==='getJiraIssue'){const found=issue(input.issueIdOrKey),histories=history[input.issueIdOrKey];found.fields.created='2026-10-20T12:00:00.000Z';found.changelog={startAt:0,maxResults:100,total:histories.length,histories};return {payload:{issues:{nodes:[found]}}};}
+   const id=/^status = (\d+) /.exec(input.jql)[1];return {payload:{issues:{nodes:[{key:'XX-1',fields:{status:Object.values(statuses).find(status=>status.id===id)}}]}}};},
   watchTool(server,tool,input,handler,opts){const watch={tool,input,opts,stopped:false};log.watches.push(watch);watch.deliver=()=>{if(!watch.stopped)handler({type:'data',result:search(input)});};setTimeout(watch.deliver,0);return ()=>{watch.stopped=true;};}
  };
  window.claude={use:name=>Promise.resolve(name==='mcp'?mcp:null)};
@@ -470,10 +470,10 @@ test('P10 P11 P12 connector Over time loads on the click and repaints local and 
  source.page.tracking={jira:{site:'https://jira.test'}};const context=vm.createContext({});vm.runInContext(sourceLoader.composeSources(['validator.js','canon.js']),context);
  const spec=JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(source,{version:1,id:'consumer',specs:[provider,source]})));
  await page.addInitScript(stubOverTimeClaude);const requests=[];await page.route('**/*',route=>{const request=route.request();if(['fetch','xhr'].includes(request.resourceType())){requests.push(request.url());return route.abort();}return route.continue();});
- const root=await open(page,server,spec,false),panel=root.locator('.pt-live-status'),local=root.locator('g.node[data-dv-node="a"]'),imported=root.locator('g.node[data-dv-node="imp::p"]'),edge=root.locator('path.edge[data-dv-edge="0"]'),overTime=panel.getByRole('button',{name:'Over time',exact:true}),live=panel.getByRole('button',{name:'Live',exact:true}),slider=panel.getByRole('slider',{name:'Day',exact:true}),history=()=>page.evaluate(()=>__mcpStub.calls.map(call=>call.tool).filter(tool=>tool==='listJiraIssueChangelogs' || tool==='listJiraStatuses').length);
+ const root=await open(page,server,spec,false),panel=root.locator('.pt-live-status'),local=root.locator('g.node[data-dv-node="a"]'),imported=root.locator('g.node[data-dv-node="imp::p"]'),edge=root.locator('path.edge[data-dv-edge="0"]'),overTime=panel.getByRole('button',{name:'Over time',exact:true}),live=panel.getByRole('button',{name:'Live',exact:true}),slider=panel.getByRole('slider',{name:'Day',exact:true}),history=()=>page.evaluate(()=>__mcpStub.calls.filter(call=>call.tool==='getJiraIssue').length);
  await expect(local).toHaveClass(/dv-live-done/);await expect(imported).toHaveClass(/dv-live-done/);await expect(edge).toHaveClass(/dv-live-active/);await expect(overTime).toBeVisible();await expect(panel.getByRole('button',{name:'Next day',exact:true})).toHaveCount(0);expect(await history(),'P10 nothing before the click').toBe(0);expect(await page.evaluate(()=>__mcpStub.watches.filter(watch=>watch.tool!=='searchJiraIssuesUsingJql').length)).toBe(0);
  const embedded=await page.locator('#flowspec').textContent(),activity=()=>panel.locator('.dv-live-activity-entry').allTextContents(),before=await activity();
- await overTime.click();await expect(overTime).toHaveAttribute('aria-pressed','true');expect(await history(),'P10 one status list and three changelogs').toBe(4);
+ await overTime.click();await expect(overTime).toHaveAttribute('aria-pressed','true');expect(await history(),'P10 one call per ticket').toBe(3);
  await expect(slider).toHaveValue(await slider.getAttribute('max'));await slider.focus();await page.keyboard.press('Home');await expect(slider).toHaveValue('0');await expect(panel.locator('.dv-live-over-time-note')).toHaveText('Status as of Oct 20 · other columns show today');
  await expect(local).toHaveClass(/dv-live-todo/);await expect(imported).toHaveClass(/dv-live-todo/);await expect(edge).toHaveClass(/dv-live-todo/);await expect(local).not.toHaveClass(/dv-live-done/);await expect(imported).not.toHaveClass(/dv-live-done/);
  await expect(panel.getByRole('button',{name:'Next day',exact:true})).toHaveCount(1);await panel.getByRole('button',{name:'Next day',exact:true}).click();await expect(slider).toHaveValue('1');await panel.getByRole('button',{name:'Previous day',exact:true}).click();await expect(slider).toHaveValue('0');

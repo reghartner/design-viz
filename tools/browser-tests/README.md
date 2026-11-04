@@ -47,7 +47,7 @@ It runs one file from `tests/` in one job with the same setup and
 `playwright.ci.config.mjs` as the CI shards, and uploads `test-results/` as the
 `one-spec-results` artifact. The run's head SHA is the commit the result
 applies to. It is not a required check; full CI still runs on every pull request and
-every push to . The
+every push to `main`. The
 branch must contain the workflow file, so a long-lived branch picks it up by
 merging `main`.
 

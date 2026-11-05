@@ -55,7 +55,7 @@ function createInlineTextEditor(opts){
     // One step text serves every path that uses the step.
     {kind:'step',selector:'.stepline .step-text',target:function(el){return opts.currentStep?opts.currentStep(el):null;},field:'text',markdown:true,value:'trimmed',label:'Edit step text',help:help},
     // A visible subtitle wins over the containing node's rename target.
-    {kind:'node',selector:'[data-dv-node]:not([data-dv-text-box]) .t2:not(:empty)',field:'sub',value:'trimmed',overlay:true,label:'Node subtitle',help:'Enter or click outside saves. Escape cancels.',
+    {kind:'node',selector:'[data-dv-node]:not([data-dv-text-box]) .t2:not(.handoff-caption):not(:empty)',field:'sub',value:'trimmed',overlay:true,label:'Node subtitle',help:'Enter or click outside saves. Escape cancels.',
       place:nodeSubtitleHost,mount:function(c){return c.el.parentNode;},hostClass:'dv-inline-subtitle-editor'},
     // Rename edits the display name only; the node ID stays in Inspect.
     {kind:'node',selector:'[data-dv-node]:not([data-dv-text-box])',field:'title',value:'trimmed',overlay:true,label:'Node name',help:'Enter or click outside saves. Escape cancels.',

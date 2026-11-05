@@ -1,6 +1,51 @@
 import {test,expect} from '../helpers/test.mjs';
-import {mountCues,mountImportedDetail,cueSpec,CUE_JIRA,CUE_SAMPLES} from '../helpers/telemetry-cards.mjs';
+import {mountCues,mountImportedDetail,cueSpec,handoffSpec,CUE_JIRA,CUE_SAMPLES} from '../helpers/telemetry-cards.mjs';
 const cards='.dv-metrics-card';
+for(const mode of ['available','host-disabled','page-disabled'])test('handoff Jira targets survive Metrics repaint: '+mode,async({page,server})=>{
+ const {root}=await mountCues(page,server),spec=handoffSpec();
+ if(mode==='page-disabled')spec.page.tracking.telemetry={enabled:false};
+ expect(Object.keys(spec.page.sections[0].diagram.nodes)).toEqual(expect.arrayContaining(['h','direct::h','nested::inner::h']));
+ await page.evaluate(({spec,mode})=>{
+  window.viewer.destroy();window.handoffQueries=0;
+  window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:mode==='host-disabled'?false:{provider:async()=>{window.handoffQueries++;return {'a->b':{signals:{rate:{value:10},errors:{value:0}}}};}}});
+ },{spec,mode});
+ const section=root.locator('#section-main'),metrics=section.getByRole('button',{name:'Metrics',exact:true}),pop=root.locator('.dv-live-popover');
+ const carriers=[['h','LOC-1'],['direct::h','IMP-1'],['nested::inner::h','IMP-1']];
+ async function checkTargets(){
+  for(const [id,ticket] of carriers){
+   const node=section.locator('[data-dv-node="'+id+'"]'),cue=node.locator('.dv-jira-cue');
+   await expect(cue).toHaveCount(1);await expect(cue).toHaveAttribute('data-jira-carrier',id);
+   await expect(cue).toHaveAttribute('tabindex','0');await expect(cue).not.toHaveAttribute('aria-hidden','true');
+   await expect(node.locator('.card')).not.toHaveAttribute('role','button');
+   await cue.press('Enter');await expect(pop.getByRole('link',{name:ticket,exact:true})).toHaveAttribute('href','https://jira.test/browse/'+ticket);
+   await page.keyboard.press('Escape');await expect(cue).toBeFocused();
+  }
+ }
+ // A sample update exercises the new full repaint, even before Metrics is enabled.
+ await page.evaluate(()=>window.viewer.controller.telemetry.apply({'a->b':{signals:{rate:{value:20}}}}));
+ await checkTargets();await expect(section.locator(cards)).toHaveCount(0);expect(await page.evaluate(()=>window.handoffQueries)).toBe(0);
+ if(mode==='available'){
+  await metrics.click();await expect(section.locator(cards)).toContainText('10 req/h');await checkTargets();
+  for(const [id] of carriers){
+   const cue=section.locator('[data-dv-node="'+id+'"] .dv-jira-cue');await cue.focus();
+   await page.evaluate(()=>window.viewer.controller.telemetry.apply({'a->b':{signals:{rate:{value:321},errors:{value:0}}}}));
+   await expect(section.locator(cards)).toContainText('321 req/h');await expect(cue).toBeFocused();
+  }
+  await checkTargets();expect((await geometry(root)).overlaps).toEqual([]);
+  await page.evaluate(()=>window.viewer.controller.telemetry.setAvailable(false));await expect(metrics).toBeHidden();await expect(section.locator(cards)).toHaveCount(0);await checkTargets();
+  await page.evaluate(()=>window.viewer.controller.telemetry.setAvailable(true));await expect(metrics).toHaveAttribute('aria-pressed','false');await checkTargets();
+ }else{
+  await expect(metrics).toBeHidden();
+  await page.evaluate(()=>{window.viewer.controller.telemetry.setAvailable(true);window.viewer.controller.liveStatus.apply({'LOC-1':{state:'done'},'IMP-1':{state:'done'}});});
+  await expect(metrics).toBeHidden();await checkTargets();expect(await page.evaluate(()=>window.handoffQueries)).toBe(0);
+ }
+ // Each original handoff still navigates, including both production-resolved imports.
+ for(const [id] of carriers){
+  await section.locator('[data-dv-node="'+id+'"] .handoff-link').press('Enter');await expect(root.locator('#section-destination')).toBeVisible();await expect(pop).toBeHidden();
+  await root.locator('.handoff-back').click();await expect(section).toBeVisible();
+ }
+ await checkTargets();await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
+});
 async function geometry(root){const result=await root.evaluate(scope=>{
  scope=scope.shadowRoot || scope;
  const overlaps=[],outside=[],sizes=[],labels=[];

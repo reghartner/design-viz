@@ -406,7 +406,7 @@ class InjectTests(unittest.TestCase):
         # signals declares the Grafana connector beside Jira, with the five tools the
         # adapter picks it by; tempo-only or honeycomb-only pages do not.
         grafana_tools = ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]
-        jira = {"server": "Atlassian", "tools": ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}
+        jira = {"server": "Atlassian", "tools": ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}
         grafana = {"server": "Grafana", "tools": grafana_tools}
 
         def guide_for(page_extra=None, node_telemetry=None):

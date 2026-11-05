@@ -559,10 +559,11 @@ class InjectTests(unittest.TestCase):
     # | P1 two-file writes flowspec.json beside the page | --two-file, formatted spec | sidecar text == inline block text + "\n"; parses to the spec | re-serialized (json.dumps) sidecar; sidecar elsewhere |
     # | P2 marker present once, inline block kept | --two-file | exactly one SPEC_FILE_MARKER line; FLOWSPEC_BLOCK still parses to spec; marker precedes the guide | marker-only impl that drops the block; stacked markers |
     # | P3 single-file writes no sidecar and no marker | same spec, no flag | sidecar is None; marker count 0 | always-on sidecar |
-    # | P4 two-file tracked declaration adds artifact + user | tracked spec, --two-file | declaration == {mcp, comments, artifact: {}, user: {scopes: ["profile"]}} | artifact without user; user without the profile scope |
+    # | P4 two-file Jira declaration adds artifact + user | Jira spec, --two-file | declaration == {mcp, comments, artifact: {}, user: {scopes: ["profile"]}} | artifact without user; user without the profile scope |
     # | P5 single-file tracked declaration unchanged | tracked spec, no flag | declaration keys == {mcp, comments} (test :214 also) | adding artifact/user to every tracked page |
     # | P6 untracked two-file declaration stays comments-only | SPEC, --two-file | declaration == {comments} (test :292 also) | adding artifact/user to untracked pages |
     # | P7 re-injecting a two-file page single-file drops the marker | built two-file page as template, no flag | marker count 0; one guide | stale marker survives like a stale guide would |
+    # | P8 telemetry-only two-file edit flow | tracking.telemetry, --two-file | artifact + user.profile and flowspec sidecar, no Jira; single-file has neither edit capability | coupling Edit/reconciliation permission to Jira permission |
     def test_two_file_writes_flowspec_json_beside_the_page_and_marks_the_html(self):
         formatted = '{\n\t"page": {\n  "blocks": [{"heading": "h"}],\n\t\t"title": "Two files"\n  }\n}\n\n'
         r, out, files = run_inject(TEMPLATE, formatted, ["--two-file"], sidecars=("flowspec.json",))
@@ -589,7 +590,7 @@ class InjectTests(unittest.TestCase):
         self.assertNotIn('dv-spec-file', out)
         self.assertEqual(FLOWSPEC_BLOCK.search(out)[1], formatted.strip())
 
-    def test_two_file_tracked_page_declares_artifact_and_user_single_file_and_untracked_do_not(self):
+    def test_two_file_edit_capabilities_are_independent_of_jira_permission(self):
         tracked = json.dumps(tracked_spec())
 
         def declaration(html):
@@ -598,7 +599,7 @@ class InjectTests(unittest.TestCase):
             self.assertEqual(len(fences), 1)
             return json.loads(fences[0]), guide
 
-        # P4: a tracked two-file page adds the artifact and user capabilities to today's declaration
+        # P4: a Jira two-file page adds the artifact and user capabilities to today's declaration
         r, out = run_inject(TEMPLATE, tracked, ["--two-file"])
         self.assertEqual(r.returncode, 0, r.stderr)
         two_file, guide = declaration(out)
@@ -627,6 +628,28 @@ class InjectTests(unittest.TestCase):
         untracked, guide = declaration(out)
         self.assertEqual(untracked, {"comments": {"composer_only": True, "customAnchors": True}})
         self.assertIn("flowspec.json", guide)
+
+        # P8: telemetry-only publishing uses the same two-file edit,
+        # reconciliation and same-URL republish flow without requesting Jira.
+        telemetry_only = json.loads(json.dumps(SPEC))
+        telemetry_only["page"]["tracking"] = {"telemetry": {"window": "24h"}}
+        r, out, files = run_inject(TEMPLATE, json.dumps(telemetry_only), ["--two-file"], sidecars=("flowspec.json",))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        telemetry_two, guide = declaration(out)
+        self.assertEqual(telemetry_two, {
+            "comments": {"composer_only": True, "customAnchors": True},
+            "artifact": {},
+            "user": {"scopes": ["profile"]},
+        })
+        self.assertEqual(json.loads(files["flowspec.json"]), telemetry_only)
+        self.assertNotIn("Atlassian", json.dumps(telemetry_two))
+        for needle in ("flowspec.json", "editHistory", "same URL"):
+            self.assertIn(needle, guide)
+        r, out = run_inject(TEMPLATE, json.dumps(telemetry_only))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        telemetry_single, guide = declaration(out)
+        self.assertEqual(telemetry_single, {"comments": {"composer_only": True, "customAnchors": True}})
+        self.assertNotIn("editHistory", guide)
 
     def test_two_file_guide_lists_board_edits_asks_before_overriding_and_logs_agent_changes(self):
         # #974 (Chuck 2026-11-04): an agent that edits the published flowspec.json reports the board

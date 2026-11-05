@@ -23,6 +23,12 @@
 !/mock-grafana-mcp/mcp.mjs
 !/mock-grafana-mcp/story.mjs
 !/mock-grafana-mcp/wrangler.jsonc
+!/mock-honeycomb-mcp/
+/mock-honeycomb-mcp/*
+!/mock-honeycomb-mcp/README.md
+!/mock-honeycomb-mcp/worker.mjs
+!/mock-honeycomb-mcp/mcp.mjs
+!/mock-honeycomb-mcp/wrangler.jsonc
 # Local settings and tool caches are never sources, at any depth.
 local.env
 .dev.vars*

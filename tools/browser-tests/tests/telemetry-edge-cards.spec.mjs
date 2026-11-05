@@ -146,7 +146,7 @@ async function standalone(page,server,{mode='valid',disabled=null}={}){
  await page.addInitScript(({mode,disabled})=>{
   window.metadata=0;window.queries=[];window.namespaces=[];window.flowviewBooted=ctl=>window.ctl=ctl;
   if(disabled==='host')window.flowviewTelemetry=false;
-  const mcp={listTools:async()=>{window.metadata++;if(mode==='throw')throw Error('unavailable');return [{server:'Grafana',tools:(mode==='missing'?['query_prometheus']:['query_prometheus','query_loki_logs','search_tempo_traces','get_annotations','generate_deeplink']).map(name=>({name}))}];},callTool:async(server,tool)=>{window.queries.push(tool);if(mode==='approval'&&!window.allowed)throw {code:'approval_required'};return tool==='query_prometheus'?{payload:{data:[{values:[[1793746800,'22'],[1793750400,'25']]}]}}:{payload:[]};}};
+  const mcp={listTools:async()=>{window.metadata++;if(mode==='throw')throw Error('unavailable');return [{server:'Grafana',tools:(mode==='missing'?['get_annotations']:['query_prometheus','query_loki_logs','search_tempo_traces','get_annotations','generate_deeplink']).map(name=>({name}))}];},callTool:async(server,tool)=>{window.queries.push(tool);if(mode==='approval'&&!window.allowed)throw {code:'approval_required'};return tool==='query_prometheus'?{payload:{data:[{values:[[1793746800,'22'],[1793750400,'25']]}]}}:{payload:[]};}};
   window.claude={use:async name=>{window.namespaces.push(name);if(name!=='mcp')return null;if(mode==='delayed')return new Promise(r=>window.release=()=>r(mcp));return mcp;}};
  },{mode,disabled});
  const file=path.join(server.root,'cards-auto.json'),out=path.join(server.root,'cards-auto.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/cards-auto.html');await page.waitForFunction(()=>!!window.ctl);return page.locator('#docview');
@@ -154,6 +154,7 @@ async function standalone(page,server,{mode='valid',disabled=null}={}){
 for(const mode of ['valid','missing','throw'])test('standalone '+mode+' capability metadata gates Metrics without data calls',async({page,server})=>{
  const root=await standalone(page,server,{mode});await expect.poll(()=>page.evaluate(()=>window.metadata)).toBe(1);const button=root.getByRole('button',{name:'Metrics',exact:true});
  if(mode==='valid'){await expect(button).toBeVisible();await expect(button).toHaveAttribute('aria-pressed','false');}else await expect(button).toBeHidden();
+ if(mode==='missing'){await expect(root.locator('.dv-live-metrics-connection')).toBeVisible();await expect(root.locator('.dv-live-metrics-connection')).toContainText('query_prometheus');}
  expect(await page.evaluate(()=>window.queries)).toEqual([]);await expect(root.locator(cards)).toHaveCount(0);
  if(mode==='valid'){await button.click();await expect(root.locator(cards)).toHaveCount(1);await expect(root.locator(cards)).toContainText('25 req/s');}
 });

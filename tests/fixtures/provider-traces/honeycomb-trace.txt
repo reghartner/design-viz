@@ -1,0 +1,75 @@
+ResultTool response| span_id | parent_id | start_unix_ns | duration_ns | kind | status_code | error | http_status | service | route | name | annotation_type | link_span_id | link_trace_id | depth | child_count | descendant_count | event_count | is_collapsed |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| dbd662d250034c44 |  | 1791779586602194688 | 4650643585 | server | UNSET | false | 200 | frontend | /cart/checkout | /cart/checkout |  |  |  | 0 | 8 | 76 | 0 | false |
+| 011114cbd1fd62de | dbd662d250034c44 | 1791779591242913280 | 9679396 | client | UNSET | false |  | frontend |  | msdemo.CurrencyService/GetSupportedCurrencies |  |  |  | 1 | 1 | 1 | 0 | false |
+| dcce084f04baa9e1 | 011114cbd1fd62de | 1791779591243000064 | 8735083 | server | UNSET | false |  | currency |  | grpc.msdemo.CurrencyService/GetSupportedCurrencies |  |  |  | 2 | 0 | 0 | 0 | false |
+| bbe8c332d35ba601 | dbd662d250034c44 | 1791779591225577472 | 17295341 | client | UNSET | false |  | frontend |  | msdemo.ProductCatalogService/GetProduct |  |  |  | 1 | 1 | 1 | 0 | false |
+| b01a8fd7791f709b | bbe8c332d35ba601 | 1791779591225932288 | 16625447 | server | UNSET | false |  | productcatalog |  | msdemo.ProductCatalogService/GetProduct |  |  |  | 2 | 0 | 0 | 0 | false |
+| e9d19bd4e038c09f | dbd662d250034c44 | 1791779591205169664 | 20367991 | client | UNSET | false |  | frontend |  | msdemo.ProductCatalogService/GetProduct |  |  |  | 1 | 1 | 1 | 0 | false |
+| 3b8c2e88761b259e | e9d19bd4e038c09f | 1791779591205549568 | 19611497 | server | UNSET | false |  | productcatalog |  | msdemo.ProductCatalogService/GetProduct |  |  |  | 2 | 0 | 0 | 0 | false |
+| 77a5f2fef02f15b8 | dbd662d250034c44 | 1791779591196771072 | 8365534 | client | UNSET | false |  | frontend |  | msdemo.ProductCatalogService/GetProduct |  |  |  | 1 | 1 | 1 | 0 | false |
+| 9854f702ff752225 | 77a5f2fef02f15b8 | 1791779591197128704 | 7662271 | server | UNSET | false |  | productcatalog |  | msdemo.ProductCatalogService/GetProduct |  |  |  | 2 | 0 | 0 | 0 | false |
+| 6dff0700dea43b16 | dbd662d250034c44 | 1791779591178394368 | 18336285 | client | UNSET | false |  | frontend |  | msdemo.ProductCatalogService/GetProduct |  |  |  | 1 | 1 | 1 | 0 | false |
+| ee7c449ba084a82c | 6dff0700dea43b16 | 1791779591178743808 | 17637495 | server | UNSET | false |  | productcatalog |  | msdemo.ProductCatalogService/GetProduct |  |  |  | 2 | 0 | 0 | 0 | false |
+| bad8ae6610e39c33 | dbd662d250034c44 | 1791779591166061568 | 12299422 | client | UNSET | false |  | frontend |  | msdemo.ProductCatalogService/GetProduct |  |  |  | 1 | 1 | 1 | 0 | false |
+| 2881b6f51e4be521 | bad8ae6610e39c33 | 1791779591166430976 | 11621295 | server | UNSET | false |  | productcatalog |  | msdemo.ProductCatalogService/GetProduct |  |  |  | 2 | 0 | 0 | 0 | false |
+| 73989545f5c4122a | dbd662d250034c44 | 1791779591049238016 | 116782321 | client | UNSET | false |  | frontend |  | msdemo.RecommendationService/ListRecommendations |  |  |  | 1 | 1 | 6 | 0 | false |
+| aa5f425e55f32e23 | 73989545f5c4122a | 1791779591049990144 | 115786480 | server | UNSET | false |  | recommendation |  | /msdemo.RecommendationService/ListRecommendations |  |  |  | 2 | 1 | 5 | 0 | false |
+| df3866b48f08a7c1 | aa5f425e55f32e23 | 1791779591050036736 | 115721234 | internal | UNSET | false |  | recommendation |  | ListRecommendationsFunction |  |  |  | 3 | 2 | 4 | 2 | false |
+| 0cbcc8636336b11c | df3866b48f08a7c1 | 1791779591154583040 | 10726454 | client | UNSET | false |  | recommendation |  | /msdemo.ProductCatalogService/ListProducts |  |  |  | 4 | 1 | 2 | 0 | false |
+| 73942ef90d5492ac | 0cbcc8636336b11c | 1791779591155174656 | 9677478 | server | UNSET | false |  | productcatalog |  | msdemo.ProductCatalogService/ListProducts |  |  |  | 5 | 1 | 1 | 0 | false |
+| d6667d51428cbb4d | 73942ef90d5492ac | 1791779591155207424 | 9585518 | internal | UNSET | false |  | database |  | SELECT productcatalog.products |  |  |  | 6 | 0 | 0 | 0 | false |
+| f8d11c19098990d3 | df3866b48f08a7c1 | 1791779591050067200 | 103965258 | internal | UNSET | false |  | database |  | SELECT recommendation.products |  |  |  | 4 | 0 | 0 | 0 | false |
+| ccc3356d1a390fe4 | dbd662d250034c44 | 1791779586602295808 | 4446858623 | client | UNSET | false |  | frontend |  | msdemo.CheckoutService/PlaceOrder |  |  |  | 1 | 1 | 56 | 0 | false |
+| 2275c50ef5f955a5 | ccc3356d1a390fe4 | 1791779586602552832 | 4446344666 | server | UNSET | false |  | checkout |  | msdemo.CheckoutService/PlaceOrder |  |  |  | 2 | 8 | 55 | 4 | false |
+| 925d28d7138b3da8 | 2275c50ef5f955a5 | 1791779591048884224 | 157549623 | client | UNSET | false |  | checkout |  | msdemo.EmailService/SendOrderConfirmation |  |  |  | 3 | 1 | 2 | 0 | false |
+| c2b2f3ef6c141a8a | 925d28d7138b3da8 | 1791779591049785344 | 156179432 | server | UNSET | false |  | email |  | /msdemo.EmailService/SendOrderConfirmation |  |  |  | 4 | 1 | 1 | 0 | false |
+| ca1df9ceaf9eba32 | c2b2f3ef6c141a8a | 1791779591155999744 | 49574308 | internal | UNSET | false |  | database |  | INSERT email.confirmations |  |  |  | 5 | 0 | 0 | 0 | false |
+| 993b4f18e00c370a | 2275c50ef5f955a5 | 1791779591048879872 | 125538262 | client | UNSET | false |  | checkout |  | msdemo.CartService/EmptyCart |  |  |  | 3 | 1 | 2 | 0 | false |
+| 6111e8f6418fc905 | 993b4f18e00c370a | 1791779591049385984 | 124654200 | server | UNSET | false |  | cart |  | msdemo.CartService/EmptyCart |  |  |  | 4 | 1 | 1 | 0 | false |
+| f9760d0d355d77fe | 6111e8f6418fc905 | 1791779591173601280 | 328500 | client | UNSET | false |  | redis |  | HMSET |  |  |  | 5 | 0 | 0 | 3 | false |
+| 02a8b726f8b16eb3 | 2275c50ef5f955a5 | 1791779590871168256 | 167066329 | client | UNSET | false |  | checkout |  | msdemo.ShippingService/ShipOrder |  |  |  | 3 | 1 | 5 | 0 | false |
+| b9edd2b3b99841ed | 02a8b726f8b16eb3 | 1791779590871625216 | 166264633 | server | UNSET | false |  | shipping |  | msdemo.ShippingService/ShipOrder |  |  |  | 4 | 2 | 4 | 0 | false |
+| 6cafcbd2c71aab2f | b9edd2b3b99841ed | 1791779591018628096 | 19155544 | internal | UNSET | false |  | database |  | INSERT shipping.shipments |  |  |  | 5 | 0 | 0 | 0 | false |
+| 41f0d663a88647a8 | b9edd2b3b99841ed | 1791779590871714560 | 146896138 | client | UNSET | false | 200 | shipping |  | HTTP POST |  |  |  | 5 | 1 | 2 | 0 | false |
+| fe8b12a4cea840f8 | 41f0d663a88647a8 | 1791779590953999872 | 19525919 | internal | UNSET | false |  | API Gateway |  | API Gateway Span |  |  |  | 6 | 1 | 1 | 0 | false |
+| c27df9e4c7b8bd96 | fe8b12a4cea840f8 | 1791779590953999872 | 14477 | internal | UNSET | false |  | tracking |  | App Span |  |  |  | 7 | 0 | 0 | 0 | false |
+| 10ecfc45067a5a01 | 2275c50ef5f955a5 | 1791779590825495040 | 24951999 | client | UNSET | false |  | checkout |  | msdemo.PaymentService/Charge |  |  |  | 3 | 1 | 2 | 0 | false |
+| 2beed983172122bf | 10ecfc45067a5a01 | 1791779590825999872 | 23559238 | server | UNSET | false |  | payment |  | grpc.msdemo.PaymentService/Charge |  |  |  | 4 | 1 | 1 | 0 | false |
+| 8376f1b2537b7385 | 2beed983172122bf | 1791779590836000000 | 13116428 | internal | UNSET | false |  | database |  | INSERT payment.charges |  |  |  | 5 | 0 | 0 | 0 | false |
+| c57dfe8bb5ed16e0 | 2275c50ef5f955a5 | 1791779590789789696 | 14429105 | client | UNSET | false |  | checkout |  | msdemo.CurrencyService/Convert |  |  |  | 3 | 1 | 1 | 0 | false |
+| 5415c7b4f2a625d7 | c57dfe8bb5ed16e0 | 1791779590790000128 | 13348686 | server | UNSET | false |  | currency |  | grpc.msdemo.CurrencyService/Convert |  |  |  | 4 | 0 | 0 | 0 | false |
+| 6477fe58996b7d9d | 2275c50ef5f955a5 | 1791779590732403200 | 31739404 | client | UNSET | false |  | checkout |  | msdemo.ShippingService/GetQuote |  |  |  | 3 | 1 | 3 | 0 | false |
+| 7231afcfa16189bb | 6477fe58996b7d9d | 1791779590732888832 | 30865953 | server | UNSET | false |  | shipping |  | msdemo.ShippingService/GetQuote |  |  |  | 4 | 2 | 2 | 0 | false |
+| c82a96cac13b21ab | 7231afcfa16189bb | 1791779590747502080 | 16158952 | internal | UNSET | false |  | database |  | INSERT shipping.quotes |  |  |  | 5 | 0 | 0 | 0 | false |
+| e255d258e372163b | 7231afcfa16189bb | 1791779590732969216 | 14519675 | internal | UNSET | false |  | database |  | SELECT shipping.products |  |  |  | 5 | 0 | 0 | 0 | false |
+| ad3630377fae4409 | 2275c50ef5f955a5 | 1791779586871226112 | 3861072108 | internal | UNSET | false |  | checkout |  | getDiscounts |  |  |  | 3 | 30 | 30 | 0 | true |
+| be250ed6273a12b0 | ad3630377fae4409 | 1791779590551002112 | 181286229 | internal | UNSET | false |  | database |  | SELECT checkout.discounts |  |  |  | 4 | 0 | 0 | 0 | false |
+| 7073772245cd637c | ad3630377fae4409 | 1791779590433750016 | 117225051 | internal | UNSET | false |  | database |  | SELECT checkout.discounts |  |  |  | 4 | 0 | 0 | 0 | false |
+| 784dd0ebbfd09107 | ad3630377fae4409 | 1791779590323498496 | 110220803 | internal | UNSET | false |  | database |  | SELECT checkout.discounts |  |  |  | 4 | 0 | 0 | 0 | false |
+| d7eedc53da2a44f1 | ad3630377fae4409 | 1791779590237283584 | 86189092 | internal | UNSET | false |  | database |  | SELECT checkout.discounts |  |  |  | 4 | 0 | 0 | 0 | false |
+| 40670f5d24d1ed41 | ad3630377fae4409 | 1791779590140067328 | 97199219 | internal | UNSET | false |  | database |  | SELECT checkout.discounts |  |  |  | 4 | 0 | 0 | 0 | false |
+| 48016a4ba611e5d7 | ad3630377fae4409 | 1791779589987637504 | 152414513 | internal | UNSET | false |  | database |  | SELECT checkout.discounts |  |  |  | 4 | 0 | 0 | 0 | false |
+| 43b18df2381e105d | ad3630377fae4409 | 1791779589873413632 | 114210779 | internal | UNSET | false |  | database |  | SELECT checkout.discounts |  |  |  | 4 | 0 | 0 | 0 | false |
+| 537febe16f142217 | ad3630377fae4409 | 1791779589765324032 | 108073823 | internal | UNSET | false |  | database |  | SELECT checkout.discounts |  |  |  | 4 | 0 | 0 | 0 | false |
+| 850c620968f62bf4 | 2275c50ef5f955a5 | 1791779586602722304 | 229619621 | client | UNSET | false |  | checkout |  | msdemo.CartService/GetCart |  |  |  | 3 | 1 | 2 | 0 | false |
+| 3d8a33bd567849b6 | 850c620968f62bf4 | 1791779586603233792 | 228700100 | server | UNSET | false |  | cart |  | msdemo.CartService/GetCart |  |  |  | 4 | 1 | 1 | 0 | false |
+| 1c4d74a48ded77bc | 3d8a33bd567849b6 | 1791779586831454208 | 370300 | client | UNSET | false |  | redis |  | HGET |  |  |  | 5 | 0 | 0 | 3 | false |
+
+
+---
+Metadata:
+  collapsed_nodes: 1
+  environment: ms-demo
+  mean_sample_rate: 1
+  navigation_hints: 1 nodes collapsed. Use 'full' mode to see all spans or 'focused' mode on specific span IDs.; Multi-service trace. Consider filtering by specific services or using focus_span_id to examine service boundaries.; Use focus_span_id='dbd662d250034c44' to examine the slowest span and its children.
+  time_range: "from 2026-10-12T00:34:09Z to 2026-10-12T06:34:09Z"
+  total_spans: 77
+  trace_id: 8413cd87a9f15b6bfe8e1acf5b3346d0
+  trace_link: "https://ui.honeycomb.io/demo/environments/ms-demo/result/Fozfr6HyfvN/trace?trace_id=8413cd87a9f15b6bfe8e1acf5b3346d0"
+  trace_result_json: "[REDACTED SIGNED URL]"
+  trace_result_pk: Fozfr6HyfvN
+  view_mode: auto
+  visible_spans: 55
+
+[Resource link: Trace spans for 8413cd87a9f15b6bfe8e1acf5b3346d0 (raw JSON)] honeycomb://trace/Fozfr6HyfvN/json

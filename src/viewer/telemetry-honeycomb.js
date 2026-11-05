@@ -1,13 +1,14 @@
 /* Honeycomb metrics (#946). The hosted run_query completes the query. Its
    formatted tables/charts are NOT exact measurements; only the documented raw
    results[].data / series[].data contract is used. See docs/live-status.md for
-   pinned official provenance and the deliberately unsupported trace/history leg.
+   pinned official provenance. Trace retrieval lives in telemetry-traces.js;
+   this scalar adapter does not supply historical Honeycomb measurements.
    No query is inferred from a carrier name; no signed URL escapes this module. */
 var TELEMETRY_HONEYCOMB_BYTES=1048576,TELEMETRY_HONEYCOMB_TIMEOUT=15000;
 function telemetryHoneycombError(message,code){var e=new Error(message);e.code=code || 'query_unobserved';return e;}
 function telemetryHoneycombJobs(bindings){
   var jobs=[];(bindings || []).forEach(function(binding){Object.keys(binding.signals || {}).forEach(function(name){
-    var s=binding.signals[name];if(s.source==='honeycomb')jobs.push({id:binding.id,name:name,query:s.query,unit:s.unit,links:binding.links || {}});
+    var s=binding.signals[name];if(s.source==='honeycomb' && !(telemetryObject(s.query) && telemetryOwn(s.query,'query_spec')))jobs.push({id:binding.id,name:name,query:s.query,unit:s.unit,links:binding.links || {}});
   });});return jobs;
 }
 function telemetryHoneycombBindings(page){return telemetryBindings(function(fn){sectionRecords(page).forEach(function(record){var d=record.section.diagram || {};
@@ -98,30 +99,7 @@ async function telemetryHoneycombRaw(win,url,signal){
    before serializing (depth/node/string bounds; no accessors, cycles or unsafe
    keys), then enforce the UTF-8 wire limit. Clone to detach provider objects. */
 function telemetryHoneycombJson(raw){
-  var nodes=0,chars=0,active=new Set();
-  function invalid(){throw telemetryHoneycombError('Honeycomb exact raw JSON is invalid or exceeds its bounds.');}
-  function walk(value,depth){
-    if(++nodes>50000 || depth>24)invalid();
-    if(value===null || typeof value==='boolean')return value;
-    if(typeof value==='number'){if(!isFinite(value))invalid();return value;}
-    if(typeof value==='string'){chars+=value.length;if(chars>TELEMETRY_HONEYCOMB_BYTES)invalid();return value;}
-    if(!value || typeof value!=='object' || active.has(value) || Object.getOwnPropertySymbols(value).length)invalid();
-    var array=Array.isArray(value),proto=Object.getPrototypeOf(value);
-    if(!array && proto!==null && Object.getPrototypeOf(proto)!==null)invalid();
-    var keys=Object.keys(value);if(keys.length>50000-nodes)invalid();
-    if(array && keys.length!==value.length)invalid();
-    active.add(value);var out=array?[]:Object.create(null);
-    keys.forEach(function(key,index){
-      if(array && key!==String(index))invalid();
-      if(['__proto__','prototype','constructor'].indexOf(key)>=0)invalid();
-      chars+=key.length;if(chars>TELEMETRY_HONEYCOMB_BYTES)invalid();
-      var descriptor=Object.getOwnPropertyDescriptor(value,key);if(!descriptor || !telemetryOwn(descriptor,'value'))invalid();
-      out[key]=walk(descriptor.value,depth+1);
-    });active.delete(value);return out;
-  }
-  var copy=walk(raw,0),text=JSON.stringify(copy);
-  if(text.length>TELEMETRY_HONEYCOMB_BYTES || new TextEncoder().encode(text).byteLength>TELEMETRY_HONEYCOMB_BYTES)invalid();
-  return copy;
+  try{return telemetryEvidenceJson(raw);}catch(e){throw telemetryHoneycombError('Honeycomb exact raw JSON is invalid or exceeds its bounds.');}
 }
 /* The local mock publishes exact raw JSON in structuredContent; a namespace
    may expose that JSON as payload. This is not evidence that hosted Honeycomb

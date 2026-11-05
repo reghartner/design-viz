@@ -88,6 +88,7 @@ function telemetrySample(raw){
     out.markers.push(kept);
   });
   if(telemetryObject(raw.links))TELEMETRY_LINKS.forEach(function(key){var url=deltaLinkUrl(raw.links[key]);if(url)out.links[key]=url;});
+  if(Array.isArray(raw.exemplars) && raw.exemplars.length<=1 && typeof telemetryTraceEnvelope==='function'){out.exemplars=[];raw.exemplars.forEach(function(v){try{out.exemplars.push(telemetryTraceEnvelope(v));}catch(e){}});}
   return out;
 }
 /* Each page's telemetry templates, parsed once per walk. */
@@ -411,7 +412,14 @@ function createTelemetry(page,options,hooks){
   function showHistory(){
     if(!past || !enabled)return;
     var day=past.days[past.index];
-    map=day && telemetryObject(day.telemetry)?day.telemetry:telemetryHistoryDay(past.map,day);
+    map=telemetryHistoryDay(past.map,day);
+    if(day && telemetryObject(day.telemetry)){
+      map=Object.create(null);Object.keys(day.telemetry).forEach(function(id){
+        var sample=telemetrySample(day.telemetry[id]);if(!sample)return;
+        // Embedded days provide numeric history, not a validated historical trace contract.
+        delete sample.exemplars;Object.keys(sample.signals).forEach(function(name){delete sample.signals[name].aggregate;});map[id]=sample;
+      });
+    }
   }
   function historyStatus(){
     var state=historyRequests.length?'loading':'ok',notes=[];
@@ -464,6 +472,16 @@ function createTelemetry(page,options,hooks){
   }
 
   var api={
+    // Explicit user action only. Never called by paint, history or captions.
+    chooseExemplar:async function(id,token,traceId){
+      if(retired || !enabled || past || !available || typeof options.chooseExemplar!=='function')throw new Error('Trace selection unavailable.');
+      var before=JSON.stringify(bindings()),sample=liveMap[id];
+      if(!sample || !sample.exemplars || !sample.exemplars.some(function(e){return e.selectionToken===token;}))throw new Error('Trace selection expired.');
+      var result=await options.chooseExemplar(id,token,traceId);
+      if(retired || !enabled || past || before!==JSON.stringify(bindings()) || liveMap[id]!==sample)throw new Error('Trace selection expired.');
+      sample.exemplars=[telemetryTraceEnvelope(result)];notify();return copy(sample.exemplars[0]);
+    },
+    retractExemplars:function(){[liveMap,map].forEach(function(m){Object.keys(m).forEach(function(id){delete m[id].exemplars;if(!Object.keys(m[id].signals).length)delete m[id];});});notify();},
     openHistory:function(days,index){
       if(retired)return;cancelHistory();liveStatus=copy(status);past={days:days,index:index,map:{}};map=Object.create(null);
       if(poller)poller.pause();loadHistory();
@@ -475,6 +493,8 @@ function createTelemetry(page,options,hooks){
       if(enabled){if(liveStatus)setStatus(liveStatus);if(poller)poller.resume();}liveStatus=null;notify();
     },
     bindings:function(){return copy(bindings());},
+    // Runtime detail identity: identical authored bindings can belong to a replacement load.
+    bindingGeneration:function(id){return bindingEpochs[id] || 0;},
     bindingsChanged:function(retiredIds){
       retiredIds=Array.isArray(retiredIds)?retiredIds:[];
       if(retiredIds.length){
@@ -489,7 +509,7 @@ function createTelemetry(page,options,hooks){
     // including cached history, without erasing a healthy peer on that carrier.
     retractSources:function(sources){
       if(retired)return;var owned=Object.create(null);bindings().forEach(function(b){owned[b.id]=Object.keys(b.signals).filter(function(n){return sources.indexOf(b.signals[n].source)>=0;});});
-      function strip(target){Object.keys(target || {}).forEach(function(id){var sample=target[id],changed=false;(owned[id] || []).forEach(function(name){if(telemetryOwn(sample.signals,name)){delete sample.signals[name];changed=true;}});if(changed){sample.links={};sample.markers=[];sample.observedAt=null;}if(!Object.keys(sample.signals).length)delete target[id];});}
+      function strip(target){Object.keys(target || {}).forEach(function(id){var sample=target[id],changed=false;(owned[id] || []).forEach(function(name){if(telemetryOwn(sample.signals,name)){delete sample.signals[name];changed=true;}});if(changed){sample.links={};sample.markers=[];sample.observedAt=null;}if(!Object.keys(sample.signals).length && !(sample.exemplars || []).length)delete target[id];});}
       strip(liveMap);strip(map);if(past)strip(past.map);historyCache.clear();notify();
     },
     // Explicit consent retry keeps healthy peer data while renewing the session.

@@ -11,8 +11,11 @@ async function openMotionWorkbench(page,server){
 }
 
 async function clocks(page){
-  return page.locator('#docview').evaluate(view=>{
+  return page.locator('#docview').evaluate(async view=>{
     const svg=view.querySelector('.boardcanvas > svg'),edge=svg.querySelector('.edge.main'),selection=svg.querySelector('g.node.dv-sel .card');
+    // CSS reports "paused" before the browser commits its pending pause task.
+    // Sample after that task settles so the exact freeze check measures a held clock.
+    await Promise.all(edge.getAnimations().map(animation=>animation.ready));
     const style=getComputedStyle(edge),selected=selection && getComputedStyle(selection);
     return {classPaused:view.classList.contains('dv-workbench-motion-paused'),smil:svg.getCurrentTime(),smilPaused:svg.animationsPaused(),
       dash:style.strokeDashoffset,play:style.animationPlayState,name:style.animationName,

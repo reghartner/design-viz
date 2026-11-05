@@ -247,6 +247,11 @@ for(const presentation of ['standard','explore'])for(const reader of [false,true
  await follow(page).click();await expect(follow(page)).toHaveAttribute('aria-pressed','false');
  await nav.getByRole('tab',{name:'Main',exact:true}).click();await frames(page,5);await expect(follow(page)).toHaveAttribute('aria-pressed','false');
  const paused=await camera(page);await section(page).locator('.path-chip[data-dv-path="remote"]').click();await frames(page,50);expect(await camera(page)).toEqual(paused);
+ // Reintroducing and removing each path's coins must keep the same paused
+ // coordinate origin, including after the graph SVG is replaced again.
+ for(const id of ['local','remote']){
+  await section(page).locator('.path-chip[data-dv-path="'+id+'"]').click();await frames(page,5);expect(await camera(page)).toEqual(paused);
+ }
  if(!reader){await expect(page.locator('#src')).toHaveValue(input);await expect(page.locator('#undo-builder')).toBeDisabled();}
 });
 

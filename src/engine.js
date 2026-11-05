@@ -3061,20 +3061,21 @@ function createBoardNavigation(board, group, legend, changed){
     if(!enabled() || !board.clientWidth)return;
     var box=svg.viewBox.baseVal,ink=boardContentBounds(svg),display=displayScale(),scale=box.width?svg.getBoundingClientRect().width/display/box.width:0;
     if(!ink || !scale)return unframe();
-    function axis(start,size,full,length,available,legacy,center){
+    function axis(start,size,full,length,available,legacy,center,followStart,followEnd){
       var from=Math.max(start,full),to=Math.min(start+size,full+length);if(to<=from){from=full;to=full+length;}
       // Whole pixels: a fractional canvas leaves the scroll bottom short of the rounded scrollHeight.
       var lead=(from-full)*scale,extent=(to-from)*scale,room=Math.ceil(Math.max(available,extent));
-      // Follow needs half a viewport of runway at either end so an edge node
-      // can be centered. Preserve it when pausing, until Fit or size reset.
-      if(followFrame)return {room:Math.ceil(extent+available),offset:available/2-lead};
+      // Follow keeps its coordinate origin and existing scroll runway until
+      // the next explicit follow target. Path renders can move a coin or
+      // remove a badge; their bounds must not shift a paused camera.
+      if(followFrame)return {room:Math.ceil((Math.max(to,followEnd)-followStart)*scale+available),offset:available/2-(followStart-full)*scale};
       // Keep the graph center chosen by Fit, rather than recentering each
       // time an author moves an outer node or coin. Other objects stay put.
       var offset=fitFrame?available/2-(center-full)*scale:legacy(room);
       return {room:room,offset:Math.max(-lead,Math.min(room-lead-extent,offset))};
     }
-    var across=axis(ink.x,ink.w,box.x,box.width,board.clientWidth,function(room){return (room-box.width*scale)/2;},fitFrame && fitFrame.x),
-        down=axis(ink.y,ink.h,box.y,box.height,Math.max(1,board.clientHeight-legend.offsetHeight),function(){return 0;},fitFrame && fitFrame.y);
+    var across=axis(ink.x,ink.w,box.x,box.width,board.clientWidth,function(room){return (room-box.width*scale)/2;},fitFrame && fitFrame.x,followFrame && followFrame.x,followFrame && followFrame.right),
+        down=axis(ink.y,ink.h,box.y,box.height,Math.max(1,board.clientHeight-legend.offsetHeight),function(){return 0;},fitFrame && fitFrame.y,followFrame && followFrame.y,followFrame && followFrame.bottom);
     board.style.setProperty('--board-canvas-width',across.room+'px');board.style.setProperty('--board-canvas-height',down.room+'px');
     board.style.setProperty('--board-offset-x',across.offset+'px');board.style.setProperty('--board-offset-y',down.offset+'px');
     board.classList.add('board-content-framed');
@@ -3162,7 +3163,7 @@ function createBoardNavigation(board, group, legend, changed){
   function restore(state){
     if(!state || retired)return;
     stopFit();fitFrame=state.fitFrame || null;
-    if(paused)paused=state;followFrame=!!state.followFrame;
+    if(paused)paused=state;followFrame=state.followFrame || false;
     if(state.width){board.style.setProperty('--board-zoom-width',state.width);board.style.setProperty('--board-viewport-height',state.height);board.classList.add('board-zoomed');}
     if(enabled()){changed();
       // CSS zoom rounds scroll metrics differently from scroll assignments.
@@ -3193,7 +3194,9 @@ function createBoardNavigation(board, group, legend, changed){
     var svg=graph(),origin=svg.viewBox.baseVal,display=displayScale(),rect=svg.getBoundingClientRect(),b=board.getBoundingClientRect(),r=ratio();
     // Establish the scroll gutter before measuring the available height: its
     // controls can add a legend row. Keep the drawn graph in its actual place.
-    followFrame=true;board.style.setProperty('--board-viewport-height',b.height/display+'px');
+    var ink=boardContentBounds(svg) || {x:origin.x,y:origin.y,w:origin.width,h:origin.height};
+    followFrame={x:ink.x,y:ink.y,right:ink.x+ink.w,bottom:ink.y+ink.h};
+    board.style.setProperty('--board-viewport-height',b.height/display+'px');
     board.style.setProperty('--board-zoom-width',origin.width*r+'px');board.classList.add('board-zoomed');changed();
     if(board.clientHeight-legend.offsetHeight<=72){reset();restore(saved);return;}
     var framed=svg.getBoundingClientRect();board.scrollLeft+=(framed.left-rect.left)/display;board.scrollTop+=(framed.top-rect.top)/display;

@@ -25,6 +25,9 @@ for(const attached of [true,false])test(`Standard diagram grows beyond the viewp
   for(let i=0;i<12;i++){const id='extra'+i;d.nodes[id]={title:'Service '+i};d.rows.push([id]);}
   if(!attached)delete d.layouts[0].sectionLayout.default[2].attachTo;
   await open(page,server,raw);
+  // This viewport-growth contract deliberately uses width sizing so a taller
+  // tile reveals more of the long graph. Fresh pages now fit both axes.
+  await page.locator('[data-layout-key="diagram"] .board').getByRole('button',{name:'Fit width',exact:true}).click();
   const tile=page.locator('[data-layout-key="diagram"]');let previous;
   for(const height of [24,32]){
     await page.getByRole('spinbutton',{name:'Height',exact:true}).fill(String(height));

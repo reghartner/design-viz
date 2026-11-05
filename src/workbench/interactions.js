@@ -485,7 +485,10 @@ function createBuilderInteractions(opts){
     referenceMenuLife.listen(document,'pointerdown',function(e){if(referenceMenu && !referenceMenu.contains(e.target))closeReferenceMenu(false);},true);
     referenceMenuLife.listen(document,'focusin',function(e){if(referenceMenu && !referenceMenu.contains(e.target))closeReferenceMenu(false);});
     referenceMenuLife.listen(window,'resize',function(){closeReferenceMenu(false);});
-    referenceMenuLife.listen(view,'scroll',function(){closeReferenceMenu(false);},true);
+    // A scrollIntoView used to reach the coin may still have a queued scroll
+    // event. Close only for movement that happens after this menu opens.
+    var scrollPositions=[];for(var host=coin.parentElement;host;host=host.parentElement)scrollPositions.push({el:host,left:host.scrollLeft,top:host.scrollTop});
+    referenceMenuLife.listen(view,'scroll',function(e){var saved=scrollPositions.find(function(p){return p.el===e.target;});if(saved && (saved.el.scrollLeft!==saved.left || saved.el.scrollTop!==saved.top))closeReferenceMenu(false);},true);
   }
   life.listen(view,'contextmenu',openCoinMenu,true);
   life.listen(view,'contextmenu',openReferenceMenu,true);

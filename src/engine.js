@@ -1520,6 +1520,9 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       var box=boardControlBox(el,svg);if(box)boxes.push(box);
     });
     if(boxes.length)extendFrame(unionGraphFrame(null,boxes,4));
+    // Metrics can add cards and move coins without resizing the board itself.
+    // Notify its screen camera only after the complete overlay geometry settles.
+    if(svg.dispatchEvent && typeof CustomEvent!=='undefined')svg.dispatchEvent(new CustomEvent('dv:boardcontentchange',{bubbles:true}));
   };
   refreshFrame();
   /* Ink measured before webfonts settle, or skipped while an inactive tab
@@ -2971,7 +2974,7 @@ function createProseController(proseEl, toggleButton, defaultCollapsed, onChange
    camera; these styles and gestures are inactive while it borrows the board. */
 function createBoardNavigation(board, group, legend, changed){
   var canvas=board.querySelector('.boardcanvas');if(!canvas)return null;
-  var retired=false,gesture=null,suppressClick=false,paused=null,followFrame=false,fitFrame=false,publishedScale=null;
+  var retired=false,gesture=null,suppressClick=false,paused=null,followFrame=false,fitFrame=null,publishedScale=null;
   var fitting=false,autoFit=false,fitRequest=null,fitGeometry='';
   var motion=createCameraMotion();
   function stopFit(){autoFit=false;if(fitRequest!==null)cancelAnimationFrame(fitRequest);fitRequest=null;}
@@ -3005,7 +3008,7 @@ function createBoardNavigation(board, group, legend, changed){
     var svg=graph();if(!autoFit || !enabled() || paused || !svg || !board.clientWidth)return;
     var box=svg.viewBox.baseVal,ink=boardContentBounds(svg);
     if(!ink || !ink.w || !ink.h || !box.width)return;
-    fitting=true;followFrame=false;fitFrame=true;
+    fitting=true;followFrame=false;fitFrame={x:ink.x+ink.w/2,y:ink.y+ink.h/2};
     board.style.setProperty('--board-viewport-height',board.getBoundingClientRect().height/displayScale()+'px');
     board.classList.add('board-zoomed');
     // Framing can remove the Scroll row and a scrollbar, changing both usable
@@ -3048,29 +3051,35 @@ function createBoardNavigation(board, group, legend, changed){
     if(!enabled() || !board.clientWidth)return;
     var box=svg.viewBox.baseVal,ink=boardContentBounds(svg),display=displayScale(),scale=box.width?svg.getBoundingClientRect().width/display/box.width:0;
     if(!ink || !scale)return unframe();
-    function axis(start,size,full,length,available,legacy){
+    function axis(start,size,full,length,available,legacy,center){
       var from=Math.max(start,full),to=Math.min(start+size,full+length);if(to<=from){from=full;to=full+length;}
       // Whole pixels: a fractional canvas leaves the scroll bottom short of the rounded scrollHeight.
       var lead=(from-full)*scale,extent=(to-from)*scale,room=Math.ceil(Math.max(available,extent));
       // Follow needs half a viewport of runway at either end so an edge node
       // can be centered. Preserve it when pausing, until Fit or size reset.
       if(followFrame)return {room:Math.ceil(extent+available),offset:available/2-lead};
-      return {room:room,offset:fitFrame?(room-extent)/2-lead:Math.max(-lead,Math.min(room-lead-extent,legacy(room)))};
+      // Keep the graph center chosen by Fit, rather than recentering each
+      // time an author moves an outer node or coin. Other objects stay put.
+      var offset=fitFrame?available/2-(center-full)*scale:legacy(room);
+      return {room:room,offset:Math.max(-lead,Math.min(room-lead-extent,offset))};
     }
-    var across=axis(ink.x,ink.w,box.x,box.width,board.clientWidth,function(room){return (room-box.width*scale)/2;}),
-        down=axis(ink.y,ink.h,box.y,box.height,Math.max(1,board.clientHeight-legend.offsetHeight),function(){return 0;});
+    var across=axis(ink.x,ink.w,box.x,box.width,board.clientWidth,function(room){return (room-box.width*scale)/2;},fitFrame && fitFrame.x),
+        down=axis(ink.y,ink.h,box.y,box.height,Math.max(1,board.clientHeight-legend.offsetHeight),function(){return 0;},fitFrame && fitFrame.y);
     board.style.setProperty('--board-canvas-width',across.room+'px');board.style.setProperty('--board-canvas-height',down.room+'px');
     board.style.setProperty('--board-offset-x',across.offset+'px');board.style.setProperty('--board-offset-y',down.offset+'px');
     board.classList.add('board-content-framed');
   }
   function reset(){
-    stopFit();motion.cancel();cancel();followFrame=false;fitFrame=false;board.classList.remove('board-zoomed');unframe();
+    stopFit();motion.cancel();cancel();followFrame=false;fitFrame=null;board.classList.remove('board-zoomed');unframe();
     board.style.removeProperty('--board-zoom-width');board.style.removeProperty('--board-viewport-height');
     if(paused){paused.width='';paused.height='';paused.pendingFit=false;}
   }
   function down(ev){
     suppressClick=false;
-    if(!enabled() || ev.button!==0 || gesture || !ev.target.closest('.boardcanvas') || ev.target.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
+    if(!enabled() || ev.button!==0 || gesture || !ev.target.closest('.boardcanvas'))return;
+    // Object selection and dragging are deliberate camera use, too.
+    stopFit();
+    if(ev.target.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
     manual();
     // Desktop touchscreens pan natively. Relinquish Follow before returning,
     // without preventing scrolling or capturing the pointer for a mouse drag.
@@ -3134,13 +3143,15 @@ function createBoardNavigation(board, group, legend, changed){
     var scroller=outerScrollerY(delta);if(!scroller || !ev.cancelable)return;
     ev.preventDefault();scroller.scrollTop+=delta;
   }
+  function contentChanged(){if(!enabled())return;if(autoFit)requestFit();else changed();}
+  board.addEventListener('dv:boardcontentchange',contentChanged);
   var listeners={pointerdown:down,pointermove:move,pointerup:up,pointercancel:cancel,lostpointercapture:lost,keydown:key};
   Object.keys(listeners).forEach(function(type){board.addEventListener(type,listeners[type]);});
   board.addEventListener('click',click,true);board.addEventListener('wheel',wheel,{passive:false});window.addEventListener('blur',cancel);
   function snapshot(){var tolerance=1/displayScale();return paused || {followFrame:followFrame,fitFrame:fitFrame,pendingFit:autoFit && !fitGeometry,width:board.style.getPropertyValue('--board-zoom-width'),height:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop,endX:board.scrollLeft>0 && board.scrollLeft+board.clientWidth>=board.scrollWidth-tolerance,endY:board.scrollTop>0 && board.scrollTop+board.clientHeight>=board.scrollHeight-tolerance};}
   function restore(state){
     if(!state || retired)return;
-    stopFit();fitFrame=!!state.fitFrame;
+    stopFit();fitFrame=state.fitFrame || null;
     if(paused)paused=state;followFrame=!!state.followFrame;
     if(state.width){board.style.setProperty('--board-zoom-width',state.width);board.style.setProperty('--board-viewport-height',state.height);board.classList.add('board-zoomed');}
     if(enabled()){changed();
@@ -3194,7 +3205,7 @@ function createBoardNavigation(board, group, legend, changed){
     snapshot:snapshot,restore:restore,
     suspend:function(){if(retired || paused)return;motion.cancel();cancel();paused=snapshot();},
     resume:function(){if(!paused || retired)return;var state=paused;paused=null;restore(state);},
-    destroy:function(){stopFit();motion.cancel();cancel();retired=true;Object.keys(listeners).forEach(function(type){board.removeEventListener(type,listeners[type]);});board.removeEventListener('click',click,true);board.removeEventListener('wheel',wheel);window.removeEventListener('blur',cancel);}};
+    destroy:function(){stopFit();motion.cancel();cancel();retired=true;Object.keys(listeners).forEach(function(type){board.removeEventListener(type,listeners[type]);});board.removeEventListener('click',click,true);board.removeEventListener('wheel',wheel);board.removeEventListener('dv:boardcontentchange',contentChanged);window.removeEventListener('blur',cancel);}};
 }
 
 /* CSS handles the explicit size modes, including hidden tabs and editor resizes.

@@ -30,6 +30,7 @@ test('P1 desktop preview cards are explicit synthetic selection targets; side/of
  await expect(toggle(page)).not.toBeChecked();await expect(cards(page)).toHaveCount(0);
  const undoBefore=await page.locator('#undo-builder').isEnabled();
  await toggle(page).check();await expect(cards(page)).toHaveCount(1);await expect(cards(page)).toHaveAttribute('data-metrics-card','a->b');
+ await expect(page.locator('#docview .dv-live-proof,#docview .dv-live-proof-table')).toHaveCount(0);
  await expect(cards(page).locator('.dv-metrics-card-note')).toHaveText('Preview · synthetic');await expect(cards(page)).toHaveAttribute('data-verdict','preview');
  await expect(page.locator('#docview .dv-metrics-stream,#docview .dv-metrics-seal')).toHaveCount(0);
  await expect(source).toHaveValue(before);expect(await page.locator('#undo-builder').isEnabled()).toBe(undoBefore);

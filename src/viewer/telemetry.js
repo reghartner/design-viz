@@ -99,7 +99,7 @@ function telemetryProofInput(eachCarrier,eachDiagram,jiraMap,telemetryMap){
   eachCarrier(function(value,id,source){
     if(typeof id!=='string' || !id || !telemetryObject(value) || isTextBoxNode(value))return;
     var binding=carrierTelemetry(value,templatesOf(source));
-    var entry={id:id,tickets:trackingRefs(value).tickets,kind:binding?binding.kind:null,signals:binding?binding.signals:{},proof:binding?binding.proof:{}};
+    var entry={id:id,title:value.title || value.label || id,tickets:trackingRefs(value).tickets,kind:binding?binding.kind:null,signals:binding?binding.signals:{},proof:binding?binding.proof:{},links:binding?binding.links:{}};
     if(!(id in index)){index[id]=carriers.length;carriers.push(entry);}
     else if(binding && !Object.keys(carriers[index[id]].signals).length)carriers[index[id]]=entry;
   });
@@ -467,7 +467,11 @@ function createTelemetry(page,options,hooks){
       notify();
     },
     clear:function(signal){if(retired)return;if(!historyRequests.some(function(request){return request.abort.signal===signal;})){cancelHistory();setStatus({busy:false});}historyCache.clear();liveMap=map=Object.create(null);if(past)past.map={};notify();},
-    snapshot:function(){return {available:available && !retired,enabled:enabled,map:copy(map),status:copy(status),verdicts:copy(verdicts())};},
+    snapshot:function(){
+      var input=telemetryProofInput(hooks.carriers || function(){},hooks.diagrams || function(){},typeof hooks.jira==='function'?hooks.jira():{},map);
+      return {available:available && !retired,enabled:enabled,map:copy(map),status:copy(status),carriers:copy(input.carriers),
+        historical:!!past,at:past && past.days[past.index]?past.days[past.index].at:null,verdicts:copy(proofVerdicts(input))};
+    },
     verdicts:function(){return copy(verdicts());},
     status:function(){return copy(status);},
     enabled:function(){return enabled;},
@@ -492,7 +496,7 @@ function createTelemetry(page,options,hooks){
       available=value;setStatus({state:value?'idle':'absent',busy:false,refreshedAt:null,note:''});notify();
     },
     onChange:function(fn){if(typeof fn!=='function' || retired)return function(){};listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
-    destroy:function(){if(retired)return;retired=true;cancelHistory();historyCache.clear();past=null;enabled=false;liveMap=map=Object.create(null);setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];}
+    destroy:function(){if(retired)return;retired=true;cancelHistory();historyCache.clear();past=null;enabled=false;liveMap=map=Object.create(null);setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];if(typeof hooks.changed==='function')hooks.changed();}
   };
   return api;
 }

@@ -1,0 +1,12 @@
+{
+  "name": "mock-honeycomb-mcp",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-12",
+  "ratelimits": [
+    {
+      "name": "RL",
+      "namespace_id": "1003",
+      "simple": { "limit": 60, "period": 60 }
+    }
+  ]
+}

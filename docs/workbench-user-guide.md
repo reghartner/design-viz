@@ -16,6 +16,10 @@ Text boxes allow up to 12,000 characters, 200 wrapped lines and 8,000 units of
 height. A rejected edit leaves the saved source intact; shorten the text, reduce
 the font size or widen the box. Clearing Color restores the theme color.
 
+## Edit visible text directly
+
+In the desktop Workbench, double-click a document or section heading, tab or View name, path label, node name or existing subtitle, panel title, connection label, or contract title, field name, value, meaning or note to edit it in place. Double-click step captions, paragraphs and bullets to edit their Markdown. Right-click a local group and choose **Rename** for its title; a connection's **Rename** action also adds a missing label. Add a first node subtitle in Inspect. Single-line edits save with Enter or a click outside; Markdown saves with Ctrl/Command+Enter or a click outside. Escape cancels, and each save is one Undo. Inspect remains available for all these fields and for panel body settings; **F2** opens Inspect for the selected object. An imported node's name or subtitle and an imported connection's label save as this consumer's display overrides, leaving the provider unchanged. Imported groups are provider-owned and cannot be renamed here.
+
 For a live delivery board, **Inspect → Document settings → Tracking → Parent**
 accepts an Epic or Initiative Jira key. Add or remove a key with one Undo/Redo;
 Export project keeps the existing `tracking.jira.epic` setting. In the connected
@@ -23,6 +27,15 @@ viewer, Jira identifies the parent type automatically. Initiatives show their
 Epics and descendant stories, with separate Epic counts and story coverage.
 The desktop **Demo live status** preview uses sample states without querying
 Jira, so it cannot infer parent type from a key. See [live status](live-status.md).
+
+**Document settings → Tracking → Metrics → Allow metrics** controls metrics
+availability for the page, including imports and details, without deleting
+bindings or templates. It defaults on; reader Metrics still defaults off with a
+24h window. **Preview metrics layout** in the desktop toolbar shows synthetic
+cards for bound edges using the reader’s placement. Select a card to edit its
+side/offset. The preview makes no connector calls, adds no Undo entry, and is
+not exported. It survives same-document edits and resets for a new project or
+import. The Services & evidence chapter explains both controls.
 
 The workspace chapter explains top inspector actions, collapsed muted section
 headers, same-selection expansion retention, and group-scoped Apply controls.
@@ -320,7 +333,7 @@ The ID must match exactly. Any other value, such as an unknown ID, a web address
 or a file path, returns to the home page with a message naming it; nothing is
 fetched or opened for it.
 
-On desktop, right-click blank diagram or Explore canvas space to open **Add** at the pointer. **Text** inserts a box there and starts editing; **Node** inserts a gear-icon **New node** there and focuses its main title for direct typing. Enter or clicking outside saves; Escape keeps the default title. Later title edits and other fields use Inspect. **Panel…** opens the existing panel library. Canvas panels appear at the chosen point; Standard panels use the section layout. **Connection** starts the two-node connection gesture and **Step** adds to the current path. Escape or clicking elsewhere dismisses the menu. Cancelling a picker adds nothing; each insertion is one Undo action. Changing the source, project, section or view retires the pending destination. The toolbar **Add** remains available with its node presets.
+On desktop, right-click blank diagram or Explore canvas space to open **Add** at the pointer. **Text** inserts a box there and starts editing; **Node** inserts a gear-icon **New node** there and focuses its main title for direct typing. Enter or clicking outside saves; Escape keeps the default title. Double-click the node later to rename it; other fields remain available in Inspect. **Panel…** opens the existing panel library. Canvas panels appear at the chosen point; Standard panels use the section layout. **Connection** starts the two-node connection gesture and **Step** adds to the current path. Escape or clicking elsewhere dismisses the menu. Cancelling a picker adds nothing; each insertion is one Undo action. Changing the source, project, section or view retires the pending destination. The toolbar **Add** remains available with its node presets.
 
 
 ### Compare device properties and UX icons

@@ -489,11 +489,13 @@ test('P3 missing claude Atlassian connector shows setup note without paint or ca
  expect(await page.evaluate(()=>__mcpStub.calls)).toEqual([]);expect(requests).toEqual([]);
 });
 test('P6 claude Jira approval is an explicit click and repeats the search exactly once',async({page,server})=>{
- const {root,requests}=await openClaude(page,server,'approval'),action=root.getByRole('button',{name:'Allow Jira',exact:true});
- await expect(action).toBeVisible();await expect(root.locator('.dv-live-note')).toHaveText('Jira access needs your approval');
+ const {root,requests}=await openClaude(page,server,'approval'),action=root.getByRole('button',{name:'Allow Jira',exact:true}),slot=root.locator('.dv-live-first');
+ await expect(action).toBeVisible();await expect(root.locator('.dv-live-note')).toHaveText('Jira access needs your approval');const slotBefore=await slot.boundingBox();
  expect(await page.evaluate(()=>__mcpStub.calls.filter(c=>c.tool==='searchJiraIssuesUsingJql').length)).toBe(0);
  await action.click();await expect(root.locator('#section-delivery g.node[data-dv-node="hardware"]')).toHaveClass(/dv-live-active/);
  expect(await page.evaluate(()=>__mcpStub.calls.filter(c=>c.tool==='searchJiraIssuesUsingJql').length)).toBe(1);await expect(action).toBeHidden();expect(requests).toEqual([]);
+ // #986: Allow Jira going away does not move the First blocker slot.
+ const slotAfter=await slot.boundingBox();expect([slotAfter.x,slotAfter.width]).toEqual([slotBefore.x,slotBefore.width]);
 });
 
 
@@ -697,7 +699,7 @@ test('B1 B2 B3 B4 B5 B7 B8 story playback stops on blockers and details reach re
  }
  await expect.poll(async()=> (await panel.locator('.dv-live-epic-counts').textContent()).split(' · ')[0]).toBe('Ready to demo');
  // Completed upstream work wears the green check (Chuck, PR #784 review).
- const doneDep=panel.locator('tr[data-live-ticket="FW-46"] .dv-live-dep');await expect(doneDep).toHaveAttribute('data-tone','done');await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCount(1);await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCSS('color',statusLine('done'));await expect(panel.locator('.dv-live-epic-progress')).toHaveText('8 of 8 stories done · 7 of 8 on diagram');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(root.getByRole('button',{name:'First blocker',exact:true})).toHaveCount(0);await expect(root.getByRole('button',{name:'No blockers',exact:true})).toBeDisabled();await expect(panel.locator('.dv-live-completion')).toContainText('11/11');
+ const doneDep=panel.locator('tr[data-live-ticket="FW-46"] .dv-live-dep');await expect(doneDep).toHaveAttribute('data-tone','done');await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCount(1);await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCSS('color',statusLine('done'));await expect(panel.locator('.dv-live-epic-progress')).toHaveText('8 of 8 stories done · 7 of 8 on diagram');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(root.getByRole('button',{name:'First blocker',exact:true})).toHaveCount(0);await expect(root.getByRole('button',{name:'No blockers',exact:true})).toBeDisabled();await expect(epic.locator('.dv-live-completion')).toContainText('11/11');await expect(panel.locator('.dv-live-proof')).toBeVisible();await expect(panel.locator('.dv-live-proof-ratio')).toHaveText('4/7 bound proven');
  await page.keyboard.press('Escape');await expect(panel).toBeVisible();await expect(panel.locator('.pbody')).not.toBeEmpty();
 });
 test('B2 B3 automatic advancement pauses on the newly selected missing beat; manual navigation remains available',async({page,server})=>{
@@ -727,7 +729,7 @@ test('B5 changing evidence keeps text and geometry steady while only active bord
 
 test('E6 E10 E11 built epic Tickets table lists all children without diagram links',async({page,server})=>{
  const root=await openStory(page,server),next=root.getByRole('button',{name:'Next day',exact:true});
- for(let day=2;day<=12;day++)await next.click();const panel=root.locator('.pt-live-status'),table=panel.locator('table.dv-live-tickets');
+ for(let day=2;day<=12;day++)await next.click();const panel=root.locator('.pt-live-status'),table=panel.getByRole('table',{name:'Tickets',exact:true});await expect(panel.getByRole('table',{name:'Proof',exact:true})).toBeVisible();
  await expect(table.locator('tbody tr[data-live-ticket]')).toHaveCount(8);await expect(table.locator('tbody tr.dv-live-coverage-row')).toHaveCount(1);await expect(table.locator('th')).toHaveText(['Key','Title','State','Owner','Depends on','PRs']);
  await expect(table.locator('tr[data-live-coverage-for="UX-90"] .dv-live-coverage-tag')).toHaveText('NOT ON DIAGRAM');await expect(table.locator('tr[data-live-ticket="HW-124"] td').nth(3)).toHaveText('Alex');
  await table.getByRole('button',{name:'Title'}).click();
@@ -876,7 +878,7 @@ test('L3 L4 L5 L10 live-status panel is beside the diagram without a click and k
  for(let day=3;day<=12;day++)await body.getByRole('button',{name:'Next day',exact:true}).click();
  await expect(body.locator('tr[data-live-coverage-for="UX-90"]')).toContainText('NOT ON DIAGRAM');await expect(body.locator('.dv-live-epic-progress')).toContainText('7 of 8 on diagram');
  await expect(body.locator('tr[data-live-coverage-for="HW-124"],.dv-live-chip')).toHaveCount(0);
- await page.emulateMedia({media:'print'});await expect(body).not.toBeEmpty();await expect(body.locator('table.dv-live-tickets')).toBeVisible();
+ await page.emulateMedia({media:'print'});await expect(body).not.toBeEmpty();await expect(body.getByRole('table',{name:'Tickets',exact:true})).toBeVisible();await expect(body.getByRole('table',{name:'Proof',exact:true})).toBeVisible();
 });
 
 test('L4 loaded external carriers have no panel links without another load',async({page,server})=>{
@@ -1004,9 +1006,9 @@ test.describe('#863 Epic status panel consistency',()=>{
  test('V1 desktop demo header buttons match the section Play button in every reader theme',async({page,server})=>{
   const root=await openStory(page,server),panel=root.locator('.pt-live-status'),section=root.locator('.doc-sec:has(.pt-live-status)');
   await expect(section).toHaveCount(1);await demoDay(root,4);await expect(panel.getByRole('button',{name:'First blocker',exact:true})).toBeVisible();
-  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','Over time','First blocker','<','>']);
+  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','Over time','Metrics','First blocker','<','>']);
   // The pressed state is the one compared: Live is on throughout.
-  expect(first.buttons.map(b=>b.pressed)).toEqual([true,false,false,false,false]);
+  expect(first.buttons.map(b=>b.pressed)).toEqual([true,false,false,false,false,false]);
   // Contrasting precondition: the reference is the default theme's pill, not a browser default.
   expect(first.play).toMatchObject({borderTopStyle:'solid',borderTopWidth:'1px',borderTopLeftRadius:'999px'});
   const toggle=root.locator('.reader-top>button'),plays=new Set();
@@ -1016,7 +1018,7 @@ test.describe('#863 Epic status panel consistency',()=>{
    await expect(root).toHaveClass(new RegExp('(^|\\s)sk-'+skin+'(\\s|$)'));await page.mouse.move(0,0);
    // Theme transitions settle on both buttons before they are compared.
    await expect.poll(async()=>differences(await looks(section)),{message:skin+' Epic status header buttons match Play'}).toEqual([]);
-   const settled=await looks(section);expect(settled.buttons.map(b=>b.name),skin).toEqual(['Live','Over time','First blocker','<','>']);expect(settled.buttons.map(b=>b.pressed),skin+' Live stays pressed').toEqual([true,false,false,false,false]);plays.add(JSON.stringify(settled.play));
+   const settled=await looks(section);expect(settled.buttons.map(b=>b.name),skin).toEqual(['Live','Over time','Metrics','First blocker','<','>']);expect(settled.buttons.map(b=>b.pressed),skin+' Live stays pressed').toEqual([true,false,false,false,false,false]);plays.add(JSON.stringify(settled.play));
   }
   expect(plays.size,'the themes give Play different looks').toBeGreaterThanOrEqual(4);
  });
@@ -1024,7 +1026,7 @@ test.describe('#863 Epic status panel consistency',()=>{
   const {root}=await openClaude(page,server,'approval'),section=root.locator('#section-delivery'),panel=section.locator('.pt-live-status');
   // Approval mode: the Flagged search has answered, so Live shows beside the action.
   await expect(panel.getByRole('button',{name:'Allow Jira',exact:true})).toBeVisible();await expect(panel.locator('.dv-live-toggle')).toBeVisible();
-  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','No blockers','Allow Jira']);
+  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','Allow Jira','No blockers']);
   expect(first.play).toMatchObject({borderTopStyle:'solid',borderTopWidth:'1px',borderTopLeftRadius:'999px'});
   await expect.poll(async()=>differences(await looks(section)),{message:'Allow Jira matches Play'}).toEqual([]);
  });
@@ -1046,6 +1048,8 @@ test.describe('#863 Epic status panel consistency',()=>{
   await panel.getByRole('button',{name:'Next day',exact:true}).click();await expect(panel.locator('.dv-live-note')).toHaveText('Demo day 2');
   await expect(panel.getByRole('button',{name:'Over time',exact:true})).toHaveCount(0);
   await expect(connection).toHaveAttribute('data-busy','false');await expect(connection).toHaveAttribute('data-state','demo');await expect(connection).toHaveText(/^Demo(?=,|$)/);
+  // #986: the Workbench demo steps back as well as forward, and stops at its first day.
+  const previous=panel.getByRole('button',{name:'Previous day',exact:true});await expect(previous).toBeEnabled();await previous.click();await expect(panel.locator('.dv-live-note')).toHaveText('Demo day 1');await expect(previous).toBeDisabled();
  });
 });
 
@@ -1202,7 +1206,7 @@ test('G2 G7 G11 GitHub icons carry state checks and review in the Tickets table 
 test('G2 G11 Jira-only connector retains plain PR links without GitHub evidence and says so on the connection line',async({page,server})=>{
  const {root}=await openClaude(page,server,'data');await expect(root.locator('g.node').first()).toHaveClass(/dv-live-active/);
  await expect(root.locator('.dv-live-tickets a[href="https://github.com/acme/firmware/pull/88"]').first()).toBeVisible();await expect(root.locator('a.dv-live-pr-link[data-pr-state]')).toHaveCount(0);await expect(root.locator('.dv-live-pr-checks')).toHaveCount(0);
- await expect(root.locator('.dv-live-connection-github')).toHaveText('GitHub not connected');await expect(root.locator('.dv-live-connection')).toHaveAttribute('data-state','connected');
+ await expect(root.locator('.dv-live-connection-github')).toBeHidden();await expect(root.locator('.dv-live-connection')).toHaveAttribute('data-state','connected');await expect(root.locator('.dv-live-connection')).not.toContainText('GitHub');
 });
 test('G12 desktop GitHub scope validates repos and org with one Undo Redo and export',async({page,server})=>{
  await page.setViewportSize({width:1440,height:1000});await useProjectDownloads({page});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);

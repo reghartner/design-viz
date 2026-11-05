@@ -135,11 +135,11 @@ function liveStatusHistoryDays(input){
       });
     }
     var text=new Date(year,month,date+i).toLocaleDateString(input.locale || [],format);
-    days.push({label:text,short:text,states:states});
+    days.push({key:new Date(Date.UTC(year,month,date+i)).toISOString().slice(0,10),at:new Date(end).toISOString(),label:text,short:text,states:states});
   }
   return {days:days,index:days.length-1};
 }
-var LIVE_STATUS_HISTORY_TOOLS=['getJiraIssue'],LIVE_STATUS_HISTORY_CACHE_MS=604800000,LIVE_STATUS_HISTORY_CALLS=6;
+var LIVE_STATUS_HISTORY_TOOLS=['getJiraIssue'];
 /* One batch of one-shot calls, made only by the reader's click: callTool, never watchTool, so nothing polls.
    One getJiraIssue per ticket gives its created time, current status and changelog, and one search per status
    no tracked ticket holds gives that status's category. Each result is cached for 7 days per viewer and
@@ -150,7 +150,7 @@ function liveStatusHistoryLoad(context,progress){
   var mcp=context.mcp,server=context.server,cloudId=context.cloudId,today=context.today,cache={staleTime:LIVE_STATUS_HISTORY_CACHE_MS,gcTime:LIVE_STATUS_HISTORY_CACHE_MS};
   var keys=Object.keys(today).filter(function(key){var entry=today[key];return entry.state!=='missing' && entry.kind!=='epic' && entry.kind!=='initiative';});
   var categories=Object.create(null),statusIds=Object.create(null),finished=0,tickets=[];
-  function call(tool,input,refresh){return mcp.callTool(server,tool,input,{cache:refresh?Object.assign({},cache,{refresh:true}):cache});}
+  function call(tool,input,refresh){return liveStatusHistoryCall(function(){return mcp.callTool(server,tool,input,{cache:refresh?Object.assign({},cache,{refresh:true}):cache});});}
   function pool(items,work){
     var next=0,failed=false,workers=[];
     function worker(){

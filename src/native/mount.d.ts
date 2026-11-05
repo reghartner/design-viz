@@ -83,7 +83,87 @@ export interface LiveStatusEntry {
    * waits while an upstream is not done, unless it is itself active or done. */
   dependsOn?: Array<{key: string; source: 'jira' | 'authored'; linkType?: string; reason?: string}>;
 }
+/** One bound carrier handed to the telemetry provider (#939): carrierTelemetry() of a
+ * local, imported or loaded detail node or edge. id is a node id, an edge identity
+ * 'from->to' or a resolved imported identity such as 'shared::api->shared::store'. */
+export interface TelemetryBinding {
+  id: string;
+  kind: 'call' | 'queue' | 'service' | 'log-event' | 'device';
+  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb'; query: string | Record<string, unknown>; unit: string | null}>;
+  proof: Record<string, {min?: number; max?: number; maxRatioOf?: string}>;
+  links: {dashboard?: string; query?: string};
+  card: {side?: 'right' | 'left' | 'above' | 'below'; offset?: number} | null;
+}
+/** Runtime evidence only; never authored, saved, or numerical proof. */
+export interface TelemetryExemplar {
+  version: 1;
+  provider: 'honeycomb' | 'tempo';
+  traceId: string;
+  signal: string;
+  selectionToken: string;
+  selectionReason: string;
+  /** Retrieval receipt time; trace age comes from selected candidate/span time. */
+  observedAt: string;
+  range: {from: string; to: string};
+  completeness: 'complete' | 'partial' | 'unknown';
+  warnings: string[];
+  url?: string;
+  candidates: Array<{traceId: string; time?: string; durationMs?: number; status: 'passing' | 'failing' | 'unknown'; url?: string}>;
+  spans: Array<{id: string; parentId: string | null; service: string; name: string; startMs: number; ms: number; error: boolean; time: string;
+    attributes: Record<string, string | number | boolean>;
+    events: Array<{name: string; timeMs: number; attributes: Record<string, string | number | boolean>}>;
+    links: Array<{traceId: string; spanId: string; attributes: Record<string, string | number | boolean>}>}>;
+}
+/** One carrier's telemetry for the observation window, keyed by carrier id in the
+ * provider result. Every field is optional; malformed entries are dropped. */
+export interface TelemetrySample {
+  /** At most one selected exemplar per carrier, with up to 20 returned candidates and 200 spans. */
+  exemplars?: TelemetryExemplar[];
+  /** Signal observedAt is measurement as-of (null means unknown); retrievedAt is
+   * client receipt time. Live charts prefer the selected signal's as-of. Mixed
+   * adapters assign each legacy signal its own endpoint before combining sources. */
+  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string; observedAt?: string | number | null; retrievedAt?: string | number | null;
+    /** Explicit measured total over [from, to], covered by signal as-of (legacy: carrier as-of). Runtime evidence only. */
+    aggregate?: {kind: 'total'; from: string | number; to: string | number}}>;
+  observedAt?: string | number;
+  markers?: Array<{at: string | number; kind?: string; label?: string}>;
+  links?: {query?: string; dashboard?: string};
+}
 export interface NativeViewerOptions {
+  /** Host-owned telemetry transport behind the Live status panel's Metrics button,
+   * which is off by default. The provider runs only while Metrics is on, every
+   * max(refreshMs, 60000) ms, paused while the document is hidden.
+   * false suppresses telemetry, including demo fallback. Page
+   * tracking.telemetry.enabled:false also wins and preserves bindings. */
+  telemetry?: false | {
+    /** report.note(text) attaches a note to this answer (status().note), such as one
+     * failed query beside answered ones. A rejection with `state: 'approval'`
+     * reports the approval state instead of an error. */
+    provider?: (bindings: TelemetryBinding[], signal: AbortSignal, report: {note: (text: string) => void}) => Promise<Record<string, TelemetrySample>>;
+    /** Click-only Over time batch. Absolute RFC3339 evaluation endpoints, each
+     * representing the previous 24h. Optional endpoints give the exact selected-day
+     * instants (local-day boundaries can be 23h/25h apart across DST). Return
+     * per-signal series; omitted days are
+     * unobserved. No live headline fallback. Optional: a live-only provider works.
+     * report.note keeps partial errors visible and the failed batch retryable. */
+    history?: (bindings: TelemetryBinding[], range: {from: string; to: string; endpoints?: {key?: string; at: string}[]}, signal: AbortSignal, report: {note: (text: string) => void}) => Promise<Record<string, TelemetrySample>>;
+    /** Include mutable datasource/account identity in the controller-local cache key. */
+    historyKey?: string | (() => unknown);
+    /** Explicit user action resolver. ctl.telemetry.chooseExemplar validates the live
+     * selection token and updates only runtime evidence. Never invoke during paint. */
+    chooseExemplar?: (carrierId: string, selectionToken: string, traceId: string) => Promise<TelemetryExemplar>;
+    /** Synchronous, read-only capability for a current token/candidate. No queries.
+     * Without this check the optional alternative UI stays hidden. */
+    canChooseExemplar?: (carrierId: string, selectionToken: string, traceId: string) => boolean;
+    /** Starts unavailable when false. The controller setAvailable(boolean) updates
+     * capability availability without enabling Metrics; page/host disable always wins. */
+    available?: boolean;
+    refreshMs?: number;
+    /** Connector name for Metrics text; a getter follows changing per-source availability. */
+    source?: string | (() => string);
+    /** A demo source mounted while Metrics is on; it feeds the controller's apply(). */
+    demo?: {mount: (telemetry: {apply: (map: Record<string, TelemetrySample>) => void}) => (() => void) | void};
+  };
   /** Host-owned ticket transport; refresh pauses while the document is hidden. */
   liveStatus?: {
     /** refs.epics holds configured parent roots (Epic or Initiative); legacy name retained. */

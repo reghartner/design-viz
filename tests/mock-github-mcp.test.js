@@ -105,7 +105,24 @@ test('H4: pull_request_read serves get, check runs, reviews, the empty legacy st
   const approved = result(await readPR('get_reviews', 12, 'hardware'));
   assert.equal(approved.length, 1); assert.equal(approved[0].state, 'APPROVED'); assert.equal(approved[0].user.login, 'kim');
   assert.deepEqual(result(await readPR('get_reviews', 88)), []);
-  assert.equal(result(await readPR('get_reviews', 91, 'backend', { scenario: 'story', day: 8, now: NOW }))[0].state, 'COMMENTED');
+  // Transport coverage must not depend on which day the demo merges this PR.
+  const commentedContext = { scenario: 'story', day: 0, now: NOW, timeline: { days: [{ issues: {
+    'BE-68': { state: 'active', updated: '2026-10-20T09:00:00.000+0000', prs: { count: 1, state: 'OPEN', links: [
+      { url: 'https://github.com/acme/backend/pull/91', state: 'open', review: 'commented' }
+    ] } }
+  } }] } };
+  assert.deepEqual(result(await readPR('get_reviews', 91, 'backend', commentedContext)), [{
+    id: 910, state: 'COMMENTED', user: { login: 'kim' }, submitted_at: '2026-10-20T09:00:00Z',
+    html_url: 'https://github.com/acme/backend/pull/91#pullrequestreview-91'
+  }]);
+  // Day 9's push work is Done but unproven: both PRs merged, with no review authored.
+  const day9 = { scenario: 'story', day: 8, now: NOW };
+  for (const [number, repo] of [[91, 'backend'], [41, 'app']]) {
+    const merged = result(await readPR('get', number, repo, day9));
+    assert.equal(merged.merged, true); assert.equal(merged.state, 'closed'); assert.equal(merged.draft, false);
+    assert.equal(merged.merged_at, '2026-10-28T09:00:00Z');
+    assert.deepEqual(result(await readPR('get_reviews', number, repo, day9)), []);
+  }
   const status = result(await readPR('get_status', 88));
   assert.equal(status.state, 'pending'); assert.equal(status.total_count, 0); assert.deepEqual(status.statuses, []);
   assert.equal((await readPR('get_files', 88)).error.code, -32602);

@@ -41,12 +41,12 @@
     function el(parent,tag,key,cls,text){
       var children=parent._liveChildren || (parent._liveChildren=Object.create(null)),node=children[key];
       if(node && node.tagName.toLowerCase()!==tag){node.remove();node=null;}
-      if(!node){node=children[key]=tag==='svg' || tag==='circle'?doc.createElementNS('http://www.w3.org/2000/svg',tag):doc.createElement(tag);parent.appendChild(node);}
+      if(!node){node=children[key]=['svg','circle','polyline','line','title'].indexOf(tag)>=0?doc.createElementNS('http://www.w3.org/2000/svg',tag):doc.createElement(tag);parent.appendChild(node);}
       if(parent._liveOrderEpoch!==epoch){parent._liveOrderEpoch=epoch;parent._livePosition=0;}
       var position=parent._livePosition++;
       if(parent.children[position]!==node)parent.insertBefore(node,parent.children[position] || null);
       node._liveEpoch=epoch;
-      if(tag==='svg' || tag==='circle')node.setAttribute('class',cls || '');else node.className=cls || '';
+      if(['svg','circle','polyline','line','title'].indexOf(tag)>=0)node.setAttribute('class',cls || '');else node.className=cls || '';
       if(text!=null && node.textContent!==String(text))node.textContent=String(text);
       return node;
     }
@@ -74,6 +74,46 @@
     }
     function link(parent,key,label,url){var node=el(parent,url?'a':'span',key,'nbacklink',label);
       if(url){node.setAttribute('href',url);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');}else node.removeAttribute('href');return node;}
+    var proofLabels={proven:'proven',degraded:'degraded',unproven:'unproven',liveEarly:'live early',neutral:'unclassified',unbound:'unbound'};
+    function proofBox(body,proof){
+      var box=el(body,'div','proof','dv-live-proof'),ring=el(box,'div','ring','dv-live-completion');
+      box.setAttribute('data-proof-bound',proof.counts.bound);box.setAttribute('data-proof-unbound',proof.counts.unbound);
+      var svg=el(ring,'svg','svg','');svg.setAttribute('viewBox','0 0 44 44');svg.setAttribute('aria-hidden','true');
+      [{key:'track'}].concat(proof.arcs).forEach(function(arc){
+        var circle=el(svg,'circle',arc.key,arc.key==='track'?'dv-live-ring-track':'dv-live-proof-arc');
+        circle.setAttribute('cx','22');circle.setAttribute('cy','22');circle.setAttribute('r','18');circle.setAttribute('pathLength','100');
+        if(arc.key!=='track'){circle.setAttribute('data-proof-bucket',arc.key);circle.setAttribute('stroke-dasharray',arc.size+' 100');circle.setAttribute('stroke-dashoffset',-arc.offset);}
+      });
+      el(ring,'strong','count','dv-live-proof-ratio',proof.counts.proven+'/'+proof.counts.bound+' bound proven');
+      var main=el(box,'div','main','dv-live-epic-main');el(main,'h3','heading','','Proof');
+      var pills=el(main,'div','pills','dv-live-proof-pills');Object.keys(proofLabels).forEach(function(key){
+        var pill=el(pills,'span',key,'dv-live-state-pill dv-live-proof-pill',proof.counts[key]+' '+proofLabels[key]);pill.setAttribute('data-proof-bucket',key);
+      });
+      el(main,'p','sentence','dv-live-proof-sentence',proof.sentence);el(main,'p','predicate','dv-live-proof-predicate',proof.predicate);
+    }
+    function proofTable(body,proof){
+      el(body,'h3','proof-heading','','Proof table');
+      var scroll=el(body,'div','proof-scroll','dv-live-tickets-scroll'),table=el(scroll,'table','proof-table','dv-live-tickets dv-live-proof-table');table.setAttribute('aria-label','Proof');
+      var headings=el(el(table,'thead','head',''),'tr','row','');
+      ['Carrier','Jira',proof.window+' window','Rate / In','Errors / Lag','p95 / Age','Since Done','Verdict','Link'].forEach(function(label,i){el(headings,'th',String(i),'',label).setAttribute('scope','col');});
+      var rows=el(table,'tbody','rows','');proof.rows.forEach(function(item){
+        var row=el(rows,'tr',item.id,'dv-live-proof-row');row.setAttribute('data-proof-carrier',item.id);row.setAttribute('data-verdict',item.verdict || 'unobserved');row.setAttribute('data-telemetry',item.telemetry);
+        var carrier=el(row,'td','carrier','');el(carrier,'strong','title','',item.title);el(carrier,'div','identity','dv-live-proof-detail',item.id+' · '+item.kind);
+        el(row,'td','jira','',item.tickets.length?item.tickets.join(', ')+' · '+item.jira:'No tickets');
+        var chart=el(row,'td','chart','dv-live-proof-chart');
+        if(item.chart.points.length || item.chart.markers.length){
+          var svg=el(chart,'svg','svg','dv-live-proof-sparkline');svg.setAttribute('viewBox','0 0 100 32');svg.setAttribute('role','img');svg.setAttribute('aria-label',proof.window+' window: '+item.chart.points.length+' observed points');
+          if(item.chart.line){var line=el(svg,'polyline','series','dv-live-proof-series');line.setAttribute('points',item.chart.line);}
+          item.chart.points.forEach(function(point,i){var dot=el(svg,'circle','point-'+i,'dv-live-proof-point');dot.setAttribute('cx',point.x);dot.setAttribute('cy',point.y);dot.setAttribute('r','1.8');});
+          item.chart.markers.forEach(function(marker,i){var tick=el(svg,'line','marker-'+i,'dv-live-proof-marker');tick.setAttribute('x1',marker.x);tick.setAttribute('x2',marker.x);tick.setAttribute('y1','2');tick.setAttribute('y2','30');tick.setAttribute('data-kind',marker.kind);el(tick,'title','title','',marker.label);});
+        }else el(chart,'span','empty','', 'unobserved');
+        item.kpis.forEach(function(kpi,i){el(row,'td','kpi-'+i,'dv-live-proof-kpi',kpi.label+': '+kpi.text);});
+        el(row,'td','since','dv-live-proof-since',item.since);
+        var verdict=el(row,'td','verdict','');var pill=el(verdict,'span','pill','dv-live-state-pill dv-live-proof-pill',item.label);pill.setAttribute('data-proof-bucket',TELEMETRY_SEALS[item.verdict]==='live-early'?'liveEarly':TELEMETRY_SEALS[item.verdict] || 'neutral');
+        el(verdict,'div','evidence','dv-live-proof-detail',item.telemetry+(item.failing.length?' · failing: '+item.failing.join(', '):''));el(verdict,'div','predicate','dv-live-proof-predicate',item.predicate);
+        var action=el(row,'td','link','');if(item.url){var anchor=link(action,'link',null,item.url);anchor.className='nbacklink dv-live-proof-link';anchor.setAttribute('aria-label','Open telemetry for '+item.title);anchor.setAttribute('title','Open telemetry for '+item.title);if(!anchor._proofIcon){anchor.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});anchor._proofIcon=true;}}
+      });
+    }
     function excludedStories(body,items){
       if(!items.length)return;
       el(body,'h3','excluded-heading','','Excluded stories');
@@ -100,17 +140,37 @@
       toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled) && !past));
       var overTime=button(controls,'over-time','reader-button dv-live-over-time',over && over.loading?'Loading history'+(over.progress?' '+over.progress:'')+'…':'Over time','overTime');overTime.hidden=!hasData || !over || !over.available;overTime.disabled=!!(over && (over.loading || over.disabled));overTime.setAttribute('aria-pressed',String(past));
       states.forEach(function(state){var count=el(countRow,'span','count-'+state,'dv-live-count'+(hasData && value && value.enabled && value.counts[state]?' dv-live-'+state:''),state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
+      // Metrics (#939): the telemetry switch beside Live, shown only with a telemetry provider or demo, off by default, never persisted.
+      var metrics=value && value.metrics || {available:false,enabled:false},proof=metrics.proof;
+      var metricsToggle=button(controls,'metrics','reader-button dv-live-metrics','Metrics','setMetricsEnabled');metricsToggle.hidden=!metrics.available;
+      metricsToggle._liveArgument=!metrics.enabled;metricsToggle.setAttribute('aria-pressed',String(!!metrics.enabled));
       var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo'}[conn.state];
       var connection=el(statusLine,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
       var connWho=(conn.source || '')+(connLabel && connLabel!==String(conn.source || '').toLowerCase()?' '+connLabel:'');
       el(connection,'i','dot','dv-live-connection-dot');el(connection,'span','text','',[connWho,conn.checkedText].filter(Boolean).join(', '));
-      var gh=conn.github || {state:'none'},ghLabel={disconnected:'GitHub not connected',connecting:'GitHub connecting',connected:'GitHub connected',error:'GitHub did not answer'}[gh.state];
+      var gh=conn.github || {state:'none'},ghLabel={connecting:'GitHub connecting',connected:'GitHub connected',error:'GitHub did not answer'}[gh.state];
       var github=el(connection,'span','github','dv-live-connection-github',ghLabel || '');github.setAttribute('data-state',gh.state);github.setAttribute('data-busy',String(!!gh.busy));github.hidden=!ghLabel;
       connection.hidden=!available || conn.state==='none';
+      // The telemetry connector beside the Jira one: same markup and dot tokens, its own class
+      // names so `.dv-live-connection` keeps naming the Jira connector alone.
+      var metricsState=metrics.state==='ok'?(metrics.demo?'demo':'connected'):{loading:'connecting',error:'error',approval:'approval'}[metrics.state] || 'disconnected';
+      var metricsLabel={connected:'connected',demo:'demo',connecting:'connecting',error:'did not answer',approval:'needs approval'}[metricsState] || 'not connected';
+      var metricsConnection=el(statusLine,'span','metrics-connection','dv-live-metrics-connection');metricsConnection.setAttribute('data-state',metricsState);metricsConnection.setAttribute('data-busy',String(!!metrics.busy));metricsConnection.setAttribute('role','status');
+      el(metricsConnection,'i','dot','dv-live-metrics-dot');
+      // A note on a good answer (a failed query beside answered ones) follows the refreshed time.
+      var answered=metricsState==='connected' || metricsState==='demo',metricsText;
+      if(metrics.source){
+        // #943: "Grafana connected · 24h window · refreshed 10:42:13"; an error shows its note, which names the fix.
+        var named=metrics.source+' '+metricsLabel;
+        metricsText=metricsState==='error'?metrics.note || named:metricsState==='disconnected'?named:
+          [named,metrics.window?metrics.window+' window':'',answered?metrics.checkedText:'',answered?metrics.note:''].filter(Boolean).join(' · ');
+      }else metricsText=metricsState==='error'?'Metrics: '+metricsLabel+(metrics.note?' · '+metrics.note:''):
+        ['Metrics: '+metricsLabel,metrics.checkedText].filter(Boolean).join(', ')+(answered && metrics.note?' · '+metrics.note:'');
+      el(metricsConnection,'span','text','',metricsText);
+      metricsConnection.hidden=!metrics.available;
       var note=el(statusLine,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
-      // A fixed slot and size (#986). "No blockers" only when that is true: blockers off the current path, or with colors off, leave "First blocker" greyed out.
-      var first=button(controls,'first','reader-button dv-live-first',value && (value.firstBlocker || (value.blockers || []).length)?'First blocker':'No blockers','firstBlocker');first.hidden=!hasData;first.disabled=!(value && value.firstBlocker);
-      var action=button(controls,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
+      var actionLabel=(available || metrics.available) && value && value.actionLabel || '';
+      var action=button(controls,'action','reader-button dv-live-action',actionLabel,'runAction');action.hidden=!actionLabel;
       var overStatus=el(statusLine,'span','over-time-status','dv-live-over-time-status',hasData && over && over.error?over.error:'');overStatus.setAttribute('role','status');overStatus.hidden=!overStatus.textContent;
       // #828 shared-board Edit mode lives in this header: Edit for editors, then a prominent Save N changes and Discard.
       var edit=available && value.edit || null,pending=edit?edit.pending:0,editing=!!(edit && edit.active);
@@ -118,15 +178,17 @@
       var saveControl=button(controls,'save','reader-button dv-live-save',edit && edit.saving?'Saving…':'Save '+pending+' change'+(pending===1?'':'s'),'editSave');saveControl.hidden=!(editing && pending);saveControl.disabled=!!(edit && edit.saving);
       var discardControl=button(controls,'discard','reader-button dv-live-discard','Discard','editDiscard');discardControl.hidden=!(editing && pending);discardControl.disabled=!!(edit && edit.saving);
       button(controls,'done','reader-button dv-live-edit-done','Done','editDone').hidden=!(editing && !pending);
+      // A fixed slot and size, last in the row so a button appearing to its left cannot move it (#986). "No blockers" only when that is true: blockers off the current path, or with colors off, leave "First blocker" greyed out.
+      var first=button(controls,'first','reader-button dv-live-first',value && (value.firstBlocker || (value.blockers || []).length)?'First blocker':'No blockers','firstBlocker');first.hidden=!hasData;first.disabled=!(value && value.firstBlocker);
       var reason=el(statusLine,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
       var editNotice=el(statusLine,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
       var editShown=!!(edit && (edit.editable || edit.notice));
-      head.hidden=!available || !(hasData || value.note.text || value.actionLabel || editShown);
-      controls.hidden=!available || !(hasData || value.actionLabel || editShown);statusRow.hidden=!available || !(hasData || value.note.text);
+      head.hidden=!metrics.available && (!available || !(hasData || value.note.text || value.actionLabel || editShown));
+      controls.hidden=!metrics.available && (!available || !(hasData || value.actionLabel || editShown));statusRow.hidden=!metrics.available && (!available || !(hasData || value.note.text));
       // Long text is cut off on screen; the tooltip and the status elements keep all of it.
-      var statusText=[connection.hidden?'':[connWho,conn.checkedText].filter(Boolean).concat(ghLabel?[ghLabel]:[]).join(', '),note.textContent,overStatus.textContent,reason.textContent,editNotice.textContent].filter(Boolean).join(' · ');
+      var statusText=[connection.hidden?'':[connWho,conn.checkedText].filter(Boolean).concat(ghLabel?[ghLabel]:[]).join(', '),metricsConnection.hidden?'':metricsText,note.textContent,overStatus.textContent,reason.textContent,editNotice.textContent].filter(Boolean).join(' · ');
       if(statusText)statusRow.setAttribute('title',statusText);else statusRow.removeAttribute('title');
-      if(!available)el(host,'p','empty','dv-live-empty','This page has no ticket references.');
+      if(!available && !proof)el(host,'p','empty','dv-live-empty','This page has no ticket references.');
       // Day buttons: on the slider row, and on a row of their own for a demo in Live mode, which has no slider. A demo's buttons move its own day.
       if(hasData && (past || value.demo)){
         var demoDays=value.demo,row=el(host,'div','day-row','dv-live-day-row'+(past?' dv-live-over-time-row':'')+(demoDays?' dv-live-demo':''));
@@ -141,8 +203,9 @@
         var nextDay=button(row,'next','reader-button dv-live-step','>',demoDays?'nextDemo':'overTimeStep');nextDay._liveArgument=1;nextDay.setAttribute('aria-label','Next day');nextDay.disabled=demoDays?demoDays.ended:over.index>=over.count-1;
         if(past)el(row,'p','note','dv-live-over-time-note','Status as of '+over.label+' · other columns show today').setAttribute('role','status');
       }
-      if(hasData){
+      if(hasData || proof || value && value.activity.length){
         var body=el(host,'div','body','dv-live-panel-body'),epic=value.epic || {keys:[]};
+        if(hasData){
         // Epic header box (#765): the epic is shown large inside the panel, never in the title bar. The old verdict line is gone.
         var box=el(body,'div','epic','dv-live-epic'),completion=el(box,'div','completion','dv-live-completion'),svg=el(completion,'svg','ring','');svg.setAttribute('viewBox','0 0 44 44');svg.setAttribute('aria-hidden','true');
         ['track','done'].forEach(function(kind){var circle=el(svg,'circle',kind,'dv-live-ring-'+kind);circle.setAttribute('cx','22');circle.setAttribute('cy','22');circle.setAttribute('r','18');circle.setAttribute('pathLength','100');if(kind==='done')circle.setAttribute('stroke-dasharray',(value.readiness.total?100*value.readiness.done/value.readiness.total:0)+' 100');});
@@ -159,6 +222,9 @@
         var progress=el(main,'div','progress','dv-live-epic-progress',epic.done+' of '+epic.stories+' stories done · '+epic.onDiagram+' of '+epic.stories+' on diagram');
         var countParts=[epic.blocked+' blocked',epic.waiting+' waiting'];if(epic.keys.length)countParts.push(epic.outside+(epic.initiatives && epic.initiatives.length?' outside scope':' outside epic'));if(epic.ready)countParts.unshift(epic.initiatives && epic.initiatives.length?'Diagram ready to demo':'Ready to demo');
         el(main,'div','counts','dv-live-epic-counts',countParts.join(' · '));
+        }
+        if(proof)proofBox(body,proof);
+        if(hasData){
         // Tickets first and tall (#765); lane data stays on step pills, row stripes and Blockers lanes (#767).
         el(body,'h3','tickets-heading','','Tickets');var scroll=el(body,'div','scroll','dv-live-tickets-scroll'),table=el(scroll,'table','table','dv-live-tickets');table.setAttribute('aria-label','Tickets');
         var tr=el(el(table,'thead','thead',''),'tr','tr',''),sort=host._liveTicketSort;
@@ -189,6 +255,9 @@
           if(item.tag){var coverageRow=el(tbody,'tr',item.key+'/coverage','dv-live-coverage-row');coverageRow.setAttribute('data-live-coverage-for',item.key);if(item.laneColor)coverageRow.style.setProperty('--dv-live-lane-color',item.laneColor);else coverageRow.style.removeProperty('--dv-live-lane-color');
             var coverageCell=el(coverageRow,'td','cell','dv-live-coverage-cell');coverageCell.setAttribute('colspan','6');var coverage=el(coverageCell,'div','coverage','dv-live-coverage');el(coverage,'span','tag','dv-live-coverage-tag',item.tag);}
         });
+        }
+        if(proof)proofTable(body,proof);
+        if(hasData){
         excludedStories(body,value.excluded || []);
         // A light hint only: the agent, not the page, writes to Jira.
         var suggestions=value.suggestions || [],suggest=el(body,'p','suggest','dv-live-suggest',suggestions.length?suggestions.length+' authored '+(suggestions.length===1?'dependency':'dependencies')+' ('+suggestions.map(function(item){return item.ticket+' → '+item.on;}).join(', ')+') '+(suggestions.length===1?'has':'have')+' no Jira link. Suggest link in Jira':'');suggest.hidden=!suggestions.length;
@@ -202,7 +271,15 @@
           var dep=depOf(key);if(index===chain.length-1){var last=value.tickets.filter(function(ticket){return ticket.key===key;})[0];dep={key:key,state:last?last.state:dep.state,tone:last && last.waiting?last.waiting:last && last.state==='done'?'done':'none',reason:''};}
           depButton(row,'hop-'+index,dep);});});
         if(!value.blockers.length && !(value.chains || []).length)el(body,'p','none','dv-live-none','None');
-        el(body,'h3','activity-heading','','Activity');var activity=el(body,'ol','activity','dv-live-activity');value.activity.forEach(function(item,index){var row=el(activity,'li',String(index),'dv-live-activity-entry',item.key+' · '+(item.added?'added to epic · not on diagram':item.old+' → '+item.state)+' · '+item.relative);if(item.at)row.setAttribute('data-updated-at',item.at);else row.removeAttribute('data-updated-at');});
+      }
+        el(body,'h3','activity-heading','','Activity');var activity=el(body,'ol','activity','dv-live-activity');value.activity.forEach(function(item,index){
+          var telemetry=item.type==='telemetry',row=el(activity,'li',(telemetry?'telemetry-':'jira-')+index,'dv-live-activity-entry',telemetry?null:item.key+' · '+(item.added?'added to epic · not on diagram':item.old+' → '+item.state)+' · '+item.relative);
+          row.setAttribute('data-activity-type',telemetry?'telemetry':'jira');
+          if(telemetry){row.setAttribute('data-activity-kind',item.kind);row.setAttribute('data-activity-carrier',item.carrier);}else{row.removeAttribute('data-activity-kind');row.removeAttribute('data-activity-carrier');}
+          if(telemetry)el(row,'span','text','',item.title+' · '+item.text+' · '+item.relative);
+          if(telemetry && item.url)link(row,'source','Source',item.url);
+          if(item.at)row.setAttribute('data-updated-at',item.at);else row.removeAttribute('data-updated-at');
+        });
       }
       if(!hasData && value && (value.excluded || []).length)excludedStories(el(host,'div','audit','dv-live-panel-body'),value.excluded);
       // #758: a built page carries an agent guide block; tell editors where it is. Nothing is painted without it.
@@ -215,24 +292,24 @@
     }
     function cleanup(){if(!live)return;live=false;host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();}
     host._panelMotionCleanup=cleanup;
-    function connect(controller){if(!live || api)return;api=controller;host._livePanelApi=api;if(offReady)offReady();paint(api.snapshot());offChange=api.onChange(paint);offDestroy=api.onDestroy(cleanup);}
+    function connect(controller){if(!live || api)return;api=controller;host._livePanelApi=api;if(offReady)offReady();paint(api.snapshot());offChange=api.onChange(paint);offDestroy=api.onDestroy(function(){var value=api.snapshot();value.metrics=Object.assign({},value.metrics,{proof:null,available:false,enabled:false});paint(value);cleanup();});}
     var controller=typeof liveStatusControllerFor==='function'?liveStatusControllerFor(host):null;
     if(controller)connect(controller);else {paint(null);if(typeof liveStatusWhenReady==='function')offReady=liveStatusWhenReady(host,connect);}
   }
   var LIVE_STYLES=String.raw`.dv-live-toggle{display:flex;gap:4px;align-items:center;}
 .dv-live-count{border-radius:4px;padding:2px 4px;color:var(--dv-live-on);}
 .dv-live-note{color:var(--dtext);}
-.dv-live-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
-.dv-live-connection[hidden]{display:none!important;}
-.dv-live-connection-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
-.dv-live-connection[data-state="connected"] .dv-live-connection-dot,.dv-live-connection[data-state="demo"] .dv-live-connection-dot{background:var(--dv-live-done);}
-.dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot{background:var(--dv-live-active);}
-.dv-live-connection[data-state="error"] .dv-live-connection-dot{background:var(--dv-live-blocked);}
-.dv-live-connection[data-busy="true"] .dv-live-connection-dot{animation:dv-live-connection-pulse 1.2s ease-in-out infinite;}
+.dv-live-connection,.dv-live-metrics-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
+.dv-live-connection[hidden],.dv-live-metrics-connection[hidden]{display:none!important;}
+.dv-live-connection-dot,.dv-live-metrics-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
+.dv-live-connection[data-state="connected"] .dv-live-connection-dot,.dv-live-connection[data-state="demo"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="connected"] .dv-live-metrics-dot,.dv-live-metrics-connection[data-state="demo"] .dv-live-metrics-dot{background:var(--dv-live-done);}
+.dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="connecting"] .dv-live-metrics-dot,.dv-live-metrics-connection[data-state="approval"] .dv-live-metrics-dot{background:var(--dv-live-active);}
+.dv-live-connection[data-state="error"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="error"] .dv-live-metrics-dot{background:var(--dv-live-blocked);}
+.dv-live-connection[data-busy="true"] .dv-live-connection-dot,.dv-live-metrics-connection[data-busy="true"] .dv-live-metrics-dot{animation:dv-live-connection-pulse 1.2s ease-in-out infinite;}
 .dv-live-connection-github::before{content:'· ';}
 .dv-live-connection-github[data-state="error"]{color:var(--dv-live-blocked);}
 @keyframes dv-live-connection-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.7);}}
-@media (prefers-reduced-motion: reduce){.dv-live-connection-dot{animation:none!important;}}
+@media (prefers-reduced-motion: reduce){.dv-live-connection-dot,.dv-live-metrics-dot{animation:none!important;}}
 .dv-live-note[data-kind="warn"],.dv-live-note[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-over-time-status{color:var(--dv-live-blocked);}
 /* Amber marks "not live": no ticket status uses it. */
@@ -249,7 +326,7 @@
 .dv-live-over-time-slider::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:var(--dv-live-past);}
 .dv-live-over-time-slider:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:2px;}
 .dv-live-over-time-note{flex:0 0 100%;margin:0;color:var(--dtext);}
-.dv-live-epic{display:flex;gap:16px;align-items:center;padding:14px 16px;margin-top:12px;border:1px solid var(--explore-border);border-radius:10px;background:color-mix(in srgb,var(--dink) 4%,transparent);}
+.dv-live-epic,.dv-live-proof{display:flex;gap:16px;align-items:center;padding:14px 16px;margin-top:12px;border:1px solid var(--explore-border);border-radius:10px;background:color-mix(in srgb,var(--dink) 4%,transparent);}
 .dv-live-epic-main{display:flex;flex-direction:column;gap:4px;min-width:0;}
 .dv-live-epic-keys{display:flex;align-items:baseline;gap:8px;font:700 20px/1.2 'IBM Plex Mono',monospace;letter-spacing:.02em;}
 .dv-live-epic-key{font:inherit;}
@@ -260,12 +337,47 @@
 .dv-live-completion{display:flex;align-items:center;gap:12px;font-variant-numeric:tabular-nums;}
 .dv-live-completion svg{width:64px;height:64px;flex:none;transform:rotate(-90deg);}
 .dv-live-completion circle{fill:none;stroke-width:4;}
+
+.dv-live-proof{flex-wrap:wrap;}
+.dv-live-proof>.dv-live-epic-main{flex:1 1 220px;}
+.dv-live-proof h3,.dv-live-proof p{margin:0;}
+.dv-live-proof-pills{display:flex;flex-wrap:wrap;gap:4px;}
+.dv-live-proof-pill[data-proof-bucket="proven"]{color:var(--dv-live-done);}
+.dv-live-proof-pill[data-proof-bucket="degraded"],.dv-live-proof-pill[data-proof-bucket="unproven"]{color:var(--dv-metrics-degraded,var(--dv-live-past));}
+.dv-live-proof-pill[data-proof-bucket="liveEarly"]{color:var(--dv-live-active);}
+.dv-live-proof-arc[data-proof-bucket="proven"]{stroke:var(--dv-live-done);}
+.dv-live-proof-arc[data-proof-bucket="degraded"]{stroke:var(--dv-metrics-degraded,var(--dv-live-past));}
+.dv-live-proof-arc[data-proof-bucket="unproven"]{stroke:var(--dfaint);}
+.dv-live-proof-arc[data-proof-bucket="liveEarly"]{stroke:var(--dv-live-active);}
+.dv-live-proof-sentence{font:11px/1.5 'IBM Plex Mono',monospace;}
+.dv-live-proof-predicate,.dv-live-proof-detail{font:10px/1.5 'IBM Plex Sans',sans-serif;color:var(--dfaint);overflow-wrap:anywhere;}
+.dv-live-tickets.dv-live-proof-table{min-width:960px;}
+.dv-live-proof-table td:first-child{min-width:140px;}
+.dv-live-proof-table td:nth-child(8){min-width:160px;}
+.dv-live-proof-table td{vertical-align:top;}
+.dv-live-proof-kpi{white-space:nowrap;}
+.dv-live-proof-since{min-width:150px;max-width:180px;overflow-wrap:anywhere;}
+.dv-live-proof-sparkline{width:100px;height:32px;overflow:visible;color:var(--dtext);}
+.dv-live-proof-series{fill:none;stroke:currentColor;stroke-width:1.5;}
+.dv-live-proof-point{fill:currentColor;}
+.dv-live-proof-marker{stroke:var(--dfaint);stroke-dasharray:3 2;stroke-width:1;}
+.dv-live-proof-link{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;}
+.dv-live-proof-link svg{width:18px;height:18px;}
+
 .dv-live-ring-track{stroke:var(--dv-live-todo);opacity:.3;}
 .dv-live-ring-done{stroke:var(--dv-live-done);}
 .dv-live-blockers,.dv-live-activity{list-style:none;padding:0;margin:0;}
 .dv-live-blocker{display:flex;flex-wrap:wrap;gap:4px 8px;padding:10px 0;border-bottom:1px solid var(--explore-border);}
 .dv-live-blocker-lanes,.dv-live-downstream,.dv-live-missing-detail{flex-basis:100%;}
 .dv-live-activity-entry{padding:5px 0;font-size:12px;}
+.dv-live-activity-entry>a{margin-left:6px;}
+.dv-live-production{border-top:1px solid var(--explore-border);margin-top:8px;padding-top:8px;}
+.dv-live-production h3,.dv-live-production p{margin:4px 0;}
+.dv-live-production-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
+.dv-live-production-kpi{border:1px solid var(--explore-border);border-radius:5px;padding:6px;overflow-wrap:anywhere;}
+.dv-live-production-since{color:var(--dfaint);overflow-wrap:anywhere;}
+.dv-live-production-link{display:inline-flex;align-items:center;gap:4px;}
+.dv-live-production-link svg{width:16px;height:16px;}
 .dv-live-excluded{list-style:none;padding:0;margin:0;}
 .dv-live-excluded-story{display:flex;flex-wrap:wrap;gap:4px 8px;padding:8px 0;border-bottom:1px solid var(--explore-border);}
 .dv-live-excluded-reason{flex-basis:100%;color:var(--dfaint);font-size:11px;}

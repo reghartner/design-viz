@@ -58,7 +58,7 @@ export interface LiveStatusPullRequest {
   source?: 'authored' | 'github-search';
 }
 export interface LiveStatusEntry {
-  state: 'todo' | 'active' | 'done' | 'blocked' | 'missing';
+  state: 'todo' | 'active' | 'testing' | 'done' | 'blocked' | 'missing';
   title?: string;
   url?: string;
   assignee?: string;
@@ -80,7 +80,7 @@ export interface LiveStatusEntry {
   lane?: string;
   /** Upstream tickets this one waits on: Jira issue links (inward types such as
    * "is blocked by") or authored page.tracking.dependencies pairs. The ticket
-   * waits while an upstream is not done, unless it is itself active or done. */
+   * waits while an upstream is not done, unless it is itself active, testing or done. */
   dependsOn?: Array<{key: string; source: 'jira' | 'authored'; linkType?: string; reason?: string}>;
 }
 /** One bound carrier handed to the telemetry provider (#939): carrierTelemetry() of a

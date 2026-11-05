@@ -6,6 +6,7 @@ function liveStatusJiraState(issue,flaggedKeys){
   var fields=issue && issue.fields || {},status=fields.status || {},key=issue && issue.key;
   var flagged=flaggedKeys && (typeof flaggedKeys.has==='function'?flaggedKeys.has(key):Array.isArray(flaggedKeys)?flaggedKeys.indexOf(key)>=0:flaggedKeys[key]);
   if(flagged || /block/i.test(status.name || ''))return 'blocked';
+  if(typeof status.name==='string' && status.name.trim().toLowerCase()==='testing')return 'testing';
   var category=(status.statusCategory || {}).key;
   return category==='indeterminate'?'active':category==='done'?'done':'todo';
 }
@@ -131,7 +132,7 @@ function liveStatusHistoryDays(input){
       // Containers follow the demo's epic rule, so they need no history calls.
       keys.filter(container).forEach(function(key){
         var children=keys.filter(function(child){return !container(child) && states[child] && (today[child].epic===key || (today[child].initiatives || []).indexOf(key)>=0);}).map(function(child){return states[child].state;});
-        states[key]={state:children.length && children.every(function(item){return item==='done';})?'done':children.some(function(item){return item==='active' || item==='blocked' || item==='done';})?'active':'todo'};
+        states[key]={state:children.length && children.every(function(item){return item==='done';})?'done':children.some(function(item){return item==='active' || item==='blocked';})?'active':children.some(function(item){return item==='testing';})?'testing':children.some(function(item){return item==='done';})?'active':'todo'};
       });
     }
     var text=new Date(year,month,date+i).toLocaleDateString(input.locale || [],format);

@@ -151,8 +151,8 @@ function telemetryProofInput(eachCarrier,eachDiagram,jiraMap,telemetryMap){
 var TELEMETRY_RATE_UNIT=/\/\s*(s|sec|second|m|min|minute|h|hr|hour|d|day)s?$/i;
 var TELEMETRY_STREAM_KINDS=['call','service'];
 var TELEMETRY_CUE_CLASSES=['dv-metrics-bound','dv-metrics-flowing','dv-metrics-degraded','dv-metrics-silent','dv-metrics-unobserved','dv-metrics-ghosted'];
-var TELEMETRY_SEALS={proven:'proven','done-degraded':'degraded','active-failing':'degraded','todo-failing':'degraded',degraded:'degraded',
-  'done-unproven':'unproven','active-live-early':'live-early','todo-already-live':'live-early'};
+var TELEMETRY_SEALS={proven:'proven','done-degraded':'degraded','active-failing':'degraded','testing-failing':'degraded','todo-failing':'degraded',degraded:'degraded',
+  'done-unproven':'unproven','active-live-early':'live-early','testing-live-early':'live-early','todo-already-live':'live-early'};
 var TELEMETRY_SEAL_GLYPHS={proven:'M-3.2 .2L-1 2.4L3.4-2.2',degraded:'M0-3.6V.8M0 2.7V3',unproven:'M-3 3L3-3','live-early':'M-4 .5Q-2-2.5 0 .5T4 .5'};
 function telemetryReading(sample,name){
   var signals=sample && telemetryObject(sample.signals)?sample.signals:null,entry=signals && telemetryOwn(signals,name)?signals[name]:null;

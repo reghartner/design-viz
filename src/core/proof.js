@@ -20,7 +20,7 @@
 
    input.jiraMap  The live-status runtime map, one entry per ticket key, as
        createLiveStatus().apply() keeps it:
-       {KEY: {state: 'todo'|'active'|'done'|'blocked'|'missing', updatedAt, ...}}
+       {KEY: {state: 'todo'|'active'|'testing'|'done'|'blocked'|'missing', updatedAt, ...}}
 
    input.telemetryMap  One sample per bound carrier id:
        {id: {signals: {name: {value, series: [[t, v], ...], unit}}, observedAt}}
@@ -62,12 +62,13 @@
      flowing     every limit holds */
 
 var proofVerdicts = (function(){
-  var PROOF_JIRA_STATES = ['todo', 'active', 'done', 'blocked', 'missing'];
+  var PROOF_JIRA_STATES = ['todo', 'active', 'testing', 'done', 'blocked', 'missing'];
   /* Rows: the carrier's Jira state; `none` is a carrier without tickets.
      Blocked and missing keep their Jira state; the overlay adds traffic cues. */
   var PROOF_MATRIX = {
     done: {silent: 'done-unproven', flowing: 'proven', degraded: 'done-degraded', unobserved: 'done'},
     active: {silent: 'active', flowing: 'active-live-early', degraded: 'active-failing', unobserved: 'active'},
+    testing: {silent: 'testing', flowing: 'testing-live-early', degraded: 'testing-failing', unobserved: 'testing'},
     todo: {silent: 'todo', flowing: 'todo-already-live', degraded: 'todo-failing', unobserved: 'todo'},
     blocked: {silent: 'blocked', flowing: 'blocked', degraded: 'blocked', unobserved: 'blocked'},
     missing: {silent: 'missing', flowing: 'missing', degraded: 'missing', unobserved: 'missing'},
@@ -76,6 +77,7 @@ var proofVerdicts = (function(){
   var PROOF_VERDICT_LABELS = {
     proven: 'PROVEN', 'done-unproven': 'DONE · UNPROVEN', 'done-degraded': 'DONE · DEGRADED', done: 'DONE',
     active: 'IN PROGRESS', 'active-live-early': 'IN PROGRESS · LIVE EARLY', 'active-failing': 'IN PROGRESS · FAILING',
+    testing: 'TESTING', 'testing-live-early': 'TESTING · LIVE EARLY', 'testing-failing': 'TESTING · FAILING',
     todo: 'TODO', 'todo-already-live': 'TODO · ALREADY LIVE?', 'todo-failing': 'TODO · FAILING',
     blocked: 'BLOCKED', missing: 'MISSING', unobserved: 'UNOBSERVED', healthy: 'HEALTHY', degraded: 'DEGRADED'
   };
@@ -83,9 +85,9 @@ var proofVerdicts = (function(){
      no-ticket healthy carriers count as bound only. */
   var PROOF_COUNTS = {
     proven: ['proven'],
-    degraded: ['done-degraded', 'active-failing', 'todo-failing', 'degraded'],
+    degraded: ['done-degraded', 'active-failing', 'testing-failing', 'todo-failing', 'degraded'],
     unproven: ['done-unproven'],
-    liveEarly: ['active-live-early', 'todo-already-live']
+    liveEarly: ['active-live-early', 'testing-live-early', 'todo-already-live']
   };
   /* Worst first: a step reads as degraded if any carrier is, then silent. */
   var PROOF_TELEMETRY_ORDER = ['degraded', 'silent', 'unobserved', 'flowing'];
@@ -105,7 +107,7 @@ var proofVerdicts = (function(){
   /* Same order as liveStatusRollup, with liveStatusPresentationRollup's rule
      that missing evidence ('unknown') never implies done or todo. */
   function proofJiraRollup(states){
-    for (var i = 0; i < 3; i++){ var state = ['blocked', 'missing', 'active'][i]; if (states.indexOf(state) >= 0) return state; }
+    for (var i = 0; i < 4; i++){ var state = ['blocked', 'missing', 'active', 'testing'][i]; if (states.indexOf(state) >= 0) return state; }
     if (states.indexOf('unknown') >= 0) return 'unknown';
     if (!states.length) return null;
     if (states.every(function(s){ return s === 'done'; })) return 'done';

@@ -4035,9 +4035,10 @@ body .docview .termbar[data-playback-position][hidden]{display:none;}
 }
 
 /* Shared status appearance. Overrides are scoped by FlowStatusColors to each viewer. */
-:root{--dv-live-todo:#8fb4ff;--dv-live-active:#009dff;--dv-live-done:#2ed600;--dv-live-blocked:#e81717;--dv-live-missing:#e81717;--dv-live-unchanged:#2ed600;}
+:root{--dv-live-todo:#8fb4ff;--dv-live-active:#009dff;--dv-live-testing:#2ed600;--dv-live-done:#2ed600;--dv-live-blocked:#e81717;--dv-live-missing:#e81717;--dv-live-unchanged:#2ed600;}
 .dv-live-todo{--dv-live-color:var(--dv-live-todo);--dv-live-line:var(--dv-live-todo-border-color,var(--dv-live-todo));--dv-live-width:var(--dv-live-todo-border-width,3px);--dv-live-node-width:var(--dv-live-todo-border-width,3px);--dv-live-fill:var(--dv-live-todo-fill-strength,15%);--dv-live-glow:var(--dv-live-todo-glow-strength,0);--dv-live-dash:1 4;--dv-live-border:dotted;}
 .dv-live-active{--dv-live-color:var(--dv-live-active);--dv-live-line:var(--dv-live-active-border-color,var(--dv-live-active));--dv-live-width:var(--dv-live-active-border-width,2px);--dv-live-node-width:var(--dv-live-active-border-width,2px);--dv-live-fill:var(--dv-live-active-fill-strength,15%);--dv-live-glow:var(--dv-live-active-glow-strength,1);}
+.dv-live-testing{--dv-live-color:var(--dv-live-testing);--dv-live-line:var(--dv-live-testing-border-color,#009dff);--dv-live-width:var(--dv-live-testing-border-width,3.5px);--dv-live-node-width:var(--dv-live-testing-border-width,3.5px);--dv-live-fill:var(--dv-live-testing-fill-strength,15%);--dv-live-glow:var(--dv-live-testing-glow-strength,0.77);}
 .dv-live-done{--dv-live-color:var(--dv-live-done);--dv-live-line:var(--dv-live-done-border-color,var(--dv-live-done));--dv-live-width:var(--dv-live-done-border-width,3.5px);--dv-live-node-width:var(--dv-live-done-border-width,3.5px);--dv-live-fill:var(--dv-live-done-fill-strength,14%);--dv-live-glow:var(--dv-live-done-glow-strength,1.53);}
 .dv-live-blocked{--dv-live-color:var(--dv-live-blocked);--dv-live-line:var(--dv-live-blocked-border-color,var(--dv-live-blocked));--dv-live-width:var(--dv-live-blocked-border-width,2px);--dv-live-node-width:var(--dv-live-blocked-border-width,3px);--dv-live-fill:var(--dv-live-blocked-fill-strength,15%);--dv-live-glow:var(--dv-live-blocked-glow-strength,1.83);}
 .dv-live-missing{--dv-live-color:var(--dv-live-missing);--dv-live-line:var(--dv-live-missing-border-color,var(--dv-live-missing));--dv-live-width:var(--dv-live-missing-border-width,2px);--dv-live-node-width:var(--dv-live-missing-border-width,2px);--dv-live-fill:var(--dv-live-missing-fill-strength,15%);--dv-live-glow:var(--dv-live-missing-glow-strength,1.3);--dv-live-dash:6 4;--dv-live-border:dashed;}
@@ -4110,7 +4111,7 @@ g.node.dv-edit-target,path.edge.dv-edit-target{cursor:copy;}
 @media print{
   .dv-live-halo{animation:none!important;}
   .dv-live-popover{display:none!important;}
-  :is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+  :is(.dv-live-todo,.dv-live-active,.dv-live-testing,.dv-live-done,.dv-live-blocked,.dv-live-missing){print-color-adjust:exact;-webkit-print-color-adjust:exact;}
 }
 
 /* Waiting is dependency evidence (#765); the original dv-live state stays intact.
@@ -4143,7 +4144,7 @@ path.edge.dv-live-missing:not(.dv-live-waiting){stroke-dasharray:6 4!important;}
 .dv-live-step-tickets .nbacklink{flex-shrink:0;white-space:nowrap;color:inherit;text-decoration:underline;text-underline-offset:2px;}
 .dv-live-step-tickets a:focus-visible{outline:2px solid var(--acc);outline-offset:3px;border-radius:2px;}
 .dv-live-caption{display:inline-flex;width:fit-content;max-width:100%;align-self:flex-start;font-size:11px;font-weight:700;margin-top:6px;}
-.lanepill:is(.dv-live-todo,.dv-live-active,.dv-live-done,.dv-live-blocked,.dv-live-missing){border-color:var(--dv-live-color)!important;color:var(--dv-live-color)!important;}
+.lanepill:is(.dv-live-todo,.dv-live-active,.dv-live-testing,.dv-live-done,.dv-live-blocked,.dv-live-missing){border-color:var(--dv-live-color)!important;color:var(--dv-live-color)!important;}
 .dv-live-stale-detail{grid-column:1 / -1;color:var(--dtext);}
 .dv-live-state-pill:not([data-live-appearance]){color:var(--dv-live-ink,inherit)!important;}
 .dv-live-state-pill{color:var(--dv-live-ink,inherit);border:1px solid currentColor;border-radius:4px;padding:0 5px;font-size:11px;}

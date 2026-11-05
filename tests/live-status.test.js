@@ -84,10 +84,10 @@ test('V2 V4 apply paints nodes, edge paths/halos/labels and step carriers; disab
  const {ctl,view}=harness(fixture()),api=ctl.liveStatus,events=[];api.onChange(v=>events.push(plain(v)));api.apply(fixed);
  for(const [selector,state] of [['g.node[data-dv-node="a"]','active'],['g.node[data-dv-node="b"]','active'],['g.node[data-dv-node="c"]','missing'],['path.edge','blocked'],['path.halo','blocked'],['text.lbl','blocked'],['g.coin[data-dv-step="0"]','blocked'],['button.schip[data-step-source="1"]','active'],['button.schip[data-step-source="2"]','blocked']])assert.ok(view.querySelector(selector).classList.contains('dv-live-'+state),selector);
  for(const id of ['text','absent'])assert.doesNotMatch(view.querySelector('[data-dv-node="'+id+'"]').className,/dv-live-/);
- assert.deepEqual(events[0].counts,{todo:1,active:1,done:1,blocked:1,missing:1});assert.equal(events[0].updatedAt,'2026-10-26T10:00:00Z');assert.equal(events[0].states['AA-1'].state,'active');assert.equal(api.state('AA-1').state,'active');
+ assert.deepEqual(events[0].counts,{todo:1,active:1,testing:0,done:1,blocked:1,missing:1});assert.equal(events[0].updatedAt,'2026-10-26T10:00:00Z');assert.equal(events[0].states['AA-1'].state,'active');assert.equal(api.state('AA-1').state,'active');
  api.setEnabled(false);assert.equal(api.enabled(),false);assert.equal(view.querySelectorAll('.dv-live-active,.dv-live-blocked,.dv-live-missing').length,0);api.setEnabled(true);assert.ok(view.querySelector('path.edge').classList.contains('dv-live-blocked'));
  api.apply({'AA-1':{state:'nonsense'},'BB-1':{state:'done'}});assert.equal(api.state('AA-1'),null);assert.doesNotMatch(view.querySelector('[data-dv-node="a"]').className,/dv-live-/);assert.ok(!view.querySelector('[data-dv-node="b"]').classList.contains('dv-live-done'),'partial evidence cannot claim completion');
- api.clear();assert.equal(view.querySelectorAll('.dv-live-done,.dv-live-badge').length,0);assert.deepEqual(events.at(-1).counts,{todo:0,active:0,done:0,blocked:0,missing:0});assert.equal(events.length,5);
+ api.clear();assert.equal(view.querySelectorAll('.dv-live-done,.dv-live-badge').length,0);assert.deepEqual(events.at(-1).counts,{todo:0,active:0,testing:0,done:0,blocked:0,missing:0});assert.equal(events.length,5);
 });
 test('V7 authored ticket menu exists without a provider and preserves plain keys without a site',()=>{
  const {C}=harness();const diagram={nodes:{a:{tickets:['AA-1'],prs:['https://example.test/pr']}}};
@@ -477,7 +477,7 @@ test('P1 P3 live nodes wear Node Styles presets and restore authored styles when
 });
 test('P4 shared status backing and text contrast are separated from provider state',()=>{
  const h=harness(),C=h.C;
- assert.deepEqual(plain(C.LIVE_STATUS_STATES),['todo','active','done','blocked','missing']);
+ assert.deepEqual(plain(C.LIVE_STATUS_STATES),['todo','active','testing','done','blocked','missing']);
  for(const [value,map,want] of [[{}, {}, 'unchanged'],[{missingWork:true},{},'missing'],[{tickets:['AA-1']},{},null],[{tickets:['AA-1'],missingWork:true},{'AA-1':{state:'done'}},'missing'],[{tickets:['AA-1'],missingWork:true},{'AA-1':{state:'blocked'}},'blocked']])assert.equal(C.liveStatusPresentation(value,map,true),want);
  for(const [states,want] of [[['unchanged','done'],'done'],[['unchanged','todo'],'todo'],[['unchanged','unknown'],null],[['unchanged','unchanged'],'unchanged']])assert.equal(C.liveStatusPresentationRollup(states),want);
  h.ctl.liveStatus.destroy();
@@ -1441,7 +1441,7 @@ test('imported consumer tracking drives refs, carrier coverage, dependencies, re
  assert.deepEqual(plain(api.refs()).tickets,['AA-1','AA-2']);assert.deepEqual(plain(api.refs()).prs,['https://github.com/acme/api/pull/1']);
  api.apply({'AA-1':{state:'blocked'},'AA-2':{state:'todo'}});
  const snap=api.snapshot();
- assert.deepEqual(plain(snap.counts),{todo:1,active:0,done:0,blocked:1,missing:0});
+ assert.deepEqual(plain(snap.counts),{todo:1,active:0,testing:0,done:0,blocked:1,missing:0});
  assert.equal(snap.readiness.total,3);assert.equal(snap.readiness.done,0);assert.equal(snap.readiness.ready,false);assert.equal(snap.readiness.blockers,1);
  assert.deepEqual(plain(snap.coverage.onDiagram),['AA-1','AA-2']);
  const d=h.ctl.page.sections[0].diagram;
@@ -1589,7 +1589,7 @@ test('X2 Epic and Initiative totals subtract exclusions then add all manual stor
  for(const initiative of [false,true]){
   const h=harness(exclusionFixture(initiative?['IN-1','EP-1','IN-1']:'EP-1')),api=h.ctl.liveStatus;mountStatus(h);api.apply(exclusionMap(initiative));const s=plain(api.snapshot());
   assert.equal(s.epic.stories,4);assert.equal(s.epic.done,3);assert.equal(s.epic.onDiagram,3);assert.equal(s.epic.blocked,0);assert.equal(s.epic.waiting,0);assert.equal(s.epic.outside,2);
-  assert.deepEqual(s.counts,{todo:0,active:0,done:3,blocked:0,missing:0});assert.deepEqual(s.tickets.map(row=>row.key).sort(),['MAN-1','ST-1','ST-3','UNKNOWN-1']);
+  assert.deepEqual(s.counts,{todo:0,active:0,testing:0,done:3,blocked:0,missing:0});assert.deepEqual(s.tickets.map(row=>row.key).sort(),['MAN-1','ST-1','ST-3','UNKNOWN-1']);
   assert.deepEqual(s.coverage.notOnDiagram,['ST-1']);assert.deepEqual(s.chains,[]);assert.deepEqual(s.blockers,[]);assert.equal(s.readiness.ready,false,'unknown carrier ticket remains incomplete');
   assert.deepEqual(s.excluded.map(row=>row.key),['ST-2','ST-3','ST-4','ST-5']);assert.equal(s.excluded[1].reason,'Included by manual attachment');
   assert.equal(s.excluded[0].url,'https://jira.test/browse/ST-2');assert.equal(s.excluded[0].title,'Unrelated delivery');
@@ -1629,7 +1629,7 @@ test('X6 completed, unknown and shared outside dependencies count once with manu
  const h=harness(raw),api=h.ctl.liveStatus;api.apply({'EP-1':{state:'done',kind:'epic'},'ST-1':{state:'todo',epic:'EP-1',dependsOn:[{key:'OUT-1',source:'jira'},{key:'UNKNOWN-1',source:'jira'},{key:'EP-1',source:'jira'}]},
   'MAN-1':{state:'active',dependsOn:[{key:'OUT-1',source:'jira'},{key:'UNKNOWN-1',source:'jira'}]},'OUT-1':{state:'done',epic:'OTHER-1'}});
  const s=plain(api.snapshot());assert.equal(s.epic.stories,4);assert.equal(s.epic.done,1);assert.equal(s.epic.onDiagram,2);assert.equal(s.epic.outside,3);assert.equal(s.epic.waiting,1);
- assert.deepEqual(s.tickets.map(row=>row.key).sort(),['MAN-1','OUT-1','ST-1','UNKNOWN-1']);assert.deepEqual(s.counts,{todo:1,active:1,done:1,blocked:0,missing:0});
+ assert.deepEqual(s.tickets.map(row=>row.key).sort(),['MAN-1','OUT-1','ST-1','UNKNOWN-1']);assert.deepEqual(s.counts,{todo:1,active:1,testing:0,done:1,blocked:0,missing:0});
  assert.equal(s.tickets.find(row=>row.key==='UNKNOWN-1').state,'No status');assert.equal(s.excluded[0].reason,'Included by manual attachment');api.destroy();
 });
 test('X7 authored exclusions are visible and linked before live evidence is available',()=>{
@@ -1671,7 +1671,7 @@ test('X10 Jira linked issue metadata keeps outside containers out of board total
   const map=C.liveStatusJiraMap(['ST-1','ST-2'],[[issue,other]],new Set(),'https://jira.test');
   assert.equal(map['EP-9'].kind,'epic');assert.equal(map['IN-9'].kind,'initiative');for(const key of ['WORK-1','WORK-2','WORK-3'])assert.equal(map[key].kind,'story');assert.equal(map['EP-404'].kind,undefined,'no type is unknown, never inferred from prefix');
   const h=harness({page:{sections:[{diagram:{nodes:{a:{tickets:['ST-1','ST-2']}},rows:[['a']]}}]}});h.ctl.liveStatus.apply(map);const s=plain(h.ctl.liveStatus.snapshot());
-  assert.equal(s.epic.stories,6);assert.equal(s.epic.done,5);assert.equal(s.epic.waiting,0);assert.deepEqual(s.tickets.map(row=>row.key).sort(),['EP-404','ST-1','ST-2','WORK-1','WORK-2','WORK-3']);assert.deepEqual(s.counts,{todo:1,active:0,done:5,blocked:0,missing:0});
+  assert.equal(s.epic.stories,6);assert.equal(s.epic.done,5);assert.equal(s.epic.waiting,0);assert.deepEqual(s.tickets.map(row=>row.key).sort(),['EP-404','ST-1','ST-2','WORK-1','WORK-2','WORK-3']);assert.deepEqual(s.counts,{todo:1,active:0,testing:0,done:5,blocked:0,missing:0});
   assert.ok(s.tickets.find(row=>row.key==='ST-1').dependsOn.some(dep=>dep.key==='IN-9'),'container remains direct dependency evidence');h.ctl.liveStatus.destroy();
  }
  const direct=upstream('KEEP-1',{name:'Story',hierarchyLevel:0}),dependent=jira('ST-1');dependent.fields.issuelinks=[link(upstream('KEEP-1',{name:'Epic',hierarchyLevel:1}))];
@@ -1732,7 +1732,7 @@ test('coverage markers survive normalization, propagate to steps, never manufact
  assert.equal(h.C.liveStatusCaption(d,d.steps[0],{}),'NO CHANGE NEEDED');
  assert.equal(h.C.liveStatusStep(d,d.steps[2],{'AA-1':{state:'done'}}),null);
  assert.equal(h.C.liveStatusStep(d,d.steps[2],{'AA-1':{state:'done'},'AA-2':{state:'done'}}),'done');
- assert.deepEqual(plain(api.refs().tickets),['AA-1','AA-2']);assert.deepEqual(plain(api.snapshot().counts),{todo:0,active:0,done:1,blocked:0,missing:0});
+ assert.deepEqual(plain(api.refs().tickets),['AA-1','AA-2']);assert.deepEqual(plain(api.snapshot().counts),{todo:0,active:0,testing:0,done:1,blocked:0,missing:0});
  assert.equal(h.C.liveStatusReadiness(h.ctl.page,{'AA-1':{state:'done'},'AA-2':{state:'done'}},{}).ready,false);
  const card=h.view.querySelector('[data-dv-node="gap"]').querySelector('.card');assert.match(card.getAttribute('aria-label'),/Work status.*Missing work/);
  h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});assert.match(h.view.querySelector('.dv-live-coverage-detail').textContent,/additional work remains/);
@@ -1749,7 +1749,7 @@ test('missing work activates consistent page-wide coverage before provider evide
  for(const selector of ['g.coin[data-dv-step="0"]','button.schip[data-step-source="0"]'])assert.equal(rec.sectionEl.querySelector(selector).getAttribute('data-live-appearance'),'unchanged');
  assert.equal(controls.host.querySelector('.dv-live-caption').textContent,'NO CHANGE NEEDED');
  controls.change(1);assert.equal(controls.host.querySelector('.dv-live-caption').textContent,'AWAITING TICKET STATUS');
- assert.deepEqual(plain(api.snapshot().counts),{todo:0,active:0,done:0,blocked:0,missing:0});
+ assert.deepEqual(plain(api.snapshot().counts),{todo:0,active:0,testing:0,done:0,blocked:0,missing:0});
  api.setEnabled(false);assert.equal(h.view.querySelectorAll('[data-live-appearance]').length,0);
  api.setEnabled(true);assert.equal(state('reuse'),'unchanged');assert.equal(state('gap'),'missing');
  api.clear();assert.equal(h.view.querySelectorAll('[data-live-appearance]').length,0);api.destroy();
@@ -1769,7 +1769,7 @@ test('edge missing work activates a real communication break without provider ev
  assert.equal(h.C.liveStatusStep(d,d.steps[0],{}),'missing');
  assert.equal(h.C.liveStatusCaption(d,d.steps[0],{}),'MISSING WORK · unlinked work remains');
  assert.equal(api.snapshot().readiness.ready,false);assert.equal(api.snapshot().readiness.total,1);
- assert.deepEqual(plain(api.refs().tickets),[]);assert.deepEqual(plain(api.snapshot().counts),{todo:0,active:0,done:0,blocked:0,missing:0});
+ assert.deepEqual(plain(api.refs().tickets),[]);assert.deepEqual(plain(api.snapshot().counts),{todo:0,active:0,testing:0,done:0,blocked:0,missing:0});
  api.destroy();
 });
 
@@ -2681,4 +2681,53 @@ test('Proof is cleared from retained panels on telemetry and live-status control
   h.ctl[owner].destroy();assert.ok(!mounted.body.querySelector('.dv-live-proof'),owner+' removes Proof from retained DOM');assert.ok(!mounted.body.querySelector('.dv-live-proof-table'));
   assert.equal(mounted.body.querySelector('.dv-live-note').textContent,'Keep Jira print evidence');api.destroy();
  }
+});
+
+
+test('Testing Jira names override category fallback while flags and blocked names still win',()=>{
+ const C=providerContext();
+ for(const category of ['new','indeterminate','done',undefined])for(const name of ['Testing','TESTING',' testing '])assert.equal(C.liveStatusJiraState(jira('AA-1',category,name)),'testing');
+ assert.equal(C.liveStatusJiraState(jira('AA-1','done','Testing'),new Set(['AA-1'])),'blocked');
+ assert.equal(C.liveStatusJiraState(jira('AA-1','indeterminate','Testing blocked')),'blocked');
+ assert.equal(C.liveStatusJiraState(jira('AA-1','indeterminate','User acceptance')),'active');
+ assert.equal(C.liveStatusJiraState(jira('AA-1','done','Released')),'done');
+});
+test('Testing remains unfinished, rolls up conservatively and keeps started dependency behavior',()=>{
+ const h=harness(),C=h.C;
+ for(const [states,want] of [[['testing'],'testing'],[['testing','done','todo'],'testing'],[['testing','active'],'active'],[['testing','missing'],'missing'],[['testing','blocked'],'blocked'],[['testing','unknown'],'testing'],[['done','unknown'],null]])assert.equal(C.liveStatusPresentationRollup(states),want);
+ const value={tickets:['AA-1'],existsWhen:'tickets-done'},map={'AA-1':{state:'testing'},'BB-1':{state:'todo'}};
+ assert.equal(C.liveStatusUnavailable(value,map),true);
+ const deps={'AA-1':[{key:'BB-1'}],'BB-1':[{key:'AA-1'}]},waiting=plain(C.liveStatusTicketWaiting(deps,map));
+ assert.equal(waiting['AA-1'],undefined);assert.equal(waiting['BB-1'].on[0].state,'testing');assert.equal(waiting['BB-1'].tone,'grey');
+ h.ctl.liveStatus.destroy();
+});
+test('Testing is preserved in local and imported node paint, counts, step labels, history and cleanup',()=>{
+ const seed=harness(),model=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=model('provider',{nodes:{testing:{tickets:['AA-1']}},rows:[['testing']],topologyExports:{core:{nodes:['testing'],edges:[]}}});
+ const consumer=model('consumer',{nodes:{local:{tickets:['AA-1']}},rows:[['local']],topologyImports:[{spec:'provider',export:'core',as:'shared'}],steps:[{nodes:['local','shared::testing']}]});
+ const resolved=seed.C.FlowTopology.materialize([provider,consumer])[1];seed.ctl.liveStatus.destroy();
+ const h=harness(resolved),api=h.ctl.liveStatus;mountStatus(h);api.apply({'AA-1':{state:'testing'}});
+ const diagram=h.ctl.page.sections[0].diagram;for(const id of ['local','shared::testing'])assert.equal(h.C.liveStatusCaption(diagram,{nodes:[id]},{'AA-1':{state:'testing'}}),'TESTING · 1 tickets');
+ assert.equal(api.state('AA-1').state,'testing');assert.equal(api.snapshot().counts.testing,1);assert.equal(api.snapshot().readiness.done,0);
+ assert.equal(h.view.querySelectorAll('.node').length,2);for(const node of h.view.querySelectorAll('.node'))assert.equal(node.getAttribute('data-live-appearance'),'testing');
+ assert.equal(h.view.querySelector('[data-live-count="testing"]').textContent,'testing 1');assert.equal(h.view.querySelector('tr[data-live-ticket="AA-1"] .dv-live-state-pill').textContent,'testing');
+ for(const item of h.view.querySelectorAll('.coin,.schip'))assert.equal(item.getAttribute('data-live-appearance'),'testing');
+ const C=providerContext(),days=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20),'Testing',[historyChange(historyAt(2026,10,21),'In Progress','Testing')])],{'AA-1':{state:'testing'}});
+ assert.deepEqual(historyStates(days,'AA-1'),['active','testing','testing','testing','testing']);
+ assert.equal(h.C.liveStatusDayMap({'AA-1':{state:'done'}},days.days[2].states)['AA-1'].state,'testing');
+ api.setEnabled(false);assert.equal(h.view.querySelectorAll('.dv-live-testing').length,0);api.setEnabled(true);assert.ok(h.view.querySelectorAll('.dv-live-testing').length);api.clear();assert.equal(h.view.querySelectorAll('.dv-live-testing').length,0);api.destroy();
+});
+
+test('Testing survives demo timelines and epic aggregation without claiming Done',()=>{
+ const C=storyContext(),day={issues:{'AA-1':{state:'testing',epic:'EP-1'}}};
+ const map=plain(C.liveStatusDemoMap(day,['AA-1'],{'EP-1':{summary:'Preview'}}));
+ assert.equal(map['AA-1'].state,'testing');assert.equal(map['EP-1'].state,'testing');
+ assert.equal(C.liveStatusDemoDays({days:[day]},['AA-1'])[0].states['AA-1'].state,'testing');
+});
+
+test('Testing rolls into epic and initiative history while other demo container states keep their semantics',()=>{
+ const C=providerContext(),today={'AA-1':{state:'testing',epic:'EP-1',initiatives:['IN-1']},'EP-1':{state:'testing',kind:'epic'},'IN-1':{state:'testing',kind:'initiative'}};
+ const days=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20),'Testing')],today);
+ assert.deepEqual(historyStates(days,'EP-1'),['testing','testing','testing','testing','testing']);assert.deepEqual(historyStates(days,'IN-1'),['testing','testing','testing','testing','testing']);
+ const D=storyContext();for(const [state,want] of [['blocked','active'],['missing','todo'],['active','active'],['done','done'],['todo','todo']])assert.equal(D.liveStatusDemoMap({issues:{'AA-1':{state,epic:'EP-1'}}},['AA-1'],{'EP-1':{}})['EP-1'].state,want);
 });

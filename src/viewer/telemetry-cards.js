@@ -70,9 +70,13 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate){
       function text(value,y,cls){var el=telemetrySvg(doc,'text',{'class':cls,x:10,y:y},card);el.textContent=value;texts.push(el);return el;}
       text(content.title,15,'t1');text(content.headline,31,'t1');
       text(content.details[0],46,'t2');text(content.details[1],59,'t2');text(content.note,72,'t2 dv-metrics-card-note');
-      var w=Math.max(138,Math.ceil(Math.max.apply(null,texts.map(function(el){return el.getComputedTextLength();})))+20);
+      // The synthetic annotation must not move the layout it is previewing.
+      // Fit that label inside the measured card, including wider fallback fonts.
+      var sizingTexts=view.preview?texts.slice(0,-1):texts;
+      var w=Math.max(138,Math.ceil(Math.max.apply(null,sizingTexts.map(function(el){return el.getComputedTextLength();})))+20);
       // Leave dedicated space beside the headline for the rate series.
       w=Math.max(w,Math.ceil(texts[1].getComputedTextLength())+78);rect.setAttribute('width',w);
+      if(view.preview && texts[4].getComputedTextLength()>w-20){texts[4].setAttribute('textLength',w-20);texts[4].setAttribute('lengthAdjust','spacingAndGlyphs');}
       if(content.series.length>=2){var values=content.series.map(function(p){return p[1];}),lo=Math.min.apply(null,values),hi=Math.max.apply(null,values);
         telemetrySvg(doc,'polyline',{'class':'dv-metrics-sparkline',points:values.map(function(v,i){return (w-58+48*i/(values.length-1))+','+(hi===lo?27:33-12*(v-lo)/(hi-lo));}).join(' ')},card);
       }

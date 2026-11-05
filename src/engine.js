@@ -1038,7 +1038,8 @@ function boardContentBounds(svg){
   Array.prototype.forEach.call(svg.children,function(child){
     // Packet dots follow already included paths. Their transient SMIL position
     // must not change saved framing; the 24-unit gutter covers their <=4.5 radius.
-    if(child.tagName.toLowerCase()==='defs' || child.matches('.dv-board-ground,.dv-board-grid,.pkt') || typeof child.getBBox!=='function')return;
+    // Metrics packet streams (#939) ride the same paths and are skipped likewise.
+    if(child.tagName.toLowerCase()==='defs' || child.matches('.dv-board-ground,.dv-board-grid,.pkt,.dv-metrics-stream') || typeof child.getBBox!=='function')return;
     try{
       var box=child.getBBox(),matrix=child.getCTM();if(!matrix || !box.width && !box.height)return;
       matrix=inverse.multiply(matrix);
@@ -1061,6 +1062,23 @@ function boardControlBox(el,svg){
   var points=[[box.x,box.y],[box.x+box.width,box.y],[box.x,box.y+box.height],[box.x+box.width,box.y+box.height]].map(function(p){return {x:matrix.a*p[0]+matrix.c*p[1]+matrix.e,y:matrix.b*p[0]+matrix.d*p[1]+matrix.f};});
   var x=Math.min.apply(null,points.map(function(p){return p.x;})),y=Math.min.apply(null,points.map(function(p){return p.y;}));
   return {x:x,y:y,w:Math.max.apply(null,points.map(function(p){return p.x;}))-x,h:Math.max.apply(null,points.map(function(p){return p.y;}))-y};
+}
+/* One packet's travel along an edge path, by the path's DOM id: a repeating
+   loop (staggered by a negative begin) or a single frozen run fired by the
+   stepper. The ordinary loop and step packets use it, and so do the Metrics
+   packet streams (#939, src/viewer/telemetry.js). */
+function packetMotion(domId, dur, begin, freeze, id){
+  var am = document.createElementNS(SVGNS, 'animateMotion');
+  am.setAttribute('dur', dur.toFixed(2) + 's');
+  am.setAttribute('begin', begin);
+  if (freeze){ am.setAttribute('fill', 'freeze'); }
+  else { am.setAttribute('repeatCount', 'indefinite'); }
+  if (id) am.setAttribute('id', id);
+  var mp = document.createElementNS(SVGNS, 'mpath');
+  mp.setAttribute('href', '#' + domId);
+  mp.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#' + domId);
+  am.appendChild(mp);
+  return am;
 }
 function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   destroyBoardLinks(el);
@@ -1498,19 +1516,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     markFragmentElement(dot, info.e);
     return dot;
   }
-  function motion(domId, dur, begin, freeze, id){
-    var am = document.createElementNS(SVGNS, 'animateMotion');
-    am.setAttribute('dur', dur.toFixed(2) + 's');
-    am.setAttribute('begin', begin);
-    if (freeze){ am.setAttribute('fill', 'freeze'); }
-    else { am.setAttribute('repeatCount', 'indefinite'); }
-    if (id) am.setAttribute('id', id);
-    var mp = document.createElementNS(SVGNS, 'mpath');
-    mp.setAttribute('href', '#' + domId);
-    mp.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#' + domId);
-    am.appendChild(mp);
-    return am;
-  }
+  var motion = packetMotion;
 
   /* ambient loop dots: every edge of every step, staggered */
   (d.steps || []).forEach(function(st, i){

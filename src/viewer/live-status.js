@@ -560,11 +560,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
   /* One walk over every carrier of the root page (resolved imported topology
      included) and its loaded detail pages, in page order: fn(value, id, source).
      refs() and the telemetry bindings (#939) share it. */
-  function eachCarrier(fn){sources().forEach(function(source){sectionRecords(source).forEach(function(record){
-    var d=record.section.diagram || {};
+  function eachDiagram(fn){sources().forEach(function(source){sectionRecords(source).forEach(function(record){if(record.section.diagram)fn(record.section.diagram,source);});});}
+  function eachCarrier(fn){eachDiagram(function(d,source){
     Object.keys(d.nodes || {}).forEach(function(id){fn(d.nodes[id],id,source);});
     (Array.isArray(d.edges)?d.edges:[]).forEach(function(edge){fn(edge,edge && typeof edge==='object'?edge.from+'->'+edge.to:null,source);});
-  });});}
+  });}
   // refs() collects the whole page; refs(key) narrows to the carriers that hold that ticket (their tickets are just the key).
   function refs(key){
     var byKey=typeof key==='string',out={tickets:[],prs:[],epics:[]};
@@ -576,11 +576,19 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return out;
   }
   /* ctl.telemetry (#939): the host telemetry provider behind the panel's Metrics
-     button, over the same carrier walk. Its changes repaint the panel header. */
-  var telemetryOptions=renderOptions && renderOptions.telemetry || null;
-  var telemetryDemo=!!(telemetryOptions && telemetryOptions.demo && typeof telemetryOptions.demo.mount==='function');
-  var telemetry=createTelemetry(page,telemetryOptions,{carriers:eachCarrier,changed:function(){if(!retired)notify();}});
+     button, over the same carrier walk. Its changes repaint the canvas cues and
+     the panel header. Without a host telemetry option, a Live status demo source
+     that carries `telemetry` (the #live=demo player, #944) supplies it as Demo. */
+  var telemetryOptions=renderOptions && renderOptions.telemetry || (demoMode && options.telemetry) || null;
+  var telemetryDemo=!!(telemetryOptions && (demoMode && telemetryOptions===options.telemetry || telemetryOptions.demo && typeof telemetryOptions.demo.mount==='function'));
+  var telemetryHooks={carriers:eachCarrier,diagrams:eachDiagram,jira:function(){return map;},changed:function(){if(!retired){paintMetrics();notify();}}};
+  var telemetry=createTelemetry(page,telemetryOptions,telemetryHooks);
   ctl.telemetry=telemetry;
+  // Metrics canvas cues on every bound section, beside the Jira paint (src/viewer/telemetry.js).
+  function paintMetrics(){
+    var metricsView=telemetryHooks.view();
+    bindings.forEach(function(binding){if(binding.section.diagram)telemetryPaintCues(binding.el,binding.section.diagram,trackingTelemetry(binding.page).templates,metricsView);});
+  }
   // A named connector (#943: 'Grafana') reads "<source> connected · <window> window · refreshed <time>".
   var telemetrySource=telemetryOptions && typeof telemetryOptions.source==='string'?telemetryOptions.source.trim():'',telemetryWindow=trackingTelemetry(page).window;
   function metricsSnapshot(){
@@ -1192,7 +1200,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         view.querySelectorAll('.dv-live-halo').forEach(function(el){el.remove();});
         bindings.forEach(paintBinding);
       }
-      bindings.forEach(paintStory);paintLanes();
+      bindings.forEach(paintStory);paintLanes();paintMetrics();
       view.querySelectorAll('.dv-edit-target').forEach(function(el){el.classList.remove('dv-edit-target');});
       if(editing())bindings.forEach(function(binding){if(binding.ordinal!=null)binding.el.querySelectorAll('g.node[data-dv-node]:not(.node-text),path.edge[data-dv-edge]').forEach(function(el){el.classList.add('dv-edit-target');});});
       if(focusBinding){var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier;});if(replacement)replacement.focus({preventScroll:true});}
@@ -1260,13 +1268,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
         activity.unshift({key:key,added:true,at:at});
       });
       activity=activity.slice(0,20);Object.keys(next).forEach(function(key){seenKeys[key]=true;});
-      map=next;applied=true;availabilityOn=true;paint();notify();
+      map=next;applied=true;availabilityOn=true;paint();notify();telemetryHooks.jiraChanged();
     },
-    clear:function(){if(retired)return;availabilityOn=false;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();},
+    clear:function(){if(retired)return;availabilityOn=false;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();telemetryHooks.jiraChanged();},
     enabled:function(){return on;},
     setEnabled:function(value){if(retired)return;on=!!value;if(on)availabilityOn=true;paint();notify();},
     // The panel's Metrics button (#939); Jira Live above is independent of it.
     setMetricsEnabled:function(value){if(!retired)telemetry.setEnabled(value);},
+    // The same controller as ctl.telemetry, so a demo player mounted on this API can feed it.
+    telemetry:telemetry,
     onDestroy:function(fn){if(typeof fn!=='function')return function(){};if(retired){fn();return function(){};}destroyListeners.push(fn);return function(){var i=destroyListeners.indexOf(fn);if(i>=0)destroyListeners.splice(i,1);};},
     onChange:function(fn){if(typeof fn!=='function' || retired)return function(){};listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
     note:function(text,kind){if(retired)return;noteText=typeof text==='string'?text:'';noteKind=['info','warn','error'].indexOf(kind)>=0?kind:'info';notify();},
@@ -1278,7 +1288,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     editSave:function(){if(!retired && editor)editor.save();},
     editDiscard:function(){if(!retired && editor)editor.discard();},
     destroy:function(){
-      if(retired)return;on=false;paintLanes();retired=true;releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();if(demoDestroy)demoDestroy();
+      if(retired)return;on=false;paintLanes();retired=true;releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];

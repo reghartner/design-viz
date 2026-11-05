@@ -4180,3 +4180,20 @@ path.edge.dv-live-missing:not(.dv-live-waiting){stroke-dasharray:6 4!important;}
 .dv-jira-back{opacity:.48;}
 .dv-jira-cue.dv-live-pointer{cursor:pointer;}
 .dv-jira-cue.dv-live-pointer:hover .dv-jira-hit{stroke:#0c66e4;stroke-width:1;}
+/* Metrics canvas cues (#939, src/viewer/telemetry.js): shown only while the Live status
+   panel's Metrics button is on, beside the Jira dv-live-* paint and never instead of it. */
+:root{--dv-metrics-packet:#0a84ff;--dv-metrics-error:#e81717;--dv-metrics-amber:#e8a300;--dv-metrics-ghost:#8a93a3;--dv-metrics-proven:#2ed600;--dv-metrics-early:#009dff;}
+svg path.edge.dv-metrics-degraded{stroke:var(--dv-metrics-amber)!important;}
+svg path.edge.dv-metrics-ghosted{opacity:.35;}
+.dv-metrics-ghost{fill:none;stroke:var(--dv-metrics-ghost);stroke-width:2.5;stroke-dasharray:1 6;stroke-linecap:round;}
+.dv-metrics-packet{fill:var(--dv-metrics-packet);stroke:none;}
+.dv-metrics-packet.dv-metrics-packet-error{fill:var(--dv-metrics-error);}
+.dv-metrics-static{display:none;}
+@media (prefers-reduced-motion: reduce){.dv-metrics-moving{display:none;}.dv-metrics-static{display:inline;}}
+@media print{.dv-metrics-moving{display:none;}.dv-metrics-static{display:inline;}.dv-metrics-packet,.dv-metrics-seal,.dv-metrics-sparkline,.dv-metrics-ghost{print-color-adjust:exact;-webkit-print-color-adjust:exact;}}
+.dv-metrics-sparkline{fill:none;stroke:var(--dv-metrics-packet);stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round;opacity:.85;}
+.dv-metrics-seal circle{fill:var(--dv-metrics-ghost);stroke:#fff;stroke-width:1.5;}
+.dv-metrics-seal[data-seal="proven"] circle{fill:var(--dv-metrics-proven);}
+.dv-metrics-seal[data-seal="degraded"] circle{fill:var(--dv-metrics-amber);}
+.dv-metrics-seal[data-seal="live-early"] circle{fill:var(--dv-metrics-early);}
+.dv-metrics-seal path{fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}

@@ -2081,7 +2081,8 @@ Each signal holds a native query object, for example:
 Use one scalar COUNT/SUM/AVG/MIN/MAX/COUNT_DISTINCT/CONCURRENCY or supported
 percentile calculation per signal, without breakdowns or formulas. Preserve
 explicit filter expressions and calculation names. The page window replaces
-query time selectors with native `time_range` seconds; schema constraints that
+conflicting time selectors with hosted MCP `query_spec.from` (for example `24h`),
+as recorded in official public CI; it does not substitute REST `time_range`. Schema constraints that
 the adapter cannot honor yield an unobserved signal and a note. Never generate
 queries from carrier names or sum percentiles. COUNT counts spans/events, **not
 automatically requests**; units remain authored, and missing/empty results are
@@ -2096,13 +2097,21 @@ nulls and malformed results are unobserved. Series timestamps are bucket starts;
 the aggregate is the whole-window headline, and `observedAt` records receipt time.
 No implicit rate conversion is performed.
 
-Only HTTPS `mcp.honeycomb.io/query_results/<token>` transport is supported, with
+For hosted results, only HTTPS `mcp.honeycomb.io/query_results/<token>` retrieval is supported, with
 credentials omitted, no referrer, redirects rejected, a 15-second timeout and a
 1 MiB streamed response cap. Abort follows Metrics off, destruction and binding
 changes. A CSP/CORS or response failure stays unobserved; no alternate endpoint
 or EU host is guessed. Signed URLs are never stored in the spec, runtime map,
 notes or UI links. An authored safe link takes priority over the returned
 `query_url` on `ui.honeycomb.io`.
+
+The local mock returns exact raw JSON in MCP `structuredContent`; a namespace
+may expose this as an object `payload`. The adapter accepts these explicit raw
+objects after bounded deep JSON validation (1 MiB UTF-8, 24 levels, 50,000 nodes),
+then applies the same aggregate/series checks as downloaded results. Invalid,
+oversized or conflicting raw objects stay unobserved; text tables are never a
+fallback. This mock-only transport is not a claim about hosted Honeycomb output.
+Mock COUNT counts hourly measurement rows, not requests or spans.
 
 While visible and Metrics is on, the controller refreshes no faster than once a
 minute: one `run_query` and at most one raw download per Honeycomb signal. Consent
@@ -2113,10 +2122,12 @@ history and cache. Trace/exemplar retrieval is a separate #947-coordinated leg;
 this metrics implementation does not complete all of #946 or fabricate trace IDs.
 
 Evidence: [official tools reference](https://docs.honeycomb.io/integrations/mcp/tools),
-[native query specification](https://docs.honeycomb.io/reference/query-specification),
-and [official agent-skill CI run 38212733085](https://github.com/honeycombio/agent-skill/actions/runs/38212733085)
+[official agent-skill CI run 38212733085](https://github.com/honeycombio/agent-skill/actions/runs/38212733085)
 at `6bb09279fc3fb69abf113228be939dbb929e34f1`. The test fixture preserves the
 redacted recorded metadata envelope; numeric raw fixtures follow the official
-result-interpretation schema and are explicitly synthetic. No live Grafana or
+result-interpretation schema and are explicitly synthetic. End-to-end mock tests
+call the actual mock `tools/list` and `handleMcp` implementations over the shared
+timeline; they verify the recorded `from` field and clearly labelled structured
+transport. No live Grafana or
 Honeycomb account was available for validation; artifact-specific CSP/CORS and
 current authenticated connector metadata remain deployment checks.

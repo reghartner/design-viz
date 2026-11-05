@@ -42,17 +42,17 @@ function telemetryHoneycombSchema(value,schema){
 }
 function telemetryHoneycombQuery(query,config,contract){
   if(!telemetryObject(query) || !Array.isArray(query.calculations) || query.calculations.length!==1 || query.breakdowns && (!Array.isArray(query.breakdowns) || query.breakdowns.length) || query.formulas && (!Array.isArray(query.formulas) || query.formulas.length))throw telemetryHoneycombError('Use one scalar calculation without breakdowns or formulas per Honeycomb signal.');
-  var fields=['calculations','filters','filter_combination','granularity','orders','limit','havings','time_range','start_time','end_time','calculated_fields','formulas','breakdowns','from','to'];
+  var fields=['calculations','filters','filter_combination','granularity','orders','limit','havings','time_range','start_time','end_time','calculated_fields','formulas','breakdowns','from','to','start','end'];
   if(Object.keys(query).some(function(key){return fields.indexOf(key)<0;}))throw telemetryHoneycombError('Unsupported Honeycomb query field; use native calculations and filters.');
   var calc=query.calculations[0],ops=['COUNT','SUM','AVG','MIN','MAX','COUNT_DISTINCT','CONCURRENCY','P001','P01','P05','P10','P25','P50','P75','P90','P95','P99','P999'];
   if(!telemetryObject(calc) || ops.indexOf(calc.op)<0 || ['COUNT','CONCURRENCY'].indexOf(calc.op)<0 && !telemetryText(calc.column))throw telemetryHoneycombError('Unsupported Honeycomb scalar calculation.');
   if(calc.name!==undefined && !telemetryText(calc.name) || ['COUNT','CONCURRENCY'].indexOf(calc.op)>=0 && calc.column!==undefined)throw telemetryHoneycombError('Unsupported Honeycomb calculation name or column.');
   if(!telemetryText(config.honeycomb.environment) || !telemetryText(config.honeycomb.dataset))throw telemetryHoneycombError('Set tracking.telemetry.honeycomb.environment and dataset.');
   var spec=JSON.parse(JSON.stringify(query));
-  // Native time_range is seconds (official query specification). The page
-  // window deliberately owns the time range; filters/calculations remain exact.
-  ['from','to','start_time','end_time'].forEach(function(k){delete spec[k];});
-  spec.time_range=telemetryGrafanaWindowMs(config.window)/1000;
+  // Hosted MCP public CI uses relative query_spec.from, not REST time_range.
+  // The page owns the window; authored calculations and filters remain exact.
+  ['from','to','start','end','start_time','end_time','time_range'].forEach(function(k){delete spec[k];});
+  spec.from=config.window;
   var input={environment_slug:config.honeycomb.environment,dataset_slug:config.honeycomb.dataset,query_spec:contract.type==='string'?JSON.stringify(spec):spec};
   if(!telemetryHoneycombSchema(input,contract.schema))throw telemetryHoneycombError('The Honeycomb run_query input schema does not support this query/window.');
   return {input:input,calculation:calc,key:calc.name || calc.op+(calc.column?'('+calc.column+')':'')};
@@ -93,15 +93,61 @@ async function telemetryHoneycombRaw(win,url,signal){
   })()]);}catch(e){throw telemetryHoneycombError(signal && signal.aborted?'Honeycomb refresh cancelled.':'Honeycomb exact raw result unavailable; check transport, permissions and query shape.');}
   finally{clearTimeout(timer);if(signal)signal.removeEventListener('abort',stop);abort.abort();if(reader)try{Promise.resolve(reader.cancel()).catch(function(){});}catch(e){}}
 }
+/* Both transport paths must be bounded JSON, not arbitrary JS objects. Walk
+   before serializing (depth/node/string bounds; no accessors, cycles or unsafe
+   keys), then enforce the UTF-8 wire limit. Clone to detach provider objects. */
+function telemetryHoneycombJson(raw){
+  var nodes=0,chars=0,active=new Set();
+  function invalid(){throw telemetryHoneycombError('Honeycomb exact raw JSON is invalid or exceeds its bounds.');}
+  function walk(value,depth){
+    if(++nodes>50000 || depth>24)invalid();
+    if(value===null || typeof value==='boolean')return value;
+    if(typeof value==='number'){if(!isFinite(value))invalid();return value;}
+    if(typeof value==='string'){chars+=value.length;if(chars>TELEMETRY_HONEYCOMB_BYTES)invalid();return value;}
+    if(!value || typeof value!=='object' || active.has(value) || Object.getOwnPropertySymbols(value).length)invalid();
+    var array=Array.isArray(value),proto=Object.getPrototypeOf(value);
+    if(!array && proto!==null && Object.getPrototypeOf(proto)!==null)invalid();
+    var keys=Object.keys(value);if(keys.length>50000-nodes)invalid();
+    if(array && keys.length!==value.length)invalid();
+    active.add(value);var out=array?[]:Object.create(null);
+    keys.forEach(function(key,index){
+      if(array && key!==String(index))invalid();
+      if(['__proto__','prototype','constructor'].indexOf(key)>=0)invalid();
+      chars+=key.length;if(chars>TELEMETRY_HONEYCOMB_BYTES)invalid();
+      var descriptor=Object.getOwnPropertyDescriptor(value,key);if(!descriptor || !telemetryOwn(descriptor,'value'))invalid();
+      out[key]=walk(descriptor.value,depth+1);
+    });active.delete(value);return out;
+  }
+  var copy=walk(raw,0),text=JSON.stringify(copy);
+  if(text.length>TELEMETRY_HONEYCOMB_BYTES || new TextEncoder().encode(text).byteLength>TELEMETRY_HONEYCOMB_BYTES)invalid();
+  return copy;
+}
+/* The local mock publishes exact raw JSON in structuredContent; a namespace
+   may expose that JSON as payload. This is not evidence that hosted Honeycomb
+   returns structured raw data. Conflicting/invalid candidates never fall back
+   to rounded content or to another response field. */
+async function telemetryHoneycombResult(win,result,meta,signal){
+  if(signal && signal.aborted)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
+  var candidates=[];
+  if(result && telemetryOwn(result,'structuredContent'))candidates.push(result.structuredContent);
+  if(result && telemetryOwn(result,'payload') && typeof result.payload!=='string')candidates.push(result.payload);
+  if(!candidates.length)return telemetryHoneycombJson(await telemetryHoneycombRaw(win,meta.query_result_json,signal));
+  var raw=candidates.map(telemetryHoneycombJson);
+  if(raw.length>1 && JSON.stringify(raw[0])!==JSON.stringify(raw[1]))throw telemetryHoneycombError('Honeycomb exact raw payload is ambiguous.');
+  return raw[0];
+}
 function telemetryHoneycombSample(raw,query,unit){
   if(!telemetryObject(raw) || !Array.isArray(raw.results) || raw.results.length!==1 || !telemetryObject(raw.results[0].data))throw telemetryHoneycombError('Honeycomb result is missing or ambiguous; expected one aggregate row.');
-  var key=query.key,header=Array.isArray(raw.header)?raw.header:[],aliases=header.filter(function(h){return h && h.alias===key && typeof h.key_name==='string';});
+  var key=query.key,header=Array.isArray(raw.header)?raw.header:[];
+  if(header.some(function(h){return !telemetryObject(h) || !telemetryText(h.alias) || !telemetryText(h.key_name);}))throw telemetryHoneycombError('Honeycomb raw result has an invalid header.');
+  var aliases=header.filter(function(h){return h && h.alias===key && typeof h.key_name==='string';});
   if(aliases.length>1)throw telemetryHoneycombError('Honeycomb result alias is ambiguous.');
   if(aliases.length===1)key=aliases[0].key_name;
   var value=raw.results[0].data[key];if(!telemetryNumber(value) || Math.abs(value)>Number.MAX_SAFE_INTEGER)throw telemetryHoneycombError('Honeycomb returned no exact finite aggregate.');
+  if(raw.header!==undefined && !Array.isArray(raw.header) || raw.series!==undefined && !Array.isArray(raw.series))throw telemetryHoneycombError('Honeycomb raw result has invalid header or series.');
   var points=[],seen=Object.create(null);
-  (Array.isArray(raw.series)?raw.series:[]).forEach(function(row){var data=row && row.data,at=data && typeof data.time==='string'?Date.parse(data.time):NaN;
-    if(!isFinite(at) || !telemetryNumber(data[key]) || Math.abs(data[key])>Number.MAX_SAFE_INTEGER)return;
+  (raw.series || []).forEach(function(row){var data=row && row.data,at=data && typeof data.time==='string'?Date.parse(data.time):NaN;
+    if(!telemetryObject(data) || !isFinite(at) || !telemetryNumber(data[key]) || Math.abs(data[key])>Number.MAX_SAFE_INTEGER)throw telemetryHoneycombError('Honeycomb raw series contains an invalid point.');
     if(seen[at])throw telemetryHoneycombError('Honeycomb series is ambiguous; multiple rows share a bucket.');seen[at]=true;points.push([at,data[key]]);
   });points.sort(function(a,b){return a[0]-b[0];});
   var sample={value:value,series:points};if(unit)sample.unit=unit;
@@ -148,12 +194,12 @@ function createTelemetryHoneycomb(page,win,now,bound){
         var result=await mcp.callTool(contract.server,'run_query',query.input,{signal:signal});
         if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
         if(result && result.isError)throw {code:'tool_error'};
-        var meta=telemetryHoneycombMetadata(result),raw=await telemetryHoneycombRaw(win,meta.query_result_json,signal),sample=telemetryHoneycombSample(raw,query,job.unit);
+        var meta=telemetryHoneycombMetadata(result),raw=await telemetryHoneycombResult(win,result,meta,signal),sample=telemetryHoneycombSample(raw,query,job.unit);
         if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
         var out=map[job.id] || (map[job.id]={signals:{},observedAt:new Date(clock()).toISOString(),links:{},markers:[]});out.signals[job.name]=sample;
         var link=telemetryHoneycombPublicLink(job.links.query) || telemetryHoneycombUrl(meta.query_url,false);if(link)out.links.query=link;
         var dashboard=telemetryHoneycombPublicLink(job.links.dashboard);if(dashboard)out.links.dashboard=dashboard;
-        if(query.calculation.op==='COUNT')notes.push('Honeycomb COUNT counts spans/events, not automatically requests.');
+        if(query.calculation.op==='COUNT')notes.push('Honeycomb COUNT counts source rows/events, not automatically requests.');
       }catch(e){
         if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
         if(['tool_error','bad_request','transform_error'].indexOf(e && e.code)>=0)e=telemetryHoneycombError('Honeycomb query failed; no measurement returned.');

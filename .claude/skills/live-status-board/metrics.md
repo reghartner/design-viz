@@ -50,7 +50,7 @@ public artifact. Use the stable `query_url` as `links.query` when supplied.
 The claude.ai viewer composes Grafana/Loki/SQL and Honeycomb metrics. Honeycomb
 requires runtime `run_query` input schemas, one scalar calculation per signal
 and no breakdowns or formulas. Use native `calculations`/`filters`; the page
-window controls native `time_range` seconds. Exact values require a permitted,
+window controls hosted MCP `query_spec.from` (for example `24h`). Exact values require a permitted,
 bounded raw-result download; CSP/CORS failure remains unobserved. COUNT counts
 spans/events, not automatically requests. Honeycomb history and trace retrieval
 are unsupported. No live-account verification is claimed.

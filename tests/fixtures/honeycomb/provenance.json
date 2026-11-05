@@ -1,1 +1,8 @@
-{"source":"https://github.com/honeycombio/agent-skill/actions/runs/38212733085","commit":"6bb09279fc3fb69abf113228be939dbb929e34f1","recorded_date":"2026-10-12","note":"Official successful CI response extract; expired token redacted, never fetched. The multi-calculation formula query behind this response is not adapter-supported; this fixture verifies the metadata envelope. Numeric fixtures are synthetic, following official result-interpretation.md results[].data, series[].data.time, header alias/key_name, info.granularity_seconds; NOT live-account evidence."}
+{
+  "source": "https://github.com/honeycombio/agent-skill/actions/runs/38212733085",
+  "commit": "6bb09279fc3fb69abf113228be939dbb929e34f1",
+  "recorded_date": "2026-10-12",
+  "note": "Official successful CI response extract; expired token redacted, never fetched. The multi-calculation formula query behind this response is not adapter-supported; this fixture verifies the metadata envelope. Numeric fixtures are synthetic, following official result-interpretation.md results[].data, series[].data.time, header alias/key_name, info.granularity_seconds; NOT live-account evidence.",
+  "hosted_request": "Official successful public CI uses query_spec.from relative text; page window replaces conflicting selectors without replacing authored calculations/filters. Runtime inputSchema selects object versus string.",
+  "mock_transport": "tests/helpers/honeycomb-bridge.mjs calls actual mock tools/list and handleMcp. StructuredContent/object payload is mock-labelled exact raw JSON, not a claim of hosted Honeycomb structured output."
+}

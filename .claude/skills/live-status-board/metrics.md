@@ -52,8 +52,21 @@ requires runtime `run_query` input schemas, one scalar calculation per signal
 and no breakdowns or formulas. Use native `calculations`/`filters`; the page
 window controls hosted MCP `query_spec.from` (for example `24h`). Exact values require a permitted,
 bounded raw-result download; CSP/CORS failure remains unobserved. COUNT counts
-spans/events, not automatically requests. Honeycomb history and trace retrieval
-are unsupported. No live-account verification is claimed.
+spans/events, not automatically requests. Honeycomb daily history remains
+unsupported. No live-account verification is claimed.
+
+Live Honeycomb trace retrieval uses `run_query` followed by `get_trace` for an
+actual returned trace ID. Declare both tools in the artifact's Honeycomb MCP
+capability; the generated scalar declaration lists only `run_query`. Author an
+explicit raw-sample wrapper with `query_spec`, `raw_row_columns` including
+`trace.trace_id`, and `results_limit` from 1 to 20. These fields belong inside
+the signal's `honeycomb` object; raw columns and the limit are siblings of
+`query_spec`. Within a carrier, the first explicit trace signal is selected.
+The adapter accepts the supported exact trace table and metadata; raw
+`trace_result_json` downloads remain unsupported. Keep partial/completeness
+warnings visible and describe only that observed request. Over time never
+borrows live traces. Read the [provider trace contract](../../../docs/provider-traces.md)
+for the complete wrapper example, tool schemas, bounds and selection behavior.
 
 ## 3. Write explicit bindings
 

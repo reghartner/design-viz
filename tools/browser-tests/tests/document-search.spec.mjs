@@ -31,9 +31,9 @@ test('live narrowing stays put, page 3 opens its matching step and Results jumps
  await input.press('Escape');await expect(root.locator('.document-search')).toBeHidden();expect((await ranges(page)).flatMap(r=>r.text)).toEqual([]);
 });
 
-test('search presentation uses readable theme colors in all six skins',async({page,server},info)=>{
+test('search presentation uses readable theme colors in all nine skins',async({page,server},info)=>{
  await page.setViewportSize({width:1280,height:900});
- for(const skin of ['aurora','daylight','editorial','terminal','pastel','blueprint']){
+ for(const skin of ['aurora','daylight','editorial','terminal','pastel','blueprint','rose','lavender','lilac']){
   const root=await open(page,server,fixture(skin),'search-'+skin);await search(root,'heartbeat');await root.getByRole('button',{name:'Results',exact:true}).click();
   await expect(root.locator('.document-search')).toBeVisible();
   const styles=await root.locator('.document-search').evaluate(node=>{const s=getComputedStyle(node),r=node.getBoundingClientRect();return {color:s.color,background:s.backgroundColor,right:r.right,bottom:r.bottom};});

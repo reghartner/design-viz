@@ -35,8 +35,9 @@ argument types and required fields. Honeycomb `query_spec` may be an object or J
 actual schema; expected-type-plus-null unions are supported. Honeycomb dataset
 is optional when the schema permits omission. Raw columns and limit are top-level. The page window (24h default)
 accepts `6h`, `-6h` or `now-6h` (surrounding whitespace ignored). These
-lookbacks normalize to `6h` for hosted `query_spec.from`, as in the scalar
-adapter, and to the same six-hour RFC3339 bounds for Tempo. Both search and
+lookbacks normalize internally to `6h`. Honeycomb receives signed `-6h` in
+hosted `query_spec.from` and `get_trace.from`, as in the scalar adapter. Other
+providers retain their conventions: Tempo uses the same six-hour RFC3339 bounds. Both search and
 detail use that window for local and imported carriers. The authored spelling
 is preserved; unsupported future offsets, zero and date expressions warn and
 use the default `24h`. `get_trace` uses

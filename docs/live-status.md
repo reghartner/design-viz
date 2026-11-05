@@ -284,8 +284,11 @@ permits availability; it never turns Metrics on. Jira Live remains independent.
 window, a duration such as `30m`, `1h` or `7d`; the default is `24h`, the previous
 24 hours (Chuck, 2026-11-04). Positive integer units `s`, `m`, `h`, `d` and
 `w` accept a bare duration or relative lookback: `6h`, `-6h` and `now-6h`
-all query the previous six hours. Surrounding whitespace is ignored. Providers
-receive the canonical positive duration; parsing never rewrites authored source.
+all query the previous six hours. Surrounding whitespace is ignored. The internal
+canonical duration is `6h`; Honeycomb receives signed `from: "-6h"` for scalar
+queries and trace search/detail. Other providers keep their existing conventions
+(for example Grafana relative starts use `now-6h`, and Tempo uses RFC3339 bounds).
+Parsing never rewrites authored source.
 The desktop Metrics window editor keeps the entered spelling (trimmed), with one
 Undo/Redo per edit. Future offsets (`+6h`), zero, fractional durations and date
 expressions are unsupported: authored invalid values warn and use `24h`, while

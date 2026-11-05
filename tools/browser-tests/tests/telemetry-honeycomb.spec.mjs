@@ -120,7 +120,7 @@ for(const shape of ['direct','detail','zero'])test('actual mock measurement cloc
  await expect(card).toContainText(shape==='zero'?'0':'645.4');
  expect((await card.locator('.dv-metrics-sparkline').getAttribute('points')).trim().split(/\s+/)).toHaveLength(24);
  await expect(row.locator('.dv-live-proof-point')).toHaveCount(24);await expect(row.locator('.dv-live-proof-series')).toHaveCount(1);
- expect(await page.evaluate(id=>liveStatusProofPresentation(window.ctl.telemetry.snapshot(),'24h').rows.find(r=>r.id===id).chart.observedAt,id)).toBe('2026-11-01T00:00:00.000Z');
+ expect(await page.evaluate(id=>window.ctl.liveStatus.snapshot().metrics.proof.rows.find(r=>r.id===id).chart.observedAt,id)).toBe('2026-11-01T00:00:00.000Z');
  const before=h.bridge.calls.length;await row.hover();expect(h.bridge.calls).toHaveLength(before);
  await metrics(root).click();h.bridge.day=7;await metrics(root).click();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);
  expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.rate,id)).toBeUndefined();await expect(row.locator('.dv-live-proof-point')).toHaveCount(0);await expect(row).toContainText('UNOBSERVED');

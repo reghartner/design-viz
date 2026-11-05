@@ -66,7 +66,8 @@ function telemetryHoneycombUrl(value,raw){
 }
 function telemetryHoneycombPublicLink(value){var link=deltaLinkUrl(value);if(!link)return null;try{var u=new URL(link);return /(?:^|\.)honeycomb\.io$/.test(u.hostname) && /(?:query_results|trace_results)\//.test(u.pathname)?null:link;}catch(e){return null;}}
 function telemetryHoneycombMetadata(result){
-  var text=typeof (result && result.payload)==='string'?result.payload:(result && result.content || []).filter(function(c){return c.type==='text' && typeof c.text==='string';}).map(function(c){return c.text;}).join('\n');
+  if(result && result.content!==undefined && !Array.isArray(result.content))throw telemetryHoneycombError('Honeycomb result metadata is invalid.');
+  var text=typeof (result && result.payload)==='string'?result.payload:(result && result.content || []).filter(function(c){return c && c.type==='text' && typeof c.text==='string';}).map(function(c){return c.text;}).join('\n');
   if(text.length>TELEMETRY_HONEYCOMB_BYTES)throw telemetryHoneycombError('Honeycomb result metadata is too large.');
   var out={};['query_result_json','query_url'].forEach(function(key){
     var re=new RegExp('^  '+key+': "([^"\\r\\n]+)"\\s*$','gm'),matches=[],m;while((m=re.exec(text)))matches.push(m[1]);
@@ -137,7 +138,7 @@ async function telemetryHoneycombResult(win,result,meta,signal){
   return raw[0];
 }
 function telemetryHoneycombSample(raw,query,unit){
-  if(!telemetryObject(raw) || !Array.isArray(raw.results) || raw.results.length!==1 || !telemetryObject(raw.results[0].data))throw telemetryHoneycombError('Honeycomb result is missing or ambiguous; expected one aggregate row.');
+  if(!telemetryObject(raw) || !Array.isArray(raw.results) || raw.results.length!==1 || !telemetryObject(raw.results[0]) || !telemetryObject(raw.results[0].data))throw telemetryHoneycombError('Honeycomb result is missing or ambiguous; expected one aggregate row.');
   var key=query.key,header=Array.isArray(raw.header)?raw.header:[];
   if(header.some(function(h){return !telemetryObject(h) || !telemetryText(h.alias) || !telemetryText(h.key_name);}))throw telemetryHoneycombError('Honeycomb raw result has an invalid header.');
   var aliases=header.filter(function(h){return h && h.alias===key && typeof h.key_name==='string';});

@@ -83,3 +83,13 @@ test('actual mock completed raw result missing or malformed cannot fall back to 
   const h=await setup({page,bridge});t.after(()=>h.close());h.api.setEnabled(true);await settle();assert.ok(h.api.snapshot().map.a.signals.rate.value>0);assert.equal(h.api.snapshot().map.a.signals.latency,undefined);assert.equal(h.fetches.length,0);
  }
 });
+
+test('actual mock malformed row or metadata preserves a successful Honeycomb peer',async t=>{
+ const {createMockBridge,nativeQuery,EVENT_QUERY,expected}=await import('./helpers/honeycomb-bridge.mjs');
+ for(const malformed of ['row','metadata']){
+  const bridge=createMockBridge(),original=bridge.callTool;
+  bridge.callTool=async(...args)=>{const result=await original(...args);if(args[0]==='Honeycomb'&&args[2].query_spec.filters[0].value==='notify->app'){if(malformed==='row')result.structuredContent.results=[null];else result.content={};}return result;};
+  const page=pageSpec();page.tracking.telemetry.honeycomb={environment:'flowview-demo',dataset:'doorbell'};page.tracking.telemetry.grafana.prometheus='prom-main';page.sections[0].diagram.nodes.a.telemetry.signals={rate:{grafana:EVENT_QUERY},latency:{honeycomb:nativeQuery()},bad:{honeycomb:nativeQuery('notify->app')}};
+  const h=await setup({page,bridge});t.after(()=>h.close());h.api.setEnabled(true);await settle();const s=h.api.snapshot();assert.equal(s.map.a?.signals.latency?.value,expected(),'successful Honeycomb signal survives malformed peer');assert.ok(s.map.a.signals.rate.value>0);assert.equal(s.map.a.signals.bad,undefined);assert.match(s.status.note,/missing or ambiguous|metadata is invalid/);
+ }
+});

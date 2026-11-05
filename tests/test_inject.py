@@ -399,6 +399,7 @@ class InjectTests(unittest.TestCase):
         declaration = json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S)[1])
         self.assertEqual(declaration, {"comments": {"composer_only": True, "customAnchors": True}})
         self.assertNotIn("searchJiraIssuesUsingJql", guide)
+        self.assertNotIn("## Metrics rules", guide)
         self.assertEqual(json.loads(FLOWSPEC_BLOCK.search(out)[1]), SPEC)
 
     def test_agent_guide_declares_the_grafana_connector_only_for_grafana_run_signals(self):
@@ -432,6 +433,28 @@ class InjectTests(unittest.TestCase):
             declaration, guide = guide_for(node_telemetry={"kind": "service", "signals": {"x": other}})
             self.assertEqual(declaration["mcp"]["servers"], [jira], other)
             self.assertNotIn("get_annotations", guide)
+            for needle in ("## Metrics rules", "never derive a query", "imported/nested", "no shipped claude.ai adapter"):
+                self.assertIn(needle, guide)
+        # Page settings alone make the conditional guide relevant without
+        # granting a connector permission; a root disable keeps authored
+        # Grafana signals visible to editors but suppresses its declaration.
+        declaration, guide = guide_for(page_extra={"tracking": {"jira": {"site": "https://jira.test"}, "telemetry": {"window": "24h"}}})
+        self.assertEqual(declaration["mcp"]["servers"], [jira])
+        self.assertIn("## Metrics rules", guide)
+        telemetry_only = json.loads(json.dumps(SPEC))
+        telemetry_only["page"]["tracking"] = {"telemetry": {"window": "24h"}}
+        r, out = run_inject(TEMPLATE, json.dumps(telemetry_only))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        guide = GUIDE_BLOCK.search(out)[1]
+        self.assertEqual(json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S)[1]), {"comments": {"composer_only": True, "customAnchors": True}})
+        self.assertIn("no Jira connector", guide)
+        self.assertIn("## Metrics rules", guide)
+        disabled = {"tracking": {"jira": {"site": "https://jira.test"}, "telemetry": {"enabled": False, "templates": {"t": {"kind": "service", "signals": {"r": {"grafana": "up"}}}}}}}
+        declaration, guide = guide_for(page_extra=disabled)
+        self.assertEqual(declaration["mcp"]["servers"], [jira])
+        self.assertIn("Root `enabled:false`", guide)
+        self.assertIn("grants no query permission", guide)
+        self.assertNotIn("get_annotations", guide)
         # an untracked page with Grafana signals declares Grafana alone
         spec = json.loads(json.dumps(SPEC))
         spec["page"]["blocks"] = [{"heading": "h", "diagram": {"nodes": {"a": {"telemetry": {"kind": "service", "signals": {"r": {"grafana": "up"}}}}}, "rows": [["a"]]}}]
@@ -475,7 +498,8 @@ class InjectTests(unittest.TestCase):
         def declaration(page_spec, provider_spec=None):
             template = TEMPLATE
             if provider_spec is not None:
-                context = {"version": 1, "id": "consumer", "specs": [provider_spec, page_spec]}
+                providers = provider_spec if isinstance(provider_spec, list) else [provider_spec]
+                context = {"version": 1, "id": page_spec["page"]["canon"]["id"], "specs": providers + [page_spec]}
                 block = '<script type="application/json" id="flowview-topology">' + json.dumps(context).replace("<", "\\u003c") + "</script>\n"
                 template = TEMPLATE.replace(BLOCK_OPEN, block + BLOCK_OPEN, 1)
             r, out = run_inject(template, json.dumps(page_spec))
@@ -495,6 +519,13 @@ class InjectTests(unittest.TestCase):
         # a consumer overlay replaces the provider binding as a whole (here with a tempo-only one)
         tempo = {"kind": "service", "signals": {"t": {"tempo": "{ }"}}}
         self.assertEqual(declaration(consumer({"api": {"telemetry": tempo}}), provider(api=signal)), {"comments": comments})
+        # Nested imports use the loader-selected export and retain the provider
+        # binding. This is the same resolution path used for selected details.
+        middle = consumer()
+        middle["page"]["canon"]["id"] = "middle"
+        middle["page"]["sections"][0]["diagram"]["topologyExports"] = {"nested": {"nodes": ["shared::api", "shared::store"], "edges": ["shared::api->shared::store"]}}
+        outer = spec("outer", {"nodes": {"local": {"title": "Local"}}, "rows": [["local"]], "topologyImports": [{"spec": "middle", "export": "nested", "as": "outer"}]})
+        self.assertEqual(declaration(outer, [provider(api=signal), middle])["mcp"]["servers"], [grafana])
         # a page with no telemetry anywhere, with or without a topology context
         self.assertEqual(declaration(consumer(), provider()), {"comments": comments})
         self.assertEqual(declaration(SPEC), {"comments": comments})

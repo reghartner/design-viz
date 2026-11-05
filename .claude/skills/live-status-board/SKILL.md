@@ -1,15 +1,14 @@
 ---
 name: live-status-board
-description: Author a Flowview live-status board (an "Epic Status board"), a diagram whose nodes and edges carry Jira ticket keys and paint themselves from live Jira state (grey to do, blue in progress, green done, red blocked or missing) when opened as a claude.ai artifact with the viewer's Atlassian connector. Load only when the request explicitly asks for live Jira status, an Epic Status board, or ticket tracking on the diagram; a delivery or cross-team diagram without that ask, and all plain Flowview authoring, stays on hld-to-page.
+description: Author a Flowview live-status board (an "Epic Status board") with live Jira state (grey to do, blue in progress, green done, red blocked or missing) and, when explicitly requested, production metrics/proof. Load for live Jira, ticket tracking, metrics, traffic, Grafana, Honeycomb, Loki or proof on a diagram; plain Flowview authoring stays on hld-to-page.
 ---
 
 # Live-status board
 
-Load this skill only for a board that must show live ticket state. It adds the
-tracking layer on top of ordinary Flowview authoring; it does not replace the
-hld-to-page flow for the story, nodes, edges and steps themselves. Do not
-apply any of this to a diagram whose request never mentions tickets, Jira,
-live status or delivery tracking. Document editing is desktop-only.
+Load this skill for a board that must show live ticket state or explicit
+production metrics/proof. It adds tracking to ordinary Flowview authoring; it
+does not replace hld-to-page for the story, nodes, edges and steps. Do not apply
+it to a plain diagram. Document editing is desktop-only.
 
 Read these on demand, not up front: `docs/live-status.md` (state model,
 rendering, demo mode, publishing), the `tracking` paragraphs of
@@ -17,6 +16,16 @@ rendering, demo mode, publishing), the `tracking` paragraphs of
 `examples/live-status/live-status.spec.json` with its
 `live-status.timeline.json`, and
 `deploy/cloudflare/mock-atlassian-mcp/README.md` for the mock server.
+
+## Metrics requests (conditional)
+
+Only when the request mentions metrics, traffic, Grafana, Honeycomb, Loki or
+proof, read [Metrics authoring](metrics.md). That chapter applies to every
+carrier: local nodes and edges, direct and nested imported carriers, consumer
+overlays, and carriers on the detail page the loader actually selects. A
+metrics-only request does not require Jira; never invent an Epic, tickets or
+ticket status to use telemetry. A request with none of these signals does not
+load the chapter.
 
 ## 0. The interaction
 

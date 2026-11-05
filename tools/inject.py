@@ -186,25 +186,45 @@ GRAFANA_TOOLS = ["query_prometheus", "query_loki_logs", "search_tempo_traces", "
 GRAFANA_SOURCES = ("grafana", "loki", "sql")
 
 
-def _grafana_binding(telemetry: dict) -> bool:
+def _telemetry_sources(telemetry: dict) -> set[str]:
+    """Authored source keys in one binding or page telemetry block."""
+    found = set()
     signals = telemetry.get("signals")
-    if isinstance(signals, dict) and any(isinstance(signal, dict) and any(source in signal for source in GRAFANA_SOURCES)
-                                         for signal in signals.values()):
-        return True
+    if isinstance(signals, dict):
+        for signal in signals.values():
+            if isinstance(signal, dict):
+                found.update(source for source in ("grafana", "loki", "tempo", "sql", "honeycomb") if source in signal)
     templates = telemetry.get("templates")
-    return isinstance(templates, dict) and any(isinstance(t, dict) and _grafana_binding(t) for t in templates.values())
+    if isinstance(templates, dict):
+        for template in templates.values():
+            if isinstance(template, dict):
+                found.update(_telemetry_sources(template))
+    return found
 
 
-def grafana_signals(value) -> bool:
-    """True when any `telemetry` object of the page (a carrier, a topology tracking
-    overlay or the page's templates) holds a signal the Grafana connector runs."""
+def telemetry_sources(value) -> set[str]:
+    """All authored telemetry sources in a spec fragment."""
+    found = set()
     if isinstance(value, dict):
         telemetry = value.get("telemetry")
-        if isinstance(telemetry, dict) and _grafana_binding(telemetry):
+        if isinstance(telemetry, dict):
+            found.update(_telemetry_sources(telemetry))
+        for item in value.values():
+            found.update(telemetry_sources(item))
+    elif isinstance(value, list):
+        for item in value:
+            found.update(telemetry_sources(item))
+    return found
+
+
+def telemetry_authored(value) -> bool:
+    """True for page settings, templates or carrier bindings, even disabled ones."""
+    if isinstance(value, dict):
+        if "telemetry" in value and isinstance(value.get("telemetry"), dict):
             return True
-        return any(grafana_signals(item) for item in value.values())
+        return any(telemetry_authored(item) for item in value.values())
     if isinstance(value, list):
-        return any(grafana_signals(item) for item in value)
+        return any(telemetry_authored(item) for item in value)
     return False
 
 
@@ -226,7 +246,7 @@ C.telemetryBindings(fn=>C.sectionRecords(page).forEach(record=>{
   Object.keys(d.nodes||{}).forEach(id=>fn(d.nodes[id],id,page));
   (Array.isArray(d.edges)?d.edges:[]).forEach(e=>fn(e,e&&typeof e==='object'?e.from+'->'+e.to:null,page));
 })).forEach(b=>Object.keys(b.signals).forEach(name=>{if(!sources.includes(b.signals[name].source))sources.push(b.signals[name].source);}));
-process.stdout.write(JSON.stringify(sources));
+process.stdout.write(JSON.stringify({bound:sources.length>0,sources}));
 """
 
 
@@ -242,22 +262,21 @@ def topology_context(html: str):
     return context if isinstance(context, dict) else None
 
 
-def imported_grafana(spec: dict, context: dict) -> bool:
-    """True when a carrier the runtime resolves from `context` binds a signal the
-    Grafana connector runs: exported and selected carriers only, consumer overlays
-    replacing provider bindings, provider templates expanded. Without node, or
-    when the context cannot be resolved (the page then stops at boot as well),
-    any spec in the context with such a signal counts, so it never under-declares."""
+def imported_telemetry(spec: dict, context: dict) -> tuple[bool, set[str]]:
+    """Telemetry the runtime resolves from imported carriers: exported and selected
+    carriers only, nested imports included, consumer overlays replacing provider
+    bindings and provider templates expanded. On resolver failure, fail open to
+    authored context so the guide never under-declares its data dependencies."""
     script = RESOLVED_SOURCES_JS.replace("__LOADER__", json.dumps(str(REPO_ROOT / "tools" / "source-loader.cjs")))
     try:
         result = subprocess.run(["node", "-e", script], input=json.dumps({"spec": spec, "context": context}),
                                 capture_output=True, text=True, timeout=120, check=False)
-        sources = json.loads(result.stdout) if result.returncode == 0 else None
-        if isinstance(sources, list):
-            return any(source in GRAFANA_SOURCES for source in sources)
+        resolved = json.loads(result.stdout) if result.returncode == 0 else None
+        if isinstance(resolved, dict) and isinstance(resolved.get("sources"), list):
+            return bool(resolved.get("bound")), set(resolved["sources"])
     except (OSError, subprocess.SubprocessError, ValueError):
         pass
-    return grafana_signals(context)
+    return telemetry_authored(context), telemetry_sources(context)
 
 
 # #826: the spec file published beside a two-file page, and the line that tells
@@ -289,12 +308,13 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
 
     Everything stated here is derived from the spec or is a fixed contract; the
     capability declaration names only what this page needs (the Jira connector only
-    when the page has tracking; the Grafana connector only when a carrier or page
-    template binds a grafana, loki or sql signal, imported carriers of the
-    embedded `topology` context included, #943; the artifact and user
+    when the page has Jira/non-telemetry tracking; the Grafana connector only when the enabled root has
+    a carrier or page template binding a grafana, loki or sql signal, imported
+    carriers of the embedded `topology` context included, #943; the artifact and user
     capabilities only for a tracked page published in two-file mode, #826). `commit` pins the doc links to the
-    source this page was built from (#758: docs at the page's version); None
-    links main with a note. Values are interpolated from a spec that already
+    source this page was built from (#758: docs at the page's version). Any authored
+    telemetry adds the compact field and honesty rules without promising an adapter;
+    a `None` commit links main with a note. Values are interpolated from a spec that already
     passed the '</script' check, so the block cannot terminate itself.
     """
     page = spec.get("page") if isinstance(spec.get("page"), dict) else {}
@@ -303,8 +323,19 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
     version = version if isinstance(version, str) and version else None
     tracking = page.get("tracking") if isinstance(page.get("tracking"), dict) else None
     jira = tracking.get("jira") if tracking and isinstance(tracking.get("jira"), dict) else {}
-    tracked = tracking is not None
-    grafana = grafana_signals(page) or (topology is not None and imported_grafana(spec, topology))
+    # A telemetry-only page uses `page.tracking.telemetry` but must not acquire
+    # Jira permissions or board-edit capabilities merely because of that shared
+    # container. Any other tracking field retains the established board behavior.
+    tracked = bool(tracking and any(key != "telemetry" for key in tracking))
+    sources = telemetry_sources(page)
+    metrics = telemetry_authored(page)
+    if topology is not None:
+        imported_bound, imported_sources = imported_telemetry(spec, topology)
+        metrics = metrics or imported_bound
+        sources.update(imported_sources)
+    telemetry_config = tracking.get("telemetry") if tracking and isinstance(tracking.get("telemetry"), dict) else {}
+    root_disabled = telemetry_config.get("enabled") is False
+    grafana = not root_disabled and any(source in GRAFANA_SOURCES for source in sources)
 
     servers = ([{"server": "Atlassian", "tools": JIRA_TOOLS}] if tracked else []) + \
         ([{"server": "Grafana", "tools": GRAFANA_TOOLS}] if grafana else [])
@@ -426,7 +457,7 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
         ]
     else:
         lines += [
-            "This page has no `page.tracking`, so it declares no Jira connector. Add "
+            "This page has no Jira/non-telemetry tracking, so it declares no Jira connector. Add "
             "the Jira connector declaration described in docs/live-status.md only after adding "
             "tracking; connector display names are per account.",
         ]
@@ -438,6 +469,27 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "(at most once a minute) makes one get_annotations call and one query per grafana or loki "
             "signal, and generate_deeplink runs once per carrier. sql signals call query_sql at most "
             "once an hour; add \"query_sql\" to the tools only when that server enables it.",
+        ]
+    if metrics:
+        lines += [
+            "",
+            "## Metrics rules",
+            "",
+            "- `page.tracking.telemetry` holds availability, datasource/environment settings, "
+            "`window` (default `24h`) and templates. A carrier `telemetry` binding holds an explicit "
+            "`kind`, named `signals`, agreed `proof` limits and safe `links`; never derive a query from "
+            "a node id, title or service name.",
+            "- Apply this to every selected local, imported/nested, consumer-overlay and loaded-detail "
+            "node or edge. Inspect current connector tool schemas, preserve exact queries and datasource "
+            "UIDs, run each selected proposal once, and report returned, empty, zero and failed evidence.",
+            "- Readers start with Metrics off. Root `enabled:false` or an explicit host false disables "
+            "all carriers and grants no query permission; missing tools hide Metrics. Preview metrics are "
+            "synthetic, unsaved and make no network call.",
+            "- Honeycomb queries are authored data but have no shipped claude.ai adapter yet. Keep only "
+            "stable dashboard/query UI URLs; never persist signed result URLs or claim live verification.",
+            "- Over time uses each day's exact prior-24h endpoint. Missing history is unobserved; never "
+            "borrow live or adjacent samples. See docs/live-status.md and the live-status-board Metrics "
+            "chapter before editing bindings.",
         ]
     lines += [
         "",

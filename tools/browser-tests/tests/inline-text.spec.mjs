@@ -244,6 +244,38 @@ for(const explore of [false,true])test('double-click renames a local node in pla
  await undo.click();await expect(src).toHaveValue(original);await expect(name).toHaveText('Existing');
 });
 
+for(const explore of [false,true])test('node subtitle edits in place with Inspect clearing parity ('+(explore?'Explore':'Standard')+')',async({page,server})=>{
+ const original=await setup(page,server,explore),src=page.locator('#src'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder');
+ const card=page.locator('#docview g.node[data-dv-node="a"]'),sub=card.locator('.t2'),edit=card.getByRole('textbox',{name:'Node subtitle',exact:true});
+ await card.click();await page.locator('#editor-tab-inspect').click();const inspect=page.locator('#guide').getByLabel('Subtitle',{exact:true});
+ await inspect.fill('');await inspect.press('Enter');const cleared=await src.inputValue();const noSub=fixture(explore);delete noSub.page.sections[0].diagram.nodes.a.sub;expect(JSON.parse(cleared)).toEqual(noSub);
+ await undo.click();await expect(src).toHaveValue(original);await closeTools(page);
+ await sub.dblclick();await expect(edit).toBeFocused();await expect(edit).toHaveValue('Keep details');await expect(card.getByRole('textbox',{name:'Node name',exact:true})).toHaveCount(0);
+ const box=await edit.boundingBox(),line=await sub.boundingBox();expect(box.y).toBeLessThanOrEqual(line.y+line.height/2);expect(box.y+box.height).toBeGreaterThanOrEqual(line.y+line.height/2);
+ await edit.fill('Discarded');await edit.press('Escape');await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();
+ await sub.dblclick();await edit.fill('Changed detail');await edit.press('Enter');const saved=await src.inputValue(),want=fixture(explore);want.page.sections[0].diagram.nodes.a.sub='Changed detail';expect(JSON.parse(saved)).toEqual(want);await expect(sub).toHaveText('Changed detail');
+ await undo.click();await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();await redo.click();await expect(src).toHaveValue(saved);await expect(sub).toHaveText('Changed detail');
+ await undo.click();await sub.dblclick();await edit.fill('   ');await edit.press('Enter');await expect(src).toHaveValue(cleared);await undo.click();await expect(src).toHaveValue(original);
+ await sub.dblclick();await edit.fill('Outside save');await page.locator('#workbench-editor-title').click();const outside=fixture(explore);outside.page.sections[0].diagram.nodes.a.sub='Outside save';expect(JSON.parse(await src.inputValue())).toEqual(outside);await undo.click();await expect(src).toHaveValue(original);
+});
+
+test('empty node subtitle falls back to name and image fallback edits an empty draft without a write',async({page,server})=>{
+ const raw=fixture();delete raw.page.sections[0].diagram.nodes.a.sub;raw.page.sections[0].diagram.nodes.image={title:'Picture',image:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4UYAAAAASUVORK5CYII='};raw.page.sections[0].diagram.rows=[['a','image']];
+ await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(raw,null,2);await pastePage(page,original);await closeTools(page);
+ const card=page.locator('#docview g.node[data-dv-node="a"]'),body=card.locator('.card'),box=await body.boundingBox();await body.dblclick({position:{x:box.width/2,y:box.height-10}});
+ const name=card.getByRole('textbox',{name:'Node name',exact:true});await expect(name).toBeFocused();await expect(page.getByRole('textbox',{name:'Node subtitle',exact:true})).toHaveCount(0);await name.press('Escape');
+ const image=page.locator('#docview g.node[data-dv-node="image"]'),sub=image.locator('.t2'),edit=image.getByRole('textbox',{name:'Node subtitle',exact:true});await expect(sub).toHaveText('Embedded image');await sub.dblclick();await expect(edit).toBeFocused();await expect(edit).toHaveValue('');await edit.press('Enter');await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
+});
+
+test('generated handoff caption opens node name instead of a hidden subtitle',async({page,server})=>{
+ const raw=fixture();raw.page.sections[0].diagram.nodes.a.handoff={spec:'target',siteBaseUrl:server.origin+'/viewer.html'};
+ const original=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await pastePage(page,original);await closeTools(page);
+ const card=page.locator('#docview g.node[data-dv-node="a"]'),caption=card.locator('.handoff-caption');await expect(caption).toBeVisible();await caption.dblclick();
+ const name=card.getByRole('textbox',{name:'Node name',exact:true});await expect(name).toBeFocused();await expect(name).toHaveValue('Existing');await expect(page.getByRole('textbox',{name:'Node subtitle',exact:true})).toHaveCount(0);
+ await name.fill('Renamed handoff');await name.press('Enter');const saved=JSON.parse(await page.locator('#src').inputValue());const expected=structuredClone(raw);expected.page.sections[0].diagram.nodes.a.title='Renamed handoff';expect(saved).toEqual(expected);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
+});
+
 // #963 desktop panel titles: real Standard title / Explore grip double-clicks,
 // raw title (not ID fallback), Inspect empty parity, exact history, and unchanged
 // panel content. Home map deliberately exercises a panel with a clickTarget hook.

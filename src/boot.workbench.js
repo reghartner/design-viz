@@ -277,7 +277,7 @@ var view = document.getElementById('docview');
 var src = document.getElementById('src');
 var msgs = document.getElementById('msgs');
 var activeSkin = null; /* explicit picker/host choice for this Workbench session */
-var workbenchPreview=createWorkbenchPreviewController({view:view,skin:currentSkin,findings:showMsgs,previewButton:document.getElementById('open-page-preview'),
+var workbenchPreview=createWorkbenchPreviewController({view:view,skin:currentSkin,findings:showMsgs,previewButton:document.getElementById('open-page-preview'),restoreDetails:false,
   resolve:function(raw){return workbenchBuilder?workbenchBuilder.resolve(raw):raw;},
   present:function(skin){setSkinButtons(skin);applySkinClasses(document.body,view,skin);},
   arrangementSection:function(request,next,previous){return workbenchBuilder?workbenchBuilder.arrangementSection(request,next,previous):null;},

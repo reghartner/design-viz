@@ -181,7 +181,7 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   var doc=view.ownerDocument,previewButton=lifecycle && lifecycle.previewButton;
   function changeMetrics(){if(!retired && lifecycle && lifecycle.metricsPreview)lifecycle.metricsPreview(metricsInput.checked);}
   if(previewButton && lifecycle && lifecycle.metricsPreview){
-    metricsLabel=doc.createElement('label');metricsLabel.className='workspace-preview';
+    metricsLabel=doc.createElement('label');metricsLabel.className='workspace-preview workspace-metrics-preview';
     metricsInput=doc.createElement('input');metricsInput.type='checkbox';metricsInput.checked=metricsOn;
     metricsInput.disabled=!trackingTelemetry(page).enabled;
     metricsLabel.title=metricsInput.disabled?'Enable Allow metrics in Document settings → Tracking → Metrics.':'Synthetic values only; no queries or saved changes.';
@@ -215,7 +215,9 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   try{
     restoreActiveTabs(ctl, tabs);
     restoreWorkbenchPreview(page, ctl, saved);
-    if(saved && saved.details && ctl.details)ctl.details.restore(saved.details);
+    // The full Workbench canvas restores details after publishing the new controller,
+    // together with Focus and authored camera state. Standalone owners restore here.
+    if(saved && saved.details && ctl.details && (!lifecycle || lifecycle.restoreDetails!==false))ctl.details.restore(saved.details);
   }catch(ex){ctl.destroy();throw ex;}
   return ctl;
 }
@@ -332,7 +334,7 @@ function createWorkbenchPreviewController(opts){
       var nextCtl=renderWorkbenchPreview(opts.view,next,skin,previousPage,previousCtl,{
         demoLiveStatus:function(on){if(ctl===nextCtl)setDemoLiveStatus(on);},
         metricsPreview:function(on){if(ctl===nextCtl)setMetricsPreview(on);},
-        previewButton:opts.previewButton,loadDetail:opts.loadDetail,
+        previewButton:opts.previewButton,loadDetail:opts.loadDetail,restoreDetails:opts.restoreDetails,
         arrangementSection:opts.arrangementSection?opts.arrangementSection(request,next,page):null,
         beforeReplace:function(){
           if(opts.beforeReplace)opts.beforeReplace(request);

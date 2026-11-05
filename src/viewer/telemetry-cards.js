@@ -3,7 +3,7 @@
    values without installing a provider or changing the authored binding. */
 function telemetryClearCards(scope){
   scope.querySelectorAll('.dv-metrics-card,.dv-metrics-leader').forEach(function(el){el.remove();});
-  scope.querySelectorAll('.dv-metrics-label-hidden').forEach(function(el){el.classList.remove('dv-metrics-label-hidden');});
+  scope.querySelectorAll('.dv-metrics-label-hidden').forEach(function(el){el.classList.remove('dv-metrics-label-hidden');el.removeAttribute('data-metrics-preview');});
 }
 function telemetryCardValue(binding,sample,name){
   if(!name || !binding.signals[name])return 'not bound';
@@ -22,6 +22,18 @@ function telemetryCardContent(edge,binding,sample,result,window){
       ['errors: '+telemetryCardValue(binding,sample,telemetryErrorSignal(binding,primary) || 'errors'),'p95: '+telemetryCardValue(binding,sample,'p95')],
     note:state==='silent'?'no traffic · '+window+' window':state==='unobserved'?'unobserved · '+window+' window':window+' window',
     series:primary?telemetryReading(sample,primary).series:[],state:state};
+}
+/* Authoring placeholders never enter ctl.telemetry or the proof engine. Only
+   explicit, valid edge bindings get samples; IDs and labels never infer queries. */
+function telemetryCardPreview(diagram,templates){
+  var map=Object.create(null);
+  (diagram.edges || []).forEach(function(edge){
+    var binding=carrierTelemetry(edge,templates);if(!binding)return;
+    var signals=Object.create(null);
+    Object.keys(binding.signals).forEach(function(name){signals[name]={value:12,series:[[0,12],[1,12]]};});
+    map[edge.from+'->'+edge.to]={signals:signals};
+  });
+  return {preview:true,map:map,verdicts:{carriers:Object.create(null)}};
 }
 /* Keep the authored side, searching along it before moving farther out. A
    bounded local search falls back to clear space on that same side. */
@@ -50,16 +62,21 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate){
       var liveBreak=svg.querySelector('.dv-live-comm-failure[data-dv-edge="'+index+'"]');
       if(!binding || edge.hidden===true || !boardControlBox(path,svg) && !boardControlBox(liveBreak,svg))return;
       var id=edge.from+'->'+edge.to,result=view.verdicts.carriers[id],content=telemetryCardContent(edge,binding,view.map[id],result,window);
-      var card=telemetrySvg(doc,'g',{'class':'dv-metrics-card','data-dv-edge':index,'data-metrics-card':id,'data-state':content.state,'data-verdict':result && result.verdict || 'unobserved'},svg);
+      if(view.preview){content.note='Preview · synthetic';content.state='preview';}
+      var card=telemetrySvg(doc,'g',{'class':'dv-metrics-card','data-dv-edge':index,'data-metrics-card':id,'data-state':content.state,'data-verdict':view.preview?'preview':result && result.verdict || 'unobserved'},svg);
       var rect=telemetrySvg(doc,'rect',{'class':'dv-metrics-card-box',rx:7,width:138,height:78},card);
       telemetrySvg(doc,'path',{'class':'dv-metrics-card-bar',d:'M3 7V71'},card);
       var texts=[];
       function text(value,y,cls){var el=telemetrySvg(doc,'text',{'class':cls,x:10,y:y},card);el.textContent=value;texts.push(el);return el;}
       text(content.title,15,'t1');text(content.headline,31,'t1');
       text(content.details[0],46,'t2');text(content.details[1],59,'t2');text(content.note,72,'t2 dv-metrics-card-note');
-      var w=Math.max(138,Math.ceil(Math.max.apply(null,texts.map(function(el){return el.getComputedTextLength();})))+20);
+      // The synthetic annotation must not move the layout it is previewing.
+      // Fit that label inside the measured card, including wider fallback fonts.
+      var sizingTexts=view.preview?texts.slice(0,-1):texts;
+      var w=Math.max(138,Math.ceil(Math.max.apply(null,sizingTexts.map(function(el){return el.getComputedTextLength();})))+20);
       // Leave dedicated space beside the headline for the rate series.
       w=Math.max(w,Math.ceil(texts[1].getComputedTextLength())+78);rect.setAttribute('width',w);
+      if(view.preview && texts[4].getComputedTextLength()>w-20){texts[4].setAttribute('textLength',w-20);texts[4].setAttribute('lengthAdjust','spacingAndGlyphs');}
       if(content.series.length>=2){var values=content.series.map(function(p){return p[1];}),lo=Math.min.apply(null,values),hi=Math.max.apply(null,values);
         telemetrySvg(doc,'polyline',{'class':'dv-metrics-sparkline',points:values.map(function(v,i){return (w-58+48*i/(values.length-1))+','+(hi===lo?27:33-12*(v-lo)/(hi-lo));}).join(' ')},card);
       }
@@ -67,8 +84,9 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate){
       card.setAttribute('transform','translate('+box.x+' '+box.y+')');card.setAttribute('data-side',placed.side);
       var end={x:Math.max(box.x,Math.min(box.x+box.w,placed.mid.x)),y:Math.max(box.y,Math.min(box.y+box.h,placed.mid.y))};
       var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader',d:'M'+placed.mid.x+' '+placed.mid.y+'L'+end.x+' '+end.y,'pointer-events':'none','aria-hidden':'true'});
+      if(view.preview)leader.setAttribute('data-metrics-preview','true');
       svg.insertBefore(leader,card);boxes.push(box);
-      var label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');if(label)label.classList.add('dv-metrics-label-hidden');
+      var label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');if(label){label.classList.add('dv-metrics-label-hidden');if(view.preview)label.setAttribute('data-metrics-preview','true');}
       if(activate)activate(card,path,edge,index);
     });
   });

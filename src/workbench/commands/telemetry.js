@@ -221,6 +221,11 @@ function telemetryEditBinding(binding,edit,options){
 function telemetryEditPage(telemetry,edit){
   var t=telemetryObject(telemetry)?telemetryClone(telemetry):{},op=edit && edit.op;
   function done(){return {value:Object.keys(t).length?t:null};}
+  if(op==='enabled'){
+    if(typeof edit.value!=='boolean')return {error:'Allow metrics must be true or false.'};
+    if(telemetry!=null && !telemetryObject(telemetry))return {error:'Metrics settings are not an object; repair tracking.telemetry in JSON first.'};
+    t.enabled=edit.value;return done();
+  }
   if(op==='grafana' || op==='honeycomb'){
     if(TELEMETRY_DATASOURCES[op].indexOf(edit.key)<0)return {error:'Unknown '+op+' setting.'};
     var group=telemetryObject(t[op])?t[op]:{};
@@ -334,6 +339,7 @@ function planPageTelemetry(text,raw,edit){
     var uses=telemetryTemplateUses(raw,edit.name);
     if(uses)return {error:uses+(uses===1?' carrier uses':' carriers use')+' template "'+edit.name+'". Switch '+(uses===1?'it':'them')+' to raw signals or another template first.'};
   }
+  if(edit && edit.op==='enabled' && doc.page.tracking!=null && !tracking)return {error:'Tracking is not an object; repair it in JSON first.'};
   var result=telemetryEditPage(current,edit);if(result.error)return result;
   if(JSON.stringify(result.value)===JSON.stringify(telemetryObject(current)?current:null) && (result.value!=null || current===undefined))return {text:text};
   if(!tracking)return result.value==null?{text:text}:planSetField(text,raw,doc.path,'tracking',JSON.stringify({telemetry:result.value},null,2));

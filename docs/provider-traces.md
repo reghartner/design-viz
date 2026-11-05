@@ -14,7 +14,7 @@ An existing opaque Honeycomb value can express native raw-sample intent:
 {
   "honeycomb": {
     "query_spec": {"filters": [{"column":"service.name","op":"=","value":"event-ingest"}]},
-    "raw_row_columns": ["trace.trace_id", "timestamp", "error"],
+    "raw_row_columns": ["trace.trace_id", "error"],
     "results_limit": 20
   }
 }
@@ -172,3 +172,11 @@ native raw wrapper. Its exact scalar structured transport remains mock-specific;
 its trace metadata now uses native lines rather than its old single JSON line.
 See its README for every mock transport distinction. Grafana's existing mock
 service/span shape already matches the pinned current native shape.
+
+Honeycomb receives signed relative `from` values such as `-24h` for both tools.
+The adapter drops legacy `timestamp` entries from outgoing `raw_row_columns`
+without changing the authored query: Honeycomb always returns that column.
+Trace evidence appears in a collapsed section of the Live status panel. Expand
+**Trace evidence** to inspect its scrolling timeline, choose or play a trace,
+or pin it to Activity. Pages without an active Live status panel use a separate
+trace rail outside the diagram tile. Navigation and Metrics off retire its actions.

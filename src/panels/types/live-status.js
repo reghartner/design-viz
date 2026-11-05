@@ -294,6 +294,8 @@
       if(!hasData && value && (value.excluded || []).length)excludedStories(el(host,'div','audit','dv-live-panel-body'),value.excluded);
       // #758: a built page carries an agent guide block; tell editors where it is. Nothing is painted without it.
       if(doc.getElementById('dv-agent-guide'))el(host,'p','agent-guide','dv-live-agent-guide',"Editors: ask your agent to read this page's agent guide (id dv-agent-guide)");
+      // The step renderer owns the disclosure and actions; keyed panel paint owns its persistent slot.
+      el(host,'div','trace-evidence','dv-live-trace-slot');
       sweep(host);
       if(value && !value.enabled && typeof liveStatusClass==='function')host.querySelectorAll('[data-live-appearance],.dv-live-state-pill,.dv-live-count').forEach(function(node){liveStatusClass(node,null);});
       if(typeof liveStatusClass==='function')states.forEach(function(state){host.querySelectorAll('.dv-live-'+state).forEach(function(node){liveStatusClass(node,state);});});

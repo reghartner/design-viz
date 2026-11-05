@@ -8,7 +8,7 @@ function telemetryClearCards(scope){
 function telemetryCardValue(binding,sample,name){
   if(!name || !binding.signals[name])return 'not bound';
   var reading=telemetryReading(sample,name),unit=binding.signals[name].unit;
-  return reading.value===null?'unobserved':Number(reading.value.toPrecision(4)).toLocaleString('en-US')+(unit?' '+unit:'');
+  return reading.value===null?'unobserved':Number(reading.value.toPrecision(4)).toLocaleString('en-US')+(unit?' '+unit:'')+(sample && sample.signals && sample.signals[name] && sample.signals[name].provenance==='formatted-text'?' (formatted text; may be rounded)':'');
 }
 function telemetryCardContent(edge,binding,sample,result,window){
   var primary=telemetryPrimary(binding),queue=binding.kind==='queue',raw=edge.telemetry || {};

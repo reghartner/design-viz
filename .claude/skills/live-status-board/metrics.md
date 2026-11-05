@@ -78,8 +78,11 @@ public artifact. Use the stable `query_url` as `links.query` when supplied.
 The claude.ai viewer composes Grafana/Loki/SQL/CloudWatch and Honeycomb metrics. Honeycomb
 requires runtime `run_query` input schemas, one scalar calculation per signal
 and no breakdowns or formulas. Use native `calculations`/`filters`; the page
-window controls hosted MCP `query_spec.from` (for example `24h`). Exact values require a permitted,
-bounded raw-result download; CSP/CORS failure remains unobserved. COUNT counts
+window controls hosted MCP `query_spec.from` (for example `-24h`). Exact values prefer a permitted,
+bounded raw-result download. If that transport is unavailable, the first matching
+`# Results` scalar row may be used with a visible "formatted text; may be rounded"
+label and unknown measurement time. Invalid JSON/structured results and tool
+errors remain unobserved; never infer zero from an absent cell. COUNT counts
 spans/events, not automatically requests. Honeycomb daily history remains
 unsupported. No live-account verification is claimed.
 
@@ -87,7 +90,8 @@ Live Honeycomb trace retrieval uses `run_query` followed by `get_trace` for an
 actual returned trace ID. Declare both tools in the artifact's Honeycomb MCP
 capability; the generated scalar declaration lists only `run_query`. Author an
 explicit raw-sample wrapper with `query_spec`, `raw_row_columns` including
-`trace.trace_id`, and `results_limit` from 1 to 20. These fields belong inside
+`trace.trace_id` (for example `["trace.trace_id", "error"]`; `timestamp` is
+always returned and must not be requested), and `results_limit` from 1 to 20. These fields belong inside
 the signal's `honeycomb` object; raw columns and the limit are siblings of
 `query_spec`. Within a carrier, the first explicit trace signal is selected.
 The adapter accepts the supported exact trace table and metadata; raw

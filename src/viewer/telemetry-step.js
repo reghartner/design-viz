@@ -36,7 +36,7 @@ function telemetryStepModel(diagram,index,pathId,page,snapshot,jiraMap,jiraOn){
 }
 function telemetryClearStep(scope){
   var state=scope._telemetryStep;if(!state)return;
-  state.stepper.clearTraceTiming();state.card.remove();delete scope._telemetryStep;
+  state.stepper.clearTraceTiming();state.card.remove();if(state.rail)state.rail.remove();delete scope._telemetryStep;
 }
 function telemetryPaintStep(binding,snapshot,jiraMap,jiraOn,api,pin){
   var scope=binding.el,stepper=binding.stepper,d=binding.section.diagram;
@@ -47,16 +47,18 @@ function telemetryPaintStep(binding,snapshot,jiraMap,jiraOn,api,pin){
   var trace=model && model.trace;if(!trace || !bar){telemetryClearStep(scope);return;}
   var e=trace.exemplar,passing=e.candidates.find(function(c){return c.status==='passing' && c.traceId!==e.traceId && api.canChooseExemplar(trace.primary,e.selectionToken,c.traceId);});
   var key=JSON.stringify([stepper.sourceIndex(),stepper.path(),trace,!!passing]),old=scope._telemetryStep;
-  if(old && old.key===key && old.card.isConnected)return;
+  // Section composition can hide/remount the panel without changing the trace.
+  var slot=Array.from(scope.querySelectorAll('.dv-live-trace-slot')).find(function(node){return node.closest('.doc-sec')===bar.closest('.doc-sec') && node.getClientRects().length;});
+  if(old && old.key===key && old.card.isConnected && (slot?old.card.parentNode===slot:old.rail))return;
   telemetryClearStep(scope);
-  var doc=bar.ownerDocument,card=doc.createElement('section');card.className='dv-trace-evidence';card.setAttribute('aria-label','Trace evidence');card.setAttribute('data-trace-id',e.traceId);
-  // Attached controls already live inside the diagram column. Detached controls
-  // use the section's diagram column so the card never enters the panel rail.
-  var column=bar.closest('.diagramcol') || scope.querySelector('.diagramcol');
-  if(column){if(bar.parentNode===column)bar.after(card);else column.appendChild(card);}else bar.after(card);
-  scope._telemetryStep={key:key,card:card,stepper:stepper};
-  function el(tag,cls,text,parent){var node=doc.createElement(tag);node.className=cls || '';if(text)node.textContent=text;(parent || card).appendChild(node);return node;}
-  el('h3','','Trace evidence');el('code','dv-trace-identity',e.traceId);
+  var doc=bar.ownerDocument,card=doc.createElement('details');card.className='dv-trace-evidence';card.setAttribute('aria-label','Trace evidence');card.setAttribute('data-trace-id',e.traceId);
+  // Use this section's active Live status rail, never a nested detail's panel.
+  var rail=null;if(!slot){rail=doc.createElement('aside');rail.className='panelcol dv-trace-rail';rail.setAttribute('aria-label','Trace evidence panel rail');scope.appendChild(rail);slot=rail;}
+  slot.appendChild(card);
+  scope._telemetryStep={key:key,card:card,stepper:stepper,rail:rail};
+  var body;
+  function el(tag,cls,text,parent){var node=doc.createElement(tag);node.className=cls || '';if(text)node.textContent=text;(parent || body || card).appendChild(node);return node;}
+  el('summary','','Trace evidence',card);body=el('div','dv-trace-evidence-body',null,card);el('code','dv-trace-identity',e.traceId);
   var age=trace.at?Math.max(0,Math.floor((Date.now()-Date.parse(trace.at))/60000)):null;
   el('p','dv-trace-age',trace.at?'Observed '+trace.at+' · '+age+' min ago':'Trace age unavailable');
   el('p','dv-trace-selection',e.selectionReason+' · '+e.range.from+' – '+e.range.to);

@@ -59,7 +59,7 @@ function queryArgs(carrier, signal, calculations = [{ op: 'AVG', column: 'flowvi
         { column: 'flowview.carrier', op: '=', value: carrier },
         { column: 'flowview.signal', op: '=', value: signal }
       ],
-      from: '24h',
+      from: '-24h',
       ...extra
     }
   };
@@ -234,7 +234,7 @@ test('H5: all 12 pinned days, rotation, clamp, silent scenarios and future windo
     from: new Date(now + HOUR).toISOString(), to: new Date(now + 2 * HOUR).toISOString()
   });
   assert.equal(future.info.rows_examined, 0, 'a future-only window cannot borrow Day 13');
-  const straddling = await query('mcu->ingest', 'rate', [{ op: 'COUNT' }], ctx(DAY12), { from: '25h', to: new Date(now + HOUR).toISOString() });
+  const straddling = await query('mcu->ingest', 'rate', [{ op: 'COUNT' }], ctx(DAY12), { from: '-25h', to: new Date(now + HOUR).toISOString() });
   assert.equal(straddling.info.rows_examined, 25, 'future endpoint adds no bucket beyond the 25 requested story hours');
   assert.ok(straddling.series.every(point => Date.parse(point.data.time) < now));
 });
@@ -243,6 +243,7 @@ test('H6: unsupported or ambiguous query shapes are explicit tool errors', async
   const base = queryArgs('mcu->ingest', 'rate');
   const cases = [
     [{ ...base, dataset_slug: 'production' }, /dataset/],
+    [{...base,query_spec:{...base.query_spec,from:'24h'}}, /signed duration/],
     [{ ...base, environment_slug: 'production' }, /environment/],
     [{ ...base, query_spec: { ...base.query_spec, calculations: [{ op: 'P95', column: 'flowview.value' }] } }, /unsupported calculation/],
     [{ ...base, query_spec: { ...base.query_spec, calculations: [{ op: 'AVG', column: 'duration_ms' }] } }, /flowview\.value/],
@@ -251,7 +252,7 @@ test('H6: unsupported or ambiguous query shapes are explicit tool errors', async
     [{ ...base, query_spec: { ...base.query_spec, breakdowns: ['flowview.carrier'] } }, /breakdowns/],
     [{ ...base, query_spec: { ...base.query_spec, formula: 'A/B' } }, /unsupported field/],
     [{ ...base, query_spec: { ...base.query_spec, time_range: '24h' } }, /unsupported field/],
-    [{ ...base, query_spec: { ...base.query_spec, from: '13d' } }, /288 hours/],
+    [{ ...base, query_spec: { ...base.query_spec, from: '-13d' } }, /288 hours/],
     [queryArgs('mcu->ingest', 'unknown'), /unknown mock carrier signal/]
   ];
   for (const [args, pattern] of cases) assert.match(error(await call('run_query', args)), pattern);
@@ -287,7 +288,7 @@ test('H8: get_trace returns only known shared-story traces in the exact bounded 
   assert.equal(failing.spans.some(span => span.status === 'error'), true);
   for (const trace of [healthy, failing, story.traceFor(model, DAY12 * 24 + 23)]) {
     const response = await call('get_trace', {
-      environment_slug: 'flowview-demo', trace_id: trace.traceId, from: '24h', view_mode: 'full'
+      environment_slug: 'flowview-demo', trace_id: trace.traceId, from: '-24h', view_mode: 'full'
     }, ctx(trace.hour < DAY12 * 24 ? DAY10 : DAY12));
     const text = response.result.content[0].text;
     assert.match(text, /^MOCK Honeycomb trace table/);
@@ -309,16 +310,16 @@ test('H8: get_trace returns only known shared-story traces in the exact bounded 
     }
   }
   assert.match(error(await call('get_trace', {
-    environment_slug: 'flowview-demo', trace_id: '0'.repeat(32), from: '24h'
+    environment_slug: 'flowview-demo', trace_id: '0'.repeat(32), from: '-24h'
   })), /not found/);
   assert.match(error(await call('get_trace', {
-    environment_slug: 'flowview-demo', trace_id: failing.traceId, from: '24h', view_mode: 'focused'
+    environment_slug: 'flowview-demo', trace_id: failing.traceId, from: '-24h', view_mode: 'focused'
   }, ctx(DAY10))), /focused mode is not served/);
   assert.match(error(await call('get_trace', {
-    environment_slug: 'flowview-demo', trace_id: healthy.traceId, from: '1h'
+    environment_slug: 'flowview-demo', trace_id: healthy.traceId, from: '-1h'
   }, ctx(DAY10))), /not found/, 'bounded from excludes an older known trace');
   assert.match(error(await call('get_trace', {
-    environment_slug: 'flowview-demo', trace_id: failing.traceId, from: '24h'
+    environment_slug: 'flowview-demo', trace_id: failing.traceId, from: '-24h'
   }, ctx(DAY10, { scenario: 'all-done' }))), /not found/);
 });
 
@@ -413,10 +414,10 @@ test('H10: docs state native/mock distinctions, query vocabulary, safe manual de
 });
 
 test('raw row wrapper returns only shared traceFor IDs and rejects unsupported sampling queries',async()=>{
- const args={environment_slug:'flowview-demo',dataset_slug:'doorbell',query_spec:{from:'24h',filters:[{column:'service.name',op:'=',value:'event-ingest'}]},raw_row_columns:['trace.trace_id','timestamp','error'],results_limit:5};
+ const args={environment_slug:'flowview-demo',dataset_slug:'doorbell',query_spec:{from:'-24h',filters:[{column:'service.name',op:'=',value:'event-ingest'}]},raw_row_columns:['trace.trace_id','error'],results_limit:5};
  const result=await call('run_query',args,ctx(DAY10));assert.ok(!result.result.isError);const text=result.result.content[0].text;
- const {createStory,traceFor}=await loadStory(),model=createStory();const ids=[...text.matchAll(/^\| ([0-9a-f]{32}) \|/gm)].map(m=>m[1]);assert.equal(ids.length,5);
+ const {createStory,traceFor}=await loadStory(),model=createStory();const ids=[...text.matchAll(/^\| [^|]+ \| ([0-9a-f]{32}) \|/gm)].map(m=>m[1]);assert.equal(ids.length,5);
  const known=Array.from({length:24},(_,i)=>traceFor(model,DAY10*24+i)).filter(Boolean).map(t=>t.traceId);assert.ok(ids.every(id=>known.includes(id)));assert.match(text,/next_cursor: MOCK_MORE_MATCHES/);
- for(const patch of [{results_limit:21},{raw_row_columns:['invented']},{query_spec:{...args.query_spec,raw_row_columns:args.raw_row_columns}},{query_spec:{...args.query_spec,filters:[{column:'service.name',op:'=',value:'invented'}]}},{query_spec:{...args.query_spec,calculations:[{op:'COUNT'}]}}])assert.ok(error(await call('run_query',{...args,...patch},ctx(DAY10))));
- const response=await call('get_trace',{environment_slug:args.environment_slug,trace_id:ids[0],from:'24h',view_mode:'full'},ctx(DAY10));assert.ok(!response.result.isError);assert.match(response.result.content[0].text,new RegExp('trace_id: "'+ids[0]+'"'));
+ for(const patch of [{raw_row_columns:['trace.trace_id','timestamp','error']},{results_limit:21},{raw_row_columns:['invented']},{query_spec:{...args.query_spec,raw_row_columns:args.raw_row_columns}},{query_spec:{...args.query_spec,filters:[{column:'service.name',op:'=',value:'invented'}]}},{query_spec:{...args.query_spec,calculations:[{op:'COUNT'}]}}])assert.ok(error(await call('run_query',{...args,...patch},ctx(DAY10))));
+ const response=await call('get_trace',{environment_slug:args.environment_slug,trace_id:ids[0],from:'-24h',view_mode:'full'},ctx(DAY10));assert.ok(!response.result.isError);assert.match(response.result.content[0].text,new RegExp('trace_id: "'+ids[0]+'"'));
 });

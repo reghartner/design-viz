@@ -5,7 +5,7 @@ var TELEMETRY_TRACE_SESSION=0;
 function telemetryTraceIntent(s){return s && (s.source==='tempo' || s.source==='honeycomb' && telemetryObject(s.query) && telemetryOwn(s.query,'query_spec'));}
 function telemetryTraceJobs(bindings){return (bindings || []).map(function(b){var name=Object.keys(b.signals || {}).find(function(n){return telemetryTraceIntent(b.signals[n]);});return name?{id:b.id,name:name,signal:b.signals[name],binding:b}:null;}).filter(Boolean);}
 function telemetryTraceText(result){
-  if(result && result.isError)telemetryTraceFail('Trace tool returned an error.');
+  if(result && result.isError)telemetryTraceFail(telemetryProviderErrorText(result) || 'Trace tool returned an error.');
   var text=typeof (result && result.payload)==='string'?result.payload:(result && Array.isArray(result.content)?result.content:[]).filter(function(c){return c && c.type==='text' && typeof c.text==='string';}).map(function(c){return c.text;}).join('\n');
   if(text.length>TELEMETRY_HONEYCOMB_BYTES || new TextEncoder().encode(text).byteLength>TELEMETRY_HONEYCOMB_BYTES)telemetryTraceFail('Trace response exceeds the byte limit.');return text;
 }
@@ -122,13 +122,13 @@ function telemetryTraceInputs(job,config,contract,range,id){
   }else{
     if(!telemetryTraceString(config.honeycomb.environment))telemetryTraceFail('Set an explicit Honeycomb environment.');
     input={environment_slug:config.honeycomb.environment};
-    if(id){input.trace_id=id;input.from=config.window;var view=contract.detail.inputSchema && contract.detail.inputSchema.properties && contract.detail.inputSchema.properties.view_mode;if(view && view.type==='string' && (!view.enum || view.enum.indexOf('full')>=0))input.view_mode='full';}
+    if(id){input.trace_id=id;input.from='-'+telemetryWindowDuration(config.window);var view=contract.detail.inputSchema && contract.detail.inputSchema.properties && contract.detail.inputSchema.properties.view_mode;if(view && view.type==='string' && (!view.enum || view.enum.indexOf('full')>=0))input.view_mode='full';}
     else{
       if(!telemetryObject(q) || Object.keys(q).some(function(k){return ['query_spec','raw_row_columns','results_limit'].indexOf(k)<0;}) || !telemetryObject(q.query_spec) || !Array.isArray(q.raw_row_columns) || q.raw_row_columns.length>30 || q.raw_row_columns.indexOf('trace.trace_id')<0 || q.raw_row_columns.some(function(k){return !telemetryTraceString(k);}) || !Number.isInteger(q.results_limit) || q.results_limit<1 || q.results_limit>TELEMETRY_TRACE_CANDIDATES)telemetryTraceFail('Use an explicit native Honeycomb raw-row wrapper with trace.trace_id and results_limit 1–20.');
-      var spec=telemetryHoneycombJson(q.query_spec);['from','to','start','end','start_time','end_time','time_range'].forEach(function(k){delete spec[k];});spec.from=config.window;
+      var spec=telemetryHoneycombJson(q.query_spec);['from','to','start','end','start_time','end_time','time_range'].forEach(function(k){delete spec[k];});spec.from='-'+telemetryWindowDuration(config.window);
       var prop=contract.search.inputSchema && contract.search.inputSchema.properties && contract.search.inputSchema.properties.query_spec;
       if(!prop || !telemetrySchemaType(prop,'object') && !telemetrySchemaType(prop,'string'))telemetryTraceFail('Unsupported query_spec type.');
-      if(telemetryTraceString(config.honeycomb.dataset))input.dataset_slug=config.honeycomb.dataset;input.query_spec=telemetrySchemaType(prop,'string')?JSON.stringify(spec):spec;input.raw_row_columns=q.raw_row_columns.slice();input.results_limit=q.results_limit;
+      if(telemetryTraceString(config.honeycomb.dataset))input.dataset_slug=config.honeycomb.dataset;input.query_spec=telemetrySchemaType(prop,'string')?JSON.stringify(spec):spec;input.raw_row_columns=q.raw_row_columns.filter(function(k){return k!=='timestamp';});input.results_limit=q.results_limit;
     }
   }
   return telemetryTraceInput(id?contract.detail:contract.search,input);
@@ -159,7 +159,7 @@ function createTelemetryTraces(page,win,now,bound){
     if(error && error.code==='user_changed'){retired=true;invalidate();if(ctl && ctl.telemetry.accountChanged)ctl.telemetry.accountChanged();}
     else if(error && ['capability_removed','server_not_connected','server_not_found','not_granted','capability_disabled','needs_reauth'].indexOf(error.code)>=0){invalidate();contracts={};if(ctl)ctl.telemetry.setAvailable(false);}
     // Provider text may contain signed transport URLs. Never report it verbatim.
-    return new Error(error && error.code==='trace_unobserved'?error.message:'Trace evidence unavailable; check the explicit query, returned shape and connector permissions.');
+    return telemetryProviderStepError(error,'Trace evidence');
   }
   async function detail(entry,candidate,reason){
     if(!active(entry.epoch))telemetryTraceFail('Trace session cancelled.');
@@ -169,15 +169,15 @@ function createTelemetryTraces(page,win,now,bound){
       if(!active(entry.epoch))telemetryTraceFail('Trace session cancelled.');
       var trace=entry.job.signal.source==='tempo'?telemetryTempoTrace(result,candidate.traceId):telemetryHoneycombTrace(result,candidate.traceId);
       return telemetryTraceEnvelope({version:1,provider:entry.job.signal.source,traceId:candidate.traceId,signal:entry.job.name,selectionReason:reason+'; first explicit trace signal in authored order',selectionToken:entry.token,observedAt:new Date(clock()).toISOString(),range:entry.range,candidates:entry.candidates,spans:trace.spans,completeness:trace.completeness,warnings:entry.warnings.concat(trace.warnings),url:trace.url || candidate.url || null});
-    })();entry.details.set(candidate.traceId,request);return request;
+    })().catch(function(error){throw telemetryProviderStepError(error,entry.contract.detail.name+' trace detail');});entry.details.set(candidate.traceId,request);return request;
   }
   async function load(job,mcp,config){
     var key=JSON.stringify([job.binding,config]),entry=entries.get(job.id);if(entry && entry.key===key)return entry.promise;
     var to=clock();entry={key:key,epoch:epoch,job:job,config:config,contract:contracts[job.signal.source],mcp:mcp,range:{from:new Date(to-telemetryGrafanaWindowMs(config.window)).toISOString(),to:new Date(to).toISOString()},token:'trace-'+session+'-'+epoch+'-'+(++serial),details:new Map(),candidates:[],warnings:[],selected:null};entries.set(job.id,entry);
     entry.promise=(async function(){
       if(!entry.contract)telemetryTraceFail('Required trace tools unavailable.');
-      var result=await mcp.callTool(entry.contract.server,entry.contract.search.name,telemetryTraceInputs(job,config,entry.contract,entry.range),{signal:abort.signal});if(!active(entry.epoch))telemetryTraceFail('Trace session cancelled.');
-      var found=job.signal.source==='tempo'?telemetryTempoCandidates(result):telemetryHoneycombCandidates(result);entry.candidates=found.candidates;entry.warnings=found.warnings;if(found.range)entry.range=found.range;
+      var result;try{result=await mcp.callTool(entry.contract.server,entry.contract.search.name,telemetryTraceInputs(job,config,entry.contract,entry.range),{signal:abort.signal});if(result && result.isError)throw {code:'tool_error',message:telemetryProviderErrorText(result)};}catch(error){throw telemetryProviderStepError(error,entry.contract.search.name+' trace search');}if(!active(entry.epoch))telemetryTraceFail('Trace session cancelled.');
+      var found;try{found=job.signal.source==='tempo'?telemetryTempoCandidates(result):telemetryHoneycombCandidates(result);}catch(error){throw telemetryProviderStepError(error,entry.contract.search.name+' trace search result');}entry.candidates=found.candidates;entry.warnings=found.warnings;if(found.range)entry.range=found.range;
       var chosen=telemetryTraceSelect(entry.candidates);if(!chosen.candidate)return null;
       entry.selected=await detail(entry,chosen.candidate,chosen.reason);return entry.selected;
     })();return entry.promise;

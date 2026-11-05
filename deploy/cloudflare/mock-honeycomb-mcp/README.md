@@ -91,8 +91,8 @@ The verified current native top-level arguments are
 - `calculations`: one to five of `AVG`, `SUM`, `MIN`, `MAX` over
   `flowview.value`, or `COUNT`;
 - `filters`: exactly the carrier and signal filters described above;
-- `from`: a relative duration (`24h`), `now-24h`, or an RFC3339 instant;
-- optional `to` (`now`, `now-24h`, or RFC3339), `granularity: 3600`, and an
+- `from`: a signed relative duration (`-24h`), `now`, or an RFC3339 instant;
+- optional `to` (`now` or RFC3339), `granularity: 3600`, and an
   empty `breakdowns` array.
 
 `COUNT` is the number of hourly measurement rows. It is not a request, span,
@@ -174,7 +174,7 @@ connect an account, or read external data.
 `run_query` also accepts the verified top-level `raw_row_columns` and
 `results_limit` wrapper. For this small mock subset, `query_spec` contains only
 `from`, optional `to`, and exactly `service.name = event-ingest`. Columns are
-`trace.trace_id` (required), `timestamp`, `error`, and `duration_ms`; limits are
+`trace.trace_id` (required), `error`, and `duration_ms` (`timestamp` is always returned and must not be requested); limits are
 1–20. Returned IDs and status come from the existing shared `traceFor` story.
 Unsupported raw filters/columns/calculations fail closed. Rounded sample duration
 is not precise span timing. The runtime selects the latest returned timestamp,

@@ -51,6 +51,11 @@ function liveStatusProofPresentation(snapshot,window){
     var url=null,authored=binding.links || {},provider=sample && sample.links || {};
     [authored.dashboard,authored.query,provider.dashboard,provider.query].some(function(value){url=deltaLinkUrl(value);return !!url;});
     var since=[];if(result.since.doneAt){since.push('Done '+result.since.doneAt);if(result.since.firstTrafficAt)since.push('First observed traffic '+result.since.firstTrafficAt);}
+    if(!snapshot.historical && result.since.doneAt)Object.keys(binding.signals).forEach(function(name){
+      var entry=sample && sample.signals && sample.signals[name],aggregate=telemetryAggregate(entry,sample && sample.observedAt);
+      if(!aggregate || aggregate.from!==result.since.doneAt)return;
+      since.push(name+' total: '+String(entry.value)+(entry.unit?' '+entry.unit:'')+' through '+aggregate.to);
+    });
     return {id:binding.id,title:binding.title,kind:binding.kind,tickets:binding.tickets.slice(),jira:result.jira || 'No tickets',
       telemetry:result.telemetry,verdict:result.verdict,label:result.label || 'UNOBSERVED',predicate:predicate(binding),failing:result.failing.slice(),
       kpis:[{label:queue?'in':'rate',text:telemetryCardValue(binding,sample,primary)},

@@ -46,10 +46,20 @@
    the document is hidden and catches up once on return (liveStatusPoller). */
 function telemetryTime(value){
   var ms=typeof value==='number'?value:typeof value==='string'?Date.parse(value):NaN;
-  return isFinite(ms)?new Date(ms).toISOString():null;
+  var date=new Date(ms);return isFinite(date.getTime())?date.toISOString():null;
 }
 function telemetryPoint(point){
   return Array.isArray(point) && point.length===2 && (telemetryNumber(point[0]) || typeof point[0]==='string' && isFinite(Date.parse(point[0]))) && telemetryNumber(point[1]);
+}
+/* An explicit measured total, never inferred from a rate, unit or series. The
+   observation must cover the entire measured interval. Invalid metadata leaves
+   a valid ordinary headline intact, but cannot authorize a since-Done total. */
+function telemetryAggregate(entry,observedAt){
+  var aggregate=entry && entry.aggregate,observed=telemetryTime(observedAt);
+  if(!telemetryObject(aggregate) || aggregate.kind!=='total' || !telemetryNumber(entry.value) || entry.value<0 || entry.value>Number.MAX_SAFE_INTEGER || !observed)return null;
+  var from=telemetryTime(aggregate.from),to=telemetryTime(aggregate.to);
+  if(!from || !to || Date.parse(from)>=Date.parse(to) || Date.parse(to)>Date.parse(observed))return null;
+  return {kind:'total',from:from,to:to};
 }
 /* One carrier's sample, kept to the provider result contract; null when unusable. */
 function telemetrySample(raw){
@@ -61,6 +71,7 @@ function telemetrySample(raw){
     if(telemetryNumber(value.value))entry.value=value.value;
     if(Array.isArray(value.series))entry.series=value.series.filter(telemetryPoint).map(function(point){return [point[0],point[1]];});
     if(telemetryText(value.unit))entry.unit=value.unit;
+    var aggregate=telemetryAggregate(value,out.observedAt);if(aggregate)entry.aggregate=aggregate;
     out.signals[name]=entry;
   });
   if(Array.isArray(raw.markers))raw.markers.forEach(function(marker){

@@ -97,7 +97,9 @@ export interface TelemetryBinding {
 /** One carrier's telemetry for the observation window, keyed by carrier id in the
  * provider result. Every field is optional; malformed entries are dropped. */
 export interface TelemetrySample {
-  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string}>;
+  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string;
+    /** Explicit measured total over [from, to], covered by observedAt. Runtime evidence only. */
+    aggregate?: {kind: 'total'; from: string | number; to: string | number}}>;
   observedAt?: string | number;
   markers?: Array<{at: string | number; kind?: string; label?: string}>;
   links?: {query?: string; dashboard?: string};

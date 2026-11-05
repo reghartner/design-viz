@@ -2077,3 +2077,28 @@ preserving Jira Activity and the selected Over time day. No queries originate fr
 Production rendering, link preparation, or history slider movement.
 
 Initial host telemetry preload remains accepted before the first Metrics decision. An explicit Metrics off (including off before the first enable), capability removal, or destroy retracts evidence and rejects late `apply()` callbacks. Capability recovery stays off; an intentional enable accepts fresh observations. `clear()` retracts the current map without disabling a current session, so provider recovery can still supply its next observation.
+
+A host/provider can explicitly supply a measured long-window total on a runtime
+signal result (this is **not an authored spec field**):
+
+```json
+{"observedAt":"2026-11-04T12:00:00Z","signals":{"rate":{"value":1200,"unit":"events","aggregate":{"kind":"total","from":"2026-11-04T11:00:00Z","to":"2026-11-04T12:00:00Z"}}}}
+```
+
+`aggregate` declares that the signal's original `value` is a measured total over
+that exact interval. Normalization requires a finite nonnegative value no larger
+than `Number.MAX_SAFE_INTEGER`, valid `from < to`, and an explicit valid
+`observedAt >= to`. Invalid metadata is dropped without discarding a valid
+ordinary headline. Proof's Since Done column and Production show the named bound
+signal's total only when `from` exactly equals the actual Done timestamp. They
+retain the original measurement value and unit, including zero, and display the
+through timestamp alongside the existing Done/first-traffic facts. Changing Done
+removes a mismatched total. History endpoint projection drops aggregate metadata;
+this version does not display totals in historical views, including embedded days.
+
+Current standard MCP adapters do not invent long-window queries or total
+semantics. Ordinary values, rates, series sums, and first-traffic measurements are
+never reconstructed into since-Done counts. A composing host/provider must retain
+each descriptor with its own signal and observation bounds, without borrowing a
+peer signal's value or timestamp. No account validation is implied by host/mock
+contract tests.

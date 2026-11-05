@@ -15,4 +15,6 @@ window.flowviewTelemetry={source:'Shared mock story fixture',provider:async func
 window.flowviewLiveStatus={source:'Fictional Jira fixture',provider:async function(){return {'TRACE-1':{state:'done',title:'Ship event handling'}};}};
 window.flowviewBooted=function(ctl){ctl.liveStatus.setHistory({load:async function(){return {days:[{key:'2026-10-27',at:'2026-10-28T00:00:00Z',label:'Earlier',states:{'TRACE-1':{state:'active'}}},{key:'2026-10-29',at:'2026-10-30T00:00:00Z',label:'Today',states:{'TRACE-1':{state:'done'}}}],index:1};}});};})();
 </script>`;
-await writeFile(out,(await readFile(out,'utf8')).replace('</head>',boot+'\n</head>'));console.log(JSON.stringify({output:out,provenance:f.provenance}));
+const html=await readFile(out,'utf8'),anchor='\n<script>\n';
+if(!html.includes(anchor))throw new Error('Standalone runtime script anchor is missing.');
+await writeFile(out,html.replace(anchor,'\n'+boot+anchor));console.log(JSON.stringify({output:out,provenance:f.provenance}));

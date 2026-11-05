@@ -1,5 +1,6 @@
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import path from 'node:path';
+import {execFileSync} from 'node:child_process';
 import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 import {stepFixture,recordedUrlEvidence,AT} from '../../../tests/helpers/step-evidence.mjs';
@@ -161,4 +162,14 @@ test('real view choice restores temporary timing without changing document layou
  await page.emulateMedia({reducedMotion:'no-preference'});const {root}=await setup(page,server,{views:true,timed:true});await metric(root).click();
  await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(3);
  await root.getByRole('tab',{name:'Alternate view',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await expect(card(root)).toHaveCount(1);await expect(card(root)).toBeVisible();await unchanged(page);
+});
+
+
+test('generated standalone fixture demonstrates trace actions alongside Over time without live queries',async({page,server})=>{
+ execFileSync('node',[path.join(repo,'tools/step-evidence-demo.mjs'),path.join(server.root,'step-demo')],{cwd:repo,stdio:'pipe'});
+ await page.setViewportSize({width:1600,height:1200});await page.goto(server.origin+'/step-demo/step-evidence.html');const root=page.locator('#docview');
+ await step(root).click();await metric(root).click();await expect(card(root)).toBeVisible();await expect(card(root).locator('.dv-trace-never[data-step-id="push"]')).toBeVisible();await capture(page,'standalone-trace-actions');
+ await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(1);
+ await over(root).click();await root.getByRole('slider',{name:'Day',exact:true}).press('Home');await expect(card(root)).toHaveCount(0);await expect(root.locator('.dv-proof-caption')).toContainText('IN PROGRESS');await capture(page,'standalone-over-time');
+ await root.getByRole('button',{name:'Live',exact:true}).click();await expect(card(root)).toBeVisible();await card(root).getByRole('button',{name:'Pick passing trace',exact:true}).click();await expect(card(root).locator('.tr-op')).toHaveCount(3);
 });

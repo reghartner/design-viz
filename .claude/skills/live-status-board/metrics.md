@@ -145,8 +145,8 @@ Validate with `node tools/validate.js <spec.json>`. For an existing published
 board, preserve the board-edit reconciliation and edit-history rules in the
 main skill. Republish only when that artifact was already in authorized
 publishing scope, and always update its existing URL; a new URL loses comments
-and history. The current repository task is not permission to publish a user
-artifact or connect an account.
+and history. Publishing authorization is separate; follow the main skill's
+existing-artifact and same-URL rules.
 
 For the complete field, verdict, provider and history contracts, read
 [`docs/live-status.md`](../../../docs/live-status.md). For a supplied Honeycomb

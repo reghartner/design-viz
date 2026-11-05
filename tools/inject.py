@@ -21,8 +21,9 @@ so the standalone boot fetches that file and renders it (#826). The inline
 block stays as the fallback for a page opened without the file (file://, or
 the file missing). A board published this way as a claude.ai artifact can
 save its own edits by republishing only flowspec.json; the guide tells the
-editor's agent to edit that file, and the declaration of a tracked page adds
-the artifact and user capabilities the board's Edit mode needs.
+editor's agent to edit that file. A Jira- or telemetry-editable two-file page
+also declares the artifact and user capabilities the board's Edit mode needs;
+those capabilities are independent of Jira connector permission.
 
 --timeline <path> embeds that demo timeline JSON (version, intervalSeconds,
 days[].issues, optional days[].telemetry) in the separate live-timeline block of a page that declares
@@ -311,7 +312,8 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
     when the page has Jira/non-telemetry tracking; the Grafana connector only when the enabled root has
     a carrier or page template binding a grafana, loki or sql signal, imported
     carriers of the embedded `topology` context included, #943; the artifact and user
-    capabilities only for a tracked page published in two-file mode, #826). `commit` pins the doc links to the
+    capabilities for Jira- or telemetry-editable pages published in two-file mode,
+    independent of Jira permission, #826). `commit` pins the doc links to the
     source this page was built from (#758: docs at the page's version). Any authored
     telemetry adds the compact field and honesty rules without promising an adapter;
     a `None` commit links main with a note. Values are interpolated from a spec that already
@@ -323,9 +325,9 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
     version = version if isinstance(version, str) and version else None
     tracking = page.get("tracking") if isinstance(page.get("tracking"), dict) else None
     jira = tracking.get("jira") if tracking and isinstance(tracking.get("jira"), dict) else {}
-    # A telemetry-only page uses `page.tracking.telemetry` but must not acquire
-    # Jira permissions or board-edit capabilities merely because of that shared
-    # container. Any other tracking field retains the established board behavior.
+    # Jira connector permission and two-file editing are separate. A telemetry-
+    # only page must not acquire Jira, but its published two-file edit loop still
+    # reads/writes the artifact and attributes saves through the viewer profile.
     tracked = bool(tracking and any(key != "telemetry" for key in tracking))
     sources = telemetry_sources(page)
     metrics = telemetry_authored(page)
@@ -341,12 +343,11 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
         ([{"server": "Grafana", "tools": GRAFANA_TOOLS}] if grafana else [])
     capabilities = {"mcp": {"servers": servers}} if servers else {}
     capabilities["comments"] = COMMENTS_CAPABILITY
-    if tracked:
-        if two_file:
-            # The board's Edit mode republishes flowspec.json from inside the
-            # artifact (files publish) and records who saved (profile name).
-            capabilities["artifact"] = {}
-            capabilities["user"] = {"scopes": ["profile"]}
+    if two_file and (tracked or metrics):
+        # The Edit/reconciliation loop republishes flowspec.json from inside the
+        # artifact (files publish) and records who saved (profile name).
+        capabilities["artifact"] = {}
+        capabilities["user"] = {"scopes": ["profile"]}
     declaration = json.dumps(capabilities, indent=2)
 
     def show(value):
@@ -457,9 +458,8 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
         ]
     else:
         lines += [
-            "This page has no Jira/non-telemetry tracking, so it declares no Jira connector. Add "
-            "the Jira connector declaration described in docs/live-status.md only after adding "
-            "tracking; connector display names are per account.",
+            "This page has no Jira tracking, so it declares no Jira connector. Add one only after "
+            "adding Jira tracking; connector display names are per account.",
         ]
     if grafana:
         lines += [
@@ -475,21 +475,18 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "",
             "## Metrics rules",
             "",
-            "- `page.tracking.telemetry` holds availability, datasource/environment settings, "
-            "`window` (default `24h`) and templates. A carrier `telemetry` binding holds an explicit "
-            "`kind`, named `signals`, agreed `proof` limits and safe `links`; never derive a query from "
-            "a node id, title or service name.",
-            "- Apply this to every selected local, imported/nested, consumer-overlay and loaded-detail "
-            "node or edge. Inspect current connector tool schemas, preserve exact queries and datasource "
-            "UIDs, run each selected proposal once, and report returned, empty, zero and failed evidence.",
-            "- Readers start with Metrics off. Root `enabled:false` or an explicit host false disables "
-            "all carriers and grants no query permission; missing tools hide Metrics. Preview metrics are "
-            "synthetic, unsaved and make no network call.",
-            "- Honeycomb queries are authored data but have no shipped claude.ai adapter yet. Keep only "
-            "stable dashboard/query UI URLs; never persist signed result URLs or claim live verification.",
-            "- Over time uses each day's exact prior-24h endpoint. Missing history is unobserved; never "
-            "borrow live or adjacent samples. See docs/live-status.md and the live-status-board Metrics "
-            "chapter before editing bindings.",
+            "- `page.tracking.telemetry` holds availability, sources, `window` (default `24h`) and "
+            "templates. Each carrier binding names `kind`, `signals`, `proof` and safe `links`; never "
+            "derive a query from names or ids.",
+            "- Cover every selected local, imported/nested, consumer-overlay and loaded-detail node or "
+            "edge. Inspect current tool schemas, preserve exact queries and source UIDs, run each proposal "
+            "once, and distinguish returned, empty, zero and failed evidence.",
+            "- Metrics starts off. Root `enabled:false`/host false disables it and grants no query permission; "
+            "missing tools hide it. Preview is synthetic, unsaved and makes no network call.",
+            "- Honeycomb has no shipped claude.ai adapter. Keep stable dashboard/query UI URLs, never "
+            "signed result URLs, and do not claim live verification.",
+            "- Over time uses each day's exact prior-24h endpoint; missing history stays unobserved. See "
+            "docs/live-status.md and the Metrics chapter before editing bindings.",
         ]
     lines += [
         "",

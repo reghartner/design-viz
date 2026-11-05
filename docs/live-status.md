@@ -1431,10 +1431,12 @@ HTML is never regenerated and comments survive (verified on claude.ai,
 2026-10-30: a publish with `url` and `files` but no `file_path` is refused;
 with the read-back page the stored capabilities carried forward and the edited
 title showed). Re-injecting a two-file page without
-`--two-file` drops the marker, as it replaces a stale guide. For a tracked page
-published this way the declaration adds the artifact and user capabilities the
-board's Edit mode needs; single-file tracked pages keep the declaration above,
-untracked pages stay comments-only:
+`--two-file` drops the marker, as it replaces a stale guide. For a Jira- or
+telemetry-editable page published this way the declaration adds the artifact
+and user capabilities the board's Edit mode needs. Those edit capabilities do
+not grant Jira permission: telemetry-only pages omit the Jira server. Single-
+file pages keep their existing declaration, and pages with neither Jira nor
+telemetry stay comments-only:
 
 ```js
 capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}]},
@@ -1658,8 +1660,9 @@ edits were saved after the newest agent entry, ask before overriding one of them
 append one agent entry for the change, and start again from the read when the
 publish is refused because the artifact changed. The inline block is
 described as the stale fallback and must not be edited.
-A tracked two-file page's declaration adds `artifact` and `user`
-(`{scopes: ["profile"]}`).
+A two-file page with Jira or telemetry editing adds `artifact` and `user`
+(`{scopes: ["profile"]}`). Telemetry alone still declares no Jira connector;
+artifact editing and Jira permission are independent.
 
 ## Edit history
 

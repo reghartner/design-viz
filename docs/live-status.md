@@ -2019,3 +2019,26 @@ aggregation. SQL and Tempo have no history adapter. Honeycomb history remains
 [Prometheus source](https://github.com/grafana/mcp-grafana/blob/main/tools/prometheus.go)
 and [Loki source](https://github.com/grafana/mcp-grafana/blob/main/tools/loki.go);
 validation uses raw MCP fixtures, not a live Grafana or Honeycomb account.
+
+### Production and telemetry Activity
+
+A carrier's existing Work status popover includes Production when the permitted
+telemetry map has measured evidence. It uses the same Proof values, configured
+window, actual points/markers and safe authored-first link as the panel. Failed
+thresholds name their signal, measured value and requirement. Missing values stay
+unobserved; measured zero stays zero. Since Done shows only the known Done and
+first observed traffic timestamps: window rates are not lifetime totals. Local,
+imported and asynchronously loaded detail carriers use their carrier identity and
+own binding scope. Refreshes and day selection update an open Production block
+without replacing its focused link or close control.
+
+Activity combines Jira changes and typed telemetry observations in timestamp
+order, newest first, with 20 entries total. Telemetry records first observed
+positive traffic after a known Done time, a measured threshold crossing, and
+silent whole-hour milestones after Done while no traffic has been observed.
+Unknown timestamps say “time unavailable.” A paint, Jira-only refresh, or historical
+day selection cannot generate telemetry Activity. New live observations held during
+history are consumed once on Return Live. Binding replacement/removal retires the
+old scope; clearing or disabling telemetry removes its events and Production while
+preserving Jira Activity and the selected Over time day. No queries originate from
+Production rendering, link preparation, or history slider movement.

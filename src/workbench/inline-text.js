@@ -29,9 +29,13 @@ function createInlineTextEditor(opts){
      hostClass. value: the empty-value rule of the matching Inspect control.
      'raw' saves the draft as typed; 'trimmed' trims it and removes the field when
      empty (Inspect text controls, inspector.js textControl). keyboard: Enter on
-     the focused text also opens it. A save is planSetField (field) or
-     planReplaceValue, through one opts.commit, unless the entry's source(snapshot,
-     target) reads the text itself and returns its own save plan (and the
+     the focused text also opens it. menu: opens only from its object-menu
+     command, never on double-click. read(snapshot,target): the entry's own
+     {text, stored} source in place of field, or null when it cannot edit.
+     A save is the entry's plan(c,value) (null: nothing to write), else
+     planSetField (field) or planReplaceValue, through one opts.commit, unless
+     the entry's source(snapshot,target) reads the text itself and returns its
+     own save plan (and the
      topology context the draft depends on). mount: the element a single-line
      host joins (default: the edited element). */
   /* A connection label: double-click the label text, or Rename (opens through
@@ -49,9 +53,17 @@ function createInlineTextEditor(opts){
     {kind:'step',selector:'.stepline .step-text',target:function(el){return opts.currentStep?opts.currentStep(el):null;},field:'text',markdown:true,value:'trimmed',label:'Edit step text',help:help},
     edgeLabel,
     // Rename on a connection that has no label yet opens from its arrow.
-    Object.assign({},edgeLabel,{selector:null,creation:true})
+    Object.assign({},edgeLabel,{selector:null,creation:true}),
+    /* A local group's boundary title opens only from its object menu (menu: no
+       double-click or Enter route). read gives the title, or the key when there
+       is none; plan saves through planSetGroupTitle, which keeps the key and
+       members. mount: the host is the last child of the group's parent, so it
+       paints above the diagram, over the title. */
+    {kind:'group',selector:'g.grp[data-dv-group]',menu:true,value:'trimmed',label:'Group title',help:'Enter or click outside saves. Escape cancels. The group key stays in Inspect.',
+      read:groupTitle,plan:function(c,value){return value==null && c.stored==null?null:planSetGroupTitle(c.snapshot.text,c.snapshot.raw,c.target.section,c.target.id,value);},
+      place:groupTitleHost,mount:function(c){return c.el.parentNode;},hostClass:'dv-inline-group-editor'}
   ];
-  function selectorOf(test){return fields.filter(function(f){return f.selector && !f.creation && test(f);}).map(function(f){return f.selector;}).join(',');}
+  function selectorOf(test){return fields.filter(function(f){return f.selector && !f.creation && !f.menu && test(f);}).map(function(f){return f.selector;}).join(',');}
   var openSelector=selectorOf(function(){return true;}),keySelector=selectorOf(function(f){return f.keyboard;});
   function context(el,creation){
     if(!el || !el.isConnected || el.closest('[data-dv-detail-preview]') || opts.disabled())return null;
@@ -61,6 +73,7 @@ function createInlineTextEditor(opts){
     var snapshot=opts.session.snapshot();
     if(snapshot.error || snapshot.renderedText!=null && snapshot.renderedText!==snapshot.text)return null;
     if(f.source){var got=f.source(snapshot,target);return got && {el:el,entry:f,target:target,text:got.text || '',source:got,snapshot:snapshot};}
+    if(f.read){var own=f.read(snapshot,target);return own && {el:el,entry:f,target:target,path:null,field:null,text:own.text,stored:own.stored,snapshot:snapshot};}
     var path=builderTargetPath(snapshot.raw,target),value=path && specValueAt(snapshot.raw,path),field=null;
     if(f.field && specObject(value)){
       if(f.accept && !f.accept(value))return null;
@@ -101,6 +114,23 @@ function createInlineTextEditor(opts){
     host.setAttribute('x',String(x-w/2));host.setAttribute('y',String(y-15));host.setAttribute('width',String(w));host.setAttribute('height','30');
     return host;
   }
+  /* A local group (declared, or holding an authored member) and its stored
+     title. Imported groups exist only in the resolved diagram: provider-owned. */
+  function groupTitle(s,t){
+    var got=builderDiagram(s.text,s.raw,t.section);if(got.error)return null;
+    var groups=got.d.groups,nodes=got.d.nodes || {},declared=specObject(groups) && Object.prototype.hasOwnProperty.call(groups,t.id),meta=declared?groups[t.id]:null;
+    if(!declared && !Object.keys(nodes).some(function(id){return specObject(nodes[id]) && nodes[id].group===t.id;}))return null;
+    if(declared && !specObject(meta) || meta && meta.title!=null && typeof meta.title!=='string')return null;
+    var title=meta && meta.title!=null?meta.title:null;
+    return {text:title==null?t.id:title,stored:title};
+  }
+  function groupTitleHost(c){
+    var title=c.el.querySelector(':scope > text.grptitle'),box=c.el.querySelector(':scope > rect.grpbox');if(!title || !box || !c.el.parentNode)return null;
+    var b=title.getBBox(),x=b.x-6,right=Number(box.getAttribute('x'))+Number(box.getAttribute('width'))-6;
+    var host=document.createElementNS('http://www.w3.org/2000/svg','foreignObject');
+    host.setAttribute('x',String(x));host.setAttribute('y',String(b.y+b.height/2-15));host.setAttribute('width',String(Math.max(160,right-x)));host.setAttribute('height','30');
+    return host;
+  }
   function fresh(c){var now=opts.session.snapshot();return c.el.isConnected && !opts.disabled() && now.project===c.snapshot.project && now.text===c.snapshot.text && (!c.source || topologyKey()===c.source.contextKey);}
   function clear(){
     if(!active)return;var a=active;active=null;a.life.destroy();a.host.remove();
@@ -111,9 +141,9 @@ function createInlineTextEditor(opts){
     if(!active)return;var a=active,c=a.c,valid=fresh(c),plan;
     if(save && valid && a.input.value!==c.text){
       var value=c.entry.value==='trimmed'?a.input.value.trim() || null:a.input.value,json=value==null?null:JSON.stringify(value);
-      plan=c.source?c.source.plan(value):c.field?planSetField(c.snapshot.text,c.snapshot.raw,c.path,c.field,json):
+      plan=c.source?c.source.plan(value):c.entry.plan?c.entry.plan(c,value):c.field?planSetField(c.snapshot.text,c.snapshot.raw,c.path,c.field,json):
         planReplaceValue(c.snapshot.text,c.snapshot.raw,c.path,json);
-      if(plan.error){a.error.textContent=plan.error;return false;}
+      if(plan && plan.error){a.error.textContent=plan.error;return false;}
     }
     clear();
     if(plan)opts.commit(plan,c.snapshot,c.target,nextTarget);

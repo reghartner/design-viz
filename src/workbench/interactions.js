@@ -442,6 +442,7 @@ function createBuilderInteractions(opts){
     item('Go to diagram',function(){window.open(url,'_blank','noopener,noreferrer');},url?null:unavailable);
     item('Inspect imported member',function(){selectSpatial([ref.target]);if(opts.workspace)opts.workspace.showTool('inspect',{closeUtilities:true});});
     if(ref.target.kind==='edge')item('Rename',function(){renameEdge(ref.target);});
+    if(ref.target.kind==='group')item('Rename',function(){},'Imported structure belongs to its provider.');
     var routingTarget=Object.assign({},ref.target,ref.target.kind==='edge'?{imported:true}:{});
     var clearPlan=planClearCustomEdges(ref.s.text,ref.s.raw,{targets:[routingTarget]},context);
     item('Clear Custom Edges',function(){applyPlan(clearPlan,null,ref.s);},clearPlan.error || (clearPlan.noop?'No authored custom edge geometry is in scope.':null));
@@ -524,7 +525,8 @@ function createBuilderInteractions(opts){
   var spatial=createBuilderSpatialSelection({document:document,window:window,view:view,src:src,session:session,isActive:opts.isActive,
     targetFromEvent:targetFromEvent,selection:function(){return multiSel.length?multiSel:session.target?[Object.assign({},session.target,{el:findTargetEl(session.target)})]:[];},
     select:selectSpatial,toggle:toggleMultiSelect,find:findTargetEl,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag || coinDrag || pathReorder && pathReorder.busy());},
-    inspect:function(){inspectSelection(false);},openAdd:opts.openAdd,renameEdge:renameEdge
+    inspect:function(){inspectSelection(false);},openAdd:opts.openAdd,renameEdge:renameEdge,
+    rename:function(t){var el=findTargetEl(t);if(el)inlineEditor.open(el);}
   });
   life.own(function(){spatial.destroy();});
 

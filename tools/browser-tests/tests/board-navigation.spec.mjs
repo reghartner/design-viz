@@ -341,6 +341,8 @@ test('standalone focused diagram steps with arrows and Space outside Present wit
   const section=page.locator('#section-main'),board=section.locator('.board'),step=section.locator('.stepline:not(.dv-caption-old) > b'),bar=section.locator('.termbar');
   await expect(page.locator('body')).not.toHaveClass(/presenting/);
   await expect(step).toHaveText('STEP 1/3');await expect(bar).toHaveAttribute('data-playback','paused');
+  // Initial fit uses zoom framing but has no overflow: step keys still work.
+  await expect(board).toHaveClass(/board-content-framed/);
   // R1-R4: a focused diagram owns ArrowRight / ArrowLeft / Space.
   const p=await background(board);await page.mouse.click(p.x,p.y);await expect(board).toBeFocused();
   await page.keyboard.press('ArrowRight');await expect(step).toHaveText('STEP 2/3');
@@ -529,10 +531,13 @@ for(const surface of ['standalone','workbench'])for(const shape of ['wide','tall
   await board.getByRole('button',{name:'Fit diagram',exact:true}).click();
   await expectFitted(board);
   const fitted=await zoomGeometry(board);
-  expect(fitted.svgW).toBeCloseTo(initial.svgW,0);
+  // Bounds round to SVG units; judge visible ink, not the padded SVG frame
+  // whose width amplifies a subpixel content difference many times over.
+  for(const edge of ['left','right','top','bottom'])expect(Math.abs(fitted.union[edge]-initial.union[edge])).toBeLessThanOrEqual(2);
   await board.getByRole('button',{name:'Fit diagram',exact:true}).click();
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  expect((await zoomGeometry(board)).svgW).toBeCloseTo(fitted.svgW,0);
+  const repeated=await zoomGeometry(board);
+  for(const edge of ['left','right','top','bottom'])expect(Math.abs(repeated.union[edge]-fitted.union[edge])).toBeLessThanOrEqual(2);
   expect(await board.locator('.boardcanvas>svg').getAttribute('viewBox')).toBe(viewBox);
   if(original!==null)await expect(page.locator('#src')).toHaveValue(original);
   // A narrower desktop column wraps controls; the active fit uses the settled

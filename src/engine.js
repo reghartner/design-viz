@@ -3189,6 +3189,7 @@ function createBoardNavigation(board, group, legend, changed){
       board.scrollTop+=(next.top-b.top)/display+(c.y-origin.y)*c.zoom-(legend.offsetHeight+(board.clientHeight-legend.offsetHeight)/2);refresh();
     },function(){return enabled() && !document.hidden && svg===graph() && board.isConnected && !!board.clientWidth;});
   }
+  if(document.fonts && document.fonts.ready)document.fonts.ready.then(function(){if(autoFit && !retired)requestFit();});
   return {refresh:refresh,requestFit:requestFit,reset:reset,frame:frame,fitSelection:fitSelection,followActive:followActive,cancelFollow:motion.cancel,manual:manual,
     snapshot:snapshot,restore:restore,
     suspend:function(){if(retired || paused)return;motion.cancel();cancel();paused=snapshot();},
@@ -4434,14 +4435,16 @@ function wirePresenter(ctl, view, win){
     ev.preventDefault();
   }
   /* Outside Present, step keys belong to a focused diagram section. Controls
-     with their own keys and pannable boards (Explore, zoomed or overflowing)
+     with their own keys and pannable boards (Explore or overflowing)
      keep native behaviour; elsewhere the page scrolls as usual. */
   function focusedStepper(ev){
     var target = ev.target;
     if (ev.defaultPrevented || ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey || !target || !target.closest) return null;
     if (target.closest('input,textarea,select,button,a[href],summary,[contenteditable]:not([contenteditable="false"]),[role="tab"],[role="slider"],[role="button"],[role="menuitem"],[role="menuitemradio"],[role="option"],.prose-code')) return null;
     var board = target.closest('.board');
-    if (board && (board.classList.contains('explore-board') || board.classList.contains('board-zoomed') ||
+    // Fresh content fitting also uses board-zoomed for its screen geometry;
+    // that alone does not make an overview pannable.
+    if (board && (board.classList.contains('explore-board') || board.scrollHeight > board.clientHeight + 1 ||
                   board.scrollWidth > board.clientWidth + 1)) return null;
     var section = target.closest('.doc-sec');
     var rec = section && ctl.sections.find(function(r){ return r.sectionEl === section; });

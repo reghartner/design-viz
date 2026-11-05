@@ -8,13 +8,13 @@ const rawQuery=()=>({query_spec:{filters:[{column:'service.name',op:'=',value:'e
 const binding=(source='honeycomb')=>({kind:'service',signals:{trace:source==='tempo'?{tempo:'{ resource.service.name = "event-ingest" }'}:{honeycomb:rawQuery()}}});
 const pageSpec=(source='honeycomb')=>({tracking:{telemetry:{honeycomb:{environment:'flowview-demo',dataset:'doorbell'},grafana:{tempo:'tempo-main',prometheus:'prom-main'}}},sections:[{id:'main',diagram:{nodes:{a:{telemetry:binding(source)}},rows:[['a']]}}]});
 function context(){const timers=new Map();let serial=0;class Clock extends Date{static now(){return Date.parse('2026-10-30T00:00:00Z');}}const C={URL,AbortController,TextDecoder,TextEncoder,Date:Clock,console,setTimeout:(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;},clearTimeout:id=>timers.delete(id),document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint('standalone').body,C);return {C,timers};}
-async function setup({page=pageSpec(),transport,wrap,host=false,hosted=false}={}){
+async function setup({page=pageSpec(),transport,wrap,host=false,hosted=false,permission='granted'}={}){
  const {createMockBridge}=await import('./helpers/honeycomb-bridge.mjs'),bridge=createMockBridge({day:9,transport}),{C,timers}=context();if(wrap)wrap(bridge);
  let permissions=[];
  if(hosted){const list=bridge.listTools;bridge.listTools=async()=>{const servers=await list();return servers.map(s=>({...s,tools:s.tools.map(t=>({name:t.name,description:t.description,annotations:t.annotations}))}));};bridge.describeTool=async(server,name)=>{const servers=await list();return servers.find(s=>s.server===server).tools.find(t=>t.name===name);};}
- const p=C.normalize(page),win={claude:{use:async name=>name==='permissions'?{request:async names=>{permissions.push(...names);return Object.fromEntries(names.map(n=>[n,'granted']));}}:bridge}},adapter=host?null:C.createTelemetryProviders(p,win);
+ const p=C.normalize(page),win={claude:{use:async name=>name==='permissions'?{request:async names=>{permissions.push(...names);return Object.fromEntries(names.map(n=>[n,typeof permission==='function'?permission(n):permission]));}}:bridge}},adapter=host?null:C.createTelemetryProviders(p,win);
  const api=C.createTelemetry(p,host?false:adapter?.options||false,{carriers:fn=>C.sectionRecords(p).forEach(r=>{const d=r.section.diagram||{};Object.keys(d.nodes||{}).forEach(id=>fn(d.nodes[id],id,p));(d.edges||[]).forEach(e=>fn(e,e.from+'->'+e.to,p));})});
- const handle=adapter?.attach({telemetry:api,liveStatus:{onDestroy:()=>()=>{}}},p);await settle();return {C,p,api,bridge,adapter,timers,permissions,close(){handle?.destroy();api.destroy();}};
+ const handle=adapter?.attach({telemetry:api,liveStatus:{onDestroy:()=>()=>{}}},p);await settle();return {C,p,win,api,bridge,adapter,timers,permissions,close(){handle?.destroy();api.destroy();}};
 }
 function envelope(C,trace=C.telemetryHoneycombTrace({payload:traceText},recordedId)){
  return C.telemetryTraceEnvelope({version:1,provider:'honeycomb',traceId:recordedId,signal:'trace',selectionToken:'test-token',selectionReason:'actual returned match',observedAt:'2026-10-12T06:34:09Z',range:{from:'2026-10-12T00:34:09Z',to:'2026-10-12T06:34:09Z'},candidates:[{traceId:recordedId,status:'unknown'}],...trace});
@@ -173,4 +173,32 @@ test('switch during trace discovery keeps the newest environment available witho
 
 for(const source of ['honeycomb','tempo'])test('hosted metadata-only '+source+' trace contracts describe after consent and preserve cached selection',async t=>{
  const h=await setup({page:pageSpec(source),hosted:true});t.after(()=>h.close());assert.equal(h.api.snapshot().available,true);assert.deepEqual(h.permissions,[]);assert.equal(h.bridge.calls.length,0);h.api.setEnabled(true);await settle();const first=h.api.snapshot().map.a.exemplars[0];assert.ok(first.spans.length);assert.ok(h.permissions.includes('mcp:'+(source==='tempo'?'Grafana':'Honeycomb')));const alternate=first.candidates.find(c=>c.traceId!==first.traceId);await h.api.chooseExemplar('a',first.selectionToken,alternate.traceId);assert.equal(h.api.snapshot().map.a.exemplars[0].traceId,alternate.traceId);
+});
+
+
+for(const kind of ['scalar','trace'])for(const peer of [false,true])test('hosted '+kind+' denial survives environment/metadata/recreation with '+(peer?'healthy Grafana':'no peer'),async t=>{
+ const {EVENT_QUERY,nativeQuery}=await import('./helpers/honeycomb-bridge.mjs'),{C}=context();
+ const signals=kind==='trace'?binding().signals:{count:{honeycomb:nativeQuery()}};if(peer)signals.rate={grafana:EVENT_QUERY};
+ const carrier={telemetry:{kind:'service',signals}},spec=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=spec('provider',{nodes:{api:carrier},rows:[['api']],topologyExports:{core:{nodes:['api'],edges:[]}}}),consumer=spec('consumer',{nodes:{local:carrier},rows:[['local']],topologyImports:[{spec:'provider',export:'core',as:'shared'}]});
+ consumer.page.tracking=pageSpec().tracking;Object.assign(consumer.page.tracking.telemetry,{environment:'qa',environments:{qa:{},prd:{}}});
+ const h=await setup({page:C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]}),hosted:true,permission:'denied'});t.after(()=>h.close());
+ assert.equal(h.api.snapshot().available,true);h.api.setEnabled(true);await settle();assert.deepEqual(h.permissions,['mcp:Honeycomb']);
+ function unchanged(api){assert.equal(api.snapshot().available,peer);assert.equal(h.bridge.calls.filter(c=>c.server==='Honeycomb').length,0);assert.deepEqual(h.permissions,['mcp:Honeycomb']);if(peer)for(const id of ['local','shared::api'])assert.ok(api.snapshot().map[id]?.signals.rate.value>0);}
+ unchanged(h.api);h.api.setEnvironment('prd');await settle();h.api.setEnabled(true);await settle();unchanged(h.api);
+ // Force scoped adapter recreation through an actual local binding edit.
+ const q=h.p.sections[0].diagram.nodes.local.telemetry.signals[kind==='trace'?'trace':'count'].honeycomb;(q.query_spec || q).filters.push({column:'new.resource',op:'=',value:'new-topic'});h.api.bindingsChanged();await settle();unchanged(h.api);
+ // A whole rerender creates another coordinator on the same host/page.
+ h.close();const adapter=h.C.createTelemetryProviders(h.p,h.win),api=h.C.createTelemetry(h.p,adapter.options,{carriers:fn=>h.C.sectionRecords(h.p).forEach(r=>Object.keys(r.section.diagram.nodes).forEach(id=>fn(r.section.diagram.nodes[id],id,h.p)))}),handle=adapter.attach({telemetry:api},h.p);t.after(()=>{handle.destroy();api.destroy();});await settle();api.setEnabled(true);await settle();unchanged(api);
+});
+
+test('denied Honeycomb traces do not hide granted Tempo traces on the same page',async t=>{
+ const p=pageSpec();p.sections[0].diagram.nodes.tempo={telemetry:binding('tempo')};p.sections[0].diagram.rows[0].push('tempo');Object.assign(p.tracking.telemetry,{environment:'qa',environments:{qa:{},prd:{}}});
+ const h=await setup({page:p,hosted:true,permission:scope=>scope==='mcp:Honeycomb'?'denied':'granted'});t.after(()=>h.close());h.api.setEnabled(true);await settle();assert.equal(h.api.snapshot().available,true);assert.ok(h.api.snapshot().map.tempo.exemplars.length);assert.equal(h.api.snapshot().map.a,undefined);h.api.setEnvironment('prd');await settle();assert.ok(h.api.snapshot().map.tempo.exemplars.length);assert.equal(h.permissions.filter(s=>s==='mcp:Honeycomb').length,1);assert.equal(h.bridge.calls.filter(c=>c.server==='Honeycomb').length,0);
+});
+
+test('a cancelled permission wait still remembers denial only for its scoped connector',async()=>{
+ const {C}=context();let active=true,finish,requests=0,descriptions=0;
+ const claude={use:async()=>({request:async names=>{requests++;return names[0]==='mcp:Honeycomb'?new Promise(resolve=>finish=resolve):{[names[0]]:'granted'};}})},mcp={describeTool:async(server,name)=>{descriptions++;return {name,inputSchema:{type:'object'}};}},tools=[{name:'run_query'}];
+ const pending=C.telemetryDescribeTools(claude,mcp,'Honeycomb',tools,()=>active);await settle();active=false;finish({'mcp:Honeycomb':'denied'});await assert.rejects(pending);await assert.rejects(C.telemetryDescribeTools(claude,mcp,'Honeycomb',tools,()=>true),e=>e.code==='not_granted');assert.equal(requests,1);assert.equal(descriptions,0);await C.telemetryDescribeTools(claude,mcp,'Other Honeycomb',tools,()=>true);assert.equal(requests,2);assert.equal(descriptions,1);
 });

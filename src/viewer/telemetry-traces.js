@@ -141,10 +141,14 @@ function createTelemetryTraces(page,win,now,bound){
   async function discover(signal){
     var e=epoch;if(!namespace)namespace=Promise.resolve(win.claude.use('mcp'));var mcp=await namespace;if(e!==epoch || retired || !ctl)telemetryTraceFail('Trace session cancelled.');var list=await mcp.listTools();if(e!==epoch || retired || !ctl)telemetryTraceFail('Trace session cancelled.');
     var next={},jobs=telemetryTraceJobs(ctl.telemetry.bindings()),config=telemetryProviderConfig(current,ctl),to=clock(),range={from:new Date(to-telemetryGrafanaWindowMs(config.window)).toISOString(),to:new Date(to).toISOString()};
-    for(var job of jobs){var c=telemetryTraceContract(list,job.signal.source);if(!c)continue;
+    for(var job of jobs){var c=telemetryTraceContract(list,job.signal.source);if(!c || telemetryConnectorRefused(win.claude,c.server))continue;
       if(!c.search.inputSchema || !c.detail.inputSchema){
-        if(!signal){next[job.signal.source]=c;continue;}
-        var described=await telemetryDescribeTools(win.claude,mcp,c.server,[c.search,c.detail],function(){return e===epoch && !retired && !!ctl && !signal.aborted && ctl.telemetry.enabled();});
+        if(!signal){
+          // Eligibility rediscovery must not downgrade an already described pair
+          // and invalidate a simultaneous refresh for the new environment.
+          var existing=contracts[job.signal.source];next[job.signal.source]=existing && existing.server===c.server && existing.search.name===c.search.name && existing.detail.name===c.detail.name?existing:c;continue;
+        }
+        var described;try{described=await telemetryDescribeTools(win.claude,mcp,c.server,[c.search,c.detail],function(){return e===epoch && !retired && !!ctl && !signal.aborted && ctl.telemetry.enabled();});}catch(error){if(error && error.code==='not_granted')continue;throw error;}
         c={server:c.server,search:described[0],detail:described[1]};
       }
       try{telemetryTraceInputs(job,config,c,range);telemetryTraceInputs(job,config,c,range,'00000000000000000000000000000000');next[job.signal.source]=c;}catch(error){}

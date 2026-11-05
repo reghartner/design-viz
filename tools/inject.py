@@ -182,7 +182,7 @@ GUIDE_BLOCK = re.compile(r'^<script type="text/markdown" id="dv-agent-guide">\n.
 GUIDE_LIMIT = 6 * 1024
 COMMENTS_CAPABILITY = {"composer_only": True, "customAnchors": True}
 JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]
-# #943: the claude.ai Grafana adapter picks the viewer's connector by these five tools.
+# Grafana connector qualification follows the query families bound on the page.
 GRAFANA_TOOLS = {"grafana": "query_prometheus", "loki": "query_loki_logs", "sql": "query_sql"}
 GRAFANA_SOURCES = ("grafana", "loki", "sql")
 HONEYCOMB_TOOLS = ["run_query"]

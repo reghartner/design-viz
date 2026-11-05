@@ -17,14 +17,23 @@ function telemetryHoneycombBindings(page){return telemetryBindings(function(fn){
 });});}
 /* Hosted listTools is metadata-only. Schema discovery follows explicit consent;
    legacy hosts that already publish schemas retain their existing contract. */
+/* Connector refusals belong to this host/page lifetime, not an adapter or
+   deployment environment. Weak keys survive rerenders without retaining hosts. */
+var telemetryConnectorRefusals=new WeakMap();
+function telemetryConnectorRefused(claude,server){var scopes=telemetryConnectorRefusals.get(claude);return !!(scopes && scopes.has(server));}
+function telemetryConnectorRefuse(claude,server){var scopes=telemetryConnectorRefusals.get(claude);if(!scopes){scopes=new Set();telemetryConnectorRefusals.set(claude,scopes);}scopes.add(server);}
 function telemetrySchemaType(schema,type){var t=schema && schema.type;return t===type || Array.isArray(t) && t.indexOf(type)>=0 && t.every(function(v){return v===type || v==='null';});}
 function telemetryHoneycombCandidate(list){var found=telemetryGrafanaListed(list).filter(function(c){return c && typeof (c.server || c.name)==='string' && telemetryGrafanaOffered(c).indexOf('run_query')>=0;});return found.find(function(c){return (c.server || c.name)==='Honeycomb';}) || found[0] || null;}
 async function telemetryDescribeTools(claude,mcp,server,tools,active){
+  if(telemetryConnectorRefused(claude,server))throw {code:'not_granted'};
   var missing=tools.filter(function(t){return !t.inputSchema;});if(!missing.length)return tools;
   function check(){if(!active())throw {code:'capability_removed'};}
   check();var permissions=await claude.use('permissions');check();
-  if(!permissions || typeof permissions.request!=='function')throw {code:'not_granted'};
-  var key='mcp:'+server,states=await permissions.request([key]);check();
+  if(!permissions || typeof permissions.request!=='function'){telemetryConnectorRefuse(claude,server);throw {code:'not_granted'};}
+  var key='mcp:'+server,states=await permissions.request([key]);
+  // Remember a human refusal even when its waiting refresh was cancelled.
+  if(states && (states[key]==='denied' || states[key]==='unavailable'))telemetryConnectorRefuse(claude,server);
+  check();
   if(!states || states[key]!=='granted')throw {code:'not_granted'};
   if(typeof mcp.describeTool!=='function')throw {code:'capability_removed'};
   var described=[];for(var tool of tools){check();var description=tool.inputSchema?tool:await mcp.describeTool(server,tool.name);check();described.push(Object.assign({},tool,description));}return described;
@@ -167,8 +176,9 @@ function createTelemetryHoneycomb(page,win,now,bound){
     if(!namespace)namespace=Promise.resolve().then(function(){return use.call(claude,'mcp');});
     var mcp=await namespace;if(!active() || !mcp)throw {code:'capability_removed'};
     var list=await mcp.listTools();if(!active())throw {code:'capability_removed'};
-    contract=telemetryHoneycombServer(list);if(contract)return mcp;
+    contract=telemetryHoneycombServer(list);if(contract){if(telemetryConnectorRefused(claude,contract.server))throw {code:'not_granted'};return mcp;}
     var candidate=telemetryHoneycombCandidate(list);if(!candidate)throw {code:'server_not_connected'};
+    if(telemetryConnectorRefused(claude,candidate.server || candidate.name))throw {code:'not_granted'};
     var tool=candidate.tools.find(function(t){return t.name==='run_query';});
     if(!signal)return mcp; // Initial paint only establishes eligibility; never prompts.
     var server=candidate.server || candidate.name,described=await telemetryDescribeTools(claude,mcp,server,[tool],active);

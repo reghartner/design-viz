@@ -136,3 +136,10 @@ for(const shared of [false,true])test('desktop '+(shared?'shared timeline':'matr
   await label('short').dblclick();await edit.fill('New primary');await edit.press('Enter');const noColor=structuredClone(want);noColor.page.sections[0].diagram.paths[0].label='New primary';expect(JSON.parse(await src.inputValue())).toEqual(noColor);await undo.click();await expect(src).toHaveValue(saved);
   await label('long').dblclick();await edit.fill('Stale draft');await src.evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await expect(edit).toHaveCount(0);await expect(src).toHaveValue(saved+' ');
 });
+
+test('context clicks on paths never leave a pending inline rename',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:1000});const spec=story(false),original=JSON.stringify(spec,null,2);
+ await page.goto(server.origin+'/workbench.html');await paste(page,original);await prepareEditorSurface(page);
+ const label=page.locator('#docview .path-chip[data-dv-path="long"] .path-chip-label');await label.click();await label.click({button:'right'});await page.locator('#workbench-editor-title').click();
+ await expect(page.locator('.dv-inline-editor').getByRole('textbox',{name:'Path label',exact:true})).toHaveCount(0);await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
+});

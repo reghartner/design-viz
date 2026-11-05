@@ -48,8 +48,8 @@ function createBuilderInteractions(opts){
       function shown(){var el=findTargetEl(target);return !!(el && el.getAttribute('aria-selected')==='true');}
       function reactivate(wasShown){var el=wasShown && findTargetEl(target);if(el && el.getAttribute('aria-selected')!=='true')el.click();}
       var wasShown=target.kind==='tab' && shown(),hooks={snapshot:snapshot,beforePublish:clearMultiSelect};
-      if(target.kind==='tab')hooks.history={kind:'source',before:snapshot.text,after:plan.text,capture:function(){return session.text();},restore:function(value,message){
-        var active=shown();if(!session.restoreHistoryText(value,message))return false;reactivate(active);return true;
+      if(target.kind==='tab')hooks.history={kind:'source',notifyHistory:true,before:snapshot.text,after:plan.text,capture:function(){return session.text();},restore:function(value){
+        var active=shown();if(!session.restoreHistoryText(value))return false;reactivate(active);return true;
       }};
       if(!session.accept(plan,hooks))return;
       reactivate(wasShown);

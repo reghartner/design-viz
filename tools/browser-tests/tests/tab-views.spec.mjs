@@ -42,8 +42,8 @@ test('Workbench edits a tab label in place and retains the shown tab through his
  await tab().click();await expect(tab()).toHaveAttribute('aria-selected','true');const before=await source.inputValue();
  await tab().dblclick();await expect(editor).toBeVisible();await expect(editor).toHaveValue('Notes');await editor.fill('  Research  ');await editor.press('Enter');
  const renamed=await source.inputValue();expect(JSON.parse(renamed).page.blocks[0].tabs[1].label).toBe('Research');await expect(tab()).toHaveText('Research');await expect(tab()).toHaveAttribute('aria-selected','true');
- await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await expect(tab()).toHaveText('Notes');await expect(tab()).toHaveAttribute('aria-selected','true');
- await page.locator('#redo-builder').click();await expect(source).toHaveValue(renamed);await expect(tab()).toHaveAttribute('aria-selected','true');
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await expect(tab()).toHaveText('Notes');await expect(tab()).toHaveAttribute('aria-selected','true');await expect(page.locator('#builder-history-status')).toHaveText('Undo complete');
+ await page.locator('#redo-builder').click();await expect(source).toHaveValue(renamed);await expect(tab()).toHaveAttribute('aria-selected','true');await expect(page.locator('#builder-history-status')).toHaveText('Redo complete');
  await tab().dblclick();await editor.fill('Findings');await page.locator('#workbench-editor-title').click();
  const clickaway=await source.inputValue();expect(JSON.parse(clickaway).page.blocks[0].tabs[1].label).toBe('Findings');await expect(tab()).toHaveText('Findings');await expect(tab()).toHaveAttribute('aria-selected','true');
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(renamed);await expect(tab()).toHaveAttribute('aria-selected','true');

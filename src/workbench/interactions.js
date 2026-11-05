@@ -28,7 +28,11 @@ function createBuilderInteractions(opts){
   life.own(function(){curveEditor.destroy();});
   var metricsCardEditor=createTelemetryCardLayoutEditor({view:view,window:window,src:src,session:session,
     disabled:function(){return !!(addToStep || connect) || opts.isActive && !opts.isActive();},message:inspectorMessage,pause:pausePreview,
-    select:function(card,target){clearMultiSelect();selectTarget(Object.assign({},target,{el:card.ownerSVGElement.querySelector('path.edge[data-dv-edge="'+target.index+'"]')}),false,true);},
+    select:function(card,target,event){
+      target=Object.assign({},target,{el:card.ownerSVGElement.querySelector('path.edge[data-dv-edge="'+target.index+'"]')});
+      if(event && (event.shiftKey || event.ctrlKey || event.metaKey)){toggleMultiSelect(target);return;}
+      clearMultiSelect();selectTarget(target,false,true);
+    },
     commit:function(plan,snapshot,target){if(!session.accept(plan,{snapshot:snapshot,beforePublish:clearMultiSelect}))return;session.target=target;rehighlight();renderInspector();}
   });
   life.own(function(){metricsCardEditor.destroy();});

@@ -60,17 +60,17 @@ function createTelemetryCardLayoutEditor(opts){
   life.listen(win,'pointerup',function(ev){
     var g=gesture;if(!g || ev.pointerId!==g.id)return;cancel();consume();
     if(g.moved && (Math.abs(g.position.x-g.c.origin.x)>.01 || Math.abs(g.position.y-g.c.origin.y)>.01))save(g.c,g.position);
-    else if(!g.moved && fresh(g.c))opts.select(g.c.card,g.c.target);
+    else if(!g.moved && fresh(g.c))opts.select(g.c.card,g.c.target,ev);
   });
   life.listen(view,'click',function(ev){
     if(suppress){suppress=false;ev.preventDefault();ev.stopImmediatePropagation();return;}
     var card=cardFrom(ev),c=card && context(card);if(!c)return;
-    ev.preventDefault();ev.stopImmediatePropagation();opts.select(card,c.target);
+    ev.preventDefault();ev.stopImmediatePropagation();opts.select(card,c.target,ev);
   },true);
   life.listen(view,'keydown',function(ev){
     var card=cardFrom(ev),c=card && context(card);if(!c)return;
     var arrows={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]},delta=arrows[ev.key];
-    if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();ev.stopImmediatePropagation();opts.select(card,c.target);return;}
+    if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();ev.stopImmediatePropagation();opts.select(card,c.target,ev);return;}
     if(!delta || ev.altKey || ev.ctrlKey || ev.metaKey)return;
     ev.preventDefault();ev.stopImmediatePropagation();if(gesture)cancel();opts.pause();
     if(nudge && (nudge.c.card!==card || !fresh(nudge.c)))cancelNudge();

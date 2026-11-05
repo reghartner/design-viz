@@ -278,3 +278,19 @@ test('external loaded imported cards honor manual position without editing affor
  const external=a.locator('[data-dv-detail-preview]:visible .dv-metrics-card[data-dv-edge="0"]');await expect(external).toHaveCount(1);await expect.poll(()=>positionOf(external)).toEqual({x:-270,y:180});await expect(external).not.toHaveAttribute('data-metrics-section');await expect(external).not.toHaveAttribute('tabindex');
  await page.evaluate(()=>window.previewOwners.forEach(p=>p.destroy()));
 });
+
+
+test('modified metrics card clicks preserve ordinary edge multiselection without moving cards',async({page,server})=>{
+ const spec=structuredClone(raw);spec.page.sections[0].diagram.edges[1].telemetry=structuredClone(binding);
+ await open(page,server,spec);await toggle(page).check();const before=await page.locator('#src').inputValue();
+ const a=page.locator('#docview .dv-metrics-card[data-dv-edge="0"]'),b=page.locator('#docview .dv-metrics-card[data-dv-edge="1"]'),selected=page.locator('#docview path.edge.dv-sel');
+ // macOS reserves Control-click for its context menu; use the native additive modifier.
+ for(const modifier of ['Shift',process.platform==='darwin'?'Meta':'Control']){
+  await a.click();await expect(selected).toHaveCount(1);await expect(selected).toHaveAttribute('data-dv-edge','0');
+  await b.click({modifiers:[modifier]});await expect(selected,modifier+' adds the edge').toHaveCount(2);
+  await b.click({modifiers:[modifier]});await expect(selected).toHaveCount(1);await expect(selected).toHaveAttribute('data-dv-edge','0');
+  await expect(page.locator('#src')).toHaveValue(before);
+ }
+ await a.focus();await b.focus();await b.press('Shift+Enter');await expect(selected).toHaveCount(2);await expect(page.locator('#src')).toHaveValue(before);
+ expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
+});

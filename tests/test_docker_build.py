@@ -73,7 +73,8 @@ class DockerSourceBuildTests(unittest.TestCase):
             for name in ['tools/compose-page-layout.cjs', 'tools/arrange/core.cjs', 'tools/arrange/estimate.cjs',
                          'tools/arrange/measure.cjs', 'tools/arrange/solver.cjs',
                          'tools/authoring-packet.py', 'tools/visibility-check.cjs',
-                         'tools/company_overlay.py', *examples]:
+                         'tools/company_overlay.py', '.claude/skills/live-status-board/SKILL.md',
+                         '.claude/skills/live-status-board/metrics.md', *examples]:
                 self.assertEqual(files[name], (ROOT / name).read_text(), name)
             self.assertIn('state', json.loads(files['tools/arrange/layouts.json']))
             self.assertFalse(any(name.endswith(('generated-native.html', 'setup.cjs', 'package-lock.json')) for name in files))

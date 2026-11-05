@@ -141,7 +141,7 @@ function createTelemetryTraces(page,win,now,bound){
     if(error && error.code==='user_changed'){retired=true;invalidate();if(ctl && ctl.telemetry.accountChanged)ctl.telemetry.accountChanged();}
     else if(error && ['capability_removed','server_not_connected','server_not_found','not_granted','capability_disabled','needs_reauth'].indexOf(error.code)>=0){invalidate();contracts={};if(ctl)ctl.telemetry.setAvailable(false);}
     // Provider text may contain signed transport URLs. Never report it verbatim.
-    return new Error('Trace evidence unavailable; check the explicit query, returned shape and connector permissions.');
+    return new Error(error && error.code==='trace_unobserved'?error.message:'Trace evidence unavailable; check the explicit query, returned shape and connector permissions.');
   }
   async function detail(entry,candidate,reason){
     if(!active(entry.epoch))telemetryTraceFail('Trace session cancelled.');

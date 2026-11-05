@@ -29,7 +29,7 @@ function telemetryEvidenceJson(raw){
 }
 var TELEMETRY_TRACE_CANDIDATES=20,TELEMETRY_TRACE_SPANS=200;
 var TELEMETRY_TRACE_ATTRS=['service.name','resource.service.name','service.namespace','service.version','http.route','http.request.method','http.method','http.response.status_code','http.status_code','rpc.service','rpc.method','rpc.system','db.system','db.operation','db.operation.name','messaging.system','messaging.destination.name','messaging.operation','messaging.operation.type','span.kind','status.code','error','exception.type','meta.signal_type','meta.annotation_type'];
-function telemetryTraceFail(message){throw new Error(message);}
+function telemetryTraceFail(message){var e=new Error(message);e.code='trace_unobserved';throw e;}
 function telemetryTraceString(v){return typeof v==='string' && v.length>0 && v.length<=512 && !/https?:\/\/mcp\.honeycomb\.io\/query_results\//.test(v);}
 function telemetryTraceId(v){return typeof v==='string' && /^[0-9a-f]{16,32}$/i.test(v);}
 function telemetryTraceTime(v){return typeof v==='string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?(?:Z|[+-]\d\d:\d\d)$/.test(v) && isFinite(Date.parse(v))?v:null;}

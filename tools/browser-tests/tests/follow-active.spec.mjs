@@ -1,6 +1,8 @@
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
+import vm from 'node:vm';
+import sourceLoader from '../../../tools/source-loader.cjs';
 import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 import {projectSource,useProjectDownloads} from '../helpers/project-export.mjs';
@@ -264,6 +266,48 @@ for(const presentation of ['standard','explore'])test(`${presentation} authored 
  await section(page).locator('.path-chip[data-dv-path="remote"]').click();await frames(page,5);expect(await camera(page)).toEqual(initial);
  await follow(page).click();await expect(follow(page)).toHaveAttribute('aria-pressed','true');
  await fit(page,['[data-dv-node=b]','[data-dv-node=c]']);expect(await camera(page)).not.toEqual(initial);
+});
+
+for(const origin of ['local','imported'])test('paused Standard Follow retains reachable left/top ink growth: '+origin,async({page,server})=>{
+ let data=fixture(),d=data.page.sections[0].diagram,id='c';
+ // Hold the authored viewBox fixed: this checks scroll runway, independently
+ // of changes to the SVG's own coordinate system.
+ d.graphFrame={x:-4000,y:-3000,w:8000,h:6000};
+ if(origin==='imported'){
+  const provider={page:{title:'Shared destination',canon:{version:1,id:'provider',kind:'canonical',owner:'group:default/test'},sections:[{diagram:{
+   nodes:{c:d.nodes.c},rows:[[]],floats:d.floats.filter(f=>f.id==='c'),edges:[],topologyExports:{destination:{nodes:['c'],edges:[]}}
+  }}]}};
+  delete d.nodes.c;d.floats=d.floats.filter(f=>f.id!=='c');id='shared::c';
+  d.edges.forEach(e=>{if(e.to==='c')e.to=id;});d.steps.forEach(s=>{if(s.nodes)s.nodes=s.nodes.map(n=>n==='c'?id:n);});
+  d.topologyImports=[{spec:'provider',export:'destination',as:'shared'}];
+  data.page.canon={version:1,id:'consumer',kind:'canonical',owner:'group:default/test'};
+  const context=vm.createContext({});vm.runInContext(sourceLoader.composeSources(['validator.js','canon.js']),context);
+  data=JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(data,{version:1,id:'consumer',specs:[provider,data]})));
+  expect(data.page.sections[0].diagram.topologyProvenance).toBeTruthy();
+ }
+ await open(page,server,'standard',true,data);await frames(page,5);
+ await section(page).locator('.schip[data-step-source="0"]').click();await fit(page,['[data-dv-node=a]']);
+ await follow(page).click();await expect(follow(page)).toHaveAttribute('aria-pressed','false');
+ const node=board(page).locator('[data-dv-node="'+id+'"]');await expect(node).toHaveCount(1);
+ const original=await node.getAttribute('transform'),paused=await camera(page);
+ async function repaint(transform){
+  // Model an in-place graph repaint, including the production notification
+  // used by dynamic overlays; use real local/resolved-imported SVG nodes.
+  await node.evaluate((node,transform)=>{node.setAttribute('transform',transform);node.closest('svg').dispatchEvent(new CustomEvent('dv:boardcontentchange',{bubbles:true}));},transform);
+  await frames(page,5);
+ }
+ function sameCamera(actual,want){expect(actual.w).toBe(want.w);for(const axis of ['x','y'])expect(Math.abs(actual[axis]-want[axis])).toBeLessThan(1);}
+ await repaint('translate(-2800 -1900)');sameCamera(await camera(page),paused);
+ await node.evaluate(node=>{
+  const b=node.closest('.board'),n=node.getBoundingClientRect(),r=b.getBoundingClientRect(),lg=b.querySelector('.lg').getBoundingClientRect();
+  b.scrollLeft+=n.x+n.width/2-(r.x+b.clientWidth/2);
+  b.scrollTop+=n.y+n.height/2-(lg.bottom+(r.bottom-lg.bottom)/2);
+ });
+ await fit(page,['[data-dv-node="'+id+'"]']);const panned=await camera(page);
+ await repaint(original);sameCamera(await camera(page),panned);
+ await repaint('translate(-2800 -1900)');sameCamera(await camera(page),panned);await fit(page,['[data-dv-node="'+id+'"]']);
+ await section(page).locator('.schip[data-step-source="1"]').click();await follow(page).click();
+ await fit(page,['[data-dv-node="'+id+'"]']);await expect(follow(page)).toHaveAttribute('aria-pressed','true');
 });
 
 test('explicit true and malformed follow defaults retain enabled reader navigation',async({page,server})=>{

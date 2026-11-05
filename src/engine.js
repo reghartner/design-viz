@@ -3061,13 +3061,16 @@ function createBoardNavigation(board, group, legend, changed){
     if(!enabled() || !board.clientWidth)return;
     var box=svg.viewBox.baseVal,ink=boardContentBounds(svg),display=displayScale(),scale=box.width?svg.getBoundingClientRect().width/display/box.width:0;
     if(!ink || !scale)return unframe();
+    var previousFollow=followFrame;
+    if(followFrame)followFrame={x:Math.min(followFrame.x,ink.x),y:Math.min(followFrame.y,ink.y),
+      right:Math.max(followFrame.right,ink.x+ink.w),bottom:Math.max(followFrame.bottom,ink.y+ink.h)};
     function axis(start,size,full,length,available,legacy,center,followStart,followEnd){
       var from=Math.max(start,full),to=Math.min(start+size,full+length);if(to<=from){from=full;to=full+length;}
       // Whole pixels: a fractional canvas leaves the scroll bottom short of the rounded scrollHeight.
       var lead=(from-full)*scale,extent=(to-from)*scale,room=Math.ceil(Math.max(available,extent));
-      // Follow keeps its coordinate origin and existing scroll runway until
-      // the next explicit follow target. Path renders can move a coin or
-      // remove a badge; their bounds must not shift a paused camera.
+      // Keep existing runway when path ink disappears, and extend both ends
+      // for new ink. The scroll compensation below keeps the paused camera
+      // fixed when left/top growth moves the canvas coordinate origin.
       if(followFrame)return {room:Math.ceil((Math.max(to,followEnd)-followStart)*scale+available),offset:available/2-(followStart-full)*scale};
       // Keep the graph center chosen by Fit, rather than recentering each
       // time an author moves an outer node or coin. Other objects stay put.
@@ -3079,6 +3082,10 @@ function createBoardNavigation(board, group, legend, changed){
     board.style.setProperty('--board-canvas-width',across.room+'px');board.style.setProperty('--board-canvas-height',down.room+'px');
     board.style.setProperty('--board-offset-x',across.offset+'px');board.style.setProperty('--board-offset-y',down.offset+'px');
     board.classList.add('board-content-framed');
+    if(previousFollow){
+      board.scrollLeft+=(previousFollow.x-followFrame.x)*scale;
+      board.scrollTop+=(previousFollow.y-followFrame.y)*scale;
+    }
   }
   function reset(){
     stopFit();motion.cancel();cancel();followFrame=false;fitFrame=null;board.classList.remove('board-zoomed');unframe();
@@ -3168,7 +3175,9 @@ function createBoardNavigation(board, group, legend, changed){
     if(enabled()){changed();
       // CSS zoom rounds scroll metrics differently from scroll assignments.
       // Overshoot saved endpoints so the browser restores the exact boundary.
-      board.scrollLeft=state.endX?board.scrollWidth:state.x;board.scrollTop=state.endY?board.scrollHeight:state.y;
+      var r=ratio(),shiftX=state.followFrame && followFrame?(state.followFrame.x-followFrame.x)*r:0,
+          shiftY=state.followFrame && followFrame?(state.followFrame.y-followFrame.y)*r:0;
+      board.scrollLeft=state.endX?board.scrollWidth:state.x+shiftX;board.scrollTop=state.endY?board.scrollHeight:state.y+shiftY;
     }
     // Composition can borrow and return a board before its first layout. Only
     // that still-pending fit resumes; a saved manual camera always wins.

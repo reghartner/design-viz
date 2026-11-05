@@ -108,14 +108,25 @@
       connection.hidden=!available || conn.state==='none';
       // The telemetry connector beside the Jira one: same markup and dot tokens, its own class
       // names so `.dv-live-connection` keeps naming the Jira connector alone.
-      var metricsState=metrics.state==='ok'?(metrics.demo?'demo':'connected'):{loading:'connecting',error:'error'}[metrics.state] || 'disconnected';
-      var metricsLabel={connected:'connected',demo:'demo',connecting:'connecting',error:'did not answer'}[metricsState] || 'not connected';
+      var metricsState=metrics.state==='ok'?(metrics.demo?'demo':'connected'):{loading:'connecting',error:'error',approval:'approval'}[metrics.state] || 'disconnected';
+      var metricsLabel={connected:'connected',demo:'demo',connecting:'connecting',error:'did not answer',approval:'needs approval'}[metricsState] || 'not connected';
       var metricsConnection=el(head,'span','metrics-connection','dv-live-metrics-connection');metricsConnection.setAttribute('data-state',metricsState);metricsConnection.setAttribute('data-busy',String(!!metrics.busy));metricsConnection.setAttribute('role','status');
       el(metricsConnection,'i','dot','dv-live-metrics-dot');
-      el(metricsConnection,'span','text','',metricsState==='error'?'Metrics: '+metricsLabel+(metrics.note?' · '+metrics.note:''):['Metrics: '+metricsLabel,metrics.checkedText].filter(Boolean).join(', '));
+      // A note on a good answer (a failed query beside answered ones) follows the refreshed time.
+      var answered=metricsState==='connected' || metricsState==='demo',metricsText;
+      if(metrics.source){
+        // #943: "Grafana connected · 24h window · refreshed 10:42:13"; an error shows its note, which names the fix.
+        var named=metrics.source+' '+metricsLabel;
+        metricsText=metricsState==='error'?metrics.note || named:metricsState==='disconnected'?named:
+          [named,metrics.window?metrics.window+' window':'',answered?metrics.checkedText:'',answered?metrics.note:''].filter(Boolean).join(' · ');
+      }else metricsText=metricsState==='error'?'Metrics: '+metricsLabel+(metrics.note?' · '+metrics.note:''):
+        ['Metrics: '+metricsLabel,metrics.checkedText].filter(Boolean).join(', ')+(answered && metrics.note?' · '+metrics.note:'');
+      el(metricsConnection,'span','text','',metricsText);
       metricsConnection.hidden=!metrics.available;
       var note=el(head,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
-      var action=button(head,'action','reader-button dv-live-action',available?value.actionLabel:'','runAction');action.hidden=!available || !value.actionLabel;
+      // A connector action ("Allow Jira", "Allow Grafana") also shows on a board whose only live evidence is Metrics.
+      var actionLabel=(available || metrics.available) && value && value.actionLabel || '';
+      var action=button(head,'action','reader-button dv-live-action',actionLabel,'runAction');action.hidden=!actionLabel;
       var first=button(head,'first','reader-button dv-live-first','First blocker','firstBlocker');first.hidden=!hasData || !value.firstBlocker;
       if(hasData && value.demo){var demo=el(head,'span','demo','dv-live-demo');var play=button(demo,'play','reader-button',value.demo.playing?'Pause':'Play','toggleDemo');play.disabled=value.demo.manual || value.demo.ended;button(demo,'next','reader-button','Next day','nextDemo').disabled=value.demo.ended;}
       // #828 shared-board Edit mode lives in this header: Edit for editors, then a prominent Save N changes and Discard.
@@ -214,7 +225,7 @@
 .dv-live-connection[hidden],.dv-live-metrics-connection[hidden]{display:none!important;}
 .dv-live-connection-dot,.dv-live-metrics-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
 .dv-live-connection[data-state="connected"] .dv-live-connection-dot,.dv-live-connection[data-state="demo"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="connected"] .dv-live-metrics-dot,.dv-live-metrics-connection[data-state="demo"] .dv-live-metrics-dot{background:var(--dv-live-done);}
-.dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="connecting"] .dv-live-metrics-dot{background:var(--dv-live-active);}
+.dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="connecting"] .dv-live-metrics-dot,.dv-live-metrics-connection[data-state="approval"] .dv-live-metrics-dot{background:var(--dv-live-active);}
 .dv-live-connection[data-state="error"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="error"] .dv-live-metrics-dot{background:var(--dv-live-blocked);}
 .dv-live-connection[data-busy="true"] .dv-live-connection-dot,.dv-live-metrics-connection[data-busy="true"] .dv-live-metrics-dot{animation:dv-live-connection-pulse 1.2s ease-in-out infinite;}
 .dv-live-connection-github::before{content:'· ';}

@@ -181,6 +181,85 @@ GUIDE_BLOCK = re.compile(r'^<script type="text/markdown" id="dv-agent-guide">\n.
 GUIDE_LIMIT = 6 * 1024
 COMMENTS_CAPABILITY = {"composer_only": True, "customAnchors": True}
 JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]
+# #943: the claude.ai Grafana adapter picks the viewer's connector by these five tools.
+GRAFANA_TOOLS = ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]
+GRAFANA_SOURCES = ("grafana", "loki", "sql")
+
+
+def _grafana_binding(telemetry: dict) -> bool:
+    signals = telemetry.get("signals")
+    if isinstance(signals, dict) and any(isinstance(signal, dict) and any(source in signal for source in GRAFANA_SOURCES)
+                                         for signal in signals.values()):
+        return True
+    templates = telemetry.get("templates")
+    return isinstance(templates, dict) and any(isinstance(t, dict) and _grafana_binding(t) for t in templates.values())
+
+
+def grafana_signals(value) -> bool:
+    """True when any `telemetry` object of the page (a carrier, a topology tracking
+    overlay or the page's templates) holds a signal the Grafana connector runs."""
+    if isinstance(value, dict):
+        telemetry = value.get("telemetry")
+        if isinstance(telemetry, dict) and _grafana_binding(telemetry):
+            return True
+        return any(grafana_signals(item) for item in value.values())
+    if isinstance(value, list):
+        return any(grafana_signals(item) for item in value)
+    return False
+
+
+# A host may embed the frozen provider context imported carriers resolve from
+# (src/boot.flowview.js reads it); re-injecting such a page keeps the block.
+TOPOLOGY_BLOCK = re.compile(r'<script type="application/json" id="flowview-topology">(.*?)</script>', re.S)
+# Resolves the page's imports as src/boot.flowview.js does at view time
+# (FlowTopology.resolveSource over that context, then normalize) and prints the
+# signal sources of every binding the runtime hands its telemetry provider.
+RESOLVED_SOURCES_JS = r"""
+const {entrypoint}=require(__LOADER__),vm=require('node:vm'),fs=require('node:fs');
+const input=JSON.parse(fs.readFileSync(0,'utf8')),quiet={log(){},info(){},warn(){},error(){}};
+const doc={hidden:false,addEventListener(){},removeEventListener(){},createElement:()=>({style:{},setAttribute(){},appendChild(){}})};
+const C={URL,console:quiet,AbortController,setTimeout,clearTimeout,document:doc};
+vm.runInNewContext(entrypoint('native').source,C);
+const page=C.normalize(C.FlowTopology.resolveSource(input.spec,input.context)),sources=[];
+C.telemetryBindings(fn=>C.sectionRecords(page).forEach(record=>{
+  const d=record.section.diagram||{};
+  Object.keys(d.nodes||{}).forEach(id=>fn(d.nodes[id],id,page));
+  (Array.isArray(d.edges)?d.edges:[]).forEach(e=>fn(e,e&&typeof e==='object'?e.from+'->'+e.to:null,page));
+})).forEach(b=>Object.keys(b.signals).forEach(name=>{if(!sources.includes(b.signals[name].source))sources.push(b.signals[name].source);}));
+process.stdout.write(JSON.stringify(sources));
+"""
+
+
+def topology_context(html: str):
+    """The `flowview-topology` context block of the page being injected into, or None."""
+    match = TOPOLOGY_BLOCK.search(html)
+    if not match:
+        return None
+    try:
+        context = json.loads(match.group(1))
+    except ValueError:
+        return None
+    return context if isinstance(context, dict) else None
+
+
+def imported_grafana(spec: dict, context: dict) -> bool:
+    """True when a carrier the runtime resolves from `context` binds a signal the
+    Grafana connector runs: exported and selected carriers only, consumer overlays
+    replacing provider bindings, provider templates expanded. Without node, or
+    when the context cannot be resolved (the page then stops at boot as well),
+    any spec in the context with such a signal counts, so it never under-declares."""
+    script = RESOLVED_SOURCES_JS.replace("__LOADER__", json.dumps(str(REPO_ROOT / "tools" / "source-loader.cjs")))
+    try:
+        result = subprocess.run(["node", "-e", script], input=json.dumps({"spec": spec, "context": context}),
+                                capture_output=True, text=True, timeout=120, check=False)
+        sources = json.loads(result.stdout) if result.returncode == 0 else None
+        if isinstance(sources, list):
+            return any(source in GRAFANA_SOURCES for source in sources)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        pass
+    return grafana_signals(context)
+
+
 # #826: the spec file published beside a two-file page, and the line that tells
 # the standalone boot to fetch it. The name is fixed: the board's Edit mode and
 # the editor's agent both publish exactly this path.
@@ -205,13 +284,15 @@ def source_commit() -> str | None:
     return sha if re.fullmatch(r"[0-9a-f]{40}", sha) else None
 
 
-def agent_guide(spec: dict, commit: str | None, two_file: bool = False) -> str:
+def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology: dict | None = None) -> str:
     """Markdown an editor's agent follows to change this page and republish it.
 
     Everything stated here is derived from the spec or is a fixed contract; the
-    capability declaration names only what this page needs (a connector only when
-    the page has tracking; the artifact and user capabilities only for a tracked
-    page published in two-file mode, #826). `commit` pins the doc links to the
+    capability declaration names only what this page needs (the Jira connector only
+    when the page has tracking; the Grafana connector only when a carrier or page
+    template binds a grafana, loki or sql signal, imported carriers of the
+    embedded `topology` context included, #943; the artifact and user
+    capabilities only for a tracked page published in two-file mode, #826). `commit` pins the doc links to the
     source this page was built from (#758: docs at the page's version); None
     links main with a note. Values are interpolated from a spec that already
     passed the '</script' check, so the block cannot terminate itself.
@@ -223,11 +304,13 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False) -> str:
     tracking = page.get("tracking") if isinstance(page.get("tracking"), dict) else None
     jira = tracking.get("jira") if tracking and isinstance(tracking.get("jira"), dict) else {}
     tracked = tracking is not None
+    grafana = grafana_signals(page) or (topology is not None and imported_grafana(spec, topology))
 
-    capabilities = {"comments": COMMENTS_CAPABILITY}
+    servers = ([{"server": "Atlassian", "tools": JIRA_TOOLS}] if tracked else []) + \
+        ([{"server": "Grafana", "tools": GRAFANA_TOOLS}] if grafana else [])
+    capabilities = {"mcp": {"servers": servers}} if servers else {}
+    capabilities["comments"] = COMMENTS_CAPABILITY
     if tracked:
-        capabilities = {"mcp": {"servers": [{"server": "Atlassian", "tools": JIRA_TOOLS}]},
-                        "comments": COMMENTS_CAPABILITY}
         if two_file:
             # The board's Edit mode republishes flowspec.json from inside the
             # artifact (files publish) and records who saved (profile name).
@@ -328,9 +411,18 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False) -> str:
         ]
     else:
         lines += [
-            "This page has no `page.tracking`, so it declares no connector (no `mcp` entry). Add "
+            "This page has no `page.tracking`, so it declares no Jira connector. Add "
             "the Jira connector declaration described in docs/live-status.md only after adding "
             "tracking; connector display names are per account.",
+        ]
+    if grafana:
+        lines += [
+            "",
+            "`Grafana` is the viewer's Grafana connector display name (grafana/mcp-grafana or a mock); "
+            "the page picks the connector by the five tool names. While Metrics is on, each refresh "
+            "(at most once a minute) makes one get_annotations call and one query per grafana or loki "
+            "signal, and generate_deeplink runs once per carrier. sql signals call query_sql at most "
+            "once an hour; add \"query_sql\" to the tools only when that server enables it.",
         ]
     lines += [
         "",
@@ -421,7 +513,7 @@ def main(argv=None) -> int:
     tpl = GUIDE_BLOCK.sub("", tpl)
     tpl = SPEC_FILE_LINE.sub("", tpl)
     try:
-        guide = agent_guide(spec, source_commit(), args.two_file)
+        guide = agent_guide(spec, source_commit(), args.two_file, topology_context(tpl))
     except ValueError as ex:
         print(f"error: {ex}", file=sys.stderr)
         return 1

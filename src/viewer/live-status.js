@@ -589,10 +589,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var metricsView=telemetryHooks.view();
     bindings.forEach(function(binding){if(binding.section.diagram)telemetryPaintCues(binding.el,binding.section.diagram,trackingTelemetry(binding.page).templates,metricsView);});
   }
+  // A named connector (#943: 'Grafana') reads "<source> connected · <window> window · refreshed <time>".
+  var telemetrySource=telemetryOptions && typeof telemetryOptions.source==='string'?telemetryOptions.source.trim():'',telemetryWindow=trackingTelemetry(page).window;
   function metricsSnapshot(){
     var status=telemetry.status();
     return {available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
-      refreshedAt:status.refreshedAt,note:status.note,checkedText:status.refreshedAt?'refreshed '+clockTime(status.refreshedAt):''};
+      refreshedAt:status.refreshedAt,note:status.note,checkedText:status.refreshedAt?'refreshed '+clockTime(status.refreshedAt):'',
+      source:telemetrySource,window:telemetryWindow};
   }
   function snapshot(){
     refreshDependencies();

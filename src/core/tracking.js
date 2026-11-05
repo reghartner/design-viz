@@ -154,7 +154,7 @@ function trackingExistsWhen(value){
    trackingTelemetry(page, invalid) always returns:
      {grafana: {prometheus?, loki?, tempo?, sql?: <datasource UID>},
       honeycomb: {environment?, dataset?},
-      window: <duration such as '1h'; default '1h'>,
+      window: <duration such as '1h'; default '24h', the previous 24 hours>,
       refreshMs: <number of ms, at least 60000>|null,
       templates: {<name>: {kind?, params: [<name>], signals, proof?, links?}}}
    Templates keep their authored form so `use` can expand them by pure string
@@ -165,7 +165,7 @@ var TELEMETRY_CARD_SIDES=['right','left','above','below'];
 var TELEMETRY_LINKS=['dashboard','query'];
 var TELEMETRY_BINDING_FIELDS=['kind','signals','proof','links','card'];
 var TELEMETRY_RESERVED=TELEMETRY_BINDING_FIELDS.concat(['use','params']);
-var TELEMETRY_DEFAULT_WINDOW='1h',TELEMETRY_MIN_REFRESH_MS=60000,TELEMETRY_CARD_OFFSET_MAX=1000;
+var TELEMETRY_DEFAULT_WINDOW='24h',TELEMETRY_MIN_REFRESH_MS=60000,TELEMETRY_CARD_OFFSET_MAX=1000;
 var telemetryNamePattern=/^[A-Za-z][A-Za-z0-9_-]*$/;
 var telemetryParamPattern=/^[A-Za-z][A-Za-z0-9_]*$/;
 var telemetryWindowPattern=/^[1-9][0-9]*[smhdw]$/;
@@ -352,7 +352,7 @@ function trackingTelemetry(page,invalid){
   });
   if(telemetryOwn(value,'window')){
     if(typeof value.window==='string' && telemetryWindowPattern.test(value.window))out.window=value.window;
-    else warn('.window','use a duration such as "30m", "1h" or "7d" — using 1h');
+    else warn('.window','use a duration such as "30m", "1h" or "7d" — using '+TELEMETRY_DEFAULT_WINDOW);
   }
   if(telemetryOwn(value,'refreshMs')){
     var ms=value.refreshMs;

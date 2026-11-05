@@ -123,7 +123,7 @@ function createFlowMetricsSettings(o){
     var group=telemetryObject(t[field[0]])?t[field[0]]:{};
     d.row(box,field[2],c.text(group[field[1]],function(v){return commit({op:field[0],key:field[1],value:v});},{placeholder:field[3]}));
   });
-  d.row(box,'Metrics window',c.text(typeof t.window==='string'?t.window:t.window==null?null:JSON.stringify(t.window),function(v){return commit({op:'window',value:v});},{placeholder:'1h'}));
+  d.row(box,'Metrics window',c.text(typeof t.window==='string'?t.window:t.window==null?null:JSON.stringify(t.window),function(v){return commit({op:'window',value:v});},{placeholder:'24h'}));
   var refresh=c.number(t.refreshMs==null?null:t.refreshMs,function(v){return commit({op:'refreshMs',value:v});});refresh.placeholder='connector default';
   d.row(box,'Metrics refresh ms',refresh);
   var templates=telemetryObject(t.templates)?t.templates:{};

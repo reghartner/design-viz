@@ -2,7 +2,7 @@
 /* #937 contract matrix: authored telemetry signal bindings (spec only; no runtime, no results).
 | row | rule |
 |---|---|
-| T1 | `trackingTelemetry(page)` always returns `{grafana, honeycomb, window, refreshMs, templates}`; absent → `{}`/`{}`/`'1h'`/`null`/`{}`. |
+| T1 | `trackingTelemetry(page)` always returns `{grafana, honeycomb, window, refreshMs, templates}`; absent → `{}`/`{}`/`'24h'`/`null`/`{}` (window default 24h, Chuck 2026-11-04). |
 | T2 | Page config keeps Grafana datasource UIDs (prometheus/loki/tempo/sql), Honeycomb environment+dataset, a duration `window`, `refreshMs` (floor 60000), named templates. |
 | T3 | Malformed page fields warn once per entry through `invalid(path, message)` and are dropped; nothing throws; the source is not modified. |
 | T4 | `carrierTelemetry(obj, templates)` parses a raw binding into `{kind, signals:{name:{source,query,unit}}, proof:{name:{min?,max?,maxRatioOf?}}, links, card}`. |
@@ -52,7 +52,7 @@ const TEMPLATES=()=>({'kafka-topic':{kind:'queue',params:['topic','group'],
 test('T1 T2 page telemetry config parses datasource ids, window, refresh and named templates',()=>{
   const {trackingTelemetry}=api();
   for(const page of [{},{tracking:{}},{tracking:{jira:{site:'https://jira.test'}}},null])
-    assert.deepEqual(plain(trackingTelemetry(page)),{grafana:{},honeycomb:{},window:'1h',refreshMs:null,templates:{}});
+    assert.deepEqual(plain(trackingTelemetry(page)),{grafana:{},honeycomb:{},window:'24h',refreshMs:null,templates:{}});
   const page={tracking:{telemetry:{grafana:{prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'lake'},
     honeycomb:{environment:'prod',dataset:'doorbell-prod'},window:'6h',refreshMs:300000,templates:TEMPLATES()}}};
   const before=JSON.stringify(page),seen=recorder(),parsed=plain(trackingTelemetry(page,seen.fn));
@@ -68,7 +68,7 @@ test('T1 T2 page telemetry config parses datasource ids, window, refresh and nam
 test('T3 malformed page telemetry warns per entry, drops it, keeps the rest and never throws',()=>{
   const {trackingTelemetry}=api();
   for(const value of [null,[],'grafana',7]){
-    const seen=recorder();assert.deepEqual(plain(trackingTelemetry({tracking:{telemetry:value}},seen.fn)).window,'1h');assert.deepEqual(seen.paths,['']);
+    const seen=recorder();assert.deepEqual(plain(trackingTelemetry({tracking:{telemetry:value}},seen.fn)).window,'24h');assert.deepEqual(seen.paths,['']);
   }
   const page={tracking:{telemetry:{grafana:{prometheus:'prom-main',loki:7,tempo:'',mimir:'x'},honeycomb:'prod',
     window:'1 hour',refreshMs:1000,provider:'grafana',
@@ -79,14 +79,14 @@ test('T3 malformed page telemetry warns per entry, drops it, keeps the rest and 
   const before=JSON.stringify(page),seen=recorder(),parsed=plain(trackingTelemetry(page,seen.fn));
   assert.equal(JSON.stringify(page),before);
   assert.deepEqual(parsed.grafana,{prometheus:'prom-main'});assert.deepEqual(parsed.honeycomb,{});
-  assert.equal(parsed.window,'1h');assert.equal(parsed.refreshMs,60000,'refresh below one minute uses the one-minute floor');
+  assert.equal(parsed.window,'24h');assert.equal(parsed.refreshMs,60000,'refresh below one minute uses the one-minute floor');
   assert.deepEqual(Object.keys(parsed.templates).sort(),['good','withCard']);assert.equal(parsed.templates.withCard.card,undefined);
   assert.deepEqual(seen.paths.sort(),['.grafana.loki','.grafana.mimir','.grafana.tempo','.honeycomb','.provider','.refreshMs',
     '.templates.bad name','.templates.badKind.kind','.templates.badParams.params','.templates.dupe.params[1]','.templates.noSignals.signals',
     '.templates.notObject','.templates.reserved.params[0]','.templates.withCard.card','.window'].sort());
   for(const ms of ['soon',-5,0,Infinity]){const r=recorder();assert.equal(trackingTelemetry({tracking:{telemetry:{refreshMs:ms}}},r.fn).refreshMs,null);assert.deepEqual(r.paths,['.refreshMs']);}
   for(const w of ['30s','15m','1h','7d','2w']){const r=recorder();assert.equal(trackingTelemetry({tracking:{telemetry:{window:w}}},r.fn).window,w);assert.deepEqual(r.paths,[]);}
-  for(const w of ['0h','1y','h',3600,'1.5h']){const r=recorder();assert.equal(trackingTelemetry({tracking:{telemetry:{window:w}}},r.fn).window,'1h');assert.deepEqual(r.paths,['.window']);}
+  for(const w of ['0h','1y','h',3600,'1.5h']){const r=recorder();assert.equal(trackingTelemetry({tracking:{telemetry:{window:w}}},r.fn).window,'24h');assert.deepEqual(r.paths,['.window']);assert.match(r.messages[0],/using 24h/,'the warning names the 24h default');}
 });
 
 test('T4 a raw call binding parses into the stable binding shape without touching the source',()=>{

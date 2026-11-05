@@ -96,3 +96,82 @@ test('H12 changed bindings or provider/datasource identity get a new batch; anot
  identity='account:B/datasource:B';api.closeHistory();api.openHistory(days,0);await settle();assert.equal(calls,4);api.destroy();
  const other=runtime(options).api;other.openHistory(days,0);other.setEnabled(true);await settle();assert.equal(calls,5);other.destroy();
 });
+
+function localHistory(zone,year,month,date){
+ const prior=process.env.TZ;process.env.TZ=zone;
+ try{
+  const C=context(),at=(d,h=12)=>new Date(year,month-1,d,h).getTime();
+  return plain(C.liveStatusHistoryDays({tickets:[{key:'AA-1',created:at(date),status:'Done',changes:[{at:at(date+1,23)+30*60000,field:'status',from:'To Do',to:'Done'}]},{key:'BB-1',created:at(date+2),status:'In Progress',changes:[]}],today:{'AA-1':{state:'done'},'BB-1':{state:'active'}},categories:{'to do':'new','done':'done','in progress':'indeterminate'},now:at(date+3),locale:'en-US'})).days;
+ }finally{if(prior===undefined)delete process.env.TZ;else process.env.TZ=prior;}
+}
+for(const fixture of [
+ {zone:'America/New_York',date:[2026,3,7],at:['2026-03-08T05:00:00.000Z','2026-03-09T04:00:00.000Z','2026-03-10T04:00:00.000Z','2026-03-11T04:00:00.000Z'],hours:23},
+ {zone:'America/New_York',date:[2026,10,31],at:['2026-11-01T04:00:00.000Z','2026-11-02T05:00:00.000Z','2026-11-03T05:00:00.000Z','2026-11-04T05:00:00.000Z'],hours:25},
+ {zone:'Asia/Kolkata',date:[2026,1,10],at:['2026-01-10T18:30:00.000Z','2026-01-11T18:30:00.000Z','2026-01-12T18:30:00.000Z','2026-01-13T18:30:00.000Z'],hours:24}
+])test('H13 local Jira endpoints and exact Grafana daily runs: '+fixture.zone+' '+fixture.hours+'h',async()=>{
+ const selected=localHistory(fixture.zone,...fixture.date);assert.deepEqual(selected.map(d=>d.at),fixture.at);
+ assert.equal((Date.parse(selected[1].at)-Date.parse(selected[0].at))/3600000,fixture.hours);
+ assert.equal(selected[0].states['AA-1'].state,'todo');assert.equal(selected[1].states['AA-1'].state,'done','late local-day change is included in the very same telemetry day');assert.equal(selected[1].states['BB-1'],undefined,'not-created Jira gaps survive');
+ const h=grafana((tool,input)=>{const from=Date.parse(input.startTime || input.startRfc3339),to=Date.parse(input.endTime || input.endRfc3339),points=[];for(let t=from;t<=to;t+=DAY)points.push([t/1000,String(fixture.at.indexOf(iso(t))*10)]);points.push([Date.parse(selected[1].key+'T00:00:00Z')/1000,'999']);return {payload:{data:[{values:points}]}};});
+ const endpoints=selected.map(({key,at})=>({key,at})),range={from:endpoints[0].at,to:endpoints.at(-1).at,endpoints};
+ const map=await h.adapter.options.history(h.bindings,range,new AbortController().signal),runs=fixture.hours===24?[[0,3]]:[[0,0],[1,3]];
+ assert.equal(h.calls.length,runs.length*2);
+ for(const [source,tool,expr] of [['grafana','query_prometheus','EXACT[24h]'],['loki','query_loki_logs','EXACT LOGQL [24h]']]){
+  assert.deepEqual(h.calls.filter(c=>c.tool===tool).map(c=>c.input),runs.map(([a,b])=>source==='grafana'?{datasourceUid:'prom-A',expr,startTime:fixture.at[a],endTime:fixture.at[b],stepSeconds:86400,queryType:'range'}:{datasourceUid:'loki-A',logql:expr,startRfc3339:fixture.at[a],endRfc3339:fixture.at[b],stepSeconds:86400,queryType:'range'}));
+ }
+ assert.deepEqual(plain(map.a.signals.rate.series),fixture.at.map((at,i)=>[Date.parse(at),i*10]));
+ assert.equal(h.C.telemetryHistoryDay(map,selected[1]).a.signals.rate.value,10);
+ assert.equal(h.C.telemetryHistoryDay(series([[selected[1].key,42]]),selected[1]).a.signals.rate.value,42,'calendar keys resolve through explicit metadata, never UTC guessing');
+ assert.deepEqual(plain(h.C.telemetryHistoryDay(series([[selected[1].key+'T00:00:00Z',999]]),selected[1])),{});
+ let calls=[];const {api}=runtime({provider:async()=>sample(999),history:async(b,r)=>{calls.push(plain(r));return map;}});api.openHistory(selected,1);api.historyDay(0);await settle();assert.equal(calls.length,0);api.setEnabled(true);await settle();assert.deepEqual(calls,[range]);api.historyDay(1);assert.equal(api.snapshot().map.a.signals.rate.value,10);api.historyDay(2);assert.equal(calls.length,1);api.destroy();
+});
+test('H14 cache tail and calendar keys honor 23h/25h endpoints and changed endpoint metadata',async()=>{
+ for(const date of [[2026,3,7],[2026,10,31]]){
+  const C=context(),cache=C.telemetryHistoryCache(),selected=localHistory('America/New_York',...date),endpoints=selected.map(({key,at})=>({key,at})),signal=new AbortController().signal,calls=[];
+  const range=end=>({from:endpoints[0].at,to:endpoints[end].at,endpoints:endpoints.slice(0,end+1)});
+  const fetch=async part=>{calls.push(plain(part));return {map:series(part.endpoints.map((d,i)=>[d.key,42+i]))};};
+  await cache.load('identity',range(0),signal,fetch);const answer=await cache.load('identity',range(2),signal,fetch);
+  assert.deepEqual(calls[1],{from:endpoints[1].at,to:endpoints[2].at,endpoints:endpoints.slice(1,3)});
+  assert.equal(C.telemetryHistoryDay(answer.map,selected[1]).a.signals.rate.value,42);await cache.load('identity',range(2),signal,fetch);assert.equal(calls.length,2);
+  const shifted={key:endpoints[1].key,at:iso(Date.parse(endpoints[1].at)+3600000)};await cache.load('identity',{from:shifted.at,to:shifted.at,endpoints:[shifted]},signal,fetch);assert.equal(calls.length,3,'same calendar key at another instant is not cached coverage');
+ }
+});
+function changingRuntime(options,page={}){
+ const C=context(),carrier=query=>({tickets:['AA-1'],telemetry:{kind:'service',signals:{rate:{grafana:query}},proof:{rate:{min:1}}}}),state={bound:[['a',carrier('root')]]};
+ const walk=fn=>state.bound.forEach(([id,value])=>fn(value,id,page)),api=C.createTelemetry(page,options,{carriers:walk,historyCarriers:walk,diagrams:()=>{},jira:()=>({'AA-1':{state:'done'}})});return {api,state,carrier};
+}
+test('H15 late bindings reuse completed peers, leave pending peers intact, cancel removal and reject same-ID stale answers',async()=>{
+ let calls=[];const {api,state,carrier}=changingRuntime({provider:async()=>sample(900),history:(bound,range,signal)=>new Promise(resolve=>calls.push({bound:plain(bound),range:plain(range),signal,resolve}))});
+ const finish=(call,value)=>call.resolve(Object.fromEntries(call.bound.map(b=>[b.id,{signals:{rate:{series:days.map(d=>[d.at,value])}}}])));
+ api.openHistory(days,0);api.bindingsChanged();assert.equal(calls.length,0);api.setEnabled(true);await settle();assert.equal(calls.length,1);
+ state.bound.push(['nested::b',carrier('child')]);api.bindingsChanged();await settle();assert.equal(calls.length,2);assert.deepEqual(calls.map(c=>c.bound.map(b=>b.id)),[['a'],['nested::b']]);assert.equal(calls[0].signal.aborted,false,'new detail does not restart pending root');
+ finish(calls[0],0);await settle();assert.equal(api.snapshot().map.a.signals.rate.value,0);assert.equal(api.status().busy,true);
+ state.bound.pop();api.bindingsChanged();assert.equal(calls[1].signal.aborted,true);finish(calls[1],999);await settle();assert.equal(api.snapshot().map['nested::b'],undefined);assert.equal(api.snapshot().map.a.signals.rate.value,0);
+ state.bound.push(['nested::b',carrier('replacement')]);api.bindingsChanged();await settle();assert.equal(calls.length,3);assert.equal(calls[2].bound[0].signals.rate.query,'replacement');finish(calls[2],7);await settle();assert.equal(api.snapshot().map['nested::b'].signals.rate.value,7);
+ state.bound[1]=['nested::b',carrier('same-id-different-query')];api.bindingsChanged();await settle();assert.equal(api.snapshot().map['nested::b'],undefined);assert.equal(calls.length,4);finish(calls[3],8);await settle();assert.equal(api.snapshot().map.a.signals.rate.value,0);
+ for(let i=0;i<5;i++){api.bindingsChanged();api.historyDay(i%3);}await settle();assert.equal(calls.length,4,'layout/slider with identical bindings never queries');
+ state.bound.pop();api.bindingsChanged();state.bound.push(['nested::b',carrier('same-id-different-query')]);api.bindingsChanged();await settle();assert.equal(calls.length,4,'reopening same binding reuses cache');assert.equal(api.snapshot().map['nested::b'].signals.rate.value,8);api.destroy();
+});
+test('H16 new detail batches are canceled on off, Live return, destroy and capability loss; disabled roots never query',async()=>{
+ for(const stop of [api=>api.setEnabled(false),api=>api.closeHistory(),api=>api.destroy(),api=>api.setAvailable(false)]){
+  let calls=[];const {api,state,carrier}=changingRuntime({provider:async()=>sample(900),history:(bound,r,signal)=>bound[0].id==='a'?Promise.resolve(series([[T,0]])):new Promise(resolve=>calls.push({signal,resolve}))});
+  api.setEnabled(true);await settle();api.openHistory(days,0);await settle();state.bound.push(['child',carrier('child')]);api.bindingsChanged();await settle();stop(api);assert.equal(calls[0].signal.aborted,true);calls[0].resolve({child:{signals:{rate:{series:[[T,999]]}}}});await settle();assert.equal(api.snapshot().map.child,undefined);api.destroy();
+ }
+ for(const [options,page] of [[false,{}],[{provider:()=>{throw Error('live disabled');},history:()=>{throw Error('history disabled');}},{tracking:{telemetry:{enabled:false}}}]]){
+  const {api,state,carrier}=changingRuntime(options,page);api.openHistory(days,0);api.setEnabled(true);state.bound.push(['child',carrier('child')]);api.bindingsChanged();await settle();assert.equal(api.enabled(),false);api.destroy();
+ }
+});
+test('H17 split DST runs and concurrent Jira work share one six-call pool to completion',async()=>{
+ let active=0,max=0,releases=[],done=false;const h=grafana(()=>new Promise(resolve=>{active++;max=Math.max(max,active);releases.push(()=>{active--;resolve({payload:{data:[]}});});}));
+ const jira=Array.from({length:2},()=>h.C.liveStatusHistoryCall(()=>new Promise(resolve=>{active++;max=Math.max(max,active);releases.push(()=>{active--;resolve();});})));
+ const endpoints=localHistory('America/New_York',2026,3,7).map(({key,at})=>({key,at}));
+ const answer=h.adapter.options.history(Array.from({length:4},(_,i)=>({...h.bindings[0],id:'split'+i})),{from:endpoints[0].at,to:endpoints.at(-1).at,endpoints},new AbortController().signal).then(value=>{done=true;return value;});
+ await settle();assert.equal(active,6);
+ for(let i=0;i<20&&!done;i++){releases.splice(0).forEach(release=>release());await settle();assert.ok(active<=6);}
+ await Promise.all(jira);await answer;assert.equal(done,true);assert.equal(max,6);assert.equal(h.calls.length,16,'four carriers × two signals × two runs');
+});
+test('H18 a successful new-detail batch cannot erase a pending peer failure or its note',async()=>{
+ const calls=[];const {api,state,carrier}=changingRuntime({provider:async()=>sample(900),history:(b,r,s)=>new Promise((resolve,reject)=>calls.push({resolve,reject}))});
+ api.openHistory(days,0);api.setEnabled(true);await settle();state.bound.push(['child',carrier('child')]);api.bindingsChanged();await settle();calls[0].reject(new Error('root history unavailable'));await settle();assert.equal(api.status().state,'error');assert.equal(api.status().busy,true);
+ calls[1].resolve({child:{signals:{rate:{series:[[T,7]]}}}});await settle();assert.equal(api.snapshot().map.child.signals.rate.value,7);assert.equal(api.status().state,'error');assert.equal(api.status().busy,false);assert.match(api.status().note,/root history unavailable/);api.destroy();
+});

@@ -397,7 +397,12 @@ consumer only; **Remove metrics** restores the inherited one.
 With no node selected, **Document settings → Tracking → Metrics** edits the page
 `tracking.telemetry` block: the Grafana Prometheus, Loki, Tempo and SQL datasource
 UIDs, the Honeycomb environment and dataset, **Metrics window** (such as `1h`) and
-**Metrics refresh ms** (60000 or more). Clearing every value removes the block.
+**Metrics refresh ms** (60000 or more). **Allow metrics** controls availability on
+this page, including all direct/nested imports and loaded details. It is checked
+by default; that permits Metrics but never turns it on or runs queries. Uncheck
+it to hide Metrics controls and suppress telemetry discovery, data calls, cards
+and cues. Bindings, templates and other settings stay saved. Rechecking permits
+availability again; readers still start with Metrics off and a default 24h window.
 **Add template** takes a name, an optional kind, parameter names separated by
 commas and a first signal. Each template then has its own kind, parameters,
 signals, proof limits and link fields. A template keeps at least one signal, and
@@ -406,6 +411,16 @@ a template that a carrier still uses cannot be removed.
 Each change is one Undo/Redo step, and Export project keeps every binding,
 template and setting in its JSON. The Workbench stores queries only: it never runs
 them or contacts Grafana or Honeycomb. These authoring controls are desktop-only.
+
+In the desktop preview toolbar, **Preview metrics layout** shows one card per
+visible bound edge, labelled **Preview · synthetic**, using the reader’s card
+placement. It does not contact connectors or show production proof. Select a
+card or edge, then edit **Card side** and **Card offset**; the placement updates
+immediately, including Undo/Redo. Unbound edges get no cards. Imported bindings
+follow the same rules and remain read only until you add a consumer override.
+This toggle starts off, is independent of Demo live status, and is never saved or
+added to Undo history. It survives edits in the same document, resets for a new
+project/import, and is suppressed while Allow metrics is off.
 
 ## State model
 

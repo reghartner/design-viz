@@ -23,6 +23,18 @@ function telemetryCardContent(edge,binding,sample,result,window){
     note:state==='silent'?'no traffic · '+window+' window':state==='unobserved'?'unobserved · '+window+' window':window+' window',
     series:primary?telemetryReading(sample,primary).series:[],state:state};
 }
+/* Authoring placeholders never enter ctl.telemetry or the proof engine. Only
+   explicit, valid edge bindings get samples; IDs and labels never infer queries. */
+function telemetryCardPreview(diagram,templates){
+  var map=Object.create(null);
+  (diagram.edges || []).forEach(function(edge){
+    var binding=carrierTelemetry(edge,templates);if(!binding)return;
+    var signals=Object.create(null);
+    Object.keys(binding.signals).forEach(function(name){signals[name]={value:12,series:[[0,12],[1,12]]};});
+    map[edge.from+'->'+edge.to]={signals:signals};
+  });
+  return {preview:true,map:map,verdicts:{carriers:Object.create(null)}};
+}
 /* Keep the authored side, searching along it before moving farther out. A
    bounded local search falls back to clear space on that same side. */
 function telemetryCardPlace(path,w,h,placement,boxes){
@@ -50,7 +62,8 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate){
       var liveBreak=svg.querySelector('.dv-live-comm-failure[data-dv-edge="'+index+'"]');
       if(!binding || edge.hidden===true || !boardControlBox(path,svg) && !boardControlBox(liveBreak,svg))return;
       var id=edge.from+'->'+edge.to,result=view.verdicts.carriers[id],content=telemetryCardContent(edge,binding,view.map[id],result,window);
-      var card=telemetrySvg(doc,'g',{'class':'dv-metrics-card','data-dv-edge':index,'data-metrics-card':id,'data-state':content.state,'data-verdict':result && result.verdict || 'unobserved'},svg);
+      if(view.preview){content.note='Preview · synthetic';content.state='preview';}
+      var card=telemetrySvg(doc,'g',{'class':'dv-metrics-card','data-dv-edge':index,'data-metrics-card':id,'data-state':content.state,'data-verdict':view.preview?'preview':result && result.verdict || 'unobserved'},svg);
       var rect=telemetrySvg(doc,'rect',{'class':'dv-metrics-card-box',rx:7,width:138,height:78},card);
       telemetrySvg(doc,'path',{'class':'dv-metrics-card-bar',d:'M3 7V71'},card);
       var texts=[];

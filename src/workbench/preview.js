@@ -58,7 +58,7 @@ function workbenchPreviewSnapshot(page, ctl, options){
       : steps.filter(function(s){ return JSON.stringify(s) === signature; }).length !== 1)) return;
     prior.mode = stepper.mode(); prior.id = id; prior.signature = signature;
   });
-  return {sections:saved,demoLiveStatus:!!(ctl && ctl.demoLiveStatus)};
+  return {sections:saved,demoLiveStatus:!!(ctl && ctl.demoLiveStatus),metricsPreview:!!(ctl && ctl.metricsPreview),details:ctl && ctl.details && ctl.details.snapshot()};
 }
 /* Authoring a legacy View materializes its generated ID as an explicit ID.
    That ID remains authoritative through Undo/Redo. Layout identity is needed
@@ -159,7 +159,8 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   var demoMap=lifecycle && lifecycle.demoLiveStatus?workbenchDemoStatus(page):{};
   var hasTickets=Object.keys(demoMap).length>0;
   var demoOn=hasTickets && !!(saved && saved.demoLiveStatus);
-  var renderOptions={autoplay:false,authoring:true,layoutTarget:'default'};
+  var metricsOn=!!(saved && saved.metricsPreview);
+  var renderOptions={autoplay:false,authoring:true,layoutTarget:'default',telemetry:false,metricsPreview:metricsOn,loadDetail:lifecycle && lifecycle.loadDetail};
   if(demoOn){
     var demoDay=0,initialDemo=JSON.parse(JSON.stringify(demoMap)),demoStates=['todo','active','done','blocked'];
     // A demo mount, as the reader's #live=demo uses, makes the connection read "Demo" instead of "Host connected" (#863).
@@ -173,10 +174,20 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
     }}};
   }
   var ctl = renderPage(view, display, skin, null, renderOptions);
-  ctl.demoLiveStatus=demoOn;
+  ctl.demoLiveStatus=demoOn;ctl.metricsPreview=metricsOn;
+  var retired=false,metricsLabel=null,metricsInput=null;
   var demoLabel=null,demoInput=null;
   function changeDemo(){if(lifecycle && lifecycle.demoLiveStatus)lifecycle.demoLiveStatus(demoInput.checked);}
-  var doc=view.ownerDocument,previewButton=doc && doc.getElementById('open-page-preview');
+  var doc=view.ownerDocument,previewButton=lifecycle && lifecycle.previewButton;
+  function changeMetrics(){if(!retired && lifecycle && lifecycle.metricsPreview)lifecycle.metricsPreview(metricsInput.checked);}
+  if(previewButton && lifecycle && lifecycle.metricsPreview){
+    metricsLabel=doc.createElement('label');metricsLabel.className='workspace-preview';
+    metricsInput=doc.createElement('input');metricsInput.type='checkbox';metricsInput.checked=metricsOn;
+    metricsInput.disabled=!trackingTelemetry(page).enabled;
+    metricsLabel.title=metricsInput.disabled?'Enable Allow metrics in Document settings → Tracking → Metrics.':'Synthetic values only; no queries or saved changes.';
+    metricsLabel.appendChild(metricsInput);metricsLabel.appendChild(doc.createTextNode('Preview metrics layout'));
+    metricsInput.addEventListener('change',changeMetrics);previewButton.parentNode.insertBefore(metricsLabel,previewButton);
+  }
   if(hasTickets && previewButton && lifecycle && lifecycle.demoLiveStatus){
     demoLabel=doc.createElement('label');demoLabel.className='workspace-preview';
     demoInput=doc.createElement('input');demoInput.type='checkbox';demoInput.checked=demoOn;
@@ -194,6 +205,9 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
     fixedDeepLinkBase(String(window.location.href).split('#')[0],window):null;
   var links=typeof wireDeepLinks==='function' && linkBase?wireDeepLinks(ctl,window,null,{history:false,linkBase:linkBase}):null,destroy=ctl.destroy;
   ctl.destroy=function(){
+    if(retired)return;retired=true;
+    if(metricsInput)metricsInput.removeEventListener('change',changeMetrics);
+    if(metricsLabel)metricsLabel.remove();
     if(demoInput)demoInput.removeEventListener('change',changeDemo);
     if(demoLabel && demoLabel.parentNode)demoLabel.parentNode.removeChild(demoLabel);
     if(links)links.destroy();destroy();
@@ -201,6 +215,7 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   try{
     restoreActiveTabs(ctl, tabs);
     restoreWorkbenchPreview(page, ctl, saved);
+    if(saved && saved.details && ctl.details)ctl.details.restore(saved.details);
   }catch(ex){ctl.destroy();throw ex;}
   return ctl;
 }
@@ -278,7 +293,7 @@ function renderWorkbenchReaderPreview(view,page,skin,authoringCtl,options){
 /* One owner for preview identity and controlled replacement outcomes. The host
    supplies presentation callbacks; callers never infer a render from DOM mutation. */
 function createWorkbenchPreviewController(opts){
-  var page=null,ctl=null,renderedText=null;
+  var page=null,ctl=null,renderedText=null,disposed=false;
   function finish(outcome){if(opts.completed)opts.completed(outcome);return outcome;}
   function replace(next,text,skin,request){
     /* Rebuilding panels can force layout while the document is only partially
@@ -302,15 +317,22 @@ function createWorkbenchPreviewController(opts){
   /* The Demo live status checkbox and a built-in template that opens with the
      demo on (#865) share this one path. Demo state is preview state only. */
   function setDemoLiveStatus(on){
-    if(!ctl || !page)return;
+    if(disposed || !ctl || !page)return;
     ctl.demoLiveStatus=on;
     replace(page,renderedText,opts.skin(page),{origin:'demo-live-status'});
+  }
+  function setMetricsPreview(on){
+    if(disposed || !ctl || !page || ctl.metricsPreview===!!on)return;
+    ctl.metricsPreview=!!on;
+    replace(page,renderedText,opts.skin(page),{origin:'metrics-preview',retention:{multi:true}});
   }
   function rebuild(next,text,skin,request){
     var replaced=false,previousPage=request.origin==='project' || request.origin==='import' ? null : page,previousCtl=ctl;
     try{
       var nextCtl=renderWorkbenchPreview(opts.view,next,skin,previousPage,previousCtl,{
-        demoLiveStatus:setDemoLiveStatus,
+        demoLiveStatus:function(on){if(ctl===nextCtl)setDemoLiveStatus(on);},
+        metricsPreview:function(on){if(ctl===nextCtl)setMetricsPreview(on);},
+        previewButton:opts.previewButton,loadDetail:opts.loadDetail,
         arrangementSection:opts.arrangementSection?opts.arrangementSection(request,next,page):null,
         beforeReplace:function(){
           if(opts.beforeReplace)opts.beforeReplace(request);
@@ -353,6 +375,7 @@ function createWorkbenchPreviewController(opts){
   return {
     render:function(text,request){
       request=request || {origin:'manual'};
+      if(disposed)return {ok:false,replaced:false,reason:'destroyed',origin:request.origin};
       var raw;
       try{raw=JSON.parse(text);}catch(ex){
         opts.findings({errors:['JSON parse: '+ex.message],warnings:[]});
@@ -383,10 +406,11 @@ function createWorkbenchPreviewController(opts){
       return outcome;
     },
     repaint:function(skin){
-      if(!page)return {ok:false,replaced:false,text:renderedText,reason:'missing',origin:'skin'};
+      if(disposed || !page)return {ok:false,replaced:false,text:renderedText,reason:'missing',origin:'skin'};
       return replace(page,renderedText,skin,{origin:'skin'});
     },
-    forgetDocument:function(){page=null;},setDemoLiveStatus:setDemoLiveStatus,
+    forgetDocument:function(){page=null;},setDemoLiveStatus:setDemoLiveStatus,setMetricsPreview:setMetricsPreview,
+    destroy:function(){if(disposed)return;disposed=true;if(ctl)ctl.destroy();ctl=null;page=null;renderedText=null;},
     controller:function(){return ctl;},page:function(){return page;},renderedText:function(){return renderedText;}
   };
 }

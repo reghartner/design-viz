@@ -3,7 +3,7 @@
    block. Read models and edits live in workbench/commands/telemetry.js; source,
    history and form lifetime stay inspector-owned, so every control calls
    o.commit(edit) and one accepted edit is one Undo step. Nothing here runs a
-   query or draws on the canvas; the placement preview is a later change. */
+   query or draws on the canvas; preview rendering has its own owner. */
 function flowMetricsDom(o){
   var doc=o.document,c=o.controls;
   function el(tag,cls,text){var node=doc.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node;}
@@ -105,7 +105,7 @@ function createFlowMetricsEditor(o){
       var card=telemetryObject(b.card)?b.card:{};
       d.row(box,'Card side',d.relabel(c.select(TELEMETRY_CARD_SIDES,typeof card.side==='string'?card.side:'',function(v){return commit({op:'card',field:'side',value:v});},true),{'':'(automatic)'}));
       d.row(box,'Card offset',c.number(telemetryNumber(card.offset)?card.offset:null,function(v){return commit({op:'card',field:'offset',value:v});}));
-      d.note(box,'Card side and offset (pixels) move this connection’s metrics card when a reader turns Metrics on.');
+      d.note(box,'Card side and offset (pixels) move this connection’s metrics card in Preview metrics layout and when a reader turns Metrics on.');
     }
     box.appendChild(c.action('Remove metrics',function(){return commit({op:'remove'});}));
   }
@@ -117,6 +117,10 @@ function createFlowMetricsEditor(o){
 function createFlowMetricsSettings(o){
   var d=flowMetricsDom(o),c=o.controls,s=o.state,commit=o.commit,t=s.telemetry || {};
   var box=d.el('fieldset','metrics-settings');box.appendChild(d.el('legend',null,'Metrics'));
+  var allow=c.checkbox(t.enabled!==false,function(value){return commit({op:'enabled',value:value});});
+  allow.querySelector('input').setAttribute('aria-label','Allow metrics');
+  d.row(box,'Allow metrics',allow);
+  d.note(box,'Allow metrics controls availability on this page, including imported diagrams and details. Turning it off keeps your bindings and settings. It does not turn Metrics on or run queries.');
   d.note(box,'Shared settings for the metrics bindings on this page. The Workbench stores queries only and never runs them.');
   [['grafana','prometheus','Grafana Prometheus UID','prom-main'],['grafana','loki','Grafana Loki UID','loki-main'],['grafana','tempo','Grafana Tempo UID','tempo-main'],
     ['grafana','sql','Grafana SQL UID','lake'],['honeycomb','environment','Honeycomb environment','prod'],['honeycomb','dataset','Honeycomb dataset','doorbell-prod']].forEach(function(field){

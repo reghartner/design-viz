@@ -19,7 +19,7 @@
 | M13 | Export project round-trip: the stamped export keeps carrier, overlay and page telemetry exactly and declares flow.telemetry. | editor-written edge template binding, node Honeycomb signal, page window, consumer overlay | `stampText` export deepEquals authored `tracking` and `sections`; `flow.telemetry` declared | an export that strips `telemetry` or template parameters |
 | M14 | Text boxes show no Metrics sub-section and the planner refuses them. | text-box node `note` | no `fieldset.metrics-editor`; the plan error names text boxes | binding telemetry to text boxes |
 | M15 | docs/live-status.md "Workbench" describes the Metrics editor and the Document settings block. | docs file | the Workbench section contains every control name | missing docs |
-| P1 | Preview metrics layout toggle: excluded — orchestrator ruling: PR 2. | n/a | n/a | n/a |
+| P1 | Preview metrics layout toggle: desktop browser coverage in telemetry-preview.spec.mjs. | n/a | n/a | n/a |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -384,4 +384,39 @@ test('M15 docs describe the Workbench Metrics editor',()=>{
   const doc=fs.readFileSync(path.join(repo,'docs/live-status.md'),'utf8'),start=doc.indexOf('\n## Workbench'),end=doc.indexOf('\n## ',start+5),section=doc.slice(start,end);
   for(const phrase of ['Metrics','Add signal','Signals from','Template parameter','Remove metrics','Card side','Document settings → Tracking → Metrics','Add template','Undo','Export project','read only'])
     assert.ok(section.includes(phrase),'Workbench section mentions '+phrase);
+});
+
+test('Allow metrics preserves authored settings and bindings with one Undo, no-op and retired-form protection',()=>{
+  const spec=board({kind:'call',signals:{rate:{grafana:'up'}}},{templates:TEMPLATES(),future:{keep:['unknown']},window:'24h'});
+  const target={kind:'document'},ui=harness(spec,target),original=ui.text;
+  const toggle=()=>ui.control('Allow metrics').querySelector('input');
+  assert.equal(toggle().checked,true,'absence permits availability');
+  const set=value=>{toggle().checked=value;toggle().fire('change');ui.h.flush();};
+  oneStep(ui,()=>set(false),target);
+  assert.deepEqual(ui.raw,{...spec,page:{...spec.page,tracking:{...spec.page.tracking,telemetry:{...spec.page.tracking.telemetry,enabled:false}}}});
+  const disabled=ui.text;
+  oneStep(ui,()=>set(true),target);
+  set(true);assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,disabled,'no-op did not consume an Undo');
+  assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,original,'exactly two logical edits');
+  ui.select(target);const stale=toggle();ui.select(EDGE);stale.checked=false;stale.fire('change');ui.h.flush();assert.equal(ui.text,original,'retired controls cannot commit');
+});
+
+test('Allow metrics pure plans preserve bare/wrapped page bytes, reject malformed settings and require a boolean',()=>{
+  const C=api(harness(board()).e.C),spec=board(null,{future:{x:1},templates:TEMPLATES()});
+  for(const raw of [spec,spec.page]){
+    const text=' \n'+JSON.stringify(raw,null,2)+'\n ';
+    for(const value of [false,true]){
+      const plan=C.planPageTelemetry(text,raw,{op:'enabled',value});assert.equal(plan.error,undefined);
+      const next=JSON.parse(plan.text),page=next.page || next;
+      assert.deepEqual(page.tracking,{...spec.page.tracking,telemetry:{...spec.page.tracking.telemetry,enabled:value}});
+      assert.deepEqual(page.sections,spec.page.sections);assert.ok(plan.text.startsWith(' \n'));assert.ok(plan.text.endsWith('\n '));
+      assert.equal(C.planPageTelemetry(plan.text,next,{op:'enabled',value}).text,plan.text);
+    }
+  }
+  for(const value of [null,undefined,'false',0,{},[]])assert.match(C.telemetryEditPage({}, {op:'enabled',value}).error,/true or false/);
+  for(const field of ['tracking','telemetry']){
+    const raw=board();if(field==='tracking')raw.page.tracking='handwritten';else raw.page.tracking.telemetry=['handwritten'];
+    const text=JSON.stringify(raw);assert.match(C.planPageTelemetry(text,raw,{op:'enabled',value:false}).error,/repair/);assert.equal(JSON.stringify(raw),text);
+  }
+  const bare=spec.page.sections[0].diagram;assert.match(C.planPageTelemetry(JSON.stringify(bare),bare,{op:'enabled',value:false}).error,/document settings/);
 });

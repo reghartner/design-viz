@@ -642,7 +642,7 @@ function trackingControls(val,overlay){
 /* Metrics (#941): telemetry bindings on the selected carrier and the page
    block. Desktop-only authoring; one accepted edit is one Undo step and an
    edit that leaves the source unchanged records no history. */
-function metricsControlKit(){return {row:frow,text:textControl,select:selectControl,number:numberControl,action:actionButton};}
+function metricsControlKit(){return {row:frow,text:textControl,select:selectControl,number:numberControl,checkbox:checkboxControl,action:actionButton};}
 function commitTelemetry(planFor){
     if(disposed)return false;
     var parsed=parseEditor();

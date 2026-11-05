@@ -609,13 +609,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var telemetry=createTelemetry(page,telemetryOptions,telemetryHooks);
   ctl.telemetry=telemetry;
   // Metrics canvas cues on every bound section, beside the Jira paint (src/viewer/telemetry.js).
+  var metricsPreview=authoring && !!(renderOptions && renderOptions.metricsPreview) && trackingTelemetry(page).enabled;
   function paintMetrics(){
     var metricsView=telemetryHooks.view();
     bindings.forEach(function(binding){
       var scope=binding.el,d=binding.section.diagram;if(!d)return;
       var templates=trackingTelemetry(binding.page).templates;
       telemetryPaintCues(scope,d,templates,metricsView);
-      telemetryPaintCards(scope,d,templates,metricsView,trackingTelemetry(page).window,function(card,path,edge,index){
+      var cardsView=metricsPreview && trackingTelemetry(binding.page).enabled?telemetryCardPreview(d,templates):metricsView;
+      telemetryPaintCards(scope,d,templates,cardsView,trackingTelemetry(page).window,authoring?null:function(card,path,edge,index){
         var previous=path._livePointerTarget || path,c=previous._liveCarrier;
         carrierTarget(card,edge.from+'->'+edge.to,edge,c && c.state,binding.page.tracking,edge.label || edge.from+' → '+edge.to,c && c.waiting,c && c.availability,binding.ordinal!=null?{section:binding.ordinal,kind:'edge',index:index}:null);
         carrierPointer(path,card);carrierPointer(path.closest('svg').querySelector('path.halo[data-dv-edge="'+index+'"]'),card);
@@ -1392,7 +1394,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   connectPanels();
   paint();events.forEach(function(type){view.addEventListener(type,schedule);});
   var metricFonts=view.ownerDocument && view.ownerDocument.fonts;
-  function metricsFontsChanged(){if(!retired && telemetry.enabled())schedule();}
+  function metricsFontsChanged(){if(!retired && (telemetry.enabled() || metricsPreview))schedule();}
   if(metricFonts && metricFonts.ready)metricFonts.ready.then(metricsFontsChanged);
   if(metricFonts && metricFonts.addEventListener){metricFonts.addEventListener('loadingdone',metricsFontsChanged);destroyListeners.push(function(){metricFonts.removeEventListener('loadingdone',metricsFontsChanged);});}
   // An edit re-renders the page: the new controller starts from the last live map so colors never reset.

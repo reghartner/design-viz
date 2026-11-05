@@ -567,3 +567,20 @@ for(const surface of ['standalone','workbench'])test(surface+' Standard fitting 
   await board.getByRole('button',{name:'Fit diagram',exact:true}).click();
   await expectFitted(board);
 });
+
+for(const surface of ['standalone','workbench'])test(surface+' Standard hidden chapters fit when shown and retain a manual camera when revisited',async({page,server})=>{
+  const first=fitSpec('wide').page.sections[0],second=fitSpec('tall').page.sections[0];
+  first.id='first';first.heading='First graph';second.id='second';second.heading='Second graph';
+  const raw={page:{title:'Deferred fitting',sections:[{tabs:[{label:'First chapter',sections:[first]},{label:'Second chapter',sections:[second]}]}]}};
+  const boards=await openStandard(page,server,surface,raw),a=boards.nth(0),b=boards.nth(1);
+  await expect(a).toBeVisible();await expect(b).toBeHidden();await expectFitted(a);
+  await a.getByRole('button',{name:'Diagram zoom in',exact:true}).click();
+  await a.evaluate(el=>{el.scrollLeft=80;el.scrollTop=70;});
+  const saved={width:await width(a),scroll:await scroll(a)};
+  await page.getByRole('button',{name:'Next page',exact:true}).click();
+  await expect(b).toBeVisible();await expectFitted(b);
+  await page.getByRole('button',{name:'Previous page',exact:true}).click();
+  await expect(a).toBeVisible();
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  expect(await width(a)).toBeCloseTo(saved.width,0);expect(await scroll(a)).toEqual(saved.scroll);
+});

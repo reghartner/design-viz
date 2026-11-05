@@ -3066,7 +3066,7 @@ function createBoardNavigation(board, group, legend, changed){
   function reset(){
     stopFit();motion.cancel();cancel();followFrame=false;fitFrame=false;board.classList.remove('board-zoomed');unframe();
     board.style.removeProperty('--board-zoom-width');board.style.removeProperty('--board-viewport-height');
-    if(paused){paused.width='';paused.height='';}
+    if(paused){paused.width='';paused.height='';paused.pendingFit=false;}
   }
   function down(ev){
     suppressClick=false;
@@ -3137,7 +3137,7 @@ function createBoardNavigation(board, group, legend, changed){
   var listeners={pointerdown:down,pointermove:move,pointerup:up,pointercancel:cancel,lostpointercapture:lost,keydown:key};
   Object.keys(listeners).forEach(function(type){board.addEventListener(type,listeners[type]);});
   board.addEventListener('click',click,true);board.addEventListener('wheel',wheel,{passive:false});window.addEventListener('blur',cancel);
-  function snapshot(){var tolerance=1/displayScale();return paused || {followFrame:followFrame,fitFrame:fitFrame,width:board.style.getPropertyValue('--board-zoom-width'),height:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop,endX:board.scrollLeft>0 && board.scrollLeft+board.clientWidth>=board.scrollWidth-tolerance,endY:board.scrollTop>0 && board.scrollTop+board.clientHeight>=board.scrollHeight-tolerance};}
+  function snapshot(){var tolerance=1/displayScale();return paused || {followFrame:followFrame,fitFrame:fitFrame,pendingFit:autoFit && !fitGeometry,width:board.style.getPropertyValue('--board-zoom-width'),height:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop,endX:board.scrollLeft>0 && board.scrollLeft+board.clientWidth>=board.scrollWidth-tolerance,endY:board.scrollTop>0 && board.scrollTop+board.clientHeight>=board.scrollHeight-tolerance};}
   function restore(state){
     if(!state || retired)return;
     stopFit();fitFrame=!!state.fitFrame;
@@ -3148,6 +3148,9 @@ function createBoardNavigation(board, group, legend, changed){
       // Overshoot saved endpoints so the browser restores the exact boundary.
       board.scrollLeft=state.endX?board.scrollWidth:state.x;board.scrollTop=state.endY?board.scrollHeight:state.y;
     }
+    // Composition can borrow and return a board before its first layout. Only
+    // that still-pending fit resumes; a saved manual camera always wins.
+    if(state.pendingFit)requestFit();
   }
   function fitSelection(extent,insets){
     manual();if(!enabled() || !graph() || !extent)return;
@@ -3276,7 +3279,7 @@ function createBoardSizeControl(board, legend, label){
   board.tabIndex = 0; board.setAttribute('role', 'region');
   board.setAttribute('aria-label', (label || 'Flow') + ' diagram; drag background to pan, or use zoom and scroll controls');
   setMode('auto');
-  navigation.requestFit();
+  if(navigation)navigation.requestFit();
   var observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncOverflow) : null;
   if (observer){observer.observe(board);observer.observe(legend);}
   return {mode:function(){ return mode; }, setMode:setMode,refresh:syncOverflow,

@@ -70,6 +70,7 @@ function telemetryHoneycombTrace(result,id){
   else if([total,visible,collapsed].every(function(n){return Number.isSafeInteger(n) && n>=0;}) && visible===spans.length && total===visible && collapsed===0 && meta.view_mode==='full')complete='complete';
   if(complete==='unknown')warnings.push('Trace completeness unknown.');
   if(rows.length!==spans.length)warnings.push('Annotation/log/link rows excluded from the span timeline.');
+  if(rows.some(function(r){return r.annotation_type==='link' || r.link_span_id || r.link_trace_id;}))warnings.push('Honeycomb link-row ownership is unverified; relationship mapping unavailable.');
   if(!spans.length)telemetryTraceFail('No timed spans returned.');
   var starts=spans.map(function(r){if(!/^\d{1,22}$/.test(r.start_unix_ns) || !/^\d{1,22}$/.test(r.duration_ns))telemetryTraceFail('Invalid exact nanosecond timing.');return BigInt(r.start_unix_ns);}),base=starts.reduce(function(a,b){return a<b?a:b;});
   var normalized=spans.map(function(r,i){var offset=starts[i]-base,duration=BigInt(r.duration_ns);if(offset>86400000000000n || duration>86400000000000n)telemetryTraceFail('Trace timing exceeds bounds.');
@@ -79,16 +80,22 @@ function telemetryHoneycombTrace(result,id){
   if(normalized.length>TELEMETRY_TRACE_SPANS){normalized=[];complete='partial';warnings.push('More than 200 spans; trace timeline unavailable.');}
   return {spans:normalized,completeness:complete,warnings:warnings,url:telemetryTraceUrl(meta.trace_link,'honeycomb')};
 }
+/* Pinned Tempo text exposes service resource; structured spans prefix those keys
+   with resource. Map only canonical context keys, with explicit span precedence. */
+function telemetryTempoAttrs(attributes,resource,structured){
+  var attrs=telemetryTraceAttrs(attributes),context=['service.namespace','service.version','deployment.environment.name','deployment.environment'];
+  context.forEach(function(k){var v=structured?attributes && attributes['resource.'+k]:resource && resource[k];if(!telemetryOwn(attrs,k) && (typeof v==='boolean' || telemetryNumber(v) || telemetryTraceString(v)))attrs[k]=v;});return attrs;
+}
 function telemetryTempoTrace(result,id){
   var raw=telemetryTraceJson(result),text=telemetryTraceText(result),secondary=null;try{secondary=JSON.parse(text);}catch(e){}
   if(raw.traceId!==id || secondary && secondary.traceId && secondary.traceId!==id)telemetryTraceFail('Returned trace ID differs from requested candidate.');
-  var flat=[];if(Array.isArray(raw.services))raw.services.forEach(function(s){if(!s || !Array.isArray(s.spans))telemetryTraceFail('Invalid Tempo service.');s.spans.forEach(function(p){flat.push({span:p,service:s.serviceName,structured:false});});});
+  var flat=[];if(Array.isArray(raw.services))raw.services.forEach(function(s){if(!s || !Array.isArray(s.spans))telemetryTraceFail('Invalid Tempo service.');s.spans.forEach(function(p){flat.push({span:p,service:s.serviceName,resource:s.resource,structured:false});});});
   else if(Array.isArray(raw.spans))raw.spans.forEach(function(p){flat.push({span:p,service:p.serviceName,structured:true});});
   else telemetryTraceFail('Unsupported Tempo trace shape.');
   if(!flat.length || flat.length>10000)telemetryTraceFail('Tempo trace span count unavailable.');
   var base=Infinity;flat.forEach(function(x){if(!telemetryNumber(x.span.startTimeMs) || !telemetryNumber(x.span.durationMs))telemetryTraceFail('Invalid Tempo timing.');base=Math.min(base,x.span.startTimeMs);});
   var native=Object.create(null);if(secondary && Array.isArray(secondary.services))secondary.services.forEach(function(s){(s.spans || []).forEach(function(p){native[p.spanId]=p;});});
-  var spans=flat.map(function(x){var p=x.span,extra=native[p.id] || {};return {id:x.structured?p.id:p.spanId,parentId:(x.structured?p.parentId:p.parentSpanId) || null,service:x.service,name:p.name,startMs:p.startTimeMs-base,ms:p.durationMs,time:telemetryTime(p.startTimeMs),error:p.status==='error' || (p.events || []).some(function(e){return e.name==='exception';}),attributes:telemetryTraceAttrs(p.attributes),events:p.events || [],links:p.links || extra.links || []};});
+  var spans=flat.map(function(x){var p=x.span,extra=native[p.id] || {};return {id:x.structured?p.id:p.spanId,parentId:(x.structured?p.parentId:p.parentSpanId) || null,service:x.service,name:p.name,startMs:p.startTimeMs-base,ms:p.durationMs,time:telemetryTime(p.startTimeMs),error:p.status==='error' || (p.events || []).some(function(e){return e.name==='exception';}),attributes:telemetryTempoAttrs(p.attributes,x.resource,x.structured),events:p.events || [],links:p.links || extra.links || []};});
   telemetryTraceCheckSpans(spans);
   var partial=raw.partial===true || secondary && secondary.partial===true,warnings=[];
   // No completeness guarantee is inferred from the presence of structuredContent.

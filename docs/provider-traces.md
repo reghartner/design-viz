@@ -71,6 +71,22 @@ if (comparison) {
   Secret/payload/message/stack attributes are not retained. Matching is exact;
   attributes outside `TELEMETRY_TRACE_ATTRS` are intentionally unsupported.
 
+`observedAt` is the retrieval receipt time, **not the trace's age**. Use the
+selected candidate's `time`, or the earliest selected span's `time`, for trace age.
+
+The bounded attribute union includes the canonical importer’s `retry.attempt`,
+`flow.delivery_failed`, `flow.backpressure`, `flow.step.id`, queue depth/message age,
+`db.system.name`, namespace/version, and deployment environment keys. Native Tempo
+service resources (or structured `resource.*` attributes) supply only the explicit
+namespace/version/deployment context keys, with span attributes taking precedence.
+This supports existing explicit `traceMatch.attributes` and `repeat: attempts`
+mappings; it does not infer a mapping or retain arbitrary resource attributes.
+Honeycomb's verified formatted table lacks retry/queue/deployment fields, so these
+remain unavailable for Honeycomb. The inspected official CI tables contain
+`span_event` annotations but no populated link rows. The docs describe link target
+IDs without establishing formatted row ownership; link rows therefore produce an
+explicit relationship-mapping limitation, never inferred parent/link evidence.
+
 The span start offset is relative to the minimum returned start. Honeycomb exact
 integer nanoseconds are subtracted as BigInt **before** converting to milliseconds.
 Rounded raw sample durations do not drive packets or precise timing. Honeycomb

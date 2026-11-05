@@ -28,7 +28,8 @@ function telemetryEvidenceJson(raw){
   return copy;
 }
 var TELEMETRY_TRACE_CANDIDATES=20,TELEMETRY_TRACE_SPANS=200;
-var TELEMETRY_TRACE_ATTRS=['service.name','resource.service.name','service.namespace','service.version','http.route','http.request.method','http.method','http.response.status_code','http.status_code','rpc.service','rpc.method','rpc.system','db.system','db.operation','db.operation.name','messaging.system','messaging.destination.name','messaging.operation','messaging.operation.type','span.kind','status.code','error','exception.type','meta.signal_type','meta.annotation_type'];
+// Includes the exact operational keys used by tools/canon/traces.mjs; no wildcard attributes.
+var TELEMETRY_TRACE_ATTRS=['service.name','resource.service.name','service.namespace','service.version','deployment.environment.name','deployment.environment','db.system.name','messaging.queue.depth','queue.depth','messaging.message.age_ms','flow.backpressure','flow.delivery_failed','retry.attempt','flow.step.id','http.route','http.request.method','http.method','http.response.status_code','http.status_code','rpc.service','rpc.method','rpc.system','db.system','db.operation','db.operation.name','messaging.system','messaging.destination.name','messaging.operation','messaging.operation.type','span.kind','status.code','error','exception.type','meta.signal_type','meta.annotation_type'];
 function telemetryTraceFail(message){var e=new Error(message);e.code='trace_unobserved';throw e;}
 function telemetryTraceString(v){return typeof v==='string' && v.length>0 && v.length<=512 && !/https?:\/\/mcp\.honeycomb\.io\/query_results\//.test(v);}
 function telemetryTraceId(v){return typeof v==='string' && /^[0-9a-f]{16,32}$/i.test(v);}

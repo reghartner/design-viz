@@ -57,3 +57,38 @@ test('explicit asynchronous alternatives are bounded and the latest action wins'
 test('metadata account change during initial discovery retires cleanly',async t=>{const h=await setup({wrap:b=>{b.listTools=async()=>{throw {code:'user_changed'};};}});t.after(()=>h.close());assert.equal(h.api.snapshot().available,false);assert.equal(h.bridge.calls.length,0);});
 test('native host bundle carries validated exemplars without provider networking',()=>{const {C}=context(),value=plain(envelope(C)),N={URL,AbortController,TextEncoder,TextDecoder,setTimeout,clearTimeout,document:{addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint('native').source,N);assert.equal(typeof N.createTelemetryTraces,'undefined');assert.equal(typeof N.telemetryTraceEnvelope,'function');const sample=N.telemetrySample({signals:{zero:{value:0}},exemplars:[value]});assert.equal(sample.exemplars[0].traceId,recordedId);assert.equal(sample.signals.zero.value,0);const history=N.telemetryHistoryDay({a:sample},{at:value.observedAt});assert.equal(history.a,undefined);});
 test('adding trace evidence cannot change measured-zero numeric Proof classification',()=>{const {C}=context(),p=C.normalize(pageSpec()),node=p.sections[0].diagram.nodes.a;node.telemetry.signals.zero={honeycomb:{calculations:[{op:'COUNT'}]}};node.telemetry.proof={zero:{max:0}};const sample={signals:{zero:{value:0}}};const input=map=>C.telemetryProofInput(fn=>fn(node,'a',p),()=>{}, {},map);const before=C.proofVerdicts(input({a:sample}));const after=C.proofVerdicts(input({a:{...sample,exemplars:[envelope(C)]}}));assert.deepEqual(plain(after),plain(before));});
+
+test('native Tempo operational attributes survive envelopes and canonical explicit retry/attribute mapping',async()=>{
+ const {normalizeTrace,mapTrace}=await import('../tools/canon/traces.mjs'),{C}=context();
+ // Synthetic operational variant of the pinned native source fixture, not a recorded account trace.
+ const raw=JSON.parse(fixture('grafana-source-test.json')),svc=raw.services[0];
+ Object.assign(svc.resource,{'service.namespace':'orders','service.version':'v2','deployment.environment':'legacy','auth.token':'drop'});
+ const operational={'retry.attempt':1,'flow.delivery_failed':true,'flow.backpressure':true,'flow.step.id':'dispatch','queue.depth':15,'messaging.queue.depth':20,'messaging.message.age_ms':500,'db.system.name':'postgresql','http.response.status_code':503};
+ svc.spans[1].attributes={...operational,'request.body':'drop','auth.token':'drop','user.id':'drop','exception.stacktrace':'drop'};
+ svc.spans.push({...svc.spans[1],spanId:'2222222222222222',startTimeMs:svc.spans[1].startTimeMs+70,attributes:{...svc.spans[1].attributes,'retry.attempt':2}});
+ const check=result=>{
+  const parsed=C.telemetryTempoTrace(result,raw.traceId),e=C.telemetryTraceEnvelope({...plain(envelope(C)),provider:'tempo',traceId:raw.traceId,candidates:[{traceId:raw.traceId,status:'unknown'}],...parsed});
+  for(const [k,v] of Object.entries(operational))assert.equal(e.spans[1].attributes[k],v,k);
+  assert.equal(e.spans[1].attributes['deployment.environment.name'],'production');
+  for(const k of ['request.body','auth.token','user.id','exception.stacktrace'])assert.equal(e.spans[1].attributes[k],undefined);
+  const trace=normalizeTrace({traceId:e.traceId,spans:e.spans.map(s=>({...s,serviceName:s.service,durationMs:s.ms}))});
+  assert.equal(trace.context.environment,'production');assert.equal(trace.context.versions['orders/checkout'],'v2');
+  const diagram={steps:[{id:'retry',traceMatch:{serviceName:'checkout',operation:'authorize',namespace:'orders',attributes:{'flow.step.id':'dispatch'},repeat:'attempts',maxQueueDepth:10,maxDurationMs:40}}]};
+  const mapping=mapTrace(diagram,trace).steps[0];assert.equal(mapping.status,'matched');
+  for(const kind of ['retry','delivery-failed','backpressure','queue-buildup','database-slow'])assert.ok(mapping.conditions.some(c=>c.kind===kind),kind);
+  assert.equal(mapping.conditions.find(c=>c.kind==='retry').attempts,2);
+  // Negative controls exercise the existing mapper: no retry metadata means ambiguity;
+  // an explicit attribute mismatch must never map the spans by name alone.
+  const noAttempts=structuredClone(trace);noAttempts.spans.forEach(s=>delete s.attributes['retry.attempt']);assert.equal(mapTrace(diagram,noAttempts).steps[0].status,'ambiguous');
+  diagram.steps[0].traceMatch.attributes['flow.step.id']='different';assert.equal(mapTrace(diagram,trace).steps[0].status,'missing');
+ };
+ check({payload:raw});
+ const structured={traceId:raw.traceId,spans:svc.spans.map(p=>({...p,id:p.spanId,parentId:p.parentSpanId,serviceName:svc.serviceName,attributes:{...Object.fromEntries(Object.entries(svc.resource).map(([k,v])=>['resource.'+k,v])),...p.attributes}}))};
+ check({structuredContent:plain(structured),content:[{type:'text',text:JSON.stringify(raw)}]});
+ structured.spans[1].attributes['deployment.environment.name']='span-env';assert.equal(C.telemetryTempoTrace({payload:plain(structured)},raw.traceId).spans[1].attributes['deployment.environment.name'],'span-env');
+});
+test('synthetic Honeycomb link row reports unsupported ownership without inventing relationships',()=>{
+ const {C}=context(),variant=traceText.replace('| /cart/checkout |  |  |  | 0 |','| /cart/checkout | link | aaaaaaaaaaaaaaaa | bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | 0 |');
+ assert.notEqual(variant,traceText);const parsed=C.telemetryHoneycombTrace({payload:variant},recordedId);
+ assert.match(parsed.warnings.join(' '),/link-row ownership is unverified/);assert.ok(parsed.spans.every(s=>s.links.length===0 && s.attributes['retry.attempt']===undefined));
+});

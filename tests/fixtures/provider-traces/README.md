@@ -9,3 +9,14 @@ No live account queries were made. These files contain no signed download URLs.
 Honeycomb source: https://github.com/honeycombio/agent-skill/actions/runs/38212733085 . The unredacted official CI artifact is intentionally not included. Hosted unauthenticated tools/list returned 401 during lead research; runtime authenticated schemas remain authoritative. Raw trace_result_json shape is unverified and unsupported.
 
 All mutations in telemetry-traces.test.js (cycles, duplicates, oversized tables, IDs, statuses, links, partial flags and schemas) are explicitly synthetic negative or boundary variants. The actual checked-in mock handlers use the existing fictional shared story and are not official provider evidence.
+
+Operational-attribute coverage uses explicitly synthetic retry/queue/deployment
+variants of the Grafana source fixture. Resource placement follows pinned
+`tempo_ds_query.go`: text `services[].resource`, structured span attributes prefixed
+with `resource.`. The runtime allowlist includes the exact operational keys in
+`tools/canon/traces.mjs`; tests exercise that importer and mapper directly.
+A bounded inspection of the official Honeycomb CI artifact found five trace tables
+and twelve annotation rows, all `span_event`, with no populated link targets.
+The pinned `trace-exploration.md` documents link target fields but does not establish
+formatted-table owner semantics. The synthetic link-row test therefore asserts an
+explicit mapping limitation rather than inventing a link relationship.

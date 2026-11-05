@@ -1773,6 +1773,10 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 .dv-inline-group-editor{overflow:visible;}
 .dv-inline-group-editor .dv-inline-input{height:30px;padding:3px 6px;font:600 13px/1.4 system-ui,sans-serif;color:var(--dtext,#202938);}
 .dv-inline-editing>[hidden]{display:none!important;}
+/* A connection label editor covers its label, or sits where the label would be drawn. */
+.dv-inline-edge-editor{overflow:visible;}
+.dv-inline-edge-editor .dv-inline-input{height:30px;padding:3px 6px;font:13px/1.4 system-ui,sans-serif;text-align:center;color:var(--dtext,#202938);}
+#docview text.lbl.dv-inline-editing{visibility:hidden;}
 /* The step caption editor takes its own line under the STEP number, lane and
    links, which stay visible and keep their actions. */
 .stepline .step-text.dv-inline-editing{display:block;margin:4px 0;}

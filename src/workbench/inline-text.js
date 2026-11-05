@@ -33,7 +33,17 @@ function createInlineTextEditor(opts){
      command, never on double-click. read(snapshot,target): the entry's own
      {text, stored} source in place of field, or null when it cannot edit.
      A save is the entry's plan(c,value) (null: nothing to write), else
-     planSetField (field) or planReplaceValue, through one opts.commit. */
+     planSetField (field) or planReplaceValue, through one opts.commit, unless
+     the entry's source(snapshot,target) reads the text itself and returns its
+     own save plan (and the
+     topology context the draft depends on). mount: the element a single-line
+     host joins (default: the edited element). */
+  /* A connection label: double-click the label text, or Rename (opens through
+     the creation route, from the label or from the arrow when it has none).
+     Local connections write their label; imported ones write this consumer's
+     Display label override. Both match their Inspect field. */
+  var edgeLabel={kind:'edge',selector:'text.lbl[data-dv-edge]',field:'label',value:'trimmed',label:'Edit connection label',help:'Enter or click outside saves. Escape cancels.',
+    source:edgeLabelSource,place:edgeLabelHost,mount:function(c){return c.el.ownerSVGElement;},hostClass:'dv-inline-edge-editor'};
   var fields=[
     {kind:'para',selector:'[data-dv-para]',field:null,markdown:true,value:'raw',keyboard:true,label:'Edit section text',help:help},
     {kind:'bullet',selector:'[data-dv-bullet-path]',field:'text',bare:true,markdown:true,value:'raw',keyboard:true,label:'Edit section text',help:help},
@@ -41,14 +51,17 @@ function createInlineTextEditor(opts){
       accept:function(value){return !isTextBoxNode(value);},place:nodeTitleHost,hostClass:'dv-inline-node-editor'},
     // One step text serves every path that uses the step.
     {kind:'step',selector:'.stepline .step-text',target:function(el){return opts.currentStep?opts.currentStep(el):null;},field:'text',markdown:true,value:'trimmed',label:'Edit step text',help:help},
+    edgeLabel,
+    // Rename on a connection that has no label yet opens from its arrow.
+    Object.assign({},edgeLabel,{selector:null,creation:true}),
     /* A local group's boundary title opens only from its object menu (menu: no
        double-click or Enter route). read gives the title, or the key when there
        is none; plan saves through planSetGroupTitle, which keeps the key and
-       members. overlay: the host is the last child of the group's parent, so it
+       members. mount: the host is the last child of the group's parent, so it
        paints above the diagram, over the title. */
     {kind:'group',selector:'g.grp[data-dv-group]',menu:true,value:'trimmed',label:'Group title',help:'Enter or click outside saves. Escape cancels. The group key stays in Inspect.',
       read:groupTitle,plan:function(c,value){return value==null && c.stored==null?null:planSetGroupTitle(c.snapshot.text,c.snapshot.raw,c.target.section,c.target.id,value);},
-      place:groupTitleHost,overlay:true,hostClass:'dv-inline-group-editor'}
+      place:groupTitleHost,mount:function(c){return c.el.parentNode;},hostClass:'dv-inline-group-editor'}
   ];
   function selectorOf(test){return fields.filter(function(f){return f.selector && !f.creation && !f.menu && test(f);}).map(function(f){return f.selector;}).join(',');}
   var openSelector=selectorOf(function(){return true;}),keySelector=selectorOf(function(f){return f.keyboard;});
@@ -59,6 +72,7 @@ function createInlineTextEditor(opts){
     delete target.el;
     var snapshot=opts.session.snapshot();
     if(snapshot.error || snapshot.renderedText!=null && snapshot.renderedText!==snapshot.text)return null;
+    if(f.source){var got=f.source(snapshot,target);return got && {el:el,entry:f,target:target,text:got.text || '',source:got,snapshot:snapshot};}
     if(f.read){var own=f.read(snapshot,target);return own && {el:el,entry:f,target:target,path:null,field:null,text:own.text,stored:own.stored,snapshot:snapshot};}
     var path=builderTargetPath(snapshot.raw,target),value=path && specValueAt(snapshot.raw,path),field=null;
     if(f.field && specObject(value)){
@@ -73,6 +87,31 @@ function createInlineTextEditor(opts){
     var got=builderDiagram(c.snapshot.text,c.snapshot.raw,c.target.section),p=!got.error && layout(got.d).pos[c.target.id];if(!p)return null;
     var host=document.createElementNS('http://www.w3.org/2000/svg','foreignObject');
     host.setAttribute('x','4');host.setAttribute('y',String(Math.max(4,(p.h-36)/2)));host.setAttribute('width',String(Math.max(40,p.w-8)));host.setAttribute('height','36');
+    return host;
+  }
+  function topologyKey(){return JSON.stringify(opts.session.topologyContext?opts.session.topologyContext():null);}
+  function edgeLabelSource(s,target){
+    var context=opts.session.topologyContext?opts.session.topologyContext():null,t=builderEdgeLayoutTarget(s.text,s.raw,target.section,target.index,null,context);
+    if(t.error || t.edge.label!=null && typeof t.edge.label!=='string' || !t.owner && t.localIndex<0)return null;
+    return {text:t.edge.label,edge:t.edge,contextKey:JSON.stringify(context),plan:function(value){
+      return t.owner?planEdgeLayout(s.text,s.raw,target.section,target.index,t.key,{label:value},context):
+        planSetField(s.text,s.raw,t.got.path.concat(['edges',t.localIndex]),'label',value==null?null:JSON.stringify(value));
+    }};
+  }
+  /* Over the rendered label; without one, where the engine would draw it:
+     above the arrow's midpoint, higher when a step circle sits there. */
+  function edgeLabelHost(c){
+    var svg=c.el.ownerSVGElement,index=c.target.index,label=svg && svg.querySelector('text.lbl[data-dv-edge="'+index+'"]'),path=svg && svg.querySelector('path.edge[data-dv-edge="'+index+'"]'),x,y,w=160;
+    try{
+      if(label){var b=label.getBBox();x=b.x+b.width/2;y=b.y+b.height/2;w=Math.max(w,b.width+40);}
+      else if(path){
+        var mid=path.getPointAtLength(path.getTotalLength()/2),edge=c.source.edge;
+        x=mid.x+(edge.labelDx || 0);y=mid.y-(svg.querySelector('[data-dv-coin-edge="'+index+'"]')?16:9)+(edge.labelDy || 0)-4;
+      }
+    }catch(ex){return null;}
+    if(!Number.isFinite(x) || !Number.isFinite(y))return null;
+    var host=document.createElementNS('http://www.w3.org/2000/svg','foreignObject');
+    host.setAttribute('x',String(x-w/2));host.setAttribute('y',String(y-15));host.setAttribute('width',String(w));host.setAttribute('height','30');
     return host;
   }
   /* A local group (declared, or holding an authored member) and its stored
@@ -92,7 +131,7 @@ function createInlineTextEditor(opts){
     host.setAttribute('x',String(x));host.setAttribute('y',String(b.y+b.height/2-15));host.setAttribute('width',String(Math.max(160,right-x)));host.setAttribute('height','30');
     return host;
   }
-  function fresh(c){var now=opts.session.snapshot();return c.el.isConnected && !opts.disabled() && now.project===c.snapshot.project && now.text===c.snapshot.text;}
+  function fresh(c){var now=opts.session.snapshot();return c.el.isConnected && !opts.disabled() && now.project===c.snapshot.project && now.text===c.snapshot.text && (!c.source || topologyKey()===c.source.contextKey);}
   function clear(){
     if(!active)return;var a=active;active=null;a.life.destroy();a.host.remove();
     if(a.original){while(a.original.firstChild)a.c.el.insertBefore(a.original.firstChild,a.original);a.original.remove();}
@@ -102,7 +141,7 @@ function createInlineTextEditor(opts){
     if(!active)return;var a=active,c=a.c,valid=fresh(c),plan;
     if(save && valid && a.input.value!==c.text){
       var value=c.entry.value==='trimmed'?a.input.value.trim() || null:a.input.value,json=value==null?null:JSON.stringify(value);
-      plan=c.entry.plan?c.entry.plan(c,value):c.field?planSetField(c.snapshot.text,c.snapshot.raw,c.path,c.field,json):
+      plan=c.source?c.source.plan(value):c.entry.plan?c.entry.plan(c,value):c.field?planSetField(c.snapshot.text,c.snapshot.raw,c.path,c.field,json):
         planReplaceValue(c.snapshot.text,c.snapshot.raw,c.path,json);
       if(plan && plan.error){a.error.textContent=plan.error;return false;}
     }
@@ -146,7 +185,7 @@ function createInlineTextEditor(opts){
       preview=document.createElement('div');preview.className='dv-inline-preview';preview.setAttribute('role','region');preview.setAttribute('aria-label','Live Markdown preview');host.appendChild(preview);
     }
     var error=document.createElement('span');error.setAttribute('role','status');host.appendChild(error);
-    if(single)(f.overlay?el.parentNode:el).appendChild(host);else el.insertBefore(host,original.nextSibling);
+    if(single)(f.mount?f.mount(c):el).appendChild(host);else el.insertBefore(host,original.nextSibling);
     el.classList.add('dv-inline-editing');
     var editing=createWorkbenchLifetime();active={c:c,input:input,host:host,original:original,preview:preview,error:error,life:editing,composing:false};
     ['pointerdown','mousedown','click','dblclick'].forEach(function(type){editing.listen(host,type,function(e){e.stopPropagation();if(e.target.closest('a')){e.preventDefault();if(type==='click' && active){active.input.focus();active.input.scrollIntoView({block:'nearest',inline:'nearest'});}}});});

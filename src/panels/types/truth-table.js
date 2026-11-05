@@ -24,15 +24,17 @@ function truthTableScalar(value) { return value === null || ['string', 'boolean'
 function truthTableCell(value) { return value === undefined ? '—' : value === null ? 'null' : value === '' ? '(empty)' : truthTableScalar(value) ? String(value) : '—'; }
 function truthTableValueColumns(panel) { return softwarePanelItems(panel).filter(function (col) { return col.kind !== 'icons'; }); }
 function truthTableIconColumns(panel) { return softwarePanelItems(panel).filter(function (col) { return col.kind === 'icons'; }); }
-function truthTableIconCell(outputs) {
+// An empty icon list shows its column's `empty` text: small muted "n/a" by default, "" shows nothing.
+function truthTableIconCell(outputs, col) {
   if (!Array.isArray(outputs)) return '—';
+  var empty = col && typeof col.empty === 'string' ? col.empty : 'n/a';
   var icons = outputs.slice(0, 8).filter(function (output) { return panelObject(output) && FlowIcons.has(output.icon); });
   var html = '<div class="truth-table-icons">';
   icons.forEach(function (output) {
     var label = typeof output.label === 'string' && output.label ? output.label : FlowIcons.registry[output.icon].label;
     html += '<span class="truth-table-output">' + FlowIcons.render(output.icon, {label: label}) + '<span aria-hidden="true">' + esc(label) + '</span></span>';
   });
-  return html + (icons.length ? '' : outputs.length ? '—' : '<span>No icons</span>') + '</div>';
+  return html + (icons.length ? '' : outputs.length ? '—' : empty ? '<span class="truth-table-empty">' + esc(empty) + '</span>' : '') + '</div>';
 }
 // Active case choices show each case's label, or its ID when unlabeled. A shown text that matches any other
 // visible choice (another case, the inherit/default choice or No active case) gets its ID, or "(case ID)".
@@ -64,6 +66,7 @@ PanelRegistry.define('truth-table', {
   validateDeclaration: function (panel, path, warnings) {
     panelCollectionWarnings(panel, path, warnings, 'columns', 8, function (col, at) {
       if (col.kind !== undefined && col.kind !== 'value' && col.kind !== 'icons') warnings.push(at + '.kind: expected value or icons — using value');
+      if (col.kind === 'icons' && col.empty !== undefined && typeof col.empty !== 'string') warnings.push(at + '.empty: expected text — showing n/a');
     });
     var columns = softwarePanelItems(panel);
     panelCollectionWarnings(panel, path, warnings, 'cases', 24, function (row, at) {
@@ -102,7 +105,7 @@ PanelRegistry.define('truth-table', {
       html += '<tr' + (active ? ' class="truth-table-active" aria-current="true"' : '') + '><th scope="row">' + esc(row.label || row.id) + (active ? '<span class="truth-table-current">Active</span>' : '') + '</th>';
       columns.forEach(function (col) {
         var value = panelOwn(row.cells, col.id) ? row.cells[col.id] : undefined;
-        html += '<td>' + (col.kind === 'icons' ? truthTableIconCell(value) : esc(truthTableCell(value))) + '</td>';
+        html += '<td>' + (col.kind === 'icons' ? truthTableIconCell(value, col) : esc(truthTableCell(value))) + '</td>';
       });
       html += '</tr>';
     });
@@ -120,11 +123,13 @@ PanelRegistry.define('truth-table', {
 .truth-table-active{background:color-mix(in srgb,var(--dink) 10%,transparent)}.truth-table-active>th{box-shadow:inset 3px 0 var(--dink)}
 .truth-table-current{display:block;font-size:10px;margin-top:4px}.truth-table-icons{display:flex;gap:12px;align-items:center;flex-wrap:wrap;min-width:160px}
 .truth-table-output{display:inline-flex;gap:5px;align-items:center;font-size:11px}.truth-table-output svg{width:24px;height:24px;flex:none}
+.truth-table-empty{font-size:10px;color:var(--dfaint)}
 @media print{.pt-truth-table{background:#fff!important;--dtext:#222;--dink:#111;--dfaint:#555}.pt-truth-table .ptitle{color:#111!important}.truth-table-scroll{overflow:visible;max-height:none}.truth-table{font-size:10px}.truth-table th,.truth-table td{min-width:0;padding:6px;max-width:none}.truth-table-icons{min-width:0}.truth-table tr{break-inside:avoid}.truth-table-active>th{border-left:3px solid currentColor}}
 `,
   // Inspect case cards: two-column ID/label row, full-width property pairs and icon lists.
   editorStyles: String.raw`
 .rowline.rowcard.truth-case{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 8px;padding:8px}
+.rowline.rowcard>.rowcell.truth-column-empty[hidden]{display:none}
 .truth-case-head,.truth-property,.truth-case-icons,.rowline.rowcard>.rowcell.truth-column-kind{grid-column:1/-1;min-width:0}
 .truth-case-head{display:flex;align-items:center;gap:8px}
 .truth-case-title{flex:1;min-width:0;font:600 12px/1.4 'IBM Plex Sans',sans-serif;color:var(--ink);overflow-wrap:anywhere}
@@ -151,10 +156,10 @@ PanelRegistry.define('truth-table', {
       ],
       initial: {active: 'solar'}
     },
-    setupFields: [['columns', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'kind', label: 'Column kind', kind: 'enum', options: ['value', 'icons'], unsetLabel: 'value (default)'}], max: 8, wide: true}], ['cases', 'jsonArr'], ['initial', 'json']],
+    setupFields: [['columns', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'kind', label: 'Column kind', kind: 'enum', options: ['value', 'icons'], unsetLabel: 'value (default)'}, {k: 'empty', label: 'Empty cell text'}], max: 8, wide: true}], ['cases', 'jsonArr'], ['initial', 'json']],
     patchFields: [['note', 'text']],
     expandPatchFields: function (panel) { return [['active', 'enum', truthTableCases(panel).map(function (row) { return row.id; }), {label: 'Active case', nullLabel: 'No active case', assignment: false, help: 'Highlight an authored case. Omitted steps inherit the previous highlight.'}], ['note', 'text']]; },
-    fieldMeta: {columns: {label: 'Properties', group: 'Content', help: 'Declare column IDs and headers. Value columns hold typed properties; Icons columns hold independent shared icon lists.'}, cases: {label: 'Cases and UX icons', group: 'Content', help: 'Authored combinations, not inferred device behavior. Each case card holds its typed property values and its output icons.'}, note: {label: 'Explanation', nullLabel: 'Clear explanation'}},
+    fieldMeta: {columns: {label: 'Properties', group: 'Content', help: 'Declare column IDs and headers. Value columns hold typed properties; Icons columns hold independent shared icon lists. An empty icon cell shows its column’s Empty cell text, or a small n/a when blank.'}, cases: {label: 'Cases and UX icons', group: 'Content', help: 'Authored combinations, not inferred device behavior. Each case card holds its typed property values and its output icons.'}, note: {label: 'Explanation', nullLabel: 'Clear explanation'}},
     editor: function (context) {
       return {patchField: function (field, input) {
         if (field[0] === 'note') input.setAttribute('aria-label', 'Explanation');
@@ -176,8 +181,17 @@ PanelRegistry.define('truth-table', {
       }, setupField: function (field, panel) {
         var doc = context.document;
         function node(tag, className, text) { var el = doc.createElement(tag); el.className = className; if (text !== undefined) el.textContent = text; return el; }
-        // Same shared rows control as other setup fields; only the kind cell spans the card so "value (default)" stays readable.
-        if (field[0] === 'columns') return context.controls.block('Properties', context.controls.rows('columns', panel.columns, field[2], {cell: function (info) { if (info.column.k === 'kind') info.cell.classList.add('truth-column-kind'); return false; }}));
+        // Same shared rows control as other setup fields; the kind cell spans the card so "value (default)" stays readable,
+        // and only icons columns show their Empty cell text (blank = the n/a default).
+        if (field[0] === 'columns') return context.controls.block('Properties', context.controls.rows('columns', panel.columns, field[2], {cell: function (info) {
+          if (info.column.k === 'kind') info.cell.classList.add('truth-column-kind');
+          if (info.column.k === 'empty') {
+            var icons = !!info.base && info.base.kind === 'icons';
+            info.cell.classList.add('truth-column-empty');info.cell.hidden = !icons;
+            if (icons) { info.input.setAttribute('aria-label', String(info.base.label || info.base.id) + ' empty cell text');info.input.placeholder = 'n/a'; }
+          }
+          return false;
+        }}));
         if (field[0] !== 'cases') return;
         var rows = truthTableCaseRows(panel);
         if (rows === null) return; // Preserve malformed imports in Advanced JSON.

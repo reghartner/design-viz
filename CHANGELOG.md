@@ -1,5 +1,50 @@
 # Changelog
 
+## Live status header without a GitHub connector (2026-11-04)
+
+- The Live status header no longer shows "GitHub not connected" (#1022). PR links
+  stay plain links when no GitHub connector is available.
+
+## Over time shows missing tickets (2026-11-04)
+
+- On a past day, a ticket with no status on that day now shows as Missing instead of
+  uncolored (#1012): a ticket not created yet, or one missing today. Its node or edge
+  wears the Missing paint and the Tickets table says missing. It is not a blocker: the
+  blocked count, the blockers list and First blocker leave it out, and a ticket that
+  depends on it waits in grey. The story total is unchanged.
+
+## Live status Over time on real Atlassian connectors (2026-11-04)
+
+- Over time now loads history through `getJiraIssue` with `expand: "changelog"`
+  (#1009), because real Atlassian connectors do not offer `listJiraIssueChangelogs`
+  or `listJiraStatuses`. Each ticket costs one call, plus one
+  `searchJiraIssuesUsingJql` lookup per status no tracked ticket holds. `tools/inject.py`
+  declares only `getAccessibleAtlassianResources`, `searchJiraIssuesUsingJql` and
+  `getJiraIssue`, so a board must be republished to get this. The mock Atlassian
+  server serves the same reply shape and no longer offers the two old tools.
+
+## Live status panel buttons stay in place (2026-11-04)
+
+- The Live status panel header now has a row of buttons that never move, with
+  counts, the connector line and notes on one fixed-height row below them (#986).
+  **First blocker** has one place and size, and reads **No blockers** greyed out
+  when there are none. The demo's Play button and automatic advance are gone. **<**
+  and **>** replace Next day and sit on the slider row, or on a row of their own for
+  a demo in Live mode. A timeline's `intervalSeconds` is still accepted and has no
+  effect.
+
+## Live status Over time (2026-11-03)
+
+- Readers can move a slider through past days on a Live status board and see each
+  ticket's status on that day, overlaid on the current diagram (#929). The Over
+  time button in the Live status panel loads history as one batch on the click;
+  nothing polls, and results are cached for 7 days per viewer. It works on
+  claude.ai boards through a connector that offers `listJiraIssueChangelogs` and
+  `listJiraStatuses`, and on `#live=demo`. `tools/inject.py` now declares both
+  tools, so a board published earlier must be republished to get the button. The
+  mock Atlassian server serves both tools and a `created` field. Host providers
+  are unchanged.
+
 ## Live status connector refresh (2026-11-03)
 
 - Live status boards published as claude.ai artifacts now re-read the Jira and
@@ -7,6 +52,27 @@
   connector calls to one fifth. GitHub cohort rotation moves to 5 minutes as well.
   A board already published keeps the old rate until it is republished. Host
   providers set their own `refreshMs` and are unchanged.
+
+## Side-by-side compare: agent update preview and Git Compare (2026-11-03)
+
+- A shared compare engine (#847) lists what changed between two Flowview documents
+  (sections, nodes, connections, panels, steps, paths, layouts, Views, tabs, imports,
+  page fields and the coverage ledger), with the step where each change shows, including
+  changes that arrive through an imported provider.
+- **Preview Agent Updates** (#848) shows the current document (**Before**) on the left
+  and the proposal (**After**) on the right with a list of changes; J / K or
+  **Next change** / **Previous change** step through them. **Focused** (the default)
+  shows only what changed: a step or panel change shows each side's step controls and
+  only the panels that differ, a node or connection change crops both diagrams to it and
+  its neighbours, a coverage ledger or page field change shows only the changed lines
+  (#892), and a step edit that only changes highlighted nodes or connections, or a path
+  edit, keeps both diagrams under the step controls at the affected step, which the list
+  names ("affects steps 3-4"; a path label edit opens at step 1 and names none, #893). **Full diagram** shows both full diagrams. Accept
+  still applies the whole proposal at once.
+- Git Compare (#849) is a local tool for the same view between two revisions of a git
+  clone (commits, branches, tags, pull requests): run `python3 tools/build.py`, then
+  `node --max-semi-space-size=1 tools/compare/serve.mjs --repo <clone>`. See
+  `docs/git-compare.md`.
 
 ## Registering a new exporting diagram (2026-11-02)
 

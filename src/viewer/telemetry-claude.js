@@ -217,7 +217,7 @@ function createTelemetryGrafana(page,win,now){
     });
   }
   function forget(){last=Object.create(null);lastMarkers=[];links=Object.create(null);sql=Object.create(null);}
-  function retract(){forget();if(ctl && ctl.telemetry && typeof ctl.telemetry.clear==='function')ctl.telemetry.clear();}
+  function retract(signal){forget();if(ctl && ctl.telemetry && typeof ctl.telemetry.clear==='function')ctl.telemetry.clear(signal);}
   function syncAction(value){
     var live=ctl && ctl.liveStatus;
     if(!live || typeof live.action!=='function' || (!approval && !shown))return;
@@ -245,20 +245,20 @@ function createTelemetryGrafana(page,win,now){
     var kind=code(error),note=null;
     if(signal && signal.aborted)return Promise.reject(telemetryGrafanaError('Grafana refresh cancelled'));
     if(kind==='user_changed'){
-      retired=true;approval=null;blocked=null;retract();syncAction();
+      retired=true;approval=null;blocked=null;retract(signal);syncAction();
       if(ctl && ctl.telemetry && typeof ctl.telemetry.setAvailable==='function')ctl.telemetry.setAvailable(false);
       return Promise.reject(telemetryGrafanaError('Grafana stopped: the signed-in account changed'));
     }
     if(kind==='approval_required' || kind==='consent_required'){
       approval=repeat || {tool:'get_annotations',input:{type:'annotation',limit:100}};
       blocked={signal:signal,error:telemetryGrafanaError('Grafana access needs your approval','approval')};
-      retract();syncAction();return Promise.reject(blocked.error);
+      retract(signal);syncAction();return Promise.reject(blocked.error);
     }
     if(kind==='needs_reauth')note='Reconnect Grafana in claude.ai Settings → Connectors';
     else if(['server_not_connected','selection_required','server_not_found'].indexOf(kind)>=0){note=TELEMETRY_GRAFANA_ADD;server=null;}
     else if(['not_in_manifest','blocked_by_policy','self_only'].indexOf(kind)>=0)note='This page is not allowed to read Grafana for your account.';
     else if(['not_granted','capability_disabled','capability_removed'].indexOf(kind)>=0){note='Grafana is not available in this view.';namespace=null;server=null;}
-    if(note){if(['server_not_connected','server_not_found','not_granted','capability_disabled','capability_removed'].indexOf(kind)>=0 && ctl && ctl.telemetry && typeof ctl.telemetry.setAvailable==='function')ctl.telemetry.setAvailable(false);blocked={signal:signal,error:telemetryGrafanaError(note)};retract();return Promise.reject(blocked.error);}
+    if(note){if(['server_not_connected','server_not_found','not_granted','capability_disabled','capability_removed'].indexOf(kind)>=0 && ctl && ctl.telemetry && typeof ctl.telemetry.setAvailable==='function')ctl.telemetry.setAvailable(false);blocked={signal:signal,error:telemetryGrafanaError(note)};retract(signal);return Promise.reject(blocked.error);}
     return Promise.reject(telemetryGrafanaError('Grafana did not answer'));
   }
   function provider(bindings,signal,report){
@@ -356,8 +356,46 @@ function createTelemetryGrafana(page,win,now){
       return JSON.parse(JSON.stringify(map));
     },function(error){return refuse(error,signal,null);});
   }
+  /* History is one absolute daily range per explicitly bound Prometheus/LogQL
+     metric. No annotations, links, SQL, query rewriting or live fallback. */
+  function history(bindings,range,signal,report){
+    var config=trackingTelemetry(current || {}),epoch=generation,jobs=telemetryGrafanaJobs(bindings),map=Object.create(null),failures=[],fatal=null;
+    function halted(){return retired || epoch!==generation || signal && signal.aborted || !!fatal;}
+    if(halted())return Promise.reject(telemetryGrafanaError('Grafana history cancelled'));
+    if(blocked && blocked.signal===signal)return Promise.reject(blocked.error);
+    return connect(true).then(function(mcp){
+      var tasks=[];
+      jobs.forEach(function(job){job.signals.forEach(function(entry){
+        if(entry.source!=='grafana' && entry.source!=='loki')return;
+        var loki=entry.source==='loki',tool=loki?'query_loki_logs':'query_prometheus',names=TELEMETRY_GRAFANA_DATASOURCE[entry.source],uid=config.grafana[names[0]],label=job.id+' '+entry.name;
+        if(!uid || offered.indexOf(tool)<0){failures.push(label+': historical datasource/tool unavailable');return;}
+        var input=loki?{datasourceUid:uid,logql:entry.query,startRfc3339:range.from,endRfc3339:range.to,queryType:'range',stepSeconds:86400}:
+          {datasourceUid:uid,expr:entry.query,startTime:range.from,endTime:range.to,queryType:'range',stepSeconds:86400};
+        tasks.push(function(){return liveStatusHistoryCall(function(){
+          if(halted())return;
+          return mcp.callTool(server,tool,input,{signal:signal,cache:{staleTime:LIVE_STATUS_HISTORY_CACHE_MS,gcTime:LIVE_STATUS_HISTORY_CACHE_MS}}).then(function(result){
+            if(halted())return;
+            var points=(loki?telemetryGrafanaLoki:telemetryGrafanaPrometheus)(result && result.payload);
+            // Empty/malformed/retention responses remain gaps, distinct from an explicit 0.
+            var out=map[job.id] || (map[job.id]={signals:{},links:job.links});
+            out.signals[entry.name]={series:points};if(entry.unit)out.signals[entry.name].unit=entry.unit;
+          },function(error){
+            if(signal && signal.aborted)return;
+            if(['tool_error','bad_request','transform_error'].indexOf(code(error))>=0)failures.push(label+': '+detail(error));
+            else if(!fatal)fatal={error:error,repeat:{tool:tool,input:input}};
+          });
+        },signal);});
+      });});
+      return telemetryGrafanaRun(tasks,LIVE_STATUS_HISTORY_CALLS,halted);
+    }).then(function(){
+      if(signal && signal.aborted || retired || epoch!==generation)throw telemetryGrafanaError('Grafana history cancelled');
+      if(fatal)return refuse(fatal.error,signal,fatal.repeat);
+      if(report && typeof report.note==='function')report.note(failures.length?failures.length+' historical queries unavailable: '+failures.join('; '):'');
+      return map;
+    },function(error){return refuse(error,signal,null);});
+  }
   return {
-    options:{provider:provider,source:'Grafana',available:false},
+    options:{provider:provider,history:history,historyKey:function(){return [server,trackingTelemetry(current || {}).grafana];},source:'Grafana',available:false},
     attach:function(next,page){
       if(page)current=page;
       ctl=next || null;shown=false;

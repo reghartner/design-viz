@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Git Compare</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="viewer.css">
+<link rel="stylesheet" href="app.css">
+<script src="viewer.js" defer></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<!--ICONS-->
+<header class="top">
+  <h1>Git Compare</h1>
+  <span class="state" data-testid="clone-state">Clone: loading…</span>
+  <span class="state" data-testid="gh-state">GitHub: checking…</span>
+  <span class="grow"></span>
+  <button type="button" id="fetch">Fetch</button>
+</header>
+<p id="message" class="message" role="alert" hidden></p>
+<main>
+  <div class="bar">
+    <label for="document">Document</label>
+    <select id="document"></select>
+  </div>
+  <div class="sides">
+    <section class="side" aria-label="From (before)" data-side="from">
+      <h2>From (before)</h2>
+      <button type="button" class="trigger" aria-label="Choose From revision" aria-haspopup="dialog" aria-expanded="false">
+        <span class="choice" data-testid="from-choice">No revision chosen</span>
+      </button>
+    </section>
+    <span class="arrow" aria-hidden="true">→</span>
+    <section class="side" aria-label="To (after)" data-side="to">
+      <h2>To (after)</h2>
+      <button type="button" class="trigger" aria-label="Choose To revision" aria-haspopup="dialog" aria-expanded="false">
+        <span class="choice" data-testid="to-choice">No revision chosen</span>
+      </button>
+    </section>
+    <button type="button" id="swap">Swap</button>
+    <button type="button" id="compare" class="primary" disabled>Compare</button>
+  </div>
+  <div class="picker" role="dialog" aria-label="From revisions" hidden>
+    <input type="search" aria-label="Search revisions" placeholder="Search subject, branch, tag, PR #, author, SHA">
+    <div role="tablist" aria-label="Revision lists">
+      <button type="button" role="tab" data-tab="document" aria-selected="true">Revisions of this document</button>
+      <button type="button" role="tab" data-tab="branches" aria-selected="false">Branches</button>
+      <button type="button" role="tab" data-tab="prs" aria-selected="false">Pull requests</button>
+      <button type="button" role="tab" data-tab="tags" aria-selected="false">Tags</button>
+      <button type="button" role="tab" data-tab="all" aria-selected="false">All commits</button>
+    </div>
+    <p class="error" role="alert" hidden></p>
+    <ul role="listbox" aria-label="Revisions"></ul>
+    <button type="button" class="more" hidden>Show more</button>
+  </div>
+  <section class="between" aria-label="Between these revisions">
+    <h2>Between these revisions</h2>
+    <p class="note">Choose From and To to list the commits between them.</p>
+    <ul></ul>
+  </section>
+  <section class="comparison" aria-label="Comparison">
+    <h2>Comparison</h2>
+    <p class="note">Choose From and To, then press Compare.</p>
+    <nav class="documents" aria-label="Changed documents" hidden><ul></ul></nav>
+    <div class="host"></div>
+  </section>
+</main>
+</body>
+</html>

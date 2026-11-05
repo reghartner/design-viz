@@ -24,6 +24,15 @@ Epics and descendant stories, with separate Epic counts and story coverage.
 The desktop **Demo live status** preview uses sample states without querying
 Jira, so it cannot infer parent type from a key. See [live status](live-status.md).
 
+**Document settings → Tracking → Metrics → Allow metrics** controls metrics
+availability for the page, including imports and details, without deleting
+bindings or templates. It defaults on; reader Metrics still defaults off with a
+24h window. **Preview metrics layout** in the desktop toolbar shows synthetic
+cards for bound edges using the reader’s placement. Select a card to edit its
+side/offset. The preview makes no connector calls, adds no Undo entry, and is
+not exported. It survives same-document edits and resets for a new project or
+import. The Services & evidence chapter explains both controls.
+
 The workspace chapter explains top inspector actions, collapsed muted section
 headers, same-selection expansion retention, and group-scoped Apply controls.
 

@@ -14,7 +14,8 @@ var SVG_EXPORT_REMOVED_SELECTOR=[
   '.dv-connect-preview','.dv-free-edge-preview','.dv-topology-boundary',
   '.dv-topology-handle','.dv-rowgrab','.dv-rowline','.dv-slotline',
   '.dv-position-lock-badge','[data-dv-hidden="true"]',
-  '.nlink','.nbackref','.nrefs-trigger','.detail-trigger'
+  '.nlink','.nbackref','.nrefs-trigger','.detail-trigger',
+  '.dv-metrics-card[data-state="preview"]','.dv-metrics-leader[data-metrics-preview]'
   ,'.dv-text-resize','.dv-text-resize-preview','.text-box-hit'
 ].join(',');
 var SVG_EXPORT_EDITOR_CLASSES=/^(?:dv-(?:sel|instep|inserttarget|dragsrc|droptgt|ghost|ghostback|grabbing|position-(?:locked|lock-feedback)|connect-(?:source|candidate|target|replaced)|free-edge-source|topology-boundary-drag)|view-focus)$/;
@@ -81,6 +82,9 @@ function svgExportStripAttributes(el,base){
   });
 }
 function svgExportCleanTree(root,base){
+  // Synthetic authoring cards never become export content. Reveal their
+  // authored labels on this clone only; the live preview stays untouched.
+  root.querySelectorAll('text.lbl[data-metrics-preview]').forEach(function(el){el.classList.remove('dv-metrics-label-hidden');});
   Array.from(root.querySelectorAll(SVG_EXPORT_REMOVED_SELECTOR)).forEach(function(el){el.remove();});
   [root].concat(Array.from(root.querySelectorAll('*'))).forEach(function(el){svgExportStripAttributes(el,base);});
 }

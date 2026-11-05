@@ -29,8 +29,16 @@ test('Production and typed Activity include direct, nested and actual asynchrono
  for(const id of ['shared::store->shared::api','detail::inner::a->detail::inner::b']){
   await deliver(page,{id,rate:100});await open(scope,id,root);await expect(production(root)).toHaveAttribute('data-production-carrier',id);await expect(production(root)).toContainText('rate: 100 req/h');await expect(production(root)).not.toContainText('Decoy');await page.keyboard.press('Escape');
  }
- await expect(activity(scope).filter({hasText:'First observed traffic after Done'})).toHaveCount(1);
+ await expect(scope.locator('[data-activity-carrier="shared::store->shared::api"][data-activity-kind="first-traffic"]')).toHaveCount(1);
+ await expect(scope.locator('[data-activity-carrier="detail::inner::a->detail::inner::b"][data-activity-kind="first-traffic"]')).toHaveCount(0);
  expect(await page.evaluate(()=>[window.calls.live.length,window.calls.detail.length])).toEqual([1,1]);
+ await scope.locator('.detail-breadcrumb button').first().click();
+ await page.evaluate(()=>{const d=window.detailSpec.page.sections.find(s=>s.id==='selected').diagram;d.edges.find(e=>e.from==='shared::store' && e.to==='shared::api').telemetry.signals.rate.grafana='replacement explicit query';});
+ await root.getByRole('button',{name:'Explore Imported service',exact:true}).click();await expect(root.getByText('Loading detail diagram…',{exact:true})).toBeVisible();await page.evaluate(()=>window.loadReleases.shift()());await expect(scope.locator('.sec-h')).toHaveText('Selected imported detail');
+ await expect(scope.locator('[data-activity-carrier="shared::store->shared::api"]')).toHaveCount(0);
+ await trigger(scope,'shared::store->shared::api').focus();await trigger(scope,'shared::store->shared::api').press('Enter');await expect(production(root)).toHaveCount(0);await page.keyboard.press('Escape');
+ await deliver(page,{id:'shared::store->shared::api',rate:12,at:T+2*H});await open(scope,'shared::store->shared::api',root);await expect(production(root)).toContainText('rate: 12 req/h');await expect(scope.locator('[data-activity-carrier="shared::store->shared::api"][data-activity-kind="first-traffic"]')).toHaveCount(1);
+ expect(await page.evaluate(()=>[window.calls.live.length,window.calls.detail.length])).toEqual([1,2]);
 });
 test('slider changes open Production to the exact day without Activity or queries, Metrics off retains Over time selection',async({page,server})=>{
  const root=await setup(page,server);await metrics(root).click();const initial=await activity(root).allTextContents();await over(root).click();await day(root,0);await open(root,'ingest->app');await expect(production(root)).toContainText('rate: 0 req/h');

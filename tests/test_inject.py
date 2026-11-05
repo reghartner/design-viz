@@ -426,6 +426,11 @@ class InjectTests(unittest.TestCase):
             self.assertEqual(declaration["mcp"]["servers"], [jira, {"server": "Grafana", "tools": [{"grafana": "query_prometheus", "loki": "query_loki_logs", "sql": "query_sql"}[source]]}], source)
             for needle in ("Grafana", "optional tools", "once/hour"):
                 self.assertIn(needle, guide, needle)
+        cw = {"namespace": "AWS/IoT", "metric": "TopicMatch", "dimensions": {"RuleName": "camera_message_camera_stats"}, "statistic": "Sum", "region": "us-east-1", "accountId": "$account"}
+        declaration, _ = guide_for(node_telemetry={"kind": "service", "signals": {"count": {"cloudwatch": cw}}})
+        self.assertEqual(declaration["mcp"]["servers"], [jira, {"server": "Grafana", "tools": ["query_cloudwatch"]}])
+        declaration, _ = guide_for(page_extra={"tracking": {"telemetry": {"grafana": {"cloudwatch": "unused"}}}})
+        self.assertNotIn("query_cloudwatch", json.dumps(declaration))
         # a template signal on the page counts too, even before a carrier uses it
         templated = {"tracking": {"jira": {"site": "https://jira.test"}, "telemetry": {"templates": {"t": {"kind": "service", "signals": {"r": {"grafana": "up"}}}}}}}
         self.assertEqual(guide_for(page_extra=templated)[0]["mcp"]["servers"], [jira, grafana])
@@ -509,6 +514,8 @@ class InjectTests(unittest.TestCase):
             return json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S)[1])
 
         signal = {"kind": "service", "signals": {"rate": {"grafana": "sum(rate(http_requests_total[5m]))"}}}
+        cw = {"kind": "service", "signals": {"count": {"cloudwatch": {"namespace": "AWS/IoT", "metric": "TopicMatch", "dimensions": {}, "statistic": "Sum", "region": "us-east-1", "accountId": "$account"}}}}
+        self.assertEqual(declaration(consumer(), provider(api=cw))["mcp"]["servers"], [{"server": "Grafana", "tools": ["query_cloudwatch"]}])
         # an imported node whose provider binding runs a grafana signal, no local telemetry
         self.assertEqual(declaration(consumer(), provider(api=signal)), {"mcp": {"servers": [grafana]}, "comments": comments})
         # Honeycomb uses the same selected-import walk and declares only its

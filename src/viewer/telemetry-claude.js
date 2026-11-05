@@ -6,7 +6,7 @@
 
    createTelemetryGrafana(page, win, now) → null | {options, attach(ctl, page)}
      null unless win.claude.use exists and a carrier of the page (local or
-     imported) binds a grafana, loki or sql signal. options is the renderPage
+     imported) binds a grafana, loki, sql or cloudwatch signal. options is the renderPage
      telemetry option {provider, source: 'Grafana', available: false}. attach(ctl, page) hands the
      adapter each render's controller (the Allow action, map retraction) and
      page (datasource UIDs and window from tracking.telemetry); it returns
@@ -25,6 +25,7 @@
      get_annotations {type: 'annotation', limit: 100}     optional, once, first and alone
      query_prometheus range call                          one per grafana signal
      query_loki_logs metric range call                    one per loki signal
+     query_cloudwatch full-window Sum                    one per cloudwatch signal
      query_sql {datasourceUid, query}                     per sql signal, at most hourly
      generate_deeplink explore link                       optional, once per carrier per page load,
                                                           unless the carrier authors links.query
@@ -45,8 +46,8 @@
    until Metrics is turned on again; approval offers one "Allow Grafana"
    call through ctl.liveStatus.action. user_changed retires the adapter. */
 var TELEMETRY_GRAFANA_TOOLS=['query_prometheus','query_loki_logs','search_tempo_traces','get_annotations','generate_deeplink'];
-var TELEMETRY_GRAFANA_RUN=['grafana','loki','sql'];
-var TELEMETRY_GRAFANA_DATASOURCE={grafana:['prometheus','Prometheus'],loki:['loki','Loki'],sql:['sql','SQL']};
+var TELEMETRY_GRAFANA_RUN=['grafana','loki','sql','cloudwatch'];
+var TELEMETRY_GRAFANA_DATASOURCE={grafana:['prometheus','Prometheus'],loki:['loki','Loki'],sql:['sql','SQL'],cloudwatch:['cloudwatch','CloudWatch']};
 var TELEMETRY_GRAFANA_SQL_MS=3600000,TELEMETRY_GRAFANA_POINTS=240,TELEMETRY_GRAFANA_PARALLEL=4;
 var TELEMETRY_GRAFANA_ADD='Add a Grafana connector in claude.ai Settings → Connectors to see live metrics.';
 var TELEMETRY_GRAFANA_ALLOW='Allow Grafana';
@@ -108,6 +109,16 @@ function telemetryGrafanaLoki(payload){
     return single?[single]:[];
   }));
 }
+/* query_cloudwatch returns a full-window Sum. Empty values/timestamps are
+   unobserved even when statistics.sum is 0 or the response contains hints. */
+function telemetryGrafanaCloudwatch(payload){
+  if(!payload || !Array.isArray(payload.values) || !Array.isArray(payload.timestamps) || !payload.values.length || payload.values.length!==payload.timestamps.length)return null;
+  var values=payload.values.map(telemetryGrafanaNumber),times=payload.timestamps.map(telemetryGrafanaNumber);
+  if(values.some(function(v){return v===null;}) || times.some(function(t){return t===null || !isFinite(new Date(t).getTime());}))return null;
+  var sum=telemetryGrafanaNumber(payload.statistics && payload.statistics.sum);
+  if(sum===null){if(values.length!==1)return null;sum=values[0];}
+  return {value:sum,observedAt:new Date(Math.max.apply(null,times)).toISOString()};
+}
 /* get_annotations: {Payload: [{time, text, tags}]} or a bare array. Kept when
    from <= time <= to, ascending; kind is deploy, else incident, else the first tag. */
 function telemetryGrafanaMarkers(payload,from,to){
@@ -142,7 +153,7 @@ function telemetryGrafanaJobs(bindings){
     var signals=[];
     Object.keys(binding.signals).forEach(function(name){
       var signal=binding.signals[name];
-      if(signal && TELEMETRY_GRAFANA_RUN.indexOf(signal.source)>=0 && typeof signal.query==='string')
+      if(signal && TELEMETRY_GRAFANA_RUN.indexOf(signal.source)>=0 && (signal.source==='cloudwatch'?telemetryCloudwatchQuery(signal.query):typeof signal.query==='string'))
         signals.push({name:name,source:signal.source,query:signal.query,unit:typeof signal.unit==='string' && signal.unit?signal.unit:null});
     });
     if(signals.length)jobs.push({id:binding.id,signals:signals,binding:binding,links:binding.links && typeof binding.links==='object'?binding.links:{}});
@@ -208,7 +219,7 @@ function createTelemetryGrafana(page,win,now,bound){
   function needed(){
     var bindings=ctl && ctl.telemetry && typeof ctl.telemetry.bindings==='function'?ctl.telemetry.bindings():null;
     if(!bindings || !bindings.length)bindings=telemetryBindings(function(fn){sectionRecords(current).forEach(function(record){var d=record.section.diagram || {};Object.keys(d.nodes || {}).forEach(function(id){fn(d.nodes[id],id,current);});(d.edges || []).forEach(function(e){fn(e,e.from+'->'+e.to,current);});});});
-    var tools=[];telemetryGrafanaJobs(bindings).forEach(function(job){job.signals.forEach(function(s){var name={grafana:'query_prometheus',loki:'query_loki_logs',sql:'query_sql'}[s.source];if(tools.indexOf(name)<0)tools.push(name);});});return tools;
+    var tools=[];telemetryGrafanaJobs(bindings).forEach(function(job){job.signals.forEach(function(s){var name={grafana:'query_prometheus',loki:'query_loki_logs',sql:'query_sql',cloudwatch:'query_cloudwatch'}[s.source];if(tools.indexOf(name)<0)tools.push(name);});});return tools;
   }
   function connect(refresh){
     var epoch=generation;
@@ -274,7 +285,7 @@ function createTelemetryGrafana(page,win,now,bound){
     if(kind==='missing_tools')note=error.message;
     else if(kind==='needs_reauth')note='Reconnect Grafana in claude.ai Settings → Connectors';
     else if(['server_not_connected','selection_required','server_not_found'].indexOf(kind)>=0){note=TELEMETRY_GRAFANA_ADD;server=null;}
-    else if(['not_in_manifest','blocked_by_policy','self_only'].indexOf(kind)>=0)note='This page is not allowed to read Grafana for your account.';
+    else if(['not_in_manifest','blocked_by_policy','self_only'].indexOf(kind)>=0)note=repeat && repeat.tool==='query_cloudwatch'?'This page cannot call CloudWatch (query_cloudwatch) for your account.':'This page is not allowed to read Grafana for your account.';
     else if(['not_granted','capability_disabled','capability_removed'].indexOf(kind)>=0){note='Grafana is not available in this view.';namespace=null;server=null;}
     if(note){if(['server_not_connected','server_not_found','not_granted','capability_disabled','capability_removed'].indexOf(kind)>=0 && ctl && ctl.telemetry && typeof ctl.telemetry.setAvailable==='function')ctl.telemetry.setAvailable(false);blocked={signal:signal,error:telemetryGrafanaError(note)};retract(signal);return Promise.reject(blocked.error);}
     return Promise.reject(telemetryGrafanaError('Grafana did not answer'));
@@ -308,6 +319,18 @@ function createTelemetryGrafana(page,win,now,bound){
         jobs.forEach(function(job){job.signals.forEach(function(entry){
           var rank=order++,label=job.id+' '+entry.name,names=TELEMETRY_GRAFANA_DATASOURCE[entry.source],uid=config.grafana[names[0]];
           if(!uid){entry.failed=true;failed(rank,label,'no '+names[1]+' datasource UID in tracking.telemetry.grafana.'+names[0]);return;}
+          if(entry.source==='cloudwatch'){
+            var query=telemetrySubstitute(entry.query,{account:config.grafana.accountId || '$account'});
+            if(/\$(?:account\b|\{account\})/.test(query.accountId)){failed(rank,label,'set tracking.telemetry.grafana.accountId for $account');return;}
+            var input={datasourceUid:uid,namespace:query.namespace,metricName:query.metric,region:query.region,accountId:query.accountId,
+              dimensions:query.dimensions,statistic:query.statistic,period:Math.ceil(windowMs/1000),start:range.from,end:range.to};
+            tasks.push(function(){return call('query_cloudwatch',input).then(function(result){
+              var sample=telemetryGrafanaCloudwatch(result && result.payload);
+              if(!sample){failed(rank,label,'query_cloudwatch returned no observation; check account, region and dimensions');return;}
+              entry.value=sample.value;entry.observedAt=sample.observedAt;
+            },caught(rank,label,{tool:'query_cloudwatch',input:input},entry));});
+            return;
+          }
           if(entry.source==='sql'){
             if(offered.indexOf('query_sql')<0){entry.failed=true;failed(rank,label,'the Grafana connector does not offer query_sql');return;}
             var key=(config.environment || '')+'\n'+uid+'\n'+entry.query,cached=sql[key];
@@ -348,7 +371,10 @@ function createTelemetryGrafana(page,win,now,bound){
       if(signal && signal.aborted)return Promise.reject(telemetryGrafanaError('Grafana refresh cancelled'));
       if(fatal)return refuse(fatal.error,signal,fatal.repeat);
       var end=null,map={};
-      jobs.forEach(function(job){job.signals.forEach(function(entry){(entry.points || []).forEach(function(point){if(end===null || point[0]>end)end=point[0];});});});
+      jobs.forEach(function(job){job.signals.forEach(function(entry){
+        if(entry.observedAt){var at=Date.parse(entry.observedAt);if(end===null || at>end)end=at;}
+        (entry.points || []).forEach(function(point){if(end===null || point[0]>end)end=point[0];});
+      });});
       if(end===null)end=clock();
       var markers=annotations!==null?telemetryGrafanaMarkers(annotations,end-windowMs,end):lastMarkers;
       jobs.forEach(function(job){
@@ -356,7 +382,7 @@ function createTelemetryGrafana(page,win,now,bound){
         job.signals.forEach(function(entry){
           var sample=null,previous=last[job.id] && last[job.id].signals[entry.name];
           if(entry.points)sample={value:entry.points.length?entry.points[entry.points.length-1][1]:0,series:entry.points};
-          else if(typeof entry.value==='number')sample={value:entry.value};
+          else if(typeof entry.value==='number'){sample={value:entry.value};if(entry.observedAt)sample.observedAt=entry.observedAt;}
           else if(entry.failed && previous)sample=JSON.parse(JSON.stringify(previous));
           if(!sample)return;
           if(entry.unit)sample.unit=entry.unit;else delete sample.unit;
@@ -397,7 +423,7 @@ function createTelemetryGrafana(page,win,now,bound){
     return connect(true).then(function(mcp){
       var tasks=[];
       jobs.forEach(function(job){job.signals.forEach(function(entry){
-        if(entry.source!=='grafana' && entry.source!=='loki')return;
+        if(entry.source!=='grafana' && entry.source!=='loki'){if(entry.source==='cloudwatch')failures.push(job.id+' '+entry.name+': CloudWatch history unsupported; sample is unobserved');return;}
         var loki=entry.source==='loki',tool=loki?'query_loki_logs':'query_prometheus',names=TELEMETRY_GRAFANA_DATASOURCE[entry.source],uid=config.grafana[names[0]],label=job.id+' '+entry.name;
         if(!uid || offered.indexOf(tool)<0){failures.push(label+': historical datasource/tool unavailable');return;}
         // DST preserves local-day endpoints: only a discontinuity starts a new

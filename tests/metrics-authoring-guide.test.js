@@ -68,7 +68,7 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
     errors:{loki:'sum(count_over_time({route="$route"} |= "error" [5m]))',unit:'req/h'}},
     proof:{rate:{min:1,max:1000},errors:{max:0.1,maxRatioOf:'rate'}},
     links:{dashboard:'https://grafana.example/d/api',query:'https://grafana.example/explore?route=$route'}};
-  const authoredRoot={enabled:false,environment:'qa',environments:{qa:{grafana:{prometheus:'prom-qa'}},prd:{}},grafana:{baseUrl:'https://grafana.example',prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'sql-main'},
+  const authoredRoot={enabled:false,environment:'qa',environments:{qa:{grafana:{prometheus:'prom-qa'}},prd:{}},grafana:{baseUrl:'https://grafana.example',prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'sql-main',cloudwatch:'cw-main',accountId:'123456789012'},
     honeycomb:{environment:'prod',dataset:'api-prod'},window:'7d',refreshMs:300000,templates:{'http-call':template}};
   const rootWarnings=[],parsed=C.trackingTelemetry({tracking:{telemetry:authoredRoot}},(at,message)=>rootWarnings.push(at+': '+message));
   assert.deepEqual(rootWarnings,[]);
@@ -86,7 +86,8 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
     ['tempo','{ resource.service.name = "api" }'],
     ['sql','SELECT count(*) FROM requests'],
     ['honeycomb',{calculations:[{op:'COUNT'}]}],
-  ],kinds=['call','queue','service','log-event','device'],sides=['right','left','above','below','right'];
+    ['cloudwatch',{namespace:'AWS/IoT',metric:'TopicMatch',region:'us-east-1',accountId:'$account',dimensions:{RuleName:'camera_message_camera_stats'},statistic:'Sum'}],
+  ],kinds=['call','queue','service','log-event','device','service'],sides=['right','left','above','below','right','left'];
   variants.forEach(([source,query],index)=>{
     const rate={[source]:query,unit:'req/h'},warnings=[];
     const raw={kind:kinds[index],signals:{rate,errors:{grafana:'sum(rate(errors_total[5m]))',unit:'req/h'}},
@@ -106,7 +107,7 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
   assert.equal(used.proof.errors.maxRatioOf,'rate');assert.equal(used.links.query,'https://grafana.example/explore?route=v1-items');
   assert.deepEqual(plain(used.card),{side:'below',offset:7});
 
-  const exercised=new Set(['baseUrl','environments','enabled','grafana','honeycomb','window','refreshMs','templates','prometheus','loki','tempo','sql','environment','dataset',
+  const exercised=new Set(['cloudwatch','accountId','baseUrl','environments','enabled','grafana','honeycomb','window','refreshMs','templates','prometheus','loki','tempo','sql','environment','dataset',
     'kind','signals','proof','links','card','use','unit','min','max','maxRatioOf','dashboard','query','side','offset','params']);
   assert.deepEqual([...documentedFields(chapter)].sort(),[...exercised].sort(),'every field named in the chapter table has a parser-backed fixture');
 

@@ -47,6 +47,10 @@ class AuthoringPacketTests(unittest.TestCase):
         self.assertIn('Jira', text)
         self.assertIn('instrumentation', text)
         self.assertIn('queues', text)
+        for source in ('grafana', 'loki', 'tempo', 'sql', 'honeycomb', 'cloudwatch'):
+            self.assertIn('`' + source + '`', text)
+        self.assertIn('query_cloudwatch', text)
+        self.assertIn('grafana.accountId', text)
         self.assertIn('.claude/skills/live-status-board/metrics.md', [p['path'] for p in meta['provenance']])
         kit = json.loads(folder_agent_kit(ROOT, '// test runtime'))
         files = json.loads(gzip.decompress(base64.b64decode(kit['gzip'])))['files']

@@ -25,7 +25,7 @@ function telemetryProviderMerge(maps){
 function createTelemetryProviders(page,win){
   try{if(!trackingTelemetry(page || {}).enabled || !win || !win.claude || typeof win.claude.use!=='function')return null;}catch(e){return null;}
   var current=page,ctl=null,parts=[],retired=false,generation=0,ensuring=false,off=null,bindingKey=null;
-  var definitions=[{name:'Grafana',sources:['grafana','loki','sql'],create:createTelemetryGrafana},{name:'Honeycomb',sources:['honeycomb'],create:createTelemetryHoneycomb},{name:'Traces',sources:[],create:createTelemetryTraces}];
+  var definitions=[{name:'Grafana',sources:['grafana','loki','sql','cloudwatch'],create:createTelemetryGrafana},{name:'Honeycomb',sources:['honeycomb'],create:createTelemetryHoneycomb},{name:'Traces',sources:[],create:createTelemetryTraces}];
   function scoped(bindings,part){if(part.definition.name==='Traces')return bindings.filter(function(b){return telemetryTraceJobs([b]).length;});return bindings.map(function(binding){var signals={};Object.keys(binding.signals || {}).forEach(function(name){if(part.definition.sources.indexOf(binding.signals[name].source)>=0 && !telemetryTraceIntent(binding.signals[name]))signals[name]=binding.signals[name];});return Object.assign({},binding,{signals:signals});}).filter(function(binding){return Object.keys(binding.signals).length;});}
   function bindingIdentity(bindings){return JSON.stringify(bindings.map(function(b){return [b,ctl && ctl.telemetry.bindingGeneration?ctl.telemetry.bindingGeneration(b.id):0];}));}
   function availability(){if(ctl)ctl.telemetry.setAvailable(!retired && parts.some(function(p){return p.available;}),parts.map(function(p){return p.note;}).filter(Boolean).join('; '));}

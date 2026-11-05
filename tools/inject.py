@@ -183,8 +183,8 @@ GUIDE_LIMIT = 6 * 1024
 COMMENTS_CAPABILITY = {"composer_only": True, "customAnchors": True}
 JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]
 # Grafana connector qualification follows the query families bound on the page.
-GRAFANA_TOOLS = {"grafana": "query_prometheus", "loki": "query_loki_logs", "sql": "query_sql"}
-GRAFANA_SOURCES = ("grafana", "loki", "sql")
+GRAFANA_TOOLS = {"grafana": "query_prometheus", "loki": "query_loki_logs", "sql": "query_sql", "cloudwatch": "query_cloudwatch"}
+GRAFANA_SOURCES = ("grafana", "loki", "sql", "cloudwatch")
 HONEYCOMB_TOOLS = ["run_query"]
 
 
@@ -195,7 +195,7 @@ def _telemetry_sources(telemetry: dict) -> set[str]:
     if isinstance(signals, dict):
         for signal in signals.values():
             if isinstance(signal, dict):
-                found.update(source for source in ("grafana", "loki", "tempo", "sql", "honeycomb") if source in signal)
+                found.update(source for source in ("grafana", "loki", "tempo", "sql", "honeycomb", "cloudwatch") if source in signal)
     templates = telemetry.get("templates")
     if isinstance(templates, dict):
         for template in templates.values():

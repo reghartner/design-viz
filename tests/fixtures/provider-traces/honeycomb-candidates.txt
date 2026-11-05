@@ -1,0 +1,58 @@
+Trace links (already scoped to this query's time range — use these as-is, do not add or edit timestamps):
+- `2b7ff9721a1417f0fcdc6d7c1f3ec39b`: https://ui.honeycomb.io/demo/environments/ms-demo/result/fC3cEe4bJro/trace?trace_id=2b7ff9721a1417f0fcdc6d7c1f3ec39b
+- `2bd4ba0e5c5c3cad6af90775bce2445b`: https://ui.honeycomb.io/demo/environments/ms-demo/result/fC3cEe4bJro/trace?trace_id=2bd4ba0e5c5c3cad6af90775bce2445b
+- `e3b0f7ca43c33f01f2d482ddd8e6abd4`: https://ui.honeycomb.io/demo/environments/ms-demo/result/fC3cEe4bJro/trace?trace_id=e3b0f7ca43c33f01f2d482ddd8e6abd4
+- `6f12619397f4eda739548456430b6baf`: https://ui.honeycomb.io/demo/environments/ms-demo/result/fC3cEe4bJro/trace?trace_id=6f12619397f4eda739548456430b6baf
+- `0cfc746f18558d978b2dc594aba660f5`: https://ui.honeycomb.io/demo/environments/ms-demo/result/fC3cEe4bJro/trace?trace_id=0cfc746f18558d978b2dc594aba660f5
+- `8413cd87a9f15b6bfe8e1acf5b3346d0`: https://ui.honeycomb.io/demo/environments/ms-demo/result/fC3cEe4bJro/trace?trace_id=8413cd87a9f15b6bfe8e1acf5b3346d0
+- `09a009b33a3a627bb5fb3d061286d3fa`: https://ui.honeycomb.io/demo/environments/ms-demo/result/fC3cEe4bJro/trace?trace_id=09a009b33a3a627bb5fb3d061286d3fa
+- `8913aa9a032ee41cedf8a9a080243f81`: https://ui.honeycomb.io/demo/environments/ms-demo/result/fC3cEe4bJro/trace?trace_id=8913aa9a032ee41cedf8a9a080243f81
+
+
+# Raw Rows
+
+| duration_ms | timestamp | trace.trace_id |
+| --- | --- | --- |
+| 4082.75 | 2026-10-12T04:30:55.304343336Z | 2b7ff9721a1417f0fcdc6d7c1f3ec39b |
+| 4020.79 | 2026-10-12T04:31:22.040885203Z | 2bd4ba0e5c5c3cad6af90775bce2445b |
+| 4087.42 | 2026-10-12T04:31:24.104243638Z | e3b0f7ca43c33f01f2d482ddd8e6abd4 |
+| 4054.93 | 2026-10-12T04:31:53.842495501Z | 6f12619397f4eda739548456430b6baf |
+| 4163.00 | 2026-10-12T04:32:24.68451001Z | 0cfc746f18558d978b2dc594aba660f5 |
+| 4446.34 | 2026-10-12T04:33:06.602552834Z | 8413cd87a9f15b6bfe8e1acf5b3346d0 |
+| 4002.19 | 2026-10-12T04:34:27.876835837Z | 09a009b33a3a627bb5fb3d061286d3fa |
+| 4245.26 | 2026-10-12T04:35:02.275976624Z | 8913aa9a032ee41cedf8a9a080243f81 |
+
+
+# Markers
+
+| Type | Scope | Message | StartTime | EndTime | Color | URL |
+| --- | --- | --- | --- | --- | --- | --- |
+| deploy | environment | Deploy 793f1375 | 2026-10-12T02:46:39Z | — | #ff9800 | https://github.com/honeycombio/microservices-demo/commit/5645075 |
+
+
+---
+Metadata:
+  elapsed_str: 454.408733ms
+  from: "2026-10-12T00:34:03Z"
+  next_cursor: MDowOnJMV1hudVhLVkJFOm9xOEx0WG9zTnhjOmZIdThZNjY1Q2ZVOjNicFRWSFpod1Rr
+  query_result_image: "https://ui.honeycomb.io/img/ffOfoq7JdLM52YhEMPc3mneafsSf3OkTePEIlu4G205H"
+  query_result_json: "[REDACTED SIGNED URL]"
+  query_run_pk: fC3cEe4bJro
+  query_url: "https://ui.honeycomb.io/demo/environments/ms-demo/datasets/checkout/result/fC3cEe4bJro"
+  rows_examined: 25763883
+  to: "2026-10-12T06:34:03Z"
+  total: 8
+---
+Dataset semantics:
+  kind: events (tracing)
+  row_unit: span
+  notes:
+    - Each row is a span — a unit of work or operation, per OpenTelemetry.
+    - COUNT aggregates spans (instrumentation points), not requests, users, or traffic volume.
+    - Span-count ratios are meaningful only when both sides filter to spans representing the same unit of work (e.g., same name, kind, or required attribute). An unfiltered COUNT denominator almost always mixes heterogeneous span types.
+    - For counting underlying work events, prefer SUM on a numeric count attribute on the span (e.g., app.*.success_count, app.*.batch_size) over COUNT of spans.
+    - For latency, use HEATMAP or P95/P99 over the duration_ms column rather than AVG.
+    - If a metrics dataset exposes the same signal directly (bytes, ops, errors), it is usually the better source for rate/ratio questions.
+
+[Resource link: Query results (raw JSON)] honeycomb://query-run/fC3cEe4bJro/json
+[Resource link: Query results (summary)] honeycomb://query-run/fC3cEe4bJro/summary

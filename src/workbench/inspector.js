@@ -560,6 +560,7 @@ function pageTrackingControls(val){
       if(bad){formError('Use owner/repo names separated by commas, or org:name.');return false;}
       return update(function(jira,page,tracking){if(parts.length)tracking.github=github;else delete tracking.github;});
     },{placeholder:'acme/firmware, acme/backend or org:acme'})));
+    var metricsSettings=metricsSettingsControls();if(metricsSettings)box.appendChild(metricsSettings);
     return box;
   }
 
@@ -632,7 +633,41 @@ function trackingControls(val,overlay){
       var help=document.createElement('p');help.className='fnote';help.id=prefix+'-'+field[0]+'-help';help.textContent=field[3];
       input.setAttribute('aria-describedby',help.id);box.appendChild(frow(field[1],input));box.appendChild(help);
     });
+    if(session.target && (session.target.kind==='node' || session.target.kind==='edge') && !textBox){
+      var metrics=metricsControls();if(metrics)box.appendChild(metrics);
+    }
     return box;
+  }
+
+/* Metrics (#941): telemetry bindings on the selected carrier and the page
+   block. Desktop-only authoring; one accepted edit is one Undo step and an
+   edit that leaves the source unchanged records no history. */
+function metricsControlKit(){return {row:frow,text:textControl,select:selectControl,number:numberControl,checkbox:checkboxControl,action:actionButton};}
+function commitTelemetry(planFor){
+    if(disposed)return false;
+    var parsed=parseEditor();
+    if(parsed.error){formError(parsed.error);return false;}
+    var plan=planFor(parsed.text,parsed.raw);
+    if(plan.error){formError(plan.error);return false;}
+    if(plan.text===parsed.text){formError('');return true;}
+    return applyPlan(plan,{after:refreshFormSoon},parsed);
+  }
+function metricsControls(){
+    var snapshot=parseEditor();if(snapshot.error)return null;
+    var target=Object.assign({},session.target),state;
+    try{state=telemetryCarrierState(snapshot.raw,target,session.topologyContext());}catch(ex){state={error:ex.message};}
+    if(state.error)return null;
+    // Pin the connection's identity so a later commit cannot land on a different edge at the same index.
+    if(target.kind==='edge')target.key=state.id;
+    return createFlowMetricsEditor({document:document,state:state,controls:metricsControlKit(),listen:listen,commit:function(edit){
+      return commitTelemetry(function(text,raw){return planCarrierTelemetry(text,raw,target,edit,session.topologyContext());});
+    }});
+  }
+function metricsSettingsControls(){
+    var snapshot=parseEditor();if(snapshot.error)return null;
+    return createFlowMetricsSettings({document:document,state:telemetryPageState(snapshot.raw),controls:metricsControlKit(),listen:listen,commit:function(edit){
+      return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
+    }});
   }
 
 function nodeForm(val, ctx){

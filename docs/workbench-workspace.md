@@ -102,6 +102,8 @@ previous Contents state, page scale, diagram camera, active tool, and each toolâ
 open or closed state, including the Hide tools preference. Focus is
 separate from authored Standard/Explore Views: it changes no source, saved
 presentation, export or Undo history. Editing and Undo can continue while focused.
+Rendering a nested detail keeps Focus on that detail. If you author a new camera
+while focused, Render and Return to page use that new camera.
 Selecting another section or View, or opening another project, ends Focus.
 
 In Explore, use **Pan** (or hold Space), zoom, and **Fit** to navigate. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph.

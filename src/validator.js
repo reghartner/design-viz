@@ -604,6 +604,8 @@ function editHistoryTimestamp(value){
   if(+m[4]>23 || +m[5]>59 || +m[6]>59 || (m[7]!=null && (+m[7]>23 || +m[8]>59)))return false;
   return isFinite(Date.parse(value));
 }
+var EDIT_HISTORY_SUMMARY_MAX=200;
+function editHistorySummary(value){return typeof value==='string' && !!value.trim() && value.length<=EDIT_HISTORY_SUMMARY_MAX && !/[\r\n\u2028\u2029]/.test(value);}
 function editHistoryEntryProblem(entry){
   if(!specObject(entry))return 'must be an object';
   if(!editHistoryTimestamp(entry.at))return 'at: must be an ISO-8601 date-time such as 2026-10-30T16:23:15Z';
@@ -612,7 +614,15 @@ function editHistoryEntryProblem(entry){
     if(Object.prototype.hasOwnProperty.call(entry.by,'id') && typeof entry.by.id!=='string')return 'by.id: must be a string';
     if(Object.prototype.hasOwnProperty.call(entry.by,'name') && typeof entry.by.name!=='string')return 'by.name: must be a string';
   }
-  if(!Array.isArray(entry.changes) || !entry.changes.length)return 'changes: must be a non-empty array';
+  /* #974: an agent's change is logged with `source: "agent"` and a one-line `summary`
+     (each requires the other); its `changes` lists only ticket changes and may be empty. */
+  var summarized=Object.prototype.hasOwnProperty.call(entry,'summary');
+  if(Object.prototype.hasOwnProperty.call(entry,'source') && entry.source!=='agent')return 'source: must be "agent"';
+  if(entry.source==='agent' && !summarized)return 'summary: an agent entry needs a one-line summary';
+  if(summarized && entry.source!=='agent')return 'source: an entry with a summary must have "source": "agent"';
+  if(summarized && !editHistorySummary(entry.summary))return 'summary: must be one line of 1–'+EDIT_HISTORY_SUMMARY_MAX+' characters';
+  if(summarized){if(!Array.isArray(entry.changes))return 'changes: must be an array (it may be empty when the entry has a summary)';}
+  else if(!Array.isArray(entry.changes) || !entry.changes.length)return 'changes: must be a non-empty array';
   for(var i=0;i<entry.changes.length;i++){
     var change=entry.changes[i],at='changes['+i+']';
     if(!specObject(change))return at+': must be an object';
@@ -667,6 +677,34 @@ function validate(page){
     warnings.push('tracking.dependencies['+index+']: '+(self?'a ticket cannot depend on itself':'use {"ticket": "UX-89", "on": "HW-124", "reason"?: "text"} with Jira keys')+' — entry ignored');
   });
   trackingDependencyLinks(page,function(index){warnings.push('tracking.jira.dependencyLinks'+(index===null?': must be an array of Jira link descriptions such as "is blocked by" — using the defaults':'['+index+']: use a non-empty link description — entry ignored'));});
+  // Telemetry bindings (#937): page config, then every carrier and consumer overlay
+  // with the page's templates. Warnings only; invalid entries are ignored.
+  var telemetry=trackingTelemetry(page,function(path,message){warnings.push('tracking.telemetry'+path+': '+message);}),hasTelemetry=false;
+  sectionRecords(page).forEach(function(record){
+    var d=record.section && record.section.diagram,DP=record.path+'.diagram';
+    if(!specObject(d))return;
+    function bound(carrier,at){
+      if(!specObject(carrier) || !Object.prototype.hasOwnProperty.call(carrier,'telemetry'))return;
+      hasTelemetry=true;
+      carrierTelemetry(carrier,telemetry.templates,function(path,message){warnings.push(at+'.telemetry'+path+': '+message);});
+    }
+    if(specObject(d.nodes))Object.keys(d.nodes).forEach(function(id){bound(d.nodes[id],DP+'.nodes.'+id);});
+    (Array.isArray(d.edges)?d.edges:[]).forEach(function(e,i){bound(e,DP+'.edges['+i+']');});
+    // Provider bindings the resolver dropped because the provider's own templates
+    // could not expand them; the carrier is unbound and the provider path is named.
+    if(typeof FlowTopology!=='undefined' && FlowTopology.telemetryDrops)FlowTopology.telemetryDrops(d).forEach(function(drop){
+      var at=DP+'.nodes.'+drop.id;
+      if(drop.kind==='edges')(Array.isArray(d.edges)?d.edges:[]).some(function(e,i){if(e && e.from+'->'+e.to===drop.id){at=DP+'.edges['+i+']';return true;}return false;});
+      warnings.push(at+'.telemetry: provider "'+drop.spec+'" '+drop.path+': '+drop.message);
+    });
+    // A resolved snapshot already carries overlay bindings on its imported carriers.
+    if(!d.topologyProvenance)(Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp,i){
+      if(!specObject(imp))return;
+      ['nodeTracking','edgeTracking'].forEach(function(field){
+        if(specObject(imp[field]))Object.keys(imp[field]).forEach(function(key){bound(imp[field][key],DP+'.topologyImports['+i+'].'+field+'.'+key);});
+      });
+    });
+  });
   editHistoryEntries(page,function(message){warnings.push(message);});
   var statusPanels=[],hasTracking=Object.prototype.hasOwnProperty.call(page,'tracking'),hasTickets=false;
   sectionRecords(page).forEach(function(record){var d=record.section.diagram || {};
@@ -679,8 +717,8 @@ function validate(page){
     });
     (d.panels || []).forEach(function(panel,index){if(panel && panel.type==='live-status')statusPanels.push(record.reference+'.diagram.panels['+index+']');});
   });
-  if((hasTracking || hasTickets) && !statusPanels.length)warnings.push('page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup');
-  if(!hasTracking && !hasTickets)statusPanels.forEach(function(path){warnings.push(path+': this page has no ticket references — the panel will be empty');});
+  if((hasTracking || hasTickets || hasTelemetry) && !statusPanels.length)warnings.push('page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup');
+  if(!hasTracking && !hasTickets && !hasTelemetry)statusPanels.forEach(function(path){warnings.push(path+': this page has no ticket references — the panel will be empty');});
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
   validateDocumentLinks(page.documentLinks,page.canon && page.canon.id,'page.documentLinks',errors);

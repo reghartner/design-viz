@@ -1,0 +1,64 @@
+ResultTool response# Results
+
+| error_rate_pct |
+| --- |
+| 5.00 |
+| 0 |
+| 5.00 |
+
+
+# Time Series
+
+```
+error_rate_pct [4.36 - 5.99]
+│                                                                                                                        
+│                                                                                                                       ·
+│                        ·                           ·                                                                   
+│                                                   · ·                                                                · 
+│                       · ·                                                  ·                                           
+│                             ··  ··                             ·      ··  ·                                   ··    ·  
+│  ·                ··          ··  ··  ··         ·   ·        ·         ·   ·          ····                  ·  ·      
+│ · ·     ··   ··  ·  ··   · ·        ··  ·             ·      ·  ·    ·   ·         ····    ·   ··   ··           · ·   
+│·       ·  ···  ··                        ·      ·                            ·   ··         · ·  ···  ··    ·     ·    
+│    ····                   ·               ······       ·    ·       ·           ·            ·          ····           
+│                                                         ·  ·     ···          ··                                       
+│                                                          ··                                                            
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ 2026-10-11T06:30Z                                  2026-10-11T18:30Z                                  2026-10-12T06:30Z
+```
+
+# Markers
+
+| Type | Scope | Message | StartTime | EndTime | Color | URL |
+| --- | --- | --- | --- | --- | --- | --- |
+| deploy | environment | Deploy 793f1375 | 2026-10-12T02:46:39Z | — | #ff9800 | https://github.com/honeycombio/microservices-demo/commit/5645075 |
+| deploy | environment | Deploy 2d6d6cb5 | 2026-10-11T22:03:39Z | — | #ff9800 | https://github.com/honeycombio/microservices-demo/commit/5645075 |
+| deploy | environment | Deploy ce47a2cf | 2026-10-11T17:17:39Z | — | #ff9800 | https://github.com/honeycombio/microservices-demo/commit/5645075 |
+| deploy | environment | Deploy 358f112e | 2026-10-11T12:34:29Z | — | #ff9800 | https://github.com/honeycombio/microservices-demo/commit/5645075 |
+| deploy | environment | Deploy 0d9367df | 2026-10-11T07:49:29Z | — | #ff9800 | https://github.com/honeycombio/microservices-demo/commit/5645075 |
+
+
+---
+Metadata:
+  elapsed_str: 636.823121ms
+  granularity: 1800
+  query_result_image: "https://ui.honeycomb.io/img/BtnEEVzxRnD57Te2eVjFfx5ekJeA9wVuYwdUzORArvNH"
+  query_result_json: "https://mcp.honeycomb.io/query_results/REDACTED_EXPIRED_TOKEN"
+  query_run_pk: huQeAkUAtg7
+  query_url: "https://ui.honeycomb.io/demo/environments/ms-demo/datasets/frontend/result/huQeAkUAtg7"
+  rows_examined: 37742970
+  total: 1
+---
+Dataset semantics:
+  kind: events (tracing)
+  row_unit: span
+  notes:
+    - Each row is a span — a unit of work or operation, per OpenTelemetry.
+    - COUNT aggregates spans (instrumentation points), not requests, users, or traffic volume.
+    - Span-count ratios are meaningful only when both sides filter to spans representing the same unit of work (e.g., same name, kind, or required attribute). An unfiltered COUNT denominator almost always mixes heterogeneous span types.
+    - For counting underlying work events, prefer SUM on a numeric count attribute on the span (e.g., app.*.success_count, app.*.batch_size) over COUNT of spans.
+    - For latency, use HEATMAP or P95/P99 over the duration_ms column rather than AVG.
+    - If a metrics dataset exposes the same signal directly (bytes, ops, errors), it is usually the better source for rate/ratio questions.
+
+[Resource link: Query results (raw JSON)] honeycomb://query-run/huQeAkUAtg7/json
+[Resource link: Query results (summary)] honeycomb://query-run/huQeAkUAtg7/summary

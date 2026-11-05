@@ -5,8 +5,8 @@
    else the first text block parsed as JSON, else that text).
 | row | rule | fixture | scoped assertion | broken implementation rejected |
 |---|---|---|---|---|
-| A1 | `viewer/telemetry-claude.js` ships in the standalone entrypoint only; the standalone boot builds the adapter with `createTelemetryGrafana(page, window)` when no `window.flowviewTelemetry` host provider is set. | Standalone/native/workbench/forge source records and boot source | Only A1 checks module existence, bundle placement and host-provider precedence | Missing adapter, adapter in another bundle, or unconditional boot provider |
-| A2 | `createTelemetryGrafana(page, win)` is null without `win.claude.use` (absent or throwing getter) and on pages without a grafana, loki or sql signal; otherwise `{options: {provider, source: 'Grafana'}, attach(ctl, page)}`. Imported carriers count. Creating it never calls `use()`. | Runtime gates, local grafana/loki/sql signals and imported edge binding; absence-tolerant loader | Named A2 gate, provider/source/attach shape and zero use() assertions | Ungated or eager adapter, ignored imported carriers |
+| A1 | `viewer/telemetry-claude.js` ships in the standalone entrypoint only; the standalone boot builds the adapter with `createTelemetryGrafana(page, window)` when no `window.flowviewTelemetry` host provider is set. | Bundle records plus production boot/rerender with real normalize, adapter and telemetry controller; rendering/navigation boundaries stubbed | Separate A1 cases check placement, initial attachment, host precedence, retirement, current normalized page/config and current-controller approval/retraction | Missing adapter, wrong provider, initial-only attachment, leaked handles, stale page/config or stale controller |
+| A2 | `createTelemetryGrafana(page, win)` is null without `win.claude.use` (absent or throwing getter) and on pages without a grafana, loki or sql signal; otherwise `{options: {provider, source: 'Grafana'}, attach(ctl, page)}`. Imported carriers count. Creating it never calls `use()`. | Runtime gates, local grafana/loki/sql signals, direct imported edge and separate nested imported node/edge bindings; absence-tolerant loader | Named A2 gate, provider/source/attach shape and zero use() assertions | Ungated or eager adapter, ignored imported carriers |
 | A3 | The connector is picked by offered tools: all of query_prometheus, query_loki_logs, search_tempo_traces, get_annotations, generate_deeplink. A connector missing one (query_prometheus) is not picked; Jira-only and GitHub-only connectors are not picked; "Grafana" wins a tie, else the first qualifying one. None → the add-connector note and no tool call. | Partial, Jira, GitHub and competing qualifying connectors; inert provider if absent | Named A3 calls select the expected connector and missing tools produce the add-connector note | Name-only selection, wrong tie-break or calls without a qualifying connector |
 | A4 | One refresh (default 24h window) makes exactly: get_annotations first and alone (no other call starts until it settles), one query_prometheus range call per grafana signal, one query_loki_logs metric range call per loki signal, generate_deeplink once per carrier without an authored query link; relative times now-24h..now, stepSeconds 360, the page's datasource UIDs, the provider's AbortSignal on every call. tempo and honeycomb signals are not queried. A later refresh repeats the queries but not the deeplinks. | One-shot deferred get_annotations, start/settle event log, then a second refresh | Exactly one pending call, no query starts before annotation settlement; exact inputs, budget, signals and cached links | Annotations launched concurrently with queries, early queries, extra calls or repeated deeplinks |
 | A5 | Day 10 recorded payloads map to the provider shape: every Prometheus and Loki series as ascending [ms, number] points (several series added point by point), value = the last point, the authored unit; a query with no data is value 0 with no points; observedAt = the newest point; markers = the window's annotations ascending as {at, kind, label}; links = authored dashboard/query plus the generated Explore link. Imported carriers map by their resolved id. | Pinned Day 10 payloads, local and resolved imported carriers, pure mapper inputs; empty map if absent | Named A5 carrier ids, mapped values/series/units, markers, timestamps and links | Wrong Loki field, missing markers, lost imported ids or incorrect series aggregation |
@@ -140,14 +140,139 @@ const PROM=(expr,extra={})=>({datasourceUid:'prom-main',expr,startTime:'now-24h'
 const LOKI=(logql,extra={})=>({datasourceUid:'loki-main',logql,startRfc3339:'now-24h',endRfc3339:'now',queryType:'range',stepSeconds:360,...extra});
 const DAY10_NOW=Date.parse('2026-10-30T00:00:00Z');
 
-test('A1 the adapter ships in the standalone entrypoint only and the boot builds it after the host provider',()=>{
+test('A1 the adapter ships in the standalone entrypoint only',()=>{
  const record=entrypoint('standalone').records.find(r=>r.file==='viewer/telemetry-claude.js');
  assert.ok(record,'A1 viewer/telemetry-claude.js is a standalone source (src/source-bundles.json)');
  assert.match(entrypoint('standalone').body,/function createTelemetryGrafana\(/);
  for(const name of ['native','workbench','forge'])assert.doesNotMatch(entrypoint(name).body,/function createTelemetryGrafana\(/,'A1 '+name+' has no claude.ai adapter');
- const boot=fs.readFileSync(path.join(ROOT,'src/boot.flowview.js'),'utf8');
- assert.match(boot,/window\.flowviewTelemetry[\s\S]{0,400}createTelemetryGrafana\(page, window\)/,'A1 the host provider wins; otherwise the boot builds the Grafana adapter');
- assert.match(boot,/\.attach\(ctl, page\)/,'A1 every render attaches the adapter to its controller');
+});
+
+/* Execute the unmodified standalone boot, including its editor render callback.
+   Only DOM rendering, the editor UI and unrelated navigation wires are boundaries:
+   normalization/validation, the Grafana adapter and ctl.telemetry are production code.
+   Attach/destroy wrappers record calls and delegate to the real adapter handles. */
+async function bootHarness({page=boardPage(),hostProvider,overrides}={}){
+ const ctx=context(),{C,doc}=ctx,net=await mockMcp({day:9},[GRAFANA_SERVER],overrides),host=claudeWin(net.mcp);
+ const renders=[],attachments=[],adapters=[],events=[];let editorRender;
+ const text=JSON.stringify(page),view={style:{},appendChild(){}};
+ doc.getElementById=id=>id==='docview'?view:id==='flowspec'?{textContent:text}:null;
+ doc.querySelector=selector=>selector==='meta[name="dv-spec-file"]'?{getAttribute:()=> 'flowspec.json'}:null;
+ doc.body={};
+ const win=Object.assign(host.win,{location:{hash:'',search:'',hostname:'localhost',href:'https://example.test/board.html'},
+  addEventListener(){},scrollTo(){},scrollX:0,scrollY:0,flowviewTelemetry:hostProvider});
+ Object.assign(C,{window:win,URLSearchParams,fetch:async()=>({ok:true,text:async()=>text}),
+  readWorkspaceHandoff:()=>null,verifyWorkspaceHandoff:async()=>{},applySkinClasses:()=>true,
+  wireDeepLinks:()=>null,initViewerExploreCanvas:()=>null,wirePresenter:()=>null,tourArtifactHost:()=>false,
+  initWorkbenchHumanGuide:undefined,wireArtifactComments:undefined,wireLiveStatusClaude:undefined,
+  wireTour:undefined,wireReaderShortcuts:undefined,
+  createBoardEditor(options){editorRender=options.render;return {};},
+  renderPage(view,page,skin,optionsBacklinks,options){
+   const id=renders.length,telemetry=C.createTelemetry(page,options.telemetry,{carriers:carriersOf(C,page)}),enabledCalls=[];
+   const setEnabled=telemetry.setEnabled;
+   telemetry.setEnabled=value=>{enabledCalls.push(value);return setEnabled(value);};
+   const ctl={page,telemetry,liveStatus:fakeLive(),enabledCalls,destroyed:false,
+    destroy(){events.push('controller-destroy:'+id);ctl.destroyed=true;telemetry.destroy();}};
+   renders.push({ctl,page,options});events.push('render:'+id);return ctl;
+  }});
+ const create=C.createTelemetryGrafana;
+ C.createTelemetryGrafana=(page,win)=>{
+  const adapter=create(page,win);adapters.push(adapter);
+  if(adapter){const attach=adapter.attach;adapter.attach=(ctl,page)=>{
+   const handle=attach(ctl,page),id=attachments.length,record={ctl,page,destroyed:false};
+   attachments.push(record);events.push('attach:'+id);
+   return {destroy(){events.push('adapter-destroy:'+id);record.destroyed=true;handle.destroy();}};
+  };}
+  return adapter;
+ };
+ vm.runInNewContext(fs.readFileSync(path.join(ROOT,'src/boot.flowview.js'),'utf8'),C);
+ await settled();
+ return {...ctx,net,host,renders,attachments,adapters,events,
+  rerender(raw){assert.equal(typeof editorRender,'function','the two-file boot created the editor render callback');return editorRender(JSON.stringify(raw));},
+  destroy(){renders.at(-1)?.ctl.telemetry.destroy();}};
+}
+
+test('A1 initial standalone boot attaches the selected adapter to its controller without connecting',async t=>{
+ const h=await bootHarness();t.after(()=>h.destroy());
+ assert.equal(h.renders.length,1,'boot rendered the page');
+ assert.equal(h.attachments.length,1,'initial controller is attached');
+ assert.equal(h.attachments[0].ctl,h.renders[0].ctl);
+ assert.equal(h.attachments[0].page,h.renders[0].page);
+ assert.equal(h.renders[0].options.telemetry,h.adapters[0].options,'renderPage receives the selected Grafana provider');
+ assert.equal(h.renders[0].ctl.telemetry.snapshot().available,true);
+ assert.equal(h.host.used(),0,'boot does not acquire MCP before Metrics is enabled');
+});
+
+test('A1 an explicit host provider wins on initial boot and re-render',async t=>{
+ const hostProvider={provider:async()=>({}),source:'Host'},h=await bootHarness({hostProvider});t.after(()=>h.destroy());
+ assert.equal(h.renders[0]?.options.telemetry,hostProvider,'initial render uses host provider');
+ assert.equal(h.rerender(boardPage('6h')),null);
+ assert.equal(h.renders[1]?.options.telemetry,hostProvider,'re-render uses host provider');
+ assert.equal(h.adapters.length,0,'boot never creates a Grafana adapter over the host');
+ assert.equal(h.attachments.length,0);
+});
+
+test('A1 re-render destroys the old adapter handle before retiring its controller and rendering again',async t=>{
+ const h=await bootHarness();t.after(()=>h.destroy());
+ assert.equal(h.rerender(boardPage('6h')),null);
+ assert.equal(h.attachments[0]?.destroyed,true,'previous adapter attachment is retired');
+ assert.equal(h.renders[0].ctl.liveStatus.listenerCount(),0,'the real handle unsubscribes from the retired controller');
+ assert.equal(h.renders[0].ctl.destroyed,true,'previous controller is retired');
+ assert.ok(h.events.indexOf('adapter-destroy:0')<h.events.indexOf('controller-destroy:0'),'attachment retires before the old controller');
+ assert.ok(h.events.indexOf('controller-destroy:0')<h.events.indexOf('render:1'),'old controller retires before the next render');
+});
+
+test('A1 re-render reuses the adapter and supplies the new controller and current normalized page',async t=>{
+ const h=await bootHarness();t.after(()=>h.destroy());
+ const edited={page:{...boardPage('6h'),title:'Edited board'}};
+ assert.equal(h.rerender(edited),null);
+ assert.equal(h.adapters.length,1,'the adapter outlives individual renders');
+ assert.equal(h.attachments.length,2,'the new render attaches too');
+ assert.equal(h.attachments[1].ctl,h.renders[1].ctl,'attachment follows the current controller');
+ assert.equal(h.attachments[1].page,h.renders[1].page,'attachment gets the same normalized page as rendering');
+ assert.notEqual(h.attachments[1].page,h.attachments[0].page,'the original page is replaced');
+ assert.deepEqual(plain(h.attachments[1].page),plain(h.C.normalize(edited)),'the edited source is normalized before attachment');
+});
+
+for(const [contract,expected] of [
+ ['Prometheus datasource','prom-edited'],['Loki datasource','loki-edited'],['window','now-6h'],['step',90]
+])test('A1 re-render queries use the current '+contract,async t=>{
+ const h=await bootHarness();t.after(()=>h.destroy());
+ const edited=boardPage('6h');edited.tracking.telemetry.grafana={prometheus:'prom-edited',loki:'loki-edited'};
+ assert.equal(h.rerender({page:edited}),null);
+ h.renders[1].ctl.telemetry.setEnabled(true);await settled();
+ const prom=h.net.calls.filter(c=>c.tool==='query_prometheus'),loki=h.net.calls.filter(c=>c.tool==='query_loki_logs');
+ assert.ok(prom.length && loki.length,'current controller issues both signal families');
+ if(contract==='Prometheus datasource')assert.deepEqual([...new Set(prom.map(c=>c.input.datasourceUid))],[expected]);
+ else if(contract==='Loki datasource')assert.deepEqual([...new Set(loki.map(c=>c.input.datasourceUid))],[expected]);
+ else{
+  for(const call of prom)assert.equal(contract==='window'?call.input.startTime:call.input.stepSeconds,expected,'current Prometheus '+contract);
+  for(const call of loki)assert.equal(contract==='window'?call.input.startRfc3339:call.input.stepSeconds,expected,'current Loki '+contract);
+ }
+});
+
+for(const contract of ['map retraction','approval action','Allow restart'])test('A1 after re-render '+contract+' follows the current controller',async t=>{
+ let needsApproval=true;
+ const h=await bootHarness({overrides:{get_annotations:()=>needsApproval?Promise.reject({code:'approval_required'}):null}});t.after(()=>h.destroy());
+ const previous=h.renders[0].ctl;
+ assert.equal(h.rerender(boardPage('6h')),null);
+ const current=h.renders[1].ctl;
+ current.telemetry.apply({ingest:{signals:{rate:{value:123}}}});
+ assert.equal(current.telemetry.snapshot().map.ingest.signals.rate.value,123,'there is a current map to retract');
+ current.telemetry.setEnabled(true);await settled();
+ if(contract==='map retraction'){
+  assert.deepEqual(plain(current.telemetry.snapshot().map),{},'refusal clears the current controller map');
+ }else if(contract==='approval action'){
+  assert.equal(current.liveStatus.label(),'Allow Grafana','approval action belongs to the current controller');
+  assert.equal(previous.liveStatus.label(),'','retired controller receives no action');
+ }else{
+  needsApproval=false;current.liveStatus.run();await settled();
+  assert.equal(h.net.calls.filter(c=>c.tool==='get_annotations').length,3,'failed call, one Allow retry, then restarted refresh');
+  assert.deepEqual(current.enabledCalls,[true,false,true],'Allow restarts current Metrics');
+  assert.deepEqual(previous.enabledCalls,[],'Allow does not restart retired Metrics');
+  assert.equal(current.liveStatus.label(),'','successful Allow clears the current action');
+  assert.equal(current.telemetry.status().state,'ok');
+  assert.ok(current.telemetry.snapshot().map.ingest,'restarted current controller receives fresh data');
+ }
 });
 
 test('A2 the adapter needs the claude.ai runtime and a grafana, loki or sql signal, local or imported; creating it never calls use()',async()=>{
@@ -172,6 +297,40 @@ test('A2 the adapter needs the claude.ai runtime and a grafana, loki or sql sign
  assert.ok(C.createTelemetryGrafana(imported,win),'A2 an imported carrier binding counts');
  assert.equal(used,0,'A2 creating the adapter never calls claude.use()');
 });
+
+/* Only the chosen nested carrier is bound. A sibling/local binding must not
+   accidentally open the gate for an adapter that drops nested imported signals. */
+function nestedCarrierPage(C,kind){
+ const spec=(id,diagram,extra={})=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},...extra,sections:[{id:'main',diagram}]}});
+ const provider=spec('provider',{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],
+  edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+ const binding=kind==='node'?{nodeTracking:{api:{telemetry:{kind:'service',signals:{rate:{loki:Q.consumed,unit:'req/h'}}}}}}:
+  {edgeTracking:{'api->store':{telemetry:{kind:'call',signals:{rate:{grafana:Q.press,unit:'press/h'}}}}}};
+ const middle=spec('middle',{nodes:{},rows:[],topologyImports:[{spec:'provider',export:'core',as:'shared',...binding}],
+  topologyExports:{nested:{nodes:['shared::api','shared::store'],edges:['shared::api->shared::store']}}});
+ const consumer=spec('consumer',{nodes:{local:{title:'Local'}},rows:[['local']],topologyImports:[{spec:'middle',export:'nested',as:'outer'}]},
+  {tracking:{telemetry:{grafana:{prometheus:'prom-main',loki:'loki-main'}}}});
+ return C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,middle,consumer]});
+}
+for(const kind of ['node','edge']){
+ test('A2 a nested imported '+kind+' signal alone enables the adapter without acquiring MCP',()=>{
+  const {C}=context(),page=C.normalize(nestedCarrierPage(C,kind)),host=claudeWin(null);
+  const adapter=C.createTelemetryGrafana(page,host.win);
+  assert.ok(adapter,'the only runnable signal is on the nested imported '+kind);
+  assert.equal(typeof adapter.options.provider,'function');assert.equal(adapter.options.source,'Grafana');
+  assert.equal(host.used(),0,'adapter discovery is lazy for nested imports too');
+ });
+ test('A5 a nested imported '+kind+' is queried and mapped under its full resolved identity',async()=>{
+  const {C}=context(),s=await setup({page:nestedCarrierPage(C,kind)}),{map,notes}=await s.refresh();
+  const node=kind==='node',id=node?'outer::shared::api':'outer::shared::api->outer::shared::store';
+  assert.deepEqual(Object.keys(map),[id],'only the nested bound carrier is mapped, without flattening its identity');
+  const tool=node?'query_loki_logs':'query_prometheus',input=node?LOKI(Q.consumed):PROM(Q.press);
+  assert.deepEqual(s.net.calls.filter(c=>c.tool==='query_prometheus' || c.tool==='query_loki_logs').map(c=>[c.tool,c.input]),[[tool,input]],'exactly the nested signal query uses the consumer datasource');
+  const payload=record(s.net.handleMcp,{day:9},tool,input),series=(node?lokiPoints:promPoints)(payload);
+  assert.deepEqual(map[id].signals.rate,{value:series.at(-1)[1],series,unit:node?'req/h':'press/h'},'recorded points, latest value and unit reach the nested carrier');
+  assert.deepEqual(notes.filter(Boolean),[]);
+ });
+}
 
 test('A3 the Grafana connector is picked by its offered tools; a connector missing query_prometheus is not picked',async()=>{
  const missing={server:'Partial',tools:TOOLS.filter(t=>t!=='query_prometheus').map(name=>({name}))};
@@ -401,7 +560,7 @@ function fakeLive(){
  const listeners=[];let label='',fn=null;
  return {action(l,f){label=typeof l==='string'?l:'';fn=label && typeof f==='function'?f:null;listeners.slice().forEach(x=>x());},
   snapshot(){return {actionLabel:fn?label:''};},onChange(f){listeners.push(f);return ()=>{const i=listeners.indexOf(f);if(i>=0)listeners.splice(i,1);};},
-  onDestroy(){return ()=>{};},run(){if(fn)fn();},label:()=>fn?label:''};
+  onDestroy(){return ()=>{};},run(){if(fn)fn();},label:()=>fn?label:'',listenerCount:()=>listeners.length};
 }
 
 test('A10 sql signals call query_sql at most hourly and reuse the value; without query_sql there is no call',async()=>{

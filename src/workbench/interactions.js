@@ -50,6 +50,12 @@ function createBuilderInteractions(opts){
       session.target=target;rehighlight();renderInspector();
     }});
   life.own(function(){inlineEditor.destroy();});
+  /* Rename opens the connection label editor over its label, or from the arrow
+     when it has no label yet. */
+  function renameEdge(target){
+    var path=findTargetEl({kind:'edge',section:target.section,index:target.index}),svg=path && path.ownerSVGElement;
+    if(svg)inlineEditor.open(svg.querySelector('text.lbl[data-dv-edge="'+target.index+'"]') || path,true);
+  }
   function selectionChanged(){if(opts.workspace && opts.workspace.selectionChanged)opts.workspace.selectionChanged();if(opts.selectionChanged)opts.selectionChanged();if(spatial)spatial.sync();}
   function setSelected(el){
     if (selectedEl) selectedEl.classList.remove('dv-sel');
@@ -440,6 +446,8 @@ function createBuilderInteractions(opts){
       var renameCheck=planTopologyNodeOverride(ref.s.text,ref.s.raw,ref.section,ref.target.id,{},context);
       item('Rename',function(){selectSpatial([ref.target]);inlineEditor.open(findTargetEl(ref.target));},renameCheck.error);
     }
+    if(ref.target.kind==='edge')item('Rename',function(){renameEdge(ref.target);});
+    if(ref.target.kind==='group')item('Rename',function(){},'Imported structure belongs to its provider.');
     var routingTarget=Object.assign({},ref.target,ref.target.kind==='edge'?{imported:true}:{});
     var clearPlan=planClearCustomEdges(ref.s.text,ref.s.raw,{targets:[routingTarget]},context);
     item('Clear Custom Edges',function(){applyPlan(clearPlan,null,ref.s);},clearPlan.error || (clearPlan.noop?'No authored custom edge geometry is in scope.':null));
@@ -522,7 +530,8 @@ function createBuilderInteractions(opts){
   var spatial=createBuilderSpatialSelection({document:document,window:window,view:view,src:src,session:session,isActive:opts.isActive,
     targetFromEvent:targetFromEvent,selection:function(){return multiSel.length?multiSel:session.target?[Object.assign({},session.target,{el:findTargetEl(session.target)})]:[];},
     select:selectSpatial,toggle:toggleMultiSelect,find:findTargetEl,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag || coinDrag || pathReorder && pathReorder.busy());},
-    inspect:function(){inspectSelection(false);},rename:function(t){inlineEditor.open(findTargetEl(t));},openAdd:opts.openAdd
+    inspect:function(){inspectSelection(false);},openAdd:opts.openAdd,renameEdge:renameEdge,
+    rename:function(t){var el=findTargetEl(t);if(el)inlineEditor.open(el);}
   });
   life.own(function(){spatial.destroy();});
 

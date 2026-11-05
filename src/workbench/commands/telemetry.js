@@ -6,8 +6,8 @@
    step. Imported carriers write the consumer overlay through
    planTopologyTracking('telemetry'), the same path as existsWhen. The
    Workbench never runs a query: nothing here contacts a connector. */
-var TELEMETRY_SOURCE_LABELS={grafana:'Grafana (PromQL)',loki:'Loki (LogQL)',tempo:'Tempo (TraceQL)',sql:'SQL',honeycomb:'Honeycomb'};
-var TELEMETRY_DATASOURCES={grafana:['prometheus','loki','tempo','sql','baseUrl'],honeycomb:['environment','dataset']};
+var TELEMETRY_SOURCE_LABELS={grafana:'Grafana (PromQL)',loki:'Loki (LogQL)',tempo:'Tempo (TraceQL)',sql:'SQL',honeycomb:'Honeycomb',cloudwatch:'CloudWatch (Sum)'};
+var TELEMETRY_DATASOURCES={grafana:['prometheus','loki','tempo','sql','cloudwatch','accountId','baseUrl'],honeycomb:['environment','dataset']};
 function telemetrySignalSource(entry){
   return telemetryObject(entry)?TELEMETRY_SOURCES.filter(function(key){return telemetryOwn(entry,key);})[0] || null:null;
 }
@@ -18,8 +18,9 @@ function telemetryQueryText(source,query){
 }
 function telemetryQueryValue(source,text){
   if(typeof text!=='string' || !text.trim())return {error:'A signal needs a query.'};
-  if(source!=='honeycomb')return {value:text.trim()};
+  if(source!=='honeycomb' && source!=='cloudwatch')return {value:text.trim()};
   var parsed=null;try{parsed=JSON.parse(text);}catch(ex){}
+  if(source==='cloudwatch')return telemetryCloudwatchQuery(parsed)?{value:parsed}:{error:'A CloudWatch query is a JSON object with namespace, metric, region, accountId, dimensions and statistic: Sum.'};
   if(!telemetryObject(parsed) || !Object.keys(parsed).length)return {error:'A Honeycomb query is a JSON object such as {"calculations":[{"op":"COUNT"}]}.'};
   return {value:parsed};
 }

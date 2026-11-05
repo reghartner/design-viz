@@ -143,8 +143,8 @@ function trackingExistsWhen(value){
 
    carrierTelemetry(obj, templates, invalid) returns null (unbound) or:
      {kind: 'call'|'queue'|'service'|'log-event'|'device',
-      signals: {<name>: {source: 'grafana'|'loki'|'tempo'|'sql'|'honeycomb',
-                         query: <string; a cloned query object for honeycomb>,
+      signals: {<name>: {source: 'grafana'|'loki'|'tempo'|'sql'|'honeycomb'|'cloudwatch',
+                         query: <string; a cloned query object for honeycomb/cloudwatch>,
                          unit: <string>|null}},
       proof: {<signal name>: {min?: number, max?: number, maxRatioOf?: <other signal name>}},
       links: {dashboard?: <absolute http(s) URL>, query?: <absolute http(s) URL>},
@@ -152,7 +152,7 @@ function trackingExistsWhen(value){
    With maxRatioOf, max is the highest allowed ratio of this signal to the named one.
 
    trackingTelemetry(page, invalid) always returns:
-     {grafana: {prometheus?, loki?, tempo?, sql?: <datasource UID>},
+     {grafana: {prometheus?, loki?, tempo?, cloudwatch?, accountId?, sql?: <datasource UID>},
       honeycomb: {environment?, dataset?},
       window: <duration such as '1h'; default '24h', the previous 24 hours>,
       refreshMs: <number of ms, at least 60000>|null,
@@ -160,7 +160,7 @@ function trackingExistsWhen(value){
    Templates keep their authored form so `use` can expand them by pure string
    substitution of the declared $param / ${param} placeholders. */
 var TELEMETRY_KINDS=['call','queue','service','log-event','device'];
-var TELEMETRY_SOURCES=['grafana','loki','tempo','sql','honeycomb'];
+var TELEMETRY_SOURCES=['grafana','loki','tempo','sql','honeycomb','cloudwatch'];
 var TELEMETRY_CARD_SIDES=['right','left','above','below'];
 var TELEMETRY_LINKS=['dashboard','query'];
 var TELEMETRY_BINDING_FIELDS=['kind','signals','proof','links','card'];
@@ -179,6 +179,11 @@ function telemetryWarn(invalid){return function(path,message){if(invalid)invalid
 function telemetryUnknown(value,allowed,warn,prefix){
   Object.keys(value).forEach(function(key){if(allowed.indexOf(key)<0)warn((prefix || '')+'.'+key,'unknown field — ignored');});
 }
+/* CloudWatch currently supports window totals only. Preserve dimension case. */
+function telemetryCloudwatchQuery(query){
+  return telemetryObject(query) && ['namespace','metric','region','accountId'].every(function(key){return telemetryText(query[key]);}) &&
+    query.statistic==='Sum' && telemetryObject(query.dimensions) && Object.keys(query.dimensions).every(function(key){return telemetryText(key) && telemetryText(query.dimensions[key]);});
+}
 /* One signal entry: exactly one source key plus an optional unit. Returns the
    cleaned authored entry ({<source>: query, unit?}) or null. */
 function telemetrySignal(name,value,warn){
@@ -188,7 +193,10 @@ function telemetrySignal(name,value,warn){
   var sources=TELEMETRY_SOURCES.filter(function(key){return telemetryOwn(value,key);});
   if(sources.length!==1){warn(at,'use exactly one of '+TELEMETRY_SOURCES.join(', ')+' — signal ignored');return null;}
   var source=sources[0],query=value[source];
-  if(source==='honeycomb'){
+  if(source==='cloudwatch'){
+    if(!telemetryCloudwatchQuery(query)){warn(at,'cloudwatch requires namespace, metric, region, accountId, string dimensions and statistic: Sum — signal ignored');return null;}
+    telemetryUnknown(query,['namespace','metric','region','accountId','dimensions','statistic'],warn,at+'.cloudwatch');
+  }else if(source==='honeycomb'){
     if(!telemetryObject(query) || !Object.keys(query).length){warn(at,'honeycomb must be a non-empty query object — signal ignored');return null;}
   }else if(!telemetryText(query)){warn(at,source+' must be a non-empty query string — signal ignored');return null;}
   var out={};out[source]=telemetryClone(query);
@@ -343,7 +351,7 @@ function trackingTelemetry(page,invalid){
   if(!telemetryObject(value)){warn('','must be an object {enabled?, grafana?, honeycomb?, window?, refreshMs?, templates?} — ignored');return out;}
   if(telemetryOwn(value,'enabled')){if(typeof value.enabled==='boolean')out.enabled=value.enabled;else warn('.enabled','must be a boolean — using true');}
   telemetryUnknown(value,['enabled','grafana','honeycomb','window','refreshMs','templates','environment','environments'],warn);
-  [['grafana',['prometheus','loki','tempo','sql','baseUrl'],'datasource UID'],['honeycomb',['environment','dataset'],'name']].forEach(function(group){
+  [['grafana',['prometheus','loki','tempo','sql','cloudwatch','accountId','baseUrl'],'datasource UID'],['honeycomb',['environment','dataset'],'name']].forEach(function(group){
     var key=group[0],given=value[key];
     if(!telemetryOwn(value,key))return;
     if(!telemetryObject(given)){warn('.'+key,'must be an object of '+group[1].join(', ')+' — ignored');return;}

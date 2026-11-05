@@ -278,7 +278,8 @@ has no Metrics controls, telemetry discovery, queries, timers, cards or cues.
 Malformed values warn and use the backward-compatible `true` default. This flag
 permits availability; it never turns Metrics on. Jira Live remains independent.
 
-`grafana` holds datasource UIDs for `prometheus`, `loki`, `tempo` and `sql`.
+`grafana` holds datasource UIDs for `prometheus`, `loki`, `tempo`, `sql` and
+`cloudwatch`, plus an optional CloudWatch `accountId` shared default.
 `honeycomb` holds `environment` and `dataset`. `window` is the observation
 window, a duration such as `30m`, `1h` or `7d`; the default is `24h`, the previous
 24 hours (Chuck, 2026-11-04). `refreshMs`
@@ -1425,7 +1426,7 @@ stays, and the header's connection line says nothing about GitHub.
 
 ### Production metrics from Grafana
 
-A board whose nodes or edges bind `grafana`, `loki` or `sql` signals (see
+A board whose nodes or edges bind `grafana`, `loki`, `sql` or `cloudwatch` signals (see
 [Telemetry bindings](#telemetry-bindings)) reads them through the viewer's Grafana
 connector when it is published as a claude.ai artifact (#943,
 `src/viewer/telemetry-claude.js`). An existing `window.flowviewTelemetry` host
@@ -1439,6 +1440,7 @@ capabilities: {mcp: {servers: [
 ]}, comments: {"composer_only": true, "customAnchors": true}}
 ```
 
+Add `"query_cloudwatch"` only for bound CloudWatch signals.
 Add `"query_sql"` to the Grafana tools only when the page has `sql` signals and the
 server enables that tool; it is off by default in
 [grafana/mcp-grafana](https://github.com/grafana/mcp-grafana), the real server,
@@ -1453,7 +1455,7 @@ provider binding; provider templates expand). A snapshot resolved before
 injection (`tools/page_build.py --resolve-imports`) carries those bindings itself.
 
 The adapter qualifies connectors by the bound signals: `query_prometheus` for
-`grafana`, `query_loki_logs` for `loki`, and `query_sql` for `sql`, preferring a
+`grafana`, `query_loki_logs` for `loki`, `query_sql` for `sql`, and `query_cloudwatch` for `cloudwatch`, preferring a
 qualifying connector named **Grafana**. Missing required query tools appear as a
 visible diagnostic. `generate_deeplink`, `get_annotations` and
 `search_tempo_traces` are optional; declare these extras only when offered and
@@ -1482,6 +1484,7 @@ calls:
 | `query_prometheus` | once per refresh for each `grafana` signal | `{datasourceUid, expr, startTime: "now-24h", endTime: "now", stepSeconds, queryType: "range"}` |
 | `query_loki_logs` | once per refresh for each `loki` signal | `{datasourceUid, logql, startRfc3339: "now-24h", endRfc3339: "now", queryType: "range", stepSeconds}` |
 | `query_sql` | at most once an hour for each `sql` signal; the value is reused in between | `{datasourceUid, query}` |
+| `query_cloudwatch` | once per refresh for each `cloudwatch` signal; [full-window Sum](#cloudwatch-signals) | `{datasourceUid, namespace, metricName, region, accountId, dimensions, statistic, period, start, end}` |
 | `generate_deeplink` | when offered, once per carrier per page load, unless the carrier authors `links.query` | `{resourceType: "explore", datasourceUid, queries: [{refId, expr}], timeRange: {from: "now-24h", to: "now"}}` |
 
 Authored `links.query` wins; otherwise a safe `exploreUrl` in the query reply
@@ -1496,17 +1499,18 @@ No datasource backend address is treated as the Grafana UI origin. Both `deploy`
 and `deployment` annotation tags produce deploy markers.
 
 `datasourceUid` is the viewed page's `tracking.telemetry.grafana.prometheus`,
-`.loki` or `.sql`, also for imported carriers. The window is
+`.loki`, `.sql` or `.cloudwatch`, also for imported carriers. The window is
 `tracking.telemetry.window` (default `24h`). Times are relative, so the server's
 clock decides "now". `stepSeconds` divides the window into about 240 points, at
 least 60 seconds. The Explore link covers the carrier's signals of the same source
 as its first `grafana` or `loki` signal. `tempo` signals (exemplar traces) and
 `honeycomb` signals are not run by this adapter.
 
-Each query's series become ascending `[epoch ms, number]` points. Several series
+PromQL and LogQL query series become ascending `[epoch ms, number]` points. Several series
 are added point by point, so write one aggregated series per signal. `NaN`
-samples are dropped. `value` is the last point. A query that matched nothing is
-`value: 0` with no points. `unit` is the authored one. A `sql` signal's value is
+samples are dropped. `value` is the last point. A PromQL or LogQL query that matched nothing is
+`value: 0` with no points. CloudWatch empty results stay unobserved; see
+[CloudWatch signals](#cloudwatch-signals). `unit` is the authored one. A `sql` signal's value is
 the first number of the first returned row. `observedAt` is the newest point of
 the refresh. Every carrier carries the window's annotations as markers `{at, kind,
 label}`: kind `deploy` when tagged deploy, else `incident`, else the first tag.
@@ -1763,7 +1767,7 @@ guide is derived from the spec: it states the renderer version from
 declaration to pass on every publish as a JSON block (the Jira connector entry
 only when the page has Jira/non-telemetry tracking—`tracking.telemetry` alone
 does not request it—the Grafana entry only when the enabled root has a carrier
-or page template binding a `grafana`, `loki` or `sql` signal,
+or page template binding a `grafana`, `loki`, `sql` or `cloudwatch` signal,
 selected direct/nested imports and consumer overlays from an embedded
 `flowview-topology` context included; connector display names are per account),
 the compact tracking rules, the page's own `tracking` values, links
@@ -2368,3 +2372,30 @@ never reconstructed into since-Done counts. A composing host/provider must retai
 each descriptor with its own signal and observation bounds, without borrowing a
 peer signal's value or timestamp. No account validation is implied by host/mock
 contract tests.
+
+### CloudWatch signals
+
+CloudWatch uses a structured `cloudwatch` signal alongside the other sources, on
+all local/imported nodes and edges. See the [CloudWatch authoring example](../.claude/skills/live-status-board/metrics.md#cloudwatch-window-totals).
+Required query fields are `namespace`, `metric`, `region`, `accountId`,
+`dimensions` (string values, preserving case), and `statistic: "Sum"`. Other
+statistics are rejected with a validation warning. The datasource UID is
+`tracking.telemetry.grafana.cloudwatch`. Shared or environment-profile
+`grafana.accountId` replaces `$account` / `${account}`; an explicit signal account
+remains literal. Existing `$env` substitution applies to nested dimension values.
+
+The artifact requests `query_cloudwatch` only for bound CloudWatch signals.
+Tool discovery diagnoses a missing query tool before any data call. Each refresh
+calls it once per bound signal with `{datasourceUid, namespace, metricName,
+region, accountId, dimensions, statistic, period, start, end}`. The page window
+supplies `start: "now-<window>"`, `end: "now"`, and full-window seconds as `period`.
+This yields a scalar Sum, read from `statistics.sum` or a sole numeric returned
+value; it is not a sparkline. Empty arrays or malformed responses clear previous
+CloudWatch evidence and remain unobserved; a real `[0]` remains measured zero.
+Transient tool errors retain the prior sample under the existing Grafana policy.
+CloudWatch history is unsupported and leaves gaps.
+
+Argument names match the [upstream CloudWatch tool](https://github.com/grafana/mcp-grafana/blob/main/tools/cloudwatch.go).
+User verification on 2026-11-05 reported that the us-east-1 monitoring datasource
+requires a linked account ID (staging `646998985045`); omitting it returned empty
+arrays with hints. Repository checks replay the response and make no live calls.

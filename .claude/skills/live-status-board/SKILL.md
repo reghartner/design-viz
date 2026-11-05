@@ -1,6 +1,6 @@
 ---
 name: live-status-board
-description: Author a Flowview live-status board (an "Epic Status board") with live Jira state (grey to do, blue in progress, green done, red blocked or missing) and, when explicitly requested, production metrics/proof. Load for live Jira, ticket tracking, metrics, traffic, Grafana, Honeycomb, Loki or proof on a diagram; plain Flowview authoring stays on hld-to-page.
+description: Author a Flowview live-status board (an "Epic Status board") with live Jira state (grey to do, blue in progress, green done, red blocked or missing) and, when explicitly requested, production metrics/proof. Load for live Jira, ticket tracking, metrics, traffic, Grafana, Honeycomb, Loki, CloudWatch or proof on a diagram; plain Flowview authoring stays on hld-to-page.
 ---
 
 # Live-status board
@@ -19,7 +19,7 @@ rendering, demo mode, publishing), the `tracking` paragraphs of
 
 ## Metrics requests (conditional)
 
-Only when the request mentions metrics, traffic, Grafana, Honeycomb, Loki or
+Only when the request mentions metrics, traffic, Grafana, Honeycomb, Loki, CloudWatch or
 proof, read [Metrics authoring](metrics.md). That chapter applies to every
 carrier: local nodes and edges, direct and nested imported carriers, consumer
 overlays, and carriers on the detail page the loader actually selects. A

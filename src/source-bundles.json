@@ -124,6 +124,7 @@
     "workbench/auto-arrange-core.js",
     "workbench/auto-arrange.js",
     "workbench/edge-curves.js",
+    "workbench/telemetry-card-layout.js",
     "workbench/shortcuts.js",
     "workbench/text-boxes.js",
     "workbench/inline-text.js",

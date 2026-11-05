@@ -350,3 +350,15 @@ test('T14 live-status docs document the telemetry fields and their examples pars
   assert.ok(queue.telemetry.signals.in.loki && queue.telemetry.signals.lag && queue.telemetry.signals.age,'the queue example has loki in, lag and age');
   assert.match(doc.slice(doc.indexOf('## Compatibility')),/flow\.telemetry/);
 });
+
+test('manual card coordinates validate atomically, preserve legacy placement, and never mutate input',()=>{
+  const {carrierTelemetry}=api();
+  for(const position of [{x:0,y:0},{x:-325.5,y:786.25}]){
+    const telemetry={...CALL(),card:{side:'above',offset:13,position}},before=JSON.stringify(telemetry),seen=recorder();
+    assert.deepEqual(plain(carrierTelemetry({telemetry},{},seen.fn).card),telemetry.card);assert.deepEqual(seen.paths,[]);assert.equal(JSON.stringify(telemetry),before);
+  }
+  for(const position of [{x:2},{x:'1',y:2},{x:Infinity,y:2},{x:2,y:NaN},null,[]]){
+    const seen=recorder(),telemetry={...CALL(),card:{side:'right',offset:15,position}};
+    assert.deepEqual(plain(carrierTelemetry({telemetry},{},seen.fn).card),{side:'right',offset:15});assert.ok(seen.paths.includes('.card.position'));
+  }
+});

@@ -789,7 +789,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var templates=trackingTelemetry(binding.page).templates;
       telemetryPaintCues(scope,d,templates,metricsView);
       var cardsView=metricsPreview && trackingTelemetry(binding.page).enabled?telemetryCardPreview(d,templates):metricsView;
-      telemetryPaintCards(scope,d,templates,cardsView,trackingTelemetry(page).window,authoring?null:function(card,path,edge,index){
+      telemetryPaintCards(scope,d,templates,cardsView,trackingTelemetry(page).window,function(card,path,edge,index){
+        if(authoring){
+          if(binding.ordinal!=null){card.setAttribute('data-metrics-section',binding.ordinal);card.setAttribute('tabindex','0');card.setAttribute('role','button');card.setAttribute('aria-label',(edge.label || edge.from+' to '+edge.to)+'. Drag metrics card to move. Arrow keys move 10 units; Shift moves 50.');}
+          return;
+        }
         var previous=path._livePointerTarget || path,c=previous._liveCarrier;
         carrierTarget(card,edge.from+'->'+edge.to,edge,c && c.state,binding.page.tracking,edge.label || edge.from+' → '+edge.to,c && c.waiting,c && c.availability,binding.ordinal!=null?{section:binding.ordinal,kind:'edge',index:index}:null);
         carrierPointer(path,card);carrierPointer(path.closest('svg').querySelector('path.halo[data-dv-edge="'+index+'"]'),card);

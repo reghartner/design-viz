@@ -210,3 +210,13 @@ test('crossing route coin reserves a bound card even when Live is off',async({pa
  await root.locator('.board').first().screenshot({path:test.info().outputPath('crossing.png')});
  const g=await geometry(root);expect(g.overlaps,'a crossing coin must move out of the card reservation').toEqual([]);expect(g.outside).toEqual([]);
 });
+
+test('manual card positions reserve frame and cue space and survive live text remeasurement',async({page,server})=>{
+ const {root}=await mountCues(page,server),spec=cueSpec();spec.page.sections[0].diagram.edges[0].telemetry.card={position:{x:840,y:420}};
+ await page.evaluate(({spec,samples})=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>samples}});},{spec,samples:CUE_SAMPLES});
+ await root.getByRole('button',{name:'Metrics',exact:true}).click();const card=root.locator('[data-metrics-card="ingest->app"]');await expect(card).toBeVisible();
+ const position=()=>card.evaluate(el=>{const m=el.transform.baseVal.consolidate().matrix;return {x:Math.round((m.e-Number(el.dataset.metricsAnchorX))*100)/100,y:Math.round((m.f-Number(el.dataset.metricsAnchorY))*100)/100};});
+ expect(await position()).toEqual({x:840,y:420});expect((await geometry(root)).outside).toEqual([]);expect((await geometry(root)).overlaps).toEqual([]);
+ await page.evaluate(()=>window.viewer.controller.telemetry.apply({'ingest->app':{signals:{rate:{value:9876543210},errors:{value:0}}}}));
+ expect(await position()).toEqual({x:840,y:420});expect((await geometry(root)).outside).toEqual([]);expect((await geometry(root)).overlaps).toEqual([]);
+});

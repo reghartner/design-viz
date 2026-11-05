@@ -186,8 +186,10 @@ function telemetryEditBinding(binding,edit,options){
       if(edit.value!=null && TELEMETRY_CARD_SIDES.indexOf(edit.value)<0)return {error:'Choose a side: '+TELEMETRY_CARD_SIDES.join(', ')+'.'};
     }else if(edit.field==='offset'){
       if(edit.value!=null && !(telemetryNumber(edit.value) && Math.abs(edit.value)<=TELEMETRY_CARD_OFFSET_MAX))return {error:'Use a number of pixels between -'+TELEMETRY_CARD_OFFSET_MAX+' and '+TELEMETRY_CARD_OFFSET_MAX+'.'};
+    }else if(edit.field==='position'){
+      if(edit.value!=null && !(telemetryObject(edit.value) && telemetryNumber(edit.value.x) && telemetryNumber(edit.value.y)))return {error:'Card position needs finite x and y coordinates.'};
     }else return {error:'Unknown card field.'};
-    if(edit.value==null)delete card[edit.field];else card[edit.field]=edit.value;
+    if(edit.value==null)delete card[edit.field];else card[edit.field]=edit.field==='position'?{x:edit.value.x,y:edit.value.y}:edit.value;
     b.card=card;telemetryDropEmpty(b,'card');
     return {value:b};
   }
@@ -350,7 +352,12 @@ function telemetryCarrierTarget(text,raw,target,context){
 }
 function planCarrierTelemetry(text,raw,target,edit,context){
   var t=telemetryCarrierTarget(text,raw,target,context);if(t.error)return t;
-  var result=telemetryEditBinding(t.binding,edit,{templates:telemetryPageTemplates(raw)});if(result.error)return result;
+  // A placement edit of inherited telemetry creates a consumer override from
+  // the resolver's expanded binding, never a reference to a provider template.
+  var binding=t.binding;
+  if(!binding && t.owner && edit && edit.op==='card')binding=telemetryObject(t.resolved.telemetry)?t.resolved.telemetry:null;
+  if(!t.binding && binding && edit.field==='position' && edit.value==null && !(binding.card && binding.card.position))return {text:text};
+  var result=telemetryEditBinding(binding,edit,{templates:telemetryPageTemplates(raw)});if(result.error)return result;
   // A non-object authored value is replaced or removed like any other binding.
   if(JSON.stringify(result.value)===JSON.stringify(t.binding) && !(t.hasField && !t.binding))return {text:text};
   if(t.owner)return planTopologyTracking(text,raw,target.section,target.kind,t.id,'telemetry',result.value,result.value==null,context,target.index);

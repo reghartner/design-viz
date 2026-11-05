@@ -148,7 +148,7 @@ function trackingExistsWhen(value){
                          unit: <string>|null}},
       proof: {<signal name>: {min?: number, max?: number, maxRatioOf?: <other signal name>}},
       links: {dashboard?: <absolute http(s) URL>, query?: <absolute http(s) URL>},
-      card: null | {side?: 'right'|'left'|'above'|'below', offset?: number}}
+      card: null | {side?: 'right'|'left'|'above'|'below', offset?: number, position?: {x:number,y:number}}}
    With maxRatioOf, max is the highest allowed ratio of this signal to the named one.
 
    trackingTelemetry(page, invalid) always returns:
@@ -258,14 +258,19 @@ function telemetryClean(raw,warn,template){
   }
   if(!template && telemetryOwn(raw,'card')){
     var card=raw.card,placed={};
-    if(!telemetryObject(card))warn('.card','must be an object {side?, offset?} — ignored');
+    if(!telemetryObject(card))warn('.card','must be an object {side?, offset?, position?} — ignored');
     else{
       if(telemetryOwn(card,'side')){if(TELEMETRY_CARD_SIDES.indexOf(card.side)>=0)placed.side=card.side;else warn('.card.side','use one of '+TELEMETRY_CARD_SIDES.join(', ')+' — ignored');}
       if(telemetryOwn(card,'offset')){
         if(telemetryNumber(card.offset) && Math.abs(card.offset)<=TELEMETRY_CARD_OFFSET_MAX)placed.offset=card.offset;
         else warn('.card.offset','must be a number of pixels between -'+TELEMETRY_CARD_OFFSET_MAX+' and '+TELEMETRY_CARD_OFFSET_MAX+' — ignored');
       }
-      telemetryUnknown(card,['side','offset'],warn,'.card');
+      if(telemetryOwn(card,'position')){
+        if(telemetryObject(card.position) && telemetryNumber(card.position.x) && telemetryNumber(card.position.y))placed.position={x:card.position.x,y:card.position.y};
+        else warn('.card.position','must contain finite x and y coordinates — ignored');
+        if(telemetryObject(card.position))telemetryUnknown(card.position,['x','y'],warn,'.card.position');
+      }
+      telemetryUnknown(card,['side','offset','position'],warn,'.card');
     }
     if(Object.keys(placed).length)out.card=placed;
   }

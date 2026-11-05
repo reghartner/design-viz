@@ -1020,7 +1020,17 @@ function fitLaneNodeTitle(node, title, width, subtitle, measurement){
     }
     target = text;
   }
-  if (fits(title, firstRight - x)) return remember();
+  if (fits(title, firstRight - x)){
+    /* Font ascenders/descenders need not match the default baseline gap.
+       Keep a real gap above the subtitle even when Fit enlarges the card;
+       screen-pixel overlap tolerances must not decide label placement. */
+    if (hasSub && typeof text.getBBox === 'function' && typeof sub.getBBox === 'function'){
+      var titleBox = text.getBBox(), subBox = sub.getBBox();
+      var rise = Math.min(Math.max(0,titleBox.y + titleBox.height + 2 - subBox.y),Math.max(0,titleBox.y - 2));
+      if (rise > 0) text.setAttribute('y',titleY - rise);
+    }
+    return remember();
+  }
   /* A title cut with … shows its full text on hover; lane and image cards
      already render one. */
   function exposeTitle(){

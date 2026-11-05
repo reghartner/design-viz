@@ -349,6 +349,7 @@ function createTelemetry(page,options,hooks){
   var status={state:available?'idle':'absent',busy:false,refreshedAt:null,note:''};
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function bindings(){return typeof hooks.carriers==='function'?telemetryBindings(hooks.carriers):[];}
+  var liveBindings=bindings();
   function emit(){if(retired || !listeners.length)return;var value=api.snapshot();listeners.slice().forEach(function(fn){fn(value);});}
   function notify(){
     if(retired)return;emit();
@@ -443,7 +444,23 @@ function createTelemetry(page,options,hooks){
       if(enabled){if(liveStatus)setStatus(liveStatus);if(poller)poller.resume();}liveStatus=null;notify();
     },
     bindings:function(){return copy(bindings());},
-    bindingsChanged:historyBindingsChanged,
+    bindingsChanged:function(){
+      var next=bindings(),prior=Object.create(null),current=Object.create(null);
+      liveBindings.forEach(function(b){prior[b.id]=b;});next.forEach(function(b){current[b.id]=b;});
+      Object.keys(liveMap).forEach(function(id){var sample=liveMap[id],old=prior[id],fresh=current[id];if(!old)return;
+        Object.keys(sample.signals).forEach(function(name){if(!fresh || JSON.stringify(old.signals[name])!==JSON.stringify(fresh.signals[name])){delete sample.signals[name];sample.links={};}});
+        if(!Object.keys(sample.signals).length)delete liveMap[id];
+      });liveBindings=next;historyBindingsChanged();notify();
+    },
+    // Automatic-provider facade: revoke only the named sources immediately,
+    // including cached history, without erasing a healthy peer on that carrier.
+    retractSources:function(sources){
+      if(retired)return;var owned=Object.create(null);bindings().forEach(function(b){owned[b.id]=Object.keys(b.signals).filter(function(n){return sources.indexOf(b.signals[n].source)>=0;});});
+      function strip(target){Object.keys(target || {}).forEach(function(id){var sample=target[id],changed=false;(owned[id] || []).forEach(function(name){if(telemetryOwn(sample.signals,name)){delete sample.signals[name];changed=true;}});if(changed){sample.links={};sample.markers=[];sample.observedAt=null;}if(!Object.keys(sample.signals).length)delete target[id];});}
+      strip(liveMap);strip(map);if(past)strip(past.map);historyCache.clear();notify();
+    },
+    // Explicit consent retry keeps healthy peer data while renewing the session.
+    retry:function(){if(retired || !enabled || !available)return;if(past)loadHistory();else if(poller){poller.stop();poller.start();}},
     apply:function(value){
       if(retired || !permitted || !available && (provider || demo || options.available===false))return;store(value);
       if(enabled && !past)setStatus({state:'ok',refreshedAt:new Date().toISOString(),note:''});

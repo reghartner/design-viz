@@ -1,0 +1,68 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import path from 'node:path';
+import {test,expect} from '../helpers/test.mjs';
+import {repo} from '../helpers/prepare.mjs';
+import {cueSpec,nestedSpec,importedDetailSpec,PANEL} from '../helpers/telemetry-cards.mjs';
+const RAW='https://mcp.honeycomb.io/query_results/SYNTHETIC_BROWSER_TEST_ONLY';
+const recorded=await readFile(path.join(repo,'tests/fixtures/honeycomb/recorded-query-response-redacted.txt'),'utf8');
+const metadata=recorded.replace('https://mcp.honeycomb.io/query_results/REDACTED_EXPIRED_TOKEN',RAW);
+const metrics=root=>root.getByRole('button',{name:'Metrics',exact:true});
+async function setup(page,server,audit,{disabled,missing=false,detail=false,nested=false,mode='ok'}={}){
+ let requests=0,release,redirectRequests=0;page.on('request',request=>{if(request.url()==='https://mcp.honeycomb.io/query_results/UNEXPECTED_REDIRECT')redirectRequests++;});
+ if(mode==='http-error'||mode==='redirect')audit.allowStatus(mode==='redirect'?302:403,url=>url===RAW || mode==='redirect'&&url==='https://mcp.honeycomb.io/query_results/UNEXPECTED_REDIRECT');
+ await audit.mockExternal(RAW,async route=>{requests++;if(mode==='http-error'||mode==='redirect'){await route.fulfill({status:mode==='redirect'?302:403,headers:{'access-control-allow-origin':'*',...(mode==='redirect'?{location:'https://mcp.honeycomb.io/query_results/UNEXPECTED_REDIRECT'}:{})},body:''});return;}if(mode==='held'){audit.allowAbort(route.request());await new Promise(r=>release=r);}if(mode==='failure'){await route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{}'});return;}await route.fulfill({contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify({results:[{data:{'P95(duration_ms)':12.3456789}}],series:[{data:{time:'2026-10-12T06:30:00Z','P95(duration_ms)':12.3456789}}],info:{granularity_seconds:1800}})});});
+ let spec=detail?{page:{title:'Real selected detail',sections:[{id:'main',diagram:{nodes:{parent:{title:'Imported service',detail:{spec:'approved-detail',revision:'r1',section:'selected'}}},rows:[['parent']],panels:[PANEL]}}]}}:nested?nestedSpec():cueSpec();
+ if(nested)spec.page.sections[0].diagram.edges[0].tickets=['NEST-1'];
+ function bind(value){if(!value||typeof value!=='object')return;if(value.telemetry?.signals){value.telemetry.signals.latency={honeycomb:{calculations:[{op:'P95',column:'duration_ms'}],filters:[{column:'service.name',op:'=',value:'EXPLICIT_FILTER'}]},unit:'ms'};}Object.values(value).forEach(bind);}
+ const detailSpec=importedDetailSpec();bind(spec);bind(detailSpec);
+ const keys=new Set();function tickets(v){if(!v||typeof v!=='object')return;(v.tickets||[]).forEach(k=>keys.add(k));Object.values(v).forEach(tickets);}tickets(spec);tickets(detailSpec);const jira=Object.fromEntries([...keys].map(k=>[k,{state:'done'}]));
+ spec.page.tracking={telemetry:{enabled:disabled!=='page',grafana:{prometheus:'real-uid'},honeycomb:{environment:'prod',dataset:'events'}}};
+ const specPath=path.join(server.root,'mixed.spec.json'),out=path.join(server.root,'mixed.html');await writeFile(specPath,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),specPath,path.join(repo,'template/flowview.html'),out],{stdio:'pipe'});
+ await page.addInitScript(({metadata,disabled,missing,RAW,detailSpec,jira})=>{
+  window.calls=[];window.rawOptions=[];window.rawAborts=0;window.metadataCalls=0;window.signedInChanged=false;
+  if(disabled==='host')window.flowviewTelemetry=false;
+  // A real host-provider boundary supplies independent synthetic Jira evidence.
+  // Without a ticket map, Over time deliberately has no UI to open.
+  window.jiraCalls=0;window.flowviewLiveStatus={provider:async()=>{window.jiraCalls++;return jira;}};
+  const nativeFetch=window.fetch.bind(window);window.fetch=(url,options)=>{if(url===RAW){window.rawOptions.push({credentials:options.credentials,referrerPolicy:options.referrerPolicy,redirect:options.redirect});options.signal.addEventListener('abort',()=>window.rawAborts++);}return nativeFetch(url,options);};
+  const schema={type:'object',properties:{environment_slug:{type:'string'},dataset_slug:{type:'string'},query_spec:{type:'string'}},required:['environment_slug','dataset_slug','query_spec']};
+  window.claude={use:async name=>name==='mcp'?{listTools:async()=>{window.metadataCalls++;return missing?[]:[{server:'Grafana',tools:['query_prometheus','query_loki_logs','search_tempo_traces','get_annotations','generate_deeplink']},{server:'Honeycomb',tools:[{name:'run_query',inputSchema:schema}]}];},callTool:async(server,tool,input,options)=>{
+   window.calls.push({server,tool,input});if(window.signedInChanged)throw {code:'user_changed'};
+   if(tool==='run_query')return {payload:metadata};
+   if(tool==='query_prometheus'){const t=input.startTime.startsWith('now')?Date.parse('2026-10-12T06:30:00Z'):Date.parse(input.startTime),end=input.endTime.startsWith('now')?t:Date.parse(input.endTime),values=[];for(let at=t;at<=end;at+=86400000)values.push([at/1000,'42']);return {payload:{data:[{values}]}};}
+   return {payload:[]};
+  }}:null};
+  window.flowviewBooted=ctl=>{window.ctl=ctl;ctl.liveStatus.setHistory({load:()=>({days:[0,1].map(i=>({key:'2026-10-'+(10+i),at:new Date(Date.parse('2026-10-11T06:30:00Z')+i*86400000).toISOString(),label:'Day '+i,states:Object.fromEntries(Object.keys(jira).map(k=>[k,{state:i===0?'active':'done'}]))})),index:1})});};
+  // Standalone exposes its production globals; the real detail loader is
+  // supplied at render boundary, then the user gesture selects the section.
+  window.detailFixture=detailSpec;
+ },{metadata:mode==='bad-url'?metadata.replace(RAW,'https://example.invalid/forbidden-result'):metadata,disabled,missing,RAW,detailSpec,jira});
+ if(detail){let html=await readFile(out,'utf8');html=html.replace('var ctl = renderPage(view, page, bootSkin, backlinkData, renderOptions);','renderOptions.loadDetail=async function(ref){window.loadedDetail=ref;return window.detailFixture;};\n  var ctl = renderPage(view, page, bootSkin, backlinkData, renderOptions);');await writeFile(out,html);}
+ await page.goto(server.origin+'/mixed.html');await page.waitForFunction(()=>!!window.ctl && Object.keys(window.ctl.liveStatus.snapshot().states).length>0);let root=page.locator('#docview');
+ if(detail){await root.getByRole('button',{name:'Explore Imported service',exact:true}).click();root=root.locator('[data-dv-detail-preview]:visible');await expect(root).toHaveCount(1);expect(await page.evaluate(()=>window.loadedDetail.section)).toBe('selected');}
+ return {root,requests:()=>requests,redirectRequests:()=>redirectRequests,release:()=>release?.()};
+}
+for(const shape of ['direct','nested','detail'])test('desktop mixed '+shape+': real fetch, Metrics and Over time retain independent evidence',async({page,server,audit})=>{
+ const h=await setup(page,server,audit,{nested:shape==='nested',detail:shape==='detail'}),root=h.root;
+ await expect(metrics(root)).toHaveAttribute('aria-pressed','false');expect(await page.evaluate(()=>window.calls.length)).toBe(0);await metrics(root).click();
+ const id=shape==='nested'?'outer::inner::a->outer::inner::b':'shared::api->shared::store';
+ await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(12.3456789);
+ expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id].signals.rate.value,id)).toBe(42);
+ expect(await page.evaluate(()=>{const map=window.ctl.telemetry.snapshot().map;return window.ctl.telemetry.bindings().filter(b=>b.signals.latency).every(b=>map[b.id]?.signals.latency?.value===12.3456789);})).toBe(true);
+ await expect(root.locator('[data-metrics-card="'+id+'"]')).toContainText('42');expect(h.requests()).toBeGreaterThan(0);
+ expect(await page.evaluate(()=>window.rawOptions.every(o=>o.credentials==='omit'&&o.redirect==='error'&&o.referrerPolicy==='no-referrer'))).toBe(true);
+ const before=await page.evaluate(()=>window.calls.filter(c=>c.tool==='run_query').length);
+ await root.getByRole('button',{name:'Over time',exact:true}).click();await expect(root.getByRole('slider',{name:'Day',exact:true})).toBeVisible();
+ await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);
+ expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency,id)).toBeUndefined();expect(await page.evaluate(()=>window.ctl.telemetry.status().note)).toContain('Honeycomb historical metrics unsupported');
+ const count=await page.evaluate(()=>window.calls.length);await root.getByRole('slider',{name:'Day',exact:true}).press('Home');expect(await page.evaluate(()=>window.calls.length)).toBe(count);expect(await page.evaluate(()=>window.calls.filter(c=>c.tool==='run_query').length)).toBe(before);
+ await root.getByRole('button',{name:'Live',exact:true}).click();await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(12.3456789);
+ await metrics(root).click();await expect(root.locator('.dv-metrics-card')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.liveStatus.enabled())).toBe(true);expect(await page.evaluate(()=>JSON.stringify(window.ctl.telemetry.snapshot()).includes('SYNTHETIC_BROWSER'))).toBe(false);
+});
+for(const disabled of ['page','host','missing'])test('desktop '+disabled+' hides Metrics and leaves Over time usable',async({page,server,audit})=>{const {root}=await setup(page,server,audit,{disabled,missing:disabled==='missing'});await expect(metrics(root)).toBeHidden();await root.getByRole('button',{name:'Over time',exact:true}).click();await expect(root.getByRole('slider',{name:'Day',exact:true})).toBeVisible();expect(await page.evaluate(()=>window.calls.length)).toBe(0);if(disabled!=='missing')expect(await page.evaluate(()=>window.metadataCalls)).toBe(0);});
+test('desktop completed-but-missing raw result keeps Grafana evidence',async({page,server,audit})=>{const {root}=await setup(page,server,audit,{mode:'failure'});await metrics(root).click();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);const s=await page.evaluate(()=>window.ctl.telemetry.snapshot());expect(s.map['shared::api'].signals.rate.value).toBe(42);expect(s.map['shared::api'].signals.latency).toBeUndefined();expect(s.status.note).toContain('missing or ambiguous');});
+test('desktop Metrics off aborts actual raw fetch and drops its late result',async({page,server,audit})=>{const h=await setup(page,server,audit,{mode:'held'});await metrics(h.root).click();await expect.poll(h.requests).toBeGreaterThan(0);await metrics(h.root).click();await expect.poll(()=>page.evaluate(()=>window.rawAborts)).toBeGreaterThan(0);h.release();await expect(h.root.locator('.dv-metrics-card')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().map)).toEqual({});});
+
+for(const mode of ['bad-url','redirect','http-error'])test('desktop raw transport '+mode+' is unobserved and preserves peer',async({page,server,audit})=>{const h=await setup(page,server,audit,{mode});await metrics(h.root).click();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);const s=await page.evaluate(()=>window.ctl.telemetry.snapshot());expect(s.map['shared::api'].signals.rate.value).toBe(42);expect(s.map['shared::api'].signals.latency).toBeUndefined();expect(s.status.note).toMatch(/raw-result URL|exact raw result unavailable/);expect(h.requests()).toBe(mode==='bad-url'?0:5);expect(h.redirectRequests()).toBe(0);expect(JSON.stringify(s)).not.toContain('SYNTHETIC_BROWSER');});
+test('desktop account change retires all mixed samples',async({page,server,audit})=>{const {root}=await setup(page,server,audit);await metrics(root).click();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.snapshot().map['shared::api']?.signals.latency?.value)).toBe(12.3456789);await metrics(root).click();await page.evaluate(()=>window.signedInChanged=true);await metrics(root).click();await expect(metrics(root)).toBeHidden();expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().map)).toEqual({});expect(await page.evaluate(()=>window.ctl.liveStatus.enabled())).toBe(true);});

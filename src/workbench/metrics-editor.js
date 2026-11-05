@@ -33,7 +33,7 @@ function flowMetricsDom(o){
       var entry=signals[name],source=telemetrySignalSource(entry),box=group(parent,'metrics-signal','Signal '+name);
       row(box,prefix+name+' name',c.text(name,function(v){return commit({op:'signal',name:name,field:'name',value:v});},{required:'A signal needs a name; use Remove signal to delete it.'}));
       row(box,prefix+name+' source',relabel(c.select(TELEMETRY_SOURCES,source || '',function(v){return commit({op:'signal',name:name,field:'source',value:v});}),TELEMETRY_SOURCE_LABELS));
-      row(box,prefix+name+' query',c.text(source?telemetryQueryText(source,entry[source]):'',function(v){return commit({op:'signal',name:name,field:'query',value:v});},{textarea:true,placeholder:source==='honeycomb'?'{"calc":"COUNT","where":"…"}':'Query text'}));
+      row(box,prefix+name+' query',c.text(source?telemetryQueryText(source,entry[source]):'',function(v){return commit({op:'signal',name:name,field:'query',value:v});},{textarea:true,placeholder:source==='honeycomb'?'{"calculations":[{"op":"COUNT"}],"filters":[]}':'Query text'}));
       row(box,prefix+name+' unit',c.text(telemetryObject(entry)?entry.unit:null,function(v){return commit({op:'signal',name:name,field:'unit',value:v});},{placeholder:'req/h, msgs, ms'}));
       proofEditors(box,binding.proof,names,name,prefix,commit);
       box.appendChild(c.action(prefix?'Remove '+prefix+'signal '+name:'Remove signal '+name,function(){return commit({op:'removeSignal',name:name});}));

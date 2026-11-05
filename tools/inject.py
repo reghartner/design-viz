@@ -184,6 +184,7 @@ JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "ge
 # #943: the claude.ai Grafana adapter picks the viewer's connector by these five tools.
 GRAFANA_TOOLS = ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]
 GRAFANA_SOURCES = ("grafana", "loki", "sql")
+HONEYCOMB_TOOLS = ["run_query"]
 
 
 def _telemetry_sources(telemetry: dict) -> set[str]:
@@ -336,9 +337,11 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
     telemetry_config = tracking.get("telemetry") if tracking and isinstance(tracking.get("telemetry"), dict) else {}
     root_disabled = telemetry_config.get("enabled") is False
     grafana = not root_disabled and any(source in GRAFANA_SOURCES for source in sources)
+    honeycomb = not root_disabled and "honeycomb" in sources
 
     servers = ([{"server": "Atlassian", "tools": JIRA_TOOLS}] if tracked else []) + \
-        ([{"server": "Grafana", "tools": GRAFANA_TOOLS}] if grafana else [])
+        ([{"server": "Grafana", "tools": GRAFANA_TOOLS}] if grafana else []) + \
+        ([{"server": "Honeycomb", "tools": HONEYCOMB_TOOLS}] if honeycomb else [])
     capabilities = {"mcp": {"servers": servers}} if servers else {}
     capabilities["comments"] = COMMENTS_CAPABILITY
     if tracked:
@@ -485,7 +488,9 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "- Readers start with Metrics off. Root `enabled:false` or an explicit host false disables "
             "all carriers and grants no query permission; missing tools hide Metrics. Preview metrics are "
             "synthetic, unsaved and make no network call.",
-            "- Honeycomb queries are authored data but have no shipped claude.ai adapter yet. Keep only "
+            "- Honeycomb uses run_query with a runtime-qualified query_spec object or JSON string, one scalar "
+            "calculation and no breakdowns/formulas. Raw-result transport must succeed for exact values; "
+            "COUNT counts spans/events, not automatically requests. History and trace retrieval are unsupported. Keep only "
             "stable dashboard/query UI URLs; never persist signed result URLs or claim live verification.",
             "- Over time uses each day's exact prior-24h endpoint. Missing history is unobserved; never "
             "borrow live or adjacent samples. See docs/live-status.md and the live-status-board Metrics "

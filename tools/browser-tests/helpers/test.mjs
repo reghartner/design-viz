@@ -34,7 +34,7 @@ export const test=base.extend({
     finally{await new Promise(resolve=>server.close(resolve));}
   },{scope:'worker'}],
   audit:[async({context,server},use,testInfo)=>{
-    const failures=[],allowedAborts=new WeakSet(),expectedAborts=[],allowedStatuses=[];
+    const failures=[],allowedAborts=new WeakSet(),expectedAborts=[],allowedStatuses=[],mockedExternal=new Set();
     // A test may deliberately serve an HTTP error for one URL (for example a
     // site without a published diagram library). Only that status/URL is allowed.
     failures.allowStatus=(status,matches)=>allowedStatuses.push({status,matches});
@@ -54,7 +54,7 @@ export const test=base.extend({
     context.on('page',watch);
     context.on('request',request=>{
       const url=request.url();
-      if(!url.startsWith(server.origin+'/')&&!url.startsWith('file:')&&!url.startsWith('data:')&&!url.startsWith('blob:'))failures.push('outbound: '+url);
+      if(!mockedExternal.has(url)&&!url.startsWith(server.origin+'/')&&!url.startsWith('file:')&&!url.startsWith('data:')&&!url.startsWith('blob:'))failures.push('outbound: '+url);
     });
     context.on('requestfailed',request=>{
       const reason=request.failure()?.errorText;
@@ -69,12 +69,15 @@ export const test=base.extend({
       if(/^https?:/.test(url)&&new URL(url).origin!==server.origin)return route.abort();
       return route.continue();
     });
+    // Exact synthetic URLs only; registration always intercepts the request,
+    // so this does not permit real external network traffic.
+    failures.mockExternal=async(url,handler)=>{mockedExternal.add(url);await context.route(url,handler);};
     await use(failures);
     if(testInfo.status!==testInfo.expectedStatus||failures.length){
       for(const [index,page] of context.pages().entries())if(!page.isClosed())await testInfo.attach('page-'+index,{body:await page.screenshot(),contentType:'image/png'});
     }
     if(expectedAborts.length)await testInfo.attach('intentional-request-cancellations',{body:JSON.stringify(expectedAborts,null,2),contentType:'application/json'});
-    delete failures.allowAbort;delete failures.allowStatus;
+    delete failures.allowAbort;delete failures.allowStatus;delete failures.mockExternal;
     await testInfo.attach('browser-audit',{body:JSON.stringify(failures,null,2),contentType:'application/json'});
     expect(failures,'No page/console/request errors or outbound requests').toEqual([]);
   },{auto:true}],

@@ -126,8 +126,8 @@ export interface NativeViewerOptions {
      * capability availability without enabling Metrics; page/host disable always wins. */
     available?: boolean;
     refreshMs?: number;
-    /** Connector name for the Metrics text: "<source> connected · <window> window · refreshed <time>". */
-    source?: string;
+    /** Connector name for Metrics text; a getter follows changing per-source availability. */
+    source?: string | (() => string);
     /** A demo source mounted while Metrics is on; it feeds the controller's apply(). */
     demo?: {mount: (telemetry: {apply: (map: Record<string, TelemetrySample>) => void}) => (() => void) | void};
   };

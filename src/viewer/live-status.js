@@ -634,12 +634,17 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });
   }
   // A named connector (#943: 'Grafana') reads "<source> connected · <window> window · refreshed <time>".
-  var telemetrySource=telemetryOptions && typeof telemetryOptions.source==='string'?telemetryOptions.source.trim():'',telemetryWindow=trackingTelemetry(page).window;
+  var telemetryWindow=trackingTelemetry(page).window;
+  function telemetrySource(){
+    var source=telemetryOptions && telemetryOptions.source;
+    if(typeof source==='function'){try{source=source();}catch(e){source='';}}
+    return typeof source==='string'?source.trim():'';
+  }
   function metricsSnapshot(){
     var status=telemetry.status();
     return {available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
       refreshedAt:status.refreshedAt,note:status.note,checkedText:status.refreshedAt?'refreshed '+clockTime(status.refreshedAt):'',
-      source:telemetrySource,window:telemetryWindow};
+      source:telemetrySource(),window:telemetryWindow};
   }
   function snapshot(){
     refreshDependencies();

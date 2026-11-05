@@ -92,3 +92,32 @@ test('synthetic Honeycomb link row reports unsupported ownership without inventi
  assert.notEqual(variant,traceText);const parsed=C.telemetryHoneycombTrace({payload:variant},recordedId);
  assert.match(parsed.warnings.join(' '),/link-row ownership is unverified/);assert.ok(parsed.spans.every(s=>s.links.length===0 && s.attributes['retry.attempt']===undefined));
 });
+
+test('combined provider clocks, totals, raw bucket starts and trace receipt stay independent through ratio Activity and history',()=>{
+ const {C}=context(),T=Date.parse('2026-10-12T00:00:00Z'),H=3600000,iso=t=>new Date(t).toISOString(),e=plain(envelope(C)),log=C.liveStatusTelemetryActivity();
+ const carrier={telemetry:{kind:'service',signals:{errors:{honeycomb:{calculations:[{op:'COUNT'}]}},rate:{grafana:'rate'},total:{grafana:'total'},unknown:{honeycomb:{calculations:[{op:'SUM',column:'count'}]}},trace:{honeycomb:rawQuery()}},proof:{errors:{max:.05,maxRatioOf:'rate'}}}};
+ const api=C.createTelemetry({}, {demo:{mount:()=>()=>{}}},{carriers:fn=>fn(carrier,'a',{}),observed:log.observe,reset:log.clear,retire:log.retire});
+ const honey={a:{observedAt:iso(T+20*H),signals:{errors:{value:1,series:[[iso(T-H),1]],observedAt:iso(T),retrievedAt:iso(T+20*H)},unknown:{value:0,observedAt:null,aggregate:{kind:'total',from:iso(T-H),to:iso(T)}}}}};
+ function apply(rate,at){
+  const grafana={a:{observedAt:iso(at),signals:{rate:{value:rate,series:[[iso(at),rate]]},total:{value:0,observedAt:iso(T),aggregate:{kind:'total',from:iso(T-H),to:iso(T)}}}}};
+  const merged=C.telemetryProviderMerge([honey,grafana,{a:{signals:{},exemplars:[e]}}]);api.apply(merged);return api.snapshot().map.a;
+ }
+ api.setEnabled(true);let sample=apply(100,T);assert.equal(sample.signals.errors.observedAt,iso(T));assert.equal(sample.signals.errors.retrievedAt,iso(T+20*H));assert.equal(sample.signals.errors.series[0][0],iso(T-H),'raw bucket start survives');
+ assert.equal(sample.signals.rate.observedAt,iso(T));assert.equal(sample.signals.unknown.observedAt,null);assert.equal(sample.signals.unknown.aggregate,undefined,'unknown as-of cannot borrow a peer receipt');assert.equal(sample.signals.total.value,0);assert.equal(sample.signals.total.aggregate.to,iso(T));assert.equal(sample.exemplars[0].observedAt,e.observedAt);
+ sample=apply(10,T+H);const crossings=log.snapshot().filter(e=>e.kind==='threshold');assert.equal(crossings.length,1);assert.equal(crossings[0].at,iso(T+H));assert.equal(sample.signals.errors.observedAt,iso(T));
+ const projected=C.telemetryHistoryDay({a:sample},{at:iso(T+H)}).a;assert.equal(projected.exemplars,undefined);assert.equal(projected.signals.rate.value,10);assert.equal(projected.signals.total,undefined);
+ const embedded={a:sample};api.openHistory([{at:iso(T+H),telemetry:embedded}],0);const historical=api.snapshot().map.a;assert.equal(historical.exemplars,undefined);assert.equal(historical.signals.total.aggregate,undefined);assert.equal(historical.signals.total.value,0);assert.ok(embedded.a.exemplars,'history projection does not mutate input');assert.ok(embedded.a.signals.total.aggregate);
+ api.closeHistory();assert.equal(api.snapshot().map.a.exemplars[0].selectionToken,e.selectionToken);api.destroy();
+});
+test('identical async detail replacement retires provider cache and tokens, including a pending alternative',async t=>{
+ let hold=false,release;const h=await setup({wrap:b=>{const call=b.callTool;b.callTool=async(...args)=>{const result=await call(...args);if(hold&&args[1]==='get_trace'){hold=false;await new Promise(r=>release=r);}return result;};}});t.after(()=>h.close());h.api.setEnabled(true);await settle();const old=h.api.snapshot().map.a.exemplars[0],alt=old.candidates.find(c=>c.traceId!==old.traceId);
+ hold=true;const pending=assert.rejects(h.api.chooseExemplar('a',old.selectionToken,alt.traceId));await settle();assert.ok(release);
+ h.api.bindingsChanged(['a']);await settle();const fresh=h.api.snapshot().map.a.exemplars[0];assert.notEqual(fresh.selectionToken,old.selectionToken);assert.equal(h.bridge.calls.filter(c=>c.name==='run_query').length,2);
+ release();await pending;await settle();assert.equal(h.api.snapshot().map.a.exemplars[0].selectionToken,fresh.selectionToken);await assert.rejects(h.api.chooseExemplar('a',old.selectionToken,old.traceId));
+ h.api.retry();await settle();assert.equal(h.bridge.calls.filter(c=>c.name==='run_query').length,2,'replacement gets one initial search, then caches');
+});
+test('native host preload retains numeric and trace evidence together until explicit off, including off before enable',()=>{
+ const {C}=context(),sample={a:{signals:{rate:{value:0}},exemplars:[plain(envelope(C))]}};
+ for(const initiallyEnable of [false,true]){const api=C.createTelemetry({}, {demo:{mount:()=>()=>{}}},{});api.apply(sample);assert.equal(api.snapshot().map.a.exemplars.length,1);assert.equal(api.snapshot().map.a.signals.rate.value,0);if(initiallyEnable)api.setEnabled(true);
+ api.setEnabled(false);api.apply(sample);assert.deepEqual(plain(api.snapshot().map),{});api.setEnabled(true);assert.deepEqual(plain(api.snapshot().map),{});api.apply(sample);assert.equal(api.snapshot().map.a.exemplars.length,1);api.destroy();api.apply(sample);assert.deepEqual(plain(api.snapshot().map),{});}
+});

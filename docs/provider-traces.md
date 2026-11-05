@@ -111,15 +111,20 @@ One search and one initial detail retrieval per carrier are cached for the Metri
 session. Polls revalidate tools but do not refetch cached search/detail data. The
 original range stays visible; it does not slide forward while cached. The cache
 identity includes full carrier binding and telemetry config, provider contract,
-and controller generation. An explicit alternative retrieves at most one detail
+and controller generation, including identical authored bindings from a replacement
+async detail load. An explicit alternative retrieves at most one detail
 per actual candidate and reuses it on subsequent selections. Last selection wins.
 
 Off, rebinding/import replacement, tool removal, account change, and destroy
 invalidate caches and late replies. Old selection tokens cannot act on a new
 adapter. Historical projection never borrows live exemplars or candidates; the
-selection API rejects while Over time is active. Slider movement, paint, panel
+selection API rejects while Over time is active. Embedded numeric history also
+strips exemplars and total descriptors; no historical trace contract is defined. Slider movement, paint, panel
 reads and caption reads never query. Trace failures preserve numeric peers;
-scalar failures preserve trace evidence. Account changes retire all providers.
+scalar failures preserve trace evidence. Numeric `observedAt`, `retrievedAt`, raw
+bucket-start series, and valid explicit `aggregate` descriptors stay on their own
+signals through composition. Trace receipt time never dates numeric Activity or
+authorizes a total. Account changes retire all providers.
 
 ## Evidence and limits
 

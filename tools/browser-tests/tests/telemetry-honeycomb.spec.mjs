@@ -21,9 +21,9 @@ async function setup(page,server,audit,{disabled,missing=false,detail=false,nest
  const detailSpec=real&&detail?nestedSpec():importedDetailSpec();
  if(real&&detail){const selected=detailSpec.page.sections[0];selected.id='selected';selected.heading='Selected nested imported detail';for(const node of Object.values(selected.diagram.nodes)){node.telemetry={kind:'service',signals:{}};node.tickets=['NEST-1'];}selected.diagram.edges[0].tickets=['NEST-1'];detailSpec.page.sections.unshift({id:'decoy',heading:'Wrong unselected detail',diagram:{nodes:{wrong:{title:'Wrong'}},rows:[['wrong']]}});}
  bind(spec);bind(detailSpec);
- if(real){function mockBindings(v){if(!v||typeof v!=='object')return;if(v.telemetry?.signals){v.telemetry.signals={rate:{grafana:EVENT_QUERY,unit:'req/h'},latency:{honeycomb:nativeQuery(),unit:'req/h'},push:{honeycomb:nativeQuery('notify->app'),unit:'req/h'}};v.telemetry.proof={rate:{min:1}};}Object.values(v).forEach(mockBindings);}mockBindings(spec);mockBindings(detailSpec);}
+ if(real){function mockBindings(v){if(!v||typeof v!=='object')return;if(v.telemetry?.signals){v.telemetry.signals={rate:{grafana:EVENT_QUERY,unit:'req/h'},latency:{honeycomb:nativeQuery(),unit:'req/h'},push:{honeycomb:nativeQuery('notify->app'),unit:'req/h'}};if(real.clockRegression)v.telemetry.signals={rate:{honeycomb:nativeQuery(real.zero?'notify->app':'mcu->ingest'),unit:'req/h'},peer:{grafana:EVENT_QUERY,unit:'req/h'}};v.telemetry.proof={rate:{min:1}};}Object.values(v).forEach(mockBindings);}mockBindings(spec);mockBindings(detailSpec);}
 
- const keys=new Set();function tickets(v){if(!v||typeof v!=='object')return;(v.tickets||[]).forEach(k=>keys.add(k));Object.values(v).forEach(tickets);}tickets(spec);tickets(detailSpec);const jira=Object.fromEntries([...keys].map(k=>[k,{state:'done'}]));
+ const keys=new Set();function tickets(v){if(!v||typeof v!=='object')return;(v.tickets||[]).forEach(k=>keys.add(k));Object.values(v).forEach(tickets);}tickets(spec);tickets(detailSpec);const jira=Object.fromEntries([...keys].map(k=>[k,{state:'done',...(real?.clockRegression?{updatedAt:'2026-10-30T23:00:00Z'}:{})}]));
  spec.page.tracking={telemetry:{enabled:disabled!=='page',grafana:{prometheus:'real-uid'},honeycomb:{environment:'prod',dataset:'events'}}};
  if(real){spec.page.tracking.telemetry.honeycomb={environment:'flowview-demo',dataset:'doorbell'};spec.page.tracking.telemetry.grafana.prometheus='prom-main';spec.page.tracking.telemetry.window=real.window||'24h';}
  const specPath=path.join(server.root,'mixed.spec.json'),out=path.join(server.root,'mixed.html');await writeFile(specPath,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),specPath,path.join(repo,'template/flowview.html'),out],{stdio:'pipe'});
@@ -104,4 +104,32 @@ test('actual mock payload: page 6h window is applied; Day8 absence is not zero',
 for(const disabled of ['page','host','missing'])test('actual mock async nested detail '+disabled+': no queries and root/host no metadata',async({page,server,audit})=>{
  const h=await setup(page,server,audit,{detail:true,disabled,real:{absent:disabled==='missing'}});await expect(metrics(h.root)).toBeHidden();expect(h.bridge.calls).toHaveLength(0);if(disabled!=='missing')expect(h.bridge.lists).toBe(0);
  await h.root.getByRole('button',{name:'Over time',exact:true}).click();await expect(h.root.getByRole('slider',{name:'Day',exact:true})).toBeVisible();expect(h.bridge.calls).toHaveLength(0);
+});
+
+for(const shape of ['direct','detail','zero'])test('actual mock measurement clock '+shape+': November client renders October card and Proof series',async({page,server,audit})=>{
+ // Deliberately outside the story: only this browser test fixes the receipt clock.
+ await page.clock.setFixedTime(new Date('2026-11-05T00:00:00Z'));
+ const h=await setup(page,server,audit,{detail:shape==='detail',real:{day:11,clockRegression:true,zero:shape==='zero'}}),root=h.root;
+ const id=shape==='detail'?'outer::inner::a->outer::inner::b':'shared::api->shared::store';
+ await expect(metrics(root)).toHaveAttribute('aria-pressed','false');expect(h.bridge.calls).toHaveLength(0);await metrics(root).click();
+ await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.rate?.value,id)).toBe(shape==='zero'?0:expected());
+ const sample=await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id],id);
+ expect(sample.signals.rate.observedAt).toBe('2026-11-01T00:00:00.000Z');expect(sample.signals.rate.retrievedAt).toBe('2026-11-05T00:00:00.000Z');
+ expect(new Date(sample.signals.peer.series.at(-1)[0]).toISOString()).toBe(sample.signals.rate.observedAt);
+ const card=root.locator('[data-metrics-card="'+id+'"]'),row=root.locator('[data-proof-carrier="'+id+'"]');
+ await expect(card).toContainText(shape==='zero'?'0':'645.4');
+ expect((await card.locator('.dv-metrics-sparkline').getAttribute('points')).trim().split(/\s+/)).toHaveLength(24);
+ await expect(row.locator('.dv-live-proof-point')).toHaveCount(24);await expect(row.locator('.dv-live-proof-series')).toHaveCount(1);
+ expect(await page.evaluate(id=>window.ctl.liveStatus.snapshot().metrics.proof.rows.find(r=>r.id===id).chart.observedAt,id)).toBe('2026-11-01T00:00:00.000Z');
+ const before=h.bridge.calls.length;
+ const trigger=root.locator('[data-live-carrier="'+id+'"][tabindex="0"]:visible');await expect(trigger).toHaveCount(1);await trigger.focus();await trigger.press('Enter');
+ const production=page.locator('#docview .dv-live-popover:visible .dv-live-production');await expect(production).toBeVisible();await expect(production.locator('.dv-live-proof-point')).toHaveCount(24);await expect(production).toContainText(shape==='zero'?'rate: 0 req/h':'rate: 645.4 req/h');
+ await page.keyboard.press('Escape');await expect(trigger).toBeFocused();
+ const events=await page.evaluate(id=>window.ctl.liveStatus.snapshot().activity.filter(e=>e.type==='telemetry'&&e.carrier===id),id);
+ expect(events.find(e=>e.kind==='first-traffic')?.at).toBe('2026-10-31T00:00:00.000Z');
+ if(shape==='zero')expect(events.find(e=>e.kind==='silent'),'measured zero Honeycomb cannot label a carrier silent while its Grafana rate is positive').toBeUndefined();
+ await row.hover();expect(h.bridge.calls).toHaveLength(before);
+ await metrics(root).click();h.bridge.day=7;await metrics(root).click();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);
+ expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.rate,id)).toBeUndefined();await expect(row.locator('.dv-live-proof-point')).toHaveCount(0);await expect(row).toHaveAttribute('data-telemetry','unobserved');await expect(row).toContainText('rate: unobserved');await expect(row).toHaveAttribute('data-verdict','done');
+ expect(h.requests()).toBe(0);
 });

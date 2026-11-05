@@ -2094,7 +2094,22 @@ and is never parsed as exact measurements. The adapter reads the provider's
 `series[].data` numbers; `header` aliases identify calculation keys. A single
 finite aggregate row is required (including explicit zero); ambiguous groups,
 nulls and malformed results are unobserved. Series timestamps are bucket starts;
-the aggregate is the whole-window headline, and `observedAt` records receipt time.
+the aggregate is the whole-window headline. Each signal's runtime `observedAt`
+is the latest returned bucket start plus valid `info.granularity_seconds` (the
+end of that observed bucket), or its latest actual start if width is unavailable.
+It does not assert complete coverage of the requested window. Without time-series
+points, measurement as-of is unknown (`null`). Runtime `retrievedAt` separately
+records client receipt time. These are normalized runtime fields, not invented
+native response fields or authored bindings.
+
+Live Proof charts use the primary signal's `observedAt`. The mixed-provider coordinator gives
+legacy adapter signals their own latest point as-of (or their source's carrier
+time for aggregate-only samples or an explicit total descriptor) before combining sources. Direct host samples
+without signal as-of keep the existing carrier-time clipping policy. An explicit unknown signal as-of stays unknown.
+The mixed carrier timestamp is a newest-observation summary, never authority to
+clip a different signal's series. Historical charts still use the selected exact
+day endpoint. Actual bucket starts remain unchanged for Since Done evidence;
+no points or Done events are shifted to the client clock.
 No implicit rate conversion is performed.
 
 For hosted results, only HTTPS `mcp.honeycomb.io/query_results/<token>` retrieval is supported, with
@@ -2135,3 +2150,65 @@ current authenticated connector metadata remain deployment checks.
 Provider trace retrieval and the runtime-only #947 selection API are documented in
 [provider-traces.md](provider-traces.md). Existing scalar calculation bodies keep
 their exact-result contract; explicit native raw wrappers are trace intent.
+
+### Production and telemetry Activity
+
+A carrier's existing Work status popover includes Production when the permitted
+telemetry map has measured evidence. It uses the same Proof values, configured
+window, actual points/markers and safe authored-first link as the panel. Failed
+thresholds name their signal, measured value and requirement. Missing values stay
+unobserved; measured zero stays zero. Since Done shows known Done and first
+observed traffic timestamps, plus explicitly measured totals when their interval
+matches Done as described below; window rates are not lifetime totals. Local,
+imported and asynchronously loaded detail carriers use their carrier identity and
+own binding scope. Refreshes and day selection update an open Production block
+without replacing its focused link or close control.
+
+Mixed telemetry Activity uses each signal's measurement as-of, with a separate
+replay watermark per signal; newer peer or receipt times cannot date an older
+signal's event or suppress its next accepted observation. Ratio thresholds watch
+both bound inputs; a crossing uses the latest actual as-of among changed values,
+not an unchanged newer input. Missing inputs remain unobserved; older or
+conflicting same-time inputs cannot generate crossings. Legacy host signals
+without their own as-of retain carrier-time behavior. First-traffic facts supplied
+by the proof engine span all rate-like signals and retain their actual point
+timestamp; a peer's traffic is not attributed to a silent primary signal.
+
+Activity combines Jira changes and typed telemetry observations in timestamp
+order, newest first, with 20 entries total. Telemetry records first observed
+positive traffic after a known Done time, a measured threshold crossing, and
+silent whole-hour milestones after Done while no traffic has been observed.
+Unknown timestamps say “time unavailable.” A paint, Jira-only refresh, or historical
+day selection cannot generate telemetry Activity. New live observations held during
+history are consumed once on Return Live. Binding replacement/removal retires the
+old scope; clearing or disabling telemetry removes its events and Production while
+preserving Jira Activity and the selected Over time day. No queries originate from
+Production rendering, link preparation, or history slider movement.
+
+Initial host telemetry preload remains accepted before the first Metrics decision. An explicit Metrics off (including off before the first enable), capability removal, or destroy retracts evidence and rejects late `apply()` callbacks. Capability recovery stays off; an intentional enable accepts fresh observations. `clear()` retracts the current map without disabling a current session, so provider recovery can still supply its next observation.
+
+A host/provider can explicitly supply a measured long-window total on a runtime
+signal result (this is **not an authored spec field**):
+
+```json
+{"observedAt":"2026-11-04T12:00:00Z","signals":{"rate":{"value":1200,"unit":"events","aggregate":{"kind":"total","from":"2026-11-04T11:00:00Z","to":"2026-11-04T12:00:00Z"}}}}
+```
+
+`aggregate` declares that the signal's original `value` is a measured total over
+that exact interval. Normalization requires a finite nonnegative value no larger
+than `Number.MAX_SAFE_INTEGER`, valid `from < to`, and an explicit valid
+signal `observedAt >= to` (carrier `observedAt` for legacy samples without a signal
+as-of). An explicit unknown signal as-of cannot borrow a peer's time. Invalid metadata is dropped without discarding a valid
+ordinary headline. Proof's Since Done column and Production show the named bound
+signal's total only when `from` exactly equals the actual Done timestamp. They
+retain the original measurement value and unit, including zero, and display the
+through timestamp alongside the existing Done/first-traffic facts. Changing Done
+removes a mismatched total. History endpoint projection drops aggregate metadata;
+this version does not display totals in historical views, including embedded days.
+
+Current standard MCP adapters do not invent long-window queries or total
+semantics. Ordinary values, rates, series sums, and first-traffic measurements are
+never reconstructed into since-Done counts. A composing host/provider must retain
+each descriptor with its own signal and observation bounds, without borrowing a
+peer signal's value or timestamp. No account validation is implied by host/mock
+contract tests.

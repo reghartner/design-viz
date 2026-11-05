@@ -4,7 +4,18 @@
 function telemetryProviderMerge(maps){
   var out=Object.create(null);maps.forEach(function(map){Object.keys(map || {}).forEach(function(id){var sample=map[id],target=out[id];
     if(!target)target=out[id]={signals:{},observedAt:null,markers:[],links:{}};
-    Object.keys(sample.signals || {}).forEach(function(name){target.signals[name]=sample.signals[name];});
+    Object.keys(sample.signals || {}).forEach(function(name){
+      var entry=Object.assign({},sample.signals[name]);
+      // Preserve explicit unknown as-of. Legacy adapter series acquire their
+      // own endpoint before carrier summaries from other sources are combined.
+      if(!telemetryOwn(entry,'observedAt')){
+        var times=(entry.series || []).map(function(p){return Date.parse(telemetryTime(p[0]));}).filter(isFinite);
+        // A total descriptor retains its source bounds even when invalid;
+        // composition must not authorize it using another observation time.
+        entry.observedAt=telemetryOwn(entry,'aggregate')?telemetryTime(sample.observedAt):times.length?telemetryTime(Math.max.apply(null,times)):telemetryTime(sample.observedAt);
+      }
+      target.signals[name]=entry;
+    });
     if(sample.observedAt && (!target.observedAt || Date.parse(sample.observedAt)>Date.parse(target.observedAt)))target.observedAt=sample.observedAt;
     if(sample.exemplars)target.exemplars=sample.exemplars;
     target.markers=target.markers.concat(sample.markers || []);
@@ -16,6 +27,7 @@ function createTelemetryProviders(page,win){
   var current=page,ctl=null,parts=[],retired=false,generation=0,ensuring=false,off=null,bindingKey=null;
   var definitions=[{name:'Grafana',sources:['grafana','loki','sql'],create:createTelemetryGrafana},{name:'Honeycomb',sources:['honeycomb'],create:createTelemetryHoneycomb},{name:'Traces',sources:[],create:createTelemetryTraces}];
   function scoped(bindings,part){if(part.definition.name==='Traces')return bindings.filter(function(b){return telemetryTraceJobs([b]).length;});return bindings.map(function(binding){var signals={};Object.keys(binding.signals || {}).forEach(function(name){if(part.definition.sources.indexOf(binding.signals[name].source)>=0 && !telemetryTraceIntent(binding.signals[name]))signals[name]=binding.signals[name];});return Object.assign({},binding,{signals:signals});}).filter(function(binding){return Object.keys(binding.signals).length;});}
+  function bindingIdentity(bindings){return JSON.stringify(bindings.map(function(b){return [b,ctl && ctl.telemetry.bindingGeneration?ctl.telemetry.bindingGeneration(b.id):0];}));}
   function availability(){if(ctl)ctl.telemetry.setAvailable(!retired && parts.some(function(p){return p.available;}));}
   function accountChanged(){if(retired)return;retired=true;generation++;parts.forEach(function(p){p.map={};p.available=false;});if(ctl){ctl.telemetry.clear();ctl.telemetry.setAvailable(false);}parts.forEach(function(p){if(p.handle)p.handle.destroy();});}
   function ensure(){
@@ -23,7 +35,7 @@ function createTelemetryProviders(page,win){
     try{var bindings=ctl.telemetry.bindings();definitions.forEach(function(definition){
       if(parts.some(function(p){return p.definition===definition;}))return;
       var part={definition:definition,map:{},available:false,adapter:null,handle:null,historyCache:telemetryHistoryCache(),bindingKey:null};
-      if(!scoped(bindings,part).length)return;part.bindingKey=JSON.stringify(scoped(bindings,part));
+      if(!scoped(bindings,part).length)return;part.bindingKey=bindingIdentity(scoped(bindings,part));
       part.adapter=definition.create(current,win,null,function(){return ctl && scoped(ctl.telemetry.bindings(),part).length;});
       if(!part.adapter)return;parts.push(part);
       var api=ctl.telemetry,facade={
@@ -73,13 +85,13 @@ function createTelemetryProviders(page,win){
   }
   var options={chooseExemplar:function(id,token,traceId){var part=parts.find(function(p){return p.definition.name==='Traces';});if(retired || !part || !part.available)throw new Error('Trace selection unavailable.');return part.adapter.options.chooseExemplar(id,token,traceId);},available:false,source:function(){return parts.filter(function(p){return p.available;}).map(function(p){return p.definition.name;}).join(' / ');},provider:function(b,s,r){return run(b,s,r);},history:function(b,r,s,n){return run(b,s,n,r);},historyKey:function(){return parts.map(function(p){return [p.definition.name,p.adapter.options.historyKey?p.adapter.options.historyKey():null];});}};
   return {options:options,attach:function(next,nextPage){
-    current=nextPage || current;ctl=next;generation++;parts=[];bindingKey=JSON.stringify(ctl.telemetry.bindings());ensure();availability();
+    current=nextPage || current;ctl=next;generation++;parts=[];bindingKey=bindingIdentity(ctl.telemetry.bindings());ensure();availability();
     off=ctl.telemetry.onChange(function(snapshot){
       if(!snapshot.enabled)parts.forEach(function(p){p.map={};});
-      var nextKey=JSON.stringify(ctl.telemetry.bindings());
+      var nextKey=bindingIdentity(ctl.telemetry.bindings());
       if(nextKey!==bindingKey && !ensuring && !retired){
         bindingKey=nextKey;generation++;
-        parts=parts.filter(function(p){if(p.bindingKey===JSON.stringify(scoped(ctl.telemetry.bindings(),p)))return true;if(p.handle)p.handle.destroy();return false;});ensure();
+        parts=parts.filter(function(p){if(p.bindingKey===bindingIdentity(scoped(ctl.telemetry.bindings(),p)))return true;if(p.handle)p.handle.destroy();return false;});ensure();
         if(snapshot.enabled && ctl.telemetry.retry)ctl.telemetry.retry();
       }else ensure();
     });

@@ -104,6 +104,7 @@ export interface TelemetryExemplar {
   signal: string;
   selectionToken: string;
   selectionReason: string;
+  /** Retrieval receipt time; trace age comes from selected candidate/span time. */
   observedAt: string;
   range: {from: string; to: string};
   completeness: 'complete' | 'partial' | 'unknown';
@@ -118,7 +119,12 @@ export interface TelemetryExemplar {
 export interface TelemetrySample {
   /** At most one selected exemplar per carrier, with up to 20 returned candidates and 200 spans. */
   exemplars?: TelemetryExemplar[];
-  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string}>;
+  /** Signal observedAt is measurement as-of (null means unknown); retrievedAt is
+   * client receipt time. Live charts prefer the selected signal's as-of. Mixed
+   * adapters assign each legacy signal its own endpoint before combining sources. */
+  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string; observedAt?: string | number | null; retrievedAt?: string | number | null;
+    /** Explicit measured total over [from, to], covered by signal as-of (legacy: carrier as-of). Runtime evidence only. */
+    aggregate?: {kind: 'total'; from: string | number; to: string | number}}>;
   observedAt?: string | number;
   markers?: Array<{at: string | number; kind?: string; label?: string}>;
   links?: {query?: string; dashboard?: string};

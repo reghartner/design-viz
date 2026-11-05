@@ -11,11 +11,11 @@ const grafana={server:'Grafana',tools:['query_prometheus','query_loki_logs','sea
 // Synthetic exact numbers in the official raw shape, NOT rounded Markdown.
 const raw=(value=123.456789)=>({results:[{data:{'P95(duration_ms)':value}}],series:[{data:{time:'2026-10-12T06:00:00Z','P95(duration_ms)':0}},{data:{time:'2026-10-12T06:30:00Z','P95(duration_ms)':value}}],header:[{alias:'P95(duration_ms)',key_name:'P95(duration_ms)',type:'float'}],info:{granularity_seconds:1800}});
 const query=()=>({calculations:[{op:'P95',column:'duration_ms'}],filters:[{column:'service.name',op:'=',value:'EXPLICIT_ID'}]});
-function context(){const timers=new Map();let serial=0;const C={URL,AbortController,TextDecoder,TextEncoder,console,setTimeout:(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;},clearTimeout:id=>timers.delete(id),document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint('standalone').body,C);return {C,timers};}
+function context(clientNow){const timers=new Map();let serial=0;const C={URL,AbortController,TextDecoder,TextEncoder,console,setTimeout:(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;},clearTimeout:id=>timers.delete(id),document:{hidden:false,addEventListener(){},removeEventListener(){}}};if(clientNow!==undefined)C.Date=class extends Date{constructor(...args){super(...(args.length?args:[clientNow]));}static now(){return clientNow;}};vm.runInNewContext(entrypoint('standalone').body,C);return {C,timers};}
 function pageSpec(){return {tracking:{telemetry:{grafana:{prometheus:'uid-exact'},honeycomb:{environment:'prod',dataset:'events'}}},sections:[{id:'main',diagram:{nodes:{a:{telemetry:{kind:'service',signals:{rate:{grafana:'EXACT_PROM[24h]',unit:'req/h'},latency:{honeycomb:query(),unit:'ms'}},proof:{rate:{min:1},latency:{max:500}}}}},rows:[['a']]}}]};}
 function fakeLive(){let label='',action=null,listeners=[];return {snapshot:()=>({actionLabel:label}),action(l,fn){label=l;action=fn;listeners.slice().forEach(f=>f({actionLabel:label}));},onChange(fn){listeners.push(fn);return ()=>listeners=listeners.filter(f=>f!==fn);},onDestroy:()=>()=>{},click(){action();}};}
-async function setup({type='object',servers,fetch,call,bridge,page=pageSpec()}={}){
- const {C,timers}=context(),p=C.normalize(page),calls=[],fetches=[],live=fakeLive();let metadataCalls=0;
+async function setup({type='object',servers,fetch,call,bridge,clientNow,page=pageSpec()}={}){
+ const {C,timers}=context(clientNow),p=C.normalize(page),calls=[],fetches=[],live=fakeLive();let metadataCalls=0;
  const win={claude:{use:async name=>{assert.equal(name,'mcp');return {listTools:async()=>{metadataCalls++;if(bridge)return bridge.listTools();return servers===undefined?[grafana,server(type)]:servers;},callTool:async(s,tool,input,options)=>{calls.push({s,tool,input:plain(input),signal:options?.signal});if(bridge)return bridge.callTool(s,tool,input,options);if(call)return call(tool,input,options);return tool==='run_query'?{payload:metadata}:{payload:tool==='query_prometheus'?{data:[{values:[[1791786600,'42']]}]}:[]};}};}},fetch:async(url,options)=>{fetches.push({url,options});return fetch?fetch(url,options):new Response(JSON.stringify(raw()));}};
  const adapter=C.createTelemetryProviders(p,win),api=C.createTelemetry(p,adapter?.options || false,{carriers:fn=>C.sectionRecords(p).forEach(r=>{const d=r.section.diagram||{};Object.keys(d.nodes||{}).forEach(id=>fn(d.nodes[id],id,p));(d.edges||[]).forEach(e=>fn(e,e.from+'->'+e.to,p));})});
  const handle=adapter?.attach({telemetry:api,liveStatus:live},p);await settle();
@@ -92,4 +92,67 @@ test('actual mock malformed row or metadata preserves a successful Honeycomb pee
   const page=pageSpec();page.tracking.telemetry.honeycomb={environment:'flowview-demo',dataset:'doorbell'};page.tracking.telemetry.grafana.prometheus='prom-main';page.sections[0].diagram.nodes.a.telemetry.signals={rate:{grafana:EVENT_QUERY},latency:{honeycomb:nativeQuery()},bad:{honeycomb:nativeQuery('notify->app')}};
   const h=await setup({page,bridge});t.after(()=>h.close());h.api.setEnabled(true);await settle();const s=h.api.snapshot();assert.equal(s.map.a?.signals.latency?.value,expected(),'successful Honeycomb signal survives malformed peer');assert.ok(s.map.a.signals.rate.value>0);assert.equal(s.map.a.signals.bad,undefined);assert.match(s.status.note,/missing or ambiguous|metadata is invalid/);
  }
+});
+
+test('actual mock clock: November client keeps October measurement as-of and visible Proof points',async t=>{
+ const {createMockBridge,nativeQuery,EVENT_QUERY,expected}=await import('./helpers/honeycomb-bridge.mjs');
+ const bridge=createMockBridge(),page=pageSpec(),clientNow=Date.parse('2026-11-05T00:00:00Z');
+ page.tracking.telemetry.honeycomb={environment:'flowview-demo',dataset:'doorbell'};page.tracking.telemetry.grafana.prometheus='prom-main';
+ const binding={kind:'service',signals:{rate:{honeycomb:nativeQuery(),unit:'req/h'},peer:{grafana:EVENT_QUERY,unit:'req/h'}},proof:{rate:{min:1}}};
+ page.sections[0].diagram.nodes={a:{telemetry:binding},push:{telemetry:{...binding,signals:{rate:{honeycomb:nativeQuery('notify->app'),unit:'req/h'}}}}};page.sections[0].rows=[['a','push']];
+ const h=await setup({page,bridge,clientNow});t.after(()=>h.close());h.api.setEnabled(true);await settle();
+ const snapshot=h.api.snapshot(),sample=snapshot.map.a,proof=h.C.liveStatusProofPresentation(snapshot,'24h'),row=proof.rows.find(r=>r.id==='a'),zero=proof.rows.find(r=>r.id==='push');
+ assert.equal(sample.signals.rate.value,expected());assert.equal(sample.signals.rate.retrievedAt,'2026-11-05T00:00:00.000Z');
+ assert.equal(row.chart.points.length,24,'actual Honeycomb Proof sparkline survives unrelated client date');assert.ok(row.chart.line);
+ assert.equal(sample.signals.rate.observedAt,'2026-11-01T00:00:00.000Z');assert.equal(sample.observedAt,'2026-11-01T00:00:00.000Z');assert.equal(row.chart.observedAt,'2026-11-01T00:00:00.000Z');
+ assert.equal(new Date(sample.signals.peer.series.at(-1)[0]).toISOString(),sample.signals.rate.observedAt,'Grafana and Honeycomb share the actual story endpoint');
+ assert.equal(zero.chart.points.length,24);assert.equal(snapshot.map.push.signals.rate.value,0);
+ // A later peer sample/carrier stamp must not clip the Honeycomb primary.
+ const later=plain(snapshot);later.map.a.observedAt='2026-11-05T00:00:00.000Z';later.map.a.signals.peer={value:9,series:[[clientNow,9]]};
+ assert.equal(h.C.liveStatusProofPresentation(later,'24h').rows.find(r=>r.id==='a').chart.points.length,24);
+ // Conversely, legacy primary signals use their own points, not peer as-of.
+ const legacy={a:{signals:{rate:{value:1,series:sample.signals.peer.series}},observedAt:sample.observedAt}};
+ later.map=h.C.telemetryProviderMerge([legacy,{a:{signals:{peer:{value:9,series:[[clientNow,9]]}},observedAt:'2026-11-05T00:00:00.000Z'}}]);
+ assert.equal(h.C.liveStatusProofPresentation(later,'24h').rows.find(r=>r.id==='a').chart.observedAt,'2026-11-01T00:00:00.000Z');
+ assert.equal(legacy.a.signals.rate.observedAt,undefined,'composition never mutates provider-owned samples');
+ const before=bridge.calls.length;h.C.liveStatusProofPresentation(snapshot,'24h');h.api.verdicts();assert.equal(bridge.calls.length,before);
+ h.api.setEnabled(false);bridge.day=7;h.api.setEnabled(true);await settle();assert.equal(h.api.snapshot().map.a?.signals.rate,undefined);const missing=h.C.liveStatusProofPresentation(h.api.snapshot(),'24h').rows.find(r=>r.id==='a');assert.equal(missing.chart.points.length,0);assert.equal(missing.chart.observedAt,null);
+});
+test('signed raw clock keeps actual bucket times and distinct retrieval; no series means unknown as-of',async t=>{
+ const h=await setup({clientNow:Date.parse('2026-11-05T00:00:00Z')});t.after(()=>h.close());h.api.setEnabled(true);await settle();const sample=h.api.snapshot().map.a.signals.latency;
+ assert.equal(sample.observedAt,'2026-10-12T07:00:00.000Z');assert.equal(sample.retrievedAt,'2026-11-05T00:00:00.000Z');assert.equal(sample.series[1][0],Date.parse('2026-10-12T06:30:00Z'));assert.ok(!JSON.stringify(sample).includes(URL_RAW));
+ const q={key:'COUNT'};assert.equal(h.C.telemetryHoneycombSample({results:[{data:{COUNT:0}}]},q).observedAt,null);
+ assert.equal(h.C.telemetryHoneycombSample({results:[{data:{COUNT:0}}],series:[{data:{time:'2026-11-05T00:00:00Z',COUNT:0}}]},q).observedAt,'2026-11-05T00:00:00.000Z');
+ const modern=raw();modern.series.forEach((row,i)=>row.data.time='2026-11-05T'+(i?'00:30':'00:00')+':00Z');assert.equal(h.C.telemetryHoneycombSample(modern,{key:'P95(duration_ms)'}).observedAt,'2026-11-05T01:00:00.000Z');
+});
+
+test('combined runtime metadata keeps totals, measurement and receipt scoped to their own mixed signal',()=>{
+ const {C}=context(),T=Date.parse('2026-11-01T00:00:00Z'),H=3600000,iso=t=>new Date(t).toISOString();
+ const carriers=[{id:'a',title:'Explicit carrier',kind:'service',tickets:['AA-1'],signals:{rate:{source:'honeycomb',query:query(),unit:'events'},peer:{source:'grafana',query:'EXPLICIT',unit:'ms'}},proof:{rate:{min:1}},links:{}}];
+ function compose(observedAt=iso(T),to=iso(T),legacy=false){
+  // Explicit host runtime total: never claimed as a native Honeycomb response field.
+  const own={a:{observedAt:iso(T),signals:{rate:{value:0,series:[[T-H,0],[T,0]],observedAt,retrievedAt:iso(T+24*H),aggregate:{kind:'total',from:iso(T-H),to},unit:'events'}}}};
+  if(legacy){delete own.a.signals.rate.observedAt;own.a.signals.rate.series=[[T-H,0]];}
+  const peer={a:{observedAt:iso(T+12*H),signals:{peer:{value:12,series:[[T+12*H,12]]}}}},before=JSON.stringify(own);
+  const map=C.telemetryProviderMerge([own,peer]);map.a=C.telemetrySample(map.a);assert.equal(JSON.stringify(own),before,'composition and normalization do not mutate source evidence');return map;
+ }
+ const legacy=compose(iso(T),iso(T),true);assert.equal(legacy.a.signals.rate.aggregate.to,iso(T));assert.equal(legacy.a.signals.rate.observedAt,iso(T),'explicit legacy total retains its source observation bounds beyond ordinary points');
+ const map=compose(),entry=map.a.signals.rate;assert.equal(entry.value,0);assert.equal(entry.observedAt,iso(T));assert.equal(entry.retrievedAt,iso(T+24*H));assert.equal(entry.aggregate.to,iso(T));assert.equal(map.a.signals.peer.value,12);
+ const snap={carriers,map,verdicts:C.proofVerdicts({carriers,telemetryMap:map,jiraMap:{'AA-1':{state:'done',updatedAt:iso(T-H)}}})},row=C.liveStatusProofPresentation(snap,'24h').rows[0];
+ assert.match(row.since,/rate total: 0 events/);assert.equal(row.chart.observedAt,iso(T));assert.equal(row.chart.points.length,2);
+ for(const bad of [compose(null),compose(iso(T),iso(T+H))]){assert.equal(bad.a.signals.rate.aggregate,undefined,'newer peer or receipt cannot authorize total beyond own as-of');assert.equal(bad.a.signals.rate.value,0);assert.equal(bad.a.signals.peer.value,12);}
+});
+test('mixed Activity uses each signal measurement time and accepts older peer-independent progress',()=>{
+ const {C}=context(),T=Date.parse('2026-11-01T00:00:00Z'),H=3600000,iso=t=>new Date(t).toISOString(),log=C.liveStatusTelemetryActivity();
+ const carriers=[{id:'a',title:'Explicit carrier',kind:'service',tickets:['AA-1'],signals:{rate:{source:'honeycomb',query:query()},latency:{source:'grafana',query:'EXPLICIT'}},proof:{rate:{min:1},latency:{max:200}},links:{}}];
+ function observe(rate,at,latency=100,peerAt=T+4*H,peerSeries=[]){
+  const map={a:C.telemetrySample({observedAt:iso(peerAt),signals:{rate:{value:rate,observedAt:at===null?null:iso(at),retrievedAt:iso(peerAt+24*H)},latency:{value:latency,observedAt:iso(peerAt),series:peerSeries}}})};
+  log.observe({carriers,map,verdicts:C.proofVerdicts({carriers,telemetryMap:map,jiraMap:{'AA-1':{state:'done',updatedAt:iso(T-2*H)}}})});
+ }
+ observe(0,T);assert.equal(log.snapshot()[0].text,'Still silent 2 h after Done');assert.equal(log.snapshot()[0].at,iso(T));
+ observe(3,T+H);assert.equal(log.snapshot().filter(e=>e.kind==='first-traffic')[0]?.at,iso(T+H),'unchanged newer peer cannot suppress an accepted primary measurement');
+ observe(3,T+H,300,T+5*H);assert.equal(log.snapshot().find(e=>e.kind==='threshold'&&e.signal==='latency').at,iso(T+5*H));
+ const primaryEvents=log.snapshot().filter(e=>e.signal==='rate').length;observe(0,T,100,T+6*H);assert.equal(log.snapshot().filter(e=>e.signal==='rate').length,primaryEvents,'older primary replay cannot cross a threshold again');
+ log.clear();observe(3,null);assert.equal(log.snapshot().filter(e=>e.kind==='first-traffic').length,0,'unknown own as-of never borrows a peer or retrieval clock');
+ log.clear();carriers[0].signals.latency.unit='req/h';observe(0,T,100,T+4*H,[[T+3*H,100]]);const peerFirst=log.snapshot().find(e=>e.kind==='first-traffic');assert.equal(peerFirst?.at,iso(T+3*H),'actual peer traffic is not clipped by the older chart primary');assert.equal(peerFirst.signal,null,'carrier-wide first traffic is not misattributed to a silent primary');
 });

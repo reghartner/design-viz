@@ -129,7 +129,13 @@ function telemetryHoneycombSample(raw,query,unit){
     if(!telemetryObject(data) || !isFinite(at) || !telemetryNumber(data[key]) || Math.abs(data[key])>Number.MAX_SAFE_INTEGER)throw telemetryHoneycombError('Honeycomb raw series contains an invalid point.');
     if(seen[at])throw telemetryHoneycombError('Honeycomb series is ambiguous; multiple rows share a bucket.');seen[at]=true;points.push([at,data[key]]);
   });points.sort(function(a,b){return a[0]-b[0];});
-  var sample={value:value,series:points};if(unit)sample.unit=unit;
+  // Raw series timestamps are bucket starts. With verified bucket width, the
+  // latest returned bucket's end is the measurement as-of (not proof of a full
+  // query window). Without width use its actual start; without points unknown.
+  var width=raw.info && raw.info.granularity_seconds,last=points.length?points[points.length-1][0]:null;
+  var end=last===null?null:last+(Number.isSafeInteger(width) && width>0 && Number.isSafeInteger(width*1000)?width*1000:0);
+  if(end!==null && !isFinite(new Date(end).getTime()))end=last;
+  var sample={value:value,series:points,observedAt:end===null?null:telemetryTime(end)};if(unit)sample.unit=unit;
   return sample;
 }
 function createTelemetryHoneycomb(page,win,now,bound){
@@ -175,7 +181,9 @@ function createTelemetryHoneycomb(page,win,now,bound){
         if(result && result.isError)throw {code:'tool_error'};
         var meta=telemetryHoneycombMetadata(result),raw=await telemetryHoneycombResult(win,result,meta,signal),sample=telemetryHoneycombSample(raw,query,job.unit);
         if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
-        var out=map[job.id] || (map[job.id]={signals:{},observedAt:new Date(clock()).toISOString(),links:{},markers:[]});out.signals[job.name]=sample;
+        sample.retrievedAt=new Date(clock()).toISOString();
+        var out=map[job.id] || (map[job.id]={signals:{},observedAt:null,links:{},markers:[]});out.signals[job.name]=sample;
+        if(sample.observedAt && (!out.observedAt || Date.parse(sample.observedAt)>Date.parse(out.observedAt)))out.observedAt=sample.observedAt;
         var link=telemetryHoneycombPublicLink(job.links.query) || telemetryHoneycombUrl(meta.query_url,false);if(link)out.links.query=link;
         var dashboard=telemetryHoneycombPublicLink(job.links.dashboard);if(dashboard)out.links.dashboard=dashboard;
         if(query.calculation.op==='COUNT')notes.push('Honeycomb COUNT counts source rows/events, not automatically requests.');

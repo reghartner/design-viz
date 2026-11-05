@@ -659,15 +659,16 @@ Every story shows its parent Epic under the key. Empty initiatives still show
 the root title and status and zero Epics/stories. Mixed Initiative and explicit
 Epic roots are deduplicated. “Diagram ready to demo” still refers to the primary
 path's carriers; it does not declare the entire initiative ready.
-There is no verdict line. Then come the Tickets table, **Excluded stories**
-when configured, **Blockers and dependency chains**, and Activity. The exclusions
+When permitted telemetry samples exist, a **Proof** box follows the epic box.
+Then come Tickets, the **Proof table** when present, **Excluded stories** when
+configured, **Blockers and dependency chains**, and Activity. The exclusions
 list links each configured story to Jira and shows its available title and state,
 plus whether it remains excluded or was included by a manual attachment, another
 source, or a dependency. It is visible before a connector responds too. Edit the
 list in desktop Document settings; the reader contains no exclusion controls. Teams are identified by each Tickets row's lane colour
 stripe and the lane names in Blockers. Status-board step captions omit the team lane chip,
 even with Live disabled; ordinary diagrams retain their authored lane context.
-Without ticket references or epics it says “This page has no ticket references.”
+Without ticket references, epics, or telemetry evidence it says “This page has no ticket references.”
 Before a provider or applied map is available, it shows the connector note and any
 required authorization action without an empty rollup. Print preserves the last
 paint, and reduced motion disables ring animation.
@@ -677,6 +678,42 @@ panel: `page.tracking: no live-status panel declared — add {"type": "live-stat
 to a section's panels so viewers see the rollup`. A panel on an untracked page
 warns “this page has no ticket references — the panel will be empty”. These are
 warnings, never errors. Strongly prefer adding the panel on every tracked page.
+
+### Proof summary and table
+
+Proof uses the same normalized samples and `proofVerdicts` results as the Metrics
+cards. It appears inside the authored panel when a permitted sample contains a
+finite value or series point for an explicitly bound signal of a known carrier.
+Measured zero qualifies; unknown identities, unbound signals, empty samples,
+markers and links alone do not. Once such a measurement exists, other bound
+carriers may appear as unobserved. This is independent of the Metrics canvas
+switch or Jira data. A host may apply samples while Metrics is off. Turning Metrics off
+clears its map; root-page disable, host disable, or capability removal also
+clears Proof. Workbench Preview's synthetic cards do not supply production Proof.
+Telemetry-only panels show Proof without invented Jira totals or a Tickets table.
+
+The ring divides **bound carriers** into proven, degraded, unproven and live early.
+Bound carriers outside those verdict buckets leave neutral space. Unbound
+carriers have a separate count and never enter the ring denominator. Both local
+and imported nodes and edges, including nested imports and loaded detail sources,
+use the controller's existing carrier identities. The summary states the counts;
+thresholds appear in plain words, per row when different carriers use different
+predicates.
+
+The table contains one row per bound carrier: its title and identity, Jira keys
+and state, configured-window chart (24h by default), rate/errors/p95 or queue
+in/lag/age, known Done and first-observed-traffic timestamps, verdict, and a safe
+link icon. Missing evidence stays unobserved; measured zero stays zero. No request
+total is inferred from a rate or elapsed time. Charts clip actual points and
+Done/deploy ticks to the window; sparse samples are dots rather than a fabricated
+dense sparkline. Authored dashboard/query links take precedence over provider
+links. Unsafe or absent URLs produce no link control.
+
+Over time selects the same day's evidence in the cards and Proof table. Slider
+changes and panel repaints do not request metrics. Historical gaps stay
+unobserved, and live values or deploy markers are never borrowed to fill them.
+Live restores the current samples. Production popovers and telemetry Activity
+entries are separate follow-up work.
 
 ### Tickets table
 
@@ -2015,3 +2052,54 @@ aggregation. SQL and Tempo have no history adapter. Honeycomb history remains
 [Prometheus source](https://github.com/grafana/mcp-grafana/blob/main/tools/prometheus.go)
 and [Loki source](https://github.com/grafana/mcp-grafana/blob/main/tools/loki.go);
 validation uses raw MCP fixtures, not a live Grafana or Honeycomb account.
+
+### Production and telemetry Activity
+
+A carrier's existing Work status popover includes Production when the permitted
+telemetry map has measured evidence. It uses the same Proof values, configured
+window, actual points/markers and safe authored-first link as the panel. Failed
+thresholds name their signal, measured value and requirement. Missing values stay
+unobserved; measured zero stays zero. Since Done shows known Done and first
+observed traffic timestamps, plus explicitly measured totals when their interval
+matches Done as described below; window rates are not lifetime totals. Local,
+imported and asynchronously loaded detail carriers use their carrier identity and
+own binding scope. Refreshes and day selection update an open Production block
+without replacing its focused link or close control.
+
+Activity combines Jira changes and typed telemetry observations in timestamp
+order, newest first, with 20 entries total. Telemetry records first observed
+positive traffic after a known Done time, a measured threshold crossing, and
+silent whole-hour milestones after Done while no traffic has been observed.
+Unknown timestamps say “time unavailable.” A paint, Jira-only refresh, or historical
+day selection cannot generate telemetry Activity. New live observations held during
+history are consumed once on Return Live. Binding replacement/removal retires the
+old scope; clearing or disabling telemetry removes its events and Production while
+preserving Jira Activity and the selected Over time day. No queries originate from
+Production rendering, link preparation, or history slider movement.
+
+Initial host telemetry preload remains accepted before the first Metrics decision. An explicit Metrics off (including off before the first enable), capability removal, or destroy retracts evidence and rejects late `apply()` callbacks. Capability recovery stays off; an intentional enable accepts fresh observations. `clear()` retracts the current map without disabling a current session, so provider recovery can still supply its next observation.
+
+A host/provider can explicitly supply a measured long-window total on a runtime
+signal result (this is **not an authored spec field**):
+
+```json
+{"observedAt":"2026-11-04T12:00:00Z","signals":{"rate":{"value":1200,"unit":"events","aggregate":{"kind":"total","from":"2026-11-04T11:00:00Z","to":"2026-11-04T12:00:00Z"}}}}
+```
+
+`aggregate` declares that the signal's original `value` is a measured total over
+that exact interval. Normalization requires a finite nonnegative value no larger
+than `Number.MAX_SAFE_INTEGER`, valid `from < to`, and an explicit valid
+`observedAt >= to`. Invalid metadata is dropped without discarding a valid
+ordinary headline. Proof's Since Done column and Production show the named bound
+signal's total only when `from` exactly equals the actual Done timestamp. They
+retain the original measurement value and unit, including zero, and display the
+through timestamp alongside the existing Done/first-traffic facts. Changing Done
+removes a mismatched total. History endpoint projection drops aggregate metadata;
+this version does not display totals in historical views, including embedded days.
+
+Current standard MCP adapters do not invent long-window queries or total
+semantics. Ordinary values, rates, series sums, and first-traffic measurements are
+never reconstructed into since-Done counts. A composing host/provider must retain
+each descriptor with its own signal and observation bounds, without borrowing a
+peer signal's value or timestamp. No account validation is implied by host/mock
+contract tests.

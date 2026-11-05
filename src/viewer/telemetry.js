@@ -46,10 +46,20 @@
    the document is hidden and catches up once on return (liveStatusPoller). */
 function telemetryTime(value){
   var ms=typeof value==='number'?value:typeof value==='string'?Date.parse(value):NaN;
-  return isFinite(ms)?new Date(ms).toISOString():null;
+  var date=new Date(ms);return isFinite(date.getTime())?date.toISOString():null;
 }
 function telemetryPoint(point){
   return Array.isArray(point) && point.length===2 && (telemetryNumber(point[0]) || typeof point[0]==='string' && isFinite(Date.parse(point[0]))) && telemetryNumber(point[1]);
+}
+/* An explicit measured total, never inferred from a rate, unit or series. The
+   observation must cover the entire measured interval. Invalid metadata leaves
+   a valid ordinary headline intact, but cannot authorize a since-Done total. */
+function telemetryAggregate(entry,observedAt){
+  var aggregate=entry && entry.aggregate,observed=telemetryTime(observedAt);
+  if(!telemetryObject(aggregate) || aggregate.kind!=='total' || !telemetryNumber(entry.value) || entry.value<0 || entry.value>Number.MAX_SAFE_INTEGER || !observed)return null;
+  var from=telemetryTime(aggregate.from),to=telemetryTime(aggregate.to);
+  if(!from || !to || Date.parse(from)>=Date.parse(to) || Date.parse(to)>Date.parse(observed))return null;
+  return {kind:'total',from:from,to:to};
 }
 /* One carrier's sample, kept to the provider result contract; null when unusable. */
 function telemetrySample(raw){
@@ -61,6 +71,7 @@ function telemetrySample(raw){
     if(telemetryNumber(value.value))entry.value=value.value;
     if(Array.isArray(value.series))entry.series=value.series.filter(telemetryPoint).map(function(point){return [point[0],point[1]];});
     if(telemetryText(value.unit))entry.unit=value.unit;
+    var aggregate=telemetryAggregate(value,out.observedAt);if(aggregate)entry.aggregate=aggregate;
     out.signals[name]=entry;
   });
   if(Array.isArray(raw.markers))raw.markers.forEach(function(marker){
@@ -99,7 +110,7 @@ function telemetryProofInput(eachCarrier,eachDiagram,jiraMap,telemetryMap){
   eachCarrier(function(value,id,source){
     if(typeof id!=='string' || !id || !telemetryObject(value) || isTextBoxNode(value))return;
     var binding=carrierTelemetry(value,templatesOf(source));
-    var entry={id:id,tickets:trackingRefs(value).tickets,kind:binding?binding.kind:null,signals:binding?binding.signals:{},proof:binding?binding.proof:{}};
+    var entry={id:id,title:value.title || value.label || id,tickets:trackingRefs(value).tickets,kind:binding?binding.kind:null,signals:binding?binding.signals:{},proof:binding?binding.proof:{},links:binding?binding.links:{}};
     if(!(id in index)){index[id]=carriers.length;carriers.push(entry);}
     else if(binding && !Object.keys(carriers[index[id]].signals).length)carriers[index[id]]=entry;
   });
@@ -335,6 +346,10 @@ function telemetryHistoryCache(now){
    createTelemetry sets hooks.view() ({map, verdicts} while Metrics is on, else
    null) for the canvas painter and hooks.jiraChanged(), which the Jira side
    calls so subscribers receive re-judged verdicts. */
+function telemetryBindingKey(binding){
+  function stable(value){if(!telemetryObject(value))return value;var out={};Object.keys(value).sort().forEach(function(key){out[key]=stable(value[key]);});return out;}
+  return JSON.stringify(stable({kind:binding.kind,signals:binding.signals,proof:binding.proof}));
+}
 function createTelemetry(page,options,hooks){
   var permitted=options!==false && trackingTelemetry(page || {}).enabled;
   options=options || {};hooks=hooks || {};
@@ -347,6 +362,8 @@ function createTelemetry(page,options,hooks){
   var map=Object.create(null),liveMap=map,past=null,historyRequests=[],historyGeneration=0,historyCache=telemetryHistoryCache(),liveStatus=null,enabled=false,retired=false,listeners=[],demoCleanup=null;
   available=available && !!(provider || demo);
   var status={state:available?'idle':'absent',busy:false,refreshedAt:null,note:''};
+  // Host preload is allowed before the first Metrics decision, never after an explicit off.
+  var preload=true,liveKeys=Object.create(null),bindingEpochs=Object.create(null),heldObservation=false;
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function bindings(){return typeof hooks.carriers==='function'?telemetryBindings(hooks.carriers):[];}
   function emit(){if(retired || !listeners.length)return;var value=api.snapshot();listeners.slice().forEach(function(fn){fn(value);});}
@@ -361,18 +378,25 @@ function createTelemetry(page,options,hooks){
   hooks.view=function(){return enabled && !retired?{map:map,verdicts:verdicts()}:null;};
   hooks.jiraChanged=emit;
   function setStatus(next){Object.keys(next).forEach(function(key){status[key]=next[key];});}
-  function store(value){
+  function bindingKeys(){var keys=Object.create(null);bindings().forEach(function(binding){keys[binding.id]=JSON.stringify([telemetryBindingKey(binding),bindingEpochs[binding.id] || 0]);});return keys;}
+  function resetObservations(){heldObservation=false;liveKeys=Object.create(null);if(typeof hooks.reset==='function')hooks.reset();}
+  function observed(){if(typeof hooks.observed==='function')hooks.observed(api.snapshot());}
+  function store(value,expected){
     var next=Object.create(null);
-    if(telemetryObject(value))Object.keys(value).forEach(function(id){var sample=telemetrySample(value[id]);if(id && sample)next[id]=sample;});
+    var keys=bindingKeys();
+    if(telemetryObject(value))Object.keys(value).forEach(function(id){var sample=telemetrySample(value[id]);if(id && sample && (!expected || expected[id]===keys[id]))next[id]=sample;});
     liveMap=next;if(!past)map=next;
+    liveKeys=keys;if(!Object.keys(next).length)resetObservations();
+    else if(past)heldObservation=true;else observed();
   }
   // Each call gets its own report; its note travels with that call's answer only.
   var poller=provider?liveStatusPoller(function(signal){
     var noted='',report={note:function(text){noted=typeof text==='string'?text:'';}};
-    return Promise.resolve(provider(bindings(),signal,report)).then(function(value){return {value:value,note:noted};});
+    var bound=bindings(),keys=bindingKeys();
+    return Promise.resolve(provider(bound,signal,report)).then(function(value){return {value:value,note:noted,keys:keys};});
   },delay,{
     busy:function(){if(past){liveStatus=Object.assign({},liveStatus,{busy:true});return;}setStatus({busy:true});notify();},
-    result:function(answer){store(answer.value);var next={state:'ok',busy:false,refreshedAt:new Date().toISOString(),note:answer.note};if(past)liveStatus=next;else setStatus(next);notify();},
+    result:function(answer){store(answer.value,answer.keys);var next={state:'ok',busy:false,refreshedAt:new Date().toISOString(),note:answer.note};if(past)liveStatus=next;else setStatus(next);notify();},
     error:function(error){var next={state:error && error.state==='approval'?'approval':'error',busy:false,note:error && typeof error.message==='string'?error.message:String(error)};if(past)liveStatus=next;else setStatus(next);notify();}
   }):null;
   function stopDemo(){var cleanup=demoCleanup;demoCleanup=null;if(typeof cleanup==='function'){try{cleanup();}catch(ex){}}}
@@ -440,42 +464,56 @@ function createTelemetry(page,options,hooks){
     historyDay:function(index){if(retired || !past)return;past.index=index;showHistory();notify();},
     closeHistory:function(){
       if(!past || retired)return;cancelHistory();past=null;map=enabled?liveMap:Object.create(null);
+      if(enabled && heldObservation){heldObservation=false;observed();}
       if(enabled){if(liveStatus)setStatus(liveStatus);if(poller)poller.resume();}liveStatus=null;notify();
     },
     bindings:function(){return copy(bindings());},
-    bindingsChanged:historyBindingsChanged,
+    bindingsChanged:function(retiredIds){
+      retiredIds=Array.isArray(retiredIds)?retiredIds:[];
+      if(retiredIds.length){
+        retiredIds.forEach(function(id){bindingEpochs[id]=(bindingEpochs[id] || 0)+1;});
+        if(typeof hooks.retire==='function')hooks.retire(retiredIds);
+        historyCache.clear();retiredIds.forEach(function(id){if(past && past.keys){delete past.keys[id];delete past.map[id];delete past.loaded[id];delete past.outcomes[id];}});
+      }
+      var keys=bindingKeys();Object.keys(liveMap).forEach(function(id){if(retiredIds.indexOf(id)>=0 || liveKeys[id]!==keys[id])delete liveMap[id];});
+      if(!past)map=liveMap;historyBindingsChanged();notify();
+    },
     apply:function(value){
-      if(retired || !permitted || !available && (provider || demo || options.available===false))return;store(value);
+      if(retired || !enabled && !preload || !permitted || !available && (provider || demo || options.available===false))return;store(value);
       if(enabled && !past)setStatus({state:'ok',refreshedAt:new Date().toISOString(),note:''});
       notify();
     },
-    clear:function(signal){if(retired)return;if(!historyRequests.some(function(request){return request.abort.signal===signal;})){cancelHistory();setStatus({busy:false});}historyCache.clear();liveMap=map=Object.create(null);if(past)past.map={};notify();},
-    snapshot:function(){return {available:available && !retired,enabled:enabled,map:copy(map),status:copy(status),verdicts:copy(verdicts())};},
+    clear:function(signal){if(retired)return;if(!historyRequests.some(function(request){return request.abort.signal===signal;})){cancelHistory();setStatus({busy:false});}historyCache.clear();liveMap=map=Object.create(null);resetObservations();if(past)past.map={};notify();},
+    snapshot:function(){
+      var input=telemetryProofInput(hooks.carriers || function(){},hooks.diagrams || function(){},typeof hooks.jira==='function'?hooks.jira():{},map);
+      return {available:available && !retired,enabled:enabled,map:copy(map),status:copy(status),carriers:copy(input.carriers),
+        historical:!!past,at:past && past.days[past.index]?past.days[past.index].at:null,verdicts:copy(proofVerdicts(input))};
+    },
     verdicts:function(){return copy(verdicts());},
     status:function(){return copy(status);},
     enabled:function(){return enabled;},
     setEnabled:function(value){
       value=!!value;
-      if(retired || !available || value===enabled)return;
-      enabled=value;
+      if(retired || value && !available || value===enabled && (value || !preload))return;
+      preload=false;enabled=value;
       if(enabled){
         setStatus({state:'loading',busy:false,refreshedAt:null,note:''});
         if(past)loadHistory();else if(poller)poller.start();
         if(demo){var cleanup=demo.mount(api);demoCleanup=typeof cleanup==='function'?cleanup:null;}
       }else{
         cancelHistory();if(poller)poller.stop();stopDemo();
-        liveMap=map=Object.create(null);if(past)past.map={};setStatus({state:'idle',busy:false,refreshedAt:null,note:''});
+        liveMap=map=Object.create(null);resetObservations();if(past)past.map={};setStatus({state:'idle',busy:false,refreshedAt:null,note:''});
       }
       notify();
     },
     setAvailable:function(value){
       if(retired)return;value=!!value && permitted && !!(provider || demo);
       if(value===available)return;
-      if(!value){api.setEnabled(false);historyCache.clear();liveMap=map=Object.create(null);}
+      if(!value){api.setEnabled(false);historyCache.clear();liveMap=map=Object.create(null);resetObservations();}
       available=value;setStatus({state:value?'idle':'absent',busy:false,refreshedAt:null,note:''});notify();
     },
     onChange:function(fn){if(typeof fn!=='function' || retired)return function(){};listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
-    destroy:function(){if(retired)return;retired=true;cancelHistory();historyCache.clear();past=null;enabled=false;liveMap=map=Object.create(null);setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];}
+    destroy:function(){if(retired)return;retired=true;cancelHistory();historyCache.clear();past=null;enabled=false;liveMap=map=Object.create(null);resetObservations();setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];if(typeof hooks.changed==='function')hooks.changed();}
   };
   return api;
 }

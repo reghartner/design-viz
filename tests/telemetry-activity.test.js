@@ -64,3 +64,41 @@ test('an in-flight provider answer from a retired detail cannot reintroduce old 
  api.bindingsChanged(['detail::api']);resolve({'detail::api':{observedAt:iso(T),signals:{rate:{value:100}}}});for(let i=0;i<4;i++)await new Promise(setImmediate);
  assert.deepEqual(plain(api.snapshot().map),{});assert.equal(log.snapshot().length,0);api.destroy();
 });
+
+test('initial host preload is accepted, but explicit off retires writes until intentional enable',()=>{
+ for(const start of [false,true]){
+  const f=fixture();f.apply(100);assert.equal(f.api.enabled(),false);assert.equal(f.log.snapshot().length,1,'initial preload is evidence before the first enable');
+  if(start)f.api.setEnabled(true);
+  f.api.setEnabled(false);f.apply(777);
+  assert.deepEqual(plain(f.api.snapshot().map),{},'late host apply after explicit off cannot restore the map');assert.equal(f.log.snapshot().length,0);
+  f.api.setEnabled(true);assert.deepEqual(plain(f.api.snapshot().map),{},'enable cannot recover retired evidence');assert.equal(f.log.snapshot().length,0);
+  f.apply(12,0,T+H);assert.equal(f.api.snapshot().map.a.signals.rate.value,12);assert.equal(f.log.snapshot().length,1,'a fresh accepted observation resumes Activity');f.api.destroy();
+ }
+});
+test('off retires held history observations and late demo writes; clear and capability recovery never reopen off writes',()=>{
+ const f=fixture();f.api.setEnabled(true);f.apply(0);f.api.openHistory([{at:iso(T),telemetry:{a:{signals:{rate:{value:0}}}}}],0);f.apply(100,0,T+H);
+ f.api.setEnabled(false);f.api.clear();f.apply(777,0,T+2*H);f.api.historyDay(0);f.api.closeHistory();
+ assert.deepEqual(plain(f.api.snapshot().map),{});assert.equal(f.log.snapshot().length,0);
+ f.api.setAvailable(false);f.api.setAvailable(true);f.apply(888);assert.deepEqual(plain(f.api.snapshot().map),{},'capability return stays off');
+ f.api.setEnabled(true);assert.equal(f.log.snapshot().length,0);assert.deepEqual(plain(f.api.snapshot().map),{});f.apply(12);assert.equal(f.log.snapshot().length,1);
+ f.api.clear();assert.equal(f.log.snapshot().length,0);f.apply(15);assert.equal(f.api.snapshot().map.a.signals.rate.value,15,'clear allows a subsequent current-session observation');
+ f.api.destroy();f.apply(999);assert.deepEqual(plain(f.api.snapshot().map),{});assert.equal(f.log.snapshot().length,0);
+ let callback;const demo=C.createTelemetry({}, {demo:{mount(api){callback=()=>api.apply({a:{signals:{rate:{value:777}}}});return callback;}}},{});
+ demo.setEnabled(true);callback();demo.setEnabled(false);callback();assert.deepEqual(plain(demo.snapshot().map),{},'cleanup and queued demo callbacks cannot restore off evidence');demo.destroy();
+});
+test('pending provider answers from an off session are rejected after re-enable, fresh answers resume',async()=>{
+ const pending=[],carrier={telemetry:{kind:'service',signals:{rate:{grafana:'explicit'}},proof:{rate:{min:1}}}};
+ const api=C.createTelemetry({}, {provider:(_,signal)=>new Promise(resolve=>pending.push({resolve,signal}))},{carriers:fn=>fn(carrier,'a',{})});
+ const settle=async()=>{for(let i=0;i<5;i++)await new Promise(setImmediate);};
+ try{
+  api.setEnabled(true);await settle();api.setEnabled(false);assert.equal(pending[0].signal.aborted,true);api.setEnabled(true);await settle();
+  pending[0].resolve({a:{signals:{rate:{value:777}}}});await settle();assert.deepEqual(plain(api.snapshot().map),{});
+  pending[1].resolve({a:{signals:{rate:{value:12}}}});await settle();assert.equal(api.snapshot().map.a.signals.rate.value,12);
+ }finally{api.destroy();}
+});
+
+test('initial capability discovery keeps host preload, actual capability loss retires it',()=>{
+ const api=C.createTelemetry({}, {available:false,demo:{mount:()=>()=>{}}},{}),sample={a:{signals:{rate:{value:12}}}};
+ api.setAvailable(false);api.setAvailable(true);api.apply(sample);assert.equal(api.enabled(),false);assert.equal(api.snapshot().map.a.signals.rate.value,12,'initial discovery is not an explicit off');
+ api.setAvailable(false);api.setAvailable(true);api.apply(sample);assert.deepEqual(plain(api.snapshot().map),{},'capability recovery after a real removal cannot reopen preload');api.destroy();
+});

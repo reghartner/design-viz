@@ -45,6 +45,7 @@ test('slider changes open Production to the exact day without Activity or querie
  await day(root,1);await expect(production(root)).toBeVisible();await expect(production(root)).toContainText('rate: unobserved');await expect(production(root).locator('.dv-live-proof-point')).toHaveCount(0);
  await day(root,2);await expect(production(root)).toContainText('rate: 50 req/h');await expect(production(root).locator('.dv-live-proof-point')).toHaveCount(1);expect(await activity(root).allTextContents()).toEqual(initial);expect(await page.evaluate(()=>[window.calls.live.length,window.calls.history.length])).toEqual([1,1]);
  await metrics(root).click();await expect(over(root)).toHaveAttribute('aria-pressed','true');await expect(root.getByRole('slider',{name:'Day',exact:true})).toHaveValue('2');await expect(production(root)).toHaveCount(0);await expect(activity(root)).toHaveCount(0);
+ await deliver(page,{rate:777});await day(root,0);await live(root).click();await expect(root.locator('.dv-live-proof')).toHaveCount(0);await expect(activity(root)).toHaveCount(0);
 });
 test('new accepted live observations emit first traffic once on Return Live and retain Jira rows on Metrics off',async({page,server})=>{
  const root=await setup(page,server);await metrics(root).click();await page.evaluate(()=>window.viewer.controller.liveStatus.apply({...window.jira,'LOC-2':{state:'done',updatedAt:new Date().toISOString()}}));await expect(root.locator('[data-activity-type="jira"]')).toHaveCount(1);
@@ -70,4 +71,16 @@ test('local/direct/nested handoff cues keep Production separate from the existin
  await page.evaluate(raw=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),raw,{telemetry:{provider:async()=>({})}});window.viewer.controller.liveStatus.apply({'LOC-1':{state:'done'},'IMP-1':{state:'done'}});window.viewer.controller.telemetry.apply(Object.fromEntries(['h','direct::h','nested::inner::h'].map(id=>[id,{signals:{rate:{value:7}}}])));},raw);
  const root=page.locator('#host');for(const id of ['h','direct::h','nested::inner::h']){await open(root,id);await expect(production(root)).toContainText('rate: 7 req/h');await page.keyboard.press('Escape');}
  await root.locator('[data-dv-node="h"] .handoff-link').press('Enter');await expect(root.locator('#section-destination')).toBeVisible();
+});
+
+test('late host callback after Metrics off cannot resurrect Production, Proof or Activity; initial preload and fresh enable still work',async({page,server})=>{
+ const root=await setup(page,server,{pending:true});await page.evaluate(()=>window.seed());
+ await expect(metrics(root)).toHaveAttribute('aria-pressed','false');await expect(root.locator('.dv-live-proof')).toHaveCount(1);await open(root,'ingest->app');await expect(production(root)).toContainText('rate: 100 req/h');await page.keyboard.press('Escape');
+ await metrics(root).click();await expect.poll(()=>page.evaluate(()=>window.liveReleases.length)).toBe(1);await metrics(root).click();
+ await deliver(page,{rate:777});
+ await expect(activity(root),'late host callback must not recreate telemetry Activity after explicit off').toHaveCount(0);
+ await expect(root.locator('.dv-live-proof')).toHaveCount(0);await trigger(root,'ingest->app').press('Enter');await expect(root.locator('.dv-live-popover:visible .dv-live-ticket')).toContainText('LOC-3');await expect(production(root)).toHaveCount(0);await page.keyboard.press('Escape');
+ await metrics(root).click();await expect.poll(()=>page.evaluate(()=>window.liveReleases.length)).toBe(2);await expect(root.locator('.dv-live-proof')).toHaveCount(0);await expect(activity(root)).toHaveCount(0);
+ await page.evaluate(()=>window.liveReleases.shift()());await expect(root.locator('.dv-live-proof')).toHaveCount(0);await expect(activity(root)).toHaveCount(0);
+ await page.evaluate(()=>window.liveReleases.shift()());await open(root,'ingest->app');await expect(production(root)).toContainText('rate: 100 req/h');await expect(activity(root).filter({hasText:'Delivery <script>bad()</script> · First observed traffic after Done'})).toHaveCount(1);
 });

@@ -2042,3 +2042,5 @@ history are consumed once on Return Live. Binding replacement/removal retires th
 old scope; clearing or disabling telemetry removes its events and Production while
 preserving Jira Activity and the selected Over time day. No queries originate from
 Production rendering, link preparation, or history slider movement.
+
+Initial host telemetry preload remains accepted before the first Metrics decision. An explicit Metrics off (including off before the first enable), capability removal, or destroy retracts evidence and rejects late `apply()` callbacks. Capability recovery stays off; an intentional enable accepts fresh observations. `clear()` retracts the current map without disabling a current session, so provider recovery can still supply its next observation.

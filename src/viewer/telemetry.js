@@ -351,7 +351,8 @@ function createTelemetry(page,options,hooks){
   var map=Object.create(null),liveMap=map,past=null,historyRequests=[],historyGeneration=0,historyCache=telemetryHistoryCache(),liveStatus=null,enabled=false,retired=false,listeners=[],demoCleanup=null;
   available=available && !!(provider || demo);
   var status={state:available?'idle':'absent',busy:false,refreshedAt:null,note:''};
-  var liveKeys=Object.create(null),bindingEpochs=Object.create(null),heldObservation=false;
+  // Host preload is allowed before the first Metrics decision, never after an explicit off.
+  var preload=true,liveKeys=Object.create(null),bindingEpochs=Object.create(null),heldObservation=false;
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function bindings(){return typeof hooks.carriers==='function'?telemetryBindings(hooks.carriers):[];}
   function emit(){if(retired || !listeners.length)return;var value=api.snapshot();listeners.slice().forEach(function(fn){fn(value);});}
@@ -467,7 +468,7 @@ function createTelemetry(page,options,hooks){
       if(!past)map=liveMap;historyBindingsChanged();notify();
     },
     apply:function(value){
-      if(retired || !permitted || !available && (provider || demo || options.available===false))return;store(value);
+      if(retired || !enabled && !preload || !permitted || !available && (provider || demo || options.available===false))return;store(value);
       if(enabled && !past)setStatus({state:'ok',refreshedAt:new Date().toISOString(),note:''});
       notify();
     },
@@ -482,8 +483,8 @@ function createTelemetry(page,options,hooks){
     enabled:function(){return enabled;},
     setEnabled:function(value){
       value=!!value;
-      if(retired || !available || value===enabled)return;
-      enabled=value;
+      if(retired || value && !available || value===enabled && (value || !preload))return;
+      preload=false;enabled=value;
       if(enabled){
         setStatus({state:'loading',busy:false,refreshedAt:null,note:''});
         if(past)loadHistory();else if(poller)poller.start();

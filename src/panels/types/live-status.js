@@ -203,7 +203,7 @@
         var nextDay=button(row,'next','reader-button dv-live-step','>',demoDays?'nextDemo':'overTimeStep');nextDay._liveArgument=1;nextDay.setAttribute('aria-label','Next day');nextDay.disabled=demoDays?demoDays.ended:over.index>=over.count-1;
         if(past)el(row,'p','note','dv-live-over-time-note','Status as of '+over.label+' · other columns show today').setAttribute('role','status');
       }
-      if(hasData || proof){
+      if(hasData || proof || value && value.activity.length){
         var body=el(host,'div','body','dv-live-panel-body'),epic=value.epic || {keys:[]};
         if(hasData){
         // Epic header box (#765): the epic is shown large inside the panel, never in the title bar. The old verdict line is gone.
@@ -271,8 +271,15 @@
           var dep=depOf(key);if(index===chain.length-1){var last=value.tickets.filter(function(ticket){return ticket.key===key;})[0];dep={key:key,state:last?last.state:dep.state,tone:last && last.waiting?last.waiting:last && last.state==='done'?'done':'none',reason:''};}
           depButton(row,'hop-'+index,dep);});});
         if(!value.blockers.length && !(value.chains || []).length)el(body,'p','none','dv-live-none','None');
-        el(body,'h3','activity-heading','','Activity');var activity=el(body,'ol','activity','dv-live-activity');value.activity.forEach(function(item,index){var row=el(activity,'li',String(index),'dv-live-activity-entry',item.key+' · '+(item.added?'added to epic · not on diagram':item.old+' → '+item.state)+' · '+item.relative);if(item.at)row.setAttribute('data-updated-at',item.at);else row.removeAttribute('data-updated-at');});
       }
+        el(body,'h3','activity-heading','','Activity');var activity=el(body,'ol','activity','dv-live-activity');value.activity.forEach(function(item,index){
+          var telemetry=item.type==='telemetry',row=el(activity,'li',(telemetry?'telemetry-':'jira-')+index,'dv-live-activity-entry',telemetry?null:item.key+' · '+(item.added?'added to epic · not on diagram':item.old+' → '+item.state)+' · '+item.relative);
+          row.setAttribute('data-activity-type',telemetry?'telemetry':'jira');
+          if(telemetry){row.setAttribute('data-activity-kind',item.kind);row.setAttribute('data-activity-carrier',item.carrier);}else{row.removeAttribute('data-activity-kind');row.removeAttribute('data-activity-carrier');}
+          if(telemetry)el(row,'span','text','',item.title+' · '+item.text+' · '+item.relative);
+          if(telemetry && item.url)link(row,'source','Source',item.url);
+          if(item.at)row.setAttribute('data-updated-at',item.at);else row.removeAttribute('data-updated-at');
+        });
       }
       if(!hasData && value && (value.excluded || []).length)excludedStories(el(host,'div','audit','dv-live-panel-body'),value.excluded);
       // #758: a built page carries an agent guide block; tell editors where it is. Nothing is painted without it.
@@ -363,6 +370,14 @@
 .dv-live-blocker{display:flex;flex-wrap:wrap;gap:4px 8px;padding:10px 0;border-bottom:1px solid var(--explore-border);}
 .dv-live-blocker-lanes,.dv-live-downstream,.dv-live-missing-detail{flex-basis:100%;}
 .dv-live-activity-entry{padding:5px 0;font-size:12px;}
+.dv-live-activity-entry>a{margin-left:6px;}
+.dv-live-production{border-top:1px solid var(--explore-border);margin-top:8px;padding-top:8px;}
+.dv-live-production h3,.dv-live-production p{margin:4px 0;}
+.dv-live-production-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
+.dv-live-production-kpi{border:1px solid var(--explore-border);border-radius:5px;padding:6px;overflow-wrap:anywhere;}
+.dv-live-production-since{color:var(--dfaint);overflow-wrap:anywhere;}
+.dv-live-production-link{display:inline-flex;align-items:center;gap:4px;}
+.dv-live-production-link svg{width:16px;height:16px;}
 .dv-live-excluded{list-style:none;padding:0;margin:0;}
 .dv-live-excluded-story{display:flex;flex-wrap:wrap;gap:4px 8px;padding:8px 0;border-bottom:1px solid var(--explore-border);}
 .dv-live-excluded-reason{flex-basis:100%;color:var(--dfaint);font-size:11px;}

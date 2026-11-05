@@ -97,7 +97,10 @@ export interface TelemetryBinding {
 /** One carrier's telemetry for the observation window, keyed by carrier id in the
  * provider result. Every field is optional; malformed entries are dropped. */
 export interface TelemetrySample {
-  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string}>;
+  /** Signal observedAt is measurement as-of (null means unknown); retrievedAt is
+   * client receipt time. Live charts prefer the selected signal's as-of. Mixed
+   * adapters assign each legacy signal its own endpoint before combining sources. */
+  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string; observedAt?: string | number | null; retrievedAt?: string | number | null}>;
   observedAt?: string | number;
   markers?: Array<{at: string | number; kind?: string; label?: string}>;
   links?: {query?: string; dashboard?: string};

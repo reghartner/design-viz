@@ -22,6 +22,8 @@
                {<carrier id>: {
                   signals: {<signal name>: {value: <number>,
                                             series: [[t, v], ...],
+                                            observedAt: <measurement as-of, or null>,
+                                            retrievedAt: <client receipt time>,
                                             unit: <string>}},
                   observedAt: <ISO time or epoch ms>,
                   markers: [{at: <ISO time or epoch ms>, kind: <string>, label: <string>}],
@@ -61,6 +63,8 @@ function telemetrySample(raw){
     if(telemetryNumber(value.value))entry.value=value.value;
     if(Array.isArray(value.series))entry.series=value.series.filter(telemetryPoint).map(function(point){return [point[0],point[1]];});
     if(telemetryText(value.unit))entry.unit=value.unit;
+    if(telemetryOwn(value,'observedAt'))entry.observedAt=telemetryTime(value.observedAt);
+    if(telemetryOwn(value,'retrievedAt'))entry.retrievedAt=telemetryTime(value.retrievedAt);
     out.signals[name]=entry;
   });
   if(Array.isArray(raw.markers))raw.markers.forEach(function(marker){

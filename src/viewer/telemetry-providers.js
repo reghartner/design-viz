@@ -4,7 +4,16 @@
 function telemetryProviderMerge(maps){
   var out=Object.create(null);maps.forEach(function(map){Object.keys(map || {}).forEach(function(id){var sample=map[id],target=out[id];
     if(!target)target=out[id]={signals:{},observedAt:null,markers:[],links:{}};
-    Object.keys(sample.signals || {}).forEach(function(name){target.signals[name]=sample.signals[name];});
+    Object.keys(sample.signals || {}).forEach(function(name){
+      var entry=Object.assign({},sample.signals[name]);
+      // Preserve explicit unknown as-of. Legacy adapter series acquire their
+      // own endpoint before carrier summaries from other sources are combined.
+      if(!telemetryOwn(entry,'observedAt')){
+        var times=(entry.series || []).map(function(p){return Date.parse(telemetryTime(p[0]));}).filter(isFinite);
+        entry.observedAt=times.length?telemetryTime(Math.max.apply(null,times)):telemetryTime(sample.observedAt);
+      }
+      target.signals[name]=entry;
+    });
     if(sample.observedAt && (!target.observedAt || Date.parse(sample.observedAt)>Date.parse(target.observedAt)))target.observedAt=sample.observedAt;
     target.markers=target.markers.concat(sample.markers || []);
     Object.keys(sample.links || {}).forEach(function(key){if(!target.links[key])target.links[key]=sample.links[key];});

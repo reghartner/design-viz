@@ -38,8 +38,11 @@ function liveStatusProofPresentation(snapshot,window){
   var rows=snapshot.carriers.filter(function(binding){return snapshot.verdicts.carriers[binding.id].bound;}).map(function(binding){
     var result=snapshot.verdicts.carriers[binding.id],sample=snapshot.map[binding.id],primary=telemetryPrimary(binding),queue=binding.kind==='queue';
     var reading=primary?telemetryReading(sample,primary):{series:[]},times=reading.series.map(function(p){return Date.parse(telemetryTime(p[0]));}).filter(isFinite);
-    var end=Date.parse(snapshot.historical?snapshot.at:sample && sample.observedAt);
-    if(!isFinite(end) && times.length)end=Math.max.apply(null,times);
+    // Each primary signal owns its measurement window. A carrier timestamp may
+    // summarize a newer peer and must not clip this signal's older points.
+    var entry=sample && sample.signals && sample.signals[primary],explicit=entry && telemetryOwn(entry,'observedAt');
+    var end=Date.parse(snapshot.historical?snapshot.at:!entry?null:explicit?entry.observedAt:sample && sample.observedAt);
+    if(!isFinite(end) && !explicit && times.length)end=Math.max.apply(null,times);
     var start=end-windowMs,points=reading.series.map(function(p){return {at:Date.parse(telemetryTime(p[0])),value:p[1]};}).filter(function(p){return isFinite(end) && p.at>=start && p.at<=end;}).sort(function(a,b){return a.at-b.at;});
     var markers=(sample && sample.markers || []).filter(function(m){return m.kind==='done' || m.kind==='deploy';}).map(function(m){return {at:Date.parse(m.at),label:m.label || m.kind,kind:m.kind};});
     if(result.since.doneAt)markers.push({at:Date.parse(result.since.doneAt),label:'Done',kind:'done'});
@@ -57,7 +60,7 @@ function liveStatusProofPresentation(snapshot,window){
         {label:queue?'lag':'errors',text:telemetryCardValue(binding,sample,queue?'lag':telemetryErrorSignal(binding,primary) || 'errors')},
         {label:queue?'age':'p95',text:telemetryCardValue(binding,sample,queue?'age':'p95')}],
       since:since.join(' · ') || 'unavailable',url:url,
-      chart:{points:plotted,line:continuous?plotted.map(function(p){return p.x+','+p.y;}).join(' '):null,
+      chart:{observedAt:isFinite(end)?new Date(end).toISOString():null,points:plotted,line:continuous?plotted.map(function(p){return p.x+','+p.y;}).join(' '):null,
         markers:markers.map(function(m){return {x:2+96*(m.at-start)/windowMs,label:m.label,kind:m.kind};})}};
   });
   var predicates=rows.map(function(row){return row.predicate;}).filter(function(value,i,all){return all.indexOf(value)===i;});

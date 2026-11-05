@@ -2094,7 +2094,22 @@ and is never parsed as exact measurements. The adapter reads the provider's
 `series[].data` numbers; `header` aliases identify calculation keys. A single
 finite aggregate row is required (including explicit zero); ambiguous groups,
 nulls and malformed results are unobserved. Series timestamps are bucket starts;
-the aggregate is the whole-window headline, and `observedAt` records receipt time.
+the aggregate is the whole-window headline. Each signal's runtime `observedAt`
+is the latest returned bucket start plus valid `info.granularity_seconds` (the
+end of that observed bucket), or its latest actual start if width is unavailable.
+It does not assert complete coverage of the requested window. Without time-series
+points, measurement as-of is unknown (`null`). Runtime `retrievedAt` separately
+records client receipt time. These are normalized runtime fields, not invented
+native response fields or authored bindings.
+
+Live Proof charts use the primary signal's `observedAt`. The mixed-provider coordinator gives
+legacy adapter signals their own latest point as-of (or their source's carrier
+time for aggregate-only samples) before combining sources. Direct host samples
+without signal as-of keep the existing carrier-time clipping policy. An explicit unknown signal as-of stays unknown.
+The mixed carrier timestamp is a newest-observation summary, never authority to
+clip a different signal's series. Historical charts still use the selected exact
+day endpoint. Actual bucket starts remain unchanged for Since Done evidence;
+no points or Done events are shifted to the client clock.
 No implicit rate conversion is performed.
 
 For hosted results, only HTTPS `mcp.honeycomb.io/query_results/<token>` retrieval is supported, with

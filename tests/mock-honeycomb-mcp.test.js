@@ -127,7 +127,23 @@ test('H2: initialize and tools/list expose only verified Honeycomb names and moc
   assert.match(error(await call('get_query_results', { query_run_pk: 'not-assumed' })), /not served.*input field names/i);
   assert.equal(handleMcp(rpc('other/method'), ctx()).error.code, -32601);
   assert.equal(handleMcp(rpc('tools/call', { name: 'find_queries', arguments: {} }), ctx()).error.code, -32602);
-  assert.equal(handleMcp({ jsonrpc: '2.0', method: 'notifications/initialized' }, ctx()), null);
+  for (const notification of [
+    { jsonrpc: '2.0', method: 'notifications/initialized' },
+    { jsonrpc: '2.0', method: 'initialize', params: {} },
+    { jsonrpc: '2.0', method: 'tools/list' },
+    { jsonrpc: '2.0', method: 'tools/call', params: { name: 'run_query', arguments: {} } }
+  ]) assert.equal(handleMcp(notification, ctx()), null, notification.method);
+  for (const invalidId of [true, false, {}, [], ['not-an-id']]) {
+    assert.deepEqual(handleMcp(rpc('tools/list', undefined, invalidId), ctx()), {
+      jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' }
+    });
+  }
+  assert.equal(handleMcp(rpc('tools/list', undefined, null), ctx()).id, null, 'null remains a valid request id');
+  for (const name of ['constructor', '__proto__', 'toString']) {
+    const response = handleMcp(rpc('tools/call', { name, arguments: {} }), ctx());
+    assert.equal(response.error.code, -32602, name);
+    assert.equal(response.id, 1, name);
+  }
   assert.equal(handleMcp({ jsonrpc: '1.0', id: 1, method: 'tools/list' }, ctx()).error.code, -32600);
 });
 
@@ -320,15 +336,39 @@ test('H9: Worker fetch covers health, CORS, JSON-RPC batches, notifications, err
   }
   const init = await fetchMock('/mcp', post(rpc('initialize')));
   assert.equal((await init.json()).result.serverInfo.name, 'mock-honeycomb-mcp');
-  assert.equal((await fetchMock('/mcp', post({ jsonrpc: '2.0', method: 'notifications/initialized' }))).status, 202);
+  let notification = await fetchMock('/mcp', post({ jsonrpc: '2.0', method: 'tools/list' }));
+  assert.equal(notification.status, 202);
+  assert.equal(await notification.text(), '');
+  notification = await fetchMock('/mcp', post([
+    { jsonrpc: '2.0', method: 'initialize', params: {} },
+    { jsonrpc: '2.0', method: 'tools/list' },
+    { jsonrpc: '2.0', method: 'tools/call', params: { name: 'run_query', arguments: {} } }
+  ]));
+  assert.equal(notification.status, 202);
+  assert.equal(await notification.text(), '', 'an all-notification batch has no response body');
   assert.equal((await (await fetchMock('/mcp', { method: 'POST', body: '{' })).json()).error.code, -32700);
   assert.equal((await (await fetchMock('/mcp', post([]))).json()).error.code, -32600);
   const batch = await (await fetchMock('/mcp?scenario=story&day=11', post([
     rpc('tools/list', undefined, 1), rpc('tools/call', { name: 'run_query', arguments: queryArgs('notify->app', 'rate') }, 2),
-    { jsonrpc: '2.0', method: 'notifications/initialized' }
+    { jsonrpc: '2.0', method: 'tools/list' }
   ]))).json();
   assert.equal(batch.length, 2);
+  assert.deepEqual(batch.map(item => item.id), [1, 2], 'mixed-batch notifications are omitted');
   assert.equal(batch[1].result.structuredContent.info.rows_examined, 24);
+  for (const invalidId of [true, false, {}, [], ['not-an-id']]) {
+    const invalid = await fetchMock('/mcp', post(rpc('tools/list', undefined, invalidId)));
+    assert.equal(invalid.status, 200);
+    assert.deepEqual(await invalid.json(), {
+      jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' }
+    });
+  }
+  for (const name of ['constructor', '__proto__', 'toString']) {
+    const inherited = await fetchMock('/mcp', post(rpc('tools/call', { name, arguments: {} })));
+    assert.equal(inherited.status, 200, name);
+    const payload = await inherited.json();
+    assert.equal(payload.error.code, -32602, name);
+    assert.equal(payload.id, 1, name);
+  }
 
   const keys = [];
   const limited = { RL: { limit: async ({ key }) => { keys.push(key); return { success: false }; } } };

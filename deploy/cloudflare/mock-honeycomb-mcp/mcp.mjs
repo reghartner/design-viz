@@ -337,11 +337,13 @@ function tools() {
 }
 
 export function handleMcp(request, env = {}) {
-  const id = request?.id;
-  if (!request || typeof request !== 'object' || Array.isArray(request) || request.jsonrpc !== '2.0' || typeof request.method !== 'string') {
-    return rpcError(id, -32600, 'Invalid Request');
+  if (!request || typeof request !== 'object' || Array.isArray(request) || request.jsonrpc !== '2.0' ||
+      typeof request.method !== 'string' ||
+      (Object.hasOwn(request, 'id') && request.id !== null && typeof request.id !== 'string' && typeof request.id !== 'number')) {
+    return rpcError(null, -32600, 'Invalid Request');
   }
-  if (request.method === 'notifications/initialized') return null;
+  const { id } = request;
+  if (!Object.hasOwn(request, 'id')) return null;
   if (request.method === 'initialize') {
     return { jsonrpc: '2.0', id, result: {
       protocolVersion: request.params?.protocolVersion || '2025-06-18',
@@ -353,7 +355,7 @@ export function handleMcp(request, env = {}) {
   if (request.method !== 'tools/call') return rpcError(id, -32601, `Method not found: ${request.method}`);
   const name = request.params?.name;
   const args = request.params?.arguments ?? {};
-  const spec = TOOL_INPUTS[name];
+  const spec = typeof name === 'string' && Object.hasOwn(TOOL_INPUTS, name) ? TOOL_INPUTS[name] : null;
   if (!spec) return rpcError(id, -32602, `Unknown tool ${JSON.stringify(name)}`);
   if (!args || typeof args !== 'object' || Array.isArray(args)) return toolError(id, 'arguments must be an object');
   for (const required of spec.required) if (args[required] === undefined) return toolError(id, `missing required argument ${required}`);

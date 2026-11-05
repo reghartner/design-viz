@@ -1,6 +1,6 @@
 // Contract matrix for "zoom scrolls only over drawn content" (issue #669;
 // Chuck's ruling 2026-10-19: option 1, content-bounded scrolling while zoomed,
-// Fit diagram unchanged; coverage extends this file on both surfaces).
+// coverage extends this file on both surfaces; Fit now also uses drawn content).
 // | row | fixture | assertion (scoped to the board) | rejects |
 // | zoomed, cards fit width: no horizontal scroll | 4 floated cards, graphFrame 800x420, + until SVG > board | board scrollWidth<=clientWidth+1 and its Scroll group hidden | scroll extent from viewBox width (main) |
 // | zoomed, cards fit height: no vertical scroll | same zoom | board scrollHeight<=clientHeight+1 | cropping width only |
@@ -13,6 +13,8 @@
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
+import vm from 'node:vm';
+import sourceLoader from '../../../tools/source-loader.cjs';
 import {test,expect,paste,prepareEditorSurface,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
@@ -64,8 +66,7 @@ for(const surface of ['standalone','workbench'])test(surface+' regular diagram p
     expect(await width(board)).toBeCloseTo(zoomed,0);
   }
   await board.getByRole('button',{name:'Fit diagram',exact:true}).click();
-  const fitted=await board.evaluate(el=>{const b=el.getBoundingClientRect(),s=el.querySelector('.boardcanvas>svg').getBoundingClientRect();return {width:s.width,available:el.clientWidth,bottom:s.bottom,frameBottom:b.bottom};});
-  expect(fitted.width).toBeLessThanOrEqual(fitted.available+1);expect(fitted.bottom).toBeLessThanOrEqual(fitted.frameBottom+1);
+  await expectFitted(board);
   await board.getByRole('button',{name:'Auto',exact:true}).click();
   // Reader viewing crosses its narrow gutter breakpoint with Contents closed.
   // Workbench authoring stays at desktop widths.
@@ -120,6 +121,9 @@ for(const surface of ['standalone','workbench'])test(surface+' diagram zoom scro
     await page.goto(server.origin+'/margin-zoom.html');
   }else{await page.goto(server.origin+'/workbench.html');await paste(page,text);await prepareEditorSurface(page);}
   const board=page.locator('.board');await expect(board).toBeVisible();
+  // This contract starts at the explicit width mode; fresh-load content fit is
+  // covered separately below, including its intentionally oversized SVG frame.
+  await board.getByRole('button',{name:'Auto',exact:true}).click();
   const zoomIn=board.getByRole('button',{name:/^(?:Canvas zoom|Diagram zoom|Zoom) in$/,exact:true}),pan=board.getByRole('group',{name:'Horizontal diagram scroll'});
   let g=await zoomGeometry(board);
   // The fixture must leave wide empty frame margins around its drawn content
@@ -485,4 +489,81 @@ test('standalone reader Present EXIT stays clickable below the navigation and na
   await expect.soft(named(exitName)).toHaveCount(1);
   await page.keyboard.press('Escape');
   await expect(body).not.toHaveClass(/presenting/);await expect(named(idleName)).toHaveCount(1);
+});
+
+// Standard fits the actual graph, including local and resolved imported nodes,
+// while keeping authored frames intact for export, print and later editing.
+async function expectFitted(board){
+  await expect.poll(async()=>{
+    const g=await zoomGeometry(board),w=g.visible.right-g.visible.left,h=g.visible.bottom-g.visible.top;
+    return g.ink.every(c=>inside(c,g.visible)) && g.sw<=g.cw+1 && g.sh<=g.ch+1 &&
+      Math.max((g.union.right-g.union.left)/w,(g.union.bottom-g.union.top)/h)>.75;
+  }).toBe(true);
+}
+async function openStandard(page,server,surface,raw){
+  const text=JSON.stringify(raw);await page.setViewportSize({width:1100,height:850});
+  if(surface==='standalone'){
+    const input=path.join(server.root,'standard-fit.json');await writeFile(input,text);
+    execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),path.join(server.root,'standard-fit.html')]);
+    await page.goto(server.origin+'/standard-fit.html#tour=0');
+  }else{await page.goto(server.origin+'/workbench.html');await paste(page,text);await prepareEditorSurface(page);}
+  await page.evaluate(()=>document.fonts.ready);
+  return page.locator('.board');
+}
+function fitSpec(shape){
+  const raw=marginSpec(),d=raw.page.sections[0].diagram;
+  d.graphFrame=shape==='wide'?{x:-2000,y:-1200,w:6000,h:3000}:{x:300,y:200,w:1800,h:15000};
+  const positions=shape==='wide'?[[-600,-200],[120,-200],[-600,70],[120,70]]:[[600,450],[850,450],[600,11000],[850,11000]];
+  d.floats.forEach((f,i)=>{f.x=positions[i][0];f.y=positions[i][1];});
+  return raw;
+}
+for(const surface of ['standalone','workbench'])for(const shape of ['wide','tall'])test(surface+' Standard fresh load and Fit fill '+shape+' content inside a padded frame',async({page,server})=>{
+  const raw=fitSpec(shape),board=await openStandard(page,server,surface,raw);
+  await expectFitted(board);
+  const initial=await zoomGeometry(board),viewBox=await board.locator('.boardcanvas>svg').getAttribute('viewBox');
+  if(shape==='wide')expect(initial.svgW).toBeGreaterThan(initial.cw*2);
+  else expect(await board.locator('.board-zoom-value').textContent()).toMatch(/^[0-9]%$/);
+  const original=surface==='workbench'?await page.locator('#src').inputValue():null;
+  for(let i=0;i<3;i++)await board.getByRole('button',{name:'Diagram zoom in',exact:true}).click();
+  await board.evaluate(el=>{el.scrollLeft=el.scrollWidth;el.scrollTop=el.scrollHeight;});
+  await board.getByRole('button',{name:'Fit diagram',exact:true}).click();
+  await expectFitted(board);
+  const fitted=await zoomGeometry(board);
+  expect(fitted.svgW).toBeCloseTo(initial.svgW,0);
+  await board.getByRole('button',{name:'Fit diagram',exact:true}).click();
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  expect((await zoomGeometry(board)).svgW).toBeCloseTo(fitted.svgW,0);
+  expect(await board.locator('.boardcanvas>svg').getAttribute('viewBox')).toBe(viewBox);
+  if(original!==null)await expect(page.locator('#src')).toHaveValue(original);
+  // A narrower desktop column wraps controls; the active fit uses the settled
+  // legend height. Once manually zoomed, the same resize preserves that camera.
+  await page.setViewportSize({width:1024,height:740});await expectFitted(board);
+  await board.getByRole('button',{name:'Diagram zoom in',exact:true}).click();
+  const manual=await width(board);await page.setViewportSize({width:1200,height:850});
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  expect(await width(board)).toBeCloseTo(manual,0);
+});
+function importedFitSpec(){
+  const raw=fitSpec('wide'),d=raw.page.sections[0].diagram;
+  const provider={page:{title:'Shared cards',canon:{version:1,id:'provider',kind:'canonical',owner:'group:default/test'},sections:[{diagram:{
+    nodes:{b:d.nodes.b,d:d.nodes.d},rows:[[]],floats:d.floats.filter(f=>f.id==='b'||f.id==='d'),edges:[],topologyExports:{core:{nodes:['b','d'],edges:[]}}
+  }}]}};
+  delete d.nodes.b;delete d.nodes.d;d.floats=d.floats.filter(f=>f.id==='a'||f.id==='c');
+  d.edges.forEach(e=>{if(e.from==='b'||e.from==='d')e.from='shared::'+e.from;});
+  d.topologyImports=[{spec:'provider',export:'core',as:'shared',position:{x:0,y:0}}];
+  raw.page.canon={version:1,id:'consumer',kind:'canonical',owner:'group:default/test'};
+  const context=vm.createContext({});vm.runInContext(sourceLoader.composeSources(['validator.js','canon.js']),context);
+  const resolved=JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(raw,{version:1,id:'consumer',specs:[provider,raw]})));
+  expect(resolved.page.sections[0].diagram.topologyProvenance).toBeTruthy();
+  return resolved;
+}
+for(const surface of ['standalone','workbench'])test(surface+' Standard fitting includes real resolved imports and local nodes',async({page,server})=>{
+  const board=await openStandard(page,server,surface,importedFitSpec());
+  await expect(board.locator('[data-dv-node="shared::b"]')).toHaveCount(1);
+  await expect(board.locator('[data-dv-node="shared::d"]')).toHaveCount(1);
+  await expect(board.locator('[data-dv-node="a"]')).toHaveCount(1);
+  await expectFitted(board);
+  await board.getByRole('button',{name:'Readable',exact:true}).click();
+  await board.getByRole('button',{name:'Fit diagram',exact:true}).click();
+  await expectFitted(board);
 });

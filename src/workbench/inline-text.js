@@ -148,6 +148,12 @@ function createInlineTextEditor(opts){
       var plan=planTabViewEdit(s.text,s.raw,t.section,t.viewId,'name',value,opts.session.validate);if(!plan.error)plan.inlineValue=value;return plan;
     }};
   }
+  // Pointer capture used by path reordering can retarget click and dblclick
+  // from the label span to its button. Both represent the same path gesture.
+  function pathLabelFrom(el){
+    var button=el && el.closest && el.closest('button.path-chip[data-dv-path]');
+    return button && !button.disabled?button.querySelector(':scope > .path-chip-label,:scope > .path-timeline-label'):null;
+  }
   function pathTarget(el){
     var button=el.closest('button.path-chip[data-dv-path]'),section=el.closest('.doc-sec[data-dv-section]');
     if(!button || button.disabled || !section)return null;
@@ -338,7 +344,7 @@ function createInlineTextEditor(opts){
     // Only the tab label and explicit panel title grip are editable buttons.
     var button=e.target.closest('button,[role="button"]');
     if(button && !button.matches('.tabbtn,.path-chip[data-dv-path]:not(:disabled),.reader-top-view[data-tab-view],.tab-view-choices button[data-tab-view],.explore-window[data-explore-panel] > .explore-window-header > .explore-window-grip'))return;
-    var el=e.target.closest(openSelector);if(el){e.preventDefault();e.stopPropagation();open(el);}
+    var el=pathLabelFrom(e.target) || e.target.closest(openSelector);if(el){e.preventDefault();e.stopPropagation();open(el);}
   }
   // Clearing an editing preview can rebuild the chips during the first click.
   // Remember that first press by identity and open its replacement after the
@@ -346,14 +352,14 @@ function createInlineTextEditor(opts){
   var pathPress=null,pathReplacement=null;
   life.listen(view,'pointerdown',function(e){
     if(e.button!==0 || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey){pathPress=pathReplacement=null;return;}
-    var label=e.target.closest && e.target.closest('button.path-chip[data-dv-path] > span.path-chip-label,button.path-chip[data-dv-path] > span.path-timeline-label');
+    var label=pathLabelFrom(e.target);
     var t=label && pathTarget(label),now=Date.now();
     pathReplacement=t && pathPress && !pathPress.el.isConnected && now-pathPress.time<500 && pathPress.section===t.section && pathPress.pathId===t.pathId && Math.abs(pathPress.x-e.clientX)<5 && Math.abs(pathPress.y-e.clientY)<5?t:null;
     pathPress=t?{el:label,section:t.section,pathId:t.pathId,time:now,x:e.clientX,y:e.clientY}:null;
   },true);
   life.listen(view,'click',function(e){
     var target=pathReplacement;pathReplacement=null;if(!target)return;pathPress=null;
-    var label=e.target.closest && e.target.closest('button.path-chip[data-dv-path] > span.path-chip-label,button.path-chip[data-dv-path] > span.path-timeline-label'),clicked=label && pathTarget(label);
+    var label=pathLabelFrom(e.target),clicked=label && pathTarget(label);
     if(!clicked || clicked.section!==target.section || clicked.pathId!==target.pathId)return;
     life.delay(function(){
       var section=view.querySelector('.doc-sec[data-dv-section="'+target.section+'"]');if(!section)return;

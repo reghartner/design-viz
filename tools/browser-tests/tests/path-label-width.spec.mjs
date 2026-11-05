@@ -123,6 +123,8 @@ for(const shared of [false,true])test('desktop '+(shared?'shared timeline':'matr
   const disabled=await chip('word').boundingBox();await page.mouse.dblclick(disabled.x+disabled.width/2,disabled.y+disabled.height/2);await expect(edit).toHaveCount(0);await expect(src).toHaveValue(original);
   await label('long').dblclick();await expect(edit).toBeFocused();await expect(edit).toHaveValue(d.paths[1].label);await expect(chip('long')).toHaveAttribute('aria-pressed','true');
   await edit.fill('Discarded');await edit.press('Escape');await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();
+  // The button padding is also a path-label gesture, even when pointer capture retargets the event.
+  await chip('long').dblclick({position:{x:4,y:4}});await expect(edit).toBeFocused();await expect(edit).toHaveValue(d.paths[1].label);await edit.press('Escape');await expect(src).toHaveValue(original);
   await label('long').dblclick();await edit.fill('');await edit.press('Enter');await expect(page.locator('.dv-inline-editor [role=status]')).toHaveText('Give the path a label and a hex color.');await expect(src).toHaveValue(original);await edit.press('Escape');await expect(undo).toBeDisabled();
   const newLabel='A much longer renamed delivery route that must wrap across lines';await label('long').dblclick();await edit.fill(newLabel);await edit.press('Enter');
   const saved=await src.inputValue(),want=structuredClone(spec);want.page.sections[0].diagram.paths[1].label=newLabel;expect(JSON.parse(saved)).toEqual(want);await expect(label('long')).toHaveText(newLabel);await expect(chip('long')).toHaveAttribute('aria-pressed','true');

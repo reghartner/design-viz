@@ -723,15 +723,21 @@ test('imported subtitle edits only the consumer display override and clears like
   const {provider}=await fixture(page,server,'file','ambient',provider=>{diagram(provider).nodes.api.sub='Provider detail';});
   const providerBefore=JSON.stringify(provider),src=page.locator('#src'),member=node(page,'shared::api'),sub=member.locator('.t2'),edit=member.getByRole('textbox',{name:'Node subtitle',exact:true});
   const undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder'),original=await source(page),base=JSON.parse(original);
+  async function renderedSubtitle(expected){
+    await expect.poll(()=>sub.evaluate(el=>el.getAttribute('aria-label') || Array.from(el.childNodes).filter(n=>n.nodeName.toLowerCase()!=='title').map(n=>n.textContent).join(''))).toBe(expected);
+    const state=await sub.evaluate(el=>({shown:Array.from(el.childNodes).filter(n=>n.nodeName.toLowerCase()!=='title').map(n=>n.textContent).join(''),title:el.querySelector('title')?.textContent || null}));
+    expect(state.shown===expected || state.shown.endsWith('…') && expected.startsWith(state.shown.slice(0,-1))).toBe(true);
+    if(state.shown!==expected)expect(state.title).toBe(expected);
+  }
   await member.click();await page.locator('#editor-tab-inspect').click();const inspect=page.getByRole('textbox',{name:'Display subtitle',exact:true});
   await expect(inspect).toHaveValue('Provider detail');await inspect.fill('');await inspect.press('Enter');const cleared=await source(page);
   expect((await overlay(page)).nodeOverrides.api.sub).toBeNull();await expect(sub).toHaveText('');await undo.click();await expect(src).toHaveValue(original);await closeTools(page);
   await sub.dblclick();await expect(edit).toBeFocused();await expect(edit).toHaveValue('Provider detail');await expect(member.getByRole('textbox',{name:'Node name',exact:true})).toHaveCount(0);
   const box=await edit.boundingBox(),line=await sub.boundingBox();expect(box.y).toBeLessThanOrEqual(line.y+line.height/2);expect(box.y+box.height).toBeGreaterThanOrEqual(line.y+line.height/2);
   await edit.fill('Discarded');await edit.press('Escape');await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();
-  await sub.dblclick();await edit.fill('Consumer detail');await edit.press('Enter');const saved=await source(page),want=structuredClone(base);diagram(want).topologyImports[0].nodeOverrides={api:{sub:'Consumer detail'}};expect(JSON.parse(saved)).toEqual(want);await expect(sub).toHaveText('Consumer detail');
-  await undo.click();await expect(src).toHaveValue(original);await expect(sub).toHaveText('Provider detail');await expect(undo).toBeDisabled();await redo.click();await expect(src).toHaveValue(saved);await expect(sub).toHaveText('Consumer detail');
-  await undo.click();await sub.dblclick();await edit.fill('');await edit.press('Enter');await expect(src).toHaveValue(cleared);await expect(sub).toHaveText('');await undo.click();await expect(src).toHaveValue(original);await expect(sub).toHaveText('Provider detail');
+  await sub.dblclick();await edit.fill('Consumer detail');await edit.press('Enter');const saved=await source(page),want=structuredClone(base);diagram(want).topologyImports[0].nodeOverrides={api:{sub:'Consumer detail'}};expect(JSON.parse(saved)).toEqual(want);await renderedSubtitle('Consumer detail');
+  await undo.click();await expect(src).toHaveValue(original);await renderedSubtitle('Provider detail');await expect(undo).toBeDisabled();await redo.click();await expect(src).toHaveValue(saved);await renderedSubtitle('Consumer detail');
+  await undo.click();await sub.dblclick();await edit.fill('');await edit.press('Enter');await expect(src).toHaveValue(cleared);await expect(sub).toHaveText('');await undo.click();await expect(src).toHaveValue(original);await renderedSubtitle('Provider detail');
   await sub.dblclick();await edit.fill('Outside detail');await node(page,'local').click();const outside=structuredClone(base);diagram(outside).topologyImports[0].nodeOverrides={api:{sub:'Outside detail'}};expect(JSON.parse(await source(page))).toEqual(outside);await undo.click();await expect(src).toHaveValue(original);
   expect(JSON.stringify(provider)).toBe(providerBefore);expect(requests.every(method=>method==='GET' || method==='HEAD')).toBe(true);
 });

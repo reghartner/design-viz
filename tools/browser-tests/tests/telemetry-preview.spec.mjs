@@ -123,8 +123,14 @@ test('P5 actual selected loaded detail with imported edges follows preview and r
 
 test('P6 nested imports render placeholders through the same reader geometry with authored side/offset',async({page,server})=>{
  const spec=nestedSpec();spec.page.sections[0].diagram.edges[0].telemetry.card={side:'right',offset:160};
- const [a]=await owners(page,server,spec);await a.getByRole('checkbox',{name:'Preview metrics layout'}).check();await expect(a.locator('.dv-metrics-card')).toHaveCount(1);
- const preview=await box(a.locator('.dv-metrics-card'));await expect(a.locator('.dv-metrics-card')).toHaveAttribute('data-metrics-card','outer::inner::a->outer::inner::b');
+ const [a]=await owners(page,server,spec);
+ // A wider fallback font must not let the synthetic annotation change layout.
+ await page.addStyleTag({content:'.dv-metrics-card-note{font-family:monospace!important;font-size:11px!important}'});
+ await a.getByRole('checkbox',{name:'Preview metrics layout'}).check();await expect(a.locator('.dv-metrics-card')).toHaveCount(1);
+ const preview=await box(a.locator('.dv-metrics-card'));
+ await expect(a.locator('.dv-metrics-card-note')).toHaveText('Preview · synthetic');
+ expect(await a.locator('.dv-metrics-card-note').evaluate(el=>el.getBBox().width)).toBeLessThanOrEqual(preview.w-20+.1);
+ await expect(a.locator('.dv-metrics-card')).toHaveAttribute('data-metrics-card','outer::inner::a->outer::inner::b');
  await page.evaluate(spec=>{
   const host=document.createElement('div');host.id='metrics-reader';host.style.width='1400px';document.body.append(host);
   window.geometryReader=window.__editorTest.renderPage(host,window.__editorTest.normalize(spec),'pastel',null,{autoplay:false,telemetry:{provider:()=>({'outer::inner::a->outer::inner::b':{signals:{rate:{value:12,series:[[0,12],[1,12]]},errors:{value:12,series:[[0,12],[1,12]]}}}})}});

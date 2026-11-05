@@ -485,11 +485,11 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "once, and distinguish returned, empty, zero and failed evidence.",
             "- Metrics defaults off. Root `enabled:false`/host false grants no query permission; absent tools hide it. "
             "Preview: synthetic, unsaved, no network.",
-            "- Honeycomb uses run_query; schema-qualified query_spec; one scalar, no breakdowns/formulas. "
-            "Exact values require raw JSON; COUNT means spans/events. No history/traces. Keep UI links, "
-            "never signed URLs; no live-account claim.",
+            "- Honeycomb uses run_query: one scalar, exact JSON, no breakdowns/formulas; COUNT counts spans/events. "
+            "For traces declare get_trace; follow docs/provider-traces.md. One request only; keep partial "
+            "warnings. No history/raw trace JSON, signed URLs or live-account claim.",
             "- Over time: exact prior-24h endpoints; missing stays unobserved. Read docs/live-status.md "
-            "and the Metrics chapter before editing.",
+            "and Metrics authoring.",
         ]
     lines += [
         "",

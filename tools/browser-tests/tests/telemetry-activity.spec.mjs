@@ -87,7 +87,7 @@ test('late host callback after Metrics off cannot resurrect Production, Proof or
 
 
 test('ratio denominator-only crossings appear in Activity with their own measurement date',async({page,server})=>{
- const root=await setup(page,server,{telemetryOnly:true});
+ const root=await setup(page,server);
  async function sample(rate,rateAt,errors=1,errorAt=T){
   await page.evaluate(({rate,rateAt,errors,errorAt,T,H})=>window.viewer.controller.telemetry.apply({'ingest->app':{
    observedAt:new Date(T+100*H).toISOString(),signals:{

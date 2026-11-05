@@ -363,28 +363,39 @@ function createTelemetryGrafana(page,win,now){
     function halted(){return retired || epoch!==generation || signal && signal.aborted || !!fatal;}
     if(halted())return Promise.reject(telemetryGrafanaError('Grafana history cancelled'));
     if(blocked && blocked.signal===signal)return Promise.reject(blocked.error);
+    var runs=[];
+    if(Array.isArray(range.endpoints))telemetryHistoryEndpoints(range).forEach(function(day){
+      var last=runs[runs.length-1];
+      if(last && Date.parse(day.at)-Date.parse(last.to)===86400000){last.to=day.at;last.endpoints.push(day);}
+      else runs.push({from:day.at,to:day.at,endpoints:[day]});
+    });else runs=[range];
     return connect(true).then(function(mcp){
       var tasks=[];
       jobs.forEach(function(job){job.signals.forEach(function(entry){
         if(entry.source!=='grafana' && entry.source!=='loki')return;
         var loki=entry.source==='loki',tool=loki?'query_loki_logs':'query_prometheus',names=TELEMETRY_GRAFANA_DATASOURCE[entry.source],uid=config.grafana[names[0]],label=job.id+' '+entry.name;
         if(!uid || offered.indexOf(tool)<0){failures.push(label+': historical datasource/tool unavailable');return;}
-        var input=loki?{datasourceUid:uid,logql:entry.query,startRfc3339:range.from,endRfc3339:range.to,queryType:'range',stepSeconds:86400}:
-          {datasourceUid:uid,expr:entry.query,startTime:range.from,endTime:range.to,queryType:'range',stepSeconds:86400};
-        tasks.push(function(){return liveStatusHistoryCall(function(){
-          if(halted())return;
-          return mcp.callTool(server,tool,input,{signal:signal,cache:{staleTime:LIVE_STATUS_HISTORY_CACHE_MS,gcTime:LIVE_STATUS_HISTORY_CACHE_MS}}).then(function(result){
+        // DST preserves local-day endpoints: only a discontinuity starts a new
+        // 86400-second run. Ordinary same-offset days remain one query/signal.
+        runs.forEach(function(run){
+          var input=loki?{datasourceUid:uid,logql:entry.query,startRfc3339:run.from,endRfc3339:run.to,queryType:'range',stepSeconds:86400}:
+            {datasourceUid:uid,expr:entry.query,startTime:run.from,endTime:run.to,queryType:'range',stepSeconds:86400};
+          tasks.push(function(){return liveStatusHistoryCall(function(){
             if(halted())return;
-            var points=(loki?telemetryGrafanaLoki:telemetryGrafanaPrometheus)(result && result.payload);
-            // Empty/malformed/retention responses remain gaps, distinct from an explicit 0.
-            var out=map[job.id] || (map[job.id]={signals:{},links:job.links});
-            out.signals[entry.name]={series:points};if(entry.unit)out.signals[entry.name].unit=entry.unit;
-          },function(error){
-            if(signal && signal.aborted)return;
-            if(['tool_error','bad_request','transform_error'].indexOf(code(error))>=0)failures.push(label+': '+detail(error));
-            else if(!fatal)fatal={error:error,repeat:{tool:tool,input:input}};
-          });
-        },signal);});
+            return mcp.callTool(server,tool,input,{signal:signal,cache:{staleTime:LIVE_STATUS_HISTORY_CACHE_MS,gcTime:LIVE_STATUS_HISTORY_CACHE_MS}}).then(function(result){
+              if(halted())return;
+              var points=(loki?telemetryGrafanaLoki:telemetryGrafanaPrometheus)(result && result.payload);
+              // Empty/malformed/retention responses remain gaps, distinct from an explicit 0.
+              var out=map[job.id] || (map[job.id]={signals:{},links:job.links});
+              if(run.endpoints)points=points.filter(function(point){return run.endpoints.some(function(day){return telemetryTime(point[0])===day.at;});});
+              var saved=out.signals[entry.name] || (out.signals[entry.name]={series:[]});saved.series=saved.series.concat(points).sort(function(a,b){return Date.parse(telemetryTime(a[0]))-Date.parse(telemetryTime(b[0]));});if(entry.unit)saved.unit=entry.unit;
+            },function(error){
+              if(signal && signal.aborted)return;
+              if(['tool_error','bad_request','transform_error'].indexOf(code(error))>=0)failures.push(label+': '+detail(error));
+              else if(!fatal)fatal={error:error,repeat:{tool:tool,input:input}};
+            });
+          },signal);});
+        });
       });});
       return telemetryGrafanaRun(tasks,LIVE_STATUS_HISTORY_CALLS,halted);
     }).then(function(){

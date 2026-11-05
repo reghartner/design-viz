@@ -135,7 +135,7 @@ function liveStatusHistoryDays(input){
       });
     }
     var text=new Date(year,month,date+i).toLocaleDateString(input.locale || [],format);
-    days.push({key:new Date(Date.UTC(year,month,date+i)).toISOString().slice(0,10),at:new Date(Date.UTC(year,month,date+i+1)).toISOString(),label:text,short:text,states:states});
+    days.push({key:new Date(Date.UTC(year,month,date+i)).toISOString().slice(0,10),at:new Date(end).toISOString(),label:text,short:text,states:states});
   }
   return {days:days,index:days.length-1};
 }

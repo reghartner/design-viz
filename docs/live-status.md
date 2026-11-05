@@ -1901,17 +1901,22 @@ slider never queries a tool. There are no slider markers.
 
 Each day carries an explicit `key` (`YYYY-MM-DD`) and `at` (RFC3339 evaluation
 endpoint), independent of its localized label. Jira reconstructs the end of the
-local calendar day; telemetry evaluates the previous 24 hours ending at the UTC
-midnight following that calendar date, giving fixed daily spacing across DST.
+local calendar day and exposes that same following local-midnight instant in
+`at`. Telemetry evaluates the previous 24 hours ending at exactly that instant.
+Adjacent endpoints can be 23 or 25 hours apart across DST; labels never determine
+the boundary. The date key identifies the displayed local calendar day.
 The demo uses its embedded telemetry block's start plus 24 hours, without network
 calls. The example's explicit window is 24h. Day 9's completed push is UNPROVEN;
 Day 12's event traffic is DEGRADED.
 
-A host may supply `telemetry.history(bindings, {from, to}, signal, report)` beside
+A host may supply `telemetry.history(bindings, {from, to, endpoints}, signal, report)` beside
 `provider` (or as `provider.history`). `from` and `to` are inclusive absolute
-RFC3339 daily evaluation endpoints. The result has the ordinary carrier map
+RFC3339 evaluation endpoints. The optional `endpoints: [{key?, at}]` array gives
+the exact instants needed, including irregular local-day spacing; the controller
+always supplies it. Older direct adapter callers without it request an evenly
+spaced daily grid starting at `from`. The result has the ordinary carrier map
 shape, with each signal's `series: [[endpoint, value], ...]` (an explicit `YYYY-MM-DD`
-day key is also accepted and means that day's following UTC midnight). `value` alone is
+day key is also accepted and resolves through that day's explicit `at` metadata). `value` alone is
 never historical evidence. Optional `report.note(text)` reports partial failures
 and keeps the batch retryable. `historyKey` (a string or function) includes any
 mutable provider/account/datasource configuration in the cache identity.
@@ -1920,8 +1925,12 @@ Only a sample at the selected endpoint counts. Missing endpoints, unsupported
 sources, retention gaps and a live-only provider give unobserved evidence, never
 last-known values or an invented zero. Explicit numeric zero remains observed.
 The same proof engine judges every local, imported, nested-import and loaded-detail
-carrier. A detail first loaded after the batch has no historical evidence until
-the next Metrics/Over time click loads its newly discovered bindings.
+carrier. Opening a detail is an explicit reader action: once its actual loader
+selection mounts, new bindings automatically join the selected historical day.
+Completed peers and unrelated pending batches are retained. Closing a detail
+removes its historical bindings and cancels its pending batch; reopening the same
+bindings can reuse their cache. Layout, polling paints and slider movement do not
+start queries. Changed queries on the same carrier ID never reuse stale samples.
 
 The controller retains live samples separately while showing history, pauses
 new telemetry polls, and holds any already-pending refresh or host `apply()`.
@@ -1932,8 +1941,11 @@ Jira Live and Over time remain independent.
 
 History shares Jira's seven-day cache policy and a single six-call queue. The
 controller's front cache is isolated to that viewer/artifact instance and keyed
-by full bindings, provider configuration and datasource identity. Repeat clicks
-reuse covered days; a longer range fetches only the new tail. Entries expire
+by each full binding, provider configuration and datasource identity. Coverage
+tracks exact `{key, at}` endpoints, rather than a presumed 24-hour interval.
+Bindings needing the same endpoints are batched together. Repeat clicks reuse
+covered days; a longer range fetches only the new tail, starting at the next
+requested instant even when DST makes it 23 or 25 hours after the prior endpoint. Entries expire
 seven days after the original batch (tail fetches do not extend their lifetime).
 The MCP namespace also caches exact range calls per viewer and artifact. A new
 controller starts with an empty front cache; exact MCP calls can still be reused.
@@ -1941,7 +1953,11 @@ Partial-error and aborted batches never extend cached coverage.
 
 Grafana history issues one `query_prometheus` or metric `query_loki_logs` range
 call per explicitly bound supported signal, with `stepSeconds: 86400` and the
-absolute endpoints. It reuses the live parsers, tool qualification, consent and
+absolute endpoints. A same-offset range is one call per signal. A DST offset
+transition splits only at the discontinuity into contiguous 86400-second runs;
+each run starts and ends at actual selected-day instants, even a single-point run.
+All runs use the same six-call queue with Jira. No nearest UTC sample is accepted.
+It reuses the live parsers, tool qualification, consent and
 abort behavior, with no annotation or deeplink calls in the history batch. It
 never rewrites authored PromQL/LogQL: authors must provide the intended 24-hour
 aggregation themselves; a daily step controls evaluation spacing, not query

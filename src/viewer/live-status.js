@@ -605,7 +605,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
      that carries `telemetry` (the #live=demo player, #944) supplies it as Demo. */
   var telemetryOptions=renderOptions && renderOptions.telemetry===false?false:renderOptions && renderOptions.telemetry || (demoMode && options.telemetry) || null;
   var telemetryDemo=!!(telemetryOptions && (demoMode && telemetryOptions===options.telemetry || telemetryOptions.demo && typeof telemetryOptions.demo.mount==='function'));
-  var telemetryHooks={carriers:eachCarrier,diagrams:eachDiagram,jira:function(){return map;},changed:function(){if(!retired){paint();notify();}}};
+  function historyCarriers(fn){
+    // Root diagrams plus the mounted drill-down stack. Cached but closed remote
+    // pages still contribute Jira refs, but no longer own historical requests.
+    var diagrams=[];sectionRecords(page).forEach(function(record){if(record.section.diagram)diagrams.push({diagram:record.section.diagram,page:page});});
+    sourceBindings().forEach(function(binding){if(binding.page!==page && binding.section.diagram)diagrams.push({diagram:binding.section.diagram,page:binding.page});});
+    diagrams.forEach(function(item){var d=item.diagram;Object.keys(d.nodes || {}).forEach(function(id){fn(d.nodes[id],id,item.page);});
+      (d.edges || []).forEach(function(edge){fn(edge,edge.from+'->'+edge.to,item.page);});});
+  }
+  var telemetryHooks={carriers:eachCarrier,historyCarriers:historyCarriers,diagrams:eachDiagram,jira:function(){return map;},changed:function(){if(!retired){paint();notify();}}};
   var telemetry=createTelemetry(page,telemetryOptions,telemetryHooks);
   ctl.telemetry=telemetry;
   // Metrics canvas cues on every bound section, beside the Jira paint (src/viewer/telemetry.js).
@@ -1302,6 +1310,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     result:function(value){api.apply(value);if(noteKind==='error')api.note('','info');setStatus({state:demoMode?'demo':'connected',busy:false,checkedAt:Date.now()});},
     error:function(error){api.note(error && error.message || String(error),'error');setStatus({state:'error',busy:false});}
   }):null;
+  function historyDetailChanged(){if(!retired)telemetry.bindingsChanged();}
+  view.addEventListener('detail-navigation',historyDetailChanged);
+  destroyListeners.push(function(){view.removeEventListener('detail-navigation',historyDetailChanged);});
   var events=['reader-skin-change','diagram-tab-change','tab-view-change','diagram-view-change','navigation-mounted','detail-navigation'];
   var api={
     refs:refs,

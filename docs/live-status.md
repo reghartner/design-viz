@@ -282,7 +282,15 @@ permits availability; it never turns Metrics on. Jira Live remains independent.
 `cloudwatch`, plus an optional CloudWatch `accountId` shared default.
 `honeycomb` holds `environment` and `dataset`. `window` is the observation
 window, a duration such as `30m`, `1h` or `7d`; the default is `24h`, the previous
-24 hours (Chuck, 2026-11-04). `refreshMs`
+24 hours (Chuck, 2026-11-04). Positive integer units `s`, `m`, `h`, `d` and
+`w` accept a bare duration or relative lookback: `6h`, `-6h` and `now-6h`
+all query the previous six hours. Surrounding whitespace is ignored. Providers
+receive the canonical positive duration; parsing never rewrites authored source.
+The desktop Metrics window editor keeps the entered spelling (trimmed), with one
+Undo/Redo per edit. Future offsets (`+6h`), zero, fractional durations and date
+expressions are unsupported: authored invalid values warn and use `24h`, while
+the editor refuses invalid edits. This shared window applies to metrics and
+native trace search/detail for all local and imported carriers. `refreshMs`
 is the connector refresh interval; values under one minute use 60000 and an
 absent value leaves the connector default. `templates` are named signal sets
 authored on the page; the repository ships none.

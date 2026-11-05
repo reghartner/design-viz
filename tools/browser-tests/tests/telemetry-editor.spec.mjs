@@ -59,6 +59,27 @@ test('W1 desktop connection gets a raw metrics signal with one Undo Redo, a proo
   expect(saved.page.flowview.features).toContain('flow.telemetry');
 });
 
+test('desktop relative metrics windows preserve aliases and exact Undo Redo source',async({page,server},testInfo)=>{
+  await open(page,server);
+  const source=page.locator('#src'),guide=page.locator('#guide');
+  const settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();};
+  for(const entered of [' -6h ',' now-6h ']){
+    await settings();const before=await source.inputValue(),input=guide.getByLabel('Metrics window',{exact:true});
+    await input.fill(entered);await input.press('Enter');
+    await expect.poll(async()=>JSON.parse(await source.inputValue()).page.tracking.telemetry?.window).toBe(entered.trim());
+    const changed=await source.inputValue();
+    await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);
+    await page.locator('#redo-builder').click();await expect(source).toHaveValue(changed);
+    await settings();await expect(guide.getByLabel('Metrics window',{exact:true})).toHaveValue(entered.trim());
+  }
+  const beforeInvalid=await source.inputValue();
+  for(const invalid of ['+6h','now--6h','-0h']){
+    const input=guide.getByLabel('Metrics window',{exact:true});await input.fill(invalid);await input.press('Enter');
+    await expect(guide).toContainText('Use a duration such as');await expect(source).toHaveValue(beforeInvalid);
+  }
+  await settings();await guide.locator('fieldset.metrics-settings').screenshot({path:testInfo.outputPath('relative-metrics-window-desktop.png')});
+});
+
 test('W2 Document settings templates round-trip through Undo Redo, a connection template binding and Export project',async({page,server},testInfo)=>{
   await open(page,server);
   const source=page.locator('#src'),guide=page.locator('#guide');

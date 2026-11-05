@@ -37,7 +37,13 @@ does not answer:
   loader-selected detail carriers need evidence;
 - whether each is a `call`, `queue`, `service`, `log-event` or `device`;
 - what observation would count, which proof limits the author accepts, and the
-  observation window (`tracking.telemetry.window`, default `24h`).
+  observation window (`tracking.telemetry.window`, default `24h`). Bare `6h`,
+  `-6h` and `now-6h` all mean the previous six hours; surrounding whitespace
+  is ignored. Use positive integer `s`/`m`/`h`/`d`/`w` units. Providers receive
+  the positive duration for metrics and native trace search/detail, including
+  imported carriers. Parsing preserves source; the desktop editor keeps the
+  trimmed spelling with Undo/Redo. Future offsets, zero and date expressions
+  are refused by the editor (authored invalid values warn and use `24h`).
 
 Bind only the carriers the author selects. Never derive a query, datasource,
 dataset or trace id from a node id, title or service-like name. A matching name

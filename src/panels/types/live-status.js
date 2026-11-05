@@ -1,8 +1,8 @@
 /* Authored placement, runtime evidence. No ticket status is folded into the spec. */
 (function(){
   var LIVE_SAMPLE=[["BE-67", "Build the notification service", "Riley"], ["BE-68", "Accept firmware events over HTTPS", "Riley"], ["FW-45", "Deliver firmware events", "Sam"], ["FW-46", "Integrate hardware interrupts", "Sam"], ["HW-123", "Debounce the doorbell button", "Alex"], ["HW-124", "Stabilize the hardware event signal", "Alex"], ["UX-89", "Show resident notifications", "Morgan"], ["UX-90", "Alert sound setting", "Morgan"]];
-  var states=['todo','active','done','blocked','missing'];
-  var ticketStateOrder=['blocked','missing','active','todo','done'];
+  var states=['todo','active','testing','done','blocked','missing'];
+  var ticketStateOrder=['blocked','missing','active','testing','todo','done'];
   var ticketCollator=new Intl.Collator('en',{numeric:true,sensitivity:'base'});
   function ticketText(value){return String(value == null?'':value).trim();}
   function ticketCompareText(a,b){

@@ -156,7 +156,7 @@ test('tracking authoring guidance separates Jira evidence from coverage presenta
   for (const pattern of [/todo[^\n]*dotted[^\n]*#8fb4ff/i,/active[^\n]*#009dff[^\n]*pulse/i,/done[^\n]*#2ed600[^\n]*steady/i,
     /blocked[^\n]*solid[^\n]*#e81717/i,/missing[^\n]*dashed[^\n]*#e81717/i,/No change needed[^\n]*#2ed600/i,
     /waiting[^\n]*dashed light blue[^\n]*dashed red/i,/15%/,
-    /blocked > missing > active > \(all done → done\) > \(all todo → todo\) > otherwise active/,
+    /blocked > missing > active > testing > \(all done → done\) > \(all todo → todo\) > otherwise active/,
     /steps, coins and chips[^.]*derive[^.]*edges and nodes[^.]*never carry tickets/is,
     /missingWork/,/prs[^.]*icon/i,/never carry live state/i,/## Rendering/]) assert.match(guide,pattern);
 });

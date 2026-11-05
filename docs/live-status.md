@@ -14,8 +14,8 @@ for tickets improving an existing component or connection. Unchecking removes
 the optional field; Undo/Redo and project export preserve it.
 
 Availability requires **every valid attached Jira ticket** to have explicit
-`state: "done"`. Missing entries, unknown states, `missing`, Todo and In Progress
-keep it unavailable. PR state never decides existence. No valid tickets means
+`state: "done"`. Missing entries, unknown states, `missing`, Todo, In Progress
+and Testing keep it unavailable. PR state never decides existence. No valid tickets means
 the rule warns and is ignored; invalid `existsWhen` values also warn and are
 ignored. Text boxes do not support the rule. Jira states, counts, rollups and
 dependency waiting remain unchanged.
@@ -425,20 +425,30 @@ project/import, and is suppressed while Allow metrics is off.
 
 ## State model
 
-The provider reports five runtime Jira evidence states. The spec stores references
+The provider reports six runtime Jira evidence states. The spec stores references
 and authored intent such as `missingWork`, never live Jira status.
 
 | State | Paint |
 | --- | --- |
 | `todo` | Dotted light-blue outline (`#8fb4ff`) |
 | `active` | Blue outline (`#009dff`); only border/glow slowly pulses |
+| `testing` | Blue outline (`#009dff`, 3.5px), green tint (`#2ed600`, 15%) and steady green glow (77%) |
 | `done` | Green outline (`#2ed600`) with a steady soft glow |
 | `blocked` | Strong solid red outline (`#e81717`) |
 | `missing` | Dashed red outline (`#e81717`) |
 | No change needed | Derived coverage state: solid green (`#2ed600`), faint fill, no glow |
 | waiting (any state) | Dashed light blue while the direct upstream is unfinished; dashed red when blocked or missing |
 
+Jira status named **Testing** (case-insensitive, surrounding whitespace ignored)
+maps to `testing` before category fallback; flagged or blocked evidence still wins.
+Testing remains unfinished for readiness and existence rules. Like Active, a Testing
+ticket has started work and does not wait on its own dependencies; downstream
+tickets still wait for it to reach Done. Local and imported nodes use the same behavior.
+
 Nodes, step coins/chips, panel counts and ticket-state pills share these tokens.
+Testing has an independent blue border: changing its green base color preserves
+the blue border unless its border color is explicitly overridden. Reset restores
+these repository defaults without requiring a saved browser palette.
 Their backing uses the configured status tint over the actual board or host surface. Title,
 subtitle and numeral ink is black or white, selected for contrast against that
 composed backing. Active pulses take 2.6 seconds and never animate text or
@@ -448,7 +458,7 @@ artwork remain separate dependency and availability evidence.
 
 For an element with several tickets, roll up their states in this order:
 
-blocked > missing > active > (all done → done) > (all todo → todo) > otherwise active
+blocked > missing > active > testing > (all done → done) > (all todo → todo) > otherwise active
 
 Steps, coins and chips derive their state only from the edges and nodes explicitly
 added to that step, including failed communications and imported elements, and
@@ -473,6 +483,7 @@ input shapes; the page-reading wrapper, overlay and panel build on it.
 | --- | --- | --- | --- | --- |
 | `done` | DONE · UNPROVEN | **PROVEN** | DONE · DEGRADED | DONE |
 | `active` | IN PROGRESS | IN PROGRESS · LIVE EARLY | IN PROGRESS · FAILING | IN PROGRESS |
+| `testing` | TESTING | TESTING · LIVE EARLY | TESTING · FAILING | TESTING |
 | `todo` | TODO | TODO · ALREADY LIVE? | TODO · FAILING | TODO |
 | `blocked`, `missing` | Jira state kept | Jira state kept | Jira state kept | Jira state kept |
 | no tickets | UNOBSERVED | HEALTHY | DEGRADED | no verdict |
@@ -719,7 +730,7 @@ entries are separate follow-up work.
 
 The Tickets table lists every story in the effective counted set: inherited
 children after exclusions, manual tickets, and needed upstream dependency stories. By default, rows sort by
-blocked, missing, active, todo, done, then key. The Key, Title, State and Owner
+blocked, missing, active, testing, todo, done, then key. The Key, Title, State and Owner
 headers are sort buttons: select a header for ascending order, then select it
 again for descending order. An arrow and the column's `aria-sort` show the current
 direction. Key, Title and Owner use case-insensitive natural order; empty titles
@@ -1221,7 +1232,7 @@ union with provenance:
 
 `liveStatusDependencies(pages, map)` merges both into `{ticket: [{key, sources,
 linkType?, reason?}]}`. X waits on Y while Y is not done, unless X itself is
-already active or done: then the link is listed but X is not waiting. A blocked
+already active, testing or done: then the link is listed but X is not waiting. A blocked
 or missing X still waits: the panel, the chains and the popover record it, while
 its carrier keeps its own blocked or missing paint on the canvas as the stronger
 state (solid blocked red or dashed missing red, without the waiting stroke). The tone comes from the
@@ -1258,7 +1269,7 @@ label would sit on the edge label, its step coin or a node card. The break's
 title and accessible name keep the full sentence with the blocking keys. The break lasts until the live state
 changes or Live is disabled. Without an existence rule, missing edges keep their
 red stroke without a communication break. Todo edges use a dashed light-blue stroke
-and hide packet dots; active and done edges retain ordinary packet animation.
+and hide packet dots; active, testing and done edges retain ordinary packet animation.
 An unavailable edge or endpoint adds a break and stops packets regardless of
 Jira state, as described under [planned availability](#planned-nodes-and-connections). Authored step failures
 keep their own lifecycle, and reduced-motion behavior is unchanged.
@@ -1827,7 +1838,7 @@ account queries.
 Live evidence follows the story's nodes and edges. Diagrams with a Live status
 panel omit the team lane chip from their step captions. In Step mode, each Jira
 ticket appears on its own line immediately below the authored step text, with
-its state beside the key: **To do**, **In progress**, **Done**, **Blocked**,
+its state beside the key: **To do**, **In progress**, **Testing**, **Done**, **Blocked**,
 **Missing**, or **No status** before evidence arrives or when a key has no runtime
 entry. Ticket keys are deduplicated across nodes explicitly added to the step
 and the step's selected edges, including failed communications. Selecting a
@@ -1843,7 +1854,7 @@ Ambient mode or when Live is disabled. The Live status panel keeps its overall
 progress, Tickets team stripes and Blockers team names.
 
 In Step mode, the caption ends with **BLOCKED · KEY · detail**, **MISSING · KEY**,
-**IN PROGRESS · n tickets**, **TODO · n tickets**, or **DONE**. Coverage adds
+**IN PROGRESS · n tickets**, **TESTING · n tickets**, **TODO · n tickets**, or **DONE**. Coverage adds
 **NO CHANGE NEEDED** and **MISSING WORK · unlinked work remains**. Incomplete
 provider evidence shows **AWAITING TICKET STATUS**. Captions update on step
 changes and new evidence.
@@ -1926,7 +1937,7 @@ node or connection. This is authored coverage intent, not a Jira status. For exa
 The marker says additional unlinked work remains, even if AUDIT-42 is Done. Clear
 it when that work is covered: here, or on a shared board in Edit mode
 (**Clear Missing work**, see "Edit mode on the shared board"). Blocked ticket evidence takes precedence over the
-marker; the marker takes precedence over active, done and todo. It participates
+marker; the marker takes precedence over active, testing, done and todo. It participates
 in step appearance and readiness without inventing a ticket or increasing Jira counts.
 
 A marked connection shows a broken line with the communication-break glyph and
@@ -1999,7 +2010,7 @@ with a versioned envelope:
 {"version":1,"colors":{"live-active":"#1666c7","pr-open":"#539a43"}}
 ```
 
-Supported names are `live-todo`, `live-active`, `live-done`, `live-blocked`,
+Supported names are `live-todo`, `live-active`, `live-testing`, `live-done`, `live-blocked`,
 `live-missing`, `live-unchanged`, `pr-open`, `pr-draft`, `pr-merged`, `pr-closed`,
 `checks-passing`, `checks-failing` and `checks-pending`. Imports reject unknown
 fields, unknown names and values other than `#RRGGBB` without replacing the
@@ -2015,7 +2026,7 @@ palette removes the storage key.
 {"version":2,"colors":{"live-active":"#1666c7"},"appearance":{"live-active":{"borderColor":"#103c72","borderWidth":3,"fillStrength":25,"glowStrength":75}}}
 ```
 
-Only the six `live-*` status names are supported in `appearance`; PR/check
+Only the seven `live-*` status names are supported in `appearance`; PR/check
 settings remain color-only. Storage errors are reported; the preview remains exportable.
 
 Preferences apply to updated standalone, Workbench, Forge and native viewers

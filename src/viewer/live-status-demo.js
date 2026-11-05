@@ -4,7 +4,7 @@ function liveStatusDemoMap(day,keys,epics){
   // Timeline-level epics {KEY: {summary}} seed the epic box; state is derived from that day's children.
   Object.keys(epics || {}).forEach(function(epic){
     var children=Object.keys(issues).filter(function(key){return issues[key] && issues[key].epic===epic;}).map(function(key){return issues[key].state;});
-    var state=children.length && children.every(function(s){return s==='done';})?'done':children.some(function(s){return s==='active' || s==='blocked' || s==='done';})?'active':'todo';
+    var state=children.length && children.every(function(s){return s==='done';})?'done':children.some(function(s){return s==='active' || s==='blocked';})?'active':children.some(function(s){return s==='testing';})?'testing':children.some(function(s){return s==='done';})?'active':'todo';
     var entry={state:state};if(epics[epic] && typeof epics[epic].summary==='string')entry.title=epics[epic].summary;map[epic]=entry;
   });
   (keys || []).concat(Object.keys(issues)).filter(function(key,index,all){return all.indexOf(key)===index;}).forEach(function(key){

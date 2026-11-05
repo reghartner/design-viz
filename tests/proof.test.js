@@ -71,7 +71,8 @@ const JIRA = {
   'BE-6': {state: 'done', updatedAt: at(1)},
   'BE-7': {state: 'done'},
 };
-const TICKET = {done: 'BE-1', active: 'BE-2', todo: 'BE-3', blocked: 'BE-4', missing: 'BE-5', unknown: 'BE-404'};
+JIRA['BE-8'] = {state:'testing'};
+const TICKET = {testing:'BE-8', done: 'BE-1', active: 'BE-2', todo: 'BE-3', blocked: 'BE-4', missing: 'BE-5', unknown: 'BE-404'};
 
 /* Rows are the carrier's Jira state ('unknown' = tickets without evidence,
    null = no tickets); columns are the telemetry state its sample produces. */
@@ -79,6 +80,7 @@ const COLUMNS = ['silent', 'flowing', 'degraded', 'unobserved'];
 const MATRIX = [
   ['done', 'done-unproven', 'proven', 'done-degraded', 'done'],
   ['active', 'active', 'active-live-early', 'active-failing', 'active'],
+  ['testing', 'testing', 'testing-live-early', 'testing-failing', 'testing'],
   ['todo', 'todo', 'todo-already-live', 'todo-failing', 'todo'],
   ['blocked', 'blocked', 'blocked', 'blocked', 'blocked'],
   ['missing', 'missing', 'missing', 'missing', 'missing'],
@@ -89,6 +91,7 @@ const FAILING = {silent: ['rate'], flowing: [], degraded: ['errors'], unobserved
 const LABELS = {
   proven: 'PROVEN', 'done-unproven': 'DONE · UNPROVEN', 'done-degraded': 'DONE · DEGRADED', done: 'DONE',
   active: 'IN PROGRESS', 'active-live-early': 'IN PROGRESS · LIVE EARLY', 'active-failing': 'IN PROGRESS · FAILING',
+  testing: 'TESTING', 'testing-live-early': 'TESTING · LIVE EARLY', 'testing-failing': 'TESTING · FAILING',
   todo: 'TODO', 'todo-already-live': 'TODO · ALREADY LIVE?', 'todo-failing': 'TODO · FAILING',
   blocked: 'BLOCKED', missing: 'MISSING', unobserved: 'UNOBSERVED', healthy: 'HEALTHY', degraded: 'DEGRADED',
 };

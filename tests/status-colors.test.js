@@ -45,3 +45,15 @@ test('appearance-only saves, legacy reads and resetting remove every scoped over
  c.apply(view,{version:1,colors:{}});assert.equal(styles.size,0);
  c.save(win,{version:2,colors:{},appearance:{'live-active':{}}});assert.equal(saved.size,0);
 });
+
+
+test('Testing and Unchanged support appearance in v2 while legacy palettes keep every existing field',()=>{
+ const c=setup(),styles=new Map(),view={style:{setProperty:(key,value)=>styles.set(key,value),removeProperty:key=>styles.delete(key)}};
+ const legacy={version:1,colors:{'live-unchanged':'#010203','pr-open':'#040506','checks-passing':'#070809'}};
+ assert.deepEqual(JSON.parse(JSON.stringify(c.validate(legacy))),legacy);
+ const palette={version:2,colors:{...legacy.colors,'live-testing':'#ABCDEF'},appearance:{'live-testing':{borderColor:'#123456',borderWidth:3,fillStrength:45,glowStrength:80},'live-unchanged':{borderWidth:2}}};
+ c.apply(view,palette);assert.equal(styles.get('--dv-live-testing'),'#abcdef');assert.equal(styles.get('--dv-live-testing-border-width'),'3px');assert.equal(styles.get('--dv-live-testing-fill-strength'),'45%');assert.equal(styles.get('--dv-live-testing-glow-strength'),'0.8');assert.equal(styles.get('--dv-live-unchanged-border-width'),'2px');
+ assert.equal(c.group('live-testing'),'status');assert.equal(c.group('live-unchanged'),'status');assert.equal(c.group('pr-open'),'pr');assert.equal(c.group('checks-passing'),'checks');
+ c.apply(view,legacy);assert.equal(styles.has('--dv-live-testing'),false);assert.equal(styles.has('--dv-live-testing-border-width'),false);assert.equal(styles.has('--dv-live-unchanged-border-width'),false);
+ c.apply(view,{version:1,colors:{}});assert.equal(styles.size,0);
+});

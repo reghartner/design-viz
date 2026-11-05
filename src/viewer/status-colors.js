@@ -3,10 +3,12 @@
 var FlowStatusColors=(function(){
   var key='flowview.status-colors.v1';
   var fields=[
-    ['live-todo','To do'],['live-active','Active'],['live-done','Done'],['live-blocked','Blocked'],['live-missing','Missing work'],['live-unchanged','Unchanged'],
+    ['live-todo','To do'],['live-active','Active'],['live-testing','Testing'],['live-done','Done'],['live-blocked','Blocked'],['live-missing','Missing work'],['live-unchanged','Unchanged'],
     ['pr-open','PR open'],['pr-draft','PR draft'],['pr-merged','PR merged'],['pr-closed','PR closed'],
     ['checks-passing','Checks passing'],['checks-failing','Checks failing'],['checks-pending','Checks pending']
   ];
+  function group(name){return name.indexOf('live-')===0?'status':name.indexOf('pr-')===0?'pr':'checks';}
+  var statusFields=fields.filter(function(field){return group(field[0])==='status';});
   var settings={borderColor:{suffix:'border-color'},borderWidth:{suffix:'border-width',min:0,max:8,unit:'px'},fillStrength:{suffix:'fill-strength',min:0,max:100,unit:'%'},glowStrength:{suffix:'glow-strength',min:0,max:200,scale:100}};
   function color(value){return typeof value==='string' && /^#[0-9a-f]{6}$/i.test(value);}
   function object(value){return value && typeof value==='object' && !Array.isArray(value);}
@@ -20,7 +22,7 @@ var FlowStatusColors=(function(){
     var result={version:raw.version,colors:colors};
     if(raw.version===2){result.appearance={};Object.keys(raw.appearance).forEach(function(name){
       var values=raw.appearance[name];
-      if(!fields.slice(0,6).some(function(field){return field[0]===name;}) || !object(values))throw new Error('Invalid status appearance '+name+'.');
+      if(!statusFields.some(function(field){return field[0]===name;}) || !object(values))throw new Error('Invalid status appearance '+name+'.');
       var next={};Object.keys(values).forEach(function(prop){
         if(!Object.prototype.hasOwnProperty.call(settings,prop))throw new Error('Unknown appearance setting '+prop+'.');
         var setting=settings[prop],value=values[prop];
@@ -33,7 +35,7 @@ var FlowStatusColors=(function(){
   function apply(view,palette){
     palette=validate(palette);
     fields.forEach(function(field){var name='--dv-'+field[0];if(palette.colors[field[0]])view.style.setProperty(name,palette.colors[field[0]]);else view.style.removeProperty(name);});
-    fields.slice(0,6).forEach(function(field){Object.keys(settings).forEach(function(prop){
+    statusFields.forEach(function(field){Object.keys(settings).forEach(function(prop){
       var setting=settings[prop],name='--dv-'+field[0]+'-'+setting.suffix,values=palette.appearance && palette.appearance[field[0]];
       if(values && Object.prototype.hasOwnProperty.call(values,prop)){var value=values[prop];view.style.setProperty(name,prop==='borderColor'?value:String(value/(setting.scale || 1))+(setting.unit || ''));}
       else view.style.removeProperty(name);
@@ -56,5 +58,5 @@ var FlowStatusColors=(function(){
     refresh();win.addEventListener('storage',refresh);win.addEventListener('flowview-status-colors-change',refresh);
     return function(){retired=true;win.removeEventListener('storage',refresh);win.removeEventListener('flowview-status-colors-change',refresh);apply(view,{version:1,colors:{}});};
   }
-  return {key:key,fields:fields,settings:settings,validate:validate,read:read,apply:apply,save:save,connect:connect};
+  return {key:key,fields:fields,group:group,settings:settings,validate:validate,read:read,apply:apply,save:save,connect:connect};
 })();

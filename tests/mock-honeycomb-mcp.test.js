@@ -113,7 +113,7 @@ test('H2: initialize and tools/list expose only verified Honeycomb names and moc
   const tools = handleMcp(rpc('tools/list'), ctx()).result.tools;
   assert.deepEqual(tools.map(tool => tool.name).sort(), ['get_query_results', 'get_trace', 'run_query']);
   const byName = Object.fromEntries(tools.map(tool => [tool.name, tool]));
-  assert.deepEqual(Object.keys(byName.run_query.inputSchema.properties).sort(), ['dataset_slug', 'environment_slug', 'query_spec']);
+  assert.deepEqual(Object.keys(byName.run_query.inputSchema.properties).sort(), ['dataset_slug', 'environment_slug', 'query_spec', 'raw_row_columns', 'results_limit']);
   assert.deepEqual(byName.run_query.inputSchema.required.sort(), ['dataset_slug', 'environment_slug', 'query_spec']);
   assert.equal(byName.run_query.inputSchema.properties.query_spec.type, 'object');
   assert.deepEqual(Object.keys(byName.get_trace.inputSchema.properties).sort(), ['environment_slug', 'from', 'trace_id', 'view_mode']);
@@ -295,7 +295,7 @@ test('H8: get_trace returns only known shared-story traces in the exact bounded 
     const header = '| span_id | parent_id | start_unix_ns | duration_ns | kind | status_code | error | http_status | service | route | name |';
     assert.ok(text.includes(header));
     assert.doesNotMatch(text, /push/i, 'the story has no push exemplar span');
-    const metadata = JSON.parse(text.split('\n').at(-1));
+    const metadata = Object.fromEntries(text.split('Metadata:\n')[1].split('\n').map(line => { const [, key, value] = /^  ([a-z_]+): (.*)$/.exec(line); return [key, JSON.parse(value)]; }));
     assert.deepEqual(Object.keys(metadata).sort(), [
       'collapsed_nodes', 'mean_sample_rate', 'total_spans', 'trace_id', 'trace_link', 'view_mode', 'visible_spans'
     ]);
@@ -410,4 +410,13 @@ test('H10: docs state native/mock distinctions, query vocabulary, safe manual de
     /\b[0-9a-f]{32}\b/i, /FLOWVIEW_CF_WORKER[ \t]*:?[=-][ \t]*["']?[A-Za-z0-9-]/,
     /\baccount_id\b\s*[:=]/i
   ]) assert.doesNotMatch(identity, pattern);
+});
+
+test('raw row wrapper returns only shared traceFor IDs and rejects unsupported sampling queries',async()=>{
+ const args={environment_slug:'flowview-demo',dataset_slug:'doorbell',query_spec:{from:'24h',filters:[{column:'service.name',op:'=',value:'event-ingest'}]},raw_row_columns:['trace.trace_id','timestamp','error'],results_limit:5};
+ const result=await call('run_query',args,ctx(DAY10));assert.ok(!result.result.isError);const text=result.result.content[0].text;
+ const {createStory,traceFor}=await loadStory(),model=createStory();const ids=[...text.matchAll(/^\| ([0-9a-f]{32}) \|/gm)].map(m=>m[1]);assert.equal(ids.length,5);
+ const known=Array.from({length:24},(_,i)=>traceFor(model,DAY10*24+i)).filter(Boolean).map(t=>t.traceId);assert.ok(ids.every(id=>known.includes(id)));assert.match(text,/next_cursor: MOCK_MORE_MATCHES/);
+ for(const patch of [{results_limit:21},{raw_row_columns:['invented']},{query_spec:{...args.query_spec,raw_row_columns:args.raw_row_columns}},{query_spec:{...args.query_spec,filters:[{column:'service.name',op:'=',value:'invented'}]}},{query_spec:{...args.query_spec,calculations:[{op:'COUNT'}]}}])assert.ok(error(await call('run_query',{...args,...patch},ctx(DAY10))));
+ const response=await call('get_trace',{environment_slug:args.environment_slug,trace_id:ids[0],from:'24h',view_mode:'full'},ctx(DAY10));assert.ok(!response.result.isError);assert.match(response.result.content[0].text,new RegExp('trace_id: "'+ids[0]+'"'));
 });

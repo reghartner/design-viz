@@ -699,7 +699,7 @@ test('B1 B2 B3 B4 B5 B7 B8 story playback stops on blockers and details reach re
  }
  await expect.poll(async()=> (await panel.locator('.dv-live-epic-counts').textContent()).split(' · ')[0]).toBe('Ready to demo');
  // Completed upstream work wears the green check (Chuck, PR #784 review).
- const doneDep=panel.locator('tr[data-live-ticket="FW-46"] .dv-live-dep');await expect(doneDep).toHaveAttribute('data-tone','done');await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCount(1);await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCSS('color',statusLine('done'));await expect(panel.locator('.dv-live-epic-progress')).toHaveText('8 of 8 stories done · 7 of 8 on diagram');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(root.getByRole('button',{name:'First blocker',exact:true})).toHaveCount(0);await expect(root.getByRole('button',{name:'No blockers',exact:true})).toBeDisabled();await expect(panel.locator('.dv-live-completion')).toContainText('11/11');
+ const doneDep=panel.locator('tr[data-live-ticket="FW-46"] .dv-live-dep');await expect(doneDep).toHaveAttribute('data-tone','done');await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCount(1);await expect(doneDep.locator('svg[data-icon="check"]')).toHaveCSS('color',statusLine('done'));await expect(panel.locator('.dv-live-epic-progress')).toHaveText('8 of 8 stories done · 7 of 8 on diagram');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(root.getByRole('button',{name:'First blocker',exact:true})).toHaveCount(0);await expect(root.getByRole('button',{name:'No blockers',exact:true})).toBeDisabled();await expect(epic.locator('.dv-live-completion')).toContainText('11/11');await expect(panel.locator('.dv-live-proof')).toBeVisible();await expect(panel.locator('.dv-live-proof-ratio')).toHaveText('4/7 bound proven');
  await page.keyboard.press('Escape');await expect(panel).toBeVisible();await expect(panel.locator('.pbody')).not.toBeEmpty();
 });
 test('B2 B3 automatic advancement pauses on the newly selected missing beat; manual navigation remains available',async({page,server})=>{
@@ -729,7 +729,7 @@ test('B5 changing evidence keeps text and geometry steady while only active bord
 
 test('E6 E10 E11 built epic Tickets table lists all children without diagram links',async({page,server})=>{
  const root=await openStory(page,server),next=root.getByRole('button',{name:'Next day',exact:true});
- for(let day=2;day<=12;day++)await next.click();const panel=root.locator('.pt-live-status'),table=panel.locator('table.dv-live-tickets');
+ for(let day=2;day<=12;day++)await next.click();const panel=root.locator('.pt-live-status'),table=panel.getByRole('table',{name:'Tickets',exact:true});await expect(panel.getByRole('table',{name:'Proof',exact:true})).toBeVisible();
  await expect(table.locator('tbody tr[data-live-ticket]')).toHaveCount(8);await expect(table.locator('tbody tr.dv-live-coverage-row')).toHaveCount(1);await expect(table.locator('th')).toHaveText(['Key','Title','State','Owner','Depends on','PRs']);
  await expect(table.locator('tr[data-live-coverage-for="UX-90"] .dv-live-coverage-tag')).toHaveText('NOT ON DIAGRAM');await expect(table.locator('tr[data-live-ticket="HW-124"] td').nth(3)).toHaveText('Alex');
  await table.getByRole('button',{name:'Title'}).click();
@@ -878,7 +878,7 @@ test('L3 L4 L5 L10 live-status panel is beside the diagram without a click and k
  for(let day=3;day<=12;day++)await body.getByRole('button',{name:'Next day',exact:true}).click();
  await expect(body.locator('tr[data-live-coverage-for="UX-90"]')).toContainText('NOT ON DIAGRAM');await expect(body.locator('.dv-live-epic-progress')).toContainText('7 of 8 on diagram');
  await expect(body.locator('tr[data-live-coverage-for="HW-124"],.dv-live-chip')).toHaveCount(0);
- await page.emulateMedia({media:'print'});await expect(body).not.toBeEmpty();await expect(body.locator('table.dv-live-tickets')).toBeVisible();
+ await page.emulateMedia({media:'print'});await expect(body).not.toBeEmpty();await expect(body.getByRole('table',{name:'Tickets',exact:true})).toBeVisible();await expect(body.getByRole('table',{name:'Proof',exact:true})).toBeVisible();
 });
 
 test('L4 loaded external carriers have no panel links without another load',async({page,server})=>{

@@ -168,3 +168,21 @@ node --test tests/mock-honeycomb-mcp.test.js
 The test exercises the pure handler and the real Worker `fetch` entry point
 using built-in `Request` and `Response`; it does not install Wrangler, deploy,
 connect an account, or read external data.
+
+### Provider exemplar adapter subset (#946)
+
+`run_query` also accepts the verified top-level `raw_row_columns` and
+`results_limit` wrapper. For this small mock subset, `query_spec` contains only
+`from`, optional `to`, and exactly `service.name = event-ingest`. Columns are
+`trace.trace_id` (required), `timestamp`, `error`, and `duration_ms`; limits are
+1–20. Returned IDs and status come from the existing shared `traceFor` story.
+Unsupported raw filters/columns/calculations fail closed. Rounded sample duration
+is not precise span timing. The runtime selects the latest returned timestamp,
+then fetches that actual ID. No new trace or timeline is fabricated.
+
+Scalar results retain the mock-only exact `structuredContent` raw JSON transport.
+Raw candidates now use the recorded native `# Raw Rows` Markdown table. Trace
+metadata now uses native `  key: value` lines instead of the earlier mock-only
+single JSON metadata line. Mock `trace_link: null` remains intentional: no live
+provider URL is invented. The mock-only cursor `MOCK_MORE_MATCHES` merely reports
+limited candidates; pagination is unsupported. No deployment accompanies this change.

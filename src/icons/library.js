@@ -119,6 +119,7 @@ var FlowIcons = (function () {
   // Check: an upstream ticket is done (live-status Depends on, green like the done preset).
   add('check', 'Check', 'Delivery', 'green', circle(12, 12, 9, 'wash') + path('m7.5 12.5 3 3 6-7'));
   add('hand', 'Raised hand', 'Delivery', 'neutral', path('M7.5 12.5V6.5a1.5 1.5 0 0 1 3 0V11M10.5 11V4.5a1.5 1.5 0 0 1 3 0V11M13.5 11V5.5a1.5 1.5 0 0 1 3 0V11M16.5 11V8a1.5 1.5 0 0 1 3 0v5.5A6.5 6.5 0 0 1 13 20h-1.2a5.5 5.5 0 0 1-4.6-2.5l-2.8-4.3a1.4 1.4 0 0 1 2.3-1.6l1.8 2.4', 'wash'));
+  add('external-link', 'Open external link', 'Software', 'blue', path('M14 3h7v7M21 3 11 13M10 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5'));
   add('pull-request', 'Pull request', 'Software', 'green', circle(6, 5.5, 2.5, 'wash') + circle(6, 18.5, 2.5, 'wash') + circle(18, 18.5, 2.5, 'wash') + path('M6 8v8') + detail(path('M18 16V9.5A3.5 3.5 0 0 0 14.5 6H11M13.5 3.5 11 6l2.5 2.5')));
 
   // Build-time company modules use this private hook before the public library

@@ -138,7 +138,11 @@ test('late detail joins the selected historical day through real nested-import E
  const root=await lateDetailSetup(page,server);await metrics(root).click();await expect(root.locator('.dv-metrics-card')).toHaveCount(1);await over(root).click();await select(root,0);
  await expect(root.locator('.dv-metrics-card')).toHaveAttribute('data-verdict','done-unproven');const scope=await exploreLate(page,root);
  await expect(scope.locator('.dv-metrics-card')).toHaveCount(4);await expect(scope.locator('[data-metrics-card="local->shared::store"]')).toContainText('0 req/h');
- for(const id of ['local','shared::api','detail::inner::a'])await expect(scope.locator('g.node[data-dv-node="'+id+'"]')).toHaveAttribute('data-metrics-verdict','done-unproven');
+ for(const id of ['local','shared::api','detail::inner::a']){
+  await expect(scope.locator('g.node[data-dv-node="'+id+'"]')).toHaveAttribute('data-metrics-verdict','done-unproven');
+  await expect(scope.locator('[data-proof-carrier="'+id+'"]')).toHaveAttribute('data-verdict','done-unproven');
+  await expect(scope.locator('[data-proof-carrier="'+id+'"]')).toContainText('rate: 0 req/h');
+ }
  const calls=await page.evaluate(()=>window.late.calls);expect(calls).toHaveLength(2);expect(calls[1].bindings.map(b=>b.id)).toEqual(expect.arrayContaining(['local','shared::api','detail::inner::a','local->shared::store','shared::api->shared::store','detail::inner::a->detail::inner::b']));expect(calls[1].bindings.map(b=>b.id)).not.toContain('outer::inner::a');expect(calls[1].range).toEqual(calls[0].range);
  await expect(slider(scope)).toHaveValue('0');await select(scope,1);await expect(scope.locator('[data-metrics-card="local->shared::store"]')).toContainText('unobserved');await expect(scope.locator('g.node[data-dv-node="local"]')).toHaveClass(/dv-live-active/);
  await select(scope,2);await expect(scope.locator('[data-metrics-card="local->shared::store"]')).toContainText('50 req/h');await layout(scope,4);expect(await page.evaluate(()=>window.late.calls.length)).toBe(2);

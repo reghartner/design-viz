@@ -186,11 +186,12 @@ function boot(raw, sourceText, sourceFallback){
                        render: function(text){ return rerender(text); }}) : null;
   /* window.flowviewTelemetry (#939): a host telemetry provider set before boot,
      shaped like the renderPage telemetry option; the Metrics button stays off until clicked.
-     Without one, a claude.ai artifact whose carriers bind grafana, loki or sql
-     signals reads them through the viewer's Grafana connector (#943). */
+     Without one, a claude.ai artifact whose carriers bind grafana, loki, sql or honeycomb
+     signals reads them through the viewer’s qualified connectors (#943/#946). */
   var telemetryHost = window.flowviewTelemetry;
-  var grafanaTelemetry = telemetryHost!==false && !telemetryHost && !(liveOptions && liveOptions.demo) && typeof createTelemetryGrafana === 'function' ? createTelemetryGrafana(page, window) : null;
-  var renderOptions = {layoutTarget:layoutTarget,liveStatus:liveOptions,telemetry:telemetryHost===false?false:telemetryHost || (grafanaTelemetry ? grafanaTelemetry.options : undefined),handoffHost:window.flowviewHandoffHost,sourceText:sourceText,sourceFallback:sourceFallback || null,boardEditor:editor};
+  var telemetryFactory=typeof createTelemetryProviders==='function'?createTelemetryProviders:typeof createTelemetryGrafana==='function'?createTelemetryGrafana:null;
+  var automaticTelemetry = telemetryHost!==false && !telemetryHost && !(liveOptions && liveOptions.demo) && telemetryFactory ? telemetryFactory(page, window) : null;
+  var renderOptions = {layoutTarget:layoutTarget,liveStatus:liveOptions,telemetry:telemetryHost===false?false:telemetryHost || (automaticTelemetry ? automaticTelemetry.options : undefined),handoffHost:window.flowviewHandoffHost,sourceText:sourceText,sourceFallback:sourceFallback || null,boardEditor:editor};
   var ctl = renderPage(view, page, bootSkin, backlinkData, renderOptions);
   if (sourceFallback && view.parentNode){
     var banner = sourceFallbackBanner(sourceFallback, page, specFile);
@@ -249,9 +250,9 @@ function boot(raw, sourceText, sourceFallback){
       if (typeof wireArtifactComments === 'function') wireArtifactComments(editor ? currentController() : ctl, view, window);
     }
     if (!(liveOptions && liveOptions.demo) && typeof wireLiveStatusClaude === 'function') wireLiveStatusClaude(ctl, page, window);
-    /* The Grafana adapter outlives an edit re-render; each render's controller
-       carries its Allow action and receives its map retractions. */
-    if (grafanaTelemetry) retire(grafanaTelemetry.attach(ctl, page));
+    /* The coordinator outlives an edit re-render; source adapters and their
+       caches/actions are attached only to the current controller. */
+    if (automaticTelemetry) retire(automaticTelemetry.attach(ctl, page));
     /* First-run guided tour: a page's own page.tour replaces the built-in
        default wholesale; an unusable override falls back to the default so a
        typo never costs the tour. wireTour itself refuses embeds and #tour=0.
@@ -297,9 +298,9 @@ function boot(raw, sourceText, sourceFallback){
     wired.splice(0).reverse().forEach(function(handle){ try { handle.destroy(); } catch (ex){} });
     ctl.destroy();
     page = next;
-    if(!grafanaTelemetry && telemetryHost!==false && !telemetryHost && !(liveOptions && liveOptions.demo) && typeof createTelemetryGrafana==='function'){
-      grafanaTelemetry=createTelemetryGrafana(page,window);
-      if(grafanaTelemetry)renderOptions.telemetry=grafanaTelemetry.options;
+    if(!automaticTelemetry && telemetryHost!==false && !telemetryHost && !(liveOptions && liveOptions.demo) && telemetryFactory){
+      automaticTelemetry=telemetryFactory(page,window);
+      if(automaticTelemetry)renderOptions.telemetry=automaticTelemetry.options;
     }
     ctl = renderPage(view, page, bootSkin, backlinkData, Object.assign({}, renderOptions, {sourceText: text}));
     wireRender(false);

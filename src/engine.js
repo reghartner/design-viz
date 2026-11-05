@@ -3003,7 +3003,7 @@ function createBoardNavigation(board, group, legend, changed){
   group.appendChild(controls);
   function enabled(){return !retired && !board.classList.contains('explore-board');}
   function graph(){return canvas.querySelector('svg');}
-  function displayScale(){var grid=board.closest('.section-layout-grid');return grid && grid.offsetWidth?grid.getBoundingClientRect().width/grid.offsetWidth:1;}
+  function displayScale(){var grid=board.closest('.section-layout-grid') || board;return grid.offsetWidth?grid.getBoundingClientRect().width/grid.offsetWidth:1;}
   function ratio(){var svg=graph();return svg?svg.getBoundingClientRect().width/displayScale()/svg.viewBox.baseVal.width:1;}
   function refresh(){if(!enabled())return;scheduleFit();var r=ratio();value.textContent=Math.round(r*100)+'%';out.disabled=r<=.1501;into.disabled=r>=3.999;if(r!==publishedScale){publishedScale=r;board.dispatchEvent(new CustomEvent('board-scale-change'));}}
   function geometry(){return [board.clientWidth,board.clientHeight,legend.offsetHeight].join(':');}
@@ -3183,9 +3183,21 @@ function createBoardNavigation(board, group, legend, changed){
     // that still-pending fit resumes; a saved manual camera always wins.
     if(state.pendingFit)requestFit();
   }
-  function fitSelection(extent,insets){
+  function camera(value){
+    var svg=graph();if(!enabled() || !svg || !board.clientWidth)return null;
+    if(value){manual();zoom(value.zoom);}
+    var vb=svg.viewBox.baseVal,r=ratio(),display=displayScale(),rect=svg.getBoundingClientRect(),b=board.getBoundingClientRect();
+    var x=vb.x+(board.clientWidth/2-(rect.left-b.left)/display)/r;
+    var y=vb.y+((board.clientHeight+legend.offsetHeight)/2-(rect.top-b.top)/display)/r;
+    if(value){board.scrollLeft+=(value.x-x)*r;board.scrollTop+=(value.y-y)*r;return camera();}
+    return {x:x,y:y,zoom:r};
+  }
+  function fitSelection(extent,insets,minContentHeight){
     manual();if(!enabled() || !graph() || !extent)return;
     insets=insets || {left:24,right:24,top:24,bottom:24};
+    // A host revealing a detail can reserve readable space below sticky controls
+    // when the initial whole-diagram fit left only a shallow board.
+    if(minContentHeight){board.classList.add('board-zoomed');board.style.setProperty('--board-viewport-height',Math.max(board.clientHeight,legend.offsetHeight+minContentHeight)+'px');changed();}
     var width=Math.max(1,board.clientWidth-insets.left-insets.right),height=Math.max(1,board.clientHeight-legend.offsetHeight-insets.top-insets.bottom);
     zoom(Math.min(width/extent.w,height/extent.h,1.5));
     var svg=graph(),rect=svg.getBoundingClientRect(),frame=board.getBoundingClientRect(),display=displayScale(),scale=ratio(),origin=svg.viewBox.baseVal;
@@ -3223,7 +3235,7 @@ function createBoardNavigation(board, group, legend, changed){
     },function(){return enabled() && !document.hidden && svg===graph() && board.isConnected && !!board.clientWidth;});
   }
   if(document.fonts && document.fonts.ready)document.fonts.ready.then(function(){if(autoFit && !retired)requestFit();});
-  return {refresh:refresh,requestFit:requestFit,cancelFit:function(){if(fitFrame)stopFit();},reset:reset,frame:frame,fitSelection:fitSelection,followActive:followActive,cancelFollow:motion.cancel,manual:manual,
+  return {camera:camera,refresh:refresh,requestFit:requestFit,cancelFit:function(){if(fitFrame)stopFit();},reset:reset,frame:frame,fitSelection:fitSelection,followActive:followActive,cancelFollow:motion.cancel,manual:manual,
     snapshot:snapshot,restore:restore,
     suspend:function(){if(retired || paused)return;motion.cancel();cancel();paused=snapshot();},
     resume:function(){if(!paused || retired)return;var state=paused;paused=null;restore(state);},
@@ -3317,9 +3329,10 @@ function createBoardSizeControl(board, legend, label){
   var observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncOverflow) : null;
   if (observer){observer.observe(board);observer.observe(legend);}
   return {mode:function(){ return mode; }, setMode:setMode,refresh:syncOverflow,
+    camera:function(value){return navigation && navigation.camera(value);},
     cancelFit:function(){if(navigation)navigation.cancelFit();},
     followActive:function(extent){if(navigation)navigation.followActive(extent);},cancelFollow:function(){if(navigation)navigation.cancelFollow();},
-    fitSelection:function(extent,insets){if(navigation)navigation.fitSelection(extent,insets);},
+    fitSelection:function(extent,insets,minContentHeight){if(navigation)navigation.fitSelection(extent,insets,minContentHeight);},
     snapshot:function(){return navigation && navigation.snapshot();},restore:function(state){if(navigation)navigation.restore(state);},
     suspend:function(){if(navigation)navigation.suspend();},resume:function(){if(navigation)navigation.resume();},
     destroy:function(){ destroyed = true; if(navigation)navigation.destroy();board.removeEventListener('scroll', syncPan); if (observer) observer.disconnect(); }};

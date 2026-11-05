@@ -1,7 +1,6 @@
-/* Side-by-side compare view (issue #848, PR 1 of 3). Chuck's rulings 2026-10-31:
+/* Side-by-side compare view (issue #848, PR 1 of 3). Chuck's rulings 2026-10-31, camera contract superseded 2026-11-05:
    coverage = this new spec plus the existing single-pane assertions updated in
-   place; camera = ONE-WAY sync (selecting a change frames both panes; manual
-   pan/zoom in one pane never moves the other). Desktop only. Real pointer and
+   place; camera = linked zoom in both directions (selecting a change frames both panes). Desktop only. Real pointer and
    keyboard input only; fixture pages are built before interaction starts.
 
    CONTRACT MATRIX (one test per row)
@@ -19,7 +18,7 @@
                        and the section's declared panel;
                        selecting a node change brings it into view in both panes; a manual wheel
                        scroll of the Before pane leaves the After pane's scroll unchanged; zooming
-                       either pane with its Zoom in button leaves the other pane's zoom and board          rejects: two-way lock; unframed target; wrong section
+                       either pane with its Zoom in button updates the other pane's zoom                   rejects: independent zoom; unframed target; wrong section
    V6 accept           with both panes shown, Accept stays enabled while every change is selected in
                        turn (added and step changes included); one Undo restores; Redo re-applies     rejects: Accept gated on a side toggle
    V7, V7b, V8b        viewer-only component page: see compare-view-standalone.spec.mjs
@@ -207,15 +206,13 @@ test('V5 Full mode renders each section exactly and frames a node change in both
     await left.hover();await page.mouse.wheel(0,400);
     await expect.poll(()=>left.evaluate(el=>el.scrollTop)).not.toBe(leftTop);
     await page.waitForTimeout(300);expect(await right.evaluate(el=>el.scrollTop),'manual scroll of Before leaves After unchanged').toBe(rightTop);
-    /* Manual zoom is per pane too (one-way sync): zooming one pane leaves the other pane's zoom and board unchanged. */
+    /* Manual zoom is linked in both directions, including Standard page zoom. */
     const zoomOf=side=>side.locator('.reader-zoom-menu>summary').first(),board=side=>side.locator('svg[aria-label="flow diagram"]:visible').first();
     for(const [own,other,name] of [[before,after,'Before'],[after,before,'After']]){
-      const ownZoom=await zoomOf(own).innerText(),otherZoom=await zoomOf(other).innerText(),otherBoard=await board(other).boundingBox();
+      const ownZoom=await zoomOf(own).innerText();
       await own.getByRole('button',{name:'Zoom in',exact:true}).first().click();
       await expect(zoomOf(own),'zooming the '+name+' pane changes its zoom').not.toHaveText(ownZoom);
-      await page.waitForTimeout(300);
-      expect(await zoomOf(other).innerText(),'zooming the '+name+' pane leaves the other pane\'s zoom').toBe(otherZoom);
-      expect(await board(other).boundingBox(),'zooming the '+name+' pane leaves the other pane\'s board').toEqual(otherBoard);
+      await expect.poll(()=>zoomOf(other).innerText(),{message:'zooming '+name+' updates the other pane'}).toBe(await zoomOf(own).innerText());
     }
   });
 });
@@ -246,7 +243,7 @@ function largeDocument(){
   }
   return {page:{title:'Large compare document',blocks}};
 }
-test('V8 twenty open/close cycles on a large document leave no renders, listeners or heap growth behind',async({page})=>{
+test('V8 twenty open/close cycles on a large document leave no renders, listeners or heap growth behind',async({page},testInfo)=>{
   test.setTimeout(420000);
   const current=largeDocument(),proposed=plain(current);
   proposed.page.blocks[0].diagram.steps[0].text+=' (agent edit)';proposed.page.blocks[2].diagram.nodes.n5.title='Renamed by agent';proposed.page.blocks[3].diagram.steps[10].panels={g1:{value:999}};
@@ -259,9 +256,11 @@ test('V8 twenty open/close cycles on a large document leave no renders, listener
     /* Read-only: the public entry point reports render and canvas owners created by
        compare views whose own destroy() has not run (counted per owner, not set by close). */
     const live=()=>page.evaluate(()=>window.FlowviewCompare?window.FlowviewCompare.liveOwners():null);
-    const host=page.locator('#agent-update-compare'),html=page.locator('html'),listeners=await keydown(),baseline=await live();let base=0;
+    const host=page.locator('#agent-update-compare'),html=page.locator('html'),listeners=await keydown(),baseline=await live(),openTimes=[];let base=0;
     for(let cycle=1;cycle<=20;cycle++){
+      const started=performance.now();
       await page.locator('#agent-update-open').click();
+      openTimes.push(performance.now()-started);
       /* #848 PR 2: the view opens Focused, so the full panes are rendered underneath but not shown. */
       await expect(dialogPane(page,'before').locator('svg[aria-label="flow diagram"]').first()).toBeAttached();
       await expect(dialogPane(page,'after').locator('svg[aria-label="flow diagram"]').first()).toBeAttached();
@@ -276,6 +275,7 @@ test('V8 twenty open/close cycles on a large document leave no renders, listener
       expect(await keydown(),'cycle '+cycle+' removes the compare key listener').toBe(listeners);
       if(cycle===2)base=await heap();
     }
+    await testInfo.attach('large-document-open-times-ms',{body:JSON.stringify(openTimes),contentType:'application/json'});
     const end=await heap();
     expect(end,'heap after cycle 20 within 10% of cycle 2 ('+base+' -> '+end+')').toBeLessThanOrEqual(base*1.1);
   }finally{await h.cleanup();}

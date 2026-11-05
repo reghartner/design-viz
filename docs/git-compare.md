@@ -5,6 +5,11 @@ revisions of a git clone: two commits, branches, tags or pull requests. It uses 
 same side-by-side compare view as the Workbench's **Preview Agent Updates** dialog
 (see `docs/folder-agent-session.md`): Before on the left, After on the right, a list
 of changes beside them, **Focused** by default with a **Full diagram** toggle.
+Selecting a node or connection change reveals it in the current Standard or Explore
+view, including imported nodes. Manual diagram pan and zoom track in both directions
+between Before and After; Standard page zoom is linked too. Ordinary document
+scrolling stays independent. An added node opens on the node change even when its
+row-layout change appears earlier in the list.
 
 It runs only on your machine. It reads a clone you already have and uses the `gh`
 CLI's existing sign-in for pull request names; nothing is uploaded.

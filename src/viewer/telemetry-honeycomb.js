@@ -99,30 +99,7 @@ async function telemetryHoneycombRaw(win,url,signal){
    before serializing (depth/node/string bounds; no accessors, cycles or unsafe
    keys), then enforce the UTF-8 wire limit. Clone to detach provider objects. */
 function telemetryHoneycombJson(raw){
-  var nodes=0,chars=0,active=new Set();
-  function invalid(){throw telemetryHoneycombError('Honeycomb exact raw JSON is invalid or exceeds its bounds.');}
-  function walk(value,depth){
-    if(++nodes>50000 || depth>24)invalid();
-    if(value===null || typeof value==='boolean')return value;
-    if(typeof value==='number'){if(!isFinite(value))invalid();return value;}
-    if(typeof value==='string'){chars+=value.length;if(chars>TELEMETRY_HONEYCOMB_BYTES)invalid();return value;}
-    if(!value || typeof value!=='object' || active.has(value) || Object.getOwnPropertySymbols(value).length)invalid();
-    var array=Array.isArray(value),proto=Object.getPrototypeOf(value);
-    if(!array && proto!==null && Object.getPrototypeOf(proto)!==null)invalid();
-    var keys=Object.keys(value);if(keys.length>50000-nodes)invalid();
-    if(array && keys.length!==value.length)invalid();
-    active.add(value);var out=array?[]:Object.create(null);
-    keys.forEach(function(key,index){
-      if(array && key!==String(index))invalid();
-      if(['__proto__','prototype','constructor'].indexOf(key)>=0)invalid();
-      chars+=key.length;if(chars>TELEMETRY_HONEYCOMB_BYTES)invalid();
-      var descriptor=Object.getOwnPropertyDescriptor(value,key);if(!descriptor || !telemetryOwn(descriptor,'value'))invalid();
-      out[key]=walk(descriptor.value,depth+1);
-    });active.delete(value);return out;
-  }
-  var copy=walk(raw,0),text=JSON.stringify(copy);
-  if(text.length>TELEMETRY_HONEYCOMB_BYTES || new TextEncoder().encode(text).byteLength>TELEMETRY_HONEYCOMB_BYTES)invalid();
-  return copy;
+  try{return telemetryEvidenceJson(raw);}catch(e){throw telemetryHoneycombError('Honeycomb exact raw JSON is invalid or exceeds its bounds.');}
 }
 /* The local mock publishes exact raw JSON in structuredContent; a namespace
    may expose that JSON as payload. This is not evidence that hosted Honeycomb

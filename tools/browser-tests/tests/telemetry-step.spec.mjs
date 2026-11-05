@@ -1,6 +1,7 @@
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 import {stepFixture,recordedUrlEvidence,AT} from '../../../tests/helpers/step-evidence.mjs';
@@ -173,10 +174,18 @@ test('real view choice restores temporary timing without changing document layou
 
 
 test('generated standalone fixture demonstrates trace actions alongside Over time without live queries',async({page,server})=>{
- execFileSync('node',[path.join(repo,'tools/step-evidence-demo.mjs'),path.join(server.root,'step-demo')],{cwd:repo,stdio:'pipe'});
+ const artifact=path.join(repo,'.local/step-evidence/demo/step-evidence.html');
+ execFileSync('node',[path.join(repo,'tools/step-evidence-demo.mjs')],{cwd:repo,stdio:'pipe'});
+ const html=await readFile(artifact);expect(html.toString()).toContain('Clearly labeled host fixture replay');expect(html.toString()).toContain('window.flowviewTelemetry');
+ await mkdir(path.join(server.root,'step-demo'),{recursive:true});await writeFile(path.join(server.root,'step-demo/step-evidence.html'),html);
+ await page.emulateMedia({reducedMotion:'no-preference'});
  await page.setViewportSize({width:1600,height:1200});await page.goto(server.origin+'/step-demo/step-evidence.html');const root=page.locator('#docview');
+ await expect(root.getByRole('heading',{name:'Trace evidence · shared mock story fixture',exact:true})).toBeVisible();
  await step(root).click();await metric(root).click();await expect(card(root)).toBeVisible();await expect(card(root).locator('.dv-trace-never[data-step-id="push"]')).toBeVisible();await capture(page,'standalone-trace-actions');
+ await expect(card(root).getByRole('link')).toHaveCount(0);await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(1);
  await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(1);
  await over(root).click();await root.getByRole('slider',{name:'Day',exact:true}).press('Home');await expect(card(root)).toHaveCount(0);await expect(root.locator('.dv-proof-caption')).toContainText('IN PROGRESS');await capture(page,'standalone-over-time');
  await root.getByRole('button',{name:'Live',exact:true}).click();await expect(card(root)).toBeVisible();await card(root).getByRole('button',{name:'Pick passing trace',exact:true}).click();await expect(card(root).locator('.tr-op')).toHaveCount(3);
+ expect(await readFile(artifact)).toEqual(html);
+ await writeFile(path.join(repo,'.local/step-evidence/standalone-artifact.json'),JSON.stringify({artifact,sha256:createHash('sha256').update(html).digest('hex'),served_identical_bytes:true,visible_mock_heading:true,actions:['Metrics','Play this trace','Pin as evidence','Over time','Day Home','Live','Pick passing trace'],provider_url_absent:true},null,2)+'\n');
 });

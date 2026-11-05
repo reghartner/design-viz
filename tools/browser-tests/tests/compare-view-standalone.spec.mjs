@@ -124,7 +124,7 @@ test('V7b an imported node change frames the imported node in both panes',async(
   for(const side of ['before','after'])await expect.poll(()=>visible(side),{message:'selecting the imported change frames child::n23 in the '+side+' pane'}).toBe(true);
   await expect(target('before')).toContainText('Provider n23');await expect(target('after')).toContainText('Provider n23 changed');
 });
-test('V8b mounting both panes takes at most 2x mounting one pane',async({page,server})=>{
+test('V8b mounting both panes takes at most 2x mounting one pane',async({page,server},testInfo)=>{
   test.setTimeout(180000);
   const blocks=[];
   for(let k=0;k<4;k++){
@@ -181,5 +181,6 @@ test('V8b mounting both panes takes at most 2x mounting one pane',async({page,se
   }
   const median=list=>list.slice().sort((x,y)=>x-y)[1],one=[],two=[];
   for(let i=0;i<3;i++){one.push(await time('#cv-one',false));two.push(await time('#cv-two',true));}
+  await testInfo.attach('first-paint-ms',{body:JSON.stringify({one,two,ratio:median(two)/median(one)}),contentType:'application/json'});
   expect(median(two),'both panes '+JSON.stringify(two)+' ms vs one pane '+JSON.stringify(one)+' ms').toBeLessThanOrEqual(2*median(one));
 });

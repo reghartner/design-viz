@@ -5,7 +5,7 @@
    and Test + flip rows 1, 2, 2b, 3; Chuck 2026-10-31 (Focused default + Full diagram toggle;
    EDIT-only list with markers on affected steps) and 2026-11-01 (coverage = this new spec + old
    tests updated in place + Node unit tests in tests/compare-focus.test.js; clicking a step on
-   either side moves BOTH sides and redraws the rows; camera sync stays one-way). Desktop only.
+   either side moves BOTH sides and redraws the rows; camera sync was originally one-way; superseded by Chuck 2026-11-05: manual camera sync in both directions). Desktop only.
    Viewer-only page with the audited server; fixtures are built before interaction; all
    interaction is real pointer/keyboard input on visible controls.
 
@@ -845,4 +845,127 @@ test('D6 an added path keeps the full panes with the full-diagram note and no st
   await expect(host.locator('.compare-focus-steps:visible')).toHaveCount(0);
   await expect(host.locator('.compare-mode-note')).toHaveText('This change shows in the full diagram.');
   await panesShown(host,'D6');
+});
+
+/* Current-view navigation: Standard is explicitly authored, so a successful
+   reveal cannot rely on the user opening Explore. Different extents exercise
+   camera scale independently of the diagram's width. */
+async function stableCamera(host){
+  const samples=await host.evaluate(async root=>{
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const frames=[];
+    for(let i=0;i<36;i++){
+      await new Promise(requestAnimationFrame);
+      frames.push([...root.querySelectorAll('.compare-pane')].map(p=>{
+        const svg=[...p.querySelectorAll('svg[aria-label="flow diagram"]')].find(n=>n.getClientRects().length),r=svg.getBoundingClientRect();return [r.x,r.y,r.width,r.height];
+      }).flat());
+    }
+    return frames;
+  });
+  for(let i=0;i<samples[0].length;i++)expect(Math.max(...samples.map(s=>s[i]))-Math.min(...samples.map(s=>s[i])),'camera stays stable across consecutive paints').toBeLessThan(1.1);
+}
+for(const imported of [false,true])test('N1 '+(imported?'imported':'local')+' added node is revealed in Standard and manual zoom tracks both directions',async({page,server},testInfo)=>{
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  const raw={page:{title:'Navigation',defaultView:'standard',views:[{id:'standard',name:'Standard',presentation:'standard',sections:['c']},{id:'explore',name:'Explore',presentation:'explore',sections:['c']}],sections:[{id:'c',heading:'Chain',diagram:chain('n')}]}},after=plain(raw);
+  let script;
+  if(imported){
+    const pair=providerPair();pair.consumer.page.views=raw.page.views;pair.consumer.page.defaultView='standard';pair.consumer.page.sections[0].id='c';
+    const provider2=plain(pair.provider),d=provider2.page.sections[0].diagram;
+    d.nodes.x={title:'Added x'};d.rows[0].push('x');d.edges.push({from:'p11',to:'x'});d.topologyExports.public.nodes.push('x');d.topologyExports.public.edges.push('p11->x');
+    script=provided(pair,provider2);
+  }else{const d=after.page.sections[0].diagram;d.nodes.x={title:'Added x'};d.rows[0].push('x');d.edges.push({from:'n11',to:'x'});}
+  const host=await mountPage(page,server,'navigation-'+imported+'-'+Date.now(),raw,after,null,script),id=imported?'child::x':'x';
+  await expect(items(host).filter({hasText:imported?/^Added · Imported node child::x/:/^Added · Node Added x/})).toHaveAttribute('aria-current','true');
+  await expect.poll(()=>shown(host,'after',id)).toBe(true);
+  await selectItem(host,imported?/^Added · Imported node child::x/:/^Added · Node Added x/);
+  await expect.poll(()=>shown(host,'after',id)).toBe(true);
+  await expect(host.locator('.viewer-exploring')).toHaveCount(0);
+  for(const compareMode of ['Full diagram','Focused']){
+    await modeBar(host).getByRole('button',{name:compareMode,exact:true}).click();
+    await selectItem(host,imported?/^Added · Imported node child::x/:/^Added · Node Added x/);
+    await expect.poll(()=>host.locator('.compare-pane[data-side="after"]').evaluate((pane,id)=>{
+      const node=[...pane.querySelectorAll('[data-dv-node]')].find(n=>n.getAttribute('data-dv-node')===id && n.getClientRects().length),r=node.getBoundingClientRect(),board=node.closest('.board'),b=board.getBoundingClientRect(),controls=board.querySelector(':scope > .lg');
+      return r.top>=(controls?controls.getBoundingClientRect().bottom:b.top)-1 && r.bottom<=b.bottom+1 && r.left>=b.left-1 && r.right<=b.right+1;
+    },id),{message:'added node is unobscured by the Standard board controls'}).toBe(true);
+  }
+  await testInfo.attach('standard-added-node',{body:await host.screenshot(),contentType:'image/png'});
+
+  for(const mode of ['Standard','Explore']){
+    if(mode==='Explore'){
+      for(const side of ['before','after'])await host.locator('.compare-pane[data-side="'+side+'"]').locator('.reader-view-picker').selectOption({label:'Explore'});
+      await expect.poll(()=>shown(host,'after',id),{message:'switching to Explore opens a visible diagram'}).toBe(true);
+      await selectItem(host,imported?/^Added · Imported node child::x/:/^Added · Node Added x/);
+      await expect.poll(()=>shown(host,'after',id)).toBe(true);
+    }
+    const panes=['before','after'].map(side=>host.locator('.compare-pane[data-side="'+side+'"]'));
+    for(const own of [0,1]){
+      const summary=p=>p.locator('.reader-zoom-menu>summary').first();
+      const old=await summary(panes[own]).innerText();
+      const zoomButton=panes[own].getByRole('button',{name:/^(Zoom in|Canvas zoom in|Diagram zoom in)$/}).first();
+      if(own===1)await zoomButton.press('Enter');else await zoomButton.click();
+      await expect(summary(panes[own])).not.toHaveText(old);
+      await expect.poll(()=>summary(panes[1-own]).innerText()).toBe(await summary(panes[own]).innerText());
+      const ref=imported?'child::p11':'n11';
+      await expect.poll(async()=>Math.abs((await width(host,'before',ref))-(await width(host,'after',ref)))).toBeLessThan(2);
+      // Sample consecutive paints across the old 150 ms retry and 250 ms
+      // remount windows; normal motion must not produce a late camera jump.
+      await stableCamera(host);
+    }
+    const ref=imported?'child::p11':'n11',position=side=>panes[side].locator('[data-dv-node="'+ref+'"]:visible').first().evaluate(n=>n.getBoundingClientRect().x);
+    for(const own of [0,1]){
+      const starts=await Promise.all([position(0),position(1)]);
+      await panes[own].locator('.board:visible').first().hover();await page.mouse.wheel(-90,0);
+      await expect.poll(async()=>Math.abs(await position(own)-starts[own])).toBeGreaterThan(20);
+      await expect.poll(async()=>Math.abs((await position(0)-starts[0])-(await position(1)-starts[1]))).toBeLessThan(2);
+    }
+    if(mode==='Explore'){await expect.poll(()=>shown(host,'after',ref),{message:'linked camera keeps the changed area on screen'}).toBe(true);}
+    if(mode==='Explore')await testInfo.attach('explore-linked-zoom',{body:await host.screenshot(),contentType:'image/png'});
+  }
+});
+
+test('N2 rapid selections and mode changes retire old framing before manual camera use on a multi-section document',async({page,server})=>{
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  const current={page:{title:'Camera lifetime',sections:[{id:'c',heading:'Chain',diagram:chain('n')},{id:'other',heading:'Other',diagram:chain('p')}]}},proposed=plain(current);
+  proposed.page.sections[0].diagram.nodes.n2.title='Changed two';proposed.page.sections[0].diagram.nodes.n9.title='Changed nine';
+  const host=await mountPage(page,server,'camera-lifetime-'+Date.now(),current,proposed);
+  await page.keyboard.press('j');await page.keyboard.press('k');await page.keyboard.press('j');
+  await modeBar(host).getByRole('button',{name:'Full diagram',exact:true}).click();
+  await modeBar(host).getByRole('button',{name:'Focused',exact:true}).click();
+  await expect(items(host).nth(1)).toHaveAttribute('aria-current','true');
+  const pane=host.locator('.compare-pane[data-side="before"]');
+  await pane.getByRole('button',{name:'Zoom in',exact:true}).first().click();
+  await stableCamera(host);
+  await expect.poll(()=>shown(host,'after','n9')).toBe(true);
+});
+
+test('N3 a removed imported node reveals its former neighbours on the side without it',async({page,server})=>{
+  const pair=providerPair(),p2=plain(pair.provider),d=p2.page.sections[0].diagram;
+  delete d.nodes.p6;d.rows[0]=d.rows[0].filter(id=>id!=='p6');d.edges=d.edges.filter(e=>e.from!=='p6' && e.to!=='p6');
+  d.topologyExports.public.nodes=d.topologyExports.public.nodes.filter(id=>id!=='p6');d.topologyExports.public.edges=d.edges.map(e=>e.from+'->'+e.to);
+  const host=await mountPage(page,server,'removed-imported-'+Date.now(),doorbell().current,null,null,provided(pair,p2));
+  await selectItem(host,/^Removed · Imported node child::p6/);
+  await exerciseCrop(host,{inside:{before:[P('p5'),P('p6'),P('p7')],after:[P('p5'),P('p7')]},far:[P('p0'),P('p11')],all:PIDS,
+    changed:{before:['data-dv-node',P('p6'),'removed'],after:null},neighbour:['data-dv-node',P('p5')],ref:P('p5'),keep:{before:[P('p6')],after:[P('p5'),P('p7')]},ends:[P('p0'),P('p11')]});
+});
+
+test('N4 background completion preserves both painted cameras without manual input',async({page,server})=>{
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  const current={page:{title:'Background completion',sections:[{id:'c',heading:'Chain',diagram:chain('n')},{id:'second',heading:'Second',diagram:chain('p')},{id:'third',heading:'Third',diagram:chain('q')}]}},proposed=plain(current);
+  proposed.page.sections[0].diagram.nodes.n6.title='Changed six';
+  const script=`document.fonts.ready.then(function(){
+    var a=FlowviewCompare.normalize(${inline(current)}),b=FlowviewCompare.normalize(${inline(proposed)}),entries=FlowviewCompare.compare({authored:a,resolved:a,ledger:null},{authored:b,resolved:b,ledger:null});
+    window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),{before:a,after:b,entries:entries});
+    window.completionFrames=[];
+    function sample(){
+      var panes=Array.from(document.querySelectorAll('#compare-host .compare-pane'));
+      window.completionFrames.push({beforeCount:panes[0].querySelectorAll('svg[aria-label="flow diagram"]').length,geometry:panes.map(function(p){var r=p.querySelector('[data-dv-node="n6"]').getBoundingClientRect();return [r.x,r.y,r.width,r.height];}).flat()});
+      if(window.completionFrames.length<90)requestAnimationFrame(sample);
+    }
+    requestAnimationFrame(function(){requestAnimationFrame(sample);});
+  });`;
+  await mountPage(page,server,'background-camera-'+Date.now(),current,proposed,null,script);
+  await expect.poll(()=>page.evaluate(()=>window.completionFrames && window.completionFrames.length)).toBe(90);
+  const samples=await page.evaluate(()=>window.completionFrames);
+  expect(samples.map(s=>s.beforeCount)).toContain(1);expect(samples.map(s=>s.beforeCount)).toContain(3);
+  for(let i=0;i<8;i++)expect(Math.max(...samples.map(s=>s.geometry[i]))-Math.min(...samples.map(s=>s.geometry[i])),'background completion preserves each pane coordinate').toBeLessThan(1.1);
 });

@@ -87,7 +87,11 @@ function initViewerExploreCanvas(ctl,view,opts){
     if(refitObserver){var board=active.sectionEl.querySelector('.board');if(board)refitObserver.observe(board);}
     var definition=active.viewport.viewDefinition(),key=active.number+':'+definition.id;
     if(opts && opts.preserveCamera && opts.preserveCamera(rec,definition))seen.add(key);
-    if(!seen.has(key)){
+    if(opts && opts.externalCamera && !seen.has(key)){
+      // Comparison owns later framing; switching into Explore still needs a
+      // useful opening camera, synchronously before the host frames its target.
+      seen.add(key);active.viewport.fitCanvas(opts.fitInsets,null,null,false,true);
+    }else if(!seen.has(key)){
       fitRecord=rec;fitDefinition=definition;fitKey=key;frame=requestAnimationFrame(function(){
         // Boot-time indexing briefly visits other views. Only mark a view after
         // its frame actually opens, so those cancelled visits cannot skip Fit.
@@ -149,5 +153,14 @@ function initViewerExploreCanvas(ctl,view,opts){
   ctl.onChange=changed;
   window.addEventListener('hashchange',navigationChanged);
   show(navigationState().rec);lastTarget=navigationState().key;if(ctl.details && ctl.details.activeSection && ctl.details.activeSection())detailChanged();
-  return {destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('detail-navigation',detailChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelFirstFit();cancelAnimationFrame(refitFrame);if(refitObserver)refitObserver.disconnect();show(null);navigation.destroy();view.classList.remove('navigation-contained');view.removeEventListener('tab-view-change',tabViewChanged);}};
+  // Host-owned cameras use the current representation's state; Standard page
+  // zoom remains owned by Contents and diagram zoom by the board.
+  function camera(value){
+    var rec=navigation.current();if(!rec)return null;
+    if(active && active.viewport){return {presentation:'explore',diagram:active.viewport.graphCamera(value && value.presentation==='explore'?value.diagram:null)};}
+    if(value && value.presentation==='standard' && navigation.contents)navigation.contents.setZoom(value.zoom);
+    var board=rec.boardSize;
+    return {presentation:'standard',zoom:navigation.contents?navigation.contents.zoom():1,diagram:board && board.camera(value && value.presentation==='standard'?value.diagram:null)};
+  }
+  return {camera:camera,destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('detail-navigation',detailChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelFirstFit();cancelAnimationFrame(refitFrame);if(refitObserver)refitObserver.disconnect();show(null);navigation.destroy();view.classList.remove('navigation-contained');view.removeEventListener('tab-view-change',tabViewChanged);}};
 }

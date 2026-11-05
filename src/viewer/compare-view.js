@@ -17,8 +17,8 @@
      emptyText     optional {before, after} text for a side without the document
    returns {select(i), next(), previous(), selected(), setMode(m), mode(), setSkin(name), destroy()}
 
-   Selecting a change frames BOTH panes on it (one-way: the selection drives the
-   panes; manual pan/zoom in one pane never moves the other). */
+   Selecting a change frames BOTH panes on it. Manual diagram pan and zoom are
+   linked in both directions, in Standard and Explore views. */
 var COMPARE_KIND_LABEL = {document:'Document', section:'Section', node:'Node', edge:'Connection', panel:'Panel', step:'Step',
   path:'Path', layout:'Layout', view:'View', tab:'Tab', import:'Import', ledger:'Coverage ledger'};
 /* Render and canvas owners created by compare views whose own destroy() has not
@@ -26,8 +26,6 @@ var COMPARE_KIND_LABEL = {document:'Document', section:'Section', node:'Node', e
 var compareViewLiveOwners = 0;
 /* Rendered width a selected node is zoomed up to (never past 100%). */
 var COMPARE_LEGIBLE_NODE_PX = 120;
-/* The Before pane's other sections render this long after the first paint, in idle time. */
-var COMPARE_BEFORE_DELAY_MS = 250, COMPARE_BEFORE_IDLE_MS = 1000;
 function compareViewTrack(owner){
   if (!owner || typeof owner.destroy !== 'function') return owner;
   var destroy = owner.destroy, done = false;
@@ -321,6 +319,23 @@ function mountCompareView(host, opts){
   var mode = opts.mode === 'full' ? 'full' : 'focused', focusCtx = null, displayOnlyCache = new Map(), ambientOnly = false;
   /* Node and connection crop (#848 PR 3): the selection's crop, its zoom-out level (-1 = whole section). */
   var cropCtx = null, cropLevel = 0, cropSelection = false;
+  var win = doc.defaultView, cameraRevision = 0, cameraFrames = new Set(), manualSide = null, syncFrame = 0, completion = 0, completionIdle = 0;
+  function cancelCamera(){
+    cameraRevision++;cameraFrames.forEach(function(id){win.cancelAnimationFrame(id);});cameraFrames.clear();
+    if(syncFrame)win.cancelAnimationFrame(syncFrame);syncFrame=0;
+  }
+  function afterLayout(action){
+    var revision=cameraRevision,id=win.requestAnimationFrame(function(){cameraFrames.delete(id);if(!destroyed && revision===cameraRevision)action();});cameraFrames.add(id);
+  }
+  function manualCamera(side){cancelCamera();cancelCompletion();manualSide=side;}
+  function linkCamera(side){
+    if(destroyed || manualSide!==side || syncFrame)return;
+    syncFrame=win.requestAnimationFrame(function(){
+      syncFrame=0;if(destroyed || manualSide!==side)return;
+      var from=panes[side],to=panes[side==='before'?'after':'before'];
+      if(from.canvas && to.canvas){var c=from.canvas.camera();if(c)to.canvas.camera(c);}
+    });
+  }
   /* Text blocks of the selected ledger or page-field change (#892), else null. */
   var textCtx = null;
   function el(tag, cls, text){ var n = doc.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
@@ -334,8 +349,8 @@ function mountCompareView(host, opts){
   bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Compare mode');
   ['focused', 'full'].forEach(function(m){ var b = modeButtons[m]; b.type = 'button'; b.addEventListener('click', function(){ setMode(m); }); bar.appendChild(b); });
   cropButtons.out.type = cropButtons.whole.type = 'button';
-  cropButtons.out.addEventListener('click', function(){ cropLevel = Math.max(0, cropLevel) + 1; applyCrop(); });
-  cropButtons.whole.addEventListener('click', function(){ cropLevel = -1; applyCrop(); });
+  cropButtons.out.addEventListener('click', function(){ cancelCamera(); manualSide=null; cropLevel = Math.max(0, cropLevel) + 1; applyCrop(); });
+  cropButtons.whole.addEventListener('click', function(){ cancelCamera(); manualSide=null; cropLevel = -1; applyCrop(); });
   bar.appendChild(cropButtons.out); bar.appendChild(cropButtons.whole);
   bar.appendChild(modeNote); focus.setAttribute('aria-label', 'Focused comparison'); focus.hidden = true;
   stage.appendChild(columns); stage.appendChild(focus); main.appendChild(bar); main.appendChild(stage);
@@ -345,6 +360,12 @@ function mountCompareView(host, opts){
   /* The view opens on the first change with a rendered object; a ledger or page-field change (a
      line diff only) is opened first only when every change is one. */
   var opening = Math.max(0, entries.findIndex(function(e){ return !compareTextBlocks(e); }));
+  // An insertion's row bookkeeping often precedes its actual node change.
+  // Start at that object while keeping the rail in document order.
+  if(entries[opening] && entries[opening].kind==='section' && compareEntryFields(entries[opening]).split(', ').every(function(f){return /^diagram\.rows(?:$|[.\[])/.test(f);})){
+    var objectOpening=entries.findIndex(function(e){return (e.kind==='node' || e.kind==='edge') && compareEntryGroup(e,pages,entries).key===compareEntryGroup(entries[opening],pages,entries).key;});
+    if(objectOpening>=0)opening=objectOpening;
+  }
   var buttons = [];
   groups.forEach(function(g){
     var box = el('section', 'compare-rail-group'), list = el('ol', 'compare-rail-list');
@@ -369,30 +390,30 @@ function mountCompareView(host, opts){
     scroll.tabIndex = 0; scroll.appendChild(view); pane.appendChild(head); pane.appendChild(scroll); columns.appendChild(pane);
     panes[side] = {pane:pane, scroll:scroll, view:view, ctl:null, canvas:null, page:pages[side]};
     if (!pages[side]){ view.appendChild(el('p', 'compare-pane-empty', opts.emptyText && opts.emptyText[side] || (side === 'before' ? 'Not in the current document.' : 'Not in the proposal.'))); return; }
-    var p = panes[side], first = side === 'before' && entries.length ? (entries[opening].section || {}).before : null, partial = first != null ? comparePartialPage(pages.before, first) : null;
-    if (partial){ p.partial = first; renderPane(p, partial); } else renderPane(p, pages[side]);
+    var p=panes[side],first=side==='before' && entries.length?(entries[opening].section || {}).before:null,partial=first!=null?comparePartialPage(pages.before,first):null;
+    if(partial){p.partial=first;renderPane(p,partial);}else renderPane(p,pages[side]);
+    var intent=function(ev){if(ev.type==='keydown' && !/^(Arrow|Page|Home|End|Enter| |[+-])/.test(ev.key))return;manualCamera(side);};
+    var changed=function(ev){if(ev.type==='scroll' && ev.target===scroll)return;linkCamera(side);};
+    ['pointerdown','wheel','keydown','click'].forEach(function(type){scroll.addEventListener(type,intent,true);});
+    ['reader-zoom-change','board-scale-change','scroll'].forEach(function(type){scroll.addEventListener(type,changed,true);});
+    panes[side].unlisten=function(){
+      ['pointerdown','wheel','keydown','click'].forEach(function(type){scroll.removeEventListener(type,intent,true);});
+      ['reader-zoom-change','board-scale-change','scroll'].forEach(function(type){scroll.removeEventListener(type,changed,true);});
+    };
   }); });
   decorate();
-  /* The Before pane opens with only the opening change's section; the rest of
-     the document replaces it right after the first paint (or at once when a
-     change in another section is selected). */
-  var win = doc.defaultView, completion = 0, completionIdle = 0;
-  if (panes.before.partial != null){
-    /* After the first paint, wait briefly, then use the browser's next idle time (at most 1 s later). */
-    if (win && win.requestAnimationFrame) completion = win.requestAnimationFrame(function(){
-      completion = win.setTimeout(function(){
-        completion = 0;
-        if (win.requestIdleCallback) completionIdle = win.requestIdleCallback(completeBefore, {timeout:COMPARE_BEFORE_IDLE_MS});
-        else completeBefore();
-      }, COMPARE_BEFORE_DELAY_MS);
-    });
-    else completeBefore();
-  }
+  // Finish untouched previews after their first paint. A manual gesture keeps
+  // its mounted Before pane until navigation or acceptance needs the rest.
+  if(panes.before.partial!=null)completion=win.setTimeout(function(){
+    completion=0;
+    if(win.requestIdleCallback)completionIdle=win.requestIdleCallback(function(){completeBefore(true);},{timeout:1000});
+    else completeBefore(true);
+  },250);
   function renderPane(p, page){
     try{
       p.ctl = compareViewTrack(renderPage(p.view, page, typeof skin === 'function' ? skin(page) : skin || page.skin, null, {autoplay:false}));
       if (typeof initViewerExploreCanvas === 'function') p.canvas = compareViewTrack(initViewerExploreCanvas(p.ctl, p.view, {container:p.scroll, initialContentsOpen:false,
-        presentation:{panelsHiddenWhenGraphVisible:false, overlayScale:.5}, forceFit:true, refitOnResize:false, fitInsets:{left:24, right:24, top:20, bottom:24}}));
+        presentation:{panelsHiddenWhenGraphVisible:false, overlayScale:.5}, externalCamera:true, refitOnResize:false, fitInsets:{left:24, right:24, top:20, bottom:24}}));
     }catch(ex){
       p.view.textContent = 'Could not render this side: ' + ex.message;
       var failure = {side:p.pane.getAttribute('data-side'), message:String(ex && ex.message || ex)};
@@ -400,33 +421,38 @@ function mountCompareView(host, opts){
       if (typeof opts.onRenderError === 'function') opts.onRenderError(failure);
     }
   }
-  function completeBefore(){
-    var p = panes.before;
-    cancelCompletion();
-    if (destroyed || p.partial == null) return;
-    try{ if (p.canvas) p.canvas.destroy(); }catch(ex){}
-    try{ if (p.ctl) p.ctl.destroy(); }catch(ex){}
-    p.canvas = p.ctl = null; p.partial = null; p.view.replaceChildren();
-    withPathGeometryCache(geometry || new Map(), function(){ renderPane(p, pages.before); });
-    geometry = null;
-    decorate();
-    if (selected >= 0) navigate('before', entries[selected], lastAfterView);
-    /* Then the Focused step and path (a panel change or a step clicked before completion). */
-    if (selected >= 0) syncPaneSteps();
-    if (selected >= 0 && ambientOnly) ambientPanes(entries[selected]);
-    if (selected >= 0) applyCrop();
-  }
   function cancelCompletion(){
-    if (win){
-      if (completion){ if (win.cancelAnimationFrame) win.cancelAnimationFrame(completion); if (win.clearTimeout) win.clearTimeout(completion); }
-      if (completionIdle && win.cancelIdleCallback) win.cancelIdleCallback(completionIdle);
-    }
-    completion = completionIdle = 0;
+    if(completion)win.clearTimeout(completion);
+    if(completionIdle && win.cancelIdleCallback)win.cancelIdleCallback(completionIdle);
+    completion=completionIdle=0;
   }
-  /* Rendered record of a section index on one pane (a partial pane holds one section). */
+  function completeBefore(preserve){
+    var p=panes.before;cancelCompletion();if(destroyed || p.partial==null)return;
+    var section=p.partial,old=recordFor(p,section),saved=preserve && old?{
+      camera:p.canvas && p.canvas.camera(),board:old.boardSize && old.boardSize.snapshot(),
+      top:old.sectionEl.getBoundingClientRect().top,x:p.scroll.scrollLeft,
+      view:p.ctl.views && p.ctl.views.current(old)
+    }:null;
+    cancelCamera();
+    if(p.canvas)p.canvas.destroy();if(p.ctl)p.ctl.destroy();
+    p.canvas=p.ctl=null;p.partial=null;p.view.replaceChildren();
+    withPathGeometryCache(geometry || new Map(),function(){renderPane(p,pages.before);});geometry=null;decorate();
+    if(!saved || selected<0 || !p.ctl)return;
+    navigate('before',entries[selected],saved.view?{id:saved.view.id,layout:saved.view.legacyLayout || saved.view.members && saved.view.members[0] && saved.view.members[0].layout}:null);
+    syncPaneSteps('before');if(ambientOnly)ambientPanes(entries[selected],'before');
+    // Retire navigation's framing pass and restore the previously painted
+    // camera in this same task. Completion never re-frames the After pane.
+    cancelCamera();
+    var rec=recordFor(p,section);
+    if(rec && saved.board && rec.boardSize)rec.boardSize.restore(saved.board);
+    if(p.canvas && saved.camera)p.canvas.camera(saved.camera);
+    p.scroll.scrollLeft=saved.x;
+    if(rec)p.scroll.scrollTop+=rec.sectionEl.getBoundingClientRect().top-saved.top;
+  }
+  /* Rendered record of a section index on one pane. */
   function recordFor(p, index){
     if (!p.ctl) return null;
-    if (p.partial != null) return index === p.partial ? (p.ctl.sections || [])[0] || null : null;
+    if(p.partial!=null)return index===p.partial?(p.ctl.sections || [])[0] || null:null;
     return (p.ctl.sections || []).find(function(r){ return r.number === index + 1; }) || null;
   }
   function decorate(){
@@ -462,28 +488,37 @@ function mountCompareView(host, opts){
     return t;
   }
   /* Center a changed object; in Explore, first zoom a changed node up to a
-     legible size (narrow panes fit whole sections small). Runs now and again
-     after the viewer's own deferred fit, unless the selection has moved on. */
-  function frame(ctl, object, t){
-    var token = selected;
+     legible size (narrow panes fit whole sections small). Runs after navigation and once after layout; new selections and manual camera
+     gestures cancel the pending pass. */
+  function frame(p, object, t){
+    var token = cameraRevision, ctl=p.ctl;
     function apply(){
-      if (destroyed || token !== selected || !object.isConnected) return;
+      if (destroyed || token !== cameraRevision || !object.isConnected) return;
       /* The Explore viewport that holds the object (a section's shown View can be another record). */
       var vp = null;
       (ctl.sections || []).forEach(function(r){ if (r.viewport && r.viewport.canvasZoom && r.sectionEl && r.sectionEl.contains(object) && r.viewport.isExplore()) vp = r.viewport; });
+      var rec=recordFor(p,t.section);
+      if(rec && rec.boardSize)rec.boardSize.cancelFit();
       if (t.attr === 'data-dv-node' && vp){
         var width = object.getBoundingClientRect().width, zoom = vp.canvasZoom();
         if (width > 0 && width < COMPARE_LEGIBLE_NODE_PX - 1 && zoom > 0) vp.canvasZoom(Math.min(1, zoom * COMPARE_LEGIBLE_NODE_PX / width));
       }
-      if (object.scrollIntoView) object.scrollIntoView({block:'center', inline:'center'});
+      if(!vp && (t.attr==='data-dv-node' || t.attr==='data-dv-edge') && rec && rec.boardSize && rec.boardSize.camera){
+        var c=rec.boardSize.camera(),w=object.getBoundingClientRect().width,b=cropBounds([object]),board=object.closest('.board');
+        if(c && b && board){
+          var z=t.attr==='data-dv-node' && w>0?Math.max(c.zoom,Math.min(1,c.zoom*COMPARE_LEGIBLE_NODE_PX/w)):Math.min(c.zoom,(board.clientWidth-48)/b.w);
+          var extentW=board.clientWidth/z;
+          rec.boardSize.fitSelection({x:b.x+b.w/2-extentW/2,y:b.y+b.h/2-.5,w:extentW,h:1},{left:0,right:0,top:0,bottom:0},Math.min(b.h*z,280)+40);
+        }
+      }
+      cropCentre(p, [object]);
     }
     apply();
-    var win = doc.defaultView;
-    if (win && win.requestAnimationFrame) win.requestAnimationFrame(function(){ win.requestAnimationFrame(apply); });
+    afterLayout(apply);
   }
   function navigate(side, entry, viewId){
     var p = panes[side], t = target(entry, side);
-    if (p.partial != null && (!t || t.section !== p.partial)) completeBefore();
+    if(p.partial!=null && (!t || t.section!==p.partial))completeBefore(false);
     if (!p.ctl || !t) return {side:side, shown:false};
     var rec = recordFor(p, t.section), visible = true;
     if (!rec) return {side:side, shown:false};
@@ -510,7 +545,8 @@ function mountCompareView(host, opts){
       var r = n.getBoundingClientRect(), area = r.width * r.height;
       if (!object || area > bestArea){ object = n; bestArea = area; }
     });
-    if (object && !cropSelection) frame(p.ctl, object, t);
+    if (object && !cropSelection) frame(p, object, t);
+    else if(!cropSelection && rec.viewport && rec.viewport.isExplore())rec.viewport.fitCanvas({left:24,right:24,top:20,bottom:24},null,null,false,true);
     else if (rec.sectionEl && rec.sectionEl.scrollIntoView && (!rec.viewport || !rec.viewport.isExplore())) rec.sectionEl.scrollIntoView({block:'start'});
     var shownView = p.ctl.views && p.ctl.views.current ? p.ctl.views.current(rec) : null;
     var shownLayout = shownView && (shownView.legacyLayout || shownView.members && shownView.members[0] && shownView.members[0].layout);
@@ -702,22 +738,22 @@ function mountCompareView(host, opts){
   /* Keep the full panes under the Focused view on the Focused step and path, so switching to
      Full diagram shows the same step (a side without the step keeps its pane where it is). */
   /* A panel change seen only in Ambient mode: put both full panes in Ambient mode on its section. */
-  function ambientPanes(entry){
-    ['before', 'after'].forEach(function(side){
+  function ambientPanes(entry, onlySide){
+    (onlySide?[onlySide]:['before', 'after']).forEach(function(side){
       var p = panes[side], index = compareSectionOnSide(entries, pages, entry, side);
       if (!p || index < 0) return;
-      if (p.partial != null && p.partial !== index) completeBefore();
+      if(p.partial!=null && p.partial!==index)completeBefore(false);
       if (!p.ctl) return;
       var rec = recordFor(p, index);
       if (rec && rec.stepper && rec.stepper.enterAmbient) try{ rec.stepper.enterAmbient(); }catch(ex){}
     });
   }
-  function syncPaneSteps(){
+  function syncPaneSteps(onlySide){
     var ctx = focusCtx; if (!ctx || destroyed) return;
-    ['before', 'after'].forEach(function(side){
+    (onlySide?[onlySide]:['before', 'after']).forEach(function(side){
       var S = ctx[side], p = panes[side];
       if (!S || S.pos < 0 || !p) return;
-      if (p.partial != null && p.partial !== S.section) completeBefore();
+      if(p.partial!=null && p.partial!==S.section)completeBefore(false);
       if (!p.ctl) return;
       var rec = recordFor(p, S.section);
       if (rec && rec.stepper && rec.stepper.jumpSource) try{ rec.stepper.jumpSource(S.indices[S.pos], S.pathId); }catch(ex){}
@@ -968,6 +1004,8 @@ function mountCompareView(host, opts){
         var u = union(); if (!u) return;
         var c = node.getBoundingClientRect();
         var left = Math.max(c.left, view.left), right = Math.min(c.right, view.right), top = Math.max(c.top, view.top), bottom = Math.min(c.bottom, view.bottom);
+        var controls=node.classList.contains('board') && node.querySelector(':scope > .lg');
+        if(controls)top=Math.max(top,controls.getBoundingClientRect().bottom);
         if (right > left) node.scrollLeft += (u.left + u.right) / 2 - (left + right) / 2;
         if (bottom > top) node.scrollTop += (u.top + u.bottom) / 2 - (top + bottom) / 2;
       }
@@ -976,13 +1014,13 @@ function mountCompareView(host, opts){
   }
   function applyCrop(){
     if (!cropCtx || mode !== 'focused' || destroyed) return;
-    var token = selected, level = cropLevel;
+    var token = cameraRevision, level = cropLevel;
     function apply(){
-      if (destroyed || token !== selected || level !== cropLevel || mode !== 'focused' || !cropCtx) return;
+      if (destroyed || token !== cameraRevision || level !== cropLevel || mode !== 'focused' || !cropCtx) return;
       ['before', 'after'].forEach(function(side){
         var p = panes[side], c = cropCtx.sides[side];
         if (!p || c.section < 0) return;
-        if (p.partial != null && p.partial !== c.section) completeBefore();
+        if(p.partial!=null && p.partial!==c.section)completeBefore(false);
         if (!p.ctl) return;
         var got = cropElements(p, side);
         if (!got) return;
@@ -998,7 +1036,7 @@ function mountCompareView(host, opts){
              height collapses to its centre line. */
           fit = function(ext){
             var vb = svg.viewBox.baseVal, e = ext || {x:vb.x, y:vb.y, w:vb.width, h:vb.height};
-            got.rec.boardSize.fitSelection({x:e.x, y:e.y + e.h / 2 - .5, w:e.w, h:1}, {left:insets.left, right:insets.right, top:0, bottom:0});
+            got.rec.boardSize.fitSelection({x:e.x, y:e.y + e.h / 2 - .5, w:e.w, h:1}, {left:insets.left, right:insets.right, top:0, bottom:0}, Math.min(e.h,280)+40);
           };
           frameW = board.clientWidth;
         }
@@ -1021,9 +1059,7 @@ function mountCompareView(host, opts){
       });
     }
     apply();
-    /* Again after the viewer's own deferred fit and layout. */
-    if (win && win.requestAnimationFrame) win.requestAnimationFrame(function(){ win.requestAnimationFrame(apply); });
-    if (win && win.setTimeout) win.setTimeout(apply, 150);
+    afterLayout(apply);
   }
   function uncrop(){
     if (!cropCtx) return;
@@ -1051,6 +1087,7 @@ function mountCompareView(host, opts){
   }
   function setMode(m){
     if (destroyed || (m !== 'focused' && m !== 'full')) return mode;
+    cancelCamera(); manualSide=null;
     var was = mode; mode = m; applyMode();
     if (m === 'focused' && was !== 'focused') applyCrop();
     /* Leaving a crop: undo the crop's camera (Explore fits the whole diagram, an inline board returns
@@ -1060,6 +1097,7 @@ function mountCompareView(host, opts){
   }
   function select(index, initial){
     if (destroyed || !entries.length) return null;
+    cancelCamera(); manualSide=null;
     selected = ((index % entries.length) + entries.length) % entries.length;
     buttons.forEach(function(b, i){ if (b) b.setAttribute('aria-current', String(i === selected)); });
     if (buttons[selected] && buttons[selected].scrollIntoView) buttons[selected].scrollIntoView({block:'nearest'});
@@ -1096,7 +1134,7 @@ function mountCompareView(host, opts){
   doc.addEventListener('keydown', onKey);
   applyMode();
   if (entries.length) withPathGeometryCache(geometry || new Map(), function(){ select(opening, true); });
-  if (panes.before.partial == null) geometry = null;
+  if(panes.before.partial==null)geometry = null;
   return {
     select:select,
     next:function(){ return select(selected + 1); },
@@ -1109,8 +1147,8 @@ function mountCompareView(host, opts){
     views:function(){ return {before:panes.before.view, after:panes.after.view}; },
     /* Sides that could not be rendered: [{side, message}]. */
     errors:function(){ return renderErrors.slice(); },
-    /* Render anything still pending (the rest of the Before document) now; returns errors(). */
-    finish:function(){ completeBefore(); return renderErrors.slice(); },
+    /* Acceptance validates any Before sections deferred during navigation. */
+    finish:function(){ completeBefore(true);return renderErrors.slice(); },
     setSkin:function(name){
       skin = name; var ok = false;
       ['before', 'after'].forEach(function(side){ if (panes[side].ctl && typeof applySkinClasses === 'function') ok = applySkinClasses(doc.body, panes[side].view, name) || ok; });
@@ -1120,11 +1158,12 @@ function mountCompareView(host, opts){
     },
     destroy:function(){
       if (destroyed) return; destroyed = true;
-      cancelCompletion();
+      cancelCamera();cancelCompletion();
       cleanFocus();
       doc.removeEventListener('keydown', onKey);
       ['before', 'after'].forEach(function(side){
         var p = panes[side]; if (!p) return;
+        if(p.unlisten)p.unlisten();
         try{ if (p.canvas) p.canvas.destroy(); }catch(ex){}
         try{ if (p.ctl) p.ctl.destroy(); }catch(ex){}
       });

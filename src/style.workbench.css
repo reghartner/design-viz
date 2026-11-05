@@ -1770,6 +1770,9 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 .dv-inline-preview .prose-code{white-space:pre;overflow:auto;}
 .dv-inline-node-editor{overflow:visible;}
 .dv-inline-node-editor .dv-inline-input{height:36px;padding:4px 6px;font:16px/1.4 system-ui,sans-serif;color:var(--dtext,#202938);}
+.dv-inline-subtitle-editor{overflow:visible;}
+.dv-inline-subtitle-editor .dv-inline-input{height:28px;padding:3px 6px;font:13px/1.4 system-ui,sans-serif;color:var(--dtext,#202938);}
+#docview text.t2.dv-inline-editing{visibility:hidden;}
 .dv-inline-group-editor{overflow:visible;}
 .dv-inline-group-editor .dv-inline-input{height:30px;padding:3px 6px;font:600 13px/1.4 system-ui,sans-serif;color:var(--dtext,#202938);}
 .dv-inline-editing>[hidden]{display:none!important;}

@@ -54,6 +54,9 @@ function createInlineTextEditor(opts){
       accept:function(value){return !isTextBoxNode(value);},place:nodeTitleHost,hostClass:'dv-inline-node-editor'},
     // One step text serves every path that uses the step.
     {kind:'step',selector:'.stepline .step-text',target:function(el){return opts.currentStep?opts.currentStep(el):null;},field:'text',markdown:true,value:'trimmed',label:'Edit step text',help:help},
+    // A visible subtitle wins over the containing node's rename target.
+    {kind:'node',selector:'[data-dv-node]:not([data-dv-text-box]) .t2:not(:empty)',field:'sub',value:'trimmed',overlay:true,label:'Node subtitle',help:'Enter or click outside saves. Escape cancels.',
+      place:nodeSubtitleHost,mount:function(c){return c.el.parentNode;},hostClass:'dv-inline-subtitle-editor'},
     // Rename edits the display name only; the node ID stays in Inspect.
     {kind:'node',selector:'[data-dv-node]:not([data-dv-text-box])',field:'title',value:'trimmed',overlay:true,label:'Node name',help:'Enter or click outside saves. Escape cancels.',
       place:nodeTitleHost,hostClass:'dv-inline-node-editor'},
@@ -118,6 +121,14 @@ function createInlineTextEditor(opts){
     var p=layout(d).pos[c.target.id];if(!p)return null;
     var host=document.createElementNS('http://www.w3.org/2000/svg','foreignObject');
     host.setAttribute('x','4');host.setAttribute('y',String(Math.max(4,(p.h-36)/2)));host.setAttribute('width',String(Math.max(40,p.w-8)));host.setAttribute('height','36');
+    return host;
+  }
+  function nodeSubtitleHost(c){
+    var card=c.el.parentNode && c.el.parentNode.querySelector('.card');if(!card)return null;
+    var b=c.el.getBBox(),width=Number(card.getAttribute('width')),height=28;
+    var host=document.createElementNS('http://www.w3.org/2000/svg','foreignObject');
+    host.setAttribute('x','4');host.setAttribute('y',String(b.y+b.height/2-height/2));
+    host.setAttribute('width',String(Math.max(40,width-8)));host.setAttribute('height',String(height));
     return host;
   }
   function topologyKey(){return JSON.stringify(opts.session.topologyContext?opts.session.topologyContext():null);}

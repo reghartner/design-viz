@@ -267,6 +267,15 @@ test('empty node subtitle falls back to name and image fallback edits an empty d
  const image=page.locator('#docview g.node[data-dv-node="image"]'),sub=image.locator('.t2'),edit=image.getByRole('textbox',{name:'Node subtitle',exact:true});await expect(sub).toHaveText('Embedded image');await sub.dblclick();await expect(edit).toBeFocused();await expect(edit).toHaveValue('');await edit.press('Enter');await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 
+test('generated handoff caption opens node name instead of a hidden subtitle',async({page,server})=>{
+ const raw=fixture();raw.page.sections[0].diagram.nodes.a.handoff={spec:'target',siteBaseUrl:server.origin+'/viewer.html'};
+ const original=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await pastePage(page,original);await closeTools(page);
+ const card=page.locator('#docview g.node[data-dv-node="a"]'),caption=card.locator('.handoff-caption');await expect(caption).toBeVisible();await caption.dblclick();
+ const name=card.getByRole('textbox',{name:'Node name',exact:true});await expect(name).toBeFocused();await expect(name).toHaveValue('Existing');await expect(page.getByRole('textbox',{name:'Node subtitle',exact:true})).toHaveCount(0);
+ await name.fill('Renamed handoff');await name.press('Enter');const saved=JSON.parse(await page.locator('#src').inputValue());const expected=structuredClone(raw);expected.page.sections[0].diagram.nodes.a.title='Renamed handoff';expect(saved).toEqual(expected);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
+});
+
 // #963 desktop panel titles: real Standard title / Explore grip double-clicks,
 // raw title (not ID fallback), Inspect empty parity, exact history, and unchanged
 // panel content. Home map deliberately exercises a panel with a clickTarget hook.

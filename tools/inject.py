@@ -478,20 +478,18 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "",
             "## Metrics rules",
             "",
-            "- `page.tracking.telemetry` holds availability, sources, `window` (default `24h`) and "
-            "templates. Each carrier binding names `kind`, `signals`, `proof` and safe `links`; never "
-            "derive a query from names or ids.",
-            "- Cover every selected local, imported/nested, consumer-overlay and loaded-detail node or "
-            "edge. Inspect current tool schemas, preserve exact queries and source UIDs, run each proposal "
+            "- `page.tracking.telemetry`: availability, sources, `window` (default `24h`), templates. "
+            "Carrier `telemetry`: `kind`, `signals`, `proof`, safe `links`. never derive a query from names/ids.",
+            "- Cover local, imported/nested, consumer-overlay and loaded-detail nodes/edges. "
+            "Inspect tool schemas, preserve exact queries/source UIDs, run each proposal "
             "once, and distinguish returned, empty, zero and failed evidence.",
-            "- Metrics starts off. Root `enabled:false`/host false disables it and grants no query permission; "
-            "missing tools hide it. Preview is synthetic, unsaved and makes no network call.",
-            "- Honeycomb uses run_query with a runtime-qualified query_spec object or JSON string, one scalar "
-            "calculation and no breakdowns/formulas. Raw-result transport must succeed for exact values; "
-            "COUNT counts spans/events, not automatically requests. History and trace retrieval are unsupported. Keep only "
-            "stable dashboard/query UI URLs; never persist signed result URLs or claim live verification.",
-            "- Over time uses each day's exact prior-24h endpoint; missing history stays unobserved. See "
-            "docs/live-status.md and the Metrics chapter before editing bindings.",
+            "- Metrics defaults off. Root `enabled:false`/host false grants no query permission; absent tools hide it. "
+            "Preview: synthetic, unsaved, no network.",
+            "- Honeycomb uses run_query; schema-qualified query_spec; one scalar, no breakdowns/formulas. "
+            "Exact values require raw JSON; COUNT means spans/events. No history/traces. Keep UI links, "
+            "never signed URLs; no live-account claim.",
+            "- Over time: exact prior-24h endpoints; missing stays unobserved. Read docs/live-status.md "
+            "and the Metrics chapter before editing.",
         ]
     lines += [
         "",

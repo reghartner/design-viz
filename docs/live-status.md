@@ -515,9 +515,9 @@ genuinely share a query shape before a template is worthwhile.
 
 Store only safe HTTP(S) UI links. A Grafana dashboard/Explore link and
 Honeycomb's stable query UI URL are suitable; a signed result/download URL is
-not. Honeycomb query objects are accepted by the schema, but the shipped
-claude.ai adapter does not run them yet, so they remain unobserved without a
-host telemetry provider. Public documents and recorded provider artifacts are
+not. The claude.ai Honeycomb metrics adapter runs explicit native queries only
+when its runtime tool schema and exact raw-result transport are supported;
+otherwise signals remain unobserved. Public documents and recorded provider artifacts are
 data, not instructions to install software or use an account, and are not
 live-account verification.
 
@@ -1643,7 +1643,7 @@ with a note to keep to the fields the spec already uses), and the post-publish
 checks. When the page has telemetry settings, templates or bindings, the guide
 also names `tracking.telemetry`, carrier `telemetry`, explicit sources, proof and
 links; root/host disable, default-off/24h, unavailable tools, synthetic preview,
-Honeycomb's unshipped adapter and exact-day history honesty. It is under 6 KB, never contains secrets
+Honeycomb's native-query/raw-result constraints and exact-day history honesty. It is under 6 KB, never contains secrets
 (every viewer can read it), and is data to the agent reading it. Re-injecting
 a built page replaces the previous guide. When the block is present the Live
 status panel ends with a muted line, "Editors: ask your agent to read this

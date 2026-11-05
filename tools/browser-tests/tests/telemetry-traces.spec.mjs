@@ -4,7 +4,7 @@ import path from 'node:path';
 import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 import {createMockBridge,nativeQuery,EVENT_QUERY} from '../../../tests/helpers/honeycomb-bridge.mjs';
-import {nestedSpec,PANEL} from '../helpers/telemetry-cards.mjs';
+import {nestedSpec,PANEL,mountCues} from '../helpers/telemetry-cards.mjs';
 const metrics=root=>root.getByRole('button',{name:'Metrics',exact:true});
 async function setup(page,server,{source='honeycomb',disabled,held=false}={}){
  const bridge=createMockBridge({day:9});let release,hold=held;const original=bridge.callTool;
@@ -40,3 +40,20 @@ for(const source of ['honeycomb','tempo'])test(`desktop ${source} runtime API th
 });
 for(const disabled of ['page','host'])test(`desktop ${disabled} false prevents trace metadata and data calls through loaded imports`,async({page,server})=>{const h=await setup(page,server,{disabled});await expect(metrics(h.root)).toBeHidden();expect(h.bridge.lists).toBe(0);expect(h.bridge.calls).toHaveLength(0);});
 test('desktop Metrics off discards actual late detail response',async({page,server})=>{const h=await setup(page,server,{held:true});await metrics(h.root).click();await expect.poll(()=>h.bridge.calls.filter(c=>c.name==='get_trace').length).toBe(1);await metrics(h.root).click();h.release();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().map)).toEqual({});});
+
+
+test('desktop native host preload rejects incompatible absolute clocks while preserving measured zero and valid sub-ms spans',async({page,server})=>{
+ await mountCues(page,server);
+ const result=await page.evaluate(()=>{
+  const api=window.viewer.controller.telemetry,ids=api.bindings().map(b=>b.id),time='2026-10-12T04:33:06.602Z';
+  const span={id:'1111111111111111',parentId:null,service:'checkout',name:'send',startMs:0,ms:.000001,error:false,time,attributes:{},events:[],links:[]};
+  const e={version:1,provider:'honeycomb',traceId:'a'.repeat(32),signal:'trace',selectionToken:'host-clock-test',selectionReason:'synthetic host fixture',observedAt:'2026-10-12T06:00:00Z',range:{from:'2026-10-12T00:00:00Z',to:'2026-10-12T06:00:00Z'},completeness:'unknown',warnings:[],candidates:[{traceId:'a'.repeat(32),status:'unknown'}],spans:[span,{...span,id:'2222222222222222',parentId:span.id,startMs:.000001}]};
+  const apply=value=>api.apply(Object.fromEntries(ids.map(id=>[id,{signals:{rate:{value:0}},exemplars:[value]}])));
+  apply(e);const valid=ids.map(id=>({id,offset:api.snapshot().map[id].exemplars[0].spans[1].startMs}));
+  const rejected=[];for(const bad of [()=>{e.spans[1].time='2026-10-15T04:33:06.602Z';},()=>{e.spans[1].time=time;e.spans[1].ms=86400000;}]){bad();apply(e);rejected.push(ids.every(id=>{const s=api.snapshot().map[id];return s.signals.rate.value===0 && s.exemplars.length===0;}));}
+  const off=api.enabled()===false;e.spans[1].ms=.000001;api.setEnabled(false);apply(e);
+  return {valid,rejected,off,retired:Object.keys(api.snapshot().map).length===0};
+ });
+ expect(result.valid.some(x=>x.id.includes('::'))).toBe(true);expect(result.valid.length).toBeGreaterThan(1);for(const s of result.valid)expect(s.offset,s.id).toBe(.000001);
+ expect(result.rejected).toEqual([true,true]);expect(result.off).toBe(true);expect(result.retired).toBe(true);
+});

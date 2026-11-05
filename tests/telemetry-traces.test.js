@@ -121,3 +121,33 @@ test('native host preload retains numeric and trace evidence together until expl
  for(const initiallyEnable of [false,true]){const api=C.createTelemetry({}, {demo:{mount:()=>()=>{}}},{});api.apply(sample);assert.equal(api.snapshot().map.a.exemplars.length,1);assert.equal(api.snapshot().map.a.signals.rate.value,0);if(initiallyEnable)api.setEnabled(true);
  api.setEnabled(false);api.apply(sample);assert.deepEqual(plain(api.snapshot().map),{});api.setEnabled(true);assert.deepEqual(plain(api.snapshot().map),{});api.apply(sample);assert.equal(api.snapshot().map.a.exemplars.length,1);api.destroy();api.apply(sample);assert.deepEqual(plain(api.snapshot().map),{});}
 });
+
+test('exemplar clock coherence rejects adjacent offsets with incompatible absolute timestamps',()=>{
+ const {C}=context(),base=plain(envelope(C));base.spans=base.spans.slice(0,2);base.spans[0].ms=.000001;base.spans[1].startMs=.000001;base.spans[1].ms=.000001;
+ const at='2026-10-12T04:33:06.602Z';base.spans.forEach(s=>s.time=at);
+ assert.equal(C.telemetryTraceEnvelope(base).spans[1].startMs,.000001);
+ for(const time of ['2026-10-14T04:33:06.602Z','2026-10-12T04:33:06.604Z']){const bad=structuredClone(base);bad.spans[1].time=time;assert.throws(()=>C.telemetryTraceEnvelope(bad),/clock|extent/);}
+ const boundary=structuredClone(base);boundary.spans[1].startMs=0;boundary.spans[1].time='2026-10-12T04:33:06.603Z';assert.throws(()=>C.telemetryTraceEnvelope(boundary),/clock/,'disjoint one-millisecond origin intervals');
+ const split=structuredClone(base);split.spans[1].startMs=1.75;split.spans[1].time='2026-10-12T04:33:06.603Z';split.spans.push({...split.spans[1],id:'3333333333333333',startMs:1.25,time:'2026-10-12T04:33:06.604Z'});assert.throws(()=>C.telemetryTraceEnvelope(split),/clock/,'all spans need one common origin, not separate tolerance against an anchor');
+});
+test('clock coherence preserves recorded Honeycomb nanosecond offsets and bounded quantized 24h endpoints',()=>{
+ const {C}=context(),recorded=plain(envelope(C));assert.equal(recorded.spans[1].startMs,4640.718592);assert.equal(Date.parse(recorded.spans[1].time)-Date.parse(recorded.spans[0].time),4640);
+ const variant=traceText.replace('1791779586602194688','1791779586602194689').replace('1791779591242913280','1791779586602194690');assert.equal(envelope(C,C.telemetryHoneycombTrace({payload:variant},recordedId)).spans[1].startMs,.000001);
+ const boundary=structuredClone(recorded);boundary.spans=boundary.spans.slice(0,2);boundary.spans[0].ms=0;boundary.spans[0].time='2026-10-12T00:00:00.000Z';boundary.spans[1].time='2026-10-13T00:00:00.000Z';boundary.spans[1].startMs=86400000-.5;boundary.spans[1].ms=.5;
+ assert.equal(C.telemetryTraceEnvelope(boundary).spans[1].ms,.5,'absolute ISO endpoints may differ by a fractional ms after quantization');
+ boundary.spans[1].ms=.500001;assert.throws(()=>C.telemetryTraceEnvelope(boundary),/span\/time/,'relative end must not exceed 24h even by 1ns');boundary.spans[1].ms=.5;boundary.spans[1].time='2026-10-13T00:00:00.001Z';assert.throws(()=>C.telemetryTraceEnvelope(boundary),/clock|extent/);
+});
+test('raw and structured Tempo source representations retain fractional-ms timing through envelope validation',()=>{
+ const {C}=context();for(const fractional of [false,true]){const raw=JSON.parse(fixture('grafana-source-test.json'));if(fractional){raw.services[0].spans[0].startTimeMs=1750000000000.25;raw.services[0].spans[1].startTimeMs=1750000000000.250244;raw.services[0].spans.forEach(s=>s.durationMs=.000001);}
+ const structured={traceId:raw.traceId,spans:raw.services[0].spans.map(p=>({...p,id:p.spanId,parentId:p.parentSpanId,serviceName:'checkout'}))};
+ for(const response of [{payload:raw},{structuredContent:plain(structured)}]){const parsed=C.telemetryTempoTrace(response,raw.traceId),e=C.telemetryTraceEnvelope({...plain(envelope(C)),provider:'tempo',traceId:raw.traceId,candidates:[{traceId:raw.traceId,status:'unknown'}],...parsed});assert.equal(e.spans[1].startMs,raw.services[0].spans[1].startTimeMs-raw.services[0].spans[0].startTimeMs);assert.equal(e.spans[1].ms,raw.services[0].spans[1].durationMs);
+ const bad=plain(e);bad.spans[1].time='2026-10-15T00:00:00.000Z';assert.throws(()=>C.telemetryTraceEnvelope(bad),/clock|extent/);}
+ }
+});
+test('native host preload rejects contradictory clocks without losing numeric zero or valid sub-ms evidence',()=>{
+ const {C}=context(),value=plain(envelope(C)),N={URL,AbortController,TextEncoder,TextDecoder,setTimeout,clearTimeout,document:{addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint('native').source,N);
+ const api=N.createTelemetry({}, {demo:{mount:()=>()=>{}}},{});try{
+ api.apply({a:{signals:{zero:{value:0}},exemplars:[value]}});assert.equal(api.snapshot().map.a.exemplars[0].spans[1].startMs,4640.718592);
+ value.spans[1].time='2026-10-15T00:00:00.000Z';api.apply({a:{signals:{zero:{value:0}},exemplars:[value]}});assert.equal(api.snapshot().map.a.signals.zero.value,0);assert.equal(api.snapshot().map.a.exemplars.length,0);assert.equal(api.enabled(),false);
+ }finally{api.destroy();}
+});

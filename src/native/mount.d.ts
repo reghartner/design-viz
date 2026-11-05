@@ -94,8 +94,6 @@ export interface TelemetryBinding {
   links: {dashboard?: string; query?: string};
   card: {side?: 'right' | 'left' | 'above' | 'below'; offset?: number} | null;
 }
-/** One carrier's telemetry for the observation window, keyed by carrier id in the
- * provider result. Every field is optional; malformed entries are dropped. */
 /** Runtime evidence only; never authored, saved, or numerical proof. */
 export interface TelemetryExemplar {
   version: 1;
@@ -116,6 +114,8 @@ export interface TelemetryExemplar {
     events: Array<{name: string; timeMs: number; attributes: Record<string, string | number | boolean>}>;
     links: Array<{traceId: string; spanId: string; attributes: Record<string, string | number | boolean>}>}>;
 }
+/** One carrier's telemetry for the observation window, keyed by carrier id in the
+ * provider result. Every field is optional; malformed entries are dropped. */
 export interface TelemetrySample {
   /** At most one selected exemplar per carrier, with up to 20 returned candidates and 200 spans. */
   exemplars?: TelemetryExemplar[];

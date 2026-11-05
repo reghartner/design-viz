@@ -2059,8 +2059,9 @@ A carrier's existing Work status popover includes Production when the permitted
 telemetry map has measured evidence. It uses the same Proof values, configured
 window, actual points/markers and safe authored-first link as the panel. Failed
 thresholds name their signal, measured value and requirement. Missing values stay
-unobserved; measured zero stays zero. Since Done shows only the known Done and
-first observed traffic timestamps: window rates are not lifetime totals. Local,
+unobserved; measured zero stays zero. Since Done shows known Done and first
+observed traffic timestamps, plus explicitly measured totals when their interval
+matches Done as described below; window rates are not lifetime totals. Local,
 imported and asynchronously loaded detail carriers use their carrier identity and
 own binding scope. Refreshes and day selection update an open Production block
 without replacing its focused link or close control.

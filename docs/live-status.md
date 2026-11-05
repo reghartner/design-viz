@@ -522,6 +522,46 @@ includes authored tickets and PRs even without a provider. Pulses stop for reduc
 
 Path, View, Tab and detail navigation reapply the current map to rebuilt elements.
 
+### Metrics cues
+
+While the panel's **Metrics** button is on, bound carriers (those with a
+[`telemetry` binding](#telemetry-bindings)) show production traffic from the
+telemetry map. Every cue sits beside the Jira paint and never replaces it. Turning
+Metrics off removes every cue. Unbound carriers and text boxes never change, and
+no text or number is drawn on the canvas.
+
+- **Packet streams.** A bound `call` or `service` edge with traffic carries 1 to 5
+  moving packets, one per order of magnitude of its primary rate: under 10 is one
+  packet, under 100 two, up to five from 10,000. The primary rate is the signal a
+  `maxRatioOf` limit names as its base, else the first signal with a `min` limit,
+  else the first with a per-time unit such as `req/h`. Red packets follow the error
+  share, the ratio limit's numerator over the rate. A failing error limit always
+  shows at least one red packet.
+- **Degraded edges** (a limit does not hold) turn amber.
+- **Silent Done edges.** A Done edge whose rate-like signals are all zero across the
+  window (DONE · UNPROVEN) gets a grey dotted ghost over a dimmed stroke.
+- **Node sparklines and seals.** A bound node gets a sparkline of its primary rate
+  series along the card bottom. A proof seal sits at the bottom-right corner:
+  check for PROVEN, `!` for DEGRADED or FAILING, slash for DONE · UNPROVEN, and a
+  wave for LIVE EARLY or ALREADY LIVE.
+
+Imported topology carriers, direct or nested, and the carriers of loaded detail pages
+get the same cues. With reduced motion and in print the packets stand still, evenly
+spaced along the edge.
+
+The cues live in a `dv-metrics-*` namespace and are re-applied after every rebuild,
+like the Jira paint. A bound carrier carries `data-metrics-state` (`flowing`,
+`degraded`, `silent` or `unobserved`), `data-metrics-verdict` (the proof verdict
+token) and the class `dv-metrics-<state>`. A ghosted edge also has
+`dv-metrics-ghosted`. A stream is a `g.dv-metrics-stream[data-metrics-edge]` holding
+`circle.dv-metrics-packet.dv-metrics-moving` packets plus the same number of
+`.dv-metrics-static` ones, with `dv-metrics-packet-error` on red packets. The ghost is
+a `path.dv-metrics-ghost[data-metrics-edge]`. A node's cues sit in a
+`g.dv-metrics-node` holding `polyline.dv-metrics-sparkline` and
+`g.dv-metrics-seal[data-seal]` (`proven`, `degraded`, `unproven`, `live-early`).
+Metrics packets reuse the ordinary packet motion along the edge path but never the
+`.pkt` or `.comm-packet` classes, so step packets and failure packets are untouched.
+
 ## Live status panel
 
 Always add an authored `live-status` panel to a tracked page:
@@ -550,8 +590,7 @@ one, with the same dot colors: “Metrics: not connected” while off, “Metric
 connecting” until the first answer, “Metrics: connected, refreshed 3:42:15 PM” (“Metrics:
 demo, …” for a demo source) and “Metrics: did not answer · <message>” after a failed
 call. The header shows whenever Metrics is available, even on a page without Jira
-evidence. The canvas does not change yet: packet streams, silent-edge ghosts, node
-sparklines and proof seals are #939's second part.
+evidence. On the canvas, Metrics draws the [Metrics cues](#metrics-cues).
 The body opens with the **epic header box**: the epic key (a Jira link), its
 summary, its state pill, “n of N stories done · m of N on diagram” and the
 blocked, waiting and outside-epic counts, with the carriers-done ring on the
@@ -827,11 +866,21 @@ Metrics off or destroying the page aborts the signal, stops the timer and drops 
 late answer; turning it off also clears the map. A demo source may stand in for a
 provider: `telemetry: {demo: {mount: function(api) {...; return cleanup;}}}` is
 mounted when Metrics turns on, receives `ctl.telemetry`, feeds it through `apply`,
-and its cleanup runs when Metrics turns off or the page is destroyed.
+and its cleanup runs when Metrics turns off or the page is destroyed. Without a host
+`telemetry` option, a Live status demo source (the `#live=demo` player) that carries
+`telemetry: {provider}` supplies Metrics, reported as Demo. The player feeds each
+demo day through `ctl.liveStatus.telemetry`, the same controller as `ctl.telemetry`.
+A host telemetry provider wins over it. `apply` while Metrics is on reports the
+connector as answered.
 
 `ctl.telemetry` exposes `bindings()`, `apply(map)`, `clear()`, `snapshot()`,
-`enabled()`, `setEnabled(bool)`, `status()` and `onChange(fn)`. `snapshot()` returns a
-copy, `{available, enabled, map, status}`. `setEnabled` is ignored without a provider
+`verdicts()`, `enabled()`, `setEnabled(bool)`, `status()` and `onChange(fn)`.
+`snapshot()` returns a copy, `{available, enabled, map, status, verdicts}`.
+`verdicts()` runs the [proof engine](#proof-verdicts) over every carrier of the page
+walk, bound or not, with the runtime Jira map and the telemetry map. It returns
+`{carriers, rollups, steps}`, with step rollups for authored step ids over their
+directly selected carriers. It is re-judged on every call, and change callbacks
+also fire after a Jira apply or clear, so subscribers see current verdicts. `setEnabled` is ignored without a provider
 or demo. `onChange` returns an unsubscribe function; callbacks receive the snapshot
 after apply, clear, enable changes and connector changes. `status()` is `{state,
 busy, refreshedAt, note}`: `state` is `absent` without a provider or demo, `idle`
@@ -841,7 +890,7 @@ is true while a call is in flight; `refreshedAt` is the last successful answer;
 same state for the panel, and `ctl.liveStatus.setMetricsEnabled(bool)` is the panel
 button's action. Standalone hosts set `window.flowviewTelemetry` before boot; native
 hosts pass `telemetry` to `mountNativeViewer`, typed in `src/native/mount.d.ts`.
-Nothing is painted on the canvas yet.
+The canvas draws the [Metrics cues](#metrics-cues) while Metrics is on.
 
 The [live-status example](../examples/live-status/live-status.spec.json) connects
 hardware, firmware, a mobile app and backend with node and edge references.
@@ -933,7 +982,9 @@ finite numbers or `null` (`NaN` and `Infinity` included), naming the path. Each 
 proof engine's input: every point is stamped at the end of its step, `null` reads as 0
 (as a connector reports a query that matched nothing), `value` is the last step and
 `observedAt` the end of the day. **Next day** and the timer move the Jira map and the
-telemetry map together. The page draws nothing from it yet; the Metrics overlay will.
+telemetry map together. The panel's **Metrics** button appears with the demo, reported
+as “Metrics: demo”, and while it is on the [Metrics cues](#metrics-cues) follow the
+demo day.
 The example timeline holds the doorbell story the mock Grafana MCP server serves:
 traffic two hours after each carrier's tickets turn Done, the event edge degraded after
 the Day 10 firmware 2.4.1 deploy, the route queue lagging on Day 11, and the push edge

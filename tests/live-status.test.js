@@ -2017,3 +2017,201 @@ test('M8 a demo telemetry source shows Metrics, mounts only while on, reports de
  metrics.dispatchEvent({type:'click'});assert.equal(mounted,2);h.ctl.liveStatus.destroy();assert.equal(cleaned,2,'M8 destroy runs the demo cleanup');
  panel.destroy();
 });
+
+/* #939 PR 2 of 2 (Metrics canvas cues and the proof wrapper).
+| W1 | `ctl.telemetry.verdicts()` runs proofVerdicts over every carrier of the page walk (bound or not, text boxes excluded) with the runtime Jira map and the telemetry map: per-carrier verdicts, telemetry state and rollups. |
+| W2 | Step rollups: each authored step id judged over its directly selected carriers (liveStatusStepCarriers(d, step, true)). |
+| W3 | Verdicts are re-evaluated on every Jira or telemetry change; telemetry change callbacks carry `verdicts` and fire after a Jira apply too. |
+| C1 | Metrics on: a bound call/service edge with traffic gets a packet stream (`g.dv-metrics-stream[data-metrics-edge]`, 1–5 moving packets by order of magnitude of its primary rate, the same count of static packets for reduced motion and print); red packets follow the error share; a degraded edge is amber (`dv-metrics-degraded`); a silent Done edge gets a dotted ghost (`path.dv-metrics-ghost`) over a dimmed stroke (`dv-metrics-silent`); unbound edges and non-call edges get no stream; Jira paint is untouched. |
+| C2 | Metrics on: a bound node gets `g.dv-metrics-node` with a sparkline of its primary rate series along the card bottom and a proof seal at the bottom-right (proven, degraded, unproven, live-early by verdict); unbound nodes and text boxes are unchanged; no text on the canvas. |
+| C3 | Metrics off removes every cue; cues are re-applied after a rebuild (`dv:pathrender`) and follow telemetry and Jira changes; destroy removes them. |
+| C4 | Imported topology carriers receive the same cues as local ones. Direct and nested consumers each have independent binding, stream, seal, sparkline, ghost, dimming, unbound-node, off and destroy tests below. Loaded-detail equivalents use the real native host loader and a clicked detail control in telemetry-overlay.spec.mjs (P12); no synthetic detail controller or mounted section. Rejects: walking only locally authored carriers, skipping detail-page paint, or leaving imported/detail cues behind on off or destroy. |
+| C5 | Metrics packets never wear the ordinary `.pkt` or `.comm-packet` classes, and the frame measure skips the stream layer. |
+| C6 | Demo: a Live status demo source carrying `telemetry: {provider}` (the #944 demo shape) shows Metrics as demo; the demo reaches the same controller as `ctl.liveStatus.telemetry`; a host telemetry provider wins over it. |
+*/
+const CUE_SERVICE=()=>({kind:'service',signals:{rate:{grafana:'sum(rate(http_requests_total[5m]))*3600',unit:'req/h'}},proof:{rate:{min:10}}});
+function cuePage(){return {page:{tracking:{jira:{site:'https://jira.test'}},sections:[{id:'main',diagram:{
+ nodes:{a:{tickets:['AA-1'],telemetry:TQUEUE()},b:{tickets:['BB-1'],telemetry:CUE_SERVICE()},c:{tickets:['CC-1'],telemetry:CUE_SERVICE()},d:{tickets:['DD-1']},f:{tickets:['FF-1'],telemetry:CUE_SERVICE()},note:{type:'text',text:'Note',telemetry:TQUEUE()}},
+ rows:[['a','b','c','d','f']],
+ edges:[{from:'a',to:'b',tickets:['EE-10'],telemetry:TCALL()},{from:'b',to:'c',tickets:['EE-11'],telemetry:TCALL()},{from:'c',to:'d',tickets:['EE-12'],telemetry:TCALL()},{from:'d',to:'a',tickets:['EE-13']},{from:'a',to:'c',tickets:['EE-14'],telemetry:TQUEUE()}],
+ steps:[{id:'s1',edge:'a->b'},{id:'s2',edge:'b->c'},{id:'s3',nodes:['f','b']}]}}]}};}
+const CUE_JIRA={'AA-1':{state:'done'},'BB-1':{state:'active'},'CC-1':{state:'done'},'DD-1':{state:'todo'},'FF-1':{state:'done'},'EE-10':{state:'done'},'EE-11':{state:'done'},'EE-12':{state:'active'},'EE-13':{state:'todo'},'EE-14':{state:'done'}};
+const CUE_MAP=()=>({a:{signals:{lag:{value:10}}},b:{signals:{rate:{value:50,series:[[1,40],[2,45],[3,50]]}}},c:{signals:{rate:{value:0,series:[[1,0],[2,0]]}}},f:{signals:{rate:{value:5,series:[[1,5],[2,5]]}}},
+ 'a->b':{signals:{rate:{value:1300,series:[[1,1200],[2,1300]]},errors:{value:4}}},'b->c':{signals:{rate:{value:0,series:[[1,0],[2,0]]},errors:{value:0}}},'c->d':{signals:{rate:{value:100},errors:{value:30}}},'a->c':{signals:{lag:{value:3}}}});
+const CUE_VERDICTS={a:'proven',b:'active-live-early',c:'done-unproven',d:null,f:'done-degraded','a->b':'proven','b->c':'done-unproven','c->d':'active-failing','d->a':null,'a->c':'proven'};
+const CUE_SELECTOR='.dv-metrics-stream,.dv-metrics-ghost,.dv-metrics-node,[data-metrics-state]';
+function cueHarness(raw=cuePage(),map=CUE_MAP){
+ let telemetryMap=map();const h=harness(raw,{provider:()=>Promise.resolve(CUE_JIRA)},{telemetry:{provider:()=>Promise.resolve(telemetryMap)}});
+ h.setMap=next=>{telemetryMap=next;};h.on=async()=>{h.flush();h.flush();await settle();assert.ok(h.ctl.telemetry,'ctl.telemetry');h.ctl.telemetry.setEnabled(true);await settle();};
+ h.edge=i=>h.view.querySelector('path.edge[data-dv-edge="'+i+'"]');h.node=id=>h.view.querySelector('g.node[data-dv-node="'+id+'"]');
+ h.stream=i=>h.view.querySelectorAll('g.dv-metrics-stream').filter(g=>g.getAttribute('data-metrics-edge')===String(i));
+ h.moving=i=>h.stream(i).flatMap(g=>g.querySelectorAll('circle.dv-metrics-moving'));h.still=i=>h.stream(i).flatMap(g=>g.querySelectorAll('circle.dv-metrics-static'));
+ h.ghost=i=>h.view.querySelectorAll('path.dv-metrics-ghost').filter(p=>p.getAttribute('data-metrics-edge')===String(i));
+ h.cues=()=>h.view.querySelectorAll(CUE_SELECTOR);return h;
+}
+
+test('W1 W2 verdicts() judges every page carrier with the Jira and telemetry maps, with rollups and step rollups',async()=>{
+ const h=cueHarness();await h.on();const t=h.ctl.telemetry;
+ assert.equal(typeof t.verdicts,'function','W1 ctl.telemetry.verdicts');
+ const v=plain(t.verdicts());
+ assert.deepEqual(Object.keys(v.carriers).sort(),Object.keys(CUE_VERDICTS).sort(),'W1 every node and edge, bound or not; the text box is not a carrier');
+ for(const [id,want] of Object.entries(CUE_VERDICTS))assert.equal(v.carriers[id].verdict,want,'W1 '+id);
+ assert.equal(v.carriers.d.bound,false);assert.equal(v.carriers['d->a'].bound,false);
+ assert.equal(v.carriers['b->c'].telemetry,'silent');assert.equal(v.carriers['c->d'].telemetry,'degraded');assert.deepEqual(v.carriers['c->d'].failing,['errors']);
+ assert.deepEqual(v.rollups,{bound:8,unbound:2,proven:3,degraded:2,unproven:2,liveEarly:1});
+ assert.deepEqual(v.steps,{s1:{verdict:'proven',label:'PROVEN'},s2:{verdict:'done-unproven',label:'DONE · UNPROVEN'},s3:{verdict:'active-failing',label:'IN PROGRESS · FAILING'}},'W2 step rollups over direct carriers');
+ h.ctl.liveStatus.destroy();
+});
+
+test('W3 verdicts follow Jira and telemetry changes and reach change subscribers',async()=>{
+ const h=cueHarness();await h.on();const t=h.ctl.telemetry,seen=[];
+ assert.equal(typeof t.verdicts,'function','ctl.telemetry.verdicts exists');
+ t.onChange(value=>seen.push(plain(value)));
+ h.ctl.liveStatus.apply({...CUE_JIRA,'AA-1':{state:'active'}});
+ assert.equal(t.verdicts().carriers.a.verdict,'active-live-early','W3 a Jira change re-judges');
+ assert.ok(seen.length>=1,'W3 a Jira change notifies telemetry subscribers');assert.equal(seen[seen.length-1].verdicts.carriers.a.verdict,'active-live-early');
+ t.apply({...CUE_MAP(),a:{signals:{lag:{value:900}}}});
+ assert.equal(t.verdicts().carriers.a.verdict,'active-failing','W3 a telemetry change re-judges');assert.equal(seen[seen.length-1].verdicts.carriers.a.verdict,'active-failing');
+ assert.equal(h.node('a').querySelector('.dv-metrics-seal').getAttribute('data-seal'),'degraded','W3 the canvas follows');
+ h.ctl.liveStatus.destroy();
+});
+
+test('C1 Metrics on paints packet streams, red error packets, amber degraded edges and a ghost on the silent Done edge',async()=>{
+ const h=cueHarness();await h.on();
+ assert.equal(h.stream(0).length,1,'C1 flowing call edge has a stream');assert.equal(h.moving(0).length,4,'C1 1300 req/h is four packets');assert.equal(h.still(0).length,4,'C1 a static copy for reduced motion and print');
+ const animated=c=>c.children.some(x=>x.tagName==='animateMotion');
+ assert.ok(h.moving(0).every(animated),'C1 moving packets animate');assert.ok(h.still(0).every(c=>!animated(c)),'C1 static packets do not');
+ assert.equal(h.moving(0).filter(c=>c.classList.contains('dv-metrics-packet-error')).length,0,'C1 0.3 % errors leave no red packet');
+ assert.equal(h.edge(0).getAttribute('data-metrics-state'),'flowing');assert.equal(h.edge(0).getAttribute('data-metrics-verdict'),'proven');
+ assert.equal(h.edge(0).getAttribute('data-live-appearance'),'done','C1 Jira paint is untouched');
+ assert.equal(h.moving(2).length,3,'C1 100 req/h is three packets');assert.equal(h.moving(2).filter(c=>c.classList.contains('dv-metrics-packet-error')).length,1,'C1 30 % errors make one red packet');
+ assert.ok(h.edge(2).classList.contains('dv-metrics-degraded'),'C1 degraded edge is amber');
+ assert.equal(h.stream(1).length,0,'C1 silent edge has no stream');assert.equal(h.ghost(1).length,1,'C1 silent Done edge has a ghost');
+ assert.ok(h.edge(1).classList.contains('dv-metrics-silent'),'C1 dimmed stroke under the ghost');assert.equal(h.ghost(1)[0].getAttribute('data-dv-edge'),null,'C1 the ghost is not a second carrier');
+ assert.equal(h.edge(3).getAttribute('data-metrics-state'),null,'C1 unbound edge unchanged');assert.equal(h.stream(3).length+h.ghost(3).length,0);
+ assert.equal(h.edge(4).getAttribute('data-metrics-state'),'flowing');assert.equal(h.stream(4).length,0,'C1 only call and service edges stream');
+ for(const i of [0,2])assert.equal(h.edge(i).classList.contains('dv-metrics-silent'),false);
+ h.ctl.liveStatus.destroy();
+});
+
+test('C2 Metrics on gives bound nodes a sparkline strip and a proof seal, and leaves unbound nodes and text boxes alone',async()=>{
+ const h=cueHarness();await h.on();
+ const seal=id=>h.node(id).querySelector('.dv-metrics-seal'),spark=id=>h.node(id).querySelector('polyline.dv-metrics-sparkline');
+ for(const [id,want] of [['a','proven'],['b','live-early'],['c','unproven'],['f','degraded']]){
+  assert.ok(seal(id),'C2 seal on '+id);assert.equal(seal(id).getAttribute('data-seal'),want,'C2 seal kind on '+id);
+  assert.equal(seal(id).getAttribute('transform'),'translate(110 45)','C2 bottom-right corner of the 120×55 card');
+  assert.equal(h.node(id).getAttribute('data-metrics-verdict'),CUE_VERDICTS[id]);
+ }
+ assert.equal(spark('a'),null,'C2 no rate-like signal, no sparkline');
+ const points=spark('b').getAttribute('points').trim().split(/\s+/).map(p=>p.split(',').map(Number));
+ assert.equal(points.length,3,'C2 one point per series point');
+ assert.ok(points.every(([x,y])=>x>=0 && x<=120 && y>=55-12 && y<=55),'C2 the strip runs along the card bottom');
+ assert.ok(points[0][1]>points[2][1],'C2 a rising series rises');
+ for(const id of ['d','note']){assert.equal(h.node(id).querySelector('.dv-metrics-node'),null,'C2 '+id+' unchanged');assert.equal(h.node(id).getAttribute('data-metrics-state'),null);}
+ assert.equal(h.view.querySelectorAll('.dv-metrics-node,.dv-metrics-stream').flatMap(g=>g.querySelectorAll('text')).length,0,'C2 no text on the canvas');
+ h.ctl.liveStatus.destroy();
+});
+
+test('C3 Metrics off removes every cue; a rebuild re-applies them; destroy removes them',async()=>{
+ const h=cueHarness();await h.on();const t=h.ctl.telemetry;
+ assert.ok(h.cues().length>0,'C3 cues while on');
+ t.setEnabled(false);assert.equal(h.cues().length,0,'C3 off removes every cue');assert.equal(h.edge(0).getAttribute('data-live-appearance'),'done','C3 Jira paint stays');
+ t.setEnabled(true);await settle();assert.equal(h.moving(0).length,4,'C3 on again');
+ h.cues().forEach(el=>{if(el.getAttribute('data-metrics-state')===null)el.remove();});
+ h.ctl.sections[0].sectionEl.dispatchEvent({type:'dv:pathrender'});h.flush();
+ assert.equal(h.moving(0).length,4,'C3 re-applied after a rebuild');assert.equal(h.ghost(1).length,1);
+ h.setMap({...CUE_MAP(),'a->b':{signals:{rate:{value:20},errors:{value:0}}}});t.apply({...CUE_MAP(),'a->b':{signals:{rate:{value:20},errors:{value:0}}}});
+ assert.equal(h.moving(0).length,2,'C3 the stream follows a telemetry change');
+ h.ctl.liveStatus.destroy();assert.equal(h.cues().length,0,'C3 destroy removes every cue');
+});
+
+async function importedCueHarness(label,t){
+ const spec=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=spec('provider',{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'},{from:'store',to:'api',label:'Return'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store','store->api']}}});
+ const consumer=spec('consumer',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{tickets:['IMP-1'],telemetry:CUE_SERVICE()}},edgeTracking:{'api->store':{tickets:['IMP-2'],telemetry:TCALL()},'store->api':{tickets:['IMP-3'],telemetry:TCALL()}}}]});
+ const middle=structuredClone(consumer);middle.page.canon.id='middle';middle.page.sections[0].diagram.topologyExports={nested:{nodes:['shared::api','shared::store'],edges:['shared::api->shared::store','shared::store->shared::api']}};
+ const outer=spec('outer',{nodes:{},rows:[[]],topologyImports:[{spec:'middle',export:'nested',as:'outer'}]});
+ const seed=harness();t.after(()=>seed.ctl.liveStatus.destroy());
+ const doc=label==='direct'?consumer:outer,prefix=label==='direct'?'shared::':'outer::shared::';
+ const resolved=seed.C.FlowTopology.resolveSource(doc,{version:1,id:doc.page.canon.id,specs:[provider,consumer,middle,outer]});
+ const api=prefix+'api',store=prefix+'store',edgeId=api+'->'+store,silentId=store+'->'+api;
+ const samples={[api]:{signals:{rate:{value:50,series:[[1,30],[2,50]]}}},[edgeId]:{signals:{rate:{value:500},errors:{value:1}}},[silentId]:{signals:{rate:{value:0},errors:{value:0}}}};
+ const h=harness(resolved,{provider:()=>Promise.resolve({'IMP-1':{state:'done'},'IMP-2':{state:'done'},'IMP-3':{state:'done'}})},{telemetry:{provider:()=>Promise.resolve(samples)}});
+ t.after(()=>h.ctl.liveStatus.destroy());
+ const scope=h.ctl.sections[0].sectionEl,d=h.ctl.page.sections[0].diagram;
+ const index=d.edges.findIndex(e=>e.from+'->'+e.to===edgeId),silentIndex=d.edges.findIndex(e=>e.from+'->'+e.to===silentId);
+ assert.ok(index>=0 && silentIndex>=0,'C4 '+label+' imported edges resolved');
+ h.flush();h.flush();await settle();h.ctl.telemetry.setEnabled(true);await settle();
+ return {...h,scope,api,store,edgeId,silentId,index,silentIndex,node:scope.querySelector('g.node[data-dv-node="'+api+'"]')};
+}
+// Each scope AND cue contract gets its own test: an absent direct-node seal
+// cannot prevent nested streams, ghosts or cleanup from reaching assertions.
+for(const label of ['direct','nested']){
+ test('C4 '+label+' imported carriers retain the selected telemetry bindings',async t=>{
+  const h=await importedCueHarness(label,t),bindings=plain(h.ctl.telemetry.bindings());
+  assert.deepEqual(bindings.map(b=>b.id),[h.api,h.edgeId,h.silentId]);
+  assert.deepEqual(bindings[0].signals.rate,{source:'grafana',query:'sum(rate(http_requests_total[5m]))*3600',unit:'req/h'});
+ });
+ test('C4 '+label+' imported node gets a proven seal',async t=>{
+  const h=await importedCueHarness(label,t);
+  assert.equal(h.node.querySelector('.dv-metrics-seal')?.getAttribute('data-seal'),'proven','C4 '+label+' imported node seal');
+ });
+ test('C4 '+label+' imported node gets a sparkline',async t=>{
+  const h=await importedCueHarness(label,t);
+  assert.ok(h.node.querySelector('polyline.dv-metrics-sparkline'),'C4 '+label+' imported node sparkline');
+ });
+ test('C4 '+label+' imported flowing edge gets a stream',async t=>{
+  const h=await importedCueHarness(label,t);
+  const moving=h.scope.querySelectorAll('g.dv-metrics-stream').filter(g=>g.getAttribute('data-metrics-edge')===String(h.index)).flatMap(g=>g.querySelectorAll('circle.dv-metrics-moving'));
+  assert.equal(moving.length,3,'C4 '+label+' imported edge stream');
+ });
+ test('C4 '+label+' imported silent Done edge gets a ghost',async t=>{
+  const h=await importedCueHarness(label,t);
+  assert.equal(h.scope.querySelectorAll('path.dv-metrics-ghost').filter(p=>p.getAttribute('data-metrics-edge')===String(h.silentIndex)).length,1,'C4 '+label+' silent imported edge ghost');
+ });
+ test('C4 '+label+' imported silent edge stroke is dimmed',async t=>{
+  const h=await importedCueHarness(label,t);
+  assert.ok(h.scope.querySelector('path.edge[data-dv-edge="'+h.silentIndex+'"]').classList.contains('dv-metrics-silent'),'C4 '+label+' silent imported stroke dimmed');
+ });
+ test('C4 '+label+' unbound imported node stays unchanged',async t=>{
+  const h=await importedCueHarness(label,t),node=h.scope.querySelector('g.node[data-dv-node="'+h.store+'"]');
+  assert.equal(node.querySelectorAll(CUE_SELECTOR).length,0);
+  assert.equal(node.getAttribute('data-metrics-state'),null,'C4 '+label+' unbound imported node unchanged');
+ });
+ for(const action of ['off','destroy'])test('C4 '+label+' '+action+' removes imported cues and carrier decoration',async t=>{
+  const h=await importedCueHarness(label,t),paintedWhileOn=h.scope.querySelectorAll(CUE_SELECTOR).length;
+  if(action==='off')h.ctl.telemetry.setEnabled(false);else h.ctl.liveStatus.destroy();
+  assert.deepEqual({paintedWhileOn:paintedWhileOn>0,remaining:h.scope.querySelectorAll(CUE_SELECTOR).length},{paintedWhileOn:true,remaining:0},'C4 '+label+' '+action+' removes cues painted while on');
+  assert.equal(h.scope.querySelectorAll('.dv-metrics-bound,.dv-metrics-flowing,.dv-metrics-degraded,.dv-metrics-silent,.dv-metrics-unobserved,.dv-metrics-ghosted,[data-metrics-verdict]').length,0,'C4 '+label+' '+action+' removes carrier classes and verdicts');
+ });
+}
+
+test('C5 Metrics packets never wear the ordinary packet classes and the frame measure skips the stream layer',async()=>{
+ const h=cueHarness();await h.on();
+ const packets=h.view.querySelectorAll('circle.dv-metrics-packet');assert.ok(packets.length>0);
+ assert.ok(packets.every(c=>!c.classList.contains('pkt') && !c.classList.contains('comm-packet') && !c.classList.contains('loopdot')),'C5 own classes only');
+ assert.match(fs.readFileSync('src/engine.js','utf8'),/child\.matches\('[^']*\.dv-metrics-stream[^']*'\)/,'C5 the frame measure skips the stream layer');
+ const css=fs.readFileSync('src/style.core.css','utf8');
+ assert.match(css,/@media \(prefers-reduced-motion: reduce\)\{[^}]*\.dv-metrics-moving\{display:none/,'C5 reduced motion hides moving packets');
+ assert.match(css,/@media print\{[^}]*\.dv-metrics-moving\{display:none/,'C5 print hides moving packets');
+ h.ctl.liveStatus.destroy();
+});
+
+test('C6 a Live status demo source with telemetry shows Metrics as demo, reaches the same controller, and yields to a host provider',async()=>{
+ let live=null;const day={'a->b':{signals:{rate:{value:1300},errors:{value:0}}}};
+ const demo=()=>({provider:()=>Promise.resolve(CUE_JIRA),telemetry:{provider:()=>day},demo:{mount:api=>{live=api;return ()=>{};}}});
+ const h=harness(cuePage(),demo()),t=h.ctl.telemetry;
+ assert.ok(t && t.snapshot().available,'C6 the demo telemetry source makes Metrics available');
+ assert.equal(live.telemetry,t,'C6 the demo reaches ctl.telemetry through the Live status API');
+ const panel=mountStatus(h);h.flush();h.flush();await settle();
+ const metrics=h.view.querySelector('button.dv-live-metrics'),conn=h.view.querySelector('.dv-live-metrics-connection');
+ assert.equal(metrics.hidden,false);metrics.dispatchEvent({type:'click'});await settle();
+ assert.equal(conn.getAttribute('data-state'),'demo','C6 reported as demo');assert.match(conn.querySelectorAll('span')[0].textContent,/^Metrics: demo, refreshed /);
+ live.telemetry.apply({'a->b':{signals:{rate:{value:20},errors:{value:0}}}});
+ assert.equal(h.view.querySelectorAll('g.dv-metrics-stream').filter(g=>g.getAttribute('data-metrics-edge')==='0').flatMap(g=>g.querySelectorAll('circle.dv-metrics-moving')).length,2,'C6 a demo day push repaints the canvas');
+ panel.destroy();h.ctl.liveStatus.destroy();
+ let hostCalls=0;const hosted=harness(cuePage(),demo(),{telemetry:{provider:()=>{hostCalls++;return Promise.resolve({});}}});
+ hosted.flush();hosted.flush();await settle();hosted.ctl.telemetry.setEnabled(true);await settle();
+ assert.equal(hostCalls,1,'C6 a host telemetry provider wins over the demo');assert.equal(hosted.ctl.liveStatus.snapshot().metrics.demo,false);
+ hosted.ctl.liveStatus.destroy();
+});

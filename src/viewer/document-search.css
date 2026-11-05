@@ -1,0 +1,26 @@
+/* Theme-owned paper, ink and accent. Search outlines are independent of the
+   current-page fill and the stepper's active glow. No unmatched text is dimmed. */
+.reader-narrow .document-search-launch{display:none;}
+.document-search-launch{display:inline-flex;flex:none;align-items:center;}
+.document-search-launch .reader-button{width:32px;height:32px;}
+.document-search{position:fixed;z-index:115;width:384px;box-sizing:border-box;overflow:auto;padding:14px;border:1px solid var(--explore-border);border-radius:10px;background:var(--reader-paper,var(--explore-bg));color:var(--dtext);box-shadow:0 8px 30px color-mix(in srgb,var(--dtext) 18%,transparent);font:13px/1.5 'IBM Plex Sans',sans-serif;text-align:left;}
+.document-search[hidden],.document-search [hidden]{display:none!important;}
+.document-search-heading,.document-search-field,.document-search-controls,.document-search-modes{display:flex;align-items:center;gap:6px;}
+.document-search-heading{justify-content:space-between;margin-bottom:10px;font-size:14px;}
+.document-search-input{min-width:0;flex:1;width:100%;padding:8px;border:1px solid var(--explore-border);border-radius:5px;background:var(--explore-bg);color:var(--dtext);font:inherit;}
+.document-search-input::placeholder{color:var(--dmuted,var(--dtext));}
+.document-search-controls{margin-top:10px;}.document-search-modes{flex:1;}
+.document-search :is(button,input):focus-visible{outline:2px solid var(--navigation-accent);outline-offset:2px;}
+.document-search-modes [aria-pressed=true]{background:var(--reader-selected,color-mix(in srgb,var(--navigation-accent) 12%,var(--explore-bg)));color:var(--navigation-accent);border-color:var(--navigation-accent);}
+.document-search-status{margin:12px 0 4px;font-weight:600;}.document-search-hint{margin:0;font-size:12px;color:var(--dmuted,var(--dtext));}
+.document-search-results{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px;}
+body .document-search .document-search-result{display:flex;flex-direction:column;align-items:stretch;width:100%;white-space:normal;text-align:left;padding:10px;border:1px solid var(--explore-border);border-radius:6px;line-height:1.5;color:var(--dtext);}
+.document-search-location{font-size:11px;color:var(--dmuted,var(--dtext));}.document-search-kind{font-size:12px;margin:3px 0;}.document-search-snippet{font-size:13px;overflow-wrap:anywhere;}
+.document-search mark{background:color-mix(in srgb,var(--navigation-accent) 22%,var(--explore-bg));color:var(--dtext);text-decoration:underline;}
+body .reader-navigation .document-search-match{outline:2px dashed var(--navigation-accent);outline-offset:3px;}
+.docview .schip.document-search-match{outline:2px dashed var(--acc);outline-offset:3px;}
+.docview .node.document-search-match>.card,.docview .node.document-search-match>.text-box-hit{stroke:var(--acc);stroke-width:3px;stroke-dasharray:5 3;}
+.docview .coin.document-search-match>circle{stroke:var(--acc);stroke-width:3px;stroke-dasharray:3 2;}
+.docview [data-search-focus]:focus-visible{outline:2px solid var(--acc);outline-offset:4px;}
+@media print{.document-search,.reader-narrow .document-search-launch{display:none;}
+.document-search-launch{display:none!important;}}

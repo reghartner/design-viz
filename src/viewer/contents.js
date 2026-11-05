@@ -6,6 +6,7 @@ function createReaderContents(ctl,nav,actions,options){
   var expandedTabs=new Set(),collapsedViews=new Set(),standardZoom=new Map(),moved=[],overflowActions=null,actionAttemptWidth=null;
   // Closed Contents leaves a numbered rail; hovering it floats the panel over the page
   // and clicking a marker goes to that part with Contents still closed.
+  var search=null;
   var hovering=false,overlayTabs=new Set(),intentTimer=0,leaveTimer=0,partCount=0,RAIL_WIDTH=44,toggleFit=null;
   function element(tag,cls,text,parent){var el=doc.createElement(tag);el.className=cls;if(text)el.textContent=text;if(parent)parent.appendChild(el);return el;}
   function button(label,text,parent,fn){var el=element('button','reader-button',text,parent);el.type='button';el.setAttribute('aria-label',label);el.title=label;
@@ -200,12 +201,14 @@ function createReaderContents(ctl,nav,actions,options){
         if(only)choose(item,only,only.members[0].record.runtime);
         else{if(shown.has(item.path))shown.delete(item.path);else shown.add(item.path);drawTree();}
       });
+      if(search)search.mark(tabButton,item);
       tabButton.classList.add('reader-tree-tab');tabButton.setAttribute('data-reader-key','tab:'+item.path);
       if(item===owner)tabButton.setAttribute('data-current-part','true');
       if(numbered){var badge=element('span','reader-part-number',String(++number));badge.setAttribute('aria-hidden','true');tabButton.prepend(badge);}
       function trail(parent){var levels=detailTrail();if(levels.length){var details=element('ol','reader-tree-details',null,parent);levels.forEach(function(level,i){var entry=element('li','reader-tree-detail',level.label,details);entry.title=level.title;if(i===levels.length-1)entry.setAttribute('aria-current','location');});}}
       function leaf(choice,definition,parent,key){
         var rec=definition.members[0].record.runtime,selected=item===owner && item.current===definition && current===rec;
+        if(search)search.mark(choice,item,rec,definition);
         choice.classList.add('reader-tree-leaf');choice.setAttribute('data-tab-view',definition.id);choice.setAttribute('data-reader-section',rec.reference);choice.setAttribute('data-owner-selected',String(item.current===definition));choice.setAttribute('data-reader-key',key);choice.setAttribute('aria-current',selected?'page':'false');choice.setAttribute('aria-pressed',String(selected));
         if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description','Explore: pan and zoom the graph.');}
         if(selected)trail(parent);
@@ -249,11 +252,13 @@ function createReaderContents(ctl,nav,actions,options){
   function topParts(){var embed=embedded();return (ctl.views?ctl.views.owners:[]).filter(function(item){return item.views.length && !(embed && ctl.views.owner(embed)!==item);});}
   function parts(){
     var owners=topParts();
+    if(search && search.hasQuery())return documentPages().map(function(page,i){return {label:'Page '+(i+1)+': '+title(page.rec)+' · '+page.definition.name,owner:page.owner,definition:page.definition,rec:page.rec,current:page.owner===owner && page.definition===owner.current && page.rec===current};});
     if(owners.length>1)return owners.map(function(item){return {label:ownerLabel(item),owner:item,current:item===owner};});
     return members.map(function(rec){return {label:title(rec),rec:rec,current:rec===current};});
   }
   function goPart(part){
-    if(part.owner){var definition=part.owner.current,first=definition && definition.members[0];if(definition)choose(part.owner,definition,first && first.record.runtime,true);}
+    if(part.definition)choose(part.owner,part.definition,part.rec,true);
+    else if(part.owner){var definition=part.owner.current,first=definition && definition.members[0];if(definition)choose(part.owner,definition,first && first.record.runtime,true);}
     else if(options.selectSection){options.selectSection(part.rec);pinnedTop=part.rec.sectionEl.getBoundingClientRect().top;}
   }
   // A document page is one navigable rendering of a section in a View. Preserve
@@ -278,6 +283,7 @@ function createReaderContents(ctl,nav,actions,options){
     railList.replaceChildren();
     list.forEach(function(part,i){
       var li=element('li','',null,railList),mark=button(part.label,String(i+1),li,function(){goPart(part);});
+      if(search)search.mark(mark,part.owner || owner,part.rec,part.definition);
       mark.classList.add('reader-rail-mark');if(i<index)mark.classList.add('reader-rail-past');if(i===index)mark.setAttribute('aria-current','page');
       if(i===focusIndex)mark.focus({preventScroll:true});
     });
@@ -328,11 +334,11 @@ function createReaderContents(ctl,nav,actions,options){
     release();
     if(!options.singleShareAction && !options.skipTabShare && owner && owner.tabBlock){var block=ctl.tabBlocks[owner.tabBlock-1],copy=block.copyButtons[owner.tab];if(copy){var anchor=doc.createComment('reader tab copy');copy.before(anchor);actions.prepend(copy);moved.push({node:copy,anchor:anchor});}}
     if(options.singleReaderToolbar){var pageActions=actions.querySelector(':scope > .viewport-actions');if(pageActions)Array.from(actions.querySelectorAll(':scope > .embedcopy')).filter(function(node){return node!==copy;}).forEach(function(node){var anchor=doc.createComment('reader page action');node.before(anchor);pageActions.appendChild(node);moved.push({node:node,anchor:anchor});});}
-    Array.from(actions.children).filter(function(node){return node!==utilities && !node.classList.contains('viewport-actions');}).forEach(function(node){var anchor=doc.createComment('reader utility');node.before(anchor);utilityBody.appendChild(node);moved.push({node:node,anchor:anchor});});
+    Array.from(actions.children).filter(function(node){return node!==utilities && !node.classList.contains('viewport-actions') && !node.classList.contains('document-search-launch');}).forEach(function(node){var anchor=doc.createComment('reader utility');node.before(anchor);utilityBody.appendChild(node);moved.push({node:node,anchor:anchor});});
     if(!options.singleReaderToolbar){var expand=actions.querySelector('.viewport-expand');if(expand){var anchor=doc.createComment('reader expand');expand.before(anchor);utilityBody.appendChild(expand);moved.push({node:expand,anchor:anchor});}}
     utilities.hidden=!utilityBody.children.length;
     scrollHeld=true;cancelAnimationFrame(holdFrame);holdFrame=requestAnimationFrame(function(){scrollHeld=false;pinnedTop=current && current.sectionEl.getBoundingClientRect().top;});
-    drawViews();drawTree();updateZoom();updateTheme();geometry();
+    drawViews();drawTree();updateZoom();updateTheme();geometry();if(search)search.refresh();
   }
   function keydown(ev){
     if(viewStrip.contains(ev.target) && (ev.key==='Enter' || ev.key===' '))ev.stopPropagation();
@@ -350,10 +356,11 @@ function createReaderContents(ctl,nav,actions,options){
     if(ev.key==='Tab' && opened && narrow){var nodes=focusable(),first=nodes[0],last=nodes[nodes.length-1];if(ev.shiftKey && (ev.target===first || !sidebar.contains(ev.target))){ev.preventDefault();last.focus();}else if(!ev.shiftKey && (ev.target===last || !sidebar.contains(ev.target))){ev.preventDefault();first.focus();}}
     if(themeMenu.open && ['ArrowDown','ArrowUp','Home','End'].indexOf(ev.key)>=0 && themeMenu.contains(ev.target)){ev.preventDefault();var nodes=Array.from(themeOptions.querySelectorAll('button')),index=nodes.indexOf(ev.target);index=ev.key==='Home'?0:ev.key==='End'?nodes.length-1:(index+(ev.key==='ArrowDown'?1:-1)+nodes.length)%nodes.length;nodes[index].focus();}
   }
+  search=createDocumentSearch(ctl,nav,top,actions,documentPages,choose,function(){if(search){drawParts();drawTree();geometry();}});
   if(opened!==null)setOpen(opened,false,false);
   var initialFrame=requestAnimationFrame(function(){if(retired)return;(ctl.views?ctl.views.owners:[]).forEach(function(item){expandedTabs.add(item.path);});drawTree();});
   nav.addEventListener('keydown',keydown,true);view.addEventListener('reader-skin-change',updateTheme);view.addEventListener('viewer-presentation-changing',release);view.addEventListener('reader-zoom-change',updateZoom);window.addEventListener('resize',geometry);window.addEventListener('scroll',geometry,true);
   function snapshot(){return {opened:opened,expanded:Array.from(expandedTabs),collapsed:Array.from(collapsedViews),zoom:(ctl.views?ctl.views.owners:[]).flatMap(function(item){return item.views.map(function(definition){return {owner:item.path,id:definition.id,section:definition.members[0].record.reference,value:standardZoom.get(definition) || 1};});})};}
   function restore(saved){if(!saved)return;cancelAnimationFrame(initialFrame);expandedTabs=new Set(saved.expanded || []);collapsedViews=new Set(saved.collapsed || []);(saved.zoom || []).forEach(function(entry){var item=ctl.views && ctl.views.owners.find(function(item){return item.path===entry.owner;}),definition=item && item.views.find(function(definition){return definition.id===entry.id && (!entry.section || definition.members[0].record.reference===entry.section);});if(definition)standardZoom.set(definition,entry.value);});setOpen(saved.opened===true,false,false);refresh(current,viewportRecord);}
-  return {snapshot:snapshot,restore:restore,setOpen:function(value){setOpen(value,false,false);},refresh:refresh,geometry:geometry,release:release,retainScroll:function(){if(scrollHeld)return true;if(pinnedTop===null || !current)return false;if(Math.abs(current.sectionEl.getBoundingClientRect().top-pinnedTop)<1)return true;pinnedTop=null;return false;},destroy:function(){retired=true;hideOverlay(true);cancelAnimationFrame(initialFrame);cancelAnimationFrame(holdFrame);release();view.removeEventListener('reader-skin-change',updateTheme);view.removeEventListener('viewer-presentation-changing',release);view.removeEventListener('reader-zoom-change',updateZoom);nav.removeEventListener('keydown',keydown,true);window.removeEventListener('resize',geometry);window.removeEventListener('scroll',geometry,true);view.classList.remove('has-reader-contents','reader-contents-open');view.style.removeProperty('--reader-inset');view.style.removeProperty('--reader-left');view.style.removeProperty('--reader-width');if(options.insetTarget)options.insetTarget.style.removeProperty('--reader-host-inset');ctl.sections.forEach(function(rec){rec.sectionEl.style.removeProperty('zoom');});}};
+  return {snapshot:snapshot,restore:restore,setOpen:function(value){setOpen(value,false,false);},refresh:refresh,geometry:geometry,release:release,retainScroll:function(){if(scrollHeld)return true;if(pinnedTop===null || !current)return false;if(Math.abs(current.sectionEl.getBoundingClientRect().top-pinnedTop)<1)return true;pinnedTop=null;return false;},destroy:function(){retired=true;if(search)search.destroy();hideOverlay(true);cancelAnimationFrame(initialFrame);cancelAnimationFrame(holdFrame);release();view.removeEventListener('reader-skin-change',updateTheme);view.removeEventListener('viewer-presentation-changing',release);view.removeEventListener('reader-zoom-change',updateZoom);nav.removeEventListener('keydown',keydown,true);window.removeEventListener('resize',geometry);window.removeEventListener('scroll',geometry,true);view.classList.remove('has-reader-contents','reader-contents-open');view.style.removeProperty('--reader-inset');view.style.removeProperty('--reader-left');view.style.removeProperty('--reader-width');if(options.insetTarget)options.insetTarget.style.removeProperty('--reader-host-inset');ctl.sections.forEach(function(rec){rec.sectionEl.style.removeProperty('zoom');});}};
 }

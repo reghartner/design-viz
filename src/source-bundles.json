@@ -41,6 +41,7 @@
     "viewer/follow-active.js",
     "viewer/explore.js",
     "viewer/explore-canvas.js", "viewer/compare-view.js",
+    "viewer/document-search.js",
     "viewer/contents.js",
     "viewer/tab-views.js",
     "viewer/workspace-handoff.js",
@@ -348,7 +349,7 @@
     ],
     "sharedStyles": {
       "core": [
-        "viewer/explore.css", "viewer/compare-view.css",
+        "viewer/explore.css", "viewer/compare-view.css", "viewer/document-search.css",
         "viewer/human-guide.css",
         "icons/library.css",
         "icons/brand.css"

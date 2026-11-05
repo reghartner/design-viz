@@ -328,9 +328,9 @@ for(const explore of [false,true])test('panel title '+(explore?'Explore grip':'S
  const saved=await src.inputValue();expect(JSON.parse(saved)).toEqual(withPanelTitle(original,'Revised home'));await expect(title).toHaveText('Revised home');
  await undo.click();await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();await expect(title).toHaveText('Shared home');
  await redo.click();await expect(src).toHaveValue(saved);await expect(title).toHaveText('Revised home');await undo.click();await expect(src).toHaveValue(original);
- // Clicking a different selection saves the draft once.
+ // Clicking outside saves the draft once in either presentation.
  await title.dblclick();await expect(edit).toBeFocused();await edit.pressSequentially('Clicked away');
- await page.locator('#docview .sec-h').click();await expect(edit).toHaveCount(0);expect(JSON.parse(await src.inputValue())).toEqual(withPanelTitle(original,'Clicked away'));
+ await page.locator('#workbench-editor-title').click();await expect(edit).toHaveCount(0);expect(JSON.parse(await src.inputValue())).toEqual(withPanelTitle(original,'Clicked away'));
  await expect(title).toHaveText('Clicked away');await undo.click();await expect(src).toHaveValue(original);
  await title.dblclick();await expect(edit).toBeFocused();await edit.pressSequentially('   ');await edit.press('Enter');await expect(edit).toHaveCount(0);
  await expect(src).toHaveValue(cleared);

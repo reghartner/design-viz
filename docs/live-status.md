@@ -657,9 +657,12 @@ warnings, never errors. Strongly prefer adding the panel on every tracked page.
 ### Proof summary and table
 
 Proof uses the same normalized samples and `proofVerdicts` results as the Metrics
-cards. It appears inside the authored panel whenever its controller holds a
-nonempty permitted telemetry map, independently of the Metrics canvas switch or
-Jira data. A host may apply samples while Metrics is off. Turning Metrics off
+cards. It appears inside the authored panel when a permitted sample contains a
+finite value or series point for an explicitly bound signal of a known carrier.
+Measured zero qualifies; unknown identities, unbound signals, empty samples,
+markers and links alone do not. Once such a measurement exists, other bound
+carriers may appear as unobserved. This is independent of the Metrics canvas
+switch or Jira data. A host may apply samples while Metrics is off. Turning Metrics off
 clears its map; root-page disable, host disable, or capability removal also
 clears Proof. Workbench Preview's synthetic cards do not supply production Proof.
 Telemetry-only panels show Proof without invented Jira totals or a Tickets table.

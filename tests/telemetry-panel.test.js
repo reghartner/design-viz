@@ -18,7 +18,28 @@ test('Proof rows and disjoint arcs use exactly the bound denominator, preserve n
  assert.match(model.sentence,/1 of 5 bound carriers proven/);assert.match(model.sentence,/1 carriers unbound/);
  assert.equal(model.rows[4].telemetry,'unobserved');assert.equal(model.rows[4].label,'DONE');assert.equal(C.liveStatusProofPresentation({...input,map:{}},'24h'),null);
  const unbound={...input,carriers:[input.carriers.at(-1)],verdicts:plain(C.proofVerdicts({carriers:[input.carriers.at(-1)]}))};
- assert.equal(C.liveStatusProofPresentation(unbound,'24h').arcs[0].size,0);
+ assert.equal(C.liveStatusProofPresentation(unbound,'24h'),null);
+});
+test('Proof activation requires finite evidence on an explicitly bound signal of an in-scope carrier, including zero',()=>{
+ const carriers=[binding('local'),binding('direct::api'),binding('outer::inner::api'),binding('loaded::inner::api'),{...binding('unbound'),signals:{}}];
+ const present=map=>{const snapshot=freeze({carriers,map,verdicts:plain(C.proofVerdicts({carriers,telemetryMap:map}))});return C.liveStatusProofPresentation(snapshot,'24h');};
+ const invalid=[
+  ['unknown carrier',{unknown:{signals:{rate:{value:42}}}}],
+  ['unbound carrier',{unbound:{signals:{rate:{value:42}}}}],
+  ['unbound signal',{local:{signals:{lag:{value:42}}}}],
+  ['empty sample',{local:{}}],['empty signals',{local:{signals:{}}}],
+  ['empty bound signal',{local:{signals:{rate:{}}}}],['empty series',{local:{signals:{rate:{series:[]}}}}],
+  ['markers and links only',{local:{markers:[{kind:'deploy',at:iso(T)}],links:{dashboard:'https://provider.test'}}}],
+  ...[null,undefined,NaN,Infinity,-Infinity,'0',false].map(value=>['invalid value '+String(value),{local:{signals:{rate:{value}}}}]),
+  ...[[T,NaN],[T,Infinity],['invalid',0],[T,'0'],[T,0,1],null].map(point=>['invalid point '+String(point),{local:{signals:{rate:{series:[point]}}}}])
+ ];
+ for(const [label,map] of invalid)assert.equal(present(map)===null,true,label+' must not activate Proof');
+ for(const c of carriers.slice(0,4))for(const entry of [{value:0},{series:[[T,0]]},{value:1},{series:[[iso(T),2]]}]){
+  const model=present({[c.id]:{signals:{rate:entry}}});assert.ok(model,c.id+' finite measurement activates Proof');
+  assert.equal(model.counts.bound,4);assert.equal(model.counts.unbound,1);assert.equal(model.rows.length,4);
+  assert.equal(model.rows.find(r=>r.id===c.id).kpis[0].text,(entry.value??entry.series[0][1])+' req/h');
+  assert.ok(model.rows.filter(r=>r.id!==c.id).every(r=>r.telemetry==='unobserved'));
+ }
 });
 test('Proof uses explicit kind/signals, truthful predicates and units, zero versus missing, and only evidenced since Done facts',()=>{
  const input=fixture(),model=C.liveStatusProofPresentation(input,'24h');

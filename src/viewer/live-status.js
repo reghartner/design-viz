@@ -7,7 +7,18 @@ var LIVE_STATUS_APPEARANCES = LIVE_STATUS_STATES.concat(['unchanged']);
    resolves bindings nor judges evidence: proofVerdicts remains the only engine.
    No clock, page walk, queries, or mutations belong in this presentation seam. */
 function liveStatusProofPresentation(snapshot,window){
-  if(!snapshot || !Object.keys(snapshot.map || {}).length)return null;
+  if(!snapshot)return null;
+  // Map keys, links and markers are not measurements. Use only already-resolved
+  // bound carriers/signals, including measured zero and finite series points.
+  var observed=snapshot.carriers.some(function(binding){
+    if(!snapshot.verdicts.carriers[binding.id].bound)return false;
+    var sample=(snapshot.map || {})[binding.id];
+    return Object.keys(binding.signals).some(function(name){
+      var entry=sample && sample.signals && sample.signals[name];
+      return telemetryObject(entry) && (telemetryNumber(entry.value) || Array.isArray(entry.series) && entry.series.some(telemetryPoint));
+    });
+  });
+  if(!observed)return null;
   var counts=Object.assign({},snapshot.verdicts.rollups),offset=0;
   counts.neutral=counts.bound-counts.proven-counts.degraded-counts.unproven-counts.liveEarly;
   var arcs=['proven','degraded','unproven','liveEarly'].map(function(key){

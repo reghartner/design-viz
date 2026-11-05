@@ -52,6 +52,53 @@ test('telemetry-only host apply while Metrics is off shows Proof without Jira to
  await expect(page.locator('#sibling .dv-live-proof')).toHaveCount(0);expect(await page.evaluate(()=>window.calls.live.length)).toBe(0);await page.evaluate(()=>window.viewer.controller.telemetry.setAvailable(false));await expect(metrics(root)).toBeHidden();await expect(root.locator('.dv-live-proof')).toHaveCount(0);await page.evaluate(()=>window.seed());await expect(root.locator('.dv-live-proof')).toHaveCount(0);
  await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();await metrics(page.locator('#sibling')).click();await expect(page.locator('#sibling .dv-live-proof')).toHaveCount(1);await page.evaluate(()=>{window.retiredProof=document.querySelector('#sibling').shadowRoot.querySelector('.pt-live-status');window.sibling.destroy();});await expect(page.locator('#sibling')).toBeEmpty();expect(await page.evaluate(()=>window.retiredProof.querySelectorAll('.dv-live-proof,.dv-live-proof-table').length)).toBe(0);
 });
+test('Proof activation ignores unknown, unbound and unobserved data but accepts local/direct/nested zero while Metrics is off',async({page,server})=>{
+ const root=await setup(page,server,{telemetryOnly:true});
+ const invalid=['unknown carrier','unbound carrier','unbound signal','empty sample','empty signals','empty series','markers and links only','invalid values and points'];
+ for(const mode of invalid){
+  await page.evaluate(({mode,T})=>{
+   const maps={
+    'unknown carrier':{unknown:{signals:{rate:{value:42}}}},
+    'unbound carrier':{app:{signals:{rate:{value:42}}}},
+    'unbound signal':{'shared::api':{signals:{lag:{value:42}}}},
+    'empty sample':{ingest:{}},'empty signals':{ingest:{signals:{}}},
+    'empty series':{ingest:{signals:{lag:{series:[]}}}},
+    'markers and links only':{ingest:{markers:[{kind:'deploy',at:new Date(T).toISOString()}],links:{dashboard:'https://provider.test'}}},
+    'invalid values and points':{ingest:{signals:{lag:{value:NaN,series:[[T,Infinity],['invalid',0],[T,'0']]},age:{value:'0'}}}}
+   };window.viewer.controller.telemetry.apply(maps[mode]);
+  },{mode,T});
+  await expect(root.locator('.dv-live-proof,.dv-live-proof-table'),mode).toHaveCount(0);
+ }
+ for(const [id,signal] of [['ingest','lag'],['shared::api','rate'],['outer::inner::a->outer::inner::b','rate']]){
+  for(const series of [false,true]){
+   await page.evaluate(({id,signal,series,T})=>window.viewer.controller.telemetry.apply({[id]:{signals:{[signal]:series?{series:[[T,0]]}:{value:0}}}}),{id,signal,series,T});
+   await expect(root.locator('.dv-live-proof')).toHaveCount(1);await expect(root.locator('.dv-live-proof-row')).toHaveCount(6);
+   await expect(carrier(root,id)).toContainText(signal+': 0');
+   await expect(carrier(root,'ingest->app')).toContainText('unobserved');
+   await page.evaluate(()=>window.viewer.controller.telemetry.apply({ingest:{signals:{lag:{}}}}));
+   await expect(root.locator('.dv-live-proof,.dv-live-proof-table')).toHaveCount(0);
+  }
+ }
+ await expect(metrics(root)).toHaveAttribute('aria-pressed','false');await expect(root.locator('.dv-metrics-card')).toHaveCount(0);
+ expect(await page.evaluate(()=>[window.calls.live.length,window.calls.history.length])).toEqual([0,0]);
+});
+test('Proof activation uses actual loader-selected detail identities and bound signals without querying',async({page,server})=>{
+ const root=await setup(page,server,{details:true});
+ // A detail-only identity is unknown until the actual loader selects its section.
+ await page.evaluate(()=>window.viewer.controller.telemetry.apply({'shared::store->shared::api':{signals:{rate:{value:0}}}}));
+ await expect(root.locator('.dv-live-proof,.dv-live-proof-table')).toHaveCount(0);
+ await root.getByRole('button',{name:'Explore Imported service',exact:true}).click();await expect(root.getByText('Loading detail diagram…',{exact:true})).toBeVisible();await page.evaluate(()=>window.loadReleases.shift()());
+ const scope=root.locator('[data-dv-detail-preview]:visible');await expect(scope.locator('.sec-h')).toHaveText('Selected imported detail');
+ for(const id of ['shared::store->shared::api','detail::inner::a->detail::inner::b']){
+  await page.evaluate(id=>window.viewer.controller.telemetry.apply({[id]:{signals:{unboundSignal:{value:0}}}}),id);
+  await expect(root.locator('.dv-live-proof,.dv-live-proof-table')).toHaveCount(0);
+  await page.evaluate(({id,T})=>window.viewer.controller.telemetry.apply({[id]:{signals:{rate:{series:[[T,0]]}}}}),{id,T});
+  await expect(scope.locator('.dv-live-proof')).toHaveCount(1);await expect(carrier(scope,id)).toContainText('rate: 0 req/h');
+  await expect(carrier(scope,'ingest->app')).toContainText('unobserved');await expect(scope.locator('.dv-live-proof-table')).not.toContainText('Decoy');
+ }
+ await expect(metrics(scope)).toHaveAttribute('aria-pressed','false');expect(await page.evaluate(()=>[window.calls.live.length,window.calls.history.length,window.calls.detail.length])).toEqual([0,0,1]);
+ await scope.locator('.detail-breadcrumb button').first().click();await page.evaluate(()=>window.viewer.controller.telemetry.apply({}));await expect(root.locator('.dv-live-proof,.dv-live-proof-table')).toHaveCount(0);
+});
 for(const disabled of ['page','host','tools'])test(disabled+' disable hides controls, rejects seeded Proof and preserves Jira',async({page,server})=>{
  const root=await setup(page,server,{disabled});await page.evaluate(()=>window.seed());await expect(metrics(root)).toBeHidden();await expect(root.locator('.dv-live-proof')).toHaveCount(0);await expect(root.locator('.dv-live-tickets')).toHaveCount(1);await over(root).click();await day(root,0);await live(root).click();expect(await page.evaluate(()=>[window.calls.live.length,window.calls.history.length,Object.keys(window.viewer.controller.telemetry.snapshot().map).length])).toEqual([0,0,0]);
 });

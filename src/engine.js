@@ -1065,7 +1065,8 @@ function boardContentBounds(svg){
   Array.prototype.forEach.call(svg.children,function(child){
     // Packet dots follow already included paths. Their transient SMIL position
     // must not change saved framing; the 24-unit gutter covers their <=4.5 radius.
-    if(child.tagName.toLowerCase()==='defs' || child.matches('.dv-board-ground,.dv-board-grid,.pkt') || typeof child.getBBox!=='function')return;
+    // Metrics packet streams (#939) ride the same paths and are skipped likewise.
+    if(child.tagName.toLowerCase()==='defs' || child.matches('.dv-board-ground,.dv-board-grid,.pkt,.dv-metrics-stream') || typeof child.getBBox!=='function')return;
     try{
       var box=child.getBBox(),matrix=child.getCTM();if(!matrix || !box.width && !box.height)return;
       matrix=inverse.multiply(matrix);
@@ -1078,6 +1079,9 @@ function boardContentBounds(svg){
 }
 /* Measured control bounds in the board coordinate space. Include transparent
    hit rectangles, but never reserve controls hidden by path/step filtering. */
+function boardBoxesOverlap(a,b,pad){
+  pad=pad || 0;return a.x+a.w+pad>b.x && a.x-pad<b.x+b.w && a.y+a.h+pad>b.y && a.y-pad<b.y+b.h;
+}
 function boardControlBox(el,svg){
   if(!el || typeof el.getCTM!=='function' || typeof svg.getCTM!=='function')return null;
   var style=el.ownerDocument.defaultView.getComputedStyle(el);
@@ -1088,6 +1092,23 @@ function boardControlBox(el,svg){
   var points=[[box.x,box.y],[box.x+box.width,box.y],[box.x,box.y+box.height],[box.x+box.width,box.y+box.height]].map(function(p){return {x:matrix.a*p[0]+matrix.c*p[1]+matrix.e,y:matrix.b*p[0]+matrix.d*p[1]+matrix.f};});
   var x=Math.min.apply(null,points.map(function(p){return p.x;})),y=Math.min.apply(null,points.map(function(p){return p.y;}));
   return {x:x,y:y,w:Math.max.apply(null,points.map(function(p){return p.x;}))-x,h:Math.max.apply(null,points.map(function(p){return p.y;}))-y};
+}
+/* One packet's travel along an edge path, by the path's DOM id: a repeating
+   loop (staggered by a negative begin) or a single frozen run fired by the
+   stepper. The ordinary loop and step packets use it, and so do the Metrics
+   packet streams (#939, src/viewer/telemetry.js). */
+function packetMotion(domId, dur, begin, freeze, id){
+  var am = document.createElementNS(SVGNS, 'animateMotion');
+  am.setAttribute('dur', dur.toFixed(2) + 's');
+  am.setAttribute('begin', begin);
+  if (freeze){ am.setAttribute('fill', 'freeze'); }
+  else { am.setAttribute('repeatCount', 'indefinite'); }
+  if (id) am.setAttribute('id', id);
+  var mp = document.createElementNS(SVGNS, 'mpath');
+  mp.setAttribute('href', '#' + domId);
+  mp.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#' + domId);
+  am.appendChild(mp);
+  return am;
 }
 function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   destroyBoardLinks(el);
@@ -1483,7 +1504,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   svg._layoutStatusCoins=function(){
     var broken=Array.from(svg.querySelectorAll('.dv-live-comm-failure .comm-break')).some(function(el){return !!boardControlBox(el,svg);});
     var reserved=[];
-    if(broken)svg.querySelectorAll('.comm-break,text.lbl,.dvdelta,.node-review-badge,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff]').forEach(function(el){
+    if(broken || svg.querySelector('.dv-metrics-card'))svg.querySelectorAll('.dv-metrics-card-box,.comm-break,text.lbl,.dvdelta,.node-review-badge,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff]').forEach(function(el){
       if(el.closest('.coin'))return;
       var box=boardControlBox(el,svg);if(box)reserved.push({x:box.x-4,y:box.y-4,w:box.w+8,h:box.h+8});
     });
@@ -1495,7 +1516,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     // frame is already intentional. Grow only for the overlay's own controls
     // and coins displaced by a live break, and only if they extend past it.
     var boxes=[],liveBreak=Array.from(svg.querySelectorAll('.dv-live-comm-failure .comm-break')).some(function(el){return !!boardControlBox(el,svg);});
-    svg.querySelectorAll('.dv-jira-cue,.dv-live-comm-failure .comm-break'+(liveBreak?',.coin':'')).forEach(function(el){
+    svg.querySelectorAll('.dv-metrics-card,.dv-metrics-leader,.dv-jira-cue,.dv-live-comm-failure .comm-break'+(liveBreak || svg.querySelector('.dv-metrics-card')?',.coin':'')).forEach(function(el){
       var box=boardControlBox(el,svg);if(box)boxes.push(box);
     });
     if(boxes.length)extendFrame(unionGraphFrame(null,boxes,4));
@@ -1525,19 +1546,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     markFragmentElement(dot, info.e);
     return dot;
   }
-  function motion(domId, dur, begin, freeze, id){
-    var am = document.createElementNS(SVGNS, 'animateMotion');
-    am.setAttribute('dur', dur.toFixed(2) + 's');
-    am.setAttribute('begin', begin);
-    if (freeze){ am.setAttribute('fill', 'freeze'); }
-    else { am.setAttribute('repeatCount', 'indefinite'); }
-    if (id) am.setAttribute('id', id);
-    var mp = document.createElementNS(SVGNS, 'mpath');
-    mp.setAttribute('href', '#' + domId);
-    mp.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#' + domId);
-    am.appendChild(mp);
-    return am;
-  }
+  var motion = packetMotion;
 
   /* ambient loop dots: every edge of every step, staggered */
   (d.steps || []).forEach(function(st, i){
@@ -1940,7 +1949,30 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   }
   paintChips();
 
+  var tracePackets=[],tracePending=[];
+  function clearTraceTiming(){
+    tracePending.forEach(clearTimeout);tracePending=[];
+    tracePackets.forEach(function(dot){dot.remove();});tracePackets=[];
+  }
+  function playTraceTiming(packets){
+    if(destroyed || mode!=='step' || hidden)return false;
+    stopAuto();clearLit();
+    if(RM || typeof window.matchMedia==='function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)return false;
+    packets.forEach(function(packet){
+      var info=board.edgeIds[packet.edge],original=info && svg.getElementById(prefix+'-am-'+info.idx);
+      if(!original || steps[cur].keys.indexOf(packet.edge)<0 || !Number.isFinite(packet.startMs) || packet.startMs<0 || !Number.isFinite(packet.ms) || packet.ms<0)return;
+      var dot=original.parentNode.cloneNode(false);dot.classList.add('dv-trace-packet');dot.style.visibility='hidden';
+      var motion=packetMotion(info.domId,packet.ms/1000,'indefinite',true);
+      // Preserve sub-millisecond evidence and true zero; packetMotion's normal
+      // authored presentation rounds seconds to two decimals.
+      motion.setAttribute('dur',String(packet.ms)+'ms');
+      dot.appendChild(motion);svg.appendChild(dot);tracePackets.push(dot);
+      fireDot(packet.edge,packet.startMs,motion,packet.ms);
+    });
+    return !!tracePackets.length;
+  }
   function clearLit(){
+    clearTraceTiming();
     clearCommunicationFailures(board);
     pending.forEach(function(t){ clearTimeout(t); });
     pending = [];
@@ -1977,17 +2009,20 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     activeOverview={keys:keys,failures:steps[cur] && steps[cur].failures};
     if(options && options.activeChanged)options.activeChanged();
   }
-  function fireDot(key, delayMs){
+  function fireDot(key, delayMs, traceMotion, durationMs){
     var info = board.edgeIds[key];
     if (!info || RM) return;
-    var am = svg.getElementById(prefix + '-am-' + info.idx);
+    var am = traceMotion || svg.getElementById(prefix + '-am-' + info.idx);
     if (!am) return;
     var go = function(){
       if (destroyed) return;
       am.parentNode.style.visibility = 'visible';
-      try { am.beginElement(); } catch (ex) {}
+      if(traceMotion && durationMs===0){
+        var path=svg.getElementById(info.domId),point=path.getPointAtLength(path.getTotalLength());
+        am.parentNode.setAttribute('transform','translate('+point.x+' '+point.y+')');
+      }else try { am.beginElement(); } catch (ex) {}
     };
-    if (delayMs > 0) pending.push(setTimeout(go, delayMs));
+    if (delayMs > 0) (traceMotion?tracePending:pending).push(setTimeout(go, delayMs));
     else go();
   }
   function clearCaptionTween(){
@@ -2164,6 +2199,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     return true;
   }
   function settleCurrentStep(){
+    clearTraceTiming();
     settleCommunicationFailures(board);
     pending.forEach(function(t){ clearTimeout(t); });
     pending = [];
@@ -2267,6 +2303,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   if (document.addEventListener) document.addEventListener('visibilitychange', visibilityChanged);
   captionLine.hidden=true;clearPathControls();syncToggle(); syncPlayback();
   return {
+    playTraceTiming:playTraceTiming,
+    clearTraceTiming:clearTraceTiming,
     sectionEl: secBox,
     scrollTargetEl: boardDiv,
     enterStep: enterStep,
@@ -2281,6 +2319,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       pathLabelWidth=next;paintChips();if(mode==='step')syncPathControls();
     },
     setViewFilter:function(pathIds,stepIds){
+      clearTraceTiming();
       var filter=sectionViewFilter(source,pathIds,stepIds),nextPaths=filter.paths,nextSteps=filter.steps;
       if(JSON.stringify(nextPaths)===JSON.stringify(visiblePathIds) && JSON.stringify(nextSteps)===JSON.stringify(visibleStepIds) && editingStep===null && editingPathId===null)return;
       var playing=!!timer,wasMode=mode;stopAuto();visiblePathIds=nextPaths;visibleStepIds=nextSteps;editingStep=null;editingPathId=null;
@@ -3733,6 +3772,7 @@ function renderPage(view, page, skin, backlinks, options){
   /* {reason, detail} when the standalone boot fell back to the inline copy
      because flowspec.json did not load; null otherwise (#828 disables Save) */
   ctl.sourceFallback=function(){return options.sourceFallback || null;};
+  // Also attaches ctl.telemetry from options.telemetry (#939, src/viewer/telemetry.js).
   ctl.liveStatus=createLiveStatus(ctl,page,options.liveStatus,options);
   if(records.some(function(r){return r.section.detailOnly || Object.values(r.section.diagram && r.section.diagram.nodes || {}).some(function(n){return n.detail;});}))
     ctl.details=wireDetailFlows(ctl,page,skin,backlinks,options);

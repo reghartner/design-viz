@@ -21,18 +21,21 @@ so the standalone boot fetches that file and renders it (#826). The inline
 block stays as the fallback for a page opened without the file (file://, or
 the file missing). A board published this way as a claude.ai artifact can
 save its own edits by republishing only flowspec.json; the guide tells the
-editor's agent to edit that file, and the declaration of a tracked page adds
-the artifact and user capabilities the board's Edit mode needs.
+editor's agent to edit that file. A Jira- or telemetry-editable two-file page
+also declares the artifact and user capabilities the board's Edit mode needs;
+those capabilities are independent of Jira connector permission.
 
 --timeline <path> embeds that demo timeline JSON (version, intervalSeconds,
-days[].issues) in the separate live-timeline block of a page that declares
+days[].issues, optional days[].telemetry) in the separate live-timeline block of a page that declares
 page.tracking; --timeline none embeds nothing, so #live=demo synthesizes four
 days from the page's own ticket keys. The default is the example timeline for
 the example spec (examples/live-status/live-status.spec.json) and none for
 every other spec.
 """
 import argparse
+from datetime import datetime
 import json
+import math
 from pathlib import Path
 import re
 import subprocess
@@ -58,6 +61,86 @@ def default_timeline(spec_path: str) -> str:
     except OSError:
         same = False
     return str(EXAMPLE_TIMELINE) if same else TIMELINE_NONE
+
+
+TELEMETRY_KEYS = {"start", "stepSeconds", "carriers", "annotations"}
+RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$", re.I)
+
+
+def is_time(value) -> bool:
+    if not isinstance(value, str) or not RFC3339.match(value):
+        return False
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00").replace("z", "+00:00"))
+    except ValueError:
+        return False
+    return True
+
+
+def telemetry_problems(at: str, block) -> list:
+    """Shape of one day's telemetry (#944): hourly carrier signals and annotations.
+
+    {start: RFC3339, stepSeconds: positive integer,
+     carriers: {carrierId: {signal: {unit?: text, values: [number | null, ...]}}},
+     annotations?: [{time: RFC3339, text, id?: integer, tags?: [text]}]}
+    All values arrays of one day have the same length; null is an hour without a sample.
+    Values must be finite: json.loads reads NaN and Infinity, a browser's JSON.parse does not.
+    """
+    if not isinstance(block, dict):
+        return [f"{at} must be an object"]
+    problems = [f"{at}.{key} is not a telemetry field" for key in block if key not in TELEMETRY_KEYS]
+    if not is_time(block.get("start")):
+        problems.append(f"{at}.start must be an RFC3339 time")
+    step = block.get("stepSeconds")
+    if isinstance(step, bool) or not isinstance(step, int) or step <= 0:
+        problems.append(f"{at}.stepSeconds must be a positive integer")
+    carriers = block.get("carriers")
+    lengths = set()
+    if not isinstance(carriers, dict):
+        problems.append(f"{at}.carriers must be an object keyed by carrier")
+    else:
+        for carrier, signals in carriers.items():
+            where = f"{at}.carriers.{carrier}"
+            if not isinstance(signals, dict) or not signals:
+                problems.append(f"{where} must be a non-empty object keyed by signal")
+                continue
+            for name, signal in signals.items():
+                here = f"{where}.{name}"
+                if not isinstance(signal, dict) or not isinstance(signal.get("values"), list) or not signal["values"]:
+                    problems.append(f"{here} must be an object with a non-empty values array")
+                    continue
+                if set(signal) - {"unit", "values"}:
+                    problems.append(f"{here} takes only unit and values")
+                if "unit" in signal and not isinstance(signal["unit"], str):
+                    problems.append(f"{here}.unit must be text")
+                values = signal["values"]
+                if any(v is not None and (isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v))
+                       for v in values):
+                    problems.append(f"{here}.values must hold finite numbers or null")
+                lengths.add(len(values))
+                if len(lengths) > 1:
+                    problems.append(f"{here}.values must have as many entries as the day's other signals")
+                    lengths = {len(values)}
+    if "annotations" in block:
+        notes = block["annotations"]
+        if not isinstance(notes, list):
+            problems.append(f"{at}.annotations must be an array")
+        else:
+            for i, note in enumerate(notes):
+                here = f"{at}.annotations[{i}]"
+                if not isinstance(note, dict):
+                    problems.append(f"{here} must be an object")
+                    continue
+                if not is_time(note.get("time")):
+                    problems.append(f"{here}.time must be an RFC3339 time")
+                if not isinstance(note.get("text"), str) or not note["text"]:
+                    problems.append(f"{here}.text must be non-empty text")
+                if "id" in note and (isinstance(note["id"], bool) or not isinstance(note["id"], int)):
+                    problems.append(f"{here}.id must be an integer")
+                tags = note.get("tags", [])
+                if not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
+                    problems.append(f"{here}.tags must be an array of text")
+    return problems
 
 
 def load_timeline(path: str) -> dict:
@@ -86,6 +169,8 @@ def load_timeline(path: str) -> dict:
             for i, day in enumerate(days):
                 if not isinstance(day, dict) or not isinstance(day.get("issues"), dict):
                     problems.append(f"days[{i}].issues must be an object keyed by ticket")
+                if isinstance(day, dict) and "telemetry" in day:
+                    problems.extend(telemetry_problems(f"days[{i}].telemetry", day["telemetry"]))
     if problems:
         raise TimelineError(f"timeline {path} has the wrong shape: " + "; ".join(problems))
     return timeline
@@ -97,6 +182,105 @@ GUIDE_BLOCK = re.compile(r'^<script type="text/markdown" id="dv-agent-guide">\n.
 GUIDE_LIMIT = 6 * 1024
 COMMENTS_CAPABILITY = {"composer_only": True, "customAnchors": True}
 JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]
+# #943: the claude.ai Grafana adapter picks the viewer's connector by these five tools.
+GRAFANA_TOOLS = ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]
+GRAFANA_SOURCES = ("grafana", "loki", "sql")
+HONEYCOMB_TOOLS = ["run_query"]
+
+
+def _telemetry_sources(telemetry: dict) -> set[str]:
+    """Authored source keys in one binding or page telemetry block."""
+    found = set()
+    signals = telemetry.get("signals")
+    if isinstance(signals, dict):
+        for signal in signals.values():
+            if isinstance(signal, dict):
+                found.update(source for source in ("grafana", "loki", "tempo", "sql", "honeycomb") if source in signal)
+    templates = telemetry.get("templates")
+    if isinstance(templates, dict):
+        for template in templates.values():
+            if isinstance(template, dict):
+                found.update(_telemetry_sources(template))
+    return found
+
+
+def telemetry_sources(value) -> set[str]:
+    """All authored telemetry sources in a spec fragment."""
+    found = set()
+    if isinstance(value, dict):
+        telemetry = value.get("telemetry")
+        if isinstance(telemetry, dict):
+            found.update(_telemetry_sources(telemetry))
+        for item in value.values():
+            found.update(telemetry_sources(item))
+    elif isinstance(value, list):
+        for item in value:
+            found.update(telemetry_sources(item))
+    return found
+
+
+def telemetry_authored(value) -> bool:
+    """True for page settings, templates or carrier bindings, even disabled ones."""
+    if isinstance(value, dict):
+        if "telemetry" in value and isinstance(value.get("telemetry"), dict):
+            return True
+        return any(telemetry_authored(item) for item in value.values())
+    if isinstance(value, list):
+        return any(telemetry_authored(item) for item in value)
+    return False
+
+
+# A host may embed the frozen provider context imported carriers resolve from
+# (src/boot.flowview.js reads it); re-injecting such a page keeps the block.
+TOPOLOGY_BLOCK = re.compile(r'<script type="application/json" id="flowview-topology">(.*?)</script>', re.S)
+# Resolves the page's imports as src/boot.flowview.js does at view time
+# (FlowTopology.resolveSource over that context, then normalize) and prints the
+# signal sources of every binding the runtime hands its telemetry provider.
+RESOLVED_SOURCES_JS = r"""
+const {entrypoint}=require(__LOADER__),vm=require('node:vm'),fs=require('node:fs');
+const input=JSON.parse(fs.readFileSync(0,'utf8')),quiet={log(){},info(){},warn(){},error(){}};
+const doc={hidden:false,addEventListener(){},removeEventListener(){},createElement:()=>({style:{},setAttribute(){},appendChild(){}})};
+const C={URL,console:quiet,AbortController,setTimeout,clearTimeout,document:doc};
+vm.runInNewContext(entrypoint('native').source,C);
+const page=C.normalize(C.FlowTopology.resolveSource(input.spec,input.context)),sources=[];
+C.telemetryBindings(fn=>C.sectionRecords(page).forEach(record=>{
+  const d=record.section.diagram||{};
+  Object.keys(d.nodes||{}).forEach(id=>fn(d.nodes[id],id,page));
+  (Array.isArray(d.edges)?d.edges:[]).forEach(e=>fn(e,e&&typeof e==='object'?e.from+'->'+e.to:null,page));
+})).forEach(b=>Object.keys(b.signals).forEach(name=>{if(!sources.includes(b.signals[name].source))sources.push(b.signals[name].source);}));
+process.stdout.write(JSON.stringify({bound:sources.length>0,sources}));
+"""
+
+
+def topology_context(html: str):
+    """The `flowview-topology` context block of the page being injected into, or None."""
+    match = TOPOLOGY_BLOCK.search(html)
+    if not match:
+        return None
+    try:
+        context = json.loads(match.group(1))
+    except ValueError:
+        return None
+    return context if isinstance(context, dict) else None
+
+
+def imported_telemetry(spec: dict, context: dict) -> tuple[bool, set[str]]:
+    """Telemetry the runtime resolves from imported carriers: exported and selected
+    carriers only, nested imports included, consumer overlays replacing provider
+    bindings and provider templates expanded. On resolver failure, fail open to
+    authored context so the guide never under-declares its data dependencies."""
+    script = RESOLVED_SOURCES_JS.replace("__LOADER__", json.dumps(str(REPO_ROOT / "tools" / "source-loader.cjs")))
+    try:
+        result = subprocess.run(["node", "-e", script], input=json.dumps({"spec": spec, "context": context}),
+                                capture_output=True, text=True, timeout=120, check=False)
+        resolved = json.loads(result.stdout) if result.returncode == 0 else None
+        if isinstance(resolved, dict) and isinstance(resolved.get("sources"), list):
+            return bool(resolved.get("bound")), set(resolved["sources"])
+    except (OSError, subprocess.SubprocessError, ValueError):
+        pass
+    return telemetry_authored(context), telemetry_sources(context)
+
+
 # #826: the spec file published beside a two-file page, and the line that tells
 # the standalone boot to fetch it. The name is fixed: the board's Edit mode and
 # the editor's agent both publish exactly this path.
@@ -121,15 +305,19 @@ def source_commit() -> str | None:
     return sha if re.fullmatch(r"[0-9a-f]{40}", sha) else None
 
 
-def agent_guide(spec: dict, commit: str | None, two_file: bool = False) -> str:
+def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology: dict | None = None) -> str:
     """Markdown an editor's agent follows to change this page and republish it.
 
     Everything stated here is derived from the spec or is a fixed contract; the
-    capability declaration names only what this page needs (a connector only when
-    the page has tracking; the artifact and user capabilities only for a tracked
-    page published in two-file mode, #826). `commit` pins the doc links to the
-    source this page was built from (#758: docs at the page's version); None
-    links main with a note. Values are interpolated from a spec that already
+    capability declaration names only what this page needs (the Jira connector only
+    when the page has Jira/non-telemetry tracking; the Grafana connector only when the enabled root has
+    a carrier or page template binding a grafana, loki or sql signal, imported
+    carriers of the embedded `topology` context included, #943; the artifact and user
+    capabilities for Jira- or telemetry-editable pages published in two-file mode,
+    independent of Jira permission, #826). `commit` pins the doc links to the
+    source this page was built from (#758: docs at the page's version). Any authored
+    telemetry adds the compact field and honesty rules without promising an adapter;
+    a `None` commit links main with a note. Values are interpolated from a spec that already
     passed the '</script' check, so the block cannot terminate itself.
     """
     page = spec.get("page") if isinstance(spec.get("page"), dict) else {}
@@ -138,17 +326,31 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False) -> str:
     version = version if isinstance(version, str) and version else None
     tracking = page.get("tracking") if isinstance(page.get("tracking"), dict) else None
     jira = tracking.get("jira") if tracking and isinstance(tracking.get("jira"), dict) else {}
-    tracked = tracking is not None
+    # Jira connector permission and two-file editing are separate. A telemetry-
+    # only page must not acquire Jira, but its published two-file edit loop still
+    # reads/writes the artifact and attributes saves through the viewer profile.
+    tracked = bool(tracking and any(key != "telemetry" for key in tracking))
+    sources = telemetry_sources(page)
+    metrics = telemetry_authored(page)
+    if topology is not None:
+        imported_bound, imported_sources = imported_telemetry(spec, topology)
+        metrics = metrics or imported_bound
+        sources.update(imported_sources)
+    telemetry_config = tracking.get("telemetry") if tracking and isinstance(tracking.get("telemetry"), dict) else {}
+    root_disabled = telemetry_config.get("enabled") is False
+    grafana = not root_disabled and any(source in GRAFANA_SOURCES for source in sources)
+    honeycomb = not root_disabled and "honeycomb" in sources
 
-    capabilities = {"comments": COMMENTS_CAPABILITY}
-    if tracked:
-        capabilities = {"mcp": {"servers": [{"server": "Atlassian", "tools": JIRA_TOOLS}]},
-                        "comments": COMMENTS_CAPABILITY}
-        if two_file:
-            # The board's Edit mode republishes flowspec.json from inside the
-            # artifact (files publish) and records who saved (profile name).
-            capabilities["artifact"] = {}
-            capabilities["user"] = {"scopes": ["profile"]}
+    servers = ([{"server": "Atlassian", "tools": JIRA_TOOLS}] if tracked else []) + \
+        ([{"server": "Grafana", "tools": GRAFANA_TOOLS}] if grafana else []) + \
+        ([{"server": "Honeycomb", "tools": HONEYCOMB_TOOLS}] if honeycomb else [])
+    capabilities = {"mcp": {"servers": servers}} if servers else {}
+    capabilities["comments"] = COMMENTS_CAPABILITY
+    if two_file and (tracked or metrics):
+        # The Edit/reconciliation loop republishes flowspec.json from inside the
+        # artifact (files publish) and records who saved (profile name).
+        capabilities["artifact"] = {}
+        capabilities["user"] = {"scopes": ["profile"]}
     declaration = json.dumps(capabilities, indent=2)
 
     def show(value):
@@ -259,9 +461,35 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False) -> str:
         ]
     else:
         lines += [
-            "This page has no `page.tracking`, so it declares no connector (no `mcp` entry). Add "
-            "the Jira connector declaration described in docs/live-status.md only after adding "
-            "tracking; connector display names are per account.",
+            "This page has no Jira tracking, so it declares no Jira connector. Add one only after "
+            "adding Jira tracking; connector display names are per account.",
+        ]
+    if grafana:
+        lines += [
+            "",
+            "`Grafana` is the viewer's Grafana connector display name (grafana/mcp-grafana or a mock); "
+            "the page picks the connector by the five tool names. While Metrics is on, each refresh "
+            "(at most once a minute) makes one get_annotations call and one query per grafana or loki "
+            "signal, and generate_deeplink runs once per carrier. sql signals call query_sql at most "
+            "once an hour; add \"query_sql\" to the tools only when that server enables it.",
+        ]
+    if metrics:
+        lines += [
+            "",
+            "## Metrics rules",
+            "",
+            "- `page.tracking.telemetry`: availability, sources, `window` (default `24h`), templates. "
+            "Carrier `telemetry`: `kind`, `signals`, `proof`, safe `links`. never derive a query from names/ids.",
+            "- Cover local, imported/nested, consumer-overlay and loaded-detail nodes/edges. "
+            "Inspect tool schemas, preserve exact queries/source UIDs, run each proposal "
+            "once, and distinguish returned, empty, zero and failed evidence.",
+            "- Metrics defaults off. Root `enabled:false`/host false grants no query permission; absent tools hide it. "
+            "Preview: synthetic, unsaved, no network.",
+            "- Honeycomb uses run_query: one scalar, exact JSON, no breakdowns/formulas; COUNT counts spans/events. "
+            "For traces declare get_trace; follow docs/provider-traces.md. One request only; keep partial "
+            "warnings. No history/raw trace JSON, signed URLs or live-account claim.",
+            "- Over time: exact prior-24h endpoints; missing stays unobserved. Read docs/live-status.md "
+            "and Metrics authoring.",
         ]
     lines += [
         "",
@@ -352,7 +580,7 @@ def main(argv=None) -> int:
     tpl = GUIDE_BLOCK.sub("", tpl)
     tpl = SPEC_FILE_LINE.sub("", tpl)
     try:
-        guide = agent_guide(spec, source_commit(), args.two_file)
+        guide = agent_guide(spec, source_commit(), args.two_file, topology_context(tpl))
     except ValueError as ex:
         print(f"error: {ex}", file=sys.stderr)
         return 1

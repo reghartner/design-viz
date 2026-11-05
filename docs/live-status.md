@@ -179,6 +179,156 @@ self-dependency and non-array fields warn individually and are ignored; a
 dependency on a key the status map never reports paints as a missing upstream
 (red waiting), in the same spirit as MISSING.
 
+### Telemetry bindings
+
+Jira says whether the work is done. Production telemetry says whether the
+finished hop carries real traffic without errors (PROVEN rather than only DONE).
+A node or edge opts in with a `telemetry` object that names its own signals.
+Nothing is inferred from node ids, titles or service names. A carrier without
+`telemetry` is **unbound**: it gets no metrics overlay and no proof verdict. The
+spec stores queries and limits only, never results.
+
+A `call` edge with a PromQL rate, an error ratio and a latency limit:
+
+```json
+{
+  "from": "notify", "to": "app", "label": "push", "tickets": ["BE-68"],
+  "telemetry": {
+    "kind": "call",
+    "signals": {
+      "rate":   {"grafana": "sum(rate(push_sent_total{app=\"notify\"}[5m]))*3600", "unit": "req/h"},
+      "errors": {"grafana": "sum(rate(push_failed_total{app=\"notify\"}[5m]))*3600", "unit": "req/h"},
+      "p95":    {"grafana": "histogram_quantile(0.95, sum by (le)(rate(push_latency_seconds_bucket{app=\"notify\"}[5m])))*1000", "unit": "ms"}
+    },
+    "proof": {"rate": {"min": 10}, "errors": {"maxRatioOf": "rate", "max": 0.01}, "p95": {"max": 500}},
+    "links": {"dashboard": "https://acme.grafana.net/d/notify/push"}
+  }
+}
+```
+
+A `queue` node that counts queued events from Loki and reads consumer lag and age
+from Prometheus:
+
+```json
+{
+  "nodes": {
+    "device-events": {
+      "title": "device-events", "sub": "Kafka topic", "tickets": ["BE-67"],
+      "telemetry": {
+        "kind": "queue",
+        "signals": {
+          "in":  {"loki": "sum(count_over_time({app=\"ingest\"} |= \"event queued\" [5m]))", "unit": "msgs"},
+          "lag": {"grafana": "max(kafka_consumergroup_lag{topic=\"device-events\",group=\"notify-consumers\"})", "unit": "msgs"},
+          "age": {"grafana": "max(kafka_consumergroup_lag_seconds{topic=\"device-events\",group=\"notify-consumers\"})", "unit": "s"}
+        },
+        "proof": {"in": {"min": 1}, "lag": {"max": 500}, "age": {"max": 60}}
+      }
+    }
+  }
+}
+```
+
+| field | value |
+|---|---|
+| `kind` | Required. `call`, `queue`, `service`, `log-event` or `device`. |
+| `signals` | Required. Named signals such as `rate`, `errors`, `p95`, `in`, `lag`, `age`. Names start with a letter and use letters, digits, `-` and `_`. Each signal has exactly one source key and an optional `unit` text. |
+| `signals.<name>.grafana` | A PromQL query string. |
+| `signals.<name>.loki` | A LogQL metric query string. |
+| `signals.<name>.tempo` | A TraceQL query string, used for exemplar traces. |
+| `signals.<name>.sql` | A SQL query string for a Grafana SQL datasource, such as a data lake. |
+| `signals.<name>.honeycomb` | A Honeycomb query object, kept as authored. |
+| `proof` | Optional per-signal limits: `min`, `max` (finite numbers) and `maxRatioOf`. With `maxRatioOf: "<other signal>"`, `max` is the highest allowed ratio of this signal to the other one, so `"errors": {"maxRatioOf": "rate", "max": 0.01}` means at most 1 % errors. `maxRatioOf` needs `max` and another signal of the same binding. `min` stays an absolute floor. |
+| `links` | Optional authored link-outs: `dashboard` and `query`, absolute HTTP(S) URLs. |
+| `card` | Optional edge-card placement: `side` (`right`, `left`, `above`, `below`) and `offset` (pixels, -1000 to 1000). |
+
+Shared settings live on the page beside the Jira settings, in
+`tracking.telemetry`:
+
+```json
+{
+  "tracking": {
+    "jira": {"site": "https://acme.atlassian.net", "epic": "DOOR-100"},
+    "telemetry": {
+      "grafana": {"prometheus": "prom-main", "loki": "loki-main", "tempo": "tempo-main", "sql": "lake"},
+      "honeycomb": {"environment": "prod", "dataset": "doorbell-prod"},
+      "window": "1h",
+      "refreshMs": 300000,
+      "templates": {
+        "kafka-topic": {
+          "kind": "queue",
+          "params": ["topic", "group"],
+          "signals": {
+            "in":  {"grafana": "sum(rate(kafka_server_brokertopicmetrics_messagesin_total{topic=\"$topic\"}[5m]))*3600", "unit": "msg/h"},
+            "lag": {"grafana": "max(kafka_consumergroup_lag{topic=\"${topic}\",group=\"$group\"})", "unit": "msgs"}
+          },
+          "proof": {"in": {"min": 10}, "lag": {"max": 500}},
+          "links": {"dashboard": "https://acme.grafana.net/d/kafka?var-topic=$topic"}
+        }
+      }
+    }
+  }
+}
+```
+
+`enabled` is an optional boolean, default `true`. Set
+`tracking.telemetry.enabled: false` on the consuming page to disable telemetry
+throughout its local, imported (including nested), and loaded-detail carriers.
+Bindings, templates and placement remain authored and editable. The disabled page
+has no Metrics controls, telemetry discovery, queries, timers, cards or cues.
+Malformed values warn and use the backward-compatible `true` default. This flag
+permits availability; it never turns Metrics on. Jira Live remains independent.
+
+`grafana` holds datasource UIDs for `prometheus`, `loki`, `tempo` and `sql`.
+`honeycomb` holds `environment` and `dataset`. `window` is the observation
+window, a duration such as `30m`, `1h` or `7d`; the default is `24h`, the previous
+24 hours (Chuck, 2026-11-04). `refreshMs`
+is the connector refresh interval; values under one minute use 60000 and an
+absent value leaves the connector default. `templates` are named signal sets
+authored on the page; the repository ships none.
+
+A carrier applies a template with `"use"` plus a value for every declared
+parameter:
+
+```json
+{
+  "from": "ingest", "to": "notify", "label": "route",
+  "telemetry": {"use": "kafka-topic", "topic": "device-events", "group": "notify-consumers", "proof": {"lag": {"max": 100}}, "card": {"side": "below"}}
+}
+```
+
+Expansion is pure string substitution: each `$param` or `${param}` placeholder
+named in `params` is replaced with the carrier's string value, in one pass. Write
+`${topic}_total` when an identifier character follows the placeholder. Other
+`$` text, such as Grafana's `$__rate_interval`, stays as authored. The carrier's
+own `kind` and `card` replace the template's; its `signals`, `proof` and `links`
+lay over the template's entry by entry, so the example above keeps both signals
+and tightens only the `lag` limit. Parameter names start with a letter, use
+letters, digits and `_`, and cannot be `kind`, `signals`, `proof`, `links`,
+`card`, `use` or `params`.
+
+`trackingTelemetry(page)` returns `{grafana, honeycomb, window, refreshMs,
+templates}` with defaults when the field is absent. `carrierTelemetry(obj,
+templates)` returns `null` for an unbound carrier, otherwise `{kind, signals:
+{<name>: {source, query, unit}}, proof, links, card}`, with `unit` and `card`
+`null` when not authored and `templates` taken from `trackingTelemetry(page)`.
+Both parsers drop invalid entries and report each one through an optional
+`invalid(path, message)` callback; neither throws or modifies the spec. The
+validator reports the same problems as warnings, never errors: a malformed
+signal or limit is ignored on its own, and a binding without a valid `kind` or
+any valid signal leaves the carrier unbound. Text boxes never carry telemetry.
+A board with bindings needs a live-status panel, like a board with tickets.
+
+Imported Canon topology accepts the same field in
+`topologyImports[].nodeTracking` and `edgeTracking`. A consumer binding replaces
+the provider's binding for that carrier as a whole; signals never merge across
+specs. A provider binding that uses one of the provider page's templates is
+expanded with those templates before it reaches the consumer. When the provider
+cannot expand it (an unknown template or a missing parameter), the binding is
+dropped and the imported carrier is unbound, even if the consumer defines a
+template with the same name. Validating the resolved consumer warns at that
+carrier and names the provider path. Ticket edits in
+the Workbench or on the shared board keep the consumer binding as authored.
+
 ## Workbench
 
 Select a node or connection on the desktop canvas and open **Inspect → Tracking**,
@@ -213,6 +363,65 @@ Jira metadata. A standalone demo timeline or host provider can supply the runtim
 hierarchy metadata below to preview an initiative without contacting Jira.
 Live colors require a viewer with the live-status overlay and a status provider.
 PRs stay icons; the demo timeline supplies their GitHub detail.
+
+### Metrics bindings
+
+Select a node or connection on the desktop canvas and open **Inspect → Tracking →
+Metrics** to edit its `telemetry` binding (see [Telemetry bindings](#telemetry-bindings)).
+An unbound carrier says it has no metrics overlay and no proof verdict. Choose
+**Metrics kind**, fill **New signal name**, **New signal source** (Grafana, Loki,
+Tempo, SQL or Honeycomb), **New signal query** and an optional **New signal unit**,
+then press **Add signal** or Enter. A Honeycomb query is a JSON object such as
+`{"calc":"COUNT"}`. Each signal then has its own name, source, query and unit
+fields, proof limits (**min**, **max** and **ratio of** another signal) and a
+**Remove signal** button. Renaming a signal moves its limit and every ratio that
+names it. Removing the last signal removes the binding; **Remove metrics**
+removes it at once.
+
+When the page has templates, **Signals from** switches between raw signals and a
+template. A template binding gets one **Template parameter** input per declared
+`$param`. Its signals are listed read only and edited in Document settings. A
+proof limit set on the carrier overlays the template's limit for that signal
+only, and setting it back to the template value removes the override. Choosing
+**Raw signals** again expands the template, with the carrier's parameter values,
+into editable raw signals.
+
+**Dashboard link** and **Query link** take absolute http(s) URLs. On a connection,
+**Card side** (right, left, above or below) and **Card offset** (pixels, -1000 to
+1000) place its metrics card. The validator's warnings for the binding are listed
+under the controls with the same text. An imported node or connection shows the
+provider's binding read only. A binding saved there is stored in the consumer's
+`nodeTracking` or `edgeTracking` entry and replaces the inherited binding for this
+consumer only; **Remove metrics** restores the inherited one.
+
+With no node selected, **Document settings → Tracking → Metrics** edits the page
+`tracking.telemetry` block: the Grafana Prometheus, Loki, Tempo and SQL datasource
+UIDs, the Honeycomb environment and dataset, **Metrics window** (such as `1h`) and
+**Metrics refresh ms** (60000 or more). **Allow metrics** controls availability on
+this page, including all direct/nested imports and loaded details. It is checked
+by default; that permits Metrics but never turns it on or runs queries. Uncheck
+it to hide Metrics controls and suppress telemetry discovery, data calls, cards
+and cues. Bindings, templates and other settings stay saved. Rechecking permits
+availability again; readers still start with Metrics off and a default 24h window.
+**Add template** takes a name, an optional kind, parameter names separated by
+commas and a first signal. Each template then has its own kind, parameters,
+signals, proof limits and link fields. A template keeps at least one signal, and
+a template that a carrier still uses cannot be removed.
+
+Each change is one Undo/Redo step, and Export project keeps every binding,
+template and setting in its JSON. The Workbench stores queries only: it never runs
+them or contacts Grafana or Honeycomb. These authoring controls are desktop-only.
+
+In the desktop preview toolbar, **Preview metrics layout** shows one card per
+visible bound edge, labelled **Preview · synthetic**, using the reader’s card
+placement. It does not contact connectors or show production proof. Select a
+card or edge, then edit **Card side** and **Card offset**; the placement updates
+immediately, including Undo/Redo. Unbound edges get no cards. Imported bindings
+follow the same rules and remain read only until you add a consumer override.
+This toggle starts off, is independent of Demo live status, and is never saved or
+added to Undo history. Diagram-only SVG exports omit synthetic cards and keep
+the authored edge labels. It survives edits in the same document, resets for a new
+project/import, and is suppressed while Allow metrics is off.
 
 ## State model
 
@@ -252,12 +461,77 @@ GitHub detail that may colour that icon (open, draft, merged, closed, checks,
 review) stays on the icon and in its tooltip. Jira's Development summary is
 informational; neither determines a carrier's status or color.
 
+### Proof verdicts
+
+Jira says whether the work is done. Telemetry says whether the carrier carries
+healthy production traffic. `src/core/proof.js` combines the Jira map with a
+telemetry map into one verdict per carrier. It is pure: no DOM, timers or clock,
+and the spec never stores samples or verdicts. Its header documents the three
+input shapes; the page-reading wrapper, overlay and panel build on it.
+
+| Jira \ telemetry | silent | flowing, healthy | degraded | unobserved |
+| --- | --- | --- | --- | --- |
+| `done` | DONE · UNPROVEN | **PROVEN** | DONE · DEGRADED | DONE |
+| `active` | IN PROGRESS | IN PROGRESS · LIVE EARLY | IN PROGRESS · FAILING | IN PROGRESS |
+| `todo` | TODO | TODO · ALREADY LIVE? | TODO · FAILING | TODO |
+| `blocked`, `missing` | Jira state kept | Jira state kept | Jira state kept | Jira state kept |
+| no tickets | UNOBSERVED | HEALTHY | DEGRADED | no verdict |
+
+Linked tickets without Jira evidence give no verdict, as they give no paint.
+Three states keep the claims honest:
+
+- **Unbound.** The carrier names no signals. It never gets a verdict and is
+  counted separately; only bound carriers enter the proof denominator.
+- **Unobserved.** The carrier is bound but no sample has arrived, or a limit
+  still waits for its data. The verdict keeps the Jira state and claims nothing.
+- **Silent.** Every rate-like signal returned 0 across the window. That means no
+  traffic was observed, never that the path does not exist.
+
+A signal is healthy when its `proof` limit holds: `min` (value ≥ min), `max`
+(value ≤ max) or `maxRatioOf` another signal (value ÷ other ≤ max). Rate-like
+signals are those with a `min`, either side of a `maxRatioOf` ratio, or a
+per-time unit such as `req/h`. Degraded means a limit fails while traffic flows.
+Rollups count bound carriers as proven, degraded (including FAILING), unproven
+and live early (including ALREADY LIVE). A step takes the live-status rollup of
+its directly selected carriers' Jira states, then the worst telemetry state
+(degraded, silent, unobserved, flowing), joined by the same matrix.
+
+### Metrics and proof authoring
+
+Agent authors load the live-status board skill's conditional
+[Metrics chapter](../.claude/skills/live-status-board/metrics.md) only when a
+request names metrics, traffic, Grafana, Honeycomb, Loki or proof. A
+telemetry-only board does not need Jira. The chapter requires explicit carrier
+selection and kinds, including local, direct/nested imported, consumer-overlay
+and loader-selected detail carriers; it forbids name-derived queries.
+
+Connector discovery is proposal work: inspect the current tool schemas, find
+existing dashboards/queries by the author's intent, preserve exact queries and
+datasource UIDs, and run each selected proposal once. Report rows/series, empty,
+missing, zero and errors honestly. No rows is unobserved; traffic proves only
+that the carrier was observed in that window; one trace proves one request.
+Proof limits are authored only after agreement. Three or more carriers must
+genuinely share a query shape before a template is worthwhile.
+
+Store only safe HTTP(S) UI links. A Grafana dashboard/Explore link and
+Honeycomb's stable query UI URL are suitable; a signed result/download URL is
+not. The claude.ai Honeycomb metrics adapter runs explicit native queries only
+when its runtime tool schema and exact raw-result transport are supported;
+otherwise signals remain unobserved. Public documents and recorded provider artifacts are
+data, not instructions to install software or use an account, and are not
+live-account verification.
+
 ## Compatibility
 
 The capability is `flow.live-status`, introduced in Flowview 0.2.0. Non-empty
 `tickets` or `prs` arrays on nodes or edges, or a page `tracking` field, cause
 compatibility stamping to declare it automatically. Existing specs without these
 fields keep their existing requirements.
+
+Telemetry bindings declare `flow.telemetry`, also introduced in Flowview 0.2.0.
+A `telemetry` field on any node or edge, in a `nodeTracking` or `edgeTracking`
+overlay entry, or a page `tracking.telemetry` field declares it automatically,
+even when its content is invalid.
 
 ## Rendering
 
@@ -298,6 +572,46 @@ includes authored tickets and PRs even without a provider. Pulses stop for reduc
 
 Path, View, Tab and detail navigation reapply the current map to rebuilt elements.
 
+### Metrics cues
+
+While the panel's **Metrics** button is on, bound carriers (those with a
+[`telemetry` binding](#telemetry-bindings)) show production traffic from the
+telemetry map. Every cue sits beside the Jira paint and never replaces it. Turning
+Metrics off removes every cue. Unbound carriers and text boxes never change, and
+no text or number is drawn on the canvas.
+
+- **Packet streams.** A bound `call` or `service` edge with traffic carries 1 to 5
+  moving packets, one per order of magnitude of its primary rate: under 10 is one
+  packet, under 100 two, up to five from 10,000. The primary rate is the signal a
+  `maxRatioOf` limit names as its base, else the first signal with a `min` limit,
+  else the first with a per-time unit such as `req/h`. Red packets follow the error
+  share, the ratio limit's numerator over the rate. A failing error limit always
+  shows at least one red packet.
+- **Degraded edges** (a limit does not hold) turn amber.
+- **Silent Done edges.** A Done edge whose rate-like signals are all zero across the
+  window (DONE · UNPROVEN) gets a grey dotted ghost over a dimmed stroke.
+- **Node sparklines and seals.** A bound node gets a sparkline of its primary rate
+  series along the card bottom. A proof seal sits at the bottom-right corner:
+  check for PROVEN, `!` for DEGRADED or FAILING, slash for DONE · UNPROVEN, and a
+  wave for LIVE EARLY or ALREADY LIVE.
+
+Imported topology carriers, direct or nested, and the carriers of loaded detail pages
+get the same cues. With reduced motion and in print the packets stand still, evenly
+spaced along the edge.
+
+The cues live in a `dv-metrics-*` namespace and are re-applied after every rebuild,
+like the Jira paint. A bound carrier carries `data-metrics-state` (`flowing`,
+`degraded`, `silent` or `unobserved`), `data-metrics-verdict` (the proof verdict
+token) and the class `dv-metrics-<state>`. A ghosted edge also has
+`dv-metrics-ghosted`. A stream is a `g.dv-metrics-stream[data-metrics-edge]` holding
+`circle.dv-metrics-packet.dv-metrics-moving` packets plus the same number of
+`.dv-metrics-static` ones, with `dv-metrics-packet-error` on red packets. The ghost is
+a `path.dv-metrics-ghost[data-metrics-edge]`. A node's cues sit in a
+`g.dv-metrics-node` holding `polyline.dv-metrics-sparkline` and
+`g.dv-metrics-seal[data-seal]` (`proven`, `degraded`, `unproven`, `live-early`).
+Metrics packets reuse the ordinary packet motion along the edge path but never the
+`.pkt` or `.comm-packet` classes, so step packets and failure packets are untouched.
+
 ## Live status panel
 
 Always add an authored `live-status` panel to a tracked page:
@@ -310,7 +624,7 @@ The generic desktop Workbench picker lists **Delivery → Live status**; inserti
 and Export project preserve the panel. There are no authored state or patch fields.
 
 The panel header has two rows. The first holds only buttons, which keep their
-place: **Live**, **Over time**, any provider action, Edit, and on the far right
+place: **Live**, **Over time**, **Metrics** when available, any provider action, Edit, and on the far right
 **First blocker**. **First blocker** keeps one size; with no blockers it reads
 **No blockers** and is greyed out, and with blockers it cannot reach from here it
 stays **First blocker** and is greyed out. The second row holds everything that
@@ -322,6 +636,18 @@ red on error, and it pulses while a fetch is in flight; the time is the last suc
 fetch, not a ticket's change time), and the provider note. Text too long for the row
 is cut off and stays available in the row's tooltip and to screen readers. Demo
 controls supply **<** and **>** on a row below the header. The engine's panel title stays above this header.
+
+**Metrics** sits beside Live and Over time, when the host supplies a telemetry
+provider or a demo telemetry source (see [Telemetry provider](#telemetry-provider));
+without one it is hidden. It is off on every load and its state is never saved.
+Turning it on calls the telemetry provider at once in Live mode and keeps it refreshing; turning
+it off stops the provider and clears the telemetry map. It never changes Live or the
+Jira paint, and Live never changes it. A second connector indicator follows the Jira
+one, with the same dot colors: “Metrics: not connected” while off, “Metrics:
+connecting” until the first answer, “Metrics: connected, refreshed 3:42:15 PM” (“Metrics:
+demo, …” for a demo source) and “Metrics: did not answer · <message>” after a failed
+call. The header shows whenever Metrics is available, even on a page without Jira
+evidence. On the canvas, Metrics draws the [Metrics cues](#metrics-cues).
 The body opens with the **epic header box**: the epic key (a Jira link), its
 summary, its state pill, “n of N stories done · m of N on diagram” and the
 blocked, waiting and outside-epic counts, with the carriers-done ring on the
@@ -333,15 +659,16 @@ Every story shows its parent Epic under the key. Empty initiatives still show
 the root title and status and zero Epics/stories. Mixed Initiative and explicit
 Epic roots are deduplicated. “Diagram ready to demo” still refers to the primary
 path's carriers; it does not declare the entire initiative ready.
-There is no verdict line. Then come the Tickets table, **Excluded stories**
-when configured, **Blockers and dependency chains**, and Activity. The exclusions
+When permitted telemetry samples exist, a **Proof** box follows the epic box.
+Then come Tickets, the **Proof table** when present, **Excluded stories** when
+configured, **Blockers and dependency chains**, and Activity. The exclusions
 list links each configured story to Jira and shows its available title and state,
 plus whether it remains excluded or was included by a manual attachment, another
 source, or a dependency. It is visible before a connector responds too. Edit the
 list in desktop Document settings; the reader contains no exclusion controls. Teams are identified by each Tickets row's lane colour
 stripe and the lane names in Blockers. Status-board step captions omit the team lane chip,
 even with Live disabled; ordinary diagrams retain their authored lane context.
-Without ticket references or epics it says “This page has no ticket references.”
+Without ticket references, epics, or telemetry evidence it says “This page has no ticket references.”
 Before a provider or applied map is available, it shows the connector note and any
 required authorization action without an empty rollup. Print preserves the last
 paint, and reduced motion disables ring animation.
@@ -351,6 +678,42 @@ panel: `page.tracking: no live-status panel declared — add {"type": "live-stat
 to a section's panels so viewers see the rollup`. A panel on an untracked page
 warns “this page has no ticket references — the panel will be empty”. These are
 warnings, never errors. Strongly prefer adding the panel on every tracked page.
+
+### Proof summary and table
+
+Proof uses the same normalized samples and `proofVerdicts` results as the Metrics
+cards. It appears inside the authored panel when a permitted sample contains a
+finite value or series point for an explicitly bound signal of a known carrier.
+Measured zero qualifies; unknown identities, unbound signals, empty samples,
+markers and links alone do not. Once such a measurement exists, other bound
+carriers may appear as unobserved. This is independent of the Metrics canvas
+switch or Jira data. A host may apply samples while Metrics is off. Turning Metrics off
+clears its map; root-page disable, host disable, or capability removal also
+clears Proof. Workbench Preview's synthetic cards do not supply production Proof.
+Telemetry-only panels show Proof without invented Jira totals or a Tickets table.
+
+The ring divides **bound carriers** into proven, degraded, unproven and live early.
+Bound carriers outside those verdict buckets leave neutral space. Unbound
+carriers have a separate count and never enter the ring denominator. Both local
+and imported nodes and edges, including nested imports and loaded detail sources,
+use the controller's existing carrier identities. The summary states the counts;
+thresholds appear in plain words, per row when different carriers use different
+predicates.
+
+The table contains one row per bound carrier: its title and identity, Jira keys
+and state, configured-window chart (24h by default), rate/errors/p95 or queue
+in/lag/age, known Done and first-observed-traffic timestamps, verdict, and a safe
+link icon. Missing evidence stays unobserved; measured zero stays zero. No request
+total is inferred from a rate or elapsed time. Charts clip actual points and
+Done/deploy ticks to the window; sparse samples are dots rather than a fabricated
+dense sparkline. Authored dashboard/query links take precedence over provider
+links. Unsafe or absent URLs produce no link control.
+
+Over time selects the same day's evidence in the cards and Proof table. Slider
+changes and panel repaints do not request metrics. Historical gaps stay
+unobserved, and live values or deploy markers are never borrowed to fill them.
+Live restores the current samples. Production popovers and telemetry Activity
+entries are separate follow-up work.
 
 ### Tickets table
 
@@ -470,15 +833,15 @@ can also use the Atlassian adapter described below.
 that ticket and their authored `prs`), `apply(map)`, `clear()`, `state(key)` (entry or
 null), `snapshot()`, `enabled()`, `setEnabled(bool)`, and `onChange(fn)` (returns an unsubscribe
 function). Change callbacks receive `{states, counts, updatedAt}` after apply,
-clear, enable changes, notes, actions, demo changes, and loaded details that change the collected references.
+clear, enable changes, notes, actions, demo changes, Metrics changes, and loaded details that change the collected references.
 `snapshot()` also exposes enabled state, note, action label, lanes, blockers,
 Tickets rows (each with `dependsOn`, `waiting` tone and `epicLabel`), `dependencies`
 (merged by provenance), `waiting` (per displayed story: tone and direct upstreams), `chains`,
 `suggestions`, `epic` (keys, title, state, stories, done, onDiagram, blocked, waiting,
 outside, ready), `excluded` audit rows (key, URL, title, state, included, reason),
 coverage (including excluded keys and additional displayed dependency keys),
-activity, demo state, verdict and `connection` for subscribed
-panels. `connection` is `{state, busy, checkedAt, source, checkedText, github}`; `state` is one of
+activity, demo state, verdict, `connection` and `metrics` (the Metrics button
+state, see [Telemetry provider](#telemetry-provider)) for subscribed panels. `connection` is `{state, busy, checkedAt, source, checkedText, github}`; `state` is one of
 `none`, `disconnected`, `approval`, `connecting`, `connected`, `error`, `demo`.
 `connection.github` is `{state, busy}` with `state` in `none`, `disconnected`,
 `connecting`, `connected`, `error`; adapters report it through
@@ -541,6 +904,128 @@ Standalone hosts set `window.flowviewLiveStatus` before boot. Native hosts pass
 external detail pages join reference collection once loaded; local detail-only
 sections are included from the start.
 
+### Edge metric cards
+
+While Metrics is available and on, each visible explicitly bound edge gets one
+rounded card with a verdict border and left bar, connected to the measured route
+midpoint. Silent cards use a dashed border. The label, primary rate headline and
+sparkline, and errors/p95 (calls) or lag/age (queues) use the authored signals.
+An explicit queue template `topic` parameter joins the label when present; names
+never create queries or bindings. Missing signals say “not bound”; missing samples
+say “unobserved”. The note names the current observation window (default `24h`),
+not an invented duration of silence. Cards grow beyond the compact minimum to fit
+current fonts and text; the default is 138 × 78 SVG units for five readable lines.
+
+`telemetry.card.side` selects `right`, `left`, `above` or `below`; `offset` moves
+along that side in SVG units. Defaults are right of a vertical route and below a
+horizontal route. Placement shares board control measurements and collision tests;
+card rectangles reserve space in the coin packer even without a live break. Jira
+cues repack around cards and coins, and the frame includes cards and displaced
+controls. Local, direct imported, nested imported and loaded-detail edges follow
+the same rules. Click, Enter or Space opens the existing carrier popover. Metrics
+off or destroy removes cards and restores original label visibility. Desktop
+Workbench preview can reuse `telemetryCardContent`, `telemetryCardPlace` and
+`telemetryPaintCards` with synthetic samples; it need not create a provider.
+
+### Telemetry provider
+
+A host can supply telemetry transport beside `liveStatus`. It drives the panel's
+**Metrics** button and runs only while Metrics is on:
+
+```js
+var ctl = renderPage(view, page, skin, backlinks, {
+  liveStatus: {provider: hostTicketLookup},
+  telemetry: {
+    provider: function(bindings, signal, report) {
+      // bindings = [{id: "notify->app", kind: "call", signals: {...}, proof: {...}, links: {...}, card: null}, ...]
+      return hostTelemetryLookup(bindings, signal);
+    },
+    refreshMs: 300000,
+    source: "Grafana"
+  }
+});
+```
+
+`bindings` lists every bound carrier once, in page order: local nodes and edges,
+imported topology carriers and the carriers of loaded detail pages. Each entry is
+`carrierTelemetry(carrier, templates)` (see [Telemetry bindings](#telemetry-bindings))
+plus its `id`: a node id, an edge identity `from->to`, or a resolved imported
+identity such as `shared::api->shared::store`. A repeated id keeps its first
+binding; unbound carriers and text boxes are absent. The provider resolves one map
+keyed by carrier id:
+
+```json
+{
+  "notify->app": {
+    "signals": {
+      "rate":   {"value": 1300, "series": [[1793696400000, 1180], [1793700000000, 1300]], "unit": "req/h"},
+      "errors": {"value": 4, "series": [[1793696400000, 2], [1793700000000, 4]], "unit": "req/h"}
+    },
+    "observedAt": "2026-11-03T10:00:00Z",
+    "markers": [{"at": "2026-11-03T08:12:00Z", "kind": "deploy", "label": "notify 2.4.1"}],
+    "links": {"query": "https://acme.grafana.net/explore", "dashboard": "https://acme.grafana.net/d/notify/push"}
+  }
+}
+```
+
+`value` is the headline number for the window. `series` points ascend in time,
+with `t` in epoch milliseconds or ISO text. Every field is optional. This map is
+the contract every telemetry adapter implements and the `telemetryMap` input of the
+proof verdict engine. `apply` keeps exactly this shape: it drops malformed carriers,
+signals, series points and markers and any link that is not an absolute HTTP(S) URL,
+turns `observedAt` and marker times into ISO text, and gives every kept carrier
+`signals`, `observedAt` (or `null`), `markers` and `links`.
+
+The first call runs when Metrics turns on. Calls repeat every `refreshMs`, else the
+page's `tracking.telemetry.refreshMs`, else one minute, and never more often than
+once a minute. A hidden document pauses refresh; returning to visible runs one
+catch-up call. A rejection reports the error and keeps the previous map. Turning
+Metrics off or destroying the page aborts the signal, stops the timer and drops any
+late answer; turning it off also clears the map. `report.note(text)` attaches a note
+to that answer, such as a query that failed while the others answered; it becomes
+`status().note` with state `ok`, and an answer without a note clears it. A rejection
+whose `state` is `"approval"` reports state `approval` instead of `error` (the panel
+dot turns amber). `source` names the connector in the panel's Metrics text: with it
+the text reads "Grafana connected · 24h window · refreshed 10:42:13" (the window is
+`tracking.telemetry.window`), "Grafana needs approval · 24h window", or the error
+note; without it the text keeps the "Metrics: connected, refreshed …" form. A demo source may stand in for a
+provider: `telemetry: {demo: {mount: function(api) {...; return cleanup;}}}` is
+mounted when Metrics turns on, receives `ctl.telemetry`, feeds it through `apply`,
+and its cleanup runs when Metrics turns off or the page is destroyed. Without a host
+`telemetry` option, a Live status demo source (the `#live=demo` player) that carries
+`telemetry: {provider}` supplies Metrics, reported as Demo. The player feeds each
+demo day through `ctl.liveStatus.telemetry`, the same controller as `ctl.telemetry`.
+A host telemetry provider wins over it. `apply` while Metrics is on reports the
+connector as answered.
+
+`ctl.telemetry` exposes `bindings()`, `apply(map)`, `clear()`, `snapshot()`,
+`verdicts()`, `enabled()`, `setEnabled(bool)`, `setAvailable(bool)`, `status()` and `onChange(fn)`.
+`snapshot()` returns a copy, `{available, enabled, map, status, verdicts}`.
+Availability is shared by the panel, cards and canvas cues. Native providers and
+demo sources start available unless explicitly disabled. A provider can start
+with `available: false` and publish capability changes with `setAvailable(bool)`.
+Removing availability turns Metrics off, aborts work, stops refresh and clears
+samples and cues; restoring availability leaves Metrics off. A page disable or
+host `telemetry: false` always wins over `setAvailable(true)`. Standalone hosts can
+set `window.flowviewTelemetry = false` to suppress host/demo/automatic fallback.
+Neither explicit false value erases the spec's bindings.
+`verdicts()` runs the [proof engine](#proof-verdicts) over every carrier of the page
+walk, bound or not, with the runtime Jira map and the telemetry map. It returns
+`{carriers, rollups, steps}`, with step rollups for authored step ids over their
+directly selected carriers. It is re-judged on every call, and change callbacks
+also fire after a Jira apply or clear, so subscribers see current verdicts. `setEnabled` is ignored without a provider
+or demo. `onChange` returns an unsubscribe function; callbacks receive the snapshot
+after apply, clear, enable changes and connector changes. `status()` is `{state,
+busy, refreshedAt, note}`: `state` is `absent` without a provider or demo, `idle`
+while Metrics is off, `loading` until the first answer, then `ok`, `error` or
+`approval`; `busy`
+is true while a call is in flight; `refreshedAt` is the last successful answer;
+`note` holds the last error message. `ctl.liveStatus.snapshot().metrics` carries the
+same state for the panel, plus `source` and `window`, and
+`ctl.liveStatus.setMetricsEnabled(bool)` is the panel button's action. Standalone hosts set `window.flowviewTelemetry` before boot; native
+hosts pass `telemetry` to `mountNativeViewer`, typed in `src/native/mount.d.ts`.
+The canvas draws the [Metrics cues](#metrics-cues) while Metrics is on.
+
 The [live-status example](../examples/live-status/live-status.spec.json) connects
 hardware, firmware, a mobile app and backend with node and edge references.
 
@@ -564,6 +1049,15 @@ serves the same timeline's pull requests through `search_pull_requests` and
 review without a GitHub account. Install it as a second custom connector and
 declare its name beside the Jira one.
 
+The [mock Grafana MCP server](../deploy/cloudflare/mock-grafana-mcp/README.md)
+serves the timeline's `days[].telemetry` blocks (see Demo mode) through Grafana's
+MCP tool names (`query_prometheus`, `query_loki_logs`, `search_tempo_traces`,
+`get_tempo_trace`, `get_annotations`, `generate_deeplink`, `list_datasources`).
+Traffic starts two hours after a carrier's tickets turn Done; the event edge
+degrades after a Day 10 firmware deploy annotation, the route queue lags on
+Day 11, and the push edge stays silent after Done. Its README lists the metric
+names, Loki streams and datasource UIDs it recognizes.
+
 ## Demo mode
 
 Open the [built story](../examples/live-status/live-status.html#live=demo) with
@@ -571,7 +1065,7 @@ Open the [built story](../examples/live-status/live-status.html#live=demo) with
 embeds a demo timeline in a separate `live-timeline` JSON block when the page
 declares `tracking`. `tools/inject.py` picks it with `--timeline <path|none>`:
 a path embeds that file after checking its shape (`version`, `intervalSeconds`,
-`days[].issues`), and `none` embeds nothing. The default is
+`days[].issues`, and `days[].telemetry` when present), and `none` embeds nothing. The default is
 `examples/live-status/live-status.timeline.json` when the injected spec is
 `examples/live-status/live-status.spec.json`, and `none` for every other spec,
 so a board never inherits the doorbell example's keys. It works offline,
@@ -594,6 +1088,41 @@ blocked HW-124), Day 7 light blue (HW-124 unblocked but unfinished), Day 8 clear
 example's `DOOR-100` gains `UX-90`, “Alert sound setting”, in the APP lane on Day 8.
 It is never assigned to a carrier. Without an embedded timeline, four days are synthesized
 from the page's ticket keys: todo, active, one blocker, then all done.
+
+A day may also carry production telemetry for the carriers the page binds (see
+Telemetry bindings), in `days[].telemetry`:
+
+```json
+{
+  "start": "2026-10-29T00:00:00Z",
+  "stepSeconds": 3600,
+  "carriers": {
+    "mcu->ingest": {
+      "rate": {"unit": "req/h", "values": [null, null, 512.4]},
+      "errors": {"unit": "req/h", "values": [null, null, 1.0]}
+    }
+  },
+  "annotations": [{"id": 5, "time": "2026-10-29T16:00:00Z", "text": "firmware 2.4.1 rollout", "tags": ["deploy", "firmware"]}]
+}
+```
+
+Carriers are keyed by node id or `from->to`. `values[k]` covers the step from
+`start + k·stepSeconds`; `null` is a step without a sample. All values arrays of a day
+have the same length. The injector rejects any other field, a non-RFC3339 `start` or
+annotation `time`, a non-positive or non-integer `stepSeconds`, and values that are not
+finite numbers or `null` (`NaN` and `Infinity` included), naming the path. Each demo day hands the page that day's map
+`{carrierId: {signals: {name: {value, series: [[t, v], ...], unit}}, observedAt}}`, the
+proof engine's input: every finite point is stamped at the end of its step, `null` is missing evidence,
+a missing final step leaves the signal unobserved, `value` is the last step and
+`observedAt` the end of the day. **Previous day** and **Next day** move the Jira map and the
+telemetry map together. The panel's **Metrics** button appears with the demo, reported
+as “Metrics: demo”, and while it is on the [Metrics cues](#metrics-cues) follow the
+demo day.
+The example timeline holds the doorbell story the mock Grafana MCP server serves:
+traffic two hours after each carrier's tickets turn Done, the event edge degraded after
+the Day 10 firmware 2.4.1 deploy, the route queue lagging on Day 11, and the push edge
+silent after its tickets turn Done on Day 9. Its silence is authored as explicit
+zero samples, so it is distinguishable from unavailable telemetry.
 
 ## Over time
 
@@ -812,6 +1341,96 @@ Without the GitHub entry, or when the viewer has no such connector, the page
 behaves as before: authored PR links stay plain icons, Jira's Development count
 stays, and the header's connection line says nothing about GitHub.
 
+### Production metrics from Grafana
+
+A board whose nodes or edges bind `grafana`, `loki` or `sql` signals (see
+[Telemetry bindings](#telemetry-bindings)) reads them through the viewer's Grafana
+connector when it is published as a claude.ai artifact (#943,
+`src/viewer/telemetry-claude.js`). An existing `window.flowviewTelemetry` host
+provider takes precedence, and demo mode (`#live=demo`) does not use it. Declare
+the connector as one more `servers` entry, by its exact display name:
+
+```js
+capabilities: {mcp: {servers: [
+  {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]},
+  {server: "Grafana", tools: ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]}
+]}, comments: {"composer_only": true, "customAnchors": true}}
+```
+
+Add `"query_sql"` to the Grafana tools only when the page has `sql` signals and the
+server enables that tool; it is off by default in
+[grafana/mcp-grafana](https://github.com/grafana/mcp-grafana), the real server,
+which the viewer adds as a custom connector. The
+[mock Grafana MCP](../deploy/cloudflare/mock-grafana-mcp/README.md) serves the
+doorbell story without a Grafana account. `tools/inject.py` adds the Grafana entry
+to the embedded agent guide's declaration when the page has such signals. That
+includes imported carriers: when the page being injected into already carries a
+`flowview-topology` context block, the imports are resolved as the runtime
+resolves them (exported, selected carriers only; a consumer overlay replaces the
+provider binding; provider templates expand). A snapshot resolved before
+injection (`tools/page_build.py --resolve-imports`) carries those bindings itself.
+
+The adapter never matches the connector by name. From the listed connectors it
+takes any that offers all five tools above, preferring one named **Grafana**, then
+the first qualifying one; a connector missing one of them, such as
+`query_prometheus`, is not used. Jira and GitHub connectors are chosen as before.
+Metrics stays hidden during discovery and when tools are missing, incomplete,
+unavailable or removed. Discovery uses only `claude.use('mcp')` and `listTools()`;
+it never calls a connector tool or requests authorization. The root page disable
+and explicit host false suppress even this telemetry metadata discovery. Discovery
+belongs to the current render; retirement drops late answers. Each refresh also
+checks the offered tools, so removal clears stale samples and hides Metrics.
+
+No data tool is called while Metrics is off. Turning Metrics on runs the first refresh,
+and claude.ai asks the viewer to allow the connector while that first call waits.
+If approval is still needed, the Metrics text reads "Grafana needs approval" and the
+panel shows **Allow Grafana**, which makes the same call once and restarts Metrics.
+Until then no further call is made. An authorization answer (reconnect, not
+allowed) also clears the map and stops calls until Metrics is
+turned on again. Missing or removed capabilities hide Metrics entirely. Refreshes follow the [telemetry provider](#telemetry-provider)
+loop: at most once a minute (the page's `refreshMs` when longer), paused while the
+document is hidden, aborted when Metrics turns off. The connector line reads
+"Grafana connected · 24h window · refreshed 10:42:13". Each refresh makes these
+calls:
+
+| tool | how often | input |
+|---|---|---|
+| `get_annotations` | once per refresh, first and alone | `{type: "annotation", limit: 100}` |
+| `query_prometheus` | once per refresh for each `grafana` signal | `{datasourceUid, expr, startTime: "now-24h", endTime: "now", stepSeconds, queryType: "range"}` |
+| `query_loki_logs` | once per refresh for each `loki` signal | `{datasourceUid, logql, startRfc3339: "now-24h", endRfc3339: "now", queryType: "range", stepSeconds}` |
+| `query_sql` | at most once an hour for each `sql` signal; the value is reused in between | `{datasourceUid, query}` |
+| `generate_deeplink` | once per carrier per page load, unless the carrier authors `links.query` | `{resourceType: "explore", datasourceUid, queries: [{refId, expr}], timeRange: {from: "now-24h", to: "now"}}` |
+
+`datasourceUid` is the viewed page's `tracking.telemetry.grafana.prometheus`,
+`.loki` or `.sql`, also for imported carriers. The window is
+`tracking.telemetry.window` (default `24h`). Times are relative, so the server's
+clock decides "now". `stepSeconds` divides the window into about 240 points, at
+least 60 seconds. The Explore link covers the carrier's signals of the same source
+as its first `grafana` or `loki` signal. `tempo` signals (exemplar traces) and
+`honeycomb` signals are not run by this adapter.
+
+Each query's series become ascending `[epoch ms, number]` points. Several series
+are added point by point, so write one aggregated series per signal. `NaN`
+samples are dropped. `value` is the last point. A query that matched nothing is
+`value: 0` with no points. `unit` is the authored one. A `sql` signal's value is
+the first number of the first returned row. `observedAt` is the newest point of
+the refresh. Every carrier carries the window's annotations as markers `{at, kind,
+label}`: kind `deploy` when tagged deploy, else `incident`, else the first tag.
+Links are the authored `dashboard` and `query`, with the Explore link standing in
+for a missing `query`.
+
+A query that fails on its own (`tool_error`, such as a PromQL parse error, or a
+missing datasource UID) leaves the other carriers fresh and keeps that signal's
+previous sample; the Metrics text adds "1 Grafana query failed: mcu->ingest p95:
+<message>". Any other failure keeps the previous map and shows its note, such as
+"Grafana did not answer". `user_changed` stops the adapter. Nothing is written
+back to the spec.
+
+Tool argument names and result shapes follow grafana/mcp-grafana's source as the
+mock mirrors it; they are unverified against a live Grafana server, and
+`query_sql`'s result shape is the least certain. Confirm with the connector's tool
+list before relying on a parameter name.
+
 ### Two-file publish: `index.html` + `flowspec.json`
 
 A board that will save its own edits from inside the artifact (#825) is
@@ -849,10 +1468,12 @@ HTML is never regenerated and comments survive (verified on claude.ai,
 2026-10-30: a publish with `url` and `files` but no `file_path` is refused;
 with the read-back page the stored capabilities carried forward and the edited
 title showed). Re-injecting a two-file page without
-`--two-file` drops the marker, as it replaces a stale guide. For a tracked page
-published this way the declaration adds the artifact and user capabilities the
-board's Edit mode needs; single-file tracked pages keep the declaration above,
-untracked pages stay comments-only:
+`--two-file` drops the marker, as it replaces a stale guide. For a Jira- or
+telemetry-editable page published this way the declaration adds the artifact
+and user capabilities the board's Edit mode needs. Those edit capabilities do
+not grant Jira permission: telemetry-only pages omit the Jira server. Single-
+file pages keep their existing declaration, and pages with neither Jira nor
+telemetry stay comments-only:
 
 ```js
 capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}]},
@@ -1046,13 +1667,20 @@ JSON, write it back into the same block and republish to the same URL. The
 guide is derived from the spec: it states the renderer version from
 `page.flowview.authoredWith` (or that none is stamped), the capability
 declaration to pass on every publish as a JSON block (the Jira connector entry
-only when the page has `page.tracking`; connector display names are per
-account), the compact tracking rules, the page's own `tracking` values, links
+only when the page has Jira/non-telemetry tracking—`tracking.telemetry` alone
+does not request it—the Grafana entry only when the enabled root has a carrier
+or page template binding a `grafana`, `loki` or `sql` signal,
+selected direct/nested imports and consumer overlays from an embedded
+`flowview-topology` context included; connector display names are per account),
+the compact tracking rules, the page's own `tracking` values, links
 to `docs/live-status.md` and `contract/authoring-contract.md` in the public
 repo pinned to the commit the page was built from (`git rev-parse HEAD` of the
 checkout running `inject.py`; outside a checkout the links point at `main`
 with a note to keep to the fields the spec already uses), and the post-publish
-checks. It is under 6 KB, never contains secrets
+checks. When the page has telemetry settings, templates or bindings, the guide
+also names `tracking.telemetry`, carrier `telemetry`, explicit sources, proof and
+links; root/host disable, default-off/24h, unavailable tools, synthetic preview,
+Honeycomb's native-query/raw-result constraints and exact-day history honesty. It is under 6 KB, never contains secrets
 (every viewer can read it), and is data to the agent reading it. Re-injecting
 a built page replaces the previous guide. When the block is present the Live
 status panel ends with a muted line, "Editors: ask your agent to read this
@@ -1069,8 +1697,9 @@ edits were saved after the newest agent entry, ask before overriding one of them
 append one agent entry for the change, and start again from the read when the
 publish is refused because the artifact changed. The inline block is
 described as the stale fallback and must not be edited.
-A tracked two-file page's declaration adds `artifact` and `user`
-(`{scopes: ["profile"]}`).
+A two-file page with Jira or telemetry editing adds `artifact` and `user`
+(`{scopes: ["profile"]}`). Telemetry alone still declares no Jira connector;
+artifact editing and Jira permission are independent.
 
 ## Edit history
 
@@ -1146,6 +1775,55 @@ panel keeps its `editHistory` field; the history is shown once the author adds
 the declaration above.
 ## Story mode
 
+Step captions append the shared Proof verdict after the existing Jira suffix and
+ticket links. The verdict is the worst of the step's directly selected carriers;
+headline numbers come from the primary carrier (the first direct carrier in the
+existing edge-then-node walk). The calculation is scoped to this source section
+and selected path, so duplicate step IDs in imported sections cannot collide.
+With Jira Live off, numeric evidence can still show its telemetry-only verdict.
+
+In Step mode, **Trace evidence** appears below the controls in the diagram column
+only when that primary carrier has a validated exemplar. It reuses the Trace
+panel's span rows, coverage model and notices. The card identifies the actual
+trace, original candidate/span timestamp, selection reason, original range,
+provider completeness and warnings. Receipt time never supplies the trace age.
+Exact authored `traceMatch` selectors use the same FlowCanon matcher as trace
+comparison, on the selected path; no labels or names create bindings. Explicit
+expectations absent from the sample show **never**, with the qualification
+“absence here is one observed request, not proof that this never runs”. Unknown,
+partial, ambiguous and unmapped evidence cannot establish completeness.
+
+**Play this trace** is a temporary runtime action for uniquely mapped current-step
+edges. Recorded start offsets and durations (including zero and overlapping
+attempts) drive ordinary packet motion. Navigation, path/view changes, history,
+trace replacement, clear, off and destroy retire the temporary packets. Authored
+timing, document source and Undo are unchanged. Reduced motion suppresses motion.
+
+**Pick passing trace** requires an actual alternative candidate with an observed
+passing status and a current provider capability. Tempo search status is unknown,
+so it does not invent this action. **Open trace** requires an actual safe provider
+UI URL; missing URLs and capabilities hide their actions. **Pin as evidence**
+adds a deduplicated in-memory Activity entry, including when numeric Proof is
+absent. Its pin timestamp is distinct from the trace observation time. Activity
+keeps at most 20 entries; telemetry retirement also retires its pins. Nothing is
+posted externally or persisted.
+
+Metrics remains off by default, uses the page's 24h default window, and is
+independent of Jira Live. Permitted host-preloaded evidence may render before a
+Metrics decision; explicit off retires it. Ambient hides the card, and Over time
+never borrows live exemplars. Root/page/host disable suppresses evidence and its
+dependent controls on local, imported and asynchronously loaded details alike.
+
+For a reproducible desktop fixture using actual shared mock-story IDs/spans and
+explicit mappings, run `python3 tools/build.py --no-config` followed by
+`node tools/step-evidence-demo.mjs`. Open
+`.local/step-evidence/demo/step-evidence.html`, choose **Step**, then **Metrics**.
+The fictional fixture offers Play, Pick passing trace and Pin. Its mock provider
+returns no UI URL, so Open stays absent. Choose **Over time**, then move **Day**:
+numeric Proof follows the selected day and the live Trace card disappears.
+Return to **Live** to restore current evidence. This fixture performs no live
+account queries.
+
 Live evidence follows the story's nodes and edges. Diagrams with a Live status
 panel omit the team lane chip from their step captions. In Step mode, each Jira
 ticket appears on its own line immediately below the authored step text, with
@@ -1211,11 +1889,13 @@ All story features work with `#live=demo`; pages without tickets or epics show t
 
 A delivery board can reference a canonical diagram and own only tracking:
 `topologyImports[].nodeTracking` maps provider node IDs to tracking fields
-(`tickets`, `prs`, `missingWork`, `existsWhen`);
+(`tickets`, `prs`, `missingWork`, `existsWhen`, `telemetry`);
 `edgeTracking` maps provider `from->to` identities to the same shape. Add these
 references through the desktop imported-selection Inspector. Inherited references
 stay read-only; local additions can be removed, undone and redone. The maps use
 strict validation and full provider-relative identities, including nested paths.
+`telemetry` content is the exception: like every telemetry binding it only warns
+(see "Telemetry bindings").
 They do not change provider structure or presentation/geometry overrides.
 
 The resolver merges inherited and consumer references before rendering, so the
@@ -1345,3 +2025,239 @@ destroy. They do not modify the document, another site's viewer, an older
 exported runtime, or another browser. File URLs have browser-dependent storage
 isolation; use the hosted page for shared defaults, or transfer JSON to another
 hosted palette page. Preview skin changes are not saved document settings.
+
+### Over time with Metrics
+
+Metrics is independent of the Jira mode buttons and off on every load. With
+Metrics off, Over time loads only Jira history. With Metrics on, clicking Over
+time loads one telemetry history batch after Jira supplies the day range.
+Turning Metrics on while the slider is open also loads that batch. Moving the
+slider never queries a tool. There are no slider markers.
+
+Each day carries an explicit `key` (`YYYY-MM-DD`) and `at` (RFC3339 evaluation
+endpoint), independent of its localized label. Jira reconstructs the end of the
+local calendar day and exposes that same following local-midnight instant in
+`at`. Telemetry evaluates the previous 24 hours ending at exactly that instant.
+Adjacent endpoints can be 23 or 25 hours apart across DST; labels never determine
+the boundary. The date key identifies the displayed local calendar day.
+The demo uses its embedded telemetry block's start plus 24 hours, without network
+calls. The example's explicit window is 24h. Day 9's completed push is UNPROVEN;
+Day 12's event traffic is DEGRADED.
+
+A host may supply `telemetry.history(bindings, {from, to, endpoints}, signal, report)` beside
+`provider` (or as `provider.history`). `from` and `to` are inclusive absolute
+RFC3339 evaluation endpoints. The optional `endpoints: [{key?, at}]` array gives
+the exact instants needed, including irregular local-day spacing; the controller
+always supplies it. Older direct adapter callers without it request an evenly
+spaced daily grid starting at `from`. The result has the ordinary carrier map
+shape, with each signal's `series: [[endpoint, value], ...]` (an explicit `YYYY-MM-DD`
+day key is also accepted and resolves through that day's explicit `at` metadata). `value` alone is
+never historical evidence. Optional `report.note(text)` reports partial failures
+and keeps the batch retryable. `historyKey` (a string or function) includes any
+mutable provider/account/datasource configuration in the cache identity.
+
+Only a sample at the selected endpoint counts. Missing endpoints, unsupported
+sources, retention gaps and a live-only provider give unobserved evidence, never
+last-known values or an invented zero. Explicit numeric zero remains observed.
+The same proof engine judges every local, imported, nested-import and loaded-detail
+carrier. Opening a detail is an explicit reader action: once its actual loader
+selection mounts, new bindings automatically join the selected historical day.
+Completed peers and unrelated pending batches are retained. Closing a detail
+removes its historical bindings and cancels its pending batch; reopening the same
+bindings can reuse their cache. Layout, polling paints and slider movement do not
+start queries. Changed queries on the same carrier ID never reuse stale samples.
+
+The controller retains live samples separately while showing history, pauses
+new telemetry polls, and holds any already-pending refresh or host `apply()`.
+Returning Live restores the newest held map and resumes refresh. Turning Metrics
+off, losing capability or destroying the controller aborts pending history and
+drops late completions; root page/host disable also covers imported/detail pages.
+Jira Live and Over time remain independent.
+
+History shares Jira's seven-day cache policy and a single six-call queue. The
+controller's front cache is isolated to that viewer/artifact instance and keyed
+by each full binding, provider configuration and datasource identity. Coverage
+tracks exact `{key, at}` endpoints, rather than a presumed 24-hour interval.
+Bindings needing the same endpoints are batched together. Repeat clicks reuse
+covered days; a longer range fetches only the new tail, starting at the next
+requested instant even when DST makes it 23 or 25 hours after the prior endpoint. Entries expire
+seven days after the original batch (tail fetches do not extend their lifetime).
+The MCP namespace also caches exact range calls per viewer and artifact. A new
+controller starts with an empty front cache; exact MCP calls can still be reused.
+Partial-error and aborted batches never extend cached coverage.
+
+Grafana history issues one `query_prometheus` or metric `query_loki_logs` range
+call per explicitly bound supported signal, with `stepSeconds: 86400` and the
+absolute endpoints. A same-offset range is one call per signal. A DST offset
+transition splits only at the discontinuity into contiguous 86400-second runs;
+each run starts and ends at actual selected-day instants, even a single-point run.
+All runs use the same six-call queue with Jira. No nearest UTC sample is accepted.
+It reuses the live parsers, tool qualification, consent and
+abort behavior, with no annotation or deeplink calls in the history batch. It
+never rewrites authored PromQL/LogQL: authors must provide the intended 24-hour
+aggregation themselves; a daily step controls evaluation spacing, not query
+aggregation. SQL and Tempo have no history adapter. Honeycomb history remains
+#946 and is unobserved here. Argument contracts follow the official
+[Prometheus source](https://github.com/grafana/mcp-grafana/blob/main/tools/prometheus.go)
+and [Loki source](https://github.com/grafana/mcp-grafana/blob/main/tools/loki.go);
+validation uses raw MCP fixtures, not a live Grafana or Honeycomb account.
+
+### Honeycomb metrics and mixed connectors (#946, metrics leg)
+
+Standalone artifacts use one automatic telemetry coordinator. Grafana and
+Honeycomb can bind different signals on the same local, imported, nested or
+loader-selected detail carrier. Each source owns its errors and caches; a
+missing/denied source does not hide a healthy peer. An account change from either
+connector retires **all** mixed data. Explicit host providers/demos take precedence.
+Root `tracking.telemetry.enabled:false` and host `flowviewTelemetry=false` prevent
+metadata discovery and data calls. Metrics starts off, with the default `24h`
+window, independently of Jira Live. Discovery alone never runs a query.
+
+Declare `{"server":"Honeycomb","tools":["run_query"]}` in the existing `mcp`
+capability alongside Grafana if both are bound. Connector names vary per account;
+selection requires offered tools and the runtime `inputSchema`. The supported
+schema declares `environment_slug` and `dataset_slug` strings and `query_spec`
+as an object or JSON string. Missing/unsupported schemas fail closed. No new SDK
+namespace, authored field or mandatory asynchronous polling contract is assumed.
+
+Root `honeycomb.environment` and `honeycomb.dataset` supply those slug arguments.
+Each signal holds a native query object, for example:
+
+```json
+{"honeycomb":{"calculations":[{"op":"P95","column":"duration_ms"}],"filters":[{"column":"service.name","op":"=","value":"author-selected-service"}]},"unit":"ms"}
+```
+
+Use one scalar COUNT/SUM/AVG/MIN/MAX/COUNT_DISTINCT/CONCURRENCY or supported
+percentile calculation per signal, without breakdowns or formulas. Preserve
+explicit filter expressions and calculation names. The page window replaces
+conflicting time selectors with hosted MCP `query_spec.from` (for example `24h`),
+as recorded in official public CI; it does not substitute REST `time_range`. Schema constraints that
+the adapter cannot honor yield an unobserved signal and a note. Never generate
+queries from carrier names or sum percentiles. COUNT counts spans/events, **not
+automatically requests**; units remain authored, and missing/empty results are
+unobserved rather than invented zeroes.
+
+`run_query` returns computed results. Its formatted Markdown/ASCII is rounded
+and is never parsed as exact measurements. The adapter reads the provider's
+`query_result_json` metadata and downloads exact `results[].data` and
+`series[].data` numbers; `header` aliases identify calculation keys. A single
+finite aggregate row is required (including explicit zero); ambiguous groups,
+nulls and malformed results are unobserved. Series timestamps are bucket starts;
+the aggregate is the whole-window headline. Each signal's runtime `observedAt`
+is the latest returned bucket start plus valid `info.granularity_seconds` (the
+end of that observed bucket), or its latest actual start if width is unavailable.
+It does not assert complete coverage of the requested window. Without time-series
+points, measurement as-of is unknown (`null`). Runtime `retrievedAt` separately
+records client receipt time. These are normalized runtime fields, not invented
+native response fields or authored bindings.
+
+Live Proof charts use the primary signal's `observedAt`. The mixed-provider coordinator gives
+legacy adapter signals their own latest point as-of (or their source's carrier
+time for aggregate-only samples or an explicit total descriptor) before combining sources. Direct host samples
+without signal as-of keep the existing carrier-time clipping policy. An explicit unknown signal as-of stays unknown.
+The mixed carrier timestamp is a newest-observation summary, never authority to
+clip a different signal's series. Historical charts still use the selected exact
+day endpoint. Actual bucket starts remain unchanged for Since Done evidence;
+no points or Done events are shifted to the client clock.
+No implicit rate conversion is performed.
+
+For hosted results, only HTTPS `mcp.honeycomb.io/query_results/<token>` retrieval is supported, with
+credentials omitted, no referrer, redirects rejected, a 15-second timeout and a
+1 MiB streamed response cap. Abort follows Metrics off, destruction and binding
+changes. A CSP/CORS or response failure stays unobserved; no alternate endpoint
+or EU host is guessed. Signed URLs are never stored in the spec, runtime map,
+notes or UI links. An authored safe link takes priority over the returned
+`query_url` on `ui.honeycomb.io`.
+
+The local mock returns exact raw JSON in MCP `structuredContent`; a namespace
+may expose this as an object `payload`. The adapter accepts these explicit raw
+objects after bounded deep JSON validation (1 MiB UTF-8, 24 levels, 50,000 nodes),
+then applies the same aggregate/series checks as downloaded results. Invalid,
+oversized or conflicting raw objects stay unobserved; text tables are never a
+fallback. This mock-only transport is not a claim about hosted Honeycomb output.
+Mock COUNT counts hourly measurement rows, not requests or spans.
+
+While visible and Metrics is on, the controller refreshes no faster than once a
+minute: one `run_query` and at most one raw download per Honeycomb signal. Consent
+uses the shared Allow action without replacing Jira/Grafana's pending action.
+Paint and history-slider movement do not query. Honeycomb daily history is
+unsupported: Over time shows it as unobserved while Grafana keeps its exact-day
+history and cache. Trace/exemplar retrieval is a separate #947-coordinated leg;
+this metrics implementation does not complete all of #946 or fabricate trace IDs.
+
+Evidence: [official tools reference](https://docs.honeycomb.io/integrations/mcp/tools),
+[official agent-skill CI run 38212733085](https://github.com/honeycombio/agent-skill/actions/runs/38212733085)
+at `6bb09279fc3fb69abf113228be939dbb929e34f1`. The test fixture preserves the
+redacted recorded metadata envelope; numeric raw fixtures follow the official
+result-interpretation schema and are explicitly synthetic. End-to-end mock tests
+call the actual mock `tools/list` and `handleMcp` implementations over the shared
+timeline; they verify the recorded `from` field and clearly labelled structured
+transport. No live Grafana or
+Honeycomb account was available for validation; artifact-specific CSP/CORS and
+current authenticated connector metadata remain deployment checks.
+
+Provider trace retrieval and the runtime-only #947 selection API are documented in
+[provider-traces.md](provider-traces.md). Existing scalar calculation bodies keep
+their exact-result contract; explicit native raw wrappers are trace intent.
+
+### Production and telemetry Activity
+
+A carrier's existing Work status popover includes Production when the permitted
+telemetry map has measured evidence. It uses the same Proof values, configured
+window, actual points/markers and safe authored-first link as the panel. Failed
+thresholds name their signal, measured value and requirement. Missing values stay
+unobserved; measured zero stays zero. Since Done shows known Done and first
+observed traffic timestamps, plus explicitly measured totals when their interval
+matches Done as described below; window rates are not lifetime totals. Local,
+imported and asynchronously loaded detail carriers use their carrier identity and
+own binding scope. Refreshes and day selection update an open Production block
+without replacing its focused link or close control.
+
+Mixed telemetry Activity uses each signal's measurement as-of, with a separate
+replay watermark per signal; newer peer or receipt times cannot date an older
+signal's event or suppress its next accepted observation. Ratio thresholds watch
+both bound inputs; a crossing uses the latest actual as-of among changed values,
+not an unchanged newer input. Missing inputs remain unobserved; older or
+conflicting same-time inputs cannot generate crossings. Legacy host signals
+without their own as-of retain carrier-time behavior. First-traffic facts supplied
+by the proof engine span all rate-like signals and retain their actual point
+timestamp; a peer's traffic is not attributed to a silent primary signal.
+
+Activity combines Jira changes and typed telemetry observations in timestamp
+order, newest first, with 20 entries total. Telemetry records first observed
+positive traffic after a known Done time, a measured threshold crossing, and
+silent whole-hour milestones after Done while no traffic has been observed.
+Unknown timestamps say “time unavailable.” A paint, Jira-only refresh, or historical
+day selection cannot generate telemetry Activity. New live observations held during
+history are consumed once on Return Live. Binding replacement/removal retires the
+old scope; clearing or disabling telemetry removes its events and Production while
+preserving Jira Activity and the selected Over time day. No queries originate from
+Production rendering, link preparation, or history slider movement.
+
+Initial host telemetry preload remains accepted before the first Metrics decision. An explicit Metrics off (including off before the first enable), capability removal, or destroy retracts evidence and rejects late `apply()` callbacks. Capability recovery stays off; an intentional enable accepts fresh observations. `clear()` retracts the current map without disabling a current session, so provider recovery can still supply its next observation.
+
+A host/provider can explicitly supply a measured long-window total on a runtime
+signal result (this is **not an authored spec field**):
+
+```json
+{"observedAt":"2026-11-04T12:00:00Z","signals":{"rate":{"value":1200,"unit":"events","aggregate":{"kind":"total","from":"2026-11-04T11:00:00Z","to":"2026-11-04T12:00:00Z"}}}}
+```
+
+`aggregate` declares that the signal's original `value` is a measured total over
+that exact interval. Normalization requires a finite nonnegative value no larger
+than `Number.MAX_SAFE_INTEGER`, valid `from < to`, and an explicit valid
+signal `observedAt >= to` (carrier `observedAt` for legacy samples without a signal
+as-of). An explicit unknown signal as-of cannot borrow a peer's time. Invalid metadata is dropped without discarding a valid
+ordinary headline. Proof's Since Done column and Production show the named bound
+signal's total only when `from` exactly equals the actual Done timestamp. They
+retain the original measurement value and unit, including zero, and display the
+through timestamp alongside the existing Done/first-traffic facts. Changing Done
+removes a mismatched total. History endpoint projection drops aggregate metadata;
+this version does not display totals in historical views, including embedded days.
+
+Current standard MCP adapters do not invent long-window queries or total
+semantics. Ordinary values, rates, series sums, and first-traffic measurements are
+never reconstructed into since-Done counts. A composing host/provider must retain
+each descriptor with its own signal and observation bounds, without borrowing a
+peer signal's value or timestamp. No account validation is implied by host/mock
+contract tests.

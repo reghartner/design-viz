@@ -19,6 +19,33 @@ function liveStatusDemoMap(day,keys,epics){
     map[key]=entry;
   });return map;
 }
+/* One story day's telemetry block (#944) as the proof engine's telemetry map (#938):
+   {carrierId: {signals: {name: {value, series: [[t, v], ...], unit}}, observedAt}}.
+   The block holds values per carrier signal from `start` every `stepSeconds`; each
+   point is stamped at the end of its step and the value is the last step. A null step
+   is missing evidence, never an implicit zero. An absent final sample leaves
+   that signal unobserved for this day. */
+function liveStatusDemoTelemetry(day){
+  var map=Object.create(null),block=day && day.telemetry;
+  if(!block || typeof block!=='object' || !block.carriers || typeof block.carriers!=='object')return map;
+  var start=typeof block.start==='string'?Date.parse(block.start):NaN,step=Number(block.stepSeconds)*1000,end=start;
+  if(!isFinite(start) || !(step>0))return map;
+  Object.keys(block.carriers).forEach(function(id){
+    var signals=block.carriers[id],out=Object.create(null),any=false;
+    if(!signals || typeof signals!=='object')return;
+    Object.keys(signals).forEach(function(name){
+      var signal=signals[name],values=signal && Array.isArray(signal.values)?signal.values:null;
+      if(!values || !values.length || typeof values[values.length-1]!=='number' || !isFinite(values[values.length-1]))return;
+      var series=values.map(function(v,k){return typeof v==='number' && isFinite(v)?[start+(k+1)*step,v]:null;}).filter(Boolean);
+      out[name]={value:series[series.length-1][1],series:series,unit:typeof signal.unit==='string'?signal.unit:null};
+      end=Math.max(end,start+values.length*step);any=true;
+    });
+    if(any)map[id]={signals:out};
+  });
+  var observedAt=new Date(end).toISOString();
+  Object.keys(map).forEach(function(id){map[id].observedAt=observedAt;});
+  return map;
+}
 function liveStatusDemoLabel(day,index){var label=String(day.label || '');return /^Day \d+\s*[—-]/.test(label)?label:'Day '+(index+1)+' — '+label;}
 /* Over time (#929): each timeline day as status only. A ticket first named on a later day is
    left out of the day, and the overlay shows it as Missing. One absent after that, or on the
@@ -32,7 +59,8 @@ function liveStatusDemoDays(timeline,keys){
       if(full[key].state==='missing' && !issues[key] && !seen[key] && index<last)return;
       states[key]={state:full[key].state};if(full[key].detail)states[key].detail=full[key].detail;
     });
-    return {label:liveStatusDemoLabel(day,index),short:'Day '+(index+1),states:states};
+    var start=day.telemetry && Date.parse(day.telemetry.start);
+    return {key:isFinite(start)?new Date(start).toISOString().slice(0,10):null,at:isFinite(start)?new Date(start+86400000).toISOString():null,telemetry:liveStatusDemoTelemetry(day),label:liveStatusDemoLabel(day,index),short:'Day '+(index+1),states:states};
   });
 }
 function liveStatusDemoTimeline(keys){
@@ -58,6 +86,7 @@ function createLiveStatusDemo(doc){
     if(typeof api.status==='function')api.status({state:'demo',source:'Demo',busy:false,checkedAt:Date.now()});
     // While a past day shows, the controller holds this map until the return to Live.
     api.apply(liveStatusDemoMap(timeline.days[day],api.refs().tickets,timeline.epics));
+    if(api.telemetry && typeof api.telemetry.apply==='function')api.telemetry.apply(liveStatusDemoTelemetry(timeline.days[day]));
     if(shown!==null)api.overTimeDay(shown);
     announce();
   }
@@ -74,6 +103,7 @@ function createLiveStatusDemo(doc){
   };
   return {
     provider:function(refs){var t=ensure(refs.tickets);return liveStatusDemoMap(t.days[day],refs.tickets,t.epics);},
+    telemetry:{provider:function(){return timeline?liveStatusDemoTelemetry(timeline.days[day]):Object.create(null);}},
     demo:{mount:function(live){
       api=live;ensure(api.refs().tickets);paint();api.setHistory(history);
       return function(){retired=true;};

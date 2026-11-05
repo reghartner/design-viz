@@ -320,6 +320,13 @@ test('D8 panel: epic box, Depends on buttons, outside-epic rows, chains and the 
  const h=harness(depFixture()),api=h.ctl.liveStatus;mountStatus(h);api.apply(Object.assign(depMap(),{'EP-1':{state:'active',title:'Connected doorbell',epic:''}}));
  const body=h.view.querySelector('.dv-live-panel-body');assert.ok(body);
  assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Tickets','Blockers and dependency chains','Activity']);
+ // A permitted host map adds Proof in place, without enabling Metrics or changing Jira sections.
+ h.ctl.page.sections[0].diagram.nodes.hw.telemetry={kind:'service',signals:{rate:{grafana:'explicit',unit:'req/h'}},proof:{rate:{min:1}}};
+ h.ctl.telemetry.apply({hw:{signals:{rate:{value:5}}}});
+ assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Proof','Tickets','Proof table','Blockers and dependency chains','Activity']);
+ assert.deepEqual(body.children.filter(el=>el.classList.contains('dv-live-epic') || el.classList.contains('dv-live-proof') || el.tagName==='h3').map(el=>el.classList.contains('dv-live-epic')?'Epic':el.classList.contains('dv-live-proof')?'Proof':el.textContent),['Epic','Proof','Tickets','Proof table','Blockers and dependency chains','Activity']);
+ h.ctl.telemetry.clear();
+ assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Tickets','Blockers and dependency chains','Activity']);
  assert.ok(h.view.querySelector('.dv-live-verdict')===null,'the old verdict line is gone');
  const epic=body.querySelector('.dv-live-epic');assert.ok(epic,'epic header box');assert.ok(body.children[0]===epic,'the epic box is first in the body');
  assert.equal(epic.querySelector('a.dv-live-epic-key').getAttribute('href'),'https://jira.test/browse/EP-1');assert.equal(epic.querySelector('.dv-live-epic-key').textContent,'EP-1');
@@ -501,6 +508,7 @@ test('S2 demo module is standalone-only and S7 documents story behavior',()=>{
  P8 publication declaration in docs and publishing skill.
  P9 no claude => unchanged; no transport outside mcp. */
 function providerContext(C={URL}){
+ if(!C.liveStatusHistoryCall)vm.runInNewContext(fs.readFileSync('src/viewer/history.js','utf8'),C);
  const record=entrypoint('standalone').records.find(r=>r.file==='viewer/live-status-claude.js');
  if(record)vm.runInNewContext(record.source,C);
  return C;
@@ -1899,6 +1907,445 @@ test('H12 Chuck 2026-10-30: history renders on a page without tracking, tickets 
  status.destroy();h.ctl.liveStatus.destroy();
 });
 
+/* #939 PR 1 of 2 (Metrics): the host telemetry provider, ctl.telemetry and the panel's Metrics button.
+   Nothing paints on the canvas in this PR; canvas cues follow in PR 2.
+| M1 | `ctl.telemetry` exists on every page with apply, clear, snapshot, onChange, setEnabled, status and bindings; without a provider or demo it reports `absent`, ignores setEnabled and the panel has no Metrics button or metrics connector text. |
+| M2 | `bindings()` and the provider's first argument list every bound carrier once, in page order, as `{id, kind, signals, proof, links, card}` from carrierTelemetry: local nodes and edges (template `use` expanded), imported topology nodes and edges (consumer overlay and provider-authored bindings), and loaded detail pages; unbound carriers and text boxes are absent; a repeated id keeps its first binding. |
+| M3 | Metrics is off by default (no call, no timer after first paint); setEnabled(true) calls the provider at once, then every max(refreshMs, 60000) ms while visible; hidden pauses and visible catches up once; a rejection sets `error` with the message and keeps the last map; setEnabled(false) aborts the signal, retires the timer, clears the map and returns to `idle`; a late answer after off is dropped; destroy aborts and stays off. |
+| M4 | Refresh cadence: the host `refreshMs` wins, else the page `tracking.telemetry.refreshMs`, else one minute; never below 60000. |
+| M5 | `apply(map)` keeps the provider result contract `{id: {signals: {name: {value, series, unit}}, observedAt, markers, links}}`, dropping malformed entries; snapshots are copies; `clear()` empties; onChange reports both and unsubscribes. |
+| M6 | The panel header shows a Metrics button after Live and its counts, before the Jira connector, off by default; clicking it turns the provider on, the metrics connector text moves from "Metrics: not connected" to "Metrics: connecting" to "Metrics: connected, refreshed <time>" ("Metrics: did not answer · <message>" on error); clicking again clears; Jira Live is untouched. |
+| M7 | A page with a telemetry provider and no Jira evidence still shows the header with Metrics while Live stays hidden. |
+| M8 | A demo telemetry source (`telemetry.demo.mount(api)`) shows Metrics, mounts only while Metrics is on, reports demo, and its cleanup runs when Metrics turns off or the page is destroyed. |
+*/
+const TQUEUE=()=>({kind:'queue',signals:{lag:{grafana:'max(kafka_consumergroup_lag)',unit:'msgs'}},proof:{lag:{max:500}}});
+const TCALL=()=>({kind:'call',signals:{rate:{grafana:'sum(rate(push_sent_total[5m]))*3600',unit:'req/h'},errors:{grafana:'sum(rate(push_failed_total[5m]))*3600',unit:'req/h'}},proof:{rate:{min:1},errors:{maxRatioOf:'rate',max:0.01}},links:{dashboard:'https://grafana.test/d/push'}});
+const TSERVICE=()=>({kind:'service',signals:{rate:{grafana:'sum(rate(http_requests_total{app="api"}[5m]))*3600',unit:'req/h'}},proof:{rate:{min:1}}});
+const bound=(id,kind,signals,proof={},links={},card=null)=>({id,kind,signals,proof,links,card});
+function telemetryPage(refreshMs){
+ const page={tracking:{jira:{site:'https://jira.test'},telemetry:{templates:{svc:{kind:'service',params:['app'],signals:{up:{grafana:'up{app="$app"}'}}}}}},sections:[{id:'main',diagram:{
+  nodes:{a:{tickets:['AA-1'],telemetry:TQUEUE()},b:{tickets:['BB-1']},c:{telemetry:{use:'svc',app:'notify'}},note:{type:'text',text:'Note',telemetry:TQUEUE()}},rows:[['a','b','c']],
+  edges:[{from:'a',to:'b',tickets:['EE-1'],telemetry:{...TCALL(),card:{side:'below'}}},{from:'b',to:'c',tickets:['EE-2']}]}}]};
+ if(refreshMs!==undefined)page.tracking.telemetry.refreshMs=refreshMs;
+ return {page};
+}
+const TQUEUE_BOUND=id=>bound(id,'queue',{lag:{source:'grafana',query:'max(kafka_consumergroup_lag)',unit:'msgs'}},{lag:{max:500}});
+const TCALL_BOUND=(id,card=null)=>bound(id,'call',{rate:{source:'grafana',query:'sum(rate(push_sent_total[5m]))*3600',unit:'req/h'},errors:{source:'grafana',query:'sum(rate(push_failed_total[5m]))*3600',unit:'req/h'}},{rate:{min:1},errors:{maxRatioOf:'rate',max:0.01}},{dashboard:'https://grafana.test/d/push'},card);
+const LOCAL_BINDINGS=[TQUEUE_BOUND('a'),bound('c','service',{up:{source:'grafana',query:'up{app="notify"}',unit:null}}),TCALL_BOUND('a->b',{side:'below'})];
+const metricsClock=at=>new Date(at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'});
+const IDLE={state:'idle',busy:false,refreshedAt:null,note:''};
+
+test('M1 ctl.telemetry exists without a provider, reports absent, ignores setEnabled and shows no Metrics control',()=>{
+ const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)}),t=h.ctl.telemetry;
+ assert.ok(t && typeof t==='object','M1 ctl.telemetry is attached to every controller');
+ for(const name of ['apply','clear','snapshot','onChange','setEnabled','status','bindings'])assert.equal(typeof t[name],'function','M1 ctl.telemetry.'+name);
+ assert.deepEqual(plain(t.status()),{state:'absent',busy:false,refreshedAt:null,note:''});
+ assert.equal(t.snapshot().available,false);assert.equal(t.snapshot().enabled,false);
+ t.setEnabled(true);assert.equal(t.snapshot().enabled,false,'M1 nothing to enable');assert.equal(t.status().state,'absent');
+ const panel=mountStatus(h);h.flush();h.flush();
+ const metrics=h.view.querySelector('button.dv-live-metrics'),conn=h.view.querySelector('.dv-live-metrics-connection');
+ assert.ok(!metrics || metrics.hidden,'M1 no Metrics button without a telemetry provider or demo');
+ assert.ok(!conn || conn.hidden,'M1 no metrics connector text without a telemetry provider or demo');
+ assert.equal(h.view.querySelector('.dv-live-toggle').hidden,false,'M1 Live is unaffected');
+ panel.destroy();h.ctl.liveStatus.destroy();
+});
+
+test('M2 bindings cover bound local, imported and loaded detail carriers once, in page order, as parsed bindings',async()=>{
+ let seen=null;
+ const local=harness(telemetryPage(),{},{telemetry:{provider:b=>{seen=b;return Promise.resolve({});}}});
+ assert.ok(local.ctl.telemetry,'M2 ctl.telemetry');
+ assert.deepEqual(plain(local.ctl.telemetry.bindings()),LOCAL_BINDINGS,'M2 local nodes, a template use and a carded edge; unbound carriers and the text box are absent');
+ local.ctl.telemetry.setEnabled(true);await settle();assert.deepEqual(plain(seen),LOCAL_BINDINGS,'M2 the provider receives the same list');
+ local.ctl.liveStatus.destroy();
+ const spec=(id,diagram,extra={})=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},...extra,sections:[{id:'main',diagram}]}});
+ const provider=spec('provider',{nodes:{api:{title:'API'},store:{title:'Store',telemetry:{use:'db',table:'events'}},cache:{title:'Cache'}},rows:[['api','store','cache']],
+  edges:[{from:'api',to:'store',label:'Persist'},{from:'api',to:'cache',label:'Warm'}],topologyExports:{core:{nodes:['api','store','cache'],edges:['api->store','api->cache']}}},
+  {tracking:{telemetry:{templates:{db:{kind:'service',params:['table'],signals:{writes:{sql:'select count(*) from $table'}}}}}}});
+ const consumer=spec('consumer',{nodes:{local:{title:'Local',telemetry:TQUEUE()}},rows:[['local']],
+  topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{tickets:['AA-1'],telemetry:TSERVICE()}},edgeTracking:{'api->store':{telemetry:TCALL()}}}]});
+ const resolved=local.C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]});
+ let resolveDetail;const renderOptions={loadDetail:()=>new Promise(r=>resolveDetail=r),telemetry:{provider:b=>{seen=b;return Promise.resolve({});}}};
+ const h=harness(resolved,{},renderOptions),t=h.ctl.telemetry;
+ const importedBindings=[TQUEUE_BOUND('local'),
+  bound('shared::api','service',{rate:{source:'grafana',query:'sum(rate(http_requests_total{app="api"}[5m]))*3600',unit:'req/h'}},{rate:{min:1}}),
+  bound('shared::store','service',{writes:{source:'sql',query:'select count(*) from events',unit:null}}),
+  TCALL_BOUND('shared::api->shared::store')];
+ assert.deepEqual(plain(t.bindings()),importedBindings,'M2 consumer overlay and provider-authored bindings reach imported nodes and edges; unbound imported carriers are absent');
+ const pending=renderOptions.loadDetail({spec:'approved-detail'},new AbortController().signal);
+ resolveDetail({nodes:{remote:{title:'Remote',telemetry:TQUEUE()},local:{title:'Shadow',telemetry:TSERVICE()}},rows:[['remote','local']]});await pending;
+ const withDetail=importedBindings.concat([TQUEUE_BOUND('remote')]);
+ assert.deepEqual(plain(t.bindings()),withDetail,'M2 a loaded detail page joins; a repeated id keeps its first binding');
+ t.setEnabled(true);await settle();assert.deepEqual(plain(seen),withDetail,'M2 the provider receives local, imported and detail carriers');
+ h.ctl.liveStatus.destroy();
+});
+
+test('M3 Metrics is off by default; on starts the provider loop with a 60 s floor, pauses hidden, catches up, keeps the last map on error; off and destroy abort',async()=>{
+ let calls=0,fail=false,hold=null;const signals=[];
+ const sample={a:{signals:{lag:{value:12,series:[[1,10],[2,12]],unit:'msgs'}},observedAt:'2026-11-03T10:00:00.000Z',markers:[],links:{}}};
+ const h=harness(telemetryPage(),{},{telemetry:{provider:(b,s)=>{calls++;signals.push(s);if(hold)return hold;return fail?Promise.reject(Error('Grafana timeout')):Promise.resolve(sample);},refreshMs:1}}),t=h.ctl.telemetry;
+ assert.ok(t,'M3 ctl.telemetry');
+ h.flush();h.flush();await settle();
+ assert.equal(calls,0,'M3 no provider call before Metrics is turned on');assert.equal(h.timers.size,0,'M3 no refresh timer while off');
+ assert.deepEqual(plain(t.status()),IDLE);assert.equal(t.snapshot().available,true);assert.equal(t.snapshot().enabled,false);
+ t.setEnabled(true);assert.equal(t.snapshot().enabled,true);assert.deepEqual(plain(t.status()),{state:'loading',busy:true,refreshedAt:null,note:''});
+ await settle();assert.equal(calls,1,'M3 on calls the provider at once');
+ const ok=plain(t.status());assert.equal(ok.state,'ok');assert.equal(ok.busy,false);assert.ok(isFinite(Date.parse(ok.refreshedAt)),'M3 refreshedAt is a timestamp');assert.equal(ok.note,'');
+ assert.deepEqual(plain(t.snapshot().map),sample);
+ assert.deepEqual([...h.timers.values()].map(x=>x.ms),[60000],'M3 refreshMs below a minute uses the 60 s floor');
+ h.doc.hidden=true;h.doc.visibilityState='hidden';h.doc.dispatchEvent({type:'visibilitychange'});assert.equal(h.timers.size,0,'M3 a hidden document pauses refresh');
+ h.doc.hidden=false;h.doc.visibilityState='visible';h.doc.dispatchEvent({type:'visibilitychange'});await settle();assert.equal(calls,2,'M3 one catch-up call on return');
+ fail=true;let next=[...h.timers.values()][0];h.timers.clear();next.fn();assert.equal(t.status().busy,true,'M3 busy during a refresh');await settle();
+ assert.equal(t.status().state,'error');assert.equal(t.status().note,'Grafana timeout');assert.equal(t.status().busy,false);
+ assert.deepEqual(plain(t.snapshot().map),sample,'M3 the last map survives a failed refresh');
+ fail=false;next=[...h.timers.values()][0];h.timers.clear();next.fn();await settle();assert.equal(t.status().state,'ok');assert.equal(t.status().note,'','M3 success clears the error note');
+ t.setEnabled(false);
+ assert.equal(signals[signals.length-1].aborted,true,'M3 off aborts the signal');assert.equal(h.timers.size,0,'M3 off retires the timer');
+ assert.deepEqual(plain(t.snapshot().map),{},'M3 off clears the map');assert.deepEqual(plain(t.status()),IDLE,'M3 off returns to idle');
+ const before=calls;h.doc.dispatchEvent({type:'visibilitychange'});await settle();assert.equal(calls,before,'M3 visibility never calls while off');
+ let release;hold=new Promise(r=>release=r);t.setEnabled(true);await settle();assert.equal(calls,before+1);t.setEnabled(false);release(sample);await settle();
+ assert.deepEqual(plain(t.snapshot().map),{},'M3 a late answer after off is dropped');assert.deepEqual(plain(t.status()),IDLE);
+ hold=null;t.setEnabled(true);await settle();assert.equal(t.status().state,'ok');const live=signals[signals.length-1];assert.equal(live.aborted,false,'M3 on again gets a fresh signal');
+ h.ctl.liveStatus.destroy();assert.equal(live.aborted,true,'M3 destroy aborts the signal');assert.equal(h.timers.size,0,'M3 destroy retires the timer');
+ const after=calls;t.setEnabled(true);await settle();assert.equal(t.snapshot().enabled,false,'M3 a destroyed controller stays off');assert.equal(calls,after);
+});
+
+test('M4 refresh cadence: host refreshMs wins, else the page tracking.telemetry.refreshMs, else one minute, never below it',async()=>{
+ for(const [pageMs,hostMs,want] of [[undefined,undefined,60000],[300000,undefined,300000],[300000,120000,120000],[undefined,30000,60000],[undefined,'soon',60000],[90000,0,90000]]){
+  const h=harness(telemetryPage(pageMs),{},{telemetry:{provider:()=>Promise.resolve({}),refreshMs:hostMs}});
+  assert.ok(h.ctl.telemetry,'M4 ctl.telemetry');h.ctl.telemetry.setEnabled(true);await settle();
+  assert.deepEqual([...h.timers.values()].map(x=>x.ms),[want],JSON.stringify({pageMs,hostMs}));h.ctl.liveStatus.destroy();
+ }
+});
+
+test('M5 apply keeps the provider result contract, snapshots are copies, clear empties, onChange reports and unsubscribes',()=>{
+ const h=harness(telemetryPage(),{},{telemetry:{provider:()=>new Promise(()=>{})}}),t=h.ctl.telemetry,seen=[];
+ assert.ok(t,'M5 ctl.telemetry');
+ const off=t.onChange(value=>seen.push(plain(value)));
+ t.apply({
+  a:{signals:{lag:{value:12,series:[[1,10],['2026-11-03T10:00:00Z',11],[NaN,1],[3,'x'],[4],'bad',['never',2]],unit:'msgs'},rate:{value:Infinity,unit:7},bad:'x','9bad':{value:1}},
+   observedAt:Date.UTC(2026,10,3,10),markers:[{at:'2026-11-03T09:00:00Z',kind:'deploy',label:'firmware 2.4.1'},{kind:'deploy'},'x',{at:'2026-11-03T09:30:00Z',kind:7}],
+   links:{query:'https://grafana.test/explore?x=1',dashboard:'javascript:alert(1)',other:'https://x.test/'}},
+  'a->b':{signals:{rate:{value:0}},observedAt:'not a time'},
+  b:'nope',c:null,d:[1]
+ });
+ const want={a:{signals:{lag:{value:12,series:[[1,10],['2026-11-03T10:00:00Z',11]],unit:'msgs'},rate:{}},observedAt:'2026-11-03T10:00:00.000Z',
+   markers:[{at:'2026-11-03T09:00:00.000Z',kind:'deploy',label:'firmware 2.4.1'},{at:'2026-11-03T09:30:00.000Z'}],links:{query:'https://grafana.test/explore?x=1'}},
+  'a->b':{signals:{rate:{value:0}},observedAt:null,markers:[],links:{}}};
+ assert.deepEqual(plain(t.snapshot().map),want);
+ assert.equal(seen.length,1,'M5 apply reports one change');assert.deepEqual(seen[0].map,want);assert.equal(seen[0].enabled,false);assert.deepEqual(seen[0].status,IDLE,'M5 apply while off leaves the connector idle');
+ const copy=t.snapshot().map;copy.a.signals.lag.value=99;assert.equal(t.snapshot().map.a.signals.lag.value,12,'M5 snapshot is a copy');
+ t.clear();assert.deepEqual(plain(t.snapshot().map),{});assert.equal(seen.length,2,'M5 clear reports a change');
+ off();t.apply(want);assert.equal(seen.length,2,'M5 unsubscribe stops change callbacks');assert.deepEqual(plain(t.snapshot().map),want);
+ h.ctl.liveStatus.destroy();
+});
+
+test('M6 Metrics sits beside Live, off by default; on calls the provider and updates its connector text; off clears; Live is untouched',async()=>{
+ let calls=0,seen=null,fail=false;const sample={a:{signals:{lag:{value:3}}}};
+ const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)},{telemetry:{provider:b=>{calls++;seen=b;return fail?Promise.reject(Error('Grafana timeout')):Promise.resolve(sample);}}});
+ const panel=mountStatus(h);h.flush();h.flush();await settle();
+ const head=h.view.querySelector('.dv-live-head'),live=head.querySelector('.dv-live-toggle'),metrics=head.querySelector('button.dv-live-metrics'),conn=head.querySelector('.dv-live-metrics-connection'),jira=head.querySelector('.dv-live-connection');
+ assert.ok(metrics,'M6 Metrics button in the panel header');assert.equal(metrics.hidden,false);assert.equal(metrics.textContent,'Metrics');assert.equal(metrics.type,'button');
+ assert.ok(metrics.classList.contains('tbtn') && metrics.classList.contains('reader-button'),'M6 Metrics wears the header button look');
+ assert.equal(metrics.getAttribute('aria-pressed'),'false','M6 off by default');assert.equal(calls,0,'M6 no provider call while off');
+ const controls=head.querySelector('.dv-live-controls'),order=controls.children;
+ assert.ok(order.indexOf(live)<order.indexOf(metrics),'M6 Metrics follows the Jira mode controls');
+ assert.ok(head.children.indexOf(controls)<head.children.indexOf(head.querySelector('.dv-live-status')),'M6 controls precede status text');
+ assert.ok(conn,'M6 metrics connector text');assert.ok(!conn.classList.contains('dv-live-connection'),'M6 distinct connector');
+ assert.equal(head.querySelectorAll('.dv-live-connection').length,1);
+ const statuses=head.querySelector('.dv-live-status-text').children;
+ assert.equal(statuses.indexOf(conn),statuses.indexOf(jira)+1,'M6 the connector indicators are adjacent');
+ const text=()=>conn.querySelectorAll('span')[0].textContent;
+ assert.equal(conn.hidden,false);assert.equal(conn.tagName,jira.tagName,'M6 same markup as the Jira connector');assert.equal(conn.getAttribute('role'),'status');assert.ok(conn.querySelector('i.dv-live-metrics-dot'),'M6 its own status dot');
+ assert.equal(conn.getAttribute('data-state'),'disconnected');assert.equal(conn.getAttribute('data-busy'),'false');assert.equal(text(),'Metrics: not connected');
+ const livePressed=live.getAttribute('aria-pressed');assert.equal(livePressed,'true');
+ metrics.dispatchEvent({type:'click'});
+ assert.equal(metrics.getAttribute('aria-pressed'),'true');assert.equal(conn.getAttribute('data-state'),'connecting');assert.equal(conn.getAttribute('data-busy'),'true');assert.equal(text(),'Metrics: connecting');
+ await settle();assert.equal(calls,1);assert.deepEqual(plain(seen),LOCAL_BINDINGS,'M6 the click hands the provider the bound carriers');
+ const at=h.ctl.telemetry.status().refreshedAt;
+ assert.equal(conn.getAttribute('data-state'),'connected');assert.equal(conn.getAttribute('data-busy'),'false');assert.equal(text(),'Metrics: connected, refreshed '+metricsClock(at));
+ assert.equal(h.ctl.liveStatus.snapshot().metrics.enabled,true,'M6 the panel snapshot carries the Metrics state');
+ fail=true;const tick=[...h.timers.values()].find(x=>x.ms===60000);assert.ok(tick,'M6 metrics refresh is armed');for(const [id,x] of h.timers)if(x===tick)h.timers.delete(id);tick.fn();await settle();
+ assert.equal(conn.getAttribute('data-state'),'error');assert.equal(text(),'Metrics: did not answer · Grafana timeout');
+ assert.equal(live.getAttribute('aria-pressed'),livePressed,'M6 Jira Live is untouched');assert.equal(h.ctl.liveStatus.enabled(),true);
+ metrics.dispatchEvent({type:'click'});
+ assert.equal(metrics.getAttribute('aria-pressed'),'false');assert.deepEqual(plain(h.ctl.telemetry.snapshot().map),{},'M6 off clears the map');
+ assert.equal(conn.getAttribute('data-state'),'disconnected');assert.equal(text(),'Metrics: not connected');
+ live.dispatchEvent({type:'click'});assert.equal(h.ctl.liveStatus.enabled(),false);assert.equal(h.ctl.telemetry.snapshot().enabled,false,'M6 Live does not drive Metrics');assert.equal(metrics.getAttribute('aria-pressed'),'false');
+ panel.destroy();h.ctl.liveStatus.destroy();
+});
+
+test('M7 a page with a telemetry provider and no Jira evidence still shows Metrics in the header',()=>{
+ const h=harness(telemetryPage(),{},{telemetry:{provider:()=>Promise.resolve({})}});
+ const panel=mountStatus(h),head=h.view.querySelector('.dv-live-head'),metrics=head && head.querySelector('button.dv-live-metrics');
+ assert.equal(head.hidden,false,'M7 the header shows for Metrics alone');assert.ok(metrics && !metrics.hidden,'M7 Metrics button');
+ assert.equal(head.querySelector('.dv-live-toggle').hidden,true,'M7 Live stays hidden without Jira evidence');
+ panel.destroy();h.ctl.liveStatus.destroy();
+});
+
+test('M8 a demo telemetry source shows Metrics, mounts only while on, reports demo, and is cleaned up on off and destroy',()=>{
+ let mounted=0,cleaned=0,given=null;
+ const h=harness(telemetryPage(),{},{telemetry:{demo:{mount:api=>{mounted++;given=api;api.apply({a:{signals:{lag:{value:1}}}});return ()=>cleaned++;}}}}),t=h.ctl.telemetry;
+ assert.ok(t,'M8 ctl.telemetry');assert.equal(t.snapshot().available,true);assert.deepEqual(plain(t.status()),IDLE);
+ const panel=mountStatus(h),metrics=h.view.querySelector('button.dv-live-metrics'),conn=h.view.querySelector('.dv-live-metrics-connection');
+ assert.ok(metrics && !metrics.hidden,'M8 a demo source shows Metrics');assert.equal(mounted,0,'M8 the demo waits for Metrics');
+ metrics.dispatchEvent({type:'click'});assert.equal(mounted,1);assert.equal(given,t,'M8 the demo drives ctl.telemetry');
+ assert.equal(t.status().state,'ok');assert.deepEqual(plain(t.snapshot().map.a.signals),{lag:{value:1}});
+ assert.equal(conn.getAttribute('data-state'),'demo');assert.match(conn.querySelectorAll('span')[0].textContent,/^Metrics: demo, refreshed /);
+ metrics.dispatchEvent({type:'click'});assert.equal(cleaned,1,'M8 off runs the demo cleanup');assert.deepEqual(plain(t.snapshot().map),{});assert.deepEqual(plain(t.status()),IDLE);
+ metrics.dispatchEvent({type:'click'});assert.equal(mounted,2);h.ctl.liveStatus.destroy();assert.equal(cleaned,2,'M8 destroy runs the demo cleanup');
+ panel.destroy();
+});
+
+/* #939 PR 2 of 2 (Metrics canvas cues and the proof wrapper).
+| W1 | `ctl.telemetry.verdicts()` runs proofVerdicts over every carrier of the page walk (bound or not, text boxes excluded) with the runtime Jira map and the telemetry map: per-carrier verdicts, telemetry state and rollups. |
+| W2 | Step rollups: each authored step id judged over its directly selected carriers (liveStatusStepCarriers(d, step, true)). |
+| W3 | Verdicts are re-evaluated on every Jira or telemetry change; telemetry change callbacks carry `verdicts` and fire after a Jira apply too. |
+| C1 | Metrics on: a bound call/service edge with traffic gets a packet stream (`g.dv-metrics-stream[data-metrics-edge]`, 1–5 moving packets by order of magnitude of its primary rate, the same count of static packets for reduced motion and print); red packets follow the error share; a degraded edge is amber (`dv-metrics-degraded`); a silent Done edge gets a dotted ghost (`path.dv-metrics-ghost`) over a dimmed stroke (`dv-metrics-silent`); unbound edges and non-call edges get no stream; Jira paint is untouched. |
+| C2 | Metrics on: a bound node gets `g.dv-metrics-node` with a sparkline of its primary rate series along the card bottom and a proof seal at the bottom-right (proven, degraded, unproven, live-early by verdict); unbound nodes and text boxes are unchanged; no text on the canvas. |
+| C3 | Metrics off removes every cue; cues are re-applied after a rebuild (`dv:pathrender`) and follow telemetry and Jira changes; destroy removes them. |
+| C4 | Imported topology carriers receive the same cues as local ones. Direct and nested consumers each have independent binding, stream, seal, sparkline, ghost, dimming, unbound-node, off and destroy tests below. Loaded-detail equivalents use the real native host loader and a clicked detail control in telemetry-overlay.spec.mjs (P12); no synthetic detail controller or mounted section. Rejects: walking only locally authored carriers, skipping detail-page paint, or leaving imported/detail cues behind on off or destroy. |
+| C5 | Metrics packets never wear the ordinary `.pkt` or `.comm-packet` classes, and the frame measure skips the stream layer. |
+| C6 | Demo: a Live status demo source carrying `telemetry: {provider}` (the #944 demo shape) shows Metrics as demo; the demo reaches the same controller as `ctl.liveStatus.telemetry`; a host telemetry provider wins over it. |
+*/
+const CUE_SERVICE=()=>({kind:'service',signals:{rate:{grafana:'sum(rate(http_requests_total[5m]))*3600',unit:'req/h'}},proof:{rate:{min:10}}});
+function cuePage(){return {page:{tracking:{jira:{site:'https://jira.test'}},sections:[{id:'main',diagram:{
+ nodes:{a:{tickets:['AA-1'],telemetry:TQUEUE()},b:{tickets:['BB-1'],telemetry:CUE_SERVICE()},c:{tickets:['CC-1'],telemetry:CUE_SERVICE()},d:{tickets:['DD-1']},f:{tickets:['FF-1'],telemetry:CUE_SERVICE()},note:{type:'text',text:'Note',telemetry:TQUEUE()}},
+ rows:[['a','b','c','d','f']],
+ edges:[{from:'a',to:'b',tickets:['EE-10'],telemetry:TCALL()},{from:'b',to:'c',tickets:['EE-11'],telemetry:TCALL()},{from:'c',to:'d',tickets:['EE-12'],telemetry:TCALL()},{from:'d',to:'a',tickets:['EE-13']},{from:'a',to:'c',tickets:['EE-14'],telemetry:TQUEUE()}],
+ steps:[{id:'s1',edge:'a->b'},{id:'s2',edge:'b->c'},{id:'s3',nodes:['f','b']}]}}]}};}
+const CUE_JIRA={'AA-1':{state:'done'},'BB-1':{state:'active'},'CC-1':{state:'done'},'DD-1':{state:'todo'},'FF-1':{state:'done'},'EE-10':{state:'done'},'EE-11':{state:'done'},'EE-12':{state:'active'},'EE-13':{state:'todo'},'EE-14':{state:'done'}};
+const CUE_MAP=()=>({a:{signals:{lag:{value:10}}},b:{signals:{rate:{value:50,series:[[1,40],[2,45],[3,50]]}}},c:{signals:{rate:{value:0,series:[[1,0],[2,0]]}}},f:{signals:{rate:{value:5,series:[[1,5],[2,5]]}}},
+ 'a->b':{signals:{rate:{value:1300,series:[[1,1200],[2,1300]]},errors:{value:4}}},'b->c':{signals:{rate:{value:0,series:[[1,0],[2,0]]},errors:{value:0}}},'c->d':{signals:{rate:{value:100},errors:{value:30}}},'a->c':{signals:{lag:{value:3}}}});
+const CUE_VERDICTS={a:'proven',b:'active-live-early',c:'done-unproven',d:null,f:'done-degraded','a->b':'proven','b->c':'done-unproven','c->d':'active-failing','d->a':null,'a->c':'proven'};
+const CUE_SELECTOR='.dv-metrics-stream,.dv-metrics-ghost,.dv-metrics-node,[data-metrics-state]';
+function cueHarness(raw=cuePage(),map=CUE_MAP){
+ let telemetryMap=map();const h=harness(raw,{provider:()=>Promise.resolve(CUE_JIRA)},{telemetry:{provider:()=>Promise.resolve(telemetryMap)}});
+ h.setMap=next=>{telemetryMap=next;};h.on=async()=>{h.flush();h.flush();await settle();assert.ok(h.ctl.telemetry,'ctl.telemetry');h.ctl.telemetry.setEnabled(true);await settle();};
+ h.edge=i=>h.view.querySelector('path.edge[data-dv-edge="'+i+'"]');h.node=id=>h.view.querySelector('g.node[data-dv-node="'+id+'"]');
+ h.stream=i=>h.view.querySelectorAll('g.dv-metrics-stream').filter(g=>g.getAttribute('data-metrics-edge')===String(i));
+ h.moving=i=>h.stream(i).flatMap(g=>g.querySelectorAll('circle.dv-metrics-moving'));h.still=i=>h.stream(i).flatMap(g=>g.querySelectorAll('circle.dv-metrics-static'));
+ h.ghost=i=>h.view.querySelectorAll('path.dv-metrics-ghost').filter(p=>p.getAttribute('data-metrics-edge')===String(i));
+ h.cues=()=>h.view.querySelectorAll(CUE_SELECTOR);return h;
+}
+
+test('W1 W2 verdicts() judges every page carrier with the Jira and telemetry maps, with rollups and step rollups',async()=>{
+ const h=cueHarness();await h.on();const t=h.ctl.telemetry;
+ assert.equal(typeof t.verdicts,'function','W1 ctl.telemetry.verdicts');
+ const v=plain(t.verdicts());
+ assert.deepEqual(Object.keys(v.carriers).sort(),Object.keys(CUE_VERDICTS).sort(),'W1 every node and edge, bound or not; the text box is not a carrier');
+ for(const [id,want] of Object.entries(CUE_VERDICTS))assert.equal(v.carriers[id].verdict,want,'W1 '+id);
+ assert.equal(v.carriers.d.bound,false);assert.equal(v.carriers['d->a'].bound,false);
+ assert.equal(v.carriers['b->c'].telemetry,'silent');assert.equal(v.carriers['c->d'].telemetry,'degraded');assert.deepEqual(v.carriers['c->d'].failing,['errors']);
+ assert.deepEqual(v.rollups,{bound:8,unbound:2,proven:3,degraded:2,unproven:2,liveEarly:1});
+ assert.deepEqual(v.steps,{s1:{verdict:'proven',label:'PROVEN'},s2:{verdict:'done-unproven',label:'DONE · UNPROVEN'},s3:{verdict:'active-failing',label:'IN PROGRESS · FAILING'}},'W2 step rollups over direct carriers');
+ h.ctl.liveStatus.destroy();
+});
+
+test('W3 verdicts follow Jira and telemetry changes and reach change subscribers',async()=>{
+ const h=cueHarness();await h.on();const t=h.ctl.telemetry,seen=[];
+ assert.equal(typeof t.verdicts,'function','ctl.telemetry.verdicts exists');
+ t.onChange(value=>seen.push(plain(value)));
+ h.ctl.liveStatus.apply({...CUE_JIRA,'AA-1':{state:'active'}});
+ assert.equal(t.verdicts().carriers.a.verdict,'active-live-early','W3 a Jira change re-judges');
+ assert.ok(seen.length>=1,'W3 a Jira change notifies telemetry subscribers');assert.equal(seen[seen.length-1].verdicts.carriers.a.verdict,'active-live-early');
+ t.apply({...CUE_MAP(),a:{signals:{lag:{value:900}}}});
+ assert.equal(t.verdicts().carriers.a.verdict,'active-failing','W3 a telemetry change re-judges');assert.equal(seen[seen.length-1].verdicts.carriers.a.verdict,'active-failing');
+ assert.equal(h.node('a').querySelector('.dv-metrics-seal').getAttribute('data-seal'),'degraded','W3 the canvas follows');
+ h.ctl.liveStatus.destroy();
+});
+
+test('C1 Metrics on paints packet streams, red error packets, amber degraded edges and a ghost on the silent Done edge',async()=>{
+ const h=cueHarness();await h.on();
+ assert.equal(h.stream(0).length,1,'C1 flowing call edge has a stream');assert.equal(h.moving(0).length,4,'C1 1300 req/h is four packets');assert.equal(h.still(0).length,4,'C1 a static copy for reduced motion and print');
+ const animated=c=>c.children.some(x=>x.tagName==='animateMotion');
+ assert.ok(h.moving(0).every(animated),'C1 moving packets animate');assert.ok(h.still(0).every(c=>!animated(c)),'C1 static packets do not');
+ assert.equal(h.moving(0).filter(c=>c.classList.contains('dv-metrics-packet-error')).length,0,'C1 0.3 % errors leave no red packet');
+ assert.equal(h.edge(0).getAttribute('data-metrics-state'),'flowing');assert.equal(h.edge(0).getAttribute('data-metrics-verdict'),'proven');
+ assert.equal(h.edge(0).getAttribute('data-live-appearance'),'done','C1 Jira paint is untouched');
+ assert.equal(h.moving(2).length,3,'C1 100 req/h is three packets');assert.equal(h.moving(2).filter(c=>c.classList.contains('dv-metrics-packet-error')).length,1,'C1 30 % errors make one red packet');
+ assert.ok(h.edge(2).classList.contains('dv-metrics-degraded'),'C1 degraded edge is amber');
+ assert.equal(h.stream(1).length,0,'C1 silent edge has no stream');assert.equal(h.ghost(1).length,1,'C1 silent Done edge has a ghost');
+ assert.ok(h.edge(1).classList.contains('dv-metrics-silent'),'C1 dimmed stroke under the ghost');assert.equal(h.ghost(1)[0].getAttribute('data-dv-edge'),null,'C1 the ghost is not a second carrier');
+ assert.equal(h.edge(3).getAttribute('data-metrics-state'),null,'C1 unbound edge unchanged');assert.equal(h.stream(3).length+h.ghost(3).length,0);
+ assert.equal(h.edge(4).getAttribute('data-metrics-state'),'flowing');assert.equal(h.stream(4).length,0,'C1 only call and service edges stream');
+ for(const i of [0,2])assert.equal(h.edge(i).classList.contains('dv-metrics-silent'),false);
+ h.ctl.liveStatus.destroy();
+});
+
+test('C2 Metrics on gives bound nodes a sparkline strip and a proof seal, and leaves unbound nodes and text boxes alone',async()=>{
+ const h=cueHarness();await h.on();
+ const seal=id=>h.node(id).querySelector('.dv-metrics-seal'),spark=id=>h.node(id).querySelector('polyline.dv-metrics-sparkline');
+ for(const [id,want] of [['a','proven'],['b','live-early'],['c','unproven'],['f','degraded']]){
+  assert.ok(seal(id),'C2 seal on '+id);assert.equal(seal(id).getAttribute('data-seal'),want,'C2 seal kind on '+id);
+  assert.equal(seal(id).getAttribute('transform'),'translate(110 45)','C2 bottom-right corner of the 120×55 card');
+  assert.equal(h.node(id).getAttribute('data-metrics-verdict'),CUE_VERDICTS[id]);
+ }
+ assert.equal(spark('a'),null,'C2 no rate-like signal, no sparkline');
+ const points=spark('b').getAttribute('points').trim().split(/\s+/).map(p=>p.split(',').map(Number));
+ assert.equal(points.length,3,'C2 one point per series point');
+ assert.ok(points.every(([x,y])=>x>=0 && x<=120 && y>=55-12 && y<=55),'C2 the strip runs along the card bottom');
+ assert.ok(points[0][1]>points[2][1],'C2 a rising series rises');
+ for(const id of ['d','note']){assert.equal(h.node(id).querySelector('.dv-metrics-node'),null,'C2 '+id+' unchanged');assert.equal(h.node(id).getAttribute('data-metrics-state'),null);}
+ assert.equal(h.view.querySelectorAll('.dv-metrics-node,.dv-metrics-stream').flatMap(g=>g.querySelectorAll('text')).length,0,'C2 no text on the canvas');
+ h.ctl.liveStatus.destroy();
+});
+
+test('C3 Metrics off removes every cue; a rebuild re-applies them; destroy removes them',async()=>{
+ const h=cueHarness();await h.on();const t=h.ctl.telemetry;
+ assert.ok(h.cues().length>0,'C3 cues while on');
+ t.setEnabled(false);assert.equal(h.cues().length,0,'C3 off removes every cue');assert.equal(h.edge(0).getAttribute('data-live-appearance'),'done','C3 Jira paint stays');
+ t.setEnabled(true);await settle();assert.equal(h.moving(0).length,4,'C3 on again');
+ h.cues().forEach(el=>{if(el.getAttribute('data-metrics-state')===null)el.remove();});
+ h.ctl.sections[0].sectionEl.dispatchEvent({type:'dv:pathrender'});h.flush();
+ assert.equal(h.moving(0).length,4,'C3 re-applied after a rebuild');assert.equal(h.ghost(1).length,1);
+ h.setMap({...CUE_MAP(),'a->b':{signals:{rate:{value:20},errors:{value:0}}}});t.apply({...CUE_MAP(),'a->b':{signals:{rate:{value:20},errors:{value:0}}}});
+ assert.equal(h.moving(0).length,2,'C3 the stream follows a telemetry change');
+ h.ctl.liveStatus.destroy();assert.equal(h.cues().length,0,'C3 destroy removes every cue');
+});
+
+async function importedCueHarness(label,t){
+ const spec=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=spec('provider',{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'},{from:'store',to:'api',label:'Return'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store','store->api']}}});
+ const consumer=spec('consumer',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{tickets:['IMP-1'],telemetry:CUE_SERVICE()}},edgeTracking:{'api->store':{tickets:['IMP-2'],telemetry:TCALL()},'store->api':{tickets:['IMP-3'],telemetry:TCALL()}}}]});
+ const middle=structuredClone(consumer);middle.page.canon.id='middle';middle.page.sections[0].diagram.topologyExports={nested:{nodes:['shared::api','shared::store'],edges:['shared::api->shared::store','shared::store->shared::api']}};
+ const outer=spec('outer',{nodes:{},rows:[[]],topologyImports:[{spec:'middle',export:'nested',as:'outer'}]});
+ const seed=harness();t.after(()=>seed.ctl.liveStatus.destroy());
+ const doc=label==='direct'?consumer:outer,prefix=label==='direct'?'shared::':'outer::shared::';
+ const resolved=seed.C.FlowTopology.resolveSource(doc,{version:1,id:doc.page.canon.id,specs:[provider,consumer,middle,outer]});
+ const api=prefix+'api',store=prefix+'store',edgeId=api+'->'+store,silentId=store+'->'+api;
+ const samples={[api]:{signals:{rate:{value:50,series:[[1,30],[2,50]]}}},[edgeId]:{signals:{rate:{value:500},errors:{value:1}}},[silentId]:{signals:{rate:{value:0},errors:{value:0}}}};
+ const h=harness(resolved,{provider:()=>Promise.resolve({'IMP-1':{state:'done'},'IMP-2':{state:'done'},'IMP-3':{state:'done'}})},{telemetry:{provider:()=>Promise.resolve(samples)}});
+ t.after(()=>h.ctl.liveStatus.destroy());
+ const scope=h.ctl.sections[0].sectionEl,d=h.ctl.page.sections[0].diagram;
+ const index=d.edges.findIndex(e=>e.from+'->'+e.to===edgeId),silentIndex=d.edges.findIndex(e=>e.from+'->'+e.to===silentId);
+ assert.ok(index>=0 && silentIndex>=0,'C4 '+label+' imported edges resolved');
+ h.flush();h.flush();await settle();h.ctl.telemetry.setEnabled(true);await settle();
+ return {...h,scope,api,store,edgeId,silentId,index,silentIndex,node:scope.querySelector('g.node[data-dv-node="'+api+'"]')};
+}
+// Each scope AND cue contract gets its own test: an absent direct-node seal
+// cannot prevent nested streams, ghosts or cleanup from reaching assertions.
+for(const label of ['direct','nested']){
+ test('C4 '+label+' imported carriers retain the selected telemetry bindings',async t=>{
+  const h=await importedCueHarness(label,t),bindings=plain(h.ctl.telemetry.bindings());
+  assert.deepEqual(bindings.map(b=>b.id),[h.api,h.edgeId,h.silentId]);
+  assert.deepEqual(bindings[0].signals.rate,{source:'grafana',query:'sum(rate(http_requests_total[5m]))*3600',unit:'req/h'});
+ });
+ test('C4 '+label+' imported node gets a proven seal',async t=>{
+  const h=await importedCueHarness(label,t);
+  assert.equal(h.node.querySelector('.dv-metrics-seal')?.getAttribute('data-seal'),'proven','C4 '+label+' imported node seal');
+ });
+ test('C4 '+label+' imported node gets a sparkline',async t=>{
+  const h=await importedCueHarness(label,t);
+  assert.ok(h.node.querySelector('polyline.dv-metrics-sparkline'),'C4 '+label+' imported node sparkline');
+ });
+ test('C4 '+label+' imported flowing edge gets a stream',async t=>{
+  const h=await importedCueHarness(label,t);
+  const moving=h.scope.querySelectorAll('g.dv-metrics-stream').filter(g=>g.getAttribute('data-metrics-edge')===String(h.index)).flatMap(g=>g.querySelectorAll('circle.dv-metrics-moving'));
+  assert.equal(moving.length,3,'C4 '+label+' imported edge stream');
+ });
+ test('C4 '+label+' imported silent Done edge gets a ghost',async t=>{
+  const h=await importedCueHarness(label,t);
+  assert.equal(h.scope.querySelectorAll('path.dv-metrics-ghost').filter(p=>p.getAttribute('data-metrics-edge')===String(h.silentIndex)).length,1,'C4 '+label+' silent imported edge ghost');
+ });
+ test('C4 '+label+' imported silent edge stroke is dimmed',async t=>{
+  const h=await importedCueHarness(label,t);
+  assert.ok(h.scope.querySelector('path.edge[data-dv-edge="'+h.silentIndex+'"]').classList.contains('dv-metrics-silent'),'C4 '+label+' silent imported stroke dimmed');
+ });
+ test('C4 '+label+' unbound imported node stays unchanged',async t=>{
+  const h=await importedCueHarness(label,t),node=h.scope.querySelector('g.node[data-dv-node="'+h.store+'"]');
+  assert.equal(node.querySelectorAll(CUE_SELECTOR).length,0);
+  assert.equal(node.getAttribute('data-metrics-state'),null,'C4 '+label+' unbound imported node unchanged');
+ });
+ for(const action of ['off','destroy'])test('C4 '+label+' '+action+' removes imported cues and carrier decoration',async t=>{
+  const h=await importedCueHarness(label,t),paintedWhileOn=h.scope.querySelectorAll(CUE_SELECTOR).length;
+  if(action==='off')h.ctl.telemetry.setEnabled(false);else h.ctl.liveStatus.destroy();
+  assert.deepEqual({paintedWhileOn:paintedWhileOn>0,remaining:h.scope.querySelectorAll(CUE_SELECTOR).length},{paintedWhileOn:true,remaining:0},'C4 '+label+' '+action+' removes cues painted while on');
+  assert.equal(h.scope.querySelectorAll('.dv-metrics-bound,.dv-metrics-flowing,.dv-metrics-degraded,.dv-metrics-silent,.dv-metrics-unobserved,.dv-metrics-ghosted,[data-metrics-verdict]').length,0,'C4 '+label+' '+action+' removes carrier classes and verdicts');
+ });
+}
+
+test('C5 Metrics packets never wear the ordinary packet classes and the frame measure skips the stream layer',async()=>{
+ const h=cueHarness();await h.on();
+ const packets=h.view.querySelectorAll('circle.dv-metrics-packet');assert.ok(packets.length>0);
+ assert.ok(packets.every(c=>!c.classList.contains('pkt') && !c.classList.contains('comm-packet') && !c.classList.contains('loopdot')),'C5 own classes only');
+ assert.match(fs.readFileSync('src/engine.js','utf8'),/child\.matches\('[^']*\.dv-metrics-stream[^']*'\)/,'C5 the frame measure skips the stream layer');
+ const css=fs.readFileSync('src/style.core.css','utf8');
+ assert.match(css,/@media \(prefers-reduced-motion: reduce\)\{[^}]*\.dv-metrics-moving\{display:none/,'C5 reduced motion hides moving packets');
+ assert.match(css,/@media print\{[^}]*\.dv-metrics-moving\{display:none/,'C5 print hides moving packets');
+ h.ctl.liveStatus.destroy();
+});
+
+test('C6 a Live status demo source with telemetry shows Metrics as demo, reaches the same controller, and yields to a host provider',async()=>{
+ let live=null;const day={'a->b':{signals:{rate:{value:1300},errors:{value:0}}}};
+ const demo=()=>({provider:()=>Promise.resolve(CUE_JIRA),telemetry:{provider:()=>day},demo:{mount:api=>{live=api;return ()=>{};}}});
+ const h=harness(cuePage(),demo()),t=h.ctl.telemetry;
+ assert.ok(t && t.snapshot().available,'C6 the demo telemetry source makes Metrics available');
+ assert.equal(live.telemetry,t,'C6 the demo reaches ctl.telemetry through the Live status API');
+ const panel=mountStatus(h);h.flush();h.flush();await settle();
+ const metrics=h.view.querySelector('button.dv-live-metrics'),conn=h.view.querySelector('.dv-live-metrics-connection');
+ assert.equal(metrics.hidden,false);metrics.dispatchEvent({type:'click'});await settle();
+ assert.equal(conn.getAttribute('data-state'),'demo','C6 reported as demo');assert.match(conn.querySelectorAll('span')[0].textContent,/^Metrics: demo, refreshed /);
+ live.telemetry.apply({'a->b':{signals:{rate:{value:20},errors:{value:0}}}});
+ assert.equal(h.view.querySelectorAll('g.dv-metrics-stream').filter(g=>g.getAttribute('data-metrics-edge')==='0').flatMap(g=>g.querySelectorAll('circle.dv-metrics-moving')).length,2,'C6 a demo day push repaints the canvas');
+ panel.destroy();h.ctl.liveStatus.destroy();
+ let hostCalls=0;const hosted=harness(cuePage(),demo(),{telemetry:{provider:()=>{hostCalls++;return Promise.resolve({});}}});
+ hosted.flush();hosted.flush();await settle();hosted.ctl.telemetry.setEnabled(true);await settle();
+ assert.equal(hostCalls,1,'C6 a host telemetry provider wins over the demo');assert.equal(hosted.ctl.liveStatus.snapshot().metrics.demo,false);
+ hosted.ctl.liveStatus.destroy();
+});
+
+/* #943: the claude.ai Grafana adapter (src/viewer/telemetry-claude.js) names its connector.
+| M9 | With `telemetry.source` (the Grafana adapter passes 'Grafana') the metrics connector text reads "<source> not connected", "<source> connecting · <window> window", "<source> connected · <window> window · refreshed <time>" plus " · <note>" when the provider reported a note for that answer (third provider argument, `report.note(text)`; a clean answer clears it), "<source> needs approval · <window> window" with data-state approval for a rejection whose `state` is 'approval', and the error note (else "<source> did not answer") on error. The window is tracking.telemetry.window, default 24h. snapshot().metrics carries source and window. Without a source the "Metrics: …" text is unchanged (M6). |
+| M10 | The panel's action button (ctl.liveStatus.action) also shows on a page whose only live evidence is a telemetry provider, so "Allow Grafana" reaches viewers of a metrics-only board. |
+*/
+test('M9 a named telemetry source reads "<source> connected · <window> window · refreshed <time>", carries its note, approval and error',async()=>{
+ let mode='ok',reports=0;const sample={a:{signals:{lag:{value:3}}}};
+ const provider=(b,signal,report)=>{
+  if(report && typeof report.note==='function'){reports++;if(mode==='note')report.note('1 Grafana query failed: a lag: boom');}
+  if(mode==='approval')return Promise.reject(Object.assign(Error('Grafana access needs your approval'),{state:'approval'}));
+  if(mode==='error')return Promise.reject(Error('Reconnect Grafana in claude.ai Settings → Connectors'));
+  if(mode==='bare')return Promise.reject(Error(''));
+  return Promise.resolve(sample);
+ };
+ const h=harness(telemetryPage(),{},{telemetry:{source:'Grafana',provider}});
+ const panel=mountStatus(h);h.flush();h.flush();await settle();
+ const metrics=h.view.querySelector('button.dv-live-metrics'),conn=h.view.querySelector('.dv-live-metrics-connection'),text=()=>conn.querySelectorAll('span')[0].textContent;
+ assert.equal(text(),'Grafana not connected','M9 idle');assert.equal(conn.getAttribute('data-state'),'disconnected');
+ metrics.dispatchEvent({type:'click'});assert.equal(text(),'Grafana connecting · 24h window','M9 connecting names the default 24h window');
+ await settle();assert.ok(reports>0,'M9 the provider receives a report object with note()');
+ const clock=()=>metricsClock(h.ctl.telemetry.status().refreshedAt);
+ assert.equal(conn.getAttribute('data-state'),'connected');assert.equal(text(),'Grafana connected · 24h window · refreshed '+clock());
+ const snap=h.ctl.liveStatus.snapshot().metrics;assert.equal(snap.source,'Grafana');assert.equal(snap.window,'24h');
+ const tick=()=>{const entry=[...h.timers].find(([,x])=>x.ms===60000);assert.ok(entry,'M9 refresh armed');h.timers.delete(entry[0]);entry[1].fn();};
+ mode='note';tick();await settle();
+ assert.equal(h.ctl.telemetry.status().state,'ok');assert.equal(h.ctl.telemetry.status().note,'1 Grafana query failed: a lag: boom','M9 a reported note rides a good answer');
+ assert.equal(text(),'Grafana connected · 24h window · refreshed '+clock()+' · 1 Grafana query failed: a lag: boom');
+ mode='ok';tick();await settle();assert.equal(h.ctl.telemetry.status().note,'','M9 a clean answer clears the note');assert.equal(text(),'Grafana connected · 24h window · refreshed '+clock());
+ const kept=plain(h.ctl.telemetry.snapshot().map);mode='approval';tick();await settle();
+ assert.equal(h.ctl.telemetry.status().state,'approval','M9 a rejection with state approval');assert.equal(conn.getAttribute('data-state'),'approval');assert.equal(text(),'Grafana needs approval · 24h window');
+ assert.deepEqual(plain(h.ctl.telemetry.snapshot().map),kept,'M9 approval keeps the map like any rejection');
+ mode='error';tick();await settle();assert.equal(conn.getAttribute('data-state'),'error');assert.equal(text(),'Reconnect Grafana in claude.ai Settings → Connectors','M9 the error note names the fix');
+ mode='bare';tick();await settle();assert.equal(text(),'Grafana did not answer','M9 an error without a note');
+ panel.destroy();h.ctl.liveStatus.destroy();
+ const six=telemetryPage();six.page.tracking.telemetry.window='6h';
+ const w=harness(six,{},{telemetry:{source:'Grafana',provider:()=>new Promise(()=>{})}}),wp=mountStatus(w);
+ w.view.querySelector('button.dv-live-metrics').dispatchEvent({type:'click'});
+ assert.equal(w.view.querySelector('.dv-live-metrics-connection').querySelectorAll('span')[0].textContent,'Grafana connecting · 6h window','M9 the authored window');
+ wp.destroy();w.ctl.liveStatus.destroy();
+});
+
+test('M10 the action button shows on a metrics-only page so Allow Grafana reaches its viewers',()=>{
+ const page={page:{tracking:{telemetry:{grafana:{prometheus:'prom-main'}}},sections:[{id:'main',diagram:{nodes:{a:{title:'A',telemetry:TQUEUE()}},rows:[['a']]}}]}};
+ const h=harness(page,{},{telemetry:{source:'Grafana',provider:()=>Promise.resolve({})}}),panel=mountStatus(h);
+ assert.equal(h.ctl.liveStatus.snapshot().available,false,'M10 no Jira evidence on this page');
+ let ran=0;h.ctl.liveStatus.action('Allow Grafana',()=>ran++);
+ const action=h.view.querySelector('.dv-live-action');
+ assert.ok(action,'M10 the action button');assert.equal(action.hidden,false,'M10 visible beside Metrics');assert.equal(action.textContent,'Allow Grafana');
+ action.dispatchEvent({type:'click'});assert.equal(ran,1,'M10 it runs the adapter action');
+ h.ctl.liveStatus.action('',null);assert.equal(h.view.querySelector('.dv-live-action').hidden,true,'M10 cleared, it hides');
+ panel.destroy();h.ctl.liveStatus.destroy();
+});
+
 /* Over time contract matrix (#929, PR 1 of 3). Source: issue behavior items 1-4, 6, 8 and 11 and
    Chuck's rulings of 2026-11-03. Real slider input and the demo player are in live-status.spec.mjs.
 | row | fixture | assertion (scoped) | rejects |
@@ -2224,4 +2671,14 @@ test('OT16 First blocker cannot reach a ticket that has no status on the day, an
  assert.equal(api.snapshot().firstBlocker,true,'contrasting day: EE-1 is really blocked');assert.equal(first().textContent,'First blocker');assert.equal(first().disabled,false);assert.equal(api.snapshot().epic.blocked,1);
  api.overTimeDay(0);h.flush();assert.ok(edge.classList.contains('dv-live-missing'),'the step edge wears the Missing paint');
  assert.equal(api.snapshot().firstBlocker,false);assert.equal(first().textContent,'No blockers');assert.equal(first().disabled,true);assert.equal(api.snapshot().epic.blocked,0);
+});
+
+test('Proof is cleared from retained panels on telemetry and live-status controller destruction',()=>{
+ for(const owner of ['telemetry','liveStatus']){
+  const h=harness(fixture()),api=h.ctl.liveStatus;h.ctl.page.sections[0].diagram.nodes.a.telemetry={kind:'service',signals:{rate:{grafana:'explicit',unit:'req/h'}},proof:{rate:{min:1}}};
+  api.apply(fixed);api.note('Keep Jira print evidence');const mounted=mountStatus(h);
+  h.ctl.telemetry.apply({a:{signals:{rate:{value:5}}}});assert.ok(mounted.body.querySelector('.dv-live-proof'));
+  h.ctl[owner].destroy();assert.ok(!mounted.body.querySelector('.dv-live-proof'),owner+' removes Proof from retained DOM');assert.ok(!mounted.body.querySelector('.dv-live-proof-table'));
+  assert.equal(mounted.body.querySelector('.dv-live-note').textContent,'Keep Jira print evidence');api.destroy();
+ }
 });

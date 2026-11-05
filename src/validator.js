@@ -677,6 +677,34 @@ function validate(page){
     warnings.push('tracking.dependencies['+index+']: '+(self?'a ticket cannot depend on itself':'use {"ticket": "UX-89", "on": "HW-124", "reason"?: "text"} with Jira keys')+' — entry ignored');
   });
   trackingDependencyLinks(page,function(index){warnings.push('tracking.jira.dependencyLinks'+(index===null?': must be an array of Jira link descriptions such as "is blocked by" — using the defaults':'['+index+']: use a non-empty link description — entry ignored'));});
+  // Telemetry bindings (#937): page config, then every carrier and consumer overlay
+  // with the page's templates. Warnings only; invalid entries are ignored.
+  var telemetry=trackingTelemetry(page,function(path,message){warnings.push('tracking.telemetry'+path+': '+message);}),hasTelemetry=false;
+  sectionRecords(page).forEach(function(record){
+    var d=record.section && record.section.diagram,DP=record.path+'.diagram';
+    if(!specObject(d))return;
+    function bound(carrier,at){
+      if(!specObject(carrier) || !Object.prototype.hasOwnProperty.call(carrier,'telemetry'))return;
+      hasTelemetry=true;
+      carrierTelemetry(carrier,telemetry.templates,function(path,message){warnings.push(at+'.telemetry'+path+': '+message);});
+    }
+    if(specObject(d.nodes))Object.keys(d.nodes).forEach(function(id){bound(d.nodes[id],DP+'.nodes.'+id);});
+    (Array.isArray(d.edges)?d.edges:[]).forEach(function(e,i){bound(e,DP+'.edges['+i+']');});
+    // Provider bindings the resolver dropped because the provider's own templates
+    // could not expand them; the carrier is unbound and the provider path is named.
+    if(typeof FlowTopology!=='undefined' && FlowTopology.telemetryDrops)FlowTopology.telemetryDrops(d).forEach(function(drop){
+      var at=DP+'.nodes.'+drop.id;
+      if(drop.kind==='edges')(Array.isArray(d.edges)?d.edges:[]).some(function(e,i){if(e && e.from+'->'+e.to===drop.id){at=DP+'.edges['+i+']';return true;}return false;});
+      warnings.push(at+'.telemetry: provider "'+drop.spec+'" '+drop.path+': '+drop.message);
+    });
+    // A resolved snapshot already carries overlay bindings on its imported carriers.
+    if(!d.topologyProvenance)(Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp,i){
+      if(!specObject(imp))return;
+      ['nodeTracking','edgeTracking'].forEach(function(field){
+        if(specObject(imp[field]))Object.keys(imp[field]).forEach(function(key){bound(imp[field][key],DP+'.topologyImports['+i+'].'+field+'.'+key);});
+      });
+    });
+  });
   editHistoryEntries(page,function(message){warnings.push(message);});
   var statusPanels=[],hasTracking=Object.prototype.hasOwnProperty.call(page,'tracking'),hasTickets=false;
   sectionRecords(page).forEach(function(record){var d=record.section.diagram || {};
@@ -689,8 +717,8 @@ function validate(page){
     });
     (d.panels || []).forEach(function(panel,index){if(panel && panel.type==='live-status')statusPanels.push(record.reference+'.diagram.panels['+index+']');});
   });
-  if((hasTracking || hasTickets) && !statusPanels.length)warnings.push('page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup');
-  if(!hasTracking && !hasTickets)statusPanels.forEach(function(path){warnings.push(path+': this page has no ticket references — the panel will be empty');});
+  if((hasTracking || hasTickets || hasTelemetry) && !statusPanels.length)warnings.push('page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup');
+  if(!hasTracking && !hasTickets && !hasTelemetry)statusPanels.forEach(function(path){warnings.push(path+': this page has no ticket references — the panel will be empty');});
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
   validateDocumentLinks(page.documentLinks,page.canon && page.canon.id,'page.documentLinks',errors);

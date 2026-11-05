@@ -191,3 +191,23 @@ test('changing Standard to Explore never manufactures panel-derived Views',async
   await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
+
+for(const surface of ['top','chapter'])for(const target of ['resident','engineering'])test('desktop '+surface+' View button edits '+target+' in place',async({page,server})=>{
+ await page.setViewportSize({width:1920,height:1000});const raw=fixture(),original=await open(page,server,raw),src=page.locator('#src'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder');
+ const other=target==='resident'?'engineering':'resident',button=id=>nav(page).locator((surface==='top'?'.reader-top-view':'.tab-view-choices button')+'[data-tab-view="'+id+'"]');
+ const editor=page.locator('.dv-inline-editor').getByRole('textbox',{name:'View name',exact:true}),expected=raw.page.blocks[0].views.find(v=>v.id===target).name;
+ await button(other).click();await expect(section(page)).toHaveAttribute('data-view-id',other);await expect(editor).toHaveCount(0);
+ await button(target).dblclick();await expect(editor).toBeVisible();await expect(editor).toBeFocused();await expect(editor).toHaveValue(expected);await expect(section(page)).toHaveAttribute('data-view-id',target);
+ await editor.fill('Discarded');await editor.press('Escape');await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();
+ await button(target).dblclick();await editor.fill('');await editor.press('Enter');await expect(page.locator('.dv-inline-editor [role=status]')).toHaveText('Use a View name between 1 and 80 characters.');await expect(src).toHaveValue(original);await editor.fill('x'.repeat(81));await editor.press('Enter');await expect(page.locator('.dv-inline-editor [role=status]')).toHaveText('Use a View name between 1 and 80 characters.');await expect(src).toHaveValue(original);await editor.press('Escape');await expect(undo).toBeDisabled();
+ await button(target).dblclick();await editor.fill('Updated View');await editor.press('Enter');const saved=await src.inputValue(),want=structuredClone(raw);want.page.blocks[0].views.find(v=>v.id===target).name='Updated View';expect(JSON.parse(saved)).toEqual(want);
+ await expect(nav(page).locator('.reader-top-view[data-tab-view="'+target+'"]')).toContainText('Updated View');await expect(nav(page).getByRole('combobox',{name:'Choose View',exact:true}).locator('option').filter({hasText:'Updated View'})).toHaveCount(1);await expect(section(page)).toHaveAttribute('data-view-id',target);
+ await undo.click();await expect(src).toHaveValue(original);await expect(section(page)).toHaveAttribute('data-view-id',target);await expect(undo).toBeDisabled();await redo.click();await expect(src).toHaveValue(saved);await expect(section(page)).toHaveAttribute('data-view-id',target);
+ await button(target).dblclick();await editor.fill('Outside View');await page.locator('#workbench-editor-title').click();const outside=structuredClone(want);outside.page.blocks[0].views.find(v=>v.id===target).name='Outside View';expect(JSON.parse(await src.inputValue())).toEqual(outside);await expect(section(page)).toHaveAttribute('data-view-id',target);await undo.click();await expect(src).toHaveValue(saved);
+ await button(target).dblclick();await editor.fill('Stale View');await writeSource(page,saved+' ');await expect(editor).toHaveCount(0);await expect(src).toHaveValue(saved+' ');
+});
+
+test('double-clicking a diagram layout button does not open View name editing',async({page,server})=>{
+ const raw=fixture();delete raw.page.blocks[0].views;delete raw.page.blocks[0].defaultView;delete raw.page.opening;const original=await open(page,server,raw);
+ const layout=section(page).locator('[data-view-layout]').first();await layout.dblclick();await expect(page.locator('.dv-inline-editor').getByRole('textbox',{name:'View name',exact:true})).toHaveCount(0);await expect(page.locator('#src')).toHaveValue(original);
+});

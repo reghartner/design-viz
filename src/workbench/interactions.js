@@ -41,7 +41,13 @@ function createBuilderInteractions(opts){
   var inlineEditor=createInlineTextEditor({view:view,document:document,window:window,src:src,session:session,documentTitle:document.getElementById('workbench-editor-title'),
     disabled:function(){return !!(addToStep || connect) || opts.isActive && !opts.isActive();},pause:pausePreview,targetFromEvent:targetFromEvent,findTargetEl:findTargetEl,
     currentStep:function(el){return currentStepTarget(el.closest('.stepline'));},
+    viewTarget:function(el){
+      var nav=el.closest('.explore-navigation[data-navigation-section]'),ctl=opts.ctl && opts.ctl(),number=nav && Number(nav.getAttribute('data-navigation-section'));
+      var rec=ctl && ctl.sections.find(function(r){return r.number===number;}),definition=rec && ctl.views && ctl.views.current(rec),id=el.getAttribute('data-tab-view');
+      return definition && definition.id===id?{kind:'view',section:number-1,viewId:id}:null;
+    },
     commit:function(plan,snapshot,target,nextTarget){
+      if(target.kind==='view'){opts.renameView(target.section,target.viewId,plan.inlineValue);return;}
       if(plan.error){inspectorMessage(plan.error);return;}
       // Tab identity in the preview is its label. Preserve the shown tab by
       // position across this rename and its history replay, only when shown.

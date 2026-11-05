@@ -8,6 +8,7 @@ import {stepFixture,recordedUrlEvidence,AT} from '../../../tests/helpers/step-ev
 import {importedDetailSpec,nestedSpec,PANEL} from '../helpers/telemetry-cards.mjs';
 const metric=r=>r.getByRole('button',{name:'Metrics',exact:true});
 const card=r=>r.locator('.dv-trace-evidence');
+async function expandTrace(root){await expect(card(root)).toHaveCount(1);if(!await card(root).evaluate(el=>el.open))await card(root).locator(':scope > summary').press('Enter');}
 const step=r=>r.getByRole('button',{name:'Step',exact:true});
 const ambient=r=>r.getByRole('button',{name:'Ambient',exact:true});
 const over=r=>r.getByRole('button',{name:'Over time',exact:true});
@@ -30,6 +31,7 @@ async function setup(page,server,options={}){
   const other=JSON.parse(JSON.stringify(f.spec.page.sections[0]).replaceAll('mcu','other-mcu').replaceAll('ingest','other-ingest').replaceAll('notify','other-notify').replaceAll('app','other-app'));other.id='other';other.heading='Independent duplicate step IDs';f.spec.page.sections.push(other);
   for(const [key,value] of Object.entries(structuredClone(f.samples))){const id=key.replaceAll('mcu','other-mcu').replaceAll('ingest','other-ingest').replaceAll('notify','other-notify').replaceAll('app','other-app');value.signals.rate={value:0};delete value.exemplars;f.samples[id]=value;}
  }
+ if(options.noPanel)f.spec.page.sections[0].diagram.panels=[];
  if(options.views){const d=f.spec.page.sections[0].diagram;d.layouts=['one','two'].map(id=>({id,name:id==='one'?'Full view':'Alternate view',sectionLayout:{columns:24,default:[{x:0,y:0,w:16,h:18},{controls:'steps',attachTo:'diagram',x:0,y:18,w:16,h:6},{panel:'status',x:16,y:0,w:8,h:24}]}}));d.defaultLayout='one';}
  if(options.recordedUrl)f.samples['mcu->ingest'].exemplars=[await recordedUrlEvidence()];
  if(options.traceOnly)Object.values(f.samples).forEach(s=>s.signals={});
@@ -82,7 +84,7 @@ test('caption, actual exemplar actions, missing-span never row, keyboard next/pr
  const {root,f}=await setup(page,server);await expect(metric(root)).toHaveAttribute('aria-pressed','false');await expect(card(root)).toHaveCount(0);await metric(root).click();
  await expect(root.locator('.dv-proof-caption')).toContainText('PROVEN');await expect(root.locator('.dv-live-step-tickets')).toContainText('TRACE-1');await expect(root.getByRole('link',{name:'TRACE-1',exact:true}).first()).toHaveAttribute('href','https://jira.test/browse/TRACE-1');
  await expect(card(root)).toHaveAttribute('data-trace-id',f.samples['mcu->ingest'].exemplars[0].traceId);await expect(card(root).locator('.tr-op')).not.toHaveCount(0);
- await expect(card(root).locator('.dv-trace-never[data-step-id="push"]')).toBeVisible();await expect(card(root).locator('.dv-trace-never[data-step-id="push"]')).toContainText('absence here is one observed request, not proof that this never runs');
+ await expandTrace(root);await expect(card(root).locator('.dv-trace-never[data-step-id="push"]')).toBeVisible();await expect(card(root).locator('.dv-trace-never[data-step-id="push"]')).toContainText('absence here is one observed request, not proof that this never runs');
  await expect(card(root).getByRole('button',{name:'Pick passing trace',exact:true})).toBeVisible();await expect(card(root).getByRole('link')).toHaveCount(0);
  await capture(page,'trace-card-actions');const calls=await page.evaluate(()=>window.calls.provider);
  await root.getByRole('button',{name:'Next step',exact:true}).press('Enter');await expect(root.locator('.step-text')).toContainText('Publish the event');await expect(card(root).getByRole('button',{name:'Play this trace',exact:true})).toHaveCount(0);
@@ -94,9 +96,9 @@ test('caption, actual exemplar actions, missing-span never row, keyboard next/pr
 
 test('trace-only pin and real alternative are explicit, deduped and retired with Metrics off',async({page,server})=>{
  const {root,f}=await setup(page,server,{traceOnly:true});await metric(root).click();await expect(root.locator('.dv-live-proof')).toHaveCount(0);
- await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).press('Enter');await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();
+ await expandTrace(root);await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).press('Enter');await expandTrace(root);await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();
  await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(1);expect(await page.evaluate(()=>window.calls.choose)).toBe(0);
- await card(root).getByRole('button',{name:'Pick passing trace',exact:true}).click();await expect(card(root)).toHaveAttribute('data-trace-id',f.alternative.traceId);expect(await page.evaluate(()=>window.calls.choose)).toBe(1);
+ await expandTrace(root);await card(root).getByRole('button',{name:'Pick passing trace',exact:true}).click();await expect(card(root)).toHaveAttribute('data-trace-id',f.alternative.traceId);expect(await page.evaluate(()=>window.calls.choose)).toBe(1);
  await metric(root).click();await expect(card(root)).toHaveCount(0);await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(0);await unchanged(page);
 });
 
@@ -108,7 +110,7 @@ test('tandem Over time never borrows live traces; toggles stay independent and s
 });
 
 for(const origin of ['local','direct','nested'])for(const loaded of [false,true])test(`${origin} imports ${loaded?'actually loaded and reloaded selected detail':'in root'} have scoped captions, edge and node traces`,async({page,server})=>{
- const {root}=await setup(page,server,{origin,loaded});await metric(root).click();await expect(card(root)).toHaveCount(1);await expect(root.locator('.dv-proof-caption')).toContainText('PROVEN');await expect(card(root).locator('.dv-trace-never[data-step-id="push"]')).toBeVisible();
+ const {root}=await setup(page,server,{origin,loaded});await metric(root).click();await expect(card(root)).toHaveCount(1);await expect(root.locator('.dv-proof-caption')).toContainText('PROVEN');await expandTrace(root);await expect(card(root).locator('.dv-trace-never[data-step-id="push"]')).toBeVisible();
  await root.locator('[data-dv-path="node-path"]').first().click();await expect(root.locator('.step-text')).toContainText('Selected imported node');await expect(card(root)).toHaveCount(1);await expect(card(root).getByRole('button',{name:'Play this trace',exact:true})).toHaveCount(0);
  if(loaded){await metric(root).click();await root.locator('.detail-breadcrumb button').first().click();await expect(page.locator('#host [data-dv-detail-preview]')).toHaveCount(0);await page.locator('#host').getByRole('button',{name:'Explore Imported service',exact:true}).click();await page.evaluate(()=>{window.detail.page.sections[1].diagram.steps[0].text='Reloaded selected request';window.releases.shift()();});const scope=page.locator('#host [data-dv-detail-preview]:visible');await step(scope).click();await metric(scope).click();await expect(scope.locator('.step-text')).toContainText('Reloaded selected request');await expect(card(scope)).toHaveCount(1);expect(await page.evaluate(()=>window.calls.loads)).toBe(2);}
  await unchanged(page);
@@ -120,10 +122,10 @@ for(const options of [{missing:true},{noTrace:true},{noHandler:true},{unknown:tr
  if(options.missing){await expect(metric(root)).toBeHidden();await expect(card(root)).toHaveCount(0);return;}
  if(!options.preload)await metric(root).click();
  if(options.noTrace){await expect(card(root)).toHaveCount(0);return;}
- await expect(card(root)).toHaveCount(1);await expect(card(root).getByRole('button',{name:'Pick passing trace',exact:true})).toHaveCount(0);
+ await expect(card(root)).toHaveCount(1);await expandTrace(root);await expect(card(root).getByRole('button',{name:'Pick passing trace',exact:true})).toHaveCount(0);
  if(options.unknown)await expect(card(root).getByRole('link')).toHaveCount(0);
- if(options.noTimeline){await expect(card(root).getByText('Trace timeline unavailable.',{exact:true})).toBeVisible();await expect(card(root).locator('.dv-trace-never')).toHaveCount(0);await expect(card(root).getByRole('button',{name:'Play this trace',exact:true})).toHaveCount(0);}
- if(options.preload){await expect(metric(root)).toBeHidden();await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();await page.evaluate(()=>window.ctl.telemetry.setEnabled(false));await expect(card(root)).toHaveCount(0);await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(0);await page.evaluate(()=>window.ctl.telemetry.apply(window.fixture.samples));await expect(card(root)).toHaveCount(0);}
+ if(options.noTimeline){await expandTrace(root);await expect(card(root).getByText('Trace timeline unavailable.',{exact:true})).toBeVisible();await expect(card(root).locator('.dv-trace-never')).toHaveCount(0);await expect(card(root).getByRole('button',{name:'Play this trace',exact:true})).toHaveCount(0);}
+ if(options.preload){await expect(metric(root)).toBeHidden();await expandTrace(root);await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();await page.evaluate(()=>window.ctl.telemetry.setEnabled(false));await expect(card(root)).toHaveCount(0);await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(0);await page.evaluate(()=>window.ctl.telemetry.apply(window.fixture.samples));await expect(card(root)).toHaveCount(0);}
 });
 
 test('real packet durations, concurrent start offsets and zero restore on navigation, history, off, clear and destroy; native sibling isolation',async({page,server})=>{
@@ -131,28 +133,28 @@ test('real packet durations, concurrent start offsets and zero restore on naviga
  await expect(card(root).locator('.dv-trace-selection')).toContainText('Synthetic animation boundary fixture');
  await page.evaluate(()=>{window.starts=[];const native=SVGAnimationElement.prototype.beginElement;SVGAnimationElement.prototype.beginElement=function(){if(this.parentElement.classList.contains('dv-trace-packet'))window.starts.push({at:performance.now(),dur:this.getAttribute('dur'),actual:this.getSimpleDuration()});return native.call(this);};});
  const authored=await root.locator('.cpkt:not(.dv-trace-packet) animateMotion').evaluateAll(els=>els.map(el=>el.getAttribute('dur')));
- await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(3);
+ await expandTrace(root);await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(3);
  await expect.poll(()=>page.evaluate(()=>window.starts.length)).toBe(2);const starts=await page.evaluate(()=>window.starts);expect(starts.map(s=>s.dur)).toEqual(['600ms','800ms']);expect(starts[0].actual).toBeCloseTo(0.6,6);expect(starts[1].actual).toBeCloseTo(0.8,6);expect(starts[1].at-starts[0].at).toBeGreaterThan(110);expect(starts[1].at-starts[0].at).toBeLessThan(300);
  await expect(root.locator('.dv-trace-packet').nth(2)).toHaveAttribute('transform',/translate/);await expect(root.locator('.dv-trace-packet').nth(2).locator('animateMotion')).toHaveAttribute('dur','0ms');await expect(page.locator('#sibling .dv-trace-packet')).toHaveCount(0);
  await root.getByRole('button',{name:'Next step',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(0);expect(await root.locator('.cpkt animateMotion').evaluateAll(els=>els.map(el=>el.getAttribute('dur')))).toEqual(authored);await root.getByRole('button',{name:'Previous step',exact:true}).click();
- await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await root.locator('[data-dv-path="short"]').first().click();await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await root.locator('[data-dv-path="event"]').first().click();
- await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await card(root).getByRole('button',{name:'Pick passing trace',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await page.evaluate(()=>window.ctl.telemetry.apply(window.fixture.samples));
- await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await page.emulateMedia({reducedMotion:'reduce'});await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await page.emulateMedia({reducedMotion:'no-preference'});
- for(const action of ['history','off','clear']){await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();if(action==='history'){await over(root).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await root.getByRole('button',{name:'Live',exact:true}).click();}else if(action==='off'){await metric(root).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await metric(root).click();}else{await page.evaluate(()=>window.ctl.telemetry.clear());await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await page.evaluate(()=>window.ctl.telemetry.apply(window.fixture.samples));}}
- await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await page.evaluate(()=>{window.retained=document.querySelector('#host').shadowRoot;window.viewer.destroy();});expect(await page.evaluate(()=>window.retained.querySelectorAll('.dv-trace-packet,.dv-trace-evidence').length)).toBe(0);await expect(page.locator('#sibling .dv-trace-evidence')).toHaveCount(1);await unchanged(page);
+ await expandTrace(root);await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await root.locator('[data-dv-path="short"]').first().click();await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await root.locator('[data-dv-path="event"]').first().click();
+ await expandTrace(root);await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await expandTrace(root);await card(root).getByRole('button',{name:'Pick passing trace',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await page.evaluate(()=>window.ctl.telemetry.apply(window.fixture.samples));
+ await expandTrace(root);await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await page.emulateMedia({reducedMotion:'reduce'});await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await page.emulateMedia({reducedMotion:'no-preference'});
+ for(const action of ['history','off','clear']){await expandTrace(root);await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();if(action==='history'){await over(root).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await root.getByRole('button',{name:'Live',exact:true}).click();}else if(action==='off'){await metric(root).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await metric(root).click();}else{await page.evaluate(()=>window.ctl.telemetry.clear());await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await page.evaluate(()=>window.ctl.telemetry.apply(window.fixture.samples));}}
+ await expandTrace(root);await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await page.evaluate(()=>{window.retained=document.querySelector('#host').shadowRoot;window.viewer.destroy();});expect(await page.evaluate(()=>window.retained.querySelectorAll('.dv-trace-packet,.dv-trace-evidence').length)).toBe(0);await expect(page.locator('#sibling .dv-trace-evidence')).toHaveCount(1);await unchanged(page);
 });
 
 test('reduced motion, capability removal and source rebind retire timing and pins',async({page,server})=>{
- const {root}=await setup(page,server);await metric(root).click();await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await expect(card(root).locator('[role="status"]')).toContainText('Reduced motion');
- await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();await page.evaluate(()=>{window.allowed=false;window.ctl.telemetry.apply(window.fixture.samples);});await expect(card(root).getByRole('button',{name:'Pick passing trace',exact:true})).toHaveCount(0);
+ const {root}=await setup(page,server);await metric(root).click();await expandTrace(root);await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await expect(card(root).locator('[role="status"]')).toContainText('Reduced motion');
+ await expandTrace(root);await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();await page.evaluate(()=>{window.allowed=false;window.ctl.telemetry.apply(window.fixture.samples);});await expect(card(root).getByRole('button',{name:'Pick passing trace',exact:true})).toHaveCount(0);
  await page.evaluate(()=>window.ctl.telemetry.retractExemplars());await expect(card(root)).toHaveCount(0);await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(0);
- await page.evaluate(()=>window.ctl.telemetry.apply(window.fixture.samples));await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();await page.evaluate(()=>window.ctl.telemetry.bindingsChanged(['mcu->ingest']));await expect(card(root)).toHaveCount(0);await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(0);
+ await page.evaluate(()=>window.ctl.telemetry.apply(window.fixture.samples));await expandTrace(root);await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();await page.evaluate(()=>window.ctl.telemetry.bindingsChanged(['mcu->ingest']));await expect(card(root)).toHaveCount(0);await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(0);
  await page.evaluate(()=>window.ctl.telemetry.setAvailable(false));await expect(metric(root)).toBeHidden();await unchanged(page);
 });
 
 
 test('Open uses the recorded safe provider UI URL and strips a transport URL',async({page,server})=>{
- const {root,f}=await setup(page,server,{recordedUrl:true});await metric(root).click();
+ const {root,f}=await setup(page,server,{recordedUrl:true});await metric(root).click();await expandTrace(root);
  const url=f.samples['mcu->ingest'].exemplars[0].url;expect(url).toMatch(/^https:\/\/ui\.honeycomb\.io\//);
  await expect(card(root).getByRole('link',{name:'Open trace in Honeycomb'})).toHaveAttribute('href',url);
  await page.evaluate(()=>{const value=structuredClone(window.fixture.samples);value['mcu->ingest'].exemplars[0].url='https://mcp.honeycomb.io/query_results/private';window.ctl.telemetry.apply(value);});await expect(card(root).getByRole('link')).toHaveCount(0);
@@ -168,7 +170,7 @@ test('mixed verdict caption keeps primary headline and trace; duplicate IDs stay
 
 test('real view choice restores temporary timing without changing document layout',async({page,server})=>{
  await page.emulateMedia({reducedMotion:'no-preference'});const {root}=await setup(page,server,{views:true,timed:true});await metric(root).click();
- await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(3);
+ await expandTrace(root);await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(3);
  await root.getByRole('tab',{name:'Alternate view',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(0);await expect(card(root)).toHaveCount(1);await expect(card(root)).toBeVisible();await unchanged(page);
 });
 
@@ -181,11 +183,27 @@ test('generated standalone fixture demonstrates trace actions alongside Over tim
  await page.emulateMedia({reducedMotion:'no-preference'});
  await page.setViewportSize({width:1600,height:1200});await page.goto(server.origin+'/step-demo/step-evidence.html');const root=page.locator('#docview');
  await expect(root.getByRole('heading',{name:'Trace evidence · shared mock story fixture',exact:true})).toBeVisible();
- await step(root).click();await metric(root).click();await expect(card(root)).toBeVisible();await expect(card(root).locator('.dv-trace-never[data-step-id="push"]')).toBeVisible();await capture(page,'standalone-trace-actions');
- await expect(card(root).getByRole('link')).toHaveCount(0);await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(1);
- await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(1);
+ await step(root).click();await metric(root).click();await expect(card(root)).toBeVisible();await expandTrace(root);await expect(card(root).locator('.dv-trace-never[data-step-id="push"]')).toBeVisible();await capture(page,'standalone-trace-actions');
+ await expect(card(root).getByRole('link')).toHaveCount(0);await expandTrace(root);await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(1);
+ await expandTrace(root);await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(1);
  await over(root).click();await root.getByRole('slider',{name:'Day',exact:true}).press('Home');await expect(card(root)).toHaveCount(0);await expect(root.locator('.dv-proof-caption')).toContainText('IN PROGRESS');await capture(page,'standalone-over-time');
- await root.getByRole('button',{name:'Live',exact:true}).click();await expect(card(root)).toBeVisible();await card(root).getByRole('button',{name:'Pick passing trace',exact:true}).click();await expect(card(root).locator('.tr-op')).toHaveCount(3);
+ await root.getByRole('button',{name:'Live',exact:true}).click();await expect(card(root)).toBeVisible();await expandTrace(root);await card(root).getByRole('button',{name:'Pick passing trace',exact:true}).click();await expect(card(root).locator('.tr-op')).toHaveCount(3);
  expect(await readFile(artifact)).toEqual(html);
  await writeFile(path.join(repo,'.local/step-evidence/standalone-artifact.json'),JSON.stringify({artifact,sha256:createHash('sha256').update(html).digest('hex'),served_identical_bytes:true,visible_mock_heading:true,actions:['Metrics','Play this trace','Pin as evidence','Over time','Day Home','Live','Pick passing trace'],provider_url_absent:true},null,2)+'\n');
+});
+
+for(const noPanel of [false,true])test('desktop trace disclosure starts closed in '+(noPanel?'fallback rail':'Live status rail')+' without resizing tall diagram',async({page,server})=>{
+ const {root}=await setup(page,server,{views:!noPanel,noPanel});
+ const diagram=root.locator('.boardcanvas').first();if(noPanel)await page.evaluate(()=>window.ctl.telemetry.setEnabled(true));else await metric(root).click();await expect(card(root)).toHaveCount(1);
+ await page.evaluate(()=>{const values=structuredClone(window.fixture.samples);Object.values(values).forEach(s=>delete s.exemplars);window.ctl.telemetry.apply(values);});await expect(card(root)).toHaveCount(0);const before=await diagram.boundingBox();await page.evaluate(()=>window.ctl.telemetry.apply(window.fixture.samples));await expect(card(root)).toHaveCount(1);
+ await expect(card(root)).not.toHaveAttribute('open','');expect(await card(root).evaluate(el=>!!el.closest('.diagramcol'))).toBe(false);
+ if(noPanel)await expect(root.locator('.dv-trace-rail > .dv-trace-evidence')).toHaveCount(1);else await expect(root.locator('.pt-live-status .dv-live-trace-slot > .dv-trace-evidence')).toHaveCount(1);
+ const after=await diagram.boundingBox();expect(Math.abs(after.width-before.width)).toBeLessThan(2);expect(Math.abs(after.height-before.height)).toBeLessThan(2);
+ await card(root).locator(':scope > summary').press('Enter');await expect(card(root)).toHaveAttribute('open','');await expect(card(root).getByRole('button',{name:'Pin as evidence',exact:true})).toBeVisible();
+ const body=card(root).locator('.dv-trace-evidence-body');expect((await body.boundingBox()).height).toBeLessThanOrEqual(420);expect(await body.evaluate(el=>getComputedStyle(el).overflowY)).toBe('auto');
+ if(!noPanel){const tile=await root.locator('.section-layout-tile[data-layout-key="diagram"]').boundingBox(),evidence=await card(root).boundingBox();expect(evidence.x>=tile.x+tile.width || evidence.y>=tile.y+tile.height).toBe(true);}
+ const expanded=await diagram.boundingBox();expect(Math.abs(expanded.width-before.width)).toBeLessThan(2);expect(Math.abs(expanded.height-before.height)).toBeLessThan(2);
+ await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();await capture(page,noPanel?'fallback-trace-rail':'live-status-trace-rail');
+ await ambient(root).click();await expect(card(root)).toHaveCount(0);await expect(root.locator('.dv-trace-rail')).toHaveCount(0);await step(root).click();await expect(card(root)).not.toHaveAttribute('open','');
+ await page.evaluate(()=>window.viewer.destroy());await expect(card(root)).toHaveCount(0);
 });

@@ -47,7 +47,7 @@ const TOOL_INPUTS = {
     properties: {
       environment_slug: string(`Mock environment slug; must be ${ENVIRONMENT}`),
       trace_id: string('Specific 32-character lowercase hexadecimal trace ID'),
-      from: string('Relative duration such as 24h, now-24h, or an RFC3339 instant'),
+      from: string('Signed relative duration such as -24h, now, or an RFC3339 instant'),
       view_mode: { type: 'string', enum: [...TRACE_VIEW_MODES], description: 'auto (default) or full' }
     }
   }
@@ -74,18 +74,16 @@ function worldFor(env) {
 }
 
 const iso = value => new Date(value).toISOString().replace('.000Z', 'Z');
-const DURATION = /^(\d+(?:\.\d+)?)(m|h|d)$/;
 const DURATION_MS = { m: 60000, h: HOUR, d: DAY };
 function parseInstant(value, now, relativeFrom = false) {
   if (typeof value !== 'string') return null;
   const text = value.trim();
   if (relativeFrom) {
-    const duration = DURATION.exec(text);
+    const duration = /^-(\d+(?:\.\d+)?)(m|h|d)$/.exec(text);
     if (duration) return now - Number(duration[1]) * DURATION_MS[duration[2]];
   }
   if (text === 'now') return now;
-  const relative = /^now-(\d+(?:\.\d+)?)(m|h|d)$/.exec(text);
-  if (relative) return now - Number(relative[1]) * DURATION_MS[relative[2]];
+
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/i.test(text)) return null;
   const parsed = Date.parse(text);
   return Number.isFinite(parsed) ? parsed : null;
@@ -184,7 +182,7 @@ function queryError(args, world) {
     return `unknown mock carrier signal ${filters.carrier}.${filters.signal}`;
   }
   const start = parseInstant(spec.from, world.now, true);
-  if (start === null) return 'query_spec.from must be a duration such as 24h, now-24h, or an RFC3339 instant';
+  if (start === null) return 'query_spec.from must be a signed duration such as -24h, now, or an RFC3339 instant';
   const end = spec.to === undefined ? world.now : parseInstant(spec.to, world.now);
   if (end === null) return 'query_spec.to must be now, now-24h, or an RFC3339 instant';
   if (end < start) return 'query_spec.to must not be before query_spec.from';
@@ -197,7 +195,9 @@ function rawQuery(args, world) {
   const spec = args.query_spec;
   const problem = ownKeys(spec, new Set(['filters', 'from', 'to']), 'query_spec');
   if (problem) return {error: problem};
-  const columns = args.raw_row_columns;
+  const requested = args.raw_row_columns;
+  if (Array.isArray(requested) && requested.includes('timestamp')) return {error: 'column timestamp is always returned; omit it from raw_row_columns'};
+  const columns = Array.isArray(requested) ? ['timestamp', ...requested] : requested;
   if (!Array.isArray(columns) || !columns.includes('trace.trace_id') || new Set(columns).size !== columns.length ||
       columns.some(c => !['trace.trace_id', 'timestamp', 'error', 'duration_ms'].includes(c)) ||
       !Number.isInteger(args.results_limit) || args.results_limit < 1 || args.results_limit > 20) return {error: 'unsupported raw row columns/results_limit'};
@@ -266,7 +266,7 @@ function runQuery(args, world) {
 function findTrace(world, traceId, from) {
   if (world.silent) return null;
   const first = parseInstant(from, world.now, true);
-  if (first === null) return { error: 'from must be a duration such as 24h, now-24h, or an RFC3339 instant' };
+  if (first === null) return { error: 'from must be a signed duration such as -24h, now, or an RFC3339 instant' };
   const lastHour = Math.min(MAX_HOURS - 1, Math.floor((world.now - STORY_START) / HOUR) - 1);
   for (let hour = 0; hour <= lastHour; hour++) {
     const trace = traceFor(world.model, hour);

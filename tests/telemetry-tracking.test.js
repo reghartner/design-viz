@@ -89,6 +89,19 @@ test('T3 malformed page telemetry warns per entry, drops it, keeps the rest and 
   for(const w of ['0h','1y','h',3600,'1.5h']){const r=recorder();assert.equal(trackingTelemetry({tracking:{telemetry:{window:w}}},r.fn).window,'24h');assert.deepEqual(r.paths,['.window']);assert.match(r.messages[0],/using 24h/,'the warning names the 24h default');}
 });
 
+test('relative lookback aliases normalize without warnings or source changes',()=>{
+  const {trackingTelemetry}=api();
+  for(const [window,expected] of [['6h','6h'],['-6h','6h'],['now-6h','6h'],[' -24h ','24h'],[' now-30m\t','30m'],[' 2w ','2w']]){
+    const page={tracking:{telemetry:{window}}},before=JSON.stringify(page),seen=recorder();
+    assert.equal(trackingTelemetry(page,seen.fn).window,expected,window);
+    assert.deepEqual(seen.paths,[]);assert.equal(JSON.stringify(page),before);
+  }
+  for(const window of ['+6h','now+6h','now--6h','--6h','-0h','now-0h','-1.5h','now-1y','now-6h/h','6h ago','now -6h','- 6h','2026-11-05','',null]){
+    const seen=recorder();assert.equal(trackingTelemetry({tracking:{telemetry:{window}}},seen.fn).window,'24h',String(window));
+    assert.deepEqual(seen.paths,['.window']);assert.match(seen.messages[0],/using 24h/);
+  }
+});
+
 test('T4 a raw call binding parses into the stable binding shape without touching the source',()=>{
   const {carrierTelemetry}=api(),edge={from:'notify',to:'app',label:'push',tickets:['BE-68'],telemetry:CALL()};
   const before=JSON.stringify(edge),seen=recorder(),binding=plain(carrierTelemetry(edge,{},seen.fn));

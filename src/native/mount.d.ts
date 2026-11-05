@@ -121,8 +121,9 @@ export interface TelemetrySample {
   exemplars?: TelemetryExemplar[];
   /** Signal observedAt is measurement as-of (null means unknown); retrievedAt is
    * client receipt time. Live charts prefer the selected signal's as-of. Mixed
-   * adapters assign each legacy signal its own endpoint before combining sources. */
-  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string; observedAt?: string | number | null; retrievedAt?: string | number | null;
+   * adapters assign each legacy signal its own endpoint before combining sources.
+   * formatted-text provenance denotes a provider table value that may be rounded. */
+  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string; observedAt?: string | number | null; retrievedAt?: string | number | null; provenance?: 'formatted-text';
     /** Explicit measured total over [from, to], covered by signal as-of (legacy: carrier as-of). Runtime evidence only. */
     aggregate?: {kind: 'total'; from: string | number; to: string | number}}>;
   observedAt?: string | number;

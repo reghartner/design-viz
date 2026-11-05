@@ -1,11 +1,20 @@
 /* Honeycomb metrics (#946). The hosted run_query completes the query. Its
-   formatted tables/charts are NOT exact measurements; only the documented raw
-   results[].data / series[].data contract is used. See docs/live-status.md for
+   raw results are preferred. A bounded first Results row is a visibly rounded
+   fallback only when the raw download transport is unavailable. See docs/live-status.md for
    pinned official provenance. Trace retrieval lives in telemetry-traces.js;
    this scalar adapter does not supply historical Honeycomb measurements.
    No query is inferred from a carrier name; no signed URL escapes this module. */
 var TELEMETRY_HONEYCOMB_BYTES=1048576,TELEMETRY_HONEYCOMB_TIMEOUT=15000;
 function telemetryHoneycombError(message,code){var e=new Error(message);e.code=code || 'query_unobserved';return e;}
+/* Only bounded, redacted text reaches status UI; never echo transport links or credentials. */
+function telemetryProviderErrorText(error){
+  var text=typeof error==='string'?error:error && typeof error.message==='string'?error.message:error && typeof error.payload==='string'?error.payload:error && Array.isArray(error.content)?error.content.filter(function(c){return c && c.type==='text' && typeof c.text==='string';}).map(function(c){return c.text;}).join(' '):'';
+  return text.replace(/(?:https?:\/\/|honeycomb:\/\/)\S+/gi,'[link omitted]').replace(/\b(Bearer|Basic)\s+\S+/gi,'$1 [redacted]').replace(/((?:x-honeycomb-team|api[_-]?key|token|password|secret|authorization)["']?\s*[=:]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi,'$1[redacted]').replace(/[\x00-\x1f\x7f]/g,' ').slice(0,400).trim();
+}
+function telemetryProviderStepError(error,step){
+  var wrapped=new Error(step+': '+(telemetryProviderErrorText(error) || 'No supported evidence returned.'));
+  wrapped.code=error && error.code || 'query_unobserved';return wrapped;
+}
 function telemetryHoneycombJobs(bindings){
   var jobs=[];(bindings || []).forEach(function(binding){Object.keys(binding.signals || {}).forEach(function(name){
     var s=binding.signals[name];if(s.source==='honeycomb' && !(telemetryObject(s.query) && telemetryOwn(s.query,'query_spec')))jobs.push({id:binding.id,name:name,query:s.query,unit:s.unit,links:binding.links || {}});
@@ -76,7 +85,7 @@ function telemetryHoneycombQuery(query,config,contract){
   // Hosted MCP public CI uses relative query_spec.from, not REST time_range.
   // The page owns the window; authored calculations and filters remain exact.
   ['from','to','start','end','start_time','end_time','time_range'].forEach(function(k){delete spec[k];});
-  spec.from=config.window;
+  spec.from='-'+telemetryWindowDuration(config.window);
   var input={environment_slug:config.honeycomb.environment,query_spec:contract.type==='string'?JSON.stringify(spec):spec};
   if(telemetryText(config.honeycomb.dataset))input.dataset_slug=config.honeycomb.dataset;
   if(!telemetryHoneycombSchema(input,contract.schema))throw telemetryHoneycombError('The Honeycomb run_query input schema does not support this query/window.');
@@ -94,29 +103,29 @@ function telemetryHoneycombMetadata(result){
   if(result && result.content!==undefined && !Array.isArray(result.content))throw telemetryHoneycombError('Honeycomb result metadata is invalid.');
   var text=typeof (result && result.payload)==='string'?result.payload:(result && result.content || []).filter(function(c){return c && c.type==='text' && typeof c.text==='string';}).map(function(c){return c.text;}).join('\n');
   if(text.length>TELEMETRY_HONEYCOMB_BYTES)throw telemetryHoneycombError('Honeycomb result metadata is too large.');
-  var out={};['query_result_json','query_url'].forEach(function(key){
+  var out={text:text};['query_result_json','query_url'].forEach(function(key){
     var re=new RegExp('^  '+key+': "([^"\\r\\n]+)"\\s*$','gm'),matches=[],m;while((m=re.exec(text)))matches.push(m[1]);
     if(matches.length===1)out[key]=matches[0];
   });return out;
 }
 /* Strict provider-returned URL, bounded stream, no credentials/referrer, no
-   redirects. CSP/CORS/network failures are ordinary unobserved measurements. */
+   redirects. Transport failures permit the separately labeled scalar fallback. */
 async function telemetryHoneycombRaw(win,url,signal){
   if(signal && signal.aborted)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
-  var safe=telemetryHoneycombUrl(url,true);if(!safe)throw telemetryHoneycombError('Honeycomb returned no supported raw-result URL.');
-  if(!win || typeof win.fetch!=='function')throw telemetryHoneycombError('Honeycomb exact-result transport is unavailable in this view.');
+  var safe=telemetryHoneycombUrl(url,true);if(!safe)throw telemetryHoneycombError('Honeycomb returned no supported raw-result URL.','transport_unavailable');
+  if(!win || typeof win.fetch!=='function')throw telemetryHoneycombError('Honeycomb exact-result transport is unavailable in this view.','transport_unavailable');
   var abort=new AbortController(),reader=null,timer,stop;
-  var cancelled=new Promise(function(resolve,reject){stop=function(){abort.abort();reject(telemetryHoneycombError('Honeycomb exact-result transport cancelled or timed out.'));};});
+  var cancelled=new Promise(function(resolve,reject){stop=function(){abort.abort();reject(telemetryHoneycombError(signal && signal.aborted?'Honeycomb refresh cancelled.':'Honeycomb raw download timed out.',signal && signal.aborted?'query_unobserved':'transport_unavailable'));};});
   if(signal){if(signal.aborted)stop();else signal.addEventListener('abort',stop,{once:true});}
   timer=setTimeout(stop,TELEMETRY_HONEYCOMB_TIMEOUT);
   try{return await Promise.race([cancelled,(async function(){
-    var response=await win.fetch(safe,{signal:abort.signal,credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',cache:'no-store'});
-    if(abort.signal.aborted || !response.ok || response.redirected || response.url && response.url!==safe || !response.body || !response.body.getReader)throw telemetryHoneycombError('Honeycomb exact-result transport is unavailable (CSP, CORS or response).');
+    var response;try{response=await win.fetch(safe,{signal:abort.signal,credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',cache:'no-store'});}catch(e){throw telemetryHoneycombError('Honeycomb raw download blocked or unavailable.','transport_unavailable');}
+    if(abort.signal.aborted || !response.ok || response.redirected || response.url && response.url!==safe || !response.body || !response.body.getReader)throw telemetryHoneycombError('Honeycomb exact-result transport is unavailable (CSP, CORS or response).','transport_unavailable');
     var size=Number(response.headers.get('content-length'));if(size>TELEMETRY_HONEYCOMB_BYTES)throw telemetryHoneycombError('Honeycomb raw result exceeds the size limit.');
     reader=response.body.getReader();var decoder=new TextDecoder(),text='',length=0;
-    while(true){var chunk=await reader.read();if(abort.signal.aborted)throw telemetryHoneycombError('Honeycomb result cancelled.');if(chunk.done)break;length+=chunk.value.byteLength;if(length>TELEMETRY_HONEYCOMB_BYTES)throw telemetryHoneycombError('Honeycomb raw result exceeds the size limit.');text+=decoder.decode(chunk.value,{stream:true});}
+    while(true){var chunk;try{chunk=await reader.read();}catch(e){throw telemetryHoneycombError('Honeycomb raw download interrupted.','transport_unavailable');}if(abort.signal.aborted)throw telemetryHoneycombError('Honeycomb result cancelled.');if(chunk.done)break;length+=chunk.value.byteLength;if(length>TELEMETRY_HONEYCOMB_BYTES)throw telemetryHoneycombError('Honeycomb raw result exceeds the size limit.');text+=decoder.decode(chunk.value,{stream:true});}
     text+=decoder.decode();return JSON.parse(text);
-  })()]);}catch(e){throw telemetryHoneycombError(signal && signal.aborted?'Honeycomb refresh cancelled.':'Honeycomb exact raw result unavailable; check transport, permissions and query shape.');}
+  })()]);}catch(e){if(signal && signal.aborted)throw telemetryHoneycombError('Honeycomb refresh cancelled.');if(e && e.code)throw e;throw telemetryHoneycombError('Honeycomb downloaded raw JSON is invalid.');}
   finally{clearTimeout(timer);if(signal)signal.removeEventListener('abort',stop);abort.abort();if(reader)try{Promise.resolve(reader.cancel()).catch(function(){});}catch(e){}}
 }
 /* Both transport paths must be bounded JSON, not arbitrary JS objects. Walk
@@ -138,6 +147,28 @@ async function telemetryHoneycombResult(win,result,meta,signal){
   var raw=candidates.map(telemetryHoneycombJson);
   if(raw.length>1 && JSON.stringify(raw[0])!==JSON.stringify(raw[1]))throw telemetryHoneycombError('Honeycomb exact raw payload is ambiguous.');
   return raw[0];
+}
+/* Hosted scalar fallback: exactly one matching column in the Results section.
+   Never parse charts, later sections, groups, localized numbers or missing cells. */
+function telemetryHoneycombFormatted(meta,query,unit){
+  var text=meta.text || '';
+  if(text.length>TELEMETRY_HONEYCOMB_BYTES || new TextEncoder().encode(text).byteLength>TELEMETRY_HONEYCOMB_BYTES)throw telemetryHoneycombError('Honeycomb formatted Results exceeds bounds.');
+  var lines=text.replace(/^ResultTool response/,'').split(/\r?\n/),sections=[];
+  lines.forEach(function(line,i){if(line.trim()==='# Results')sections.push(i);});
+  if(sections.length!==1)throw telemetryHoneycombError('Honeycomb formatted Results section is missing or ambiguous.');
+  var i=sections[0]+1;while(i<lines.length && !lines[i].trim())i++;
+  var header=/^\s*\|\s*([^|\\]+?)\s*\|\s*$/.exec(lines[i] || '');
+  if(!header || header[1].trim()!==query.key || !/^\s*\|\s*:?-{3,}:?\s*\|\s*$/.test(lines[i+1] || ''))throw telemetryHoneycombError('Honeycomb formatted Results header does not match the scalar calculation.');
+  var row=/^\s*\|\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?)\s*\|\s*$/.exec(lines[i+2] || ''),value=row?Number(row[1]):NaN;
+  if(!isFinite(value) || Math.abs(value)>Number.MAX_SAFE_INTEGER)throw telemetryHoneycombError('Honeycomb formatted Results first row has no finite scalar.');
+  var sample={value:value,series:[],observedAt:null,provenance:'formatted-text'};if(unit)sample.unit=unit;return sample;
+}
+async function telemetryHoneycombMeasurement(win,result,meta,signal,query,unit){
+  try{return telemetryHoneycombSample(await telemetryHoneycombResult(win,result,meta,signal),query,unit);}
+  catch(error){
+    if(signal && signal.aborted || !error || error.code!=='transport_unavailable')throw error;
+    return telemetryHoneycombFormatted(meta,query,unit);
+  }
 }
 function telemetryHoneycombSample(raw,query,unit){
   if(!telemetryObject(raw) || !Array.isArray(raw.results) || raw.results.length!==1 || !telemetryObject(raw.results[0]) || !telemetryObject(raw.results[0].data))throw telemetryHoneycombError('Honeycomb result is missing or ambiguous; expected one aggregate row.');
@@ -191,7 +222,7 @@ function createTelemetryHoneycomb(page,win,now,bound){
     if(code==='approval_required' || code==='consent_required'){approval=input;syncAction();}
     if(['server_not_connected','server_not_found','not_granted','capability_disabled','capability_removed'].indexOf(code)>=0)available(false);
     if(code!=='query_unobserved'){blocked=signal;if(ctl && ctl.telemetry.clear)ctl.telemetry.clear(signal);}
-    var e=telemetryHoneycombError(code==='user_changed'?'Honeycomb stopped: the signed-in account changed':approval?'Honeycomb access needs your approval':code==='needs_reauth'?'Reconnect Honeycomb in claude.ai Settings → Connectors':code==='query_unobserved'?error.message:'Honeycomb unavailable; check connector permissions and tools.');
+    var e=telemetryHoneycombError(code==='user_changed'?'Honeycomb stopped: the signed-in account changed':approval?'Honeycomb access needs your approval':code==='needs_reauth'?'Reconnect Honeycomb in claude.ai Settings → Connectors':code==='query_unobserved'?error.message:telemetryProviderStepError(error,'Honeycomb connector').message);
     if(approval)e.state='approval';return e;
   }
   function allow(){if(!approval || retired)return;var input=approval,epoch=generation,attempt=++allowEpoch;approval=null;syncAction();
@@ -205,13 +236,13 @@ function createTelemetryHoneycomb(page,win,now,bound){
     try{mcp=await connect(signal);}catch(e){if(signal.aborted)throw telemetryHoneycombError('Honeycomb refresh cancelled.');throw failure(e,signal,null);}
     for(var i=0;i<jobs.length;i++){
       if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
-      var job=jobs[i],query;
+      var job=jobs[i],query,stage='Honeycomb run_query input';
       try{
         query=telemetryHoneycombQuery(job.query,config,contract);
-        var result=await mcp.callTool(contract.server,'run_query',query.input,{signal:signal});
+        stage='Honeycomb run_query';var result=await mcp.callTool(contract.server,'run_query',query.input,{signal:signal});
         if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
-        if(result && result.isError)throw {code:'tool_error'};
-        var meta=telemetryHoneycombMetadata(result),raw=await telemetryHoneycombResult(win,result,meta,signal),sample=telemetryHoneycombSample(raw,query,job.unit);
+        if(result && result.isError)throw {code:'tool_error',message:telemetryProviderErrorText(result)};
+        stage='Honeycomb run_query result';var meta=telemetryHoneycombMetadata(result),sample=await telemetryHoneycombMeasurement(win,result,meta,signal,query,job.unit);
         if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
         sample.retrievedAt=new Date(clock()).toISOString();
         var out=map[job.id] || (map[job.id]={signals:{},observedAt:null,links:{},markers:[]});out.signals[job.name]=sample;
@@ -221,7 +252,8 @@ function createTelemetryHoneycomb(page,win,now,bound){
         if(query.calculation.op==='COUNT')notes.push('Honeycomb COUNT counts source rows/events, not automatically requests.');
       }catch(e){
         if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
-        if(['tool_error','bad_request','transform_error'].indexOf(e && e.code)>=0)e=telemetryHoneycombError('Honeycomb query failed; no measurement returned.');
+        if(['tool_error','bad_request','transform_error'].indexOf(e && e.code)>=0)e=telemetryHoneycombError(telemetryProviderErrorText(e) || 'Tool failed; no measurement returned.');
+        if(e && e.code==='query_unobserved')e=telemetryProviderStepError(e,stage);
         var error=failure(e,signal,query && query.input);notes.push(job.id+' '+job.name+': '+error.message);
         if(e.code!=='query_unobserved')throw error;
       }

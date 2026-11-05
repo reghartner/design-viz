@@ -263,8 +263,8 @@ function telemetryEditPage(telemetry,edit){
   }
   if(op==='window'){
     if(edit.value==null)delete t.window;
-    else if(typeof edit.value!=='string' || !telemetryWindowPattern.test(edit.value))return {error:'Use a duration such as 30m, 1h or 7d.'};
-    else t.window=edit.value;
+    else if(!telemetryWindowDuration(edit.value))return {error:'Use a duration such as 30m, 1h, 7d, -6h or now-6h.'};
+    else t.window=edit.value.trim();
     return done();
   }
   if(op==='refreshMs'){

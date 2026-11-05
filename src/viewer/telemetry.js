@@ -78,6 +78,7 @@ function telemetrySample(raw){
     if(telemetryText(value.unit))entry.unit=value.unit;
     if(telemetryOwn(value,'observedAt'))entry.observedAt=telemetryTime(value.observedAt);
     if(telemetryOwn(value,'retrievedAt'))entry.retrievedAt=telemetryTime(value.retrievedAt);
+    if(value.provenance==='formatted-text')entry.provenance='formatted-text';
     var aggregate=telemetryAggregate(value,out.observedAt);if(aggregate)entry.aggregate=aggregate;
     out.signals[name]=entry;
   });

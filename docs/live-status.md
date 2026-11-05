@@ -282,7 +282,18 @@ permits availability; it never turns Metrics on. Jira Live remains independent.
 `cloudwatch`, plus an optional CloudWatch `accountId` shared default.
 `honeycomb` holds `environment` and `dataset`. `window` is the observation
 window, a duration such as `30m`, `1h` or `7d`; the default is `24h`, the previous
-24 hours (Chuck, 2026-11-04). `refreshMs`
+24 hours (Chuck, 2026-11-04). Positive integer units `s`, `m`, `h`, `d` and
+`w` accept a bare duration or relative lookback: `6h`, `-6h` and `now-6h`
+all query the previous six hours. Surrounding whitespace is ignored. The internal
+canonical duration is `6h`; Honeycomb receives signed `from: "-6h"` for scalar
+queries and trace search/detail. Other providers keep their existing conventions
+(for example Grafana relative starts use `now-6h`, and Tempo uses RFC3339 bounds).
+Parsing never rewrites authored source.
+The desktop Metrics window editor keeps the entered spelling (trimmed), with one
+Undo/Redo per edit. Future offsets (`+6h`), zero, fractional durations and date
+expressions are unsupported: authored invalid values warn and use `24h`, while
+the editor refuses invalid edits. This shared window applies to metrics and
+native trace search/detail for all local and imported carriers. `refreshMs`
 is the connector refresh interval; values under one minute use 60000 and an
 absent value leaves the connector default. `templates` are named signal sets
 authored on the page; the repository ships none.
@@ -2249,15 +2260,15 @@ Each signal holds a native query object, for example:
 Use one scalar COUNT/SUM/AVG/MIN/MAX/COUNT_DISTINCT/CONCURRENCY or supported
 percentile calculation per signal, without breakdowns or formulas. Preserve
 explicit filter expressions and calculation names. The page window replaces
-conflicting time selectors with hosted MCP `query_spec.from` (for example `24h`),
-as recorded in official public CI; it does not substitute REST `time_range`. Schema constraints that
+conflicting time selectors with hosted MCP `query_spec.from` (for example `-24h`),
+using the signed duration required by the hosted connector; it does not substitute REST `time_range`. Schema constraints that
 the adapter cannot honor yield an unobserved signal and a note. Never generate
 queries from carrier names or sum percentiles. COUNT counts spans/events, **not
 automatically requests**; units remain authored, and missing/empty results are
 unobserved rather than invented zeroes.
 
-`run_query` returns computed results. Its formatted Markdown/ASCII is rounded
-and is never parsed as exact measurements. The adapter reads the provider's
+`run_query` returns computed results. Its formatted Markdown/ASCII may be rounded.
+The adapter first reads the provider's
 `query_result_json` metadata and downloads exact `results[].data` and
 `series[].data` numbers; `header` aliases identify calculation keys. A single
 finite aggregate row is required (including explicit zero); ambiguous groups,
@@ -2269,6 +2280,14 @@ It does not assert complete coverage of the requested window. Without time-serie
 points, measurement as-of is unknown (`null`). Runtime `retrievedAt` separately
 records client receipt time. These are normalized runtime fields, not invented
 native response fields or authored bindings.
+
+If the raw download is unavailable (including published-page CSP/CORS blocking),
+the adapter can read the **first data row** of the single matching column in
+`# Results`. The card and Proof KPI label say **formatted text; may be rounded**.
+This fallback has no time series or measurement timestamp (`observedAt: null`);
+receipt time is separate. Invalid/conflicting structured data, downloaded invalid
+JSON, cancellation and tool errors never trigger fallback. Empty or nonnumeric
+first rows remain unobserved. No additional network permissions are requested.
 
 Live Proof charts use the primary signal's `observedAt`. The mixed-provider coordinator gives
 legacy adapter signals their own latest point as-of (or their source's carrier
@@ -2283,7 +2302,7 @@ No implicit rate conversion is performed.
 For hosted results, only HTTPS `mcp.honeycomb.io/query_results/<token>` retrieval is supported, with
 credentials omitted, no referrer, redirects rejected, a 15-second timeout and a
 1 MiB streamed response cap. Abort follows Metrics off, destruction and binding
-changes. A CSP/CORS or response failure stays unobserved; no alternate endpoint
+changes. A CSP/CORS or response transport failure may use the labeled scalar fallback; no alternate endpoint
 or EU host is guessed. Signed URLs are never stored in the spec, runtime map,
 notes or UI links. An authored safe link takes priority over the returned
 `query_url` on `ui.honeycomb.io`.
@@ -2293,7 +2312,7 @@ may expose this as an object `payload`. The adapter accepts these explicit raw
 objects after bounded deep JSON validation (1 MiB UTF-8, 24 levels, 50,000 nodes),
 then applies the same aggregate/series checks as downloaded results. Invalid,
 oversized or conflicting raw objects stay unobserved; text tables are never a
-fallback. This mock-only transport is not a claim about hosted Honeycomb output.
+fallback for invalid or conflicting raw objects. This mock-only transport is not a claim about hosted Honeycomb output.
 Mock COUNT counts hourly measurement rows, not requests or spans.
 
 While visible and Metrics is on, the controller refreshes no faster than once a

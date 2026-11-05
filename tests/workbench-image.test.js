@@ -24,8 +24,13 @@ function kitFiles(html){
   return JSON.parse(require('node:zlib').gunzipSync(Buffer.from(envelope.gzip,'base64'))).files;
 }
 
+function assertMetricsGuidance(kit){
+  for(const file of ['.claude/skills/live-status-board/SKILL.md','.claude/skills/live-status-board/metrics.md'])
+    assert.equal(kit[file],fs.readFileSync(path.join(ROOT,file),'utf8'),`Offline metrics guidance: ${file}`);
+}
+
 function prepareImageContext(directory,{company=path.join(ROOT,'company')}={}){
-  for(const folder of ['deploy/workbench','tools/canon','workbench','src','contract','cookbook','docs','.claude/skills/hld-to-page','examples/canon',
+  for(const folder of ['deploy/workbench','tools/canon','workbench','src','contract','cookbook','docs','.claude/skills/hld-to-page','.claude/skills/live-status-board','examples/canon',
     ...markedExamples()]){
     fs.cpSync(path.join(ROOT,folder),path.join(directory,folder),{recursive:true});
   }
@@ -108,6 +113,7 @@ test('image source fixture builds without Docker or preexisting generated arrang
     assert.equal(fs.existsSync(path.join(directory,file)),false,file);
   execFileSync('python3',['tools/build.py'],{cwd:directory,encoding:'utf8',timeout:60000,maxBuffer:20*1024*1024});
   const kit=kitFiles(fs.readFileSync(path.join(directory,'workbench/flowspec.html'),'utf8'));
+  assertMetricsGuidance(kit);
   const expected=kitExamples().filter(file=>!file.startsWith('company/'));
   for(const file of ['examples/contract-blocks/contract-blocks.spec.json','examples/data-contract/data-contract.spec.json',
     'examples/doorbell-chime/doorbell-chime.spec.json','examples/independent-extraction/README.md','examples/independent-extraction/before.spec.json'])
@@ -123,6 +129,7 @@ test('image source fixture bundles a company overlay without upstream edits',t=>
   const html=fs.readFileSync(path.join(directory,'workbench/flowspec.html'),'utf8');
   assert.ok(html.includes("PanelRegistry.define('ticket-board'"));
   const kit=kitFiles(html);
+  assertMetricsGuidance(kit);
   assert.equal(kit['company/examples/ticket-board/ticket-board.spec.json'],
     fs.readFileSync(path.join(COMPANY_FIXTURE,'examples/ticket-board/ticket-board.spec.json'),'utf8'));
   assert.match(kit['contract/authoring-contract.md'],/- `ticket-board` — closed tickets/);
@@ -192,6 +199,7 @@ test('nginx image publishes central canon membership and replaces a stale librar
   assert.equal(editorResponse.status,200);assert.equal(editorResponse.headers['cache-control'],'no-cache');
   assert.match(editorResponse.body,/id="workbench-welcome"/);
   assert.ok(editorResponse.body.includes("PanelRegistry.define('ticket-board'"),'company overlay panel in the image');
+  assertMetricsGuidance(kitFiles(editorResponse.body));
   const viewerResponse=await probeHttp('http://127.0.0.1:'+port+'/template/flowview.html',2000);
   assert.equal(viewerResponse.status,200);assert.equal(viewerResponse.headers['cache-control'],'no-cache');
   assert.match(viewerResponse.body,/id="flowspec"/);

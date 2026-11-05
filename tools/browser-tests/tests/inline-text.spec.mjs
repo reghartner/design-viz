@@ -243,3 +243,120 @@ for(const explore of [false,true])test('double-click renames a local node in pla
  await expect(anyEdit).toHaveCount(0);await expect(src).toHaveValue(inspectCleared);await expect(name).toHaveText('a');
  await undo.click();await expect(src).toHaveValue(original);await expect(name).toHaveText('Existing');
 });
+
+// #963 desktop panel titles: real Standard title / Explore grip double-clicks,
+// raw title (not ID fallback), Inspect empty parity, exact history, and unchanged
+// panel content. Home map deliberately exercises a panel with a clickTarget hook.
+function panelTitleFixture(explore=false,titled=true,homeMap=false){
+ const home=homeMap?{id:'home',type:'homemap',outline:{w:300,h:164},rooms:[],devices:[]}:{id:'home',type:'state',states:['Ready'],initial:{state:'Ready'}};
+ if(titled)home.title='Shared home';
+ return {page:{title:'Panel titles',sections:[{heading:'Panel section',diagram:{autoplay:false,
+  nodes:{a:{title:'Actor'}},rows:[['a']],panels:[home],steps:[{text:'At home',nodes:['a']}],
+  layouts:[{id:'main',name:'Main',presentation:explore?'explore':'standard',
+   sectionLayout:{default:[{x:0,y:0,w:7,h:12},{panel:'home',x:7,y:0,w:5,h:12}]},
+   exploreLayout:{panelPlacement:'floating',panels:[{panel:'home',x:.3,y:.1,w:.45,h:.6,stacked:false}]}}],defaultLayout:'main'}}]}};
+}
+const panelTitleSurface=(page,explore)=>page.locator(explore?'#docview [data-explore-panel="home"] > .explore-window-header > .explore-window-grip':'#docview .pwidget[data-dv-panel="0"] > .ptitle');
+const panelTitleInput=page=>page.locator('#docview').getByRole('textbox',{name:'Panel title',exact:true});
+async function setupPanelTitle(page,server,explore=false,titled=true,homeMap=false){
+ await page.setViewportSize({width:1280,height:900});await page.goto(server.origin+'/workbench.html');
+ const original=JSON.stringify(panelTitleFixture(explore,titled,homeMap),null,2);await pastePage(page,original);await closeTools(page);return original;
+}
+function withPanelTitle(source,title){
+ const raw=JSON.parse(source),panel=raw.page.sections[0].diagram.panels[0];
+ if(title==null)delete panel.title;else panel.title=title;return raw;
+}
+for(const explore of [false,true])test('panel title '+(explore?'Explore grip':'Standard')+' edits in place: selection, Escape, Enter, click outside, empty parity and one Undo',async({page,server})=>{
+ const original=await setupPanelTitle(page,server,explore),src=page.locator('#src'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder');
+ const title=panelTitleSurface(page,explore),edit=panelTitleInput(page),card=page.locator('#docview .pwidget[data-dv-panel="0"]');
+ await expect(title).toBeVisible();await expect(title).toHaveText('Shared home');await expect(edit).toHaveCount(0);
+ // Single click selects the panel and never opens a draft.
+ await title.click();await expect(edit).toHaveCount(0);await expect(src).toHaveValue(original);
+ await page.locator('#editor-tab-inspect').click();
+ const inspectTitle=page.locator('#guide').getByRole('textbox',{name:'Title',exact:true});
+ await expect(inspectTitle).toHaveValue('Shared home');
+ // Inspect defines the empty rule; the inline editor must produce identical bytes.
+ await inspectTitle.fill('');await inspectTitle.press('Enter');await expect(src).not.toHaveValue(original);
+ const cleared=await src.inputValue();expect(JSON.parse(cleared)).toEqual(withPanelTitle(original,null));
+ if(explore)await expect(title).toHaveText('home');else await expect(title).toHaveCount(0);
+ await undo.click();await expect(src).toHaveValue(original);await closeTools(page);
+ const spot=await title.boundingBox();
+ await title.dblclick();await expect(edit).toBeVisible();await expect(edit).toBeFocused();await expect(edit).toHaveValue('Shared home');
+ expect(await edit.evaluate(el=>[el.selectionStart,el.selectionEnd])).toEqual([0,'Shared home'.length]);
+ const box=await edit.boundingBox(),cx=spot.x+spot.width/2,cy=spot.y+spot.height/2;
+ expect(box.x<=cx && cx<=box.x+box.width && box.y<=cy && cy<=box.y+box.height,'editor covers the title').toBe(true);
+ await expect(src).toHaveValue(original);await expect(edit).toHaveAttribute('aria-description',/Enter or click outside saves.*Escape cancels/);
+ // A sibling input avoids nesting an interactive control inside the grip button.
+ expect(await edit.evaluate(el=>!!el.closest('button'))).toBe(false);
+ await edit.pressSequentially('Discarded');await edit.press('Escape');await expect(edit).toHaveCount(0);
+ await expect(src).toHaveValue(original);await expect(title).toBeVisible();await expect(title).toHaveText('Shared home');
+ await expect(page.locator('#docview .dv-inline-html-mount')).toHaveCount(0);
+ // Enter changes just the title; one Undo restores exact source and Redo reapplies it.
+ await title.dblclick();await expect(edit).toBeFocused();await edit.pressSequentially('  Revised home  ');await edit.press('Enter');await expect(edit).toHaveCount(0);
+ const saved=await src.inputValue();expect(JSON.parse(saved)).toEqual(withPanelTitle(original,'Revised home'));await expect(title).toHaveText('Revised home');
+ await undo.click();await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();await expect(title).toHaveText('Shared home');
+ await redo.click();await expect(src).toHaveValue(saved);await expect(title).toHaveText('Revised home');await undo.click();await expect(src).toHaveValue(original);
+ // Clicking a different selection saves the draft once.
+ await title.dblclick();await expect(edit).toBeFocused();await edit.pressSequentially('Clicked away');
+ await page.locator('#docview .sec-h').click();await expect(edit).toHaveCount(0);expect(JSON.parse(await src.inputValue())).toEqual(withPanelTitle(original,'Clicked away'));
+ await expect(title).toHaveText('Clicked away');await undo.click();await expect(src).toHaveValue(original);
+ await title.dblclick();await expect(edit).toBeFocused();await edit.pressSequentially('   ');await edit.press('Enter');await expect(edit).toHaveCount(0);
+ await expect(src).toHaveValue(cleared);
+ if(explore)await expect(title).toHaveText('home');else await expect(card.locator(':scope > .ptitle')).toHaveCount(0);
+ await undo.click();await expect(src).toHaveValue(original);await expect(title).toHaveText('Shared home');
+});
+
+test('untitled Explore panel opens an empty title draft and grip dragging moves only the window',async({page,server})=>{
+ const original=await setupPanelTitle(page,server,true,false),src=page.locator('#src'),undo=page.locator('#undo-builder');
+ const title=panelTitleSurface(page,true),edit=panelTitleInput(page),window=page.locator('#docview [data-explore-panel="home"]');
+ await expect(title).toHaveText('home');await title.dblclick();await expect(edit).toBeFocused();await expect(edit).toHaveValue('');await expect(src).toHaveValue(original);
+ await edit.pressSequentially('New home title');await edit.press('Enter');await expect(edit).toHaveCount(0);
+ const saved=await src.inputValue();expect(JSON.parse(saved)).toEqual(withPanelTitle(original,'New home title'));await expect(title).toHaveText('New home title');
+ await undo.click();await expect(src).toHaveValue(original);await expect(title).toHaveText('home');
+ await page.locator('#redo-builder').click();await expect(src).toHaveValue(saved);await expect(title).toHaveText('New home title');
+ const before=await window.boundingBox(),grip=await title.boundingBox();
+ await page.mouse.move(grip.x+30,grip.y+grip.height/2);await page.mouse.down();await page.mouse.move(grip.x+100,grip.y+grip.height/2+35,{steps:8});await page.mouse.up();
+ await expect(edit).toHaveCount(0);await expect(src).not.toHaveValue(saved);
+ const after=await window.boundingBox();expect(after.x-before.x).toBeGreaterThan(40);expect(after.y-before.y).toBeGreaterThan(15);
+ const moved=JSON.parse(await src.inputValue()),prior=JSON.parse(saved);
+ expect(moved.page.sections[0].diagram.panels).toEqual(prior.page.sections[0].diagram.panels);
+ // Geometry may change only the active Explore layout, never panel content or identity.
+ const movedLayout=moved.page.sections[0].diagram.layouts[0].exploreLayout;
+ prior.page.sections[0].diagram.layouts[0].exploreLayout=movedLayout;expect(moved).toEqual(prior);
+ await expect(title).toHaveText('New home title');await undo.click();await expect(src).toHaveValue(saved);
+});
+
+test('untitled Standard panel still adds its title through Inspect',async({page,server})=>{
+ const original=await setupPanelTitle(page,server,false,false),src=page.locator('#src'),card=page.locator('#docview .pwidget[data-dv-panel="0"]');
+ await expect(card.locator(':scope > .ptitle')).toHaveCount(0);await expect(panelTitleInput(page)).toHaveCount(0);
+ await inspectPageElement(page,card);const field=page.locator('#guide').getByRole('textbox',{name:'Title',exact:true});
+ await expect(field).toHaveValue('');await field.fill('Inspector title');await field.press('Enter');
+ expect(JSON.parse(await src.inputValue())).toEqual(withPanelTitle(original,'Inspector title'));await expect(panelTitleSurface(page,false)).toHaveText('Inspector title');
+ await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);await expect(card.locator(':scope > .ptitle')).toHaveCount(0);
+});
+
+test('Home map title resolves to the panel and keeps its layout control alive while editing',async({page,server})=>{
+ const original=await setupPanelTitle(page,server,false,true,true),src=page.locator('#src'),title=panelTitleSurface(page,false),edit=panelTitleInput(page);
+ const layout=title.getByRole('button',{name:'Edit home layout',exact:true}),held=await layout.elementHandle();
+ // The title includes a child button; target the actual text, not the full bar's centre.
+ const at=await title.evaluate(el=>{const range=document.createRange();range.selectNodeContents(el.firstChild);const r=range.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};});
+ await page.mouse.dblclick(at.x,at.y);await expect(edit).toBeFocused();await expect(edit).toHaveValue('Shared home');
+ const box=await edit.boundingBox();expect(at.x).toBeGreaterThanOrEqual(box.x);expect(at.x).toBeLessThanOrEqual(box.x+box.width);
+ expect(at.y).toBeGreaterThanOrEqual(box.y);expect(at.y).toBeLessThanOrEqual(box.y+box.height);
+ await expect(layout).toBeVisible();expect(await held.evaluate(el=>el.isConnected)).toBe(true);
+ await edit.pressSequentially('Revised map');await edit.press('Enter');await expect(edit).toHaveCount(0);
+ expect(JSON.parse(await src.inputValue())).toEqual(withPanelTitle(original,'Revised map'));await expect(title).toContainText('Revised map');await expect(layout).toBeVisible();
+ await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
+ // The title's control keeps its action; double-click never opens a title draft.
+ await layout.dblclick();await expect(edit).toHaveCount(0);await expect(src).toHaveValue(original);
+});
+
+test('panel title source replacement drops the draft and removes its temporary HTML host',async({page,server})=>{
+ const original=await setupPanelTitle(page,server,true),src=page.locator('#src'),title=panelTitleSurface(page,true),edit=panelTitleInput(page);
+ await title.dblclick();await expect(edit).toBeFocused();await edit.pressSequentially('Stale draft');const held=await edit.elementHandle();
+ const changed=original.replace('Shared home','Replacement');
+ await page.evaluate(text=>{const src=document.querySelector('#src');src.value=text;src.dispatchEvent(new Event('input',{bubbles:true}));},changed);
+ await expect(edit).toHaveCount(0);await expect(title).toBeVisible();await expect(page.locator('#docview .dv-inline-html-mount')).toHaveCount(0);
+ await held.evaluate(el=>el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})));
+ await expect(src).toHaveValue(changed);
+});

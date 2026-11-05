@@ -25,7 +25,8 @@ function createInlineTextEditor(opts){
      else the Workbench target under the element. field: the key written on that
      target's source object (null: the value itself; bare: a plain string value is
      the text). markdown: multi-line Markdown draft with live preview in place of
-     the text; otherwise one line in the SVG host from place(c), classed
+     the text; otherwise one line in the SVG host from place(c), or an HTML
+     overlay beside the text when html is true, classed
      hostClass. value: the empty-value rule of the matching Inspect control.
      'raw' saves the draft as typed; 'trimmed' trims it and removes the field when
      empty (Inspect text controls, inspector.js textControl). keyboard: Enter on
@@ -56,6 +57,10 @@ function createInlineTextEditor(opts){
     // Rename edits the display name only; the node ID stays in Inspect.
     {kind:'node',selector:'[data-dv-node]:not([data-dv-text-box])',field:'title',value:'trimmed',overlay:true,label:'Node name',help:'Enter or click outside saves. Escape cancels.',
       place:nodeTitleHost,hostClass:'dv-inline-node-editor'},
+    {kind:'panel',selector:'.pwidget[data-dv-panel] > .ptitle,.explore-window[data-explore-panel] > .explore-window-header > .explore-window-grip',
+      field:'title',value:'trimmed',html:true,label:'Panel title',help:'Enter or click outside saves. Escape cancels.',
+      // Home map can decorate an untitled Standard bar with just a layout button.
+      accept:function(value,el){return el.matches('.explore-window-grip') || !!value.title;}},
     edgeLabel,
     // Rename on a connection that has no label yet opens from its arrow.
     Object.assign({},edgeLabel,{selector:null,creation:true}),
@@ -82,7 +87,7 @@ function createInlineTextEditor(opts){
     var path=builderTargetPath(snapshot.raw,target),value=path && specValueAt(snapshot.raw,path),field=null,overlay=null;
     if(value==null && f.overlay){overlay=importedNode(snapshot,target);if(!overlay)return null;value=overlay.value;}
     if(f.field && specObject(value)){
-      if(f.accept && !f.accept(value))return null;
+      if(f.accept && !f.accept(value,el))return null;
       field=f.field;
     }else if(f.field && !f.bare || typeof value!=='string')return null;
     var text=field?value[field]:value;
@@ -158,6 +163,11 @@ function createInlineTextEditor(opts){
     if(!active)return;var a=active;active=null;a.life.destroy();a.host.remove();
     if(a.original){while(a.original.firstChild)a.c.el.insertBefore(a.original.firstChild,a.original);a.original.remove();}
     a.c.el.classList.remove('dv-inline-editing');
+    if(a.c.entry.html){
+      a.c.htmlAnchor.classList.remove('dv-inline-html-editing');
+      if(a.c.htmlText)a.c.htmlText.replaceWith(a.c.htmlText.firstChild);
+      if(a.c.positionedMount)a.c.htmlMount.classList.remove('dv-inline-html-mount');
+    }
   }
   function finish(save,focus,nextTarget){
     if(!active)return;var a=active,c=a.c,valid=fresh(c),plan;
@@ -181,13 +191,32 @@ function createInlineTextEditor(opts){
     var input=active.input,scroll=input.scrollTop;
     input.style.height='auto';input.style.height=Math.max(64,input.scrollHeight+4)+'px';input.scrollTop=scroll;
   }
+  /* A sibling host keeps inputs outside interactive titles such as Explore's
+     grip button. Leave the title in layout so opening a draft cannot move it. */
+  function htmlLineHost(c){
+    var el=c.el,parent=el.parentElement;if(!parent)return null;
+    // Titles may have a trailing action such as Home map's Edit layout. Keep
+    // that action mounted and visible, and cover only the authored text node.
+    var text=Array.from(el.childNodes).find(function(node){return node.nodeType===3 && node.textContent.trim();});
+    if(text && el.querySelector('a,button,input,select,textarea')){
+      var span=document.createElement('span');text.replaceWith(span);span.appendChild(text);c.htmlText=span;
+    }
+    var anchor=c.htmlAnchor=c.htmlText || el;
+    c.htmlMount=parent;c.positionedMount=getComputedStyle(parent).position==='static';
+    if(c.positionedMount)parent.classList.add('dv-inline-html-mount');
+    var host=document.createElement('div');
+    host.style.left=anchor.offsetLeft+'px';host.style.top=anchor.offsetTop+'px';
+    host.style.width=anchor.offsetWidth+'px';host.style.height=Math.max(28,anchor.offsetHeight)+'px';
+    host.style.font=getComputedStyle(el).font;
+    return host;
+  }
   function open(el,creation,selectAll){
     if(active && active.c.el===el){active.input.focus();return;}
     if(finish(true,false)===false)return;
     var c=context(el,creation);if(!c)return;opts.pause();
     var f=c.entry,single=!f.markdown,host,input,original=null;
     if(single){
-      host=f.place(c);if(!host)return;
+      host=f.html?htmlLineHost(c):f.place(c);if(!host)return;
       input=document.createElementNS('http://www.w3.org/1999/xhtml','input');input.type='text';
     }else{
       host=document.createElement('div');input=document.createElement('textarea');input.rows=2;input.spellcheck=true;
@@ -197,7 +226,7 @@ function createInlineTextEditor(opts){
       Array.from(el.childNodes).forEach(function(child){if(!(child.nodeType===1 && child.matches('ul.sec-bullets')))original.appendChild(child);});
       el.prepend(original);
     }
-    host.setAttribute('class','dv-inline-editor'+(f.hostClass?' '+f.hostClass:''));
+    host.setAttribute('class','dv-inline-editor'+(f.html?' dv-inline-html-editor':'')+(f.hostClass?' '+f.hostClass:''));
     input.className='dv-inline-input';input.value=c.text;
     input.setAttribute('aria-label',f.label);
     input.setAttribute('aria-description',f.help);
@@ -208,8 +237,9 @@ function createInlineTextEditor(opts){
       preview=document.createElement('div');preview.className='dv-inline-preview';preview.setAttribute('role','region');preview.setAttribute('aria-label','Live Markdown preview');host.appendChild(preview);
     }
     var error=document.createElement('span');error.setAttribute('role','status');host.appendChild(error);
-    if(single)(f.mount?f.mount(c):el).appendChild(host);else el.insertBefore(host,original.nextSibling);
+    if(single)(f.html?c.htmlMount:f.mount?f.mount(c):el).appendChild(host);else el.insertBefore(host,original.nextSibling);
     el.classList.add('dv-inline-editing');
+    if(f.html)c.htmlAnchor.classList.add('dv-inline-html-editing');
     var editing=createWorkbenchLifetime();active={c:c,input:input,host:host,original:original,preview:preview,error:error,life:editing,composing:false};
     ['pointerdown','mousedown','click','dblclick'].forEach(function(type){editing.listen(host,type,function(e){e.stopPropagation();if(e.target.closest('a')){e.preventDefault();if(type==='click' && active){active.input.focus();active.input.scrollIntoView({block:'nearest',inline:'nearest'});}}});});
     editing.listen(input,'input',paint);
@@ -240,7 +270,10 @@ function createInlineTextEditor(opts){
   life.listen(document,'pointerdown',function(e){if(active && !inside(e.target) && finish(true,false,opts.targetFromEvent(e))===false){e.preventDefault();e.stopImmediatePropagation();}},true);
   life.listen(document,'focusin',function(e){if(active && !inside(e.target))finish(true,false,opts.targetFromEvent(e));});
   life.listen(view,'dblclick',function(e){
-    if(e.target.closest('.dv-inline-editor,a,button,input,textarea,.nlink'))return;
+    if(e.target.closest('.dv-inline-editor,a,input,select,textarea,summary,[contenteditable],.nlink'))return;
+    // Only the explicit panel title grip is an editable button.
+    var button=e.target.closest('button,[role="button"]');
+    if(button && !button.matches('.explore-window[data-explore-panel] > .explore-window-header > .explore-window-grip'))return;
     var el=e.target.closest(openSelector);if(el){e.preventDefault();e.stopPropagation();open(el);}
   },true);
   life.listen(view,'keydown',function(e){if(e.target.matches(keySelector) && e.key==='Enter' && !e.isComposing){e.preventDefault();e.stopImmediatePropagation();open(e.target);}},true);

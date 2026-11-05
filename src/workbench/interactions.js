@@ -539,6 +539,17 @@ function createBuilderInteractions(opts){
 
   function targetFromEvent(ev){
     if(inDetailPreview(ev.target))return null;
+    // Titles belong to the panel, before a panel-specific body click hook can
+    // redirect to a Home map step. Explore shows the same title on its grip.
+    var panelTitle=ev.target.closest && ev.target.closest('.pwidget[data-dv-panel] > .ptitle,.explore-window[data-explore-panel] > .explore-window-header > .explore-window-grip');
+    if(panelTitle && (!ev.target.closest('a,button,summary,[role="button"],input,select,textarea') || ev.target.closest('.explore-window-grip'))){
+      var titleWindow=panelTitle.closest('.explore-window[data-explore-panel]'),titleCard=titleWindow?titleWindow.querySelector('.pwidget[data-dv-panel]'):panelTitle.parentElement;
+      var titleSection=titleCard && titleCard.closest('.doc-sec');
+      if(titleSection && titleSection.hasAttribute('data-dv-section')){
+        if(titleWindow && titleWindow.closest('.explore-canvas-objects')){var titleTarget=spatial.target(titleWindow);if(titleTarget)return titleTarget;}
+        return {section:Number(titleSection.getAttribute('data-dv-section')),kind:'panel',index:Number(titleCard.getAttribute('data-dv-panel')),el:titleCard};
+      }
+    }
     /* Map editing follows the same manual transport/path selection as the
        preview. Play/Pause are excluded so selecting an inspector cannot
        immediately stop a user-started animation. */

@@ -18,6 +18,7 @@ function telemetryStepModel(diagram,index,pathId,page,snapshot,jiraMap,jiraOn){
       var candidate=exemplar.candidates.find(function(c){return c.traceId===exemplar.traceId;}),times=exemplar.spans.map(function(s){return s.time;}).filter(Boolean).sort(function(a,b){return Date.parse(a)-Date.parse(b);});
       var panel={type:'trace',spans:exemplar.spans},data=tracePanelData(panel),mapping=null,warning='';
       try{
+        if(data.errors.length)throw new Error('trace timeline unavailable');
         var normalized={spans:exemplar.spans.map(function(s){return {id:s.id,parentId:s.parentId,serviceName:s.service,operation:s.name,startMs:s.startMs,durationMs:s.ms,error:s.error,statusCode:s.attributes['http.response.status_code'] || s.attributes['http.status_code'],attributes:s.attributes,links:s.links.filter(function(l){return l.traceId===exemplar.traceId;}).map(function(l){return l.spanId;})};}),warnings:exemplar.warnings};
         var path=diagram.paths && diagram.paths.length?pathId:undefined;
         mapping=FlowTraceMatch.mapTrace(diagram,normalized,path);

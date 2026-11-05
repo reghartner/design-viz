@@ -9,6 +9,10 @@ test('actual mock trace, source-scoped proof and original observation time; no f
  const f=await story(),m=model(f);assert.equal(m.primary,'mcu->ingest');assert.match(m.caption,/PROVEN/);assert.equal(m.trace.at,m.trace.exemplar.candidates.find(c=>c.traceId===m.trace.exemplar.traceId).time);assert.notEqual(m.trace.at,m.trace.exemplar.observedAt);assert.equal(m.trace.packets[0].startMs,0);assert.ok(m.trace.never.some(s=>s.stepId==='push'));assert.equal(model(f,3).trace,null);
  const short=model(f,0,'short');assert.equal(short.trace.never.length,0);assert.match(model(f,0,'event',false).caption,/HEALTHY/);
 });
+test('unavailable timeline retains identity but cannot assert missing spans or precise timing',async()=>{
+ const f=structuredClone(await story()),e=f.samples['mcu->ingest'].exemplars[0];e.spans=[];e.completeness='unknown';
+ const trace=model(f).trace;assert.equal(trace.exemplar.traceId,e.traceId);assert.equal(trace.mapping,null);assert.equal(trace.never.length,0);assert.equal(trace.packets.length,0);assert.match(trace.warning,/timeline unavailable/);
+});
 test('worst secondary verdict wins, while headline and exemplar stay on primary',async()=>{
  const f=structuredClone(await story()),d=f.spec.page.sections[0].diagram;d.steps[0].edges=['mcu->ingest','ingest->notify'];delete d.steps[0].edge;d.edges[1].tickets=['TRACE-1'];d.edges[1].telemetry.proof.rate={min:1};f.samples['ingest->notify'].signals.rate.value=0;f.samples['ingest->notify'].signals.rate.series=[];
  assert.match(model(f).caption,/DONE · UNPROVEN/);assert.equal(model(f).trace.primary,'mcu->ingest');

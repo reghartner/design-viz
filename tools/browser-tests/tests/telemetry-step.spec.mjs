@@ -33,6 +33,7 @@ async function setup(page,server,options={}){
  if(options.recordedUrl)f.samples['mcu->ingest'].exemplars=[await recordedUrlEvidence()];
  if(options.traceOnly)Object.values(f.samples).forEach(s=>s.signals={});
  if(options.noTrace)Object.values(f.samples).forEach(s=>delete s.exemplars);
+ if(options.noTimeline)Object.values(f.samples).forEach(s=>s.exemplars?.forEach(e=>{e.spans=[];e.completeness='unknown';}));
  if(options.unknown)Object.values(f.samples).forEach(s=>s.exemplars?.forEach(e=>{e.candidates.forEach(c=>c.status='unknown');delete e.url;}));
  if(options.disabled==='page')f.spec.page.tracking.telemetry={enabled:false};
  if(options.timed){
@@ -109,13 +110,14 @@ for(const origin of ['local','direct','nested'])for(const loaded of [false,true]
 });
 
 for(const disabled of ['page','host'])test(`${disabled} disable hides card, pins and all dependent actions on actual loaded imports`,async({page,server})=>{const {root}=await setup(page,server,{origin:'nested',loaded:true,disabled});await expect(metric(root)).toBeHidden();await expect(card(root)).toHaveCount(0);await expect(root.locator('.dv-proof-caption')).toHaveCount(0);await over(root).click();await expect(root.getByRole('slider',{name:'Day',exact:true})).toBeVisible();expect(await page.evaluate(()=>window.calls.provider)).toBe(0);});
-for(const options of [{missing:true},{noTrace:true},{noHandler:true},{unknown:true},{preload:true}])test('missing capabilities / no sample / unknown alternatives / permitted preload '+JSON.stringify(options),async({page,server})=>{
+for(const options of [{missing:true},{noTrace:true},{noHandler:true},{unknown:true},{preload:true},{noTimeline:true,noHandler:true}])test('missing capabilities / no sample / unknown alternatives / permitted preload '+JSON.stringify(options),async({page,server})=>{
  const {root}=await setup(page,server,options);
  if(options.missing){await expect(metric(root)).toBeHidden();await expect(card(root)).toHaveCount(0);return;}
  if(!options.preload)await metric(root).click();
  if(options.noTrace){await expect(card(root)).toHaveCount(0);return;}
  await expect(card(root)).toHaveCount(1);await expect(card(root).getByRole('button',{name:'Pick passing trace',exact:true})).toHaveCount(0);
  if(options.unknown)await expect(card(root).getByRole('link')).toHaveCount(0);
+ if(options.noTimeline){await expect(card(root).getByText('Trace timeline unavailable.',{exact:true})).toBeVisible();await expect(card(root).locator('.dv-trace-never')).toHaveCount(0);await expect(card(root).getByRole('button',{name:'Play this trace',exact:true})).toHaveCount(0);}
  if(options.preload){await expect(metric(root)).toBeHidden();await card(root).getByRole('button',{name:'Pin as evidence',exact:true}).click();await page.evaluate(()=>window.ctl.telemetry.setEnabled(false));await expect(card(root)).toHaveCount(0);await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(0);await page.evaluate(()=>window.ctl.telemetry.apply(window.fixture.samples));await expect(card(root)).toHaveCount(0);}
 });
 

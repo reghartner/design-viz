@@ -97,3 +97,14 @@ export function nestedSpec(){
  const context=vm.createContext({});vm.runInContext(sourceLoader.composeSources(['validator.js','canon.js']),context);
  return JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,middle,consumer]})));
 }
+export function handoffSpec(){
+ const make=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram},{id:'destination',heading:'Destination',diagram:{nodes:{end:{title:'Destination'}},rows:[['end']]}}]}});
+ const handoff=ticket=>({title:'Continuation '+ticket,tickets:[ticket],handoff:{localSection:'destination'}});
+ const provider=make('provider',{nodes:{h:handoff('IMP-1')},rows:[['h']],topologyExports:{core:{nodes:['h'],edges:[]}}});
+ const middle=make('middle',{nodes:{},rows:[],topologyImports:[{spec:'provider',export:'core',as:'inner'}],topologyExports:{nested:{nodes:['inner::h'],edges:[]}}});
+ const consumer=make('consumer',{view:'ambient',nodes:{h:handoff('LOC-1'),a:{title:'Sender'},b:{title:'Receiver'}},rows:[['a','b'],['h']],edges:[{from:'a',to:'b',label:'Delivery',tickets:['EDGE-1'],telemetry:CALL()}],panels:[PANEL],
+  topologyImports:[{spec:'provider',export:'core',as:'direct',position:{x:450,y:250}},{spec:'middle',export:'nested',as:'nested',position:{x:700,y:250}}]});
+ consumer.page.tracking={jira:{site:'https://jira.test'}};
+ const context=vm.createContext({});vm.runInContext(sourceLoader.composeSources(['validator.js','canon.js']),context);
+ return JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,middle,consumer]})));
+}

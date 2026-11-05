@@ -615,14 +615,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var scope=binding.el,d=binding.section.diagram;if(!d)return;
       var templates=trackingTelemetry(binding.page).templates;
       telemetryPaintCues(scope,d,templates,metricsView);
-      scope.querySelectorAll('.dv-jira-cue').forEach(function(el){el.remove();});
       telemetryPaintCards(scope,d,templates,metricsView,trackingTelemetry(page).window,function(card,path,edge,index){
         var previous=path._livePointerTarget || path,c=previous._liveCarrier;
         carrierTarget(card,edge.from+'->'+edge.to,edge,c && c.state,binding.page.tracking,edge.label || edge.from+' → '+edge.to,c && c.waiting,c && c.availability,binding.ordinal!=null?{section:binding.ordinal,kind:'edge',index:index}:null);
         carrierPointer(path,card);carrierPointer(path.closest('svg').querySelector('path.halo[data-dv-edge="'+index+'"]'),card);
       });
       scope.querySelectorAll('svg').forEach(function(svg){if(svg._layoutStatusCoins)svg._layoutStatusCoins();});
-      paintJiraCues(scope,d);
     });
   }
   // A named connector (#943: 'Grafana') reads "<source> connected · <window> window · refreshed <time>".
@@ -1238,8 +1236,6 @@ function createLiveStatus(ctl,page,options,renderOptions){
       }
       carrierPointer(el,target);
     });
-    // Jira cues are placed once, after Metrics cards in paintMetrics(). A second
-    // pass would discard the handoff card's transferred keyboard ticket target.
     scope.querySelectorAll('g.coin[data-dv-step],button.schip[data-step-source]').forEach(function(el){
       var index=Number(el.getAttribute(el.classList.contains('coin')?'data-dv-step':'data-step-source')),step=(d.steps || [])[index];
       liveStatusClass(el,on && availabilityOn && step && coverageActive?liveStatusStep(d,step,map):null);
@@ -1282,6 +1278,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
         bindings.forEach(paintBinding);
       }
       bindings.forEach(paintStory);paintLanes();paintMetrics();
+      // Paint Jira cues once, after cards and coins reserve their final boxes.
+      // Handoffs transfer their ticket target from the card to the cue; a second
+      // cue paint would discard that target after its source has been cleared.
+      bindings.forEach(function(binding){if(binding.section.diagram)paintJiraCues(binding.el,binding.section.diagram);});
       view.querySelectorAll('.dv-edit-target').forEach(function(el){el.classList.remove('dv-edit-target');});
       if(editing())bindings.forEach(function(binding){if(binding.ordinal!=null)binding.el.querySelectorAll('g.node[data-dv-node]:not(.node-text),path.edge[data-dv-edge]').forEach(function(el){el.classList.add('dv-edit-target');});});
       if(focusBinding){var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier && !el.classList.contains('dv-metrics-label-hidden');});if(replacement)replacement.focus({preventScroll:true});}

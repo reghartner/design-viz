@@ -260,7 +260,7 @@ for(const explore of [false,true])test('node subtitle edits in place with Inspec
 });
 
 test('empty node subtitle falls back to name and image fallback edits an empty draft without a write',async({page,server})=>{
- const raw=fixture();delete raw.page.sections[0].diagram.nodes.a.sub;raw.page.sections[0].diagram.nodes.image={title:'Picture',image:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4UYAAAAASUVORK5CYII='};raw.page.sections[0].diagram.rows=[['a','image']];
+ const raw=fixture();delete raw.page.sections[0].diagram.nodes.a.sub;raw.page.sections[0].diagram.nodes.image={title:'Picture',alt:'A small picture',image:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4UYAAAAASUVORK5CYII='};raw.page.sections[0].diagram.rows=[['a','image']];
  await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(raw,null,2);await pastePage(page,original);await closeTools(page);
  const card=page.locator('#docview g.node[data-dv-node="a"]'),body=card.locator('.card'),box=await body.boundingBox();await body.dblclick({position:{x:box.width/2,y:box.height-10}});
  const name=card.getByRole('textbox',{name:'Node name',exact:true});await expect(name).toBeFocused();await expect(page.getByRole('textbox',{name:'Node subtitle',exact:true})).toHaveCount(0);await name.press('Escape');

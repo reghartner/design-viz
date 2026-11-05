@@ -139,9 +139,9 @@ for(const kind of ['document','section'])test('inline '+kind+' title saves throu
  await undo.click();await expect(src).toHaveValue(original);await expect(title).toContainText(first);
 });
 
-test('section source and embed chips keep their actions and stay outside the title editor',async({page,server,context})=>{
+test('section source and embed chips keep their actions and stay outside the title editor',async({page,server,audit})=>{
  await page.addInitScript(()=>{window.__titleCopies=[];Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>window.__titleCopies.push(text)}});});
- await context.route('https://example.test/heading-source',route=>route.fulfill({contentType:'text/html',body:'<h1>Heading source</h1>'}));
+ await audit.mockExternal('https://example.test/heading-source',route=>route.fulfill({contentType:'text/html',body:'<h1>Heading source</h1>'}));
  await page.goto(server.origin+'/workbench.html');
  const raw={page:{title:'Title chips',blocks:[{id:'story',heading:'Story heading',source:'https://example.test/heading-source',diagram}]}},original=JSON.stringify(raw,null,2);
  await paste(page,original);await prepareEditorSurface(page);

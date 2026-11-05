@@ -80,7 +80,7 @@ function createInlineTextEditor(opts){
     {kind:'crow',selector:'td.ctv',field:'v',value:'trimmed',html:true,htmlInside:true,label:'Contract value',help:'Enter or click outside saves. Escape cancels.'},
     {kind:'crow',selector:'td.ctg',field:'g',markdown:true,value:'trimmed',label:'Contract meaning',help:help},
     {kind:'contract',selector:'.ctnote',field:'note',markdown:true,value:'trimmed',label:'Contract note',help:help},
-    {kind:'tab',selector:'.tabbtn',field:'label',value:'trimmed',html:true,label:'Tab label',help:'Enter or click outside saves. Escape cancels.',
+    {kind:'tab',selector:'.tabbtn,.reader-tab-label',target:function(el){return el.matches('.tabbtn')?opts.targetFromEvent({target:el}):opts.tabTarget(el);},field:'label',value:'trimmed',html:true,label:'Tab label',help:'Enter or click outside saves. Escape cancels.',
       plan:function(c,value){return value==null?{error:'a tab needs a label'}:planSetField(c.snapshot.text,c.snapshot.raw,c.path,'label',JSON.stringify(value));}},
     edgeLabel,
     // Rename on a connection that has no label yet opens from its arrow.

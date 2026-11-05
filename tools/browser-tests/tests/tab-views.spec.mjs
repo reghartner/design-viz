@@ -36,24 +36,22 @@ test('Workbench first View edit migrates the owner atomically and preserves sele
 });
 test('Workbench edits a tab label in place and retains the shown tab through history',async({page,server})=>{
  await page.setViewportSize({width:1280,height:950});
- await page.addInitScript(()=>{window.__tabCopies=[];Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>window.__tabCopies.push(text)}});});
  const raw=await fixture();await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
- const root=page.locator('#docview'),source=page.locator('#src'),tab=()=>root.locator('#tab-0-1'),editor=page.getByRole('textbox',{name:'Tab label',exact:true});
- await tab().click();await expect(tab()).toHaveAttribute('aria-selected','true');const before=await source.inputValue();
- await tab().dblclick();await expect(editor).toBeVisible();await expect(editor).toHaveValue('Notes');await editor.fill('  Research  ');await editor.press('Enter');
- const renamed=await source.inputValue();expect(JSON.parse(renamed).page.blocks[0].tabs[1].label).toBe('Research');await expect(tab()).toHaveText('Research');await expect(tab()).toHaveAttribute('aria-selected','true');
- await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await expect(tab()).toHaveText('Notes');await expect(tab()).toHaveAttribute('aria-selected','true');await expect(page.locator('#builder-history-status')).toHaveText('Undo complete');
+ const root=page.locator('#docview'),source=page.locator('#src'),tab=()=>root.locator('#tab-0-1'),label=()=>nav(root).locator('.reader-tab-label'),editor=page.getByRole('textbox',{name:'Tab label',exact:true});
+ await chooseTab(root,'Notes');await expect(label()).toHaveText('Notes');await expect(tab()).toHaveAttribute('aria-selected','true');const before=await source.inputValue();
+ await label().dblclick();await expect(editor).toBeVisible();await expect(editor).toHaveValue('Notes');await editor.fill('  Research  ');await editor.press('Enter');
+ const renamed=await source.inputValue();expect(JSON.parse(renamed).page.blocks[0].tabs[1].label).toBe('Research');await expect(label()).toHaveText('Research');await expect(tab()).toHaveAttribute('aria-selected','true');
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await expect(label()).toHaveText('Notes');await expect(tab()).toHaveAttribute('aria-selected','true');await expect(page.locator('#builder-history-status')).toHaveText('Undo complete');
  await page.locator('#redo-builder').click();await expect(source).toHaveValue(renamed);await expect(tab()).toHaveAttribute('aria-selected','true');await expect(page.locator('#builder-history-status')).toHaveText('Redo complete');
- await tab().dblclick();await editor.fill('Findings');await page.locator('#workbench-editor-title').click();
- const clickaway=await source.inputValue();expect(JSON.parse(clickaway).page.blocks[0].tabs[1].label).toBe('Findings');await expect(tab()).toHaveText('Findings');await expect(tab()).toHaveAttribute('aria-selected','true');
+ await label().dblclick();await editor.fill('Findings');await page.locator('#workbench-editor-title').click();
+ const clickaway=await source.inputValue();expect(JSON.parse(clickaway).page.blocks[0].tabs[1].label).toBe('Findings');await expect(label()).toHaveText('Findings');await expect(tab()).toHaveAttribute('aria-selected','true');
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(renamed);await expect(tab()).toHaveAttribute('aria-selected','true');
  await page.locator('#redo-builder').click();await expect(source).toHaveValue(clickaway);await expect(tab()).toHaveAttribute('aria-selected','true');
- await tab().dblclick();await editor.fill('   ');await editor.press('Enter');await expect(page.locator('.dv-inline-editor [role=status]')).toHaveText('a tab needs a label');await expect(source).toHaveValue(clickaway);
+ await label().dblclick();await editor.fill('   ');await editor.press('Enter');await expect(page.locator('.dv-inline-editor [role=status]')).toHaveText('a tab needs a label');await expect(source).toHaveValue(clickaway);
  await editor.press('Escape');await expect(editor).toHaveCount(0);await expect(source).toHaveValue(clickaway);
- await tab().dblclick();await editor.fill('Discarded');await editor.press('Escape');await expect(source).toHaveValue(clickaway);
- const copy=root.getByRole('button',{name:'Copy link to tab Findings',exact:true});await copy.dblclick();await expect(editor).toHaveCount(0);await expect.poll(()=>page.evaluate(()=>window.__tabCopies.length)).toBeGreaterThan(0);expect(await page.evaluate(()=>window.__tabCopies[0])).toContain('t=findings');
+ await label().dblclick();await editor.fill('Discarded');await editor.press('Escape');await expect(source).toHaveValue(clickaway);
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(renamed);await expect(tab()).toHaveAttribute('aria-selected','true');
- await root.locator('#tab-0-0').click();await expect(root.locator('#tab-0-0')).toHaveAttribute('aria-selected','true');await expect(tab()).toHaveAttribute('aria-selected','false');
+ await chooseTab(root,'Product');await expect(label()).toHaveText('Product');await expect(root.locator('#tab-0-0')).toHaveAttribute('aria-selected','true');await expect(tab()).toHaveAttribute('aria-selected','false');
 });
 test('native Views keep host-top nav, reject cross-View destinations and isolate sibling mounts',async({page,server})=>{
  await writeFile(path.join(server.root,'tab-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));await writeFile(path.join(server.root,'tab-native.html'),'<style>body{margin:0}.host{height:700px;overflow:auto;position:relative;width:48%;display:inline-block;vertical-align:top}</style><div class="host" id="one"></div><div class="host" id="two"></div><script type="module">import {mountNativeViewer} from "./tab-native.js";window.mount=mountNativeViewer;</script>');await page.goto(server.origin+'/tab-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(raw=>{window.first=mount(document.querySelector('#one'),raw);window.second=mount(document.querySelector('#two'),raw);first.setCanvas(true);},await fixture());

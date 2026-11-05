@@ -41,6 +41,12 @@ function createBuilderInteractions(opts){
   var inlineEditor=createInlineTextEditor({view:view,document:document,window:window,src:src,session:session,documentTitle:document.getElementById('workbench-editor-title'),
     disabled:function(){return !!(addToStep || connect) || opts.isActive && !opts.isActive();},pause:pausePreview,targetFromEvent:targetFromEvent,findTargetEl:findTargetEl,
     currentStep:function(el){return currentStepTarget(el.closest('.stepline'));},
+    tabTarget:function(el){
+      var nav=el.closest('.explore-navigation[data-navigation-section]'),ctl=opts.ctl && opts.ctl(),number=nav && Number(nav.getAttribute('data-navigation-section'));
+      var rec=ctl && ctl.sections.find(function(r){return r.number===number;}),owner=rec && ctl.views && ctl.views.owner(rec);
+      var block=owner && owner.tabBlock && ctl.tabBlocks[owner.tabBlock-1],button=block && block.buttons[owner.tab],match=button && /^tab-(\d+)-(\d+)$/.exec(button.id || '');
+      return match?{kind:'tab',block:Number(match[1]),tab:Number(match[2])}:null;
+    },
     viewTarget:function(el){
       var nav=el.closest('.explore-navigation[data-navigation-section]'),ctl=opts.ctl && opts.ctl(),number=nav && Number(nav.getAttribute('data-navigation-section'));
       var rec=ctl && ctl.sections.find(function(r){return r.number===number;}),definition=rec && ctl.views && ctl.views.current(rec),id=el.getAttribute('data-tab-view');

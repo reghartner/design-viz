@@ -37,10 +37,14 @@ async function setup(page,server,options={}){
  if(options.unknown)Object.values(f.samples).forEach(s=>s.exemplars?.forEach(e=>{e.candidates.forEach(c=>c.status='unknown');delete e.url;}));
  if(options.disabled==='page')f.spec.page.tracking.telemetry={enabled:false};
  if(options.timed){
-  const e=f.samples['mcu->ingest'].exemplars[0],base=e.spans[0];
+  const e=f.samples['mcu->ingest'].exemplars[0],base=e.spans[0],recordedId=e.traceId;
   // Labeled synthetic boundary case: actual animation assertions need visible
   // durations, overlapping attempts, and zero. Screenshots use only mock story.
-  e.spans=[{...base,id:'a'.repeat(16),parentId:null,startMs:0,ms:600,attributes:{'retry.attempt':0}},{...base,id:'b'.repeat(16),parentId:null,startMs:150,ms:800,attributes:{'retry.attempt':1}},{...base,id:'c'.repeat(16),parentId:null,startMs:300,ms:0,attributes:{'retry.attempt':2}}];
+  e.traceId='947'.padEnd(32,'0');e.selectionReason='Synthetic animation boundary fixture';e.completeness='unknown';delete e.url;
+  e.candidates=[{traceId:e.traceId,time:base.time,status:'unknown'},...e.candidates.filter(c=>c.traceId!==recordedId)];
+  e.warnings=['Synthetic timing spans: coherent absolute timestamps, overlapping attempts and true zero; not a recorded request.'];
+  e.spans=[{id:'a'.repeat(16),startMs:0,ms:600},{id:'b'.repeat(16),startMs:150,ms:800},{id:'c'.repeat(16),startMs:300,ms:0}].map((timing,i)=>({...base,...timing,parentId:null,time:new Date(Date.parse(base.time)+timing.startMs).toISOString(),attributes:{'retry.attempt':i},events:[],links:[]}));
+  f.spec.page.title='Synthetic animation boundary fixture';f.spec.page.sections[0].heading='Synthetic packet timing · coherent clocks';
   f.spec.page.sections[0].diagram.steps[0].traceMatch.repeat='attempts';
  }
  await page.setViewportSize({width:1600,height:1200});
@@ -123,6 +127,7 @@ for(const options of [{missing:true},{noTrace:true},{noHandler:true},{unknown:tr
 
 test('real packet durations, concurrent start offsets and zero restore on navigation, history, off, clear and destroy; native sibling isolation',async({page,server})=>{
  await page.emulateMedia({reducedMotion:'no-preference'});const {root}=await setup(page,server,{timed:true,sibling:true});await metric(root).click();
+ await expect(card(root).locator('.dv-trace-selection')).toContainText('Synthetic animation boundary fixture');
  await page.evaluate(()=>{window.starts=[];const native=SVGAnimationElement.prototype.beginElement;SVGAnimationElement.prototype.beginElement=function(){if(this.parentElement.classList.contains('dv-trace-packet'))window.starts.push({at:performance.now(),dur:this.getAttribute('dur'),actual:this.getSimpleDuration()});return native.call(this);};});
  const authored=await root.locator('.cpkt:not(.dv-trace-packet) animateMotion').evaluateAll(els=>els.map(el=>el.getAttribute('dur')));
  await card(root).getByRole('button',{name:'Play this trace',exact:true}).click();await expect(root.locator('.dv-trace-packet')).toHaveCount(3);

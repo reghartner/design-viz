@@ -200,9 +200,11 @@ function createBuilderSession(options){
       if(outcome && outcome.restorePanelMenu)outcome.restorePanelMenu();
       return true;
     },
-    restoreHistoryText:function(value){
+    restoreHistoryText:function(value,message){
       if(disposed)return false;
-      options.source.write(value);target=null;render('history',{});save();return true;
+      options.source.write(value);target=null;var outcome=render('history',{});
+      if(message && options.afterHistory)options.afterHistory(message,outcome);
+      save();return true;
     },
     rememberView:function(change){
       if(disposed || !change || typeof change.restore!=='function' || JSON.stringify(change.before)===JSON.stringify(change.after))return false;

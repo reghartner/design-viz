@@ -43,7 +43,16 @@ function createBuilderInteractions(opts){
     currentStep:function(el){return currentStepTarget(el.closest('.stepline'));},
     commit:function(plan,snapshot,target,nextTarget){
       if(plan.error){inspectorMessage(plan.error);return;}
-      if(!session.accept(plan,{snapshot:snapshot,beforePublish:clearMultiSelect}))return;
+      // Tab identity in the preview is its label. Preserve the shown tab by
+      // position across this rename and its history replay, only when shown.
+      function shown(){var el=findTargetEl(target);return !!(el && el.getAttribute('aria-selected')==='true');}
+      function reactivate(wasShown){var el=wasShown && findTargetEl(target);if(el && el.getAttribute('aria-selected')!=='true')el.click();}
+      var wasShown=target.kind==='tab' && shown(),hooks={snapshot:snapshot,beforePublish:clearMultiSelect};
+      if(target.kind==='tab')hooks.history={kind:'source',before:snapshot.text,after:plan.text,capture:function(){return session.text();},restore:function(value,message){
+        var active=shown();if(!session.restoreHistoryText(value,message))return false;reactivate(active);return true;
+      }};
+      if(!session.accept(plan,hooks))return;
+      reactivate(wasShown);
       // Resolve the clicked authored identity after publication; its old DOM was retired.
       var nextEl=nextTarget && findTargetEl(nextTarget);
       if(nextEl){selectTarget(Object.assign({},nextTarget,{el:nextEl}),false,true);return;}

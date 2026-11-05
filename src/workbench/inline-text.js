@@ -336,19 +336,24 @@ function createInlineTextEditor(opts){
   // second click has selected the path, even if no native dblclick survives.
   var pathPress=null,pathReplacement=null;
   life.listen(view,'pointerdown',function(e){
+    if(e.button!==0 || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey){pathPress=pathReplacement=null;return;}
     var label=e.target.closest && e.target.closest('button.path-chip[data-dv-path] > span.path-chip-label,button.path-chip[data-dv-path] > span.path-timeline-label');
     var t=label && pathTarget(label),now=Date.now();
     pathReplacement=t && pathPress && !pathPress.el.isConnected && now-pathPress.time<500 && pathPress.section===t.section && pathPress.pathId===t.pathId && Math.abs(pathPress.x-e.clientX)<5 && Math.abs(pathPress.y-e.clientY)<5?t:null;
     pathPress=t?{el:label,section:t.section,pathId:t.pathId,time:now,x:e.clientX,y:e.clientY}:null;
   },true);
-  life.listen(view,'click',function(){
+  life.listen(view,'click',function(e){
     var target=pathReplacement;pathReplacement=null;if(!target)return;pathPress=null;
+    var label=e.target.closest && e.target.closest('button.path-chip[data-dv-path] > span.path-chip-label,button.path-chip[data-dv-path] > span.path-timeline-label'),clicked=label && pathTarget(label);
+    if(!clicked || clicked.section!==target.section || clicked.pathId!==target.pathId)return;
     life.delay(function(){
       var section=view.querySelector('.doc-sec[data-dv-section="'+target.section+'"]');if(!section)return;
       var button=Array.from(section.querySelectorAll('button.path-chip[data-dv-path]')).find(function(el){return el.getAttribute('data-dv-path')===target.pathId && !el.disabled;});
       var label=button && button.querySelector('.path-chip-label,.path-timeline-label');if(label)open(label);
     },0);
   },true);
+  life.listen(view,'contextmenu',function(){pathPress=pathReplacement=null;},true);
+  life.listen(view,'pointercancel',function(){pathPress=pathReplacement=null;},true);
   life.listen(view,'dblclick',doubleClick,true);
   // Current desktop chrome displays the document title outside the preview.
   // This one explicit surface shares the same active guard and editor lifetime.

@@ -2,6 +2,7 @@
    is installed by authoring. Exact counts, geometry, history and retired callbacks
    are observed at the DOM/session boundaries, never by replacing the painter. */
 import {test,expect,paste,prepareEditorSurface,trackResources} from '../helpers/test.mjs';
+import {readFile} from 'node:fs/promises';
 import {projectFiles,useProjectDownloads} from '../helpers/project-export.mjs';
 import {importedDetailSpec,nestedSpec} from '../helpers/telemetry-cards.mjs';
 const binding={kind:'call',signals:{rate:{grafana:'up',unit:'req/h'},errors:{grafana:'errors',unit:'req/h'}},card:{side:'below',offset:0}};
@@ -185,3 +186,14 @@ test('P9 preview mode retains the chosen named view, path and canvas scroll thro
 });
 
 test.afterEach(async({page})=>{expect(await page.evaluate(()=>window.metricToolCalls || []),'Authoring never acquires a connector, discovers tools or requests data').toEqual([]);});
+
+
+test('P10 diagram-only SVG export omits synthetic cards and leaders, restores authored labels and leaves preview untouched',async({page,server})=>{
+ await open(page,server);const source=await page.locator('#src').inputValue();await toggle(page).check();await expect(cards(page)).toHaveCount(1);
+ const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-svg').click();
+ const download=await pending,svg=await readFile(await download.path(),'utf8');
+ const exported=await page.evaluate(text=>{const doc=new DOMParser().parseFromString(text,'image/svg+xml');return {cards:doc.querySelectorAll('.dv-metrics-card').length,leaders:doc.querySelectorAll('.dv-metrics-leader').length,labels:Array.from(doc.querySelectorAll('text.lbl')).map(el=>({text:el.textContent,hidden:el.classList.contains('dv-metrics-label-hidden'),opacity:el.style.opacity,visibility:el.style.visibility}))};},svg);
+ expect(exported.cards,'synthetic preview cards are not export content').toBe(0);expect(exported.leaders).toBe(0);expect(svg).not.toContain('Preview · synthetic');
+ const label=exported.labels.find(el=>el.text===raw.page.sections[0].diagram.edges[0].label);expect(label).toBeTruthy();expect(label.hidden).toBe(false);expect(label.opacity).not.toBe('0');expect(label.visibility).not.toBe('hidden');
+ await expect(cards(page)).toHaveCount(1);await expect(toggle(page)).toBeChecked();await expect(page.locator('#src')).toHaveValue(source);
+});

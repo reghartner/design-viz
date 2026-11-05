@@ -419,7 +419,8 @@ card or edge, then edit **Card side** and **Card offset**; the placement updates
 immediately, including Undo/Redo. Unbound edges get no cards. Imported bindings
 follow the same rules and remain read only until you add a consumer override.
 This toggle starts off, is independent of Demo live status, and is never saved or
-added to Undo history. It survives edits in the same document, resets for a new
+added to Undo history. Diagram-only SVG exports omit synthetic cards and keep
+the authored edge labels. It survives edits in the same document, resets for a new
 project/import, and is suppressed while Allow metrics is off.
 
 ## State model

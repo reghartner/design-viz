@@ -3,7 +3,7 @@
    values without installing a provider or changing the authored binding. */
 function telemetryClearCards(scope){
   scope.querySelectorAll('.dv-metrics-card,.dv-metrics-leader').forEach(function(el){el.remove();});
-  scope.querySelectorAll('.dv-metrics-label-hidden').forEach(function(el){el.classList.remove('dv-metrics-label-hidden');});
+  scope.querySelectorAll('.dv-metrics-label-hidden').forEach(function(el){el.classList.remove('dv-metrics-label-hidden');el.removeAttribute('data-metrics-preview');});
 }
 function telemetryCardValue(binding,sample,name){
   if(!name || !binding.signals[name])return 'not bound';
@@ -80,8 +80,9 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate){
       card.setAttribute('transform','translate('+box.x+' '+box.y+')');card.setAttribute('data-side',placed.side);
       var end={x:Math.max(box.x,Math.min(box.x+box.w,placed.mid.x)),y:Math.max(box.y,Math.min(box.y+box.h,placed.mid.y))};
       var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader',d:'M'+placed.mid.x+' '+placed.mid.y+'L'+end.x+' '+end.y,'pointer-events':'none','aria-hidden':'true'});
+      if(view.preview)leader.setAttribute('data-metrics-preview','true');
       svg.insertBefore(leader,card);boxes.push(box);
-      var label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');if(label)label.classList.add('dv-metrics-label-hidden');
+      var label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');if(label){label.classList.add('dv-metrics-label-hidden');if(view.preview)label.setAttribute('data-metrics-preview','true');}
       if(activate)activate(card,path,edge,index);
     });
   });

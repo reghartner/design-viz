@@ -47,7 +47,7 @@ Table `showChange:false`; contract `fieldLabel`: [columns](../../../cookbook/sof
 
 ## Choose the starting point
 
-Browser imports: [supported formats](../../../docs/workbench-user-guide.md).
+[Imports/edit](../../../docs/workbench-user-guide.md#edit-visible-text-directly).
 
 After the packet, route source/handoff details:
 

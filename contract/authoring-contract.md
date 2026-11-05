@@ -396,8 +396,9 @@ Omitting `ct` retains the existing first-card behavior.
 
 In the workbench, use **Add to diagram → Contracts & page structure → Add
 contract block**, or select the section and use **+ Add contract block**.
-Click a block heading or note to set its width, title, source and note; click a
-row to edit its fields. The block inspector adds fields, duplicates, reorders,
+Double-click a block title, field name, value, meaning or note to edit it in place.
+Click a block heading or note to inspect its width, title, source and note; click a
+row to inspect its fields. The block inspector adds fields, duplicates, reorders,
 and deletes blocks. Reordering explicitly migrates a legacy single card into
 `contracts`; appending leaves its original JSON intact. These are undoable.
 

@@ -56,8 +56,10 @@ function createBuilderSession(options){
       var captured=entry.capture?entry.capture():entry.after;
       var restored=entry.restore(entry.before,message);if(restored===false)return false;
       if(restored==='expired'){from.pop();historyVersion++;historyChanged();return historyStep(from,to,message);}
-      from.pop();to.push({kind:entry.kind,capture:entry.capture,restore:entry.restore,before:captured,after:entry.before});
-      historyVersion++;historyChanged();return true;
+      from.pop();to.push({kind:entry.kind,capture:entry.capture,restore:entry.restore,before:captured,after:entry.before,notifyHistory:entry.notifyHistory});
+      historyVersion++;historyChanged();
+      if(entry.notifyHistory && options.afterHistory)options.afterHistory(message);
+      return true;
     }
     historyVersion++;
     to.push(text());options.source.write(from.pop());historyChanged();target=null;

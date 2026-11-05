@@ -216,7 +216,7 @@ test('duplicate section assigns a fresh stable ID; moves retain each numeric tar
 /* The inspector and interaction owners receive a tiny injected DOM. This
    exercises actual form events/session publication without loading a viewer. */
 function ui(spec=fixture(),options={}){
-  const doc={activeElement:null};
+  const doc={activeElement:null,getElementById(){return null;}};
   function element(tag='div'){
     const attrs={},events={},el={tagName:tag.toUpperCase(),children:[],className:'',value:'',textContent:'',style:{},scrollTop:0,scrollLeft:0,
       addEventListener(type,fn){(events[type] ||= []).push(fn);},removeEventListener(type,fn){events[type]=(events[type] || []).filter(f=>f!==fn);},

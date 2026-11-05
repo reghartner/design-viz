@@ -38,17 +38,46 @@ function createBuilderInteractions(opts){
     }});
   life.own(function(){textEditor.destroy();});
 
-  var inlineEditor=createInlineTextEditor({view:view,document:document,window:window,src:src,session:session,
+  var inlineEditor=createInlineTextEditor({view:view,document:document,window:window,src:src,session:session,documentTitle:document.getElementById('workbench-editor-title'),
     disabled:function(){return !!(addToStep || connect) || opts.isActive && !opts.isActive();},pause:pausePreview,targetFromEvent:targetFromEvent,findTargetEl:findTargetEl,
+    currentStep:function(el){return currentStepTarget(el.closest('.stepline'));},
+    tabTarget:function(el){
+      var nav=el.closest('.explore-navigation[data-navigation-section]'),ctl=opts.ctl && opts.ctl(),number=nav && Number(nav.getAttribute('data-navigation-section'));
+      var rec=ctl && ctl.sections.find(function(r){return r.number===number;}),owner=rec && ctl.views && ctl.views.owner(rec);
+      var block=owner && owner.tabBlock && ctl.tabBlocks[owner.tabBlock-1],button=block && block.buttons[owner.tab],match=button && /^tab-(\d+)-(\d+)$/.exec(button.id || '');
+      return match?{kind:'tab',block:Number(match[1]),tab:Number(match[2])}:null;
+    },
+    viewTarget:function(el){
+      var nav=el.closest('.explore-navigation[data-navigation-section]'),ctl=opts.ctl && opts.ctl(),number=nav && Number(nav.getAttribute('data-navigation-section'));
+      var rec=ctl && ctl.sections.find(function(r){return r.number===number;}),definition=rec && ctl.views && ctl.views.current(rec),id=el.getAttribute('data-tab-view');
+      return definition && definition.id===id?{kind:'view',section:number-1,viewId:id}:null;
+    },
     commit:function(plan,snapshot,target,nextTarget){
+      if(target.kind==='view'){opts.renameView(target.section,target.viewId,plan.inlineValue);return;}
       if(plan.error){inspectorMessage(plan.error);return;}
-      if(!session.accept(plan,{snapshot:snapshot,beforePublish:clearMultiSelect}))return;
+      // Tab identity in the preview is its label. Preserve the shown tab by
+      // position across this rename and its history replay, only when shown.
+      function shown(){var el=findTargetEl(target);return !!(el && el.getAttribute('aria-selected')==='true');}
+      function reactivate(wasShown){var el=wasShown && findTargetEl(target);if(el && el.getAttribute('aria-selected')!=='true')el.click();}
+      var wasShown=target.kind==='tab' && shown(),hooks={snapshot:snapshot,beforePublish:clearMultiSelect};
+      if(target.kind==='tab')hooks.history={kind:'source',notifyHistory:true,before:snapshot.text,after:plan.text,capture:function(){return session.text();},restore:function(value){
+        var active=shown();if(!session.restoreHistoryText(value))return false;reactivate(active);return true;
+      }};
+      if(!session.accept(plan,hooks))return;
+      reactivate(wasShown);
+      if(target.kind==='path'){rehighlight();renderInspector();return;}
       // Resolve the clicked authored identity after publication; its old DOM was retired.
       var nextEl=nextTarget && findTargetEl(nextTarget);
       if(nextEl){selectTarget(Object.assign({},nextTarget,{el:nextEl}),false,true);return;}
       session.target=target;rehighlight();renderInspector();
     }});
   life.own(function(){inlineEditor.destroy();});
+  /* Rename opens the connection label editor over its label, or from the arrow
+     when it has no label yet. */
+  function renameEdge(target){
+    var path=findTargetEl({kind:'edge',section:target.section,index:target.index}),svg=path && path.ownerSVGElement;
+    if(svg)inlineEditor.open(svg.querySelector('text.lbl[data-dv-edge="'+target.index+'"]') || path,true);
+  }
   function selectionChanged(){if(opts.workspace && opts.workspace.selectionChanged)opts.workspace.selectionChanged();if(opts.selectionChanged)opts.selectionChanged();if(spatial)spatial.sync();}
   function setSelected(el){
     if (selectedEl) selectedEl.classList.remove('dv-sel');
@@ -136,6 +165,22 @@ function createBuilderInteractions(opts){
     var rec = null;
     ctl.sections.forEach(function(s){ if (!rec && s.number === sectionOrdinal + 1) rec = s; });
     return rec ? rec.stepper : null;
+  }
+  /* The step a caption line is showing: its section's current step chip names
+     the source step, in Standard and Explore alike. */
+  function currentStepTarget(line){
+    var lineSec = line && line.closest('.doc-sec');
+    var chipsBox = lineSec && lineSec.querySelector('.schips');
+    if (!lineSec || !chipsBox || !lineSec.hasAttribute('data-dv-section')) return null;
+    var cur = -1, currentChip = null;
+    Array.prototype.forEach.call(chipsBox.querySelectorAll('.schip'), function(c){
+      if (cur < 0 && c.getAttribute('aria-current') === 'true'){
+        cur = Number(c.getAttribute('data-step-source')); currentChip = c;
+      }
+    });
+    if (cur < 0) return null;
+    return {section: parseInt(lineSec.getAttribute('data-dv-section'), 10),
+            kind: 'step', index: cur, el: currentChip};
   }
   function pausePreview(){
     var ctl = opts.ctl ? opts.ctl() : null;
@@ -418,6 +463,13 @@ function createBuilderInteractions(opts){
     var unavailable='This provider has no verified published link in this repository catalog.';
     item('Go to diagram',function(){window.open(url,'_blank','noopener,noreferrer');},url?null:unavailable);
     item('Inspect imported member',function(){selectSpatial([ref.target]);if(opts.workspace)opts.workspace.showTool('inspect',{closeUtilities:true});});
+    // Renaming the invoked imported node edits only this consumer's display name.
+    if(ref.target.kind==='node' && ref.el===ref.target.el && ref.el.matches('[data-dv-node]:not([data-dv-text-box])')){
+      var renameCheck=planTopologyNodeOverride(ref.s.text,ref.s.raw,ref.section,ref.target.id,{},context);
+      item('Rename',function(){selectSpatial([ref.target]);inlineEditor.open(findTargetEl(ref.target));},renameCheck.error);
+    }
+    if(ref.target.kind==='edge')item('Rename',function(){renameEdge(ref.target);});
+    if(ref.target.kind==='group')item('Rename',function(){},'Imported structure belongs to its provider.');
     var routingTarget=Object.assign({},ref.target,ref.target.kind==='edge'?{imported:true}:{});
     var clearPlan=planClearCustomEdges(ref.s.text,ref.s.raw,{targets:[routingTarget]},context);
     item('Clear Custom Edges',function(){applyPlan(clearPlan,null,ref.s);},clearPlan.error || (clearPlan.noop?'No authored custom edge geometry is in scope.':null));
@@ -500,7 +552,8 @@ function createBuilderInteractions(opts){
   var spatial=createBuilderSpatialSelection({document:document,window:window,view:view,src:src,session:session,isActive:opts.isActive,
     targetFromEvent:targetFromEvent,selection:function(){return multiSel.length?multiSel:session.target?[Object.assign({},session.target,{el:findTargetEl(session.target)})]:[];},
     select:selectSpatial,toggle:toggleMultiSelect,find:findTargetEl,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag || coinDrag || pathReorder && pathReorder.busy());},
-    inspect:function(){inspectSelection(false);},openAdd:opts.openAdd
+    inspect:function(){inspectSelection(false);},openAdd:opts.openAdd,renameEdge:renameEdge,
+    rename:function(t){var el=findTargetEl(t);if(el)inlineEditor.open(el);}
   });
   life.own(function(){spatial.destroy();});
 
@@ -508,6 +561,17 @@ function createBuilderInteractions(opts){
 
   function targetFromEvent(ev){
     if(inDetailPreview(ev.target))return null;
+    // Titles belong to the panel, before a panel-specific body click hook can
+    // redirect to a Home map step. Explore shows the same title on its grip.
+    var panelTitle=ev.target.closest && ev.target.closest('.pwidget[data-dv-panel] > .ptitle,.explore-window[data-explore-panel] > .explore-window-header > .explore-window-grip');
+    if(panelTitle && (!ev.target.closest('a,button,summary,[role="button"],input,select,textarea') || ev.target.closest('.explore-window-grip'))){
+      var titleWindow=panelTitle.closest('.explore-window[data-explore-panel]'),titleCard=titleWindow?titleWindow.querySelector('.pwidget[data-dv-panel]'):panelTitle.parentElement;
+      var titleSection=titleCard && titleCard.closest('.doc-sec');
+      if(titleSection && titleSection.hasAttribute('data-dv-section')){
+        if(titleWindow && titleWindow.closest('.explore-canvas-objects')){var titleTarget=spatial.target(titleWindow);if(titleTarget)return titleTarget;}
+        return {section:Number(titleSection.getAttribute('data-dv-section')),kind:'panel',index:Number(titleCard.getAttribute('data-dv-panel')),el:titleCard};
+      }
+    }
     /* Map editing follows the same manual transport/path selection as the
        preview. Play/Pause are excluded so selecting an inspector cannot
        immediately stop a user-started animation. */
@@ -570,17 +634,7 @@ function createBuilderInteractions(opts){
         section:parseInt(lineSec.getAttribute('data-dv-section'),10),kind:'step-controls',
         layoutId:explorePlayer.getAttribute('data-explore-layout'),el:explorePlayer
       };
-      var chipsBox = lineSec && lineSec.querySelector('.schips');
-      if (!lineSec || !chipsBox || !lineSec.hasAttribute('data-dv-section')) return null;
-      var cur = -1, currentChip = null;
-      Array.prototype.forEach.call(chipsBox.querySelectorAll('.schip'), function(c){
-        if (cur < 0 && c.getAttribute('aria-current') === 'true'){
-          cur = Number(c.getAttribute('data-step-source')); currentChip = c;
-        }
-      });
-      if (cur < 0) return null;
-      return {section: parseInt(lineSec.getAttribute('data-dv-section'), 10),
-              kind: 'step', index: cur, el: currentChip};
+      return currentStepTarget(line);
     }
     var secEl = ev.target.closest('.doc-sec');
     if (!secEl || !secEl.hasAttribute('data-dv-section')) return null;

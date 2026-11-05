@@ -105,3 +105,73 @@ test('#583 document settings edit description and tags; invalid values are rejec
   await settings(reopened);await edit(reopened,'Description','');await expect.poll(async()=>Object.hasOwn(JSON.parse(await source(reopened)).page,'description')).toBe(false);
   await reopened.close();
 });
+
+// #964: both titles use their existing planners and Inspect empty-value rules.
+// Exact-source comparisons also protect non-title metadata and neighboring fields.
+for(const kind of ['document','section'])test('inline '+kind+' title saves through its settings planner: Escape, Enter, click outside, empty parity, one Undo',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');
+ const raw={page:{title:'Original document',skin:'aurora',blocks:[{heading:'Original section',text:['Body stays'],diagram}]}},original=JSON.stringify(raw,null,'\t');
+ await paste(page,original);await prepareEditorSurface(page);
+ const doc=kind==='document',title=page.locator(doc?'#workbench-editor-title':'#docview .sec-h'),src=page.locator('#src'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder');
+ const draft=page.locator('.dv-inline-editor').getByRole('textbox',{name:doc?'Document title':'Section heading',exact:true}),label=doc?'Document title':'heading',first=doc?'Original document':'Original section';
+ if(doc)await settings(page);else await inspectPageElement(page,title);
+ await edit(page,label,'');await expect(src).not.toHaveValue(original);const cleared=await source(page),empty=JSON.parse(cleared);
+ expect(doc?Object.hasOwn(empty.page,'title'):Object.hasOwn(empty.page.blocks[0],'heading')).toBe(false);
+ await undo.click();await expect(src).toHaveValue(original);await prepareEditorSurface(page);
+ const spot=await title.boundingBox();await title.dblclick();await expect(draft).toBeVisible();await expect(draft).toBeFocused();await expect(draft).toHaveValue(first);
+ expect(await draft.evaluate(el=>[el.selectionStart,el.selectionEnd])).toEqual([0,first.length]);
+ const box=await draft.boundingBox(),cx=spot.x+spot.width/2,cy=spot.y+spot.height/2;
+ expect(box.x<=cx && cx<=box.x+box.width && box.y<=cy && cy<=box.y+box.height,'editor covers title').toBe(true);
+ await draft.pressSequentially('Discarded');await draft.press('Escape');await expect(draft).toHaveCount(0);await expect(src).toHaveValue(original);await expect(title).toContainText(first);
+ await title.dblclick();await expect(draft).toBeFocused();await draft.pressSequentially('  Renamed title  ');await draft.press('Enter');await expect(draft).toHaveCount(0);
+ const saved=await source(page),want=structuredClone(raw);if(doc)want.page.title='Renamed title';else want.page.blocks[0].heading='Renamed title';
+ expect(JSON.parse(saved)).toEqual(want);await expect(title).toContainText('Renamed title');
+ if(doc)await expect(page.locator('#docview .doc-title')).toHaveText('Renamed title');
+ await undo.click();await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();await redo.click();await expect(src).toHaveValue(saved);
+ await undo.click();await expect(src).toHaveValue(original);
+ await title.dblclick();await expect(draft).toBeFocused();await draft.pressSequentially('Click-away title');
+ await page.locator('#editor-tab-inspect').click();await expect(draft).toHaveCount(0);
+ const clicked=structuredClone(raw);if(doc)clicked.page.title='Click-away title';else clicked.page.blocks[0].heading='Click-away title';
+ expect(JSON.parse(await source(page))).toEqual(clicked);await undo.click();await expect(src).toHaveValue(original);await prepareEditorSurface(page);
+ await title.dblclick();await expect(draft).toBeFocused();await draft.pressSequentially('   ');await draft.press('Enter');await expect(draft).toHaveCount(0);await expect(src).toHaveValue(cleared);
+ if(doc){await expect(page.locator('#docview .doc-title')).toHaveCount(0);await expect(title).toHaveText('Untitled story');await title.dblclick();await expect(draft).toHaveCount(0);await expect(src).toHaveValue(cleared);}
+ else await expect(title).toHaveCount(0);
+ await undo.click();await expect(src).toHaveValue(original);await expect(title).toContainText(first);
+});
+
+test('section source and embed chips keep their actions and stay outside the title editor',async({page,server,audit})=>{
+ await page.addInitScript(()=>{window.__titleCopies=[];Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>window.__titleCopies.push(text)}});});
+ await audit.mockExternal('https://example.test/heading-source',route=>route.fulfill({contentType:'text/html',body:'<h1>Heading source</h1>'}));
+ await page.goto(server.origin+'/workbench.html');
+ const raw={page:{title:'Title chips',blocks:[{id:'story',heading:'Story heading',source:'https://example.test/heading-source',diagram}]}},original=JSON.stringify(raw,null,2);
+ await paste(page,original);await prepareEditorSurface(page);
+ const title=page.locator('#docview .sec-h'),sourceChip=title.locator('.srcchip'),draft=page.locator('.dv-inline-editor').getByRole('textbox',{name:'Section heading',exact:true});
+ // Click actual heading text; its linked source remains mounted and usable beside it.
+ const point=await title.evaluate(el=>{const r=document.createRange();r.selectNodeContents(el.firstChild);const b=r.getBoundingClientRect();return {x:b.x+b.width/2,y:b.y+b.height/2};});
+ await page.mouse.dblclick(point.x,point.y);await expect(draft).toBeFocused();await expect(draft).toHaveValue('Story heading');await expect(sourceChip).toBeVisible();
+ await draft.press('Escape');await expect(draft).toHaveCount(0);
+ const opened=page.waitForEvent('popup');await sourceChip.dblclick();const popup=await opened;
+ await expect(popup).toHaveURL('https://example.test/heading-source');await popup.close();await expect(draft).toHaveCount(0);await expect(page.locator('#src')).toHaveValue(original);
+ // The navigation owns the same embed button when the current View is active.
+ const embed=page.locator('#docview .embedcopy:visible');await expect(embed).toHaveCount(1);await embed.dblclick();
+ await expect.poll(()=>page.evaluate(()=>window.__titleCopies.length)).toBeGreaterThan(0);
+ const copied=await page.evaluate(()=>window.__titleCopies.at(-1));expect(new URL(copied).hash).toContain('embed=story');
+ await expect(draft).toHaveCount(0);await expect(page.locator('#src')).toHaveValue(original);
+});
+
+test('external document-title editor drops stale source and retires its listener on builder teardown',async({page,server})=>{
+ await page.goto(server.origin+'/lifetime/index.html');
+ const original=JSON.stringify({page:{title:'External title',blocks:[{heading:'Flow',diagram}]}},null,2);
+ await paste(page,original);await prepareEditorSurface(page);
+ const title=page.locator('#workbench-editor-title'),draft=page.locator('.dv-inline-editor').getByRole('textbox',{name:'Document title',exact:true}),src=page.locator('#src');
+ await title.dblclick();await expect(draft).toBeFocused();await draft.pressSequentially('Stale draft');const stale=await draft.elementHandle();
+ const changed=original.replace('External title','Replacement title');
+ await page.evaluate(text=>{const src=document.querySelector('#src');src.value=text;src.dispatchEvent(new Event('input',{bubbles:true}));},changed);
+ await expect(draft).toHaveCount(0);await expect(title).toBeVisible();await expect(page.locator('.dv-inline-html-mount')).toHaveCount(0);
+ await stale.evaluate(el=>el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})));await expect(src).toHaveValue(changed);
+ await page.evaluate(text=>__editorTest.builder.loadText(text),changed);await title.dblclick();await expect(draft).toHaveValue('Replacement title');
+ await page.evaluate(()=>__editorTest.builder.destroy());await expect(draft).toHaveCount(0);await expect(title).toBeVisible();
+ await title.dblclick();await expect(draft).toHaveCount(0);await expect(src).toHaveValue(changed);
+ await page.evaluate(()=>__editorTest.remount());await title.dblclick();await expect(draft).toBeFocused();await draft.pressSequentially('Remounted title');await draft.press('Enter');
+ await expect(title).toHaveText('Remounted title');await page.locator('#undo-builder').click();await expect(src).toHaveValue(changed);
+});

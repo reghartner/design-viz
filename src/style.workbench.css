@@ -1773,7 +1773,25 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 .dv-inline-preview .prose-code{white-space:pre;overflow:auto;}
 .dv-inline-node-editor{overflow:visible;}
 .dv-inline-node-editor .dv-inline-input{height:36px;padding:4px 6px;font:16px/1.4 system-ui,sans-serif;color:var(--dtext,#202938);}
+.dv-inline-subtitle-editor{overflow:visible;}
+.dv-inline-subtitle-editor .dv-inline-input{height:28px;padding:3px 6px;font:13px/1.4 system-ui,sans-serif;color:var(--dtext,#202938);}
+#docview text.t2.dv-inline-editing{visibility:hidden;}
+.dv-inline-group-editor{overflow:visible;}
+.dv-inline-group-editor .dv-inline-input{height:30px;padding:3px 6px;font:600 13px/1.4 system-ui,sans-serif;color:var(--dtext,#202938);}
 .dv-inline-editing>[hidden]{display:none!important;}
+.dv-inline-html-mount{position:relative;}
+.dv-inline-html-editing{visibility:hidden;}
+.dv-inline-html-editor{position:absolute;z-index:2;}
+.path-matrix > .dv-inline-html-editor,.path-timeline > .dv-inline-html-editor{z-index:10;}
+.dv-inline-html-editor .dv-inline-input{height:100%;padding:2px 6px;white-space:nowrap;color:var(--dtext,#202938);}
+/* A connection label editor covers its label, or sits where the label would be drawn. */
+.dv-inline-edge-editor{overflow:visible;}
+.dv-inline-edge-editor .dv-inline-input{height:30px;padding:3px 6px;font:13px/1.4 system-ui,sans-serif;text-align:center;color:var(--dtext,#202938);}
+#docview text.lbl.dv-inline-editing{visibility:hidden;}
+/* The step caption editor takes its own line under the STEP number, lane and
+   links, which stay visible and keep their actions. */
+.stepline .step-text.dv-inline-editing{display:block;margin:4px 0;}
+.stepline .dv-inline-input{max-height:160px;overflow-y:auto;}
 #docview [data-dv-para]:focus-visible,#docview [data-dv-bullet-path]:focus-visible{outline:2px solid #2563eb;outline-offset:3px;}
 
 /* Keep hidden nodes selectable on the desktop authoring canvas for restoration. */

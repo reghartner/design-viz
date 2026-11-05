@@ -487,9 +487,13 @@ them or contacts Grafana or Honeycomb. These authoring controls are desktop-only
 In the desktop preview toolbar, **Preview metrics layout** shows one card per
 visible bound edge, labelled **Preview · synthetic**, using the reader’s card
 placement. It does not contact connectors or show production proof. Select a
-card or edge, then edit **Card side** and **Card offset**; the placement updates
-immediately, including Undo/Redo. Unbound edges get no cards. Imported bindings
-follow the same rules and remain read only until you add a consumer override.
+card or edge to open Inspect. Drag a card anywhere, or Tab to it and use Arrow
+keys (10 SVG units; Shift+Arrow moves 50). Release the arrows to save one
+Undo/Redo step; Escape cancels a drag or a held keyboard move. **Reset card to automatic** restores placement using **Card side**
+and **Card offset**. Unbound edges get no cards. Moving direct or nested imported
+cards saves a consumer override with the inherited binding; providers stay unchanged.
+Cards in authored local detail sections can also move. Details loaded from other
+documents display saved positions but remain read only in this document.
 This toggle starts off, is independent of Demo live status, and is never saved or
 added to Undo history. Diagram-only SVG exports omit synthetic cards and keep
 the authored edge labels. It survives edits in the same document, resets for a new
@@ -1001,7 +1005,11 @@ current fonts and text; the default is 138 × 78 SVG units for five readable lin
 
 `telemetry.card.side` selects `right`, `left`, `above` or `below`; `offset` moves
 along that side in SVG units. Defaults are right of a vertical route and below a
-horizontal route. Placement shares board control measurements and collision tests;
+horizontal route. Optional `position: {"x": -180, "y": 90}` sets the card’s top-left
+in SVG units relative to the edge path midpoint. Both coordinates must be finite
+numbers. This manual position overrides side/offset and automatic collision packing;
+text width and zoom do not shift it. Removing `position` restores automatic placement.
+Automatic cards avoid manual cards. Placement shares board control measurements and collision tests;
 card rectangles reserve space in the coin packer even without a live break. Jira
 cues repack around cards and coins, and the frame includes cards and displaced
 controls. Local, direct imported, nested imported and loaded-detail edges follow

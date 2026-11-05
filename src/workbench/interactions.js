@@ -26,6 +26,16 @@ function createBuilderInteractions(opts){
       session.target={section:section,kind:'edge',index:index};rehighlight();renderInspector();
     }});
   life.own(function(){curveEditor.destroy();});
+  var metricsCardEditor=createTelemetryCardLayoutEditor({view:view,window:window,src:src,session:session,
+    disabled:function(){return !!(addToStep || connect) || opts.isActive && !opts.isActive();},message:inspectorMessage,pause:pausePreview,
+    select:function(card,target,event){
+      target=Object.assign({},target,{el:card.ownerSVGElement.querySelector('path.edge[data-dv-edge="'+target.index+'"]')});
+      if(event && (event.shiftKey || event.ctrlKey || event.metaKey)){toggleMultiSelect(target);return;}
+      clearMultiSelect();selectTarget(target,false,true);
+    },
+    commit:function(plan,snapshot,target){if(!session.accept(plan,{snapshot:snapshot,beforePublish:clearMultiSelect}))return;session.target=target;rehighlight();renderInspector();}
+  });
+  life.own(function(){metricsCardEditor.destroy();});
   var textEditor=createTextBoxEditor({view:view,document:document,window:window,src:src,session:session,
     disabled:function(){return !!(addToStep || connect) || opts.isActive && !opts.isActive();},pause:pausePreview,targetFromEvent:targetFromEvent,
     commit:function(plan,snapshot,target,nextTarget){
@@ -1892,7 +1902,7 @@ function createBuilderInteractions(opts){
   function cancelGestures(){
     closeReferenceMenu(false);
     if(spatial)spatial.clear();
-    curveEditor.cancel();
+    curveEditor.cancel();metricsCardEditor.cancel();
     cancelNodeDrag();cancelGroupDrag();cancelRowDrag();cancelCoinDrag();
     if(drag){drag.lbl.removeAttribute('transform');drag=null;}
   }
@@ -1959,7 +1969,7 @@ function createBuilderInteractions(opts){
     selectAllNodes:function(){return life.alive() && spatial.selectAllNodes();},
     inspectSelection:life.guard(inspectSelection),
     spatialActions:function(host,lifetime){return spatial.actions(host,lifetime);},
-    busy:function(){return life.alive() && !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag || coinDrag || pathReorder.busy() || curveEditor.busy());},
+    busy:function(){return life.alive() && !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag || coinDrag || pathReorder.busy() || curveEditor.busy() || metricsCardEditor.busy());},
     toggleAdding:life.guard(function(t){if(addToStep){cancelAddToStep(null);return;}if(connect)cancelConnect(null);addToStep={section:t.section,step:t.index};addToStepStatus();renderInspector();}),
     beforeReplace:life.guard(beforeReplace),retire:life.guard(retire),
     destroy:function(){if(!life.alive())return;life.destroy();retire();

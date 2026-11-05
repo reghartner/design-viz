@@ -438,3 +438,30 @@ test('environment profiles are desktop controls with one Undo, defaults, inherit
   assert.deepEqual(ui.raw.page.tracking.telemetry,{grafana:{prometheus:'prom-$env'}});
   ui.set('New environment id','qa"');ui.click('Add environment');assert.match(ui.error(),/Environment ids/);
 });
+
+test('manual card position validates both finite axes, preserves template semantics and reset/no-op history',()=>{
+  const binding={use:'kafka-topic',topic:'events',group:'workers',card:{side:'left',offset:42}},ui=harness(board(binding,{templates:TEMPLATES()}),EDGE),C=api(ui.e.C);
+  for(const value of [{x:0},{x:'2',y:3},{x:NaN,y:1},{x:1,y:Infinity},[],false])assert.ok(C.telemetryEditBinding(binding,{op:'card',field:'position',value}).error);
+  const before=ui.text,position={x:-217.25,y:133.5};
+  const plan=C.planCarrierTelemetry(before,ui.raw,EDGE,{op:'card',field:'position',value:position});assert.ok(!plan.error,plan.error);
+  oneStep(ui,()=>ui.h.session.accept(plan,{snapshot:ui.h.session.snapshot()}));
+  assert.deepEqual(edgeOf(ui).telemetry,{...binding,card:{...binding.card,position}});
+  assert.equal(C.planCarrierTelemetry(ui.text,ui.raw,EDGE,{op:'card',field:'position',value:position}).text,ui.text);
+  oneStep(ui,()=>ui.click('Reset card to automatic'));
+  assert.deepEqual(edgeOf(ui).telemetry,binding);
+  assert.equal(C.planCarrierTelemetry(ui.text,ui.raw,EDGE,{op:'card',field:'position',value:null}).text,ui.text);
+});
+
+test('moving inherited cards writes only the consumer overlay and preserves the resolved binding and annotations',()=>{
+  const f=topologyFixtures(),C=api(inspectorEnvironment(names).C);
+  f.provider.page.tracking={telemetry:{templates:TEMPLATES()}};
+  diagramOf(f.provider).edges[0].telemetry={use:'kafka-topic',topic:'delivery',group:'workers',proof:{lag:{max:17}},links:{query:'https://example.com/query'}};
+  const providerBefore=JSON.stringify(f.provider);
+  const resolved=diagramOf(C.FlowTopology.resolveSource(f.consumer,f.context)),index=resolved.edges.findIndex(e=>e.from==='shared::api'),target={kind:'edge',section:0,index},inherited=plain(resolved.edges[index].telemetry);
+  const consumer=structuredClone(f.consumer);diagramOf(consumer).topologyImports[0].edgeTracking={'api->store':{tickets:['TEST-9'],prs:['https://github.com/acme/service/pull/9']}};
+  const text=JSON.stringify(consumer,null,2),plan=C.planCarrierTelemetry(text,consumer,target,{op:'card',field:'position',value:{x:-40,y:60}},f.context);assert.ok(!plan.error,plan.error);
+  const next=JSON.parse(plan.text),entry=diagramOf(next).topologyImports[0].edgeTracking['api->store'];
+  assert.equal(entry.telemetry.use,undefined);assert.equal(entry.telemetry.proof.lag.max,17);assert.match(entry.telemetry.signals.in.grafana,/delivery/);
+  assert.deepEqual(entry,{tickets:['TEST-9'],prs:['https://github.com/acme/service/pull/9'],telemetry:{...inherited,card:{...inherited.card,position:{x:-40,y:60}}}});
+  assert.equal(JSON.stringify(f.provider),providerBefore);assert.equal(JSON.stringify(f.context.specs[0]),providerBefore);
+});

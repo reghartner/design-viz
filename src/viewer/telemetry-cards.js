@@ -41,6 +41,9 @@ function telemetryCardPlace(path,w,h,placement,boxes){
   var length=path.getTotalLength(),mid=path.getPointAtLength(length/2),a=path.getPointAtLength(Math.max(0,length/2-2)),b=path.getPointAtLength(Math.min(length,length/2+2));
   var side=placement.side || (Math.abs(b.y-a.y)>Math.abs(b.x-a.x)?'right':'below'),vertical=side==='right' || side==='left',offset=placement.offset || 0;
   function candidate(gap,shift){return {x:vertical?(side==='right'?mid.x+gap:mid.x-gap-w):mid.x-w/2+offset+shift,y:vertical?mid.y-h/2+offset+shift:(side==='below'?mid.y+gap:mid.y-gap-h),w:w,h:h};}
+  // Manual top-left is relative to the path midpoint, independent of card
+  // text width, side preferences and automatic obstacle packing.
+  if(placement.position)return {box:{x:mid.x+placement.position.x,y:mid.y+placement.position.y,w:w,h:h},mid:mid,side:side};
   var box=null;
   for(var ring=0;ring<32 && !box;ring++){
     [0,24,-24,48,-48,96,-96].some(function(shift){var next=candidate(12+ring*24,shift);if(boxes.some(function(obstacle){return boardBoxesOverlap(next,obstacle,6);}))return false;box=next;return true;});
@@ -57,7 +60,10 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate){
   scope.querySelectorAll('svg').forEach(function(svg){
     var boxes=[],doc=svg.ownerDocument;
     svg.querySelectorAll('.node .card,.node .icbg,.node use,.node image,.node text,.handoff-stripe,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff],.dvdelta,.node-review-badge,.comm-break,text.lbl').forEach(function(el){if(el.closest('.coin'))return;var box=boardControlBox(el,svg);if(box)boxes.push(box);});
-    svg.querySelectorAll('path.edge[data-dv-edge]').forEach(function(path){
+    Array.from(svg.querySelectorAll('path.edge[data-dv-edge]')).sort(function(a,b){
+      function manual(path){var edge=(diagram.edges || [])[Number(path.getAttribute('data-dv-edge'))],binding=edge && carrierTelemetry(edge,templates);return !!(binding && binding.card && binding.card.position);}
+      return Number(manual(b))-Number(manual(a));
+    }).forEach(function(path){
       var index=Number(path.getAttribute('data-dv-edge')),edge=(diagram.edges || [])[index],binding=edge && carrierTelemetry(edge,templates);
       var liveBreak=svg.querySelector('.dv-live-comm-failure[data-dv-edge="'+index+'"]');
       if(!binding || edge.hidden===true || !boardControlBox(path,svg) && !boardControlBox(liveBreak,svg))return;
@@ -85,9 +91,10 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate){
         telemetrySvg(doc,'polyline',{'class':'dv-metrics-sparkline',points:values.map(function(v,i){return (w-58+48*i/(values.length-1))+','+(hi===lo?27:33-12*(v-lo)/(hi-lo));}).join(' ')},card);
       }
       var placed=telemetryCardPlace(path,w,78,binding.card || {},boxes),box=placed.box;
+      card.setAttribute('data-metrics-anchor-x',placed.mid.x);card.setAttribute('data-metrics-anchor-y',placed.mid.y);
       card.setAttribute('transform','translate('+box.x+' '+box.y+')');card.setAttribute('data-side',placed.side);
       var end={x:Math.max(box.x,Math.min(box.x+box.w,placed.mid.x)),y:Math.max(box.y,Math.min(box.y+box.h,placed.mid.y))};
-      var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader',d:'M'+placed.mid.x+' '+placed.mid.y+'L'+end.x+' '+end.y,'pointer-events':'none','aria-hidden':'true'});
+      var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-dv-edge':index,d:'M'+placed.mid.x+' '+placed.mid.y+'L'+end.x+' '+end.y,'pointer-events':'none','aria-hidden':'true'});
       if(view.preview)leader.setAttribute('data-metrics-preview','true');
       svg.insertBefore(leader,card);boxes.push(box);
       var label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');if(label){label.classList.add('dv-metrics-label-hidden');if(view.preview)label.setAttribute('data-metrics-preview','true');}

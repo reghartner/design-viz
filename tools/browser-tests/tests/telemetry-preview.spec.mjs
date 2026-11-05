@@ -204,3 +204,93 @@ test('P10 diagram-only SVG export omits synthetic cards and leaders, restores au
  const label=exported.labels.find(el=>el.text===raw.page.sections[0].diagram.edges[0].label);expect(label).toBeTruthy();expect(label.hidden).toBe(false);expect(label.opacity).not.toBe('0');expect(label.visibility).not.toBe('hidden');
  await expect(cards(page)).toHaveCount(1);await expect(toggle(page)).toBeChecked();await expect(page.locator('#src')).toHaveValue(source);
 });
+
+async function dragCard(page,card,dx,dy){
+ const geometry=await card.evaluate(el=>{const r=el.getBoundingClientRect(),m=el.ownerSVGElement.getScreenCTM();return {x:r.x+r.width/2,y:r.y+r.height/2,scale:m.a};});
+ await page.mouse.move(geometry.x,geometry.y);await page.mouse.down();await page.mouse.move(geometry.x+dx*geometry.scale,geometry.y+dy*geometry.scale,{steps:6});await page.mouse.up();
+}
+const positionOf=card=>card.evaluate(el=>{const m=el.transform.baseVal.consolidate().matrix;return {x:Math.round((m.e-Number(el.dataset.metricsAnchorX))*100)/100,y:Math.round((m.f-Number(el.dataset.metricsAnchorY))*100)/100};});
+
+test('manual card drag/nudge preserves zoom coordinates, atomic history, export/reload and reader placement',async({page,server},testInfo)=>{
+ await open(page,server);await toggle(page).check();const card=cards(page),source=page.locator('#src'),before=await source.inputValue();
+ // Use the real board transform, not a synthetic mouse coordinate mutation.
+ await page.locator('#workspace-focus-diagram').click();await page.getByRole('button',{name:'Diagram zoom in',exact:true}).click();
+ const initial=await positionOf(card);
+ await dragCard(page,card,83,-47);
+ await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.position).toEqual({x:initial.x+83,y:initial.y-47});
+ const moved=await source.inputValue();await expect.poll(()=>positionOf(card)).toEqual({x:initial.x+83,y:initial.y-47});
+ expect(edge(moved)).toEqual({...edge(before),telemetry:{...binding,card:{...binding.card,position:{x:initial.x+83,y:initial.y-47}}}});
+ await expect(page.locator('.dv-live-popover:visible')).toHaveCount(0);
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(moved);
+ await card.focus();await card.press('ArrowRight');await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.position.x).toBe(initial.x+93);
+ await card.press('Shift+ArrowUp');await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.position.y).toBe(initial.y-97);
+ const nudged=await source.inputValue(),position=edge(nudged).telemetry.card.position;
+ await page.keyboard.down('ArrowLeft');await page.keyboard.down('ArrowLeft');await expect(source).toHaveValue(nudged);await page.keyboard.press('Escape');await page.keyboard.up('ArrowLeft');await expect(source).toHaveValue(nudged);await expect.poll(()=>positionOf(card)).toEqual(position);
+ await card.focus();await page.keyboard.down('ArrowDown');await page.keyboard.down('ArrowDown');await expect(source).toHaveValue(nudged);await page.keyboard.up('ArrowDown');await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.position.y).toBe(position.y+20);
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(nudged);const saved=await exported(page);
+ expect(saved.page.sections[0].diagram.edges[0].telemetry.card.position).toEqual(position);
+ await page.evaluate(spec=>window.__editorTest.builder.loadText(JSON.stringify(spec)),saved);await toggle(page).check();await expect.poll(()=>positionOf(card)).toEqual(position);
+ await page.evaluate(spec=>{const host=document.createElement('div');host.id='manual-reader';host.style.width='1400px';document.body.append(host);window.manualReader=window.__editorTest.renderPage(host,window.__editorTest.normalize(spec),'pastel',null,{autoplay:false,telemetry:{provider:()=>({'a->b':{signals:{rate:{value:234567},errors:{value:0}}}})}});window.manualReader.telemetry.setEnabled(true);},saved);
+ const reader=page.locator('#manual-reader .dv-metrics-card');await expect(reader).toHaveCount(1);await expect.poll(()=>positionOf(reader)).toEqual(position);await expect(reader).not.toHaveAttribute('data-metrics-section');
+ await page.evaluate(()=>window.manualReader.destroy());await card.click();await page.locator('#editor-tab-inspect').click();await page.getByRole('button',{name:'Reset card to automatic',exact:true}).click();
+ await expect.poll(async()=>edge(await source.inputValue()).telemetry.card).toEqual(binding.card);
+ await page.locator('#undo-builder').click();await expect.poll(()=>positionOf(card)).toEqual(position);
+ await page.locator('#docview').screenshot({path:testInfo.outputPath('manual-card-desktop.png')});expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
+});
+
+test('manual card cancellation and stale gestures never publish; direct and nested imports preserve provider bindings',async({page,server})=>{
+ await open(page,server);const {provider,middle,consumer}=imports();
+ await page.evaluate(({provider,middle,consumer})=>{window.metricsImportContext={version:1,id:'consumer',specs:[provider,middle,consumer]};window.__editorTest.builder.loadText(JSON.stringify(consumer),window.metricsImportContext);},{provider,middle,consumer});await toggle(page).check();
+ for(const [id,ordinal,key] of [['direct::a->direct::b',0,'a->b'],['outer::inner::a->outer::inner::b',1,'inner::a->inner::b']]){
+  const card=page.locator('#docview .dv-metrics-card[data-metrics-card="'+id+'"]'),initial=await positionOf(card),before=await page.locator('#src').inputValue();
+  await card.scrollIntoViewIfNeeded();await dragCard(page,card,40,25);
+  const next=JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.topologyImports[ordinal].edgeTracking[key].telemetry;
+  expect(next).toEqual({...binding,card:{...binding.card,position:{x:initial.x+40,y:initial.y+25}}});
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();
+ }
+ expect(await page.evaluate(()=>window.metricsImportContext.specs[0])).toEqual(provider);expect(await page.evaluate(()=>window.metricsImportContext.specs[1])).toEqual(middle);
+ let card=page.locator('#docview .dv-metrics-card[data-metrics-card="x->y"]');const before=await page.locator('#src').inputValue(),initial=await positionOf(card);
+ async function start(){await card.scrollIntoViewIfNeeded();const r=await card.boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2+45,r.y+r.height/2+30,{steps:3});}
+ await start();await page.keyboard.press('Escape');await page.mouse.up();await expect(page.locator('#src')).toHaveValue(before);await expect.poll(()=>positionOf(card)).toEqual(initial);
+ await start();await page.evaluate(()=>window.dispatchEvent(new Event('blur')));await page.mouse.up();await expect(page.locator('#src')).toHaveValue(before);await expect.poll(()=>positionOf(card)).toEqual(initial);
+ await start();await card.dispatchEvent('pointercancel',{pointerId:1});await page.mouse.up();await expect(page.locator('#src')).toHaveValue(before);
+ await start();await page.evaluate(()=>{const src=document.getElementById('src');src.value='{ handwritten';src.dispatchEvent(new Event('input',{bubbles:true}));});await page.mouse.up();await expect(page.locator('#src')).toHaveValue('{ handwritten');
+ await page.evaluate(spec=>window.__editorTest.builder.loadText(JSON.stringify(spec)),raw);await toggle(page).check();card=cards(page);await start();
+ await page.evaluate(()=>window.__editorTest.builder.loadText(JSON.stringify({nodes:{new:{title:'New'}},rows:[['new']]})));await page.mouse.up();await expect(cards(page)).toHaveCount(0);
+ await page.evaluate(spec=>window.__editorTest.builder.loadText(JSON.stringify(spec)),raw);await toggle(page).check();card=cards(page);const destroyBefore=await page.locator('#src').inputValue();await start();await page.evaluate(()=>window.__editorTest.builder.destroy());await page.mouse.up();await expect(page.locator('#src')).toHaveValue(destroyBefore);
+ expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
+});
+
+test('manual card layout edits authored local detail copies',async({page,server})=>{
+ const spec=structuredClone(raw);spec.page.sections[0].diagram.nodes.a.detail={section:'child',mode:'focus'};
+ spec.page.sections.push({id:'child',heading:'Local detail',detailOnly:true,diagram:{view:'ambient',nodes:{c:{title:'Child sender'},d:{title:'Child receiver'}},rows:[['c','d']],edges:[{from:'c',to:'d',label:'Child delivery',telemetry:binding}]}});
+ await open(page,server,spec);await toggle(page).check();await page.getByRole('button',{name:'Explore Sender',exact:true}).click();
+ const card=page.locator('#docview [data-dv-detail-preview]:visible .dv-metrics-card');await expect(card).toHaveAttribute('data-metrics-section','1');const initial=await positionOf(card),before=await page.locator('#src').inputValue();
+ await dragCard(page,card,32,21);await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[1].diagram.edges[0].telemetry.card.position).toEqual({x:initial.x+32,y:initial.y+21});
+ await expect(card).toBeVisible();await card.focus();await card.press('ArrowLeft');await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[1].diagram.edges[0].telemetry.card.position.x).toBe(initial.x+22);
+ await page.locator('#undo-builder').click();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect.poll(()=>positionOf(card)).toEqual(initial);
+});
+
+test('external loaded imported cards honor manual position without editing affordances',async({page,server})=>{
+ const remote=structuredClone(raw);remote.page.sections[0].diagram.nodes.a.detail={spec:'approved-detail',revision:'r1',section:'selected'};
+ const detail=importedDetailSpec();detail.page.sections[1].diagram.edges[0].telemetry.card={position:{x:-270,y:180}};
+ const [a]=await owners(page,server,remote,detail);await a.getByRole('checkbox',{name:'Preview metrics layout'}).check();await a.getByRole('button',{name:'Explore Sender',exact:true}).click();
+ const external=a.locator('[data-dv-detail-preview]:visible .dv-metrics-card[data-dv-edge="0"]');await expect(external).toHaveCount(1);await expect.poll(()=>positionOf(external)).toEqual({x:-270,y:180});await expect(external).not.toHaveAttribute('data-metrics-section');await expect(external).not.toHaveAttribute('tabindex');
+ await page.evaluate(()=>window.previewOwners.forEach(p=>p.destroy()));
+});
+
+
+test('modified metrics card clicks preserve ordinary edge multiselection without moving cards',async({page,server})=>{
+ const spec=structuredClone(raw);spec.page.sections[0].diagram.edges[1].telemetry=structuredClone(binding);
+ await open(page,server,spec);await toggle(page).check();const before=await page.locator('#src').inputValue();
+ const a=page.locator('#docview .dv-metrics-card[data-dv-edge="0"]'),b=page.locator('#docview .dv-metrics-card[data-dv-edge="1"]'),selected=page.locator('#docview path.edge.dv-sel');
+ // macOS reserves Control-click for its context menu; use the native additive modifier.
+ for(const modifier of ['Shift',process.platform==='darwin'?'Meta':'Control']){
+  await a.click();await expect(selected).toHaveCount(1);await expect(selected).toHaveAttribute('data-dv-edge','0');
+  await b.click({modifiers:[modifier]});await expect(selected,modifier+' adds the edge').toHaveCount(2);
+  await b.click({modifiers:[modifier]});await expect(selected).toHaveCount(1);await expect(selected).toHaveAttribute('data-dv-edge','0');
+  await expect(page.locator('#src')).toHaveValue(before);
+ }
+ await a.focus();await b.focus();await b.press('Shift+Enter');await expect(selected).toHaveCount(2);await expect(page.locator('#src')).toHaveValue(before);
+ expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
+});

@@ -324,7 +324,8 @@
 .dv-live-over-time-status{color:var(--dv-live-blocked);}
 /* Amber marks "not live": no ticket status uses it. */
 .pt-live-status{--dv-live-past:#f5a524;}
-.pt-live-status .dv-live-head .tbtn.dv-live-toggle[aria-pressed="true"],.pt-live-status .dv-live-head .tbtn.dv-live-toggle[aria-pressed="true"]:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#fff;}
+.pt-live-status .dv-live-head .tbtn:is(.dv-live-toggle,.dv-live-metrics)[aria-pressed="true"],.pt-live-status .dv-live-head .tbtn:is(.dv-live-toggle,.dv-live-metrics)[aria-pressed="true"]:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#000;}
+.pt-live-status .dv-live-head .tbtn:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:3px;}
 .pt-live-status .dv-live-head .tbtn.dv-live-over-time[aria-pressed="true"],.pt-live-status .dv-live-head .tbtn.dv-live-over-time[aria-pressed="true"]:hover{background:var(--dv-live-past);border-color:var(--dv-live-past);color:#2b1a00;}
 .dv-live-day-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:10px;font:11px/1.4 'IBM Plex Mono',monospace;color:var(--dtext);font-variant-numeric:tabular-nums;}
 .dv-live-over-time-row{padding:8px 12px;border-left:3px solid var(--dv-live-past);border-radius:4px;background:color-mix(in srgb,var(--dv-live-past) 14%,transparent);}

@@ -1796,3 +1796,8 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 
 /* Keep hidden nodes selectable on the desktop authoring canvas for restoration. */
 body:not(.workbench-reader-preview-active) #docview .node[data-dv-hidden="true"]{visibility:visible!important;pointer-events:auto!important;opacity:.3!important;}
+
+/* Metrics cards are movable only when their authored source is addressable. */
+.dv-metrics-card[data-metrics-section]{cursor:grab;touch-action:none}
+.dv-metrics-card[data-metrics-section]:focus-visible .dv-metrics-card-box{stroke:var(--accent,#4c6ef5);stroke-width:2}
+.dv-metrics-card.dv-metrics-dragging{cursor:grabbing}

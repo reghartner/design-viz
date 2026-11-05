@@ -92,31 +92,38 @@ function liveStatusTelemetryActivity(){
       var sample=snapshot.map[binding.id],result=snapshot.verdicts.carriers[binding.id],key=telemetryBindingKey(binding);
       if(!result.bound || !sample)return;
       var measured=Object.keys(binding.signals).some(function(name){return telemetryReading(sample,name).value!==null;});if(!measured)return;
-      var scope=scopes[binding.id] || (scopes[binding.id]={key:key,at:null,first:Object.create(null),silent:Object.create(null),limits:Object.create(null)});
-      var at=telemetryTime(sample.observedAt),stamp=at?Date.parse(at):null;
-      // Replayed or out-of-order dated observations cannot cross a threshold again.
-      if(stamp!==null && scope.at!==null && stamp<=scope.at)return;
+      var scope=scopes[binding.id] || (scopes[binding.id]={key:key,at:Object.create(null),first:Object.create(null),silent:Object.create(null),limits:Object.create(null)});
+      function time(name){return telemetrySignalTime(sample.signals && sample.signals[name],sample.observedAt);}
+      // Each signal owns its watermark. A newer source on this carrier cannot
+      // date another signal's Activity or suppress that signal's next sample.
+      function fresh(name){var at=time(name);return !at || scope.at[name]===undefined || Date.parse(at)>scope.at[name];}
       var row=presentation.rows.find(function(row){return row.id===binding.id;});
       function add(kind,text,time,signal){events.unshift({type:'telemetry',kind:kind,carrier:binding.id,binding:key,title:binding.title,text:text,at:time || null,signal:signal || null,url:row.url});}
-      var done=result.since.doneAt,first=result.since.firstTrafficAt,primary=telemetryPrimary(binding),reading=telemetryReading(sample,primary);
+      var done=result.since.doneAt,first=result.since.firstTrafficAt,primary=telemetryPrimary(binding),reading=telemetryReading(sample,primary),at=time(primary),stamp=at?Date.parse(at):null;
       if(done && !scope.first[done]){
         // The engine supplies actual series traffic; a positive headline is an
         // observation at observedAt, never a fabricated earlier first timestamp.
-        var traffic=first || (reading.value>0 && stamp!==null && stamp>=Date.parse(done)?at:null);
-        if(traffic && (stamp===null || Date.parse(traffic)<=stamp)){scope.first[done]=true;add('first-traffic','First observed traffic after Done',traffic,primary);}
+        var traffic=first || (fresh(primary) && reading.value>0 && stamp!==null && stamp>=Date.parse(done)?at:null);
+        // Core first-traffic evidence spans all rate-like signals, not just the
+        // chart primary. Keep its actual timestamp and carrier-wide bounds.
+        var bound=first?telemetryTime(sample.observedAt):at,boundStamp=bound?Date.parse(bound):null;
+        if(traffic && (boundStamp===null || Date.parse(traffic)<=boundStamp)){
+          var owns=!first || reading.series.some(function(point){return point[1]>0 && telemetryTime(point[0])===first;});
+          scope.first[done]=true;add('first-traffic','First observed traffic after Done',traffic,owns?primary:null);
+        }
       }
-      if(done && !scope.first[done] && result.telemetry==='silent' && stamp!==null && stamp>=Date.parse(done)){
+      if(fresh(primary) && done && !scope.first[done] && result.telemetry==='silent' && stamp!==null && stamp>=Date.parse(done)){
         var hours=Math.floor((stamp-Date.parse(done))/3600000);
         if(scope.silent[done]===undefined || hours>scope.silent[done]){scope.silent[done]=hours;add('silent','Still silent '+hours+' h after Done',at,primary);}
       }
       Object.keys(binding.proof || {}).forEach(function(name){
         var limit=binding.proof[name],reading=telemetryReading(sample,name);
-        if(reading.value===null || limit.maxRatioOf && (!binding.signals[limit.maxRatioOf] || telemetryReading(sample,limit.maxRatioOf).value===null))return;
+        if(!fresh(name) || reading.value===null || limit.maxRatioOf && (!binding.signals[limit.maxRatioOf] || telemetryReading(sample,limit.maxRatioOf).value===null))return;
         var failed=result.failing.indexOf(name)>=0,previous=scope.limits[name];
-        if(previous!==undefined && previous!==failed)add('threshold',name+' crossed '+(failed?'outside':'back within')+' its proof threshold',at,name);
+        if(previous!==undefined && previous!==failed)add('threshold',name+' crossed '+(failed?'outside':'back within')+' its proof threshold',time(name),name);
         scope.limits[name]=failed;
       });
-      if(stamp!==null)scope.at=stamp;
+      Object.keys(binding.signals).forEach(function(name){var at=time(name);if(at && fresh(name) && telemetryReading(sample,name).value!==null)scope.at[name]=Date.parse(at);});
     });
     events=liveStatusActivity([],events);
   }

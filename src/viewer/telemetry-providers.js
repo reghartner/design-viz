@@ -10,7 +10,9 @@ function telemetryProviderMerge(maps){
       // own endpoint before carrier summaries from other sources are combined.
       if(!telemetryOwn(entry,'observedAt')){
         var times=(entry.series || []).map(function(p){return Date.parse(telemetryTime(p[0]));}).filter(isFinite);
-        entry.observedAt=times.length?telemetryTime(Math.max.apply(null,times)):telemetryTime(sample.observedAt);
+        // A total descriptor retains its source bounds even when invalid;
+        // composition must not authorize it using another observation time.
+        entry.observedAt=telemetryOwn(entry,'aggregate')?telemetryTime(sample.observedAt):times.length?telemetryTime(Math.max.apply(null,times)):telemetryTime(sample.observedAt);
       }
       target.signals[name]=entry;
     });

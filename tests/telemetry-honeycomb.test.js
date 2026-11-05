@@ -125,3 +125,34 @@ test('signed raw clock keeps actual bucket times and distinct retrieval; no seri
  assert.equal(h.C.telemetryHoneycombSample({results:[{data:{COUNT:0}}],series:[{data:{time:'2026-11-05T00:00:00Z',COUNT:0}}]},q).observedAt,'2026-11-05T00:00:00.000Z');
  const modern=raw();modern.series.forEach((row,i)=>row.data.time='2026-11-05T'+(i?'00:30':'00:00')+':00Z');assert.equal(h.C.telemetryHoneycombSample(modern,{key:'P95(duration_ms)'}).observedAt,'2026-11-05T01:00:00.000Z');
 });
+
+test('combined runtime metadata keeps totals, measurement and receipt scoped to their own mixed signal',()=>{
+ const {C}=context(),T=Date.parse('2026-11-01T00:00:00Z'),H=3600000,iso=t=>new Date(t).toISOString();
+ const carriers=[{id:'a',title:'Explicit carrier',kind:'service',tickets:['AA-1'],signals:{rate:{source:'honeycomb',query:query(),unit:'events'},peer:{source:'grafana',query:'EXPLICIT',unit:'ms'}},proof:{rate:{min:1}},links:{}}];
+ function compose(observedAt=iso(T),to=iso(T),legacy=false){
+  // Explicit host runtime total: never claimed as a native Honeycomb response field.
+  const own={a:{observedAt:iso(T),signals:{rate:{value:0,series:[[T-H,0],[T,0]],observedAt,retrievedAt:iso(T+24*H),aggregate:{kind:'total',from:iso(T-H),to},unit:'events'}}}};
+  if(legacy){delete own.a.signals.rate.observedAt;own.a.signals.rate.series=[[T-H,0]];}
+  const peer={a:{observedAt:iso(T+12*H),signals:{peer:{value:12,series:[[T+12*H,12]]}}}},before=JSON.stringify(own);
+  const map=C.telemetryProviderMerge([own,peer]);map.a=C.telemetrySample(map.a);assert.equal(JSON.stringify(own),before,'composition and normalization do not mutate source evidence');return map;
+ }
+ const legacy=compose(iso(T),iso(T),true);assert.equal(legacy.a.signals.rate.aggregate.to,iso(T));assert.equal(legacy.a.signals.rate.observedAt,iso(T),'explicit legacy total retains its source observation bounds beyond ordinary points');
+ const map=compose(),entry=map.a.signals.rate;assert.equal(entry.value,0);assert.equal(entry.observedAt,iso(T));assert.equal(entry.retrievedAt,iso(T+24*H));assert.equal(entry.aggregate.to,iso(T));assert.equal(map.a.signals.peer.value,12);
+ const snap={carriers,map,verdicts:C.proofVerdicts({carriers,telemetryMap:map,jiraMap:{'AA-1':{state:'done',updatedAt:iso(T-H)}}})},row=C.liveStatusProofPresentation(snap,'24h').rows[0];
+ assert.match(row.since,/rate total: 0 events/);assert.equal(row.chart.observedAt,iso(T));assert.equal(row.chart.points.length,2);
+ for(const bad of [compose(null),compose(iso(T),iso(T+H))]){assert.equal(bad.a.signals.rate.aggregate,undefined,'newer peer or receipt cannot authorize total beyond own as-of');assert.equal(bad.a.signals.rate.value,0);assert.equal(bad.a.signals.peer.value,12);}
+});
+test('mixed Activity uses each signal measurement time and accepts older peer-independent progress',()=>{
+ const {C}=context(),T=Date.parse('2026-11-01T00:00:00Z'),H=3600000,iso=t=>new Date(t).toISOString(),log=C.liveStatusTelemetryActivity();
+ const carriers=[{id:'a',title:'Explicit carrier',kind:'service',tickets:['AA-1'],signals:{rate:{source:'honeycomb',query:query()},latency:{source:'grafana',query:'EXPLICIT'}},proof:{rate:{min:1},latency:{max:200}},links:{}}];
+ function observe(rate,at,latency=100,peerAt=T+4*H,peerSeries=[]){
+  const map={a:C.telemetrySample({observedAt:iso(peerAt),signals:{rate:{value:rate,observedAt:at===null?null:iso(at),retrievedAt:iso(peerAt+24*H)},latency:{value:latency,observedAt:iso(peerAt),series:peerSeries}}})};
+  log.observe({carriers,map,verdicts:C.proofVerdicts({carriers,telemetryMap:map,jiraMap:{'AA-1':{state:'done',updatedAt:iso(T-2*H)}}})});
+ }
+ observe(0,T);assert.equal(log.snapshot()[0].text,'Still silent 2 h after Done');assert.equal(log.snapshot()[0].at,iso(T));
+ observe(3,T+H);assert.equal(log.snapshot().filter(e=>e.kind==='first-traffic')[0]?.at,iso(T+H),'unchanged newer peer cannot suppress an accepted primary measurement');
+ observe(3,T+H,300,T+5*H);assert.equal(log.snapshot().find(e=>e.kind==='threshold'&&e.signal==='latency').at,iso(T+5*H));
+ const primaryEvents=log.snapshot().filter(e=>e.signal==='rate').length;observe(0,T,100,T+6*H);assert.equal(log.snapshot().filter(e=>e.signal==='rate').length,primaryEvents,'older primary replay cannot cross a threshold again');
+ log.clear();observe(3,null);assert.equal(log.snapshot().filter(e=>e.kind==='first-traffic').length,0,'unknown own as-of never borrows a peer or retrieval clock');
+ log.clear();carriers[0].signals.latency.unit='req/h';observe(0,T,100,T+4*H,[[T+3*H,100]]);const peerFirst=log.snapshot().find(e=>e.kind==='first-traffic');assert.equal(peerFirst?.at,iso(T+3*H),'actual peer traffic is not clipped by the older chart primary');assert.equal(peerFirst.signal,null,'carrier-wide first traffic is not misattributed to a silent primary');
+});

@@ -2104,7 +2104,7 @@ native response fields or authored bindings.
 
 Live Proof charts use the primary signal's `observedAt`. The mixed-provider coordinator gives
 legacy adapter signals their own latest point as-of (or their source's carrier
-time for aggregate-only samples) before combining sources. Direct host samples
+time for aggregate-only samples or an explicit total descriptor) before combining sources. Direct host samples
 without signal as-of keep the existing carrier-time clipping policy. An explicit unknown signal as-of stays unknown.
 The mixed carrier timestamp is a newest-observation summary, never authority to
 clip a different signal's series. Historical charts still use the selected exact
@@ -2159,6 +2159,13 @@ matches Done as described below; window rates are not lifetime totals. Local,
 imported and asynchronously loaded detail carriers use their carrier identity and
 own binding scope. Refreshes and day selection update an open Production block
 without replacing its focused link or close control.
+
+Mixed telemetry Activity uses each signal's measurement as-of, with a separate
+replay watermark per signal; newer peer or receipt times cannot date an older
+signal's event or suppress its next accepted observation. Legacy host signals
+without their own as-of retain carrier-time behavior. First-traffic facts supplied
+by the proof engine span all rate-like signals and retain their actual point
+timestamp; a peer's traffic is not attributed to a silent primary signal.
 
 Activity combines Jira changes and typed telemetry observations in timestamp
 order, newest first, with 20 entries total. Telemetry records first observed

@@ -5,13 +5,13 @@ description: Author or update Flowview diagrams from stories, HLDs or Honeycomb 
 
 # HLD to page: packet first
 
-Read source for new diagrams; for edits inspect source, spec,
-ledger, inherited state and nearby steps. Treat source as evidence. Preserve
-facts, icons, animations and outcomes; do not re-ask settled facts.
+Read source for new diagrams; for edits inspect source, spec, ledger, inherited
+state and nearby steps. Preserve source facts, icons, animations and outcomes;
+do not re-ask settled facts.
 
 ## Generate the entry packet
 
-VIZ is the checkout or `authoring/` kit; use its directory or absolute paths.
+VIZ is the checkout or `authoring/` kit; use its path.
 Select planned panels/features for new stories; for edits, infer from the spec
 and add new source requirements:
 
@@ -22,15 +22,15 @@ python3 tools/authoring-packet.py --spec <candidate.spec.json> --mode edit --out
 
 Repeat `--panel` / `--feature`; `python3 tools/widget_doc.py --list`
 lists panels; [packet options](../../../docs/authoring-packets.md) lists features.
-Selections combine with inference. New/changed stories
-use `--mode new` (also with `--spec`) for source, question and worksheet phases
-before JSON. Fully specified scoped edits need no new questions or worksheet.
-Read the packet first; follow its routes. Do not preload the full
-contract, cookbook or examples. Docs remain offline.
+Selections combine with inference. New/changed stories use `--mode new` (also
+with `--spec`) for source, question and worksheet phases before JSON. Fully
+specified scoped edits need no new questions or worksheet.
+Read the packet; follow its routes. Do not preload the full contract, cookbook
+or examples.
 
 Follow packet story/fidelity/state/placement and verification rules. Add visible-beat ledger evidence and run its visibility and value/icon checks. Report fit, occlusion and legibility unverified until a Workbench preview
 or authorized rendered evidence supplies them. File-only kits need no browser,
-server, installation or additional agent.
+server, install or additional agent.
 
 Compose `tools/compose-page-layout.cjs`, then size `tools/size-section-layout.cjs`.
 New nodes auto-place; selected nodes: `tools/place-nodes.cjs`.
@@ -91,8 +91,10 @@ After the packet, route source/handoff details:
   [Independent visual review](references/independent-visual-review.md) applies
   only with already-authorized delegation and available rendered captures.
 - [Diagram links](../../../cookbook/diagram-handoffs.md); [design reviews](../../../docs/design-review.md).
-- [Jira / status colors / `missingWork` / `existsWhen:"tickets-done"`](../../../docs/live-status.md): desktop
-  `tracking.jira.exclude`; count parents − exclusions + manual + dependency stories once.
+- [Live Jira / metrics proof / `missingWork`](../../../docs/live-status.md): use
+  `live-status-board` when requested; its Metrics chapter is conditional.
+  Desktop; include imported carriers. Jira counts parent minus exclusions plus
+  manual/dependency stories once.
 
 Deliver spec/ledger files together. Ask unresolved story decisions and, after
 relevant checks, needed Mixed/Engineering source access plainly.

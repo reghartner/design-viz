@@ -1,0 +1,7 @@
+{
+  "traceId": "0123456789abcdef0123456789abcdef",
+  "services": [{"serviceName":"checkout","resource":{"service.name":"checkout","deployment.environment.name":"production"},"spans":[
+    {"spanId":"0102030405060708","name":"POST /checkout","startTimeMs":1750000000000,"durationMs":125,"attributes":{"http.request.method":"POST"},"events":[{"name":"exception","timeMs":1750000000100,"attributes":{"exception.type":"PaymentTimeout"}}]},
+    {"spanId":"1111111111111111","parentSpanId":"0102030405060708","name":"authorize","startTimeMs":1750000000020,"durationMs":60,"status":"ok"}
+  ]}]
+}

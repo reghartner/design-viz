@@ -24,6 +24,8 @@ const TOOL_INPUTS = {
     properties: {
       environment_slug: string(`Mock environment slug; must be ${ENVIRONMENT}`),
       dataset_slug: string(`Mock dataset slug; must be ${DATASET}`),
+      raw_row_columns: {type: 'array', items: {type: 'string'}},
+      results_limit: {type: 'integer'},
       query_spec: {
         type: 'object',
         description: 'Native Honeycomb query object; this mock serves a documented aggregation/filter/time subset'
@@ -190,7 +192,34 @@ function queryError(args, world) {
   return { spec, calculations, filters, start, end };
 }
 
+function rawQuery(args, world) {
+  if (args.environment_slug !== ENVIRONMENT || args.dataset_slug !== DATASET) return {error: 'unknown mock environment/dataset'};
+  const spec = args.query_spec;
+  const problem = ownKeys(spec, new Set(['filters', 'from', 'to']), 'query_spec');
+  if (problem) return {error: problem};
+  const columns = args.raw_row_columns;
+  if (!Array.isArray(columns) || !columns.includes('trace.trace_id') || new Set(columns).size !== columns.length ||
+      columns.some(c => !['trace.trace_id', 'timestamp', 'error', 'duration_ms'].includes(c)) ||
+      !Number.isInteger(args.results_limit) || args.results_limit < 1 || args.results_limit > 20) return {error: 'unsupported raw row columns/results_limit'};
+  if (!Array.isArray(spec.filters) || spec.filters.length !== 1 ||
+      JSON.stringify(Object.keys(spec.filters[0]).sort()) !== JSON.stringify(['column', 'op', 'value']) ||
+      spec.filters[0].column !== 'service.name' || spec.filters[0].op !== '=' || spec.filters[0].value !== 'event-ingest') return {error: 'raw mock supports exactly service.name = event-ingest'};
+  const start = parseInstant(spec.from, world.now, true), end = spec.to === undefined ? world.now : parseInstant(spec.to, world.now);
+  if (start === null || end === null || end <= start || end - start > MAX_HOURS * HOUR) return {error: 'unsupported raw query range'};
+  const matches = [];
+  for (let hour = Math.min(MAX_HOURS - 1, Math.floor((world.now - STORY_START) / HOUR) - 1); hour >= 0 && !world.silent; hour--) {
+    const trace = traceFor(world.model, hour);
+    if (!trace || trace.startTimeMs < start || trace.startTimeMs > end) continue;
+    matches.push({'trace.trace_id': trace.traceId, timestamp: iso(trace.startTimeMs), error: trace.spans[0].status === 'error', duration_ms: trace.spans[0].durationMs});
+  }
+  const rows = matches.slice(0, args.results_limit);
+  return {text: ['# Raw Rows', '', `| ${columns.join(' | ')} |`, `| ${columns.map(() => '---').join(' | ')} |`,
+    ...rows.map(row => `| ${columns.map(c => cell(row[c])).join(' | ')} |`), '', '---', 'Metadata:',
+    `  total: ${rows.length}`, `  from: ${JSON.stringify(iso(start))}`, `  to: ${JSON.stringify(iso(end))}`, ...(matches.length > rows.length ? ['  next_cursor: MOCK_MORE_MATCHES'] : [])].join('\n')};
+}
+
 function runQuery(args, world) {
+  if (args.raw_row_columns !== undefined || args.results_limit !== undefined) return rawQuery(args, world);
   const parsed = queryError(args, world);
   if (typeof parsed === 'string') return { error: parsed };
   const rows = world.silent ? [] : measurements(
@@ -289,7 +318,7 @@ function traceText(trace, viewMode) {
     '',
     '---',
     'Metadata:',
-    JSON.stringify(metadata)
+    ...Object.entries(metadata).map(([key, value]) => `  ${key}: ${JSON.stringify(value)}`)
   ].join('\n');
 }
 

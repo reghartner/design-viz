@@ -158,6 +158,7 @@
         "viewer/live-status-claude.js",
         "viewer/telemetry-claude.js",
         "viewer/telemetry-honeycomb.js",
+        "viewer/telemetry-traces.js",
         "viewer/telemetry-providers.js",
         "workbench/source-edit.js",
         "workbench/targets.js",

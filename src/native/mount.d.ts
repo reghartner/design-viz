@@ -96,7 +96,28 @@ export interface TelemetryBinding {
 }
 /** One carrier's telemetry for the observation window, keyed by carrier id in the
  * provider result. Every field is optional; malformed entries are dropped. */
+/** Runtime evidence only; never authored, saved, or numerical proof. */
+export interface TelemetryExemplar {
+  version: 1;
+  provider: 'honeycomb' | 'tempo';
+  traceId: string;
+  signal: string;
+  selectionToken: string;
+  selectionReason: string;
+  observedAt: string;
+  range: {from: string; to: string};
+  completeness: 'complete' | 'partial' | 'unknown';
+  warnings: string[];
+  url?: string;
+  candidates: Array<{traceId: string; time?: string; durationMs?: number; status: 'passing' | 'failing' | 'unknown'; url?: string}>;
+  spans: Array<{id: string; parentId: string | null; service: string; name: string; startMs: number; ms: number; error: boolean; time: string;
+    attributes: Record<string, string | number | boolean>;
+    events: Array<{name: string; timeMs: number; attributes: Record<string, string | number | boolean>}>;
+    links: Array<{traceId: string; spanId: string; attributes: Record<string, string | number | boolean>}>}>;
+}
 export interface TelemetrySample {
+  /** At most one selected exemplar per carrier, with up to 20 returned candidates and 200 spans. */
+  exemplars?: TelemetryExemplar[];
   signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string}>;
   observedAt?: string | number;
   markers?: Array<{at: string | number; kind?: string; label?: string}>;
@@ -122,6 +143,9 @@ export interface NativeViewerOptions {
     history?: (bindings: TelemetryBinding[], range: {from: string; to: string; endpoints?: {key?: string; at: string}[]}, signal: AbortSignal, report: {note: (text: string) => void}) => Promise<Record<string, TelemetrySample>>;
     /** Include mutable datasource/account identity in the controller-local cache key. */
     historyKey?: string | (() => unknown);
+    /** Explicit user action resolver. ctl.telemetry.chooseExemplar validates the live
+     * selection token and updates only runtime evidence. Never invoke during paint. */
+    chooseExemplar?: (carrierId: string, selectionToken: string, traceId: string) => Promise<TelemetryExemplar>;
     /** Starts unavailable when false. The controller setAvailable(boolean) updates
      * capability availability without enabling Metrics; page/host disable always wins. */
     available?: boolean;

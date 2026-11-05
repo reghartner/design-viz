@@ -12,15 +12,15 @@ export function expected(day=11,carrier='mcu->ingest',hours=24){
 export function createMockBridge({day=11,transport='structuredContent',absent=false}={}){
  let id=0;const calls=[];const bridge={day,calls,lists:0};
  const rpc=(handler,method,params)=>handler({jsonrpc:'2.0',id:++id,method,params},{scenario:'story',day:bridge.day});
- bridge.listTools=async()=>{bridge.lists++;return absent?[]:[{server:'Grafana',tools:rpc(grafana,'tools/list').result.tools},{server:'Honeycomb',tools:rpc(honeycomb,'tools/list').result.tools}];};
+ bridge.listTools=async()=>{bridge.lists++;return absent?[]:structuredClone([{server:'Grafana',tools:rpc(grafana,'tools/list').result.tools},{server:'Honeycomb',tools:rpc(honeycomb,'tools/list').result.tools}]);};
  bridge.callTool=async(server,name,args)=>{
   calls.push({server,name,args:structuredClone(args)});
   const response=rpc(server==='Honeycomb'?honeycomb:grafana,'tools/call',{name,arguments:args});
   if(response.error)throw Object.assign(new Error(response.error.message),{code:'tool_error'});
   const result=response.result;
-  if(server==='Honeycomb')return transport==='payload'&&!result.isError?{payload:result.structuredContent}:result;
+  if(server==='Honeycomb')return transport==='payload'&&!result.isError?{payload:result.structuredContent ?? result.content.filter(c=>c.type==='text').map(c=>c.text).join('\n')}:result;
   if(result.isError)throw Object.assign(new Error(result.content[0].text),{code:'tool_error'});
-  if(result.structuredContent)return {payload:result.structuredContent};
+  if(result.structuredContent)return {payload:result.structuredContent ?? result.content.filter(c=>c.type==='text').map(c=>c.text).join('\n')};
   const text=result.content.filter(c=>c.type==='text').map(c=>c.text).join('\n');
   try{return {payload:JSON.parse(text)};}catch{return {payload:text};}
  };

@@ -1,13 +1,14 @@
 /* Honeycomb metrics (#946). The hosted run_query completes the query. Its
    formatted tables/charts are NOT exact measurements; only the documented raw
    results[].data / series[].data contract is used. See docs/live-status.md for
-   pinned official provenance and the deliberately unsupported trace/history leg.
+   pinned official provenance. Trace retrieval lives in telemetry-traces.js;
+   this scalar adapter does not supply historical Honeycomb measurements.
    No query is inferred from a carrier name; no signed URL escapes this module. */
 var TELEMETRY_HONEYCOMB_BYTES=1048576,TELEMETRY_HONEYCOMB_TIMEOUT=15000;
 function telemetryHoneycombError(message,code){var e=new Error(message);e.code=code || 'query_unobserved';return e;}
 function telemetryHoneycombJobs(bindings){
   var jobs=[];(bindings || []).forEach(function(binding){Object.keys(binding.signals || {}).forEach(function(name){
-    var s=binding.signals[name];if(s.source==='honeycomb')jobs.push({id:binding.id,name:name,query:s.query,unit:s.unit,links:binding.links || {}});
+    var s=binding.signals[name];if(s.source==='honeycomb' && !(telemetryObject(s.query) && telemetryOwn(s.query,'query_spec')))jobs.push({id:binding.id,name:name,query:s.query,unit:s.unit,links:binding.links || {}});
   });});return jobs;
 }
 function telemetryHoneycombBindings(page){return telemetryBindings(function(fn){sectionRecords(page).forEach(function(record){var d=record.section.diagram || {};

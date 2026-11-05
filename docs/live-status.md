@@ -2131,3 +2131,7 @@ timeline; they verify the recorded `from` field and clearly labelled structured
 transport. No live Grafana or
 Honeycomb account was available for validation; artifact-specific CSP/CORS and
 current authenticated connector metadata remain deployment checks.
+
+Provider trace retrieval and the runtime-only #947 selection API are documented in
+[provider-traces.md](provider-traces.md). Existing scalar calculation bodies keep
+their exact-result contract; explicit native raw wrappers are trace intent.

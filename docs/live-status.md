@@ -2162,7 +2162,10 @@ without replacing its focused link or close control.
 
 Mixed telemetry Activity uses each signal's measurement as-of, with a separate
 replay watermark per signal; newer peer or receipt times cannot date an older
-signal's event or suppress its next accepted observation. Legacy host signals
+signal's event or suppress its next accepted observation. Ratio thresholds watch
+both bound inputs; a crossing uses the latest actual as-of among changed values,
+not an unchanged newer input. Missing inputs remain unobserved; older or
+conflicting same-time inputs cannot generate crossings. Legacy host signals
 without their own as-of retain carrier-time behavior. First-traffic facts supplied
 by the proof engine span all rate-like signals and retain their actual point
 timestamp; a peer's traffic is not attributed to a silent primary signal.

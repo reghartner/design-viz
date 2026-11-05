@@ -92,7 +92,7 @@ function liveStatusTelemetryActivity(){
       var sample=snapshot.map[binding.id],result=snapshot.verdicts.carriers[binding.id],key=telemetryBindingKey(binding);
       if(!result.bound || !sample)return;
       var measured=Object.keys(binding.signals).some(function(name){return telemetryReading(sample,name).value!==null;});if(!measured)return;
-      var scope=scopes[binding.id] || (scopes[binding.id]={key:key,at:Object.create(null),first:Object.create(null),silent:Object.create(null),limits:Object.create(null)});
+      var scope=scopes[binding.id] || (scopes[binding.id]={key:key,at:Object.create(null),values:Object.create(null),ratios:Object.create(null),first:Object.create(null),silent:Object.create(null),limits:Object.create(null)});
       function time(name){return telemetrySignalTime(sample.signals && sample.signals[name],sample.observedAt);}
       // Each signal owns its watermark. A newer source on this carrier cannot
       // date another signal's Activity or suppress that signal's next sample.
@@ -118,12 +118,31 @@ function liveStatusTelemetryActivity(){
       }
       Object.keys(binding.proof || {}).forEach(function(name){
         var limit=binding.proof[name],reading=telemetryReading(sample,name);
-        if(!fresh(name) || reading.value===null || limit.maxRatioOf && (!binding.signals[limit.maxRatioOf] || telemetryReading(sample,limit.maxRatioOf).value===null))return;
+        var crossingAt=time(name);
+        if(limit.maxRatioOf){
+          // A ratio has two independently clocked inputs. Reuse unchanged
+          // accepted measurements, but reject stale or conflicting replays.
+          var inputs=[name,limit.maxRatioOf].map(function(dependency){
+            return {name:dependency,value:telemetryReading(sample,dependency).value,at:time(dependency)};
+          });
+          if(inputs.some(function(input){
+            var watermark=scope.at[input.name],stamp=input.at?Date.parse(input.at):null;
+            return !binding.signals[input.name] || input.value===null || watermark!==undefined &&
+              (stamp===null || stamp<watermark || stamp===watermark && input.value!==scope.values[input.name]);
+          }))return;
+          var prior=scope.ratios[name];
+          var changed=inputs.filter(function(input,index){return !prior || input.value!==prior[index].value;});
+          scope.ratios[name]=inputs;
+          if(prior && !changed.length)return;
+          // Only changed values contribute to this crossing; an unchanged
+          // newer numerator or an unrelated peer cannot supply its date.
+          crossingAt=changed.some(function(input){return !input.at;})?null:changed.map(function(input){return input.at;}).sort().pop();
+        }else if(!fresh(name) || reading.value===null)return;
         var failed=result.failing.indexOf(name)>=0,previous=scope.limits[name];
-        if(previous!==undefined && previous!==failed)add('threshold',name+' crossed '+(failed?'outside':'back within')+' its proof threshold',time(name),name);
+        if(previous!==undefined && previous!==failed)add('threshold',name+' crossed '+(failed?'outside':'back within')+' its proof threshold',crossingAt,name);
         scope.limits[name]=failed;
       });
-      Object.keys(binding.signals).forEach(function(name){var at=time(name);if(at && fresh(name) && telemetryReading(sample,name).value!==null)scope.at[name]=Date.parse(at);});
+      Object.keys(binding.signals).forEach(function(name){var at=time(name);if(at && fresh(name) && telemetryReading(sample,name).value!==null){scope.at[name]=Date.parse(at);scope.values[name]=telemetryReading(sample,name).value;}});
     });
     events=liveStatusActivity([],events);
   }

@@ -397,7 +397,12 @@ consumer only; **Remove metrics** restores the inherited one.
 With no node selected, **Document settings → Tracking → Metrics** edits the page
 `tracking.telemetry` block: the Grafana Prometheus, Loki, Tempo and SQL datasource
 UIDs, the Honeycomb environment and dataset, **Metrics window** (such as `1h`) and
-**Metrics refresh ms** (60000 or more). Clearing every value removes the block.
+**Metrics refresh ms** (60000 or more). **Allow metrics** controls availability on
+this page, including all direct/nested imports and loaded details. It is checked
+by default; that permits Metrics but never turns it on or runs queries. Uncheck
+it to hide Metrics controls and suppress telemetry discovery, data calls, cards
+and cues. Bindings, templates and other settings stay saved. Rechecking permits
+availability again; readers still start with Metrics off and a default 24h window.
 **Add template** takes a name, an optional kind, parameter names separated by
 commas and a first signal. Each template then has its own kind, parameters,
 signals, proof limits and link fields. A template keeps at least one signal, and
@@ -406,6 +411,17 @@ a template that a carrier still uses cannot be removed.
 Each change is one Undo/Redo step, and Export project keeps every binding,
 template and setting in its JSON. The Workbench stores queries only: it never runs
 them or contacts Grafana or Honeycomb. These authoring controls are desktop-only.
+
+In the desktop preview toolbar, **Preview metrics layout** shows one card per
+visible bound edge, labelled **Preview · synthetic**, using the reader’s card
+placement. It does not contact connectors or show production proof. Select a
+card or edge, then edit **Card side** and **Card offset**; the placement updates
+immediately, including Undo/Redo. Unbound edges get no cards. Imported bindings
+follow the same rules and remain read only until you add a consumer override.
+This toggle starts off, is independent of Demo live status, and is never saved or
+added to Undo history. Diagram-only SVG exports omit synthetic cards and keep
+the authored edge labels. It survives edits in the same document, resets for a new
+project/import, and is suppressed while Allow metrics is off.
 
 ## State model
 
@@ -582,17 +598,24 @@ width. It appears immediately, with no menu click.
 The generic desktop Workbench picker lists **Delivery → Live status**; insertion
 and Export project preserve the panel. There are no authored state or patch fields.
 
-The panel header holds **Live**, distinct-ticket counts, a connector indicator
-(a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
+The panel header has two rows. The first holds only buttons, which keep their
+place: **Live**, **Over time**, **Metrics** when available, any provider action, Edit, and on the far right
+**First blocker**. **First blocker** keeps one size; with no blockers it reads
+**No blockers** and is greyed out, and with blockers it cannot reach from here it
+stays **First blocker** and is greyed out. The second row holds everything that
+changes. Its height follows the panel's width, one line when the panel is wide and
+two when it is narrow, and never its text, so it cannot move the buttons or what is
+below: distinct-ticket counts, a connector indicator (a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
 blue (`--dv-live-active`) while connecting or awaiting approval, green when connected or in demo mode,
 red on error, and it pulses while a fetch is in flight; the time is the last successful
-fetch, not a ticket's change time), provider note and action, **First blocker**, and
-demo **Play/Pause** and **Next day** when demo controls are supplied. The engine's panel title stays above this header.
+fetch, not a ticket's change time), and the provider note. Text too long for the row
+is cut off and stays available in the row's tooltip and to screen readers. Demo
+controls supply **<** and **>** on a row below the header. The engine's panel title stays above this header.
 
-**Metrics** sits beside Live, after its counts, when the host supplies a telemetry
+**Metrics** sits beside Live and Over time, when the host supplies a telemetry
 provider or a demo telemetry source (see [Telemetry provider](#telemetry-provider));
 without one it is hidden. It is off on every load and its state is never saved.
-Turning it on calls the telemetry provider at once and keeps it refreshing; turning
+Turning it on calls the telemetry provider at once in Live mode and keeps it refreshing; turning
 it off stops the provider and clears the telemetry map. It never changes Live or the
 Jira paint, and Live never changes it. A second connector indicator follows the Jira
 one, with the same dot colors: “Metrics: not connected” while off, “Metrics:
@@ -761,8 +784,8 @@ state, see [Telemetry provider](#telemetry-provider)) for subscribed panels. `co
 `connection.github` is `{state, busy}` with `state` in `none`, `disconnected`,
 `connecting`, `connected`, `error`; adapters report it through
 `ctl.liveStatus.status({github: {state, busy}})` and the panel header appends
-“· GitHub connected”, “· GitHub not connected”, “· GitHub connecting” or
-“· GitHub did not answer” after the Jira text (hidden for `none`). A host
+“· GitHub connected”, “· GitHub connecting” or “· GitHub did not answer”
+after the Jira text. It shows nothing for `none` or `disconnected`. A host
 provider is reported as source “Host”: connecting until its first answer, busy during
 each call, connected with `checkedAt` after a successful call, error after a rejection.
 Hosts and adapters may call `ctl.liveStatus.status({state, busy, checkedAt, source})`
@@ -988,10 +1011,9 @@ including `file://`, without fetching or changing the spec. A host provider take
 precedence. An explicitly requested demo also takes precedence over the automatic
 claude.ai connector. Without the hash, no demo starts.
 
-The Live status panel header shows the current day and offers **Pause/Play** and **Next day**.
-Days advance at the timeline's `intervalSeconds` (6 seconds by default), ending
-on the final day. Reduced motion uses manual advancement only. Hidden pages pause
-the timer. Requested ticket keys absent from a day become `missing`; a day's
+The Live status panel shows the current day, and **<** and **>** move one day
+back or forward. Nothing advances by itself: the timeline's `intervalSeconds` is
+still accepted, and has no effect. Requested ticket keys absent from a day become `missing`; a day's
 `prs` may carry `links` in the host-provider shape, which the demo passes
 through so the Tickets table and popover show the same GitHub icons offline. Every key in a day's `issues` is included, even when no
 carrier references it; entries may include `kind`, `parent`, `initiatives`, `epic`, a lane ID in `lane`, and
@@ -1028,16 +1050,94 @@ have the same length. The injector rejects any other field, a non-RFC3339 `start
 annotation `time`, a non-positive or non-integer `stepSeconds`, and values that are not
 finite numbers or `null` (`NaN` and `Infinity` included), naming the path. Each demo day hands the page that day's map
 `{carrierId: {signals: {name: {value, series: [[t, v], ...], unit}}, observedAt}}`, the
-proof engine's input: every point is stamped at the end of its step, `null` reads as 0
-(as a connector reports a query that matched nothing), `value` is the last step and
-`observedAt` the end of the day. **Next day** and the timer move the Jira map and the
+proof engine's input: every finite point is stamped at the end of its step, `null` is missing evidence,
+a missing final step leaves the signal unobserved, `value` is the last step and
+`observedAt` the end of the day. **Previous day** and **Next day** move the Jira map and the
 telemetry map together. The panel's **Metrics** button appears with the demo, reported
 as “Metrics: demo”, and while it is on the [Metrics cues](#metrics-cues) follow the
 demo day.
 The example timeline holds the doorbell story the mock Grafana MCP server serves:
 traffic two hours after each carrier's tickets turn Done, the event edge degraded after
 the Day 10 firmware 2.4.1 deploy, the route queue lagging on Day 11, and the push edge
-silent after Done.
+silent after its tickets turn Done on Day 9. Its silence is authored as explicit
+zero samples, so it is distinguishable from unavailable telemetry.
+
+## Over time
+
+Over time lets a reader move through past days on a board. It overlays each
+ticket's status for the chosen day on the current diagram. The diagram is not a
+historical version: its structure, the list of stories, titles, owners, PR icons
+and dependency links all stay as of today. Authors set nothing, and no spec field
+is involved.
+
+**Using it.** **Live** and **Over time** are the two modes, side by side at the
+start of the Live status panel's header. The selected one is filled: blue for
+Live, amber for Over time. Over time appears once ticket status has loaded and a
+history source exists. Clicking it loads history, shows progress on the button,
+then adds a thin amber-tinted slider row to the panel. Clicking **Live** returns
+to today; while Live is already selected, clicking it turns colors off as it
+always has, and Over time turns them back on. The slider moves one whole day at a
+time by pointer or arrow keys, Home and End jump to the first and last day, and
+**<** and **>** on the same row step one day. Each day repaints
+nodes and edges (local and imported), step coins and captions, lane rollups,
+panel counts, the progress ring, blockers, the Tickets table State column and
+planned-node treatment.
+
+**Day range and day status.** The first day is the day the oldest ticket was
+created. The last day is today while any ticket is open, or the day the last
+ticket reached Done once all are Done. A day's status is the ticket's status at
+the end of that day in the viewer's local time. A day with no change keeps the
+previous day's status. Blocked uses the same rule as the live board: flagged as
+an impediment, or a status name containing "block". Parents roll up from their
+children, so they need no history calls. The last day is exactly the live map.
+
+**Before a ticket existed.** A ticket with no status on a day shows as Missing on
+that day: its node or edge wears the Missing paint, the Tickets table says missing,
+and its popover says "No ticket on this day". An uncolored carrier would hide the gap.
+It is not a blocker: it stays out of the blocked count and the blockers list, First
+blocker cannot reach it, and a ticket that depends on it waits with a grey tone. It
+keeps its title and row and stays in the total, so the total is the same on every day.
+This covers a ticket not created yet and a ticket missing today, which has no history.
+
+**While a past day shows.** Live refresh keeps running but does not change the
+display. Returning to **Live** applies the newest live status as a normal refresh,
+including anything that changed meanwhile. Moving the slider adds nothing to
+Activity, causes no change pulse and shows no "no activity N d" mark. The Edit
+button is disabled with a stated reason, Over time is disabled while Edit mode
+is active, and the saved spec never changes.
+
+**History source and call cost.** Only a click loads history, as one batch of
+one-shot `callTool` calls. Nothing polls, and no history call happens at page load
+or on a refresh. Each ticket costs one `getJiraIssue` call with `expand: "changelog"`,
+which returns its created time, current status and changelog. A changelog names
+statuses but not their categories, so any status no tracked ticket holds gets one
+`searchJiraIssuesUsingJql` lookup for `status = <id>`. The cost is about
+one call per ticket plus one per unknown status, at most six at once, so a 100-ticket
+board costs about 100 calls on a first click for each viewer. Each result is cached for 7 days for
+that viewer and artifact. A later click reads the cache and calls Jira again only for
+a ticket whose live `updated` time is newer than its cached result. The runtime cache
+is best-effort and size-bounded, and an older claude.ai shell keeps results for less
+time or not at all, so a repeat click can cost the full batch.
+
+If any call fails, or a ticket's changelog holds fewer entries than its `total`, the
+board stays on today, the panel says history could not load, and the button can be
+clicked again. A partial history is never shown. A status no ticket anywhere holds,
+such as one retired from a workflow, follows the live board's rule for an unknown
+category: To Do, unless its name contains "block".
+
+**Where it appears.** A claude.ai board needs a connector that offers
+`getJiraIssue` and a page that declares it, so a board published earlier must be
+republished to get it. On `#live=demo` the button uses the
+embedded timeline's days, or the four synthesized days, with no network calls.
+The slider and **<** and **>** share one current day: the buttons carry on from
+the slider's day, and Live returns to the day the buttons reached. There the timeline's
+last day supplies titles and the story list, so the total stays the same. There
+is no button on host-provider pages or in Workbench preview.
+
+The `getJiraIssue` reply shape was checked with one real call on a live Atlassian
+connector: the issue sits in `issues.nodes[0]`, and a plain top-level REST issue is
+also accepted. A ticket with a very long changelog has not been tested. Past-day
+Blocked from Flagged assumes Flagged changes appear in the changelog.
 
 ## Dependencies
 
@@ -1110,7 +1210,7 @@ Settings → Connectors, together with the two Jira tools and the comments
 capability. For Atlassian's own connector that is:
 
 ```js
-capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]}, comments: {"composer_only": true, "customAnchors": true}}
+capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}]}, comments: {"composer_only": true, "customAnchors": true}}
 ```
 
 For a custom connector (for example the mock server installed as
@@ -1147,6 +1247,9 @@ Jira status determines colors;
 Development PR summaries, when returned, are informational. All tool calls go
 through `window.claude.use("mcp")`; the artifact never fetches Jira directly.
 
+Clicking **Over time** adds `getJiraIssue` calls and status lookups; see
+[Over time](#over-time). A connector without `getJiraIssue` still paints live status.
+
 Without the connector, viewers see “Add the Atlassian connector in claude.ai
 Settings → Connectors to see live ticket status.” If approval is needed, the
 **Allow Jira** button makes one explicit retry. Account and policy errors clear
@@ -1167,15 +1270,14 @@ GitHub connector described next; declare it as a second `servers` entry:
 
 ```js
 capabilities: {mcp: {servers: [
-  {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]},
+  {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]},
   {server: "GitHub", tools: ["search_pull_requests", "pull_request_read"]}
 ]}, comments: {"composer_only": true, "customAnchors": true}}
 ```
 
 Without the GitHub entry, or when the viewer has no such connector, the page
 behaves as before: authored PR links stay plain icons, Jira's Development count
-stays, and the header's connection line reads “GitHub not connected” on pages
-that carry GitHub PR URLs or a `tracking.github` scope.
+stays, and the header's connection line says nothing about GitHub.
 
 ### Production metrics from Grafana
 
@@ -1310,7 +1412,7 @@ board's Edit mode needs; single-file tracked pages keep the declaration above,
 untracked pages stay comments-only:
 
 ```js
-capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]}]},
+capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}]},
   comments: {"composer_only": true, "customAnchors": true}, artifact: {}, user: {scopes: ["profile"]}}
 ```
 
@@ -1364,7 +1466,56 @@ mode:
   the inline copy), Edit is disabled with that reason: saving the old copy would
   overwrite newer changes and their history.
 
-Pulling the saved `flowspec.json` back into the repository stays the author's job.
+### Agents and board edits (#974)
+
+Board edits change only the artifact's `flowspec.json`. An agent that keeps its own copy
+of the spec (a repository file or a working copy) brings them in before it changes
+anything, with `tools/board-sync.js`. Board edits can only add a ticket to a node or edge,
+remove one, or clear a Missing work marker, so folding them in is mechanical; the agent
+asks the author only about a real conflict.
+
+1. Read the artifact's current `flowspec.json` (Artifact tool, read action with `path`)
+   and save it, for example as `live.json`.
+2. `node tools/board-sync.js pull <local.json> live.json` lists the board edits the local
+   copy does not have, one line each
+   (`2026-11-03 14:02 UTC  Bo: DOOR-104 moved from Door API to Cloud sync`), and writes
+   them into the local file: the tickets and Missing work markers on the nodes and edges
+   those edits touched, plus their `page.editHistory` entries. Every other line stays as
+   written and changes made only in the local copy are kept. Tell the author the listed
+   lines.
+   - Exit 2, nothing written: a conflict. The same ticket was placed differently on the
+     board and in the local copy, or a board edit added a ticket to a node or edge the
+     local copy no longer has. (A board edit that removed a ticket from, or cleared the
+     marker of, a node or edge the local copy deleted needs no question: both sides agree
+     the ticket is not there.) Ask the author, then rerun with `--resolve KEY=live` (keep the board's
+     placement) or `--resolve KEY=local` (keep the local one, after placing the ticket
+     where the author says).
+   - Exit 3, nothing written: the live board was republished by an agent from another
+     copy, so its structure may differ. Start again from `live.json`: copy it over the
+     local file and redo the requested change. If the local file has changes of its own
+     that were never published, ask the author before replacing it.
+3. Make the requested change in the local file.
+4. `node tools/board-sync.js log <local.json> live.json --by "<author name>"` appends one
+   agent entry: `"source": "agent"`, a counted one-line `summary` ("Added 5 nodes, moved
+   5 tickets"; `--summary "<one line>"` replaces it) and the ticket changes. It refuses
+   with exit 2 when the change alters where a ticket sits (moves it, removes it, adds it
+   anywhere, or deletes the node or edge holding it) and a board edit saved after the
+   newest agent entry added, moved or removed that ticket; the message names who made the
+   board edit, when, and what it did. Ask the
+   author and rerun with `--confirm KEY` once they agree. Board edits older than the
+   newest agent entry were already in front of the author and need no question
+   (Chuck 2026-11-04). Exit 3: pull first.
+5. Validate the local file (`node tools/validate.js <local.json>`) after logging, so the
+   file you publish, agent entry included, has no errors.
+6. Republish to the same URL with the edited file as `flowspec.json` (above). If the
+   publish is refused because the artifact changed after the read, someone saved in the
+   meantime: read `flowspec.json` again, repeat step 2, validate again, then publish; do
+   not log a second time, the agent entry is already in the local file.
+
+An agent without a checkout follows the same rules from the page's agent guide while it
+edits the live `flowspec.json` directly: it tells the author which board edits were saved
+after the newest agent entry, asks before overriding one of them, and appends the agent
+entry itself.
 
 ## Pull requests from GitHub
 
@@ -1471,7 +1622,11 @@ For a page injected with `--two-file` the guide's edit loop targets
 (always the current version, since the board saves its own edits into it and
 records each save under `page.editHistory`, which the agent keeps), change it,
 validate, and republish to the same URL with the artifact's own `index.html`
-read back as the page and the edited file in `files`. The inline block is
+read back as the page and the edited file in `files`. Its steps also carry the
+board-edit rules of "Agents and board edits" (#974): tell the editor which board
+edits were saved after the newest agent entry, ask before overriding one of them,
+append one agent entry for the change, and start again from the read when the
+publish is refused because the artifact changed. The inline block is
 described as the stale fallback and must not be edited.
 A tracked two-file page's declaration adds `artifact` and `user`
 (`{scopes: ["profile"]}`).
@@ -1508,6 +1663,24 @@ Validation follows the warning-only policy of the other tracking fields: a
 malformed entry warns and is ignored, a non-array warns once, and more than 200
 entries warn once with only the newest 200 used (Edit mode trims to 200 on
 save).
+
+An agent's change to the board is one agent entry (#974), written by
+`node tools/board-sync.js log` (see "Agents and board edits" above):
+
+```json
+{"at": "2026-11-04T15:00:00.000Z", "by": {"name": "Chuck"}, "source": "agent",
+ "summary": "Added 5 nodes, moved 5 tickets",
+ "changes": [{"op": "remove", "ticket": "DOOR-104", "node": "door-api", "label": "Door API"},
+             {"op": "add", "ticket": "DOOR-104", "node": "cloud-sync", "label": "Cloud sync"}]}
+```
+
+`"source": "agent"` and `summary` require each other: `summary` is one line of 1–200
+characters, and any other `source` is malformed. An agent entry's `changes` lists only its
+ticket changes and may be empty (a change to structure or text alone). Its row reads
+editor, an agent tag, the time and the summary, with no change count; it expands to its
+ticket changes when it has any and does not expand otherwise. Agent entries also mark where
+an agent last brought the board in line: board edits saved after the newest one are the
+ones an agent asks about before overriding.
 
 The **Edit history** panel shows those entries. Add it to the diagram's panels
 after the Live status panel and place it below the board in every host profile:
@@ -1733,3 +1906,79 @@ destroy. They do not modify the document, another site's viewer, an older
 exported runtime, or another browser. File URLs have browser-dependent storage
 isolation; use the hosted page for shared defaults, or transfer JSON to another
 hosted palette page. Preview skin changes are not saved document settings.
+
+### Over time with Metrics
+
+Metrics is independent of the Jira mode buttons and off on every load. With
+Metrics off, Over time loads only Jira history. With Metrics on, clicking Over
+time loads one telemetry history batch after Jira supplies the day range.
+Turning Metrics on while the slider is open also loads that batch. Moving the
+slider never queries a tool. There are no slider markers.
+
+Each day carries an explicit `key` (`YYYY-MM-DD`) and `at` (RFC3339 evaluation
+endpoint), independent of its localized label. Jira reconstructs the end of the
+local calendar day and exposes that same following local-midnight instant in
+`at`. Telemetry evaluates the previous 24 hours ending at exactly that instant.
+Adjacent endpoints can be 23 or 25 hours apart across DST; labels never determine
+the boundary. The date key identifies the displayed local calendar day.
+The demo uses its embedded telemetry block's start plus 24 hours, without network
+calls. The example's explicit window is 24h. Day 9's completed push is UNPROVEN;
+Day 12's event traffic is DEGRADED.
+
+A host may supply `telemetry.history(bindings, {from, to, endpoints}, signal, report)` beside
+`provider` (or as `provider.history`). `from` and `to` are inclusive absolute
+RFC3339 evaluation endpoints. The optional `endpoints: [{key?, at}]` array gives
+the exact instants needed, including irregular local-day spacing; the controller
+always supplies it. Older direct adapter callers without it request an evenly
+spaced daily grid starting at `from`. The result has the ordinary carrier map
+shape, with each signal's `series: [[endpoint, value], ...]` (an explicit `YYYY-MM-DD`
+day key is also accepted and resolves through that day's explicit `at` metadata). `value` alone is
+never historical evidence. Optional `report.note(text)` reports partial failures
+and keeps the batch retryable. `historyKey` (a string or function) includes any
+mutable provider/account/datasource configuration in the cache identity.
+
+Only a sample at the selected endpoint counts. Missing endpoints, unsupported
+sources, retention gaps and a live-only provider give unobserved evidence, never
+last-known values or an invented zero. Explicit numeric zero remains observed.
+The same proof engine judges every local, imported, nested-import and loaded-detail
+carrier. Opening a detail is an explicit reader action: once its actual loader
+selection mounts, new bindings automatically join the selected historical day.
+Completed peers and unrelated pending batches are retained. Closing a detail
+removes its historical bindings and cancels its pending batch; reopening the same
+bindings can reuse their cache. Layout, polling paints and slider movement do not
+start queries. Changed queries on the same carrier ID never reuse stale samples.
+
+The controller retains live samples separately while showing history, pauses
+new telemetry polls, and holds any already-pending refresh or host `apply()`.
+Returning Live restores the newest held map and resumes refresh. Turning Metrics
+off, losing capability or destroying the controller aborts pending history and
+drops late completions; root page/host disable also covers imported/detail pages.
+Jira Live and Over time remain independent.
+
+History shares Jira's seven-day cache policy and a single six-call queue. The
+controller's front cache is isolated to that viewer/artifact instance and keyed
+by each full binding, provider configuration and datasource identity. Coverage
+tracks exact `{key, at}` endpoints, rather than a presumed 24-hour interval.
+Bindings needing the same endpoints are batched together. Repeat clicks reuse
+covered days; a longer range fetches only the new tail, starting at the next
+requested instant even when DST makes it 23 or 25 hours after the prior endpoint. Entries expire
+seven days after the original batch (tail fetches do not extend their lifetime).
+The MCP namespace also caches exact range calls per viewer and artifact. A new
+controller starts with an empty front cache; exact MCP calls can still be reused.
+Partial-error and aborted batches never extend cached coverage.
+
+Grafana history issues one `query_prometheus` or metric `query_loki_logs` range
+call per explicitly bound supported signal, with `stepSeconds: 86400` and the
+absolute endpoints. A same-offset range is one call per signal. A DST offset
+transition splits only at the discontinuity into contiguous 86400-second runs;
+each run starts and ends at actual selected-day instants, even a single-point run.
+All runs use the same six-call queue with Jira. No nearest UTC sample is accepted.
+It reuses the live parsers, tool qualification, consent and
+abort behavior, with no annotation or deeplink calls in the history batch. It
+never rewrites authored PromQL/LogQL: authors must provide the intended 24-hour
+aggregation themselves; a daily step controls evaluation spacing, not query
+aggregation. SQL and Tempo have no history adapter. Honeycomb history remains
+#946 and is unobserved here. Argument contracts follow the official
+[Prometheus source](https://github.com/grafana/mcp-grafana/blob/main/tools/prometheus.go)
+and [Loki source](https://github.com/grafana/mcp-grafana/blob/main/tools/loki.go);
+validation uses raw MCP fixtures, not a live Grafana or Honeycomb account.

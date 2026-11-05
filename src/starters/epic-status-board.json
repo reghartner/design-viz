@@ -105,7 +105,7 @@
         "heading": "Press the button, ring the chime, alert the resident",
         "text": [
           "One feature, four teams. Every node and edge carries the Jira tickets that deliver it; the document stores only the keys. Opened as a Claude artifact with the viewer's Atlassian connector, each node and edge takes the color of its tickets' Jira state (to do, in progress, done, blocked or missing), and Epic status lists the epic's tickets and progress. Dashed strokes mark work waiting on another ticket.",
-          "Make it yours: set your Jira site and epic under page.tracking and put your ticket keys on the nodes and edges, or ask your agent to build the board from your epic. In the Workbench, Demo live status paints sample states and Next day in Epic status moves them along. Edit history lists the ticket changes recorded against the diagram."
+          "Make it yours: set your Jira site and epic under page.tracking and put your ticket keys on the nodes and edges, or ask your agent to build the board from your epic. In the Workbench, Demo live status paints sample states and the > button in Epic status moves them along. Edit history lists the ticket changes recorded against the diagram."
         ],
         "diagram": {
           "view": "ambient",

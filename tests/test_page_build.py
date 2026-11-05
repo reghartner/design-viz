@@ -30,6 +30,19 @@ def run_tool(*args):
                           capture_output=True, text=True, cwd=ROOT)
 
 
+def hold_manifest_lock(path):
+    """Take the OS lock here, so a build must honor it, not only this helper."""
+    lock = open(path, "a")
+    try:
+        import fcntl
+    except ImportError:
+        import msvcrt
+        msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+    return lock
+
+
 @unittest.skipUnless(shutil.which("node"), "node not available")
 class PageBuildTest(unittest.TestCase):
     def setUp(self):
@@ -211,6 +224,24 @@ class PageBuildTest(unittest.TestCase):
         pages = json.loads((self.root / "manifest.json").read_text())["pages"]
         self.assertEqual({page["file"] for page in pages},
                          {"alpha.html", "beta.html"})
+
+    def test_build_waits_for_the_manifest_lock(self):
+        self.root.mkdir(parents=True)
+        lock = hold_manifest_lock(self.root / ".manifest.lock")
+        build = subprocess.Popen(
+            ["python3", str(TOOL), str(self.spec), "--root", str(self.root)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=ROOT)
+        try:
+            with self.assertRaises(subprocess.TimeoutExpired,
+                                   msg="the build must wait for the lock"):
+                build.wait(timeout=8)
+            self.assertFalse((self.root / "manifest.json").exists())
+        finally:
+            lock.close()
+        stdout, stderr = build.communicate(timeout=60)
+        self.assertEqual(build.returncode, 0, stdout + stderr)
+        pages = json.loads((self.root / "manifest.json").read_text())["pages"]
+        self.assertEqual([page["file"] for page in pages], ["temp.html"])
 
     def test_happy_path_builds_page_and_manifest(self):
         r = run_tool(str(self.spec), "acme-cam/thermal", "--root", str(self.root),

@@ -24,6 +24,15 @@ Epics and descendant stories, with separate Epic counts and story coverage.
 The desktop **Demo live status** preview uses sample states without querying
 Jira, so it cannot infer parent type from a key. See [live status](live-status.md).
 
+**Document settings → Tracking → Metrics → Allow metrics** controls metrics
+availability for the page, including imports and details, without deleting
+bindings or templates. It defaults on; reader Metrics still defaults off with a
+24h window. **Preview metrics layout** in the desktop toolbar shows synthetic
+cards for bound edges using the reader’s placement. Select a card to edit its
+side/offset. The preview makes no connector calls, adds no Undo entry, and is
+not exported. It survives same-document edits and resets for a new project or
+import. The Services & evidence chapter explains both controls.
+
 The workspace chapter explains top inspector actions, collapsed muted section
 headers, same-selection expansion retention, and group-scoped Apply controls.
 
@@ -330,7 +339,10 @@ for column headers and **Column kind** (**value (default)** or `icons`), then **
 and UX icons**: one card per case holds its typed values, each value’s type beside
 it, and that case’s independent icon cells. Add multiple
 icon columns, such as Power icon and Battery icons. The visual picker uses the shared icon library; multiple outputs
-appear together in each cell, and removing all outputs displays **No icons**. Open
+appear together in each cell, and removing all outputs shows a small **n/a**. To show
+other text, such as `No icons`, fill that icons column’s **Empty cell text** in
+**Properties**; clearing it restores n/a. To show nothing, set `"empty": ""` on that
+column in the **raw JSON** under **Properties** (Workbench fields cannot save a blank). Open
 **Starting state** to choose the initial **Active case**. Its one dropdown lists
 cases by label (with the ID when labels would look alike) and **No active case**;
 step controls offer the same choices plus **Inherit previous** to keep the earlier

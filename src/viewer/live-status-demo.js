@@ -23,7 +23,8 @@ function liveStatusDemoMap(day,keys,epics){
    {carrierId: {signals: {name: {value, series: [[t, v], ...], unit}}, observedAt}}.
    The block holds values per carrier signal from `start` every `stepSeconds`; each
    point is stamped at the end of its step and the value is the last step. A null step
-   becomes 0, as a connector reports a query that ran and matched nothing. */
+   is missing evidence, never an implicit zero. An absent final sample leaves
+   that signal unobserved for this day. */
 function liveStatusDemoTelemetry(day){
   var map=Object.create(null),block=day && day.telemetry;
   if(!block || typeof block!=='object' || !block.carriers || typeof block.carriers!=='object')return map;
@@ -34,8 +35,8 @@ function liveStatusDemoTelemetry(day){
     if(!signals || typeof signals!=='object')return;
     Object.keys(signals).forEach(function(name){
       var signal=signals[name],values=signal && Array.isArray(signal.values)?signal.values:null;
-      if(!values || !values.length)return;
-      var series=values.map(function(v,k){return [start+(k+1)*step,typeof v==='number' && isFinite(v)?v:0];});
+      if(!values || !values.length || typeof values[values.length-1]!=='number' || !isFinite(values[values.length-1]))return;
+      var series=values.map(function(v,k){return typeof v==='number' && isFinite(v)?[start+(k+1)*step,v]:null;}).filter(Boolean);
       out[name]={value:series[series.length-1][1],series:series,unit:typeof signal.unit==='string'?signal.unit:null};
       end=Math.max(end,start+values.length*step);any=true;
     });
@@ -45,6 +46,23 @@ function liveStatusDemoTelemetry(day){
   Object.keys(map).forEach(function(id){map[id].observedAt=observedAt;});
   return map;
 }
+function liveStatusDemoLabel(day,index){var label=String(day.label || '');return /^Day \d+\s*[—-]/.test(label)?label:'Day '+(index+1)+' — '+label;}
+/* Over time (#929): each timeline day as status only. A ticket first named on a later day is
+   left out of the day, and the overlay shows it as Missing. One absent after that, or on the
+   last day, is what the live demo shows: missing. */
+function liveStatusDemoDays(timeline,keys){
+  var seen=Object.create(null),last=timeline.days.length-1;
+  return timeline.days.map(function(day,index){
+    var full=liveStatusDemoMap(day,keys,timeline.epics),issues=day.issues || {},states=Object.create(null);
+    Object.keys(issues).forEach(function(key){seen[key]=true;});
+    Object.keys(full).forEach(function(key){
+      if(full[key].state==='missing' && !issues[key] && !seen[key] && index<last)return;
+      states[key]={state:full[key].state};if(full[key].detail)states[key].detail=full[key].detail;
+    });
+    var start=day.telemetry && Date.parse(day.telemetry.start);
+    return {key:isFinite(start)?new Date(start).toISOString().slice(0,10):null,at:isFinite(start)?new Date(start+86400000).toISOString():null,telemetry:liveStatusDemoTelemetry(day),label:liveStatusDemoLabel(day,index),short:'Day '+(index+1),states:states};
+  });
+}
 function liveStatusDemoTimeline(keys){
   var labels=['kickoff','work starts','dependency blocked','delivery complete'];
   return {version:1,intervalSeconds:6,days:labels.map(function(label,index){
@@ -53,40 +71,42 @@ function liveStatusDemoTimeline(keys){
   })};
 }
 function createLiveStatusDemo(doc){
-  var timeline=null,api=null,day=0,timer=0,retired=false,playing=false;
-  var media=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+  // `shown` is the slider's day while Over time is open. The day buttons carry on from it.
+  var timeline=null,api=null,day=0,shown=null,retired=false;
   var block=doc.getElementById('live-timeline');
   if(block){try{var parsed=JSON.parse(block.textContent);if(parsed && Array.isArray(parsed.days) && parsed.days.length)timeline=parsed;}catch(ex){/* A missing/unusable timeline uses page-local tickets. */}}
   function ensure(keys){if(!timeline)timeline=liveStatusDemoTimeline(keys);return timeline;}
-  function stop(){if(timer){clearTimeout(timer);timer=0;}}
-  function manual(){return !!(media && media.matches);}
-  function ended(){return day>=timeline.days.length-1;}
-  function controls(){api.setDemoControls({playing:playing,manual:manual(),ended:ended(),toggle:toggle,next:next});}
+  function current(){return shown===null?day:shown;}
+  function ended(){return current()>=timeline.days.length-1;}
+  function first(){return current()<=0;}
+  function controls(){api.setDemoControls({ended:ended(),first:first(),prev:previous,next:next});}
+  function announce(){api.note(liveStatusDemoLabel(timeline.days[current()],current()),'info');controls();}
   function paint(){
     if(retired)return;
-    var current=timeline.days[day],label=String(current.label || '');
     if(typeof api.status==='function')api.status({state:'demo',source:'Demo',busy:false,checkedAt:Date.now()});
-    api.apply(liveStatusDemoMap(current,api.refs().tickets,timeline.epics));
-    // The same day's telemetry goes to a telemetry sink when the host offers one (#939 draws it).
-    if(api.telemetry && typeof api.telemetry.apply==='function')api.telemetry.apply(liveStatusDemoTelemetry(current));
-    api.note(/^Day \d+\s*[—-]/.test(label)?label:'Day '+(day+1)+' — '+label,'info');controls();
+    // While a past day shows, the controller holds this map until the return to Live.
+    api.apply(liveStatusDemoMap(timeline.days[day],api.refs().tickets,timeline.epics));
+    if(api.telemetry && typeof api.telemetry.apply==='function')api.telemetry.apply(liveStatusDemoTelemetry(timeline.days[day]));
+    if(shown!==null)api.overTimeDay(shown);
+    announce();
   }
-  function arm(){
-    stop();if(retired || !playing || manual() || ended() || doc.hidden)return;
-    var seconds=Number(timeline.intervalSeconds),delay=isFinite(seconds) && seconds>0?seconds*1000:6000;
-    timer=setTimeout(function(){timer=0;next();},delay);
-  }
-  function next(){if(retired || ended())return;day++;if(ended())playing=false;paint();arm();}
-  function toggle(){if(retired || manual() || ended())return;playing=!playing;controls();arm();}
-  function motionChanged(){if(manual())playing=false;controls();arm();}
-  function visibility(){arm();}
+  function step(target){day=target;if(shown!==null)shown=day;paint();}
+  function next(){if(!retired && !ended())step(current()+1);}
+  function previous(){if(!retired && !first())step(current()-1);}
+  var history={
+    load:function(){
+      var keys=api.refs().tickets;shown=day;controls();
+      return {today:liveStatusDemoMap(timeline.days[timeline.days.length-1],keys,timeline.epics),days:liveStatusDemoDays(timeline,keys),index:day};
+    },
+    day:function(index){shown=index;announce();},
+    close:function(){shown=null;announce();}
+  };
   return {
     provider:function(refs){var t=ensure(refs.tickets);return liveStatusDemoMap(t.days[day],refs.tickets,t.epics);},
     telemetry:{provider:function(){return timeline?liveStatusDemoTelemetry(timeline.days[day]):Object.create(null);}},
     demo:{mount:function(live){
-      api=live;ensure(api.refs().tickets);playing=!manual();paint();arm();
-      doc.addEventListener('visibilitychange',visibility);if(media)media.addEventListener('change',motionChanged);
-      return function(){retired=true;stop();doc.removeEventListener('visibilitychange',visibility);if(media)media.removeEventListener('change',motionChanged);};
+      api=live;ensure(api.refs().tickets);paint();api.setHistory(history);
+      return function(){retired=true;};
     }}
   };
 }

@@ -164,7 +164,7 @@ function initWorkbenchWorkspace(){
   function place(name,opening){
     if(docked()===name)return;
     var preferred=boundRect(prefs.windows[name],name),current=rect(name),b=bounds(),selected=(name==='inspect' || prefs.windows.inspect.open)?selectedRects():[];
-    var other=names.filter(function(n){return n!==name && prefs.windows[n] && prefs.windows[n].open && !hidden;}).map(rect);
+    var neighbors=names.filter(function(n){return n!==name && prefs.windows[n] && prefs.windows[n].open && !hidden;}),other=neighbors.map(rect);
     function score(r){return selected.reduce(function(sum,s){return sum+overlap(r,s)*100;},0)+other.reduce(function(sum,o){
       // Keep other windows' title bars and resize handles reachable when possible.
       return sum+overlap(r,{x:o.x,y:o.y,w:o.w,h:48})*4+overlap(r,{x:o.x+o.w-24,y:o.y+o.h-24,w:24,h:24})*4+overlap({x:r.x,y:r.y,w:r.w,h:48},o)*4+overlap({x:r.x+r.w-24,y:r.y+r.h-24,w:24,h:24},o)*4;
@@ -175,7 +175,10 @@ function initWorkbenchWorkspace(){
     function clamp(value){return workspacePanelRect(value,availableWidth,innerHeight,b.top,b.bottom,b.left);}
     // In a crowded desktop, a temporary narrower/shorter window can expose
     // both windows' controls without discarding either saved floating size.
-    [preferred,Object.assign({},preferred,{w:300}),Object.assign({},preferred,{h:240}),Object.assign({},preferred,{w:300,h:240})].forEach(function(size){
+    // Inspect always keeps its saved size: it may move or overlap the
+    // selection, but a shrunk inspector over a large panel is unusable.
+    var sizes=name==='inspect'?[preferred]:[preferred,Object.assign({},preferred,{w:300}),Object.assign({},preferred,{h:240}),Object.assign({},preferred,{w:300,h:240})];
+    sizes.forEach(function(size){
       var xs=[b.left,innerWidth-size.w-12-(docked()?dockWidth()+12:0)],ys=[b.top,innerHeight-b.bottom-size.h];
       selected.forEach(function(r){xs.push(r.x-size.w-12,r.x+r.w+12);ys.push(r.y-size.h-12,r.y+r.h+12);});
       other.forEach(function(r){xs.push(r.x+r.w+12,r.x-size.w-12,r.x-36);ys.push(r.y+52);});
@@ -183,6 +186,12 @@ function initWorkbenchWorkspace(){
     });
     var best=candidates.reduce(function(a,r){return score(r)<score(a)?r:a;},preferred);
     placements[name]=best;
+    // Inspect cannot shrink, so a neighbor whose title bar or resize handle it
+    // now covers yields instead, through the same display-only placement.
+    if(name==='inspect')neighbors.forEach(function(n){
+      var o=rect(n);
+      if(overlap(best,{x:o.x,y:o.y,w:o.w,h:48})>0 || overlap(best,{x:o.x+o.w-24,y:o.y+o.h-24,w:24,h:24})>0)place(n,true);
+    });
   }
   function reserveCanvas(){
     document.body.style.setProperty('--workspace-dock-width',docked()?(dockWidth()+12)+'px':'0px');
@@ -230,7 +239,7 @@ function initWorkbenchWorkspace(){
     cancelAnimationFrame(selectionFrame);selectionFrame=requestAnimationFrame(function(){
       var next=Array.from(document.querySelectorAll('#docview .dv-sel')).map(function(el){var section=el.closest('[data-dv-section]');return [section && section.getAttribute('data-dv-section'),el.tagName,JSON.stringify(el.dataset)];});
       var key=JSON.stringify(next);if(key===selectionKey && !force)return;selectionKey=key;
-      if(prefs.windows.inspect.open && !hidden && !gesture){place('inspect',false);paint('inspect');}
+      if(prefs.windows.inspect.open && !hidden && !gesture){place('inspect',false);paintAll();}
     });
   }
   function finish(cancel){
@@ -321,6 +330,10 @@ function initWorkbenchWorkspace(){
   // gestures retire it before any old anchor can move the new camera.
   document.getElementById('workspace-focus-diagram').addEventListener('click',retireDock);
   var view=document.getElementById('docview');
+  // Moving or resizing a canvas object under Inspect rechecks its placement,
+  // so that object's own handles come back within reach.
+  function canvasObjectMoved(ev){if((ev.type==='pointerup' || /^Arrow/.test(ev.key)) && ev.target.closest('.explore-window-grip,.explore-window-resize'))selectionChanged(true);}
+  view.addEventListener('pointerup',canvasObjectMoved,true);view.addEventListener('keyup',canvasObjectMoved,true);
   ['diagram-view-change','diagram-tab-change','tab-view-change','detail-navigation','workbench-view-section','pointerdown','wheel','keydown'].forEach(function(type){view.addEventListener(type,retireDock,true);});
   // A fresh editor has no selection, so keep the authored controls and panels
   // available until the user chooses a tool. Saved open windows still restore.

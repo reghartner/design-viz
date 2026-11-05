@@ -2025,7 +2025,7 @@ test('M8 a demo telemetry source shows Metrics, mounts only while on, reports de
 | C1 | Metrics on: a bound call/service edge with traffic gets a packet stream (`g.dv-metrics-stream[data-metrics-edge]`, 1–5 moving packets by order of magnitude of its primary rate, the same count of static packets for reduced motion and print); red packets follow the error share; a degraded edge is amber (`dv-metrics-degraded`); a silent Done edge gets a dotted ghost (`path.dv-metrics-ghost`) over a dimmed stroke (`dv-metrics-silent`); unbound edges and non-call edges get no stream; Jira paint is untouched. |
 | C2 | Metrics on: a bound node gets `g.dv-metrics-node` with a sparkline of its primary rate series along the card bottom and a proof seal at the bottom-right (proven, degraded, unproven, live-early by verdict); unbound nodes and text boxes are unchanged; no text on the canvas. |
 | C3 | Metrics off removes every cue; cues are re-applied after a rebuild (`dv:pathrender`) and follow telemetry and Jira changes; destroy removes them. |
-| C4 | Imported topology carriers receive the same cues as local ones, including loaded detail flows. Fixture: direct and nested consumers plus an imported consumer loaded through `loadDetail` and mounted as the active detail section. Scoped assertion: each section gets a stream on its flowing edge, a ghost on its silent Done edge, and a sparkline/proven seal on its bound node; unbound nodes stay unchanged and Metrics off clears every cue in that section. Rejects: walking only root-page or locally authored carriers, skipping detail-page paint, or leaving imported/detail cues behind on off. |
+| C4 | Imported topology carriers receive the same cues as local ones. Direct and nested consumers each have independent binding, stream, seal, sparkline, ghost, dimming, unbound-node, off and destroy tests below. Loaded-detail equivalents use the real native host loader and a clicked detail control in telemetry-overlay.spec.mjs (P12); no synthetic detail controller or mounted section. Rejects: walking only locally authored carriers, skipping detail-page paint, or leaving imported/detail cues behind on off or destroy. |
 | C5 | Metrics packets never wear the ordinary `.pkt` or `.comm-packet` classes, and the frame measure skips the stream layer. |
 | C6 | Demo: a Live status demo source carrying `telemetry: {provider}` (the #944 demo shape) shows Metrics as demo; the demo reaches the same controller as `ctl.liveStatus.telemetry`; a host telemetry provider wins over it. |
 */
@@ -2125,45 +2125,66 @@ test('C3 Metrics off removes every cue; a rebuild re-applies them; destroy remov
  h.ctl.liveStatus.destroy();assert.equal(h.cues().length,0,'C3 destroy removes every cue');
 });
 
-test('C4 imported topology carriers, direct, nested and on a loaded detail page, get the same cues as local ones',async()=>{
- const spec=(id,diagram,extra={})=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},...extra,sections:[{id:'main',diagram}]}});
+async function importedCueHarness(label,t){
+ const spec=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
  const provider=spec('provider',{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'},{from:'store',to:'api',label:'Return'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store','store->api']}}});
  const consumer=spec('consumer',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{tickets:['IMP-1'],telemetry:CUE_SERVICE()}},edgeTracking:{'api->store':{tickets:['IMP-2'],telemetry:TCALL()},'store->api':{tickets:['IMP-3'],telemetry:TCALL()}}}]});
- const middle=JSON.parse(JSON.stringify(consumer));middle.page.canon.id='middle';middle.page.sections[0].diagram.topologyExports={nested:{nodes:['shared::api','shared::store'],edges:['shared::api->shared::store','shared::store->shared::api']}};
+ const middle=structuredClone(consumer);middle.page.canon.id='middle';middle.page.sections[0].diagram.topologyExports={nested:{nodes:['shared::api','shared::store'],edges:['shared::api->shared::store','shared::store->shared::api']}};
  const outer=spec('outer',{nodes:{},rows:[[]],topologyImports:[{spec:'middle',export:'nested',as:'outer'}]});
- const seed=harness(),resolve=(doc,specs)=>seed.C.FlowTopology.resolveSource(doc,{version:1,id:doc.page.canon.id,specs});seed.ctl.liveStatus.destroy();
- for(const [label,doc,specs,prefix] of [['direct',consumer,[provider,consumer],'shared::'],['nested',outer,[provider,middle,outer],'outer::shared::'],['detail',consumer,[provider,consumer],'shared::']]){
-  const api=prefix+'api',store=prefix+'store',edgeId=api+'->'+store,silentId=store+'->'+api;
-  const map=()=>({[api]:{signals:{rate:{value:50,series:[[1,30],[2,50]]}}},[edgeId]:{signals:{rate:{value:500},errors:{value:1}}},[silentId]:{signals:{rate:{value:0},errors:{value:0}}}});
-  const resolved=resolve(doc,specs),isDetail=label==='detail',renderOptions={telemetry:{provider:()=>Promise.resolve(map())}};
-  if(isDetail)renderOptions.loadDetail=()=>Promise.resolve(resolved);
-  const root=isDetail?spec('root',{nodes:{parent:{detail:{spec:'approved-detail'}}},rows:[['parent']]}):resolved;
-  const h=harness(root,{provider:()=>Promise.resolve({'IMP-1':{state:'done'},'IMP-2':{state:'done'},'IMP-3':{state:'done'}})},renderOptions);
-  let scope=h.ctl.sections[0].sectionEl,d=h.ctl.page.sections[0].diagram;
-  if(isDetail){
-   const child=harness(resolved);child.ctl.liveStatus.destroy();const rootRec=h.ctl.sections[0],childRec=child.ctl.sections[0];
-   h.view.appendChild(childRec.sectionEl);
-   h.ctl.details={snapshot:()=>({section:'main',frames:[{node:'parent'}]}),activeSections:()=>[rootRec,childRec]};
-   await renderOptions.loadDetail({spec:'approved-detail'},new AbortController().signal);
-   scope=childRec.sectionEl;d=child.ctl.page.sections[0].diagram;
-   assert.ok(h.ctl.liveStatus.refs().tickets.includes('IMP-3'),'C4 detail refs include loaded imported carriers');
-  }
-  h.flush();h.flush();await settle();assert.ok(h.ctl.telemetry,'C4 ctl.telemetry');h.ctl.telemetry.setEnabled(true);await settle();
-  const node=scope.querySelector('g.node[data-dv-node="'+api+'"]'),index=d.edges.findIndex(e=>e.from+'->'+e.to===edgeId),silentIndex=d.edges.findIndex(e=>e.from+'->'+e.to===silentId);
-  assert.ok(index>=0 && silentIndex>=0,'C4 '+label+' imported edges resolved');
-  assert.equal(node.querySelector('.dv-metrics-seal')?.getAttribute('data-seal'),'proven','C4 '+label+' imported node seal');
-  assert.ok(node.querySelector('polyline.dv-metrics-sparkline'),'C4 '+label+' imported node sparkline');
-  const moving=scope.querySelectorAll('g.dv-metrics-stream').filter(g=>g.getAttribute('data-metrics-edge')===String(index)).flatMap(g=>g.querySelectorAll('circle.dv-metrics-moving'));
+ const seed=harness();t.after(()=>seed.ctl.liveStatus.destroy());
+ const doc=label==='direct'?consumer:outer,prefix=label==='direct'?'shared::':'outer::shared::';
+ const resolved=seed.C.FlowTopology.resolveSource(doc,{version:1,id:doc.page.canon.id,specs:[provider,consumer,middle,outer]});
+ const api=prefix+'api',store=prefix+'store',edgeId=api+'->'+store,silentId=store+'->'+api;
+ const samples={[api]:{signals:{rate:{value:50,series:[[1,30],[2,50]]}}},[edgeId]:{signals:{rate:{value:500},errors:{value:1}}},[silentId]:{signals:{rate:{value:0},errors:{value:0}}}};
+ const h=harness(resolved,{provider:()=>Promise.resolve({'IMP-1':{state:'done'},'IMP-2':{state:'done'},'IMP-3':{state:'done'}})},{telemetry:{provider:()=>Promise.resolve(samples)}});
+ t.after(()=>h.ctl.liveStatus.destroy());
+ const scope=h.ctl.sections[0].sectionEl,d=h.ctl.page.sections[0].diagram;
+ const index=d.edges.findIndex(e=>e.from+'->'+e.to===edgeId),silentIndex=d.edges.findIndex(e=>e.from+'->'+e.to===silentId);
+ assert.ok(index>=0 && silentIndex>=0,'C4 '+label+' imported edges resolved');
+ h.flush();h.flush();await settle();h.ctl.telemetry.setEnabled(true);await settle();
+ return {...h,scope,api,store,edgeId,silentId,index,silentIndex,node:scope.querySelector('g.node[data-dv-node="'+api+'"]')};
+}
+// Each scope AND cue contract gets its own test: an absent direct-node seal
+// cannot prevent nested streams, ghosts or cleanup from reaching assertions.
+for(const label of ['direct','nested']){
+ test('C4 '+label+' imported carriers retain the selected telemetry bindings',async t=>{
+  const h=await importedCueHarness(label,t),bindings=plain(h.ctl.telemetry.bindings());
+  assert.deepEqual(bindings.map(b=>b.id),[h.api,h.edgeId,h.silentId]);
+  assert.deepEqual(bindings[0].signals.rate,{source:'grafana',query:'sum(rate(http_requests_total[5m]))*3600',unit:'req/h'});
+ });
+ test('C4 '+label+' imported node gets a proven seal',async t=>{
+  const h=await importedCueHarness(label,t);
+  assert.equal(h.node.querySelector('.dv-metrics-seal')?.getAttribute('data-seal'),'proven','C4 '+label+' imported node seal');
+ });
+ test('C4 '+label+' imported node gets a sparkline',async t=>{
+  const h=await importedCueHarness(label,t);
+  assert.ok(h.node.querySelector('polyline.dv-metrics-sparkline'),'C4 '+label+' imported node sparkline');
+ });
+ test('C4 '+label+' imported flowing edge gets a stream',async t=>{
+  const h=await importedCueHarness(label,t);
+  const moving=h.scope.querySelectorAll('g.dv-metrics-stream').filter(g=>g.getAttribute('data-metrics-edge')===String(h.index)).flatMap(g=>g.querySelectorAll('circle.dv-metrics-moving'));
   assert.equal(moving.length,3,'C4 '+label+' imported edge stream');
-  assert.equal(scope.querySelectorAll('path.dv-metrics-ghost').filter(p=>p.getAttribute('data-metrics-edge')===String(silentIndex)).length,1,'C4 '+label+' silent imported edge ghost');
-  assert.ok(scope.querySelector('path.edge[data-dv-edge="'+silentIndex+'"]').classList.contains('dv-metrics-silent'),'C4 '+label+' silent imported stroke dimmed');
-  assert.equal(scope.querySelector('g.node[data-dv-node="'+store+'"]').getAttribute('data-metrics-state'),null,'C4 '+label+' unbound imported node unchanged');
-  h.ctl.telemetry.setEnabled(false);
-  assert.equal(scope.querySelectorAll(CUE_SELECTOR).length,0,'C4 '+label+' off removes every imported cue');
-  assert.equal(scope.querySelectorAll('.dv-metrics-bound,.dv-metrics-flowing,.dv-metrics-silent,.dv-metrics-ghosted,[data-metrics-verdict]').length,0,'C4 '+label+' off removes carrier classes and verdicts');
-  h.ctl.liveStatus.destroy();
- }
-});
+ });
+ test('C4 '+label+' imported silent Done edge gets a ghost',async t=>{
+  const h=await importedCueHarness(label,t);
+  assert.equal(h.scope.querySelectorAll('path.dv-metrics-ghost').filter(p=>p.getAttribute('data-metrics-edge')===String(h.silentIndex)).length,1,'C4 '+label+' silent imported edge ghost');
+ });
+ test('C4 '+label+' imported silent edge stroke is dimmed',async t=>{
+  const h=await importedCueHarness(label,t);
+  assert.ok(h.scope.querySelector('path.edge[data-dv-edge="'+h.silentIndex+'"]').classList.contains('dv-metrics-silent'),'C4 '+label+' silent imported stroke dimmed');
+ });
+ test('C4 '+label+' unbound imported node stays unchanged',async t=>{
+  const h=await importedCueHarness(label,t),node=h.scope.querySelector('g.node[data-dv-node="'+h.store+'"]');
+  assert.equal(node.querySelectorAll(CUE_SELECTOR).length,0);
+  assert.equal(node.getAttribute('data-metrics-state'),null,'C4 '+label+' unbound imported node unchanged');
+ });
+ for(const action of ['off','destroy'])test('C4 '+label+' '+action+' removes imported cues and carrier decoration',async t=>{
+  const h=await importedCueHarness(label,t),paintedWhileOn=h.scope.querySelectorAll(CUE_SELECTOR).length;
+  if(action==='off')h.ctl.telemetry.setEnabled(false);else h.ctl.liveStatus.destroy();
+  assert.deepEqual({paintedWhileOn:paintedWhileOn>0,remaining:h.scope.querySelectorAll(CUE_SELECTOR).length},{paintedWhileOn:true,remaining:0},'C4 '+label+' '+action+' removes cues painted while on');
+  assert.equal(h.scope.querySelectorAll('.dv-metrics-bound,.dv-metrics-flowing,.dv-metrics-degraded,.dv-metrics-silent,.dv-metrics-unobserved,.dv-metrics-ghosted,[data-metrics-verdict]').length,0,'C4 '+label+' '+action+' removes carrier classes and verdicts');
+ });
+}
 
 test('C5 Metrics packets never wear the ordinary packet classes and the frame measure skips the stream layer',async()=>{
  const h=cueHarness();await h.on();

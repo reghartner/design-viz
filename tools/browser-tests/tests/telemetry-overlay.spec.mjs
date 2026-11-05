@@ -12,6 +12,7 @@
 | P9 | Reduced motion shows static packets | `reducedMotion: 'reduce'` | moving packets hidden, static packets visible |
 | P10 | Off removes every cue | independent native mount; wait for the existing provider connection, record cues on, then click off | named `P10 off removes every cue painted while on` assertion checks both nonempty on and empty off after both clicks, so absent cues fail this row without a feature-dependent precondition; off also clears carrier verdicts/classes and preserves Jira paint. Rejects missing cues or incomplete cleanup |
 | P11 | `#live=demo` mounts the demo telemetry so Metrics follows the demo day | built example with its timeline, `#live=demo` | Metrics visible and off; on is "Metrics: demo, refreshed …"; Day 8 has no stream; Day 10 streams 3 packets on the 530 req/h `mcu->ingest` call edge, ghosts the silent Done `notify->app` push edge and seals `ingest`; off removes every cue |
+| P12 / C4 | Loaded imported detail carriers get the same cues | real native host `loadDetail` returns a resolved imported consumer; click the parent detail control to load and mount the explicitly selected, nonfirst section, then click Metrics | independent tests for provider bindings, proven seal, sparkline, stream, ghost, dimmed stroke, unbound node, off and destroy cleanup; no cue precondition hides another contract. A decoy first section shares unbound carrier IDs to detect painting with the wrong section binding. Destroy inspects the retained section DOM so merely detaching the viewer cannot pass |
 */
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -200,6 +201,97 @@ test('P9 reduced motion shows static Metrics packets instead of moving ones',asy
  await expect(stream(root,0)).toHaveCount(4);
  await expect(stream(root,0).first()).toBeHidden();
  await expect(root.locator('g.dv-metrics-stream[data-metrics-edge="0"] circle.dv-metrics-static').first()).toBeVisible();
+});
+
+/* P12 / C4: use the native host's real loader, normalization, validation,
+   buildSection and detail-navigation event. The first section is a decoy;
+   the selected section's imported bindings must drive its actual rendered DOM. */
+function importedDetailSpec(){
+ const spec=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'selected',heading:'Selected imported detail',diagram}]}});
+ const provider=spec('provider',{nodes:{api:{title:'Detail API'},store:{title:'Detail store'}},rows:[['api','store']],
+  edges:[{from:'api',to:'store',label:'Persist'},{from:'store',to:'api',label:'Return'}],
+  topologyExports:{core:{nodes:['api','store'],edges:['api->store','store->api']}}});
+ const consumer=spec('detail-consumer',{nodes:{},rows:[[]],panels:[PANEL],topologyImports:[{spec:'provider',export:'core',as:'shared',
+  nodeTracking:{api:{tickets:['IMP-1'],telemetry:SERVICE()}},
+  edgeTracking:{'api->store':{tickets:['IMP-2'],telemetry:CALL()},'store->api':{tickets:['IMP-3'],telemetry:CALL()}}}]});
+ consumer.page.tracking={jira:{site:'https://jira.test'}};
+ const context=vm.createContext({});vm.runInContext(sourceLoader.composeSources(['validator.js','canon.js']),context);
+ const resolved=JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(consumer,{version:1,id:'detail-consumer',specs:[provider,consumer]})));
+ resolved.page.sections.unshift({id:'decoy',heading:'Unselected detail',diagram:{
+  nodes:{'shared::api':{title:'Unbound decoy API'},'shared::store':{title:'Unbound decoy store'}},rows:[['shared::api','shared::store']],
+  edges:[{from:'shared::store',to:'shared::api',label:'Decoy return'},{from:'shared::api',to:'shared::store',label:'Decoy persist'}]}});
+ return resolved;
+}
+async function mountImportedDetail(page,server){
+ await page.setViewportSize({width:1440,height:1000});
+ await writeFile(path.join(server.root,'telemetry-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'telemetry-detail.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./telemetry-native.js";window.mount=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/telemetry-detail.html');await page.waitForFunction(()=>!!window.mount);
+ const rootSpec={page:{title:'Detail host',tracking:{jira:{site:'https://jira.test'}},sections:[{id:'main',diagram:{
+  nodes:{parent:{title:'Imported service',tickets:['ROOT-1'],detail:{spec:'approved-detail',revision:'r1',section:'selected'}}},rows:[['parent']],panels:[PANEL]}}]}};
+ const samples={'shared::api':{signals:{rate:{value:50,series:[[T1,30],[T2,50]]}}},
+  'shared::api->shared::store':{signals:{rate:{value:500},errors:{value:1}}},'shared::store->shared::api':{signals:{rate:{value:0},errors:{value:0}}}};
+ await page.evaluate(({rootSpec,detail,samples})=>{
+  window.detailLoads=[];window.detailTelemetryCalls=[];
+  window.viewer=window.mount(document.querySelector('#host'),rootSpec,{
+   loadDetail:(ref,signal)=>{window.detailLoads.push({...ref,aborted:signal.aborted,abortable:typeof signal.addEventListener==='function'});return Promise.resolve(structuredClone(detail));},
+   telemetry:{provider:bindings=>{window.detailTelemetryCalls.push(structuredClone(bindings));return Promise.resolve(structuredClone(samples));}}
+  });
+  window.viewer.controller.liveStatus.apply({'ROOT-1':{state:'done'},'IMP-1':{state:'done'},'IMP-2':{state:'done'},'IMP-3':{state:'done'}});
+ },{rootSpec,detail:importedDetailSpec(),samples});
+ const root=page.locator('#host');
+ await root.getByRole('button',{name:'Explore Imported service',exact:true}).click();
+ const scope=root.locator('[data-dv-detail-preview]:visible');
+ await expect(scope).toHaveCount(1);await expect(scope.locator('.sec-h')).toHaveText('Selected imported detail');
+ expect(await page.evaluate(()=>window.detailLoads),'P12 the real gesture calls the host loader').toEqual([{spec:'approved-detail',revision:'r1',section:'selected',aborted:false,abortable:true}]);
+ expect(await page.evaluate(()=>window.viewer.controller.details.snapshot().frames.map(frame=>frame.node))).toEqual(['parent']);
+ const metrics=metricsButton(scope.locator('.pt-live-status'));await metrics.click();
+ // Wait for the existing connection contract, never for any new canvas cue.
+ await expect(scope.locator('.dv-live-metrics-connection')).toHaveAttribute('data-state','connected');
+ return {root,scope,metrics,node:scope.locator('g.node[data-dv-node="shared::api"]')};
+}
+test('P12 loaded imported detail contributes its selected telemetry bindings to the host provider',async({page,server})=>{
+ await mountImportedDetail(page,server);
+ const calls=await page.evaluate(()=>window.detailTelemetryCalls);
+ expect(calls).toHaveLength(1);
+ expect(calls[0].map(binding=>binding.id)).toEqual(['shared::api','shared::api->shared::store','shared::store->shared::api']);
+ expect(calls[0][0].signals.rate).toEqual({source:'grafana',query:'sum(rate(http_requests_total{app="api"}[5m]))*3600',unit:'req/h'});
+ expect(await page.evaluate(()=>window.viewer.controller.liveStatus.refs().tickets)).toEqual(['ROOT-1','IMP-1','IMP-2','IMP-3']);
+});
+test('P12 loaded imported detail node gets a proven seal',async({page,server})=>{
+ const {node}=await mountImportedDetail(page,server);
+ await expect(node.locator('.dv-metrics-seal'),'P12 loaded imported node seal').toHaveAttribute('data-seal','proven');
+});
+test('P12 loaded imported detail node gets a sparkline',async({page,server})=>{
+ const {node}=await mountImportedDetail(page,server);
+ await expect(node.locator('polyline.dv-metrics-sparkline'),'P12 loaded imported node sparkline').toHaveCount(1);
+});
+test('P12 loaded imported detail flowing edge gets a stream',async({page,server})=>{
+ const {scope}=await mountImportedDetail(page,server);
+ await expect(stream(scope,0),'P12 loaded imported edge stream').toHaveCount(3);
+});
+test('P12 loaded imported detail silent Done edge gets a ghost',async({page,server})=>{
+ const {scope}=await mountImportedDetail(page,server);
+ await expect(scope.locator('path.dv-metrics-ghost[data-metrics-edge="1"]'),'P12 loaded silent imported edge ghost').toHaveCount(1);
+});
+test('P12 loaded imported detail silent edge stroke is dimmed',async({page,server})=>{
+ const {scope}=await mountImportedDetail(page,server);
+ await expect(scope.locator('path.edge[data-dv-edge="1"]'),'P12 loaded silent imported stroke dimmed').toHaveClass(/dv-metrics-silent/);
+});
+test('P12 loaded unbound imported detail node stays unchanged',async({page,server})=>{
+ const {scope}=await mountImportedDetail(page,server),store=scope.locator('g.node[data-dv-node="shared::store"]');
+ await expect(store.locator(CUES),'P12 loaded unbound imported node has no cue').toHaveCount(0);
+ await expect(store).not.toHaveAttribute('data-metrics-state',/./);
+});
+for(const action of ['off','destroy'])test('P12 '+action+' removes loaded imported detail cues and carrier decoration',async({page,server})=>{
+ const {scope,metrics}=await mountImportedDetail(page,server);
+ // Retain the real section to inspect its contents even after viewer.destroy()
+ // detaches it. Counting only the host would let detachment masquerade as cleanup.
+ const section=await scope.elementHandle(),paintedWhileOn=await scope.locator(CUES).count();
+ if(action==='off')await metrics.click();else await page.evaluate(()=>window.viewer.destroy());
+ const remaining=await section.evaluate((el,selector)=>el.querySelectorAll(selector).length,CUES);
+ expect({paintedWhileOn:paintedWhileOn>0,remaining},'P12 '+action+' removes cues painted on loaded detail').toEqual({paintedWhileOn:true,remaining:0});
+ expect(await section.evaluate(el=>el.querySelectorAll('[data-metrics-verdict],.dv-metrics-bound,.dv-metrics-flowing,.dv-metrics-degraded,.dv-metrics-silent,.dv-metrics-unobserved,.dv-metrics-ghosted').length),'P12 '+action+' removes loaded carrier classes and verdicts').toBe(0);
 });
 
 /* P11: the built example's #live=demo player feeds the Metrics cues day by day (#944 PR 2 timeline). */

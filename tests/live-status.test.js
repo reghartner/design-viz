@@ -2672,3 +2672,13 @@ test('OT16 First blocker cannot reach a ticket that has no status on the day, an
  api.overTimeDay(0);h.flush();assert.ok(edge.classList.contains('dv-live-missing'),'the step edge wears the Missing paint');
  assert.equal(api.snapshot().firstBlocker,false);assert.equal(first().textContent,'No blockers');assert.equal(first().disabled,true);assert.equal(api.snapshot().epic.blocked,0);
 });
+
+test('Proof is cleared from retained panels on telemetry and live-status controller destruction',()=>{
+ for(const owner of ['telemetry','liveStatus']){
+  const h=harness(fixture()),api=h.ctl.liveStatus;h.ctl.page.sections[0].diagram.nodes.a.telemetry={kind:'service',signals:{rate:{grafana:'explicit',unit:'req/h'}},proof:{rate:{min:1}}};
+  api.apply(fixed);api.note('Keep Jira print evidence');const mounted=mountStatus(h);
+  h.ctl.telemetry.apply({a:{signals:{rate:{value:5}}}});assert.ok(mounted.body.querySelector('.dv-live-proof'));
+  h.ctl[owner].destroy();assert.ok(!mounted.body.querySelector('.dv-live-proof'),owner+' removes Proof from retained DOM');assert.ok(!mounted.body.querySelector('.dv-live-proof-table'));
+  assert.equal(mounted.body.querySelector('.dv-live-note').textContent,'Keep Jira print evidence');api.destroy();
+ }
+});

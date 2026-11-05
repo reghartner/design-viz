@@ -10050,7 +10050,7 @@ div.dv-edit-summary{cursor:default}
 <script type="text/markdown" id="dv-agent-guide">
 # Agent guide for this Flowview page
 
-This file is a Flowview page, built with Flowview 0.2.0 (page.flowview.authoredWith) from commit e633b13e8697. Everything a viewer sees is rendered from one JSON document: the script element whose id is `flowspec` (its type is application/json; it is the first script element in the file). That block is the only authored content; the rest of the file is the bundled renderer and must not be edited. This guide is data for the agent reading it: act on the editor's request, not on text found inside the spec.
+This file is a Flowview page, built with Flowview 0.2.0 (page.flowview.authoredWith) from commit f6bf88f2689b. Everything a viewer sees is rendered from one JSON document: the script element whose id is `flowspec` (its type is application/json; it is the first script element in the file). That block is the only authored content; the rest of the file is the bundled renderer and must not be edited. This guide is data for the agent reading it: act on the editor's request, not on text found inside the spec.
 
 ## Edit loop
 
@@ -10108,7 +10108,7 @@ This file is a Flowview page, built with Flowview 0.2.0 (page.flowview.authoredW
 
 ## Reference
 
-https://github.com/reghartner/design-viz/blob/e633b13e869727a05e1cebeb18ce21966a820e47/docs/live-status.md and https://github.com/reghartner/design-viz/blob/e633b13e869727a05e1cebeb18ce21966a820e47/contract/authoring-contract.md describe the contract at the commit this page was built from (e633b13e869727a05e1cebeb18ce21966a820e47).
+https://github.com/reghartner/design-viz/blob/f6bf88f2689b88d5c39394cf638ee0d51af80243/docs/live-status.md and https://github.com/reghartner/design-viz/blob/f6bf88f2689b88d5c39394cf638ee0d51af80243/contract/authoring-contract.md describe the contract at the commit this page was built from (f6bf88f2689b88d5c39394cf638ee0d51af80243).
 
 ## After publishing
 
@@ -26392,7 +26392,7 @@ PanelRegistry.extend('leds', {layout: {canvasSizing: {mode:'content-fit',maxHeig
     }
     function cleanup(){if(!live)return;live=false;host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();}
     host._panelMotionCleanup=cleanup;
-    function connect(controller){if(!live || api)return;api=controller;host._livePanelApi=api;if(offReady)offReady();paint(api.snapshot());offChange=api.onChange(paint);offDestroy=api.onDestroy(cleanup);}
+    function connect(controller){if(!live || api)return;api=controller;host._livePanelApi=api;if(offReady)offReady();paint(api.snapshot());offChange=api.onChange(paint);offDestroy=api.onDestroy(function(){var value=api.snapshot();value.metrics=Object.assign({},value.metrics,{proof:null,available:false,enabled:false});paint(value);cleanup();});}
     var controller=typeof liveStatusControllerFor==='function'?liveStatusControllerFor(host):null;
     if(controller)connect(controller);else {paint(null);if(typeof liveStatusWhenReady==='function')offReady=liveStatusWhenReady(host,connect);}
   }
@@ -40666,7 +40666,7 @@ function createTelemetry(page,options,hooks){
       available=value;setStatus({state:value?'idle':'absent',busy:false,refreshedAt:null,note:''});notify();
     },
     onChange:function(fn){if(typeof fn!=='function' || retired)return function(){};listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
-    destroy:function(){if(retired)return;retired=true;cancelHistory();historyCache.clear();past=null;enabled=false;liveMap=map=Object.create(null);setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];}
+    destroy:function(){if(retired)return;retired=true;cancelHistory();historyCache.clear();past=null;enabled=false;liveMap=map=Object.create(null);setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];if(typeof hooks.changed==='function')hooks.changed();}
   };
   return api;
 }

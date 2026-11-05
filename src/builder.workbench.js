@@ -781,6 +781,7 @@ function initWorkbenchBuilder(opts){
 
   interactions=createBuilderInteractions({document:document,window:window,view:view,src:src,session:session,
     inspector:inspector,guide:guide,targetLabel:targetLabel,addModeExit:addModeExit,
+    renameView:function(section,id,value){return sectionLayoutEditor && sectionLayoutEditor.renameView(section,id,value);},
     apply:applyPlan,selectRange:selectRange,ctl:opts.ctl,workspace:opts.workspace,isActive:opts.isActive,renderedText:opts.renderedText,
     openAdd:function(at){return addMenu && addMenu.openInline(at);},
     selectionChanged:function(){refreshClipboardActions();},

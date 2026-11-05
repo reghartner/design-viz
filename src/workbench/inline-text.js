@@ -70,6 +70,8 @@ function createInlineTextEditor(opts){
       // The desktop app bar also shows an untitled fallback. Only authored text edits.
       accept:function(value){return !!value.title;},
       plan:function(c,value){return planDocumentSetting(c.snapshot.text,c.snapshot.raw,'title',value);}},
+    {kind:'view',selector:'.reader-top-view[data-tab-view],.tab-view-choices button[data-tab-view]',target:function(el){return opts.viewTarget(el);},source:viewSource,
+      value:'trimmed',html:true,label:'View name',help:'Enter or click outside saves. Escape cancels.'},
     {kind:'path',selector:'button.path-chip[data-dv-path] > span.path-chip-label,button.path-chip[data-dv-path] > span.path-timeline-label',
       target:pathTarget,source:pathSource,value:'trimmed',html:true,pathHost:true,label:'Path label',help:'Enter or click outside saves. Escape cancels.'},
     {kind:'contract',selector:'.cttitle > span',field:'title',value:'trimmed',html:true,label:'Contract title',help:'Enter or click outside saves. Escape cancels.'},
@@ -138,6 +140,13 @@ function createInlineTextEditor(opts){
     host.setAttribute('x','4');host.setAttribute('y',String(b.y+b.height/2-height/2));
     host.setAttribute('width',String(Math.max(40,width-8)));host.setAttribute('height',String(height));
     return host;
+  }
+  function viewSource(s,t){
+    var got=builderTabViewOwner(s.raw,t.section),definition=got && tabViewDefinitions(got.owner).find(function(v){return v.id===t.viewId && v.members[0].record.number===t.section+1;});
+    if(!definition)return null;
+    return {text:definition.name,contextKey:topologyKey(),plan:function(value){
+      var plan=planTabViewEdit(s.text,s.raw,t.section,t.viewId,'name',value,opts.session.validate);if(!plan.error)plan.inlineValue=value;return plan;
+    }};
   }
   function pathTarget(el){
     var button=el.closest('button.path-chip[data-dv-path]'),section=el.closest('.doc-sec[data-dv-section]');
@@ -322,13 +331,13 @@ function createInlineTextEditor(opts){
         input.setSelectionRange(edit.start+edit.text.length,edit.start+edit.text.length);}
     }
   },true);
-  life.listen(document,'pointerdown',function(e){if(active && !inside(e.target) && finish(true,false,opts.targetFromEvent(e))===false){e.preventDefault();e.stopImmediatePropagation();}},true);
+  life.listen(document,'pointerdown',function(e){if(active && active.c.target.kind==='view' && e.target.closest('[data-tab-view]') && !inside(e.target)){clear();return;}if(active && !inside(e.target) && finish(true,false,opts.targetFromEvent(e))===false){e.preventDefault();e.stopImmediatePropagation();}},true);
   life.listen(document,'focusin',function(e){if(active && !inside(e.target))finish(true,false,opts.targetFromEvent(e));});
   function doubleClick(e){
     if(e.target.closest('.dv-inline-editor,a,input,select,textarea,summary,[contenteditable],.nlink'))return;
     // Only the tab label and explicit panel title grip are editable buttons.
     var button=e.target.closest('button,[role="button"]');
-    if(button && !button.matches('.tabbtn,.path-chip[data-dv-path]:not(:disabled),.explore-window[data-explore-panel] > .explore-window-header > .explore-window-grip'))return;
+    if(button && !button.matches('.tabbtn,.path-chip[data-dv-path]:not(:disabled),.reader-top-view[data-tab-view],.tab-view-choices button[data-tab-view],.explore-window[data-explore-panel] > .explore-window-header > .explore-window-grip'))return;
     var el=e.target.closest(openSelector);if(el){e.preventDefault();e.stopPropagation();open(el);}
   }
   // Clearing an editing preview can rebuild the chips during the first click.
@@ -349,11 +358,29 @@ function createInlineTextEditor(opts){
       var label=button && button.querySelector('.path-chip-label,.path-timeline-label');if(label)open(label);
     },0);
   },true);
+  var viewPress=null,viewReplacement=null;
+  life.listen(view,'pointerdown',function(e){
+    if(e.button!==0 || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey){viewPress=viewReplacement=null;return;}
+    var button=e.target.closest && e.target.closest('.reader-top-view[data-tab-view],.tab-view-choices button[data-tab-view]');
+    var nav=button && button.closest('.explore-navigation'),id=button && button.getAttribute('data-tab-view'),surface=button && (button.matches('.reader-top-view')?'top':'chapter'),now=Date.now();
+    viewReplacement=button && viewPress && !viewPress.button.isConnected && viewPress.nav===nav && viewPress.id===id && viewPress.surface===surface && now-viewPress.time<500 && Math.abs(viewPress.x-e.clientX)<5 && Math.abs(viewPress.y-e.clientY)<5?{nav:nav,id:id,surface:surface}:null;
+    viewPress=button?{button:button,nav:nav,id:id,surface:surface,time:now,x:e.clientX,y:e.clientY}:null;
+  },true);
+  life.listen(view,'click',function(e){
+    var saved=viewReplacement;viewReplacement=null;if(!saved)return;viewPress=null;
+    var clicked=e.target.closest && e.target.closest('.reader-top-view[data-tab-view],.tab-view-choices button[data-tab-view]');
+    if(!clicked || clicked.closest('.explore-navigation')!==saved.nav || clicked.getAttribute('data-tab-view')!==saved.id || (clicked.matches('.reader-top-view')?'top':'chapter')!==saved.surface)return;
+    life.delay(function(){var selector=saved.surface==='top'?'.reader-top-view[data-tab-view]':'.tab-view-choices button[data-tab-view]';
+      var button=Array.from(saved.nav.querySelectorAll(selector)).find(function(el){return el.getAttribute('data-tab-view')===saved.id;});if(button)open(button);
+    },0);
+  },true);
+  life.listen(view,'contextmenu',function(){viewPress=viewReplacement=null;},true);
+  life.listen(view,'pointercancel',function(){viewPress=viewReplacement=null;},true);
   life.listen(view,'dblclick',doubleClick,true);
   // Current desktop chrome displays the document title outside the preview.
   // This one explicit surface shares the same active guard and editor lifetime.
   if(opts.documentTitle)life.listen(opts.documentTitle,'dblclick',doubleClick,true);
   life.listen(view,'keydown',function(e){if(e.target.matches(keySelector) && e.key==='Enter' && !e.isComposing){e.preventDefault();e.stopImmediatePropagation();open(e.target);}},true);
-  life.listen(opts.src,'input',clear);life.listen(view,'dv:pathchange',clear);
+  life.listen(opts.src,'input',clear);life.listen(view,'dv:pathchange',clear);life.listen(view,'tab-view-change',clear);
   return {open:open,clear:clear,decorate:decorate,refresh:function(){if(active && !fresh(active.c))clear();decorate();},destroy:function(){clear();life.destroy();}};
 }

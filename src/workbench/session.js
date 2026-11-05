@@ -56,8 +56,10 @@ function createBuilderSession(options){
       var captured=entry.capture?entry.capture():entry.after;
       var restored=entry.restore(entry.before,message);if(restored===false)return false;
       if(restored==='expired'){from.pop();historyVersion++;historyChanged();return historyStep(from,to,message);}
-      from.pop();to.push({kind:entry.kind,capture:entry.capture,restore:entry.restore,before:captured,after:entry.before});
-      historyVersion++;historyChanged();return true;
+      from.pop();to.push({kind:entry.kind,capture:entry.capture,restore:entry.restore,before:captured,after:entry.before,notifyHistory:entry.notifyHistory});
+      historyVersion++;historyChanged();
+      if(entry.notifyHistory && options.afterHistory)options.afterHistory(message);
+      return true;
     }
     historyVersion++;
     to.push(text());options.source.write(from.pop());historyChanged();target=null;
@@ -200,11 +202,9 @@ function createBuilderSession(options){
       if(outcome && outcome.restorePanelMenu)outcome.restorePanelMenu();
       return true;
     },
-    restoreHistoryText:function(value,message){
+    restoreHistoryText:function(value){
       if(disposed)return false;
-      options.source.write(value);target=null;var outcome=render('history',{});
-      if(message && options.afterHistory)options.afterHistory(message,outcome);
-      save();return true;
+      options.source.write(value);target=null;render('history',{});save();return true;
     },
     rememberView:function(change){
       if(disposed || !change || typeof change.restore!=='function' || JSON.stringify(change.before)===JSON.stringify(change.after))return false;

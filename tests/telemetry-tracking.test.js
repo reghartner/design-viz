@@ -52,7 +52,7 @@ const TEMPLATES=()=>({'kafka-topic':{kind:'queue',params:['topic','group'],
 test('T1 T2 page telemetry config parses datasource ids, window, refresh and named templates',()=>{
   const {trackingTelemetry}=api();
   for(const page of [{},{tracking:{}},{tracking:{jira:{site:'https://jira.test'}}},null])
-    assert.deepEqual(plain(trackingTelemetry(page)),{grafana:{},honeycomb:{},window:'24h',refreshMs:null,templates:{}});
+    assert.deepEqual(plain(trackingTelemetry(page)),{enabled:true,grafana:{},honeycomb:{},window:'24h',refreshMs:null,templates:{}});
   const page={tracking:{telemetry:{grafana:{prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'lake'},
     honeycomb:{environment:'prod',dataset:'doorbell-prod'},window:'6h',refreshMs:300000,templates:TEMPLATES()}}};
   const before=JSON.stringify(page),seen=recorder(),parsed=plain(trackingTelemetry(page,seen.fn));

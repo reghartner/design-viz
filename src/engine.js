@@ -1052,6 +1052,9 @@ function boardContentBounds(svg){
 }
 /* Measured control bounds in the board coordinate space. Include transparent
    hit rectangles, but never reserve controls hidden by path/step filtering. */
+function boardBoxesOverlap(a,b,pad){
+  pad=pad || 0;return a.x+a.w+pad>b.x && a.x-pad<b.x+b.w && a.y+a.h+pad>b.y && a.y-pad<b.y+b.h;
+}
 function boardControlBox(el,svg){
   if(!el || typeof el.getCTM!=='function' || typeof svg.getCTM!=='function')return null;
   var style=el.ownerDocument.defaultView.getComputedStyle(el);
@@ -1474,7 +1477,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   svg._layoutStatusCoins=function(){
     var broken=Array.from(svg.querySelectorAll('.dv-live-comm-failure .comm-break')).some(function(el){return !!boardControlBox(el,svg);});
     var reserved=[];
-    if(broken)svg.querySelectorAll('.comm-break,text.lbl,.dvdelta,.node-review-badge,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff]').forEach(function(el){
+    if(broken || svg.querySelector('.dv-metrics-card'))svg.querySelectorAll('.dv-metrics-card-box,.comm-break,text.lbl,.dvdelta,.node-review-badge,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff]').forEach(function(el){
       if(el.closest('.coin'))return;
       var box=boardControlBox(el,svg);if(box)reserved.push({x:box.x-4,y:box.y-4,w:box.w+8,h:box.h+8});
     });
@@ -1486,7 +1489,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     // frame is already intentional. Grow only for the overlay's own controls
     // and coins displaced by a live break, and only if they extend past it.
     var boxes=[],liveBreak=Array.from(svg.querySelectorAll('.dv-live-comm-failure .comm-break')).some(function(el){return !!boardControlBox(el,svg);});
-    svg.querySelectorAll('.dv-jira-cue,.dv-live-comm-failure .comm-break'+(liveBreak?',.coin':'')).forEach(function(el){
+    svg.querySelectorAll('.dv-metrics-card,.dv-metrics-leader,.dv-jira-cue,.dv-live-comm-failure .comm-break'+(liveBreak || svg.querySelector('.dv-metrics-card')?',.coin':'')).forEach(function(el){
       var box=boardControlBox(el,svg);if(box)boxes.push(box);
     });
     if(boxes.length)extendFrame(unionGraphFrame(null,boxes,4));

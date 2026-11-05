@@ -105,12 +105,17 @@ export interface TelemetrySample {
 export interface NativeViewerOptions {
   /** Host-owned telemetry transport behind the Live status panel's Metrics button,
    * which is off by default. The provider runs only while Metrics is on, every
-   * max(refreshMs, 60000) ms, paused while the document is hidden. */
-  telemetry?: {
+   * max(refreshMs, 60000) ms, paused while the document is hidden.
+   * false suppresses telemetry, including demo fallback. Page
+   * tracking.telemetry.enabled:false also wins and preserves bindings. */
+  telemetry?: false | {
     /** report.note(text) attaches a note to this answer (status().note), such as one
      * failed query beside answered ones. A rejection with `state: 'approval'`
      * reports the approval state instead of an error. */
     provider?: (bindings: TelemetryBinding[], signal: AbortSignal, report: {note: (text: string) => void}) => Promise<Record<string, TelemetrySample>>;
+    /** Starts unavailable when false. The controller setAvailable(boolean) updates
+     * capability availability without enabling Metrics; page/host disable always wins. */
+    available?: boolean;
     refreshMs?: number;
     /** Connector name for the Metrics text: "<source> connected · <window> window · refreshed <time>". */
     source?: string;

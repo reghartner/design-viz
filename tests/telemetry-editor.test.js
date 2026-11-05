@@ -306,7 +306,7 @@ test('M10 M12 Document settings edit the page telemetry block, validate window a
   for(const bad of [Infinity,NaN,'300000'])assert.match(api(ui.e.C).telemetryEditPage({},{op:'refreshMs',value:bad}).error || '',/60000/,'refresh refuses '+String(bad));
   oneStep(ui,()=>ui.set('Metrics window','6h'),DOC);oneStep(ui,()=>ui.set('Metrics refresh ms','300000'),DOC);
   assert.deepEqual(tracking().telemetry,{grafana:{prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'lake'},honeycomb:{environment:'prod',dataset:'doorbell-prod'},window:'6h',refreshMs:300000});
-  assert.deepEqual(plain(ui.e.C.trackingTelemetry(ui.raw.page)),{grafana:{prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'lake'},honeycomb:{environment:'prod',dataset:'doorbell-prod'},window:'6h',refreshMs:300000,templates:{}});
+  assert.deepEqual(plain(ui.e.C.trackingTelemetry(ui.raw.page)),{enabled:true,grafana:{prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'lake'},honeycomb:{environment:'prod',dataset:'doorbell-prod'},window:'6h',refreshMs:300000,templates:{}});
   for(const label of ['Grafana Prometheus UID','Grafana Loki UID','Grafana Tempo UID','Grafana SQL UID','Honeycomb environment','Honeycomb dataset','Metrics window','Metrics refresh ms'])oneStep(ui,()=>ui.set(label,''),DOC);
   assert.deepEqual(tracking(),{jira},'an empty block removes tracking.telemetry');
   // Page warnings: an authored invalid value is listed until fixed.

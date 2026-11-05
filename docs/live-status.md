@@ -270,6 +270,14 @@ Shared settings live on the page beside the Jira settings, in
 }
 ```
 
+`enabled` is an optional boolean, default `true`. Set
+`tracking.telemetry.enabled: false` on the consuming page to disable telemetry
+throughout its local, imported (including nested), and loaded-detail carriers.
+Bindings, templates and placement remain authored and editable. The disabled page
+has no Metrics controls, telemetry discovery, queries, timers, cards or cues.
+Malformed values warn and use the backward-compatible `true` default. This flag
+permits availability; it never turns Metrics on. Jira Live remains independent.
+
 `grafana` holds datasource UIDs for `prometheus`, `loki`, `tempo` and `sql`.
 `honeycomb` holds `environment` and `dataset`. `window` is the observation
 window, a duration such as `30m`, `1h` or `7d`; the default is `24h`, the previous
@@ -811,6 +819,29 @@ Standalone hosts set `window.flowviewLiveStatus` before boot. Native hosts pass
 external detail pages join reference collection once loaded; local detail-only
 sections are included from the start.
 
+### Edge metric cards
+
+While Metrics is available and on, each visible explicitly bound edge gets one
+rounded card with a verdict border and left bar, connected to the measured route
+midpoint. Silent cards use a dashed border. The label, primary rate headline and
+sparkline, and errors/p95 (calls) or lag/age (queues) use the authored signals.
+An explicit queue template `topic` parameter joins the label when present; names
+never create queries or bindings. Missing signals say “not bound”; missing samples
+say “unobserved”. The note names the current observation window (default `24h`),
+not an invented duration of silence. Cards grow beyond the compact minimum to fit
+current fonts and text; the default is 138 × 78 SVG units for five readable lines.
+
+`telemetry.card.side` selects `right`, `left`, `above` or `below`; `offset` moves
+along that side in SVG units. Defaults are right of a vertical route and below a
+horizontal route. Placement shares board control measurements and collision tests;
+card rectangles reserve space in the coin packer even without a live break. Jira
+cues repack around cards and coins, and the frame includes cards and displaced
+controls. Local, direct imported, nested imported and loaded-detail edges follow
+the same rules. Click, Enter or Space opens the existing carrier popover. Metrics
+off or destroy removes cards and restores original label visibility. Desktop
+Workbench preview can reuse `telemetryCardContent`, `telemetryCardPlace` and
+`telemetryPaintCards` with synthetic samples; it need not create a provider.
+
 ### Telemetry provider
 
 A host can supply telemetry transport beside `liveStatus`. It drives the panel's
@@ -883,8 +914,16 @@ A host telemetry provider wins over it. `apply` while Metrics is on reports the
 connector as answered.
 
 `ctl.telemetry` exposes `bindings()`, `apply(map)`, `clear()`, `snapshot()`,
-`verdicts()`, `enabled()`, `setEnabled(bool)`, `status()` and `onChange(fn)`.
+`verdicts()`, `enabled()`, `setEnabled(bool)`, `setAvailable(bool)`, `status()` and `onChange(fn)`.
 `snapshot()` returns a copy, `{available, enabled, map, status, verdicts}`.
+Availability is shared by the panel, cards and canvas cues. Native providers and
+demo sources start available unless explicitly disabled. A provider can start
+with `available: false` and publish capability changes with `setAvailable(bool)`.
+Removing availability turns Metrics off, aborts work, stops refresh and clears
+samples and cues; restoring availability leaves Metrics off. A page disable or
+host `telemetry: false` always wins over `setAvailable(true)`. Standalone hosts can
+set `window.flowviewTelemetry = false` to suppress host/demo/automatic fallback.
+Neither explicit false value erases the spec's bindings.
 `verdicts()` runs the [proof engine](#proof-verdicts) over every carrier of the page
 walk, bound or not, with the runtime Jira map and the telemetry map. It returns
 `{carriers, rollups, steps}`, with step rollups for authored step ids over their
@@ -1171,16 +1210,20 @@ The adapter never matches the connector by name. From the listed connectors it
 takes any that offers all five tools above, preferring one named **Grafana**, then
 the first qualifying one; a connector missing one of them, such as
 `query_prometheus`, is not used. Jira and GitHub connectors are chosen as before.
-Without a qualifying connector the Metrics text reads "Add a Grafana connector in
-claude.ai Settings → Connectors to see live metrics."
+Metrics stays hidden during discovery and when tools are missing, incomplete,
+unavailable or removed. Discovery uses only `claude.use('mcp')` and `listTools()`;
+it never calls a connector tool or requests authorization. The root page disable
+and explicit host false suppress even this telemetry metadata discovery. Discovery
+belongs to the current render; retirement drops late answers. Each refresh also
+checks the offered tools, so removal clears stale samples and hides Metrics.
 
-Nothing is called while Metrics is off. Turning Metrics on runs the first refresh,
+No data tool is called while Metrics is off. Turning Metrics on runs the first refresh,
 and claude.ai asks the viewer to allow the connector while that first call waits.
 If approval is still needed, the Metrics text reads "Grafana needs approval" and the
 panel shows **Allow Grafana**, which makes the same call once and restarts Metrics.
 Until then no further call is made. An authorization answer (reconnect, not
-allowed, not connected) also clears the map and stops calls until Metrics is
-turned on again. Refreshes follow the [telemetry provider](#telemetry-provider)
+allowed) also clears the map and stops calls until Metrics is
+turned on again. Missing or removed capabilities hide Metrics entirely. Refreshes follow the [telemetry provider](#telemetry-provider)
 loop: at most once a minute (the page's `refreshMs` when longer), paused while the
 document is hidden, aborted when Metrics turns off. The connector line reads
 "Grafana connected · 24h window · refreshed 10:42:13". Each refresh makes these

@@ -189,8 +189,8 @@ function boot(raw, sourceText, sourceFallback){
      Without one, a claude.ai artifact whose carriers bind grafana, loki or sql
      signals reads them through the viewer's Grafana connector (#943). */
   var telemetryHost = window.flowviewTelemetry;
-  var grafanaTelemetry = !telemetryHost && !(liveOptions && liveOptions.demo) && typeof createTelemetryGrafana === 'function' ? createTelemetryGrafana(page, window) : null;
-  var renderOptions = {layoutTarget:layoutTarget,liveStatus:liveOptions,telemetry:telemetryHost || (grafanaTelemetry ? grafanaTelemetry.options : undefined),handoffHost:window.flowviewHandoffHost,sourceText:sourceText,sourceFallback:sourceFallback || null,boardEditor:editor};
+  var grafanaTelemetry = telemetryHost!==false && !telemetryHost && !(liveOptions && liveOptions.demo) && typeof createTelemetryGrafana === 'function' ? createTelemetryGrafana(page, window) : null;
+  var renderOptions = {layoutTarget:layoutTarget,liveStatus:liveOptions,telemetry:telemetryHost===false?false:telemetryHost || (grafanaTelemetry ? grafanaTelemetry.options : undefined),handoffHost:window.flowviewHandoffHost,sourceText:sourceText,sourceFallback:sourceFallback || null,boardEditor:editor};
   var ctl = renderPage(view, page, bootSkin, backlinkData, renderOptions);
   if (sourceFallback && view.parentNode){
     var banner = sourceFallbackBanner(sourceFallback, page, specFile);
@@ -297,6 +297,10 @@ function boot(raw, sourceText, sourceFallback){
     wired.splice(0).reverse().forEach(function(handle){ try { handle.destroy(); } catch (ex){} });
     ctl.destroy();
     page = next;
+    if(!grafanaTelemetry && telemetryHost!==false && !telemetryHost && !(liveOptions && liveOptions.demo) && typeof createTelemetryGrafana==='function'){
+      grafanaTelemetry=createTelemetryGrafana(page,window);
+      if(grafanaTelemetry)renderOptions.telemetry=grafanaTelemetry.options;
+    }
     ctl = renderPage(view, page, bootSkin, backlinkData, Object.assign({}, renderOptions, {sourceText: text}));
     wireRender(false);
     window.scrollTo(scrollX, scrollY);

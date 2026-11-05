@@ -70,7 +70,7 @@ function telemetryPaintStep(binding,snapshot,jiraMap,jiraOn,api,pin){
   if(passing){var choose=button('Pick passing trace',async function(){choose.disabled=true;try{await api.chooseExemplar(trace.primary,e.selectionToken,passing.traceId);}catch(ex){if(card.isConnected){notice.textContent=ex.message;choose.disabled=false;}}});}
   button('Pin as evidence',function(){notice.textContent=pin(trace.primary,e)?'Pinned in this session’s Activity.':'Already pinned in this session’s Activity.';});
   var services=[];e.spans.forEach(function(s){if(services.indexOf(s.service)<0)services.push(s.service);});
-  if(!services.length)el('p','tr-notice','Trace timeline unavailable.');
+  if(!services.length && e.warnings.indexOf('Trace timeline unavailable.')<0)el('p','tr-notice','Trace timeline unavailable.');
   services.forEach(function(service){var selected=e.spans.find(function(s){return s.service===service;}),body=el('div','dv-trace-timeline');body.innerHTML=tracePanelHTML(trace.panel,{selected:selected.id},[]);});
   trace.never.forEach(function(m){var row=el('div','dv-trace-never');row.setAttribute('data-step-id',m.stepId);el('b','','never · '+m.stepId,row);el('p','','absence here is one observed request, not proof that this never runs',row);});
   if(trace.mapping)trace.mapping.steps.filter(function(m){return m.status==='ambiguous' || m.status==='unmapped' || m.detail;}).forEach(function(m){el('p','tr-notice',m.stepId+': '+(m.detail || m.status)+' · precise timing unavailable.');});

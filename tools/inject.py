@@ -180,7 +180,7 @@ GUIDE_OPEN = '<script type="text/markdown" id="dv-agent-guide">'
 GUIDE_BLOCK = re.compile(r'^<script type="text/markdown" id="dv-agent-guide">\n.*?\n</script>\n?', re.S | re.M)
 GUIDE_LIMIT = 6 * 1024
 COMMENTS_CAPABILITY = {"composer_only": True, "customAnchors": True}
-JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]
+JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]
 # #943: the claude.ai Grafana adapter picks the viewer's connector by these five tools.
 GRAFANA_TOOLS = ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]
 GRAFANA_SOURCES = ("grafana", "loki", "sql")
@@ -347,21 +347,36 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "fallback copy for a page opened without that file; it goes stale as the board is "
             "edited, so never edit it. The rest of the file is the bundled renderer and must not be "
             "edited.")
+        # #974: board edits are only ticket moves and cleared markers, so the agent folds them
+        # in, asks only before overriding one saved after the newest agent entry, and logs its
+        # own change as one agent entry the Edit history panel tags.
         edit_loop = [
             f"1. Read `{SPEC_FILE_NAME}` from this artifact (Artifact tool, read action with "
-            f"`path`), always the current version: the board saves its own edits into this file. "
-            "Each save appends one entry to `page.editHistory` (who, when, which ticket was added "
-            "to or removed from which node or edge); read it to learn what viewers changed, and "
-            "keep it.",
-            "2. Change the JSON. Keep every field you do not understand.",
-            "3. " + validate_step,
-            f"4. Republish to the same URL: the publish call needs the page too, so first read "
+            f"`path`), always the current version: the board saves its own edits into this file "
+            "and appends one `page.editHistory` entry per save (who, when, which ticket was added "
+            "to or removed from which node or edge). Keep every entry. Before changing anything, "
+            "tell the editor, one line each, which board edits were saved after the newest agent "
+            "entry (entries with a `source`). With the public repo and an older local copy of the "
+            "spec, `node tools/board-sync.js pull <copy> <the file you read>` folds them into it.",
+            "2. Change the JSON. Keep every field you do not understand. If the request moves, "
+            "removes or re-adds a ticket that a board edit saved after the newest agent entry "
+            "touched, or deletes its node or edge, ask the editor first and say who changed it and "
+            "when; older board edits need no question.",
+            '3. Append one `page.editHistory` entry for your change: `{"at": "<now, ISO-8601>", '
+            '"by": {"name": "<editor>"}, "source": "agent", "summary": "Added 5 nodes, moved 5 '
+            'tickets", "changes": [<each ticket added or removed, shaped like the board\'s '
+            "entries>]}`; `summary` is one line of at most 200 characters. With the public repo, "
+            "`node tools/board-sync.js log <copy> <the file you read> --by <editor>` writes it.",
+            "4. " + validate_step + " Validate after step 3, so the file you publish is the "
+            "one you checked.",
+            f"5. Republish to the same URL: the publish call needs the page too, so first read "
             "`index.html` from this artifact (read action, `path`) to a local file, then publish "
             f"with `url`, `file_path` = that saved page unchanged, and `files` = "
             f'{{"{SPEC_FILE_NAME}": <the edited file>}}. The page HTML is never regenerated. '
-            "A new URL loses every comment and the artifact's version history; "
-            "`page.editHistory` travels inside the file, so keep it.",
-            "5. Pass the capability declaration below on every publish; it is not recoverable from "
+            "A new URL loses every comment and the artifact's version history. If the publish is "
+            "refused because the artifact changed after your read, start again from step 1 with the "
+            "new file and append your entry once: the new file has none of yours yet.",
+            "6. Pass the capability declaration below on every publish; it is not recoverable from "
             "the files.",
         ]
     else:

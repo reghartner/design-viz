@@ -14,7 +14,7 @@
     "core/proof.js",
     "core/section-layout.js",
     "core/state.js",
-    "core/visibility-evidence.js",
+    "core/visibility-evidence.js", "core/compare.js",
     "core/geometry.js",
     "core/text-box.js",
     "core/details.js",
@@ -39,13 +39,14 @@
     "viewer/path-timeline.js",
     "viewer/follow-active.js",
     "viewer/explore.js",
-    "viewer/explore-canvas.js",
+    "viewer/explore-canvas.js", "viewer/compare-view.js",
     "viewer/contents.js",
     "viewer/tab-views.js",
     "viewer/workspace-handoff.js",
     "viewer/deltas.js",
     "viewer/step-coins.js",
     "viewer/status-colors.js",
+    "viewer/history.js",
     "viewer/live-status.js",
     "viewer/telemetry.js",
     "viewer/telemetry-cards.js",
@@ -340,7 +341,7 @@
     ],
     "sharedStyles": {
       "core": [
-        "viewer/explore.css",
+        "viewer/explore.css", "viewer/compare-view.css",
         "viewer/human-guide.css",
         "icons/library.css",
         "icons/brand.css"

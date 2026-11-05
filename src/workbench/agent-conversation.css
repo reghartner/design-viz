@@ -72,7 +72,7 @@
 .agent-update-dialog textarea{box-sizing:border-box;width:100%;background:var(--bg);color:var(--ink);padding:12px;border:1px solid var(--line);font:12px/1.5 'IBM Plex Mono',monospace;}
 /* Contain the reader's fixed canvas, navigation and detail overlays inside the
    review surface, leaving the pinned comparison and decision bar outside. */
-#agent-update-scroll{flex:1;min-height:0;overflow:auto;background:var(--bg);padding:8px 12px;contain:layout paint;}
+#agent-update-compare{flex:1;min-height:0;background:var(--bg);}
 #agent-update-scroll.viewer-exploring{overflow:hidden;}
 #agent-update-note[hidden],#agent-update-issues[hidden],.agent-update-details[hidden]{display:none;}
 .agent-update-notice{display:flex;align-items:center;justify-content:center;gap:12px;margin:0;padding:7px 12px;border-bottom:1px solid #d69a2f;background:#fff3cf;color:#593a08;font-size:13px;line-height:1.35;flex:none;z-index:3;}

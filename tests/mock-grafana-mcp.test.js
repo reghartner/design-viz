@@ -284,10 +284,11 @@ test('G7: the push edge is silent on Day 12 although both of its tickets are Don
   for (const key of specTickets('notify->app')) assert.equal(day12[key].state, 'done', key);
   for (const logql of [L.pushSent, L.pushFailed]) {
     const result = payload(await call('query_loki_logs', { datasourceUid: LOKI, logql, startRfc3339: 'now-24h', endRfc3339: 'now', stepSeconds: 3600 }));
-    assert.deepEqual(result.data, [], logql);
-    assert.equal(typeof result.hints.summary, 'string');
+    assert.ok(result.data.length, logql+' returns explicit measured zero');
+    assert.ok(result.data.every(series=>series.values.every(point=>Number(point.value)===0)),logql);
+    assert.equal(result.hints,undefined,'measured zero is data, not an empty-result hint');
   }
-  assert.deepEqual((await prom(Q.pushP95, ctx(DAY12), { queryType: 'range', startTime: 'now-24h', stepSeconds: 3600 })).data, []);
+  assert.ok((await prom(Q.pushP95, ctx(DAY12), { queryType: 'range', startTime: 'now-24h', stepSeconds: 3600 })).data.every(series=>series.values.every(point=>Number(point[1])===0)));
   // The notification service itself is busy: it consumes events but never pushes.
   const consumed = payload(await call('query_loki_logs', { datasourceUid: LOKI, logql: L.consumed, queryType: 'instant', endRfc3339: 'now' }));
   assert.ok(consumed.data[0].value >= 10);

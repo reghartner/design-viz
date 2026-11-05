@@ -355,11 +355,13 @@ test('practice object copy stays local and step lessons follow the user’s sele
   await expect(frame.getByLabel('Step ID',{exact:true})).toHaveValue('notify');
 });
 
-test('Next commits the practice proposal even after comparing Current state',async({page,server})=>{
+test('Next commits the practice proposal shown side by side with the current state',async({page,server})=>{
   const frame=await start(page,server);
   for(let i=0;i<5;i++)await next(frame);
-  await frame.locator('#agent-update-current').click();
-  await expect(frame.locator('#agent-update-commit')).toBeDisabled();
+  await expect(frame.locator('#agent-update-current')).toHaveCount(0);
+  await expect(frame.locator('#agent-update-compare .compare-pane[data-side="before"]')).toBeVisible();
+  await expect(frame.locator('#agent-update-compare .compare-pane[data-side="after"]')).toBeVisible();
+  await expect(frame.locator('#agent-update-commit')).toBeEnabled();
   await next(frame);await expect(heading(frame)).toHaveText('Accept when the story is right');
   await next(frame);await expect(heading(frame)).toHaveText('You remain in control');
   await expect(frame.locator('#undo-builder')).toBeEnabled();

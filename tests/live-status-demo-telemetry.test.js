@@ -132,7 +132,9 @@ test('D4: the demo story: push silent on Day 12, event degraded past its limit, 
   assert.ok(ratio(day12['mcu->ingest'], 'errors', 'rate') > errorLimit.max, 'event errors above the authored ratio limit on Day 12');
   assert.ok(day12['mcu->ingest'].signals.rate.value >= bound['mcu->ingest'].proof.rate.min, 'the event edge still carries traffic');
   assert.ok(at(DAY9)['button->mcu'].signals.rate.value >= 10, 'press flows on Day 9');
-  assert.ok(at(DAY9)['mcu->ingest'].signals.rate.series.every(([, v]) => v === 0), 'no events before FW-45 is Done');
+  assert.equal(at(DAY9)['mcu->ingest'],undefined,'no observation before FW-45 is Done; never an implicit zero');
+  for(const key of ['BE-68','UX-89'])assert.equal(days[DAY9].issues[key].state,'done','Day 9 push ticket is Done');
+  assert.equal(at(DAY9)['notify->app'].signals.rate.value,0,'Day 9 push has explicit zero traffic');
   const lagLimit = bound['ingest->notify'].proof.lag.max, ageLimit = bound['ingest->notify'].proof.age.max;
   for (const [index, lagging] of [[DAY10, false], [DAY11, true], [DAY12, false]]) {
     const route = at(index)['ingest->notify'].signals;
@@ -150,7 +152,7 @@ test('D5: the demo day controls drive the Jira map and the telemetry map togethe
   const jira = [], telemetry = [];
   let controls = null;
   const api = { refs: () => ({ tickets: ['HW-123', 'HW-124', 'FW-45', 'FW-46', 'UX-89', 'BE-67', 'BE-68'] }), apply: map => jira.push(plain(map)),
-    note() {}, status() {}, setDemoControls: value => { controls = value; }, telemetry: { apply: map => telemetry.push(plain(map)) } };
+    note() {}, status() {}, setHistory() {}, setDemoControls: value => { controls = value; }, telemetry: { apply: map => telemetry.push(plain(map)) } };
   demo.demo.mount(api);
   assert.equal(jira.length, 1);
   assert.equal(telemetry.length, 1, 'mounting paints Day 1 telemetry with Day 1 Jira');

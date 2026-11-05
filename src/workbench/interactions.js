@@ -53,6 +53,7 @@ function createBuilderInteractions(opts){
       }};
       if(!session.accept(plan,hooks))return;
       reactivate(wasShown);
+      if(target.kind==='path'){rehighlight();renderInspector();return;}
       // Resolve the clicked authored identity after publication; its old DOM was retired.
       var nextEl=nextTarget && findTargetEl(nextTarget);
       if(nextEl){selectTarget(Object.assign({},nextTarget,{el:nextEl}),false,true);return;}

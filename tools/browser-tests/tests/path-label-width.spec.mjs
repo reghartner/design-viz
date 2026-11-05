@@ -111,3 +111,35 @@ test('timeline measures wrapped labels after its initially hidden Tab opens',asy
   await chooseNavigation(page.locator('.docview .reader-navigation'),'Tab','Routes');
   await expect(timeline).toBeVisible();await checkLabels(page,true,160);
 });
+
+for(const shared of [false,true])test('desktop '+(shared?'shared timeline':'matrix')+' edits path labels while retaining selection and reordering',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:1000});const spec=story(shared),d=spec.page.sections[0].diagram;
+  d.paths[1].color='#f97316';d.paths[1].basedOn='short';d.paths[2].steps=['s4'];
+  d.layouts[0].steps=['s0','s1','s2','s3',...(shared?['s5']:[])];d.defaultLayout='chapter';
+  await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(spec,null,2);await paste(page,original);await prepareEditorSurface(page);
+  const root=page.locator('#docview'),src=page.locator('#src'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder');
+  const chip=id=>root.locator('.path-chip[data-dv-path="'+id+'"]'),label=id=>chip(id).locator(shared?'.path-timeline-label':'.path-chip-label'),edit=page.getByRole('textbox',{name:'Path label',exact:true});
+  await expect(root.locator(shared?'.path-timeline':'.path-matrix')).toBeVisible();await expect(chip('word')).toBeDisabled();
+  const disabled=await chip('word').boundingBox();await page.mouse.dblclick(disabled.x+disabled.width/2,disabled.y+disabled.height/2);await expect(edit).toHaveCount(0);await expect(src).toHaveValue(original);
+  await label('long').dblclick();await expect(edit).toBeFocused();await expect(edit).toHaveValue(d.paths[1].label);await expect(chip('long')).toHaveAttribute('aria-pressed','true');
+  await edit.fill('Discarded');await edit.press('Escape');await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();
+  await label('long').dblclick();await edit.fill('');await edit.press('Enter');await expect(page.locator('.dv-inline-editor [role=status]')).toHaveText('Give the path a label and a hex color.');await expect(src).toHaveValue(original);await edit.press('Escape');await expect(undo).toBeDisabled();
+  const newLabel='A much longer renamed delivery route that must wrap across lines';await label('long').dblclick();await edit.fill(newLabel);await edit.press('Enter');
+  const saved=await src.inputValue(),want=structuredClone(spec);want.page.sections[0].diagram.paths[1].label=newLabel;expect(JSON.parse(saved)).toEqual(want);await expect(label('long')).toHaveText(newLabel);await expect(chip('long')).toHaveAttribute('aria-pressed','true');
+  await expect.poll(()=>label('long').evaluate(el=>el.offsetHeight/parseFloat(getComputedStyle(el).lineHeight))).toBeGreaterThan(1);
+  await undo.click();await expect(src).toHaveValue(original);await expect(chip('long')).toHaveAttribute('aria-pressed','true');await expect(undo).toBeDisabled();await redo.click();await expect(src).toHaveValue(saved);await expect(chip('long')).toHaveAttribute('aria-pressed','true');
+  await label('long').dblclick();await edit.fill('Click away label');await page.locator('#workbench-editor-title').click();const outside=structuredClone(want);outside.page.sections[0].diagram.paths[1].label='Click away label';expect(JSON.parse(await src.inputValue())).toEqual(outside);await expect(chip('long')).toHaveAttribute('aria-pressed','true');await undo.click();await expect(src).toHaveValue(saved);
+  // Both pointer and keyboard reorder remain separate undoable gestures.
+  const a=await chip('short').boundingBox(),b=await chip('long').boundingBox();await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2,b.y+b.height-2,{steps:8});await page.mouse.up();
+  await expect.poll(async()=>JSON.parse(await src.inputValue()).page.sections[0].diagram.paths.map(p=>p.id)).toEqual(['long','short','word']);await undo.click();await expect(src).toHaveValue(saved);
+  await chip('long').focus();await chip('long').press('Alt+ArrowUp');await expect.poll(async()=>JSON.parse(await src.inputValue()).page.sections[0].diagram.paths.map(p=>p.id)).toEqual(['long','short','word']);await undo.click();await expect(src).toHaveValue(saved);
+  await label('short').dblclick();await edit.fill('New primary');await edit.press('Enter');const noColor=structuredClone(want);noColor.page.sections[0].diagram.paths[0].label='New primary';expect(JSON.parse(await src.inputValue())).toEqual(noColor);await undo.click();await expect(src).toHaveValue(saved);
+  await label('long').dblclick();await edit.fill('Stale draft');await src.evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await expect(edit).toHaveCount(0);await expect(src).toHaveValue(saved+' ');
+});
+
+test('context clicks on paths never leave a pending inline rename',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:1000});const spec=story(false),original=JSON.stringify(spec,null,2);
+ await page.goto(server.origin+'/workbench.html');await paste(page,original);await prepareEditorSurface(page);
+ const label=page.locator('#docview .path-chip[data-dv-path="long"] .path-chip-label');await label.click();await label.click({button:'right'});await page.locator('#workbench-editor-title').click();
+ await expect(page.locator('.dv-inline-editor').getByRole('textbox',{name:'Path label',exact:true})).toHaveCount(0);await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
+});

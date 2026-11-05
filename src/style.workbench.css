@@ -1779,6 +1779,7 @@ body:is(.sk-lavender,.sk-lilac).canon-reader-active .workbench-reader-title{bord
 .dv-inline-html-mount{position:relative;}
 .dv-inline-html-editing{visibility:hidden;}
 .dv-inline-html-editor{position:absolute;z-index:2;}
+.path-matrix > .dv-inline-html-editor,.path-timeline > .dv-inline-html-editor{z-index:10;}
 .dv-inline-html-editor .dv-inline-input{height:100%;padding:2px 6px;white-space:nowrap;color:var(--dtext,#202938);}
 /* A connection label editor covers its label, or sits where the label would be drawn. */
 .dv-inline-edge-editor{overflow:visible;}

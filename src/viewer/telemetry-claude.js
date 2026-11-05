@@ -184,11 +184,11 @@ function telemetryGrafanaRun(tasks,limit,halted){
     pump();
   });
 }
-function createTelemetryGrafana(page,win,now){
+function createTelemetryGrafana(page,win,now,bound){
   if(!trackingTelemetry(page || {}).enabled)return null;
   var claude,use;
   try{claude=win && win.claude;use=claude && claude.use;}catch(ex){return null;}
-  if(typeof use!=='function' || !telemetryGrafanaBound(page))return null;
+  if(typeof use!=='function' || !(bound?bound():telemetryGrafanaBound(page)))return null;
   var clock=typeof now==='function'?now:function(){return Date.now();};
   var current=page,ctl=null,namespace=null,server=null,offered=[],retired=false,shown=false,generation=0;
   // blocked: {signal, error} — the Metrics session (one AbortSignal) a refusal stopped.
@@ -221,7 +221,7 @@ function createTelemetryGrafana(page,win,now){
   function syncAction(value){
     var live=ctl && ctl.liveStatus;
     if(!live || typeof live.action!=='function' || (!approval && !shown))return;
-    var label=value && typeof value.actionLabel==='string'?value.actionLabel:typeof live.snapshot==='function'?(live.snapshot() || {}).actionLabel || '':'';
+    var label=typeof live.snapshot==='function'?(live.snapshot() || {}).actionLabel || '':value && typeof value.actionLabel==='string'?value.actionLabel:'';
     // Another connector's action keeps the slot; ours comes back once it is free.
     if(approval){if(!label){shown=true;live.action(TELEMETRY_GRAFANA_ALLOW,allow);}}
     else{shown=false;if(label===TELEMETRY_GRAFANA_ALLOW)live.action('',null);}
@@ -246,6 +246,7 @@ function createTelemetryGrafana(page,win,now){
     if(signal && signal.aborted)return Promise.reject(telemetryGrafanaError('Grafana refresh cancelled'));
     if(kind==='user_changed'){
       retired=true;approval=null;blocked=null;retract(signal);syncAction();
+      if(ctl && ctl.telemetry && typeof ctl.telemetry.accountChanged==='function')ctl.telemetry.accountChanged();
       if(ctl && ctl.telemetry && typeof ctl.telemetry.setAvailable==='function')ctl.telemetry.setAvailable(false);
       return Promise.reject(telemetryGrafanaError('Grafana stopped: the signed-in account changed'));
     }
@@ -413,7 +414,7 @@ function createTelemetryGrafana(page,win,now){
       var offs=[],mine=ctl,epoch=++generation;
       function availability(value){if(epoch===generation && ctl===mine && mine && mine.telemetry && typeof mine.telemetry.setAvailable==='function')mine.telemetry.setAvailable(value);}
       availability(false);
-      if(trackingTelemetry(current || {}).enabled && telemetryGrafanaBound(current) && !retired)connect(true).then(function(){availability(true);},function(){availability(false);});
+      if(trackingTelemetry(current || {}).enabled && (bound?bound():telemetryGrafanaBound(current)) && !retired)connect(true).then(function(){availability(true);},function(error){availability(false);if(epoch===generation && error && error.code==='user_changed' && mine && mine.telemetry && mine.telemetry.accountChanged)mine.telemetry.accountChanged();});
       if(mine && mine.liveStatus && typeof mine.liveStatus.onChange==='function')offs.push(mine.liveStatus.onChange(syncAction));
       // Metrics turned off: the pending approval goes with it; turning it on asks again.
       if(mine && mine.telemetry && typeof mine.telemetry.onChange==='function')offs.push(mine.telemetry.onChange(function(snapshot){

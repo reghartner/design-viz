@@ -47,10 +47,13 @@ request, not the route or service in general.
 Honeycomb's hosted MCP may return formatted text plus metadata and a temporary
 signed `query_result_json` URL. Never copy that signed URL into the spec or a
 public artifact. Use the stable `query_url` as `links.query` when supplied.
-Honeycomb bindings are accepted authoring data, but the shipped claude.ai
-viewer adapter currently runs Grafana/Loki/SQL only; without a host telemetry
-provider a Honeycomb signal remains unobserved. Do not claim live-account
-verification or a shipped Honeycomb adapter without current evidence.
+The claude.ai viewer composes Grafana/Loki/SQL and Honeycomb metrics. Honeycomb
+requires runtime `run_query` input schemas, one scalar calculation per signal
+and no breakdowns or formulas. Use native `calculations`/`filters`; the page
+window controls hosted MCP `query_spec.from` (for example `24h`). Exact values require a permitted,
+bounded raw-result download; CSP/CORS failure remains unobserved. COUNT counts
+spans/events, not automatically requests. Honeycomb history and trace retrieval
+are unsupported. No live-account verification is claimed.
 
 ## 3. Write explicit bindings
 

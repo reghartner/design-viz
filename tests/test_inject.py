@@ -405,7 +405,7 @@ class InjectTests(unittest.TestCase):
     def test_agent_guide_declares_the_grafana_connector_only_for_grafana_run_signals(self):
         # #943: a page whose carriers (or page templates) bind grafana, loki or sql
         # signals declares the Grafana connector beside Jira, with the five tools the
-        # adapter picks it by; tempo-only or honeycomb-only pages do not.
+        # adapter picks it by; Honeycomb has its own run_query declaration.
         grafana_tools = ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]
         jira = {"server": "Atlassian", "tools": ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}
         grafana = {"server": "Grafana", "tools": grafana_tools}
@@ -431,9 +431,9 @@ class InjectTests(unittest.TestCase):
         self.assertEqual(guide_for(page_extra=templated)[0]["mcp"]["servers"], [jira, grafana])
         for other in ({"tempo": "{ }"}, {"honeycomb": {"dataset": "d"}}):
             declaration, guide = guide_for(node_telemetry={"kind": "service", "signals": {"x": other}})
-            self.assertEqual(declaration["mcp"]["servers"], [jira], other)
+            self.assertEqual(declaration["mcp"]["servers"], [jira] + ([{"server": "Honeycomb", "tools": ["run_query"]}] if "honeycomb" in other else []), other)
             self.assertNotIn("get_annotations", guide)
-            for needle in ("## Metrics rules", "never derive a query", "imported/nested", "no shipped claude.ai adapter"):
+            for needle in ("## Metrics rules", "never derive a query", "imported/nested", "Honeycomb uses run_query"):
                 self.assertIn(needle, guide)
         # Page settings alone make the conditional guide relevant without
         # granting a connector permission; a root disable keeps authored
@@ -511,6 +511,15 @@ class InjectTests(unittest.TestCase):
         signal = {"kind": "service", "signals": {"rate": {"grafana": "sum(rate(http_requests_total[5m]))"}}}
         # an imported node whose provider binding runs a grafana signal, no local telemetry
         self.assertEqual(declaration(consumer(), provider(api=signal)), {"mcp": {"servers": [grafana]}, "comments": comments})
+        # Honeycomb uses the same selected-import walk and declares only its
+        # shipped metrics tool, not deferred trace/history tools.
+        honeycomb = {"server": "Honeycomb", "tools": ["run_query"]}
+        honey_signal = {"kind": "service", "signals": {"p95": {"honeycomb": {"calculations": [{"op": "P95", "column": "duration_ms"}]}}}}
+        self.assertEqual(declaration(consumer(), provider(api=honey_signal))["mcp"]["servers"], [honeycomb])
+        self.assertEqual(declaration(consumer(), provider(hidden=honey_signal)), {"comments": comments})
+        disabled_honey = consumer()
+        disabled_honey["page"]["tracking"] = {"telemetry": {"enabled": False}}
+        self.assertEqual(declaration(disabled_honey, provider(api=honey_signal)), {"comments": comments})
         # the provider binding uses a provider template with a loki signal
         templated = provider(api={"use": "svc", "app": "api"}, templates={"svc": {"kind": "service", "params": ["app"], "signals": {"logs": {"loki": 'sum(rate({app="$app"}[5m]))'}}}})
         self.assertEqual(declaration(consumer(), templated)["mcp"]["servers"], [grafana])

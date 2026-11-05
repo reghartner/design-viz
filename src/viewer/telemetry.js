@@ -22,6 +22,8 @@
                {<carrier id>: {
                   signals: {<signal name>: {value: <number>,
                                             series: [[t, v], ...],
+                                            observedAt: <measurement as-of, or null>,
+                                            retrievedAt: <client receipt time>,
                                             unit: <string>}},
                   observedAt: <ISO time or epoch ms>,
                   markers: [{at: <ISO time or epoch ms>, kind: <string>, label: <string>}],
@@ -54,8 +56,11 @@ function telemetryPoint(point){
 /* An explicit measured total, never inferred from a rate, unit or series. The
    observation must cover the entire measured interval. Invalid metadata leaves
    a valid ordinary headline intact, but cannot authorize a since-Done total. */
+function telemetrySignalTime(entry,carrierTime){
+  return telemetryTime(entry && telemetryOwn(entry,'observedAt')?entry.observedAt:carrierTime);
+}
 function telemetryAggregate(entry,observedAt){
-  var aggregate=entry && entry.aggregate,observed=telemetryTime(observedAt);
+  var aggregate=entry && entry.aggregate,observed=telemetrySignalTime(entry,observedAt);
   if(!telemetryObject(aggregate) || aggregate.kind!=='total' || !telemetryNumber(entry.value) || entry.value<0 || entry.value>Number.MAX_SAFE_INTEGER || !observed)return null;
   var from=telemetryTime(aggregate.from),to=telemetryTime(aggregate.to);
   if(!from || !to || Date.parse(from)>=Date.parse(to) || Date.parse(to)>Date.parse(observed))return null;
@@ -71,6 +76,8 @@ function telemetrySample(raw){
     if(telemetryNumber(value.value))entry.value=value.value;
     if(Array.isArray(value.series))entry.series=value.series.filter(telemetryPoint).map(function(point){return [point[0],point[1]];});
     if(telemetryText(value.unit))entry.unit=value.unit;
+    if(telemetryOwn(value,'observedAt'))entry.observedAt=telemetryTime(value.observedAt);
+    if(telemetryOwn(value,'retrievedAt'))entry.retrievedAt=telemetryTime(value.retrievedAt);
     var aggregate=telemetryAggregate(value,out.observedAt);if(aggregate)entry.aggregate=aggregate;
     out.signals[name]=entry;
   });
@@ -478,6 +485,15 @@ function createTelemetry(page,options,hooks){
       var keys=bindingKeys();Object.keys(liveMap).forEach(function(id){if(retiredIds.indexOf(id)>=0 || liveKeys[id]!==keys[id])delete liveMap[id];});
       if(!past)map=liveMap;historyBindingsChanged();notify();
     },
+    // Automatic-provider facade: revoke only the named sources immediately,
+    // including cached history, without erasing a healthy peer on that carrier.
+    retractSources:function(sources){
+      if(retired)return;var owned=Object.create(null);bindings().forEach(function(b){owned[b.id]=Object.keys(b.signals).filter(function(n){return sources.indexOf(b.signals[n].source)>=0;});});
+      function strip(target){Object.keys(target || {}).forEach(function(id){var sample=target[id],changed=false;(owned[id] || []).forEach(function(name){if(telemetryOwn(sample.signals,name)){delete sample.signals[name];changed=true;}});if(changed){sample.links={};sample.markers=[];sample.observedAt=null;}if(!Object.keys(sample.signals).length)delete target[id];});}
+      strip(liveMap);strip(map);if(past)strip(past.map);historyCache.clear();notify();
+    },
+    // Explicit consent retry keeps healthy peer data while renewing the session.
+    retry:function(){if(retired || !enabled || !available)return;if(past)loadHistory();else if(poller){poller.stop();poller.start();}},
     apply:function(value){
       if(retired || !enabled && !preload || !permitted || !available && (provider || demo || options.available===false))return;store(value);
       if(enabled && !past)setStatus({state:'ok',refreshedAt:new Date().toISOString(),note:''});

@@ -102,3 +102,29 @@ test('initial capability discovery keeps host preload, actual capability loss re
  api.setAvailable(false);api.setAvailable(true);api.apply(sample);assert.equal(api.enabled(),false);assert.equal(api.snapshot().map.a.signals.rate.value,12,'initial discovery is not an explicit off');
  api.setAvailable(false);api.setAvailable(true);api.apply(sample);assert.deepEqual(plain(api.snapshot().map),{},'capability recovery after a real removal cannot reopen preload');api.destroy();
 });
+
+
+test('ratio Activity follows both actual measurements, rejecting replay and stale dependencies',()=>{
+ const log=C.liveStatusTelemetryActivity(),carriers=[{id:'a',title:'API',kind:'service',tickets:[],signals:{errors:{source:'honeycomb',query:{calculations:[{op:'COUNT'}]}},rate:{source:'grafana',query:'explicit'},peer:{source:'grafana',query:'other'}},proof:{errors:{maxRatioOf:'rate',max:.05}},links:{}}];
+ function observe(rate,rateAt,errors=1,errorAt=T){
+  const signals={errors:{value:errors,observedAt:iso(errorAt)},rate:{value:rate,observedAt:iso(rateAt)},peer:{value:999,observedAt:iso(T+100*H)}};
+  const map={a:C.telemetrySample({observedAt:iso(T+100*H),retrievedAt:iso(T+200*H),signals})};
+  const verdicts=C.proofVerdicts({carriers,telemetryMap:map,jiraMap:{}});
+  log.observe({carriers,map,verdicts});return verdicts.carriers.a;
+ }
+ const rows=()=>plain(log.snapshot().filter(e=>e.kind==='threshold'));
+ observe(100,T);assert.deepEqual(rows(),[]);
+ assert.deepEqual(plain(observe(10,T+H).failing),['errors']);
+ assert.equal(rows().length,1,'denominator-only failure must produce Activity');assert.equal(rows()[0].at,iso(T+H));assert.match(rows()[0].text,/outside/);
+ observe(10,T+H);observe(100,T);observe(100,T+H);observe(100,T+2*H,99,T-H);
+ assert.equal(rows().length,1,'duplicates, conflicting same-time values and stale numerator cannot cross');
+ observe(100,T+2*H);assert.equal(rows().length,2);assert.equal(rows()[0].at,iso(T+2*H));assert.match(rows()[0].text,/back within/);
+ observe(10,T+H);assert.equal(rows().length,2,'replayed failure cannot recross');
+ observe(null,T+3*H);assert.deepEqual(plain(observe(null,T+4*H).failing),[]);assert.equal(rows().length,2,'missing denominator is not zero');
+ observe(10,T+5*H);assert.equal(rows().length,3);assert.equal(rows()[0].at,iso(T+5*H));
+ // A later unchanged numerator must not date a denominator-only recovery.
+ observe(100,T+6*H,1,T+20*H);assert.equal(rows().length,4);assert.equal(rows()[0].at,iso(T+6*H));
+ // Independent clocks permit numerator progress older than the denominator.
+ observe(100,T+30*H,1,T+20*H);observe(100,T+30*H,10,T+21*H);
+ assert.equal(rows().length,5);assert.equal(rows()[0].at,iso(T+21*H));
+});

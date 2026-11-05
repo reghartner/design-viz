@@ -185,6 +185,7 @@ JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "ge
 # #943: the claude.ai Grafana adapter picks the viewer's connector by these five tools.
 GRAFANA_TOOLS = ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]
 GRAFANA_SOURCES = ("grafana", "loki", "sql")
+HONEYCOMB_TOOLS = ["run_query"]
 
 
 def _telemetry_sources(telemetry: dict) -> set[str]:
@@ -338,9 +339,11 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
     telemetry_config = tracking.get("telemetry") if tracking and isinstance(tracking.get("telemetry"), dict) else {}
     root_disabled = telemetry_config.get("enabled") is False
     grafana = not root_disabled and any(source in GRAFANA_SOURCES for source in sources)
+    honeycomb = not root_disabled and "honeycomb" in sources
 
     servers = ([{"server": "Atlassian", "tools": JIRA_TOOLS}] if tracked else []) + \
-        ([{"server": "Grafana", "tools": GRAFANA_TOOLS}] if grafana else [])
+        ([{"server": "Grafana", "tools": GRAFANA_TOOLS}] if grafana else []) + \
+        ([{"server": "Honeycomb", "tools": HONEYCOMB_TOOLS}] if honeycomb else [])
     capabilities = {"mcp": {"servers": servers}} if servers else {}
     capabilities["comments"] = COMMENTS_CAPABILITY
     if two_file and (tracked or metrics):
@@ -475,18 +478,18 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "",
             "## Metrics rules",
             "",
-            "- `page.tracking.telemetry` holds availability, sources, `window` (default `24h`) and "
-            "templates. Each carrier binding names `kind`, `signals`, `proof` and safe `links`; never "
-            "derive a query from names or ids.",
-            "- Cover every selected local, imported/nested, consumer-overlay and loaded-detail node or "
-            "edge. Inspect current tool schemas, preserve exact queries and source UIDs, run each proposal "
+            "- `page.tracking.telemetry`: availability, sources, `window` (default `24h`), templates. "
+            "Carrier `telemetry`: `kind`, `signals`, `proof`, safe `links`. never derive a query from names/ids.",
+            "- Cover local, imported/nested, consumer-overlay and loaded-detail nodes/edges. "
+            "Inspect tool schemas, preserve exact queries/source UIDs, run each proposal "
             "once, and distinguish returned, empty, zero and failed evidence.",
-            "- Metrics starts off. Root `enabled:false`/host false disables it and grants no query permission; "
-            "missing tools hide it. Preview is synthetic, unsaved and makes no network call.",
-            "- Honeycomb has no shipped claude.ai adapter. Keep stable dashboard/query UI URLs, never "
-            "signed result URLs, and do not claim live verification.",
-            "- Over time uses each day's exact prior-24h endpoint; missing history stays unobserved. See "
-            "docs/live-status.md and the Metrics chapter before editing bindings.",
+            "- Metrics defaults off. Root `enabled:false`/host false grants no query permission; absent tools hide it. "
+            "Preview: synthetic, unsaved, no network.",
+            "- Honeycomb uses run_query; schema-qualified query_spec; one scalar, no breakdowns/formulas. "
+            "Exact values require raw JSON; COUNT means spans/events. No history/traces. Keep UI links, "
+            "never signed URLs; no live-account claim.",
+            "- Over time: exact prior-24h endpoints; missing stays unobserved. Read docs/live-status.md "
+            "and the Metrics chapter before editing.",
         ]
     lines += [
         "",

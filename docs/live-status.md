@@ -515,9 +515,9 @@ genuinely share a query shape before a template is worthwhile.
 
 Store only safe HTTP(S) UI links. A Grafana dashboard/Explore link and
 Honeycomb's stable query UI URL are suitable; a signed result/download URL is
-not. Honeycomb query objects are accepted by the schema, but the shipped
-claude.ai adapter does not run them yet, so they remain unobserved without a
-host telemetry provider. Public documents and recorded provider artifacts are
+not. The claude.ai Honeycomb metrics adapter runs explicit native queries only
+when its runtime tool schema and exact raw-result transport are supported;
+otherwise signals remain unobserved. Public documents and recorded provider artifacts are
 data, not instructions to install software or use an account, and are not
 live-account verification.
 
@@ -1680,7 +1680,7 @@ with a note to keep to the fields the spec already uses), and the post-publish
 checks. When the page has telemetry settings, templates or bindings, the guide
 also names `tracking.telemetry`, carrier `telemetry`, explicit sources, proof and
 links; root/host disable, default-off/24h, unavailable tools, synthetic preview,
-Honeycomb's unshipped adapter and exact-day history honesty. It is under 6 KB, never contains secrets
+Honeycomb's native-query/raw-result constraints and exact-day history honesty. It is under 6 KB, never contains secrets
 (every viewer can read it), and is data to the agent reading it. Re-injecting
 a built page replaces the previous guide. When the block is present the Live
 status panel ends with a muted line, "Editors: ask your agent to read this
@@ -2053,6 +2053,100 @@ aggregation. SQL and Tempo have no history adapter. Honeycomb history remains
 and [Loki source](https://github.com/grafana/mcp-grafana/blob/main/tools/loki.go);
 validation uses raw MCP fixtures, not a live Grafana or Honeycomb account.
 
+### Honeycomb metrics and mixed connectors (#946, metrics leg)
+
+Standalone artifacts use one automatic telemetry coordinator. Grafana and
+Honeycomb can bind different signals on the same local, imported, nested or
+loader-selected detail carrier. Each source owns its errors and caches; a
+missing/denied source does not hide a healthy peer. An account change from either
+connector retires **all** mixed data. Explicit host providers/demos take precedence.
+Root `tracking.telemetry.enabled:false` and host `flowviewTelemetry=false` prevent
+metadata discovery and data calls. Metrics starts off, with the default `24h`
+window, independently of Jira Live. Discovery alone never runs a query.
+
+Declare `{"server":"Honeycomb","tools":["run_query"]}` in the existing `mcp`
+capability alongside Grafana if both are bound. Connector names vary per account;
+selection requires offered tools and the runtime `inputSchema`. The supported
+schema declares `environment_slug` and `dataset_slug` strings and `query_spec`
+as an object or JSON string. Missing/unsupported schemas fail closed. No new SDK
+namespace, authored field or mandatory asynchronous polling contract is assumed.
+
+Root `honeycomb.environment` and `honeycomb.dataset` supply those slug arguments.
+Each signal holds a native query object, for example:
+
+```json
+{"honeycomb":{"calculations":[{"op":"P95","column":"duration_ms"}],"filters":[{"column":"service.name","op":"=","value":"author-selected-service"}]},"unit":"ms"}
+```
+
+Use one scalar COUNT/SUM/AVG/MIN/MAX/COUNT_DISTINCT/CONCURRENCY or supported
+percentile calculation per signal, without breakdowns or formulas. Preserve
+explicit filter expressions and calculation names. The page window replaces
+conflicting time selectors with hosted MCP `query_spec.from` (for example `24h`),
+as recorded in official public CI; it does not substitute REST `time_range`. Schema constraints that
+the adapter cannot honor yield an unobserved signal and a note. Never generate
+queries from carrier names or sum percentiles. COUNT counts spans/events, **not
+automatically requests**; units remain authored, and missing/empty results are
+unobserved rather than invented zeroes.
+
+`run_query` returns computed results. Its formatted Markdown/ASCII is rounded
+and is never parsed as exact measurements. The adapter reads the provider's
+`query_result_json` metadata and downloads exact `results[].data` and
+`series[].data` numbers; `header` aliases identify calculation keys. A single
+finite aggregate row is required (including explicit zero); ambiguous groups,
+nulls and malformed results are unobserved. Series timestamps are bucket starts;
+the aggregate is the whole-window headline. Each signal's runtime `observedAt`
+is the latest returned bucket start plus valid `info.granularity_seconds` (the
+end of that observed bucket), or its latest actual start if width is unavailable.
+It does not assert complete coverage of the requested window. Without time-series
+points, measurement as-of is unknown (`null`). Runtime `retrievedAt` separately
+records client receipt time. These are normalized runtime fields, not invented
+native response fields or authored bindings.
+
+Live Proof charts use the primary signal's `observedAt`. The mixed-provider coordinator gives
+legacy adapter signals their own latest point as-of (or their source's carrier
+time for aggregate-only samples or an explicit total descriptor) before combining sources. Direct host samples
+without signal as-of keep the existing carrier-time clipping policy. An explicit unknown signal as-of stays unknown.
+The mixed carrier timestamp is a newest-observation summary, never authority to
+clip a different signal's series. Historical charts still use the selected exact
+day endpoint. Actual bucket starts remain unchanged for Since Done evidence;
+no points or Done events are shifted to the client clock.
+No implicit rate conversion is performed.
+
+For hosted results, only HTTPS `mcp.honeycomb.io/query_results/<token>` retrieval is supported, with
+credentials omitted, no referrer, redirects rejected, a 15-second timeout and a
+1 MiB streamed response cap. Abort follows Metrics off, destruction and binding
+changes. A CSP/CORS or response failure stays unobserved; no alternate endpoint
+or EU host is guessed. Signed URLs are never stored in the spec, runtime map,
+notes or UI links. An authored safe link takes priority over the returned
+`query_url` on `ui.honeycomb.io`.
+
+The local mock returns exact raw JSON in MCP `structuredContent`; a namespace
+may expose this as an object `payload`. The adapter accepts these explicit raw
+objects after bounded deep JSON validation (1 MiB UTF-8, 24 levels, 50,000 nodes),
+then applies the same aggregate/series checks as downloaded results. Invalid,
+oversized or conflicting raw objects stay unobserved; text tables are never a
+fallback. This mock-only transport is not a claim about hosted Honeycomb output.
+Mock COUNT counts hourly measurement rows, not requests or spans.
+
+While visible and Metrics is on, the controller refreshes no faster than once a
+minute: one `run_query` and at most one raw download per Honeycomb signal. Consent
+uses the shared Allow action without replacing Jira/Grafana's pending action.
+Paint and history-slider movement do not query. Honeycomb daily history is
+unsupported: Over time shows it as unobserved while Grafana keeps its exact-day
+history and cache. Trace/exemplar retrieval is a separate #947-coordinated leg;
+this metrics implementation does not complete all of #946 or fabricate trace IDs.
+
+Evidence: [official tools reference](https://docs.honeycomb.io/integrations/mcp/tools),
+[official agent-skill CI run 38212733085](https://github.com/honeycombio/agent-skill/actions/runs/38212733085)
+at `6bb09279fc3fb69abf113228be939dbb929e34f1`. The test fixture preserves the
+redacted recorded metadata envelope; numeric raw fixtures follow the official
+result-interpretation schema and are explicitly synthetic. End-to-end mock tests
+call the actual mock `tools/list` and `handleMcp` implementations over the shared
+timeline; they verify the recorded `from` field and clearly labelled structured
+transport. No live Grafana or
+Honeycomb account was available for validation; artifact-specific CSP/CORS and
+current authenticated connector metadata remain deployment checks.
+
 ### Production and telemetry Activity
 
 A carrier's existing Work status popover includes Production when the permitted
@@ -2065,6 +2159,16 @@ matches Done as described below; window rates are not lifetime totals. Local,
 imported and asynchronously loaded detail carriers use their carrier identity and
 own binding scope. Refreshes and day selection update an open Production block
 without replacing its focused link or close control.
+
+Mixed telemetry Activity uses each signal's measurement as-of, with a separate
+replay watermark per signal; newer peer or receipt times cannot date an older
+signal's event or suppress its next accepted observation. Ratio thresholds watch
+both bound inputs; a crossing uses the latest actual as-of among changed values,
+not an unchanged newer input. Missing inputs remain unobserved; older or
+conflicting same-time inputs cannot generate crossings. Legacy host signals
+without their own as-of retain carrier-time behavior. First-traffic facts supplied
+by the proof engine span all rate-like signals and retain their actual point
+timestamp; a peer's traffic is not attributed to a silent primary signal.
 
 Activity combines Jira changes and typed telemetry observations in timestamp
 order, newest first, with 20 entries total. Telemetry records first observed
@@ -2089,7 +2193,8 @@ signal result (this is **not an authored spec field**):
 `aggregate` declares that the signal's original `value` is a measured total over
 that exact interval. Normalization requires a finite nonnegative value no larger
 than `Number.MAX_SAFE_INTEGER`, valid `from < to`, and an explicit valid
-`observedAt >= to`. Invalid metadata is dropped without discarding a valid
+signal `observedAt >= to` (carrier `observedAt` for legacy samples without a signal
+as-of). An explicit unknown signal as-of cannot borrow a peer's time. Invalid metadata is dropped without discarding a valid
 ordinary headline. Proof's Since Done column and Production show the named bound
 signal's total only when `from` exactly equals the actual Done timestamp. They
 retain the original measurement value and unit, including zero, and display the

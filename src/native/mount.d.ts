@@ -97,8 +97,11 @@ export interface TelemetryBinding {
 /** One carrier's telemetry for the observation window, keyed by carrier id in the
  * provider result. Every field is optional; malformed entries are dropped. */
 export interface TelemetrySample {
-  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string;
-    /** Explicit measured total over [from, to], covered by observedAt. Runtime evidence only. */
+  /** Signal observedAt is measurement as-of (null means unknown); retrievedAt is
+   * client receipt time. Live charts prefer the selected signal's as-of. Mixed
+   * adapters assign each legacy signal its own endpoint before combining sources. */
+  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string; observedAt?: string | number | null; retrievedAt?: string | number | null;
+    /** Explicit measured total over [from, to], covered by signal as-of (legacy: carrier as-of). Runtime evidence only. */
     aggregate?: {kind: 'total'; from: string | number; to: string | number}}>;
   observedAt?: string | number;
   markers?: Array<{at: string | number; kind?: string; label?: string}>;
@@ -128,8 +131,8 @@ export interface NativeViewerOptions {
      * capability availability without enabling Metrics; page/host disable always wins. */
     available?: boolean;
     refreshMs?: number;
-    /** Connector name for the Metrics text: "<source> connected · <window> window · refreshed <time>". */
-    source?: string;
+    /** Connector name for Metrics text; a getter follows changing per-source availability. */
+    source?: string | (() => string);
     /** A demo source mounted while Metrics is on; it feeds the controller's apply(). */
     demo?: {mount: (telemetry: {apply: (map: Record<string, TelemetrySample>) => void}) => (() => void) | void};
   };

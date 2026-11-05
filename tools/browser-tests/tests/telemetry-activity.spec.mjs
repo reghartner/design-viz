@@ -84,3 +84,29 @@ test('late host callback after Metrics off cannot resurrect Production, Proof or
  await page.evaluate(()=>window.liveReleases.shift()());await expect(root.locator('.dv-live-proof')).toHaveCount(0);await expect(activity(root)).toHaveCount(0);
  await page.evaluate(()=>window.liveReleases.shift()());await open(root,'ingest->app');await expect(production(root)).toContainText('rate: 100 req/h');await expect(activity(root).filter({hasText:'Delivery <script>bad()</script> · First observed traffic after Done'})).toHaveCount(1);
 });
+
+
+test('ratio denominator-only crossings appear in Activity with their own measurement date',async({page,server})=>{
+ const root=await setup(page,server);
+ async function sample(rate,rateAt,errors=1,errorAt=T){
+  await page.evaluate(({rate,rateAt,errors,errorAt,T,H})=>window.viewer.controller.telemetry.apply({'ingest->app':{
+   observedAt:new Date(T+100*H).toISOString(),signals:{
+    errors:{value:errors,observedAt:new Date(errorAt).toISOString()},
+    rate:{value:rate,observedAt:new Date(rateAt).toISOString(),retrievedAt:new Date(T+200*H).toISOString()}
+   }
+  }}),{rate,rateAt,errors,errorAt,T,H});
+ }
+ const rows=root.locator('[data-activity-carrier="ingest->app"][data-activity-kind="threshold"]');
+ await sample(100,T);await expect(rows).toHaveCount(0);
+ await sample(10,T+H);await expect(rows).toHaveCount(1);
+ await expect(rows.first()).toContainText('errors crossed outside its proof threshold');
+ await expect(rows.first()).toHaveAttribute('data-updated-at',new Date(T+H).toISOString());
+ await open(root,'ingest->app');await expect(production(root)).toContainText('errors is 1 req/h');await page.keyboard.press('Escape');
+ await sample(10,T+H);await sample(100,T);await sample(100,T+H);await expect(rows).toHaveCount(1);
+ await sample(null,T+2*H);await expect(rows).toHaveCount(1);
+ await sample(100,T+3*H,1,T+20*H);await expect(rows).toHaveCount(2);
+ await expect(rows.first()).toContainText('errors crossed back within its proof threshold');
+ await expect(rows.first()).toHaveAttribute('data-updated-at',new Date(T+3*H).toISOString());
+ await sample(10,T+H);await expect(rows).toHaveCount(2);
+ expect(await page.evaluate(()=>[window.calls.live.length,window.calls.history.length])).toEqual([0,0]);
+});

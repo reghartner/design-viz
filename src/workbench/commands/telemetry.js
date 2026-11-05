@@ -20,7 +20,7 @@ function telemetryQueryValue(source,text){
   if(typeof text!=='string' || !text.trim())return {error:'A signal needs a query.'};
   if(source!=='honeycomb')return {value:text.trim()};
   var parsed=null;try{parsed=JSON.parse(text);}catch(ex){}
-  if(!telemetryObject(parsed) || !Object.keys(parsed).length)return {error:'A Honeycomb query is a JSON object such as {"calc":"COUNT"}.'};
+  if(!telemetryObject(parsed) || !Object.keys(parsed).length)return {error:'A Honeycomb query is a JSON object such as {"calculations":[{"op":"COUNT"}]}.'};
   return {value:parsed};
 }
 function telemetrySignalName(name,signals,current){
@@ -134,7 +134,7 @@ function telemetryEditBinding(binding,edit,options){
       if(TELEMETRY_SOURCES.indexOf(edit.value)<0)return {error:'Choose a source: Grafana, Loki, Tempo, SQL or Honeycomb.'};
       if(edit.value===source)return {value:b};
       var moved=telemetryQueryValue(edit.value,telemetryQueryText(source,source?entry[source]:null));
-      if(moved.error)return {error:edit.value==='honeycomb'?'A Honeycomb query is a JSON object such as {"calc":"COUNT"}. Enter it as the query first, then choose Honeycomb.':moved.error};
+      if(moved.error)return {error:edit.value==='honeycomb'?'A Honeycomb query is a JSON object such as {"calculations":[{"op":"COUNT"}]}. Enter it as the query first, then choose Honeycomb.':moved.error};
       next[edit.value]=moved.value;
     }else if(edit.field==='query'){
       if(!source)return {error:'Choose a source for this signal first.'};

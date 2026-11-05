@@ -38,8 +38,11 @@ function liveStatusProofPresentation(snapshot,window){
   var rows=snapshot.carriers.filter(function(binding){return snapshot.verdicts.carriers[binding.id].bound;}).map(function(binding){
     var result=snapshot.verdicts.carriers[binding.id],sample=snapshot.map[binding.id],primary=telemetryPrimary(binding),queue=binding.kind==='queue';
     var reading=primary?telemetryReading(sample,primary):{series:[]},times=reading.series.map(function(p){return Date.parse(telemetryTime(p[0]));}).filter(isFinite);
-    var end=Date.parse(snapshot.historical?snapshot.at:sample && sample.observedAt);
-    if(!isFinite(end) && times.length)end=Math.max.apply(null,times);
+    // Each primary signal owns its measurement window. A carrier timestamp may
+    // summarize a newer peer and must not clip this signal's older points.
+    var entry=sample && sample.signals && sample.signals[primary],explicit=entry && telemetryOwn(entry,'observedAt');
+    var end=Date.parse(snapshot.historical?snapshot.at:!entry?null:explicit?entry.observedAt:sample && sample.observedAt);
+    if(!isFinite(end) && !explicit && times.length)end=Math.max.apply(null,times);
     var start=end-windowMs,points=reading.series.map(function(p){return {at:Date.parse(telemetryTime(p[0])),value:p[1]};}).filter(function(p){return isFinite(end) && p.at>=start && p.at<=end;}).sort(function(a,b){return a.at-b.at;});
     var markers=(sample && sample.markers || []).filter(function(m){return m.kind==='done' || m.kind==='deploy';}).map(function(m){return {at:Date.parse(m.at),label:m.label || m.kind,kind:m.kind};});
     if(result.since.doneAt)markers.push({at:Date.parse(result.since.doneAt),label:'Done',kind:'done'});
@@ -65,7 +68,7 @@ function liveStatusProofPresentation(snapshot,window){
       linkLabel:primary && binding.signals[primary].source==='grafana'?'Open in Grafana':primary && binding.signals[primary].source==='honeycomb'?'Open in Honeycomb':'Open telemetry',
       explanation:result.failing.length?'Outside proof threshold: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name)+'; requires '+predicate(binding,[name]);}).join('. '):
         result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':'Observed signals meet the authored proof thresholds.',
-      chart:{points:plotted,line:continuous?plotted.map(function(p){return p.x+','+p.y;}).join(' '):null,
+      chart:{observedAt:isFinite(end)?new Date(end).toISOString():null,points:plotted,line:continuous?plotted.map(function(p){return p.x+','+p.y;}).join(' '):null,
         markers:markers.map(function(m){return {x:2+96*(m.at-start)/windowMs,label:m.label,kind:m.kind};})}};
   });
   var predicates=rows.map(function(row){return row.predicate;}).filter(function(value,i,all){return all.indexOf(value)===i;});
@@ -89,31 +92,57 @@ function liveStatusTelemetryActivity(){
       var sample=snapshot.map[binding.id],result=snapshot.verdicts.carriers[binding.id],key=telemetryBindingKey(binding);
       if(!result.bound || !sample)return;
       var measured=Object.keys(binding.signals).some(function(name){return telemetryReading(sample,name).value!==null;});if(!measured)return;
-      var scope=scopes[binding.id] || (scopes[binding.id]={key:key,at:null,first:Object.create(null),silent:Object.create(null),limits:Object.create(null)});
-      var at=telemetryTime(sample.observedAt),stamp=at?Date.parse(at):null;
-      // Replayed or out-of-order dated observations cannot cross a threshold again.
-      if(stamp!==null && scope.at!==null && stamp<=scope.at)return;
+      var scope=scopes[binding.id] || (scopes[binding.id]={key:key,at:Object.create(null),values:Object.create(null),ratios:Object.create(null),first:Object.create(null),silent:Object.create(null),limits:Object.create(null)});
+      function time(name){return telemetrySignalTime(sample.signals && sample.signals[name],sample.observedAt);}
+      // Each signal owns its watermark. A newer source on this carrier cannot
+      // date another signal's Activity or suppress that signal's next sample.
+      function fresh(name){var at=time(name);return !at || scope.at[name]===undefined || Date.parse(at)>scope.at[name];}
       var row=presentation.rows.find(function(row){return row.id===binding.id;});
       function add(kind,text,time,signal){events.unshift({type:'telemetry',kind:kind,carrier:binding.id,binding:key,title:binding.title,text:text,at:time || null,signal:signal || null,url:row.url});}
-      var done=result.since.doneAt,first=result.since.firstTrafficAt,primary=telemetryPrimary(binding),reading=telemetryReading(sample,primary);
+      var done=result.since.doneAt,first=result.since.firstTrafficAt,primary=telemetryPrimary(binding),reading=telemetryReading(sample,primary),at=time(primary),stamp=at?Date.parse(at):null;
       if(done && !scope.first[done]){
         // The engine supplies actual series traffic; a positive headline is an
         // observation at observedAt, never a fabricated earlier first timestamp.
-        var traffic=first || (reading.value>0 && stamp!==null && stamp>=Date.parse(done)?at:null);
-        if(traffic && (stamp===null || Date.parse(traffic)<=stamp)){scope.first[done]=true;add('first-traffic','First observed traffic after Done',traffic,primary);}
+        var traffic=first || (fresh(primary) && reading.value>0 && stamp!==null && stamp>=Date.parse(done)?at:null);
+        // Core first-traffic evidence spans all rate-like signals, not just the
+        // chart primary. Keep its actual timestamp and carrier-wide bounds.
+        var bound=first?telemetryTime(sample.observedAt):at,boundStamp=bound?Date.parse(bound):null;
+        if(traffic && (boundStamp===null || Date.parse(traffic)<=boundStamp)){
+          var owns=!first || reading.series.some(function(point){return point[1]>0 && telemetryTime(point[0])===first;});
+          scope.first[done]=true;add('first-traffic','First observed traffic after Done',traffic,owns?primary:null);
+        }
       }
-      if(done && !scope.first[done] && result.telemetry==='silent' && stamp!==null && stamp>=Date.parse(done)){
+      if(fresh(primary) && done && !scope.first[done] && result.telemetry==='silent' && stamp!==null && stamp>=Date.parse(done)){
         var hours=Math.floor((stamp-Date.parse(done))/3600000);
         if(scope.silent[done]===undefined || hours>scope.silent[done]){scope.silent[done]=hours;add('silent','Still silent '+hours+' h after Done',at,primary);}
       }
       Object.keys(binding.proof || {}).forEach(function(name){
         var limit=binding.proof[name],reading=telemetryReading(sample,name);
-        if(reading.value===null || limit.maxRatioOf && (!binding.signals[limit.maxRatioOf] || telemetryReading(sample,limit.maxRatioOf).value===null))return;
+        var crossingAt=time(name);
+        if(limit.maxRatioOf){
+          // A ratio has two independently clocked inputs. Reuse unchanged
+          // accepted measurements, but reject stale or conflicting replays.
+          var inputs=[name,limit.maxRatioOf].map(function(dependency){
+            return {name:dependency,value:telemetryReading(sample,dependency).value,at:time(dependency)};
+          });
+          if(inputs.some(function(input){
+            var watermark=scope.at[input.name],stamp=input.at?Date.parse(input.at):null;
+            return !binding.signals[input.name] || input.value===null || watermark!==undefined &&
+              (stamp===null || stamp<watermark || stamp===watermark && input.value!==scope.values[input.name]);
+          }))return;
+          var prior=scope.ratios[name];
+          var changed=inputs.filter(function(input,index){return !prior || input.value!==prior[index].value;});
+          scope.ratios[name]=inputs;
+          if(prior && !changed.length)return;
+          // Only changed values contribute to this crossing; an unchanged
+          // newer numerator or an unrelated peer cannot supply its date.
+          crossingAt=changed.some(function(input){return !input.at;})?null:changed.map(function(input){return input.at;}).sort().pop();
+        }else if(!fresh(name) || reading.value===null)return;
         var failed=result.failing.indexOf(name)>=0,previous=scope.limits[name];
-        if(previous!==undefined && previous!==failed)add('threshold',name+' crossed '+(failed?'outside':'back within')+' its proof threshold',at,name);
+        if(previous!==undefined && previous!==failed)add('threshold',name+' crossed '+(failed?'outside':'back within')+' its proof threshold',crossingAt,name);
         scope.limits[name]=failed;
       });
-      if(stamp!==null)scope.at=stamp;
+      Object.keys(binding.signals).forEach(function(name){var at=time(name);if(at && fresh(name) && telemetryReading(sample,name).value!==null){scope.at[name]=Date.parse(at);scope.values[name]=telemetryReading(sample,name).value;}});
     });
     events=liveStatusActivity([],events);
   }
@@ -760,12 +789,17 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });
   }
   // A named connector (#943: 'Grafana') reads "<source> connected · <window> window · refreshed <time>".
-  var telemetrySource=telemetryOptions && typeof telemetryOptions.source==='string'?telemetryOptions.source.trim():'',telemetryWindow=trackingTelemetry(page).window;
+  var telemetryWindow=trackingTelemetry(page).window;
+  function telemetrySource(){
+    var source=telemetryOptions && telemetryOptions.source;
+    if(typeof source==='function'){try{source=source();}catch(e){source='';}}
+    return typeof source==='string'?source.trim():'';
+  }
   function metricsSnapshot(){
     var evidence=telemetry.snapshot(),status=evidence.status;
     return {proof:liveStatusProofPresentation(evidence,telemetryWindow),available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
       refreshedAt:status.refreshedAt,note:status.note,checkedText:status.refreshedAt?'refreshed '+clockTime(status.refreshedAt):'',
-      source:telemetrySource,window:telemetryWindow};
+      source:telemetrySource(),window:telemetryWindow};
   }
   function snapshot(){
     refreshDependencies();

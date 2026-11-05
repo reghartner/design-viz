@@ -2,9 +2,13 @@
 
 A dependency-free Cloudflare Worker for exercising Flowview live ticket status
 without an Atlassian account. It serves fictional Jira data using the three
-Atlassian tool names: `getAccessibleAtlassianResources`,
-`searchJiraIssuesUsingJql`, and `getJiraIssue`. It is a public, read-only mock,
-with no credentials or Jira connection. Document editing remains desktop-only.
+Atlassian tool names a real connector offers for this work:
+`getAccessibleAtlassianResources`, `searchJiraIssuesUsingJql`, and `getJiraIssue`.
+`getJiraIssue` with `expand: "changelog"` answers in the real connector's
+`issues.nodes` shape with history derived from the same story timeline, up to the
+story's current day, and `status = <id> ORDER BY updated DESC` finds an issue in that
+status on any story day. It is a public, read-only mock, with no credentials or Jira
+connection. Document editing remains desktop-only.
 
 ## Deploy
 

@@ -330,7 +330,10 @@ for column headers and **Column kind** (**value (default)** or `icons`), then **
 and UX icons**: one card per case holds its typed values, each value’s type beside
 it, and that case’s independent icon cells. Add multiple
 icon columns, such as Power icon and Battery icons. The visual picker uses the shared icon library; multiple outputs
-appear together in each cell, and removing all outputs displays **No icons**. Open
+appear together in each cell, and removing all outputs shows a small **n/a**. To show
+other text, such as `No icons`, fill that icons column’s **Empty cell text** in
+**Properties**; clearing it restores n/a. To show nothing, set `"empty": ""` on that
+column in the **raw JSON** under **Properties** (Workbench fields cannot save a blank). Open
 **Starting state** to choose the initial **Active case**. Its one dropdown lists
 cases by label (with the ID when labels would look alike) and **No active case**;
 step controls offer the same choices plus **Inherit previous** to keep the earlier

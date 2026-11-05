@@ -4,7 +4,8 @@
 (function(){
   var SAMPLE=[
     {at:'2026-10-30T16:23:15Z',by:{name:'Riley'},changes:[{op:'add',ticket:'BE-68',node:'backend',label:'Backend'},{op:'remove',ticket:'UX-90',node:'ux',label:'UX mobile app'}]},
-    {at:'2026-10-29T09:40:00Z',by:{name:'Sam'},changes:[{op:'add',ticket:'FW-46',edge:['hardware','firmware'],label:'Hardware → Firmware'},{op:'clear-missing-work',edge:['hardware','firmware'],label:'Hardware → Firmware'}]}
+    {at:'2026-10-29T09:40:00Z',by:{name:'Sam'},changes:[{op:'add',ticket:'FW-46',edge:['hardware','firmware'],label:'Hardware → Firmware'},{op:'clear-missing-work',edge:['hardware','firmware'],label:'Hardware → Firmware'}]},
+    {at:'2026-10-28T15:05:00Z',by:{name:'Chuck'},source:'agent',summary:'Added 2 nodes, moved 3 tickets',changes:[]}
   ];
   function empty(){return {};}
   function carrierLabel(change){
@@ -17,6 +18,11 @@
   function opText(change){return clears(change)?'Missing work cleared from':change.op==='remove'?'removed from':'added to';}
   function changeText(change){return (clears(change)?'':change.ticket+' ')+opText(change)+' '+carrierLabel(change);}
   function countText(n){return n+' '+(n===1?'change':'changes');}
+  /* #974: an agent entry reads editor · agent · time · its one-line summary; a summary
+     replaces the count and the first change. Rows without ticket changes do not expand. */
+  function summarized(entry){return typeof entry.summary==='string';}
+  function agent(entry){return entry.source==='agent';}
+  function firstText(entry){return summarized(entry)?entry.summary:changeText(entry.changes[0]);}
   function whenText(at){
     var date=new Date(at);if(!isFinite(date.getTime()))return String(at);
     try{return date.toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});}
@@ -30,9 +36,11 @@
   /* Static markup for the picker preview: the same structure the live mount builds. */
   function rowsHTML(entries){
     return '<ol class="dv-edit-history" aria-label="Edit history">'+entries.map(function(entry){
-      return '<li class="dv-edit-entry" data-edit-at="'+esc(entry.at)+'"><details class="dv-edit-details"><summary class="dv-edit-summary">'+
-        '<span class="dv-edit-who">'+esc(editorName(entry,null))+'</span><time class="dv-edit-when" datetime="'+esc(entry.at)+'">'+esc(whenText(entry.at))+'</time>'+
-        '<span class="dv-edit-count">'+esc(countText(entry.changes.length))+'</span><span class="dv-edit-first">'+esc(changeText(entry.changes[0]))+'</span></summary>'+
+      var head='<span class="dv-edit-who">'+esc(editorName(entry,null))+'</span>'+(agent(entry)?'<span class="dv-edit-agent">agent</span>':'')+
+        '<time class="dv-edit-when" datetime="'+esc(entry.at)+'">'+esc(whenText(entry.at))+'</time>'+
+        (summarized(entry)?'':'<span class="dv-edit-count">'+esc(countText(entry.changes.length))+'</span>')+'<span class="dv-edit-first">'+esc(firstText(entry))+'</span>';
+      if(!entry.changes.length)return '<li class="dv-edit-entry" data-edit-at="'+esc(entry.at)+'"><div class="dv-edit-summary">'+head+'</div></li>';
+      return '<li class="dv-edit-entry" data-edit-at="'+esc(entry.at)+'"><details class="dv-edit-details"><summary class="dv-edit-summary">'+head+'</summary>'+
         '<ul class="dv-edit-changes">'+entry.changes.map(function(change){
           return '<li class="dv-edit-change" data-edit-op="'+esc(change.op)+'"'+(clears(change)?'>':' data-edit-ticket="'+esc(change.ticket)+'"><span class="dv-edit-ticket">'+esc(change.ticket)+'</span>')+
             '<span class="dv-edit-op">'+esc(opText(change))+'</span><span class="dv-edit-carrier">'+esc(carrierLabel(change))+'</span></li>';
@@ -53,12 +61,15 @@
       var list=el(host,'ol','dv-edit-history');list.setAttribute('aria-label','Edit history');
       entries.forEach(function(entry,index){
         var key=entry.at+'#'+index,item=el(list,'li','dv-edit-entry');item.setAttribute('data-edit-at',entry.at);
-        var details=el(item,'details','dv-edit-details');details.setAttribute('data-edit-key',key);if(open[key])details.open=true;
-        var summary=el(details,'summary','dv-edit-summary');
+        var details=entry.changes.length?el(item,'details','dv-edit-details'):null;
+        if(details){details.setAttribute('data-edit-key',key);if(open[key])details.open=true;}
+        var summary=details?el(details,'summary','dv-edit-summary'):el(item,'div','dv-edit-summary');
         el(summary,'span','dv-edit-who',editorName(entry,names));
+        if(agent(entry))el(summary,'span','dv-edit-agent','agent');
         el(summary,'time','dv-edit-when',whenText(entry.at)).setAttribute('datetime',entry.at);
-        el(summary,'span','dv-edit-count',countText(entry.changes.length));
-        el(summary,'span','dv-edit-first',changeText(entry.changes[0]));
+        if(!summarized(entry))el(summary,'span','dv-edit-count',countText(entry.changes.length));
+        el(summary,'span','dv-edit-first',firstText(entry));
+        if(!details)return;
         var changes=el(details,'ul','dv-edit-changes');
         entry.changes.forEach(function(change){
           var row=el(changes,'li','dv-edit-change');row.setAttribute('data-edit-op',change.op);
@@ -105,6 +116,8 @@
 .dv-edit-summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:8px 4px;cursor:pointer;color:var(--dtext)}
 .dv-edit-summary:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:2px}
 .dv-edit-who{font-weight:600;color:var(--dink)}
+div.dv-edit-summary{cursor:default}
+.dv-edit-agent{font:600 10px/1.4 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.04em;padding:0 5px;border:1px solid var(--explore-border);border-radius:3px;color:var(--dfaint)}
 .dv-edit-when,.dv-edit-count{font:11px/1.5 'IBM Plex Mono',monospace;color:var(--dfaint);white-space:nowrap;font-variant-numeric:tabular-nums}
 .dv-edit-first{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 .dv-edit-changes{list-style:none;margin:0 0 8px;padding:0 4px 0 20px}
@@ -133,7 +146,7 @@
     render:function(host,panel,state){return state && state.editSample?{html:rowsHTML(state.editSample)}:
       {html:'<p class="dv-edit-history-empty">No edits yet.</p>',mounted:function(){mount(host);}};},
     authoring:{template:{title:'Edit history'},setupFields:[],patchFields:[],
-      picker:{name:'Edit history',category:'Delivery',tagline:'See who changed the board and when',description:'List every save of the live board below the diagram: editor, time and a summary that expands to each ticket added or removed and each Missing work marker cleared.'},
+      picker:{name:'Edit history',category:'Delivery',tagline:'See who changed the board and when',description:'List every save of the live board below the diagram: editor, time and a summary that expands to each ticket added or removed and each Missing work marker cleared. Changes an agent made are tagged agent and read as one line.'},
       example:function(sample){sample.state.editSample=SAMPLE.map(function(entry){return JSON.parse(JSON.stringify(entry));});return sample;}},
     styles:EDIT_HISTORY_STYLES
   });

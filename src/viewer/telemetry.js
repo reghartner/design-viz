@@ -230,6 +230,105 @@ function telemetryPaintCues(scope,diagram,templates,view){
   });
 }
 
+/* History timestamps are evaluation endpoints, each for the previous 24h.
+   A missing endpoint stays absent; never forward-fill a retention gap or take
+   `value` (which is a live headline). Labels are presentation only. */
+function telemetryHistoryTime(value,endpoints){
+  // Calendar keys have meaning only through the explicit selected-day metadata.
+  if(typeof value==='string' && /^\d{4}-\d{2}-\d{2}$/.test(value)){
+    var day=(endpoints || []).find(function(item){return item.key===value;});
+    return day?telemetryTime(day.at):null;
+  }
+  return telemetryTime(value);
+}
+function telemetryHistoryEndpoints(range){
+  var from=Date.parse(range.from),to=Date.parse(range.to),seen=Object.create(null),out=[];
+  if(Array.isArray(range.endpoints))range.endpoints.forEach(function(day){
+    var at=day && telemetryTime(day.at),time=Date.parse(at);
+    if(!at || time<from || time>to || seen[at])return;seen[at]=true;
+    var item={at:at};if(typeof day.key==='string')item.key=day.key;out.push(item);
+  });
+  // Backward-compatible callers without metadata explicitly request a daily grid.
+  else if(isFinite(from) && isFinite(to))for(var t=from;t<=to;t+=86400000)out.push({at:new Date(t).toISOString()});
+  return out.sort(function(a,b){return Date.parse(a.at)-Date.parse(b.at);});
+}
+function telemetryHistoryRange(endpoints,explicit){
+  var range={from:endpoints[0].at,to:endpoints[endpoints.length-1].at};
+  if(explicit)range.endpoints=endpoints;return range;
+}
+function telemetryHistoryDay(value,day){
+  var out=Object.create(null),at=day && telemetryTime(day.at);
+  if(!at || !telemetryObject(value))return out;
+  Object.keys(value).forEach(function(id){
+    var sample=telemetrySample(value[id]);if(!sample)return;
+    var signals={};
+    Object.keys(sample.signals).forEach(function(name){
+      var entry=sample.signals[name],points=(entry.series || []).filter(function(point){return telemetryHistoryTime(point[0],[day])===at;});
+      if(!points.length)return;
+      var point=points[points.length-1];signals[name]={value:point[1],series:[[at,point[1]]]};
+      if(entry.unit)signals[name].unit=entry.unit;
+    });
+    if(Object.keys(signals).length)out[id]={signals:signals,observedAt:at,links:sample.links,markers:[]};
+  });
+  return out;
+}
+/* Per-controller seven-day cache, with exact endpoint coverage per full binding.
+   A DST tail starts at the next requested instant, never old.to + 24 hours.
+   Batch bindings that need the same endpoints so ordinary loads still make one
+   provider call. Partial-error and aborted batches never extend coverage. */
+function telemetryHistoryCache(now){
+  var entries=Object.create(null),clock=now || Date.now;
+  function copy(value){return JSON.parse(JSON.stringify(value));}
+  function endpointKey(day){return JSON.stringify([day.key || '',day.at]);}
+  function prepare(key,range){
+    var old=entries[key],endpoints=telemetryHistoryEndpoints(range);
+    if(old && clock()-old.at>=LIVE_STATUS_HISTORY_CACHE_MS)old=null;
+    return {key:key,old:old,range:range,missing:endpoints.filter(function(day){return !old || old.covered.indexOf(endpointKey(day))<0;})};
+  }
+  function finish(plan,answer,signal){
+    if(signal.aborted)throw new Error('History cancelled');
+    var old=plan.old,map=old?copy(old.map):Object.create(null),wanted=plan.missing.map(function(day){return day.at;});
+    Object.keys(answer.map || {}).forEach(function(id){
+      var sample=telemetrySample(answer.map[id]);if(!sample)return;
+      var target=telemetryOwn(map,id)?map[id]:{signals:Object.create(null),markers:[],links:{}};
+      Object.keys(sample.signals).forEach(function(name){
+        var entry=sample.signals[name],previous=target.signals[name];
+        var points=(entry.series || []).map(function(p){return [telemetryHistoryTime(p[0],plan.missing),p[1]];}).filter(function(p){return wanted.indexOf(p[0])>=0;});
+        target.signals[name]={series:(previous && previous.series || []).concat(points)};
+        if(entry.unit)target.signals[name].unit=entry.unit;
+      });
+      target.links=sample.links;map[id]=target;
+    });
+    if(!answer.note)entries[plan.key]={covered:(old?old.covered:[]).concat(plan.missing.map(endpointKey)),at:old?old.at:clock(),map:copy(map)};
+    return {map:map,note:answer.note || ''};
+  }
+  return {clear:function(){entries=Object.create(null);},load:function(key,range,signal,fetch){
+    var plan=prepare(key,range);
+    if(!plan.missing.length)return Promise.resolve({map:plan.old?copy(plan.old.map):{},note:''});
+    return Promise.resolve().then(function(){
+      if(signal.aborted)throw new Error('History cancelled');
+      return fetch(telemetryHistoryRange(plan.missing,Array.isArray(range.endpoints)));
+    }).then(function(answer){return finish(plan,answer,signal);});
+  },loadBindings:function(identity,bound,range,signal,fetch){
+    var groups=Object.create(null),map=Object.create(null),notes=[];
+    bound.forEach(function(binding){
+      var plan=prepare(JSON.stringify([identity,binding]),range);
+      if(!plan.missing.length){if(plan.old && plan.old.map[binding.id])map[binding.id]=copy(plan.old.map[binding.id]);return;}
+      var key=JSON.stringify(plan.missing),group=groups[key] || (groups[key]={plans:[],bindings:[]});
+      group.plans.push(plan);group.bindings.push(binding);
+    });
+    return Promise.all(Object.keys(groups).map(function(key){var group=groups[key];return Promise.resolve().then(function(){
+      if(signal.aborted)throw new Error('History cancelled');
+      return fetch(group.bindings,telemetryHistoryRange(group.plans[0].missing,true));
+    }).then(function(answer){
+      if(answer.note)notes.push(answer.note);
+      group.plans.forEach(function(plan,i){var id=group.bindings[i].id,part={};if(answer.map && answer.map[id])part[id]=answer.map[id];
+        var saved=finish(plan,{map:part,note:answer.note},signal);if(saved.map[id])map[id]=saved.map[id];
+      });
+    });})).then(function(){if(signal.aborted)throw new Error('History cancelled');return {map:map,note:notes.join('; ')};});
+  }};
+}
+
 /* ctl.telemetry. hooks: {carriers: eachCarrier, diagrams: eachDiagram,
    jira: function() → the runtime Jira map, changed: function()}. changed lets
    the Live status panel and the canvas follow a telemetry change. In return
@@ -241,10 +340,11 @@ function createTelemetry(page,options,hooks){
   options=options || {};hooks=hooks || {};
   var available=permitted && options.available!==false;
   var provider=typeof options.provider==='function'?options.provider:null;
+  var history=typeof options.history==='function'?options.history:provider && typeof provider.history==='function'?provider.history:null;
   var demo=options.demo && typeof options.demo.mount==='function'?options.demo:null;
   var configured=Number(options.refreshMs),authored=trackingTelemetry(page || {}).refreshMs;
   var delay=Math.max(TELEMETRY_MIN_REFRESH_MS,configured>0 && isFinite(configured)?configured:authored || TELEMETRY_MIN_REFRESH_MS);
-  var map=Object.create(null),enabled=false,retired=false,listeners=[],demoCleanup=null;
+  var map=Object.create(null),liveMap=map,past=null,historyRequests=[],historyGeneration=0,historyCache=telemetryHistoryCache(),liveStatus=null,enabled=false,retired=false,listeners=[],demoCleanup=null;
   available=available && !!(provider || demo);
   var status={state:available?'idle':'absent',busy:false,refreshedAt:null,note:''};
   function copy(value){return JSON.parse(JSON.stringify(value));}
@@ -264,26 +364,92 @@ function createTelemetry(page,options,hooks){
   function store(value){
     var next=Object.create(null);
     if(telemetryObject(value))Object.keys(value).forEach(function(id){var sample=telemetrySample(value[id]);if(id && sample)next[id]=sample;});
-    map=next;
+    liveMap=next;if(!past)map=next;
   }
   // Each call gets its own report; its note travels with that call's answer only.
   var poller=provider?liveStatusPoller(function(signal){
     var noted='',report={note:function(text){noted=typeof text==='string'?text:'';}};
     return Promise.resolve(provider(bindings(),signal,report)).then(function(value){return {value:value,note:noted};});
   },delay,{
-    busy:function(){setStatus({busy:true});notify();},
-    result:function(answer){store(answer.value);setStatus({state:'ok',busy:false,refreshedAt:new Date().toISOString(),note:answer.note});notify();},
-    error:function(error){setStatus({state:error && error.state==='approval'?'approval':'error',busy:false,note:error && typeof error.message==='string'?error.message:String(error)});notify();}
+    busy:function(){if(past){liveStatus=Object.assign({},liveStatus,{busy:true});return;}setStatus({busy:true});notify();},
+    result:function(answer){store(answer.value);var next={state:'ok',busy:false,refreshedAt:new Date().toISOString(),note:answer.note};if(past)liveStatus=next;else setStatus(next);notify();},
+    error:function(error){var next={state:error && error.state==='approval'?'approval':'error',busy:false,note:error && typeof error.message==='string'?error.message:String(error)};if(past)liveStatus=next;else setStatus(next);notify();}
   }):null;
   function stopDemo(){var cleanup=demoCleanup;demoCleanup=null;if(typeof cleanup==='function'){try{cleanup();}catch(ex){}}}
+  function cancelHistory(){historyGeneration++;historyRequests.forEach(function(request){request.abort.abort();});historyRequests=[];}
+  function showHistory(){
+    if(!past || !enabled)return;
+    var day=past.days[past.index];
+    map=day && telemetryObject(day.telemetry)?day.telemetry:telemetryHistoryDay(past.map,day);
+  }
+  function historyStatus(){
+    var state=historyRequests.length?'loading':'ok',notes=[];
+    Object.keys(past.outcomes).forEach(function(id){var outcome=past.outcomes[id];
+      if(outcome.state==='approval' || outcome.state==='error' && state!=='approval')state=outcome.state;
+      if(outcome.note && notes.indexOf(outcome.note)<0)notes.push(outcome.note);
+    });
+    setStatus({state:state,busy:!!historyRequests.length,note:notes.join('; ')});
+  }
+  function historyBindingsChanged(){
+    if(!past || !enabled || !available || retired || !history || past.embedded)return;
+    var bound=telemetryBindings(hooks.historyCarriers || hooks.carriers || function(){});
+    var identity=JSON.stringify([trackingTelemetry(page),typeof options.historyKey==='function'?options.historyKey():options.historyKey || '']);
+    var keys=Object.create(null);bound.forEach(function(binding){keys[binding.id]=JSON.stringify([identity,binding]);});
+    if(JSON.stringify(keys)===JSON.stringify(past.keys))return;
+    Object.keys(past.keys).forEach(function(id){if(keys[id]!==past.keys[id]){delete past.map[id];delete past.loaded[id];delete past.outcomes[id];}});
+    past.keys=keys;
+    // A removed/rebound member invalidates its pending batch. Completed peers
+    // stay in the per-binding cache; unrelated pending batches keep running.
+    historyRequests=historyRequests.filter(function(request){
+      if(request.bound.some(function(binding){return keys[binding.id]!==request.keys[binding.id];})){request.abort.abort();return false;}return true;
+    });
+    var needed=bound.filter(function(binding){return past.loaded[binding.id]!==keys[binding.id] && !historyRequests.some(function(request){return request.keys[binding.id]===keys[binding.id];});});
+    showHistory();
+    if(!needed.length){historyStatus();notify();return;}
+    var dated=past.days.filter(function(day){return !!telemetryTime(day.at);}).map(function(day){var item={at:telemetryTime(day.at)};if(typeof day.key==='string')item.key=day.key;return item;}).sort(function(a,b){return Date.parse(a.at)-Date.parse(b.at);});
+    if(!dated.length)return;
+    var generation=historyGeneration,request={abort:new AbortController(),bound:needed,keys:keys};historyRequests.push(request);
+    historyStatus();notify();
+    historyCache.loadBindings(identity,needed,telemetryHistoryRange(dated,true),request.abort.signal,function(batch,part){
+      var note='',report={note:function(text){note=typeof text==='string'?text:'';}};
+      return Promise.resolve(history(batch,part,request.abort.signal,report)).then(function(value){return {map:value,note:note};});
+    }).then(function(answer){finish(answer,null);},function(error){finish(null,error);});
+    function finish(answer,error){
+      if(retired || !enabled || !past || request.abort.signal.aborted || generation!==historyGeneration)return;
+      historyRequests=historyRequests.filter(function(item){return item!==request;});
+      needed.forEach(function(binding){var id=binding.id;if(past.keys[id]!==keys[id])return;
+        past.loaded[id]=keys[id];if(answer && answer.map[id])past.map[id]=answer.map[id];
+        past.outcomes[id]={state:error?(error.state==='approval'?'approval':'error'):'ok',note:error?error.message || 'Historical metrics did not answer':answer.note};
+      });
+      showHistory();historyStatus();notify();
+    }
+  }
+  function loadHistory(){
+    cancelHistory();if(!past || !enabled || !available || retired)return;
+    past.map={};past.keys=Object.create(null);past.loaded=Object.create(null);past.outcomes=Object.create(null);past.embedded=past.days.every(function(day){return telemetryObject(day.telemetry);});showHistory();
+    if(past.embedded){setStatus({state:'ok',busy:false,note:''});notify();return;}
+    if(!history || !past.days.some(function(day){return !!telemetryTime(day.at);})){setStatus({state:'ok',busy:false,note:'Historical metrics unavailable; missing samples are unobserved.'});notify();return;}
+    setStatus({state:'ok',busy:false,note:''});historyBindingsChanged();
+  }
+
   var api={
+    openHistory:function(days,index){
+      if(retired)return;cancelHistory();liveStatus=copy(status);past={days:days,index:index,map:{}};map=Object.create(null);
+      if(poller)poller.pause();loadHistory();
+    },
+    historyDay:function(index){if(retired || !past)return;past.index=index;showHistory();notify();},
+    closeHistory:function(){
+      if(!past || retired)return;cancelHistory();past=null;map=enabled?liveMap:Object.create(null);
+      if(enabled){if(liveStatus)setStatus(liveStatus);if(poller)poller.resume();}liveStatus=null;notify();
+    },
     bindings:function(){return copy(bindings());},
+    bindingsChanged:historyBindingsChanged,
     apply:function(value){
       if(retired || !permitted || !available && (provider || demo || options.available===false))return;store(value);
-      if(enabled)setStatus({state:'ok',refreshedAt:new Date().toISOString(),note:''});
+      if(enabled && !past)setStatus({state:'ok',refreshedAt:new Date().toISOString(),note:''});
       notify();
     },
-    clear:function(){if(retired)return;map=Object.create(null);notify();},
+    clear:function(signal){if(retired)return;if(!historyRequests.some(function(request){return request.abort.signal===signal;})){cancelHistory();setStatus({busy:false});}historyCache.clear();liveMap=map=Object.create(null);if(past)past.map={};notify();},
     snapshot:function(){return {available:available && !retired,enabled:enabled,map:copy(map),status:copy(status),verdicts:copy(verdicts())};},
     verdicts:function(){return copy(verdicts());},
     status:function(){return copy(status);},
@@ -294,22 +460,22 @@ function createTelemetry(page,options,hooks){
       enabled=value;
       if(enabled){
         setStatus({state:'loading',busy:false,refreshedAt:null,note:''});
-        if(poller)poller.start();
+        if(past)loadHistory();else if(poller)poller.start();
         if(demo){var cleanup=demo.mount(api);demoCleanup=typeof cleanup==='function'?cleanup:null;}
       }else{
-        if(poller)poller.stop();stopDemo();
-        map=Object.create(null);setStatus({state:'idle',busy:false,refreshedAt:null,note:''});
+        cancelHistory();if(poller)poller.stop();stopDemo();
+        liveMap=map=Object.create(null);if(past)past.map={};setStatus({state:'idle',busy:false,refreshedAt:null,note:''});
       }
       notify();
     },
     setAvailable:function(value){
       if(retired)return;value=!!value && permitted && !!(provider || demo);
       if(value===available)return;
-      if(!value){api.setEnabled(false);map=Object.create(null);}
+      if(!value){api.setEnabled(false);historyCache.clear();liveMap=map=Object.create(null);}
       available=value;setStatus({state:value?'idle':'absent',busy:false,refreshedAt:null,note:''});notify();
     },
     onChange:function(fn){if(typeof fn!=='function' || retired)return function(){};listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
-    destroy:function(){if(retired)return;retired=true;enabled=false;map=Object.create(null);setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];}
+    destroy:function(){if(retired)return;retired=true;cancelHistory();historyCache.clear();past=null;enabled=false;liveMap=map=Object.create(null);setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];}
   };
   return api;
 }

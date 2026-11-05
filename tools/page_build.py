@@ -39,7 +39,7 @@ Exit code 0 = page built and manifest updated; anything else = STOP and
 report the printed reason verbatim.
 """
 import argparse
-import fcntl
+import errno
 import json
 import pathlib
 import re
@@ -47,6 +47,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+
+try:
+    import fcntl
+except ImportError:  # Windows has no fcntl; msvcrt gives the same exclusive lock.
+    fcntl = None
+    import msvcrt
 
 from crossrefs import (
     CrossrefError,
@@ -129,6 +136,22 @@ def nested_owner(output_root: pathlib.Path, html_path: pathlib.Path):
             return (output_root.parent / spec_rel).resolve()
         fail(f"cannot verify existing nested page owner: unsafe spec path {spec_rel!r}")
     return None
+
+
+def lock_exclusive(lock) -> None:
+    """Wait until this process holds the lock; closing the file releases it."""
+    if fcntl:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        return
+    lock.seek(0)
+    while True:
+        try:
+            msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+            return
+        except OSError as error:
+            if error.errno != errno.EACCES:
+                raise
+            time.sleep(0.05)
 
 
 def main() -> int:
@@ -290,8 +313,9 @@ def main() -> int:
     previous_diff_error = None
     snapshot_write_error = None
 
-    with open(lock_path, "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    # Append, because truncating a file another build has locked fails on Windows.
+    with open(lock_path, "a") as lock:
+        lock_exclusive(lock)
         manifest = load_manifest(manifest_path)
         pages = [p for p in manifest.get("pages", []) if isinstance(p, dict)]
         prev = next((p for p in pages if p.get("file") == html_rel), None)
@@ -332,7 +356,7 @@ def main() -> int:
                 previous_diff_error = "no previous successful build snapshot"
 
         r2 = subprocess.run(
-            ["python3", str(ROOT / "tools" / "inject.py"),
+            [sys.executable, str(ROOT / "tools" / "inject.py"),
              str(build_spec_path), str(TEMPLATE), str(html_path)],
             capture_output=True, text=True, cwd=ROOT,
         )

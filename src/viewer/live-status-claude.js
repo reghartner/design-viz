@@ -62,6 +62,149 @@ function liveStatusJiraDependencies(issue,linkTypes){
   });
   return out;
 }
+/* Over time (#929, #1009): rebuild each ticket's status by local day from its creation time and
+   change history, read through getJiraIssue with expand changelog. The reply shape was checked
+   on a live Atlassian connector: the issue sits in issues.nodes[0]. A plain REST issue also works. */
+function liveStatusHistoryList(payload,names){
+  if(Array.isArray(payload))return payload;
+  if(!payload || typeof payload!=='object')return [];
+  for(var i=0;i<names.length;i++)if(Array.isArray(payload[names[i]]))return payload[names[i]];
+  return liveStatusHistoryList(payload.data,names);
+}
+function liveStatusHistoryChanges(payload){
+  var out=[];
+  liveStatusHistoryList(payload,['values','histories','changelogs','nodes']).forEach(function(entry){
+    if(!entry || !Array.isArray(entry.items))return;
+    var at=Date.parse(entry.created);if(!isFinite(at))return;
+    entry.items.forEach(function(item){
+      var name=item && typeof item.field==='string'?item.field.toLowerCase():'',field=name==='status'?'status':name==='flagged'?'flag':null;
+      // A plain object inherits a toString function, so only an own value counts.
+      if(!field || !Object.prototype.hasOwnProperty.call(item,'toString'))return;
+      var from=typeof item.fromString==='string'?item.fromString:'',to=typeof item.toString==='string'?item.toString:'',change={at:at,field:field,from:from,to:to};
+      if(field==='status'){if(!to)return;change.fromId=typeof item.from==='string'?item.from:'';change.toId=typeof item.to==='string'?item.to:'';}
+      out.push(change);
+    });
+  });
+  return out;
+}
+function liveStatusHistoryIssue(payload){
+  var found=liveStatusJiraIssues(payload)[0];
+  return found || (payload && typeof payload==='object' && payload.fields && typeof payload.fields==='object'?payload:null);
+}
+/* tickets: [{key,created,status,statusId,flagged,changes}], today: the live map. A status's category
+   comes from its id in statusIds, then its name in categories; changelogs give ids and names only. A
+   status neither knows follows the live board's rule for an unknown category. A ticket's status before
+   its first change comes from that change's old value. Days run from the oldest creation to today, or to
+   the last Done once every ticket is done; the last day is exactly the live map. */
+function liveStatusHistoryDays(input){
+  var tickets=input.tickets || [],today=input.today || {},categories=input.categories || {},statusIds=input.statusIds || {},keys=Object.keys(today);
+  function container(key){return today[key].kind==='epic' || today[key].kind==='initiative';}
+  function state(key,name,id,flagged){return liveStatusJiraState({key:key,fields:{status:{name:name,statusCategory:{key:statusIds[id] || categories[String(name).toLowerCase()]}}}},flagged?[key]:null);}
+  var open=keys.some(function(key){return !container(key) && today[key].state!=='done';}),first=Infinity,finished=-Infinity;
+  var lines=tickets.map(function(ticket){
+    var changes=ticket.changes.slice().sort(function(a,b){return a.at-b.at;});
+    function earliest(field){return changes.filter(function(change){return change.field===field;})[0];}
+    var status=earliest('status'),flag=earliest('flag'),name=status?status.from:ticket.status,id=status?status.fromId:ticket.statusId,flagged=flag?!!flag.from:!!ticket.flagged;
+    var points=[{at:ticket.created,state:state(ticket.key,name,id,flagged)}];first=Math.min(first,ticket.created);
+    if(points[0].state==='done')finished=Math.max(finished,ticket.created);
+    changes.forEach(function(change){
+      if(change.field==='status'){name=change.to;id=change.toId;}else flagged=!!change.to;
+      var next=state(ticket.key,name,id,flagged);
+      if(next==='done' && points[points.length-1].state!=='done')finished=Math.max(finished,change.at);
+      points.push({at:change.at,state:next});
+    });
+    return {key:ticket.key,created:ticket.created,points:points,at:0};
+  });
+  if(!isFinite(first))return {days:[],index:-1};
+  var start=new Date(first),last=new Date(open || !isFinite(finished)?input.now:finished);
+  var year=start.getFullYear(),month=start.getMonth(),date=start.getDate(),count=Math.max(1,Math.round((new Date(last.getFullYear(),last.getMonth(),last.getDate())-new Date(year,month,date))/86400000)+1);
+  var format=year===last.getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'},days=[];
+  for(var i=0;i<count;i++){
+    var end=new Date(year,month,date+i+1).getTime(),states=Object.create(null);
+    if(i===count-1)keys.forEach(function(key){states[key]={state:today[key].state};if(typeof today[key].detail==='string')states[key].detail=today[key].detail;});
+    else{
+      lines.forEach(function(line){
+        if(line.created>=end)return;
+        while(line.at+1<line.points.length && line.points[line.at+1].at<end)line.at++;
+        states[line.key]={state:line.points[line.at].state};
+      });
+      // Containers follow the demo's epic rule, so they need no history calls.
+      keys.filter(container).forEach(function(key){
+        var children=keys.filter(function(child){return !container(child) && states[child] && (today[child].epic===key || (today[child].initiatives || []).indexOf(key)>=0);}).map(function(child){return states[child].state;});
+        states[key]={state:children.length && children.every(function(item){return item==='done';})?'done':children.some(function(item){return item==='active' || item==='blocked' || item==='done';})?'active':'todo'};
+      });
+    }
+    var text=new Date(year,month,date+i).toLocaleDateString(input.locale || [],format);
+    days.push({key:new Date(Date.UTC(year,month,date+i)).toISOString().slice(0,10),at:new Date(end).toISOString(),label:text,short:text,states:states});
+  }
+  return {days:days,index:days.length-1};
+}
+var LIVE_STATUS_HISTORY_TOOLS=['getJiraIssue'];
+/* One batch of one-shot calls, made only by the reader's click: callTool, never watchTool, so nothing polls.
+   One getJiraIssue per ticket gives its created time, current status and changelog, and one search per status
+   no tracked ticket holds gives that status's category. Each result is cached for 7 days per viewer and
+   artifact. A cached reply older than the ticket's live `updated` time, or one that cannot be used, is read
+   again, so a repeat click costs one call for each changed ticket. Any failure rejects the whole batch: a
+   partial history is never shown. */
+function liveStatusHistoryLoad(context,progress){
+  var mcp=context.mcp,server=context.server,cloudId=context.cloudId,today=context.today,cache={staleTime:LIVE_STATUS_HISTORY_CACHE_MS,gcTime:LIVE_STATUS_HISTORY_CACHE_MS};
+  var keys=Object.keys(today).filter(function(key){var entry=today[key];return entry.state!=='missing' && entry.kind!=='epic' && entry.kind!=='initiative';});
+  var categories=Object.create(null),statusIds=Object.create(null),finished=0,tickets=[];
+  function call(tool,input,refresh){return liveStatusHistoryCall(function(){return mcp.callTool(server,tool,input,{cache:refresh?Object.assign({},cache,{refresh:true}):cache});});}
+  function pool(items,work){
+    var next=0,failed=false,workers=[];
+    function worker(){
+      if(failed || next>=items.length)return Promise.resolve();
+      return work(items[next++]).then(worker,function(error){failed=true;throw error;});
+    }
+    for(var i=0;i<Math.min(LIVE_STATUS_HISTORY_CALLS,items.length);i++)workers.push(worker());
+    return Promise.all(workers);
+  }
+  function learn(status){
+    var key=status && status.statusCategory && status.statusCategory.key;if(typeof key!=='string')return;
+    if(status.id!=null)statusIds[String(status.id)]=key;
+    if(typeof status.name==='string')categories[status.name.toLowerCase()]=key;
+  }
+  // Null when the reply cannot give a whole history: no issue, no created time, no changelog, or fewer entries than total.
+  function ticketFrom(key,payload){
+    var issue=liveStatusHistoryIssue(payload),fields=issue && issue.fields || {},status=fields.status || {},changelog=issue && issue.changelog,created=Date.parse(fields.created);
+    if(!isFinite(created) || typeof status.name!=='string' || !changelog || typeof changelog!=='object')return null;
+    var listed=liveStatusHistoryList(changelog,['histories','values']).length;
+    if(typeof changelog.total==='number' && listed<changelog.total)return null;
+    learn(status);
+    return {key:key,created:created,status:status.name,statusId:status.id==null?'':String(status.id),flagged:!!context.flagged[key],changes:liveStatusHistoryChanges(changelog)};
+  }
+  function read(key,refresh){
+    var input={cloudId:cloudId,issueIdOrKey:key,fields:['status','created'],expand:'changelog'},updated=Date.parse(today[key].updatedAt);
+    return call('getJiraIssue',input,refresh).then(function(result){
+      var stored=result && result.cache && result.cache.storedAt,ticket=ticketFrom(key,result && result.payload);
+      if(!refresh && typeof stored==='number' && (updated>stored || !ticket))return read(key,true);
+      if(!ticket)throw new Error('Jira gave no complete history for '+key);
+      return ticket;
+    });
+  }
+  function unknownStatuses(){
+    var found=[];
+    tickets.forEach(function(ticket){ticket.changes.forEach(function(change){
+      if(change.field!=='status')return;
+      [change.fromId,change.toId].forEach(function(id){if(/^[0-9]+$/.test(id) && !statusIds[id] && found.indexOf(id)<0)found.push(id);});
+    });});
+    return found;
+  }
+  function lookUp(id){
+    return call('searchJiraIssuesUsingJql',{cloudId:cloudId,jql:'status = '+id+' ORDER BY updated DESC',fields:['status'],maxResults:1}).then(function(result){
+      var issue=liveStatusJiraIssues(result && result.payload)[0],status=issue && issue.fields && issue.fields.status,key=status && status.statusCategory && status.statusCategory.key;
+      if(typeof key==='string')statusIds[id]=key;
+    });
+  }
+  Object.keys(context.issues || {}).forEach(function(key){var issue=context.issues[key];learn(issue && issue.fields && issue.fields.status);});
+  progress(0,keys.length);
+  return pool(keys,function(key){
+    return read(key,false).then(function(ticket){tickets.push(ticket);progress(++finished,keys.length);});
+  }).then(function(){return pool(unknownStatuses(),lookUp);}).then(function(){
+    return liveStatusHistoryDays({tickets:tickets,today:today,categories:categories,statusIds:statusIds,now:Date.now()});
+  });
+}
 function liveStatusJiraChunks(keys){
   var chunks=[];for(var i=0;i<keys.length;i+=10)chunks.push(keys.slice(i,i+10));return chunks;
 }
@@ -314,7 +457,7 @@ function wireLiveStatusClaude(ctl,page,win){
     removeWaitingDestroy=api.onDestroy(stopWaiting);
     return null;
   }
-  var stopped=false,mcp=null,server=null,site='',cloudId=null,chunks=[],jobs=[],subscriptions=[],timers=[];
+  var stopped=false,mcp=null,server=null,site='',cloudId=null,chunks=[],jobs=[],subscriptions=[],timers=[],historyOffered=false;
   var syncing=false,resync=false,linkTypes=typeof trackingDependencyLinks==='function'?trackingDependencyLinks(page):null;
   var dirty=false,publishing=false,removeChange=null,removeDestroy=null,github=null;
   var addConnector='Add the Atlassian connector in claude.ai Settings → Connectors to see live ticket status.';
@@ -326,6 +469,7 @@ function wireLiveStatusClaude(ctl,page,win){
   function unsubscribe(value){try{if(typeof value==='function')value();else if(value && typeof value.unsubscribe==='function')value.unsubscribe();}catch(ex){}}
   function stop(){
     if(stopped)return;stopped=true;if(github)github.stop();
+    if(typeof api.setHistory==='function')api.setHistory(null);
     subscriptions.splice(0).forEach(unsubscribe);timers.splice(0).forEach(function(id){win.clearTimeout(id);});
     if(removeChange)removeChange();if(removeDestroy)removeDestroy();
   }
@@ -523,6 +667,15 @@ function wireLiveStatusClaude(ctl,page,win){
     var resource=desired?list.filter(function(item){return item && host(item.url) && host(item.url)===host(desired);})[0]:list[0];
     if(!resource || !resource.id){api.note('No Atlassian site is available to this account.','warn');status({state:'disconnected',busy:false});stop();return;}
     site=resource.url;cloudId=resource.id;syncWatches();status({busy:busy()});
+    if(historyOffered)api.setHistory({load:function(progress){
+      if(stopped)return Promise.reject(new Error('Jira connection ended'));
+      var issues=Object.create(null),flagged=Object.create(null);
+      chunks.forEach(function(chunk){
+        (chunk.issues || []).forEach(function(issue){if(issue && issue.key)issues[issue.key]=issue;});
+        (chunk.flagged || []).forEach(function(issue){if(issue && issue.key)flagged[issue.key]=true;});
+      });
+      return liveStatusHistoryLoad({mcp:mcp,server:server,cloudId:cloudId,today:api.snapshot().states,issues:issues,flagged:flagged},progress);
+    }});
   }
   var pending;
   try{pending=use.call(claude,'mcp');}catch(ex){status({state:'disconnected',busy:false});return null;}
@@ -550,6 +703,12 @@ function wireLiveStatusClaude(ctl,page,win){
       ['Atlassian MCP','Atlassian'].some(function(name){if(qualified.indexOf(name)>=0)server=name;return !!server;});
       if(!server && qualified.length)server=qualified[0];
       if(!server){api.note(addConnector,'info');status({state:'disconnected',busy:false});stop();return null;}
+      // Over time needs getJiraIssue. A connector without it keeps today's board and shows no button.
+      listed.forEach(function(candidate){
+        if(!candidate || (candidate.server || candidate.name)!==server || !Array.isArray(candidate.tools))return;
+        var offered=candidate.tools.map(function(tool){return typeof tool==='string'?tool:tool && tool.name;});
+        historyOffered=LIVE_STATUS_HISTORY_TOOLS.every(function(tool){return offered.indexOf(tool)>=0;});
+      });
       // GitHub is optional and also chosen by offered tools. "GitHub" is only a tie-break.
       var githubServers=[];
       listed.forEach(function(candidate){

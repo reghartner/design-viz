@@ -406,9 +406,11 @@ test('A5 Day 10 recorded payloads map to the provider shape: series, values, uni
  assert.ok(consumed.length>10 && consumed.at(-1)[1]>0,'the recorded notify stream flows on Day 10');
  assert.deepEqual(map.notify.signals.rate,{value:consumed.at(-1)[1],series:consumed,unit:'req/h'},'A5 the Loki metric series and its last value');
  assert.deepEqual(Object.keys(map.notify.signals),['rate'],'A5 the tempo signal is not mapped');
- // The push edge is silent: the query ran and matched nothing.
- assert.deepEqual(rec('query_loki_logs',LOKI(Q.pushSent)).data,[],'the recorded push stream is empty');
- assert.deepEqual(map['notify->app'].signals,{rate:{value:0,series:[],unit:'req/h'},errors:{value:0,series:[],unit:'req/h'}},'A5 no data is value 0 with no points');
+ // #994: the demo now authors measured zero, distinct from missing historical evidence.
+ for(const [name,query] of [['rate',Q.pushSent],['errors',Q.pushFailed]]){
+  const points=lokiPoints(rec('query_loki_logs',LOKI(query)));assert.ok(points.length>0 && points.every(p=>p[1]===0),'A5 explicit push zeros');
+  assert.deepEqual(map['notify->app'].signals[name],{value:0,series:points,unit:'req/h'},'A5 measured silence keeps its samples');
+ }
  // Story checks: degraded after the firmware 2.4.1 deploy.
  const ratio=map['mcu->ingest'].signals.errors.value/map['mcu->ingest'].signals.rate.value;
  assert.ok(ratio>0.03 && ratio<0.05,'A5 the event edge error ratio is about 4% at the end of Day 10: '+ratio);
@@ -464,7 +466,7 @@ test('A6 the page window drives range and step; Day 11 shows the incident and th
  assert.ok(Math.max(...(m11['ingest->notify']?.signals.lag?.series || []).map(p=>p[1]))>=2000,'A6 Day 11 the route queue lags');
  const day12=await setup({day:11}),{map:m12}=await day12.refresh();
  assert.ok(m12['ingest->notify']?.signals.lag?.value<100,'A6 Day 12 the queue has recovered');
- assert.deepEqual(m12['notify->app']?.signals.rate,{value:0,series:[],unit:'req/h'},'A6 Day 12 push is still silent');
+ assert.deepEqual(m12['notify->app']?.signals.rate,{value:0,series:lokiPoints(record(day12.net.handleMcp,{day:11},'query_loki_logs',LOKI(Q.pushSent))),unit:'req/h'},'A6 Day 12 push is explicitly measured silent');
  assert.deepEqual(m12.ingest?.markers,[],'A6 no annotation inside Day 12');
  const silent=await setup({scenario:'all-todo'}),{map:quiet}=await silent.refresh();
  assert.deepEqual(quiet['button->mcu']?.signals.rate,{value:0,series:[],unit:'press/h'},'A6 a silent scenario reports zeros');
@@ -598,4 +600,17 @@ test('A1 disabled boot does not discover; editor enabling creates the adapter an
 });
 test('A1 explicit standalone false defeats automatic fallback across editor renders',async t=>{
  const h=await bootHarness({hostProvider:false});t.after(()=>h.destroy());assert.equal(h.host.used(),0);assert.equal(h.renders[0].ctl.telemetry.snapshot().available,false);h.rerender(boardPage('6h'));await settled();assert.equal(h.host.used(),0);assert.equal(h.renders[1].ctl.telemetry.snapshot().available,false);
+});
+
+test('A12 history over the raw mock MCP handler preserves Day 9 gaps, explicit push zero and Day 12 degradation',async()=>{
+ const s=await setup({day:11}),range={from:'2026-10-21T00:00:00.000Z',to:'2026-11-01T00:00:00.000Z'},signal=new AbortController().signal,notes=[];
+ const map=await s.adapter.options.history(s.bindings(),range,signal,{note:t=>notes.push(t)});
+ assert.deepEqual(notes.filter(Boolean),[]);
+ const expected=s.bindings().flatMap(b=>Object.values(b.signals)).filter(v=>['grafana','loki'].includes(v.source)).length;
+ assert.equal(s.net.calls.length,expected,'one range per explicit supported binding and no annotation/link calls');
+ for(const call of s.net.calls){assert.ok(['query_prometheus','query_loki_logs'].includes(call.tool));assert.equal(call.input.stepSeconds,86400);assert.equal(call.input.startTime || call.input.startRfc3339,range.from);assert.equal(call.input.endTime || call.input.endRfc3339,range.to);}
+ const day9=s.C.telemetryHistoryDay(map,{at:'2026-10-29T00:00:00.000Z'}),day12=s.C.telemetryHistoryDay(map,{at:range.to});
+ assert.equal(day9['mcu->ingest'],undefined,'Day 9 missing events are not borrowed from Live or zero-filled');
+ assert.equal(day9['notify->app'].signals.rate.value,0,'explicit Day 9 push silence');
+ assert.ok(day12['mcu->ingest'].signals.errors.value/day12['mcu->ingest'].signals.rate.value>.01,'Day 12 event exceeds its ratio limit');
 });

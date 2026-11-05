@@ -325,24 +325,50 @@ both artifacts. Oversized handwritten artifacts are refused before replacing
 the last saved pair.
 
 **Preview Agent Updates** in the update banner at the top of the workbench opens a
-full-window proposed rendering (the Agent window only notes that an update waits), with **Current**
-and **Proposed** controls in the pinned decision bar. Change highlights start
-on: Proposed marks added content in green and modified content in amber;
-Current marks removed counterparts in red and modified counterparts in amber.
-The compact legend reports the number of document, section, node, edge, panel,
-step, path, layout and View changes in the selected state. Use **Highlights: On/Off** when the
-unmarked rendering is easier to inspect. Highlights follow redraws, paths and
-contained Explore navigation; they do not become spec data.
+full-window side-by-side comparison (the Agent window only notes that an update
+waits): the current document (**Before**) on the left, the proposal (**After**)
+on the right, and a list of changes beside them, grouped by section. The pinned
+decision bar counts added, removed and modified changes.
 
-Use **Next change** / **Previous change** or open **Changes** for a navigable
-list with added, removed and modified labels. Changes can select another section,
-View or path; removed objects open in Current. Document metadata and coverage
-ledger changes open Details. A section excluded from all Views has a source
-fallback there. These controls never edit or accept the proposal.
+Click a change, use **Next change** / **Previous change**, or press J / K (both
+wrap around) to select it. Selecting a change frames the changed object in both
+panes: it can open another section, View, path or step, and it marks added,
+removed and modified objects. Removed objects appear only in Before and added
+objects only in After. In **Focused** mode a coverage ledger change shows only its
+changed lines, numbered, Before on the left and After on the right, with removed words
+marked on the Before side and added words on the After side; a document metadata change
+(title, description and other page fields) shows each changed field's Before and After
+value ("Not set" when one side has none). In **Full diagram** these changes open Details,
+which also shows the current document's ledger and JSON. The comparison opens on the
+first change that is not a ledger or metadata change, and on one of those only when
+every change is one. A section
+excluded from all Views has a source fallback there. Pan and zoom in one pane
+do not move the other. These controls never edit or accept the proposal, and
+Accept does not depend on which change is selected.
 
-Switching Current/Proposed preserves matching section, View, path and step
-identities, reader scroll and camera zoom. Reordered registries do not redirect
-the comparison to another object. Missing counterparts have an explicit fallback.
+The comparison opens **Focused**. A change to a step's caption, panel values, panel
+visibility or time, and a panel change that shows at a numbered step, show each
+side's step controls at that step and then only the panels that differ there: one
+row per panel with Before on the left, After on the right, a label per changed value
+(for example `value 6 → 42`) and the range of steps where the panel differs. A
+caption change also shows a word diff. Dots on the step buttons mark edited steps and
+steps whose reader view differs because of an earlier edit. Clicking a step on either
+side moves the other side to its paired step (steps pair by id, content, caption, or
+as the one remaining step); when the other document has no paired step, that side
+shows "Step not in the current document" or "Step not in the proposal". A node or
+connection change, local or imported, frames both full diagrams on the changed node and
+its direct neighbours (for a connection: both endpoints and their neighbours), with the
+change outlined; a side without the node frames its neighbours there. **Zoom out**
+widens both frames by the same factor and **Whole section** fits each section; the next
+change crops again. A step edit that only changes the highlighted nodes or connections,
+and a path edit, keep both full diagrams under each side's step controls, opened at the
+affected step with that step marked; clicking a step moves both diagrams. The list of
+changes names the affected steps ("affects step 3", "affects steps 3-4"); for a path
+edit these are the positions where the path's step list differs, and a label-only path
+edit names none. Other changes (sections and a panel change seen only in Ambient mode)
+show both full diagrams with the note "This change shows in the full diagram." **Full diagram**
+shows both full diagrams for every change until **Focused** is chosen again.
+
 A refreshed proposal replaces the list and retires the previous navigation state;
 its separate acceptance guard still requires review of the refreshed version.
 

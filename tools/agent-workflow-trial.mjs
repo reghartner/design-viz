@@ -252,8 +252,8 @@ try {
   await expect(page.locator('#agent-update-view')).toContainText('Front door camera');
   await expect(page.locator('#agent-update-view')).toContainText('Delivery API');
   assert.equal(await page.locator('#src').inputValue(),human);
-  await page.locator('#agent-update-current').click();await expect(page.locator('#agent-update-commit')).toBeDisabled();
-  await page.locator('#agent-update-proposed').click();
+  await expect(page.locator('#agent-update-view-before'),'the current document is shown beside the proposal').toBeVisible();
+  await expect(page.locator('#agent-update-commit')).toBeEnabled();
   await commit(external,first,'independent-merge');
   await page.locator('#undo-builder').click();assert.equal(await page.locator('#src').inputValue(),human);
   await page.locator('#redo-builder').click();

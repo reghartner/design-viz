@@ -113,6 +113,15 @@ export interface NativeViewerOptions {
      * failed query beside answered ones. A rejection with `state: 'approval'`
      * reports the approval state instead of an error. */
     provider?: (bindings: TelemetryBinding[], signal: AbortSignal, report: {note: (text: string) => void}) => Promise<Record<string, TelemetrySample>>;
+    /** Click-only Over time batch. Absolute RFC3339 evaluation endpoints, each
+     * representing the previous 24h. Optional endpoints give the exact selected-day
+     * instants (local-day boundaries can be 23h/25h apart across DST). Return
+     * per-signal series; omitted days are
+     * unobserved. No live headline fallback. Optional: a live-only provider works.
+     * report.note keeps partial errors visible and the failed batch retryable. */
+    history?: (bindings: TelemetryBinding[], range: {from: string; to: string; endpoints?: {key?: string; at: string}[]}, signal: AbortSignal, report: {note: (text: string) => void}) => Promise<Record<string, TelemetrySample>>;
+    /** Include mutable datasource/account identity in the controller-local cache key. */
+    historyKey?: string | (() => unknown);
     /** Starts unavailable when false. The controller setAvailable(boolean) updates
      * capability availability without enabling Metrics; page/host disable always wins. */
     available?: boolean;

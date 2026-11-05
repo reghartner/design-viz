@@ -472,6 +472,13 @@ function createTelemetry(page,options,hooks){
   }
 
   var api={
+    // Read-only capability: rendering must never discover tools or fetch details.
+    canChooseExemplar:function(id,token,traceId){
+      if(retired || !enabled || past || !available || typeof options.chooseExemplar!=='function' || typeof options.canChooseExemplar!=='function')return false;
+      var sample=liveMap[id],e=sample && (sample.exemplars || []).find(function(e){return e.selectionToken===token;});
+      if(!e || !e.candidates.some(function(c){return c.traceId===traceId && c.traceId!==e.traceId;}))return false;
+      try{return options.canChooseExemplar(id,token,traceId)===true;}catch(ex){return false;}
+    },
     // Explicit user action only. Never called by paint, history or captions.
     chooseExemplar:async function(id,token,traceId){
       if(retired || !enabled || past || !available || typeof options.chooseExemplar!=='function')throw new Error('Trace selection unavailable.');

@@ -146,7 +146,16 @@ function liveStatusTelemetryActivity(){
     });
     events=liveStatusActivity([],events);
   }
-  return {observe:observe,reconcile:reconcile,retire:function(ids){ids.forEach(function(id){delete scopes[id];});events=events.filter(function(event){return ids.indexOf(event.carrier)<0;});},
+  function pin(binding,exemplar,at){
+    var key=telemetryBindingKey(binding),identity=JSON.stringify([key,exemplar.provider,exemplar.traceId]);
+    if(events.some(function(e){return e.carrier===binding.id && e.identity===identity;}))return false;
+    var candidate=exemplar.candidates.find(function(c){return c.traceId===exemplar.traceId;});
+    events.unshift({type:'telemetry',kind:'trace-pin',carrier:binding.id,binding:key,title:binding.title,identity:identity,
+      traceId:exemplar.traceId,provider:exemplar.provider,at:at,traceAt:candidate && candidate.time || exemplar.spans.map(function(s){return s.time;}).sort(function(a,b){return Date.parse(a)-Date.parse(b);})[0] || null,
+      text:'Pinned trace '+exemplar.traceId+' as evidence (this session)',url:telemetryTraceUrl(exemplar.url,exemplar.provider)});
+    events=liveStatusActivity([],events);return true;
+  }
+  return {pin:pin,observe:observe,reconcile:reconcile,reconcileTraces:function(snapshot){if(!snapshot.historical)events=events.filter(function(e){return e.kind!=='trace-pin' || snapshot.map[e.carrier] && (snapshot.map[e.carrier].exemplars || []).length;});},retire:function(ids){ids.forEach(function(id){delete scopes[id];});events=events.filter(function(event){return ids.indexOf(event.carrier)<0;});},
     clear:function(){scopes=Object.create(null);events=[];},snapshot:function(){return JSON.parse(JSON.stringify(events));}};
 }
 function liveStatusActivity(jira,telemetry){
@@ -700,7 +709,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function reducedMotion(){return typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');}
   var motion=reducedMotion();
-  function motionChanged(){if(motion.matches)view.querySelectorAll('.dv-live-changed').forEach(function(el){el.classList.remove('dv-live-changed');});}
+  function motionChanged(){if(motion.matches){view.querySelectorAll('.dv-live-changed').forEach(function(el){el.classList.remove('dv-live-changed');});bindings.forEach(function(b){if(b.stepper && b.stepper.clearTraceTiming)b.stepper.clearTraceTiming();});}}
   if(motion && motion.addEventListener)motion.addEventListener('change',motionChanged);
   var remotePages=Object.create(null),originalLoad=renderOptions && renderOptions.loadDetail,wrappedLoad=null;
   function copy(value){return JSON.parse(JSON.stringify(value));}
@@ -768,7 +777,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   var telemetryHooks={carriers:eachCarrier,historyCarriers:historyCarriers,diagrams:eachDiagram,jira:function(){return map;},
     observed:telemetryActivity.observe,reset:telemetryActivity.clear,retire:telemetryActivity.retire,
-    changed:function(){if(!retired){telemetryActivity.reconcile(telemetry.snapshot().carriers);paint();notify();}}};
+    changed:function(){if(!retired){telemetryActivity.reconcile(telemetry.snapshot().carriers);telemetryActivity.reconcileTraces(telemetry.snapshot());paint();notify();}}};
   var telemetry=createTelemetry(page,telemetryOptions,telemetryHooks);
   ctl.telemetry=telemetry;
   // Metrics canvas cues on every bound section, beside the Jira paint (src/viewer/telemetry.js).
@@ -1164,6 +1173,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
     el.classList.add('dv-live-changed');
     if(!el._livePulseEnd){el._livePulseEnd=function(ev){if(!ev.animationName || ev.animationName==='dvnodepulse'){el.classList.remove('dv-live-changed');}};el.addEventListener('animationend',el._livePulseEnd);}
   }
+  function pinTrace(id,exemplar){
+    var snapshot=telemetry.snapshot(),sample=snapshot.map[id],binding=snapshot.carriers.find(function(c){return c.id===id;});
+    if(retired || snapshot.historical || !binding || !sample || !(sample.exemplars || []).some(function(e){return e.traceId===exemplar.traceId && e.selectionToken===exemplar.selectionToken;}))return false;
+    var added=telemetryActivity.pin(binding,exemplar,new Date().toISOString());notify();return added;
+  }
   function paintStory(binding){
     var stepper=binding.stepper,d=binding.section.diagram,scope=binding.el;
     scope.querySelectorAll('.dv-live-caption').forEach(function(el){el.remove();});
@@ -1171,7 +1185,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var host=step && scope.querySelector('.termbar .step-text'),keys=step?liveStatusStepTickets(d,step,true):[];
     var row=host && host.querySelector('.dv-live-step-tickets');
     scope.querySelectorAll('.dv-live-step-tickets').forEach(function(el){if(el!==row || !keys.length)el.remove();});
-    if(!host)return;
+    if(!host){telemetryPaintStep(binding,telemetry.snapshot(),map,on,telemetry,pinTrace);return;}
     if(keys.length){
       var tickets=keys.map(function(key){return {key:key,url:liveStatusTicketURL(binding.page.tracking,key,map[key],liveStatusPageTicketURL(binding.page,key))};});
       var signature=JSON.stringify(tickets);
@@ -1194,6 +1208,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }
     var text=availabilityOn && presentationActive()?liveStatusCaption(d,step,map,ticketWaiting):'';
     if(text){var caption=element('span','dv-live-caption dv-live-state-pill',text,host);liveStatusClass(caption,liveStatusStep(d,step,map));if(!caption.getAttribute('data-live-appearance'))liveStatusInk(caption,null);}
+    telemetryPaintStep(binding,telemetry.snapshot(),map,on,telemetry,pinTrace);
   }
   function laneLabel(id,source){return ((source.lanes || {})[id] || {}).label || id;}
   function laneRecords(){
@@ -1467,7 +1482,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     stepHooks.splice(0).forEach(function(off){off();});
   }
   function syncBindings(){
-    releaseBindings();bindings=sourceBindings();
+    releaseBindings();var previous=bindings;bindings=sourceBindings();
+    previous.forEach(function(old){if(!bindings.some(function(b){return b.el===old.el && b.stepper===old.stepper;}))telemetryClearStep(old.el);});
     bindings.forEach(function(binding){
       ['dv:pathrender','dv:pathchange','dv:stepchange'].forEach(function(type){binding.el.addEventListener(type,schedule);});
       if(binding.stepper && binding.stepper.onBeforeAdvance)stepHooks.push(binding.stepper.onBeforeAdvance(function(index){
@@ -1600,7 +1616,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     editSave:function(){if(!retired && editor)editor.save();},
     editDiscard:function(){if(!retired && editor)editor.discard();},
     destroy:function(){
-      if(retired)return;on=false;paintLanes();retired=true;releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);telemetryClearCards(view);if(demoDestroy)demoDestroy();
+      if(retired)return;on=false;paintLanes();retired=true;bindings.forEach(function(b){telemetryClearStep(b.el);b.el.querySelectorAll('.dv-proof-caption').forEach(function(el){el.remove();});});releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);telemetryClearCards(view);if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];

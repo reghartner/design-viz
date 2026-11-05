@@ -187,7 +187,10 @@ function createTelemetryTraces(page,win,now,bound){
     // Revalidate metadata on explicit actions, including cached alternatives.
     try{await discover();if(!active(entry.epoch))telemetryTraceFail('Trace selection expired.');var attempt=entry.attempt=(entry.attempt || 0)+1,value=await detail(entry,candidate,'explicit user selection');if(!active(entry.epoch) || attempt!==entry.attempt)telemetryTraceFail('Trace selection replaced.');entry.selected=Object.assign({},value,{selectionReason:'explicit user selection; first explicit trace signal in authored order'});return entry.selected;}catch(e){throw fail(e);}
   }
-  return {options:{provider:provider,chooseExemplar:choose,available:false,source:'Traces'},attach:function(next,nextPage){
+  function canChoose(id,token,traceId){
+    var entry=entries.get(id);return !!(entry && entry.token===token && active(entry.epoch) && contracts[entry.job.signal.source] && entry.key===JSON.stringify([ctl.telemetry.bindings().find(function(b){return b.id===id;}),trackingTelemetry(current)]) && entry.candidates.some(function(c){return c.traceId===traceId;}));
+  }
+  return {options:{provider:provider,chooseExemplar:choose,canChooseExemplar:canChoose,available:false,source:'Traces'},attach:function(next,nextPage){
     ctl=next;current=nextPage || current;invalidate();var mine=ctl;discover().catch(function(e){if(ctl===mine){fail(e);if(ctl===mine)ctl.telemetry.setAvailable(false);}});
     off=ctl.telemetry.onChange(function(s){if(!s.enabled && entries.size)invalidate();});
     return {destroy:function(){if(ctl!==mine)return;invalidate();if(off)off();off=null;ctl=null;namespace=null;}};

@@ -55,6 +55,14 @@ if (comparison) {
 }
 ```
 
+Before exposing that optional action, use the synchronous read-only
+`ctl.telemetry.canChooseExemplar(carrierId, selectionToken, traceId)`. It checks
+the live session, actual candidate, current tools/handler and adapter token
+without querying. Host adapters that offer selection supply both
+`chooseExemplar` and a read-only `canChooseExemplar` callback; without the latter
+the alternative control stays hidden. The action still revalidates tools and
+token/epoch ownership when clicked.
+
 `TelemetryExemplar` in `src/native/mount.d.ts` is the serializable shape:
 
 - `version: 1`, `provider: honeycomb | tempo`, actual `traceId`, selected signal

@@ -1949,7 +1949,30 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   }
   paintChips();
 
+  var tracePackets=[],tracePending=[];
+  function clearTraceTiming(){
+    tracePending.forEach(clearTimeout);tracePending=[];
+    tracePackets.forEach(function(dot){dot.remove();});tracePackets=[];
+  }
+  function playTraceTiming(packets){
+    if(destroyed || mode!=='step' || hidden)return false;
+    stopAuto();clearLit();
+    if(RM || typeof window.matchMedia==='function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)return false;
+    packets.forEach(function(packet){
+      var info=board.edgeIds[packet.edge],original=info && svg.getElementById(prefix+'-am-'+info.idx);
+      if(!original || steps[cur].keys.indexOf(packet.edge)<0 || !Number.isFinite(packet.startMs) || packet.startMs<0 || !Number.isFinite(packet.ms) || packet.ms<0)return;
+      var dot=original.parentNode.cloneNode(false);dot.classList.add('dv-trace-packet');dot.style.visibility='hidden';
+      var motion=packetMotion(info.domId,packet.ms/1000,'indefinite',true);
+      // Preserve sub-millisecond evidence and true zero; packetMotion's normal
+      // authored presentation rounds seconds to two decimals.
+      motion.setAttribute('dur',String(packet.ms)+'ms');
+      dot.appendChild(motion);svg.appendChild(dot);tracePackets.push(dot);
+      fireDot(packet.edge,packet.startMs,motion,packet.ms);
+    });
+    return !!tracePackets.length;
+  }
   function clearLit(){
+    clearTraceTiming();
     clearCommunicationFailures(board);
     pending.forEach(function(t){ clearTimeout(t); });
     pending = [];
@@ -1986,17 +2009,20 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     activeOverview={keys:keys,failures:steps[cur] && steps[cur].failures};
     if(options && options.activeChanged)options.activeChanged();
   }
-  function fireDot(key, delayMs){
+  function fireDot(key, delayMs, traceMotion, durationMs){
     var info = board.edgeIds[key];
     if (!info || RM) return;
-    var am = svg.getElementById(prefix + '-am-' + info.idx);
+    var am = traceMotion || svg.getElementById(prefix + '-am-' + info.idx);
     if (!am) return;
     var go = function(){
       if (destroyed) return;
       am.parentNode.style.visibility = 'visible';
-      try { am.beginElement(); } catch (ex) {}
+      if(traceMotion && durationMs===0){
+        var path=svg.getElementById(info.domId),point=path.getPointAtLength(path.getTotalLength());
+        am.parentNode.setAttribute('transform','translate('+point.x+' '+point.y+')');
+      }else try { am.beginElement(); } catch (ex) {}
     };
-    if (delayMs > 0) pending.push(setTimeout(go, delayMs));
+    if (delayMs > 0) (traceMotion?tracePending:pending).push(setTimeout(go, delayMs));
     else go();
   }
   function clearCaptionTween(){
@@ -2173,6 +2199,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     return true;
   }
   function settleCurrentStep(){
+    clearTraceTiming();
     settleCommunicationFailures(board);
     pending.forEach(function(t){ clearTimeout(t); });
     pending = [];
@@ -2276,6 +2303,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   if (document.addEventListener) document.addEventListener('visibilitychange', visibilityChanged);
   captionLine.hidden=true;clearPathControls();syncToggle(); syncPlayback();
   return {
+    playTraceTiming:playTraceTiming,
+    clearTraceTiming:clearTraceTiming,
     sectionEl: secBox,
     scrollTargetEl: boardDiv,
     enterStep: enterStep,
@@ -2290,6 +2319,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       pathLabelWidth=next;paintChips();if(mode==='step')syncPathControls();
     },
     setViewFilter:function(pathIds,stepIds){
+      clearTraceTiming();
       var filter=sectionViewFilter(source,pathIds,stepIds),nextPaths=filter.paths,nextSteps=filter.steps;
       if(JSON.stringify(nextPaths)===JSON.stringify(visiblePathIds) && JSON.stringify(nextSteps)===JSON.stringify(visibleStepIds) && editingStep===null && editingPathId===null)return;
       var playing=!!timer,wasMode=mode;stopAuto();visiblePathIds=nextPaths;visibleStepIds=nextSteps;editingStep=null;editingPathId=null;

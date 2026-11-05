@@ -1775,6 +1775,55 @@ panel keeps its `editHistory` field; the history is shown once the author adds
 the declaration above.
 ## Story mode
 
+Step captions append the shared Proof verdict after the existing Jira suffix and
+ticket links. The verdict is the worst of the step's directly selected carriers;
+headline numbers come from the primary carrier (the first direct carrier in the
+existing edge-then-node walk). The calculation is scoped to this source section
+and selected path, so duplicate step IDs in imported sections cannot collide.
+With Jira Live off, numeric evidence can still show its telemetry-only verdict.
+
+In Step mode, **Trace evidence** appears below the controls in the diagram column
+only when that primary carrier has a validated exemplar. It reuses the Trace
+panel's span rows, coverage model and notices. The card identifies the actual
+trace, original candidate/span timestamp, selection reason, original range,
+provider completeness and warnings. Receipt time never supplies the trace age.
+Exact authored `traceMatch` selectors use the same FlowCanon matcher as trace
+comparison, on the selected path; no labels or names create bindings. Explicit
+expectations absent from the sample show **never**, with the qualification
+“absence here is one observed request, not proof that this never runs”. Unknown,
+partial, ambiguous and unmapped evidence cannot establish completeness.
+
+**Play this trace** is a temporary runtime action for uniquely mapped current-step
+edges. Recorded start offsets and durations (including zero and overlapping
+attempts) drive ordinary packet motion. Navigation, path/view changes, history,
+trace replacement, clear, off and destroy retire the temporary packets. Authored
+timing, document source and Undo are unchanged. Reduced motion suppresses motion.
+
+**Pick passing trace** requires an actual alternative candidate with an observed
+passing status and a current provider capability. Tempo search status is unknown,
+so it does not invent this action. **Open trace** requires an actual safe provider
+UI URL; missing URLs and capabilities hide their actions. **Pin as evidence**
+adds a deduplicated in-memory Activity entry, including when numeric Proof is
+absent. Its pin timestamp is distinct from the trace observation time. Activity
+keeps at most 20 entries; telemetry retirement also retires its pins. Nothing is
+posted externally or persisted.
+
+Metrics remains off by default, uses the page's 24h default window, and is
+independent of Jira Live. Permitted host-preloaded evidence may render before a
+Metrics decision; explicit off retires it. Ambient hides the card, and Over time
+never borrows live exemplars. Root/page/host disable suppresses evidence and its
+dependent controls on local, imported and asynchronously loaded details alike.
+
+For a reproducible desktop fixture using actual shared mock-story IDs/spans and
+explicit mappings, run `python3 tools/build.py --no-config` followed by
+`node tools/step-evidence-demo.mjs`. Open
+`.local/step-evidence/demo/step-evidence.html`, choose **Step**, then **Metrics**.
+The fictional fixture offers Play, Pick passing trace and Pin. Its mock provider
+returns no UI URL, so Open stays absent. Choose **Over time**, then move **Day**:
+numeric Proof follows the selected day and the live Trace card disappears.
+Return to **Live** to restore current evidence. This fixture performs no live
+account queries.
+
 Live evidence follows the story's nodes and edges. Diagrams with a Live status
 panel omit the team lane chip from their step captions. In Step mode, each Jira
 ticket appears on its own line immediately below the authored step text, with

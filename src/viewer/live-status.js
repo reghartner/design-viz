@@ -1238,7 +1238,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
       }
       carrierPointer(el,target);
     });
-    paintJiraCues(scope,d);
+    // Jira cues are placed once, after Metrics cards in paintMetrics(). A second
+    // pass would discard the handoff card's transferred keyboard ticket target.
     scope.querySelectorAll('g.coin[data-dv-step],button.schip[data-step-source]').forEach(function(el){
       var index=Number(el.getAttribute(el.classList.contains('coin')?'data-dv-step':'data-step-source')),step=(d.steps || [])[index];
       liveStatusClass(el,on && availabilityOn && step && coverageActive?liveStatusStep(d,step,map):null);

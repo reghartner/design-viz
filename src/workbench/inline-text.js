@@ -61,6 +61,12 @@ function createInlineTextEditor(opts){
       field:'title',value:'trimmed',html:true,label:'Panel title',help:'Enter or click outside saves. Escape cancels.',
       // Home map can decorate an untitled Standard bar with just a layout button.
       accept:function(value,el){return el.matches('.explore-window-grip') || !!value.title;}},
+    {kind:'section',selector:'.sec-h',field:'heading',value:'trimmed',html:true,label:'Section heading',help:'Enter or click outside saves. Escape cancels.',
+      plan:function(c,value){return planSetSectionIdentity(c.snapshot.text,c.snapshot.raw,c.target.section,'heading',value);}},
+    {kind:'document',selector:'.doc-title,#workbench-editor-title',target:function(){return {kind:'document'};},field:'title',value:'trimmed',html:true,label:'Document title',help:'Enter or click outside saves. Escape cancels.',
+      // The desktop app bar also shows an untitled fallback. Only authored text edits.
+      accept:function(value){return !!value.title;},
+      plan:function(c,value){return planDocumentSetting(c.snapshot.text,c.snapshot.raw,'title',value);}},
     edgeLabel,
     // Rename on a connection that has no label yet opens from its arrow.
     Object.assign({},edgeLabel,{selector:null,creation:true}),
@@ -269,13 +275,17 @@ function createInlineTextEditor(opts){
   },true);
   life.listen(document,'pointerdown',function(e){if(active && !inside(e.target) && finish(true,false,opts.targetFromEvent(e))===false){e.preventDefault();e.stopImmediatePropagation();}},true);
   life.listen(document,'focusin',function(e){if(active && !inside(e.target))finish(true,false,opts.targetFromEvent(e));});
-  life.listen(view,'dblclick',function(e){
+  function doubleClick(e){
     if(e.target.closest('.dv-inline-editor,a,input,select,textarea,summary,[contenteditable],.nlink'))return;
     // Only the explicit panel title grip is an editable button.
     var button=e.target.closest('button,[role="button"]');
     if(button && !button.matches('.explore-window[data-explore-panel] > .explore-window-header > .explore-window-grip'))return;
     var el=e.target.closest(openSelector);if(el){e.preventDefault();e.stopPropagation();open(el);}
-  },true);
+  }
+  life.listen(view,'dblclick',doubleClick,true);
+  // Current desktop chrome displays the document title outside the preview.
+  // This one explicit surface shares the same active guard and editor lifetime.
+  if(opts.documentTitle)life.listen(opts.documentTitle,'dblclick',doubleClick,true);
   life.listen(view,'keydown',function(e){if(e.target.matches(keySelector) && e.key==='Enter' && !e.isComposing){e.preventDefault();e.stopImmediatePropagation();open(e.target);}},true);
   life.listen(opts.src,'input',clear);life.listen(view,'dv:pathchange',clear);
   return {open:open,clear:clear,decorate:decorate,refresh:function(){if(active && !fresh(active.c))clear();decorate();},destroy:function(){clear();life.destroy();}};

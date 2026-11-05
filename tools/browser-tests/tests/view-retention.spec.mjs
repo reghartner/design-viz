@@ -56,3 +56,31 @@ test('removing the selected view uses the remaining authored default',async({pag
   await renderJSON(page,raw=>{raw.page.blocks[0].diagram.layouts.pop();});
   await expect(section(page)).toHaveAttribute('data-view-id','home-story');
 });
+
+// #964: edit the real title surfaces while a nondefault View is selected.
+// Both pinned and closed Contents must survive every source/history publication.
+for(const contentsOpen of [false,true])test('inline heading and document title preserve selected View and Contents '+(contentsOpen?'open':'closed')+' through save and Undo/Redo',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:900});await page.goto(server.origin+'/workbench.html');
+ const original=JSON.stringify(fixture('named'),null,2);await paste(page,original);await prepareEditorSurface(page);
+ const src=page.locator('#src'),nav=page.locator('#docview>.explore-navigation'),toggle=nav.locator('.reader-top>button'),contents=nav.locator('.reader-contents');
+ await nav.getByRole('button',{name:'Data flow',exact:true}).click();
+ if((await toggle.getAttribute('aria-expanded')==='true')!==contentsOpen)await toggle.click();
+ async function retained(){
+  await expect(section(page)).toHaveAttribute('data-view-id','service-flow');await expect(toggle).toHaveAttribute('aria-expanded',String(contentsOpen));
+  if(contentsOpen)await expect(contents).toBeVisible();else await expect(contents).toBeHidden();
+ }
+ await retained();
+ for(const documentTitle of [false,true]){
+  // In current desktop chrome .doc-title is hidden; its app-bar counterpart is visible.
+  const title=documentTitle?page.locator('#workbench-editor-title'):section(page).locator('.sec-h');
+  const edit=page.locator('.dv-inline-editor').getByRole('textbox',{name:documentTitle?'Document title':'Section heading',exact:true});
+  const name=documentTitle?'Retitled document':'Retitled section',before=documentTitle?'View retention':'Doorbell story';
+  await title.dblclick();await expect(edit).toBeVisible();await expect(edit).toBeFocused();await expect(edit).toHaveValue(before);await expect(src).toHaveValue(original);
+  await edit.pressSequentially(name);await edit.press('Enter');await expect(edit).toHaveCount(0);
+  const saved=await src.inputValue(),want=JSON.parse(original);if(documentTitle)want.page.title=name;else want.page.blocks[0].heading=name;
+  expect(JSON.parse(saved)).toEqual(want);await expect(title).toContainText(name);await retained();
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);await expect(title).toContainText(before);await retained();
+  await page.locator('#redo-builder').click();await expect(src).toHaveValue(saved);await retained();
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);await retained();
+ }
+});

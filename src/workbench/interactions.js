@@ -38,7 +38,7 @@ function createBuilderInteractions(opts){
     }});
   life.own(function(){textEditor.destroy();});
 
-  var inlineEditor=createInlineTextEditor({view:view,document:document,window:window,src:src,session:session,
+  var inlineEditor=createInlineTextEditor({view:view,document:document,window:window,src:src,session:session,documentTitle:document.getElementById('workbench-editor-title'),
     disabled:function(){return !!(addToStep || connect) || opts.isActive && !opts.isActive();},pause:pausePreview,targetFromEvent:targetFromEvent,findTargetEl:findTargetEl,
     currentStep:function(el){return currentStepTarget(el.closest('.stepline'));},
     commit:function(plan,snapshot,target,nextTarget){

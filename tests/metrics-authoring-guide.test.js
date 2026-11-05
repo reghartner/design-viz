@@ -68,10 +68,11 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
     errors:{loki:'sum(count_over_time({route="$route"} |= "error" [5m]))',unit:'req/h'}},
     proof:{rate:{min:1,max:1000},errors:{max:0.1,maxRatioOf:'rate'}},
     links:{dashboard:'https://grafana.example/d/api',query:'https://grafana.example/explore?route=$route'}};
-  const authoredRoot={enabled:false,grafana:{prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'sql-main'},
+  const authoredRoot={enabled:false,environment:'qa',environments:{qa:{grafana:{prometheus:'prom-qa'}},prd:{}},grafana:{baseUrl:'https://grafana.example',prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'sql-main'},
     honeycomb:{environment:'prod',dataset:'api-prod'},window:'7d',refreshMs:300000,templates:{'http-call':template}};
   const rootWarnings=[],parsed=C.trackingTelemetry({tracking:{telemetry:authoredRoot}},(at,message)=>rootWarnings.push(at+': '+message));
   assert.deepEqual(rootWarnings,[]);
+  assert.equal(parsed.environment,'qa');assert.equal(parsed.environments.qa.grafana.prometheus,'prom-qa');assert.deepEqual(plain(parsed.environments.prd),{grafana:{},honeycomb:{}});
   assert.equal(parsed.enabled,false);assert.deepEqual(plain(parsed.grafana),authoredRoot.grafana);
   assert.deepEqual(plain(parsed.honeycomb),authoredRoot.honeycomb);assert.equal(parsed.window,'7d');assert.equal(parsed.refreshMs,300000);
   const parsedTemplate=parsed.templates['http-call'];
@@ -105,7 +106,7 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
   assert.equal(used.proof.errors.maxRatioOf,'rate');assert.equal(used.links.query,'https://grafana.example/explore?route=v1-items');
   assert.deepEqual(plain(used.card),{side:'below',offset:7});
 
-  const exercised=new Set(['enabled','grafana','honeycomb','window','refreshMs','templates','prometheus','loki','tempo','sql','environment','dataset',
+  const exercised=new Set(['baseUrl','environments','enabled','grafana','honeycomb','window','refreshMs','templates','prometheus','loki','tempo','sql','environment','dataset',
     'kind','signals','proof','links','card','use','unit','min','max','maxRatioOf','dashboard','query','side','offset','params']);
   assert.deepEqual([...documentedFields(chapter)].sort(),[...exercised].sort(),'every field named in the chapter table has a parser-backed fixture');
 
@@ -121,4 +122,10 @@ test('G4 conditional chapter links resolve and bounded hld entry stays below its
   const compact=hld.replace(/\s+/g,' ');
   assert.match(compact,/New\/changed stories use `--mode new`.*source, question and worksheet phases before JSON/);
   assert.match(compact,/Fully specified scoped edits need no new questions or worksheet/);
+});
+
+test('feature evidence discovery begins with Jira and PR changes and rejects unrelated traffic',()=>{
+  const text=read(chapterPath),inventory=text.indexOf('read the scoped Jira tickets'),discovery=text.indexOf('`search_dashboards`');
+  assert.ok(inventory>=0 && inventory<discovery);
+  for(const phrase of ['linked PRs and','new queues, topics, pipes','exact new resource','ticket/PR evidence','deployment environment','Missing instrumentation','never fill it with unrelated traffic','Never\nfabricate Jira tickets or PRs'])assert.ok(text.includes(phrase),phrase);
 });

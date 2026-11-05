@@ -28,7 +28,7 @@ function createTelemetryProviders(page,win){
   var definitions=[{name:'Grafana',sources:['grafana','loki','sql'],create:createTelemetryGrafana},{name:'Honeycomb',sources:['honeycomb'],create:createTelemetryHoneycomb},{name:'Traces',sources:[],create:createTelemetryTraces}];
   function scoped(bindings,part){if(part.definition.name==='Traces')return bindings.filter(function(b){return telemetryTraceJobs([b]).length;});return bindings.map(function(binding){var signals={};Object.keys(binding.signals || {}).forEach(function(name){if(part.definition.sources.indexOf(binding.signals[name].source)>=0 && !telemetryTraceIntent(binding.signals[name]))signals[name]=binding.signals[name];});return Object.assign({},binding,{signals:signals});}).filter(function(binding){return Object.keys(binding.signals).length;});}
   function bindingIdentity(bindings){return JSON.stringify(bindings.map(function(b){return [b,ctl && ctl.telemetry.bindingGeneration?ctl.telemetry.bindingGeneration(b.id):0];}));}
-  function availability(){if(ctl)ctl.telemetry.setAvailable(!retired && parts.some(function(p){return p.available;}));}
+  function availability(){if(ctl)ctl.telemetry.setAvailable(!retired && parts.some(function(p){return p.available;}),parts.map(function(p){return p.note;}).filter(Boolean).join('; '));}
   function accountChanged(){if(retired)return;retired=true;generation++;parts.forEach(function(p){p.map={};p.available=false;});if(ctl){ctl.telemetry.clear();ctl.telemetry.setAvailable(false);}parts.forEach(function(p){if(p.handle)p.handle.destroy();});}
   function ensure(){
     if(!ctl || retired || ensuring)return;ensuring=true;
@@ -39,9 +39,9 @@ function createTelemetryProviders(page,win){
       part.adapter=definition.create(current,win,null,function(){return ctl && scoped(ctl.telemetry.bindings(),part).length;});
       if(!part.adapter)return;parts.push(part);
       var api=ctl.telemetry,facade={
-        bindings:function(){return scoped(api.bindings(),part);},enabled:function(){return api.enabled();},
+        config:function(){return typeof api.config==='function'?api.config():telemetryEnvironmentConfig(current);},environment:function(){return typeof api.environment==='function'?api.environment():null;},bindings:function(){return scoped(api.bindings(),part);},enabled:function(){return api.enabled();},
         setEnabled:function(value){if(value && api.enabled() && api.retry)api.retry();},
-        setAvailable:function(value){var was=part.available;part.available=!!value;if(!value){part.map={};part.historyCache.clear();if(part.definition.name==='Traces'){if(api.retractExemplars)api.retractExemplars();}else if(api.retractSources)api.retractSources(part.definition.sources);}availability();if(value && !was && api.enabled() && api.retry)api.retry();},
+        setAvailable:function(value,note){part.note=note || '';var was=part.available;part.available=!!value;if(!value){part.map={};part.historyCache.clear();if(part.definition.name==='Traces'){if(api.retractExemplars)api.retractExemplars();}else if(api.retractSources)api.retractSources(part.definition.sources);}availability();if(value && !was && api.enabled() && api.retry)api.retry();},
         clear:function(){part.map={};part.historyCache.clear();if(part.definition.name==='Traces'){if(api.retractExemplars)api.retractExemplars();}else if(api.retractSources)api.retractSources(part.definition.sources);},accountChanged:accountChanged,
         onChange:function(fn){return api.onChange(function(snapshot){fn(Object.assign({},snapshot,{available:part.available}));});}
       };
@@ -54,14 +54,14 @@ function createTelemetryProviders(page,win){
     var answers=await Promise.all(parts.map(async function(part){
       var bound=scoped(bindings,part);if(!bound.length){if(!range)part.map={};return {};}
       // A missing connector must not prevent its healthy peer from refreshing.
-      if(!part.available){notes.push(part.definition.name+' unavailable.');return {};}
+      if(!part.available){notes.push(part.note || part.definition.name+' unavailable.');return {};}
       var fn=range?part.adapter.options.history:part.adapter.options.provider;
       if(!fn){notes.push(part.definition.name+' historical metrics unsupported; samples are unobserved.');return {};}
       try{
         var note='',partReport={note:function(text){note=text;}};
         var value;
         if(range){
-          var identity=JSON.stringify([trackingTelemetry(current),part.adapter.options.historyKey?part.adapter.options.historyKey():null]);
+          var identity=JSON.stringify([telemetryProviderConfig(current,ctl),part.adapter.options.historyKey?part.adapter.options.historyKey():null]);
           var saved=await part.historyCache.loadBindings(identity,bound,range,signal,function(batch,dates){
             var message='';return Promise.resolve(fn(batch,dates,signal,{note:function(text){message=text;}})).then(function(map){return {map:map,note:message};});
           });value=saved.map;note=saved.note;
@@ -83,7 +83,7 @@ function createTelemetryProviders(page,win){
     if(approval && !Object.keys(map).length){var error=new Error(notes.join('; '));error.state='approval';throw error;}
     return map;
   }
-  var options={canChooseExemplar:function(id,token,traceId){var part=parts.find(function(p){return p.definition.name==='Traces';});return !!(!retired && part && part.available && part.adapter.options.canChooseExemplar(id,token,traceId));},chooseExemplar:function(id,token,traceId){var part=parts.find(function(p){return p.definition.name==='Traces';});if(retired || !part || !part.available)throw new Error('Trace selection unavailable.');return part.adapter.options.chooseExemplar(id,token,traceId);},available:false,source:function(){return parts.filter(function(p){return p.available;}).map(function(p){return p.definition.name;}).join(' / ');},provider:function(b,s,r){return run(b,s,r);},history:function(b,r,s,n){return run(b,s,n,r);},historyKey:function(){return parts.map(function(p){return [p.definition.name,p.adapter.options.historyKey?p.adapter.options.historyKey():null];});}};
+  var options={environmentChanged:function(){generation++;bindingKey=bindingIdentity(ctl.telemetry.bindings());parts.forEach(function(p){p.bindingKey=bindingIdentity(scoped(ctl.telemetry.bindings(),p));p.map={};p.historyCache.clear();if(p.adapter.options.environmentChanged)p.adapter.options.environmentChanged();});},canChooseExemplar:function(id,token,traceId){var part=parts.find(function(p){return p.definition.name==='Traces';});return !!(!retired && part && part.available && part.adapter.options.canChooseExemplar(id,token,traceId));},chooseExemplar:function(id,token,traceId){var part=parts.find(function(p){return p.definition.name==='Traces';});if(retired || !part || !part.available)throw new Error('Trace selection unavailable.');return part.adapter.options.chooseExemplar(id,token,traceId);},available:false,source:function(){return parts.filter(function(p){return p.available;}).map(function(p){return p.definition.name;}).join(' / ');},provider:function(b,s,r){return run(b,s,r);},history:function(b,r,s,n){return run(b,s,n,r);},historyKey:function(){return parts.map(function(p){return [p.definition.name,p.adapter.options.historyKey?p.adapter.options.historyKey():null];});}};
   return {options:options,attach:function(next,nextPage){
     current=nextPage || current;ctl=next;generation++;parts=[];bindingKey=bindingIdentity(ctl.telemetry.bindings());ensure();availability();
     off=ctl.telemetry.onChange(function(snapshot){

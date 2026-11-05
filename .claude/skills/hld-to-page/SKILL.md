@@ -1,6 +1,6 @@
 ---
 name: hld-to-page
-description: Author or update Flowview diagrams from stories, HLDs or Honeycomb traces. Produce specs, coverage ledgers and pages, with enrichment and pilot capture. Not for renderer code or PR review.
+description: Author Flowview specs, ledgers and pages from stories, HLDs or Honeycomb traces. Not for renderer code or PR review.
 ---
 
 # HLD to page: packet first
@@ -93,7 +93,8 @@ After the packet, route source/handoff details:
 - [Diagram links](../../../cookbook/diagram-handoffs.md); [design reviews](../../../docs/design-review.md).
 - [Live Jira / metrics proof / `missingWork`](../../../docs/live-status.md): use
   `live-status-board` when requested; its Metrics chapter is conditional.
-  Desktop; include imported carriers. Jira counts parent minus exclusions plus
+  Metrics: Jira/PR changes → new resources; qa/stg/prd profiles. Desktop, imported
+  carriers too. Jira counts parent minus exclusions plus
   manual/dependency stories once.
 
 Deliver spec/ledger files together. Ask unresolved story decisions and, after

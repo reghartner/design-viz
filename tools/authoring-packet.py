@@ -39,12 +39,13 @@ FEATURES = {
     'reveals': ['fragment-level reveals'],
     'groups': ['groups — containment boundaries'],
     'delta': ['Delta markers — nodes, edges, and steps'],
-    'bindings': [], 'topology': ['Shared topology references'], 'drilldowns': [],
+    'metrics': [], 'bindings': [], 'topology': ['Shared topology references'], 'drilldowns': [],
 }
 DEPENDENCIES = {'time': ['steps'], 'paths': ['steps'], 'reveals': ['steps'],
                 'visibility': ['steps'], 'audio': ['steps'], 'delta': ['steps'],
                 'drilldowns': ['layouts'], 'explore': ['layouts']}
 ROUTES = {
+    'metrics': ['docs/live-status.md', '.claude/skills/live-status-board/metrics.md'],
     'layouts': ['docs/tab-views.md', 'docs/section-layouts.md'], 'explore': ['docs/tab-views.md', 'docs/section-layouts.md'],
     'bindings': [REFS + 'bindings-and-code.md'],
     'topology': ['docs/shared-topology.md'],
@@ -55,6 +56,7 @@ ROUTES = {
 # For dependencies whose rules are not in the contract, embed their maintained
 # owner instead of writing a second set of rules here.
 INLINE = {
+          'metrics': ['.claude/skills/live-status-board/metrics.md'],
           'bindings': [REFS + 'bindings-and-code.md'],
           'topology': ['docs/shared-topology.md'],
           'drilldowns': ['docs/drilldowns.md']}
@@ -159,6 +161,13 @@ def infer(raw):
                 for item in value: visit(item)
         if any(isinstance(node, dict) and node.get('detail') for node in d.get('nodes', {}).values()): features.add('drilldowns')
         visit(sec)
+    # Authored roots, provider templates, imported carrier overlays and nested
+    # details all count, even before local topology imports have been resolved.
+    def metrics(value):
+        if isinstance(value, dict):
+            return 'telemetry' in value or any(metrics(item) for item in value.values())
+        return isinstance(value, list) and any(metrics(item) for item in value)
+    if metrics(raw): features.add('metrics')
     return panels, features
 
 

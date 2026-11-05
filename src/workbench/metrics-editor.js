@@ -123,10 +123,26 @@ function createFlowMetricsSettings(o){
   d.note(box,'Allow metrics controls availability on this page, including imported diagrams and details. Turning it off keeps your bindings and settings. It does not turn Metrics on or run queries.');
   d.note(box,'Shared settings for the metrics bindings on this page. The Workbench stores queries only and never runs them.');
   [['grafana','prometheus','Grafana Prometheus UID','prom-main'],['grafana','loki','Grafana Loki UID','loki-main'],['grafana','tempo','Grafana Tempo UID','tempo-main'],
-    ['grafana','sql','Grafana SQL UID','lake'],['honeycomb','environment','Honeycomb environment','prod'],['honeycomb','dataset','Honeycomb dataset','doorbell-prod']].forEach(function(field){
+    ['grafana','baseUrl','Grafana base URL','https://example.grafana.net'],['grafana','sql','Grafana SQL UID','lake'],['honeycomb','environment','Honeycomb environment','prod'],['honeycomb','dataset','Honeycomb dataset','doorbell-prod']].forEach(function(field){
     var group=telemetryObject(t[field[0]])?t[field[0]]:{};
     d.row(box,field[2],c.text(group[field[1]],function(v){return commit({op:field[0],key:field[1],value:v});},{placeholder:field[3]}));
   });
+  var profiles=telemetryObject(t.environments)?t.environments:{},environmentIds=Object.keys(profiles);
+  var environments=d.group(box,'metrics-environments','Environments');
+  d.note(environments,'Optional deployment profiles, such as qa, stg and prd. Blank values inherit shared settings. Readers can switch environments in Live status. Use $env or ${env} in queries, links and datasource values.');
+  if(environmentIds.length)d.row(environments,'Default environment',c.select(environmentIds,t.environment || environmentIds[0],function(v){return commit({op:'environment',value:v});}));
+  environmentIds.forEach(function(id){
+    var profile=telemetryObject(profiles[id])?profiles[id]:{},set=d.group(environments,'metrics-environment','Environment '+id);
+    [['grafana','prometheus','Grafana Prometheus UID'],['grafana','loki','Grafana Loki UID'],['grafana','tempo','Grafana Tempo UID'],['grafana','baseUrl','Grafana base URL'],['grafana','sql','Grafana SQL UID'],['honeycomb','environment','Honeycomb environment'],['honeycomb','dataset','Honeycomb dataset']].forEach(function(field){
+      var group=telemetryObject(profile[field[0]])?profile[field[0]]:{};
+      d.row(set,id+' '+field[2],c.text(group[field[1]],function(v){return commit({op:'environmentSetting',name:id,source:field[0],key:field[1],value:v});},{placeholder:'Inherit shared setting'}));
+    });
+    set.appendChild(c.action('Remove environment '+id,function(){return commit({op:'removeEnvironment',name:id});}));
+  });
+  var environmentName=d.draft(environments,'New environment id','text',null,'');environmentName.placeholder='qa, stg or prd';
+  function addEnvironment(){return commit({op:'addEnvironment',name:environmentName.value.trim()});}
+  o.listen(environmentName,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addEnvironment();}});
+  environments.appendChild(c.action('Add environment',addEnvironment));
   d.row(box,'Metrics window',c.text(typeof t.window==='string'?t.window:t.window==null?null:JSON.stringify(t.window),function(v){return commit({op:'window',value:v});},{placeholder:'24h'}));
   var refresh=c.number(t.refreshMs==null?null:t.refreshMs,function(v){return commit({op:'refreshMs',value:v});});refresh.placeholder='connector default';
   d.row(box,'Metrics refresh ms',refresh);

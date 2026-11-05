@@ -156,3 +156,39 @@ test('mixed Activity uses each signal measurement time and accepts older peer-in
  log.clear();observe(3,null);assert.equal(log.snapshot().filter(e=>e.kind==='first-traffic').length,0,'unknown own as-of never borrows a peer or retrieval clock');
  log.clear();carriers[0].signals.latency.unit='req/h';observe(0,T,100,T+4*H,[[T+3*H,100]]);const peerFirst=log.snapshot().find(e=>e.kind==='first-traffic');assert.equal(peerFirst?.at,iso(T+3*H),'actual peer traffic is not clipped by the older chart primary');assert.equal(peerFirst.signal,null,'carrier-wide first traffic is not misattributed to a silent primary');
 });
+
+test('Honeycomb profiles select slug/dataset and nested query values; old downloads cannot cross deployments',async t=>{
+ const p=pageSpec();Object.assign(p.tracking.telemetry,{environment:'qa',environments:{qa:{honeycomb:{environment:'test-observability',dataset:'events-$env'}},prd:{honeycomb:{environment:'prod-observability',dataset:'events-$env'}}}});
+ p.sections[0].diagram.nodes.a.telemetry.signals.latency.honeycomb.filters[0].value='new-pipe-${env}';
+ let release,downloads=0;const h=await setup({page:p,fetch:async()=>{if(++downloads===1)await new Promise(r=>release=r);return new Response(JSON.stringify(raw(downloads===1?1:99)));}});t.after(()=>h.close());
+ h.api.setEnabled(true);await settle();assert.ok(release);h.api.setEnvironment('prd');await settle();release();await settle();
+ const queries=h.calls.filter(c=>c.tool==='run_query');assert.equal(queries.length,2);assert.equal(queries[0].signal.aborted,true);
+ assert.equal(queries[0].input.environment_slug,'test-observability');assert.equal(queries[0].input.dataset_slug,'events-qa');assert.equal(queries[0].input.query_spec.filters[0].value,'new-pipe-qa');
+ assert.equal(queries[1].input.environment_slug,'prod-observability');assert.equal(queries[1].input.dataset_slug,'events-prd');assert.equal(queries[1].input.query_spec.filters[0].value,'new-pipe-prd');assert.equal(h.api.snapshot().map.a.signals.latency.value,99);assert.equal(h.api.enabled(),true);
+});
+
+
+async function hosted({permission='granted',hold=false}={}){
+ const {C}=context(),p=pageSpec();delete p.tracking.telemetry.honeycomb.dataset;delete p.sections[0].diagram.nodes.a.telemetry.signals.rate;
+ p.tracking.telemetry.environment='qa';p.tracking.telemetry.environments={qa:{},prd:{honeycomb:{environment:'production'}}};
+ const page=C.normalize(p),events=[],grants=[];
+ const schema={type:'object',properties:{environment_slug:{type:'string'},dataset_slug:{type:['null','string']},query_spec:{type:'object',properties:{calculations:{type:'array',items:{type:'object',properties:{op:{type:'string'},column:{type:['null','string']}},required:['op']}},filters:{type:'array'},from:{type:'string'}}}},required:['environment_slug','query_spec']};
+ const win={claude:{use:async name=>name==='permissions'?(permission===null?null:{request:async names=>{events.push(['permission',...names]);if(hold)return await new Promise(r=>grants.push(r));return {[names[0]]:permission};}}):{listTools:async()=>[{server:'Team Honeycomb',tools:[{name:'run_query',description:'query',annotations:{readOnlyHint:true}}]}],describeTool:async(server,name)=>{events.push(['describe',server,name]);return {name,inputSchema:schema};},callTool:async(server,name,input)=>{events.push(['query',plain(input)]);return {structuredContent:raw()};}}}};
+ const adapter=C.createTelemetryProviders(page,win),api=C.createTelemetry(page,adapter.options,{carriers:fn=>fn(page.sections[0].diagram.nodes.a,'a',page)}),handle=adapter.attach({telemetry:api,liveStatus:fakeLive()},page);await settle();
+ return {C,api,events,schema,grant:()=>grants.shift()?.({'mcp:Team Honeycomb':'granted'}),close(){handle.destroy();api.destroy();}};
+}
+test('hosted metadata-only Honeycomb waits for permission then describes nullable schema with optional dataset',async t=>{
+ const h=await hosted();t.after(()=>h.close());assert.equal(h.api.snapshot().available,true);assert.deepEqual(h.events,[]);h.api.setEnabled(true);await settle();
+ assert.deepEqual(h.events.slice(0,2),[['permission','mcp:Team Honeycomb'],['describe','Team Honeycomb','run_query']]);assert.equal(h.api.snapshot().map.a.signals.latency.value,123.456789);assert.equal(h.events[2][1].dataset_slug,undefined);
+ assert.equal(h.C.telemetryHoneycombSchema({column:null},{type:'object',properties:{column:{type:['null','string']}}}),true);assert.equal(h.C.telemetryHoneycombSchema({column:3},{type:'object',properties:{column:{type:['null','string']}}}),false);
+});
+for(const permission of ['denied','unavailable',null])test('hosted Honeycomb '+permission+' hides Metrics without describing or querying',async t=>{
+ const h=await hosted({permission});t.after(()=>h.close());h.api.setEnabled(true);await settle();assert.equal(h.api.snapshot().available,false);assert.equal(h.api.enabled(),false);assert.equal(h.events.filter(e=>e[0]!=='permission').length,0);h.api.setEnabled(true);await settle();assert.ok(h.events.length<=1);
+});
+for(const change of ['off','environment','destroy'])test('hosted pending consent retired by '+change+' cannot describe/query old environment',async()=>{
+ const h=await hosted({hold:true});h.api.setEnabled(true);await settle();if(change==='off')h.api.setEnabled(false);else if(change==='environment'){h.api.setEnabled(false);h.api.setEnvironment('prd');}else h.close();h.grant();await settle();assert.equal(h.events.filter(e=>e[0]!=='permission').length,0);h.close();
+});
+
+test('hosted consent during an enabled environment switch only queries the new environment',async t=>{
+ const h=await hosted({hold:true});t.after(()=>h.close());h.api.setEnabled(true);await settle();h.api.setEnvironment('prd');await settle();assert.equal(h.api.enabled(),true);h.grant();await settle();assert.equal(h.events.filter(e=>e[0]==='query').length,0);h.grant();await settle();const queries=h.events.filter(e=>e[0]==='query');assert.equal(queries.length,1);assert.equal(queries[0][1].environment_slug,'production');assert.equal(h.api.snapshot().map.a.signals.latency.value,123.456789);
+});

@@ -8,11 +8,13 @@ const rawQuery=()=>({query_spec:{filters:[{column:'service.name',op:'=',value:'e
 const binding=(source='honeycomb')=>({kind:'service',signals:{trace:source==='tempo'?{tempo:'{ resource.service.name = "event-ingest" }'}:{honeycomb:rawQuery()}}});
 const pageSpec=(source='honeycomb')=>({tracking:{telemetry:{honeycomb:{environment:'flowview-demo',dataset:'doorbell'},grafana:{tempo:'tempo-main',prometheus:'prom-main'}}},sections:[{id:'main',diagram:{nodes:{a:{telemetry:binding(source)}},rows:[['a']]}}]});
 function context(){const timers=new Map();let serial=0;class Clock extends Date{static now(){return Date.parse('2026-10-30T00:00:00Z');}}const C={URL,AbortController,TextDecoder,TextEncoder,Date:Clock,console,setTimeout:(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;},clearTimeout:id=>timers.delete(id),document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint('standalone').body,C);return {C,timers};}
-async function setup({page=pageSpec(),transport,wrap,host=false}={}){
+async function setup({page=pageSpec(),transport,wrap,host=false,hosted=false}={}){
  const {createMockBridge}=await import('./helpers/honeycomb-bridge.mjs'),bridge=createMockBridge({day:9,transport}),{C,timers}=context();if(wrap)wrap(bridge);
- const p=C.normalize(page),win={claude:{use:async()=>bridge}},adapter=host?null:C.createTelemetryProviders(p,win);
+ let permissions=[];
+ if(hosted){const list=bridge.listTools;bridge.listTools=async()=>{const servers=await list();return servers.map(s=>({...s,tools:s.tools.map(t=>({name:t.name,description:t.description,annotations:t.annotations}))}));};bridge.describeTool=async(server,name)=>{const servers=await list();return servers.find(s=>s.server===server).tools.find(t=>t.name===name);};}
+ const p=C.normalize(page),win={claude:{use:async name=>name==='permissions'?{request:async names=>{permissions.push(...names);return Object.fromEntries(names.map(n=>[n,'granted']));}}:bridge}},adapter=host?null:C.createTelemetryProviders(p,win);
  const api=C.createTelemetry(p,host?false:adapter?.options||false,{carriers:fn=>C.sectionRecords(p).forEach(r=>{const d=r.section.diagram||{};Object.keys(d.nodes||{}).forEach(id=>fn(d.nodes[id],id,p));(d.edges||[]).forEach(e=>fn(e,e.from+'->'+e.to,p));})});
- const handle=adapter?.attach({telemetry:api,liveStatus:{onDestroy:()=>()=>{}}},p);await settle();return {C,p,api,bridge,adapter,timers,close(){handle?.destroy();api.destroy();}};
+ const handle=adapter?.attach({telemetry:api,liveStatus:{onDestroy:()=>()=>{}}},p);await settle();return {C,p,api,bridge,adapter,timers,permissions,close(){handle?.destroy();api.destroy();}};
 }
 function envelope(C,trace=C.telemetryHoneycombTrace({payload:traceText},recordedId)){
  return C.telemetryTraceEnvelope({version:1,provider:'honeycomb',traceId:recordedId,signal:'trace',selectionToken:'test-token',selectionReason:'actual returned match',observedAt:'2026-10-12T06:34:09Z',range:{from:'2026-10-12T00:34:09Z',to:'2026-10-12T06:34:09Z'},candidates:[{traceId:recordedId,status:'unknown'}],...trace});
@@ -150,4 +152,25 @@ test('native host preload rejects contradictory clocks without losing numeric ze
  api.apply({a:{signals:{zero:{value:0}},exemplars:[value]}});assert.equal(api.snapshot().map.a.exemplars[0].spans[1].startMs,4640.718592);
  value.spans[1].time='2026-10-15T00:00:00.000Z';api.apply({a:{signals:{zero:{value:0}},exemplars:[value]}});assert.equal(api.snapshot().map.a.signals.zero.value,0);assert.equal(api.snapshot().map.a.exemplars.length,0);assert.equal(api.enabled(),false);
  }finally{api.destroy();}
+});
+
+test('identical trace queries in different deployment profiles never share candidates or pending choices',async t=>{
+ const p=pageSpec();Object.assign(p.tracking.telemetry,{environment:'qa',environments:{qa:{},prd:{}}});
+ let hold=false,release;const h=await setup({page:p,wrap:b=>{const original=b.callTool;b.callTool=async(...args)=>{const value=await original(...args);if(hold&&args[1]==='get_trace'){hold=false;await new Promise(r=>release=r);}return value;};}});t.after(()=>h.close());
+ h.api.setEnabled(true);await settle();const old=h.api.snapshot().map.a.exemplars[0],other=old.candidates.find(c=>c.traceId!==old.traceId);
+ hold=true;const choice=h.api.chooseExemplar('a',old.selectionToken,other.traceId),rejected=assert.rejects(choice,/cancelled|expired|unavailable/i);await settle();assert.ok(release);
+ h.api.setEnvironment('prd');assert.deepEqual(plain(h.api.snapshot().map),{});assert.equal(h.api.canChooseExemplar('a',old.selectionToken,other.traceId),false);await settle();release();await rejected;await settle();
+ assert.equal(h.api.enabled(),true);const fresh=h.api.snapshot().map.a.exemplars[0];assert.notEqual(fresh.selectionToken,old.selectionToken);assert.equal(h.bridge.calls.filter(c=>c.name==='run_query').length,2);
+ h.api.setEnvironment('qa');await settle();assert.notEqual(h.api.snapshot().map.a.exemplars[0].selectionToken,old.selectionToken);assert.equal(h.bridge.calls.filter(c=>c.name==='run_query').length,3);
+});
+
+test('switch during trace discovery keeps the newest environment available without data queries',async()=>{
+ const {createMockBridge}=await import('./helpers/honeycomb-bridge.mjs'),bridge=createMockBridge(),{C}=context(),p=pageSpec();Object.assign(p.tracking.telemetry,{environment:'qa',environments:{qa:{},prd:{}}});
+ const original=bridge.listTools;let first=true,release;bridge.listTools=async()=>{if(first){first=false;await new Promise(r=>release=r);}return original();};
+ const adapter=C.createTelemetryProviders(p,{claude:{use:async()=>bridge}}),api=C.createTelemetry(p,adapter.options,{carriers:fn=>fn(p.sections[0].diagram.nodes.a,'a',p)}),handle=adapter.attach({telemetry:api},p);
+ await settle();assert.ok(release);api.setEnvironment('prd');await settle();assert.equal(api.snapshot().available,true);release();await settle();assert.equal(api.snapshot().available,true);assert.equal(api.enabled(),false);assert.equal(bridge.calls.length,0);api.setEnabled(true);await settle();assert.ok(api.snapshot().map.a.exemplars.length);handle.destroy();api.destroy();
+});
+
+for(const source of ['honeycomb','tempo'])test('hosted metadata-only '+source+' trace contracts describe after consent and preserve cached selection',async t=>{
+ const h=await setup({page:pageSpec(source),hosted:true});t.after(()=>h.close());assert.equal(h.api.snapshot().available,true);assert.deepEqual(h.permissions,[]);assert.equal(h.bridge.calls.length,0);h.api.setEnabled(true);await settle();const first=h.api.snapshot().map.a.exemplars[0];assert.ok(first.spans.length);assert.ok(h.permissions.includes('mcp:'+(source==='tempo'?'Grafana':'Honeycomb')));const alternate=first.candidates.find(c=>c.traceId!==first.traceId);await h.api.chooseExemplar('a',first.selectionToken,alternate.traceId);assert.equal(h.api.snapshot().map.a.exemplars[0].traceId,alternate.traceId);
 });

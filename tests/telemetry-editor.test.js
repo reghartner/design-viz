@@ -420,3 +420,21 @@ test('Allow metrics pure plans preserve bare/wrapped page bytes, reject malforme
   }
   const bare=spec.page.sections[0].diagram;assert.match(C.planPageTelemetry(JSON.stringify(bare),bare,{op:'enabled',value:false}).error,/document settings/);
 });
+
+test('environment profiles are desktop controls with one Undo, defaults, inherited fields and export',()=>{
+  const ui=harness(board(null,{grafana:{prometheus:'prom-$env'}}),{kind:'document'});
+  const step=act=>oneStep(ui,act,{kind:'document'});
+  function add(id){ui.set('New environment id',id);step(()=>ui.click('Add environment'));}
+  add('qa');add('stg');add('prd');
+  step(()=>ui.set('Default environment','prd'));
+  step(()=>ui.set('qa Grafana Prometheus UID','qa-prom'));
+  step(()=>ui.set('prd Honeycomb environment','production'));
+  const t=ui.raw.page.tracking.telemetry;
+  assert.equal(t.environment,'prd');assert.deepEqual(t.environments,{qa:{grafana:{prometheus:'qa-prom'}},stg:{},prd:{honeycomb:{environment:'production'}}});
+  const stamped=JSON.parse(ui.e.C.FlowviewCompatibility.stampText(ui.text,ui.raw));assert.deepEqual(stamped.page.tracking.telemetry,t);
+  step(()=>ui.set('qa Grafana Prometheus UID',''));assert.deepEqual(ui.raw.page.tracking.telemetry.environments.qa,{});
+  step(()=>ui.click('Remove environment prd'));assert.equal(ui.raw.page.tracking.telemetry.environment,'qa');
+  step(()=>ui.click('Remove environment qa'));step(()=>ui.click('Remove environment stg'));
+  assert.deepEqual(ui.raw.page.tracking.telemetry,{grafana:{prometheus:'prom-$env'}});
+  ui.set('New environment id','qa"');ui.click('Add environment');assert.match(ui.error(),/Environment ids/);
+});

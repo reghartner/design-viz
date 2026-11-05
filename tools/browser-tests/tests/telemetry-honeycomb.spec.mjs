@@ -34,13 +34,13 @@ async function setup(page,server,audit,{disabled,missing=false,detail=false,nest
   // Without a ticket map, Over time deliberately has no UI to open.
   window.jiraCalls=0;window.flowviewLiveStatus={provider:async()=>{window.jiraCalls++;return jira;}};
   const nativeFetch=window.fetch.bind(window);window.fetch=(url,options)=>{if(url===RAW){window.rawOptions.push({credentials:options.credentials,referrerPolicy:options.referrerPolicy,redirect:options.redirect});options.signal.addEventListener('abort',()=>window.rawAborts++);}return nativeFetch(url,options);};
-  const schema={type:'object',properties:{environment_slug:{type:'string'},dataset_slug:{type:'string'},query_spec:{type:'string'}},required:['environment_slug','dataset_slug','query_spec']};
-  window.claude={use:async name=>name==='mcp'?{listTools:async()=>{window.metadataCalls++;if(real)return window.mockTools();return missing?[]:[{server:'Grafana',tools:['query_prometheus','query_loki_logs','search_tempo_traces','get_annotations','generate_deeplink']},{server:'Honeycomb',tools:[{name:'run_query',inputSchema:schema}]}];},callTool:async(server,tool,input,options)=>{
+  const schema={type:'object',properties:{environment_slug:{type:'string'},dataset_slug:{type:['null','string']},query_spec:{type:'string'}},required:['environment_slug','query_spec']};
+  window.claude={use:async name=>name==='mcp'?{listTools:async()=>{window.metadataCalls++;if(real)return window.mockTools();return missing?[]:[{server:'Grafana',tools:['query_prometheus','query_loki_logs','search_tempo_traces','get_annotations','generate_deeplink']},{server:'Honeycomb',tools:[{name:'run_query',description:'Run a query',annotations:{readOnlyHint:true}}]}];},describeTool:async(server,tool)=>({name:tool,inputSchema:schema}),callTool:async(server,tool,input,options)=>{
    window.calls.push({server,tool,input});if(window.signedInChanged)throw {code:'user_changed'};if(real)return window.mockCall(server,tool,input);
    if(tool==='run_query')return {payload:metadata};
    if(tool==='query_prometheus'){const t=input.startTime.startsWith('now')?Date.parse('2026-10-12T06:30:00Z'):Date.parse(input.startTime),end=input.endTime.startsWith('now')?t:Date.parse(input.endTime),values=[];for(let at=t;at<=end;at+=86400000)values.push([at/1000,'42']);return {payload:{data:[{values}]}};}
    return {payload:[]};
-  }}:null};
+  }}:name==='permissions'?{request:async names=>Object.fromEntries(names.map(n=>[n,'granted']))}:null};
   window.flowviewBooted=ctl=>{window.ctl=ctl;ctl.liveStatus.setHistory({load:()=>({days:[0,1].map(i=>({key:real?'2026-10-'+(30+i):'2026-10-'+(10+i),at:new Date(Date.parse(real?'2026-10-31T00:00:00Z':'2026-10-11T06:30:00Z')+i*86400000).toISOString(),label:'Day '+i,states:Object.fromEntries(Object.keys(jira).map(k=>[k,{state:i===0?'active':'done'}]))})),index:1})});};
   // Standalone exposes its production globals; the real detail loader is
   // supplied at render boundary, then the user gesture selects the section.

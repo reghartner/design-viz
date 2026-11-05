@@ -7,7 +7,7 @@
    planTopologyTracking('telemetry'), the same path as existsWhen. The
    Workbench never runs a query: nothing here contacts a connector. */
 var TELEMETRY_SOURCE_LABELS={grafana:'Grafana (PromQL)',loki:'Loki (LogQL)',tempo:'Tempo (TraceQL)',sql:'SQL',honeycomb:'Honeycomb'};
-var TELEMETRY_DATASOURCES={grafana:['prometheus','loki','tempo','sql'],honeycomb:['environment','dataset']};
+var TELEMETRY_DATASOURCES={grafana:['prometheus','loki','tempo','sql','baseUrl'],honeycomb:['environment','dataset']};
 function telemetrySignalSource(entry){
   return telemetryObject(entry)?TELEMETRY_SOURCES.filter(function(key){return telemetryOwn(entry,key);})[0] || null:null;
 }
@@ -175,7 +175,7 @@ function telemetryEditBinding(binding,edit,options){
     var links=telemetryObject(b.links)?b.links:{};
     if(edit.value==null)delete links[edit.key];
     else if(asTemplate){if(!telemetryText(edit.value))return {error:'Enter a URL; $param placeholders are allowed.'};links[edit.key]=edit.value.trim();}
-    else{var url=deltaLinkUrl(edit.value);if(!url)return {error:'Use an absolute http(s) URL.'};links[edit.key]=url;}
+    else{var url=deltaLinkUrl(edit.value);if(!url)return {error:'Use an absolute http(s) URL.'};links[edit.key]=edit.value.indexOf('${env}')>=0?url.replace(/\$%7Benv%7D/gi,'${env}'):url;}
     b.links=links;telemetryDropEmpty(b,'links');
     return {value:b};
   }
@@ -225,6 +225,30 @@ function telemetryEditPage(telemetry,edit){
     if(typeof edit.value!=='boolean')return {error:'Allow metrics must be true or false.'};
     if(telemetry!=null && !telemetryObject(telemetry))return {error:'Metrics settings are not an object; repair tracking.telemetry in JSON first.'};
     t.enabled=edit.value;return done();
+  }
+  if(op==='addEnvironment' || op==='removeEnvironment' || op==='environment' || op==='environmentSetting'){
+    var profiles=telemetryObject(t.environments)?t.environments:{},id=edit.name;
+    if(op==='environment'){
+      if(typeof edit.value!=='string' || !telemetryOwn(profiles,edit.value))return {error:'Choose a configured environment.'};
+      t.environment=edit.value;return done();
+    }
+    if(typeof id!=='string' || !telemetryNamePattern.test(id))return {error:'Environment ids start with a letter and use letters, digits, - and _.'};
+    if(op==='addEnvironment'){
+      if(telemetryOwn(profiles,id))return {error:'Environment "'+id+'" already exists.'};
+      Object.defineProperty(profiles,id,{value:{},enumerable:true,writable:true,configurable:true});
+      if(!t.environment)t.environment=id;
+    }else{
+      if(!telemetryOwn(profiles,id))return {error:'Choose a configured environment.'};
+      if(op==='removeEnvironment'){
+        delete profiles[id];if(t.environment===id)t.environment=Object.keys(profiles)[0];
+      }else{
+        if(['grafana','honeycomb'].indexOf(edit.source)<0)return {error:'Unknown environment datasource.'};
+        var changed=telemetryEditPage(profiles[id],{op:edit.source,key:edit.key,value:edit.value});if(changed.error)return changed;
+        profiles[id]=changed.value || {};
+      }
+    }
+    if(Object.keys(profiles).length)t.environments=profiles;else {delete t.environments;delete t.environment;}
+    return done();
   }
   if(op==='grafana' || op==='honeycomb'){
     if(TELEMETRY_DATASOURCES[op].indexOf(edit.key)<0)return {error:'Unknown '+op+' setting.'};

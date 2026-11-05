@@ -406,7 +406,7 @@ class InjectTests(unittest.TestCase):
         # #943: a page whose carriers (or page templates) bind grafana, loki or sql
         # signals declares the Grafana connector beside Jira, with the five tools the
         # adapter picks it by; Honeycomb has its own run_query declaration.
-        grafana_tools = ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]
+        grafana_tools = ["query_prometheus"]
         jira = {"server": "Atlassian", "tools": ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}
         grafana = {"server": "Grafana", "tools": grafana_tools}
 
@@ -423,8 +423,8 @@ class InjectTests(unittest.TestCase):
 
         for source in ("grafana", "loki", "sql"):
             declaration, guide = guide_for(node_telemetry={"kind": "service", "signals": {"rate": {source: "q"}}})
-            self.assertEqual(declaration["mcp"]["servers"], [jira, grafana], source)
-            for needle in ("Grafana", "get_annotations", "query_sql", "at most once an hour"):
+            self.assertEqual(declaration["mcp"]["servers"], [jira, {"server": "Grafana", "tools": [{"grafana": "query_prometheus", "loki": "query_loki_logs", "sql": "query_sql"}[source]]}], source)
+            for needle in ("Grafana", "optional tools", "once/hour"):
                 self.assertIn(needle, guide, needle)
         # a template signal on the page counts too, even before a carrier uses it
         templated = {"tracking": {"jira": {"site": "https://jira.test"}, "telemetry": {"templates": {"t": {"kind": "service", "signals": {"r": {"grafana": "up"}}}}}}}
@@ -470,7 +470,7 @@ class InjectTests(unittest.TestCase):
         # The detection resolves the imports as the runtime does: only exported,
         # selected carriers count, a consumer overlay replaces the provider binding,
         # and provider templates expand.
-        grafana = {"server": "Grafana", "tools": ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]}
+        grafana = {"server": "Grafana", "tools": ["query_prometheus"]}
         comments = {"composer_only": True, "customAnchors": True}
 
         def spec(spec_id, diagram, **extra):
@@ -522,7 +522,7 @@ class InjectTests(unittest.TestCase):
         self.assertEqual(declaration(disabled_honey, provider(api=honey_signal)), {"comments": comments})
         # the provider binding uses a provider template with a loki signal
         templated = provider(api={"use": "svc", "app": "api"}, templates={"svc": {"kind": "service", "params": ["app"], "signals": {"logs": {"loki": 'sum(rate({app="$app"}[5m]))'}}}})
-        self.assertEqual(declaration(consumer(), templated)["mcp"]["servers"], [grafana])
+        self.assertEqual(declaration(consumer(), templated)["mcp"]["servers"], [{"server": "Grafana", "tools": ["query_loki_logs"]}])
         # a provider carrier the import does not export never reaches the page
         self.assertEqual(declaration(consumer(), provider(hidden=signal)), {"comments": comments})
         # a consumer overlay replaces the provider binding as a whole (here with a tempo-only one)
@@ -535,6 +535,19 @@ class InjectTests(unittest.TestCase):
         middle["page"]["sections"][0]["diagram"]["topologyExports"] = {"nested": {"nodes": ["shared::api", "shared::store"], "edges": ["shared::api->shared::store"]}}
         outer = spec("outer", {"nodes": {"local": {"title": "Local"}}, "rows": [["local"]], "topologyImports": [{"spec": "middle", "export": "nested", "as": "outer"}]})
         self.assertEqual(declaration(outer, [provider(api=signal), middle])["mcp"]["servers"], [grafana])
+        # Full two-file combined guide follows nested imported bindings too.
+        outer["page"]["tracking"] = {"jira": {"site": "https://jira.test", "epic": "FEAT-1"}, "github": {"repos": ["acme/feature"]}}
+        combined = json.loads(json.dumps(signal))
+        combined["signals"].update(honey_signal["signals"])
+        imported_provider = provider(api=combined)
+        topology = {"version": 1, "id": "outer", "specs": [imported_provider, middle, outer]}
+        built = load_inject().agent_guide(outer, "a" * 40, True, topology)
+        body = GUIDE_BLOCK.search(built)[1]
+        self.assertLess(len(body.encode("utf-8")), 6 * 1024)
+        permissions = json.loads(re.search(r"```json\n(.*?)\n```", body, re.S)[1])
+        self.assertEqual([entry["server"] for entry in permissions["mcp"]["servers"]], ["Atlassian", "Grafana", "Honeycomb"])
+        self.assertEqual(permissions["user"], {"scopes": ["profile"]})
+        self.assertIn("scoped Jira tickets", body)
         # a page with no telemetry anywhere, with or without a topology context
         self.assertEqual(declaration(consumer(), provider()), {"comments": comments})
         self.assertEqual(declaration(SPEC), {"comments": comments})
@@ -542,6 +555,49 @@ class InjectTests(unittest.TestCase):
         resolved = consumer()
         resolved["page"]["sections"][0]["diagram"] = {"nodes": {"local": {"title": "Local"}, "shared::api": {"title": "API", "telemetry": signal}}, "rows": [["local", "shared::api"]]}
         self.assertEqual(declaration(resolved)["mcp"]["servers"], [grafana])
+
+    def test_combined_jira_honeycomb_guides_fit_real_cap_without_losing_edit_rules(self):
+        inject = load_inject()
+        self.assertEqual(inject.GUIDE_LIMIT, 6 * 1024, "keep the existing cap")
+        for mixed in (False, True):
+            for two_file in (False, True):
+                with self.subTest(mixed=mixed, two_file=two_file):
+                    spec = tracked_spec()
+                    spec["page"]["tracking"].update({
+                        "github": {"repos": ["acme/new-feature"]},
+                        "telemetry": {"environment": "qa", "environments": {"qa": {}, "prd": {}},
+                                      "honeycomb": {"environment": "test", "dataset": "new-pipe"}},
+                    })
+                    signals = {"newPipe": {"honeycomb": {"calculations": [{"op": "COUNT"}]}}}
+                    if mixed:
+                        signals["lag"] = {"grafana": 'lag{topic="new-feature-$env"}'}
+                    spec["page"]["blocks"] = [{"diagram": {"nodes": {
+                        "pipe": {"tickets": ["FEATURE-1"], "telemetry": {"kind": "queue", "signals": signals}}
+                    }, "rows": [["pipe"]]}}]
+                    result, out = run_inject(TEMPLATE, json.dumps(spec), ["--two-file"] if two_file else [])
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    guide = GUIDE_BLOCK.search(out)[1]
+                    self.assertLess(len(guide.encode("utf-8")), inject.GUIDE_LIMIT)
+                    declaration = json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S)[1])
+                    self.assertEqual([entry["server"] for entry in declaration["mcp"]["servers"]],
+                                     ["Atlassian"] + (["Grafana"] if mixed else []) + ["Honeycomb"])
+                    for text in ("scoped Jira tickets", "linked PR diffs", "queues/topics/pipes", "missing instrumentation",
+                                 "imported/nested", "exact metric/query", "deployed environment", "never invented Jira/PRs",
+                                 "never signed URLs", "Honeycomb uses run_query", "same URL", "node tools/validate.js"):
+                        self.assertIn(text, guide)
+                    self.assertRegex(guide, r"blob/[0-9a-f]{40}/.claude/skills/live-status-board/metrics.md")
+                    if two_file:
+                        for text in ('"source": "agent"', "after the newest agent entry", "ask the editor", "tools/board-sync.js pull", "tools/board-sync.js log", "unchanged page"):
+                            self.assertIn(text, guide)
+                    # Long authored lists/Unicode metadata are source data, not an
+                    # instruction budget. They remain intact in the spec and are
+                    # referenced compactly in the guide.
+                    spec["page"]["tracking"]["jira"]["exclude"] = ["FEATURE-" + str(i) for i in range(2000)]
+                    spec["page"]["flowview"] = {"authoredWith": "版本" * 300}
+                    for commit in ("a" * 40, None):
+                        bounded = inject.agent_guide(spec, commit, two_file)
+                        self.assertLess(len(GUIDE_BLOCK.search(bounded)[1].encode("utf-8")), inject.GUIDE_LIMIT)
+                        self.assertIn("see current spec", bounded)
 
     def test_agent_guide_replaces_a_stale_guide_when_reinjecting_a_built_page(self):
         built = TEMPLATE.replace("</script>\n" + BACKLINK_OPEN,

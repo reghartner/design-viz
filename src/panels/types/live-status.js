@@ -143,6 +143,14 @@
       // Metrics (#939): the telemetry switch beside Live, shown only with a telemetry provider or demo, off by default, never persisted.
       var metrics=value && value.metrics || {available:false,enabled:false},proof=metrics.proof;
       var metricsToggle=button(controls,'metrics','reader-button dv-live-metrics','Metrics','setMetricsEnabled');metricsToggle.hidden=!metrics.available;
+      if(metrics.environments && metrics.environments.length){
+        var environmentLabel=el(controls,'label','environment-label','dv-live-environment');
+        el(environmentLabel,'span','caption','','Environment ');
+        var environmentSelect=el(environmentLabel,'select','select','reader-button tbtn');environmentSelect.setAttribute('aria-label','Environment');
+        metrics.environments.forEach(function(id){var option=el(environmentSelect,'option',id,'',id);option.value=id;});
+        environmentSelect.value=metrics.environment;
+        if(!environmentSelect._liveChange){environmentSelect._liveChange=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnvironment(environmentSelect.value);};environmentSelect.addEventListener('change',environmentSelect._liveChange);}
+      }
       metricsToggle._liveArgument=!metrics.enabled;metricsToggle.setAttribute('aria-pressed',String(!!metrics.enabled));
       var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo'}[conn.state];
       var connection=el(statusLine,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
@@ -166,8 +174,10 @@
           [named,metrics.window?metrics.window+' window':'',answered?metrics.checkedText:'',answered?metrics.note:''].filter(Boolean).join(' · ');
       }else metricsText=metricsState==='error'?'Metrics: '+metricsLabel+(metrics.note?' · '+metrics.note:''):
         ['Metrics: '+metricsLabel,metrics.checkedText].filter(Boolean).join(', ')+(answered && metrics.note?' · '+metrics.note:'');
+      if(!metrics.available && metrics.note)metricsText=metrics.note;
+      if(metrics.environment)metricsText+=' · '+metrics.environment;
       el(metricsConnection,'span','text','',metricsText);
-      metricsConnection.hidden=!metrics.available;
+      metricsConnection.hidden=!metrics.available && !metrics.note;
       var note=el(statusLine,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
       var actionLabel=(available || metrics.available) && value && value.actionLabel || '';
       var action=button(controls,'action','reader-button dv-live-action',actionLabel,'runAction');action.hidden=!actionLabel;
@@ -183,8 +193,8 @@
       var reason=el(statusLine,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
       var editNotice=el(statusLine,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
       var editShown=!!(edit && (edit.editable || edit.notice));
-      head.hidden=!metrics.available && (!available || !(hasData || value.note.text || value.actionLabel || editShown));
-      controls.hidden=!metrics.available && (!available || !(hasData || value.actionLabel || editShown));statusRow.hidden=!metrics.available && (!available || !(hasData || value.note.text));
+      head.hidden=!metrics.note && !metrics.available && (!available || !(hasData || value.note.text || value.actionLabel || editShown));
+      controls.hidden=!metrics.available && (!available || !(hasData || value.actionLabel || editShown));statusRow.hidden=!metrics.note && !metrics.available && (!available || !(hasData || value.note.text));
       // Long text is cut off on screen; the tooltip and the status elements keep all of it.
       var statusText=[connection.hidden?'':[connWho,conn.checkedText].filter(Boolean).concat(ghLabel?[ghLabel]:[]).join(', '),metricsConnection.hidden?'':metricsText,note.textContent,overStatus.textContent,reason.textContent,editNotice.textContent].filter(Boolean).join(' · ');
       if(statusText)statusRow.setAttribute('title',statusText);else statusRow.removeAttribute('title');

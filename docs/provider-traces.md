@@ -25,9 +25,15 @@ A wrapper goes only to the exemplar adapter. Within each carrier, the **first
 explicit trace signal in authored key order** wins, even across providers. No
 query, service binding, join, trace ID, or provider UI path is inferred.
 
-The current `tools/list` must declare each argument's supported type and required
-fields. Honeycomb `query_spec` may be an object or JSON string, as declared by the
-actual schema. Raw columns and limit are top-level. The page window (24h default)
+Hosted `listTools` supplies tool metadata. After the viewer turns Metrics on,
+the runtime requests the selected connector's scoped permission and calls
+`describeTool(server, tool)` for its search/detail schemas. No permission prompt
+or schema request blocks the initial paint. Denial hides that source without
+retrying; off, environment changes and destruction retire pending work. Legacy
+hosts may still supply schemas in the list. Each schema must declare supported
+argument types and required fields. Honeycomb `query_spec` may be an object or JSON string, as declared by the
+actual schema; expected-type-plus-null unions are supported. Honeycomb dataset
+is optional when the schema permits omission. Raw columns and limit are top-level. The page window (24h default)
 sets hosted `query_spec.from`, as in the scalar adapter. `get_trace` uses
 `environment_slug`, returned `trace_id`, `from`, and `view_mode: full` only if
 supported. `run_query` completes results; there is no invented polling contract.

@@ -237,13 +237,16 @@ function telemetryPaintCues(scope,diagram,templates,view){
    null) for the canvas painter and hooks.jiraChanged(), which the Jira side
    calls so subscribers receive re-judged verdicts. */
 function createTelemetry(page,options,hooks){
+  var permitted=options!==false && trackingTelemetry(page || {}).enabled;
   options=options || {};hooks=hooks || {};
+  var available=permitted && options.available!==false;
   var provider=typeof options.provider==='function'?options.provider:null;
   var demo=options.demo && typeof options.demo.mount==='function'?options.demo:null;
   var configured=Number(options.refreshMs),authored=trackingTelemetry(page || {}).refreshMs;
   var delay=Math.max(TELEMETRY_MIN_REFRESH_MS,configured>0 && isFinite(configured)?configured:authored || TELEMETRY_MIN_REFRESH_MS);
   var map=Object.create(null),enabled=false,retired=false,listeners=[],demoCleanup=null;
-  var status={state:provider || demo?'idle':'absent',busy:false,refreshedAt:null,note:''};
+  available=available && !!(provider || demo);
+  var status={state:available?'idle':'absent',busy:false,refreshedAt:null,note:''};
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function bindings(){return typeof hooks.carriers==='function'?telemetryBindings(hooks.carriers):[];}
   function emit(){if(retired || !listeners.length)return;var value=api.snapshot();listeners.slice().forEach(function(fn){fn(value);});}
@@ -276,18 +279,18 @@ function createTelemetry(page,options,hooks){
   var api={
     bindings:function(){return copy(bindings());},
     apply:function(value){
-      if(retired)return;store(value);
+      if(retired || !permitted || !available && (provider || demo || options.available===false))return;store(value);
       if(enabled)setStatus({state:'ok',refreshedAt:new Date().toISOString(),note:''});
       notify();
     },
     clear:function(){if(retired)return;map=Object.create(null);notify();},
-    snapshot:function(){return {available:!!(provider || demo),enabled:enabled,map:copy(map),status:copy(status),verdicts:copy(verdicts())};},
+    snapshot:function(){return {available:available && !retired,enabled:enabled,map:copy(map),status:copy(status),verdicts:copy(verdicts())};},
     verdicts:function(){return copy(verdicts());},
     status:function(){return copy(status);},
     enabled:function(){return enabled;},
     setEnabled:function(value){
       value=!!value;
-      if(retired || !(provider || demo) || value===enabled)return;
+      if(retired || !available || value===enabled)return;
       enabled=value;
       if(enabled){
         setStatus({state:'loading',busy:false,refreshedAt:null,note:''});
@@ -299,8 +302,14 @@ function createTelemetry(page,options,hooks){
       }
       notify();
     },
+    setAvailable:function(value){
+      if(retired)return;value=!!value && permitted && !!(provider || demo);
+      if(value===available)return;
+      if(!value){api.setEnabled(false);map=Object.create(null);}
+      available=value;setStatus({state:value?'idle':'absent',busy:false,refreshedAt:null,note:''});notify();
+    },
     onChange:function(fn){if(typeof fn!=='function' || retired)return function(){};listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
-    destroy:function(){if(retired)return;retired=true;enabled=false;if(poller)poller.stop();stopDemo();listeners=[];}
+    destroy:function(){if(retired)return;retired=true;enabled=false;map=Object.create(null);setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];}
   };
   return api;
 }

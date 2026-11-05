@@ -579,15 +579,25 @@ function createLiveStatus(ctl,page,options,renderOptions){
      button, over the same carrier walk. Its changes repaint the canvas cues and
      the panel header. Without a host telemetry option, a Live status demo source
      that carries `telemetry` (the #live=demo player, #944) supplies it as Demo. */
-  var telemetryOptions=renderOptions && renderOptions.telemetry || (demoMode && options.telemetry) || null;
+  var telemetryOptions=renderOptions && renderOptions.telemetry===false?false:renderOptions && renderOptions.telemetry || (demoMode && options.telemetry) || null;
   var telemetryDemo=!!(telemetryOptions && (demoMode && telemetryOptions===options.telemetry || telemetryOptions.demo && typeof telemetryOptions.demo.mount==='function'));
-  var telemetryHooks={carriers:eachCarrier,diagrams:eachDiagram,jira:function(){return map;},changed:function(){if(!retired){paintMetrics();notify();}}};
+  var telemetryHooks={carriers:eachCarrier,diagrams:eachDiagram,jira:function(){return map;},changed:function(){if(!retired){paint();notify();}}};
   var telemetry=createTelemetry(page,telemetryOptions,telemetryHooks);
   ctl.telemetry=telemetry;
   // Metrics canvas cues on every bound section, beside the Jira paint (src/viewer/telemetry.js).
   function paintMetrics(){
     var metricsView=telemetryHooks.view();
-    bindings.forEach(function(binding){if(binding.section.diagram)telemetryPaintCues(binding.el,binding.section.diagram,trackingTelemetry(binding.page).templates,metricsView);});
+    bindings.forEach(function(binding){
+      var scope=binding.el,d=binding.section.diagram;if(!d)return;
+      var templates=trackingTelemetry(binding.page).templates;
+      telemetryPaintCues(scope,d,templates,metricsView);
+      telemetryPaintCards(scope,d,templates,metricsView,trackingTelemetry(page).window,function(card,path,edge,index){
+        var previous=path._livePointerTarget || path,c=previous._liveCarrier;
+        carrierTarget(card,edge.from+'->'+edge.to,edge,c && c.state,binding.page.tracking,edge.label || edge.from+' → '+edge.to,c && c.waiting,c && c.availability,binding.ordinal!=null?{section:binding.ordinal,kind:'edge',index:index}:null);
+        carrierPointer(path,card);carrierPointer(path.closest('svg').querySelector('path.halo[data-dv-edge="'+index+'"]'),card);
+      });
+      scope.querySelectorAll('svg').forEach(function(svg){if(svg._layoutStatusCoins)svg._layoutStatusCoins();});
+    });
   }
   // A named connector (#943: 'Grafana') reads "<source> connected · <window> window · refreshed <time>".
   var telemetrySource=telemetryOptions && typeof telemetryOptions.source==='string'?telemetryOptions.source.trim():'',telemetryWindow=trackingTelemetry(page).window;
@@ -1061,11 +1071,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function paintJiraCues(scope,d){
     scope.querySelectorAll('svg').forEach(function(svg){
       var obstacles=[];
-      svg.querySelectorAll('.node .card,.node .icbg,.node use,.node image,.node text,.handoff-stripe,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff],.dvdelta,.node-review-badge,.coin,.coin-base,.comm-break,text.lbl').forEach(function(el){
+      svg.querySelectorAll('.node .card,.node .icbg,.node use,.node image,.node text,.handoff-stripe,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff],.dvdelta,.node-review-badge,.coin,.coin-base,.comm-break,text.lbl,.dv-metrics-card-box').forEach(function(el){
         var box=boardControlBox(el,svg);if(box)obstacles.push({el:el,box:box});
       });
       function free(point,ignore){
-        return !obstacles.some(function(item){var b=item.box;return item.el!==ignore && point.x+13>b.x && point.x-13<b.x+b.w && point.y+13>b.y && point.y-13<b.y+b.h;});
+        return !obstacles.some(function(item){var b=item.box;return item.el!==ignore && boardBoxesOverlap({x:point.x-13,y:point.y-13,w:26,h:26},b);});
       }
       // If even the bounded local search is crowded, keep the link discoverable
       // in clear space beside the drawing; frame expansion includes that slot.
@@ -1159,7 +1169,6 @@ function createLiveStatus(ctl,page,options,renderOptions){
       }
       carrierPointer(el,target);
     });
-    paintJiraCues(scope,d);
     scope.querySelectorAll('g.coin[data-dv-step],button.schip[data-step-source]').forEach(function(el){
       var index=Number(el.getAttribute(el.classList.contains('coin')?'data-dv-step':'data-step-source')),step=(d.steps || [])[index];
       liveStatusClass(el,on && availabilityOn && step && coverageActive?liveStatusStep(d,step,map):null);
@@ -1194,16 +1203,21 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // rather than relying on a flag that would be reset before delivery.
     if(observer)observer.disconnect();
     try{
-      var focused=view.ownerDocument && view.ownerDocument.activeElement,focusCarrier=focused && focused.classList && focused.classList.contains('dv-live-target') && focused.getAttribute('data-live-carrier'),focusBinding=focusCarrier && bindings.find(function(binding){return binding.el.contains(focused);});
+      var focusRoot=typeof view.getRootNode==='function'?view.getRootNode():view.ownerDocument;
+      var focused=focusRoot && focusRoot.activeElement,focusCarrier=focused && focused.classList && focused.classList.contains('dv-live-target') && focused.getAttribute('data-live-carrier'),focusBinding=focusCarrier && bindings.find(function(binding){return binding.el.contains(focused);});
       close(false);syncBindings();clearTargets();refreshDependencies();
       if(applied || availabilityOn || refs().tickets.length){
         view.querySelectorAll('.dv-live-halo').forEach(function(el){el.remove();});
         bindings.forEach(paintBinding);
       }
       bindings.forEach(paintStory);paintLanes();paintMetrics();
+      // Paint Jira cues once, after cards and coins reserve their final boxes.
+      // Handoffs transfer their ticket target from the card to the cue; a second
+      // cue paint would discard that target after its source has been cleared.
+      bindings.forEach(function(binding){if(binding.section.diagram)paintJiraCues(binding.el,binding.section.diagram);});
       view.querySelectorAll('.dv-edit-target').forEach(function(el){el.classList.remove('dv-edit-target');});
       if(editing())bindings.forEach(function(binding){if(binding.ordinal!=null)binding.el.querySelectorAll('g.node[data-dv-node]:not(.node-text),path.edge[data-dv-edge]').forEach(function(el){el.classList.add('dv-edit-target');});});
-      if(focusBinding){var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier;});if(replacement)replacement.focus({preventScroll:true});}
+      if(focusBinding){var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier && !el.classList.contains('dv-metrics-label-hidden');});if(replacement)replacement.focus({preventScroll:true});}
       changedKeys=[];
     }finally{
       painting=false;if(!retired)observeBindings();
@@ -1288,7 +1302,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     editSave:function(){if(!retired && editor)editor.save();},
     editDiscard:function(){if(!retired && editor)editor.discard();},
     destroy:function(){
-      if(retired)return;on=false;paintLanes();retired=true;releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);if(demoDestroy)demoDestroy();
+      if(retired)return;on=false;paintLanes();retired=true;releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);telemetryClearCards(view);if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];
@@ -1308,6 +1322,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
   liveStatusControllers.set(view,api);
   connectPanels();
   paint();events.forEach(function(type){view.addEventListener(type,schedule);});
+  var metricFonts=view.ownerDocument && view.ownerDocument.fonts;
+  function metricsFontsChanged(){if(!retired && telemetry.enabled())schedule();}
+  if(metricFonts && metricFonts.ready)metricFonts.ready.then(metricsFontsChanged);
+  if(metricFonts && metricFonts.addEventListener){metricFonts.addEventListener('loadingdone',metricsFontsChanged);destroyListeners.push(function(){metricFonts.removeEventListener('loadingdone',metricsFontsChanged);});}
   // An edit re-renders the page: the new controller starts from the last live map so colors never reset.
   if(editor && editor.lastMap())api.apply(editor.lastMap());
   if(poller)firstPaint=requestAnimationFrame(function(){firstPaint=requestAnimationFrame(function(){firstPaint=0;poller.start();});});

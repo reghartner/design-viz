@@ -48,6 +48,7 @@
     "viewer/status-colors.js",
     "viewer/live-status.js",
     "viewer/telemetry.js",
+    "viewer/telemetry-cards.js",
     "engine.js",
     "viewer/detail-overview.js",
     "viewer/details.js",

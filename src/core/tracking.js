@@ -334,12 +334,13 @@ function carrierTelemetry(obj,templates,invalid){
   return {kind:clean.kind,signals:signals,proof:clean.proof || {},links:clean.links || {},card:clean.card || null};
 }
 function trackingTelemetry(page,invalid){
-  var warn=telemetryWarn(invalid),out={grafana:{},honeycomb:{},window:TELEMETRY_DEFAULT_WINDOW,refreshMs:null,templates:{}};
+  var warn=telemetryWarn(invalid),out={enabled:true,grafana:{},honeycomb:{},window:TELEMETRY_DEFAULT_WINDOW,refreshMs:null,templates:{}};
   var tracking=page && page.tracking;
   if(!telemetryObject(tracking) || !telemetryOwn(tracking,'telemetry'))return out;
   var value=tracking.telemetry;
-  if(!telemetryObject(value)){warn('','must be an object {grafana?, honeycomb?, window?, refreshMs?, templates?} — ignored');return out;}
-  telemetryUnknown(value,['grafana','honeycomb','window','refreshMs','templates'],warn);
+  if(!telemetryObject(value)){warn('','must be an object {enabled?, grafana?, honeycomb?, window?, refreshMs?, templates?} — ignored');return out;}
+  if(telemetryOwn(value,'enabled')){if(typeof value.enabled==='boolean')out.enabled=value.enabled;else warn('.enabled','must be a boolean — using true');}
+  telemetryUnknown(value,['enabled','grafana','honeycomb','window','refreshMs','templates'],warn);
   [['grafana',['prometheus','loki','tempo','sql'],'datasource UID'],['honeycomb',['environment','dataset'],'name']].forEach(function(group){
     var key=group[0],given=value[key];
     if(!telemetryOwn(value,key))return;

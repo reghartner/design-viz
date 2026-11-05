@@ -6,12 +6,12 @@
 | row | rule | fixture | scoped assertion | broken implementation rejected |
 |---|---|---|---|---|
 | A1 | `viewer/telemetry-claude.js` ships in the standalone entrypoint only; the standalone boot builds the adapter with `createTelemetryGrafana(page, window)` when no `window.flowviewTelemetry` host provider is set. | Bundle records plus production boot/rerender with real normalize, adapter and telemetry controller; rendering/navigation boundaries stubbed | Separate A1 cases check placement, initial attachment, host precedence, retirement, current normalized page/config and current-controller approval/retraction | Missing adapter, wrong provider, initial-only attachment, leaked handles, stale page/config or stale controller |
-| A2 | `createTelemetryGrafana(page, win)` is null without `win.claude.use` (absent or throwing getter) and on pages without a grafana, loki or sql signal; otherwise `{options: {provider, source: 'Grafana'}, attach(ctl, page)}`. Imported carriers count. Creating it never calls `use()`. | Runtime gates, local grafana/loki/sql signals, direct imported edge and separate nested imported node/edge bindings; absence-tolerant loader | Named A2 gate, provider/source/attach shape and zero use() assertions | Ungated or eager adapter, ignored imported carriers |
+| A2 | `createTelemetryGrafana(page, win)` is null without `win.claude.use` (absent or throwing getter) and on pages without a grafana, loki or sql signal; otherwise `{options: {provider, source: 'Grafana', available: false}, attach(ctl, page)}`. Imported carriers count. Creating it never calls `use()`. | Runtime gates, local grafana/loki/sql signals, direct imported edge and separate nested imported node/edge bindings; absence-tolerant loader | Named A2 gate, provider/source/attach shape and zero use() assertions | Ungated or eager adapter, ignored imported carriers |
 | A3 | The connector is picked by offered tools: all of query_prometheus, query_loki_logs, search_tempo_traces, get_annotations, generate_deeplink. A connector missing one (query_prometheus) is not picked; Jira-only and GitHub-only connectors are not picked; "Grafana" wins a tie, else the first qualifying one. None → the add-connector note and no tool call. | Partial, Jira, GitHub and competing qualifying connectors; inert provider if absent | Named A3 calls select the expected connector and missing tools produce the add-connector note | Name-only selection, wrong tie-break or calls without a qualifying connector |
 | A4 | One refresh (default 24h window) makes exactly: get_annotations first and alone (no other call starts until it settles), one query_prometheus range call per grafana signal, one query_loki_logs metric range call per loki signal, generate_deeplink once per carrier without an authored query link; relative times now-24h..now, stepSeconds 360, the page's datasource UIDs, the provider's AbortSignal on every call. tempo and honeycomb signals are not queried. A later refresh repeats the queries but not the deeplinks. | One-shot deferred get_annotations, start/settle event log, then a second refresh | Exactly one pending call, no query starts before annotation settlement; exact inputs, budget, signals and cached links | Annotations launched concurrently with queries, early queries, extra calls or repeated deeplinks |
 | A5 | Day 10 recorded payloads map to the provider shape: every Prometheus and Loki series as ascending [ms, number] points (several series added point by point), value = the last point, the authored unit; a query with no data is value 0 with no points; observedAt = the newest point; markers = the window's annotations ascending as {at, kind, label}; links = authored dashboard/query plus the generated Explore link. Imported carriers map by their resolved id. | Pinned Day 10 payloads, local and resolved imported carriers, pure mapper inputs; empty map if absent | Named A5 carrier ids, mapped values/series/units, markers, timestamps and links | Wrong Loki field, missing markers, lost imported ids or incorrect series aggregation |
 | A6 | The page window drives the range and step (6h → now-6h, 90 s; 30m → 60 s floor); Day 11 shows the incident marker and the lagging queue; Day 12 the recovered queue and the still-silent push edge. | 6h/30m/7d windows and pinned Day 11/12/all-todo story; missing calls read as undefined | Named A6 ranges, step floor, incident marker, lag/recovery and silent-edge values | Fixed window/step, missing incident marker or wrong recovery/silence values |
-| A7 | Through ctl.telemetry: Metrics off makes no call; the refresh never runs faster than 60 s even when the page asks for less; a hidden document pauses and returns with one catch-up; Metrics off aborts the signal. | Fake timers and document visibility through ctl.telemetry; page requests 1000 ms | Named A7 off/on calls, delivered map, 60000 ms floor, hidden pause, one catch-up and abort | Eager calls, sub-minute refresh, hidden polling, duplicate catch-up or no abort |
+| A7 | Through ctl.telemetry: Metrics off makes no data call (metadata discovery is permitted); the refresh never runs faster than 60 s even when the page asks for less; a hidden document pauses and returns with one catch-up; Metrics off aborts the signal. | Fake timers and document visibility through ctl.telemetry; page requests 1000 ms | Named A7 off/on calls, delivered map, 60000 ms floor, hidden pause, one catch-up and abort | Eager calls, sub-minute refresh, hidden polling, duplicate catch-up or no abort |
 | A8 | A connector-level failure (server_unavailable) keeps the previous map and sets status().note; a tool_error on one query keeps the other carriers fresh, keeps that signal's previous sample and reports the failed query in status().note. | Good sample then connector failure and per-query error with distinct second-refresh Prometheus/Loki peer series, plus missing datasource; inert provider if absent | Named A8 error status/note, retained previous map/failed sample, every successful peer equals the new series and differs from its first sample, and cleared note | Failure reported as success, erased previous map, an implementation that keeps the whole stale map after one failure, or unreported query error |
 | A9 | approval_required → status `approval`, no further connector call in that Metrics session, an "Allow Grafana" action on ctl.liveStatus (re-shown after another connector clears the slot, never over another connector's action); Allow makes the same call once and restarts Metrics. Authorization denials clear the map, set the note and stop calls until Metrics is turned on again; user_changed retires the adapter. | Deferred approval/denial behavior and fake live-status action through ctl.telemetry | Named A9 approval status/text, one Allow retry, retracted map and retired adapter | Silent success, repeated unattended requests, overwritten action or retained unauthorized data |
 | A10 | sql signals call query_sql at most once an hour (the value is reused in between); without query_sql on the connector there is no call and the note says so. | SQL connector, controlled clock at 0/59/61 minutes, missing-tool case; no calls if absent | Named A10 SQL inputs/value, hourly cap/cache and missing-tool note | Missing SQL call, per-refresh SQL query, stale hourly cache or unsupported tool call |
@@ -191,7 +191,7 @@ async function bootHarness({page=boardPage(),hostProvider,overrides}={}){
   destroy(){renders.at(-1)?.ctl.telemetry.destroy();}};
 }
 
-test('A1 initial standalone boot attaches the selected adapter to its controller without connecting',async t=>{
+test('A1 initial standalone boot attaches the selected adapter to its controller with metadata discovery only',async t=>{
  const h=await bootHarness();t.after(()=>h.destroy());
  assert.equal(h.renders.length,1,'boot rendered the page');
  assert.equal(h.attachments.length,1,'initial controller is attached');
@@ -199,7 +199,7 @@ test('A1 initial standalone boot attaches the selected adapter to its controller
  assert.equal(h.attachments[0].page,h.renders[0].page);
  assert.equal(h.renders[0].options.telemetry,h.adapters[0].options,'renderPage receives the selected Grafana provider');
  assert.equal(h.renders[0].ctl.telemetry.snapshot().available,true);
- assert.equal(h.host.used(),0,'boot does not acquire MCP before Metrics is enabled');
+ assert.equal(h.host.used(),1,'boot discovers MCP metadata');assert.equal(h.net.calls.length,0,'no data calls before Metrics is enabled');
 });
 
 test('A1 an explicit host provider wins on initial boot and re-render',async t=>{
@@ -239,7 +239,7 @@ for(const [contract,expected] of [
  const h=await bootHarness();t.after(()=>h.destroy());
  const edited=boardPage('6h');edited.tracking.telemetry.grafana={prometheus:'prom-edited',loki:'loki-edited'};
  assert.equal(h.rerender({page:edited}),null);
- h.renders[1].ctl.telemetry.setEnabled(true);await settled();
+ await settled();h.renders[1].ctl.telemetry.setEnabled(true);await settled();
  const prom=h.net.calls.filter(c=>c.tool==='query_prometheus'),loki=h.net.calls.filter(c=>c.tool==='query_loki_logs');
  assert.ok(prom.length && loki.length,'current controller issues both signal families');
  if(contract==='Prometheus datasource')assert.deepEqual([...new Set(prom.map(c=>c.input.datasourceUid))],[expected]);
@@ -255,7 +255,7 @@ for(const contract of ['map retraction','approval action','Allow restart'])test(
  const h=await bootHarness({overrides:{get_annotations:()=>needsApproval?Promise.reject({code:'approval_required'}):null}});t.after(()=>h.destroy());
  const previous=h.renders[0].ctl;
  assert.equal(h.rerender(boardPage('6h')),null);
- const current=h.renders[1].ctl;
+ await settled();const current=h.renders[1].ctl;
  current.telemetry.apply({ingest:{signals:{rate:{value:123}}}});
  assert.equal(current.telemetry.snapshot().map.ingest.signals.rate.value,123,'there is a current map to retract');
  current.telemetry.setEnabled(true);await settled();
@@ -473,7 +473,7 @@ test('A6 the page window drives range and step; Day 11 shows the incident and th
 test('A7 through ctl.telemetry: off makes no call, refresh is floored at 60 s, hidden pauses with one catch-up, off aborts',async()=>{
  const raw=boardPage();raw.tracking.telemetry.refreshMs=1000;
  const s=await setup({page:raw}),t=s.C.createTelemetry(s.page,s.adapter.options,{carriers:carriersOf(s.C,s.page)});
- await settled();assert.equal(s.net.calls.length,0,'A7 Metrics off: no call');assert.equal(s.host.used(),0,'A7 Metrics off: use() is not called');
+ s.adapter.attach({telemetry:t},s.page);await settled();assert.equal(s.net.calls.length,0,'A7 Metrics off: no call');assert.equal(s.host.used(),1,'A7 Metrics off: metadata only');
  t.setEnabled(true);await settled();
  const first=s.net.calls.length;assert.ok(first>0,'A7 Metrics on refreshes at once');assert.equal(t.status().state,'ok');
  assert.equal(Object.keys(plain(t.snapshot().map)).length,6,'A7 the map reaches ctl.telemetry');
@@ -497,7 +497,7 @@ test('A8 a connector failure keeps the previous map and sets the note; one faile
   query_loki_logs:()=>mode==='bad'
    ?Promise.resolve({payload:{data:[{values:peerSeries.map(([ms,value])=>({timestamp:String(ms/1000),value:String(value)}))}]}}):null}});
  const t=s.C.createTelemetry(s.page,s.adapter.options,{carriers:carriersOf(s.C,s.page)});
- t.setEnabled(true);await settled();const good=plain(t.snapshot().map);assert.equal(t.status().state,'ok','A8 the first refresh answers');assert.equal(t.status().note,'','A8 no note on a clean answer');
+ s.adapter.attach({telemetry:t},s.page);await settled();t.setEnabled(true);await settled();const good=plain(t.snapshot().map);assert.equal(t.status().state,'ok','A8 the first refresh answers');assert.equal(t.status().note,'','A8 no note on a clean answer');
  mode='down';s.tick(60000);await settled();
  assert.equal(t.status().state,'error','A8 a connector failure reports error');assert.equal(t.status().note,'Grafana did not answer','A8 the connector note');
  assert.deepEqual(plain(t.snapshot().map),good,'A8 the previous map is kept');
@@ -529,7 +529,7 @@ test('A9 approval, authorization denials and user_changed: one Allow call, no na
  const s=await setup({overrides:{get_annotations:()=>approve?null:Promise.reject({code:'approval_required',message:'Approval required'})}});
  const t=s.C.createTelemetry(s.page,s.adapter.options,{carriers:carriersOf(s.C,s.page)});
  const handle=s.adapter.attach({telemetry:t,liveStatus:live},s.page);assert.equal(typeof handle.destroy,'function');
- t.setEnabled(true);await settled();
+ await settled();t.setEnabled(true);await settled();
  assert.equal(t.status().state,'approval','A9 status approval');assert.equal(t.status().note,'Grafana access needs your approval');
  assert.equal(s.net.calls.length,1,'A9 the first call asked and stopped the refresh');assert.equal(live.label(),'Allow Grafana','A9 the Allow action');
  s.tick(60000);await settled();assert.equal(s.net.calls.length,1,'A9 no unattended call while approval is pending');
@@ -542,10 +542,10 @@ test('A9 approval, authorization denials and user_changed: one Allow call, no na
  assert.equal(t.status().state,'ok','A9 Metrics restarted and refreshed');assert.ok(s.net.calls.length>3);assert.equal(Object.keys(plain(t.snapshot().map)).length,6);
  handle.destroy();
  // Authorization denials retract data and stop calls for the Metrics session.
- for(const [code,note] of [['needs_reauth','Reconnect Grafana in claude.ai Settings → Connectors'],['not_in_manifest','This page is not allowed to read Grafana for your account.'],['blocked_by_policy','This page is not allowed to read Grafana for your account.'],['server_not_connected','Add a Grafana connector in claude.ai Settings → Connectors to see live metrics.']]){
+ for(const [code,note] of [['needs_reauth','Reconnect Grafana in claude.ai Settings → Connectors'],['not_in_manifest','This page is not allowed to read Grafana for your account.'],['blocked_by_policy','This page is not allowed to read Grafana for your account.']]){
   let deny=false;const d=await setup({overrides:{query_prometheus:()=>deny?Promise.reject({code,message:code}):null}});
   const dt=d.C.createTelemetry(d.page,d.adapter.options,{carriers:carriersOf(d.C,d.page)});d.adapter.attach({telemetry:dt,liveStatus:fakeLive()},d.page);
-  dt.setEnabled(true);await settled();assert.ok(Object.keys(plain(dt.snapshot().map)).length,code+' first refresh');
+  await settled();dt.setEnabled(true);await settled();assert.ok(Object.keys(plain(dt.snapshot().map)).length,code+' first refresh');
   deny=true;d.tick(60000);await settled();
   assert.equal(dt.status().state,'error',code);assert.equal(dt.status().note,note,'A9 '+code+' note');assert.deepEqual(plain(dt.snapshot().map),{},'A9 '+code+' retracts the map');
   const after=d.net.calls.length;d.tick(60000);await settled();assert.equal(d.net.calls.length,after,'A9 '+code+': no unattended call');
@@ -553,7 +553,7 @@ test('A9 approval, authorization denials and user_changed: one Allow call, no na
  }
  let changed=false;const u=await setup({overrides:{get_annotations:()=>changed?Promise.reject({code:'user_changed',message:'user changed'}):null}});
  const ut=u.C.createTelemetry(u.page,u.adapter.options,{carriers:carriersOf(u.C,u.page)});u.adapter.attach({telemetry:ut,liveStatus:fakeLive()},u.page);
- ut.setEnabled(true);await settled();changed=true;u.tick(60000);await settled();assert.deepEqual(plain(ut.snapshot().map),{},'A9 user_changed retracts');
+ await settled();ut.setEnabled(true);await settled();changed=true;u.tick(60000);await settled();assert.deepEqual(plain(ut.snapshot().map),{},'A9 user_changed retracts');
  const frozen=u.net.calls.length;changed=false;ut.setEnabled(false);ut.setEnabled(true);await settled();assert.equal(u.net.calls.length,frozen,'A9 user_changed retires the adapter');
 });
 function fakeLive(){
@@ -587,4 +587,15 @@ test('A11 docs declare the Grafana connector, its five tools and the call budget
  const docs=fs.readFileSync(path.join(ROOT,'docs/live-status.md'),'utf8');
  assert.match(docs,/\{server: "Grafana", tools: \["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"\]\}/,'A11 the declaration');
  for(const phrase of [/Allow Grafana/,/once per refresh/i,/query_sql/,/at most once an hour/i,/now-24h/,/unverified/i])assert.match(docs,phrase);
+});
+
+test('A1 disabled boot does not discover; editor enabling creates the adapter and disabling retires it',async t=>{
+ const page=boardPage();page.tracking.telemetry.enabled=false;const h=await bootHarness({page});t.after(()=>h.destroy());
+ assert.equal(h.host.used(),0);assert.equal(h.renders[0].ctl.telemetry.snapshot().available,false);
+ const edited=boardPage();edited.tracking.telemetry.enabled=true;assert.equal(h.rerender(edited),null);await settled();
+ assert.equal(h.renders[1].ctl.telemetry.snapshot().available,true);assert.equal(h.renders[1].ctl.telemetry.enabled(),false);assert.equal(h.net.calls.length,0);
+ assert.equal(h.rerender(page),null);await settled();assert.equal(h.renders[2].ctl.telemetry.snapshot().available,false);assert.equal(h.host.used(),1);
+});
+test('A1 explicit standalone false defeats automatic fallback across editor renders',async t=>{
+ const h=await bootHarness({hostProvider:false});t.after(()=>h.destroy());assert.equal(h.host.used(),0);assert.equal(h.renders[0].ctl.telemetry.snapshot().available,false);h.rerender(boardPage('6h'));await settled();assert.equal(h.host.used(),0);assert.equal(h.renders[1].ctl.telemetry.snapshot().available,false);
 });

@@ -4197,3 +4197,20 @@ svg path.edge.dv-metrics-ghosted{opacity:.35;}
 .dv-metrics-seal[data-seal="degraded"] circle{fill:var(--dv-metrics-amber);}
 .dv-metrics-seal[data-seal="live-early"] circle{fill:var(--dv-metrics-early);}
 .dv-metrics-seal path{fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+
+/* Metrics edge cards (#940): measured with the same fonts as node cards. */
+.dv-metrics-label-hidden{display:none!important;}
+.dv-metrics-card{--metric-verdict:var(--dv-metrics-packet);cursor:pointer;}
+.dv-metrics-card[data-state="silent"],.dv-metrics-card[data-state="unobserved"]{--metric-verdict:var(--dv-metrics-ghost);}
+.dv-metrics-card[data-state="degraded"]{--metric-verdict:var(--dv-metrics-amber);}
+.dv-metrics-card-box{fill:var(--explore-bg,#fff);stroke:var(--metric-verdict);stroke-width:1.5;}
+.dv-metrics-card[data-state="silent"] .dv-metrics-card-box{stroke-dasharray:4 3;}
+.dv-metrics-card-bar{fill:none;stroke:var(--metric-verdict);stroke-width:4;stroke-linecap:round;}
+.dv-metrics-card .t1{fill:var(--dtext);font-size:11px;font-weight:600;}
+.dv-metrics-card .t2{fill:var(--dtext);font-size:10px;}
+.dv-metrics-card-note{opacity:.7;}
+.dv-metrics-leader{fill:none;stroke:var(--explore-border,var(--dv-metrics-ghost));stroke-width:1;}
+.dv-metrics-card:focus{outline:none;}
+.dv-metrics-card:focus .dv-metrics-card-box{stroke-width:3;}
+
+.dv-metrics-card[data-verdict="proven"]{--metric-verdict:var(--dv-metrics-proven);}

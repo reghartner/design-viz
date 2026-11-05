@@ -70,6 +70,8 @@ function createInlineTextEditor(opts){
       // The desktop app bar also shows an untitled fallback. Only authored text edits.
       accept:function(value){return !!value.title;},
       plan:function(c,value){return planDocumentSetting(c.snapshot.text,c.snapshot.raw,'title',value);}},
+    {kind:'path',selector:'button.path-chip[data-dv-path] > span.path-chip-label,button.path-chip[data-dv-path] > span.path-timeline-label',
+      target:pathTarget,source:pathSource,value:'trimmed',html:true,pathHost:true,label:'Path label',help:'Enter or click outside saves. Escape cancels.'},
     {kind:'contract',selector:'.cttitle > span',field:'title',value:'trimmed',html:true,label:'Contract title',help:'Enter or click outside saves. Escape cancels.'},
     {kind:'crow',selector:'.ctkey',field:'k',value:'trimmed',html:true,label:'Contract field name',help:'Enter or click outside saves. Escape cancels.',
       plan:function(c,value){return value==null?{error:'a contract row needs k — the field name'}:planSetField(c.snapshot.text,c.snapshot.raw,c.path,'k',JSON.stringify(value));}},
@@ -136,6 +138,23 @@ function createInlineTextEditor(opts){
     host.setAttribute('x','4');host.setAttribute('y',String(b.y+b.height/2-height/2));
     host.setAttribute('width',String(Math.max(40,width-8)));host.setAttribute('height',String(height));
     return host;
+  }
+  function pathTarget(el){
+    var button=el.closest('button.path-chip[data-dv-path]'),section=el.closest('.doc-sec[data-dv-section]');
+    if(!button || button.disabled || !section)return null;
+    return {kind:'path',section:Number(section.getAttribute('data-dv-section')),pathId:button.getAttribute('data-dv-path')};
+  }
+  function pathSource(s,t){
+    var got=builderDiagram(s.text,s.raw,t.section),paths=got.d && got.d.paths;
+    if(got.error || !Array.isArray(paths))return null;
+    var index=paths.findIndex(function(path){return path && path.id===t.pathId;});if(index<0)return null;
+    var path=paths[index];if(path.label!=null && typeof path.label!=='string')return null;
+    return {text:path.label || path.id,contextKey:topologyKey(),plan:function(value){
+      // Validate through the same command as Path settings, but write only the
+      // label so an omitted color remains omitted in the authored source.
+      var checked=planPathStepEdit(s.text,s.raw,t.section,t.pathId,-1,'metadata',{label:value,color:path.color || '#38bdf8'});
+      return checked.error?checked:planSetField(s.text,s.raw,got.path.concat(['paths',index]),'label',JSON.stringify(value));
+    }};
   }
   function topologyKey(){return JSON.stringify(opts.session.topologyContext?opts.session.topologyContext():null);}
   function edgeLabelSource(s,target){
@@ -220,6 +239,15 @@ function createInlineTextEditor(opts){
      grip button. Leave the title in layout so opening a draft cannot move it. */
   function htmlLineHost(c){
     var el=c.el,parent=el.parentElement;if(!parent)return null;
+    if(c.entry.pathHost){
+      var button=parent,mount=button.closest('.path-matrix,.path-timeline');if(!mount)return null;
+      var mr=mount.getBoundingClientRect(),br=button.getBoundingClientRect(),sx=mr.width/mount.offsetWidth || 1,sy=mr.height/mount.offsetHeight || sx;
+      c.htmlAnchor=el;c.htmlMount=mount;c.positionedMount=getComputedStyle(mount).position==='static';
+      if(c.positionedMount)mount.classList.add('dv-inline-html-mount');
+      var pathHost=document.createElement('div');pathHost.style.left=(br.left-mr.left)/sx+'px';pathHost.style.top=(br.top-mr.top)/sy+'px';
+      pathHost.style.width=button.offsetWidth+'px';pathHost.style.height=Math.max(28,button.offsetHeight)+'px';pathHost.style.font=getComputedStyle(el).font;
+      return pathHost;
+    }
     // Titles may have a trailing action such as Home map's Edit layout. Keep
     // that action mounted and visible, and cover only the authored text node.
     var text=Array.from(el.childNodes).find(function(node){return node.nodeType===3 && node.textContent.trim();});
@@ -300,9 +328,27 @@ function createInlineTextEditor(opts){
     if(e.target.closest('.dv-inline-editor,a,input,select,textarea,summary,[contenteditable],.nlink'))return;
     // Only the tab label and explicit panel title grip are editable buttons.
     var button=e.target.closest('button,[role="button"]');
-    if(button && !button.matches('.tabbtn,.explore-window[data-explore-panel] > .explore-window-header > .explore-window-grip'))return;
+    if(button && !button.matches('.tabbtn,.path-chip[data-dv-path]:not(:disabled),.explore-window[data-explore-panel] > .explore-window-header > .explore-window-grip'))return;
     var el=e.target.closest(openSelector);if(el){e.preventDefault();e.stopPropagation();open(el);}
   }
+  // Clearing an editing preview can rebuild the chips during the first click.
+  // Remember that first press by identity and open its replacement after the
+  // second click has selected the path, even if no native dblclick survives.
+  var pathPress=null,pathReplacement=null;
+  life.listen(view,'pointerdown',function(e){
+    var label=e.target.closest && e.target.closest('button.path-chip[data-dv-path] > span.path-chip-label,button.path-chip[data-dv-path] > span.path-timeline-label');
+    var t=label && pathTarget(label),now=Date.now();
+    pathReplacement=t && pathPress && !pathPress.el.isConnected && now-pathPress.time<500 && pathPress.section===t.section && pathPress.pathId===t.pathId && Math.abs(pathPress.x-e.clientX)<5 && Math.abs(pathPress.y-e.clientY)<5?t:null;
+    pathPress=t?{el:label,section:t.section,pathId:t.pathId,time:now,x:e.clientX,y:e.clientY}:null;
+  },true);
+  life.listen(view,'click',function(){
+    var target=pathReplacement;pathReplacement=null;if(!target)return;pathPress=null;
+    life.delay(function(){
+      var section=view.querySelector('.doc-sec[data-dv-section="'+target.section+'"]');if(!section)return;
+      var button=Array.from(section.querySelectorAll('button.path-chip[data-dv-path]')).find(function(el){return el.getAttribute('data-dv-path')===target.pathId && !el.disabled;});
+      var label=button && button.querySelector('.path-chip-label,.path-timeline-label');if(label)open(label);
+    },0);
+  },true);
   life.listen(view,'dblclick',doubleClick,true);
   // Current desktop chrome displays the document title outside the preview.
   // This one explicit surface shares the same active guard and editor lifetime.

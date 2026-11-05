@@ -95,3 +95,43 @@ test('native Backstage contract grid follows the host width, not the outer viewp
  await expect.poll(async()=>{const b=await bounds(root);return b[1].y>b[0].y+b[0].h;}).toBe(true);
  await page.evaluate(()=>viewer.destroy());await expect(root).toBeEmpty();
 });
+
+test('contract text edits the addressed block and row in place with one Undo',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:950});
+ await page.addInitScript(()=>{window.__contractCopies=[];Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>window.__contractCopies.push(text)}});});
+ const doc=structuredClone(raw);delete doc.page.blocks[0].contract;const chosen=doc.page.blocks[0].contracts[1];delete chosen.title;chosen.source=server.origin+'/contract-source.html';chosen.fields[0].link=server.origin+'/field-source.html';
+ await writeFile(path.join(server.root,'contract-source.html'),'Contract source');await writeFile(path.join(server.root,'field-source.html'),'Field source');
+ const original=JSON.stringify(doc,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,original);
+ await page.getByRole('button',{name:'Dock Inspect panel',exact:true}).click();
+ const root=page.locator('#docview'),card=root.locator('[data-dv-contract="1"]'),row=card.locator('.ctrow').first(),src=page.locator('#src'),guide=page.locator('#guide'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder');
+ const title=card.locator('.cttitle > span'),key=row.locator('.ctkey'),value=row.locator('.ctv'),meaning=row.locator('.ctg'),note=card.locator('.ctnote');
+ const input=name=>page.getByRole('textbox',{name,exact:true});
+ await title.click();await expect(guide.getByLabel('title',{exact:true})).toHaveValue('');await expect(input('Contract title')).toHaveCount(0);
+ await row.click();await expect(guide.getByLabel('k',{exact:true})).toHaveValue('event_id');await expect(input('Contract field name')).toHaveCount(0);
+ const sourceLink=card.locator('.srcchip'),fieldLink=row.locator('.ctlink');
+ for(const link of [sourceLink,fieldLink]){const popup=page.waitForEvent('popup');await link.click();const opened=await popup;await opened.close();await expect(page.locator('.dv-inline-editor')).toHaveCount(0);}
+ await card.locator('.contractcopy').click();await expect.poll(()=>page.evaluate(()=>window.__contractCopies.length)).toBeGreaterThan(0);await expect(page.locator('.dv-inline-editor')).toHaveCount(0);await expect(src).toHaveValue(original);
+ await row.click();const inspectValue=guide.getByLabel('v',{exact:true});await inspectValue.fill('');await inspectValue.press('Enter');const cleared=await src.inputValue();
+ await undo.click();await expect(src).toHaveValue(original);
+ const entries=[
+  [title,'Contract title','Renamed contract','title',false],
+  [key,'Contract field name','message_key','k',false],
+  [value,'Contract value','response value','v',false],
+  [meaning,'Contract meaning','Meaning **changed**','g',true],
+  [note,'Contract note','Note with `code`','note',true]
+ ];
+ for(const [surface,label,next,field,markdown] of entries){
+  const before=await src.inputValue(),expected=JSON.parse(before);if(field==='title' || field==='note')expected.page.blocks[0].contracts[1][field]=next;else expected.page.blocks[0].contracts[1].fields[0][field]=next;
+  await surface.dblclick();const edit=input(label);await expect(edit).toBeFocused();if(field==='title')await expect(edit).toHaveValue('');
+  await edit.fill(next);await edit.press(markdown?'ControlOrMeta+Enter':'Enter');await expect(edit).toHaveCount(0);const saved=await src.inputValue();expect(JSON.parse(saved)).toEqual(expected);
+  if(field==='g')await expect(meaning.locator('strong')).toHaveText('changed');else if(field==='note')await expect(note.locator('code')).toHaveText('code');else await expect(surface).toContainText(next);
+  await undo.click();await expect(src).toHaveValue(before);await redo.click();await expect(src).toHaveValue(saved);
+ }
+ const before=await src.inputValue();await key.dblclick();await input('Contract field name').fill('   ');await input('Contract field name').press('Enter');await expect(page.locator('.dv-inline-editor [role=status]')).toHaveText('a contract row needs k — the field name');await expect(src).toHaveValue(before);await input('Contract field name').press('Escape');
+ await value.dblclick();await input('Contract value').fill('discarded');await input('Contract value').press('Escape');await expect(src).toHaveValue(before);
+ // Revert the five edits to compare the same source with Inspect's empty-value result.
+ for(let i=0;i<5;i++)await undo.click();await expect(src).toHaveValue(original);
+ await value.dblclick();await input('Contract value').fill('');await input('Contract value').press('Enter');await expect(src).toHaveValue(cleared);await undo.click();await expect(src).toHaveValue(original);
+ await meaning.dblclick();await input('Contract meaning').fill('A line');await input('Contract meaning').press('Enter');await input('Contract meaning').pressSequentially('second');await expect(input('Contract meaning')).toHaveValue('A line\nsecond');await title.click();expect(JSON.parse(await src.inputValue()).page.blocks[0].contracts[1].fields[0].g).toBe('A line\nsecond');await undo.click();await expect(src).toHaveValue(original);
+ await note.dblclick();await input('Contract note').fill('stale draft');await src.evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await expect(input('Contract note')).toHaveCount(0);await expect(src).toHaveValue(original+' ');
+});

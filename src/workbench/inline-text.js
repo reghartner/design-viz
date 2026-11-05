@@ -70,6 +70,12 @@ function createInlineTextEditor(opts){
       // The desktop app bar also shows an untitled fallback. Only authored text edits.
       accept:function(value){return !!value.title;},
       plan:function(c,value){return planDocumentSetting(c.snapshot.text,c.snapshot.raw,'title',value);}},
+    {kind:'contract',selector:'.cttitle > span',field:'title',value:'trimmed',html:true,label:'Contract title',help:'Enter or click outside saves. Escape cancels.'},
+    {kind:'crow',selector:'.ctkey',field:'k',value:'trimmed',html:true,label:'Contract field name',help:'Enter or click outside saves. Escape cancels.',
+      plan:function(c,value){return value==null?{error:'a contract row needs k — the field name'}:planSetField(c.snapshot.text,c.snapshot.raw,c.path,'k',JSON.stringify(value));}},
+    {kind:'crow',selector:'td.ctv',field:'v',value:'trimmed',html:true,htmlInside:true,label:'Contract value',help:'Enter or click outside saves. Escape cancels.'},
+    {kind:'crow',selector:'td.ctg',field:'g',markdown:true,value:'trimmed',label:'Contract meaning',help:help},
+    {kind:'contract',selector:'.ctnote',field:'note',markdown:true,value:'trimmed',label:'Contract note',help:help},
     {kind:'tab',selector:'.tabbtn',field:'label',value:'trimmed',html:true,label:'Tab label',help:'Enter or click outside saves. Escape cancels.',
       plan:function(c,value){return value==null?{error:'a tab needs a label'}:planSetField(c.snapshot.text,c.snapshot.raw,c.path,'label',JSON.stringify(value));}},
     edgeLabel,
@@ -217,15 +223,17 @@ function createInlineTextEditor(opts){
     // Titles may have a trailing action such as Home map's Edit layout. Keep
     // that action mounted and visible, and cover only the authored text node.
     var text=Array.from(el.childNodes).find(function(node){return node.nodeType===3 && node.textContent.trim();});
-    if(text && el.querySelector('a,button,input,select,textarea')){
+    if(c.entry.htmlInside && !text){text=document.createTextNode('');el.prepend(text);}
+    if(text && (c.entry.htmlInside || el.querySelector('a,button,input,select,textarea'))){
       var span=document.createElement('span');text.replaceWith(span);span.appendChild(text);c.htmlText=span;
     }
     var anchor=c.htmlAnchor=c.htmlText || el;
+    parent=c.entry.htmlInside?el:parent;
     c.htmlMount=parent;c.positionedMount=getComputedStyle(parent).position==='static';
     if(c.positionedMount)parent.classList.add('dv-inline-html-mount');
     var host=document.createElement('div');
     host.style.left=anchor.offsetLeft+'px';host.style.top=anchor.offsetTop+'px';
-    host.style.width=anchor.offsetWidth+'px';host.style.height=Math.max(28,anchor.offsetHeight)+'px';
+    host.style.width=(c.entry.htmlInside?el.clientWidth:anchor.offsetWidth)+'px';host.style.height=Math.max(28,anchor.offsetHeight)+'px';
     host.style.font=getComputedStyle(el).font;
     return host;
   }

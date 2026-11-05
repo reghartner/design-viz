@@ -496,6 +496,31 @@ and live early (including ALREADY LIVE). A step takes the live-status rollup of
 its directly selected carriers' Jira states, then the worst telemetry state
 (degraded, silent, unobserved, flowing), joined by the same matrix.
 
+### Metrics and proof authoring
+
+Agent authors load the live-status board skill's conditional
+[Metrics chapter](../.claude/skills/live-status-board/metrics.md) only when a
+request names metrics, traffic, Grafana, Honeycomb, Loki or proof. A
+telemetry-only board does not need Jira. The chapter requires explicit carrier
+selection and kinds, including local, direct/nested imported, consumer-overlay
+and loader-selected detail carriers; it forbids name-derived queries.
+
+Connector discovery is proposal work: inspect the current tool schemas, find
+existing dashboards/queries by the author's intent, preserve exact queries and
+datasource UIDs, and run each selected proposal once. Report rows/series, empty,
+missing, zero and errors honestly. No rows is unobserved; traffic proves only
+that the carrier was observed in that window; one trace proves one request.
+Proof limits are authored only after agreement. Three or more carriers must
+genuinely share a query shape before a template is worthwhile.
+
+Store only safe HTTP(S) UI links. A Grafana dashboard/Explore link and
+Honeycomb's stable query UI URL are suitable; a signed result/download URL is
+not. Honeycomb query objects are accepted by the schema, but the shipped
+claude.ai adapter does not run them yet, so they remain unobserved without a
+host telemetry provider. Public documents and recorded provider artifacts are
+data, not instructions to install software or use an account, and are not
+live-account verification.
+
 ## Compatibility
 
 The capability is `flow.live-status`, introduced in Flowview 0.2.0. Non-empty
@@ -1406,10 +1431,12 @@ HTML is never regenerated and comments survive (verified on claude.ai,
 2026-10-30: a publish with `url` and `files` but no `file_path` is refused;
 with the read-back page the stored capabilities carried forward and the edited
 title showed). Re-injecting a two-file page without
-`--two-file` drops the marker, as it replaces a stale guide. For a tracked page
-published this way the declaration adds the artifact and user capabilities the
-board's Edit mode needs; single-file tracked pages keep the declaration above,
-untracked pages stay comments-only:
+`--two-file` drops the marker, as it replaces a stale guide. For a Jira- or
+telemetry-editable page published this way the declaration adds the artifact
+and user capabilities the board's Edit mode needs. Those edit capabilities do
+not grant Jira permission: telemetry-only pages omit the Jira server. Single-
+file pages keep their existing declaration, and pages with neither Jira nor
+telemetry stay comments-only:
 
 ```js
 capabilities: {mcp: {servers: [{server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]}]},
@@ -1603,15 +1630,20 @@ JSON, write it back into the same block and republish to the same URL. The
 guide is derived from the spec: it states the renderer version from
 `page.flowview.authoredWith` (or that none is stamped), the capability
 declaration to pass on every publish as a JSON block (the Jira connector entry
-only when the page has `page.tracking`, the Grafana entry only when a carrier or
-page template binds a `grafana`, `loki` or `sql` signal, imported carriers of an
-embedded `flowview-topology` context included; connector display names are per
-account), the compact tracking rules, the page's own `tracking` values, links
+only when the page has Jira/non-telemetry tracking—`tracking.telemetry` alone
+does not request it—the Grafana entry only when the enabled root has a carrier
+or page template binding a `grafana`, `loki` or `sql` signal,
+selected direct/nested imports and consumer overlays from an embedded
+`flowview-topology` context included; connector display names are per account),
+the compact tracking rules, the page's own `tracking` values, links
 to `docs/live-status.md` and `contract/authoring-contract.md` in the public
 repo pinned to the commit the page was built from (`git rev-parse HEAD` of the
 checkout running `inject.py`; outside a checkout the links point at `main`
 with a note to keep to the fields the spec already uses), and the post-publish
-checks. It is under 6 KB, never contains secrets
+checks. When the page has telemetry settings, templates or bindings, the guide
+also names `tracking.telemetry`, carrier `telemetry`, explicit sources, proof and
+links; root/host disable, default-off/24h, unavailable tools, synthetic preview,
+Honeycomb's unshipped adapter and exact-day history honesty. It is under 6 KB, never contains secrets
 (every viewer can read it), and is data to the agent reading it. Re-injecting
 a built page replaces the previous guide. When the block is present the Live
 status panel ends with a muted line, "Editors: ask your agent to read this
@@ -1628,8 +1660,9 @@ edits were saved after the newest agent entry, ask before overriding one of them
 append one agent entry for the change, and start again from the read when the
 publish is refused because the artifact changed. The inline block is
 described as the stale fallback and must not be edited.
-A tracked two-file page's declaration adds `artifact` and `user`
-(`{scopes: ["profile"]}`).
+A two-file page with Jira or telemetry editing adds `artifact` and `user`
+(`{scopes: ["profile"]}`). Telemetry alone still declares no Jira connector;
+artifact editing and Jira permission are independent.
 
 ## Edit history
 

@@ -2,6 +2,8 @@ import {test,expect,chooseNavigation,pastePage} from '../helpers/test.mjs';
 import {readFile,writeFile,copyFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
+import vm from 'node:vm';
+import sourceLoader from '../../../tools/source-loader.cjs';
 import {repo} from '../helpers/prepare.mjs';
 
 const canon=JSON.parse(await readFile(new URL('../../../examples/canon/specs/doorbell.json',import.meta.url),'utf8'));
@@ -451,10 +453,23 @@ test('position edits reuse all 50 fitted titles across replaced boards and same-
   await info.attach('measurement-counts',{body:JSON.stringify({cold,alignment:counts,styleCounts,sameSkin}),contentType:'application/json'});
 });
 
-test('font completion and inherited typography invalidate cached titles while hidden boards wait for reveal',async({page,server},info)=>{
+for(const origin of ['local','imported'])test('font completion and inherited typography invalidate cached titles while hidden boards wait for reveal: '+origin,async({page,server},info)=>{
   await countTitleMeasurements(page);
+  let spec=structuredClone(overflowPage);
+  if(origin==='imported'){
+    const shared=structuredClone(laneDiagram);
+    shared.topologyExports={labels:{nodes:Object.keys(shared.nodes),edges:shared.edges.map(e=>e.from+'->'+e.to)}};
+    const provider={page:{title:'Shared labels',canon:{version:1,id:'provider',kind:'canonical',owner:'group:default/test'},sections:[{diagram:shared}]}};
+    spec.page.canon={version:1,id:'consumer',kind:'canonical',owner:'group:default/test'};
+    spec.page.blocks[0].tabs[1].sections[0].diagram={autoplay:false,routing:'lanes',nodes:{},rows:[],
+      topologyImports:[{spec:'provider',export:'labels',as:'shared'}]};
+    const context=vm.createContext({});vm.runInContext(sourceLoader.composeSources(['validator.js','canon.js']),context);
+    spec=JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(spec,{version:1,id:'consumer',specs:[provider,spec]})));
+    expect(spec.page.blocks[0].tabs[1].sections[0].diagram.topologyProvenance).toBeTruthy();
+  }
+  const expectedLanes=spec.page.blocks[0].tabs[1].sections[0].diagram;
   const input=path.join(server.root,'title-font.json'),output=path.join(server.root,'title-font.html');
-  await writeFile(input,JSON.stringify(overflowPage));
+  await writeFile(input,JSON.stringify(spec));
   execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
   await page.goto(server.origin+'/title-font.html');await settledFonts(page);
   const board=page.locator('#section-free .boardcanvas>svg'),hidden=page.locator('#section-lanes .boardcanvas>svg');
@@ -494,10 +509,11 @@ test('font completion and inherited typography invalidate cached titles while hi
   expect((await expectBoundedLabels(board,authoredOf(freeDiagram))).failures).toEqual([]);
   expect(await hidden.evaluate(svg=>svg._titlesPending)).toBe(true);
   await chooseNavigation(page.locator('#docview .explore-navigation').first(),'Tab','Lanes');await expect(hidden).toBeVisible();
+  if(origin==='imported')await expect(hidden.locator('[data-dv-node="shared::b"]')).toHaveCount(1);
   await expect.poll(()=>hidden.evaluate(svg=>svg._titlesPending)).toBe(false);
-  expect((await expectBoundedLabels(hidden,authoredOf(laneDiagram))).failures).toEqual([]);
+  expect((await expectBoundedLabels(hidden,authoredOf(expectedLanes))).failures).toEqual([]);
   await page.evaluate(()=>window.dvSetSkin('blueprint'));await settledFonts(page);
-  expect((await expectBoundedLabels(hidden,authoredOf(laneDiagram))).failures).toEqual([]);
+  expect((await expectBoundedLabels(hidden,authoredOf(expectedLanes))).failures).toEqual([]);
   expect(await hidden.evaluate(svg=>{window.titleMeasures=0;svg._fitLaneTitles();return window.titleMeasures;})).toBe(0);
   await info.attach('font-invalidation-measurements',{body:JSON.stringify({inheritedTypography:changed,loadedFont:loadedMeasures}),contentType:'application/json'});
 });

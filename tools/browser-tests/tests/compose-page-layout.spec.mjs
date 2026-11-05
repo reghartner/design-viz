@@ -93,6 +93,9 @@ for(const width of [800,1200,1440,1920])test('width-sized graph SVG fits its til
  const measurer=await require('../../arrange/measure.cjs').createMeasurer(width),result=await measurer.arrange({diagram:A.seed(raw,[])},'pastel'),d=result.spec.diagram;
  await measurer.close();
  const initial=await page.evaluate(diagram=>arrangementNative.paint({diagram,skin:'pastel'}),d),observations=[];
+ // This checks the composition's width-sized SVG, including its full frame.
+ // Choose that mode explicitly; a fresh Standard camera now fits drawn ink.
+ await page.locator('[data-layout-key="diagram"]').getByRole('button',{name:'Auto',exact:true}).click();
  for(const state of initial.states){const o=await page.evaluate(s=>arrangementNative.observe(s),state);observations.push(o);expect(o.graph.clipped).toBe(0);expect(o.graph.minimumLabelPx).toBeGreaterThanOrEqual(8);}
  const geometry=await page.evaluate(()=>{const svg=document.querySelector('[data-layout-key="diagram"] .boardcanvas>svg'),board=svg.closest('.board'),header=board.querySelector('.lg'),zoom=board.querySelector('.board-zoom');return {svgBottom:svg.getBoundingClientRect().bottom,svgHeight:svg.getBoundingClientRect().height,boardBottom:board.getBoundingClientRect().bottom,boardWidth:board.getBoundingClientRect().width,boardHeight:board.getBoundingClientRect().height,headerHeight:header.getBoundingClientRect().height,zoomHeight:zoom.getBoundingClientRect().height};});
  await fs.writeFile(info.outputPath('measurements.json'),JSON.stringify({estimates:result.diagnostics,observations,geometry},null,2));
@@ -131,6 +134,9 @@ test('Auto resize changes graph height beyond the single composition target',asy
  const measurer=await require('../../arrange/measure.cjs').createMeasurer(targetWidth),result=await measurer.arrange({diagram:A.seed(raw,[])},'pastel');await measurer.close();
  expect(result.diagnostics.targetWidth).toBe(targetWidth);expect(result.diagnostics.resizeScope).toContain('single target width');
  await page.evaluate(diagram=>arrangementNative.paint({diagram,skin:'pastel'}),result.spec.diagram);
+ // Explicit Auto retains width-based resizing; the initial fitted camera
+ // deliberately keeps the whole graph visible when the host changes width.
+ await page.locator('[data-layout-key="diagram"]').getByRole('button',{name:'Auto',exact:true}).click();
  const dimensions=()=>page.evaluate(()=>{const tile=document.querySelector('[data-layout-key="diagram"]'),svg=tile.querySelector('.boardcanvas>svg');return {tileHeight:tile.getBoundingClientRect().height,svgWidth:svg.getBoundingClientRect().width,svgHeight:svg.getBoundingClientRect().height};});
  const before=await dimensions(),beforeObservation=await page.evaluate(()=>arrangementNative.observe({mode:'step',index:0}));
  expect(beforeObservation.graph.clipped).toBe(0);

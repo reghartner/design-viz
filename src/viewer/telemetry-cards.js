@@ -76,6 +76,10 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate){
       var w=Math.max(138,Math.ceil(Math.max.apply(null,sizingTexts.map(function(el){return el.getComputedTextLength();})))+20);
       // Leave dedicated space beside the headline for the rate series.
       w=Math.max(w,Math.ceil(texts[1].getComputedTextLength())+78);rect.setAttribute('width',w);
+      // Chromium can reshape hinted SVG glyphs when a fitted board changes
+      // scale. Keep each measured advance tied to the card geometry so a
+      // later zoom cannot push a note outside its already-sized rectangle.
+      texts.forEach(function(el){el.setAttribute('textLength',el.getComputedTextLength());el.setAttribute('lengthAdjust','spacingAndGlyphs');});
       if(view.preview && texts[4].getComputedTextLength()>w-20){texts[4].setAttribute('textLength',w-20);texts[4].setAttribute('lengthAdjust','spacingAndGlyphs');}
       if(content.series.length>=2){var values=content.series.map(function(p){return p[1];}),lo=Math.min.apply(null,values),hi=Math.max.apply(null,values);
         telemetrySvg(doc,'polyline',{'class':'dv-metrics-sparkline',points:values.map(function(v,i){return (w-58+48*i/(values.length-1))+','+(hi===lo?27:33-12*(v-lo)/(hi-lo));}).join(' ')},card);

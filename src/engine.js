@@ -1020,7 +1020,17 @@ function fitLaneNodeTitle(node, title, width, subtitle, measurement){
     }
     target = text;
   }
-  if (fits(title, firstRight - x)) return remember();
+  if (fits(title, firstRight - x)){
+    /* Font ascenders/descenders need not match the default baseline gap.
+       Keep a real gap above the subtitle even when Fit enlarges the card;
+       screen-pixel overlap tolerances must not decide label placement. */
+    if (hasSub && typeof text.getBBox === 'function' && typeof sub.getBBox === 'function'){
+      var titleBox = text.getBBox(), subBox = sub.getBBox();
+      var rise = Math.min(Math.max(0,titleBox.y + titleBox.height + 2 - subBox.y),Math.max(0,titleBox.y - 2));
+      if (rise > 0) text.setAttribute('y',titleY - rise);
+    }
+    return remember();
+  }
   /* A title cut with … shows its full text on hover; lane and image cards
      already render one. */
   function exposeTitle(){
@@ -1520,6 +1530,9 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       var box=boardControlBox(el,svg);if(box)boxes.push(box);
     });
     if(boxes.length)extendFrame(unionGraphFrame(null,boxes,4));
+    // Metrics can add cards and move coins without resizing the board itself.
+    // Notify its screen camera only after the complete overlay geometry settles.
+    if(svg.dispatchEvent && typeof CustomEvent!=='undefined')svg.dispatchEvent(new CustomEvent('dv:boardcontentchange',{bubbles:true}));
   };
   refreshFrame();
   /* Ink measured before webfonts settle, or skipped while an inactive tab
@@ -2971,9 +2984,11 @@ function createProseController(proseEl, toggleButton, defaultCollapsed, onChange
    camera; these styles and gestures are inactive while it borrows the board. */
 function createBoardNavigation(board, group, legend, changed){
   var canvas=board.querySelector('.boardcanvas');if(!canvas)return null;
-  var retired=false,gesture=null,suppressClick=false,paused=null,followFrame=false,publishedScale=null;
+  var retired=false,gesture=null,suppressClick=false,paused=null,followFrame=false,fitFrame=null,publishedScale=null;
+  var fitting=false,autoFit=false,fitRequest=null,fitGeometry='';
   var motion=createCameraMotion();
-  function manual(){motion.cancel();board.dispatchEvent(new CustomEvent('dv:cameramanual'));}
+  function stopFit(){autoFit=false;if(fitRequest!==null)cancelAnimationFrame(fitRequest);fitRequest=null;}
+  function manual(){stopFit();motion.cancel();board.dispatchEvent(new CustomEvent('dv:cameramanual'));}
   var controls=document.createElement('div');controls.className='board-zoom';
   controls.setAttribute('role','group');controls.setAttribute('aria-label','Diagram zoom');
   function button(text,label,action){var b=document.createElement('button');b.type='button';b.className='mbtn';b.textContent=text;b.setAttribute('aria-label',label);b.addEventListener('click',action);controls.appendChild(b);return b;}
@@ -2982,10 +2997,7 @@ function createBoardNavigation(board, group, legend, changed){
   var value=document.createElement('span');value.className='board-zoom-value';controls.appendChild(value);
   var into=button('+','Diagram zoom in',function(){scale(1.25);});
   button('Fit diagram','Fit diagram',function(){
-    manual();followFrame=false;var svg=graph();if(!enabled() || !svg)return;
-    var box=svg.viewBox.baseVal;
-    zoom(Math.min(board.clientWidth/box.width,Math.max(1,board.clientHeight-legend.offsetHeight)/box.height));
-    board.scrollLeft=board.scrollTop=0;
+    manual();requestFit();
   });
   controls.title='Drag the diagram background to pan. Ctrl/⌘ + wheel or pinch to zoom.';
   group.appendChild(controls);
@@ -2993,7 +3005,34 @@ function createBoardNavigation(board, group, legend, changed){
   function graph(){return canvas.querySelector('svg');}
   function displayScale(){var grid=board.closest('.section-layout-grid');return grid && grid.offsetWidth?grid.getBoundingClientRect().width/grid.offsetWidth:1;}
   function ratio(){var svg=graph();return svg?svg.getBoundingClientRect().width/displayScale()/svg.viewBox.baseVal.width:1;}
-  function refresh(){if(!enabled())return;var r=ratio();value.textContent=Math.round(r*100)+'%';out.disabled=r<=.1501;into.disabled=r>=3.999;if(r!==publishedScale){publishedScale=r;board.dispatchEvent(new CustomEvent('board-scale-change'));}}
+  function refresh(){if(!enabled())return;scheduleFit();var r=ratio();value.textContent=Math.round(r*100)+'%';out.disabled=r<=.1501;into.disabled=r>=3.999;if(r!==publishedScale){publishedScale=r;board.dispatchEvent(new CustomEvent('board-scale-change'));}}
+  function geometry(){return [board.clientWidth,board.clientHeight,legend.offsetHeight].join(':');}
+  function scheduleFit(){
+    if(!autoFit || fitting || fitRequest!==null || !enabled() || paused || !board.clientWidth || geometry()===fitGeometry)return;
+    // Layout composition and its legend controls are completed after the board
+    // is built. Hidden chapters wait for their first measurable ResizeObserver.
+    fitRequest=requestAnimationFrame(function(){fitRequest=null;fit();});
+  }
+  function requestFit(){autoFit=true;fitGeometry='';scheduleFit();}
+  function fit(){
+    var svg=graph();if(!autoFit || !enabled() || paused || !svg || !board.clientWidth)return;
+    var box=svg.viewBox.baseVal,ink=boardContentBounds(svg);
+    if(!ink || !ink.w || !ink.h || !box.width)return;
+    fitting=true;followFrame=false;fitFrame={x:ink.x+ink.w/2,y:ink.y+ink.h/2};
+    board.style.setProperty('--board-viewport-height',board.getBoundingClientRect().height/displayScale()+'px');
+    board.classList.add('board-zoomed');
+    // Framing can remove the Scroll row and a scrollbar, changing both usable
+    // axes. Remeasure after each update rather than fitting to stale controls.
+    for(var pass=0;pass<4;pass++){
+      var before=geometry(),available=Math.max(1,board.clientHeight-legend.offsetHeight);
+      var scale=Math.min(Math.max(1,board.clientWidth-1)/ink.w,Math.max(1,available-1)/ink.h);
+      board.style.setProperty('--board-zoom-width',box.width*scale+'px');
+      changed();
+      if(before===geometry())break;
+    }
+    board.scrollLeft=board.scrollTop=0;
+    fitGeometry=geometry();fitting=false;refresh();
+  }
   function zoom(next){
     var svg=graph();if(!enabled() || !svg || !board.clientWidth)return;
     var frame=board.getBoundingClientRect(),before=svg.getBoundingClientRect(),display=displayScale();
@@ -3022,29 +3061,43 @@ function createBoardNavigation(board, group, legend, changed){
     if(!enabled() || !board.clientWidth)return;
     var box=svg.viewBox.baseVal,ink=boardContentBounds(svg),display=displayScale(),scale=box.width?svg.getBoundingClientRect().width/display/box.width:0;
     if(!ink || !scale)return unframe();
-    function axis(start,size,full,length,available,legacy){
+    var previousFollow=followFrame;
+    if(followFrame)followFrame={x:Math.min(followFrame.x,ink.x),y:Math.min(followFrame.y,ink.y),
+      right:Math.max(followFrame.right,ink.x+ink.w),bottom:Math.max(followFrame.bottom,ink.y+ink.h)};
+    function axis(start,size,full,length,available,legacy,center,followStart,followEnd){
       var from=Math.max(start,full),to=Math.min(start+size,full+length);if(to<=from){from=full;to=full+length;}
       // Whole pixels: a fractional canvas leaves the scroll bottom short of the rounded scrollHeight.
       var lead=(from-full)*scale,extent=(to-from)*scale,room=Math.ceil(Math.max(available,extent));
-      // Follow needs half a viewport of runway at either end so an edge node
-      // can be centered. Preserve it when pausing, until Fit or size reset.
-      if(followFrame)return {room:Math.ceil(extent+available),offset:available/2-lead};
-      return {room:room,offset:Math.max(-lead,Math.min(room-lead-extent,legacy(room)))};
+      // Keep existing runway when path ink disappears, and extend both ends
+      // for new ink. The scroll compensation below keeps the paused camera
+      // fixed when left/top growth moves the canvas coordinate origin.
+      if(followFrame)return {room:Math.ceil((Math.max(to,followEnd)-followStart)*scale+available),offset:available/2-(followStart-full)*scale};
+      // Keep the graph center chosen by Fit, rather than recentering each
+      // time an author moves an outer node or coin. Other objects stay put.
+      var offset=fitFrame?available/2-(center-full)*scale:legacy(room);
+      return {room:room,offset:Math.max(-lead,Math.min(room-lead-extent,offset))};
     }
-    var across=axis(ink.x,ink.w,box.x,box.width,board.clientWidth,function(room){return (room-box.width*scale)/2;}),
-        down=axis(ink.y,ink.h,box.y,box.height,Math.max(1,board.clientHeight-legend.offsetHeight),function(){return 0;});
+    var across=axis(ink.x,ink.w,box.x,box.width,board.clientWidth,function(room){return (room-box.width*scale)/2;},fitFrame && fitFrame.x,followFrame && followFrame.x,followFrame && followFrame.right),
+        down=axis(ink.y,ink.h,box.y,box.height,Math.max(1,board.clientHeight-legend.offsetHeight),function(){return 0;},fitFrame && fitFrame.y,followFrame && followFrame.y,followFrame && followFrame.bottom);
     board.style.setProperty('--board-canvas-width',across.room+'px');board.style.setProperty('--board-canvas-height',down.room+'px');
     board.style.setProperty('--board-offset-x',across.offset+'px');board.style.setProperty('--board-offset-y',down.offset+'px');
     board.classList.add('board-content-framed');
+    if(previousFollow){
+      board.scrollLeft+=(previousFollow.x-followFrame.x)*scale;
+      board.scrollTop+=(previousFollow.y-followFrame.y)*scale;
+    }
   }
   function reset(){
-    motion.cancel();cancel();followFrame=false;board.classList.remove('board-zoomed');unframe();
+    stopFit();motion.cancel();cancel();followFrame=false;fitFrame=null;board.classList.remove('board-zoomed');unframe();
     board.style.removeProperty('--board-zoom-width');board.style.removeProperty('--board-viewport-height');
-    if(paused){paused.width='';paused.height='';}
+    if(paused){paused.width='';paused.height='';paused.pendingFit=false;}
   }
   function down(ev){
     suppressClick=false;
-    if(!enabled() || ev.button!==0 || gesture || !ev.target.closest('.boardcanvas') || ev.target.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
+    if(!enabled() || ev.button!==0 || gesture || !ev.target.closest('.boardcanvas'))return;
+    // Object selection and dragging are deliberate camera use, too.
+    stopFit();
+    if(ev.target.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
     manual();
     // Desktop touchscreens pan natively. Relinquish Follow before returning,
     // without preventing scrolling or capturing the pointer for a mouse drag.
@@ -3108,19 +3161,27 @@ function createBoardNavigation(board, group, legend, changed){
     var scroller=outerScrollerY(delta);if(!scroller || !ev.cancelable)return;
     ev.preventDefault();scroller.scrollTop+=delta;
   }
+  function contentChanged(){if(!enabled())return;if(autoFit)requestFit();else changed();}
+  board.addEventListener('dv:boardcontentchange',contentChanged);
   var listeners={pointerdown:down,pointermove:move,pointerup:up,pointercancel:cancel,lostpointercapture:lost,keydown:key};
   Object.keys(listeners).forEach(function(type){board.addEventListener(type,listeners[type]);});
   board.addEventListener('click',click,true);board.addEventListener('wheel',wheel,{passive:false});window.addEventListener('blur',cancel);
-  function snapshot(){var tolerance=1/displayScale();return paused || {followFrame:followFrame,width:board.style.getPropertyValue('--board-zoom-width'),height:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop,endX:board.scrollLeft>0 && board.scrollLeft+board.clientWidth>=board.scrollWidth-tolerance,endY:board.scrollTop>0 && board.scrollTop+board.clientHeight>=board.scrollHeight-tolerance};}
+  function snapshot(){var tolerance=1/displayScale();return paused || {followFrame:followFrame,fitFrame:fitFrame,pendingFit:autoFit && !fitGeometry,width:board.style.getPropertyValue('--board-zoom-width'),height:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop,endX:board.scrollLeft>0 && board.scrollLeft+board.clientWidth>=board.scrollWidth-tolerance,endY:board.scrollTop>0 && board.scrollTop+board.clientHeight>=board.scrollHeight-tolerance};}
   function restore(state){
     if(!state || retired)return;
-    if(paused)paused=state;followFrame=!!state.followFrame;
+    stopFit();fitFrame=state.fitFrame || null;
+    if(paused)paused=state;followFrame=state.followFrame || false;
     if(state.width){board.style.setProperty('--board-zoom-width',state.width);board.style.setProperty('--board-viewport-height',state.height);board.classList.add('board-zoomed');}
     if(enabled()){changed();
       // CSS zoom rounds scroll metrics differently from scroll assignments.
       // Overshoot saved endpoints so the browser restores the exact boundary.
-      board.scrollLeft=state.endX?board.scrollWidth:state.x;board.scrollTop=state.endY?board.scrollHeight:state.y;
+      var r=ratio(),shiftX=state.followFrame && followFrame?(state.followFrame.x-followFrame.x)*r:0,
+          shiftY=state.followFrame && followFrame?(state.followFrame.y-followFrame.y)*r:0;
+      board.scrollLeft=state.endX?board.scrollWidth:state.x+shiftX;board.scrollTop=state.endY?board.scrollHeight:state.y+shiftY;
     }
+    // Composition can borrow and return a board before its first layout. Only
+    // that still-pending fit resumes; a saved manual camera always wins.
+    if(state.pendingFit)requestFit();
   }
   function fitSelection(extent,insets){
     manual();if(!enabled() || !graph() || !extent)return;
@@ -3134,6 +3195,7 @@ function createBoardNavigation(board, group, legend, changed){
   }
   function followActive(extent){
     if(!enabled() || !graph() || !board.clientWidth)return;
+    stopFit();
     // Compact embedded boards can have less room than the camera padding.
     // Keep their overview usable instead of reducing the drawing to zero.
     if(board.clientWidth<=72 || board.clientHeight-legend.offsetHeight<=72)return;
@@ -3141,7 +3203,9 @@ function createBoardNavigation(board, group, legend, changed){
     var svg=graph(),origin=svg.viewBox.baseVal,display=displayScale(),rect=svg.getBoundingClientRect(),b=board.getBoundingClientRect(),r=ratio();
     // Establish the scroll gutter before measuring the available height: its
     // controls can add a legend row. Keep the drawn graph in its actual place.
-    followFrame=true;board.style.setProperty('--board-viewport-height',b.height/display+'px');
+    var ink=boardContentBounds(svg) || {x:origin.x,y:origin.y,w:origin.width,h:origin.height};
+    followFrame={x:ink.x,y:ink.y,right:ink.x+ink.w,bottom:ink.y+ink.h};
+    board.style.setProperty('--board-viewport-height',b.height/display+'px');
     board.style.setProperty('--board-zoom-width',origin.width*r+'px');board.classList.add('board-zoomed');changed();
     if(board.clientHeight-legend.offsetHeight<=72){reset();restore(saved);return;}
     var framed=svg.getBoundingClientRect();board.scrollLeft+=(framed.left-rect.left)/display;board.scrollTop+=(framed.top-rect.top)/display;
@@ -3158,14 +3222,15 @@ function createBoardNavigation(board, group, legend, changed){
       board.scrollTop+=(next.top-b.top)/display+(c.y-origin.y)*c.zoom-(legend.offsetHeight+(board.clientHeight-legend.offsetHeight)/2);refresh();
     },function(){return enabled() && !document.hidden && svg===graph() && board.isConnected && !!board.clientWidth;});
   }
-  return {refresh:refresh,reset:reset,frame:frame,fitSelection:fitSelection,followActive:followActive,cancelFollow:motion.cancel,manual:manual,
+  if(document.fonts && document.fonts.ready)document.fonts.ready.then(function(){if(autoFit && !retired)requestFit();});
+  return {refresh:refresh,requestFit:requestFit,cancelFit:function(){if(fitFrame)stopFit();},reset:reset,frame:frame,fitSelection:fitSelection,followActive:followActive,cancelFollow:motion.cancel,manual:manual,
     snapshot:snapshot,restore:restore,
     suspend:function(){if(retired || paused)return;motion.cancel();cancel();paused=snapshot();},
     resume:function(){if(!paused || retired)return;var state=paused;paused=null;restore(state);},
-    destroy:function(){motion.cancel();cancel();retired=true;Object.keys(listeners).forEach(function(type){board.removeEventListener(type,listeners[type]);});board.removeEventListener('click',click,true);board.removeEventListener('wheel',wheel);window.removeEventListener('blur',cancel);}};
+    destroy:function(){stopFit();motion.cancel();cancel();retired=true;Object.keys(listeners).forEach(function(type){board.removeEventListener(type,listeners[type]);});board.removeEventListener('click',click,true);board.removeEventListener('wheel',wheel);board.removeEventListener('dv:boardcontentchange',contentChanged);window.removeEventListener('blur',cancel);}};
 }
 
-/* CSS handles automatic sizing, including hidden tabs and editor resizes.
+/* CSS handles the explicit size modes, including hidden tabs and editor resizes.
    Center a newly scrollable view so centered entry nodes start in sight.
    These controls are viewport state only; they never patch the diagram. */
 function createBoardSizeControl(board, legend, label){
@@ -3248,9 +3313,11 @@ function createBoardSizeControl(board, legend, label){
   board.tabIndex = 0; board.setAttribute('role', 'region');
   board.setAttribute('aria-label', (label || 'Flow') + ' diagram; drag background to pan, or use zoom and scroll controls');
   setMode('auto');
+  if(navigation)navigation.requestFit();
   var observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncOverflow) : null;
-  if (observer) observer.observe(board);
+  if (observer){observer.observe(board);observer.observe(legend);}
   return {mode:function(){ return mode; }, setMode:setMode,refresh:syncOverflow,
+    cancelFit:function(){if(navigation)navigation.cancelFit();},
     followActive:function(extent){if(navigation)navigation.followActive(extent);},cancelFollow:function(){if(navigation)navigation.cancelFollow();},
     fitSelection:function(extent,insets){if(navigation)navigation.fitSelection(extent,insets);},
     snapshot:function(){return navigation && navigation.snapshot();},restore:function(state){if(navigation)navigation.restore(state);},
@@ -3488,7 +3555,12 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var stepper = attachStepper(box, boardDiv, {
     bar:bar, chips:chips, reviewVerdict:reviewVerdict,reviewComparison:reviewComparison,stepN:stepN, stepText:stepText, sharedStatus:sharedStatus, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,runtimeStatus:runtimeStatus,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
-  }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {section:sec,activeChanged:function(){if(result.follow)result.follow.update();},viewSteps:function(ids,pathIds){
+  }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {section:sec,activeChanged:function(){if(result.follow){
+    // Playback owns the camera after a step/path choice. Stop an established
+    // opening fit even when Follow is disabled; hidden first fits still wait.
+    if(result.boardSize)result.boardSize.cancelFit();
+    result.follow.update();
+  }},viewSteps:function(ids,pathIds){
     var pathSteps=null;
     if(Array.isArray(pathIds)){
       pathSteps=[];diagramPathList(d).forEach(function(path){if(pathIds.indexOf(path.id)>=0)path.indices.forEach(function(index){var step=d.steps[index];if(step && pathSteps.indexOf(step.id)<0)pathSteps.push(step.id);});});
@@ -4402,14 +4474,16 @@ function wirePresenter(ctl, view, win){
     ev.preventDefault();
   }
   /* Outside Present, step keys belong to a focused diagram section. Controls
-     with their own keys and pannable boards (Explore, zoomed or overflowing)
+     with their own keys and pannable boards (Explore or overflowing)
      keep native behaviour; elsewhere the page scrolls as usual. */
   function focusedStepper(ev){
     var target = ev.target;
     if (ev.defaultPrevented || ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey || !target || !target.closest) return null;
     if (target.closest('input,textarea,select,button,a[href],summary,[contenteditable]:not([contenteditable="false"]),[role="tab"],[role="slider"],[role="button"],[role="menuitem"],[role="menuitemradio"],[role="option"],.prose-code')) return null;
     var board = target.closest('.board');
-    if (board && (board.classList.contains('explore-board') || board.classList.contains('board-zoomed') ||
+    // Fresh content fitting also uses board-zoomed for its screen geometry;
+    // that alone does not make an overview pannable.
+    if (board && (board.classList.contains('explore-board') || board.scrollHeight > board.clientHeight + 1 ||
                   board.scrollWidth > board.clientWidth + 1)) return null;
     var section = target.closest('.doc-sec');
     var rec = section && ctl.sections.find(function(r){ return r.sectionEl === section; });

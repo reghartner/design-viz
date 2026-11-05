@@ -182,6 +182,9 @@ test('dense coin reservation keeps cards clear with Live off and no break',async
  await page.evaluate(({spec})=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>({'a->b':{signals:{rate:{value:99},errors:{value:0}}}})}});window.viewer.controller.liveStatus.setEnabled(false);},{spec});
  await root.getByRole('button',{name:'Metrics',exact:true}).click();await expect(root.locator(cards)).toHaveCount(1);await expect(root.locator('.coin')).toHaveCount(12);await expect(root.locator('.dv-live-comm-failure')).toHaveCount(0);
  const g=await geometry(root);expect(g.overlaps,'card reservations must repack a dense coin grid').toEqual([]);expect(g.outside).toEqual([]);
+ // Repacked coins and the new Metrics card must fit the visible board, not
+ // merely its expanded SVG viewBox; the sticky legend must not cover a coin.
+ await expect.poll(()=>root.locator('.board').evaluate(board=>{const b=board.getBoundingClientRect(),top=board.querySelector('.lg').getBoundingClientRect().bottom;return [...board.querySelectorAll('.coin,.dv-metrics-card')].every(el=>{const r=el.getBoundingClientRect();return r.left>=b.left && r.right<=b.right && r.top>=top && r.bottom<=b.bottom;});})).toBe(true);
  await root.locator('.coin[data-dv-step="1"]').click();await expect(root.locator('.schip[aria-current="true"]')).toHaveAttribute('data-step-source','1');
 });
 for(const disabled of ['host','page'])test('demo fallback respects '+disabled+' disable while Jira Live remains independent',async({page,server})=>{

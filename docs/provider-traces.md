@@ -97,6 +97,17 @@ explicit relationship-mapping limitation, never inferred parent/link evidence.
 
 The span start offset is relative to the minimum returned start. Honeycomb exact
 integer nanoseconds are subtracted as BigInt **before** converting to milliseconds.
+Absolute span `time` values are normalized to ISO milliseconds by the providers;
+relative `startMs` and `ms` retain finer precision. Validation leaves these values
+unchanged and requires all spans to admit a common origin within one millisecond:
+for each span, the interval `[time - startMs, time - startMs + 1ms)` must intersect
+all the others. Epoch differences are taken as BigInt before Number conversion.
+This is a compatibility bound at the normalized timestamps' precision, not a claim
+that their discarded fractions are known. Exact equality would reject the recorded
+Honeycomb fixture and legitimate sub-millisecond Tempo spans. Contradictory clocks
+are rejected even when each timestamp and relative offset is individually valid.
+The relative end `startMs + ms` still cannot exceed 24h; a displayed absolute
+endpoint may differ by less than 1ms due to timestamp precision, never by days.
 Rounded raw sample durations do not drive packets or precise timing. Honeycomb
 selects the latest timestamp among returned matches (or first if timestamps are
 absent); Tempo selects the slowest among returned matches. Neither is a global

@@ -51,6 +51,23 @@ function telemetryTraceCandidates(rows){
   if(rows.length>TELEMETRY_TRACE_CANDIDATES)telemetryTraceFail('Too many trace candidates; selection unavailable.');
   var seen=Object.create(null),out=[];rows.forEach(function(c){if(seen[c.traceId]){if(JSON.stringify(seen[c.traceId])!==JSON.stringify(c))telemetryTraceFail('Conflicting duplicate trace candidates.');return;}seen[c.traceId]=c;out.push(c);});return out;
 }
+/* Provider ISO times discard sub-millisecond precision, while relative offsets
+   retain it. All spans must admit one common origin within a millisecond, not
+   merely be individually valid dates. Subtract absolute epochs as BigInt before
+   conversion; never round or rewrite the original offsets/durations. */
+function telemetryTraceClocks(spans){
+  if(!spans.length)return;
+  var anchor=telemetryTraceInstantNs(spans[0].time),lower=-Infinity,upper=Infinity;
+  spans.forEach(function(s){
+    var delta=telemetryTraceInstantNs(s.time)-anchor;
+    // The strict relative end bound remains 24h. This guard allows only the
+    // additional millisecond of uncertainty in normalized absolute timestamps.
+    if(delta>86400001000000n || delta< -86400001000000n)telemetryTraceFail('Absolute trace extent exceeds 24h timestamp precision.');
+    var origin=Number(delta)/1e6-s.startMs;
+    lower=Math.max(lower,origin);upper=Math.min(upper,origin+1);
+  });
+  if(lower>=upper)telemetryTraceFail('Trace absolute clocks disagree with relative offsets.');
+}
 /* Canonical envelope validation is shared by provider output and telemetrySample.
    Never silently truncate spans/candidates and claim a complete trace. */
 function telemetryTraceEnvelope(value){
@@ -67,6 +84,7 @@ function telemetryTraceEnvelope(value){
     (s.links || []).forEach(function(l){if(!telemetryTraceId(l.traceId) || !telemetryTraceId(l.spanId))telemetryTraceFail('Invalid span link.');span.links.push({traceId:l.traceId,spanId:l.spanId,attributes:telemetryTraceAttrs(l.attributes)});});
     ids[s.id]=span;out.spans.push(span);
   });
+  telemetryTraceClocks(out.spans);
   out.spans.forEach(function(s){var visited=new Set(),p=s;while(p){if(visited.has(p.id))telemetryTraceFail('Trace contains a parent cycle.');visited.add(p.id);if(p.parentId && !ids[p.parentId]){out.completeness='partial';if(out.warnings.indexOf('Missing parent spans.')<0)out.warnings.push('Missing parent spans.');}p=ids[p.parentId];}});
   if(!out.spans.length){out.completeness='partial';if(out.warnings.indexOf('Trace timeline unavailable.')<0)out.warnings.push('Trace timeline unavailable.');}
   return out;

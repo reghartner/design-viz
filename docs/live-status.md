@@ -634,15 +634,16 @@ Every story shows its parent Epic under the key. Empty initiatives still show
 the root title and status and zero Epics/stories. Mixed Initiative and explicit
 Epic roots are deduplicated. “Diagram ready to demo” still refers to the primary
 path's carriers; it does not declare the entire initiative ready.
-There is no verdict line. Then come the Tickets table, **Excluded stories**
-when configured, **Blockers and dependency chains**, and Activity. The exclusions
+When permitted telemetry samples exist, a **Proof** box follows the epic box.
+Then come Tickets, the **Proof table** when present, **Excluded stories** when
+configured, **Blockers and dependency chains**, and Activity. The exclusions
 list links each configured story to Jira and shows its available title and state,
 plus whether it remains excluded or was included by a manual attachment, another
 source, or a dependency. It is visible before a connector responds too. Edit the
 list in desktop Document settings; the reader contains no exclusion controls. Teams are identified by each Tickets row's lane colour
 stripe and the lane names in Blockers. Status-board step captions omit the team lane chip,
 even with Live disabled; ordinary diagrams retain their authored lane context.
-Without ticket references or epics it says “This page has no ticket references.”
+Without ticket references, epics, or telemetry evidence it says “This page has no ticket references.”
 Before a provider or applied map is available, it shows the connector note and any
 required authorization action without an empty rollup. Print preserves the last
 paint, and reduced motion disables ring animation.
@@ -652,6 +653,39 @@ panel: `page.tracking: no live-status panel declared — add {"type": "live-stat
 to a section's panels so viewers see the rollup`. A panel on an untracked page
 warns “this page has no ticket references — the panel will be empty”. These are
 warnings, never errors. Strongly prefer adding the panel on every tracked page.
+
+### Proof summary and table
+
+Proof uses the same normalized samples and `proofVerdicts` results as the Metrics
+cards. It appears inside the authored panel whenever its controller holds a
+nonempty permitted telemetry map, independently of the Metrics canvas switch or
+Jira data. A host may apply samples while Metrics is off. Turning Metrics off
+clears its map; root-page disable, host disable, or capability removal also
+clears Proof. Workbench Preview's synthetic cards do not supply production Proof.
+Telemetry-only panels show Proof without invented Jira totals or a Tickets table.
+
+The ring divides **bound carriers** into proven, degraded, unproven and live early.
+Bound carriers outside those verdict buckets leave neutral space. Unbound
+carriers have a separate count and never enter the ring denominator. Both local
+and imported nodes and edges, including nested imports and loaded detail sources,
+use the controller's existing carrier identities. The summary states the counts;
+thresholds appear in plain words, per row when different carriers use different
+predicates.
+
+The table contains one row per bound carrier: its title and identity, Jira keys
+and state, configured-window chart (24h by default), rate/errors/p95 or queue
+in/lag/age, known Done and first-observed-traffic timestamps, verdict, and a safe
+link icon. Missing evidence stays unobserved; measured zero stays zero. No request
+total is inferred from a rate or elapsed time. Charts clip actual points and
+Done/deploy ticks to the window; sparse samples are dots rather than a fabricated
+dense sparkline. Authored dashboard/query links take precedence over provider
+links. Unsafe or absent URLs produce no link control.
+
+Over time selects the same day's evidence in the cards and Proof table. Slider
+changes and panel repaints do not request metrics. Historical gaps stay
+unobserved, and live values or deploy markers are never borrowed to fill them.
+Live restores the current samples. Production popovers and telemetry Activity
+entries are separate follow-up work.
 
 ### Tickets table
 

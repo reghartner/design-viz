@@ -320,6 +320,13 @@ test('D8 panel: epic box, Depends on buttons, outside-epic rows, chains and the 
  const h=harness(depFixture()),api=h.ctl.liveStatus;mountStatus(h);api.apply(Object.assign(depMap(),{'EP-1':{state:'active',title:'Connected doorbell',epic:''}}));
  const body=h.view.querySelector('.dv-live-panel-body');assert.ok(body);
  assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Tickets','Blockers and dependency chains','Activity']);
+ // A permitted host map adds Proof in place, without enabling Metrics or changing Jira sections.
+ h.ctl.page.sections[0].diagram.nodes.hw.telemetry={kind:'service',signals:{rate:{grafana:'explicit',unit:'req/h'}},proof:{rate:{min:1}}};
+ h.ctl.telemetry.apply({hw:{signals:{rate:{value:5}}}});
+ assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Proof','Tickets','Proof table','Blockers and dependency chains','Activity']);
+ assert.deepEqual(body.children.filter(el=>el.classList.contains('dv-live-epic') || el.classList.contains('dv-live-proof') || el.tagName==='h3').map(el=>el.classList.contains('dv-live-epic')?'Epic':el.classList.contains('dv-live-proof')?'Proof':el.textContent),['Epic','Proof','Tickets','Proof table','Blockers and dependency chains','Activity']);
+ h.ctl.telemetry.clear();
+ assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Tickets','Blockers and dependency chains','Activity']);
  assert.ok(h.view.querySelector('.dv-live-verdict')===null,'the old verdict line is gone');
  const epic=body.querySelector('.dv-live-epic');assert.ok(epic,'epic header box');assert.ok(body.children[0]===epic,'the epic box is first in the body');
  assert.equal(epic.querySelector('a.dv-live-epic-key').getAttribute('href'),'https://jira.test/browse/EP-1');assert.equal(epic.querySelector('.dv-live-epic-key').textContent,'EP-1');

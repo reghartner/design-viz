@@ -67,6 +67,8 @@ function createInlineTextEditor(opts){
       // The desktop app bar also shows an untitled fallback. Only authored text edits.
       accept:function(value){return !!value.title;},
       plan:function(c,value){return planDocumentSetting(c.snapshot.text,c.snapshot.raw,'title',value);}},
+    {kind:'tab',selector:'.tabbtn',field:'label',value:'trimmed',html:true,label:'Tab label',help:'Enter or click outside saves. Escape cancels.',
+      plan:function(c,value){return value==null?{error:'a tab needs a label'}:planSetField(c.snapshot.text,c.snapshot.raw,c.path,'label',JSON.stringify(value));}},
     edgeLabel,
     // Rename on a connection that has no label yet opens from its arrow.
     Object.assign({},edgeLabel,{selector:null,creation:true}),
@@ -277,9 +279,9 @@ function createInlineTextEditor(opts){
   life.listen(document,'focusin',function(e){if(active && !inside(e.target))finish(true,false,opts.targetFromEvent(e));});
   function doubleClick(e){
     if(e.target.closest('.dv-inline-editor,a,input,select,textarea,summary,[contenteditable],.nlink'))return;
-    // Only the explicit panel title grip is an editable button.
+    // Only the tab label and explicit panel title grip are editable buttons.
     var button=e.target.closest('button,[role="button"]');
-    if(button && !button.matches('.explore-window[data-explore-panel] > .explore-window-header > .explore-window-grip'))return;
+    if(button && !button.matches('.tabbtn,.explore-window[data-explore-panel] > .explore-window-header > .explore-window-grip'))return;
     var el=e.target.closest(openSelector);if(el){e.preventDefault();e.stopPropagation();open(el);}
   }
   life.listen(view,'dblclick',doubleClick,true);

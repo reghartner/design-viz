@@ -331,6 +331,8 @@
 .dv-live-completion svg{width:64px;height:64px;flex:none;transform:rotate(-90deg);}
 .dv-live-completion circle{fill:none;stroke-width:4;}
 
+.dv-live-proof{flex-wrap:wrap;}
+.dv-live-proof>.dv-live-epic-main{flex:1 1 220px;}
 .dv-live-proof h3,.dv-live-proof p{margin:0;}
 .dv-live-proof-pills{display:flex;flex-wrap:wrap;gap:4px;}
 .dv-live-proof-pill[data-proof-bucket="proven"]{color:var(--dv-live-done);}
@@ -342,10 +344,12 @@
 .dv-live-proof-arc[data-proof-bucket="liveEarly"]{stroke:var(--dv-live-active);}
 .dv-live-proof-sentence{font:11px/1.5 'IBM Plex Mono',monospace;}
 .dv-live-proof-predicate,.dv-live-proof-detail{font:10px/1.5 'IBM Plex Sans',sans-serif;color:var(--dfaint);overflow-wrap:anywhere;}
-.dv-live-proof-table{min-width:800px;}
+.dv-live-tickets.dv-live-proof-table{min-width:960px;}
+.dv-live-proof-table td:first-child{min-width:140px;}
+.dv-live-proof-table td:nth-child(8){min-width:160px;}
 .dv-live-proof-table td{vertical-align:top;}
 .dv-live-proof-kpi{white-space:nowrap;}
-.dv-live-proof-since{max-width:180px;overflow-wrap:anywhere;}
+.dv-live-proof-since{min-width:150px;max-width:180px;overflow-wrap:anywhere;}
 .dv-live-proof-sparkline{width:100px;height:32px;overflow:visible;color:var(--dtext);}
 .dv-live-proof-series{fill:none;stroke:currentColor;stroke-width:1.5;}
 .dv-live-proof-point{fill:currentColor;}

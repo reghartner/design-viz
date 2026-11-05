@@ -40,6 +40,45 @@
    excluded — §0 ruling ("the ticket's Test + flip section, as written"): lane pill and step
       number double-click (named only in "How it should look"), node/edge/other entries
       (children #961-#971). */
+/* #970 node rename by double-click (desktop Workbench; ticket "Test + flip", Chuck's coverage ruling
+   2026-11-04: the Test + flip section as written). Hosted by "double-click renames a local node" below,
+   once in Standard and once in Explore, and by the updated creation test. Fixture fixture(): node a
+   {title:'Existing', sub:'Keep details'} in rows, no history after paste. The rename editor is the
+   textbox "Node name" inside the node's own g.node; the creation editor is "New node title".
+   Right-click / Shift+F10 -> Rename rows: node-alignment.spec.mjs. Imported nodes:
+   topology-connections.spec.mjs.
+
+   row | fixture / input | scoped assertion | rejects
+   P1 contrast | paste | a .t1 'Existing', no "Node name" editor | -
+   P2 Inspect empty rule | click a, Inspect Name cleared + Enter | parsed #src equals the fixture
+      without nodes.a.title (ID key a kept) | (precondition for N6)
+   N1 double-click the name opens in place (FLIP) | dblclick a .t1 | "Node name" editor inside g.node a,
+      focused, value 'Existing', selection [0,8], box inside the card and over the name's vertical
+      middle; no "New node title" editor; #src unchanged | no route (fails today); an editor opened
+      in Inspect or elsewhere; the creation editor reused
+   N2 accessible text | same | aria-description says "Enter or click outside saves" and "Escape
+      cancels", not "Later changes use Inspect" | the creation entry's label/help reused
+   N3 Escape writes nothing | type, Escape | editor gone; #src === original; .t1 'Existing' | Escape
+      that saves
+   N4 double-click the card body opens | dblclick .card at its right middle (away from the text) |
+      "Node name" editor focused, value 'Existing' | a selector on the name text only, when Chuck
+      ruled "double-clicking a node also renames it"
+   N5 save, ID, selection, one Undo | dblclick, type, Enter | parsed #src equals the fixture with
+      only nodes.a.title = 'Renamed node' (no new key, ID a kept); .t1 shows it; g.node a has dv-sel
+      and is the only selected node; Undo: #src === original exactly, Undo disabled; Redo: saved |
+      an ID rename; a write to sub or another node; a save recording two entries or none; a
+      commit that drops the selection
+   N6 empty value = Inspect | dblclick, type three spaces (replacing the selection), Enter | #src ===
+      the P2 source exactly; .t1 shows the ID 'a'; Undo: original | the editor's raw-string save
+      (JSON "   " or "")
+   C1 creation editor keeps its name; double-click after creation renames (changed on purpose) |
+      Add node (preset and canvas menu), Enter, Undo, Redo, dblclick the new node's .t1 | "New node
+      title" at creation; afterwards "Node name" focused with 'New title' and no "New node title"
+      editor; Escape; Inspect Name still edits the title | creation editor reopened for renames
+   hosted elsewhere: a double-click that does not move a node, and dragging by the name, run on free
+      nodes in node-alignment.spec.mjs (row node a here cannot move).
+   excluded — §0 ruling ("the Test + flip section as written"): text-box nodes keep their own
+      double-click editor (named only in "How it should look"; text-boxes.spec.mjs:14 stays green). */
 import {writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {test,expect,pastePage,closeTools,inspectPageElement} from '../helpers/test.mjs';
@@ -71,7 +110,7 @@ test('prose draft protects IME, native paste, structured bullets, cancellation a
  await page.locator('#docview .sec-h').click();await expect(edit).toHaveCount(0);const saved=JSON.parse(await page.locator('#src').inputValue());expect(saved.page.sections[0].bullets[0]).toEqual({...fixture().page.sections[0].bullets[0],text:'Pasted <b>plain</b>\n- item'});
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
 });
-for(const contextual of [false,true])test('new node '+(contextual?'canvas':'preset')+' title is direct only at creation, then Inspect',async({page,server},info)=>{
+for(const contextual of [false,true])test('new node '+(contextual?'canvas':'preset')+' title is direct at creation, then double-click renames it and Inspect still edits it',async({page,server},info)=>{
  await setup(page,server,true);
  if(contextual){
   const board=page.locator('#docview .board'),p=await board.evaluate(board=>{const r=board.getBoundingClientRect();for(let y=Math.min(r.bottom-20,innerHeight-20);y>r.top+20;y-=30)for(let x=Math.min(r.right-20,innerWidth-20);x>r.left+20;x-=30){const el=document.elementFromPoint(x,y);if(el&&board.contains(el)&&!el.closest('button,input,textarea,a,.explore-window,.explore-player,[data-dv-node],[data-dv-edge],[data-dv-group],[data-dv-row]'))return {x,y};}throw Error('No exposed background');});await page.mouse.click(p.x,p.y,{button:'right'});await page.getByRole('menuitem',{name:'Node',exact:true}).click();
@@ -79,7 +118,10 @@ for(const contextual of [false,true])test('new node '+(contextual?'canvas':'pres
  const edit=page.getByRole('textbox',{name:'New node title',exact:true});await expect(edit).toBeFocused();expect(await edit.evaluate(el=>[el.selectionStart,el.selectionEnd])).toEqual([0,(await edit.inputValue()).length]);const created=await page.locator('#src').inputValue();await page.screenshot({path:info.outputPath('new-node-title-'+(contextual?'canvas':'preset')+'.png')});
  await edit.pressSequentially('New title');await edit.press('Enter');await expect(edit).toHaveCount(0);let raw=JSON.parse(await page.locator('#src').inputValue()),id=Object.keys(raw.page.sections[0].diagram.nodes).find(id=>id!=='a');expect(raw.page.sections[0].diagram.nodes[id].title).toBe('New title');
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(created);await page.locator('#redo-builder').click();
- const node=page.locator('#docview [data-dv-node="'+id+'"]');await node.dblclick();await expect(edit).toHaveCount(0);await page.locator('#editor-tab-inspect').click();const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Inspector title');await title.press('Enter');expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.nodes[id].title).toBe('Inspector title');
+ // C1 (changed on purpose, #970): double-click now opens the rename editor, never the creation editor.
+ const node=page.locator('#docview [data-dv-node="'+id+'"]'),rename=node.getByRole('textbox',{name:'Node name',exact:true});await node.locator('.t1').dblclick();
+ await expect(rename).toBeFocused();await expect(rename).toHaveValue('New title');await expect(edit).toHaveCount(0);await rename.press('Escape');await expect(rename).toHaveCount(0);
+ await page.locator('#editor-tab-inspect').click();const title=page.locator('#guide').getByLabel('Name',{exact:true});await title.fill('Inspector title');await title.press('Enter');expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.nodes[id].title).toBe('Inspector title');
 });
 test('source replacement and teardown retire inline drafts and stale input events',async({page,server})=>{
  await page.goto(server.origin+'/lifetime/index.html');const original=JSON.stringify(fixture());await pastePage(page,original);await closeTools(page);await paragraph(page).dblclick();const edit=input(page);await edit.pressSequentially(' unsaved');const held=await edit.elementHandle();
@@ -161,4 +203,43 @@ for(const explore of [false,true])test('step caption '+(explore?'Explore':'Stand
  want.page.sections[0].diagram.steps[2].text='Both paths **changed**';expect(JSON.parse(await src.inputValue())).toEqual(want);
  await route('other').click();await expect(stepN).toHaveText('STEP 1/2');await expect(caption).toHaveText('Alternate start');
  await next.click();await expect(stepN).toHaveText('STEP 2/2');await expect(caption.locator('strong')).toHaveText('changed');await expect(caption).toHaveText('Both paths changed');
+});
+
+for(const explore of [false,true])test('double-click renames a local node in place ('+(explore?'Explore':'Standard')+'): Node name editor, Escape, card body, one Undo, selection, empty rule',async({page,server})=>{
+ const original=await setup(page,server,explore),src=page.locator('#src'),undo=page.locator('#undo-builder'),redo=page.locator('#redo-builder');
+ const card=page.locator('#docview g.node[data-dv-node="a"]'),name=card.locator('.t1'),edit=card.getByRole('textbox',{name:'Node name',exact:true}),anyEdit=page.getByRole('textbox',{name:'Node name',exact:true});
+ const want=title=>{const raw=fixture(explore),n=raw.page.sections[0].diagram.nodes.a;if(title==null)delete n.title;else n.title=title;return raw;};
+ // P1: contrasting precondition.
+ await expect(name).toHaveText('Existing');await expect(anyEdit).toHaveCount(0);await expect(undo).toBeDisabled();
+ // P2: Inspect's empty rule for Name removes `title` and keeps the ID.
+ await card.click();await page.locator('#editor-tab-inspect').click();const inspectName=page.locator('#guide').getByLabel('Name',{exact:true});
+ await expect(inspectName).toHaveValue('Existing');await inspectName.fill('');await inspectName.press('Enter');await expect(src).not.toHaveValue(original);
+ const inspectCleared=await src.inputValue();expect(JSON.parse(inspectCleared)).toEqual(want(null));
+ await undo.click();await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();await closeTools(page);await expect(name).toHaveText('Existing');
+ // N1 (flip) + N2: double-click the name opens the single-line rename editor over it, all text selected.
+ await name.dblclick();await expect(edit).toBeVisible();await expect(edit).toBeFocused();await expect(edit).toHaveValue('Existing');
+ expect(await edit.evaluate(el=>[el.selectionStart,el.selectionEnd])).toEqual([0,'Existing'.length]);
+ await expect(page.getByRole('textbox',{name:'New node title',exact:true})).toHaveCount(0);await expect(src).toHaveValue(original);
+ const box=await edit.boundingBox(),cardBox=await card.locator('.card').boundingBox(),nameBox=await name.boundingBox();
+ expect(box.x).toBeGreaterThanOrEqual(cardBox.x-1);expect(box.x+box.width).toBeLessThanOrEqual(cardBox.x+cardBox.width+1);
+ expect(box.y).toBeGreaterThanOrEqual(cardBox.y-1);expect(box.y+box.height).toBeLessThanOrEqual(cardBox.y+cardBox.height+1);
+ expect(box.y).toBeLessThanOrEqual(nameBox.y+nameBox.height/2);expect(box.y+box.height).toBeGreaterThanOrEqual(nameBox.y+nameBox.height/2);
+ await expect(edit).toHaveAttribute('aria-description',/Enter or click outside saves/);await expect(edit).toHaveAttribute('aria-description',/Escape cancels/);
+ await expect(edit).not.toHaveAttribute('aria-description',/Later changes use Inspect/);
+ // N3: Escape cancels and writes nothing.
+ await edit.pressSequentially('Discarded');await expect(edit).toHaveValue('Discarded');await edit.press('Escape');
+ await expect(anyEdit).toHaveCount(0);await expect(src).toHaveValue(original);await expect(name).toHaveText('Existing');
+ // N4: double-clicking the card body, away from the name text, also renames the node.
+ const body=await card.locator('.card').boundingBox();await card.locator('.card').dblclick({position:{x:body.width-12,y:body.height/2}});
+ await expect(edit).toBeFocused();await expect(edit).toHaveValue('Existing');await edit.press('Escape');await expect(anyEdit).toHaveCount(0);await expect(src).toHaveValue(original);
+ // N5: Enter saves only nodes.a.title; the ID stays, the node stays selected, one Undo entry.
+ await name.dblclick();await expect(edit).toBeFocused();await edit.pressSequentially('Renamed node');await edit.press('Enter');await expect(anyEdit).toHaveCount(0);
+ const saved=await src.inputValue();expect(JSON.parse(saved)).toEqual(want('Renamed node'));
+ await expect(name).toHaveText('Renamed node');await expect(card).toHaveClass(/dv-sel/);await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(1);
+ await undo.click();await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();await expect(name).toHaveText('Existing');
+ await redo.click();await expect(src).toHaveValue(saved);await undo.click();await expect(src).toHaveValue(original);
+ // N6: a whitespace-only name saves the same source as clearing Inspect -> Name.
+ await name.dblclick();await expect(edit).toBeFocused();await edit.pressSequentially('   ');await expect(edit).toHaveValue('   ');await edit.press('Enter');
+ await expect(anyEdit).toHaveCount(0);await expect(src).toHaveValue(inspectCleared);await expect(name).toHaveText('a');
+ await undo.click();await expect(src).toHaveValue(original);await expect(name).toHaveText('Existing');
 });

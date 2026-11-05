@@ -29,7 +29,9 @@ function createInlineTextEditor(opts){
      hostClass. value: the empty-value rule of the matching Inspect control.
      'raw' saves the draft as typed; 'trimmed' trims it and removes the field when
      empty (Inspect text controls, inspector.js textControl). keyboard: Enter on
-     the focused text also opens it. menu: opens only from its object-menu
+     the focused text also opens it. overlay: an imported (provider-owned) node
+     saves field through planTopologyNodeOverride in this consumer's display
+     override, as Inspect's Display controls do. menu: opens only from its object-menu
      command, never on double-click. read(snapshot,target): the entry's own
      {text, stored} source in place of field, or null when it cannot edit.
      A save is the entry's plan(c,value) (null: nothing to write), else
@@ -51,6 +53,9 @@ function createInlineTextEditor(opts){
       accept:function(value){return !isTextBoxNode(value);},place:nodeTitleHost,hostClass:'dv-inline-node-editor'},
     // One step text serves every path that uses the step.
     {kind:'step',selector:'.stepline .step-text',target:function(el){return opts.currentStep?opts.currentStep(el):null;},field:'text',markdown:true,value:'trimmed',label:'Edit step text',help:help},
+    // Rename edits the display name only; the node ID stays in Inspect.
+    {kind:'node',selector:'[data-dv-node]:not([data-dv-text-box])',field:'title',value:'trimmed',overlay:true,label:'Node name',help:'Enter or click outside saves. Escape cancels.',
+      place:nodeTitleHost,hostClass:'dv-inline-node-editor'},
     edgeLabel,
     // Rename on a connection that has no label yet opens from its arrow.
     Object.assign({},edgeLabel,{selector:null,creation:true}),
@@ -74,17 +79,30 @@ function createInlineTextEditor(opts){
     if(snapshot.error || snapshot.renderedText!=null && snapshot.renderedText!==snapshot.text)return null;
     if(f.source){var got=f.source(snapshot,target);return got && {el:el,entry:f,target:target,text:got.text || '',source:got,snapshot:snapshot};}
     if(f.read){var own=f.read(snapshot,target);return own && {el:el,entry:f,target:target,path:null,field:null,text:own.text,stored:own.stored,snapshot:snapshot};}
-    var path=builderTargetPath(snapshot.raw,target),value=path && specValueAt(snapshot.raw,path),field=null;
+    var path=builderTargetPath(snapshot.raw,target),value=path && specValueAt(snapshot.raw,path),field=null,overlay=null;
+    if(value==null && f.overlay){overlay=importedNode(snapshot,target);if(!overlay)return null;value=overlay.value;}
     if(f.field && specObject(value)){
       if(f.accept && !f.accept(value))return null;
       field=f.field;
     }else if(f.field && !f.bare || typeof value!=='string')return null;
     var text=field?value[field]:value;
     if(text!=null && typeof text!=='string')return null;
-    return {el:el,entry:f,target:target,path:path,field:field,text:text || '',snapshot:snapshot};
+    return {el:el,entry:f,target:target,path:path,field:field,text:text || '',snapshot:snapshot,overlay:overlay};
+  }
+  /* A resolved node this consumer imports from an authored topology import:
+     its provider value and the topology context its display override uses. */
+  function importedNode(snapshot,target){
+    var context=opts.session.topologyContext?opts.session.topologyContext():null,resolved;
+    try{resolved=opts.session.resolve?opts.session.resolve(snapshot.raw):snapshot.raw;}catch(ex){return null;}
+    var rec=specSectionPaths(resolved)[target.section],d=rec && specValueAt(resolved,rec.diagram),value=d && (d.nodes || {})[target.id];
+    if(!specObject(value) || !FlowTopology.origin(d,'nodes',target.id))return null;
+    if(planTopologyNodeOverride(snapshot.text,snapshot.raw,target.section,target.id,{},context).error)return null;
+    return {value:value,diagram:d,context:context,key:JSON.stringify(context)};
   }
   function nodeTitleHost(c){
-    var got=builderDiagram(c.snapshot.text,c.snapshot.raw,c.target.section),p=!got.error && layout(got.d).pos[c.target.id];if(!p)return null;
+    var d=c.overlay && c.overlay.diagram;
+    if(!d){var got=builderDiagram(c.snapshot.text,c.snapshot.raw,c.target.section);if(got.error)return null;d=got.d;}
+    var p=layout(d).pos[c.target.id];if(!p)return null;
     var host=document.createElementNS('http://www.w3.org/2000/svg','foreignObject');
     host.setAttribute('x','4');host.setAttribute('y',String(Math.max(4,(p.h-36)/2)));host.setAttribute('width',String(Math.max(40,p.w-8)));host.setAttribute('height','36');
     return host;
@@ -131,7 +149,11 @@ function createInlineTextEditor(opts){
     host.setAttribute('x',String(x));host.setAttribute('y',String(b.y+b.height/2-15));host.setAttribute('width',String(Math.max(160,right-x)));host.setAttribute('height','30');
     return host;
   }
-  function fresh(c){var now=opts.session.snapshot();return c.el.isConnected && !opts.disabled() && now.project===c.snapshot.project && now.text===c.snapshot.text && (!c.source || topologyKey()===c.source.contextKey);}
+  function fresh(c){
+    var now=opts.session.snapshot();
+    return c.el.isConnected && !opts.disabled() && now.project===c.snapshot.project && now.text===c.snapshot.text &&
+      (!c.overlay || topologyKey()===c.overlay.key) && (!c.source || topologyKey()===c.source.contextKey);
+  }
   function clear(){
     if(!active)return;var a=active;active=null;a.life.destroy();a.host.remove();
     if(a.original){while(a.original.firstChild)a.c.el.insertBefore(a.original.firstChild,a.original);a.original.remove();}
@@ -140,8 +162,9 @@ function createInlineTextEditor(opts){
   function finish(save,focus,nextTarget){
     if(!active)return;var a=active,c=a.c,valid=fresh(c),plan;
     if(save && valid && a.input.value!==c.text){
-      var value=c.entry.value==='trimmed'?a.input.value.trim() || null:a.input.value,json=value==null?null:JSON.stringify(value);
-      plan=c.source?c.source.plan(value):c.entry.plan?c.entry.plan(c,value):c.field?planSetField(c.snapshot.text,c.snapshot.raw,c.path,c.field,json):
+      var value=c.entry.value==='trimmed'?a.input.value.trim() || null:a.input.value,json=value==null?null:JSON.stringify(value),patch={};
+      if(c.overlay){patch[c.field]=value;plan=planTopologyNodeOverride(c.snapshot.text,c.snapshot.raw,c.target.section,c.target.id,patch,c.overlay.context);}
+      else plan=c.source?c.source.plan(value):c.entry.plan?c.entry.plan(c,value):c.field?planSetField(c.snapshot.text,c.snapshot.raw,c.path,c.field,json):
         planReplaceValue(c.snapshot.text,c.snapshot.raw,c.path,json);
       if(plan && plan.error){a.error.textContent=plan.error;return false;}
     }
@@ -217,7 +240,7 @@ function createInlineTextEditor(opts){
   life.listen(document,'pointerdown',function(e){if(active && !inside(e.target) && finish(true,false,opts.targetFromEvent(e))===false){e.preventDefault();e.stopImmediatePropagation();}},true);
   life.listen(document,'focusin',function(e){if(active && !inside(e.target))finish(true,false,opts.targetFromEvent(e));});
   life.listen(view,'dblclick',function(e){
-    if(e.target.closest('.dv-inline-editor,a,button,input,textarea'))return;
+    if(e.target.closest('.dv-inline-editor,a,button,input,textarea,.nlink'))return;
     var el=e.target.closest(openSelector);if(el){e.preventDefault();e.stopPropagation();open(el);}
   },true);
   life.listen(view,'keydown',function(e){if(e.target.matches(keySelector) && e.key==='Enter' && !e.isComposing){e.preventDefault();e.stopImmediatePropagation();open(e.target);}},true);

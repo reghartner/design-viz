@@ -441,6 +441,11 @@ function createBuilderInteractions(opts){
     var unavailable='This provider has no verified published link in this repository catalog.';
     item('Go to diagram',function(){window.open(url,'_blank','noopener,noreferrer');},url?null:unavailable);
     item('Inspect imported member',function(){selectSpatial([ref.target]);if(opts.workspace)opts.workspace.showTool('inspect',{closeUtilities:true});});
+    // Renaming the invoked imported node edits only this consumer's display name.
+    if(ref.target.kind==='node' && ref.el===ref.target.el && ref.el.matches('[data-dv-node]:not([data-dv-text-box])')){
+      var renameCheck=planTopologyNodeOverride(ref.s.text,ref.s.raw,ref.section,ref.target.id,{},context);
+      item('Rename',function(){selectSpatial([ref.target]);inlineEditor.open(findTargetEl(ref.target));},renameCheck.error);
+    }
     if(ref.target.kind==='edge')item('Rename',function(){renameEdge(ref.target);});
     if(ref.target.kind==='group')item('Rename',function(){},'Imported structure belongs to its provider.');
     var routingTarget=Object.assign({},ref.target,ref.target.kind==='edge'?{imported:true}:{});

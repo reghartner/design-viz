@@ -1,3 +1,31 @@
+/* #970 imported node rename (desktop Workbench; ticket "Test + flip", Chuck's coverage ruling
+   2026-11-04: the Test + flip section as written). Hosted by the two "imported node ..." rename tests
+   at the end. Fixture fixture(): consumer imports provider export core as `shared`; imported node
+   shared::api has provider title 'API'. Editor = textbox "Node name" inside g.node shared::api; menu =
+   "Reference actions for shared". overlay = consumer topologyImports[0]; base = parsed #src at start.
+
+   row | fixture / input | scoped assertion | rejects
+   I1 double-click writes only the display override (FLIP) | no override; dblclick the node, type,
+      Enter | editor inside the node, focused, 'API' all selected; parsed #src equals base with only
+      overlay.nodeOverrides = {api:{title:'Checkout API'}} (no consumer nodes['shared::api']); card
+      .t1 shows it; node selected | no route (fails today); a local shadow node or a write to
+      nodes; the local-node title path
+   I2 Undo restores, provider intact | Undo, Redo | Undo: #src === base exactly, Undo disabled, card
+      .t1 'API' again (the provider title was never changed); Redo: saved | a second history
+      entry; a write into the loaded provider
+   P3 Inspect empty rule | existing override {title:'Checkout API', sub:'This flow only'}; Inspect ->
+      Display name cleared + Enter | #src changed; no override title remains; Undo restores
+      (precondition for I4)
+   I3 right-click -> Rename, Escape (FLIP) | right-click the node | reference menu has Rename; it
+      opens the editor with 'Checkout API'; type, Escape: #src unchanged | no Rename item (fails
+      today); Escape that saves
+   I4 empty value = Inspect | Rename, Backspace on the selected name, Enter | #src === the P3 source
+      exactly; Undo restores | an editor writing "" or the raw string
+   I5 keyboard: Shift+F10 -> Rename | focus the node, Shift+F10, ArrowDown until Rename, Enter, type,
+      Enter | reference menu opens; Rename focused; editor focused with 'Checkout API'; parsed #src
+      equals base with only overlay.nodeOverrides.api.title = 'Keyboard API' (sub kept); card .t1
+      shows it; Undo: #src === base | Rename missing from the keyboard menu; a patch replacing the
+      whole override (drops sub) */
 /* #961 edge label contract (desktop Workbench, Standard view). Source: ticket #961 "How it should
    look and behave" and "Test + flip" (Chuck's coverage ruling 2026-11-04: the Test + flip section as
    written) and the epic #959 shared rules. Hosted by the three "edge label" tests at the end of this
@@ -506,6 +534,53 @@ test('imported display label control saves only its overlay and resets without c
   const resetBefore=await source(page);await page.getByRole('button',{name:'Reset imported display label',exact:true}).click();
   await expect.poll(async()=> (await overlay(page)).edgeOverrides?.['api->store']).toEqual({labelDx:25});await roundtrip(page,resetBefore);
   await expect(page.locator('#docview text.lbl[data-dv-edge="1"]')).toContainText('Persist');
+});
+
+test('imported node double-click rename writes only the consumer display override and Undo restores the provider name',async({page,server})=>{
+  await fixture(page,server);
+  const src=page.locator('#src'),member=node(page,'shared::api'),name=member.locator('.t1'),undo=page.locator('#undo-builder');
+  const edit=member.getByRole('textbox',{name:'Node name',exact:true}),anyEdit=page.getByRole('textbox',{name:'Node name',exact:true});
+  const original=await source(page),base=JSON.parse(original);
+  const want=override=>{const raw=structuredClone(base);diagram(raw).topologyImports[0].nodeOverrides={api:override};return raw;};
+  await expect(name).toHaveText('API');expect(diagram(base).topologyImports[0].nodeOverrides).toBeUndefined();expect(diagram(base).nodes['shared::api']).toBeUndefined();await expect(undo).toBeDisabled();
+  // I1 (flip): double-click the imported node, rename, Enter.
+  await name.dblclick();await expect(edit).toBeVisible();await expect(edit).toBeFocused();await expect(edit).toHaveValue('API');
+  expect(await edit.evaluate(el=>[el.selectionStart,el.selectionEnd])).toEqual([0,'API'.length]);await expect(src).toHaveValue(original);
+  await edit.pressSequentially('Checkout API');await edit.press('Enter');await expect(anyEdit).toHaveCount(0);
+  const saved=await source(page);expect(JSON.parse(saved)).toEqual(want({title:'Checkout API'}));
+  await expect(name).toHaveText('Checkout API');await expect(member).toHaveClass(/dv-sel/);
+  // I2: one Undo restores the exact source and the provider's own name.
+  await undo.click();await expect(src).toHaveValue(original);await expect(undo).toBeDisabled();await expect(name).toHaveText('API');
+  await page.locator('#redo-builder').click();await expect(src).toHaveValue(saved);await expect(name).toHaveText('Checkout API');
+});
+
+test('imported node Rename in the reference menu by pointer and keyboard edits the display override like Inspect',async({page,server})=>{
+  await fixture(page,server,'file','ambient',(_,consumer)=>{diagram(consumer).topologyImports[0].nodeOverrides={api:{title:'Checkout API',sub:'This flow only'}};});
+  const src=page.locator('#src'),member=node(page,'shared::api'),name=member.locator('.t1'),undo=page.locator('#undo-builder');
+  const edit=member.getByRole('textbox',{name:'Node name',exact:true}),anyEdit=page.getByRole('textbox',{name:'Node name',exact:true});
+  const reference=page.getByRole('menu',{name:'Reference actions for shared',exact:true}),rename=reference.getByRole('menuitem',{name:'Rename',exact:true});
+  const original=await source(page),base=JSON.parse(original);
+  await expect(name).toHaveText('Checkout API');expect(diagram(base).nodes['shared::api']).toBeUndefined();
+  // P3: Inspect -> Display name cleared is the reference result for an empty name.
+  await member.click();await page.locator('#editor-tab-inspect').click();const display=page.getByRole('textbox',{name:'Display name',exact:true});
+  await expect(display).toHaveValue('Checkout API');await display.fill('');await display.press('Enter');await expect(src).not.toHaveValue(original);
+  const inspectCleared=await source(page);expect(diagram(JSON.parse(inspectCleared)).topologyImports[0].nodeOverrides?.api?.title??null).toBeNull();
+  await undo.click();await expect(src).toHaveValue(original);await closeTools(page);await expect(name).toHaveText('Checkout API');
+  // I3 (flip): right-click -> Rename opens the editor; Escape writes nothing.
+  await member.click({button:'right'});await expect(reference).toBeVisible();await expect(rename).toBeVisible();await rename.click();await expect(reference).toHaveCount(0);
+  await expect(edit).toBeFocused();await expect(edit).toHaveValue('Checkout API');await edit.pressSequentially('Discarded');await edit.press('Escape');
+  await expect(anyEdit).toHaveCount(0);await expect(src).toHaveValue(original);await expect(name).toHaveText('Checkout API');
+  // I4: clearing the name saves the same source as clearing Inspect -> Display name.
+  await member.click({button:'right'});await rename.click();await expect(edit).toBeFocused();await edit.press('Backspace');await expect(edit).toHaveValue('');await edit.press('Enter');
+  await expect(anyEdit).toHaveCount(0);await expect(src).toHaveValue(inspectCleared);await undo.click();await expect(src).toHaveValue(original);
+  // I5: keyboard users reach Rename with Shift+F10 and the arrow keys.
+  await member.focus();await page.keyboard.press('Shift+F10');await expect(reference).toBeVisible();await expect(rename).toHaveCount(1);
+  const items=await reference.getByRole('menuitem').count();
+  for(let i=0;i<items && !await rename.evaluate(el=>el===document.activeElement);i++)await page.keyboard.press('ArrowDown');
+  await expect(rename).toBeFocused();await page.keyboard.press('Enter');await expect(reference).toHaveCount(0);
+  await expect(edit).toBeFocused();await expect(edit).toHaveValue('Checkout API');await page.keyboard.type('Keyboard API');await page.keyboard.press('Enter');await expect(anyEdit).toHaveCount(0);
+  const keyed=structuredClone(base);diagram(keyed).topologyImports[0].nodeOverrides.api.title='Keyboard API';expect(JSON.parse(await source(page))).toEqual(keyed);
+  await expect(name).toHaveText('Keyboard API');await undo.click();await expect(src).toHaveValue(original);await expect(name).toHaveText('Checkout API');
 });
 
 // #961 edge label: right-click Rename and double-click edit the label in place (contract matrix at the top).

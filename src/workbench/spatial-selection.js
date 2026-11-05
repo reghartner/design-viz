@@ -216,6 +216,8 @@ function createBuilderSpatialSelection(opts){
       menuLife.listen(button,'click',function(e){e.stopPropagation();if(reason)return;close(false);if(opts.session.text()!==s.text || JSON.stringify(opts.session.topologyContext?opts.session.topologyContext():null)!==topologyKey)return;action();});menu.appendChild(button);return button;
     }
     item('Inspect',function(){opts.inspect();});
+    // One node's display name opens in place; text boxes keep their own editor.
+    if(opts.rename && targets.length===1 && t.kind==='node' && t.el && t.el.matches('[data-dv-node]:not([data-dv-text-box])'))item('Rename',function(){opts.rename(t);});
     if(targets.length===1 && t.kind==='edge' && opts.renameEdge)item('Rename',function(){opts.renameEdge(t);});
     // One local group renames its boundary title in place; its key stays in Inspect.
     if(targets.length===1 && t.kind==='group')item('Rename',function(){opts.rename(t);});

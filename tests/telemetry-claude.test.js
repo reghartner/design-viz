@@ -15,7 +15,7 @@
 | A8 | A connector-level failure (server_unavailable) keeps the previous map and sets status().note; a tool_error on one query keeps the other carriers fresh, keeps that signal's previous sample and reports the failed query in status().note. | Good sample then connector failure and per-query error with distinct second-refresh Prometheus/Loki peer series, plus missing datasource; inert provider if absent | Named A8 error status/note, retained previous map/failed sample, every successful peer equals the new series and differs from its first sample, and cleared note | Failure reported as success, erased previous map, an implementation that keeps the whole stale map after one failure, or unreported query error |
 | A9 | approval_required → status `approval`, no further connector call in that Metrics session, an "Allow Grafana" action on ctl.liveStatus (re-shown after another connector clears the slot, never over another connector's action); Allow makes the same call once and restarts Metrics. Authorization denials clear the map, set the note and stop calls until Metrics is turned on again; user_changed retires the adapter. | Deferred approval/denial behavior and fake live-status action through ctl.telemetry | Named A9 approval status/text, one Allow retry, retracted map and retired adapter | Silent success, repeated unattended requests, overwritten action or retained unauthorized data |
 | A10 | sql signals call query_sql at most once an hour (the value is reused in between); without query_sql on the connector there is no call and the note says so. | SQL connector, controlled clock at 0/59/61 minutes, missing-tool case; no calls if absent | Named A10 SQL inputs/value, hourly cap/cache and missing-tool note | Missing SQL call, per-refresh SQL query, stale hourly cache or unsupported tool call |
-| A11 | docs/live-status.md declares the Grafana connector with its five tools and states the per-refresh call budget. | docs/live-status.md source | Declared connector, five tools and call-budget prose | Missing connector declaration or budget guidance |
+| A11 | docs/live-status.md declares the Grafana connector with its bound query tools and states the per-refresh call budget. | docs/live-status.md source | Declared connector, five tools and call-budget prose | Missing connector declaration or budget guidance |
 Flip: read the Loki metric result from the wrong field (A5 notify node and push edge fail). */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const {pathToFileURL}=require('node:url');
@@ -345,7 +345,7 @@ test('A3 the Grafana connector is picked by its offered tools; a connector missi
  }
  for(const servers of [[JIRA_SERVER,github,missing],[]]){
   const s=await setup({servers});
-  await assert.rejects(s.refresh(),err=>{assert.equal(err.message,'Add a Grafana connector in claude.ai Settings → Connectors to see live metrics.');return true;},'A3 no qualifying connector');
+  await assert.rejects(s.refresh(),err=>{assert.match(err.message,/Grafana needs connector tools:/);return true;},'A3 no qualifying connector');
   assert.equal(s.net.calls.length,0,'A3 no tool call without a qualifying connector');
  }
  const {C}=context();
@@ -424,7 +424,7 @@ test('A5 Day 10 recorded payloads map to the provider shape: series, values, uni
  assert.equal(map['mcu->ingest'].links.dashboard,DASHBOARD,'A5 the authored dashboard link');
  assert.match(map['mcu->ingest'].links.query,/^https:\/\/acme\.grafana\.net\/explore\?panes=/,'A5 the generated Explore link');
  const explore=decodeURIComponent(map['mcu->ingest'].links.query.split('panes=')[1].split('&')[0].replace(/\+/g,' '));
- assert.match(explore,/http_server_request_duration_seconds_bucket/);assert.match(explore,/"from":"now-24h"/);
+ assert.match(explore,/http_server_requests_total/);assert.match(explore,/"from":"now-24h"/);
  assert.deepEqual(map['notify->app'].links,{query:AUTHORED_QUERY},'A5 an authored query link wins and no dashboard is invented');
  assert.deepEqual(Object.keys(map.ingest.links),['query'],'A5 a carrier without authored links gets the generated one only');
  // The adapter output survives ctl.telemetry.apply() unchanged (it already has the provider shape).
@@ -580,14 +580,13 @@ test('A10 sql signals call query_sql at most hourly and reuse the value; without
  assert.equal(sqlAnswers.length,2,'A10 query_sql again after an hour');assert.equal(third.map.notify.signals.total.value,148002);
  const {C}=context();assert.equal(typeof C.telemetryGrafanaSql,'function','A10 the query_sql reader is a named helper');
  for(const [payload,want] of [[{rows:[[null,'42']]},42],[{data:[{n:'7.5'}]},7.5],[[[3]],3],[[],null],['oops',null]])assert.equal(C.telemetryGrafanaSql(payload),want,'A10 '+JSON.stringify(payload));
- const without=await setup({page:raw,now:()=>clock});const {notes}=await without.refresh();
+ const without=await setup({page:raw,now:()=>clock});await assert.rejects(without.refresh(),/Grafana needs connector tools:.*query_sql/);
  assert.equal(without.net.calls.filter(c=>c.tool==='query_sql').length,0,'A10 no query_sql call when the connector does not offer it');
- assert.deepEqual(notes.filter(Boolean),['1 Grafana query failed: notify total: the Grafana connector does not offer query_sql']);
 });
 
-test('A11 docs declare the Grafana connector, its five tools and the call budget',()=>{
+test('A11 docs declare the Grafana connector, its bound query tools and the call budget',()=>{
  const docs=fs.readFileSync(path.join(ROOT,'docs/live-status.md'),'utf8');
- assert.match(docs,/\{server: "Grafana", tools: \["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"\]\}/,'A11 the declaration');
+ assert.match(docs,/\{server: "Grafana", tools: \["query_prometheus", "query_loki_logs"\]\}/,'A11 the declaration');
  for(const phrase of [/Allow Grafana/,/once per refresh/i,/query_sql/,/at most once an hour/i,/now-24h/,/unverified/i])assert.match(docs,phrase);
 });
 
@@ -613,4 +612,13 @@ test('A12 history over the raw mock MCP handler preserves Day 9 gaps, explicit p
  assert.equal(day9['mcu->ingest'],undefined,'Day 9 missing events are not borrowed from Live or zero-filled');
  assert.equal(day9['notify->app'].signals.rate.value,0,'explicit Day 9 push silence');
  assert.ok(day12['mcu->ingest'].signals.errors.value/day12['mcu->ingest'].signals.rate.value>.01,'Day 12 event exceeds its ratio limit');
+});
+
+
+test('hosted Grafana needs only bound queries and uses returned Explore origins for Loki',async()=>{
+ const h=await setup({servers:[{server:'Grafana Cloud',tools:[{name:'query_prometheus'},{name:'query_loki_logs'}]}],overrides:{query_prometheus:()=>({payload:{data:[{values:[[1793894400,'7']]}],exploreUrl:'https://observed.grafana.net/explore?prom=1'}})}});
+ const {map}=await h.refresh();assert.equal(map.ingest.signals.rate.value,7);assert.equal(map.ingest.links.query,'https://observed.grafana.net/explore?prom=1');
+ const url=new URL(map.notify.links.query);assert.equal(url.origin,'https://observed.grafana.net');assert.equal(url.pathname,'/explore');assert.equal(url.searchParams.get('schemaVersion'),'1');const pane=JSON.parse(url.searchParams.get('panes')).a;assert.equal(pane.datasource,'loki-main');assert.equal(pane.queries[0].expr,Q.consumed);assert.equal(pane.queries[0].datasource.uid,'loki-main');assert.equal(pane.queries[0].datasource.type,'loki');assert.equal(pane.queries[0].range,true);assert.deepEqual(pane.range,{from:'now-24h',to:'now'});
+ assert.ok(h.net.calls.every(c=>['query_prometheus','query_loki_logs'].includes(c.tool)));
+ const markers=h.C.telemetryGrafanaMarkers({Payload:[{tags:['deployment'],text:'new feature',time:1000}]},0,2000);assert.equal(markers[0].kind,'deploy');
 });

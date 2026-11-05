@@ -27,6 +27,12 @@ metrics-only request does not require Jira; never invent an Epic, tickets or
 ticket status to use telemetry. A request with none of these signals does not
 load the chapter.
 
+For feature metrics, start with the scoped Jira tickets and linked PR diffs:
+identify the new queues/topics/pipes/routes and their instrumentation, then
+find only indicators proving that feature path in its deployed environment.
+Use the Metrics chapter's evidence mapping and gap rules; broad service health
+is not the default evidence for new work.
+
 ## 0. The interaction
 
 The usual request is "give me an Epic Status board for DOOR-100". The agent

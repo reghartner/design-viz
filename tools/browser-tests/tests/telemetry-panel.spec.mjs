@@ -91,8 +91,19 @@ test('actual async selected detail adds direct and nested imported Proof in hist
  await day(scope,2);await expect(carrier(scope,'shared::store->shared::api')).toContainText('rate: 50 req/h');await expect(scope.locator('[data-metrics-card="shared::store->shared::api"]')).toContainText('50 req/h');expect(await page.evaluate(()=>window.calls.history.length)).toBe(2);
  await scope.locator('.detail-breadcrumb button').first().click();await expect(root.locator('[data-dv-detail-preview]')).toHaveCount(0);await metrics(root).click();await expect(root.locator('.dv-live-proof')).toHaveCount(0);await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
 });
-test('discovered missing tools hide Metrics and reject Proof without starting queries',async({page,server})=>{
+async function discoveredTools(page,server,tools){
  const raw=spec();raw.page.sections[0].diagram.edges[0].label='Delivery';raw.page.tracking.telemetry.grafana={prometheus:'prom-main'};
- await page.addInitScript(()=>{window.toolCalls=[];window.flowviewBooted=ctl=>window.ctl=ctl;window.claude={use:async()=>({listTools:async()=>[{server:'Grafana',tools:['query_prometheus']}],callTool:async(...args)=>{window.toolCalls.push(args);return {payload:[]};}})};});
- const file=path.join(server.root,'proof-missing-tools.json'),out=path.join(server.root,'proof-missing-tools.html');await writeFile(file,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/proof-missing-tools.html');await page.waitForFunction(()=>!!window.ctl);const root=page.locator('#docview');await expect(metrics(root)).toBeHidden();await page.evaluate(()=>window.ctl.telemetry.apply({ingest:{signals:{lag:{value:10}}}}));await expect(root.locator('.dv-live-proof')).toHaveCount(0);expect(await page.evaluate(()=>window.toolCalls)).toEqual([]);
+ await page.addInitScript(tools=>{window.toolCalls=[];window.flowviewBooted=ctl=>window.ctl=ctl;window.claude={use:async()=>({listTools:async()=>[{server:'Grafana',tools}],callTool:async(...args)=>{window.toolCalls.push(args);return {payload:{data:[{values:[[1793746800,'22'],[1793750400,'25']]}]}};}})};},tools);
+ const file=path.join(server.root,'proof-tools.json'),out=path.join(server.root,'proof-tools.html');await writeFile(file,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/proof-tools.html');await page.waitForFunction(()=>!!window.ctl);return page.locator('#docview');
+}
+test('discovered missing tools hide Metrics and reject Proof without starting queries',async({page,server})=>{
+ const root=await discoveredTools(page,server,['get_annotations']);
+ await expect(root.locator('.dv-live-metrics-connection')).toBeVisible();await expect(root.locator('.dv-live-metrics-connection')).toContainText('Grafana needs connector tools: query_prometheus');
+ await expect(metrics(root)).toBeHidden();expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().enabled)).toBe(false);
+ await page.evaluate(()=>window.ctl.telemetry.apply({ingest:{signals:{lag:{value:10}}},'shared::api':{signals:{rate:{value:10}}}}));await expect(root.locator('.dv-live-proof')).toHaveCount(0);expect(await page.evaluate(()=>window.toolCalls)).toEqual([]);
+});
+test('discovered Prometheus-only tools qualify local and imported Proof after Metrics is enabled',async({page,server})=>{
+ const root=await discoveredTools(page,server,['query_prometheus']);await expect(metrics(root)).toBeVisible();await expect(metrics(root)).toHaveAttribute('aria-pressed','false');expect(await page.evaluate(()=>window.toolCalls)).toEqual([]);
+ await metrics(root).click();await expect(carrier(root,'ingest')).toContainText('lag: 25');await expect(carrier(root,'shared::api')).toContainText('rate: 25');
+ expect(await page.evaluate(()=>window.toolCalls.map(call=>call[1]))).toEqual(expect.arrayContaining(['query_prometheus']));expect(await page.evaluate(()=>window.toolCalls.every(call=>call[1]==='query_prometheus'))).toBe(true);
 });

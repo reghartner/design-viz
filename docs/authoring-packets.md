@@ -14,11 +14,20 @@ python3 tools/authoring-packet.py --spec story.spec.json --mode edit --out packe
 Repeat `--panel` and `--feature`; unknown names fail. Panel names are listed by
 `python3 tools/widget_doc.py --list`. Features: `steps`, `time`, `paths`,
 `layouts`, `explore`, `icons`, `audio`, `visibility`, `contracts`, `reveals`, `groups`,
-`delta`, `bindings`, `topology`, `drilldowns`. Explicit selections **union** with
+`delta`, `bindings`, `topology`, `drilldowns`, `metrics`. Explicit selections **union** with
 spec inference; they never silently narrow an existing spec. Inference uses
 canonical sections, including tabs and bare diagrams. Review its reported
 selection when the source requires a feature the spec does not yet contain.
 Topology imports/exports are recognized without resolving or changing them.
+Metrics inference covers authored telemetry settings/templates, local carriers,
+imported carrier overlays, embedded topology and nested detail content. Use
+`--feature metrics --mode edit` for a board whose new metrics are not yet authored.
+Its maintained [Metrics authoring chapter](../.claude/skills/live-status-board/metrics.md)
+starts with scoped Jira tickets and linked PR diffs, inventories the feature's new
+queues/topics/pipes and instrumentation, and maps exact indicators to resources
+and deployed environments. The chapter and its linked guidance ship in the
+offline kit; an edit packet retains this research context without generic
+service-wide dashboard exploration.
 
 The generator uses `widget_doc.load_sections` for selected panel contracts and
 extracts other rules from their maintained headings. It includes common spec,

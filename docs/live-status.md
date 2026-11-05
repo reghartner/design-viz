@@ -329,6 +329,77 @@ template with the same name. Validating the resolved consumer warns at that
 carrier and names the provider path. Ticket edits in
 the Workbench or on the shared board keep the consumer binding as authored.
 
+## Telemetry environments
+
+Telemetry profiles are opt-in. Documents without them keep their shared
+configuration and do not substitute `$env` or automatically query production.
+In desktop **Document settings → Tracking → Metrics → Environments**, add
+`qa`, `stg`, and `prd` (or other ids), choose **Default environment**, and set
+per-environment Grafana UIDs/base URL and Honeycomb environment/dataset values. Each
+control is one Undo step; export preserves the authored profiles. Removing the
+default selects the first remaining profile; removing the last restores shared
+settings. Blank profile fields inherit the shared value.
+
+```json
+{
+  "tracking": {"telemetry": {
+    "grafana": {"prometheus": "prom-$env", "loki": "logs"},
+    "honeycomb": {"environment": "observability", "dataset": "events-$env"},
+    "environment": "qa",
+    "environments": {
+      "qa": {},
+      "stg": {"grafana": {"prometheus": "staging-prom"}},
+      "prd": {"honeycomb": {"environment": "production"}}
+    }
+  }}
+}
+```
+
+Ids start with a letter and contain only letters, digits, hyphens and
+underscores. Invalid entries warn and are ignored. An absent or invalid default
+uses the first valid profile in document order; no valid profiles means shared
+settings. Deployment ids and Honeycomb environment slugs are separate values.
+
+The **Environment** selector in Live status changes only this reader session;
+it never writes the default into the document. Metrics starts off. Selecting
+while off makes no data queries. Switching while on aborts old requests, clears
+live/history evidence, proof/activity observations, trace candidates and source
+caches, then refreshes the selected environment. Late results cannot replace
+its evidence. Selecting while Over time is open reloads that environment's
+history; unsupported history stays unobserved. Legacy embedded timeline metrics
+have no environment identity, so configured profiles do not reuse them.
+
+`$env` and `${env}` are replaced literally in signal query strings, nested
+Honeycomb string values, binding links, and Grafana/Honeycomb config strings.
+Use them as quoted label/filter values or safe resource-name suffixes; this is
+literal substitution, not a query-language builder. Object keys are unchanged.
+Grafana `$__interval`/`$__rate_interval` and other placeholders stay intact.
+Template parameters expand first, so an existing declared `env` parameter
+continues to use its carrier's value. The consuming reader's environment applies
+to all local, imported/nested and loaded-detail bindings after provider template
+expansion; imported source documents are never edited.
+
+Hosts can read `ctl.telemetry.environment()` and `config()`, or call
+`setEnvironment(id)` (false for invalid/unchanged/unavailable-by-policy choices).
+Snapshots include `environment` and `environments`. Providers receive an optional
+fourth context argument `{environment, config}`; history receives that context
+as its fifth argument. `environmentChanged(id, config)` lets a custom provider
+synchronously invalidate its own caches before the next request. Custom
+providers must honor request cancellation and key any external caches by
+environment. Grafana daily history remains supported; Honeycomb history remains
+unsupported.
+
+When gathering metrics for a feature board, start from scoped Jira tickets and
+linked PR diffs. Inventory the new queues, topics, pipes, routes, jobs and
+instrumentation, then map each candidate to its ticket/PR, exact new resource,
+carrier, query/datasource and deployed environment. Prefer indicators proving
+that feature path, including its throughput, lag/backlog and errors. Avoid
+service-wide dashboard crawls or generic CPU/uptime/request rates unless they
+directly prove the feature or supporting context was requested. Name missing
+instrumentation as an evidence gap. Telemetry-only boards use supplied resource
+and code evidence without inventing tickets. See
+[Metrics authoring](../.claude/skills/live-status-board/metrics.md).
+
 ## Workbench
 
 Select a node or connection on the desktop canvas and open **Inspect → Tracking**,
@@ -1364,7 +1435,7 @@ the connector as one more `servers` entry, by its exact display name:
 ```js
 capabilities: {mcp: {servers: [
   {server: "Atlassian", tools: ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql"]},
-  {server: "Grafana", tools: ["query_prometheus", "query_loki_logs", "search_tempo_traces", "get_annotations", "generate_deeplink"]}
+  {server: "Grafana", tools: ["query_prometheus", "query_loki_logs"]}
 ]}, comments: {"composer_only": true, "customAnchors": true}}
 ```
 
@@ -1381,16 +1452,17 @@ resolves them (exported, selected carriers only; a consumer overlay replaces the
 provider binding; provider templates expand). A snapshot resolved before
 injection (`tools/page_build.py --resolve-imports`) carries those bindings itself.
 
-The adapter never matches the connector by name. From the listed connectors it
-takes any that offers all five tools above, preferring one named **Grafana**, then
-the first qualifying one; a connector missing one of them, such as
-`query_prometheus`, is not used. Jira and GitHub connectors are chosen as before.
-Metrics stays hidden during discovery and when tools are missing, incomplete,
-unavailable or removed. Discovery uses only `claude.use('mcp')` and `listTools()`;
-it never calls a connector tool or requests authorization. The root page disable
-and explicit host false suppress even this telemetry metadata discovery. Discovery
-belongs to the current render; retirement drops late answers. Each refresh also
-checks the offered tools, so removal clears stale samples and hides Metrics.
+The adapter qualifies connectors by the bound signals: `query_prometheus` for
+`grafana`, `query_loki_logs` for `loki`, and `query_sql` for `sql`, preferring a
+qualifying connector named **Grafana**. Missing required query tools appear as a
+visible diagnostic. `generate_deeplink`, `get_annotations` and
+`search_tempo_traces` are optional; declare these extras only when offered and
+needed. The generated declaration is a minimum; preserve previously verified
+offered optional tools when republishing. The trace adapter independently
+requires its search/detail pair.
+Discovery uses `claude.use('mcp')` and `listTools()` metadata, without data calls
+or permission prompts. Page/host disable suppresses discovery. Late results after
+retirement are dropped; each refresh rechecks required tools.
 
 No data tool is called while Metrics is off. Turning Metrics on runs the first refresh,
 and claude.ai asks the viewer to allow the connector while that first call waits.
@@ -1406,11 +1478,22 @@ calls:
 
 | tool | how often | input |
 |---|---|---|
-| `get_annotations` | once per refresh, first and alone | `{type: "annotation", limit: 100}` |
+| `get_annotations` | when offered, once per refresh, first and alone | `{type: "annotation", limit: 100}` |
 | `query_prometheus` | once per refresh for each `grafana` signal | `{datasourceUid, expr, startTime: "now-24h", endTime: "now", stepSeconds, queryType: "range"}` |
 | `query_loki_logs` | once per refresh for each `loki` signal | `{datasourceUid, logql, startRfc3339: "now-24h", endRfc3339: "now", queryType: "range", stepSeconds}` |
 | `query_sql` | at most once an hour for each `sql` signal; the value is reused in between | `{datasourceUid, query}` |
-| `generate_deeplink` | once per carrier per page load, unless the carrier authors `links.query` | `{resourceType: "explore", datasourceUid, queries: [{refId, expr}], timeRange: {from: "now-24h", to: "now"}}` |
+| `generate_deeplink` | when offered, once per carrier per page load, unless the carrier authors `links.query` | `{resourceType: "explore", datasourceUid, queries: [{refId, expr}], timeRange: {from: "now-24h", to: "now"}}` |
+
+Authored `links.query` wins; otherwise a safe `exploreUrl` in the query reply
+wins over the optional deeplink tool. Without either, an Explore URL can be built
+from the same refresh's returned Explore origin, then the carrier's authored
+`links.dashboard`/`links.query`, then optional `tracking.telemetry.grafana.baseUrl`
+(including an environment override). If none is evidenced, no link is shown.
+Credentials and non-HTTP(S) URLs are rejected. Loki panes carry the exact LogQL,
+datasource UID and window in Grafana's documented [external Explore URL
+format](https://grafana.com/docs/grafana-cloud/learn-and-build/visualizations/explore/get-started-with-explore/#generate-explore-urls-from-external-tools).
+No datasource backend address is treated as the Grafana UI origin. Both `deploy`
+and `deployment` annotation tags produce deploy markers.
 
 `datasourceUid` is the viewed page's `tracking.telemetry.grafana.prometheus`,
 `.loki` or `.sql`, also for imported carriers. The window is
@@ -2127,11 +2210,24 @@ window, independently of Jira Live. Discovery alone never runs a query.
 Declare `{"server":"Honeycomb","tools":["run_query"]}` in the existing `mcp`
 capability alongside Grafana if both are bound. Connector names vary per account;
 selection requires offered tools and the runtime `inputSchema`. The supported
-schema declares `environment_slug` and `dataset_slug` strings and `query_spec`
-as an object or JSON string. Missing/unsupported schemas fail closed. No new SDK
+schema declares `environment_slug` as a string and `query_spec` as an object or JSON string.
+`dataset_slug` may be optional and nullable; omit it when no dataset is authored.
+Type unions of the expected type plus `null` are accepted, including calculation
+columns. Unsupported schemas fail closed. No new SDK
 namespace, authored field or mandatory asynchronous polling contract is assumed.
 
-Root `honeycomb.environment` and `honeycomb.dataset` supply those slug arguments.
+Root `honeycomb.environment` and optional `honeycomb.dataset` supply those slug arguments.
+Hosted `listTools()` contains metadata only. A listed `run_query` makes Metrics
+eligible; only turning Metrics on requests `claude.use('permissions')` followed by
+`permissions.request(['mcp:'+actualServerName])`. The built-in permissions
+capability is never declared. After a `granted` result, `mcp.describeTool(server,
+'run_query')` supplies the input schema; description itself never prompts. Denied,
+unavailable or null permissions hide that source without retrying or nagging.
+The initial page paint never waits for a human permission response. Turning
+Metrics off, switching environments or destroying the controller retires pending
+permission/description work before any query can run. Trace search/detail tools
+use the same permission-first description path. Legacy hosts already supplying
+schemas in `listTools` retain their existing call authorization flow.
 Each signal holds a native query object, for example:
 
 ```json

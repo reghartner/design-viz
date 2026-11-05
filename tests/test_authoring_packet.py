@@ -38,6 +38,24 @@ class AuthoringPacketTests(unittest.TestCase):
             count += 1
         self.assertGreater(count, 20)
 
+    def test_metrics_packet_infers_templates_and_imported_overlays_and_ships_offline_routes(self):
+        for telemetry in ({'tracking': {'telemetry': {'templates': {'new_queue': {'signals': {'lag': {'grafana': 'lag'}}}}}}},
+                          {'sections': [{'id': 'main', 'diagram': {'nodes': {}, 'rows': [], 'topologyImports': [{'id': 'shared', 'overrides': {'nodes': {'queue': {'telemetry': {'signals': {'lag': {'grafana': 'lag'}}}}}}}]}}]}):
+            raw = {'page': {'title': 'Feature board', 'sections': [], **telemetry}}
+            self.assertIn('metrics', packet.infer(raw)[1])
+        text, meta = packet.generate([], ['metrics'], mode='edit')
+        self.assertIn('Jira', text)
+        self.assertIn('instrumentation', text)
+        self.assertIn('queues', text)
+        self.assertIn('.claude/skills/live-status-board/metrics.md', [p['path'] for p in meta['provenance']])
+        kit = json.loads(folder_agent_kit(ROOT, '// test runtime'))
+        files = json.loads(gzip.decompress(base64.b64decode(kit['gzip'])))['files']
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name, value in files.items():
+                path = root / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_text(value)
+            self.assert_local_links_resolve(text, root)
+
     def test_handoff_contract_and_migration_travel_in_packets_and_folder_kit(self):
         text, _ = packet.generate([], [])
         self.assertIn('`spec` is required; `handoff.url` is removed and rejected', text)

@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import { gunzipSync } from 'node:zlib';
 import { options } from '../create.mjs';
 import { vendorFlowview } from '../fixtures/designer/scripts/vendor-flowview.mjs';
 
@@ -216,6 +217,25 @@ test(
       runtime.revision,
       (await run('git', ['rev-parse', 'HEAD'], root)).stdout.trim()
     );
+    // Inspect the actual vendored HTML, not an independently built kit. Its
+    // extracted metrics packet must work without the publisher source tree.
+    const vendoredHtml = await readFile(path.join(designer, 'workbench/flowspec.html'), 'utf8');
+    const kitMatch = /<script type="application\/json" id="flowview-folder-kit">(.*?)<\/script>/s.exec(vendoredHtml);
+    assert.ok(kitMatch, 'vendored Workbench includes its offline authoring kit');
+    const kit = JSON.parse(gunzipSync(Buffer.from(JSON.parse(kitMatch[1]).gzip, 'base64'))).files;
+    const chapter = '.claude/skills/live-status-board/metrics.md';
+    assert.equal(kit[chapter], await readFile(path.join(root, chapter), 'utf8'));
+    const authoring = path.join(temporary, 'offline-authoring');
+    for (const [name, text] of Object.entries(kit)) {
+      const file = path.join(authoring, name);
+      await mkdir(path.dirname(file), {recursive:true});
+      await writeFile(file, text);
+    }
+    await run('python3', ['tools/authoring-packet.py', '--feature', 'metrics', '--mode', 'edit', '--out', 'packet.md'], authoring);
+    const packet = await readFile(path.join(authoring, 'packet.md'), 'utf8');
+    assert.ok(packet.includes('## 1. Start with the feature\'s new work'));
+    const packetMeta = JSON.parse(await readFile(path.join(authoring, 'packet.md.json'), 'utf8'));
+    assert.ok(packetMeta.provenance.some(source => source.path === chapter));
     // The source checkout need not contain generated HTML before packaging.
     await run('python3', ['tools/build.py'], root);
     assert.equal(

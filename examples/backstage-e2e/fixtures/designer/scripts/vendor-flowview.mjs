@@ -36,7 +36,7 @@ export async function vendorFlowview(source, destination) {
   const marked = tracked.filter(name => name.startsWith('examples/') && path.posix.basename(name) === '.agent-kit')
     .map(name => path.posix.dirname(name) + '/');
   const inputs = ['src/', 'tools/', 'apps/backstage/', 'contract/', 'cookbook/', 'docs/',
-    '.claude/skills/hld-to-page/', 'examples/canon/', ...marked, 'company/', 'diagrams/'];
+    '.claude/skills/hld-to-page/', '.claude/skills/live-status-board/', 'examples/canon/', ...marked, 'company/', 'diagrams/'];
   try {
     for (const name of tracked.filter(name => ['canon.json', 'LICENSE'].includes(name) || inputs.some(prefix => name.startsWith(prefix)))) {
       const target = path.join(buildRoot, name);

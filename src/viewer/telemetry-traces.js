@@ -120,15 +120,15 @@ function telemetryTraceInputs(job,config,contract,range,id){
     if(!telemetryTraceString(input.datasourceUid) || typeof q!=='string')telemetryTraceFail('Set an explicit Tempo datasource and TraceQL query.');
     if(id)input.trace_id=id;else {input.query=q;input.limit=TELEMETRY_TRACE_CANDIDATES;input.spss=3;}
   }else{
-    if(!telemetryTraceString(config.honeycomb.environment) || !telemetryTraceString(config.honeycomb.dataset))telemetryTraceFail('Set an explicit Honeycomb environment and dataset.');
+    if(!telemetryTraceString(config.honeycomb.environment))telemetryTraceFail('Set an explicit Honeycomb environment.');
     input={environment_slug:config.honeycomb.environment};
     if(id){input.trace_id=id;input.from=config.window;var view=contract.detail.inputSchema && contract.detail.inputSchema.properties && contract.detail.inputSchema.properties.view_mode;if(view && view.type==='string' && (!view.enum || view.enum.indexOf('full')>=0))input.view_mode='full';}
     else{
       if(!telemetryObject(q) || Object.keys(q).some(function(k){return ['query_spec','raw_row_columns','results_limit'].indexOf(k)<0;}) || !telemetryObject(q.query_spec) || !Array.isArray(q.raw_row_columns) || q.raw_row_columns.length>30 || q.raw_row_columns.indexOf('trace.trace_id')<0 || q.raw_row_columns.some(function(k){return !telemetryTraceString(k);}) || !Number.isInteger(q.results_limit) || q.results_limit<1 || q.results_limit>TELEMETRY_TRACE_CANDIDATES)telemetryTraceFail('Use an explicit native Honeycomb raw-row wrapper with trace.trace_id and results_limit 1–20.');
       var spec=telemetryHoneycombJson(q.query_spec);['from','to','start','end','start_time','end_time','time_range'].forEach(function(k){delete spec[k];});spec.from=config.window;
       var prop=contract.search.inputSchema && contract.search.inputSchema.properties && contract.search.inputSchema.properties.query_spec;
-      if(!prop || ['object','string'].indexOf(prop.type)<0)telemetryTraceFail('Unsupported query_spec type.');
-      input.dataset_slug=config.honeycomb.dataset;input.query_spec=prop.type==='string'?JSON.stringify(spec):spec;input.raw_row_columns=q.raw_row_columns.slice();input.results_limit=q.results_limit;
+      if(!prop || !telemetrySchemaType(prop,'object') && !telemetrySchemaType(prop,'string'))telemetryTraceFail('Unsupported query_spec type.');
+      if(telemetryTraceString(config.honeycomb.dataset))input.dataset_slug=config.honeycomb.dataset;input.query_spec=telemetrySchemaType(prop,'string')?JSON.stringify(spec):spec;input.raw_row_columns=q.raw_row_columns.slice();input.results_limit=q.results_limit;
     }
   }
   return telemetryTraceInput(id?contract.detail:contract.search,input);
@@ -138,10 +138,21 @@ function createTelemetryTraces(page,win,now,bound){
   var session=++TELEMETRY_TRACE_SESSION,ctl=null,current=page,clock=now || Date.now,epoch=0,serial=0,retired=false,namespace=null,contracts={},entries=new Map(),abort=new AbortController(),off=null,contractKey=null;
   function invalidate(){epoch++;abort.abort();abort=new AbortController();entries.clear();}
   function active(e){return !retired && e===epoch && ctl && ctl.telemetry.enabled() && !abort.signal.aborted;}
-  async function discover(){
+  async function discover(signal){
     var e=epoch;if(!namespace)namespace=Promise.resolve(win.claude.use('mcp'));var mcp=await namespace;if(e!==epoch || retired || !ctl)telemetryTraceFail('Trace session cancelled.');var list=await mcp.listTools();if(e!==epoch || retired || !ctl)telemetryTraceFail('Trace session cancelled.');
-    var next={},jobs=telemetryTraceJobs(ctl.telemetry.bindings()),config=trackingTelemetry(current),to=clock(),range={from:new Date(to-telemetryGrafanaWindowMs(config.window)).toISOString(),to:new Date(to).toISOString()};
-    jobs.forEach(function(job){var c=telemetryTraceContract(list,job.signal.source);if(c)try{telemetryTraceInputs(job,config,c,range);telemetryTraceInputs(job,config,c,range,'00000000000000000000000000000000');next[job.signal.source]=c;}catch(e){}});
+    var next={},jobs=telemetryTraceJobs(ctl.telemetry.bindings()),config=telemetryProviderConfig(current,ctl),to=clock(),range={from:new Date(to-telemetryGrafanaWindowMs(config.window)).toISOString(),to:new Date(to).toISOString()};
+    for(var job of jobs){var c=telemetryTraceContract(list,job.signal.source);if(!c || telemetryConnectorRefused(win.claude,c.server))continue;
+      if(!c.search.inputSchema || !c.detail.inputSchema){
+        if(!signal){
+          // Eligibility rediscovery must not downgrade an already described pair
+          // and invalidate a simultaneous refresh for the new environment.
+          var existing=contracts[job.signal.source];next[job.signal.source]=existing && existing.server===c.server && existing.search.name===c.search.name && existing.detail.name===c.detail.name?existing:c;continue;
+        }
+        var described;try{described=await telemetryDescribeTools(win.claude,mcp,c.server,[c.search,c.detail],function(){return e===epoch && !retired && !!ctl && !signal.aborted && ctl.telemetry.enabled();});}catch(error){if(error && error.code==='not_granted')continue;throw error;}
+        c={server:c.server,search:described[0],detail:described[1]};
+      }
+      try{telemetryTraceInputs(job,config,c,range);telemetryTraceInputs(job,config,c,range,'00000000000000000000000000000000');next[job.signal.source]=c;}catch(error){}
+    }
     var key=JSON.stringify(next);if(contractKey!==null && key!==contractKey)invalidate();contractKey=key;contracts=next;ctl.telemetry.setAvailable(Object.keys(next).length>0);return mcp;
   }
   function fail(error){
@@ -173,7 +184,7 @@ function createTelemetryTraces(page,win,now,bound){
   }
   async function provider(bindings,signal,report){
     var map=Object.create(null),notes=[];if(signal.aborted || retired)return map;
-    var mcp;try{mcp=await discover();}catch(e){throw fail(e);}var e=epoch,config=trackingTelemetry(current);
+    var mcp;try{mcp=await discover(signal);}catch(e){if(signal.aborted)throw new Error('Trace session cancelled.');throw fail(e);}if(signal.aborted)return map;var e=epoch,config=telemetryProviderConfig(current,ctl);
     for(var job of telemetryTraceJobs(bindings)){
       if(signal.aborted || !active(e))break;
       try{var envelope=await load(job,mcp,config);if(signal.aborted || !active(e))break;var saved=entries.get(job.id);if(envelope)map[job.id]={signals:{},exemplars:[saved.selected || envelope]};}
@@ -182,16 +193,16 @@ function createTelemetryTraces(page,win,now,bound){
     if(report && report.note)report.note(notes.length?notes[0]:'');return map;
   }
   async function choose(id,token,traceId){
-    var entry=entries.get(id);if(!entry || entry.token!==token || !active(entry.epoch) || entry.key!==JSON.stringify([ctl.telemetry.bindings().find(function(b){return b.id===id;}),trackingTelemetry(current)]))telemetryTraceFail('Trace selection expired.');
+    var entry=entries.get(id);if(!entry || entry.token!==token || !active(entry.epoch) || entry.key!==JSON.stringify([ctl.telemetry.bindings().find(function(b){return b.id===id;}),telemetryProviderConfig(current,ctl)]))telemetryTraceFail('Trace selection expired.');
     var candidate=entry.candidates.find(function(c){return c.traceId===traceId;});if(!candidate)telemetryTraceFail('Choose an actual returned trace candidate.');
     // Revalidate metadata on explicit actions, including cached alternatives.
-    try{await discover();if(!active(entry.epoch))telemetryTraceFail('Trace selection expired.');var attempt=entry.attempt=(entry.attempt || 0)+1,value=await detail(entry,candidate,'explicit user selection');if(!active(entry.epoch) || attempt!==entry.attempt)telemetryTraceFail('Trace selection replaced.');entry.selected=Object.assign({},value,{selectionReason:'explicit user selection; first explicit trace signal in authored order'});return entry.selected;}catch(e){throw fail(e);}
+    try{await discover(abort.signal);if(!active(entry.epoch))telemetryTraceFail('Trace selection expired.');var attempt=entry.attempt=(entry.attempt || 0)+1,value=await detail(entry,candidate,'explicit user selection');if(!active(entry.epoch) || attempt!==entry.attempt)telemetryTraceFail('Trace selection replaced.');entry.selected=Object.assign({},value,{selectionReason:'explicit user selection; first explicit trace signal in authored order'});return entry.selected;}catch(e){throw fail(e);}
   }
   function canChoose(id,token,traceId){
-    var entry=entries.get(id);return !!(entry && entry.token===token && active(entry.epoch) && contracts[entry.job.signal.source] && entry.key===JSON.stringify([ctl.telemetry.bindings().find(function(b){return b.id===id;}),trackingTelemetry(current)]) && entry.candidates.some(function(c){return c.traceId===traceId;}));
+    var entry=entries.get(id);return !!(entry && entry.token===token && active(entry.epoch) && contracts[entry.job.signal.source] && entry.key===JSON.stringify([ctl.telemetry.bindings().find(function(b){return b.id===id;}),telemetryProviderConfig(current,ctl)]) && entry.candidates.some(function(c){return c.traceId===traceId;}));
   }
-  return {options:{provider:provider,chooseExemplar:choose,canChooseExemplar:canChoose,available:false,source:'Traces'},attach:function(next,nextPage){
-    ctl=next;current=nextPage || current;invalidate();var mine=ctl;discover().catch(function(e){if(ctl===mine){fail(e);if(ctl===mine)ctl.telemetry.setAvailable(false);}});
+  return {options:{environmentChanged:function(){invalidate();var e=epoch,mine=ctl;discover().catch(function(error){if(ctl===mine && e===epoch){fail(error);if(ctl===mine)ctl.telemetry.setAvailable(false);}});},provider:provider,chooseExemplar:choose,canChooseExemplar:canChoose,available:false,source:'Traces'},attach:function(next,nextPage){
+    ctl=next;current=nextPage || current;invalidate();var mine=ctl,attachedEpoch=epoch;discover().catch(function(e){if(ctl===mine && attachedEpoch===epoch){fail(e);if(ctl===mine)ctl.telemetry.setAvailable(false);}});
     off=ctl.telemetry.onChange(function(s){if(!s.enabled && entries.size)invalidate();});
     return {destroy:function(){if(ctl!==mine)return;invalidate();if(off)off();off=null;ctl=null;namespace=null;}};
   }};

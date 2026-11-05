@@ -14,8 +14,7 @@
      availability without calling a data tool. A disabled page never discovers.
      now() is the clock of the hourly query_sql cap.
 
-   Connector: the first listed connector offering every tool in
-   TELEMETRY_GRAFANA_TOOLS, preferring one named "Grafana". Argument names
+   Connector: the first listed connector offering the bound query tools, preferring one named "Grafana". Argument names
    follow grafana/mcp-grafana's source as mirrored by the mock Worker
    (deploy/cloudflare/mock-grafana-mcp); they are not verified against a live
    Grafana server.
@@ -23,11 +22,11 @@
    One refresh (ctl.telemetry calls the provider when Metrics turns on, then at
    most once a minute while the document is visible), every call with the
    refresh's AbortSignal:
-     get_annotations {type: 'annotation', limit: 100}     once, first and alone
+     get_annotations {type: 'annotation', limit: 100}     optional, once, first and alone
      query_prometheus range call                          one per grafana signal
      query_loki_logs metric range call                    one per loki signal
      query_sql {datasourceUid, query}                     per sql signal, at most hourly
-     generate_deeplink explore link                       once per carrier per page load,
+     generate_deeplink explore link                       optional, once per carrier per page load,
                                                           unless the carrier authors links.query
    Times are relative to the server clock: now-<window> to now. tempo signals
    (exemplar traces) and honeycomb signals are not run here.
@@ -62,11 +61,12 @@ function telemetryGrafanaOffered(candidate){
 function telemetryGrafanaListed(list){return Array.isArray(list)?list:list && Array.isArray(list.servers)?list.servers:[];}
 /* The connector name to call, or null: chosen by what it offers, never by its
    display name alone ("Grafana" only breaks a tie). */
-function telemetryGrafanaServer(list){
+function telemetryGrafanaServer(list,required){
+  required=required || TELEMETRY_GRAFANA_TOOLS;
   var qualified=[];
   telemetryGrafanaListed(list).forEach(function(candidate){
     var name=candidate && (candidate.server || candidate.name),offered=telemetryGrafanaOffered(candidate);
-    if(typeof name==='string' && name && TELEMETRY_GRAFANA_TOOLS.every(function(tool){return offered.indexOf(tool)>=0;}) && qualified.indexOf(name)<0)qualified.push(name);
+    if(typeof name==='string' && name && required.every(function(tool){return offered.indexOf(tool)>=0;}) && qualified.indexOf(name)<0)qualified.push(name);
   });
   return qualified.indexOf('Grafana')>=0?'Grafana':qualified[0] || null;
 }
@@ -116,7 +116,7 @@ function telemetryGrafanaMarkers(payload,from,to){
     if(!item || typeof item!=='object')return;
     var at=telemetryGrafanaNumber(item.time);if(at===null || at<from || at>to)return;
     var tags=Array.isArray(item.tags)?item.tags.filter(function(tag){return typeof tag==='string' && tag;}):[];
-    var marker={at:new Date(at).toISOString(),kind:tags.indexOf('deploy')>=0?'deploy':tags.indexOf('incident')>=0?'incident':tags[0] || 'annotation'};
+    var marker={at:new Date(at).toISOString(),kind:(tags.indexOf('deploy')>=0 || tags.indexOf('deployment')>=0)?'deploy':tags.indexOf('incident')>=0?'incident':tags[0] || 'annotation'};
     if(typeof item.text==='string' && item.text.trim())marker.label=item.text.trim();
     out.push(marker);
   });
@@ -162,6 +162,14 @@ function telemetryGrafanaExplore(binding,config,range){
   var uid=family && config.grafana[TELEMETRY_GRAFANA_DATASOURCE[family][0]];
   return uid && queries.length?{resourceType:'explore',datasourceUid:uid,queries:queries,timeRange:{from:range.from,to:range.to}}:null;
 }
+/* Accept only navigable web URLs; never infer a Grafana hostname. */
+function telemetryGrafanaUrl(value){try{var url=new URL(value);return typeof value==='string' && (url.protocol==='https:' || url.protocol==='http:') && !url.username && !url.password?value.trim():null;}catch(e){return null;}}
+function telemetryGrafanaExploreUrl(binding,config,range,base){
+  var input=telemetryGrafanaExplore(binding,config,range),url=telemetryGrafanaUrl(base);if(!input || !url)return null;
+  var family=Object.keys(binding.signals || {}).map(function(k){return binding.signals[k].source;}).find(function(s){return s==='loki' || s==='grafana';});
+  var uid=input.datasourceUid,panes={a:{datasource:uid,queries:input.queries.map(function(q){return {datasource:{uid:uid,type:family==='loki'?'loki':'prometheus'},expr:q.expr,range:true,refId:q.refId};}),range:input.timeRange}};
+  return new URL(url).origin+'/explore?panes='+encodeURIComponent(JSON.stringify(panes))+'&schemaVersion=1';
+}
 /* Every bound carrier of a page, its resolved imported topology included,
    through the same walk ctl.telemetry uses. */
 function telemetryGrafanaBound(page){
@@ -197,6 +205,11 @@ function createTelemetryGrafana(page,win,now,bound){
   var last=Object.create(null),lastMarkers=[],links=Object.create(null),sql=Object.create(null);
   function code(error){return error && typeof error.code==='string'?error.code:'upstream_error';}
   function detail(error){var text=error && typeof error.message==='string'?error.message.trim():'';return text.length>160?text.slice(0,159)+'…':text || code(error);}
+  function needed(){
+    var bindings=ctl && ctl.telemetry && typeof ctl.telemetry.bindings==='function'?ctl.telemetry.bindings():null;
+    if(!bindings || !bindings.length)bindings=telemetryBindings(function(fn){sectionRecords(current).forEach(function(record){var d=record.section.diagram || {};Object.keys(d.nodes || {}).forEach(function(id){fn(d.nodes[id],id,current);});(d.edges || []).forEach(function(e){fn(e,e.from+'->'+e.to,current);});});});
+    var tools=[];telemetryGrafanaJobs(bindings).forEach(function(job){job.signals.forEach(function(s){var name={grafana:'query_prometheus',loki:'query_loki_logs',sql:'query_sql'}[s.source];if(tools.indexOf(name)<0)tools.push(name);});});return tools;
+  }
   function connect(refresh){
     var epoch=generation;
     if(!namespace){
@@ -209,8 +222,11 @@ function createTelemetryGrafana(page,win,now,bound){
       if(server && !refresh)return mcp;
       return Promise.resolve(mcp.listTools()).then(function(list){
         if(epoch!==generation || retired || !trackingTelemetry(current || {}).enabled)throw {code:'capability_removed'};
-        server=telemetryGrafanaServer(list);
-        if(!server)throw {code:'server_not_connected'};
+        server=telemetryGrafanaServer(list,needed());
+        if(!server){var required=needed(),missing=required;
+          telemetryGrafanaListed(list).forEach(function(candidate){var offered=telemetryGrafanaOffered(candidate),absent=required.filter(function(tool){return offered.indexOf(tool)<0;});if(absent.length<missing.length)missing=absent;});
+          throw {code:'missing_tools',message:'Grafana needs connector tools: '+missing.join(', ')};
+        }
         telemetryGrafanaListed(list).forEach(function(candidate){if(candidate && (candidate.server || candidate.name)===server)offered=telemetryGrafanaOffered(candidate);});
         return mcp;
       });
@@ -255,7 +271,8 @@ function createTelemetryGrafana(page,win,now,bound){
       blocked={signal:signal,error:telemetryGrafanaError('Grafana access needs your approval','approval')};
       retract(signal);syncAction();return Promise.reject(blocked.error);
     }
-    if(kind==='needs_reauth')note='Reconnect Grafana in claude.ai Settings → Connectors';
+    if(kind==='missing_tools')note=error.message;
+    else if(kind==='needs_reauth')note='Reconnect Grafana in claude.ai Settings → Connectors';
     else if(['server_not_connected','selection_required','server_not_found'].indexOf(kind)>=0){note=TELEMETRY_GRAFANA_ADD;server=null;}
     else if(['not_in_manifest','blocked_by_policy','self_only'].indexOf(kind)>=0)note='This page is not allowed to read Grafana for your account.';
     else if(['not_granted','capability_disabled','capability_removed'].indexOf(kind)>=0){note='Grafana is not available in this view.';namespace=null;server=null;}
@@ -268,7 +285,7 @@ function createTelemetryGrafana(page,win,now,bound){
     if(retired)return Promise.reject(telemetryGrafanaError('Grafana stopped: the signed-in account changed'));
     if(blocked && blocked.signal===signal)return Promise.reject(blocked.error);
     blocked=null;
-    var config=trackingTelemetry(current || {}),windowMs=telemetryGrafanaWindowMs(config.window);
+    var config=telemetryProviderConfig(current || {},ctl),windowMs=telemetryGrafanaWindowMs(config.window);
     var range={from:'now-'+config.window,to:'now'},step=Math.max(60,Math.ceil(windowMs/1000/TELEMETRY_GRAFANA_POINTS));
     var options=signal?{signal:signal}:undefined,failures=[],fatal=null,annotations=null,order=0;
     function failed(rank,label,message){failures.push({rank:rank,text:label+': '+message});}
@@ -279,13 +296,13 @@ function createTelemetryGrafana(page,win,now,bound){
       if(!fatal)fatal={error:error,repeat:repeat};
     };}
     return connect(true).catch(function(error){
-      if(ctl && ctl.telemetry && typeof ctl.telemetry.setAvailable==='function')ctl.telemetry.setAvailable(false);
+      if(!(signal && signal.aborted) && ctl && ctl.telemetry && typeof ctl.telemetry.setAvailable==='function')ctl.telemetry.setAvailable(false);
       throw error;
     }).then(function(mcp){
       if(signal && signal.aborted)throw {code:'capability_removed'};
       function call(tool,input){return Promise.resolve().then(function(){if(signal && signal.aborted)throw {code:'capability_removed'};return mcp.callTool(server,tool,input,options);});}
       var probe={tool:'get_annotations',input:{type:'annotation',limit:100}};
-      return call(probe.tool,probe.input).then(function(result){annotations=result && result.payload;},caught(-1,'annotations',probe,null)).then(function(){
+      return (offered.indexOf(probe.tool)>=0?call(probe.tool,probe.input):Promise.resolve(null)).then(function(result){annotations=result && result.payload;},caught(-1,'annotations',probe,null)).then(function(){
         if(fatal)return;
         var tasks=[];
         jobs.forEach(function(job){job.signals.forEach(function(entry){
@@ -293,7 +310,7 @@ function createTelemetryGrafana(page,win,now,bound){
           if(!uid){entry.failed=true;failed(rank,label,'no '+names[1]+' datasource UID in tracking.telemetry.grafana.'+names[0]);return;}
           if(entry.source==='sql'){
             if(offered.indexOf('query_sql')<0){entry.failed=true;failed(rank,label,'the Grafana connector does not offer query_sql');return;}
-            var key=uid+'\n'+entry.query,cached=sql[key];
+            var key=(config.environment || '')+'\n'+uid+'\n'+entry.query,cached=sql[key];
             if(cached && clock()-cached.at<TELEMETRY_GRAFANA_SQL_MS){if(cached.value!==null)entry.value=cached.value;else entry.failed=true;return;}
             var input={datasourceUid:uid,query:entry.query},attempt={at:clock(),value:cached?cached.value:null};
             tasks.push(function(){sql[key]=attempt;return call('query_sql',input).then(function(result){
@@ -308,16 +325,17 @@ function createTelemetryGrafana(page,win,now,bound){
             {datasourceUid:uid,expr:entry.query,startTime:range.from,endTime:range.to,stepSeconds:step,queryType:'range'};
           tasks.push(function(){return call(tool,query).then(function(result){
             entry.points=(loki?telemetryGrafanaLoki:telemetryGrafanaPrometheus)(result && result.payload);
+            var url=telemetryGrafanaUrl(result && result.payload && result.payload.exploreUrl);if(url)entry.exploreUrl=url;
           },caught(rank,label,{tool:tool,input:query},entry));});
         });});
         // Explore links: once per carrier and page load, unless the author linked a query.
         jobs.forEach(function(job){
-          if(job.links.query)return;
+          if(job.links.query || offered.indexOf('generate_deeplink')<0)return;
           var input=telemetryGrafanaExplore(job.binding,config,range);if(!input)return;
-          var key=JSON.stringify(input);job.explore=key;
+          var key=JSON.stringify([config.environment,input]);job.explore=key;
           if(Object.prototype.hasOwnProperty.call(links,key))return;
           tasks.push(function(){return call('generate_deeplink',input).then(function(result){
-            var url=result && result.payload;links[key]=typeof url==='string' && /^https?:\/\//i.test(url.trim())?url.trim():null;
+            if(signal && signal.aborted)return;var url=result && result.payload;links[key]=typeof url==='string' && /^https?:\/\//i.test(url.trim())?url.trim():null;
           },function(error){
             if(signal && signal.aborted)return;
             if(['tool_error','bad_request','transform_error'].indexOf(code(error))>=0){links[key]=null;return;}
@@ -346,7 +364,13 @@ function createTelemetryGrafana(page,win,now,bound){
         });
         if(!Object.keys(out.signals).length)return;
         if(typeof job.links.dashboard==='string')out.links.dashboard=job.links.dashboard;
-        var query=typeof job.links.query==='string'?job.links.query:job.explore && links[job.explore];
+        var returned=job.signals.map(function(entry){return entry.exploreUrl;}).filter(Boolean)[0];
+        var query=typeof job.links.query==='string'?job.links.query:returned || job.explore && links[job.explore];
+        if(!query){
+          var sameRefresh=jobs.reduce(function(all,j){return all.concat(j.signals.map(function(e){return e.exploreUrl;}));},[]).filter(Boolean)[0];
+          var base=sameRefresh || telemetryGrafanaUrl(job.links.dashboard) || telemetryGrafanaUrl(job.links.query) || telemetryGrafanaUrl(config.grafana.baseUrl);
+          query=telemetryGrafanaExploreUrl(job.binding,config,range,base);
+        }
         if(query)out.links.query=query;
         map[job.id]=out;
       });
@@ -355,12 +379,12 @@ function createTelemetryGrafana(page,win,now,bound){
       if(report && typeof report.note==='function')report.note(note);
       last=map;lastMarkers=markers;
       return JSON.parse(JSON.stringify(map));
-    },function(error){return refuse(error,signal,null);});
+    },function(error){if(signal && signal.aborted)throw telemetryGrafanaError('Grafana refresh cancelled');return refuse(error,signal,null);});
   }
   /* History is one absolute daily range per explicitly bound Prometheus/LogQL
      metric. No annotations, links, SQL, query rewriting or live fallback. */
   function history(bindings,range,signal,report){
-    var config=trackingTelemetry(current || {}),epoch=generation,jobs=telemetryGrafanaJobs(bindings),map=Object.create(null),failures=[],fatal=null;
+    var config=telemetryProviderConfig(current || {},ctl),epoch=generation,jobs=telemetryGrafanaJobs(bindings),map=Object.create(null),failures=[],fatal=null;
     function halted(){return retired || epoch!==generation || signal && signal.aborted || !!fatal;}
     if(halted())return Promise.reject(telemetryGrafanaError('Grafana history cancelled'));
     if(blocked && blocked.signal===signal)return Promise.reject(blocked.error);
@@ -383,7 +407,7 @@ function createTelemetryGrafana(page,win,now,bound){
             {datasourceUid:uid,expr:entry.query,startTime:run.from,endTime:run.to,queryType:'range',stepSeconds:86400};
           tasks.push(function(){return liveStatusHistoryCall(function(){
             if(halted())return;
-            return mcp.callTool(server,tool,input,{signal:signal,cache:{staleTime:LIVE_STATUS_HISTORY_CACHE_MS,gcTime:LIVE_STATUS_HISTORY_CACHE_MS}}).then(function(result){
+            return mcp.callTool(server,tool,input,{signal:signal,cache:{staleTime:config.environment?0:LIVE_STATUS_HISTORY_CACHE_MS,gcTime:config.environment?0:LIVE_STATUS_HISTORY_CACHE_MS}}).then(function(result){
               if(halted())return;
               var points=(loki?telemetryGrafanaLoki:telemetryGrafanaPrometheus)(result && result.payload);
               // Empty/malformed/retention responses remain gaps, distinct from an explicit 0.
@@ -404,17 +428,17 @@ function createTelemetryGrafana(page,win,now,bound){
       if(fatal)return refuse(fatal.error,signal,fatal.repeat);
       if(report && typeof report.note==='function')report.note(failures.length?failures.length+' historical queries unavailable: '+failures.join('; '):'');
       return map;
-    },function(error){return refuse(error,signal,null);});
+    },function(error){if(signal && signal.aborted)throw telemetryGrafanaError('Grafana refresh cancelled');return refuse(error,signal,null);});
   }
   return {
-    options:{provider:provider,history:history,historyKey:function(){return [server,trackingTelemetry(current || {}).grafana];},source:'Grafana',available:false},
+    options:{environmentChanged:function(){forget();approval=null;blocked=null;syncAction();},provider:provider,history:history,historyKey:function(){var config=telemetryProviderConfig(current || {},ctl);return [server,config.environment,config.grafana];},source:'Grafana',available:false},
     attach:function(next,page){
       if(page)current=page;
       ctl=next || null;shown=false;
       var offs=[],mine=ctl,epoch=++generation;
-      function availability(value){if(epoch===generation && ctl===mine && mine && mine.telemetry && typeof mine.telemetry.setAvailable==='function')mine.telemetry.setAvailable(value);}
+      function availability(value,note){if(epoch===generation && ctl===mine && mine && mine.telemetry && typeof mine.telemetry.setAvailable==='function')mine.telemetry.setAvailable(value,note);}
       availability(false);
-      if(trackingTelemetry(current || {}).enabled && (bound?bound():telemetryGrafanaBound(current)) && !retired)connect(true).then(function(){availability(true);},function(error){availability(false);if(epoch===generation && error && error.code==='user_changed' && mine && mine.telemetry && mine.telemetry.accountChanged)mine.telemetry.accountChanged();});
+      if(trackingTelemetry(current || {}).enabled && (bound?bound():telemetryGrafanaBound(current)) && !retired)connect(true).then(function(){availability(true);},function(error){availability(false,error && error.code==='missing_tools'?error.message:'');if(epoch===generation && error && error.code==='user_changed' && mine && mine.telemetry && mine.telemetry.accountChanged)mine.telemetry.accountChanged();});
       if(mine && mine.liveStatus && typeof mine.liveStatus.onChange==='function')offs.push(mine.liveStatus.onChange(syncAction));
       // Metrics turned off: the pending approval goes with it; turning it on asks again.
       if(mine && mine.telemetry && typeof mine.telemetry.onChange==='function')offs.push(mine.telemetry.onChange(function(snapshot){

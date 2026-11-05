@@ -19,7 +19,8 @@ def folder_agent_kit(root, runtime):
         files[AGENT_CONTEXT] = json.dumps(context, sort_keys=True) + '\n'
     for directory, patterns in [('src/starters', ('*.json',)), ('contract', ('*.md',)),
                                  ('cookbook', ('*.md',)), ('docs', ('*.md',)),
-                                 ('.claude/skills/hld-to-page', ('*.md', '*.py', '*.cjs'))]:
+                                 ('.claude/skills/hld-to-page', ('*.md', '*.py', '*.cjs')),
+                                 ('.claude/skills/live-status-board', ('*.md',))]:
         for pattern in patterns:
             for path in sorted((root / directory).rglob(pattern)):
                 relative = path.relative_to(root)

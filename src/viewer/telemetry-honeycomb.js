@@ -15,15 +15,36 @@ function telemetryHoneycombBindings(page){return telemetryBindings(function(fn){
   Object.keys(d.nodes || {}).forEach(function(id){fn(d.nodes[id],id,page);});
   (d.edges || []).forEach(function(edge){fn(edge,edge.from+'->'+edge.to,page);});
 });});}
-/* A named run_query is not enough: the current namespace must publish the
-   argument types. We never guess whether query_spec needs JSON serialization. */
+/* Hosted listTools is metadata-only. Schema discovery follows explicit consent;
+   legacy hosts that already publish schemas retain their existing contract. */
+/* Connector refusals belong to this host/page lifetime, not an adapter or
+   deployment environment. Weak keys survive rerenders without retaining hosts. */
+var telemetryConnectorRefusals=new WeakMap();
+function telemetryConnectorRefused(claude,server){var scopes=telemetryConnectorRefusals.get(claude);return !!(scopes && scopes.has(server));}
+function telemetryConnectorRefuse(claude,server){var scopes=telemetryConnectorRefusals.get(claude);if(!scopes){scopes=new Set();telemetryConnectorRefusals.set(claude,scopes);}scopes.add(server);}
+function telemetrySchemaType(schema,type){var t=schema && schema.type;return t===type || Array.isArray(t) && t.indexOf(type)>=0 && t.every(function(v){return v===type || v==='null';});}
+function telemetryHoneycombCandidate(list){var found=telemetryGrafanaListed(list).filter(function(c){return c && typeof (c.server || c.name)==='string' && telemetryGrafanaOffered(c).indexOf('run_query')>=0;});return found.find(function(c){return (c.server || c.name)==='Honeycomb';}) || found[0] || null;}
+async function telemetryDescribeTools(claude,mcp,server,tools,active){
+  if(telemetryConnectorRefused(claude,server))throw {code:'not_granted'};
+  var missing=tools.filter(function(t){return !t.inputSchema;});if(!missing.length)return tools;
+  function check(){if(!active())throw {code:'capability_removed'};}
+  check();var permissions=await claude.use('permissions');check();
+  if(!permissions || typeof permissions.request!=='function'){telemetryConnectorRefuse(claude,server);throw {code:'not_granted'};}
+  var key='mcp:'+server,states=await permissions.request([key]);
+  // Remember a human refusal even when its waiting refresh was cancelled.
+  if(states && (states[key]==='denied' || states[key]==='unavailable'))telemetryConnectorRefuse(claude,server);
+  check();
+  if(!states || states[key]!=='granted')throw {code:'not_granted'};
+  if(typeof mcp.describeTool!=='function')throw {code:'capability_removed'};
+  var described=[];for(var tool of tools){check();var description=tool.inputSchema?tool:await mcp.describeTool(server,tool.name);check();described.push(Object.assign({},tool,description));}return described;
+}
 function telemetryHoneycombServer(list){
   var found=[];telemetryGrafanaListed(list).forEach(function(candidate){
     var name=candidate && (candidate.server || candidate.name);
     (candidate && Array.isArray(candidate.tools)?candidate.tools:[]).forEach(function(tool){
       var schema=tool && tool.inputSchema,p=schema && schema.properties,q=p && p.query_spec;
-      if(typeof name==='string' && name && tool.name==='run_query' && schema.type==='object' && p.environment_slug && p.environment_slug.type==='string' && p.dataset_slug && p.dataset_slug.type==='string' && q && (q.type==='object' || q.type==='string') &&
-        (!schema.required || schema.required.every(function(k){return ['environment_slug','dataset_slug','query_spec'].indexOf(k)>=0;})))found.push({server:name,schema:schema,type:q.type});
+      if(typeof name==='string' && name && tool.name==='run_query' && schema && schema.type==='object' && p && telemetrySchemaType(p.environment_slug,'string') && (!p.dataset_slug || telemetrySchemaType(p.dataset_slug,'string')) && q && (telemetrySchemaType(q,'object') || telemetrySchemaType(q,'string')) &&
+        (!schema.required || schema.required.every(function(k){return ['environment_slug','dataset_slug','query_spec'].indexOf(k)>=0;})))found.push({server:name,schema:schema,type:telemetrySchemaType(q,'object')?'object':'string'});
     });
   });return found.find(function(item){return item.server==='Honeycomb';}) || found[0] || null;
 }
@@ -33,6 +54,8 @@ function telemetryHoneycombSchema(value,schema){
   if(schema===true)return true;if(!schema || schema===false || typeof schema!=='object')return false;
   var allowed=['type','properties','required','additionalProperties','items','enum','description','title','default','$schema','examples'];
   if(Object.keys(schema).some(function(k){return allowed.indexOf(k)<0;}))return false;
+  if(Array.isArray(schema.type)){if(!schema.type.length || !schema.type.every(function(t){return typeof t==='string';}))return false;return schema.type.some(function(t){return telemetryHoneycombSchema(value,Object.assign({},schema,{type:t}));});}
+  if(schema.type==='null')return value===null && (!schema.enum || schema.enum.indexOf(null)>=0);
   if(schema.type && (schema.type==='object'?!telemetryObject(value):schema.type==='array'?!Array.isArray(value):schema.type==='integer'?!Number.isInteger(value):schema.type==='number'?!telemetryNumber(value):typeof value!==schema.type))return false;
   if(schema.enum && !schema.enum.some(function(v){return JSON.stringify(v)===JSON.stringify(value);}))return false;
   if(telemetryObject(value)){
@@ -47,14 +70,15 @@ function telemetryHoneycombQuery(query,config,contract){
   if(Object.keys(query).some(function(key){return fields.indexOf(key)<0;}))throw telemetryHoneycombError('Unsupported Honeycomb query field; use native calculations and filters.');
   var calc=query.calculations[0],ops=['COUNT','SUM','AVG','MIN','MAX','COUNT_DISTINCT','CONCURRENCY','P001','P01','P05','P10','P25','P50','P75','P90','P95','P99','P999'];
   if(!telemetryObject(calc) || ops.indexOf(calc.op)<0 || ['COUNT','CONCURRENCY'].indexOf(calc.op)<0 && !telemetryText(calc.column))throw telemetryHoneycombError('Unsupported Honeycomb scalar calculation.');
-  if(calc.name!==undefined && !telemetryText(calc.name) || ['COUNT','CONCURRENCY'].indexOf(calc.op)>=0 && calc.column!==undefined)throw telemetryHoneycombError('Unsupported Honeycomb calculation name or column.');
-  if(!telemetryText(config.honeycomb.environment) || !telemetryText(config.honeycomb.dataset))throw telemetryHoneycombError('Set tracking.telemetry.honeycomb.environment and dataset.');
+  if(calc.name!==undefined && !telemetryText(calc.name) || ['COUNT','CONCURRENCY'].indexOf(calc.op)>=0 && calc.column!==undefined && calc.column!==null)throw telemetryHoneycombError('Unsupported Honeycomb calculation name or column.');
+  if(!telemetryText(config.honeycomb.environment))throw telemetryHoneycombError('Set tracking.telemetry.honeycomb.environment.');
   var spec=JSON.parse(JSON.stringify(query));
   // Hosted MCP public CI uses relative query_spec.from, not REST time_range.
   // The page owns the window; authored calculations and filters remain exact.
   ['from','to','start','end','start_time','end_time','time_range'].forEach(function(k){delete spec[k];});
   spec.from=config.window;
-  var input={environment_slug:config.honeycomb.environment,dataset_slug:config.honeycomb.dataset,query_spec:contract.type==='string'?JSON.stringify(spec):spec};
+  var input={environment_slug:config.honeycomb.environment,query_spec:contract.type==='string'?JSON.stringify(spec):spec};
+  if(telemetryText(config.honeycomb.dataset))input.dataset_slug=config.honeycomb.dataset;
   if(!telemetryHoneycombSchema(input,contract.schema))throw telemetryHoneycombError('The Honeycomb run_query input schema does not support this query/window.');
   return {input:input,calculation:calc,key:calc.name || calc.op+(calc.column?'('+calc.column+')':'')};
 }
@@ -147,11 +171,19 @@ function createTelemetryHoneycomb(page,win,now,bound){
     if(approval && !label){shown=true;live.action('Allow Honeycomb',allow);}else if(!approval && shown){shown=false;if(label==='Allow Honeycomb')live.action('',null);}
   }
   function available(value){if(ctl && ctl.telemetry)ctl.telemetry.setAvailable(value);}
-  function connect(){var epoch=generation;
+  async function connect(signal){var epoch=generation;
+    function active(){return !retired && epoch===generation && !(signal && signal.aborted);}
     if(!namespace)namespace=Promise.resolve().then(function(){return use.call(claude,'mcp');});
-    return namespace.then(function(mcp){if(retired || epoch!==generation || !mcp)throw {code:'capability_removed'};
-      return Promise.resolve(mcp.listTools()).then(function(list){if(retired || epoch!==generation)throw {code:'capability_removed'};contract=telemetryHoneycombServer(list);if(!contract)throw {code:'server_not_connected'};return mcp;});
-    });
+    var mcp=await namespace;if(!active() || !mcp)throw {code:'capability_removed'};
+    var list=await mcp.listTools();if(!active())throw {code:'capability_removed'};
+    contract=telemetryHoneycombServer(list);if(contract){if(telemetryConnectorRefused(claude,contract.server))throw {code:'not_granted'};return mcp;}
+    var candidate=telemetryHoneycombCandidate(list);if(!candidate)throw {code:'server_not_connected'};
+    if(telemetryConnectorRefused(claude,candidate.server || candidate.name))throw {code:'not_granted'};
+    var tool=candidate.tools.find(function(t){return t.name==='run_query';});
+    if(!signal)return mcp; // Initial paint only establishes eligibility; never prompts.
+    var server=candidate.server || candidate.name,described=await telemetryDescribeTools(claude,mcp,server,[tool],active);
+    if(!active())throw {code:'capability_removed'};
+    contract=telemetryHoneycombServer([{server:server,tools:described}]);if(!contract)throw telemetryHoneycombError('Unsupported Honeycomb run_query input schema.');return mcp;
   }
   function failure(error,signal,input){
     var code=error && error.code;
@@ -168,14 +200,14 @@ function createTelemetryHoneycomb(page,win,now,bound){
   async function provider(bindings,signal,report){
     if(retired || signal.aborted)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
     if(blocked===signal){var refused=telemetryHoneycombError(approval?'Honeycomb access needs your approval':'Honeycomb unavailable for this Metrics session.');if(approval)refused.state='approval';throw refused;}
-    var epoch=generation,map=Object.create(null),notes=[],jobs=telemetryHoneycombJobs(bindings),mcp;
+    var config=telemetryProviderConfig(current,ctl),epoch=generation,map=Object.create(null),notes=[],jobs=telemetryHoneycombJobs(bindings),mcp;
     if(!jobs.length)return map;
-    try{mcp=await connect();}catch(e){throw failure(e,signal,null);}
+    try{mcp=await connect(signal);}catch(e){if(signal.aborted)throw telemetryHoneycombError('Honeycomb refresh cancelled.');throw failure(e,signal,null);}
     for(var i=0;i<jobs.length;i++){
       if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
       var job=jobs[i],query;
       try{
-        query=telemetryHoneycombQuery(job.query,trackingTelemetry(current),contract);
+        query=telemetryHoneycombQuery(job.query,config,contract);
         var result=await mcp.callTool(contract.server,'run_query',query.input,{signal:signal});
         if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
         if(result && result.isError)throw {code:'tool_error'};
@@ -196,7 +228,7 @@ function createTelemetryHoneycomb(page,win,now,bound){
     }
     if(report && report.note)report.note(notes.filter(function(n,i){return notes.indexOf(n)===i;}).join('; '));return map;
   }
-  return {options:{provider:provider,source:'Honeycomb',available:false},attach:function(next,nextPage){
+  return {options:{environmentChanged:function(){allowEpoch++;approval=null;blocked=null;syncAction();},provider:provider,source:'Honeycomb',available:false},attach:function(next,nextPage){
     ctl=next;current=nextPage || current;var epoch=++generation,mine=ctl,offs=[];available(false);
     if(!retired)connect().then(function(){if(epoch===generation && !retired)available(true);},function(e){if(epoch===generation && !retired){if(e && e.code==='user_changed')failure(e,null,null);else available(false);}});
     if(ctl.liveStatus && ctl.liveStatus.onChange)offs.push(ctl.liveStatus.onChange(syncAction));

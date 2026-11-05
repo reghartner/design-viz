@@ -113,7 +113,9 @@ test('runtime vendoring builds distributions and excludes source and unrelated p
   await file(source, 'tools/canon/entity-diagrams.d.mts', 'export function buildEntityDiagramIndex(): unknown;');
   // This isolated package-boundary fixture supplies a tiny builder; the full
   // rehearsal test exercises the actual engine build from a clean clone.
-  await file(source, 'tools/build.py', 'from pathlib import Path\nfor name in ["template/flowview.html", "workbench/flowspec.html", "tools/canon/generated-runtime.cjs"]:\n    p = Path(name)\n    p.parent.mkdir(parents=True, exist_ok=True)\n    p.write_text("built fixture")\n');
+  const metricsChapter = await readFile(new URL('../../../.claude/skills/live-status-board/metrics.md', import.meta.url), 'utf8');
+  await file(source, '.claude/skills/live-status-board/metrics.md', metricsChapter);
+  await file(source, 'tools/build.py', 'from pathlib import Path\nmetrics = Path(".claude/skills/live-status-board/metrics.md").read_text()\nfor name in ["template/flowview.html", "workbench/flowspec.html", "tools/canon/generated-runtime.cjs"]:\n    p = Path(name)\n    p.parent.mkdir(parents=True, exist_ok=True)\n    p.write_text(metrics if name == "workbench/flowspec.html" else "built fixture")\n');
   await file(source, 'deploy/workbench/Dockerfile.prebuilt', 'FROM nginx:stable-alpine\n');
   await file(source, 'company-private.txt', 'DO_NOT_VENDOR');
   for (const args of [['init', '--quiet'], ['config', 'user.name', 'Fixture'], ['config', 'user.email', 'fixture@example.test'], ['remote', 'add', 'origin', 'https://github.com/fixture/runtime'], ['add', '.'], ['commit', '--quiet', '-m', 'Native fixture']])
@@ -121,6 +123,8 @@ test('runtime vendoring builds distributions and excludes source and unrelated p
   await file(designer, 'apps/backstage/viewer/frame.js', 'retired');
   await file(designer, 'specs/company.json', 'company data');
   await vendorFlowview(source, designer);
+  assert.equal(await readFile(path.join(designer, 'workbench/flowspec.html'), 'utf8'), metricsChapter);
+  await assert.rejects(access(path.join(designer, '.claude/skills/live-status-board/metrics.md')), {code:'ENOENT'});
   await assert.rejects(access(path.join(designer, 'apps/backstage/viewer/frame.js')), {code: 'ENOENT'});
   await assert.rejects(access(path.join(designer, 'company-private.txt')), {code: 'ENOENT'});
   assert.equal(await readFile(path.join(designer, 'specs/company.json'), 'utf8'), 'company data');

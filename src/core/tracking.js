@@ -316,7 +316,7 @@ function telemetryExpand(raw,templates,invalid){
   });
   return out;
 }
-function carrierTelemetry(obj,templates,invalid){
+function carrierTelemetry(obj,templates,invalid,environment){
   var warn=telemetryWarn(invalid);
   if(!telemetryObject(obj) || !telemetryOwn(obj,'telemetry'))return null;
   if(telemetryTextBox(obj)){warn('','text boxes do not carry telemetry — ignored');return null;}
@@ -324,6 +324,7 @@ function carrierTelemetry(obj,templates,invalid){
   if(!telemetryObject(raw)){warn('','must be an object {kind, signals, proof?, links?, card?} or {use, ...params} — ignored');return null;}
   var expanded=telemetryExpand(raw,templates,warn);
   if(!expanded)return null;
+  if(environment)expanded=telemetrySubstitute(expanded,{env:environment});
   var clean=telemetryClean(expanded,warn,false);
   if(!clean)return null;
   var signals={};
@@ -333,6 +334,7 @@ function carrierTelemetry(obj,templates,invalid){
   });
   return {kind:clean.kind,signals:signals,proof:clean.proof || {},links:clean.links || {},card:clean.card || null};
 }
+function telemetryConfigUrl(value){try{var u=new URL(value);return typeof value==='string' && /^https?:\/\//i.test(value) && !/[\s\\]/.test(value) && !u.username && !u.password;}catch(e){return false;}}
 function trackingTelemetry(page,invalid){
   var warn=telemetryWarn(invalid),out={enabled:true,grafana:{},honeycomb:{},window:TELEMETRY_DEFAULT_WINDOW,refreshMs:null,templates:{}};
   var tracking=page && page.tracking;
@@ -340,17 +342,37 @@ function trackingTelemetry(page,invalid){
   var value=tracking.telemetry;
   if(!telemetryObject(value)){warn('','must be an object {enabled?, grafana?, honeycomb?, window?, refreshMs?, templates?} — ignored');return out;}
   if(telemetryOwn(value,'enabled')){if(typeof value.enabled==='boolean')out.enabled=value.enabled;else warn('.enabled','must be a boolean — using true');}
-  telemetryUnknown(value,['enabled','grafana','honeycomb','window','refreshMs','templates'],warn);
-  [['grafana',['prometheus','loki','tempo','sql'],'datasource UID'],['honeycomb',['environment','dataset'],'name']].forEach(function(group){
+  telemetryUnknown(value,['enabled','grafana','honeycomb','window','refreshMs','templates','environment','environments'],warn);
+  [['grafana',['prometheus','loki','tempo','sql','baseUrl'],'datasource UID'],['honeycomb',['environment','dataset'],'name']].forEach(function(group){
     var key=group[0],given=value[key];
     if(!telemetryOwn(value,key))return;
     if(!telemetryObject(given)){warn('.'+key,'must be an object of '+group[1].join(', ')+' — ignored');return;}
     Object.keys(given).forEach(function(field){
       if(group[1].indexOf(field)<0)warn('.'+key+'.'+field,'unknown field — ignored');
+      else if(field==='baseUrl' && !telemetryConfigUrl(given[field]))warn('.'+key+'.'+field,'use an absolute HTTP(S) URL — ignored');
       else if(!telemetryText(given[field]))warn('.'+key+'.'+field,'use a non-empty '+group[2]+' — ignored');
       else out[key][field]=given[field];
     });
   });
+  if(telemetryOwn(value,'environments')){
+    if(!telemetryObject(value.environments))warn('.environments','must be an object of named environment profiles — ignored');
+    else{
+      var profiles={};
+      Object.keys(value.environments).forEach(function(id){
+        var at='.environments.'+id,profile=value.environments[id];
+        if(!telemetryNamePattern.test(id)){warn(at,'environment ids start with a letter and use letters, digits, - and _ — ignored');return;}
+        if(!telemetryObject(profile)){warn(at,'must be an object {grafana?, honeycomb?} — ignored');return;}
+        telemetryUnknown(profile,['grafana','honeycomb'],warn,at);
+        var clean=trackingTelemetry({tracking:{telemetry:{grafana:telemetryOwn(profile,'grafana')?profile.grafana:{},honeycomb:telemetryOwn(profile,'honeycomb')?profile.honeycomb:{}}}},function(path,message){warn(at+path,message);});
+        Object.defineProperty(profiles,id,{value:{grafana:clean.grafana,honeycomb:clean.honeycomb},enumerable:true,writable:true,configurable:true});
+      });
+      if(Object.keys(profiles).length){out.environments=profiles;out.environment=Object.keys(profiles)[0];}
+    }
+  }
+  if(telemetryOwn(value,'environment')){
+    if(out.environments && typeof value.environment==='string' && telemetryOwn(out.environments,value.environment))out.environment=value.environment;
+    else warn('.environment','must name a configured environment — using the first valid profile, or shared settings when none exist');
+  }
   if(telemetryOwn(value,'window')){
     if(typeof value.window==='string' && telemetryWindowPattern.test(value.window))out.window=value.window;
     else warn('.window','use a duration such as "30m", "1h" or "7d" — using '+TELEMETRY_DEFAULT_WINDOW);
@@ -382,4 +404,18 @@ function trackingTelemetry(page,invalid){
     });
   }
   return out;
+}
+
+/* Resolve a consumer's selected profile without changing authored source. A
+   deployment id is distinct from the Honeycomb environment slug. */
+function telemetryEnvironmentConfig(page,environment){
+  var config=trackingTelemetry(page),profiles=config.environments;
+  if(!profiles)return config;
+  var id=typeof environment==='string' && telemetryOwn(profiles,environment)?environment:config.environment;
+  config.environment=id;
+  ['grafana','honeycomb'].forEach(function(key){config[key]=telemetrySubstitute(Object.assign({},config[key],profiles[id][key]),{env:id});});
+  return config;
+}
+function telemetryProviderConfig(page,ctl){
+  return ctl && ctl.telemetry && typeof ctl.telemetry.config==='function'?ctl.telemetry.config():telemetryEnvironmentConfig(page);
 }

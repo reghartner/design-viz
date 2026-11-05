@@ -806,7 +806,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function metricsSnapshot(){
     var evidence=telemetry.snapshot(),status=evidence.status;
-    return {proof:liveStatusProofPresentation(evidence,telemetryWindow),available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
+    return {environment:evidence.environment,environments:evidence.environments,proof:liveStatusProofPresentation(evidence,telemetryWindow),available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
       refreshedAt:status.refreshedAt,note:status.note,checkedText:status.refreshedAt?'refreshed '+clockTime(status.refreshedAt):'',
       source:telemetrySource(),window:telemetryWindow};
   }
@@ -929,7 +929,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(!scope)return null;
     // Resolve the activated carrier in its own loaded detail/template scope.
     // Display titles can repeat and are never telemetry lookup keys.
-    var input=telemetryProofInput(function(fn){fn(trigger._liveCarrier.value,id,scope.page);},function(){},map,evidence.map);
+    var input=telemetryProofInput(function(fn){fn(trigger._liveCarrier.value,id,scope.page);},function(){},map,evidence.map,evidence.environment);
     evidence.carriers=evidence.carriers.filter(function(binding){return binding.id!==id;}).concat(input.carriers);
     evidence.verdicts=proofVerdicts({carriers:evidence.carriers,jiraMap:map,telemetryMap:evidence.map});
     var proof=liveStatusProofPresentation(evidence,telemetryWindow);
@@ -1602,6 +1602,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     enabled:function(){return on;},
     setEnabled:function(value){if(retired)return;on=!!value;if(on)availabilityOn=true;paint();notify();},
     // The panel's Metrics button (#939); Jira Live above is independent of it.
+    setMetricsEnvironment:function(value){if(!retired)telemetry.setEnvironment(value);},
     setMetricsEnabled:function(value){if(!retired)telemetry.setEnabled(value);},
     // The same controller as ctl.telemetry, so a demo player mounted on this API can feed it.
     telemetry:telemetry,

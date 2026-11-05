@@ -14,6 +14,7 @@ COPY contract/ contract/
 COPY cookbook/ cookbook/
 COPY docs/ docs/
 COPY .claude/skills/hld-to-page/ .claude/skills/hld-to-page/
+COPY .claude/skills/live-status-board/ .claude/skills/live-status-board/
 # Examples marked with .agent-kit join the offline folder-agent kit.
 COPY examples/ examples/
 # Fork-owned overlay: company panels, contract fragments and examples.

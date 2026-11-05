@@ -997,7 +997,7 @@ test('E6 Tickets table orders states and keeps PRs, lane stripes and information
  assert.equal(all.length,9);assert.equal(all[1].getAttribute('data-live-ticket'),'FF-1');
  const aa=rows.at(-1),extra=coverageOf('EX-1');assert.equal(aa.querySelector('.dv-live-state-pill').textContent,'done');assert.match(textOf(aa),/Client work.*Alex/);assert.doesNotMatch(textOf(aa),/time unavailable|ago/);assert.match(textOf(aa),/2 declined/);
  assert.deepEqual(aa.querySelectorAll('a').map(el=>el.getAttribute('href')),['https://jira.test/browse/AA-1','https://code.test/pull/1','https://code.test/pull/2']);
- assert.equal(extra.querySelector('.dv-live-coverage-tag').textContent,'NOT ON DIAGRAM');assert.equal(coverageOf('BB-1').querySelector('.dv-live-coverage-tag').textContent,'NOT IN EPIC');
+ assert.equal(extra.querySelector('.dv-live-coverage-tag').textContent,'NOT ON DIAGRAM');assert.equal(coverageOf('BB-1').querySelector('.dv-live-coverage-tag').textContent,'NOT IN PARENT EPIC');
  assert.equal(rows.find(el=>el.getAttribute('data-live-ticket')==='EX-1').props['--dv-live-lane-color'],'#34d399');assert.equal(coverageOf('AA-1'),undefined);assert.equal(table.querySelectorAll('.dv-live-chip').length,0);
  let focused=false;h.view.querySelector('g.node[data-dv-node="a"]').querySelector('.card').focus=()=>focused=true;api.focusCarrier(api.snapshot().tickets.find(item=>item.key==='AA-1').carriers[0]);assert.equal(focused,true,'controller navigation remains available');
  assert.match(h.view.querySelector('.dv-live-epic-progress').textContent,/6 of 7 on diagram/);assert.match(api.snapshot().verdict,/6 of 7 stories on diagram/);

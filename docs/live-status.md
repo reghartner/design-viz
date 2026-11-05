@@ -772,7 +772,7 @@ summary adds a muted, informational “n open/merged/declined” count only when
 counts more pull requests than the icons show (its tooltip says Jira does not
 expose the link). The panel does not show diagram-part links beside tickets. Stories without
 carriers say **NOT ON DIAGRAM**. Carrier tickets without membership evidence in
-a configured epic say **NOT IN EPIC**. Linked upstreams that are neither carriers
+a configured epic say **NOT IN PARENT EPIC**. Linked upstreams that are neither carriers
 nor included parent children say **DEPENDENCY ONLY** and still count in story totals. The epic box gives “m of N on diagram”. A child first received after the initial map adds
 “KEY · added to epic · not on diagram” to Activity using the existing time rules.
 The table scrolls for narrow read-only viewing and print retains the panel content.
@@ -886,7 +886,7 @@ parents configured, `notInEpic` is empty. With initiative metadata, coverage als
 returns `initiatives`, and `epics` contains the distinct discovered/explicit Epic
 keys. `snapshot().epic` adds these same `initiatives` and `epics` arrays; `keys`
 contains the configured roots (initiatives first). Outside carrier rows say
-**NOT IN SCOPE** when an initiative is configured. Extra stories do not affect carrier
+**NOT IN PARENT INITIATIVE** when an initiative is configured. Extra stories do not affect carrier
 colors, completion, or readiness.
 The map may carry numeric `storedAt` metadata (epoch milliseconds), including
 as a non-enumerable property. A valid cache timestamp supplies the control and

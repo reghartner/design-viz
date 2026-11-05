@@ -3223,7 +3223,7 @@ function createBoardNavigation(board, group, legend, changed){
     },function(){return enabled() && !document.hidden && svg===graph() && board.isConnected && !!board.clientWidth;});
   }
   if(document.fonts && document.fonts.ready)document.fonts.ready.then(function(){if(autoFit && !retired)requestFit();});
-  return {refresh:refresh,requestFit:requestFit,reset:reset,frame:frame,fitSelection:fitSelection,followActive:followActive,cancelFollow:motion.cancel,manual:manual,
+  return {refresh:refresh,requestFit:requestFit,cancelFit:function(){if(fitFrame)stopFit();},reset:reset,frame:frame,fitSelection:fitSelection,followActive:followActive,cancelFollow:motion.cancel,manual:manual,
     snapshot:snapshot,restore:restore,
     suspend:function(){if(retired || paused)return;motion.cancel();cancel();paused=snapshot();},
     resume:function(){if(!paused || retired)return;var state=paused;paused=null;restore(state);},
@@ -3317,6 +3317,7 @@ function createBoardSizeControl(board, legend, label){
   var observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncOverflow) : null;
   if (observer){observer.observe(board);observer.observe(legend);}
   return {mode:function(){ return mode; }, setMode:setMode,refresh:syncOverflow,
+    cancelFit:function(){if(navigation)navigation.cancelFit();},
     followActive:function(extent){if(navigation)navigation.followActive(extent);},cancelFollow:function(){if(navigation)navigation.cancelFollow();},
     fitSelection:function(extent,insets){if(navigation)navigation.fitSelection(extent,insets);},
     snapshot:function(){return navigation && navigation.snapshot();},restore:function(state){if(navigation)navigation.restore(state);},
@@ -3554,7 +3555,12 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var stepper = attachStepper(box, boardDiv, {
     bar:bar, chips:chips, reviewVerdict:reviewVerdict,reviewComparison:reviewComparison,stepN:stepN, stepText:stepText, sharedStatus:sharedStatus, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,runtimeStatus:runtimeStatus,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
-  }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {section:sec,activeChanged:function(){if(result.follow)result.follow.update();},viewSteps:function(ids,pathIds){
+  }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {section:sec,activeChanged:function(){if(result.follow){
+    // Playback owns the camera after a step/path choice. Stop an established
+    // opening fit even when Follow is disabled; hidden first fits still wait.
+    if(result.boardSize)result.boardSize.cancelFit();
+    result.follow.update();
+  }},viewSteps:function(ids,pathIds){
     var pathSteps=null;
     if(Array.isArray(pathIds)){
       pathSteps=[];diagramPathList(d).forEach(function(path){if(pathIds.indexOf(path.id)>=0)path.indices.forEach(function(index){var step=d.steps[index];if(step && pathSteps.indexOf(step.id)<0)pathSteps.push(step.id);});});

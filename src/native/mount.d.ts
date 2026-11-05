@@ -152,6 +152,9 @@ export interface NativeViewerOptions {
     /** Explicit user action resolver. ctl.telemetry.chooseExemplar validates the live
      * selection token and updates only runtime evidence. Never invoke during paint. */
     chooseExemplar?: (carrierId: string, selectionToken: string, traceId: string) => Promise<TelemetryExemplar>;
+    /** Synchronous, read-only capability for a current token/candidate. No queries.
+     * Without this check the optional alternative UI stays hidden. */
+    canChooseExemplar?: (carrierId: string, selectionToken: string, traceId: string) => boolean;
     /** Starts unavailable when false. The controller setAvailable(boolean) updates
      * capability availability without enabling Metrics; page/host disable always wins. */
     available?: boolean;

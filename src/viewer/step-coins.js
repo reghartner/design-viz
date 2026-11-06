@@ -3,6 +3,27 @@
    go to that step. The card belongs to one stepper and survives board
    re-renders because it listens on the board's stable container. */
 var STEP_COIN_CARD_DELAY_MS = 400;
+var STEP_COIN_PREVIEW_CHARACTERS = 240;
+
+function stepCoinPreview(text, value){
+  // Format first, then shorten text nodes: slicing source markup can expose a
+  // partial link or lose the closing delimiter of a code/emphasis span.
+  text.innerHTML = proseMarkup(value);
+  var remaining = STEP_COIN_PREVIEW_CHARACTERS, truncated = false;
+  function shorten(parent){
+    Array.from(parent.childNodes).forEach(function(node){
+      if (truncated){ node.remove(); return; }
+      if (node.nodeType !== 3){ shorten(node); return; }
+      var characters = Array.from(node.textContent.replace(/\s+/g, ' '));
+      node.textContent = characters.slice(0, remaining).join('');
+      if (characters.length > remaining) truncated = true;
+      remaining -= Math.min(remaining, characters.length);
+    });
+  }
+  shorten(text);
+  if (truncated) text.append('…');
+  return truncated;
+}
 
 function wireStepCoins(host, prefix, describe, activate){
   if (!host || !host.addEventListener) return {hide:function(){}, destroy:function(){}};
@@ -36,15 +57,17 @@ function wireStepCoins(host, prefix, describe, activate){
     if (!card.isConnected) host.appendChild(card);
     card.replaceChildren();
     var eyebrow = document.createElement('span'); eyebrow.className = 'step-coin-card-label';
-    eyebrow.textContent = ['Step ' + info.number].concat(info.lane ? [info.lane] : [], info.route ? [info.route] : []).join(' · ');
+    var label = Array.from(['Step ' + info.number].concat(info.lane ? [info.lane] : [], info.route ? [info.route] : []).join(' · '));
+    eyebrow.textContent = label.slice(0, 160).join('') + (label.length > 160 ? '…' : '');
     card.appendChild(eyebrow);
+    var truncated = false;
     if (info.text){
       var text = document.createElement('div'); text.className = 'step-coin-card-text';
-      text.innerHTML = proseMarkup(info.text); card.appendChild(text);
+      truncated = stepCoinPreview(text, info.text); card.appendChild(text);
     }
     if (info.hint){
       var hint = document.createElement('span'); hint.className = 'step-coin-card-hint';
-      hint.textContent = info.hint; card.appendChild(hint);
+      hint.textContent = truncated ? 'Click to view full step' : info.hint; card.appendChild(hint);
     }
     card.hidden = false;
     if (card.showPopover) card.showPopover();

@@ -809,7 +809,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return typeof source==='string'?source.trim():'';
   }
   // Selection belongs to a section object and carrier token, never to a step.
-  var statusMode='jira',traceSelection=null,traceInitial=true,traceRequest=0,traceNotice='',traceShow=true;
+  var statusMode='jira',traceSelection=null,traceInitial=true,traceRequest=0,traceNotice='',traceShow=true,tracePending=null;
   var traceSections=new WeakMap(),traceSectionSerial=0;
   function traceSources(){
     var evidence=telemetry.snapshot(),entries=[],owners=Object.create(null),mounted=sourceBindings(),ambiguous=new Set();
@@ -832,8 +832,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function traceSnapshot(){
     var source=traceSources(),entries=source.entries,evidence=source.evidence;
-    var selected=traceSelection && entries.find(function(e){return e.key===traceSelection.key;});
-    if(traceSelection && !selected){traceSelection=null;traceInitial=false;traceRequest++;traceNotice='Trace selection expired. Select current evidence.';}
+    var selected=traceSelection && entries.find(function(e){return e.key===traceSelection.key && e.exemplar.traceId===traceSelection.traceId;});
+    if(!selected && traceSelection && tracePending && tracePending.request===traceRequest && tracePending.key===traceSelection.key){selected=entries.find(function(e){return e.key===tracePending.key && e.exemplar.traceId===tracePending.traceId;});if(selected)traceSelection.traceId=selected.exemplar.traceId;}
+    if(traceSelection && !selected){traceSelection=null;tracePending=null;traceInitial=false;traceRequest++;traceNotice='Trace selection expired. Select current evidence.';}
     if(!selected && traceInitial && statusMode==='trace' && entries.length){selected=entries[0];traceSelection={key:selected.key,traceId:selected.exemplar.traceId};traceInitial=false;}
     var model=selected?telemetryTraceModel(selected.binding.section.diagram,selected.binding.stepper && selected.binding.stepper.path(),selected.exemplar):null;
     return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,carrier:selected.carrier,exemplar:selected.exemplar,model:model}:null,
@@ -1600,13 +1601,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
     chooseTrace:async function(choice){
       if(retired || statusMode!=='trace')return;
       var entry=traceSources().entries.find(function(e){return e.key===choice.key;});if(!entry)return;
-      var request=++traceRequest;traceInitial=false;traceNotice='';
+      var request=++traceRequest;tracePending=null;traceInitial=false;traceNotice='';
       if(choice.traceId===entry.exemplar.traceId){traceSelection={key:entry.key,traceId:choice.traceId};paint();notify();return;}
       if(!telemetry.canChooseExemplar(entry.carrier,entry.exemplar.selectionToken,choice.traceId))return;
-      traceNotice='Loading selected trace…';notify();
+      tracePending={request:request,key:entry.key,traceId:choice.traceId};traceNotice='Loading selected trace…';notify();
       try{await telemetry.chooseExemplar(entry.carrier,entry.exemplar.selectionToken,choice.traceId);if(retired || request!==traceRequest)return;traceSelection={key:entry.key,traceId:choice.traceId};traceNotice='';}
       catch(ex){if(retired || request!==traceRequest)return;traceNotice=ex.message;}
-      paint();notify();
+      tracePending=null;paint();notify();
     },
     pinSelectedTrace:function(){var selected=traceSnapshot().selected;if(selected){traceNotice=pinTrace(selected.carrier,selected.exemplar)?'Pinned in this session’s Activity.':'Already pinned in this session’s Activity.';notify();}},
     firstBlocker:jumpFirstBlocker,

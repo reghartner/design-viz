@@ -139,7 +139,7 @@
         metrics.environments.forEach(function(id){var option=el(select,'option',id,'',id);option.value=id;});select.value=metrics.environment;
         if(!select._liveChange){select._liveChange=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnvironment(select.value);};select.addEventListener('change',select._liveChange);}
       }
-      var message=trace.historical?'Traces are unavailable in Over time. Return to Live in Jira to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?'Trace evidence unavailable. Check page bindings and connector permissions.':!trace.enabled?'Enable traces to retrieve the explicitly bound request samples.':!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
+      var message=trace.historical?'Traces are unavailable in Over time. Return to Live in Jira to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Enable traces to refresh explicit bindings.':'Enable traces to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
       var status=el(body,'p','status','dv-trace-mode-status',[message,trace.status.note,trace.notice].filter(Boolean).join(' '));status.setAttribute('role','status');
       if(trace.entries.length){
         el(body,'h3','candidates-title','','Returned traces');

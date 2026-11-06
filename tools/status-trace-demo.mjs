@@ -8,5 +8,5 @@ const f=await canonTraceFixture(),spec=path.join(dir,'status-trace.spec.json'),o
 await writeFile(spec,JSON.stringify(f.spec,null,2)+'\n');
 execFileSync('python3',['tools/inject.py',spec,'template/flowview.html',out],{stdio:'pipe'});
 const data=JSON.stringify(f).replaceAll('<','\\u003c');
-const boot=`<script>(function(){var f=${data};window.flowviewTelemetry={source:'Canonical fictional trace fixtures',provider:async function(){return f.samples;},canChooseExemplar:function(id,token,traceId){return !!f.alternatives[traceId];},chooseExemplar:async function(id,token,traceId){return Object.assign({},f.alternatives[traceId],{selectionToken:token});}};})();</script>`;
+const boot=`<script>(function(){var f=${data};window.flowviewTelemetry={source:'Canonical fictional trace fixtures',provider:async function(){return f.samples;},canChooseExemplar:function(id,token,traceId){return !!f.alternatives[traceId];},chooseExemplar:async function(id,token,traceId){var e=Object.assign({},f.alternatives[traceId],{selectionToken:token});f.samples[id].exemplars=[e];return e;}};})();</script>`;
 await writeFile(out,(await readFile(out,'utf8')).replace('\n<script>\n','\n'+boot+'\n<script>\n'));console.log(out);

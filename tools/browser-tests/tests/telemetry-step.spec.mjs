@@ -57,7 +57,7 @@ async function setup(page,server,options={}){
  await page.evaluate(({f,options,AT})=>{
   Date.now=()=>Date.parse(AT);window.fixture=f;window.before=JSON.stringify(f.spec);window.calls={provider:0,choose:0,history:0,loads:0};window.allowed=true;window.releases=[];
   const provider=async()=>{window.calls.provider++;return structuredClone(f.samples);};
-  const telemetry={provider,canChooseExemplar:()=>window.allowed,chooseExemplar:async(id,token,traceId)=>{window.calls.choose++;if(options.holdChoose)await new Promise(resolve=>window.releaseChoice=resolve);return {...structuredClone(f.alternatives?.[traceId] || f.alternative),selectionToken:token,traceId};},history:async(bindings,range)=>{window.calls.history++;return Object.fromEntries(bindings.map(b=>[b.id,{signals:{rate:{series:[[Date.parse('2026-10-28T00:00:00Z'),0],[Date.parse(AT),30]]}}}]));}};
+  const telemetry={provider,canChooseExemplar:()=>window.allowed,chooseExemplar:async(id,token,traceId)=>{window.calls.choose++;if(options.holdChoose)await new Promise(resolve=>window.releaseChoice=resolve);const e={...structuredClone(f.alternatives?.[traceId] || f.alternative),selectionToken:token,traceId};f.samples[id].exemplars=[e];return e;},history:async(bindings,range)=>{window.calls.history++;return Object.fromEntries(bindings.map(b=>[b.id,{signals:{rate:{series:[[Date.parse('2026-10-28T00:00:00Z'),0],[Date.parse(AT),30]]}}}]));}};
   if(options.noHandler)delete telemetry.canChooseExemplar;
   let spec=f.spec;
   if(options.loaded){
@@ -138,4 +138,10 @@ test('late explicit alternative after off cannot restore trace selection or SVG'
 });
 test('duplicate carrier IDs in distinct sections never borrow another section’s trace',async({page,server})=>{
  const {root}=await setup(page,server,{sameIds:true});const first=root.locator('#section-main');await traceTab(first).click();await first.getByRole('button',{name:'Enable traces',exact:true}).click();await expect(first.locator('.dv-trace-mode-status')).toContainText('duplicate carrier IDs');await expect(root.locator('[data-trace-tone]')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.liveStatus.snapshot().trace.entries.length)).toBe(0);
+});
+
+test('reused host token cannot silently replace an explicitly selected trace',async({page,server})=>{
+ const {root,f}=await setup(page,server);await openTrace(root);await root.locator('.dv-trace-candidate[data-trace-id="'+f.alternative.traceId+'"]').first().click();await expect(selected(root)).toHaveAttribute('data-trace-id',f.alternative.traceId);
+ await page.evaluate(()=>window.ctl.telemetry.retry());await expect(selected(root)).toHaveAttribute('data-trace-id',f.alternative.traceId);
+ await page.evaluate(()=>{const samples=structuredClone(window.fixture.samples);samples['mcu->ingest'].exemplars[0].traceId=samples['mcu->ingest'].exemplars[0].candidates.find(c=>c.traceId!==samples['mcu->ingest'].exemplars[0].traceId).traceId;window.ctl.telemetry.apply(samples);});await expect(selected(root)).toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);await expect(root.locator('.dv-trace-mode-status')).toContainText('expired');
 });

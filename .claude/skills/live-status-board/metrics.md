@@ -420,3 +420,13 @@ and label text. Displaying a named counter does not make it traffic evidence.
 Optional signal labels and query URLs have their own environment substitution.
 An unresolved variable drops only that display field (label falls back to the
 signal name); missing variables in the actual metric query still block it.
+
+## Company account aliases
+
+When the authoring packet supplies `company.awsAccounts` context, reuse its
+`${alias}` values in signal fields (for example `${iot}` in CloudWatch
+`accountId`, `${queue}` inside a Logs ARN). Keep board-owned environment profiles
+and selection. Company defaults for that selected environment are overridden by
+board shared variables, then profile variables; never borrow an account from a
+different environment. See [company AWS account defaults](../../../docs/live-status.md#company-aws-account-defaults)
+for the fork-owned configuration schema and portable-build behavior.

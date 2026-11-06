@@ -493,12 +493,14 @@ function trackingTelemetry(page,invalid){
 
 /* Resolve a consumer's selected profile without changing authored source. A
    deployment id is distinct from the Honeycomb environment slug. */
+var TELEMETRY_COMPANY_AWS_ACCOUNTS=/* @company-aws-accounts */ {};
 function telemetryEnvironmentConfig(page,environment){
   var config=trackingTelemetry(page),profiles=config.environments;
   if(!profiles){if(typeof environment==='string')config.environment=environment;return config;}
   var id=typeof environment==='string' && telemetryOwn(profiles,environment)?environment:config.environment;
   config.environment=id;
-  if(config.variables || profiles[id].variables)config.variables=Object.assign({},config.variables,profiles[id].variables);
+  var accounts=telemetryOwn(TELEMETRY_COMPANY_AWS_ACCOUNTS,id)?TELEMETRY_COMPANY_AWS_ACCOUNTS[id]:null;
+  if(accounts || config.variables || profiles[id].variables)config.variables=Object.assign({},accounts,config.variables,profiles[id].variables);
   ['grafana','honeycomb'].forEach(function(key){config[key]=telemetrySubstitute(Object.assign({},config[key],profiles[id][key]),{env:id});});
   return config;
 }

@@ -573,6 +573,64 @@ for(const surface of ['standalone','workbench'])test(surface+' Standard fitting 
   await expectFitted(board);
 });
 
+// Playwright hides scrollbars by default, removing their layout footprint.
+// Exercise classic scrollbars, including on hosts that normally overlay them.
+const scrollbarTest=test.extend({launchOptions:{ignoreDefaultArgs:['--hide-scrollbars']}});
+scrollbarTest.describe('Standard scrollbar stability',()=>{
+  for(const surface of ['standalone','workbench'])scrollbarTest(surface+' keeps fractional desktop fit stable on load and clicks',async({page,server},info)=>{
+    await page.addInitScript(()=>{
+      const style=document.createElement('style');
+      // A desktop host column drives the production Standard layout to 80%.
+      style.textContent='.section-viewport{width:800px!important;max-width:none!important}.board::-webkit-scrollbar{width:15px;height:15px}';
+      const observer=new MutationObserver(()=>{if(document.head){document.head.append(style);observer.disconnect();}});
+      observer.observe(document,{childList:true,subtree:true});
+    });
+    const raw=importedFitSpec(),d=raw.page.sections[0].diagram;
+    delete d.graphFrame;d.floats=[];d.rows=[['a','shared::b'],['c','shared::d']];d.edges=[];
+    d.layouts=[{id:'standard',name:'Standard',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}];d.defaultLayout='standard';
+    const board=await openStandard(page,server,surface,raw);
+    await expect(board).toHaveClass(/board-content-framed/);
+    expect(await page.locator('.section-layout-grid').evaluate(el=>Number(getComputedStyle(el).zoom))).toBeCloseTo(.8,2);
+    async function stable(label){
+      const frames=await board.evaluate(async el=>{
+        const frames=[];
+        for(let i=0;i<36;i++){
+          await new Promise(requestAnimationFrame);
+          const legend=el.querySelector('.lg'),canvas=el.querySelector('.boardcanvas');
+          frames.push([el.clientWidth,el.clientHeight,el.scrollWidth,el.scrollHeight,legend.offsetHeight,
+            canvas.getBoundingClientRect().width,canvas.getBoundingClientRect().height,
+            el.style.cssText,el.querySelector('.board-pan').hidden]);
+        }
+        return frames;
+      });
+      await info.attach(label,{body:JSON.stringify(frames),contentType:'application/json'});
+      // Allow the initial layout/observer turns, then require every following
+      // frame to agree; a snapshot or eventual-fit assertion misses the loop.
+      expect(new Set(frames.slice(12).map(JSON.stringify)).size).toBe(1);
+    }
+    await stable('fresh-load');await expectFitted(board);
+    const fitted=await width(board);
+    // Local and imported cards share this viewport and its selection behavior.
+    for(const id of ['a','shared::b']){
+      if(surface==='workbench')await closeTools(page);
+      await board.locator('[data-dv-node="'+id+'"]').click();
+      await stable('selected-'+id.replace('::','-'));
+      expect(await width(board)).toBeCloseTo(fitted,0);
+    }
+    if(surface==='workbench')await closeTools(page);
+    for(let i=0;i<3;i++)await board.getByRole('button',{name:'Diagram zoom in',exact:true}).click();
+    await stable('real-overflow');
+    await expect(board.getByRole('group',{name:'Horizontal diagram scroll'})).toBeVisible();
+    // Confirm native tracks actually consume space, and real overflow pans.
+    expect(await board.evaluate(el=>el.offsetWidth-el.clientWidth-2*el.clientLeft)).toBeGreaterThan(10);
+    expect(await board.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeGreaterThan(50);
+    await board.getByRole('button',{name:'Scroll diagram right',exact:true}).click();
+    expect((await scroll(board)).x).toBeGreaterThan(0);
+    await board.getByRole('button',{name:'Fit diagram',exact:true}).click();
+    await stable('fit-again');await expectFitted(board);
+  });
+});
+
 for(const surface of ['standalone','workbench'])test(surface+' Standard hidden chapters fit when shown and retain a manual camera when revisited',async({page,server})=>{
   const first=fitSpec('wide').page.sections[0],second=fitSpec('tall').page.sections[0];
   first.id='first';first.heading='First graph';second.id='second';second.heading='Second graph';

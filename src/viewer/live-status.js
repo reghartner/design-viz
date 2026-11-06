@@ -39,14 +39,14 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
   });
   var duration=/^(\d+)([smhdw])$/.exec(window),windowMs=duration?Number(duration[1])*({s:1000,m:60000,h:3600000,d:86400000,w:604800000})[duration[2]]:86400000;
   function number(value){return Number(value.toPrecision(4)).toLocaleString('en-US');}
-  function predicate(binding,names){
+  function predicate(binding,names,measured){
     var words=[];
     (names || telemetryMetricProofNames(binding)).forEach(function(name){
       var limit=binding.proof[name];if(proofVerdicts.isTraceSignal(binding.signals[name]))return;var unit=binding.signals[name] && binding.signals[name].unit || '';
       if(telemetryNumber(limit.min))words.push(name+' at least '+number(limit.min)+(unit?' '+unit:''));
       if(telemetryNumber(limit.max))words.push(limit.maxRatioOf?name+' no more than '+number(limit.max*100)+'% of '+limit.maxRatioOf:name+' at most '+number(limit.max)+(unit?' '+unit:''));
     });
-    return words.length?words.join('; '):'Observed signals; no authored thresholds';
+    return words.length?words.join('; '):(measured?'Observed signals':'No observed signals')+'; no authored thresholds';
   }
   var rows=snapshot.carriers.filter(function(binding){return snapshot.verdicts.carriers[binding.id].bound;}).map(function(binding){
     var waiting=pending[binding.id] || {},loading=telemetryMetricNames(binding).some(function(name){return waiting[name];}),measured=telemetryMetricNames(binding).some(function(name){return telemetryReading(snapshot.map[binding.id],name).value!==null;});
@@ -80,7 +80,7 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
       if(result.jira==='unknown')label+=' · Jira status unavailable';
     }
     return {id:binding.id,title:binding.title,kind:binding.kind,tickets:binding.tickets.slice(),jira:result.jira || 'No tickets',
-      loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,label:loading && !measured?'Loading…':label,predicate:predicate(binding)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
+      loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,label:loading && !measured?'Loading…':label,predicate:predicate(binding,null,measured)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
       kpis:telemetryMetricRows(binding,sample,waiting),
       since:since.join(' · ') || 'unavailable',url:url,
       linkLabel:primary && binding.signals[primary].source==='grafana'?'Open in Grafana':primary && binding.signals[primary].source==='honeycomb'?'Open in Honeycomb':'Open telemetry',

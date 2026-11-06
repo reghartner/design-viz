@@ -199,6 +199,7 @@ value is invalid. Every field except `version` is optional.
 | `revision` | The branch in the authoring-skill and tour-guide links and the welcome form's revision field. | `main` |
 | `brand` | A brand file path inside `company/`, relative to `company.json`, with `companyName`, `logo`, `primaryColor` and `secondaryColor` (the fields of `src/company-brand.config.js`). `logo` is a 1–4 character monogram, a PNG/JPEG/WebP data URI, or a relative path (inside `company/`) to a PNG/JPEG/WebP file of up to 512 KiB that the build embeds. The brand's `companyName` defaults to the top-level `companyName`. Every viewer, the workbench and the validator runtime use it as the global brand. | The placeholders in `src/company-brand.config.js` |
 | `package` | Backstage package identity; see below. | Upstream `package.json` values |
+| `awsAccounts` | Environment-to-alias mapping of 12-digit account ID strings. Compiled defaults for existing `${alias}` telemetry variables; see [AWS account defaults](live-status.md#company-aws-account-defaults). Board shared variables override company defaults, then profile variables override shared values. The board owns environment profiles and selection. | No company account defaults |
 | `backstage.baseUrl` | Public Backstage UI base URL included in copied Workbench connection instructions and focused authoring packets, including the offline folder-agent kit. | No company Backstage context |
 
 The values replace marked text at build time: sources mark each literal with
@@ -210,6 +211,24 @@ viewer, workbench and runtime are byte-identical to a build without this
 feature. `python3 tools/build.py --no-config` ignores `company.json` as well as
 `workbench/site.json`; the browser contracts build that way and set
 `FLOWVIEW_COMPANY_IDENTITY=off` so they keep asserting upstream labels.
+
+## AWS account defaults
+
+Add `"awsAccounts": {"qa": {"iot": "000000000001", "queue": "000000000002"}}`
+to `company/company.json` (synthetic IDs shown). Environment IDs start with a
+letter and permit letters, digits, `_` and `-`; aliases omit `-`. The names
+`env`, `account`, `constructor`, `prototype` and `__proto__` are reserved.
+Account IDs must be exactly 12 digits stored as strings, including leading zeros.
+Each environment value is an object of aliases; arrays and malformed entries
+fail the build with a field diagnostic. Empty mappings are allowed.
+
+References such as `${iot}` in CloudWatch `accountId` and `${queue}` in a Logs
+ARN use only the selected board environment. Missing aliases do not fall back to
+another environment. Rebuild after changing the registry: defaults travel in
+standalone HTML, native modules, backend/validator bundles and source-free kits.
+They do not mutate authored documents or provide authentication. CONNECT and
+authoring packets list the available aliases and account IDs. `--no-config` and
+`FLOWVIEW_COMPANY_IDENTITY=off` omit them. See the [full configuration example](live-status.md#company-aws-account-defaults).
 
 ## Backstage context for agents
 
@@ -229,7 +248,7 @@ an API endpoint or an authentication setting, and does not grant access.
 Explicit entity references and source URLs remain authoritative. Use a
 non-secret URL suitable for inclusion in generated Workbench files and prompts.
 The offline kit exports only the normalized agent context (`repository`,
-`backstage` and `site`) in `tools/company-agent-context.json`, without copying
+`backstage`, `site` and `awsAccounts`) in `tools/company-agent-context.json`, without copying
 `company.json`, brand assets or package settings. Packet metadata records it as `companyContext`.
 
 `python3 tools/build.py --no-config` omits this context from the generated

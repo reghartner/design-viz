@@ -94,6 +94,29 @@ function readBrand(file, companyName, company) {
   }
   return brand;
 }
+// These defaults are configuration context, never connector credentials.
+function companyAwsAccounts(raw, file) {
+  const object = value => value && typeof value === 'object' && !Array.isArray(value) &&
+    [Object.prototype, null].includes(Object.getPrototypeOf(value));
+  const reserved = ['__proto__', 'prototype', 'constructor', 'env', 'account'];
+  if (!object(raw)) throw companyError(file, 'awsAccounts must be an object of environment account aliases');
+  const out = {};
+  for (const [environment, aliases] of Object.entries(raw)) {
+    const at = 'awsAccounts.' + environment;
+    if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(environment) || reserved.includes(environment))
+      throw companyError(file, at + ': use a non-reserved environment id');
+    if (!object(aliases)) throw companyError(file, at + ' must be an object of account aliases');
+    out[environment] = {};
+    for (const [alias, account] of Object.entries(aliases)) {
+      if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(alias) || reserved.includes(alias))
+        throw companyError(file, at + '.' + alias + ': use a non-reserved variable name');
+      if (typeof account !== 'string' || !/^[0-9]{12}$/.test(account))
+        throw companyError(file, at + '.' + alias + ': account ID must be a 12-digit string');
+      out[environment][alias] = account;
+    }
+  }
+  return out;
+}
 function companyConfig(root = sourceRoot) {
   const company = companyDir(root);
   if (!company || process.env.FLOWVIEW_COMPANY_IDENTITY === 'off') return null;
@@ -102,11 +125,12 @@ function companyConfig(root = sourceRoot) {
   let raw;
   try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { throw companyError(file, error.message); }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw companyError(file, 'expected a JSON object');
-  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package', 'backstage', 'site'];
+  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package', 'backstage', 'site', 'awsAccounts'];
   const unknown = Object.keys(raw).filter(key => !allowed.includes(key));
   if (unknown.length) throw companyError(file, 'unknown field ' + unknown.join(', ') + '; allowed: ' + allowed.join(', '));
   if (raw.version !== 1) throw companyError(file, 'version must be 1');
   const config = {companyName:null, repository:null, revision:null, brand:null, package:{}};
+  if (Object.hasOwn(raw, 'awsAccounts')) config.awsAccounts = companyAwsAccounts(raw.awsAccounts, file);
   if (raw.companyName != null) config.companyName = plainText(raw.companyName, file, 'companyName', 40);
   if (raw.repository != null) config.repository = repositoryUrl(raw.repository, file);
   if (raw.revision != null) {
@@ -148,9 +172,9 @@ function companyConfig(root = sourceRoot) {
   return config;
 }
 // Only public authoring context travels into prompts and the offline kit: the
-// repository address agents clone and send canon PRs to, and link bases.
+// repository address, link bases and AWS account defaults (not credentials).
 function companyAgentContext(config = companyConfig()) {
-  return Object.assign({}, config && config.repository ? {repository: config.repository} : {}, config && config.backstage ? {backstage: {baseUrl: config.backstage.baseUrl}} : {}, config && config.site ? {site: {baseUrl: config.site.baseUrl}} : {});
+  return Object.assign({}, config && config.awsAccounts ? {awsAccounts: config.awsAccounts} : {}, config && config.repository ? {repository: config.repository} : {}, config && config.backstage ? {backstage: {baseUrl: config.backstage.baseUrl}} : {}, config && config.site ? {site: {baseUrl: config.site.baseUrl}} : {});
 }
 /* Marked literals keep today's text unless the company config replaces it:
    `/*@company:name*\/'Company service'` replaces the word Company,
@@ -243,12 +267,13 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
     if (file === 'icons/library.js') source = expandCompanyIcons(source, root);
     if (file === 'workbench/auto-arrange.js' && substitute) {
       const files = manifest(root).assets.autoArrangeWorker;
-      const worker = files.map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
+      const worker = sourceRecords(files, root).map(record => record.source).join('\n');
       source = source.replace('/* @auto-arrange-worker */ ""', () => JSON.stringify(worker).replace(/</g, '\\u003c'));
     }
     if (substitute) source = companyText(source, file, company);
     if (file === 'workbench/agent-chat.js' && substitute)
       source = source.replace('/* @company-agent-context */ {}', () => JSON.stringify(companyAgentContext(company)).replace(/</g, '\\u003c'));
+    if (file === 'core/tracking.js' && substitute) source = source.replace('/* @company-aws-accounts */ {}', () => JSON.stringify(company && company.awsAccounts || {}).replace(/</g, '\\u003c'));
     if (file === 'core/document-links.js' && substitute) source = source.replace('/* @company-site-base */ null', () => JSON.stringify(company && company.site ? company.site.baseUrl : null).replace(/</g, '\\u003c'));
     if (file === 'company-brand.config.js' && company && company.brand) source = companyBrandSource(company.brand);
     if (file === 'compatibility.js' && substitute) {

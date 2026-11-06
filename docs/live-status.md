@@ -2426,8 +2426,10 @@ references. Then one environment pass resolves shared variables overridden by
 the active profile, consistently for local and imported templates. Carrier
 signal overrides use that same environment pass. Arbitrary environment names
 require `${name}`; only legacy `$env` and `$account` also accept bare syntax.
-Inserted environment-variable values are literal and never recursively expanded. Unknown `${name}` in a signal
-makes that signal unobserved with a configuration reason and prevents its call.
+Inserted environment-variable values are literal and never recursively expanded.
+Unknown `${name}` blocks the affected query with a configuration reason. When
+only an optional Logs `breakdown` is affected, the scalar still refreshes; a
+missing variable in the scalar or shared signal fields blocks the whole signal.
 Never interpolate user secrets; profiles and queries are shipped in the artifact.
 The source and authored default environment stay unchanged when readers switch.
 The desktop editor's shared/profile variables JSON and structured query controls
@@ -2512,7 +2514,10 @@ page window (including aliases such as `now-6h`). Without `breakdown` only the
 original scalar call runs, retaining its relative-window convention. The details
 call follows scalar success in the same bounded provider task; it introduces no
 additional polling. Scalar failure skips details. Details failure clears old rows
-and displays a one-line error while retaining a successfully read scalar.
+and displays a one-line error while retaining a successfully read scalar. Missing
+variables only inside `breakdown` skip that optional query and show its
+configuration error while the scalar still refreshes. Missing variables in the
+scalar query or shared fields block the whole signal.
 Environment changes, Metrics off and controller destruction retire both calls.
 
 For a **synthetic** line `device_id=cam-123 issue=publish_failed`, an explicit

@@ -148,3 +148,17 @@ test('breakdown strings use named variables and template pass; desktop editor pr
  assert.equal(b.signals.refused.query.breakdown.query,'filter account = "123" | stats count() as n by clientId');assert.equal(b.signals.refused.query.breakdown.labelField,'clientId');assert.equal(b.signals.refused.query.breakdown.title,'Devices in stg');
  vm.runInNewContext(readSource('workbench/commands/telemetry.js'),C);assert.deepEqual(plain(C.telemetryQueryValue('cloudwatchLogs',JSON.stringify(q)).value),q);
 });
+
+
+test('missing breakdown-only variables preserve totals across local/imported environment switches; shared and scalar failures still block calls',async t=>{
+ const edit=p=>{withDetails(p);p.tracking.telemetry.environments.stg.variables.deviceFilter='camera';function visit(v){if(!v||typeof v!=='object')return;if(v.cloudwatchLogs)v.cloudwatchLogs.breakdown.query='filter deviceType = "${deviceFilter}" | '+v.cloudwatchLogs.breakdown.query;Object.values(v).forEach(visit);}visit(p);};
+ const answer=input=>({payload:{status:'Complete',logs:grouped(input)?detailsRows():[{n:'15'}]}});
+ const h=await setup({edit,answer});t.after(()=>h.close());const before=JSON.stringify(h.p);h.api.setEnabled(true);await settle();
+ for(const id of ids)assert.equal(h.api.snapshot().map[id].signals.rate.breakdown.status,'complete');
+ const count=h.calls.length;h.api.setEnvironment('prd');assert.deepEqual(plain(h.api.snapshot().map),{});await settle();
+ const fresh=h.calls.slice(count).filter(c=>c.tool==='query_cloudwatch_logs');assert.equal(fresh.length,4);assert.ok(fresh.every(c=>!grouped(c.input)&&c.input.logGroups[0].includes('139648982912')));
+ for(const id of ids){const sample=h.api.snapshot().map[id].signals.rate,b=h.api.bindings().find(b=>b.id===id).signals.rate;assert.equal(sample.value,15);assert.equal(sample.breakdown.status,'error');assert.match(sample.breakdown.error,/deviceFilter/);assert.equal(sample.breakdown.rows,undefined);assert.equal(b.error,undefined);assert.match(b.breakdownError,/deviceFilter/);}
+ assert.ok(h.C.liveStatusLogDetails(h.api.snapshot()).every(row=>row.total.includes('15')&&row.details.error.includes('deviceFilter')));
+ h.api.setEnvironment('stg');await settle();for(const id of ids)assert.equal(h.api.snapshot().map[id].signals.rate.breakdown.status,'complete');assert.equal(JSON.stringify(h.p),before);
+ for(const shared of [false,true]){const blocked=await setup({answer,edit:p=>{edit(p);if(shared)delete p.tracking.telemetry.environments.stg.variables.iotAccount;else {function visit(v){if(!v||typeof v!=='object')return;if(v.cloudwatchLogs)v.cloudwatchLogs.query+=' | filter x = "${scalarFilter}"';Object.values(v).forEach(visit);}visit(p);}}});t.after(()=>blocked.close());blocked.api.setEnabled(true);await settle();assert.ok(blocked.calls.every(c=>c.tool!=='query_cloudwatch_logs'));assert.match(blocked.api.status().note,shared?/iotAccount/:/scalarFilter/);}
+});

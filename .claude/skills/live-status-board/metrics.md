@@ -170,8 +170,10 @@ references. Then one environment pass resolves shared variables overridden by
 the active profile, consistently for local and imported templates. Carrier
 signal overrides use that same environment pass. Arbitrary environment names
 require `${name}`; only legacy `$env` and `$account` also accept bare syntax.
-Inserted environment-variable values are literal and never recursively expanded. Unknown `${name}` in a signal
-makes that signal unobserved with a configuration reason and prevents its call.
+Inserted environment-variable values are literal and never recursively expanded.
+Unknown `${name}` blocks the affected query with a configuration reason. When
+only an optional Logs `breakdown` is affected, the scalar still refreshes; a
+missing variable in the scalar or shared signal fields blocks the whole signal.
 Never interpolate user secrets; profiles and queries are shipped in the artifact.
 The source and authored default environment stay unchanged when readers switch.
 The desktop editor's shared/profile variables JSON and structured query controls
@@ -237,7 +239,10 @@ details; selected missing text cells show `(missing)`. Up to four text columns,
 The card keeps its independent scalar total. Paired queries share one fixed
 range. Live status shows a collapsed, scrollable list of actual returned rows,
 never an exhaustive group total; query/display limits may omit groups. A failed
-details query clears old rows and retains the scalar. Add a Live status panel to
+details query clears old rows and retains the scalar. Missing
+variables only inside `breakdown` skip that optional query and show its
+configuration error while the scalar still refreshes. Missing variables in the
+scalar query or shared fields block the whole signal. Add a Live status panel to
 see details; no panel is inserted automatically. No click-to-query drilldown.
 See [grouped Logs examples](../../../docs/live-status.md#grouped-log-details-and-text-extraction).
 

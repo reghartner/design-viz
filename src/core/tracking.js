@@ -359,16 +359,22 @@ function carrierTelemetry(obj,templates,invalid,environment){
   // Local templates take that same pass here, before exactly one environment pass.
   var expanded=telemetryExpand(raw,templates,warn);
   if(!expanded)return null;
-  var config=telemetryObject(environment)?environment:environment?{environment:environment}:null,errors=Object.create(null);
+  var config=telemetryObject(environment)?environment:environment?{environment:environment}:null,errors=Object.create(null),breakdownErrors=Object.create(null);
   if(config){
     var values=Object.assign(Object.create(null),config.variables || {});
     if(config.environment)values.env=config.environment;
     if(config.grafana && config.grafana.accountId)values.account=config.grafana.accountId;
     Object.keys(expanded).forEach(function(key){
       if(key==='signals' && telemetryObject(expanded[key]))Object.keys(expanded[key]).forEach(function(name){
+        var authored=expanded[key][name],logs=telemetryObject(authored) && authored.cloudwatchLogs,hasBreakdown=telemetryObject(logs) && telemetryOwn(logs,'breakdown'),breakdown=hasBreakdown?logs.breakdown:null;
+        // The optional grouped query owns its configuration errors. Resolve it
+        // separately, once, so it cannot suppress an otherwise readable total.
+        if(hasBreakdown)delete logs.breakdown;
+        function missingReason(missing){return 'Set telemetry variable ${'+missing+'} in the active environment'+(missing==='account'?' or tracking.telemetry.grafana.accountId':'')+'.';}
         expanded[key][name]=telemetrySubstitute(expanded[key][name],values,function(missing){
-          errors[name]='Set telemetry variable ${'+missing+'} in the active environment'+(missing==='account'?' or tracking.telemetry.grafana.accountId':'')+'.';
+          errors[name]=missingReason(missing);
         },true);
+        if(hasBreakdown)expanded[key][name].cloudwatchLogs.breakdown=telemetrySubstitute(breakdown,values,function(missing){breakdownErrors[name]=missingReason(missing);},true);
       });
       else expanded[key]=telemetrySubstitute(expanded[key],values,null,true);
     });
@@ -381,6 +387,7 @@ function carrierTelemetry(obj,templates,invalid,environment){
     signals[name]={source:source,query:entry[source],unit:telemetryOwn(entry,'unit')?entry.unit:null};
     if(entry.scope)signals[name].scope=entry.scope;
     if(errors[name])signals[name].error=errors[name];
+    if(breakdownErrors[name])signals[name].breakdownError=breakdownErrors[name];
   });
   return {kind:clean.kind,signals:signals,proof:clean.proof || {},links:clean.links || {},card:clean.card || null};
 }

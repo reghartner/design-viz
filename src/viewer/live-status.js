@@ -12,7 +12,7 @@ function liveStatusLogDetails(snapshot){
   (snapshot.carriers || []).forEach(function(binding){Object.keys(binding.signals || {}).forEach(function(name){
     var signal=binding.signals[name],config=signal.source==='cloudwatchLogs' && signal.query.breakdown;
     if(!config)return;
-    var sample=snapshot.map[binding.id],entry=sample && sample.signals[name],details=entry && entry.breakdown;
+    var sample=snapshot.map[binding.id],entry=sample && sample.signals[name],details=signal.breakdownError?telemetryLogDetails({status:'error',error:signal.breakdownError}):entry && entry.breakdown;
     out.push({key:JSON.stringify([snapshot.environment,binding.id,name,signal]),id:binding.id,signal:name,title:binding.title || binding.id,
       config:config,scope:telemetrySignalScope(signal),total:telemetryCardValue(binding,sample,name),details:details || null});
   });});

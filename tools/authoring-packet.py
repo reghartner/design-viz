@@ -189,6 +189,13 @@ def generate(panel_names, feature_names, mode='new', raw=None):
         features = expanded
     parts, provenance, loaded = [], [], {}
     company_context = company_agent_context(ROOT)
+    if company_context.get('awsAccounts'):
+        parts.append('## Company AWS account defaults\n\n' +
+                     json.dumps(company_context['awsAccounts'], sort_keys=True) +
+                     '\n\nUse existing `${alias}` variables in telemetry signal fields. The board owns '
+                     'environment profiles and selection. Defaults apply only to the selected environment; '
+                     'shared board variables override them, then profile variables override shared values. '
+                     'Account IDs are configuration context, not authentication.')
     if company_context.get('backstage'):
         parts.append('## Company Backstage context\n\nBackstage base URL: ' +
                      json.dumps(company_context['backstage']['baseUrl']) +

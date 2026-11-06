@@ -2449,6 +2449,46 @@ User verification on 2026-11-05 reported that the us-east-1 monitoring datasourc
 requires a linked account ID (staging `646998985045`); omitting it returned empty
 arrays with hints. Repository checks replay the response and make no live calls.
 
+### Company AWS account defaults
+
+A fork can define account aliases once in `company/company.json`:
+
+```json
+{
+  "version": 1,
+  "awsAccounts": {
+    "qa": {"iot": "000000000001", "queue": "000000000002"},
+    "stg": {"iot": "111111111111", "queue": "222222222222"},
+    "prd": {"iot": "333333333333", "queue": "444444444444"}
+  }
+}
+```
+
+These synthetic IDs illustrate the shape; use your own 12-digit **strings**.
+The registry supplies defaults for existing `${iot}` / `${queue}` references in
+any signal string, such as CloudWatch `accountId`, dimensions, Logs ARNs and
+PromQL. Precedence is company selected-environment defaults, then board shared
+`tracking.telemetry.variables`, then `environments.<id>.variables`.
+
+The board still declares its own environment profiles and default. The registry
+never adds choices or chooses an environment. An absent alias in the selected
+environment does not fall back to another environment; that signal remains
+unobserved with a variable diagnostic. Other valid signals can still refresh.
+Template parameters expand first, then the environment pass runs once; inserted
+values are not recursively expanded. `$env`, `$account` and literal `$aws`
+retain their existing behavior.
+
+Builds compile these defaults into portable viewers, native modules and validators;
+readers never fetch company configuration and switching environments does not
+edit the document. Rebuild after changing the registry. `--no-config` or
+`FLOWVIEW_COMPANY_IDENTITY=off` omits it. CONNECT instructions, focused authoring
+packets and offline kits carry the same environment/alias mapping. Account IDs
+are public configuration context in exported artifacts, not credentials.
+Environment IDs start with a letter and allow letters, digits, `_` and `-`;
+aliases allow letters, digits and `_`, starting with a letter. `env`, `account`,
+`constructor`, `prototype` and `__proto__` are reserved. Arrays, numeric IDs,
+unknown company fields and malformed entries fail the build with their field path.
+
 ### Named environment variables and counting scope
 
 Put shared string defaults in `tracking.telemetry.variables`, with per-profile

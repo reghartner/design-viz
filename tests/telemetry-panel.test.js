@@ -99,3 +99,14 @@ test('unknown Jira preserves observed, silent, degraded and incomplete evidence 
   if(name==='no minimum')assert.doesNotMatch(row.explanation,/meet.*thresholds/);
  }
 });
+
+
+test('missing company alias and pending no-threshold evidence never claim observed signals on any node origin',()=>{
+ for(const id of ['local','shared::api','outer::inner::api','loaded::api']){
+  const b={id,title:id,tickets:[],kind:'service',signals:{events:{source:'cloudwatch',query:{accountId:'${iot}'},error:'Set telemetry variable ${iot} in the active environment.'}},proof:{},links:{}};
+  for(const [value,pending,expected] of [[null,false,'No observed signals'],[null,true,'No observed signals'],[0,false,'Observed signals'],[12,true,'Observed signals']]){
+   const map=value===null?{}:{[id]:{signals:{events:{value}}}},carriers=[b],model=C.liveStatusProofPresentation({carriers,map,pending:pending?{[id]:{events:true}}:{},verdicts:C.proofVerdicts({carriers,telemetryMap:map})},'24h',true),row=model.rows[0];
+   assert.equal(row.predicate,expected+'; no authored thresholds');assert.doesNotMatch(row.explanation,/meet.*thresholds/);if(value===null)assert.equal(row.label,pending?'Loading…':'UNOBSERVED');
+  }
+ }
+});

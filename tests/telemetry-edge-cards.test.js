@@ -30,3 +30,14 @@ test('trace ratio targets cannot manufacture scalar traffic or suppress genuine 
  assert.equal(C.telemetryPrimary(binding),null);
  binding.signals.events.unit='events/s';assert.equal(C.telemetryPrimary(binding),'events');
 });
+
+test('scalar observation window follows only an observed number, never a pending or missing result',()=>{
+ for(const source of ['cloudwatch','cloudwatchLogs']){
+  const binding={kind:'service',signals:{events:{source,query:{},unit:'events'}},proof:{events:{min:1}}};
+  const content=(sample,pending)=>C.telemetryCardContent({from:'a',to:'b'},binding,sample,null,'24h',pending);
+  assert.equal(content(null,{events:true}).headline,'Loading…');
+  assert.equal(content(null,{}).headline,'unobserved');
+  assert.equal(content({signals:{events:{value:0}}},{}).headline,'0 events in 24h');
+  assert.equal(content({signals:{events:{value:12}}},{events:true}).headline,'12 events · Refreshing… in 24h');
+ }
+});

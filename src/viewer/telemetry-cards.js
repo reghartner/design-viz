@@ -21,7 +21,7 @@ function telemetryCardContent(edge,binding,sample,result,window,pending){
   var loading=telemetryMetricNames(binding).some(function(name){return pending && pending[name];});
   var measured=telemetryMetricNames(binding).some(function(name){return telemetryReading(sample,name).value!==null;});
   if(loading && !measured)state='loading';
-  return {title:title,headline:(queue?'in: ':'')+telemetryCardValue(binding,sample,primary,pending)+(scalar?' in '+window:''),scope:[scope,telemetryCountNote(binding)?'COUNT: source rows/events':''].filter(Boolean).join(' · '),
+  return {title:title,headline:(queue?'in: ':'')+telemetryCardValue(binding,sample,primary,pending)+(scalar && telemetryReading(sample,primary).value!==null?' in '+window:''),scope:[scope,telemetryCountNote(binding)?'COUNT: source rows/events':''].filter(Boolean).join(' · '),
     details:queue?['lag: '+telemetryCardValue(binding,sample,'lag',pending),'age: '+telemetryCardValue(binding,sample,'age',pending)]:
       ['errors: '+telemetryCardValue(binding,sample,telemetryErrorSignal(binding,primary) || 'errors',pending),'p95: '+telemetryCardValue(binding,sample,'p95',pending)],
     note:loading?(measured?'Refreshing…':'Loading…'):state==='silent'?'no traffic · '+window+' window':state==='unobserved'?'unobserved · '+window+' window':window+' window',

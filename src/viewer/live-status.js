@@ -73,8 +73,14 @@ function liveStatusProofPresentation(snapshot,window){
       if(!aggregate || aggregate.from!==result.since.doneAt)return;
       since.push(name+' total: '+String(entry.value)+(entry.unit?' '+entry.unit:'')+' through '+aggregate.to);
     });
+    // No combined verdict while Jira is unknown does not erase measured evidence.
+    var label=result.label;
+    if(!label){
+      label=result.telemetry==='silent'?'SILENT':result.telemetry==='degraded'?'DEGRADED':measured?(result.telemetry==='unobserved'?'OBSERVED · evidence incomplete':'OBSERVED'):'UNOBSERVED';
+      if(result.jira==='unknown')label+=' · Jira status unavailable';
+    }
     return {id:binding.id,title:binding.title,kind:binding.kind,tickets:binding.tickets.slice(),jira:result.jira || 'No tickets',
-      loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,label:loading && !measured?'Loading…':result.label || 'UNOBSERVED',predicate:predicate(binding)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
+      loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,label:loading && !measured?'Loading…':label,predicate:predicate(binding)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
       kpis:[{label:queue?'in':'rate',text:telemetryCardValue(binding,sample,primary,waiting)},
         {label:queue?'lag':'errors',text:telemetryCardValue(binding,sample,queue?'lag':telemetryErrorSignal(binding,primary) || 'errors',waiting)},
         {label:queue?'age':'p95',text:telemetryCardValue(binding,sample,queue?'age':'p95',waiting)}],

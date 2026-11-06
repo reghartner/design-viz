@@ -81,3 +81,21 @@ test('no-threshold evidence never says thresholds met, and COUNT caveats stay on
  assert.doesNotMatch(C.telemetryCardContent({from:'a',to:'b'},cw,map.cloud,null,'24h').scope,/COUNT/);
  assert.match(C.telemetryCardContent({from:'a',to:'b'},hc,map.honey,null,'24h').scope,/COUNT: source rows/);
 });
+
+test('unknown Jira preserves observed, silent, degraded and incomplete evidence labels without proof',()=>{
+ const cases=[
+  ['healthy',{rate:{min:1}},{rate:{value:12}},'OBSERVED'],
+  ['silent',{rate:{min:1}},{rate:{value:0},errors:{value:0}},'SILENT'],
+  ['degraded',{rate:{min:20}},{rate:{value:12}},'DEGRADED'],
+  ['no minimum',{}, {rate:{value:12}},'OBSERVED'],
+  ['partial',{rate:{min:1},errors:{max:0}},{rate:{value:12}},'OBSERVED · evidence incomplete'],
+  ['missing',{rate:{min:1}}, {},'UNOBSERVED']
+ ];
+ for(const id of ['local','shared::api','outer::inner::api','loaded::api'])for(const [name,proof,signals,label] of cases){
+  const b={...binding(id),proof},anchor=binding('anchor'),carriers=[b,anchor],map={[id]:{signals},anchor:{signals:{rate:{value:1},errors:{value:0},p95:{value:1}}}};
+  const verdicts=C.proofVerdicts({carriers,jiraMap:{},telemetryMap:map}),row=C.liveStatusProofPresentation({carriers,map,verdicts},'24h').rows[0];
+  assert.equal(row.label,label+' · Jira status unavailable',id+' '+name);assert.equal(row.verdict,null);assert.equal(verdicts.rollups.proven,0);assert.doesNotMatch(row.label,/PROVEN/);
+  if(name==='degraded')assert.match(row.explanation,/Outside proof threshold/);
+  if(name==='no minimum')assert.doesNotMatch(row.explanation,/meet.*thresholds/);
+ }
+});

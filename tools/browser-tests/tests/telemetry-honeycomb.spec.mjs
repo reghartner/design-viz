@@ -37,11 +37,18 @@ async function setup(page,server,audit,{disabled,missing=false,detail=false,nest
   const schema={type:'object',properties:{environment_slug:{type:'string'},dataset_slug:{type:['null','string']},query_spec:{type:'string'}},required:['environment_slug','query_spec']};
   window.claude={use:async name=>name==='mcp'?{listTools:async()=>{window.metadataCalls++;if(real)return window.mockTools();return missing?[]:[{server:'Grafana',tools:['query_prometheus','query_loki_logs','search_tempo_traces','get_annotations','generate_deeplink']},{server:'Honeycomb',tools:[{name:'run_query',description:'Run a query',annotations:{readOnlyHint:true}}]}];},describeTool:async(server,tool)=>({name:tool,inputSchema:schema}),callTool:async(server,tool,input,options)=>{
    window.calls.push({server,tool,input});if(window.signedInChanged)throw {code:'user_changed'};if(real)return window.mockCall(server,tool,input);
-   if(tool==='run_query')return {payload:metadata};
-   if(tool==='query_prometheus'){const t=input.startTime.startsWith('now')?Date.parse('2026-10-12T06:30:00Z'):Date.parse(input.startTime),end=input.endTime.startsWith('now')?t:Date.parse(input.endTime),values=[];for(let at=t;at<=end;at+=86400000)values.push([at/1000,'42']);return {payload:{data:[{values}]}};}
+   if(tool==='run_query'){
+    const q=typeof input.query_spec==='string'?JSON.parse(input.query_spec):input.query_spec,end=Date.parse(q.to);
+    if(mode==='ok'&&Number.isFinite(end)){
+     const value=new Date(end).getUTCDate()*10;
+     return {structuredContent:{results:[{data:{'P95(duration_ms)':value}}],series:[{data:{time:new Date(end-1800000).toISOString(),'P95(duration_ms)':value}}],info:{granularity_seconds:1800}}};
+    }
+    return {payload:metadata};
+   }
+   if(tool==='query_prometheus'){const t=input.startTime.startsWith('now')?Date.parse('2026-10-12T06:30:00Z'):Date.parse(input.startTime),end=input.endTime.startsWith('now')?t:Date.parse(input.endTime),values=[];for(let at=t;at<=end;at+=86400000)values.push([at/1000,input.startTime.startsWith('now')?'42':String(new Date(end).getUTCDate()*10+1)]);return {payload:{data:[{values}]}};}
    return {payload:[]};
   }}:name==='permissions'?{request:async names=>Object.fromEntries(names.map(n=>[n,'granted']))}:null};
-  window.flowviewBooted=ctl=>{window.ctl=ctl;ctl.liveStatus.setHistory({load:()=>({days:[0,1].map(i=>({key:real?'2026-10-'+(30+i):'2026-10-'+(10+i),at:new Date(Date.parse(real?'2026-10-31T00:00:00Z':'2026-10-11T06:30:00Z')+i*86400000).toISOString(),label:'Day '+i,states:Object.fromEntries(Object.keys(jira).map(k=>[k,{state:i===0?'active':'done'}]))})),index:1})});};
+  window.flowviewBooted=ctl=>{window.ctl=ctl;ctl.liveStatus.setHistory({load:()=>({days:[0,1].map(i=>({key:real?'2026-10-'+(29+i):'2026-10-'+(10+i),at:new Date(Date.parse(real?'2026-10-30T00:00:00Z':'2026-10-11T06:30:00Z')+i*86400000).toISOString(),label:'Day '+i,states:Object.fromEntries(Object.keys(jira).map(k=>[k,{state:i===0?'active':'done'}]))})),index:1})});};
   // Standalone exposes its production globals; the real detail loader is
   // supplied at render boundary, then the user gesture selects the section.
   window.detailFixture=detailSpec;
@@ -50,6 +57,25 @@ async function setup(page,server,audit,{disabled,missing=false,detail=false,nest
  await page.goto(server.origin+'/mixed.html');await page.waitForFunction(()=>!!window.ctl && Object.keys(window.ctl.liveStatus.snapshot().states).length>0);let root=page.locator('#docview');
  if(detail){await root.getByRole('button',{name:'Explore Imported service',exact:true}).click();root=root.locator('[data-dv-detail-preview]:visible');await expect(root).toHaveCount(1);expect(await page.evaluate(()=>window.loadedDetail.section)).toBe('selected');}
  return {root,bridge,requests:()=>requests,redirectRequests:()=>redirectRequests,release:()=>release?.()};
+}
+
+function assertHistoricalCalls(calls,to){
+ const from=new Date(Date.parse(to)-86400000).toISOString(),honey=calls.filter(c=>c.tool==='run_query'),prom=calls.filter(c=>c.tool==='query_prometheus');
+ expect(honey.length).toBeGreaterThan(0);expect(prom.length).toBeGreaterThan(0);
+ for(const c of honey){const q=typeof c.input.query_spec==='string'?JSON.parse(c.input.query_spec):c.input.query_spec;expect(q.from).toBe(from);expect(q.to).toBe(to);expect(q.time_range).toBeUndefined();}
+ for(const c of prom){expect(c.input.startTime).toBe(from);expect(c.input.endTime).toBe(to);}
+ expect(calls.some(c=>/trace/i.test(c.tool))).toBe(false);
+}
+async function assertHistoricalEvidence(page,id,to,value){
+ await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(value);
+ await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);
+ const snap=await page.evaluate(()=>window.ctl.telemetry.snapshot()),from=new Date(Date.parse(to)-86400000).toISOString();
+ expect(snap.historical).toBe(true);expect(snap.at).toBe(to);expect(snap.window).toEqual({from,to});expect(snap.status.note).not.toContain('unsupported');
+ for(const binding of snap.carriers.filter(b=>b.signals.latency)){
+  const sample=snap.map[binding.id];expect(sample.signals.latency.value,'history applies to every local/imported/loaded binding').toBe(value);expect(sample.window).toEqual({from,to});
+  expect(sample.signals.latency.series.length).toBeGreaterThan(0);expect(sample.signals.latency.series.every(([t])=>{const at=typeof t==='number'?t:Date.parse(t);return at>=Date.parse(from)&&at<Date.parse(to);})).toBe(true);
+ }
+ return snap;
 }
 for(const shape of ['direct','nested','detail'])test('desktop mixed '+shape+': real fetch, Metrics and Over time retain independent evidence',async({page,server,audit})=>{
  const h=await setup(page,server,audit,{nested:shape==='nested',detail:shape==='detail'}),root=h.root;
@@ -60,12 +86,16 @@ for(const shape of ['direct','nested','detail'])test('desktop mixed '+shape+': r
  expect(await page.evaluate(()=>{const map=window.ctl.telemetry.snapshot().map;return window.ctl.telemetry.bindings().filter(b=>b.signals.latency).every(b=>map[b.id]?.signals.latency?.value===12.3456789);})).toBe(true);
  await expect(root.locator('[data-metrics-card="'+id+'"]')).toContainText('42');expect(h.requests()).toBeGreaterThan(0);
  expect(await page.evaluate(()=>window.rawOptions.every(o=>o.credentials==='omit'&&o.redirect==='error'&&o.referrerPolicy==='no-referrer'))).toBe(true);
- const before=await page.evaluate(()=>window.calls.filter(c=>c.tool==='run_query').length);
- await root.getByRole('button',{name:'Over time',exact:true}).click();await expect(root.getByRole('slider',{name:'Day',exact:true})).toBeVisible();
- await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);
- expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency,id)).toBeUndefined();expect(await page.evaluate(()=>window.ctl.telemetry.status().note)).toContain('Honeycomb historical metrics unsupported');
- const count=await page.evaluate(()=>window.calls.length);await root.getByRole('slider',{name:'Day',exact:true}).press('Home');expect(await page.evaluate(()=>window.calls.length)).toBe(count);expect(await page.evaluate(()=>window.calls.filter(c=>c.tool==='run_query').length)).toBe(before);
- await root.getByRole('button',{name:'Live',exact:true}).click();await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(12.3456789);
+ const before=await page.evaluate(()=>window.calls.length),slider=root.getByRole('slider',{name:'Day',exact:true});
+ await root.getByRole('button',{name:'Over time',exact:true}).click();await expect(slider).toHaveValue('1');
+ let history=await assertHistoricalEvidence(page,id,'2026-10-12T06:30:00.000Z',120);expect(history.map[id].signals.rate.value).toBe(121);
+ assertHistoricalCalls(await page.evaluate(n=>window.calls.slice(n),before),'2026-10-12T06:30:00.000Z');
+ const count=await page.evaluate(()=>window.calls.length);await slider.press('Home');
+ history=await assertHistoricalEvidence(page,id,'2026-10-11T06:30:00.000Z',110);expect(history.map[id].signals.rate.value).toBe(111);
+ assertHistoricalCalls(await page.evaluate(n=>window.calls.slice(n),count),'2026-10-11T06:30:00.000Z');
+ const cached=await page.evaluate(()=>window.calls.length);await slider.press('End');await assertHistoricalEvidence(page,id,'2026-10-12T06:30:00.000Z',120);expect(await page.evaluate(()=>window.calls.length)).toBe(cached);
+ if(shape==='detail')await root.screenshot({path:'/tmp/pr4-honeycomb-history-loaded-raw.png'});
+ await root.getByRole('button',{name:'Live',exact:true}).click();await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(12.3456789);expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id].signals.rate.value,id)).toBe(42);
  await metrics(root).click();await expect(root.locator('.dv-metrics-card')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.liveStatus.enabled())).toBe(true);expect(await page.evaluate(()=>JSON.stringify(window.ctl.telemetry.snapshot()).includes('SYNTHETIC_BROWSER'))).toBe(false);
 });
 for(const disabled of ['page','host','missing'])test('desktop '+disabled+' hides Metrics and leaves Over time usable',async({page,server,audit})=>{const {root}=await setup(page,server,audit,{disabled,missing:disabled==='missing'});await expect(metrics(root)).toBeHidden();await root.getByRole('button',{name:'Over time',exact:true}).click();await expect(root.getByRole('slider',{name:'Day',exact:true})).toBeVisible();expect(await page.evaluate(()=>window.calls.length)).toBe(0);if(disabled!=='missing')expect(await page.evaluate(()=>window.metadataCalls)).toBe(0);});
@@ -85,14 +115,19 @@ for(const shape of ['direct','nested','detail'])test('actual mock '+shape+': nat
  for(const b of bound){expect(b.sample,'all applicable loaded carriers have exact mock evidence').toBeDefined();expect(b.sample.signals.latency.value).toBe(expected());expect(b.sample.signals.push.value).toBe(0);expect(b.sample.signals.rate.value).toBeGreaterThan(0);}
  expect(bound.some(b=>b.id===id)).toBe(true);expect(await page.evaluate(()=>window.ctl.liveStatus.snapshot().metrics.source)).toBe('Grafana / Honeycomb');expect(h.requests()).toBe(0);expect(h.bridge.lists).toBeGreaterThan(0);
  for(const c of h.bridge.calls.filter(c=>c.name==='run_query')){expect(c.args.query_spec.from).toBe('-24h');expect(c.args.query_spec.time_range).toBeUndefined();expect(c.args.query_spec.calculations).toEqual(nativeQuery().calculations);}
- const hc=h.bridge.calls.filter(c=>c.name==='run_query').length;
- await root.getByRole('button',{name:'Over time',exact:true}).click();await expect(root.getByRole('slider',{name:'Day',exact:true})).toBeVisible();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);
- const historic=await page.evaluate(()=>({metrics:window.ctl.telemetry.snapshot(),jira:window.ctl.liveStatus.snapshot()}));
- expect(historic.jira.overTime).toMatchObject({active:true,index:1,label:'Day 1'});expect(Object.values(historic.jira.states).every(v=>v.state==='done')).toBe(true);expect(historic.metrics.at).toBe('2026-11-01T00:00:00.000Z');expect(historic.metrics.map[id]?.signals.latency).toBeUndefined();expect(historic.metrics.map[id]?.signals.rate.value).toBeGreaterThan(0);
- expect(await page.evaluate(()=>window.ctl.telemetry.status().note)).toContain('Honeycomb historical metrics unsupported');
- const before=h.bridge.calls.length;await root.getByRole('slider',{name:'Day',exact:true}).press('Home');
- await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.snapshot().at)).toBe('2026-10-31T00:00:00.000Z');expect(await page.evaluate(()=>window.ctl.liveStatus.snapshot().overTime.index)).toBe(0);expect(await page.evaluate(()=>Object.values(window.ctl.liveStatus.snapshot().states).every(v=>v.state==='active'))).toBe(true);expect(h.bridge.calls).toHaveLength(before);expect(h.bridge.calls.filter(c=>c.name==='run_query')).toHaveLength(hc);
- await root.getByRole('button',{name:'Live',exact:true}).click();await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(expected());
+ const before=await page.evaluate(()=>window.calls.length),slider=root.getByRole('slider',{name:'Day',exact:true});
+ await root.getByRole('button',{name:'Over time',exact:true}).click();await expect(slider).toHaveValue('1');
+ let historic=await assertHistoricalEvidence(page,id,'2026-10-31T00:00:00.000Z',expected(10));expect(historic.map[id].signals.latency.value).not.toBe(expected(11));expect(historic.map[id].signals.push.value).toBe(0);expect(historic.map[id].signals.rate.value).toBeGreaterThan(0);
+ expect(await page.evaluate(()=>window.ctl.liveStatus.snapshot().overTime)).toMatchObject({active:true,index:1,label:'Day 1'});expect(await page.evaluate(()=>Object.values(window.ctl.liveStatus.snapshot().states).every(v=>v.state==='done'))).toBe(true);
+ assertHistoricalCalls(await page.evaluate(n=>window.calls.slice(n),before),'2026-10-31T00:00:00.000Z');
+ const count=await page.evaluate(()=>window.calls.length);await slider.press('Home');
+ historic=await assertHistoricalEvidence(page,id,'2026-10-30T00:00:00.000Z',expected(9));expect(historic.map[id].signals.latency.value).not.toBe(expected(10));expect(historic.map[id].signals.push.value).toBe(0);
+ expect(await page.evaluate(()=>window.ctl.liveStatus.snapshot().overTime.index)).toBe(0);expect(await page.evaluate(()=>Object.values(window.ctl.liveStatus.snapshot().states).every(v=>v.state==='active'))).toBe(true);
+ assertHistoricalCalls(await page.evaluate(n=>window.calls.slice(n),count),'2026-10-30T00:00:00.000Z');
+ const cached=await page.evaluate(()=>window.calls.length);await slider.press('End');await assertHistoricalEvidence(page,id,'2026-10-31T00:00:00.000Z',expected(10));expect(await page.evaluate(()=>window.calls.length)).toBe(cached);
+ if(shape==='detail')await root.screenshot({path:'/tmp/pr4-honeycomb-history-loaded-mock.png'});
+ await root.getByRole('button',{name:'Live',exact:true}).click();await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(expected(11));
+ const returned=await page.evaluate(n=>window.calls.slice(n).filter(c=>c.tool==='run_query'),cached);expect(returned.length).toBeGreaterThan(0);expect(returned.every(c=>c.input.query_spec.from==='-24h')).toBe(true);
  await metrics(root).click();expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().map)).toEqual({});expect(await page.evaluate(()=>window.ctl.liveStatus.enabled())).toBe(true);
 });
 test('actual mock payload: page 6h window is applied; Day8 absence is not zero',async({page,server,audit})=>{

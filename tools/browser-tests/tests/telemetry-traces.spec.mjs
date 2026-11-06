@@ -3,7 +3,7 @@ import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
-import {createMockBridge,nativeQuery,EVENT_QUERY} from '../../../tests/helpers/honeycomb-bridge.mjs';
+import {createMockBridge,nativeQuery,EVENT_QUERY,expected} from '../../../tests/helpers/honeycomb-bridge.mjs';
 import {nestedSpec,PANEL,mountCues} from '../helpers/telemetry-cards.mjs';
 const metrics=root=>root.getByRole('button',{name:'Metrics',exact:true});
 async function setup(page,server,{source='honeycomb',disabled,held=false}={}){
@@ -38,7 +38,37 @@ for(const source of ['honeycomb','tempo'])test(`desktop ${source} runtime API th
  const search=source==='tempo'?'search_tempo_traces':'run_query';for(const call of h.bridge.calls.filter(c=>c.name===search||c.name===get)){if(source==='honeycomb'){expect(call.name===get?call.args.from:call.args.query_spec.from).toBe('-6h');if(call.args.raw_row_columns)expect(call.args.raw_row_columns).not.toContain('timestamp');}else{expect(call.args.start).toBe('2026-10-29T18:00:00.000Z');expect(call.args.end).toBe('2026-10-30T00:00:00.000Z');}}
  await root.getByRole('button',{name:/^Trace(?: · \d+)?$/}).click();const key=await page.evaluate(id=>window.ctl.liveStatus.snapshot().trace.entries.find(e=>e.carrier===id).key,id);await root.getByRole('combobox',{name:'Trace source'}).selectOption(key);
  const alternate=e.candidates.find(c=>c.traceId!==e.traceId);await root.locator('.dv-trace-candidate[data-trace-id="'+alternate.traceId+'"]').click();await expect(root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',alternate.traceId);await expect(root.locator('.dv-live-tickets,.dv-live-proof,.dv-live-activity')).toHaveCount(0);await root.getByRole('button',{name:'Jira',exact:true}).click();expect(h.bridge.calls.filter(c=>c.name===get)).toHaveLength(initial+1);expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id].exemplars[0].traceId,id)).toBe(alternate.traceId);
- await root.getByRole('button',{name:'Over time',exact:true}).click();await expect(root.getByRole('slider',{name:'Day',exact:true})).toBeVisible();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);expect(await page.evaluate(()=>Object.values(window.ctl.telemetry.snapshot().map).some(s=>s.exemplars?.length))).toBe(false);const count=h.bridge.calls.length;await root.getByRole('slider',{name:'Day',exact:true}).press('Home');expect(h.bridge.calls).toHaveLength(count);expect(h.bridge.calls.filter(c=>c.name===get)).toHaveLength(initial+1);
+ // Honeycomb uses run_query for both numeric calculations and raw trace rows.
+ // Date changes may fetch the former, but must never fetch the latter.
+ const query=call=>typeof call.args.query_spec==='string'?JSON.parse(call.args.query_spec):call.args.query_spec;
+ const numericHoneycomb=call=>call.name==='run_query'&&Array.isArray(query(call)?.calculations)&&!call.args.raw_row_columns;
+ const traceCall=call=>['get_trace','get_tempo_trace','search_tempo_traces'].includes(call.name)||call.name==='run_query'&&!numericHoneycomb(call);
+ const traceBefore=h.bridge.calls.filter(traceCall),start=h.bridge.calls.length,slider=root.getByRole('slider',{name:'Day',exact:true});
+ function numericWindow(after,to){
+  const calls=h.bridge.calls.slice(after),from=new Date(Date.parse(to)-6*3600000).toISOString(),honey=calls.filter(numericHoneycomb),prom=calls.filter(c=>c.name==='query_prometheus');
+  expect(honey.length).toBeGreaterThan(0);expect(prom.length).toBeGreaterThan(0);
+  for(const c of honey)expect(query(c)).toMatchObject({from,to,calculations:nativeQuery().calculations});
+  for(const c of prom)expect(c.args).toMatchObject({startTime:from,endTime:to});
+  expect(h.bridge.calls.filter(traceCall)).toEqual(traceBefore);
+ }
+ async function withoutTraceEvidence(to){
+  await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);
+  const snapshot=await page.evaluate(()=>window.ctl.telemetry.snapshot());
+  expect(snapshot.window).toEqual({from:new Date(Date.parse(to)-6*3600000).toISOString(),to});
+  expect(Object.values(snapshot.map).some(s=>s.exemplars?.length)).toBe(false);expect(h.bridge.calls.filter(traceCall)).toEqual(traceBefore);
+  await expect(root.locator('.dv-trace-selected,.dv-trace-candidate,[data-metrics-card="local"]')).toHaveCount(0);
+  await expect(root.locator('g.node[data-dv-node="local"] .dv-metrics-node')).toHaveCount(0);
+  return snapshot;
+ }
+ await root.getByRole('button',{name:'Over time',exact:true}).click();await expect(slider).toHaveValue('1');
+ await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.scalar?.value,id)).toBe(expected(9,'mcu->ingest',6));
+ let historic=await withoutTraceEvidence('2026-10-30T00:00:00.000Z');numericWindow(start,'2026-10-30T00:00:00.000Z');expect(historic.map[id].signals.rate.value).toBeGreaterThan(0);
+ const count=h.bridge.calls.length;await slider.press('Home');await expect(slider).toHaveValue('0');
+ historic=await withoutTraceEvidence('2026-10-29T00:00:00.000Z');numericWindow(count,'2026-10-29T00:00:00.000Z');
+ expect(expected(8,'mcu->ingest',6)).toBeUndefined();expect(historic.map[id]?.signals.scalar).toBeUndefined();expect(historic.map[id]?.signals.rate).toBeUndefined();
+ await expect(root.locator('[data-metrics-card="'+id+'"] .dv-metrics-card-value')).toHaveText(['unobserved','unobserved']);
+ await root.screenshot({path:'/tmp/pr4-traces-'+source+'-numeric-history.png'});
+ const cached=h.bridge.calls.length;await slider.press('End');await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.scalar?.value,id)).toBe(expected(9,'mcu->ingest',6));await withoutTraceEvidence('2026-10-30T00:00:00.000Z');expect(h.bridge.calls).toHaveLength(cached);expect(h.bridge.calls.filter(c=>c.name===get)).toHaveLength(initial+1);
  expect(await page.evaluate(()=>JSON.stringify(window.detailFixture)===window.authoredBefore)).toBe(true);expect(await page.evaluate(()=>window.ctl.liveStatus.enabled())).toBe(true);
 });
 for(const disabled of ['page','host'])test(`desktop ${disabled} false prevents trace metadata and data calls through loaded imports`,async({page,server})=>{const h=await setup(page,server,{disabled});await expect(metrics(h.root)).toBeHidden();expect(h.bridge.lists).toBe(0);expect(h.bridge.calls).toHaveLength(0);});

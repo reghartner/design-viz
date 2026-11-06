@@ -5,22 +5,26 @@ function telemetryClearCards(scope){
   scope.querySelectorAll('.dv-metrics-card,.dv-metrics-leader').forEach(function(el){el.remove();});
   scope.querySelectorAll('.dv-metrics-label-hidden').forEach(function(el){el.classList.remove('dv-metrics-label-hidden');el.removeAttribute('data-metrics-preview');});
 }
-function telemetryCardValue(binding,sample,name){
-  if(!name || !binding.signals[name])return 'not bound';
+function telemetryCardValue(binding,sample,name,pending){
+  if(!name || !binding.signals[name] || proofVerdicts.isTraceSignal(binding.signals[name]))return 'not bound';
   var reading=telemetryReading(sample,name),unit=binding.signals[name].unit;
-  return reading.value===null?'unobserved':Number(reading.value.toPrecision(4)).toLocaleString('en-US')+(unit?' '+unit:'')+(sample && sample.signals && sample.signals[name] && sample.signals[name].provenance==='formatted-text'?' (formatted text; may be rounded)':'');
+  return reading.value===null?(pending && pending[name]?'Loading…':'unobserved'):Number(reading.value.toPrecision(4)).toLocaleString('en-US')+(unit?' '+unit:'')+(sample && sample.signals && sample.signals[name] && sample.signals[name].provenance==='formatted-text'?' (formatted text; may be rounded)':'')+(pending && pending[name]?' · Refreshing…':'');
 }
-function telemetryCardContent(edge,binding,sample,result,window){
+function telemetryCountNote(binding){return telemetryMetricNames(binding).some(function(name){var s=binding.signals[name];return s.source==='honeycomb' && Array.isArray(s.query.calculations) && s.query.calculations.some(function(c){return c && c.op==='COUNT';});})?'Honeycomb COUNT counts source rows/events, not automatically requests.':'';}
+function telemetryCardContent(edge,binding,sample,result,window,pending){
   var primary=telemetryPrimary(binding,true),queue=binding.kind==='queue',raw=edge.telemetry || {};
   var title=edge.label || edge.from+' → '+edge.to;
   // A template parameter is explicit author input. Never extract a queue name
   // or a query from the title, id, or query text.
   if(queue && raw.use && telemetryText(raw.topic) && title.indexOf(raw.topic)<0)title+=' · '+raw.topic;
   var state=result && result.telemetry || 'unobserved',signal=primary && binding.signals[primary],scope=telemetrySignalScope(signal),scalar=signal && (signal.source==='cloudwatch' || signal.source==='cloudwatchLogs');
-  return {title:title,headline:(queue?'in: ':'')+telemetryCardValue(binding,sample,primary)+(scalar?' in '+window:''),scope:scope,
-    details:queue?['lag: '+telemetryCardValue(binding,sample,'lag'),'age: '+telemetryCardValue(binding,sample,'age')]:
-      ['errors: '+telemetryCardValue(binding,sample,telemetryErrorSignal(binding,primary) || 'errors'),'p95: '+telemetryCardValue(binding,sample,'p95')],
-    note:state==='silent'?'no traffic · '+window+' window':state==='unobserved'?'unobserved · '+window+' window':window+' window',
+  var loading=telemetryMetricNames(binding).some(function(name){return pending && pending[name];});
+  var measured=telemetryMetricNames(binding).some(function(name){return telemetryReading(sample,name).value!==null;});
+  if(loading && !measured)state='loading';
+  return {title:title,headline:(queue?'in: ':'')+telemetryCardValue(binding,sample,primary,pending)+(scalar?' in '+window:''),scope:[scope,telemetryCountNote(binding)?'COUNT: source rows/events':''].filter(Boolean).join(' · '),
+    details:queue?['lag: '+telemetryCardValue(binding,sample,'lag',pending),'age: '+telemetryCardValue(binding,sample,'age',pending)]:
+      ['errors: '+telemetryCardValue(binding,sample,telemetryErrorSignal(binding,primary) || 'errors',pending),'p95: '+telemetryCardValue(binding,sample,'p95',pending)],
+    note:loading?(measured?'Refreshing…':'Loading…'):state==='silent'?'no traffic · '+window+' window':state==='unobserved'?'unobserved · '+window+' window':window+' window',
     series:primary?telemetryReading(sample,primary).series:[],state:state};
 }
 /* Authoring placeholders never enter ctl.telemetry or the proof engine. Only
@@ -28,9 +32,9 @@ function telemetryCardContent(edge,binding,sample,result,window){
 function telemetryCardPreview(diagram,templates){
   var map=Object.create(null);
   (diagram.edges || []).forEach(function(edge){
-    var binding=carrierTelemetry(edge,templates);if(!binding)return;
+    var binding=carrierTelemetry(edge,templates);if(!binding || !telemetryMetricNames(binding).length)return;
     var signals=Object.create(null);
-    Object.keys(binding.signals).forEach(function(name){signals[name]={value:12,series:[[0,12],[1,12]]};});
+    telemetryMetricNames(binding).forEach(function(name){signals[name]={value:12,series:[[0,12],[1,12]]};});
     map[edge.from+'->'+edge.to]={signals:signals};
   });
   return {preview:true,map:map,verdicts:{carriers:Object.create(null)}};
@@ -66,8 +70,8 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
     }).forEach(function(path){
       var index=Number(path.getAttribute('data-dv-edge')),edge=(diagram.edges || [])[index],binding=edge && carrierTelemetry(edge,templates,null,config);
       var liveBreak=svg.querySelector('.dv-live-comm-failure[data-dv-edge="'+index+'"]');
-      if(!binding || edge.hidden===true || !boardControlBox(path,svg) && !boardControlBox(liveBreak,svg))return;
-      var id=edge.from+'->'+edge.to,result=view.verdicts.carriers[id],content=telemetryCardContent(edge,binding,view.map[id],result,window);
+      if(!binding || !telemetryMetricNames(binding).length || edge.hidden===true || !boardControlBox(path,svg) && !boardControlBox(liveBreak,svg))return;
+      var id=edge.from+'->'+edge.to,result=view.verdicts.carriers[id],content=telemetryCardContent(edge,binding,view.map[id],result,window,view.pending && view.pending[id]);
       if(view.preview){content.note='Preview · synthetic';content.state='preview';}
       var card=telemetrySvg(doc,'g',{'class':'dv-metrics-card','data-dv-edge':index,'data-metrics-card':id,'data-state':content.state,'data-verdict':view.preview?'preview':result && result.verdict || 'unobserved'},svg);
       var height=content.scope?93:78;

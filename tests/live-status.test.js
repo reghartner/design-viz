@@ -2116,7 +2116,7 @@ function cuePage(){return {page:{tracking:{jira:{site:'https://jira.test'}},sect
 const CUE_JIRA={'AA-1':{state:'done'},'BB-1':{state:'active'},'CC-1':{state:'done'},'DD-1':{state:'todo'},'FF-1':{state:'done'},'EE-10':{state:'done'},'EE-11':{state:'done'},'EE-12':{state:'active'},'EE-13':{state:'todo'},'EE-14':{state:'done'}};
 const CUE_MAP=()=>({a:{signals:{lag:{value:10}}},b:{signals:{rate:{value:50,series:[[1,40],[2,45],[3,50]]}}},c:{signals:{rate:{value:0,series:[[1,0],[2,0]]}}},f:{signals:{rate:{value:5,series:[[1,5],[2,5]]}}},
  'a->b':{signals:{rate:{value:1300,series:[[1,1200],[2,1300]]},errors:{value:4}}},'b->c':{signals:{rate:{value:0,series:[[1,0],[2,0]]},errors:{value:0}}},'c->d':{signals:{rate:{value:100},errors:{value:30}}},'a->c':{signals:{lag:{value:3}}}});
-const CUE_VERDICTS={a:'proven',b:'active-live-early',c:'done-unproven',d:null,f:'done-degraded','a->b':'proven','b->c':'done-unproven','c->d':'active-failing','d->a':null,'a->c':'proven'};
+const CUE_VERDICTS={a:'done-traffic-unmeasured',b:'active-live-early',c:'done-unproven',d:null,f:'done-degraded','a->b':'proven','b->c':'done-unproven','c->d':'active-failing','d->a':null,'a->c':'done-traffic-unmeasured'};
 const CUE_SELECTOR='.dv-metrics-stream,.dv-metrics-ghost,.dv-metrics-node,[data-metrics-state]';
 function cueHarness(raw=cuePage(),map=CUE_MAP){
  let telemetryMap=map();const h=harness(raw,{provider:()=>Promise.resolve(CUE_JIRA)},{telemetry:{provider:()=>Promise.resolve(telemetryMap)}});
@@ -2136,7 +2136,7 @@ test('W1 W2 verdicts() judges every page carrier with the Jira and telemetry map
  for(const [id,want] of Object.entries(CUE_VERDICTS))assert.equal(v.carriers[id].verdict,want,'W1 '+id);
  assert.equal(v.carriers.d.bound,false);assert.equal(v.carriers['d->a'].bound,false);
  assert.equal(v.carriers['b->c'].telemetry,'silent');assert.equal(v.carriers['c->d'].telemetry,'degraded');assert.deepEqual(v.carriers['c->d'].failing,['errors']);
- assert.deepEqual(v.rollups,{bound:8,unbound:2,proven:3,degraded:2,unproven:2,liveEarly:1});
+ assert.deepEqual(v.rollups,{bound:8,unbound:2,proven:1,degraded:2,unproven:2,liveEarly:1});
  assert.deepEqual(v.steps,{s1:{verdict:'proven',label:'PROVEN'},s2:{verdict:'done-unproven',label:'DONE · UNPROVEN'},s3:{verdict:'active-failing',label:'IN PROGRESS · FAILING'}},'W2 step rollups over direct carriers');
  h.ctl.liveStatus.destroy();
 });
@@ -2146,8 +2146,8 @@ test('W3 verdicts follow Jira and telemetry changes and reach change subscribers
  assert.equal(typeof t.verdicts,'function','ctl.telemetry.verdicts exists');
  t.onChange(value=>seen.push(plain(value)));
  h.ctl.liveStatus.apply({...CUE_JIRA,'AA-1':{state:'active'}});
- assert.equal(t.verdicts().carriers.a.verdict,'active-live-early','W3 a Jira change re-judges');
- assert.ok(seen.length>=1,'W3 a Jira change notifies telemetry subscribers');assert.equal(seen[seen.length-1].verdicts.carriers.a.verdict,'active-live-early');
+ assert.equal(t.verdicts().carriers.a.verdict,'active','W3 a Jira change re-judges');
+ assert.ok(seen.length>=1,'W3 a Jira change notifies telemetry subscribers');assert.equal(seen[seen.length-1].verdicts.carriers.a.verdict,'active');
  t.apply({...CUE_MAP(),a:{signals:{lag:{value:900}}}});
  assert.equal(t.verdicts().carriers.a.verdict,'active-failing','W3 a telemetry change re-judges');assert.equal(seen[seen.length-1].verdicts.carriers.a.verdict,'active-failing');
  assert.equal(h.node('a').querySelector('.dv-metrics-seal').getAttribute('data-seal'),'degraded','W3 the canvas follows');
@@ -2167,7 +2167,7 @@ test('C1 Metrics on paints packet streams, red error packets, amber degraded edg
  assert.equal(h.stream(1).length,0,'C1 silent edge has no stream');assert.equal(h.ghost(1).length,1,'C1 silent Done edge has a ghost');
  assert.ok(h.edge(1).classList.contains('dv-metrics-silent'),'C1 dimmed stroke under the ghost');assert.equal(h.ghost(1)[0].getAttribute('data-dv-edge'),null,'C1 the ghost is not a second carrier');
  assert.equal(h.edge(3).getAttribute('data-metrics-state'),null,'C1 unbound edge unchanged');assert.equal(h.stream(3).length+h.ghost(3).length,0);
- assert.equal(h.edge(4).getAttribute('data-metrics-state'),'flowing');assert.equal(h.stream(4).length,0,'C1 only call and service edges stream');
+ assert.equal(h.edge(4).getAttribute('data-metrics-state'),'unmeasured');assert.equal(h.stream(4).length,0,'C1 only call and service edges stream');
  for(const i of [0,2])assert.equal(h.edge(i).classList.contains('dv-metrics-silent'),false);
  h.ctl.liveStatus.destroy();
 });
@@ -2175,11 +2175,12 @@ test('C1 Metrics on paints packet streams, red error packets, amber degraded edg
 test('C2 Metrics on gives bound nodes a sparkline strip and a proof seal, and leaves unbound nodes and text boxes alone',async()=>{
  const h=cueHarness();await h.on();
  const seal=id=>h.node(id).querySelector('.dv-metrics-seal'),spark=id=>h.node(id).querySelector('polyline.dv-metrics-sparkline');
- for(const [id,want] of [['a','proven'],['b','live-early'],['c','unproven'],['f','degraded']]){
+ for(const [id,want] of [['b','live-early'],['c','unproven'],['f','degraded']]){
   assert.ok(seal(id),'C2 seal on '+id);assert.equal(seal(id).getAttribute('data-seal'),want,'C2 seal kind on '+id);
   assert.equal(seal(id).getAttribute('transform'),'translate(110 45)','C2 bottom-right corner of the 120×55 card');
   assert.equal(h.node(id).getAttribute('data-metrics-verdict'),CUE_VERDICTS[id]);
  }
+ assert.equal(seal('a'),null,'C2 a maximum alone cannot earn a proof seal');
  assert.equal(spark('a'),null,'C2 no rate-like signal, no sparkline');
  const points=spark('b').getAttribute('points').trim().split(/\s+/).map(p=>p.split(',').map(Number));
  assert.equal(points.length,3,'C2 one point per series point');
@@ -2735,7 +2736,7 @@ test('Testing rolls into epic and initiative history while other demo container 
 test('Status Jira and Trace bodies are exclusive, remain instance-owned and preserve Jira state',()=>{
  const h=harness(fixture()),peer=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const m=mountStatus(h),other=mountStatus(peer);
  assert.equal(api.snapshot().mode,'jira');assert.ok(m.body.querySelector('table.dv-live-tickets'));
- api.setStatusMode('trace');assert.equal(api.snapshot().mode,'trace');assert.ok(m.body.querySelector('.dv-live-trace'));assert.equal(m.body.querySelector('table.dv-live-tickets'),null);assert.match(textOf(m.body),/Trace evidence unavailable/);
+ api.setStatusMode('trace');assert.equal(api.snapshot().mode,'trace');assert.ok(m.body.querySelector('.dv-live-trace'));assert.equal(m.body.querySelector('table.dv-live-tickets'),null);assert.match(textOf(m.body),/No traceMatch steps on this board/);
  assert.equal(peer.ctl.liveStatus.snapshot().mode,'jira');assert.equal(other.body.querySelector('.dv-live-trace'),null);
  api.setStatusMode('jira');assert.ok(m.body.querySelector('table.dv-live-tickets'));assert.equal(m.body.querySelector('.dv-live-trace'),null);assert.equal(api.state('AA-1').state,fixed['AA-1'].state);
  api.destroy();peer.ctl.liveStatus.destroy();

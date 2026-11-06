@@ -97,7 +97,7 @@
       var headings=el(el(table,'thead','head',''),'tr','row','');
       ['Carrier','Jira',proof.window+' window','Rate / In','Errors / Lag','p95 / Age','Since Done','Verdict','Link'].forEach(function(label,i){el(headings,'th',String(i),'',label).setAttribute('scope','col');});
       var rows=el(table,'tbody','rows','');proof.rows.forEach(function(item){
-        var row=el(rows,'tr',item.id,'dv-live-proof-row');row.setAttribute('data-proof-carrier',item.id);row.setAttribute('data-verdict',item.verdict || 'unobserved');row.setAttribute('data-telemetry',item.telemetry);
+        var row=el(rows,'tr',item.id,'dv-live-proof-row');row.setAttribute('data-loading',item.initialLoading?'true':'false');row.setAttribute('data-proof-carrier',item.id);row.setAttribute('data-verdict',item.verdict || 'unobserved');row.setAttribute('data-telemetry',item.telemetry);
         var carrier=el(row,'td','carrier','');el(carrier,'strong','title','',item.title);el(carrier,'div','identity','dv-live-proof-detail',item.id+' · '+item.kind);
         el(row,'td','jira','',item.tickets.length?item.tickets.join(', ')+' · '+item.jira:'No tickets');
         var chart=el(row,'td','chart','dv-live-proof-chart');
@@ -106,11 +106,11 @@
           if(item.chart.line){var line=el(svg,'polyline','series','dv-live-proof-series');line.setAttribute('points',item.chart.line);}
           item.chart.points.forEach(function(point,i){var dot=el(svg,'circle','point-'+i,'dv-live-proof-point');dot.setAttribute('cx',point.x);dot.setAttribute('cy',point.y);dot.setAttribute('r','1.8');});
           item.chart.markers.forEach(function(marker,i){var tick=el(svg,'line','marker-'+i,'dv-live-proof-marker');tick.setAttribute('x1',marker.x);tick.setAttribute('x2',marker.x);tick.setAttribute('y1','2');tick.setAttribute('y2','30');tick.setAttribute('data-kind',marker.kind);el(tick,'title','title','',marker.label);});
-        }else el(chart,'span','empty','', 'unobserved');
+        }else el(chart,'span','empty','',item.chart.pending?'Loading…':'unobserved');
         item.kpis.forEach(function(kpi,i){el(row,'td','kpi-'+i,'dv-live-proof-kpi',kpi.label+': '+kpi.text);});
         el(row,'td','since','dv-live-proof-since',item.since);
         var verdict=el(row,'td','verdict','');var pill=el(verdict,'span','pill','dv-live-state-pill dv-live-proof-pill',item.label);pill.setAttribute('data-proof-bucket',TELEMETRY_SEALS[item.verdict]==='live-early'?'liveEarly':TELEMETRY_SEALS[item.verdict] || 'neutral');
-        el(verdict,'div','evidence','dv-live-proof-detail',item.telemetry+(item.failing.length?' · failing: '+item.failing.join(', '):''));el(verdict,'div','predicate','dv-live-proof-predicate',item.predicate);
+        el(verdict,'div','evidence','dv-live-proof-detail',(item.initialLoading?'Loading…':item.telemetry)+(item.failing.length?' · failing: '+item.failing.join(', '):''));el(verdict,'div','predicate','dv-live-proof-predicate',item.predicate);
         var action=el(row,'td','link','');if(item.url){var anchor=link(action,'link',null,item.url);anchor.className='nbacklink dv-live-proof-link';anchor.setAttribute('aria-label','Open telemetry for '+item.title);anchor.setAttribute('title','Open telemetry for '+item.title);if(!anchor._proofIcon){anchor.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});anchor._proofIcon=true;}}
       });
     }
@@ -164,8 +164,8 @@
         metrics.environments.forEach(function(id){var option=el(select,'option',id,'',id);option.value=id;});select.value=metrics.environment;
         if(!select._liveChange){select._liveChange=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnvironment(select.value);};select.addEventListener('change',select._liveChange);}
       }
-      var message=trace.historical?'Traces are unavailable in Over time. Return to Live in Jira to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Enable traces to refresh explicit bindings.':'Enable traces to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
-      var status=el(body,'p','status','dv-trace-mode-status',[message,trace.status.note,trace.notice].filter(Boolean).join(' '));status.setAttribute('role','status');
+      var message=!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live in Jira to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Enable traces to refresh explicit bindings.':'Enable traces to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
+      var status=el(body,'p','status','dv-trace-mode-status',[message,trace.hasMappings?trace.status.note:'',trace.hasMappings?trace.notice:''].filter(Boolean).join(' '));status.setAttribute('role','status');
       if(trace.entries.length){
         el(body,'h3','candidates-title','','Returned traces');
         var list;
@@ -482,6 +482,7 @@ g.node[data-trace-tone],path.edge[data-trace-tone]{opacity:1!important}g.node[da
 .dv-live-activity-entry>a{margin-left:6px;}
 .dv-live-production{border-top:1px solid var(--explore-border);margin-top:8px;padding-top:8px;}
 .dv-live-production h3,.dv-live-production p{margin:4px 0;}
+.dv-live-production[data-loading="true"] .dv-live-production-verdict,.dv-live-proof-row[data-loading="true"] .dv-live-proof-pill{color:var(--dv-live-active,#2879d9);}
 .dv-live-production-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
 .dv-live-production-kpi{border:1px solid var(--explore-border);border-radius:5px;padding:6px;overflow-wrap:anywhere;}
 .dv-live-production-since{color:var(--dfaint);overflow-wrap:anywhere;}

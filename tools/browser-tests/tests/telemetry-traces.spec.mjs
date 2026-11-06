@@ -31,6 +31,7 @@ async function setup(page,server,{source='honeycomb',disabled,held=false}={}){
 for(const source of ['honeycomb','tempo'])test(`desktop ${source} runtime API through real async nested import, cached alternate and Over time`,async({page,server})=>{
  const h=await setup(page,server,{source}),root=h.root,id='outer::inner::a->outer::inner::b';await expect(metrics(root)).toHaveAttribute('aria-pressed','false');expect(h.bridge.calls).toHaveLength(0);await metrics(root).click();
  await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.exemplars?.length,id)).toBe(1);
+ await expect(root.locator('g.node[data-dv-node="local"] .dv-metrics-node')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.telemetry.verdicts().carriers.local.bound)).toBe(false);
  const all=await page.evaluate(()=>window.ctl.telemetry.bindings().map(b=>({id:b.id,sample:window.ctl.telemetry.snapshot().map[b.id]})));expect(all.some(b=>b.id==='local')).toBe(true);for(const b of all)expect(b.sample?.exemplars?.length,b.id).toBe(1);
  const e=await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id].exemplars[0],id),get=source==='tempo'?'get_tempo_trace':'get_trace',initial=h.bridge.calls.filter(c=>c.name===get).length;expect(initial).toBe(all.length);
  await page.evaluate(()=>{window.ctl.telemetry.snapshot();window.ctl.telemetry.verdicts();window.ctl.telemetry.retry();});await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);expect(h.bridge.calls.filter(c=>c.name===get)).toHaveLength(initial);

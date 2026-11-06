@@ -58,7 +58,7 @@ function createTelemetryProviders(page,win){
       var fn=range?part.adapter.options.history:part.adapter.options.provider;
       if(!fn){notes.push(part.definition.name+' historical metrics unsupported; samples are unobserved.');return {};}
       try{
-        var note='',partReport={note:function(text){note=text;}};
+        var note='',waiting={},partReport={note:function(text){note=text;if(!range && !retired && epoch===generation && !signal.aborted){part.resultNote=text;if(report && report.note)report.note(parts.map(function(p){return p.resultNote;}).filter(Boolean).join('; '));}},pending:function(id,name){if(range || retired || epoch!==generation || signal.aborted)return;waiting[JSON.stringify([id,name])]=[id,name];if(report && report.pending)report.pending(id,name);},settled:function(id,name,sample){if(range || retired || epoch!==generation || signal.aborted)return;delete waiting[JSON.stringify([id,name])];if(report && report.settled)report.settled(id,name,sample);}};
         var value;
         if(range){
           var identity=JSON.stringify([telemetryProviderConfig(current,ctl),part.adapter.options.historyKey?part.adapter.options.historyKey():null]);
@@ -67,16 +67,16 @@ function createTelemetryProviders(page,win){
           });value=saved.map;note=saved.note;
         }else value=await fn(bound,signal,partReport);
         if(retired || epoch!==generation || signal.aborted)return {};
-        if(note)notes.push(note);if(!range)part.map=value;return value;
+        if(note)notes.push(note);if(!range){part.map=value;part.resultNote=note;}return value;
       }catch(e){
         if(retired || epoch!==generation || signal.aborted)return {};
-        notes.push(e.message || part.definition.name+' unavailable.');if(e.state==='approval')approval=true;
+        part.resultNote=e.message || part.definition.name+' unavailable.';notes.push(part.resultNote);if(e.state==='approval')approval=true;
         // Grafana's established transient-error cache is source-local. Honeycomb
         // cannot turn a failed exact-result download into an observed sample.
         if(part.definition.name==='Honeycomb' || part.definition.name==='Traces')part.map={};
-        else Object.keys(part.map).forEach(function(id){var b=bound.find(function(b){return b.id===id;});Object.keys(part.map[id].signals || {}).forEach(function(name){var s=b && b.signals[name];if(!s || s.source==='cloudwatch' || s.source==='cloudwatchLogs')delete part.map[id].signals[name];});if(!Object.keys(part.map[id].signals).length)delete part.map[id];});
+        else Object.keys(part.map).forEach(function(id){var b=bound.find(function(b){return b.id===id;});Object.keys(part.map[id].signals || {}).forEach(function(name){var s=b && b.signals[name];if(!s || s.source==='cloudwatch' || s.source==='cloudwatchLogs' || s.source==='loki')delete part.map[id].signals[name];});if(!Object.keys(part.map[id].signals).length)delete part.map[id];});
         return range?{}:part.map;
-      }
+      }finally{if(!range && waiting)Object.keys(waiting).forEach(function(key){var pair=waiting[key];partReport.settled(pair[0],pair[1],null);});}
     }));
     if(retired || epoch!==generation || signal.aborted)throw new Error('Metrics session retired.');
     if(report && report.note)report.note(notes.join('; '));
@@ -84,7 +84,7 @@ function createTelemetryProviders(page,win){
     if(approval && !Object.keys(map).length){var error=new Error(notes.join('; '));error.state='approval';throw error;}
     return map;
   }
-  var options={environmentChanged:function(){generation++;bindingKey=bindingIdentity(ctl.telemetry.bindings());parts.forEach(function(p){p.bindingKey=bindingIdentity(scoped(ctl.telemetry.bindings(),p));p.map={};p.historyCache.clear();if(p.adapter.options.environmentChanged)p.adapter.options.environmentChanged();});},canChooseExemplar:function(id,token,traceId){var part=parts.find(function(p){return p.definition.name==='Traces';});return !!(!retired && part && part.available && part.adapter.options.canChooseExemplar(id,token,traceId));},chooseExemplar:function(id,token,traceId){var part=parts.find(function(p){return p.definition.name==='Traces';});if(retired || !part || !part.available)throw new Error('Trace selection unavailable.');return part.adapter.options.chooseExemplar(id,token,traceId);},available:false,source:function(){return parts.filter(function(p){return p.available;}).map(function(p){return p.definition.name;}).join(' / ');},provider:function(b,s,r){return run(b,s,r);},history:function(b,r,s,n){return run(b,s,n,r);},historyKey:function(){return parts.map(function(p){return [p.definition.name,p.adapter.options.historyKey?p.adapter.options.historyKey():null];});}};
+  var options={managesPending:true,traceStatus:function(){var part=parts.find(function(p){return p.definition.name==='Traces';});return {available:!!(part && part.available),note:part && (part.resultNote || part.note) || ''};},environmentChanged:function(){generation++;bindingKey=bindingIdentity(ctl.telemetry.bindings());parts.forEach(function(p){p.bindingKey=bindingIdentity(scoped(ctl.telemetry.bindings(),p));p.map={};p.resultNote='';p.historyCache.clear();if(p.adapter.options.environmentChanged)p.adapter.options.environmentChanged();});},canChooseExemplar:function(id,token,traceId){var part=parts.find(function(p){return p.definition.name==='Traces';});return !!(!retired && part && part.available && part.adapter.options.canChooseExemplar(id,token,traceId));},chooseExemplar:function(id,token,traceId){var part=parts.find(function(p){return p.definition.name==='Traces';});if(retired || !part || !part.available)throw new Error('Trace selection unavailable.');return part.adapter.options.chooseExemplar(id,token,traceId);},available:false,source:function(){return parts.filter(function(p){return p.available;}).map(function(p){return p.definition.name;}).join(' / ');},provider:function(b,s,r){return run(b,s,r);},history:function(b,r,s,n){return run(b,s,n,r);},historyKey:function(){return parts.map(function(p){return [p.definition.name,p.adapter.options.historyKey?p.adapter.options.historyKey():null];});}};
   return {options:options,attach:function(next,nextPage){
     current=nextPage || current;ctl=next;generation++;parts=[];bindingKey=bindingIdentity(ctl.telemetry.bindings());ensure();availability();
     off=ctl.telemetry.onChange(function(snapshot){

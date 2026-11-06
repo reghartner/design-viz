@@ -239,6 +239,7 @@ function createTelemetryHoneycomb(page,win,now,bound){
       var job=jobs[i],query,stage='Honeycomb run_query input';
       try{
         query=telemetryHoneycombQuery(job.query,config,contract);
+        if(report && report.pending)report.pending(job.id,job.name);
         stage='Honeycomb run_query';var result=await mcp.callTool(contract.server,'run_query',query.input,{signal:signal});
         if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
         if(result && result.isError)throw {code:'tool_error',message:telemetryProviderErrorText(result)};
@@ -249,11 +250,13 @@ function createTelemetryHoneycomb(page,win,now,bound){
         if(sample.observedAt && (!out.observedAt || Date.parse(sample.observedAt)>Date.parse(out.observedAt)))out.observedAt=sample.observedAt;
         var link=telemetryHoneycombPublicLink(job.links.query) || telemetryHoneycombUrl(meta.query_url,false);if(link)out.links.query=link;
         var dashboard=telemetryHoneycombPublicLink(job.links.dashboard);if(dashboard)out.links.dashboard=dashboard;
-        if(query.calculation.op==='COUNT')notes.push('Honeycomb COUNT counts source rows/events, not automatically requests.');
+        if(report && report.settled)report.settled(job.id,job.name,sample);
+        // COUNT semantics are presented on the corresponding carrier evidence.
       }catch(e){
         if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
         if(['tool_error','bad_request','transform_error'].indexOf(e && e.code)>=0)e=telemetryHoneycombError(telemetryProviderErrorText(e) || 'Tool failed; no measurement returned.');
         if(e && e.code==='query_unobserved')e=telemetryProviderStepError(e,stage);
+        if(report && report.settled)report.settled(job.id,job.name,null);
         var error=failure(e,signal,query && query.input);notes.push(job.id+' '+job.name+': '+error.message);
         if(e.code!=='query_unobserved')throw error;
       }

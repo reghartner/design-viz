@@ -109,10 +109,39 @@ function telemetryGrafanaLoki(payload){
     return single?[single]:[];
   }));
 }
+/* Conservative LogQL metric grammar for empty LIVE results. Strings cannot
+   smuggle function names; unsupported expressions remain unobserved. */
+function telemetryLokiCountingQuery(query){
+  if(typeof query!=='string')return false;
+  var text=query.replace(/"(?:\\.|[^"\\])*"|`[^`]*`/g,'Q').trim();
+  if(/["`]/.test(text))return false;
+  function unwrap(value){
+    value=value.trim();
+    if(value[0]!=='(')return null;
+    var depth=0;
+    for(var i=0;i<value.length;i++){if(value[i]==='(')depth++;if(value[i]===')' && --depth===0)return i===value.length-1?value.slice(1,-1):null;}
+    return null;
+  }
+  function metric(value,depth){
+    if(depth>8)return false;value=value.trim();
+    var inner=unwrap(value);if(inner!==null)return metric(inner,depth+1);
+    var sum=/^sum\s*(?:(?:by|without)\s*\([A-Za-z_][A-Za-z0-9_,\s]*\)\s*)?(\(.*?\))(?:\s*(?:by|without)\s*\([A-Za-z_][A-Za-z0-9_,\s]*\))?$/.exec(value);
+    if(sum){inner=unwrap(sum[1]);return inner!==null && metric(inner,depth+1);}
+    var range=/^(count_over_time|rate)\s*\((.*)\)$/.exec(value);
+    return !!range && /^\{\s*[A-Za-z_][A-Za-z0-9_]*\s*(?:=|!=|=~|!~)\s*Q(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*\s*(?:=|!=|=~|!~)\s*Q)*\s*\}(?:\s*(?:\|=|\|~|!=|!~)\s*Q)*\s*\[\s*(?:\d+(?:ms|s|m|h|d|w|y))+\s*\]$/.test(range[2].trim());
+  }
+  return metric(text,0);
+}
+function telemetryLokiEmpty(payload){
+  return !!payload && !payload.error && payload.status==='success' && payload.data &&
+    ['matrix','vector'].indexOf(payload.data.resultType)>=0 && Array.isArray(payload.data.result) && !payload.data.result.length ||
+    !!payload && !payload.error && (!payload.status || payload.status==='success') && Array.isArray(payload.data) && !payload.data.length;
+}
 /* query_cloudwatch returns a full-window Sum. Empty values/timestamps are
    unobserved even when statistics.sum is 0 or the response contains hints. */
+function telemetryGrafanaCloudwatchEmpty(payload){return !!payload && !payload.error && (!payload.status || payload.status==='success') && Array.isArray(payload.values) && Array.isArray(payload.timestamps) && !payload.values.length && !payload.timestamps.length;}
 function telemetryGrafanaCloudwatch(payload,statistic){
-  if(!payload || !Array.isArray(payload.values) || !Array.isArray(payload.timestamps) || !payload.values.length || payload.values.length!==payload.timestamps.length)return null;
+  if(!payload || payload.error || payload.status && payload.status!=='success' || !Array.isArray(payload.values) || !Array.isArray(payload.timestamps) || !payload.values.length || payload.values.length!==payload.timestamps.length)return null;
   var values=payload.values.map(telemetryGrafanaNumber),times=payload.timestamps.map(telemetryGrafanaNumber);
   if(values.some(function(v){return v===null;}) || times.some(function(t){return t===null || !isFinite(new Date(t).getTime());}))return null;
   if(values.length===1)return {value:values[0],observedAt:new Date(times[0]).toISOString()};
@@ -347,12 +376,22 @@ function createTelemetryGrafana(page,win,now,bound){
     var config=telemetryProviderConfig(current || {},ctl),windowMs=telemetryGrafanaWindowMs(config.window);
     var anchoredEnd=clock(),anchoredRange={from:new Date(anchoredEnd-windowMs).toISOString(),to:new Date(anchoredEnd).toISOString()};
     var range={from:'now-'+config.window,to:'now'},step=Math.max(60,Math.ceil(windowMs/1000/TELEMETRY_GRAFANA_POINTS));
-    var options=signal?{signal:signal}:undefined,failures=[],fatal=null,annotations=null,order=0;
-    function failed(rank,label,message){failures.push({rank:rank,text:label+': '+message});}
+    var options=signal?{signal:signal}:undefined,notices=[],failures=[],fatal=null,annotations=null,order=0,reportedNote=null;
+    function started(job,entry){if(report && report.pending)report.pending(job.id,entry.name);}
+    function settled(job,entry){
+      if(!report || !report.settled)return;var sample=null;
+      if(entry.points && entry.points.length)sample={value:entry.points[entry.points.length-1][1],series:entry.points,observedAt:new Date(entry.points[entry.points.length-1][0]).toISOString()};
+      else if(typeof entry.value==='number')sample={value:entry.value,observedAt:entry.observedAt || new Date(clock()).toISOString()};
+      else if(entry.points)sample={value:0,series:[],observedAt:new Date(clock()).toISOString()};
+      if(sample){if(entry.unit)sample.unit=entry.unit;if(entry.breakdown)sample.breakdown=entry.breakdown;}
+      report.settled(job.id,entry.name,sample);
+    }
+    function progressNote(){failures.sort(function(a,b){return a.rank-b.rank;});var note=!failures.length?'':failures.length===1?'1 Grafana query failed: '+failures[0].text:failures.length+' Grafana queries failed; first '+failures[0].text;var text=[note].concat(notices).filter(Boolean).join('; ');if(report && report.note && text!==reportedNote){reportedNote=text;report.note(text);}}
+    function failed(rank,label,message){failures.push({rank:rank,text:label+': '+message});if(report && report.pending)progressNote();}
     // A query's failure: its own (tool_error, bad input) or the refresh's (everything else).
     function caught(rank,label,repeat,entry){return function(error){
       if(signal && signal.aborted)return;
-      if(entry && (entry.source==='cloudwatch' || entry.source==='cloudwatchLogs') && ['approval_required','consent_required','user_changed','needs_reauth'].indexOf(code(error))<0){entry.failed=true;failed(rank,label,(code(error)==='not_in_manifest'?'This page cannot call CloudWatch ('+repeat.tool+') for your account. Re-export with this signal enabled.':detail(error)));return;}
+      if(entry && (entry.source==='cloudwatch' || entry.source==='cloudwatchLogs' || entry.source==='loki') && ['approval_required','consent_required','user_changed','needs_reauth'].indexOf(code(error))<0){entry.failed=true;failed(rank,label,(code(error)==='not_in_manifest' && entry.source!=='loki'?'This page cannot call CloudWatch ('+repeat.tool+') for your account. Re-export with this signal enabled.':detail(error)));return;}
       if(['tool_error','bad_request','transform_error'].indexOf(code(error))>=0){if(entry)entry.failed=true;if(label)failed(rank,label,detail(error));return;}
       if(!fatal)fatal={error:error,repeat:repeat};
     };}
@@ -377,16 +416,22 @@ function createTelemetryGrafana(page,win,now,bound){
             if(/\$(?:account\b|\{account\})/.test(query.accountId)){failed(rank,label,'set tracking.telemetry.grafana.accountId for $account');return;}
             var input={datasourceUid:uid,namespace:query.namespace,metricName:query.metric,region:query.region,accountId:query.accountId,
               dimensions:query.dimensions,statistic:query.statistic,period:Math.ceil(windowMs/1000),start:range.from,end:range.to};
-            tasks.push(function(){return call('query_cloudwatch',input).then(function(result){
-              var sample=telemetryGrafanaCloudwatch(telemetryGrafanaPayload(result),query.statistic);
-              if(!sample){failed(rank,label,'query_cloudwatch returned no observation; check account, region and dimensions');return;}
+            started(job,entry);tasks.push(function(){return call('query_cloudwatch',input).then(function(result){
+              var payload=telemetryGrafanaPayload(result);
+              if(telemetryGrafanaCloudwatchEmpty(payload)){
+                if(query.missingMeansZero===true){entry.value=0;entry.observedAt=new Date(clock()).toISOString();}
+                else{notices.push(label+': no data points yet');if(report && report.pending)progressNote();}
+                return;
+              }
+              var sample=telemetryGrafanaCloudwatch(payload,query.statistic);
+              if(!sample){entry.failed=true;failed(rank,label,'query_cloudwatch returned a malformed observation');return;}
               entry.value=sample.value;entry.observedAt=sample.observedAt;
-            }).catch(caught(rank,label,{tool:'query_cloudwatch',input:input},entry));});
+            }).catch(caught(rank,label,{tool:'query_cloudwatch',input:input},entry)).finally(function(){settled(job,entry);});});
             return;
           }
           if(entry.source==='cloudwatchLogs'){
             var q=entry.query,logRange=q.breakdown?anchoredRange:range,input={datasourceUid:uid,region:q.region,logGroups:q.logGroups,queryString:q.query,start:logRange.from,end:logRange.to,limit:100};
-            tasks.push(function(){return call('query_cloudwatch_logs',input).then(function(result){
+            started(job,entry);tasks.push(function(){return call('query_cloudwatch_logs',input).then(function(result){
               entry.value=telemetryGrafanaCloudwatchLogs(telemetryGrafanaPayload(result),q);entry.observedAt=new Date(clock()).toISOString();
               if(!q.breakdown || signal && signal.aborted)return;
               if(entry.breakdownError){entry.breakdown=telemetryLogDetails({status:'error',error:entry.breakdownError});failed(rank,label+' log details',entry.breakdown.error);return;}
@@ -396,7 +441,7 @@ function createTelemetryGrafana(page,win,now,bound){
                 if(code(error)==='user_changed'){if(!fatal)fatal={error:error,repeat:{tool:'query_cloudwatch_logs',input:detailsInput}};return;}
                 entry.breakdown=telemetryLogDetails({status:'error',error:detail(error)});failed(rank,label+' log details',entry.breakdown.error);
               });
-            }).catch(caught(rank,label,{tool:'query_cloudwatch_logs',input:input},entry));});
+            }).catch(caught(rank,label,{tool:'query_cloudwatch_logs',input:input},entry)).finally(function(){settled(job,entry);});});
             return;
           }
           if(entry.source==='sql'){
@@ -404,20 +449,28 @@ function createTelemetryGrafana(page,win,now,bound){
             var key=(config.environment || '')+'\n'+uid+'\n'+entry.query,cached=sql[key];
             if(cached && clock()-cached.at<TELEMETRY_GRAFANA_SQL_MS){if(cached.value!==null)entry.value=cached.value;else entry.failed=true;return;}
             var input={datasourceUid:uid,query:entry.query},attempt={at:clock(),value:cached?cached.value:null};
-            tasks.push(function(){sql[key]=attempt;return call('query_sql',input).then(function(result){
+            started(job,entry);tasks.push(function(){sql[key]=attempt;return call('query_sql',input).then(function(result){
               var value=telemetryGrafanaSql(result && result.payload);
               if(value===null){entry.failed=true;failed(rank,label,'query_sql returned no number');return;}
               attempt.value=entry.value=value;
-            },caught(rank,label,{tool:'query_sql',input:input},entry));});
+            },caught(rank,label,{tool:'query_sql',input:input},entry)).finally(function(){settled(job,entry);});});
             return;
           }
           var loki=entry.source==='loki',tool=loki?'query_loki_logs':'query_prometheus';
           var query=loki?{datasourceUid:uid,logql:entry.query,startRfc3339:range.from,endRfc3339:range.to,queryType:'range',stepSeconds:step}:
             {datasourceUid:uid,expr:entry.query,startTime:range.from,endTime:range.to,stepSeconds:step,queryType:'range'};
-          tasks.push(function(){return call(tool,query).then(function(result){
-            entry.points=(loki?telemetryGrafanaLoki:telemetryGrafanaPrometheus)(result && result.payload);
+          started(job,entry);tasks.push(function(){return call(tool,query).then(function(result){
+            var payload=telemetryGrafanaPayload(result);
+            if(loki){
+              if(payload && payload.status && payload.status!=='success' || payload && payload.error)throw {code:'tool_error',message:'Loki query failed'};
+              var data=payload && payload.data && Array.isArray(payload.data.result)?{data:payload.data.result}:payload;
+              var points=payload && payload.data && payload.data.resultType==='streams'?[]:telemetryGrafanaLoki(data);
+              if(points.length)entry.points=points;
+              else if(telemetryLokiEmpty(payload) && telemetryLokiCountingQuery(entry.query))entry.value=0;
+              else notices.push(label+': no numeric observation');
+            }else entry.points=telemetryGrafanaPrometheus(payload);
             var url=telemetryGrafanaUrl(result && result.payload && result.payload.exploreUrl);if(url)entry.exploreUrl=url;
-          },caught(rank,label,{tool:tool,input:query},entry));});
+          }).catch(caught(rank,label,{tool:tool,input:query},entry)).finally(function(){settled(job,entry);});});
         });});
         // Explore links: once per carrier and page load, unless the author linked a query.
         jobs.forEach(function(job){
@@ -451,7 +504,7 @@ function createTelemetryGrafana(page,win,now,bound){
           var sample=null,previous=last[job.id] && last[job.id].signals[entry.name];
           if(entry.points)sample={value:entry.points.length?entry.points[entry.points.length-1][1]:0,series:entry.points};
           else if(typeof entry.value==='number'){sample={value:entry.value};if(entry.observedAt)sample.observedAt=entry.observedAt;}
-          else if(entry.failed && previous && entry.source!=='cloudwatch' && entry.source!=='cloudwatchLogs' && !entry.error)sample=JSON.parse(JSON.stringify(previous));
+          else if(entry.failed && previous && entry.source!=='cloudwatch' && entry.source!=='cloudwatchLogs' && entry.source!=='loki' && !entry.error)sample=JSON.parse(JSON.stringify(previous));
           if(!sample)return;
           if(entry.breakdown)sample.breakdown=entry.breakdown;
           if(entry.unit)sample.unit=entry.unit;else delete sample.unit;
@@ -469,9 +522,7 @@ function createTelemetryGrafana(page,win,now,bound){
         if(query)out.links.query=query;
         map[job.id]=out;
       });
-      failures.sort(function(a,b){return a.rank-b.rank;});
-      var note=!failures.length?'':failures.length===1?'1 Grafana query failed: '+failures[0].text:failures.length+' Grafana queries failed; first '+failures[0].text;
-      if(report && typeof report.note==='function')report.note(note);
+      progressNote();
       last=map;lastMarkers=markers;
       return JSON.parse(JSON.stringify(map));
     },function(error){if(signal && signal.aborted)throw telemetryGrafanaError('Grafana refresh cancelled');return refuse(error,signal,null);});

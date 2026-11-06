@@ -78,7 +78,7 @@ const TICKET = {testing:'BE-8', done: 'BE-1', active: 'BE-2', todo: 'BE-3', bloc
    null = no tickets); columns are the telemetry state its sample produces. */
 const COLUMNS = ['silent', 'flowing', 'degraded', 'unobserved'];
 const MATRIX = [
-  ['done', 'done-unproven', 'proven', 'done-degraded', 'done'],
+  ['done', 'done-unproven', 'proven', 'done-degraded', 'done-traffic-unmeasured'],
   ['active', 'active', 'active-live-early', 'active-failing', 'active'],
   ['testing', 'testing', 'testing-live-early', 'testing-failing', 'testing'],
   ['todo', 'todo', 'todo-already-live', 'todo-failing', 'todo'],
@@ -89,7 +89,7 @@ const MATRIX = [
 ];
 const FAILING = {silent: ['rate'], flowing: [], degraded: ['errors'], unobserved: []};
 const LABELS = {
-  proven: 'PROVEN', 'done-unproven': 'DONE · UNPROVEN', 'done-degraded': 'DONE · DEGRADED', done: 'DONE',
+  'done-traffic-unmeasured': 'DONE · traffic not measured', proven: 'PROVEN', 'done-unproven': 'DONE · UNPROVEN', 'done-degraded': 'DONE · DEGRADED', done: 'DONE',
   active: 'IN PROGRESS', 'active-live-early': 'IN PROGRESS · LIVE EARLY', 'active-failing': 'IN PROGRESS · FAILING',
   testing: 'TESTING', 'testing-live-early': 'TESTING · LIVE EARLY', 'testing-failing': 'TESTING · FAILING',
   todo: 'TODO', 'todo-already-live': 'TODO · ALREADY LIVE?', 'todo-failing': 'TODO · FAILING',
@@ -118,7 +118,8 @@ test('every verdict-matrix cell: Jira state x telemetry state', () => {
 });
 
 test('verdict labels name every matrix verdict', () => {
-  const out = judge(matrixPage()), seen = new Set();
+  const input=matrixPage();input.carriers.push({id:'pending-other',tickets:['BE-1'],...CALL});input.telemetryMap['pending-other']={signals:{rate:{value:30}}};
+  const out = judge(input), seen = new Set(['done']);assert.equal(out.carriers['pending-other'].label,LABELS.done);
   for (const [jira, ...verdicts] of MATRIX) COLUMNS.forEach((column, index) => {
     const verdict = verdicts[index], got = out.carriers[(jira || 'none') + ':' + column];
     assert.equal(got.label, verdict === null ? null : LABELS[verdict], (jira || 'none') + ' x ' + column + ': label');
@@ -162,7 +163,7 @@ const LIMITS = [
   ['without value the last series point is the headline (fails)', QUEUE, {in: {series: [[T0, 40], [T0 + H, 2]]}, lag: 0, age: 0}, 'degraded', ['in']],
   ['value wins over the series tail', QUEUE, {in: {value: 40, series: [[T0, 2]]}, lag: 0, age: 0}, 'flowing', []],
 ];
-const DONE_VERDICT = {flowing: 'proven', degraded: 'done-degraded', unobserved: 'done', silent: 'done-unproven'};
+const DONE_VERDICT = {unmeasured: 'done-traffic-unmeasured', flowing: 'proven', degraded: 'done-degraded', unobserved: 'done', silent: 'done-unproven'};
 
 test('proof limits: min, max and maxRatioOf', () => {
   for (const [name, binding, values, telemetry, failing] of LIMITS) {
@@ -184,19 +185,19 @@ const PRESENCE = [
   ['a sample without signals', CALL, {signals: {}}, 'unobserved'],
   ['readings that are not finite numbers', CALL, {signals: {rate: {value: 'n/a'}, errors: {value: null}, p95: {series: [[T0, NaN]]}}}, 'unobserved'],
   ['every rate-like signal zero over the window is silent', LOG, {signals: {count: {value: 0, series: [[T0, 0], [T0 + H, 0]]}}}, 'silent'],
-  ['zero now but traffic earlier in the window is not silent', LOG, {signals: {count: {value: 0, series: [[T0, 4], [T0 + H, 0]]}}}, 'flowing'],
+  ['zero now but traffic earlier in the window is not silent', LOG, {signals: {count: {value: 0, series: [[T0, 4], [T0 + H, 0]]}}}, 'unmeasured'],
   ['one rate-like signal pending and the rest zero is not yet silent', CALL, {signals: {rate: {value: 0}}}, 'unobserved'],
   ['a maxRatioOf numerator is rate-like without a per-time unit: errors at zero rate are not silent', COUNTS, {signals: {rate: {value: 0}, errors: {value: 3}}}, 'degraded'],
   ['a maxRatioOf denominator is rate-like without a limit or unit: pending total is not yet silent', RATIO_ONLY, {signals: {fails: {value: 0}}}, 'unobserved'],
   ['a per-time unit makes a signal rate-like without any limit', {kind: 'device', signals: {presses: {source: 'grafana', query: 'sum(rate(button_press_total[5m]))*3600', unit: 'presses/h'}, battery: {source: 'grafana', query: 'min(battery_percent)', unit: '%'}}},
     {signals: {presses: {value: 0}, battery: {value: 80}}}, 'silent'],
-  ['without rate-like signals a carrier is never silent', {kind: 'queue', signals: {lag: QUEUE.signals.lag}, proof: {lag: {max: 500}}}, {signals: {lag: {value: 0}}}, 'flowing'],
+  ['without rate-like signals a carrier is never silent', {kind: 'queue', signals: {lag: QUEUE.signals.lag}, proof: {lag: {max: 500}}}, {signals: {lag: {value: 0}}}, 'unmeasured'],
 ];
 
 test('silent vs unobserved vs unbound', () => {
   for (const [name, binding, sample, telemetry] of PRESENCE) {
     const got = judge({carriers: [{id: 'c', tickets: ['BE-1'], ...binding}], jiraMap: JIRA, telemetryMap: sample ? {c: sample} : {}}).carriers.c;
-    assert.deepEqual({bound: got.bound, telemetry: got.telemetry, verdict: got.verdict}, {bound: true, telemetry, verdict: DONE_VERDICT[telemetry]}, name);
+    assert.deepEqual({bound: got.bound, telemetry: got.telemetry, verdict: got.verdict}, {bound: true, telemetry, verdict: telemetry==='unobserved' && !Number.isFinite(sample?.signals?.rate?.value) ? 'done-traffic-unmeasured' : DONE_VERDICT[telemetry]}, name);
   }
   const unbound = judge({carriers: [
     {id: 'empty-signals', tickets: ['BE-1'], kind: 'call', signals: {}, proof: {rate: {min: 10}}},
@@ -253,7 +254,7 @@ const STEPS = [
   ['all proven', ['proven-a', 'canon::api'], 'proven'],
   ['one silent carrier leaves a done step unproven', ['proven-a', 'done-unproven'], 'done-unproven'],
   ['degraded outranks silent', ['done-unproven', 'proven-a', 'done-degraded'], 'done-degraded'],
-  ['pending telemetry keeps the Jira state', ['proven-a', 'done-unobserved'], 'done'],
+  ['pending minimum observation is not measured traffic', ['proven-a', 'done-unobserved'], 'done-traffic-unmeasured'],
   ['silent outranks pending', ['done-unobserved', 'done-unproven'], 'done-unproven'],
   ['active work wins the Jira axis', ['proven-a', 'active-silent'], 'active'],
   ['live early needs every carrier flowing', ['proven-a', 'active-live-early'], 'active-live-early'],
@@ -300,4 +301,53 @@ test('ships in the validator runtime bundle next to the other core modules', () 
   assert.ok(sourceFiles('validator.js').includes('core/proof.js'), 'src/source-bundles.json lists core/proof.js in validator.js');
   const V = {URL}; vm.createContext(V); vm.runInContext(readSource('validator.js'), V);
   assert.deepEqual(judge(matrixPage(), {}, V), judge(matrixPage()), 'the bundled engine gives the same verdicts');
+});
+
+test('authored observed minimum gates proof for local/imported/nested/overlay/loaded numeric carriers',()=>{
+ const cases=[
+  ['errors-only',{}, {errors:{max:0}}, {errors:0},'unmeasured','done-traffic-unmeasured',[]],
+  ['arbitrary event count and zero errors',{}, {errors:{max:0}}, {total:18,errors:0},'unmeasured','done-traffic-unmeasured',[]],
+  ['no limits',{}, {}, {total:18},'unmeasured','done-traffic-unmeasured',[]],
+  ['max only',{}, {total:{max:20}}, {total:18},'unmeasured','done-traffic-unmeasured',[]],
+  ['max fails',{}, {total:{max:10}}, {total:18},'degraded','done-degraded',['total']],
+  ['per-time without min',{total:'events/h'}, {}, {total:18},'unmeasured','done-traffic-unmeasured',[]],
+  ['no minima or observations',{}, {}, {},'unobserved','done-traffic-unmeasured',[]],
+  ['min read missing',{}, {total:{min:1}}, {errors:0},'unobserved','done-traffic-unmeasured',[]],
+  ['min actual zero',{}, {total:{min:1}}, {total:0},'silent','done-unproven',['total']],
+  ['zero floor silent',{}, {total:{min:0}}, {total:0},'silent','done-unproven',[]],
+  ['positive pass',{}, {total:{min:1}}, {total:18},'flowing','proven',[]],
+  ['positive fail',{}, {total:{min:20}}, {total:18},'degraded','done-degraded',['total']],
+  ['ratio without minimum',{}, {errors:{max:.1,maxRatioOf:'total'}}, {total:18,errors:0},'unmeasured','done-traffic-unmeasured',[]],
+  ['ratio pending',{}, {total:{min:1},errors:{max:.1,maxRatioOf:'total'}}, {total:18},'unobserved','done',[]],
+  ['ratio fails',{}, {total:{min:1},errors:{max:.1,maxRatioOf:'total'}}, {total:18,errors:5},'degraded','done-degraded',['errors']],
+ ];
+ for(const [name,units,proof,values,state,verdict,failing] of cases)for(const id of ['local','direct::api','outer::inner::api','overlay::api','loaded::api']){
+  const carrier={id,tickets:['BE-1'],signals:Object.fromEntries(['total','errors'].map(n=>[n,{source:'grafana',query:n,unit:units[n]}])),proof};
+  const sample={signals:Object.fromEntries(Object.entries(values).map(([n,value])=>[n,{value}]))};
+  const out=judge({carriers:[carrier],jiraMap:JIRA,telemetryMap:{[id]:sample},steps:[{id:'step',carriers:[id]}]});
+  assert.deepEqual([out.carriers[id].telemetry,out.carriers[id].verdict,out.carriers[id].failing],[state,verdict,failing],id+' '+name);
+  assert.equal(out.steps.step.verdict,verdict,id+' '+name+' step');
+  if(verdict==='done-traffic-unmeasured')assert.equal(out.carriers[id].label,'DONE · traffic not measured');
+  for(const jira of ['active','testing','todo']){
+   carrier.tickets=[TICKET[jira]];const result=judge({carriers:[carrier],jiraMap:JIRA,telemetryMap:{[id]:sample}}).carriers[id];
+   if(state==='unmeasured')assert.equal(result.verdict,jira,name+' cannot invent live early');
+  }
+ }
+});
+
+test('trace declarations never participate in numeric proof, including misleading names and samples',()=>{
+ for(const trace of [{source:'tempo',query:'{}'},{source:'honeycomb',query:{query_spec:{}}}]){
+  const carrier={id:'shared::api',tickets:['BE-1'],signals:{rate:trace},proof:{rate:{min:1}}};
+  const telemetryMap={'shared::api':{signals:{rate:{value:500}}}};
+  assert.equal(judge({carriers:[carrier],jiraMap:JIRA,telemetryMap}).carriers[carrier.id].bound,false);
+  carrier.signals.count={source:'grafana',query:'count'};carrier.proof.count={min:1};telemetryMap[carrier.id].signals.count={value:2};
+  const result=judge({carriers:[carrier],jiraMap:JIRA,telemetryMap}).carriers[carrier.id];
+  assert.equal(result.verdict,'proven');assert.deepEqual(result.failing,[]);
+ }
+});
+
+test('trace ratio targets do not participate in scalar limits or traffic classification',()=>{
+ const carrier={id:'a',tickets:['BE-1'],signals:{events:{source:'grafana',query:'count'},trace:{source:'tempo',query:'{}'}},proof:{events:{min:1,max:1,maxRatioOf:'trace'}}};
+ const result=judge({carriers:[carrier],jiraMap:JIRA,telemetryMap:{a:{signals:{events:{value:5}}}}}).carriers.a;
+ assert.equal(result.telemetry,'unmeasured');assert.equal(result.verdict,'done-traffic-unmeasured');assert.deepEqual(result.failing,[]);
 });

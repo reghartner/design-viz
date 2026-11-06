@@ -186,7 +186,7 @@ function telemetryUnknown(value,allowed,warn,prefix){
 }
 /* CloudWatch supports one full-window scalar. Preserve dimension case. */
 function telemetryCloudwatchQuery(query){
-  return telemetryObject(query) && ['namespace','metric','region','accountId'].every(function(key){return telemetryText(query[key]);}) &&
+  return telemetryObject(query) && (!telemetryOwn(query,'missingMeansZero') || typeof query.missingMeansZero==='boolean') && ['namespace','metric','region','accountId'].every(function(key){return telemetryText(query[key]);}) &&
     (['Sum','Maximum','Minimum','Average','SampleCount'].indexOf(query.statistic)>=0 || typeof query.statistic==='string' && /^\$(?:[A-Za-z][A-Za-z0-9_]*|\{[A-Za-z][A-Za-z0-9_]*\})$/.test(query.statistic)) && telemetryObject(query.dimensions) && Object.keys(query.dimensions).every(function(key){return telemetryText(key) && telemetryText(query.dimensions[key]);});
 }
 function telemetryLogBreakdownQuery(value){
@@ -210,7 +210,7 @@ function telemetrySignal(name,value,warn){
   var source=sources[0],query=value[source];
   if(source==='cloudwatch'){
     if(!telemetryCloudwatchQuery(query)){warn(at,'cloudwatch requires namespace, metric, region, accountId, string dimensions and statistic: Sum, Maximum, Minimum, Average or SampleCount — signal ignored');return null;}
-    telemetryUnknown(query,['namespace','metric','region','accountId','dimensions','statistic'],warn,at+'.cloudwatch');
+    telemetryUnknown(query,['namespace','metric','region','accountId','dimensions','statistic','missingMeansZero'],warn,at+'.cloudwatch');
   }else if(source==='cloudwatchLogs'){
     if(!telemetryCloudwatchLogsQuery(query)){warn(at,'cloudwatchLogs requires logGroups, query, region; breakdown needs query, labelField, valueField, limit 1–100 and at most 4 text columns — signal ignored');return null;}
     telemetryUnknown(query,['logGroups','query','region','valueField','breakdown'],warn,at+'.cloudwatchLogs');

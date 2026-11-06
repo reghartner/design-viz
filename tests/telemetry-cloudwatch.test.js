@@ -14,8 +14,9 @@ function importedPage(C,literal){
  if(literal)consumer.page.sections[0].diagram.nodes.local.telemetry.signals.matched.cloudwatch.accountId=literal;
  return C.normalize(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]}));
 }
-async function setup({answer=()=>sample(24114),tools=['query_cloudwatch'],literal}={}){
+async function setup({answer=()=>sample(24114),tools=['query_cloudwatch'],literal,missingMeansZero}={}){
  const C=context(),p=importedPage(C,literal),calls=[];
+ if(missingMeansZero!==undefined){const visit=v=>{if(!v || typeof v!=='object')return;if(v.cloudwatch && typeof v.cloudwatch==='object')v.cloudwatch.missingMeansZero=missingMeansZero;Object.values(v).forEach(visit);};visit(p);}
  const adapter=C.createTelemetryProviders(p,{claude:{use:async()=>({listTools:async()=>[{server:'Grafana',tools}],callTool:async(server,tool,input,options)=>{calls.push({tool,input:plain(input),signal:options?.signal});return {payload:await answer(input,calls.length)};}})}});
  const carriers=fn=>C.sectionRecords(p).forEach(r=>{const d=r.section.diagram;Object.entries(d.nodes).forEach(([id,node])=>fn(node,id,p));d.edges.forEach(e=>fn(e,e.from+'->'+e.to,p));});
  const api=C.createTelemetry(p,adapter.options,{carriers}),handle=adapter.attach({telemetry:api},p);await settle();
@@ -37,7 +38,7 @@ test('CloudWatch exact window/account/dimensions on local and resolved imported 
 });
 test('successful empty or malformed results clear obsolete samples; real zero remains observed',async t=>{
  let payload=sample(24114);const h=await setup({answer:()=>payload});t.after(()=>h.close());h.api.setEnabled(true);await settle();
- payload={timestamps:[],values:[],statistics:{sum:0},hints:['Specify accountId']};h.api.retry();await settle();assert.deepEqual(plain(h.api.snapshot().map),{});assert.match(h.api.status().note,/query_cloudwatch returned no observation/);
+ payload={timestamps:[],values:[],statistics:{sum:0},hints:['Specify accountId']};h.api.retry();await settle();assert.deepEqual(plain(h.api.snapshot().map),{});assert.match(h.api.status().note,/no data points yet/);assert.doesNotMatch(h.api.status().note,/failed/);
  payload=sample(0);h.api.retry();await settle();assert.equal(h.api.snapshot().map.local.signals.matched.value,0);assert.equal(h.api.status().note,'');
  payload={timestamps:[1793827860000],values:['bad'],statistics:{sum:0}};h.api.retry();await settle();assert.deepEqual(plain(h.api.snapshot().map),{});
 });
@@ -67,7 +68,7 @@ test('validator and desktop editor preserve structured queries and reject unsupp
  assert.equal(C.carrierTelemetry(raw,{},(at,msg)=>warnings.push(msg)).signals.matched.source,'cloudwatch');assert.deepEqual(warnings,[]);assert.equal(JSON.stringify(raw),before);
  assert.deepEqual(plain(C.telemetryQueryValue('cloudwatch',JSON.stringify(query())).value),query());
  assert.deepEqual(JSON.parse(C.telemetryQueryText('cloudwatch',query())),query());
- for(const patch of [{statistic:'Median'},{metric:''},{accountId:''},{dimensions:{RuleName:5}}]){const q={...query(),...patch},warn=[];const b=C.carrierTelemetry({telemetry:{kind:'service',signals:{bad:{cloudwatch:q},good:{grafana:'up'}}}},{},(at,msg)=>warn.push(msg));assert.equal(b.signals.bad,undefined);assert.ok(b.signals.good);assert.match(warn.join(' '),/cloudwatch requires/);assert.ok(C.telemetryQueryValue('cloudwatch',JSON.stringify(q)).error);}
+ for(const patch of [{statistic:'Median'},{metric:''},{accountId:''},{dimensions:{RuleName:5}},{missingMeansZero:'true'}]){const q={...query(),...patch},warn=[];const b=C.carrierTelemetry({telemetry:{kind:'service',signals:{bad:{cloudwatch:q},good:{grafana:'up'}}}},{},(at,msg)=>warn.push(msg));assert.equal(b.signals.bad,undefined);assert.ok(b.signals.good);assert.match(warn.join(' '),/cloudwatch requires/);assert.ok(C.telemetryQueryValue('cloudwatch',JSON.stringify(q)).error);}
  const unknown=[];C.carrierTelemetry({telemetry:{kind:'service',signals:{bad:{unknown:'q'}}}},{},(at,msg)=>unknown.push(msg));assert.match(unknown.join(' '),/exactly one of/);
 });
 
@@ -84,4 +85,17 @@ for(const window of ['-6h','now-6h',' -24h '])test('relative '+window+' drives C
  assert.equal(h.calls.length,12);assert.ok(h.calls.every(c=>c.input.period===seconds&&c.input.start==='now-'+duration&&c.input.end==='now'));
  for(const id of ['local','shared::api','local->other','shared::api->shared::store'])assert.equal(h.api.snapshot().map[id].signals.matched.value,24114);
  assert.equal(JSON.stringify(h.p),before,'querying leaves authored window intact');
+});
+
+test('missingMeansZero defaults false and only opts successful empty arrays into observed zero for every origin',async t=>{
+ for(const opt of [undefined,false,true]){
+  let payload={timestamps:[],values:[],statistics:{sum:0},hints:['No samples']};
+  const h=await setup({missingMeansZero:opt,answer:()=>payload});t.after(()=>h.close());h.api.setEnabled(true);await settle();
+  for(const id of ['local','local->other','shared::api','shared::api->shared::store'])assert.equal(h.api.snapshot().map[id]?.signals.matched.value,opt===true?0:undefined);
+  assert.doesNotMatch(h.api.status().note,/failed/);
+  for(const malformed of [{values:[],timestamps:[1]},{values:[]},{status:'error',values:[],timestamps:[]},{values:['bad'],timestamps:[1]}]){
+   payload=malformed;h.api.retry();await settle();assert.deepEqual(plain(h.api.snapshot().map),{});assert.match(h.api.status().note,/failed/);
+  }
+  payload=sample(0);h.api.retry();await settle();assert.equal(h.api.snapshot().map.local.signals.matched.value,0);
+ }
 });

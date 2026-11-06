@@ -25,12 +25,13 @@ function liveStatusProofPresentation(snapshot,window){
   var observed=snapshot.carriers.some(function(binding){
     if(!snapshot.verdicts.carriers[binding.id].bound)return false;
     var sample=(snapshot.map || {})[binding.id];
-    return Object.keys(binding.signals).some(function(name){
+    return telemetryMetricNames(binding).some(function(name){
       var entry=sample && sample.signals && sample.signals[name];
       return telemetryObject(entry) && (telemetryNumber(entry.value) || Array.isArray(entry.series) && entry.series.some(telemetryPoint));
     });
   });
-  if(!observed)return null;
+  var pending=snapshot.pending || {},querying=snapshot.carriers.some(function(binding){return telemetryMetricNames(binding).some(function(name){return pending[binding.id] && pending[binding.id][name];});});
+  if(!observed && !querying)return null;
   var counts=Object.assign({},snapshot.verdicts.rollups),offset=0;
   counts.neutral=counts.bound-counts.proven-counts.degraded-counts.unproven-counts.liveEarly;
   var arcs=['proven','degraded','unproven','liveEarly'].map(function(key){
@@ -40,14 +41,15 @@ function liveStatusProofPresentation(snapshot,window){
   function number(value){return Number(value.toPrecision(4)).toLocaleString('en-US');}
   function predicate(binding,names){
     var words=[];
-    (names || Object.keys(binding.proof || {})).forEach(function(name){
-      var limit=binding.proof[name],unit=binding.signals[name] && binding.signals[name].unit || '';
+    (names || telemetryMetricProofNames(binding)).forEach(function(name){
+      var limit=binding.proof[name];if(proofVerdicts.isTraceSignal(binding.signals[name]))return;var unit=binding.signals[name] && binding.signals[name].unit || '';
       if(telemetryNumber(limit.min))words.push(name+' at least '+number(limit.min)+(unit?' '+unit:''));
       if(telemetryNumber(limit.max))words.push(limit.maxRatioOf?name+' no more than '+number(limit.max*100)+'% of '+limit.maxRatioOf:name+' at most '+number(limit.max)+(unit?' '+unit:''));
     });
     return words.length?words.join('; '):'Observed signals; no authored thresholds';
   }
   var rows=snapshot.carriers.filter(function(binding){return snapshot.verdicts.carriers[binding.id].bound;}).map(function(binding){
+    var waiting=pending[binding.id] || {},loading=telemetryMetricNames(binding).some(function(name){return waiting[name];}),measured=telemetryMetricNames(binding).some(function(name){return telemetryReading(snapshot.map[binding.id],name).value!==null;});
     var result=snapshot.verdicts.carriers[binding.id],sample=snapshot.map[binding.id],primary=telemetryPrimary(binding,true),queue=binding.kind==='queue';
     var reading=primary?telemetryReading(sample,primary):{series:[]},times=reading.series.map(function(p){return Date.parse(telemetryTime(p[0]));}).filter(isFinite);
     // Each primary signal owns its measurement window. A carrier timestamp may
@@ -66,21 +68,21 @@ function liveStatusProofPresentation(snapshot,window){
     var url=null,authored=binding.links || {},provider=sample && sample.links || {};
     [authored.dashboard,authored.query,provider.dashboard,provider.query].some(function(value){url=deltaLinkUrl(value);return !!url;});
     var since=[];if(result.since.doneAt){since.push('Done '+result.since.doneAt);if(result.since.firstTrafficAt)since.push('First observed traffic '+result.since.firstTrafficAt);}
-    if(!snapshot.historical && result.since.doneAt)Object.keys(binding.signals).forEach(function(name){
+    if(!snapshot.historical && result.since.doneAt)telemetryMetricNames(binding).forEach(function(name){
       var entry=sample && sample.signals && sample.signals[name],aggregate=telemetryAggregate(entry,sample && sample.observedAt);
       if(!aggregate || aggregate.from!==result.since.doneAt)return;
       since.push(name+' total: '+String(entry.value)+(entry.unit?' '+entry.unit:'')+' through '+aggregate.to);
     });
     return {id:binding.id,title:binding.title,kind:binding.kind,tickets:binding.tickets.slice(),jira:result.jira || 'No tickets',
-      telemetry:result.telemetry,verdict:result.verdict,label:result.label || 'UNOBSERVED',predicate:predicate(binding)+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
-      kpis:[{label:queue?'in':'rate',text:telemetryCardValue(binding,sample,primary)},
-        {label:queue?'lag':'errors',text:telemetryCardValue(binding,sample,queue?'lag':telemetryErrorSignal(binding,primary) || 'errors')},
-        {label:queue?'age':'p95',text:telemetryCardValue(binding,sample,queue?'age':'p95')}],
+      loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,label:loading && !measured?'Loading…':result.label || 'UNOBSERVED',predicate:predicate(binding)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
+      kpis:[{label:queue?'in':'rate',text:telemetryCardValue(binding,sample,primary,waiting)},
+        {label:queue?'lag':'errors',text:telemetryCardValue(binding,sample,queue?'lag':telemetryErrorSignal(binding,primary) || 'errors',waiting)},
+        {label:queue?'age':'p95',text:telemetryCardValue(binding,sample,queue?'age':'p95',waiting)}],
       since:since.join(' · ') || 'unavailable',url:url,
       linkLabel:primary && binding.signals[primary].source==='grafana'?'Open in Grafana':primary && binding.signals[primary].source==='honeycomb'?'Open in Honeycomb':'Open telemetry',
-      explanation:result.failing.length?'Outside proof threshold: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name)+'; requires '+predicate(binding,[name]);}).join('. '):
-        result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':'Observed signals meet the authored proof thresholds.',
-      chart:{observedAt:isFinite(end)?new Date(end).toISOString():null,points:plotted,line:continuous?plotted.map(function(p){return p.x+','+p.y;}).join(' '):null,
+      explanation:result.failing.length?'Outside proof threshold: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name)+'; requires '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
+        result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':result.telemetry==='unmeasured'?'Traffic proof requires an observed signal with an authored minimum.':'Observed signals meet the authored proof thresholds.',
+      chart:{pending:!!waiting[primary],observedAt:isFinite(end)?new Date(end).toISOString():null,points:plotted,line:continuous?plotted.map(function(p){return p.x+','+p.y;}).join(' '):null,
         markers:markers.map(function(m){return {x:2+96*(m.at-start)/windowMs,label:m.label,kind:m.kind};})}};
   });
   var predicates=rows.map(function(row){return row.predicate;}).filter(function(value,i,all){return all.indexOf(value)===i;});
@@ -103,7 +105,7 @@ function liveStatusTelemetryActivity(){
     snapshot.carriers.forEach(function(binding){
       var sample=snapshot.map[binding.id],result=snapshot.verdicts.carriers[binding.id],key=telemetryBindingKey(binding);
       if(!result.bound || !sample)return;
-      var measured=Object.keys(binding.signals).some(function(name){return telemetryReading(sample,name).value!==null;});if(!measured)return;
+      var measured=telemetryMetricNames(binding).some(function(name){return telemetryReading(sample,name).value!==null;});if(!measured)return;
       var scope=scopes[binding.id] || (scopes[binding.id]={key:key,at:Object.create(null),values:Object.create(null),ratios:Object.create(null),first:Object.create(null),silent:Object.create(null),limits:Object.create(null)});
       function time(name){return telemetrySignalTime(sample.signals && sample.signals[name],sample.observedAt);}
       // Each signal owns its watermark. A newer source on this carrier cannot
@@ -128,7 +130,7 @@ function liveStatusTelemetryActivity(){
         var hours=Math.floor((stamp-Date.parse(done))/3600000);
         if(scope.silent[done]===undefined || hours>scope.silent[done]){scope.silent[done]=hours;add('silent','Still silent '+hours+' h after Done',at,primary);}
       }
-      Object.keys(binding.proof || {}).forEach(function(name){
+      telemetryMetricProofNames(binding).forEach(function(name){
         var limit=binding.proof[name],reading=telemetryReading(sample,name);
         var crossingAt=time(name);
         if(limit.maxRatioOf){
@@ -154,7 +156,7 @@ function liveStatusTelemetryActivity(){
         if(previous!==undefined && previous!==failed)add('threshold',name+' crossed '+(failed?'outside':'back within')+' its proof threshold',crossingAt,name);
         scope.limits[name]=failed;
       });
-      Object.keys(binding.signals).forEach(function(name){var at=time(name);if(at && fresh(name) && telemetryReading(sample,name).value!==null){scope.at[name]=Date.parse(at);scope.values[name]=telemetryReading(sample,name).value;}});
+      telemetryMetricNames(binding).forEach(function(name){var at=time(name);if(at && fresh(name) && telemetryReading(sample,name).value!==null){scope.at[name]=Date.parse(at);scope.values[name]=telemetryReading(sample,name).value;}});
     });
     events=liveStatusActivity([],events);
   }
@@ -843,14 +845,17 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return {entries:entries,evidence:evidence,ambiguous:ambiguous.size};
   }
   function traceSnapshot(){
-    var source=traceSources(),entries=source.entries,evidence=source.evidence;
+    var source=traceSources(),entries=source.entries,evidence=source.evidence,hasMappings=false;
+    eachDiagram(function(d){if((d.steps || []).some(function(step){return !!step.traceMatch;}))hasMappings=true;});
+    var hasBindings=evidence.carriers.some(function(binding){return Object.keys(binding.signals).some(function(name){return proofVerdicts.isTraceSignal(binding.signals[name]);});});
+    var traceStatus=telemetryOptions && typeof telemetryOptions.traceStatus==='function'?telemetryOptions.traceStatus():{available:evidence.available,note:''};
     var selected=traceSelection && entries.find(function(e){return e.key===traceSelection.key && e.exemplar.traceId===traceSelection.traceId;});
     if(!selected && traceSelection && tracePending && tracePending.request===traceRequest && tracePending.key===traceSelection.key){selected=entries.find(function(e){return e.key===tracePending.key && e.exemplar.traceId===tracePending.traceId;});if(selected)traceSelection.traceId=selected.exemplar.traceId;}
     if(traceSelection && !selected){traceSelection=null;tracePending=null;traceInitial=false;traceRequest++;traceNotice='Trace selection expired. Select current evidence.';}
     if(!selected && traceInitial && statusMode==='trace' && entries.length){selected=entries[0];traceSelection={key:selected.key,traceId:selected.exemplar.traceId};traceInitial=false;}
     var model=selected?telemetryTraceModel(selected.binding.section.diagram,selected.binding.stepper && selected.binding.stepper.path(),selected.exemplar):null;
     return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,carrier:selected.carrier,exemplar:selected.exemplar,model:model}:null,
-      historical:evidence.historical,enabled:evidence.enabled,available:evidence.available,status:evidence.status,notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
+      hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
   function paintTrace(){
     var trace=traceSnapshot(),selected=trace.selected,sources=traceSources().entries;
@@ -991,9 +996,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var row=productionRow(trigger),block=pop.querySelector('.dv-live-production');
     if(!row){if(block)block.remove();return false;}
     if(!block)block=element('section','dv-live-production',null,pop);
-    block.setAttribute('data-production-carrier',row.id);block.setAttribute('data-verdict',row.verdict || 'unobserved');
+    block.setAttribute('data-loading',row.initialLoading?'true':'false');block.setAttribute('data-production-carrier',row.id);block.setAttribute('data-verdict',row.verdict || 'unobserved');
     function text(tag,cls,value){var node=block.querySelector('.'+cls);if(!node)node=element(tag,cls,null,block);if(node.textContent!==value)node.textContent=value;return node;}
-    text('h3','dv-live-production-heading','Production');
+    var environment=telemetry.environment();
+    text('h3','dv-live-production-heading',(environment?environment.toUpperCase()+' ':'')+'Evidence');
     text('p','dv-live-production-verdict',row.label+' · '+row.explanation);
     text('p','dv-live-proof-predicate',row.predicate);
     var chart=block.querySelector('.dv-live-production-chart') || element('div','dv-live-production-chart',null,block);chart.replaceChildren();
@@ -1002,7 +1008,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(row.chart.line)telemetrySvg(document,'polyline',{class:'dv-live-proof-series',points:row.chart.line},svg);
       row.chart.points.forEach(function(point){telemetrySvg(document,'circle',{class:'dv-live-proof-point',cx:point.x,cy:point.y,r:1.8},svg);});
       row.chart.markers.forEach(function(marker){var tick=telemetrySvg(document,'line',{class:'dv-live-proof-marker',x1:marker.x,x2:marker.x,y1:2,y2:30,'data-kind':marker.kind},svg);telemetrySvg(document,'title',{},tick).textContent=marker.label;});
-    }else element('span','','No observed series in this window',chart);
+    }else element('span','',row.chart.pending?'Loading…':'No observed series in this window',chart);
     var kpis=block.querySelector('.dv-live-production-kpis') || element('div','dv-live-production-kpis',null,block);
     row.kpis.forEach(function(kpi,i){var tile=kpis.children[i] || element('div','dv-live-production-kpi',null,kpis);tile.textContent=kpi.label+': '+kpi.text;});
     text('p','dv-live-production-since','Since Done: '+row.since);

@@ -2,7 +2,7 @@
    docs/provider-traces.md. No authored fields, query inference or numeric proof.
    Only the first explicit trace signal in authored order is selected per carrier. */
 var TELEMETRY_TRACE_SESSION=0;
-function telemetryTraceIntent(s){return s && (s.source==='tempo' || s.source==='honeycomb' && telemetryObject(s.query) && telemetryOwn(s.query,'query_spec'));}
+function telemetryTraceIntent(s){return proofVerdicts.isTraceSignal(s);}
 function telemetryTraceJobs(bindings){return (bindings || []).map(function(b){var name=Object.keys(b.signals || {}).find(function(n){return telemetryTraceIntent(b.signals[n]);});return name?{id:b.id,name:name,signal:b.signals[name],binding:b}:null;}).filter(Boolean);}
 function telemetryTraceText(result){
   if(result && result.isError)telemetryTraceFail(telemetryProviderErrorText(result) || 'Trace tool returned an error.');

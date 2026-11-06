@@ -12,10 +12,10 @@ test('Proof exact bound rows, ring denominator and neutral remainder across loca
  const root=await setup(page,server);await expect(metrics(root)).toHaveAttribute('aria-pressed','false');await expect(root.locator('.dv-live-proof')).toHaveCount(0);await metrics(root).click();
  const panel=root.locator('.pt-live-status');await expect(panel.locator('.dv-live-proof-row')).toHaveCount(6);
  expect(await panel.locator('.dv-live-proof-row').evaluateAll(rows=>rows.map(r=>r.dataset.proofCarrier))).toEqual(['ingest','shared::api','ingest->app','app->push','shared::api->shared::store','outer::inner::a->outer::inner::b']);
- await expect(panel.locator('.dv-live-proof-ratio')).toHaveText('2/6 bound proven');await expect(panel.locator('.dv-live-proof')).toHaveAttribute('data-proof-bound','6');await expect(panel.locator('.dv-live-proof')).toHaveAttribute('data-proof-unbound','6');
+ await expect(panel.locator('.dv-live-proof-ratio')).toHaveText('1/6 bound proven');await expect(panel.locator('.dv-live-proof')).toHaveAttribute('data-proof-bound','6');await expect(panel.locator('.dv-live-proof')).toHaveAttribute('data-proof-unbound','6');
  const arcs=await panel.locator('.dv-live-proof-arc').evaluateAll(nodes=>nodes.map(n=>({bucket:n.dataset.proofBucket,size:parseFloat(n.getAttribute('stroke-dasharray')),offset:Number(n.getAttribute('stroke-dashoffset'))})));
- expect(arcs.map(a=>a.bucket)).toEqual(['proven','degraded','unproven','liveEarly']);expect(arcs[0].size).toBeCloseTo(100*2/6,8);expect(arcs.slice(1).map(a=>a.size)).toEqual([100/6,100/6,100/6]);expect(arcs.reduce((n,a)=>n+a.size,0)).toBeCloseTo(100*5/6,8);
- await expect(panel.locator('.dv-live-proof-pills')).toHaveText('2 proven1 degraded1 unproven1 live early1 unclassified6 unbound');
+ expect(arcs.map(a=>a.bucket)).toEqual(['proven','degraded','unproven','liveEarly']);expect(arcs[0].size).toBeCloseTo(100/6,8);expect(arcs.slice(1).map(a=>a.size)).toEqual([100/6,100/6,100/6]);expect(arcs.reduce((n,a)=>n+a.size,0)).toBeCloseTo(100*4/6,8);
+ await expect(panel.locator('.dv-live-proof-pills')).toHaveText('1 proven1 degraded1 unproven1 live early2 unclassified6 unbound');
  expect(await panel.locator('.dv-live-panel-body').evaluate(body=>[...body.children].filter(n=>n.matches('.dv-live-epic,.dv-live-proof,h3')).map(n=>n.classList.contains('dv-live-proof')?'Proof':n.classList.contains('dv-live-epic')?'Epic':n.textContent))).toEqual(['Epic','Proof','Tickets','Proof table','Blockers and dependency chains','Activity']);
  await expect(carrier(panel,'ingest->app')).toContainText('Delivery <script>bad()</script>');await expect(carrier(panel,'ingest->app').locator('script')).toHaveCount(0);await expect(carrier(panel,'ingest->app').locator('a')).toHaveAttribute('href','https://authored.test/board');await expect(carrier(panel,'shared::api->shared::store').locator('a')).toHaveAttribute('href','https://provider.test/fallback');await expect(carrier(panel,'app->push').locator('a')).toHaveCount(0);
  await expect(carrier(panel,'ingest->app').locator('.dv-live-proof-marker')).toHaveCount(2);await expect(carrier(panel,'ingest->app').locator('.dv-live-proof-series')).toHaveCount(1);await expect(carrier(panel,'shared::api')).toContainText('unobserved');await expect(carrier(panel,'app->push')).toContainText('rate: 0 req/h');
@@ -106,4 +106,28 @@ test('discovered Prometheus-only tools qualify local and imported Proof after Me
  const root=await discoveredTools(page,server,['query_prometheus']);await expect(metrics(root)).toBeVisible();await expect(metrics(root)).toHaveAttribute('aria-pressed','false');expect(await page.evaluate(()=>window.toolCalls)).toEqual([]);
  await metrics(root).click();await expect(carrier(root,'ingest')).toContainText('lag: 25');await expect(carrier(root,'shared::api')).toContainText('rate: 25');
  expect(await page.evaluate(()=>window.toolCalls.map(call=>call[1]))).toEqual(expect.arrayContaining(['query_prometheus']));expect(await page.evaluate(()=>window.toolCalls.every(call=>call[1]==='query_prometheus'))).toBe(true);
+});
+
+ test('desktop native Inspect uses Evidence without an environment and Trace isolates metric failures',async({page,server})=>{
+ const root=await setup(page,server);await metrics(root).click();await root.locator('g.node[data-dv-node="ingest"]').click();await expect(root.locator('.dv-live-production-heading')).toHaveText('Evidence');await page.keyboard.press('Escape');
+ await page.evaluate(()=>window.viewer.controller.telemetry.setAvailable(true,'3 Grafana queries failed: CloudWatch timeout'));
+ await root.getByRole('button',{name:/^Trace(?: · \d+)?$/}).click();await expect(root.locator('.dv-trace-mode-status')).toHaveText('No traceMatch steps on this board');
+ await page.screenshot({path:'/tmp/evidence-status-trace-empty.png'});
+ });
+
+test('desktop native trace-only local/imported/nested carriers have no numeric cards or proof rows',async({page,server})=>{
+ const root=await setup(page,server);const raw=spec();
+ await page.evaluate(raw=>{
+  window.viewer.destroy();const d=raw.page.sections[0].diagram,trace={honeycomb:{query_spec:{limit:1}},unit:'req/h'};
+  for(const id of ['ingest','shared::api']){d.nodes[id].telemetry.signals={rate:trace};d.nodes[id].telemetry.proof={rate:{min:1}};}
+  d.edges.forEach(e=>{if(['ingest->app','outer::inner::a->outer::inner::b'].includes(e.from+'->'+e.to)){e.telemetry.signals={rate:trace};e.telemetry.proof={rate:{min:1}};}else if(e.telemetry)e.telemetry.signals.trace=trace;});
+  window.viewer=window.mount(document.querySelector('#host'),raw,{telemetry:{provider:async bindings=>Object.fromEntries(bindings.map(b=>[b.id,{signals:Object.fromEntries(Object.keys(b.signals).map(n=>[n,{value:n==='errors'?0:42}]))}]))}});
+  window.viewer.controller.liveStatus.apply(window.jira);window.viewer.controller.telemetry.setEnabled(true);
+ },raw);
+ await expect(root.locator('[data-metrics-card="shared::api->shared::store"]')).toBeVisible();
+ for(const id of ['ingest','shared::api','ingest->app','outer::inner::a->outer::inner::b']){
+  await expect(root.locator('[data-metrics-card="'+id+'"]')).toHaveCount(0);await expect(root.locator('[data-proof-carrier="'+id+'"]')).toHaveCount(0);
+ }
+ for(const id of ['ingest','shared::api'])await expect(root.locator('g.node[data-dv-node="'+id+'"] .dv-metrics-node')).toHaveCount(0);
+ await root.screenshot({path:'/tmp/evidence-status-trace-card-eligibility.png'});
 });

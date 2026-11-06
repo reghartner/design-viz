@@ -14,8 +14,9 @@
      tickets  Jira keys on the carrier (trackingRefs(value).tickets).
      kind     'call' | 'queue' | 'service' | 'log-event' | 'device'; not judged.
      signals  {name: {source, query, unit}}, source one of 'grafana', 'loki',
-              'tempo', 'sql', 'honeycomb'. A carrier with at least one signal
-              is bound. Without signals it is unbound: counted, never judged.
+              'tempo', 'sql', 'honeycomb', 'cloudwatch', 'cloudwatchLogs'. A carrier
+              with at least one numeric signal is bound. Trace signals are
+              excluded; without numeric signals it is counted, never judged.
      proof    {name: {min, max, maxRatioOf}}, the limits below. Optional.
 
    input.jiraMap  The live-status runtime map, one entry per ticket key, as
@@ -28,7 +29,7 @@
               last finite series point stands in.
      series   Points across the window in ascending time; t is epoch
               milliseconds or an ISO string.
-     A query that ran and matched nothing is reported by the adapter as 0. A
+     Adapters distinguish successful empty counts from unobserved results. A
      signal with neither a finite value nor a finite point is unobserved.
 
    input.steps  [{id, carriers: [carrier id, ...]}]: each step's directly
@@ -59,9 +60,11 @@
      unobserved  rate-like signals exist but none shows traffic yet
      degraded    a limit does not hold
      unobserved  a limit is pending
-     flowing     every limit holds */
+     unmeasured  no observed signal has an authored finite minimum
+     flowing     an observed finite minimum exists and every limit holds */
 
 var proofVerdicts = (function(){
+  function isTraceSignal(s){ return !!s && (s.source === 'tempo' || s.source === 'honeycomb' && proofObject(s.query) && Object.prototype.hasOwnProperty.call(s.query, 'query_spec')); }
   var PROOF_JIRA_STATES = ['todo', 'active', 'testing', 'done', 'blocked', 'missing'];
   /* Rows: the carrier's Jira state; `none` is a carrier without tickets.
      Blocked and missing keep their Jira state; the overlay adds traffic cues. */
@@ -133,6 +136,10 @@ var proofVerdicts = (function(){
     return latest;
   }
 
+  Object.keys(PROOF_MATRIX).forEach(function(jira){ PROOF_MATRIX[jira].unmeasured = jira === 'done' ? 'done-traffic-unmeasured' : jira === 'none' ? null : jira; });
+  PROOF_VERDICT_LABELS['done-traffic-unmeasured'] = 'DONE · traffic not measured';
+  PROOF_TELEMETRY_ORDER.splice(2, 0, 'unmeasured');
+
   function proofLabel(verdict){ return verdict === null ? null : PROOF_VERDICT_LABELS[verdict]; }
   function proofCell(jira, telemetry){
     var row = jira === null ? PROOF_MATRIX.none : proofOwn(PROOF_MATRIX, jira);
@@ -142,7 +149,7 @@ var proofVerdicts = (function(){
 
   function proofSignals(carrier){
     var signals = proofObject(carrier) && proofObject(carrier.signals) ? carrier.signals : {};
-    return Object.keys(signals).filter(function(name){ return proofObject(signals[name]); });
+    return Object.keys(signals).filter(function(name){ return proofObject(signals[name]) && !isTraceSignal(signals[name]); });
   }
   function proofReading(sample, name, unit){
     var entry = proofObject(sample) ? proofOwn(sample.signals, name) : undefined;
@@ -178,7 +185,8 @@ var proofVerdicts = (function(){
   function proofTelemetry(carrier, sample){
     var names = proofSignals(carrier);
     if (!names.length) return null;
-    var proof = proofObject(carrier.proof) ? carrier.proof : {}, readings = Object.create(null), observed = 0;
+    var proof = {}, authored = proofObject(carrier.proof) ? carrier.proof : {}, readings = Object.create(null), observed = 0;
+    Object.keys(authored).forEach(function(name){var limit=authored[name];if(!isTraceSignal(carrier.signals[name]) && !(proofObject(limit) && isTraceSignal(carrier.signals[limit.maxRatioOf])))proof[name]=limit;});
     var rateLike = [], failing = [], pending = false;
     names.forEach(function(name){
       var declared = typeof carrier.signals[name].unit === 'string' ? carrier.signals[name].unit : '';
@@ -187,15 +195,16 @@ var proofVerdicts = (function(){
       if (proofRateLike(name, proof, reading ? reading.unit : declared)) rateLike.push(name);
     });
     Object.keys(proof).forEach(function(name){
-      if (!proofObject(proof[name])) return;
+      if (!proofObject(proof[name]) || isTraceSignal(carrier.signals[name])) return;
       var held = proofLimit(proof[name], names.indexOf(name) >= 0 ? readings[name] : null, readings);
       if (held === false) failing.push(name); else if (held === null) pending = true;
     });
     var traffic = rateLike.some(function(name){ return readings[name] && !readings[name].zero; });
     var silent = rateLike.length > 0 && rateLike.every(function(name){ return readings[name] && readings[name].zero; });
+    var minimumObserved = rateLike.some(function(name){ return readings[name] && proofObject(proof[name]) && proofNumber(proof[name].min) !== null; });
     var state = !observed ? 'unobserved' : silent ? 'silent' : rateLike.length && !traffic ? 'unobserved' :
-      failing.length ? 'degraded' : pending ? 'unobserved' : 'flowing';
-    return {state: state, failing: failing, readings: readings, rateLike: rateLike};
+      failing.length ? 'degraded' : pending ? 'unobserved' : !minimumObserved ? 'unmeasured' : 'flowing';
+    return {state: state, minimumObserved: minimumObserved, failing: failing, readings: readings, rateLike: rateLike};
   }
   function proofFirstTraffic(judged, doneAt){
     var first = null;
@@ -220,7 +229,10 @@ var proofVerdicts = (function(){
     if (jira === 'unknown') return null;
     for (var i = 0; i < PROOF_TELEMETRY_ORDER.length; i++){
       var state = PROOF_TELEMETRY_ORDER[i];
-      if (bound.some(function(result){ return result.telemetry === state; })) return proofCell(jira, state);
+      if (bound.some(function(result){ return result.telemetry === state; })){
+        if(jira === 'done' && state === 'unobserved' && bound.some(function(result){return result.verdict === 'done-traffic-unmeasured';}))return 'done-traffic-unmeasured';
+        return proofCell(jira, state);
+      }
     }
     return null;
   }
@@ -236,6 +248,7 @@ var proofVerdicts = (function(){
       var jira = proofJira(tickets, jiraMap), doneAt = jira === 'done' ? proofDoneAt(tickets, jiraMap) : null;
       var judged = proofTelemetry(carrier, proofOwn(telemetryMap, carrier.id));
       var verdict = judged ? proofCell(jira, judged.state) : null;
+      if(verdict === 'done' && !judged.minimumObserved)verdict = 'done-traffic-unmeasured';
       var result = {bound: !!judged, jira: jira, telemetry: judged ? judged.state : null,
         verdict: verdict, label: proofLabel(verdict), failing: judged ? judged.failing : [],
         since: {doneAt: proofISO(doneAt), firstTrafficAt: judged ? proofISO(proofFirstTraffic(judged, doneAt)) : null}};
@@ -253,5 +266,6 @@ var proofVerdicts = (function(){
     });
     return {carriers: carriers, rollups: rollups, steps: steps};
   }
+  proofVerdicts.isTraceSignal = isTraceSignal;
   return proofVerdicts;
 })();

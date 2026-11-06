@@ -155,12 +155,20 @@ function initViewerExploreCanvas(ctl,view,opts){
   show(navigationState().rec);lastTarget=navigationState().key;if(ctl.details && ctl.details.activeSection && ctl.details.activeSection())detailChanged();
   // Host-owned cameras use the current representation's state; Standard page
   // zoom remains owned by Contents and diagram zoom by the board.
-  function camera(value){
-    var rec=navigation.current();if(!rec)return null;
-    if(active && active.viewport){return {presentation:'explore',diagram:active.viewport.graphCamera(value && value.presentation==='explore'?value.diagram:null)};}
+  function camera(value,record){
+    var rec=record || navigation.current();if(!rec)return null;
+    if(rec===active && active.viewport){return {presentation:'explore',diagram:active.viewport.graphCamera(value && value.presentation==='explore'?value.diagram:null)};}
     if(value && value.presentation==='standard' && navigation.contents)navigation.contents.setZoom(value.zoom);
     var board=rec.boardSize;
     return {presentation:'standard',zoom:navigation.contents?navigation.contents.zoom():1,diagram:board && board.camera(value && value.presentation==='standard'?value.diagram:null)};
   }
-  return {camera:camera,destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('detail-navigation',detailChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelFirstFit();cancelAnimationFrame(refitFrame);if(refitObserver)refitObserver.disconnect();show(null);navigation.destroy();view.classList.remove('navigation-contained');view.removeEventListener('tab-view-change',tabViewChanged);}};
+  // Comparison hosts can address a scrolled-to Standard section and select a
+  // corresponding View without depending on DOM indices or synthetic clicks.
+  function select(rec,id,layout){
+    var current=ctl.views && ctl.views.current(rec);
+    if(navigation.current()===rec && (!id || current && (current.id===id || layout && current.legacyLayout===layout)))return true;
+    if(id && ctl.views && !ctl.views.ensure(rec,id,true) && !(layout && ctl.views.ensure(rec,layout,true)))return false;
+    selectSection(rec);return true;
+  }
+  return {camera:camera,current:function(){return navigation.current();},select:select,destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('detail-navigation',detailChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelFirstFit();cancelAnimationFrame(refitFrame);if(refitObserver)refitObserver.disconnect();show(null);navigation.destroy();view.classList.remove('navigation-contained');view.removeEventListener('tab-view-change',tabViewChanged);}};
 }

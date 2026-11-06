@@ -190,7 +190,7 @@ test('V4b the agent dialog opens Focused and shows the changed panel of a step c
     await expect(rows.first().locator('.compare-focus-cell[data-side="after"] .gaugeval')).toHaveText('42 mA');
   });
 });
-test('V5 Full mode renders each section exactly and frames a node change in both panes; manual scroll stays per pane',async({page})=>{
+test('V5 Full mode renders each section exactly and frames a node change in both panes; manual document scroll tracks both directions',async({page})=>{
   await withProposal(page,async()=>{
     const before=dialogPane(page,'before'),after=dialogPane(page,'after');
     /* #848 PR 2: Focused is the default; this test covers the Full diagram mode. */
@@ -202,10 +202,15 @@ test('V5 Full mode renders each section exactly and frames a node change in both
     await rail(page.locator('#agent-update-compare')).getByRole('button',{name:ITEMS[0],exact:true}).click();
     for(const side of [before,after])await inView(side.locator('.compare-pane-scroll'),side.locator('[data-dv-node="b"]').first());
     const left=before.locator('.compare-pane-scroll'),right=after.locator('.compare-pane-scroll');
-    const rightTop=await right.evaluate(el=>el.scrollTop),leftTop=await left.evaluate(el=>el.scrollTop);
-    await left.hover();await page.mouse.wheel(0,400);
-    await expect.poll(()=>left.evaluate(el=>el.scrollTop)).not.toBe(leftTop);
-    await page.waitForTimeout(300);expect(await right.evaluate(el=>el.scrollTop),'manual scroll of Before leaves After unchanged').toBe(rightTop);
+    const landmark=side=>side.locator('[data-dv-node="b"]').first().evaluate(node=>{
+      const r=node.getBoundingClientRect(),p=node.closest('.compare-pane-scroll').getBoundingClientRect();return {x:r.x-p.x,y:r.y-p.y};
+    });
+    for(const [own,delta] of [[left,180],[right,-120]]){
+      const start=await own.evaluate(el=>el.scrollTop),box=await own.boundingBox();
+      await page.mouse.move(box.x+3,box.y+box.height/2);await page.mouse.wheel(0,delta);
+      await expect.poll(async()=>Math.abs(await own.evaluate(el=>el.scrollTop)-start)).toBeGreaterThan(20);
+      for(const axis of ['x','y'])await expect.poll(async()=>Math.abs((await landmark(before))[axis]-(await landmark(after))[axis]),{message:'ordinary document scrolling keeps both panes aligned on '+axis}).toBeLessThan(2);
+    }
     /* Manual zoom is linked in both directions, including Standard page zoom. */
     const zoomOf=side=>side.locator('.reader-zoom-menu>summary').first(),board=side=>side.locator('svg[aria-label="flow diagram"]:visible').first();
     for(const [own,other,name] of [[before,after,'Before'],[after,before,'After']]){

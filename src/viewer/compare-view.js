@@ -17,7 +17,7 @@
      emptyText     optional {before, after} text for a side without the document
    returns {select(i), next(), previous(), selected(), setMode(m), mode(), setSkin(name), destroy()}
 
-   Selecting a change frames BOTH panes on it. Manual diagram pan and zoom are
+   Selecting a change frames BOTH panes on it. Manual navigation, including document scrolling, is
    linked in both directions, in Standard and Explore views. */
 var COMPARE_KIND_LABEL = {document:'Document', section:'Section', node:'Node', edge:'Connection', panel:'Panel', step:'Step',
   path:'Path', layout:'Layout', view:'View', tab:'Tab', import:'Import', ledger:'Coverage ledger'};
@@ -323,17 +323,95 @@ function mountCompareView(host, opts){
   function cancelCamera(){
     cameraRevision++;cameraFrames.forEach(function(id){win.cancelAnimationFrame(id);});cameraFrames.clear();
     if(syncFrame)win.cancelAnimationFrame(syncFrame);syncFrame=0;
+    Object.keys(panes).forEach(function(side){panes[side].navigationRecord=null;});
   }
   function afterLayout(action){
     var revision=cameraRevision,id=win.requestAnimationFrame(function(){cameraFrames.delete(id);if(!destroyed && revision===cameraRevision)action();});cameraFrames.add(id);
   }
   function manualCamera(side){cancelCamera();cancelCompletion();manualSide=side;}
-  function linkCamera(side){
-    if(destroyed || manualSide!==side || syncFrame)return;
+  function pairedRecord(side,rec){
+    var from=panes[side],to=panes[side==='before'?'after':'before'];
+    if(!rec || !to.ctl)return null;
+    var index=from.partial!=null?from.partial:rec.number-1;
+    var section={};section[side]=index;
+    var other=compareSectionOnSide(entries,pages,{section:section},side==='before'?'after':'before');
+    if(to.partial!=null && to.partial!==other)completeBefore(true);
+    return recordFor(to,other);
+  }
+  function visibleRecord(p){
+    if(!p.ctl)return null;
+    if(p.scroll.classList.contains('viewer-exploring'))return p.canvas.current();
+    var box=p.scroll.getBoundingClientRect(),best=null,distance=Infinity;
+    (p.ctl.sections || []).forEach(function(rec){
+      var board=rec.sectionEl.querySelector('.board'),anchor=board || rec.sectionEl,r=anchor.getBoundingClientRect();
+      if(!r.width || !r.height)return;
+      var d=Math.max(r.top-box.top,box.top-r.bottom,0);
+      if(d<distance){best=rec;distance=d;}
+    });
+    return best || p.canvas.current();
+  }
+  function graphPosition(p,rec){
+    var svg=rec && rec.sectionEl.querySelector('.boardcanvas>svg');
+    if(!svg || !svg.getClientRects().length)return null;
+    var r=svg.getBoundingClientRect(),box=p.scroll.getBoundingClientRect(),vb=svg.viewBox.baseVal,scale=r.width/vb.width;
+    return scale>0?{x:r.left-box.left-vb.x*scale,y:r.top-box.top-vb.y*scale,scale:scale,display:r.width/parseFloat(win.getComputedStyle(svg).width)}:null;
+  }
+  // Pane offsets are anchored to the corresponding section, not a percentage
+  // of unrelated document lengths. Reserve blank scroll room when a shorter
+  // side would otherwise clamp the shared position at its beginning or end.
+  function alignScroll(from,to,rec,paired){
+    if(from.scroll.classList.contains('viewer-exploring'))return;
+    var a=rec.sectionEl.querySelector('.board') || rec.sectionEl,b=paired.sectionEl.querySelector('.board') || paired.sectionEl;
+    var source=a.getBoundingClientRect(),dest=b.getBoundingClientRect(),fb=from.scroll.getBoundingClientRect(),tb=to.scroll.getBoundingClientRect();
+    var y=to.scroll.scrollTop+(dest.top-tb.top)-(source.top-fb.top);
+    if(y<0){var pad=parseFloat(to.view.style.paddingTop)||0;to.view.style.paddingTop=(pad-y)+'px';y=0;}
+    var max=to.scroll.scrollHeight-to.scroll.clientHeight;
+    if(y>max){var bottom=parseFloat(to.view.style.paddingBottom)||0;to.view.style.paddingBottom=(bottom+y-max+1)+'px';}
+    to.scroll.scrollTop=y;
+    to.scroll.scrollLeft=from.scroll.scrollLeft;
+  }
+  function mirrorNavigation(side,sourceRecord){
+    var from=panes[side],to=panes[side==='before'?'after':'before'];
+    if(!from.canvas || !to.canvas)return;
+    var rec=sourceRecord || visibleRecord(from),paired=pairedRecord(side,rec);
+    if(!paired)return; // A section present on just one side has no counterpart.
+    if(!rec.sectionEl.getBoundingClientRect().width)return;
+    var view=from.ctl.views && from.ctl.views.current(rec);
+    if(!to.canvas.select(paired,view && view.id,view && view.legacyLayout))return;
+    var c=from.canvas.camera(null,rec);if(!c)return;
+    var sourceGraph=graphPosition(from,rec);
+    if(c.diagram){
+      c.diagram.unbounded=true;
+      if(sourceGraph)c.diagram.zoom=sourceGraph.scale/sourceGraph.display;
+    }
+    to.canvas.camera(c,paired);
+    alignScroll(from,to,rec,paired);
+    // Equal center coordinates do not imply equal visible locations: board
+    // heights, legends, headings and SVG viewBoxes can differ between sides.
+    var a=graphPosition(from,rec),b=graphPosition(to,paired),actual=to.canvas.camera(null,paired);
+    if(a && b && actual && actual.diagram){
+      actual.diagram.x+=(b.x-a.x)/b.scale;actual.diagram.y+=(b.y-a.y)/b.scale;
+      actual.diagram.zoom=a.scale/b.display;
+      actual.diagram.unbounded=true;to.canvas.camera(actual,paired);
+      // Native scroll metrics round under CSS page zoom. Correct the rendered
+      // remainder in display pixels after the camera has reserved its runway.
+      var final=graphPosition(to,paired),board=paired.sectionEl.querySelector('.board'),display=final && final.display;
+      if(final && board && display){board.scrollLeft+=(final.x-a.x)/display;board.scrollTop+=(final.y-a.y)/display;}
+    }
+  }
+  function linkCamera(side,record){
+    if(destroyed || manualSide!==side)return;
+    if(record!==undefined)panes[side].navigationRecord=record;
+    if(syncFrame)return;
     syncFrame=win.requestAnimationFrame(function(){
       syncFrame=0;if(destroyed || manualSide!==side)return;
-      var from=panes[side],to=panes[side==='before'?'after':'before'];
-      if(from.canvas && to.canvas){var c=from.canvas.camera();if(c)to.canvas.camera(c);}
+      var p=panes[side],rec=p.navigationRecord;p.navigationRecord=null;
+      if(p.completeNavigation && !p.navigationPointer && panes.before.partial!=null){
+        var index=rec && (p.partial!=null?p.partial:rec.number-1);
+        p.completeNavigation=false;completeBefore(true);
+        rec=index!=null?recordFor(p,index):null;
+      }
+      mirrorNavigation(side,rec);
     });
   }
   /* Text blocks of the selected ledger or page-field change (#892), else null. */
@@ -392,13 +470,26 @@ function mountCompareView(host, opts){
     if (!pages[side]){ view.appendChild(el('p', 'compare-pane-empty', opts.emptyText && opts.emptyText[side] || (side === 'before' ? 'Not in the current document.' : 'Not in the proposal.'))); return; }
     var p=panes[side],first=side==='before' && entries.length?(entries[opening].section || {}).before:null,partial=first!=null?comparePartialPage(pages.before,first):null;
     if(partial){p.partial=first;renderPane(p,partial);}else renderPane(p,pages[side]);
-    var intent=function(ev){if(ev.type==='keydown' && !/^(Arrow|Page|Home|End|Enter| |[+-])/.test(ev.key))return;manualCamera(side);};
-    var changed=function(ev){if(ev.type==='scroll' && ev.target===scroll)return;linkCamera(side);};
-    ['pointerdown','wheel','keydown','click'].forEach(function(type){scroll.addEventListener(type,intent,true);});
-    ['reader-zoom-change','board-scale-change','scroll'].forEach(function(type){scroll.addEventListener(type,changed,true);});
+    var intent=function(ev){
+      if(ev.type==='keydown' && !/^(Arrow|Page|Home|End|Enter| |[+-])/.test(ev.key))return;
+      if(ev.type==='pointerdown')p.navigationPointer=true;
+      if(ev.type==='pointerup' || ev.type==='pointercancel')p.navigationPointer=false;
+      p.completeNavigation=true;manualCamera(side);linkCamera(side);
+    };
+    var changed=function(ev){
+      if(!p.ctl)return;
+      // Initial framing can finish after its first paint (Explore's deferred
+      // Fit scroll). Keep following that source until a manual gesture owns it.
+      var entry=entries[selected],selectionSide=entry && entry.section && entry.section.after!=null?'after':'before';
+      if(!manualSide && entry && side===selectionSide){alignSelection();return;}
+      var rec=ev.target===scroll?null:(p.ctl.sections || []).find(function(r){return r.sectionEl.contains(ev.target);});
+      linkCamera(side,rec);
+    };
+    ['pointerdown','pointerup','pointercancel','wheel','keydown','click','change'].forEach(function(type){scroll.addEventListener(type,intent,true);});
+    ['reader-zoom-change','board-scale-change','scroll','diagram-view-change','tab-view-change','detail-navigation'].forEach(function(type){scroll.addEventListener(type,changed,true);});
     panes[side].unlisten=function(){
-      ['pointerdown','wheel','keydown','click'].forEach(function(type){scroll.removeEventListener(type,intent,true);});
-      ['reader-zoom-change','board-scale-change','scroll'].forEach(function(type){scroll.removeEventListener(type,changed,true);});
+      ['pointerdown','pointerup','pointercancel','wheel','keydown','click','change'].forEach(function(type){scroll.removeEventListener(type,intent,true);});
+      ['reader-zoom-change','board-scale-change','scroll','diagram-view-change','tab-view-change','detail-navigation'].forEach(function(type){scroll.removeEventListener(type,changed,true);});
     };
   }); });
   decorate();
@@ -414,6 +505,16 @@ function mountCompareView(host, opts){
       p.ctl = compareViewTrack(renderPage(p.view, page, typeof skin === 'function' ? skin(page) : skin || page.skin, null, {autoplay:false}));
       if (typeof initViewerExploreCanvas === 'function') p.canvas = compareViewTrack(initViewerExploreCanvas(p.ctl, p.view, {container:p.scroll, initialContentsOpen:false,
         presentation:{panelsHiddenWhenGraphVisible:false, overlayScale:.5}, externalCamera:true, refitOnResize:false, fitInsets:{left:24, right:24, top:20, bottom:24}}));
+      // CSS page zoom and board reflow can move the SVG without a scroll or
+      // scale event. Observe the actual surfaces, and retire them on remount.
+      if(p.navigationObserver)p.navigationObserver.disconnect();
+      p.navigationObserver=new ResizeObserver(function(){
+        if(destroyed)return;
+        var side=p.pane.getAttribute('data-side');
+        if(manualSide===side)linkCamera(side);else if(!manualSide)alignSelection();
+      });
+      p.navigationObserver.observe(p.scroll);
+      p.view.querySelectorAll('.board,.board > .lg').forEach(function(n){p.navigationObserver.observe(n);});
     }catch(ex){
       p.view.textContent = 'Could not render this side: ' + ex.message;
       var failure = {side:p.pane.getAttribute('data-side'), message:String(ex && ex.message || ex)};
@@ -428,12 +529,14 @@ function mountCompareView(host, opts){
   }
   function completeBefore(preserve){
     var p=panes.before;cancelCompletion();if(destroyed || p.partial==null)return;
+    var focused=doc.activeElement,focusLabel=p.view.contains(focused) && focused.getAttribute('aria-label');
     var section=p.partial,old=recordFor(p,section),saved=preserve && old?{
       camera:p.canvas && p.canvas.camera(),board:old.boardSize && old.boardSize.snapshot(),
       top:old.sectionEl.getBoundingClientRect().top,x:p.scroll.scrollLeft,
       view:p.ctl.views && p.ctl.views.current(old)
     }:null;
     cancelCamera();
+    if(p.navigationObserver)p.navigationObserver.disconnect();
     if(p.canvas)p.canvas.destroy();if(p.ctl)p.ctl.destroy();
     p.canvas=p.ctl=null;p.partial=null;p.view.replaceChildren();
     withPathGeometryCache(geometry || new Map(),function(){renderPane(p,pages.before);});geometry=null;decorate();
@@ -448,6 +551,10 @@ function mountCompareView(host, opts){
     if(p.canvas && saved.camera)p.canvas.camera(saved.camera);
     p.scroll.scrollLeft=saved.x;
     if(rec)p.scroll.scrollTop+=rec.sectionEl.getBoundingClientRect().top-saved.top;
+    if(focusLabel){
+      var replacement=Array.from(p.view.querySelectorAll('[aria-label]')).find(function(n){return n.tagName===focused.tagName && n.getAttribute('aria-label')===focusLabel;});
+      if(replacement)replacement.focus({preventScroll:true});
+    }
   }
   /* Rendered record of a section index on one pane. */
   function recordFor(p, index){
@@ -1060,6 +1167,7 @@ function mountCompareView(host, opts){
     }
     apply();
     afterLayout(apply);
+    alignSelection();
   }
   function uncrop(){
     if (!cropCtx) return;
@@ -1085,6 +1193,13 @@ function mountCompareView(host, opts){
     modeButtons.focused.setAttribute('aria-pressed', String(mode === 'focused'));
     modeButtons.full.setAttribute('aria-pressed', String(mode === 'full'));
   }
+  function alignSelection(){
+    var entry=entries[selected];if(!entry)return;
+    var side=entry.section && entry.section.after!=null?'after':'before';
+    var index=compareSectionOnSide(entries,pages,entry,side);
+    if(index<0)return;
+    afterLayout(function(){mirrorNavigation(side,recordFor(panes[side],index));});
+  }
   function setMode(m){
     if (destroyed || (m !== 'focused' && m !== 'full')) return mode;
     cancelCamera(); manualSide=null;
@@ -1098,6 +1213,7 @@ function mountCompareView(host, opts){
   function select(index, initial){
     if (destroyed || !entries.length) return null;
     cancelCamera(); manualSide=null;
+    Object.keys(panes).forEach(function(side){panes[side].view.style.paddingTop=panes[side].view.style.paddingBottom='';});
     selected = ((index % entries.length) + entries.length) % entries.length;
     buttons.forEach(function(b, i){ if (b) b.setAttribute('aria-current', String(i === selected)); });
     if (buttons[selected] && buttons[selected].scrollIntoView) buttons[selected].scrollIntoView({block:'nearest'});
@@ -1117,6 +1233,7 @@ function mountCompareView(host, opts){
     try{ cropCtx = focusCtx || textCtx ? null : buildCrop(entry); }catch(ex){ cropCtx = null; }
     if (!cropCtx) cropSelection = false;
     renderFocus(); applyMode(); applyCrop();
+    if(!cropCtx || mode!=='focused')alignSelection();
     result.focused = mode === 'focused' && !!focusCtx;
     /* A ledger or page-field change shown as a line diff (Focused mode only). */
     result.text = mode === 'focused' && !!textCtx;
@@ -1164,6 +1281,7 @@ function mountCompareView(host, opts){
       ['before', 'after'].forEach(function(side){
         var p = panes[side]; if (!p) return;
         if(p.unlisten)p.unlisten();
+        if(p.navigationObserver)p.navigationObserver.disconnect();
         try{ if (p.canvas) p.canvas.destroy(); }catch(ex){}
         try{ if (p.ctl) p.ctl.destroy(); }catch(ex){}
       });

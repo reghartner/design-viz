@@ -257,6 +257,7 @@ The accepted authored fields are:
 | `tracking.telemetry.honeycomb` | `environment`, optional `dataset` |
 | carrier `telemetry` | `kind`, `signals`, `proof`, `links`, `card`, or `use` plus declared template parameters |
 | signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope` |
+| `cloudwatch` query | `namespace`, `metric`, `region`, `accountId`, `dimensions`, `statistic`; optional `missingMeansZero` |
 | `cloudwatchLogs` query | `logGroups`, `query`, `region`, optional `valueField`, `breakdown` |
 | breakdown | `query`, `labelField`, `valueField`; optional `title`, `labelTitle`, `valueTitle`, `columns`, `limit` |
 | breakdown column | `field`, `label` |
@@ -344,7 +345,9 @@ Interpret evidence this way:
 | traffic returned and agreed limits hold | observed healthy in this window |
 | traffic returned and a limit fails | observed degraded in this window |
 | explicit returned zero | silent in this window, not nonexistent |
-| no rows, missing sample, error or unsupported source | unobserved |
+| empty CloudWatch arrays | unobserved / no data points yet, unless explicit `missingMeansZero: true` |
+| successful empty recognized Loki count/rate | observed zero |
+| missing sample, error or unsupported source | unobserved |
 | one trace | this one request was observed |
 
 Over time uses the exact prior-24-hour window ending at each day's explicit
@@ -364,3 +367,31 @@ For the complete field, verdict, provider and history contracts, read
 [`docs/live-status.md`](../../../docs/live-status.md). For a supplied Honeycomb
 trace/export (a different workflow), use
 [`use-case-honeycomb.md`](../hld-to-page/references/use-case-honeycomb.md).
+
+### Evidence eligibility and empty observations
+
+PROVEN requires a bound numeric signal with an observed finite value and an
+authored finite `proof.<signal>.min`, with applicable limits holding. Per-time
+units classify traffic for silence and timing; they do not supply that minimum.
+Done carriers lacking this measured minimum read **DONE · traffic not measured**;
+observed silence and explicit failing thresholds retain their own diagnostics.
+An arbitrary event count or errors=0 alone cannot prove traffic or imply LIVE EARLY.
+Tempo and Honeycomb `query_spec` bindings are trace evidence: they never create
+numeric cards, preview values or proof, including imported/loaded carriers.
+Inspect headings use the active environment key (for example **STG Evidence**),
+or **Evidence** when no environment is selected. While an actual numeric query
+is pending, cards and evidence show **Loading…**; refresh retains valid values
+with **Refreshing…**. Settled peers remain visible. Progress is never proof.
+
+Successful empty CloudWatch `values` and `timestamps` mean **no data points yet**,
+not a failed query. Optional query boolean `missingMeansZero: true` opts only
+that successful empty shape into zero; absent/false stays unobserved. Errors,
+timeouts and malformed results never become zero. A real numeric zero remains
+observed. For live Loki, successful empty numeric count/rate queries become zero
+only for recognized `count_over_time`/`rate` log-range expressions and `sum`
+wrappers (including by/without grouping). Raw logs, arbitrary expressions and
+misleading function names inside strings remain unobserved. Daily history keeps
+its existing contract. Honeycomb COUNT caveats belong to Honeycomb evidence only.
+
+Arbitrary named-signal display and authored display labels are planned separately;
+this change does not claim that expanded display contract.

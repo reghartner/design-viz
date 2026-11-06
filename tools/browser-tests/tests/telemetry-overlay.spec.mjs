@@ -21,7 +21,7 @@ import vm from 'node:vm';
 import sourceLoader from '../../../tools/source-loader.cjs';
 import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
-import {mountCues,mountImportedDetail,CUES} from '../helpers/telemetry-cards.mjs';
+import {mountCues,mountImportedDetail,cueSpec,CUE_JIRA,CUE_SAMPLES,CUES} from '../helpers/telemetry-cards.mjs';
 
 const QUEUE=()=>({kind:'queue',signals:{lag:{grafana:'max(kafka_consumergroup_lag{topic="device-events"})',unit:'msgs'}},proof:{lag:{max:500}}});
 const CALL=()=>({kind:'call',signals:{rate:{grafana:'sum(rate(push_sent_total[5m]))*3600',unit:'req/h'},errors:{grafana:'sum(rate(push_failed_total[5m]))*3600',unit:'req/h'}},proof:{rate:{min:1},errors:{maxRatioOf:'rate',max:0.01}}});
@@ -145,7 +145,11 @@ test('P7 Metrics ghosts the silent Done edge and dims its stroke',async({page,se
 });
 
 test('P8 Metrics seals bound local and imported nodes and leaves unbound nodes unchanged',async({page,server})=>{
- const {root,metrics}=await mountCues(page,server),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');await metrics.click();
+ const {root}=await mountCues(page,server),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
+ const spec=cueSpec(),samples=structuredClone(CUE_SAMPLES),local=spec.page.sections[0].diagram.nodes.ingest.telemetry;
+ local.signals.in={grafana:'sum(rate(queue_received_total[5m]))*3600',unit:'msg/h'};local.proof.in={min:1};samples.ingest.signals.in={value:100};
+ await page.evaluate(({spec,samples,jira})=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>samples}});window.viewer.controller.liveStatus.apply(jira);},{spec,samples,jira:CUE_JIRA});
+ await root.getByRole('button',{name:'Metrics',exact:true}).click();
  await expect(node('ingest').locator('.dv-metrics-seal'),'P8 the bound local node has a proven seal').toHaveAttribute('data-seal','proven');
  await expect(node('shared::api').locator('.dv-metrics-seal'),'P8 the bound imported node has a proven seal').toHaveAttribute('data-seal','proven');
  await expect(node('shared::api').locator('polyline.dv-metrics-sparkline'),'P8 imported node sparkline').toHaveCount(1);
@@ -153,6 +157,14 @@ test('P8 Metrics seals bound local and imported nodes and leaves unbound nodes u
   await expect(node(id).locator('.dv-metrics-node'),'P8 unbound '+id+' has no seal or sparkline').toHaveCount(0);
   await expect(node(id),'P8 unbound '+id+' has no Metrics state').not.toHaveAttribute('data-metrics-state',/./);
  }
+});
+
+test('P8 a queue maximum without an observed authored traffic minimum never gets a proven seal',async({page,server})=>{
+ const {root,metrics}=await mountCues(page,server);await metrics.click();
+ await expect(root.locator('.dv-live-metrics-connection')).toHaveAttribute('data-state','connected');
+ await expect(root.locator('g.node[data-dv-node="ingest"] .dv-metrics-seal')).toHaveCount(0);
+ expect(await page.evaluate(()=>window.viewer.controller.telemetry.verdicts().carriers.ingest.verdict)).toBe('done-traffic-unmeasured');
+ await expect(root.locator('g.node[data-dv-node="shared::api"] .dv-metrics-seal')).toHaveAttribute('data-seal','proven');
 });
 
 test('P10 turning Metrics off removes every cue and preserves Jira paint',async({page,server})=>{

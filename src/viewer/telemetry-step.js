@@ -5,7 +5,7 @@ function telemetryStepModel(diagram,index,pathId,page,snapshot,jiraMap,jiraOn){
   var direct=liveStatusStepCarriers(diagram,step,true),templates=telemetryTemplates()(page);
   var carriers=direct.map(function(c){var b=carrierTelemetry(c.value,templates);return {id:c.id,tickets:jiraOn?trackingRefs(c.value).tickets:[],kind:b && b.kind,signals:b?b.signals:{},proof:b?b.proof:{}};});
   var proof=proofVerdicts({carriers:carriers,jiraMap:jiraMap,telemetryMap:snapshot.map,steps:[{id:'current',carriers:carriers.map(function(c){return c.id;})}]});
-  var measured=carriers.some(function(c){return Object.keys(c.signals).some(function(n){return telemetryReading(snapshot.map[c.id],n).value!==null;});});
+  var measured=carriers.some(function(c){return telemetryMetricNames(c).some(function(n){return telemetryReading(snapshot.map[c.id],n).value!==null;});});
   // Primary is the first directly selected carrier in the existing carrier walk
   // (edges, then explicit nodes), not whichever happens to return a trace.
   var primary=direct[0],binding=primary && carrierTelemetry(primary.value,templates),sample=primary && snapshot.map[primary.id];

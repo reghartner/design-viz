@@ -86,10 +86,22 @@ export interface LiveStatusEntry {
 /** One bound carrier handed to the telemetry provider (#939): carrierTelemetry() of a
  * local, imported or loaded detail node or edge. id is a node id, an edge identity
  * 'from->to' or a resolved imported identity such as 'shared::api->shared::store'. */
+/** CloudWatch empty-as-zero is explicit author intent, never inferred from errors or hints. */
+export interface TelemetryCloudWatchQuery {
+  namespace: string; metric: string; region: string; accountId: string;
+  dimensions: Record<string, string>; statistic: 'Sum' | 'Maximum' | 'Minimum' | 'Average' | 'SampleCount';
+  missingMeansZero?: boolean;
+}
+export interface TelemetryProgress {
+  note: (text: string) => void;
+  /** Runtime-only lifecycle, scoped to the current request. */
+  pending?: (carrierId: string, signalName: string) => void;
+  settled?: (carrierId: string, signalName: string, sample: NonNullable<TelemetrySample['signals']>[string] | null) => void;
+}
 export interface TelemetryBinding {
   id: string;
   kind: 'call' | 'queue' | 'service' | 'log-event' | 'device';
-  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch' | 'cloudwatchLogs'; query: string | Record<string, unknown>; unit: string | null; scope?: string; error?: string; /** Derived configuration error: skip only the optional grouped query; never save this into the authored query. */ breakdownError?: string}>;
+  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch' | 'cloudwatchLogs'; query: string | TelemetryCloudWatchQuery | Record<string, unknown>; unit: string | null; scope?: string; error?: string; /** Derived configuration error: skip only the optional grouped query; never save this into the authored query. */ breakdownError?: string}>;
   proof: Record<string, {min?: number; max?: number; maxRatioOf?: string}>;
   links: {dashboard?: string; query?: string};
   card: {side?: 'right' | 'left' | 'above' | 'below'; offset?: number} | null;
@@ -152,17 +164,20 @@ export interface NativeViewerOptions {
    * false suppresses telemetry, including demo fallback. Page
    * tracking.telemetry.enabled:false also wins and preserves bindings. */
   telemetry?: false | {
-    /** report.note(text) attaches a note to this answer (status().note), such as one
+    /** Opt into explicit report.pending/settled lifecycle for dispatched numeric signals.
+     * By default legacy providers mark their supplied numeric bindings pending for the call. */
+    managesPending?: boolean;
+    /** report.note(text) updates the current request note (status().note), such as one
      * failed query beside answered ones. A rejection with `state: 'approval'`
      * reports the approval state instead of an error. */
-    provider?: (bindings: TelemetryBinding[], signal: AbortSignal, report: {note: (text: string) => void}) => Promise<Record<string, TelemetrySample>>;
+    provider?: (bindings: TelemetryBinding[], signal: AbortSignal, report: TelemetryProgress) => Promise<Record<string, TelemetrySample>>;
     /** Click-only Over time batch. Absolute RFC3339 evaluation endpoints, each
      * representing the previous 24h. Optional endpoints give the exact selected-day
      * instants (local-day boundaries can be 23h/25h apart across DST). Return
      * per-signal series; omitted days are
      * unobserved. No live headline fallback. Optional: a live-only provider works.
      * report.note keeps partial errors visible and the failed batch retryable. */
-    history?: (bindings: TelemetryBinding[], range: {from: string; to: string; endpoints?: {key?: string; at: string}[]}, signal: AbortSignal, report: {note: (text: string) => void}) => Promise<Record<string, TelemetrySample>>;
+    history?: (bindings: TelemetryBinding[], range: {from: string; to: string; endpoints?: {key?: string; at: string}[]}, signal: AbortSignal, report: TelemetryProgress) => Promise<Record<string, TelemetrySample>>;
     /** Include mutable datasource/account identity in the controller-local cache key. */
     historyKey?: string | (() => unknown);
     /** Explicit user action resolver. ctl.telemetry.chooseExemplar validates the live

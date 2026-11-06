@@ -573,7 +573,7 @@ class InjectTests(unittest.TestCase):
 
     def test_combined_jira_honeycomb_guides_fit_real_cap_without_losing_edit_rules(self):
         inject = load_inject()
-        self.assertEqual(inject.GUIDE_LIMIT, 6 * 1024, "keep the existing cap")
+        self.assertEqual(inject.GUIDE_LIMIT, 8 * 1024, "all-connectors headroom; separate skill caps are unchanged")
         for mixed in (False, True):
             for two_file in (False, True):
                 with self.subTest(mixed=mixed, two_file=two_file):
@@ -613,6 +613,36 @@ class InjectTests(unittest.TestCase):
                         bounded = inject.agent_guide(spec, commit, two_file)
                         self.assertLess(len(GUIDE_BLOCK.search(bounded)[1].encode("utf-8")), inject.GUIDE_LIMIT)
                         self.assertIn("see current spec", bounded)
+
+    def test_all_connectors_guide_has_board_text_headroom_and_size_errors_name_section(self):
+        inject = load_inject()
+        spec = tracked_spec()
+        spec["page"]["tracking"]["telemetry"] = {"grafana": {"prometheus": "prom", "loki": "logs", "tempo": "traces", "cloudwatch": "cw"}, "honeycomb": {"environment": "stg", "dataset": "api"}}
+        signals = {"requests": {"grafana": "requests"}, "logs": {"loki": 'count_over_time({app="api"}[5m])'}, "tempo": {"tempo": "{}"}, "hc": {"honeycomb": {"calculations": [{"op": "COUNT"}]}}, "trace": {"honeycomb": {"query_spec": {"limit": 1}}}, "cloud": {"cloudwatch": {"namespace": "AWS/IoT", "metric": "Failure", "region": "us-east-1", "accountId": "111111111111", "dimensions": {}, "statistic": "Sum", "missingMeansZero": True}}, "insights": {"cloudwatchLogs": {"logGroups": ["iot"], "region": "us-east-1", "query": "stats count() as n"}}, "sql": {"sql": "select count(*) from events"}}
+        spec["page"]["blocks"] = [{"diagram": {"nodes": {"api": {"telemetry": {"kind": "service", "signals": signals}}}, "rows": [["api"]]}}]
+        for two_file in (False, True):
+            guide = GUIDE_BLOCK.search(inject.agent_guide(spec, "a" * 40, two_file))[1]
+            self.assertIn("get_trace", guide)  # Explicit trace extras stay author-declared.
+            board_text = "Board evidence: " + "x" * (540 - len("Board evidence: "))
+            manifest = re.search(r"```json\n(.*?)\n```", guide, re.S)
+            declaration = json.loads(manifest[1])
+            # Publishing authors explicitly add offered trace tools to the real
+            # capability declaration; the injector must not infer these extras.
+            for server in declaration["mcp"]["servers"]:
+                extras = ["get_trace"] if "run_query" in server["tools"] else ["search_tempo_traces", "get_tempo_trace"] if "query_prometheus" in server["tools"] else []
+                server["tools"].extend(extras)
+            authored_guide = guide.replace(manifest[1], json.dumps(declaration, indent=2)) + "\n## Board context\n" + board_text
+            self.assertGreaterEqual(inject.GUIDE_LIMIT - len(authored_guide.encode("utf-8")), 512)
+            tools = [tool for server in declaration["mcp"]["servers"] for tool in server["tools"]]
+            for tool in ("query_prometheus", "query_loki_logs", "query_cloudwatch", "query_cloudwatch_logs", "run_query"):
+                self.assertIn(tool, tools)
+        previous = inject.GUIDE_LIMIT
+        try:
+            inject.GUIDE_LIMIT = 100
+            with self.assertRaisesRegex(ValueError, r"largest section .+: [0-9]+ bytes"):
+                inject.agent_guide(spec, "a" * 40, True)
+        finally:
+            inject.GUIDE_LIMIT = previous
 
     def test_agent_guide_replaces_a_stale_guide_when_reinjecting_a_built_page(self):
         built = TEMPLATE.replace("</script>\n" + BACKLINK_OPEN,

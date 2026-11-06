@@ -80,8 +80,15 @@ test('late host callback after Metrics off cannot resurrect Production, Proof or
  await deliver(page,{rate:777});
  await expect(activity(root),'late host callback must not recreate telemetry Activity after explicit off').toHaveCount(0);
  await expect(root.locator('.dv-live-proof')).toHaveCount(0);await trigger(root,'ingest->app').press('Enter');await expect(root.locator('.dv-live-popover:visible .dv-live-ticket')).toContainText('LOC-3');await expect(production(root)).toHaveCount(0);await page.keyboard.press('Escape');
- await metrics(root).click();await expect.poll(()=>page.evaluate(()=>window.liveReleases.length)).toBe(2);await expect(root.locator('.dv-live-proof')).toHaveCount(0);await expect(activity(root)).toHaveCount(0);
- await page.evaluate(()=>window.liveReleases.shift()());await expect(root.locator('.dv-live-proof')).toHaveCount(0);await expect(activity(root)).toHaveCount(0);
+ await metrics(root).click();await expect.poll(()=>page.evaluate(()=>window.liveReleases.length)).toBe(2);
+ async function pendingWithoutStaleEvidence(){
+  await expect(root.locator('.dv-live-proof')).toHaveCount(1);await expect(root.locator('[data-proof-carrier="ingest->app"]')).toContainText('Loading…');
+  await expect(root.locator('[data-proof-carrier="ingest->app"]')).not.toContainText('777');await expect(activity(root)).toHaveCount(0);
+  expect(await page.evaluate(()=>window.viewer.controller.telemetry.snapshot().map)).toEqual({});
+  expect(await page.evaluate(()=>window.viewer.controller.telemetry.verdicts().rollups.proven)).toBe(0);
+ }
+ await pendingWithoutStaleEvidence();
+ await page.evaluate(()=>window.liveReleases.shift()());await pendingWithoutStaleEvidence();
  await page.evaluate(()=>window.liveReleases.shift()());await open(root,'ingest->app');await expect(production(root)).toContainText('rate: 100 req/h');await expect(activity(root).filter({hasText:'Delivery <script>bad()</script> · First observed traffic after Done'})).toHaveCount(1);
 });
 

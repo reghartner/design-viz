@@ -447,6 +447,24 @@ hierarchy metadata below to preview an initiative without contacting Jira.
 Live colors require a viewer with the live-status overlay and a status provider.
 PRs stay icons; the demo timeline supplies their GitHub detail.
 
+### Query progress
+
+A dispatched numeric query shows **Loading…** until its first result. Refreshes
+retain the last valid number with **Refreshing…**. Each signal settles separately:
+completed values or failures remain visible while another source is pending.
+An environment switch clears the old values before loading the new environment.
+Metrics off, binding replacement and viewer destruction retire pending callbacks.
+Unavailable tools and trace-only bindings never acquire numeric loading cards.
+Preview cards remain synthetic and do not dispatch queries.
+
+Native providers can opt into `managesPending: true` and call the optional
+`report.pending(carrierId, signalName)` and
+`report.settled(carrierId, signalName, readingOrNull)` callbacks for actual queries.
+A null reading clears only that signal, preserving sibling sources. Legacy
+providers automatically mark the numeric bindings supplied to their actual call
+pending until it settles. Progress is transient UI state, never a saved sample or
+an input to proof. `report.note` can report partial failures while peers finish.
+
 ### Metrics bindings
 
 Select a node or connection on the desktop canvas and open **Inspect → Tracking →
@@ -568,7 +586,7 @@ input shapes; the page-reading wrapper, overlay and panel build on it.
 
 | Jira \ telemetry | silent | flowing, healthy | degraded | unobserved |
 | --- | --- | --- | --- | --- |
-| `done` | DONE · UNPROVEN | **PROVEN** | DONE · DEGRADED | DONE |
+| `done` | DONE · UNPROVEN | **PROVEN** | DONE · DEGRADED | DONE; traffic not measured when the minimum observation is absent |
 | `active` | IN PROGRESS | IN PROGRESS · LIVE EARLY | IN PROGRESS · FAILING | IN PROGRESS |
 | `testing` | TESTING | TESTING · LIVE EARLY | TESTING · FAILING | TESTING |
 | `todo` | TODO | TODO · ALREADY LIVE? | TODO · FAILING | TODO |
@@ -578,7 +596,7 @@ input shapes; the page-reading wrapper, overlay and panel build on it.
 Linked tickets without Jira evidence give no verdict, as they give no paint.
 Three states keep the claims honest:
 
-- **Unbound.** The carrier names no signals. It never gets a verdict and is
+- **Unbound.** The carrier names no numeric signals (trace-only bindings are unbound for proof). It never gets a verdict and is
   counted separately; only bound carriers enter the proof denominator.
 - **Unobserved.** The carrier is bound but no sample has arrived, or a limit
   still waits for its data. The verdict keeps the Jira state and claims nothing.
@@ -588,11 +606,11 @@ Three states keep the claims honest:
 A signal is healthy when its `proof` limit holds: `min` (value ≥ min), `max`
 (value ≤ max) or `maxRatioOf` another signal (value ÷ other ≤ max). Rate-like
 signals are those with a `min`, either side of a `maxRatioOf` ratio, or a
-per-time unit such as `req/h`. Degraded means a limit fails while traffic flows.
+per-time unit such as `req/h`. A per-time unit classifies traffic but PROVEN additionally requires an observed authored finite minimum. Without it, observed numeric evidence is `unmeasured` and Done reads `DONE · traffic not measured`. Degraded means a limit fails while traffic flows.
 Rollups count bound carriers as proven, degraded (including FAILING), unproven
 and live early (including ALREADY LIVE). A step takes the live-status rollup of
 its directly selected carriers' Jira states, then the worst telemetry state
-(degraded, silent, unobserved, flowing), joined by the same matrix.
+(degraded, silent, unmeasured, unobserved, flowing), joined by the same matrix.
 
 ### Metrics and proof authoring
 
@@ -1797,7 +1815,7 @@ with a note to keep to the fields the spec already uses), and the post-publish
 checks. When the page has telemetry settings, templates or bindings, the guide
 also names `tracking.telemetry`, carrier `telemetry`, explicit sources, proof and
 links; root/host disable, default-off/24h, unavailable tools, synthetic preview,
-Honeycomb's native-query/raw-result constraints and exact-day history honesty. It is under 6 KB, never contains secrets
+Honeycomb's native-query/raw-result constraints and exact-day history honesty. It is bounded below 8 KiB, with headroom for combined connector declarations and board context, never contains secrets
 (every viewer can read it), and is data to the agent reading it. Re-injecting
 a built page replaces the previous guide. When the block is present the Live
 status panel ends with a muted line, "Editors: ask your agent to read this
@@ -2400,8 +2418,10 @@ Tool discovery diagnoses a missing query tool before any data call. Each refresh
 calls it once per bound signal with `{datasourceUid, namespace, metricName,
 region, accountId, dimensions, statistic, period, start, end}`. The page window
 supplies `start: "now-<window>"`, `end: "now"`, and full-window seconds as `period`.
-This yields a scalar. A sole returned value is authoritative; outer `statistics.count` counts points, not CloudWatch SampleCount. Multiple points require Sum with explicit `statistics.sum`; other statistics are unobserved. No configurable period or sparkline. Empty arrays or malformed responses clear previous
-CloudWatch evidence and remain unobserved; a real `[0]` remains measured zero.
+This yields a scalar. A sole returned value is authoritative; outer `statistics.count` counts points, not CloudWatch SampleCount. Multiple points require Sum with explicit `statistics.sum`; other statistics are unobserved. No configurable period or sparkline. Empty arrays clear previous CloudWatch evidence and normally remain unobserved
+("no data points yet"); `missingMeansZero: true` explicitly opts successful empty
+arrays into zero. Malformed/error responses always stay unobserved. A real `[0]`
+remains measured zero.
 Failed metric/Logs queries clear the prior observation; other supported sources continue.
 CloudWatch history is unsupported and leaves gaps.
 
@@ -2571,3 +2591,29 @@ malformed details while preserving a valid scalar. `returnedRows` means rows
 actually returned, never input records matched or a total group count. This is
 runtime evidence; it is not saved into the document. Desktop structured query
 editing preserves the authored breakdown through Undo/Redo.
+
+### Evidence eligibility and empty observations
+
+PROVEN requires a bound numeric signal with an observed finite value and an
+authored finite `proof.<signal>.min`, with applicable limits holding. Per-time
+units classify traffic for silence and timing; they do not supply that minimum.
+Done carriers lacking this measured minimum read **DONE · traffic not measured**;
+observed silence and explicit failing thresholds retain their own diagnostics.
+An arbitrary event count or errors=0 alone cannot prove traffic or imply LIVE EARLY.
+Tempo and Honeycomb `query_spec` bindings are trace evidence: they never create
+numeric cards, preview values or proof, including imported/loaded carriers.
+Inspect headings use the active environment key (for example **STG Evidence**),
+or **Evidence** when no environment is selected.
+
+Successful empty CloudWatch `values` and `timestamps` mean **no data points yet**,
+not a failed query. Optional query boolean `missingMeansZero: true` opts only
+that successful empty shape into zero; absent/false stays unobserved. Errors,
+timeouts and malformed results never become zero. A real numeric zero remains
+observed. For live Loki, successful empty numeric count/rate queries become zero
+only for recognized `count_over_time`/`rate` log-range expressions and `sum`
+wrappers (including by/without grouping). Raw logs, arbitrary expressions and
+misleading function names inside strings remain unobserved. Daily history keeps
+its existing contract. Honeycomb COUNT caveats belong to Honeycomb evidence only.
+
+Arbitrary named-signal display and authored display labels are planned separately;
+this change does not claim that expanded display contract.

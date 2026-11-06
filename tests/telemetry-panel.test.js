@@ -16,7 +16,7 @@ test('Proof rows and disjoint arcs use exactly the bound denominator, preserve n
  assert.deepEqual(plain(model.arcs.map(a=>[a.size,a.offset])),[[20,0],[20,20],[20,40],[20,60]]);
  assert.deepEqual(plain(model.rows.map(r=>r.id)),['a','b','c','d','e']);assert.equal(JSON.stringify(input),before);
  assert.match(model.sentence,/1 of 5 bound carriers proven/);assert.match(model.sentence,/1 carriers unbound/);
- assert.equal(model.rows[4].telemetry,'unobserved');assert.equal(model.rows[4].label,'DONE');assert.equal(C.liveStatusProofPresentation({...input,map:{}},'24h'),null);
+ assert.equal(model.rows[4].telemetry,'unobserved');assert.equal(model.rows[4].label,'DONE · traffic not measured');assert.equal(C.liveStatusProofPresentation({...input,map:{}},'24h'),null);
  const unbound={...input,carriers:[input.carriers.at(-1)],verdicts:plain(C.proofVerdicts({carriers:[input.carriers.at(-1)]}))};
  assert.equal(C.liveStatusProofPresentation(unbound,'24h'),null);
 });
@@ -69,4 +69,33 @@ test('controller snapshot carries the same resolved bindings/verdicts for presen
  let calls=0;const api=C.createTelemetry(page,{provider:()=>{calls++;return {};}},{carriers:fn=>fn(carrier,'direct::nested::api',page),jira:()=>({'AA-1':{state:'done'}})});
  api.apply({'direct::nested::api':{signals:{rate:{value:5}}}});const snap=api.snapshot(),model=C.liveStatusProofPresentation(snap,'6h');assert.equal(api.enabled(),false);assert.equal(calls,0);assert.equal(model.rows[0].label,'PROVEN');assert.equal(model.rows[0].title,carrier.title);assert.equal(model.rows[0].url,'https://authored.test/q');
  snap.carriers[0].signals.rate.query='changed';assert.equal(api.bindings()[0].signals.rate.query,'explicit');api.setAvailable(false);assert.equal(C.liveStatusProofPresentation(api.snapshot(),'6h'),null);api.destroy();
+});
+
+test('no-threshold evidence never says thresholds met, and COUNT caveats stay on Honeycomb carriers',()=>{
+ const cw={id:'cloud',title:'Cloud',tickets:['CW-1'],kind:'service',signals:{events:{source:'cloudwatch',query:{},unit:'events'}},proof:{},links:{}};
+ const hc={...cw,id:'honey',signals:{events:{source:'honeycomb',query:{calculations:[{op:'COUNT'}]},unit:'events'}}};
+ const carriers=[cw,hc],map={cloud:{signals:{events:{value:20}}},honey:{signals:{events:{value:20}}}};
+ const model=C.liveStatusProofPresentation({carriers,map,verdicts:C.proofVerdicts({carriers,jiraMap:{'CW-1':{state:'done'}},telemetryMap:map})},'24h');
+ for(const row of model.rows){assert.equal(row.label,'DONE · traffic not measured');assert.doesNotMatch(row.explanation,/meet.*thresholds/);assert.match(row.predicate,/no authored thresholds/);}
+ assert.doesNotMatch(model.rows[0].predicate,/Honeycomb COUNT/);assert.match(model.rows[1].predicate,/Honeycomb COUNT counts source rows/);
+ assert.doesNotMatch(C.telemetryCardContent({from:'a',to:'b'},cw,map.cloud,null,'24h').scope,/COUNT/);
+ assert.match(C.telemetryCardContent({from:'a',to:'b'},hc,map.honey,null,'24h').scope,/COUNT: source rows/);
+});
+
+test('unknown Jira preserves observed, silent, degraded and incomplete evidence labels without proof',()=>{
+ const cases=[
+  ['healthy',{rate:{min:1}},{rate:{value:12}},'OBSERVED'],
+  ['silent',{rate:{min:1}},{rate:{value:0},errors:{value:0}},'SILENT'],
+  ['degraded',{rate:{min:20}},{rate:{value:12}},'DEGRADED'],
+  ['no minimum',{}, {rate:{value:12}},'OBSERVED'],
+  ['partial',{rate:{min:1},errors:{max:0}},{rate:{value:12}},'OBSERVED · evidence incomplete'],
+  ['missing',{rate:{min:1}}, {},'UNOBSERVED']
+ ];
+ for(const id of ['local','shared::api','outer::inner::api','loaded::api'])for(const [name,proof,signals,label] of cases){
+  const b={...binding(id),proof},anchor=binding('anchor'),carriers=[b,anchor],map={[id]:{signals},anchor:{signals:{rate:{value:1},errors:{value:0},p95:{value:1}}}};
+  const verdicts=C.proofVerdicts({carriers,jiraMap:{},telemetryMap:map}),row=C.liveStatusProofPresentation({carriers,map,verdicts},'24h').rows[0];
+  assert.equal(row.label,label+' · Jira status unavailable',id+' '+name);assert.equal(row.verdict,null);assert.equal(verdicts.rollups.proven,0);assert.doesNotMatch(row.label,/PROVEN/);
+  if(name==='degraded')assert.match(row.explanation,/Outside proof threshold/);
+  if(name==='no minimum')assert.doesNotMatch(row.explanation,/meet.*thresholds/);
+ }
 });

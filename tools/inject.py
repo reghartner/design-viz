@@ -179,7 +179,8 @@ def load_timeline(path: str) -> dict:
 PUBLIC_REPO = "https://github.com/reghartner/design-viz"
 GUIDE_OPEN = '<script type="text/markdown" id="dv-agent-guide">'
 GUIDE_BLOCK = re.compile(r'^<script type="text/markdown" id="dv-agent-guide">\n.*?\n</script>\n?', re.S | re.M)
-GUIDE_LIMIT = 6 * 1024
+# All connectors plus representative board metadata need bounded 8 KiB headroom.
+GUIDE_LIMIT = 8 * 1024
 COMMENTS_CAPABILITY = {"composer_only": True, "customAnchors": True}
 JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]
 # Grafana connector qualification follows the query families bound on the page.
@@ -511,7 +512,10 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
     if "</script" in guide or "<script" in guide or 'id="flowspec"' in guide:
         raise ValueError("agent guide would be mistaken for a script element")
     if len(guide.encode("utf-8")) >= GUIDE_LIMIT:
-        raise ValueError(f"agent guide is {len(guide.encode('utf-8'))} bytes; limit is {GUIDE_LIMIT}")
+        sections = re.split(r"(?m)^(?=## )", guide)
+        largest = max(sections, key=lambda section: len(section.encode("utf-8")))
+        name = largest.splitlines()[0].lstrip("# ") or "Introduction"
+        raise ValueError(f"agent guide is {len(guide.encode('utf-8'))} bytes; limit is {GUIDE_LIMIT}; largest section {name}: {len(largest.encode('utf-8'))} bytes")
     return GUIDE_OPEN + "\n" + guide + "\n</script>"
 
 

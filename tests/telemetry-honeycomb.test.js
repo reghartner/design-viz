@@ -221,3 +221,9 @@ for(const mode of ['timeout','interrupted'])test('unavailable raw '+mode+' falls
  const sample=await pending;assert.equal(sample.value,5);assert.equal(sample.provenance,'formatted-text');assert.equal(timers.size,0);
  const blocked=C.telemetryHoneycombMeasurement({fetch:()=>new Promise(()=>{})},{payload:recorded},meta,abort.signal,query);abort.abort();await assert.rejects(blocked,/cancelled/);assert.equal(timers.size,0);
 });
+
+test('automatic mixed-source progress settles Grafana before delayed Honeycomb and failures remain settled during refresh',async t=>{
+ let release,fail=false;const h=await setup({call:async tool=>{if(tool==='run_query')return new Promise(resolve=>release=()=>resolve({payload:metadata}));if(tool==='query_prometheus'){if(fail)throw {code:'tool_error',message:'Prometheus unavailable'};return {payload:{data:[{values:[[1791786600,'42']]}]}};}return {payload:[]};}});t.after(()=>h.close());
+ h.api.setEnabled(true);await settle();assert.equal(h.api.snapshot().map.a.signals.rate.value,42);assert.deepEqual(plain(h.api.snapshot().pending),{a:{latency:true}});assert.equal(h.api.status().busy,true);release();await settle();assert.deepEqual(plain(h.api.snapshot().pending),{});assert.equal(h.api.snapshot().map.a.signals.latency.value,123.456789);
+ fail=true;h.api.retry();await settle();assert.equal(h.api.snapshot().pending.a.rate,undefined);assert.equal(h.api.snapshot().pending.a.latency,true);assert.match(h.api.status().note,/Prometheus unavailable/);assert.equal(h.api.snapshot().map.a.signals.latency.value,123.456789,'pending Honeycomb retains its prior result');release();await settle();assert.deepEqual(plain(h.api.snapshot().pending),{});
+});

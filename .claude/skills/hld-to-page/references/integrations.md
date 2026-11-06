@@ -105,6 +105,9 @@ steps from actual evidence separately. Existing bound nodes are reused; the
 whole insertion is undoable. See `docs/workbench-catalog-sync.md` for the snapshot
 shape, import path and dependency export configuration.
 See the node-reference menu section in `docs/backstage-integration.md`.
+For ordinary Status Trace overlays on an existing diagram, follow
+[Trace-ready authoring](../../../../docs/trace-ready-authoring.md). Exact mapping
+and provider retrieval are separate; reference approval is not required.
 For approved reference traces and incident alternates, use
 `cookbook/canonical-incidents.md` and `tools/canon/trace-cli.mjs`. Bind exact
 service/operation names with `traceMatch`; disambiguate parallel/repeated calls

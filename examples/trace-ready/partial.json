@@ -1,0 +1,12 @@
+{
+  "spans": [
+    {
+      "traceId": "fixture-request",
+      "id": "request",
+      "serviceName": "request-api",
+      "operation": "POST /records",
+      "startMs": 0,
+      "durationMs": 50
+    }
+  ]
+}

@@ -54,7 +54,7 @@ After the packet, route source/handoff details:
 | Starting point | Guide |
 |---|---|
 | Business story or later engineer enrichment | [Story and engineer handoff](references/use-case-story.md) |
-| Existing engineering flow | [Existing engineering flow](references/use-case-existing-flow.md) |
+| Existing | [Flow](references/use-case-existing-flow.md); [mapping](../../../docs/trace-ready-authoring.md) |
 | HLD | [HLD](references/use-case-hld.md) |
 | Honeycomb trace or export | [Honeycomb trace](references/use-case-honeycomb.md) |
 

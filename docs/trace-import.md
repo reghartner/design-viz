@@ -219,13 +219,15 @@ span a bottleneck without considering nesting, or treat one request as the
 whole system design. Preserve span IDs and the source link. Review visible
 completeness warnings before converting observations into design claims.
 
-## Next slices
+## Align evidence with an existing diagram
 
-1. Map spans/services onto nodes in an existing HLD and report unexpected or
-   unobserved paths; an unobserved path is not proof that it is unused.
-2. Add focused exploration of an already imported diagram, with explicit
-   boundary context and original-source recovery when broadening a saved view.
-3. Add a Honeycomb account adapter. Honeycomb documents a hosted MCP
-   `get_trace` tool, which is a promising agent path for URL-based imports.
-   No such connector is installed or used by this implementation.
-   [Honeycomb MCP concepts](https://docs.honeycomb.io/integrations/mcp/concepts)
+[Trace-ready authoring](trace-ready-authoring.md) covers mapping spans onto
+existing local and imported nodes with exact selectors, preserving authored
+identity and layout. Use this instead of rebuilding an accepted HLD from spans.
+Missing operations remain unknown, never proof an unobserved path is unused.
+
+Live Honeycomb and Tempo retrieval is available separately through the
+[provider trace adapter](provider-traces.md), subject to explicit bindings and
+host/account consent. The import-trace converter itself still performs no account
+connection or URL fetching. Focused import exploration and source boundaries are
+described above; preserve original evidence when broadening a saved view.

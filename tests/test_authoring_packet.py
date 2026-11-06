@@ -60,6 +60,72 @@ class AuthoringPacketTests(unittest.TestCase):
                 path = root / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_text(value)
             self.assert_local_links_resolve(text, root)
 
+    def test_traces_route_is_explicit_and_inferred_from_local_and_imported_selectors(self):
+        raw = simple_spec()
+        raw['page']['sections'][0]['diagram']['steps'][0]['traceMatch'] = {'serviceName': 'api', 'operation': 'send', 'nodeId': 'n'}
+        self.assertIn('traces', packet.infer(raw)[1])
+        raw['page']['sections'][0]['diagram']['steps'][0]['traceMatch']['nodeId'] = 'shared::n'
+        raw['page']['sections'][0]['diagram']['topologyImports'] = [{'spec': 'provider', 'export': 'core', 'as': 'shared'}]
+        self.assertIn('traces', packet.infer(raw)[1])
+        text, meta = packet.generate([], ['traces'], mode='edit')
+        self.assertIn('steps', meta['selected']['features'])
+        self.assertIn('docs/trace-ready-authoring.md', [p['path'] for p in meta['provenance']])
+        self.assertIn('Ordinary Status Trace mode requires no', text)
+        self.assertIn('Never flatten imports', text)
+
+    def test_portable_trace_mapper_runs_real_normal_partial_and_ambiguous_examples_without_source(self):
+        runtime = (ROOT / 'tools/canon/generated-runtime.cjs').read_text()
+        bundle = json.loads(folder_agent_kit(ROOT, runtime))
+        files = json.loads(gzip.decompress(base64.b64decode(bundle['gzip'])))['files']
+        with tempfile.TemporaryDirectory() as temp:
+            kit = Path(temp)
+            for name, content in files.items():
+                path = kit / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_text(content)
+            self.assertFalse((kit / 'src/core').exists())
+            source = kit / 'examples/trace-ready/existing.spec.json'
+            before = source.read_bytes()
+            for name, status in [('normal', 'matched'), ('partial', 'missing'), ('ambiguous', 'ambiguous')]:
+                evidence = kit / ('examples/trace-ready/' + name + '.json')
+                original = evidence.read_bytes()
+                run = subprocess.run(['node', 'tools/canon/trace-cli.mjs', 'preview', '--spec', str(source), '--trace', str(evidence)], cwd=kit, text=True, capture_output=True)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                result = json.loads(run.stdout)
+                self.assertEqual([r['status'] for r in result['mapping']['steps']], ['matched', status])
+                self.assertEqual(result['eligible'], name == 'normal')
+                self.assertEqual(evidence.read_bytes(), original)
+            self.assertEqual(source.read_bytes(), before)
+            # Resolve direct and nested provider nodes only into a temporary copy.
+            def canonical(identity, diagram):
+                return {'page': {'title': identity, 'canon': {'version': 1, 'id': identity, 'kind': 'canonical', 'owner': 'group:default/fixture'}, 'sections': [{'diagram': diagram}]}}
+            provider = canonical('provider', {'nodes': {'store': {'title': 'Record store'}}, 'rows': [['store']], 'topologyExports': {'core': {'nodes': ['store'], 'edges': []}}})
+            middle = canonical('middle', {'nodes': {}, 'rows': [], 'topologyImports': [{'spec': 'provider', 'export': 'core', 'as': 'inner'}], 'topologyExports': {'core': {'nodes': ['inner::store'], 'edges': []}}})
+            for name, value in [('provider', provider), ('middle', middle)]:
+                (kit / (name + '.json')).write_text(json.dumps(value))
+            registry = kit / 'registry.json'
+            registry.write_text(json.dumps({'version': 1, 'diagrams': [{'id': name, 'path': name + '.json'} for name in ['provider', 'middle']]}))
+            for nested in [False, True]:
+                raw = json.loads(before)
+                d = raw['page']['sections'][0]['diagram']
+                node = 'shared::inner::store' if nested else 'shared::store'
+                del d['nodes']['store']; d['rows'] = [['client', 'api']]
+                d['topologyImports'] = [{'spec': 'middle' if nested else 'provider', 'export': 'core', 'as': 'shared'}]
+                d['edges'][1]['to'] = node
+                d['steps'][1]['edge'] = 'api->' + node; d['steps'][1]['traceMatch']['nodeId'] = node
+                authored = kit / 'imported.json'; authored.write_text(json.dumps(raw)); saved = authored.read_bytes()
+                resolved = subprocess.run(['node', 'tools/canon/local-imports.mjs', str(authored), str(registry)], cwd=kit, text=True, capture_output=True)
+                self.assertEqual(resolved.returncode, 0, resolved.stderr)
+                temporary = kit / 'resolved.json'; temporary.write_text(resolved.stdout)
+                mapped = subprocess.run(['node', 'tools/canon/trace-cli.mjs', 'preview', '--spec', str(temporary), '--trace', 'examples/trace-ready/normal.json'], cwd=kit, text=True, capture_output=True)
+                self.assertEqual(mapped.returncode, 0, mapped.stderr)
+                rows = json.loads(mapped.stdout)['mapping']['steps']
+                self.assertEqual(rows[1]['nodeId'], node); self.assertEqual(rows[1]['status'], 'matched')
+                self.assertEqual(authored.read_bytes(), saved)
+            output = kit / 'trace-packet.md'
+            run = subprocess.run([sys.executable, 'tools/authoring-packet.py', '--spec', str(source), '--mode', 'edit', '--out', str(output)], cwd=kit, text=True, capture_output=True)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertIn('docs/trace-ready-authoring.md', output.read_text())
+            self.assert_local_links_resolve(output.read_text(), kit)
+
     def test_handoff_contract_and_migration_travel_in_packets_and_folder_kit(self):
         text, _ = packet.generate([], [])
         self.assertIn('`spec` is required; `handoff.url` is removed and rejected', text)

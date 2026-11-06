@@ -70,3 +70,8 @@ Use `--mode new --spec ...` for a materially changed story. No mode re-asks sour
 facts or drops required icons, animation or richness to reduce reading context.
 See [visibility evidence](visibility-evidence.md) for the authored ledger mapping,
 value/icon and eligibility checks, honest N/A, and pending Workbench visual review.
+
+For existing diagram/span alignment, request `--feature traces --mode edit`.
+A spec containing `traceMatch` infers this route; the packet includes
+[Trace-ready authoring](trace-ready-authoring.md). The portable kit includes
+the same read-only mapping CLI and fictional normal/partial/ambiguous examples.

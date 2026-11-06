@@ -1,5 +1,10 @@
 # Engineer supplies a Honeycomb trace
 
+For an existing diagram that must align with observed spans, use the
+[Trace-ready authoring workflow](../../../../docs/trace-ready-authoring.md) and
+`--feature traces --mode edit`. Preserve identities and imported topology;
+map evidence before separately configuring live retrieval.
+
 Read [trace import](../../../../docs/trace-import.md) and the common honesty rules.
 The packaged kit includes `tools/trace2spec.js` and its converter. A Honeycomb
 URL alone is source provenance, not trace data: the importer does not fetch

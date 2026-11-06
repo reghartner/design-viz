@@ -1,5 +1,10 @@
 # Existing engineering flow
 
+For an existing diagram that must align with observed spans, use the
+[Trace-ready authoring workflow](../../../../docs/trace-ready-authoring.md) and
+`--feature traces --mode edit`. Preserve identities and imported topology;
+map evidence before separately configuring live retrieval.
+
 An engineer can describe a known flow without an HLD. Establish the concrete
 trigger, initial state, service hops and last supported outcome; ask for missing
 facts that would change the depiction. Default to Engineering detail only when

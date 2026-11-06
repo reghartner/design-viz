@@ -174,6 +174,9 @@ its trace metadata now uses native lines rather than its old single JSON line.
 See its README for every mock transport distinction. Grafana's existing mock
 service/span shape already matches the pinned current native shape.
 
+For step-by-step setup on an existing local or imported diagram, follow
+[Trace-ready authoring](trace-ready-authoring.md).
+
 ## Inspect a request in Status
 
 The existing **Status** panel has **Jira** and **Trace** views. Jira is the default.

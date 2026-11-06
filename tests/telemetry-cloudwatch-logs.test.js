@@ -96,3 +96,55 @@ test('environment variables require braces and cannot rewrite literal AWS/provid
  const template={kind:'service',params:['aws'],signals:{count:{grafana:'$aws ${aws}'}}};assert.equal(C.carrierTelemetry({telemetry:{use:'x',aws:'template-value'}},{x:template},null,{variables:{aws:'environment-value'}}).signals.count.query,'template-value template-value');
 });
 test('no supported CloudWatch tools leaves Metrics unavailable with a one-line actionable Logs diagnostic',async t=>{const h=await setup({tools:[]});t.after(()=>h.close());assert.equal(h.api.snapshot().available,false);assert.match(h.api.status().note,/Grafana needs connector tools:.*query_cloudwatch_logs/);assert.doesNotMatch(h.api.status().note,/\n/);h.api.setEnabled(true);await settle();assert.equal(h.calls.length,0);assert.deepEqual(plain(h.api.snapshot().map),{});});
+
+
+const breakdown=()=>({query:logs().query.replace('stats count() as n','stats count() as n, latest(reason) as sampleReason by clientId | sort n desc | limit 20'),labelField:'clientId',valueField:'n',title:'Devices',labelTitle:'Client ID',valueTitle:'Failures',columns:[{field:'sampleReason',label:'Latest reason'}],limit:20});
+function withDetails(page){function visit(v){if(!v || typeof v!=='object')return;if(v.cloudwatchLogs)v.cloudwatchLogs.breakdown=breakdown();Object.values(v).forEach(visit);}visit(page);}
+const detailsRows=()=>[{clientId:'cam-123',n:'12',sampleReason:'AUTHORIZATION_FAILURE'},{clientId:'cam-456',n:'2',sampleReason:'<img src=x onerror=alert(1)>'}];
+const grouped=input=>typeof input.queryString==='string' && input.queryString.includes('by clientId');
+test('paired Logs queries preserve scalar15 beside grouped12+2, share an anchored range, and expose all local/imported carriers',async t=>{
+ const h=await setup({edit:p=>{withDetails(p);p.tracking.telemetry.window='now-6h';},answer:input=>({payload:{status:'Complete',logs:grouped(input)?detailsRows():[{n:'15'}],totalFound:99999}})});t.after(()=>h.close());h.api.setEnabled(true);await settle();
+ const calls=h.calls.filter(c=>c.tool==='query_cloudwatch_logs');assert.equal(calls.length,8);
+ const ranges=new Set(calls.map(c=>JSON.stringify([c.input.start,c.input.end])));assert.equal(ranges.size,1);assert.equal(Date.parse(calls[0].input.end)-Date.parse(calls[0].input.start),6*3600000);
+ assert.ok(calls.every(c=>c.input.logGroups[0].includes('646998985045')));assert.equal(calls.filter(c=>grouped(c.input)).every(c=>c.input.limit===20),true);
+ for(const id of ids){const entry=h.api.snapshot().map[id].signals.rate;assert.equal(entry.value,15);assert.deepEqual(plain(entry.breakdown.rows),[{label:'cam-123',value:12,cells:['AUTHORIZATION_FAILURE']},{label:'cam-456',value:2,cells:['<img src=x onerror=alert(1)>']}]);assert.equal(entry.breakdown.returnedRows,2);assert.equal(entry.breakdown.limit,20);}
+ const model=h.C.liveStatusLogDetails(h.api.snapshot());assert.deepEqual(plain(model.map(x=>x.id)).sort(),ids.slice().sort());assert.ok(model.every(x=>x.total.includes('15') && x.config.title==='Devices'));
+ h.api.setEnabled(false);assert.deepEqual(plain(h.C.liveStatusLogDetails(h.api.snapshot())),[]);
+});
+test('detail empty is complete; malformed/error rows replace old details without erasing scalar or unrelated metrics',async t=>{
+ let result={status:'Complete',logs:detailsRows(),totalFound:999};const h=await setup({edit:withDetails,answer:input=>{if(!grouped(input))return {payload:{status:'Complete',logs:[{n:'15'}]}};if(result.throw)throw result.throw;return {structuredContent:result};}});t.after(()=>h.close());h.api.setEnabled(true);await settle();
+ for(const bad of [{status:'Running',logs:[]},{status:'Complete',logs:[{n:'12'}]},{status:'Complete',logs:[{clientId:'cam'}]},{status:'Complete',logs:[{clientId:'cam',n:'NaN'}]},{status:'Complete',logs:[{clientId:'cam',n:'-1'}]},{status:'Complete',logs:[{clientId:'cam',n:'Infinity'}]},{status:'Complete',logs:[{clientId:'cam',n:'1',sampleReason:{html:'oops'}}]},{throw:{code:'tool_error',message:'Permission denied\nReconnect'}},{throw:{code:'upstream_error',message:'Timeout'}}]){
+   result=bad;h.api.retry();await settle();const entry=h.api.snapshot().map.local.signals.rate;assert.equal(entry.value,15);assert.equal(entry.breakdown.status,'error');assert.equal(entry.breakdown.rows,undefined);assert.doesNotMatch(entry.breakdown.error,/\n/);assert.equal(h.api.snapshot().map.local.signals.sent.value,37);
+ }
+ result={status:'Complete',logs:[],totalFound:123};h.api.retry();await settle();const entry=h.api.snapshot().map.local.signals.rate;assert.equal(entry.value,15);assert.equal(entry.breakdown.status,'complete');assert.deepEqual(plain(entry.breakdown.rows),[]);assert.equal(entry.breakdown.returnedRows,0);
+ result={status:'Complete',logs:[{clientId:'cam',n:'0'}]};h.api.retry();await settle();assert.deepEqual(plain(h.api.snapshot().map.local.signals.rate.breakdown.rows),[{label:'cam',value:0,cells:['(missing)']}]);
+});
+test('detail contracts cap rows, columns and text, preserve literal HTML and reject malformed host samples',()=>{
+ const C=context(),config=breakdown(),range={from:'2026-11-05T00:00:00Z',to:'2026-11-06T00:00:00Z'},rows=Array.from({length:120},(_,i)=>({clientId:'cam-'+i,n:'0',sampleReason:'<b>'+ 'x'.repeat(800)}));
+ const d=C.telemetryGrafanaLogDetails({status:'Complete',logs:rows,totalFound:900000},config,range);assert.equal(d.rows.length,20);assert.equal(d.returnedRows,120);assert.equal(d.rows[0].cells[0].length,500);assert.match(d.rows[0].cells[0],/^<b>/);assert.equal(d.textTruncated,true);
+ const n={URL,AbortController,TextEncoder,TextDecoder,setTimeout,clearTimeout,document:{addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint('native').source,n);
+ const sample=raw=>n.telemetrySample({signals:{refused:{value:15,breakdown:raw}}}).signals.refused;
+ assert.equal(sample(d).breakdown.rows.length,20);assert.equal(sample({...d,rows:[{label:'',value:1,cells:[]}]}).breakdown.status,'error');assert.equal(sample({...d,rows:[{label:'cam',value:-1,cells:[]}]}).value,15);assert.equal(sample({...d,range:{}}).breakdown.status,'error');
+ assert.equal(sample({...d,rows:[{label:'cam',value:1,cells:Array(5).fill('x')}]}).breakdown.status,'error');
+ for(const bad of [{...config,limit:101},{...config,limit:0},{...config,columns:Array(5).fill({field:'x',label:'X'})},{...config,labelField:''},{...config,valueField:undefined},{...config,title:'x'.repeat(81)}])assert.equal(C.telemetryCloudwatchLogsQuery({...logs(),breakdown:bad}),false);
+ assert.equal(C.telemetryCloudwatchLogsQuery({...logs(),breakdown:{query:'stats count() as n by clientId',labelField:'clientId',valueField:'n'}}),true);
+});
+test('scalar failure skips details and no prior grouped observation survives',async t=>{
+ let bad=false;const h=await setup({edit:withDetails,answer:input=>{if(bad)throw {code:'tool_error',message:'scalar failed'};return {payload:{status:'Complete',logs:grouped(input)?detailsRows():[{n:'15'}]}};}});t.after(()=>h.close());h.api.setEnabled(true);await settle();assert.ok(h.api.snapshot().map.local.signals.rate.breakdown);const count=h.calls.length;bad=true;h.api.retry();await settle();assert.equal(h.api.snapshot().map.local.signals.rate,undefined);assert.ok(h.calls.slice(count).filter(c=>c.tool==='query_cloudwatch_logs').every(c=>!grouped(c.input)));
+});
+test('late grouped responses cannot cross environment switches, Metrics off, destroy or sibling controllers',async t=>{
+ for(const action of ['environment','disable','destroy']){
+  let held=true;const pending=[];const h=await setup({edit:withDetails,answer:input=>grouped(input)&&held?new Promise(resolve=>pending.push(resolve)):{payload:{status:'Complete',logs:grouped(input)?[{clientId:'new',n:'2'}]:[{n:'15'}]}}});t.after(()=>h.close());h.api.setEnabled(true);await settle();assert.ok(pending.length);const oldSignal=h.calls[0].signal;held=false;
+  if(action==='environment')h.api.setEnvironment('prd');else if(action==='disable')h.api.setEnabled(false);else h.close();await settle();assert.equal(oldSignal.aborted,true);
+  const before=JSON.stringify(h.api.snapshot().map);pending.forEach(resolve=>resolve({payload:{status:'Complete',logs:[{clientId:'OLD',n:'999'}]}}));await settle();assert.equal(JSON.stringify(h.api.snapshot().map),before);assert.ok(!before.includes('OLD'));
+  if(action==='environment'){assert.equal(h.api.snapshot().map.local.signals.rate.breakdown.rows[0].label,'new');assert.ok(h.calls.filter(c=>c.signal!==oldSignal&&grouped(c.input)).every(c=>c.input.logGroups[0].includes('139648982912')));}
+ }
+ const a=await setup({edit:withDetails}),b=await setup({edit:withDetails,answer:input=>({payload:{status:'Complete',logs:grouped(input)?detailsRows():[{n:'7'}]}})});t.after(()=>a.close());t.after(()=>b.close());a.api.setEnabled(true);b.api.setEnabled(true);await settle();a.api.setEnabled(false);assert.equal(b.api.snapshot().map.local.signals.rate.value,7);
+});
+test('breakdown strings use named variables and template pass; desktop editor preserves structured details',()=>{
+ const C=context(),q={...logs(),breakdown:{...breakdown(),query:'filter account = "${iotAccount}" | stats count() as n by ${field}',labelField:'${field}',title:'Devices in $env'}};
+ const template={kind:'service',params:['field'],signals:{refused:{cloudwatchLogs:q}}};
+ const b=C.carrierTelemetry({telemetry:{use:'logs',field:'clientId'}},{logs:template},null,{environment:'stg',variables:{iotAccount:'123'}});
+ assert.equal(b.signals.refused.query.breakdown.query,'filter account = "123" | stats count() as n by clientId');assert.equal(b.signals.refused.query.breakdown.labelField,'clientId');assert.equal(b.signals.refused.query.breakdown.title,'Devices in stg');
+ vm.runInNewContext(readSource('workbench/commands/telemetry.js'),C);assert.deepEqual(plain(C.telemetryQueryValue('cloudwatchLogs',JSON.stringify(q)).value),q);
+});

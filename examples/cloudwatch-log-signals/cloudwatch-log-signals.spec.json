@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "Camera publish authorization \u2014 CloudWatch example",
-    "subtitle": "Exact-topic refused publishes and separate-account queue traffic. Configure QA and production SQS before querying those signals. Replace the illustrative QueueName with the real queue name; no live verification.",
+    "subtitle": "Exact-topic refused publishes and separate-account queue traffic. Configure QA and production SQS before querying those signals. Replace the illustrative QueueName with the real queue name; no live verification. Client grouping is illustrative; clientId does not guarantee physical-device identity.",
     "tracking": {
       "telemetry": {
         "window": "24h",
@@ -49,7 +49,22 @@
                       ],
                       "query": "filter eventType = \"Publish-In\" and status = \"Failure\" and reason = \"AUTHORIZATION_FAILURE\" and topicName = \"$aws/rules/camera_message_power_state\" | stats count() as n",
                       "region": "us-east-1",
-                      "valueField": "n"
+                      "valueField": "n",
+                      "breakdown": {
+                        "query": "filter eventType = \"Publish-In\" and status = \"Failure\" and reason = \"AUTHORIZATION_FAILURE\" and topicName = \"$aws/rules/camera_message_power_state\" | stats count() as n, latest(reason) as sampleReason by clientId | sort n desc | limit 20",
+                        "labelField": "clientId",
+                        "valueField": "n",
+                        "title": "Publish failures by client",
+                        "labelTitle": "Client ID",
+                        "valueTitle": "Failures",
+                        "columns": [
+                          {
+                            "field": "sampleReason",
+                            "label": "Latest reason"
+                          }
+                        ],
+                        "limit": 20
+                      }
                     },
                     "unit": "refused publishes",
                     "scope": "topic $aws/rules/camera_message_power_state \u00b7 account ${iotAccount}"
@@ -101,7 +116,22 @@
                       ],
                       "query": "filter eventType = \"Publish-In\" and status = \"Failure\" and reason = \"AUTHORIZATION_FAILURE\" and topicName = \"$aws/rules/camera_message_power_state\" | stats count() as n",
                       "region": "us-east-1",
-                      "valueField": "n"
+                      "valueField": "n",
+                      "breakdown": {
+                        "query": "filter eventType = \"Publish-In\" and status = \"Failure\" and reason = \"AUTHORIZATION_FAILURE\" and topicName = \"$aws/rules/camera_message_power_state\" | stats count() as n, latest(reason) as sampleReason by clientId | sort n desc | limit 20",
+                        "labelField": "clientId",
+                        "valueField": "n",
+                        "title": "Publish failures by client",
+                        "labelTitle": "Client ID",
+                        "valueTitle": "Failures",
+                        "columns": [
+                          {
+                            "field": "sampleReason",
+                            "label": "Latest reason"
+                          }
+                        ],
+                        "limit": 20
+                      }
                     },
                     "unit": "refused publishes",
                     "scope": "topic $aws/rules/camera_message_power_state \u00b7 account ${iotAccount}"

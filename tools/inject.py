@@ -458,11 +458,11 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "Name missing instrumentation; use supplied resources, never invented Jira/PRs.",
             "- `page.tracking.telemetry`: sources, `window` (default `24h`), templates; "
             "`environment`/`environments` inherit shared values; qa/stg/prd differs from Honeycomb slug. "
-            "Selection is session-only; $env/${env} expand strings. Shared/profile `variables` resolve ${name} once "
+            "Session-only selection. $env/${env} expand strings; shared/profile `variables` resolve ${name} once "
             "in signals; template params win; missing variables block calls.",
             "- Carrier `telemetry`: `kind`, `signals`, `proof`, safe `links`; never derive a query "
             "from names/ids. Include local, imported/nested, overlay and loaded-detail nodes/edges. "
-            "Inspect schemas; preserve queries/UIDs; verify once. "
+            "Preserve verified queries/UIDs. "
             "Distinguish returned, empty, zero and failed evidence; missing is unobserved.",
             "- Metrics starts off. Root `enabled:false`/host false grants no query permission; "
             "absent tools hide it. Preview is synthetic, unsaved, no network. Over time uses exact "
@@ -470,7 +470,7 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "- Sources: grafana/PromQL, loki/LogQL, tempo/TraceQL, sql/hourly scalar, honeycomb; "
             "cloudwatch: Sum/Maximum/Minimum/Average/SampleCount, full-window scalar; "
             "cloudwatchLogs/query_cloudwatch_logs: first row valueField/column; Complete+empty+totalFound=0 means zero. "
-            "Neither has history/period/sparklines/breakdowns. Scope: dimensions or explicit label, never titles.",
+            "Logs breakdown: parse/stats + selected text, bounded Live status rows; card total unchanged. No history/period/sparklines; scope from dimensions/label.",
             "- Honeycomb uses run_query: one scalar, exact JSON, no breakdowns/formulas; COUNT "
             "counts spans/events. Use stable query links, never signed URLs. For traces declare "
             "get_trace and read the trace contract; one request only, retain partial warnings. "

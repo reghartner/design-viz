@@ -151,6 +151,21 @@ function telemetryGrafanaCloudwatchLogs(payload,query){
   if(value===null)throw {code:'tool_error',message:'query_cloudwatch_logs first row needs numeric field '+(field || '(first column)')};
   return value;
 }
+function telemetryGrafanaLogDetails(payload,config,range){
+  if(!payload || payload.status!=='Complete' || !Array.isArray(payload.logs))throw {code:'tool_error',message:'Log details query did not return Complete rows'};
+  var limit=config.limit || 20,rows=payload.logs.slice(0,limit).map(function(row,index){
+    var label=telemetryObject(row) && telemetryOwn(row,config.labelField)?row[config.labelField]:null;
+    var value=telemetryObject(row) && telemetryOwn(row,config.valueField)?telemetryGrafanaNumber(row[config.valueField]):null;
+    if(!telemetryText(label) || value===null || value<0)throw {code:'tool_error',message:'Log details row '+(index+1)+' needs '+config.labelField+' and nonnegative numeric '+config.valueField};
+    var cells=(config.columns || []).map(function(column){
+      if(!telemetryOwn(row,column.field) || row[column.field]===null)return '(missing)';
+      if(typeof row[column.field]!=='string')throw {code:'tool_error',message:'Log details field '+column.field+' must be text'};
+      return row[column.field];
+    });
+    return {label:label,value:value,cells:cells};
+  });
+  return telemetryLogDetails({status:'complete',rows:rows,returnedRows:payload.logs.length,limit:limit,range:range});
+}
 /* get_annotations: {Payload: [{time, text, tags}]} or a bare array. Kept when
    from <= time <= to, ascending; kind is deploy, else incident, else the first tag. */
 function telemetryGrafanaMarkers(payload,from,to){
@@ -330,6 +345,7 @@ function createTelemetryGrafana(page,win,now,bound){
     if(blocked && blocked.signal===signal)return Promise.reject(blocked.error);
     blocked=null;
     var config=telemetryProviderConfig(current || {},ctl),windowMs=telemetryGrafanaWindowMs(config.window);
+    var anchoredEnd=clock(),anchoredRange={from:new Date(anchoredEnd-windowMs).toISOString(),to:new Date(anchoredEnd).toISOString()};
     var range={from:'now-'+config.window,to:'now'},step=Math.max(60,Math.ceil(windowMs/1000/TELEMETRY_GRAFANA_POINTS));
     var options=signal?{signal:signal}:undefined,failures=[],fatal=null,annotations=null,order=0;
     function failed(rank,label,message){failures.push({rank:rank,text:label+': '+message});}
@@ -369,9 +385,16 @@ function createTelemetryGrafana(page,win,now,bound){
             return;
           }
           if(entry.source==='cloudwatchLogs'){
-            var q=entry.query,input={datasourceUid:uid,region:q.region,logGroups:q.logGroups,queryString:q.query,start:range.from,end:range.to,limit:100};
+            var q=entry.query,logRange=q.breakdown?anchoredRange:range,input={datasourceUid:uid,region:q.region,logGroups:q.logGroups,queryString:q.query,start:logRange.from,end:logRange.to,limit:100};
             tasks.push(function(){return call('query_cloudwatch_logs',input).then(function(result){
               entry.value=telemetryGrafanaCloudwatchLogs(telemetryGrafanaPayload(result),q);entry.observedAt=new Date(clock()).toISOString();
+              if(!q.breakdown || signal && signal.aborted)return;
+              var detailsInput=Object.assign({},input,{queryString:q.breakdown.query,limit:q.breakdown.limit || 20});
+              return call('query_cloudwatch_logs',detailsInput).then(function(details){entry.breakdown=telemetryGrafanaLogDetails(telemetryGrafanaPayload(details),q.breakdown,logRange);}).catch(function(error){
+                if(signal && signal.aborted)return;
+                if(code(error)==='user_changed'){if(!fatal)fatal={error:error,repeat:{tool:'query_cloudwatch_logs',input:detailsInput}};return;}
+                entry.breakdown=telemetryLogDetails({status:'error',error:detail(error)});failed(rank,label+' log details',entry.breakdown.error);
+              });
             }).catch(caught(rank,label,{tool:'query_cloudwatch_logs',input:input},entry));});
             return;
           }
@@ -429,6 +452,7 @@ function createTelemetryGrafana(page,win,now,bound){
           else if(typeof entry.value==='number'){sample={value:entry.value};if(entry.observedAt)sample.observedAt=entry.observedAt;}
           else if(entry.failed && previous && entry.source!=='cloudwatch' && entry.source!=='cloudwatchLogs' && !entry.error)sample=JSON.parse(JSON.stringify(previous));
           if(!sample)return;
+          if(entry.breakdown)sample.breakdown=entry.breakdown;
           if(entry.unit)sample.unit=entry.unit;else delete sample.unit;
           out.signals[entry.name]=sample;
         });

@@ -66,6 +66,23 @@ function telemetryAggregate(entry,observedAt){
   if(!from || !to || Date.parse(from)>=Date.parse(to) || Date.parse(to)>Date.parse(observed))return null;
   return {kind:'total',from:from,to:to};
 }
+/* Bounded log evidence, including native host samples. Invalid details cannot
+   erase a valid scalar, nor masquerade as a successful empty result. */
+function telemetryLogDetails(raw){
+  function error(message){return {status:'error',error:String(message).replace(/\s+/g,' ').slice(0,500)};}
+  if(!telemetryObject(raw))return error('Malformed log details');
+  if(raw.status==='error')return error(telemetryText(raw.error)?raw.error:'Log details unavailable');
+  var from=raw.range && telemetryTime(raw.range.from),to=raw.range && telemetryTime(raw.range.to);
+  if(raw.status!=='complete' || !from || !to || Date.parse(from)>=Date.parse(to) || !Array.isArray(raw.rows) || !Number.isInteger(raw.limit) || raw.limit<1 || raw.limit>100 || !Number.isSafeInteger(raw.returnedRows) || raw.returnedRows<raw.rows.length || Math.min(raw.rows.length,raw.limit)!==Math.min(raw.returnedRows,raw.limit))return error('Malformed log details');
+  var truncated=!!raw.textTruncated,rows=[];
+  function text(value){if(value.length>500){truncated=true;return value.slice(0,499)+'…';}return value;}
+  for(var i=0;i<Math.min(raw.rows.length,raw.limit);i++){
+    var row=raw.rows[i];
+    if(!telemetryObject(row) || !telemetryText(row.label) || !telemetryNumber(row.value) || row.value<0 || !Array.isArray(row.cells) || row.cells.length>4 || !row.cells.every(function(v){return typeof v==='string';}))return error('Log details row '+(i+1)+' needs a label, nonnegative count and text cells');
+    rows.push({label:text(row.label),value:row.value,cells:row.cells.map(text)});
+  }
+  return {status:'complete',rows:rows,limit:raw.limit,returnedRows:raw.returnedRows,textTruncated:truncated,range:{from:from,to:to}};
+}
 /* One carrier's sample, kept to the provider result contract; null when unusable. */
 function telemetrySample(raw){
   if(!telemetryObject(raw))return null;
@@ -80,6 +97,7 @@ function telemetrySample(raw){
     if(telemetryOwn(value,'retrievedAt'))entry.retrievedAt=telemetryTime(value.retrievedAt);
     if(value.provenance==='formatted-text')entry.provenance='formatted-text';
     var aggregate=telemetryAggregate(value,out.observedAt);if(aggregate)entry.aggregate=aggregate;
+    if(telemetryOwn(value,'breakdown'))entry.breakdown=telemetryLogDetails(value.breakdown);
     out.signals[name]=entry;
   });
   if(Array.isArray(raw.markers))raw.markers.forEach(function(marker){

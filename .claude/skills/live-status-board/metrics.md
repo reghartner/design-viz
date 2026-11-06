@@ -110,7 +110,7 @@ for the complete wrapper example, tool schemas, bounds and selection behavior.
 
 - `grafana`: PromQL; `loki`: metric LogQL. Range series and exact daily history.
 - `cloudwatch`: metric object; Sum, Maximum, Minimum, Average or SampleCount. One full-window scalar; no configurable period, sparkline or daily history.
-- `cloudwatchLogs`: Logs Insights object; first row's `valueField` (or first column), numeric strings accepted. No reason breakdown or daily history.
+- `cloudwatchLogs`: Logs Insights object; first row's `valueField` (or first column), numeric strings accepted. Optional bounded grouped details in Live status; no daily history.
 - `sql`: query string, first numeric scalar, at most once/hour.
 - `honeycomb`: query object with one scalar calculation, no breakdowns/formulas; COUNT counts events/spans. No daily history.
 - `tempo`: explicit TraceQL trace search; one observed request, not an aggregate metric.
@@ -189,7 +189,7 @@ in 24h” on a scalar card.
 ### CloudWatch Logs Insights
 
 A `cloudwatchLogs` signal is a structured object with `logGroups` (nonempty
-strings), `query`, `region`, and optional `valueField`. It uses the same
+strings), `query`, `region`, optional `valueField` and optional `breakdown`. It uses the same
 `tracking.telemetry.grafana.cloudwatch` datasource UID as metric queries.
 Use full log-group ARNs for linked source accounts, and don't mix ARNs and names.
 The artifact declares `query_cloudwatch_logs` only when a local/imported/template
@@ -209,8 +209,8 @@ supported; error wrappers never become observations.
 The [Grafana Logs tool source](https://github.com/grafana/mcp-grafana/blob/main/tools/cloudwatch_logs.go)
 returns `{logs: []map[string]string, totalFound, status, hints?}` and polls for
 completion. Repository tests replay this contract; no live connector/account
-verification is claimed. Optional period/sparklines, daily CloudWatch history
-and Logs reason breakdowns are outside this pass.
+verification is claimed. Optional period/sparklines and daily CloudWatch history
+remain unsupported.
 
 See the validated [device → IoT → queue example](../../../examples/cloudwatch-log-signals/cloudwatch-log-signals.spec.json).
 The queue name `camera_message_power_state_${env}` is illustrative: replace it with the real queue name before querying. No queue metric was live verified here.
@@ -223,6 +223,24 @@ used as SQS. QA accounts and production SQS were not supplied: those variable
 values are deliberately absent, so affected signals remain unobserved until
 configured, with no wrong-account call.
 
+For per-device counts, keep the scalar query and add `cloudwatchLogs.breakdown`
+with explicit `query`, `labelField`, `valueField`; optionally `title`,
+`labelTitle`, `valueTitle`, `columns: [{field, label}]`, `limit` (default 20,
+maximum 100). Use `stats count() as n, latest(reason) as sampleReason by clientId`
+after the same failure filter, then `sort n desc | limit 20`. Label client IDs
+honestly; they are not necessarily physical-device identities. For text logs,
+author `parse @message /device_id=(?<deviceId>[^ ]+)/` before grouping, based on
+a verified sample, not a guessed production format. Missing IDs/counts fail the
+details; selected missing text cells show `(missing)`. Up to four text columns,
+500 characters per displayed cell; field names/headings at most 80 characters.
+
+The card keeps its independent scalar total. Paired queries share one fixed
+range. Live status shows a collapsed, scrollable list of actual returned rows,
+never an exhaustive group total; query/display limits may omit groups. A failed
+details query clears old rows and retains the scalar. Add a Live status panel to
+see details; no panel is inserted automatically. No click-to-query drilldown.
+See [grouped Logs examples](../../../docs/live-status.md#grouped-log-details-and-text-extraction).
+
 ## 3. Write explicit bindings
 
 The accepted authored fields are:
@@ -234,6 +252,9 @@ The accepted authored fields are:
 | `tracking.telemetry.honeycomb` | `environment`, optional `dataset` |
 | carrier `telemetry` | `kind`, `signals`, `proof`, `links`, `card`, or `use` plus declared template parameters |
 | signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope` |
+| `cloudwatchLogs` query | `logGroups`, `query`, `region`, optional `valueField`, `breakdown` |
+| breakdown | `query`, `labelField`, `valueField`; optional `title`, `labelTitle`, `valueTitle`, `columns`, `limit` |
+| breakdown column | `field`, `label` |
 | proof entry | `min`, `max`, optional `maxRatioOf` another signal |
 | links | absolute HTTP(S) `dashboard`, `query` |
 | edge card | `side`, `offset` |

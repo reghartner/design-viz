@@ -189,8 +189,15 @@ function telemetryCloudwatchQuery(query){
   return telemetryObject(query) && ['namespace','metric','region','accountId'].every(function(key){return telemetryText(query[key]);}) &&
     (['Sum','Maximum','Minimum','Average','SampleCount'].indexOf(query.statistic)>=0 || typeof query.statistic==='string' && /^\$(?:[A-Za-z][A-Za-z0-9_]*|\{[A-Za-z][A-Za-z0-9_]*\})$/.test(query.statistic)) && telemetryObject(query.dimensions) && Object.keys(query.dimensions).every(function(key){return telemetryText(key) && telemetryText(query.dimensions[key]);});
 }
+function telemetryLogBreakdownQuery(value){
+  function heading(text){return telemetryText(text) && text.length<=80;}
+  return telemetryObject(value) && telemetryText(value.query) && heading(value.labelField) && heading(value.valueField) &&
+    ['title','labelTitle','valueTitle'].every(function(key){return !telemetryOwn(value,key) || heading(value[key]);}) &&
+    (!telemetryOwn(value,'limit') || Number.isInteger(value.limit) && value.limit>=1 && value.limit<=100) &&
+    (!telemetryOwn(value,'columns') || Array.isArray(value.columns) && value.columns.length<=4 && value.columns.every(function(column){return telemetryObject(column) && heading(column.field) && heading(column.label);}));
+}
 function telemetryCloudwatchLogsQuery(query){
-  return telemetryObject(query) && Array.isArray(query.logGroups) && query.logGroups.length>0 && query.logGroups.every(telemetryText) && telemetryText(query.query) && telemetryText(query.region) && (!telemetryOwn(query,'valueField') || telemetryText(query.valueField));
+  return telemetryObject(query) && Array.isArray(query.logGroups) && query.logGroups.length>0 && query.logGroups.every(telemetryText) && telemetryText(query.query) && telemetryText(query.region) && (!telemetryOwn(query,'valueField') || telemetryText(query.valueField)) && (!telemetryOwn(query,'breakdown') || telemetryLogBreakdownQuery(query.breakdown));
 }
 /* One signal entry: exactly one source key plus an optional unit. Returns the
    cleaned authored entry ({<source>: query, unit?}) or null. */
@@ -205,8 +212,9 @@ function telemetrySignal(name,value,warn){
     if(!telemetryCloudwatchQuery(query)){warn(at,'cloudwatch requires namespace, metric, region, accountId, string dimensions and statistic: Sum, Maximum, Minimum, Average or SampleCount — signal ignored');return null;}
     telemetryUnknown(query,['namespace','metric','region','accountId','dimensions','statistic'],warn,at+'.cloudwatch');
   }else if(source==='cloudwatchLogs'){
-    if(!telemetryCloudwatchLogsQuery(query)){warn(at,'cloudwatchLogs requires logGroups, query, region and optional valueField — signal ignored');return null;}
-    telemetryUnknown(query,['logGroups','query','region','valueField'],warn,at+'.cloudwatchLogs');
+    if(!telemetryCloudwatchLogsQuery(query)){warn(at,'cloudwatchLogs requires logGroups, query, region; breakdown needs query, labelField, valueField, limit 1–100 and at most 4 text columns — signal ignored');return null;}
+    telemetryUnknown(query,['logGroups','query','region','valueField','breakdown'],warn,at+'.cloudwatchLogs');
+    if(query.breakdown){telemetryUnknown(query.breakdown,['query','labelField','valueField','title','labelTitle','valueTitle','columns','limit'],warn,at+'.cloudwatchLogs.breakdown');(query.breakdown.columns || []).forEach(function(column,i){telemetryUnknown(column,['field','label'],warn,at+'.cloudwatchLogs.breakdown.columns.'+i);});}
   }else if(source==='honeycomb'){
     if(!telemetryObject(query) || !Object.keys(query).length){warn(at,'honeycomb must be a non-empty query object — signal ignored');return null;}
   }else if(!telemetryText(query)){warn(at,source+' must be a non-empty query string — signal ignored');return null;}

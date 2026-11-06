@@ -93,7 +93,7 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
     ['sql','SELECT count(*) FROM requests'],
     ['honeycomb',{calculations:[{op:'COUNT'}]}],
     ['cloudwatch',{namespace:'AWS/IoT',metric:'TopicMatch',region:'us-east-1',accountId:'$account',dimensions:{RuleName:'camera_message_camera_stats'},statistic:'Sum'}],
-    ['cloudwatchLogs',{logGroups:['arn:aws:logs:us-east-1:${iotAccount}:log-group:AWSIotLogsV2'],query:'filter topicName = "$aws/rules/camera_message_power_state" | stats count() as n',region:'us-east-1',valueField:'n'}],
+    ['cloudwatchLogs',{logGroups:['arn:aws:logs:us-east-1:${iotAccount}:log-group:AWSIotLogsV2'],query:'filter topicName = "$aws/rules/camera_message_power_state" | stats count() as n',region:'us-east-1',valueField:'n',breakdown:{query:'stats count() as n, latest(reason) as sampleReason by clientId',labelField:'clientId',valueField:'n',title:'Devices',labelTitle:'Client ID',valueTitle:'Failures',columns:[{field:'sampleReason',label:'Latest reason'}],limit:20}}],
   ],kinds=['call','queue','service','log-event','device','service','log-event'],sides=['right','left','above','below','right','left','above'];
   variants.forEach(([source,query],index)=>{
     const rate={[source]:query,unit:'req/h',scope:'authored counting scope'},warnings=[];
@@ -124,7 +124,7 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
   assert.equal(resolvedUse.signals.rate.scope,'route v1-items · api · account 222222222222');
   assert.deepEqual(authoredRoot.variables,{service:'api',iotAccount:'111111111111'},'profile resolution preserves authored defaults');
 
-  const exercised=new Set(['cloudwatch','cloudwatchLogs','scope','variables','accountId','baseUrl','environments','enabled','grafana','honeycomb','window','refreshMs','templates','prometheus','loki','tempo','sql','environment','dataset',
+  const exercised=new Set(['cloudwatch','cloudwatchLogs','logGroups','region','valueField','breakdown','labelField','title','labelTitle','valueTitle','columns','limit','field','label','scope','variables','accountId','baseUrl','environments','enabled','grafana','honeycomb','window','refreshMs','templates','prometheus','loki','tempo','sql','environment','dataset',
     'kind','signals','proof','links','card','use','unit','min','max','maxRatioOf','dashboard','query','side','offset','params']);
   assert.deepEqual([...documentedFields(chapter)].sort(),[...exercised].sort(),'every field named in the chapter table has a parser-backed fixture');
 

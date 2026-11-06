@@ -2445,7 +2445,7 @@ in 24h” on a scalar card.
 ### CloudWatch Logs Insights
 
 A `cloudwatchLogs` signal is a structured object with `logGroups` (nonempty
-strings), `query`, `region`, and optional `valueField`. It uses the same
+strings), `query`, `region`, optional `valueField` and optional `breakdown`. It uses the same
 `tracking.telemetry.grafana.cloudwatch` datasource UID as metric queries.
 Use full log-group ARNs for linked source accounts, and don't mix ARNs and names.
 The artifact declares `query_cloudwatch_logs` only when a local/imported/template
@@ -2465,8 +2465,8 @@ supported; error wrappers never become observations.
 The [Grafana Logs tool source](https://github.com/grafana/mcp-grafana/blob/main/tools/cloudwatch_logs.go)
 returns `{logs: []map[string]string, totalFound, status, hints?}` and polls for
 completion. Repository tests replay this contract; no live connector/account
-verification is claimed. Optional period/sparklines, daily CloudWatch history
-and Logs reason breakdowns are outside this pass.
+verification is claimed. Optional period/sparklines and daily CloudWatch history
+remain unsupported.
 
 See the validated [device → IoT → queue example](../examples/cloudwatch-log-signals/cloudwatch-log-signals.spec.json).
 The queue name `camera_message_power_state_${env}` is illustrative: replace it with the real queue name before querying. No queue metric was live verified here.
@@ -2478,3 +2478,91 @@ is `139648982912`. Production `970642438387` is an **SNS** account and is not
 used as SQS. QA accounts and production SQS were not supplied: those variable
 values are deliberately absent, so affected signals remain unobserved until
 configured, with no wrong-account call.
+
+
+### Grouped log details and text extraction
+
+An optional `cloudwatchLogs.breakdown` requests a second, authored Logs Insights
+query. The scalar query remains the authoritative total on the card and in Proof.
+For example, scalar 15 and returned device counts 12 + 2 still display total 15.
+Neither grouped-row sums nor connector `totalFound` replace that total.
+
+The illustrative AWS IoT recipe below uses the documented JSON `clientId` field,
+which is a client identifier, not necessarily a unique physical device. Keep the
+same exact-topic/failure filter in the scalar and grouped queries. No production
+device-ID format or live account result has been verified.
+
+```json
+{
+  "query": "filter eventType = \"Publish-In\" and status = \"Failure\" and reason = \"AUTHORIZATION_FAILURE\" and topicName = \"$aws/rules/camera_message_power_state\" | stats count() as n, latest(reason) as sampleReason by clientId | sort n desc | limit 20",
+  "labelField": "clientId",
+  "valueField": "n",
+  "title": "Publish failures by client",
+  "labelTitle": "Client ID",
+  "valueTitle": "Failures",
+  "columns": [{"field": "sampleReason", "label": "Latest reason"}],
+  "limit": 20
+}
+```
+
+Place that object under `cloudwatchLogs.breakdown`. It inherits the signal's
+log groups, region and datasource, including environment variables. Both calls
+use one absolute ISO start/end pair anchored at refresh start, with the selected
+page window (including aliases such as `now-6h`). Without `breakdown` only the
+original scalar call runs, retaining its relative-window convention. The details
+call follows scalar success in the same bounded provider task; it introduces no
+additional polling. Scalar failure skips details. Details failure clears old rows
+and displays a one-line error while retaining a successfully read scalar.
+Environment changes, Metrics off and controller destruction retire both calls.
+
+For a **synthetic** line `device_id=cam-123 issue=publish_failed`, an explicit
+text-extraction recipe is:
+
+```text
+filter @message like /issue=publish_failed/
+| parse @message /device_id=(?<deviceId>[^ ]+)/
+| stats count() as n, latest(@message) as sampleMessage by deviceId
+| sort n desc
+| limit 20
+```
+
+Choose `labelField: "deviceId"`, `valueField: "n"`, and optionally
+`columns: [{"field":"sampleMessage","label":"Latest sample"}]`. The scalar
+query uses the same issue filter followed by `stats count() as n`. Adapt the
+extraction to an actual log sample; it is not an automatic parser or a claim about
+the user's production format. To filter one known device, author an explicit
+`filter deviceId = "cam-123"` after `parse` in both queries. AWS documents
+[parse and named captures](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CWL_QuerySyntax-Parse.html)
+and [stats grouping](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CWL_QuerySyntax-Stats.html).
+
+The schema requires nonempty `query`, `labelField`, `valueField`. Optional
+`title`, `labelTitle`, `valueTitle` customize headings. `columns` selects at most
+four text fields as `{field,label}`; raw log rows are never dumped by default.
+Field names and headings are at most 80 characters. `limit` defaults to 20 and
+must be an integer from 1 to 100; it bounds the connector request and displayed
+rows. Displayed labels and text cells are capped at 500 characters with a visible
+shortening notice. Counts must be finite and nonnegative; numeric strings and
+zero are accepted. Missing/blank group labels or missing/invalid counts reject
+the details visibly instead of hiding rows. Missing optional text cells show
+`(missing)`; non-text cells reject the details. All text uses textContent.
+
+The existing **Live status** panel shows default-collapsed Log details sections
+identified by carrier and signal, including local/imported nodes and edges and
+loaded details. Tables scroll within 280 pixels. Expansion and keyboard focus
+survive ordinary refreshes in the same view; environment/binding/page changes
+and Metrics off clear their identity and state. With no authored Live status
+panel, the scalar card still works; add `{ "type": "live-status" }` to see details.
+The UI reports displayed rows, actual returned rows and the configured display
+limit. Even fewer rows than the limit do not prove complete group coverage:
+the authored query may have its own smaller limit. Empty Complete details mean
+no grouped rows returned, not a failed query or necessarily a zero scalar.
+Latest reason/sample columns are representative text, not a most-frequent cause.
+Details do not create successful-traffic animation or a measured aggregate.
+
+Native hosts can supply `signals[name].breakdown` with `status: "complete"`,
+`range: {from,to}`, `limit`, `returnedRows`, and `rows: [{label,value,cells}]`, or
+`status: "error", error`. Native normalization applies the same bounds and rejects
+malformed details while preserving a valid scalar. `returnedRows` means rows
+actually returned, never input records matched or a total group count. This is
+runtime evidence; it is not saved into the document. Desktop structured query
+editing preserves the authored breakdown through Undo/Redo.

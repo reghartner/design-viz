@@ -47,7 +47,7 @@ class AuthoringPacketTests(unittest.TestCase):
         self.assertIn('Jira', text)
         self.assertIn('instrumentation', text)
         self.assertIn('queues', text)
-        for source in ('grafana', 'loki', 'tempo', 'sql', 'honeycomb', 'cloudwatch'):
+        for source in ('grafana', 'loki', 'tempo', 'sql', 'honeycomb', 'cloudwatch', 'cloudwatchLogs'):
             self.assertIn('`' + source + '`', text)
         self.assertIn('query_cloudwatch', text)
         self.assertIn('grafana.accountId', text)

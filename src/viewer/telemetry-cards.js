@@ -11,13 +11,13 @@ function telemetryCardValue(binding,sample,name){
   return reading.value===null?'unobserved':Number(reading.value.toPrecision(4)).toLocaleString('en-US')+(unit?' '+unit:'')+(sample && sample.signals && sample.signals[name] && sample.signals[name].provenance==='formatted-text'?' (formatted text; may be rounded)':'');
 }
 function telemetryCardContent(edge,binding,sample,result,window){
-  var primary=telemetryPrimary(binding),queue=binding.kind==='queue',raw=edge.telemetry || {};
+  var primary=telemetryPrimary(binding,true),queue=binding.kind==='queue',raw=edge.telemetry || {};
   var title=edge.label || edge.from+' → '+edge.to;
   // A template parameter is explicit author input. Never extract a queue name
   // or a query from the title, id, or query text.
   if(queue && raw.use && telemetryText(raw.topic) && title.indexOf(raw.topic)<0)title+=' · '+raw.topic;
-  var state=result && result.telemetry || 'unobserved';
-  return {title:title,headline:(queue?'in: ':'')+telemetryCardValue(binding,sample,primary),
+  var state=result && result.telemetry || 'unobserved',signal=primary && binding.signals[primary],scope=telemetrySignalScope(signal),scalar=signal && (signal.source==='cloudwatch' || signal.source==='cloudwatchLogs');
+  return {title:title,headline:(queue?'in: ':'')+telemetryCardValue(binding,sample,primary)+(scalar?' in '+window:''),scope:scope,
     details:queue?['lag: '+telemetryCardValue(binding,sample,'lag'),'age: '+telemetryCardValue(binding,sample,'age')]:
       ['errors: '+telemetryCardValue(binding,sample,telemetryErrorSignal(binding,primary) || 'errors'),'p95: '+telemetryCardValue(binding,sample,'p95')],
     note:state==='silent'?'no traffic · '+window+' window':state==='unobserved'?'unobserved · '+window+' window':window+' window',
@@ -54,31 +54,32 @@ function telemetryCardPlace(path,w,h,placement,boxes){
   }
   return {box:box,mid:mid,side:side};
 }
-function telemetryPaintCards(scope,diagram,templates,view,window,activate){
+function telemetryPaintCards(scope,diagram,templates,view,window,activate,config){
   telemetryClearCards(scope);
   if(!view || !diagram)return;
   scope.querySelectorAll('svg').forEach(function(svg){
     var boxes=[],doc=svg.ownerDocument;
     svg.querySelectorAll('.node .card,.node .icbg,.node use,.node image,.node text,.handoff-stripe,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff],.dvdelta,.node-review-badge,.comm-break,text.lbl').forEach(function(el){if(el.closest('.coin'))return;var box=boardControlBox(el,svg);if(box)boxes.push(box);});
     Array.from(svg.querySelectorAll('path.edge[data-dv-edge]')).sort(function(a,b){
-      function manual(path){var edge=(diagram.edges || [])[Number(path.getAttribute('data-dv-edge'))],binding=edge && carrierTelemetry(edge,templates);return !!(binding && binding.card && binding.card.position);}
+      function manual(path){var edge=(diagram.edges || [])[Number(path.getAttribute('data-dv-edge'))],binding=edge && carrierTelemetry(edge,templates,null,config);return !!(binding && binding.card && binding.card.position);}
       return Number(manual(b))-Number(manual(a));
     }).forEach(function(path){
-      var index=Number(path.getAttribute('data-dv-edge')),edge=(diagram.edges || [])[index],binding=edge && carrierTelemetry(edge,templates);
+      var index=Number(path.getAttribute('data-dv-edge')),edge=(diagram.edges || [])[index],binding=edge && carrierTelemetry(edge,templates,null,config);
       var liveBreak=svg.querySelector('.dv-live-comm-failure[data-dv-edge="'+index+'"]');
       if(!binding || edge.hidden===true || !boardControlBox(path,svg) && !boardControlBox(liveBreak,svg))return;
       var id=edge.from+'->'+edge.to,result=view.verdicts.carriers[id],content=telemetryCardContent(edge,binding,view.map[id],result,window);
       if(view.preview){content.note='Preview · synthetic';content.state='preview';}
       var card=telemetrySvg(doc,'g',{'class':'dv-metrics-card','data-dv-edge':index,'data-metrics-card':id,'data-state':content.state,'data-verdict':view.preview?'preview':result && result.verdict || 'unobserved'},svg);
-      var rect=telemetrySvg(doc,'rect',{'class':'dv-metrics-card-box',rx:7,width:138,height:78},card);
+      var height=content.scope?93:78;
+      var rect=telemetrySvg(doc,'rect',{'class':'dv-metrics-card-box',rx:7,width:138,height:height},card);
       telemetrySvg(doc,'path',{'class':'dv-metrics-card-bar',d:'M3 7V71'},card);
       var texts=[];
       function text(value,y,cls){var el=telemetrySvg(doc,'text',{'class':cls,x:10,y:y},card);el.textContent=value;texts.push(el);return el;}
       text(content.title,15,'t1');text(content.headline,31,'t1');
-      text(content.details[0],46,'t2');text(content.details[1],59,'t2');text(content.note,72,'t2 dv-metrics-card-note');
+      text(content.details[0],46,'t2');text(content.details[1],59,'t2');text(content.note,72,'t2 dv-metrics-card-note');if(content.scope)text(content.scope,87,'t2 dv-metrics-card-scope');
       // The synthetic annotation must not move the layout it is previewing.
       // Fit that label inside the measured card, including wider fallback fonts.
-      var sizingTexts=view.preview?texts.slice(0,-1):texts;
+      var sizingTexts=view.preview?texts.filter(function(el,i){return i!==4;}):texts;
       var w=Math.max(138,Math.ceil(Math.max.apply(null,sizingTexts.map(function(el){return el.getComputedTextLength();})))+20);
       // Leave dedicated space beside the headline for the rate series.
       w=Math.max(w,Math.ceil(texts[1].getComputedTextLength())+78);rect.setAttribute('width',w);
@@ -90,7 +91,7 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate){
       if(content.series.length>=2){var values=content.series.map(function(p){return p[1];}),lo=Math.min.apply(null,values),hi=Math.max.apply(null,values);
         telemetrySvg(doc,'polyline',{'class':'dv-metrics-sparkline',points:values.map(function(v,i){return (w-58+48*i/(values.length-1))+','+(hi===lo?27:33-12*(v-lo)/(hi-lo));}).join(' ')},card);
       }
-      var placed=telemetryCardPlace(path,w,78,binding.card || {},boxes),box=placed.box;
+      var placed=telemetryCardPlace(path,w,height,binding.card || {},boxes),box=placed.box;
       card.setAttribute('data-metrics-anchor-x',placed.mid.x);card.setAttribute('data-metrics-anchor-y',placed.mid.y);
       card.setAttribute('transform','translate('+box.x+' '+box.y+')');card.setAttribute('data-side',placed.side);
       var end={x:Math.max(box.x,Math.min(box.x+box.w,placed.mid.x)),y:Math.max(box.y,Math.min(box.y+box.h,placed.mid.y))};

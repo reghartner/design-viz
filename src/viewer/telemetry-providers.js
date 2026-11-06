@@ -25,10 +25,10 @@ function telemetryProviderMerge(maps){
 function createTelemetryProviders(page,win){
   try{if(!trackingTelemetry(page || {}).enabled || !win || !win.claude || typeof win.claude.use!=='function')return null;}catch(e){return null;}
   var current=page,ctl=null,parts=[],retired=false,generation=0,ensuring=false,off=null,bindingKey=null;
-  var definitions=[{name:'Grafana',sources:['grafana','loki','sql','cloudwatch'],create:createTelemetryGrafana},{name:'Honeycomb',sources:['honeycomb'],create:createTelemetryHoneycomb},{name:'Traces',sources:[],create:createTelemetryTraces}];
+  var definitions=[{name:'Grafana',sources:['grafana','loki','sql','cloudwatch','cloudwatchLogs'],create:createTelemetryGrafana},{name:'Honeycomb',sources:['honeycomb'],create:createTelemetryHoneycomb},{name:'Traces',sources:[],create:createTelemetryTraces}];
   function scoped(bindings,part){if(part.definition.name==='Traces')return bindings.filter(function(b){return telemetryTraceJobs([b]).length;});return bindings.map(function(binding){var signals={};Object.keys(binding.signals || {}).forEach(function(name){if(part.definition.sources.indexOf(binding.signals[name].source)>=0 && !telemetryTraceIntent(binding.signals[name]))signals[name]=binding.signals[name];});return Object.assign({},binding,{signals:signals});}).filter(function(binding){return Object.keys(binding.signals).length;});}
   function bindingIdentity(bindings){return JSON.stringify(bindings.map(function(b){return [b,ctl && ctl.telemetry.bindingGeneration?ctl.telemetry.bindingGeneration(b.id):0];}));}
-  function availability(){if(ctl)ctl.telemetry.setAvailable(!retired && parts.some(function(p){return p.available;}),parts.map(function(p){return p.note;}).filter(Boolean).join('; '));}
+  function availability(){if(ctl){var errors=[];ctl.telemetry.bindings().forEach(function(b){Object.keys(b.signals).forEach(function(n){if(b.signals[n].error)errors.push(b.id+' '+n+': '+b.signals[n].error);});});ctl.telemetry.setAvailable(!retired && parts.some(function(p){return p.available;}),parts.map(function(p){return p.note;}).concat(errors).filter(Boolean).join('; '));}}
   function accountChanged(){if(retired)return;retired=true;generation++;parts.forEach(function(p){p.map={};p.available=false;});if(ctl){ctl.telemetry.clear();ctl.telemetry.setAvailable(false);}parts.forEach(function(p){if(p.handle)p.handle.destroy();});}
   function ensure(){
     if(!ctl || retired || ensuring)return;ensuring=true;
@@ -52,7 +52,7 @@ function createTelemetryProviders(page,win){
     ensure();var epoch=generation,notes=[],approval=false;
     if(retired || signal.aborted)throw new Error('Metrics session retired.');
     var answers=await Promise.all(parts.map(async function(part){
-      var bound=scoped(bindings,part);if(!bound.length){if(!range)part.map={};return {};}
+      var bound=scoped(bindings,part).map(function(b){var signals={};Object.keys(b.signals).forEach(function(name){var s=b.signals[name];if(s.error)notes.push(b.id+' '+name+': '+s.error);else signals[name]=s;});return Object.assign({},b,{signals:signals});}).filter(function(b){return Object.keys(b.signals).length;});if(!bound.length){if(!range)part.map={};return {};}
       // A missing connector must not prevent its healthy peer from refreshing.
       if(!part.available){notes.push(part.note || part.definition.name+' unavailable.');return {};}
       var fn=range?part.adapter.options.history:part.adapter.options.provider;
@@ -74,6 +74,7 @@ function createTelemetryProviders(page,win){
         // Grafana's established transient-error cache is source-local. Honeycomb
         // cannot turn a failed exact-result download into an observed sample.
         if(part.definition.name==='Honeycomb' || part.definition.name==='Traces')part.map={};
+        else Object.keys(part.map).forEach(function(id){var b=bound.find(function(b){return b.id===id;});Object.keys(part.map[id].signals || {}).forEach(function(name){var s=b && b.signals[name];if(!s || s.source==='cloudwatch' || s.source==='cloudwatchLogs')delete part.map[id].signals[name];});if(!Object.keys(part.map[id].signals).length)delete part.map[id];});
         return range?{}:part.map;
       }
     }));

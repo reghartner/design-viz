@@ -89,7 +89,7 @@ export interface LiveStatusEntry {
 export interface TelemetryBinding {
   id: string;
   kind: 'call' | 'queue' | 'service' | 'log-event' | 'device';
-  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch'; query: string | Record<string, unknown>; unit: string | null}>;
+  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch' | 'cloudwatchLogs'; query: string | Record<string, unknown>; unit: string | null; scope?: string; error?: string; /** Derived configuration error: skip only the optional grouped query; never save this into the authored query. */ breakdownError?: string}>;
   proof: Record<string, {min?: number; max?: number; maxRatioOf?: string}>;
   links: {dashboard?: string; query?: string};
   card: {side?: 'right' | 'left' | 'above' | 'below'; offset?: number} | null;
@@ -116,6 +116,19 @@ export interface TelemetryExemplar {
 }
 /** One carrier's telemetry for the observation window, keyed by carrier id in the
  * provider result. Every field is optional; malformed entries are dropped. */
+export interface TelemetryLogDetails {
+  status: 'complete' | 'error';
+  error?: string;
+  /** Required for complete results; anchored start and end of paired queries. */
+  range?: {from: string; to: string};
+  /** Default query limit 20, maximum 100. Only selected text cells, maximum 4, are retained. */
+  limit?: number;
+  /** Number of actual connector rows, never matched input records or a total group count. */
+  returnedRows?: number;
+  textTruncated?: boolean;
+  /** Labels/text are capped at 500 characters; missing labels/counts invalidate the details. */
+  rows?: Array<{label: string; value: number; cells: string[]}>;
+}
 export interface TelemetrySample {
   /** At most one selected exemplar per carrier, with up to 20 returned candidates and 200 spans. */
   exemplars?: TelemetryExemplar[];
@@ -125,7 +138,9 @@ export interface TelemetrySample {
    * formatted-text provenance denotes a provider table value that may be rounded. */
   signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string; observedAt?: string | number | null; retrievedAt?: string | number | null; provenance?: 'formatted-text';
     /** Explicit measured total over [from, to], covered by signal as-of (legacy: carrier as-of). Runtime evidence only. */
-    aggregate?: {kind: 'total'; from: string | number; to: string | number}}>;
+    aggregate?: {kind: 'total'; from: string | number; to: string | number};
+    /** Runtime grouped Logs evidence, independent of the scalar value and proof. */
+    breakdown?: TelemetryLogDetails}>;
   observedAt?: string | number;
   markers?: Array<{at: string | number; kind?: string; label?: string}>;
   links?: {query?: string; dashboard?: string};

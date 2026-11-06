@@ -114,6 +114,31 @@
         var action=el(row,'td','link','');if(item.url){var anchor=link(action,'link',null,item.url);anchor.className='nbacklink dv-live-proof-link';anchor.setAttribute('aria-label','Open telemetry for '+item.title);anchor.setAttribute('title','Open telemetry for '+item.title);if(!anchor._proofIcon){anchor.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});anchor._proofIcon=true;}}
       });
     }
+    function logDetails(body,items){
+      if(!items.length)return;
+      var group=el(body,'section','log-details','dv-live-log-details');el(group,'h3','heading','','Log details');
+      items.forEach(function(item){
+        var config=item.config,data=item.details,box=el(group,'details',item.key,'dv-live-log-group');
+        box.setAttribute('data-log-carrier',item.id);box.setAttribute('data-log-signal',item.signal);
+        el(box,'summary','summary','',(config.title || 'Groups')+' · '+item.title+' · '+item.signal);
+        el(box,'p','identity','dv-live-proof-detail',item.id+' · '+item.signal+(item.scope?' · '+item.scope:''));
+        el(box,'p','total','dv-live-log-total','Total: '+item.total);
+        if(!data || data.status==='error'){
+          el(box,'p','status','dv-live-log-status',data?'Log details unavailable: '+data.error:'Log details unobserved; waiting for a successful scalar and grouped query.').setAttribute('role','status');return;
+        }
+        el(box,'p','range','dv-live-proof-detail',data.range.from+' → '+data.range.to);
+        el(box,'p','limit','dv-live-log-status','Showing '+data.rows.length+' of '+data.returnedRows+' returned rows (display limit '+data.limit+'). These rows may not include every group; use the total above for the overall count.'+(data.textTruncated?' Long text shortened to 500 characters.':''));
+        if(!data.rows.length){el(box,'p','empty','dv-live-log-empty','Query complete: no grouped rows returned.');return;}
+        var scroll=el(box,'div','scroll','dv-live-log-scroll');scroll.setAttribute('tabindex','0');scroll.setAttribute('role','region');scroll.setAttribute('aria-label',(config.title || 'Log details')+' rows for '+item.id+' '+item.signal);
+        var table=el(scroll,'table','table','dv-live-tickets dv-live-log-table');table.setAttribute('aria-label',item.id+' '+item.signal+' log details');table.style.minWidth=(2+(config.columns || []).length)*90+'px';
+        var head=el(el(table,'thead','head',''),'tr','row','');
+        [config.labelTitle || config.labelField,config.valueTitle || config.valueField].concat((config.columns || []).map(function(c){return c.label;})).forEach(function(label,i){el(head,'th',String(i),'',label).setAttribute('scope','col');});
+        var rows=el(table,'tbody','rows','');data.rows.forEach(function(item,i){
+          var row=el(rows,'tr',String(i),'');el(row,'td','label','',item.label);el(row,'td','value','',item.value);
+          (config.columns || []).forEach(function(column,n){el(row,'td','cell-'+n,'',item.cells[n]===undefined?'(missing)':item.cells[n]);});
+        });
+      });
+    }
     function excludedStories(body,items){
       if(!items.length)return;
       el(body,'h3','excluded-heading','','Excluded stories');
@@ -272,7 +297,7 @@
         var nextDay=button(row,'next','reader-button dv-live-step','>',demoDays?'nextDemo':'overTimeStep');nextDay._liveArgument=1;nextDay.setAttribute('aria-label','Next day');nextDay.disabled=demoDays?demoDays.ended:over.index>=over.count-1;
         if(past)el(row,'p','note','dv-live-over-time-note','Status as of '+over.label+' · other columns show today').setAttribute('role','status');
       }
-      if(hasData || proof || value && value.activity.length){
+      if(hasData || proof || (metrics.logDetails || []).length || value && value.activity.length){
         var body=el(host,'div','body','dv-live-panel-body'),epic=value.epic || {keys:[]};
         if(hasData){
         // Epic header box (#765): the epic is shown large inside the panel, never in the title bar. The old verdict line is gone.
@@ -326,6 +351,7 @@
         });
         }
         if(proof)proofTable(body,proof);
+        logDetails(body,metrics.logDetails || []);
         if(hasData){
         excludedStories(body,value.excluded || []);
         // A light hint only: the agent, not the page, writes to Jira.
@@ -433,6 +459,7 @@ g.node[data-trace-tone],path.edge[data-trace-tone]{opacity:1!important}g.node[da
 .dv-live-proof-arc[data-proof-bucket="liveEarly"]{stroke:var(--dv-live-active);}
 .dv-live-proof-sentence{font:11px/1.5 'IBM Plex Mono',monospace;}
 .dv-live-proof-predicate,.dv-live-proof-detail{font:10px/1.5 'IBM Plex Sans',sans-serif;color:var(--dfaint);overflow-wrap:anywhere;}
+.dv-live-log-group{margin:8px 0;border:1px solid var(--explore-border);border-radius:6px;padding:8px;min-width:0}.dv-live-log-group summary{cursor:pointer;font-weight:600;overflow-wrap:anywhere}.dv-live-log-group p{font-size:11px;overflow-wrap:anywhere}.dv-live-log-scroll{max-height:280px;overflow:auto;border:1px solid var(--explore-border)}.dv-live-tickets.dv-live-log-table{width:100%;table-layout:fixed}.dv-live-tickets.dv-live-log-table th:nth-child(n){width:auto;white-space:normal;overflow-wrap:anywhere}.dv-live-log-table td{vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere}.dv-live-log-status{color:var(--dfaint)}
 .dv-live-tickets.dv-live-proof-table{min-width:960px;}
 .dv-live-proof-table td:first-child{min-width:140px;}
 .dv-live-proof-table td:nth-child(8){min-width:160px;}

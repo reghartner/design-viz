@@ -6,6 +6,18 @@ var LIVE_STATUS_APPEARANCES = LIVE_STATUS_STATES.concat(['unchanged']);
 /* Proof presentation consumes one normalized controller snapshot. It neither
    resolves bindings nor judges evidence: proofVerdicts remains the only engine.
    No clock, page walk, queries, or mutations belong in this presentation seam. */
+function liveStatusLogDetails(snapshot){
+  var out=[];
+  if(!snapshot.enabled || snapshot.historical)return out;
+  (snapshot.carriers || []).forEach(function(binding){Object.keys(binding.signals || {}).forEach(function(name){
+    var signal=binding.signals[name],config=signal.source==='cloudwatchLogs' && signal.query.breakdown;
+    if(!config)return;
+    var sample=snapshot.map[binding.id],entry=sample && sample.signals[name],details=signal.breakdownError?telemetryLogDetails({status:'error',error:signal.breakdownError}):entry && entry.breakdown;
+    out.push({key:JSON.stringify([snapshot.environment,binding.id,name,signal]),id:binding.id,signal:name,title:binding.title || binding.id,
+      config:config,scope:telemetrySignalScope(signal),total:telemetryCardValue(binding,sample,name),details:details || null});
+  });});
+  return out;
+}
 function liveStatusProofPresentation(snapshot,window){
   if(!snapshot)return null;
   // Map keys, links and markers are not measurements. Use only already-resolved
@@ -36,7 +48,7 @@ function liveStatusProofPresentation(snapshot,window){
     return words.length?words.join('; '):'Observed signals; no authored thresholds';
   }
   var rows=snapshot.carriers.filter(function(binding){return snapshot.verdicts.carriers[binding.id].bound;}).map(function(binding){
-    var result=snapshot.verdicts.carriers[binding.id],sample=snapshot.map[binding.id],primary=telemetryPrimary(binding),queue=binding.kind==='queue';
+    var result=snapshot.verdicts.carriers[binding.id],sample=snapshot.map[binding.id],primary=telemetryPrimary(binding,true),queue=binding.kind==='queue';
     var reading=primary?telemetryReading(sample,primary):{series:[]},times=reading.series.map(function(p){return Date.parse(telemetryTime(p[0]));}).filter(isFinite);
     // Each primary signal owns its measurement window. A carrier timestamp may
     // summarize a newer peer and must not clip this signal's older points.
@@ -60,7 +72,7 @@ function liveStatusProofPresentation(snapshot,window){
       since.push(name+' total: '+String(entry.value)+(entry.unit?' '+entry.unit:'')+' through '+aggregate.to);
     });
     return {id:binding.id,title:binding.title,kind:binding.kind,tickets:binding.tickets.slice(),jira:result.jira || 'No tickets',
-      telemetry:result.telemetry,verdict:result.verdict,label:result.label || 'UNOBSERVED',predicate:predicate(binding),failing:result.failing.slice(),
+      telemetry:result.telemetry,verdict:result.verdict,label:result.label || 'UNOBSERVED',predicate:predicate(binding)+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
       kpis:[{label:queue?'in':'rate',text:telemetryCardValue(binding,sample,primary)},
         {label:queue?'lag':'errors',text:telemetryCardValue(binding,sample,queue?'lag':telemetryErrorSignal(binding,primary) || 'errors')},
         {label:queue?'age':'p95',text:telemetryCardValue(binding,sample,queue?'age':'p95')}],
@@ -797,7 +809,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         var previous=path._livePointerTarget || path,c=previous._liveCarrier;
         carrierTarget(card,edge.from+'->'+edge.to,edge,c && c.state,binding.page.tracking,edge.label || edge.from+' → '+edge.to,c && c.waiting,c && c.availability,binding.ordinal!=null?{section:binding.ordinal,kind:'edge',index:index}:null);
         carrierPointer(path,card);carrierPointer(path.closest('svg').querySelector('path.halo[data-dv-edge="'+index+'"]'),card);
-      });
+      },telemetry.config());
       scope.querySelectorAll('svg').forEach(function(svg){if(svg._layoutStatusCoins)svg._layoutStatusCoins();});
     });
   }
@@ -846,7 +858,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function metricsSnapshot(){
     var evidence=telemetry.snapshot(),status=evidence.status;
-    return {environment:evidence.environment,environments:evidence.environments,proof:liveStatusProofPresentation(evidence,telemetryWindow),available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
+    return {environment:evidence.environment,environments:evidence.environments,proof:liveStatusProofPresentation(evidence,telemetryWindow),logDetails:liveStatusLogDetails(evidence),available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
       refreshedAt:status.refreshedAt,note:status.note,checkedText:status.refreshedAt?'refreshed '+clockTime(status.refreshedAt):'',
       source:telemetrySource(),window:telemetryWindow};
   }

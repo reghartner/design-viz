@@ -470,3 +470,20 @@ test('moving inherited cards writes only the consumer overlay and preserves the 
   assert.deepEqual(entry,{tickets:['TEST-9'],prs:['https://github.com/acme/service/pull/9'],telemetry:{...inherited,card:{...inherited.card,position:{x:-40,y:60}}}});
   assert.equal(JSON.stringify(f.provider),providerBefore);assert.equal(JSON.stringify(f.context.specs[0]),providerBefore);
 });
+test('signal label and query link edit with one Undo/Redo and survive ordinary signal edits and exported source',()=>{
+ const ui=harness(board({kind:'call',signals:{events:{grafana:'events',unit:'events'}}}),EDGE);
+ oneStep(ui,()=>ui.set('events label','Accepted events'));oneStep(ui,()=>ui.set('events query link','https://grafana.example/explore?expr=events'));
+ oneStep(ui,()=>ui.set('events unit','items'));oneStep(ui,()=>ui.set('events query','updated_events'));
+ assert.deepEqual(edgeOf(ui).telemetry.signals.events,{grafana:'updated_events',unit:'items',label:'Accepted events',links:{query:'https://grafana.example/explore?expr=events'}});
+ const before=ui.text;ui.set('events query link','https://user:secret@example.test');assert.equal(ui.text,before);assert.match(ui.error(),/without credentials/);
+ ui.set('events label','x'.repeat(121));assert.equal(ui.text,before);assert.match(ui.error(),/120/);
+ const exported=ui.e.C.stampText?ui.e.C.stampText(ui.text):ui.text;assert.ok(JSON.stringify(exported).includes('Accepted events'));
+});
+
+test('signal show on card is one reversible edit and survives label, source and query edits',()=>{
+ const ui=harness(board({kind:'queue',signals:{received:{grafana:'received'}}}),EDGE);ui.metrics();
+ oneStep(ui,()=>{const toggle=ui.control('received show on card').querySelector('input');toggle.checked=false;toggle.fire('change');ui.h.flush();});
+ assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,false);oneStep(ui,()=>ui.set('received label','Received'));oneStep(ui,()=>ui.set('received query','new_received'));
+ assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,false);
+ oneStep(ui,()=>{const toggle=ui.control('received show on card').querySelector('input');toggle.checked=true;toggle.fire('change');ui.h.flush();});assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,true);
+});

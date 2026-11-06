@@ -76,7 +76,7 @@ request, not the route or service in general.
 
 Honeycomb's hosted MCP may return formatted text plus metadata and a temporary
 signed `query_result_json` URL. Never copy that signed URL into the spec or a
-public artifact. Use the stable `query_url` as `links.query` when supplied.
+public artifact. Use the stable `query_url` as the signal’s `links.query` when supplied.
 The claude.ai viewer composes Grafana/Loki/SQL/CloudWatch and Honeycomb metrics. Honeycomb
 requires runtime `run_query` input schemas, one scalar calculation per signal
 and no breakdowns or formulas. Use native `calculations`/`filters`; the page
@@ -185,8 +185,8 @@ Without explicit scope, CloudWatch `RuleName` means “this rule only”, `Queue
 means “queue only”, and AWS/IoT PublishIn.AuthError / Connect.AuthError with only
 account/protocol dimensions mean “all topics / whole account” / “all connections /
 whole account”. Other dimensions, edge titles and arbitrary Logs query text never
-establish topic scope. Use `unit: "refused publishes"` to read “15 refused publishes
-in 24h” on a scalar card.
+establish topic scope. Use `unit: "refused publishes"` to read “15 refused publishes”
+with the card’s “24h window” context.
 
 ### CloudWatch Logs Insights
 
@@ -256,13 +256,14 @@ The accepted authored fields are:
 | `tracking.telemetry.grafana` | `prometheus`, `loki`, `tempo`, `sql`, `cloudwatch` datasource UIDs; optional `accountId` for CloudWatch; optional `baseUrl` for evidenced Grafana UI origin |
 | `tracking.telemetry.honeycomb` | `environment`, optional `dataset` |
 | carrier `telemetry` | `kind`, `signals`, `proof`, `links`, `card`, or `use` plus declared template parameters |
-| signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope` |
+| signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope`, `label`, `showOnCard`, `links` |
 | `cloudwatch` query | `namespace`, `metric`, `region`, `accountId`, `dimensions`, `statistic`; optional `missingMeansZero` |
 | `cloudwatchLogs` query | `logGroups`, `query`, `region`, optional `valueField`, `breakdown` |
 | breakdown | `query`, `labelField`, `valueField`; optional `title`, `labelTitle`, `valueTitle`, `columns`, `limit` |
 | breakdown column | `field`, `label` |
 | proof entry | `min`, `max`, optional `maxRatioOf` another signal |
-| links | absolute HTTP(S) `dashboard`, `query` |
+| carrier links | absolute HTTP(S) `dashboard`, `query` |
+| signal links | absolute HTTP(S) `query` without credentials |
 | edge card | `side`, `offset` |
 | template | optional `kind`, `params`; required `signals`; optional `proof`, `links` |
 
@@ -393,5 +394,29 @@ wrappers (including by/without grouping). Raw logs, arbitrary expressions and
 misleading function names inside strings remain unobserved. Daily history keeps
 its existing contract. Honeycomb COUNT caveats belong to Honeycomb evidence only.
 
-Arbitrary named-signal display and authored display labels are planned separately;
-this change does not claim that expanded display contract.
+Cards and node Inspect display every numeric signal in authored order, excluding
+trace bindings. Optional boolean `showOnCard: false` hides only that canvas row;
+Inspect and proof still use the signal. With no visible numeric rows, no card is
+shown. Optional `label` is plain text (1–120 characters, no control
+characters); otherwise the signal name labels the row. For example:
+
+```json
+{"telemetry":{"kind":"service","signals":{"matched":{"cloudwatch":{"namespace":"AWS/IoT","metric":"TopicMatch","dimensions":{"RuleName":"camera_message_camera_stats"},"statistic":"Sum","region":"us-east-1","accountId":"123456789012"},"unit":"events","label":"Matched events","showOnCard":true,"links":{"query":"https://grafana.example/explore?query=matched"}}}}}
+```
+
+Each row's external-link icon opens its own query in a new tab. Author
+`signals.<name>.links.query` for a stable provider query URL; it wins over the
+provider-returned URL. Grafana Prometheus/Loki and Honeycomb can supply stable
+per-signal query links. CloudWatch/Logs/SQL can use authored URLs. Never use
+credentials or a signed Honeycomb result/download URL. A legacy carrier query
+link is a row fallback only for a single-signal carrier. Preview makes no provider
+URLs. A missing link does not invalidate a measured value.
+
+Cards cap width and wrap values; long labels/titles/scopes are shortened. Their
+height participates in layout packing. CloudWatch cards use “This rule”, “This
+queue” or “All topics · whole account”; Inspect retains full rule/account/scope
+and label text. Displaying a named counter does not make it traffic evidence.
+
+Optional signal labels and query URLs have their own environment substitution.
+An unresolved variable drops only that display field (label falls back to the
+signal name); missing variables in the actual metric query still block it.

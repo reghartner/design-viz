@@ -35,6 +35,9 @@ function flowMetricsDom(o){
       row(box,prefix+name+' source',relabel(c.select(TELEMETRY_SOURCES,source || '',function(v){return commit({op:'signal',name:name,field:'source',value:v});}),TELEMETRY_SOURCE_LABELS));
       row(box,prefix+name+' query',c.text(source?telemetryQueryText(source,entry[source]):'',function(v){return commit({op:'signal',name:name,field:'query',value:v});},{textarea:true,placeholder:source==='honeycomb'?'{"calculations":[{"op":"COUNT"}],"filters":[]}':'Query text'}));
       row(box,prefix+name+' unit',c.text(telemetryObject(entry)?entry.unit:null,function(v){return commit({op:'signal',name:name,field:'unit',value:v});},{placeholder:'req/h, msgs, ms'}));
+      row(box,prefix+name+' label',c.text(telemetryObject(entry)?entry.label:null,function(v){return commit({op:'signal',name:name,field:'label',value:v});},{placeholder:'Display name (optional, up to 120 characters)'}));
+      row(box,prefix+name+' show on card',c.checkbox(!entry || entry.showOnCard!==false,function(v){return commit({op:'signal',name:name,field:'showOnCard',value:v});}));
+      row(box,prefix+name+' query link',c.text(entry && entry.links?entry.links.query:null,function(v){return commit({op:'signal',name:name,field:'queryLink',value:v});},{placeholder:'https://… (stable source query)'}));
       row(box,prefix+name+' scope',c.text(telemetryObject(entry)?entry.scope:null,function(v){return commit({op:'signal',name:name,field:'scope',value:v});},{placeholder:'Exact counting scope (optional)'}));
       proofEditors(box,binding.proof,names,name,prefix,commit);
       box.appendChild(c.action(prefix?'Remove '+prefix+'signal '+name:'Remove signal '+name,function(){return commit({op:'removeSignal',name:name});}));

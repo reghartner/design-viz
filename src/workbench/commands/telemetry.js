@@ -143,13 +143,21 @@ function telemetryEditBinding(binding,edit,options){
       if(edit.value==null)return {error:'A signal needs a query; use Remove signal to delete it.'};
       var value=telemetryQueryValue(source,edit.value);if(value.error)return value;
       next[source]=value.value;
-    }else if(edit.field==='unit' || edit.field==='scope'){
+    }else if(edit.field==='showOnCard'){
+      if(typeof edit.value!=='boolean')return {error:'Show on card must be a boolean.'};
       if(source)next[source]=entry[source];
-      if(edit.value!=null && !telemetryText(edit.value))return {error:'A unit is non-empty text.'};
+    }else if(edit.field==='unit' || edit.field==='scope' || edit.field==='label' || edit.field==='queryLink'){
+      if(source)next[source]=entry[source];
+      if(edit.value!=null && !telemetryText(edit.value))return {error:'Signal metadata must be non-empty text, or removed.'};
     }else return {error:'Unknown signal field.'};
     var unit=edit.field==='unit'?(edit.value==null?null:edit.value.trim()):(telemetryText(entry.unit)?entry.unit:null);
     if(unit)next.unit=unit;
     var scope=edit.field==='scope'?edit.value:entry.scope;if(telemetryText(scope))next.scope=scope.trim();
+    var showOnCard=edit.field==='showOnCard'?edit.value:entry.showOnCard;if(typeof showOnCard==='boolean')next.showOnCard=showOnCard;
+    var label=edit.field==='label'?edit.value:entry.label;
+    if(label!=null){if(!telemetryText(label) || label.length>120 || /[\x00-\x1f\x7f]/.test(label))return {error:'A label is 1–120 plain-text characters without control characters.'};next.label=label.trim();}
+    var queryLink=edit.field==='queryLink'?edit.value:entry.links && entry.links.query;
+    if(queryLink!=null){if(!telemetryQueryUrl(queryLink))return {error:'A query link is an absolute HTTP(S) URL without credentials or signed result tokens.'};next.links={query:queryLink};}
     signals[name]=next;b.signals=signals;
     return {value:b};
   }

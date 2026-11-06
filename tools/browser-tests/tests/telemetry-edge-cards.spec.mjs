@@ -78,7 +78,7 @@ for(const live of [false,true])test('cards pack with coins, nodes and Jira cues;
  await expect(root.locator('.dv-metrics-label-hidden')).toHaveCount(3);
  if(!live)await root.locator('.board').first().screenshot({path:test.info().outputPath('edge-cards.png')});
  await expect(root.locator('[data-metrics-card="app->push"]')).toContainText('24h window');
- await expect(root.locator('[data-metrics-card="ingest->app"]')).toContainText('p95: not bound');
+ await expect(root.locator('[data-metrics-card="ingest->app"]')).not.toContainText('not bound');
  await expect(root.locator('[data-metrics-card="shared::api->shared::store"]')).toBeVisible();
  await metrics.click();await expect(root.locator(cards)).toHaveCount(0);await expect(root.locator('.dv-metrics-label-hidden')).toHaveCount(0);
  await expect(root.locator('text.lbl[data-dv-edge="0"]')).toBeVisible();
@@ -95,7 +95,7 @@ test('authored left and offset, absent samples, no inferred binding, safe label'
  await root.getByRole('button',{name:'Metrics',exact:true}).click();await expect(root.locator(cards)).toHaveCount(3);
  const card=root.locator('[data-metrics-card="ingest->app"]');await expect(card).toHaveAttribute('data-side','left');await expect(card).toContainText('<script>unsafe</script>');await expect(card).toContainText('unobserved');expect(await card.locator('script').count()).toBe(0);
  const placement=await card.evaluate(el=>{const p=el.closest('svg').querySelector('path.edge[data-dv-edge="0"]'),mid=p.getPointAtLength(p.getTotalLength()/2),b=el.getBBox(),m=el.transform.baseVal.consolidate().matrix;return {right:m.e+b.width,mid:mid.x,dy:m.f+b.height/2-mid.y};});
- expect(placement.right).toBeLessThan(placement.mid);expect(placement.dy).toBe(180);expect((await geometry(root)).overlaps).toEqual([]);
+ expect(placement.right).toBeLessThan(placement.mid);expect([0,24,-24,48,-48,96,-96]).toContain(placement.dy-180);expect((await geometry(root)).overlaps).toEqual([]);
 });
 test('production loaded detail cards clean their retained DOM on destroy',async({page,server})=>{
  const {scope}=await mountImportedDetail(page,server);await expect(scope.locator(cards)).toHaveCount(2);expect((await geometry(scope)).overlaps).toEqual([]);

@@ -294,3 +294,11 @@ test('modified metrics card clicks preserve ordinary edge multiselection without
  await a.focus();await b.focus();await b.press('Shift+Enter');await expect(selected).toHaveCount(2);await expect(page.locator('#src')).toHaveValue(before);
  expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
 });
+test('authored query link in desktop preview opens source without selection, dragging or history',async({page,server,audit})=>{
+ const spec=structuredClone(raw),signal=spec.page.sections[0].diagram.edges[0].telemetry.signals.rate;signal.label='Requests';signal.links={query:'https://grafana.test/explore?expr=requests'};
+ await open(page,server,spec);await toggle(page).check();const source=page.locator('#src'),before=await source.inputValue(),card=cards(page),position=await box(card),link=card.locator('a[data-signal="rate"]');await expect(link).toHaveCount(1);await expect(card.locator('a')).toHaveCount(1);
+ await audit.mockExternal(signal.links.query,route=>route.fulfill({body:'Explicit authored query',contentType:'text/html'}));
+ for(const keyboard of [true,false]){const popup=page.waitForEvent('popup');if(keyboard)await link.press('Enter');else await link.click();const tab=await popup;await tab.close();await expect(source).toHaveValue(before);expect(await box(card)).toEqual(position);await expect(page.locator('.dv-live-popover:visible')).toHaveCount(0);}
+ expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
+ await card.focus();await card.press('ArrowRight');await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.position?.x).toBeDefined();const moved=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(moved);
+});

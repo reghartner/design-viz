@@ -17,7 +17,7 @@ function telemetryProviderStepError(error,step){
 }
 function telemetryHoneycombJobs(bindings){
   var jobs=[];(bindings || []).forEach(function(binding){Object.keys(binding.signals || {}).forEach(function(name){
-    var s=binding.signals[name];if(s.source==='honeycomb' && !(telemetryObject(s.query) && telemetryOwn(s.query,'query_spec')))jobs.push({id:binding.id,name:name,query:s.query,unit:s.unit,links:binding.links || {}});
+    var s=binding.signals[name];if(s.source==='honeycomb' && !(telemetryObject(s.query) && telemetryOwn(s.query,'query_spec')))jobs.push({id:binding.id,name:name,query:s.query,unit:s.unit,links:s.links || {},dashboard:binding.links && binding.links.dashboard});
   });});return jobs;
 }
 function telemetryHoneycombBindings(page){return telemetryBindings(function(fn){sectionRecords(page).forEach(function(record){var d=record.section.diagram || {};
@@ -248,8 +248,8 @@ function createTelemetryHoneycomb(page,win,now,bound){
         sample.retrievedAt=new Date(clock()).toISOString();
         var out=map[job.id] || (map[job.id]={signals:{},observedAt:null,links:{},markers:[]});out.signals[job.name]=sample;
         if(sample.observedAt && (!out.observedAt || Date.parse(sample.observedAt)>Date.parse(out.observedAt)))out.observedAt=sample.observedAt;
-        var link=telemetryHoneycombPublicLink(job.links.query) || telemetryHoneycombUrl(meta.query_url,false);if(link)out.links.query=link;
-        var dashboard=telemetryHoneycombPublicLink(job.links.dashboard);if(dashboard)out.links.dashboard=dashboard;
+        var link=telemetryHoneycombPublicLink(job.links.query) || telemetryHoneycombUrl(meta.query_url,false);if(link)sample.links={query:link};
+        var dashboard=telemetryHoneycombPublicLink(job.dashboard);if(dashboard)out.links.dashboard=dashboard;
         if(report && report.settled)report.settled(job.id,job.name,sample);
         // COUNT semantics are presented on the corresponding carrier evidence.
       }catch(e){

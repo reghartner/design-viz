@@ -5,51 +5,47 @@ description: Author Flowview specs, ledgers and pages from stories, HLDs or Hone
 
 # HLD to page: packet first
 
-Read source for new diagrams; for edits inspect source, spec, ledger, inherited
-state and nearby steps. Preserve source facts, icons, animations and outcomes;
-do not re-ask settled facts.
+Read source; for edits also inspect spec, ledger, inherited state and nearby
+steps. Preserve facts, icons, animations and outcomes; do not re-ask settled facts.
 
 ## Generate the entry packet
 
-VIZ is the checkout or `authoring/` kit; use its path.
-Select planned panels/features for new stories; for edits, infer from the spec
-and add new source requirements:
+VIZ is the checkout or `authoring/` kit. Select planned panels/features; edits
+infer these from the spec plus new source requirements:
 
 ```sh
 python3 tools/authoring-packet.py --panel state --feature steps --out <scratch>/packet.md
 python3 tools/authoring-packet.py --spec <candidate.spec.json> --mode edit --out <scratch>/packet.md
 ```
 
-Repeat `--panel` / `--feature`; `python3 tools/widget_doc.py --list`
-lists panels; [packet options](../../../docs/authoring-packets.md) lists features.
+Repeat `--panel` / `--feature`; list panels with `python3 tools/widget_doc.py --list`;
+[feature options](../../../docs/authoring-packets.md).
 Selections combine with inference. New/changed stories use `--mode new` (also
 with `--spec`) for source, question and worksheet phases before JSON. Fully
 specified scoped edits need no new questions or worksheet.
-Read the packet; follow its routes. Do not preload the full contract, cookbook
-or examples.
+Follow packet routes; do not preload the contract, cookbook or examples.
 
-Follow packet story/fidelity/state/placement and verification rules. Add visible-beat ledger evidence and run its visibility and value/icon checks. Report fit, occlusion and legibility unverified until a Workbench preview
+Follow packet story, fidelity, state, placement and verification rules, including
+visible-beat ledger evidence and visibility/value/icon checks. Report fit, occlusion and legibility unverified until a Workbench preview
 or authorized rendered evidence supplies them. File-only kits need no browser,
 server, install or additional agent.
 
-Compose `tools/compose-page-layout.cjs`, then size `tools/size-section-layout.cjs`.
-New nodes auto-place; selected nodes: `tools/place-nodes.cjs`.
+Layout: `tools/compose-page-layout.cjs`, then `tools/size-section-layout.cjs`.
+Nodes auto-place; reposition with `tools/place-nodes.cjs`.
 `section.views` share section content; each View is a page: [Views](../../../docs/tab-views.md).
 `sectionLayout` is geometry: [migration](../../../docs/section-layout-migration.md), [limits](../../../docs/auto-arrange.md).
 
-Play buttons: [`playbackPosition`](../../../docs/section-layouts.md#play-button-placement) sets `auto`/`above`/`beside` per arrangement.
+Play buttons: [`playbackPosition`](../../../docs/section-layouts.md#play-button-placement).
 
-Explore notes: section [`textStyle`](../../../docs/section-layouts.md#section-notes-typography) formats the whole box.
+Explore notes: [`textStyle`](../../../docs/section-layouts.md#section-notes-typography).
 
 JSON: `--feature contracts`; [recipe](../../../docs/contract-blocks.md#json-directly-on-a-connection). Desktop editing only.
 
 Table `showChange:false`; contract `fieldLabel`: [columns](../../../cookbook/software-state.md).
 
-## Choose the starting point
+## Source and handoff routes
 
 [Imports/edit](../../../docs/workbench-user-guide.md#edit-visible-text-directly).
-
-After the packet, route source/handoff details:
 
 | Starting point | Guide |
 |---|---|
@@ -85,20 +81,17 @@ After the packet, route source/handoff details:
 - **Canon/topology:** `--feature topology`; keep imports/exports/providers.
   Merge `export:["a","b"]`; nest via re-exported IDs. [Overlays](../../../docs/shared-topology.md).
   Repo preview: consumer `folder-agent.py refresh-sources --source-repo /repo`. No cloud disk refresh.
-- **Optional detail:** the [workflow reference](references/authoring-workflow.md)
-  preserves phases. [Recipe routing](references/recipe-routing.md) and
-  [authoring details](references/authoring-details.md) cover special features.
+- **Details:** [workflow](references/authoring-workflow.md),
+  [recipes](references/recipe-routing.md), [special features](references/authoring-details.md).
   [Independent visual review](references/independent-visual-review.md) applies
   only with already-authorized delegation and available rendered captures.
 - [Diagram links](../../../cookbook/diagram-handoffs.md); [design reviews](../../../docs/design-review.md).
 - [Live Jira / metrics proof / `missingWork`](../../../docs/live-status.md): use
   `live-status-board` when requested; its Metrics chapter is conditional.
-  Metrics: Jira/PR; env variables; CloudWatch/Logs scalars; `6h`/`-6h`/`now-6h`.
-  Desktop, imported too. Jira: parent minus exclusions plus manual/dependency
-  stories once.
+  Metrics chapter: Jira/PR discovery, env variables, named values/query links,
+  provider semantics. Desktop; imported too. Count each included Jira story once.
 
-Deliver spec/ledger files together. Ask unresolved story decisions and, after
-relevant checks, needed Mixed/Engineering source access plainly.
-HTML requires an explicit
+Deliver spec/ledger together. Ask unresolved story decisions and needed
+Mixed/Engineering access after relevant checks. HTML needs an explicit
 standalone-output request. Commit, publish and Canon enrollment require user
 authorization. Never modify the renderer to make a spec pass.

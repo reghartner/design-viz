@@ -101,7 +101,7 @@ export interface TelemetryProgress {
 export interface TelemetryBinding {
   id: string;
   kind: 'call' | 'queue' | 'service' | 'log-event' | 'device';
-  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch' | 'cloudwatchLogs'; query: string | TelemetryCloudWatchQuery | Record<string, unknown>; unit: string | null; scope?: string; error?: string; /** Derived configuration error: skip only the optional grouped query; never save this into the authored query. */ breakdownError?: string}>;
+  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch' | 'cloudwatchLogs'; query: string | TelemetryCloudWatchQuery | Record<string, unknown>; unit: string | null; scope?: string; label?: string; showOnCard?: boolean; links?: {query?: string}; error?: string; /** Derived configuration error: skip only the optional grouped query; never save this into the authored query. */ breakdownError?: string}>;
   proof: Record<string, {min?: number; max?: number; maxRatioOf?: string}>;
   links: {dashboard?: string; query?: string};
   card: {side?: 'right' | 'left' | 'above' | 'below'; offset?: number} | null;
@@ -148,7 +148,7 @@ export interface TelemetrySample {
    * client receipt time. Live charts prefer the selected signal's as-of. Mixed
    * adapters assign each legacy signal its own endpoint before combining sources.
    * formatted-text provenance denotes a provider table value that may be rounded. */
-  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string; observedAt?: string | number | null; retrievedAt?: string | number | null; provenance?: 'formatted-text';
+  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string; observedAt?: string | number | null; retrievedAt?: string | number | null; provenance?: 'formatted-text'; links?: {query?: string};
     /** Explicit measured total over [from, to], covered by signal as-of (legacy: carrier as-of). Runtime evidence only. */
     aggregate?: {kind: 'total'; from: string | number; to: string | number};
     /** Runtime grouped Logs evidence, independent of the scalar value and proof. */

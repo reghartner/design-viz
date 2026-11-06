@@ -85,8 +85,7 @@ bounded raw-result download. If that transport is unavailable, the first matchin
 `# Results` scalar row may be used with a visible "formatted text; may be rounded"
 label and unknown measurement time. Invalid JSON/structured results and tool
 errors remain unobserved; never infer zero from an absent cell. COUNT counts
-spans/events, not automatically requests. Honeycomb daily history remains
-unsupported. No live-account verification is claimed.
+spans/events, not automatically requests. Honeycomb Over time queries the selected window directly, including Today. No live-account verification is claimed.
 
 To align existing local or imported nodes with spans, first follow
 [Trace-ready authoring](../../../docs/trace-ready-authoring.md). Mapping selectors
@@ -108,11 +107,11 @@ for the complete wrapper example, tool schemas, bounds and selection behavior.
 
 ### Supported metrics sources and limits
 
-- `grafana`: PromQL; `loki`: metric LogQL. Range series and exact daily history.
-- `cloudwatch`: metric object; Sum, Maximum, Minimum, Average or SampleCount. One full-window scalar; no configurable period, sparkline or daily history.
-- `cloudwatchLogs`: Logs Insights object; first row's `valueField` (or first column), numeric strings accepted. Optional bounded grouped details in Live status; no daily history.
-- `sql`: query string, first numeric scalar, at most once/hour.
-- `honeycomb`: query object with one scalar calculation, no breakdowns/formulas; COUNT counts events/spans. No daily history.
+- `grafana`: PromQL; `loki`: metric LogQL. Range series in Live and selected-window Over time.
+- `cloudwatch`: metric object; Sum, Maximum, Minimum, Average or SampleCount. Per-period series plus a correct window headline; optional `period` and selected-window history.
+- `cloudwatchLogs`: Logs Insights object; first row's `valueField` (or first column), numeric strings accepted. Optional trends and bounded grouped details, including selected-window history.
+- `sql`: query string, first numeric scalar, at most once/hour in Live. History requires authored time macros.
+- `honeycomb`: query object with one scalar calculation, no breakdowns/formulas; COUNT counts events/spans. History evaluates each selected window directly.
 - `tempo`: explicit TraceQL trace search; one observed request, not an aggregate metric.
 
 All sources apply to local, imported/nested, overlay and detail nodes/edges. Missing tools give an actionable source/tool diagnostic; other supported sources keep working.
@@ -143,16 +142,24 @@ example qa/prd account IDs with evidence from those deployments before binding:
 {"telemetry":{"kind":"service","signals":{"matched":{"cloudwatch":{"namespace":"AWS/IoT","metric":"TopicMatch","dimensions":{"RuleName":"camera_message_camera_stats"},"statistic":"Sum","region":"us-east-1","accountId":"$account"},"unit":"events"},"delivered":{"cloudwatch":{"namespace":"AWS/IoT","metric":"Success","dimensions":{"RuleName":"camera_message_camera_stats","ActionType":"SQS"},"statistic":"Sum","region":"us-east-1","accountId":"$account"},"unit":"events"},"failed":{"cloudwatch":{"namespace":"AWS/IoT","metric":"Failure","dimensions":{"RuleName":"camera_message_camera_stats","ActionType":"Kafka"},"statistic":"Sum","region":"us-east-1","accountId":"$account"},"unit":"events"}}}}
 ```
 
-The artifact declares `query_cloudwatch` only when CloudWatch is bound. Each
-refresh sends `{datasourceUid, namespace, metricName, region, accountId,
-dimensions, statistic, period, start, end}`; `start: "now-24h"`, `end: "now"` and
-`period: 86400` come from the page window. No per-signal window or period override.
-A sole numeric value is authoritative for all statistics (outer summary `statistics.count` counts returned points, not SampleCount). Multiple returned points are accepted only for Sum with an explicit numeric `statistics.sum`; other statistics remain unobserved. Empty `timestamps`/`values`, even with zero statistics or
-hints, clear the prior observation; `[0]` is a measured zero. Missing account
-configuration or a missing connector tool produces a concise diagnostic.
-CloudWatch daily history is unsupported and stays unobserved. The account
-requirement and example response were supplied by the user from live verification
-on 2026-11-05; repository tests use recorded fixtures and make no live calls.
+The artifact declares `query_cloudwatch` only when CloudWatch is bound.
+Each request uses one absolute start/end pair for the page window. The default
+period is 300 seconds for windows up to 6h and 3600 seconds for 24h/48h;
+longer windows choose bounded coarser periods. Optional positive integer `period`
+uses regular CloudWatch multiples of 60 seconds, at least 300 seconds for data
+15–63 days old and 3600 seconds beyond 63 days. Invalid periods, more than 1440
+points, or starts beyond 455-day retention are diagnosed before querying.
+Returned timestamps are sorted and must lie within the requested window, allowing
+the first rounded boundary bucket. Boundary buckets can cover a partial window;
+the headline and graph use the same returned buckets, without prorating.
+`Sum` and `SampleCount` sum bucket values; `Maximum`/`Minimum` take their extrema.
+`Average` weights each bucket by its underlying SampleCount from a paired query
+with exactly the same range/period. Missing, invalid or mismatched weights leave
+Average unobserved, never the last bucket or an unweighted mean. Tool summaries
+such as `statistics.avg` and `statistics.count` are not underlying sample weights.
+Actual series remain timestamp-spaced, including isolated points and gaps.
+Empty arrays normally mean no data points yet; `missingMeansZero: true` opts only
+successful empty results into zero. Malformed/error results never become zero.
 
 ### Named environment variables and counting scope
 
@@ -211,8 +218,7 @@ supported; error wrappers never become observations.
 The [Grafana Logs tool source](https://github.com/grafana/mcp-grafana/blob/main/tools/cloudwatch_logs.go)
 returns `{logs: []map[string]string, totalFound, status, hints?}` and polls for
 completion. Repository tests replay this contract; no live connector/account
-verification is claimed. Optional period/sparklines and daily CloudWatch history
-remain unsupported.
+verification is claimed. Live and selected-day history use the same bounded series contracts.
 
 See the validated [device → IoT → queue example](../../../examples/cloudwatch-log-signals/cloudwatch-log-signals.spec.json).
 The queue name `camera_message_power_state_${env}` is illustrative: replace it with the real queue name before querying. No queue metric was live verified here.
@@ -246,6 +252,27 @@ scalar query or shared fields block the whole signal. Add a Live status panel to
 see details; no panel is inserted automatically. No click-to-query drilldown.
 See [grouped Logs examples](../../../docs/live-status.md#grouped-log-details-and-text-extraction).
 
+### Logs trends
+
+The scalar query remains the authoritative headline; neither bucket sums nor
+`totalFound` replace it. A plain terminal `stats count() as n` after only
+`filter`/`parse` stages receives an automatic bucketed companion query. Other
+pipelines are left untouched. Automatic bins use valid minutes/hours/days (never
+`bin(300s)`, which AWS caps at 60 seconds), with at most 1000 returned rows.
+Use `trend: false` to disable it, or explicitly author:
+
+```json
+{"trend":{"query":"filter status = 'Failure' | stats count() as n by bin(5m) as t","timeField":"t","valueField":"n","binSeconds":300}}
+```
+
+`binSeconds` is optional for explicit trends; when supplied it permits the first
+bucket to start at the preceding bin boundary. All other timestamps must lie in
+the requested window. No missing buckets are filled with zero. Exactly 1000 rows
+is labeled potentially truncated; the independent scalar remains authoritative.
+Scalar, trend and optional device breakdown share one anchored range. Trend or
+breakdown failures clear their own old evidence while retaining a successful
+scalar. Variables used only in either optional query cannot block the total.
+
 ## 3. Write explicit bindings
 
 The accepted authored fields are:
@@ -257,8 +284,9 @@ The accepted authored fields are:
 | `tracking.telemetry.honeycomb` | `environment`, optional `dataset` |
 | carrier `telemetry` | `kind`, `signals`, `proof`, `links`, `card`, or `use` plus declared template parameters |
 | signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope`, `label`, `showOnCard`, `links` |
-| `cloudwatch` query | `namespace`, `metric`, `region`, `accountId`, `dimensions`, `statistic`; optional `missingMeansZero` |
-| `cloudwatchLogs` query | `logGroups`, `query`, `region`, optional `valueField`, `breakdown` |
+| `cloudwatch` query | `namespace`, `metric`, `region`, `accountId`, `dimensions`, `statistic`; optional `missingMeansZero`, `period` |
+| Logs `trend` | `query`, `timeField`, `valueField`; optional `binSeconds` (or false instead of an object) |
+| `cloudwatchLogs` query | `logGroups`, `query`, `region`, optional `valueField`, `breakdown`, `trend` |
 | breakdown | `query`, `labelField`, `valueField`; optional `title`, `labelTitle`, `valueTitle`, `columns`, `limit` |
 | breakdown column | `field`, `label` |
 | proof entry | `min`, `max`, optional `maxRatioOf` another signal |
@@ -351,8 +379,8 @@ Interpret evidence this way:
 | missing sample, error or unsupported source | unobserved |
 | one trace | this one request was observed |
 
-Over time uses the exact prior-24-hour window ending at each day's explicit
-endpoint. It never borrows the live value or a neighboring day's sample.
+Over time uses the page window (the exact prior-24-hour window by default)
+ending at each day's explicit endpoint; Today ends now and future dates do not query. It never borrows the live value or a neighboring day's sample.
 Retention gaps, missing endpoints and unsupported history stay unobserved.
 
 ## 5. Validate and update the existing artifact

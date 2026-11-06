@@ -2174,7 +2174,7 @@ test('C1 Metrics on paints packet streams, red error packets, amber degraded edg
 
 test('C2 Metrics on gives bound nodes a sparkline strip and a proof seal, and leaves unbound nodes and text boxes alone',async()=>{
  const h=cueHarness();await h.on();
- const seal=id=>h.node(id).querySelector('.dv-metrics-seal'),spark=id=>h.node(id).querySelector('polyline.dv-metrics-sparkline');
+ const seal=id=>h.node(id).querySelector('.dv-metrics-seal'),spark=id=>h.node(id).querySelector('.dv-metrics-sparkline');
  for(const [id,want] of [['b','live-early'],['c','unproven'],['f','degraded']]){
   assert.ok(seal(id),'C2 seal on '+id);assert.equal(seal(id).getAttribute('data-seal'),want,'C2 seal kind on '+id);
   assert.equal(seal(id).getAttribute('transform'),'translate(110 45)','C2 bottom-right corner of the 120×55 card');
@@ -2182,10 +2182,13 @@ test('C2 Metrics on gives bound nodes a sparkline strip and a proof seal, and le
  }
  assert.equal(seal('a'),null,'C2 a maximum alone cannot earn a proof seal');
  assert.equal(spark('a'),null,'C2 no rate-like signal, no sparkline');
- const points=spark('b').getAttribute('points').trim().split(/\s+/).map(p=>p.split(',').map(Number));
- assert.equal(points.length,3,'C2 one point per series point');
+ const points=h.node('b').querySelectorAll('circle.dv-metrics-sparkline').map(dot=>[Number(dot.getAttribute('cx')),Number(dot.getAttribute('cy'))]);
+ assert.equal(points.length,3,'C2 one visible dot per observed series point');
  assert.ok(points.every(([x,y])=>x>=0 && x<=120 && y>=55-12 && y<=55),'C2 the strip runs along the card bottom');
  assert.ok(points[0][1]>points[2][1],'C2 a rising series rises');
+ const segments=h.node('b').querySelectorAll('polyline.dv-metrics-sparkline').map(line=>line.getAttribute('points').trim().split(/\s+/).map(p=>p.split(',').map(Number)));
+ assert.equal(segments.length,2,'C2 each adjacent observed pair has its own segment');
+ segments.forEach((segment,i)=>{assert.equal(segment.length,2);segment.forEach((point,j)=>point.forEach((coordinate,axis)=>assert.ok(Math.abs(coordinate-points[i+j][axis])<=.051,'C2 segments join their actual neighboring dots')));});
  for(const id of ['d','note']){assert.equal(h.node(id).querySelector('.dv-metrics-node'),null,'C2 '+id+' unchanged');assert.equal(h.node(id).getAttribute('data-metrics-state'),null);}
  assert.equal(h.view.querySelectorAll('.dv-metrics-node,.dv-metrics-stream').flatMap(g=>g.querySelectorAll('text')).length,0,'C2 no text on the canvas');
  h.ctl.liveStatus.destroy();

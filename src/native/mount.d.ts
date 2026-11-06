@@ -91,6 +91,13 @@ export interface TelemetryCloudWatchQuery {
   namespace: string; metric: string; region: string; accountId: string;
   dimensions: Record<string, string>; statistic: 'Sum' | 'Maximum' | 'Minimum' | 'Average' | 'SampleCount';
   missingMeansZero?: boolean;
+  /** Regular CloudWatch period in seconds; validated against age and the 1440-point limit. */
+  period?: number;
+}
+export interface TelemetryCloudWatchLogsQuery {
+  logGroups: string[]; query: string; region: string; valueField?: string;
+  trend?: false | {query: string; timeField: string; valueField: string; binSeconds?: number};
+  breakdown?: {query: string; labelField: string; valueField: string; title?: string; labelTitle?: string; valueTitle?: string; limit?: number; columns?: Array<{field: string; label: string}>};
 }
 export interface TelemetryProgress {
   note: (text: string) => void;
@@ -101,7 +108,7 @@ export interface TelemetryProgress {
 export interface TelemetryBinding {
   id: string;
   kind: 'call' | 'queue' | 'service' | 'log-event' | 'device';
-  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch' | 'cloudwatchLogs'; query: string | TelemetryCloudWatchQuery | Record<string, unknown>; unit: string | null; scope?: string; label?: string; showOnCard?: boolean; links?: {query?: string}; error?: string; /** Derived configuration error: skip only the optional grouped query; never save this into the authored query. */ breakdownError?: string}>;
+  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch' | 'cloudwatchLogs'; query: string | TelemetryCloudWatchQuery | TelemetryCloudWatchLogsQuery | Record<string, unknown>; unit: string | null; scope?: string; label?: string; showOnCard?: boolean; links?: {query?: string}; error?: string; /** Derived configuration error: skip only the optional grouped query; never save this into the authored query. */ breakdownError?: string; trendError?: string}>;
   proof: Record<string, {min?: number; max?: number; maxRatioOf?: string}>;
   links: {dashboard?: string; query?: string};
   card: {side?: 'right' | 'left' | 'above' | 'below'; offset?: number} | null;
@@ -142,13 +149,15 @@ export interface TelemetryLogDetails {
   rows?: Array<{label: string; value: number; cells: string[]}>;
 }
 export interface TelemetrySample {
+  /** Query bounds are independent of actual observation/receipt time. */
+  window?: {from: string; to: string};
   /** At most one selected exemplar per carrier, with up to 20 returned candidates and 200 spans. */
   exemplars?: TelemetryExemplar[];
   /** Signal observedAt is measurement as-of (null means unknown); retrievedAt is
    * client receipt time. Live charts prefer the selected signal's as-of. Mixed
    * adapters assign each legacy signal its own endpoint before combining sources.
    * formatted-text provenance denotes a provider table value that may be rounded. */
-  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; unit?: string; observedAt?: string | number | null; retrievedAt?: string | number | null; provenance?: 'formatted-text'; links?: {query?: string};
+  signals?: Record<string, {value?: number; series?: Array<[number | string, number]>; intervalMs?: number; window?: {from: string; to: string}; unit?: string; observedAt?: string | number | null; retrievedAt?: string | number | null; provenance?: 'formatted-text'; links?: {query?: string};
     /** Explicit measured total over [from, to], covered by signal as-of (legacy: carrier as-of). Runtime evidence only. */
     aggregate?: {kind: 'total'; from: string | number; to: string | number};
     /** Runtime grouped Logs evidence, independent of the scalar value and proof. */
@@ -167,6 +176,8 @@ export interface NativeViewerOptions {
     /** Opt into explicit report.pending/settled lifecycle for dispatched numeric signals.
      * By default legacy providers mark their supplied numeric bindings pending for the call. */
     managesPending?: boolean;
+    /** Selected-day complete samples instead of legacy endpoint-only series. */
+    historyMode?: 'window';
     /** report.note(text) updates the current request note (status().note), such as one
      * failed query beside answered ones. A rejection with `state: 'approval'`
      * reports the approval state instead of an error. */
@@ -177,7 +188,7 @@ export interface NativeViewerOptions {
      * per-signal series; omitted days are
      * unobserved. No live headline fallback. Optional: a live-only provider works.
      * report.note keeps partial errors visible and the failed batch retryable. */
-    history?: (bindings: TelemetryBinding[], range: {from: string; to: string; endpoints?: {key?: string; at: string}[]}, signal: AbortSignal, report: TelemetryProgress) => Promise<Record<string, TelemetrySample>>;
+    history?: (bindings: TelemetryBinding[], range: {from: string; to: string; endpoints?: {key?: string; at: string}[]; window?: {from: string; to: string}}, signal: AbortSignal, report: TelemetryProgress) => Promise<Record<string, TelemetrySample>>;
     /** Include mutable datasource/account identity in the controller-local cache key. */
     historyKey?: string | (() => unknown);
     /** Explicit user action resolver. ctl.telemetry.chooseExemplar validates the live

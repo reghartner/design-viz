@@ -51,7 +51,6 @@ var TELEMETRY_GRAFANA_DATASOURCE={grafana:['prometheus','Prometheus'],loki:['lok
 var TELEMETRY_GRAFANA_SQL_MS=3600000,TELEMETRY_GRAFANA_POINTS=240,TELEMETRY_GRAFANA_PARALLEL=4;
 var TELEMETRY_GRAFANA_ADD='Add a Grafana connector in claude.ai Settings → Connectors to see live metrics.';
 var TELEMETRY_GRAFANA_ALLOW='Allow Grafana';
-var TELEMETRY_GRAFANA_UNITS={s:1000,m:60000,h:3600000,d:86400000,w:604800000};
 function telemetryGrafanaNumber(value){
   var n=typeof value==='number'?value:typeof value==='string' && value.trim()!==''?Number(value):NaN;
   return isFinite(n)?n:null;
@@ -81,7 +80,7 @@ function telemetryGrafanaSum(series){
 }
 function telemetryGrafanaPoint(seconds,value){
   var t=telemetryGrafanaNumber(seconds),v=telemetryGrafanaNumber(value);
-  return t===null || v===null?null:[Math.round(t*1000),v];
+  return t===null || v===null || !isFinite(new Date(t*1000).getTime())?null:[Math.round(t*1000),v];
 }
 /* query_prometheus: {data: matrix | vector} (or the bare array, or a
    Prometheus API {data: {result}}); NaN and Inf samples are dropped. */
@@ -137,18 +136,45 @@ function telemetryLokiEmpty(payload){
     ['matrix','vector'].indexOf(payload.data.resultType)>=0 && Array.isArray(payload.data.result) && !payload.data.result.length ||
     !!payload && !payload.error && (!payload.status || payload.status==='success') && Array.isArray(payload.data) && !payload.data.length;
 }
-/* query_cloudwatch returns a full-window Sum. Empty values/timestamps are
-   unobserved even when statistics.sum is 0 or the response contains hints. */
+/* CloudWatch values are per-period statistics, never tool summary averages.
+   Average needs the underlying SampleCount at each identical timestamp. */
 function telemetryGrafanaCloudwatchEmpty(payload){return !!payload && !payload.error && (!payload.status || payload.status==='success') && Array.isArray(payload.values) && Array.isArray(payload.timestamps) && !payload.values.length && !payload.timestamps.length;}
-function telemetryGrafanaCloudwatch(payload,statistic){
-  if(!payload || payload.error || payload.status && payload.status!=='success' || !Array.isArray(payload.values) || !Array.isArray(payload.timestamps) || !payload.values.length || payload.values.length!==payload.timestamps.length)return null;
-  var values=payload.values.map(telemetryGrafanaNumber),times=payload.timestamps.map(telemetryGrafanaNumber);
-  if(values.some(function(v){return v===null;}) || times.some(function(t){return t===null || !isFinite(new Date(t).getTime());}))return null;
-  if(values.length===1)return {value:values[0],observedAt:new Date(times[0]).toISOString()};
-  if(statistic && statistic!=='Sum')return null;
-  var sum=telemetryGrafanaNumber(payload.statistics && payload.statistics.sum);
-  if(sum===null){if(values.length!==1)return null;sum=values[0];}
-  return {value:sum,observedAt:new Date(Math.max.apply(null,times)).toISOString()};
+function telemetryCloudwatchPoints(payload){
+  if(!payload || payload.error || payload.status && payload.status!=='success' || !Array.isArray(payload.values) || !Array.isArray(payload.timestamps) || !payload.values.length || payload.values.length!==payload.timestamps.length || payload.values.length>1440)return null;
+  var seen=Object.create(null),points=[];
+  for(var i=0;i<payload.values.length;i++){
+    var v=telemetryGrafanaNumber(payload.values[i]),t=telemetryGrafanaNumber(payload.timestamps[i]);
+    if(v===null || t===null || !isFinite(new Date(t).getTime()) || seen[t])return null;
+    seen[t]=true;points.push([t,v]);
+  }
+  return points.sort(function(a,b){return a[0]-b[0];});
+}
+function telemetryGrafanaCloudwatch(payload,statistic,weights,range,period){
+  var points=telemetryCloudwatchPoints(payload);if(!points)return null;
+  if(range && points.some(function(p){return p[0]<Math.floor(Date.parse(range.from)/(period*1000))*period*1000 || p[0]>=Date.parse(range.to);}))return null;
+  var values=points.map(function(p){return p[1];}),value;
+  if(statistic==='Average'){
+    var counts=telemetryCloudwatchPoints(weights);if(!counts || counts.length!==points.length)return null;
+    var sum=0,count=0;
+    for(var i=0;i<points.length;i++){if(counts[i][0]!==points[i][0] || counts[i][1]<=0)return null;sum+=points[i][1]*counts[i][1];count+=counts[i][1];}
+    value=sum/count;
+  }else if(statistic==='Maximum')value=Math.max.apply(null,values);
+  else if(statistic==='Minimum')value=Math.min.apply(null,values);
+  else if(!statistic || statistic==='Sum' || statistic==='SampleCount')value=values.reduce(function(a,b){return a+b;},0);
+  else return null;
+  return isFinite(value)?{value:value,series:points,observedAt:new Date(points[points.length-1][0]).toISOString()}:null;
+}
+function telemetryCloudwatchPeriod(query,range,now){
+  var duration=(Date.parse(range.to)-Date.parse(range.from))/1000,age=(now-Date.parse(range.from))/86400000;
+  if(!(duration>0) || age>455)throw {code:'bad_request',message:'CloudWatch window is outside its 455-day retention'};
+  var minimum=age>=63?3600:age>=15?300:60,period=query.period;
+  if(period!==undefined){
+    if(!Number.isInteger(period) || period<minimum || period%minimum || Math.ceil(duration/period)>1440)throw {code:'bad_request',message:'CloudWatch period must be a multiple of '+minimum+' seconds and return at most 1440 points'};
+    return period;
+  }
+  // Compact useful trends: 6h has 72 five-minute points; 24h has 24 hourly points.
+  var desired=duration<=21600?300:duration<=172800?3600:Math.ceil(duration/72/3600)*3600;
+  return Math.max(minimum,Math.ceil(Math.max(desired,duration/1440)/minimum)*minimum);
 }
 /* Grafana's hosted namespace exposes payload; raw MCP can wrap the same JSON
    in structuredContent or text. Refuse errors before unwrapping any sample. */
@@ -179,6 +205,35 @@ function telemetryGrafanaCloudwatchLogs(payload,query){
   var value=field && telemetryOwn(row,field)?telemetryGrafanaNumber(row[field]):null;
   if(value===null)throw {code:'tool_error',message:'query_cloudwatch_logs first row needs numeric field '+(field || '(first column)')};
   return value;
+}
+/* Only a terminal plain count after filter/parse stages can be rewritten.
+   Strings and regexes are opaque: a pipe inside one is never a pipeline. */
+function telemetryLogTrend(query,windowMs){
+  if(query.trend===false)return null;if(query.trend)return query.trend;
+  var text=query.query,parts=[],start=0,quote=null,escaped=false;
+  for(var i=0;i<text.length;i++){
+    var c=text[i];if(escaped){escaped=false;continue;}if(c==='\\'){escaped=true;continue;}
+    if(quote){if(c===quote)quote=null;continue;}if(c==='"' || c==="'" || c==='`' || c==='/'){quote=c;continue;}
+    if(c==='|'){parts.push(text.slice(start,i).trim());start=i+1;}
+  }
+  if(quote || escaped)return null;parts.push(text.slice(start).trim());
+  var match=/^stats\s+count\(\s*\)\s+as\s+([A-Za-z_][A-Za-z0-9_]*)$/i.exec(parts.pop());
+  if(!match || parts.some(function(p){return !/^(?:filter|parse)\s+\S/i.test(p);}))return null;
+  var minutes=Math.max(1,Math.ceil(windowMs/60000/120)),hours=Math.ceil(minutes/60),days=Math.ceil(hours/24);
+  var bin=minutes<=60?minutes+'m':hours<=24?hours+'h':days+'d',seconds=minutes<=60?minutes*60:hours<=24?hours*3600:days*86400;
+  return {query:parts.concat(['stats count() as '+match[1]+' by bin('+bin+') as flowview_time']).join(' | '),timeField:'flowview_time',valueField:match[1],binSeconds:seconds};
+}
+function telemetryGrafanaLogTrend(payload,query,range){
+  if(!payload || payload.status!=='Complete' || !Array.isArray(payload.logs))throw {code:'tool_error',message:'Log trend did not return Complete rows'};
+  if(payload.logs.length>1000)throw {code:'tool_error',message:'Log trend exceeded the 1000-row limit'};
+  var seen=Object.create(null),points=payload.logs.map(function(row){
+    var raw=telemetryObject(row)?row[query.timeField]:null,value=telemetryObject(row)?telemetryGrafanaNumber(row[query.valueField]):null;
+    // Logs Insights renders UTC timestamps without an offset in some versions.
+    var time=typeof raw==='string' && /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(raw)?Date.parse(raw.replace(' ','T')+'Z'):Date.parse(telemetryTime(raw));
+    if(!isFinite(time) || value===null || value<0 || seen[time] || time<(query.binSeconds?Math.floor(Date.parse(range.from)/(query.binSeconds*1000))*query.binSeconds*1000:Date.parse(range.from)) || time>=Date.parse(range.to))throw {code:'tool_error',message:'Log trend needs unique in-window timestamps and nonnegative numeric counts'};
+    seen[time]=true;return [time,value];
+  }).sort(function(a,b){return a[0]-b[0];});
+  return {series:points,truncated:payload.logs.length===1000};
 }
 function telemetryGrafanaLogDetails(payload,config,range){
   if(!payload || payload.status!=='Complete' || !Array.isArray(payload.logs))throw {code:'tool_error',message:'Log details query did not return Complete rows'};
@@ -217,9 +272,45 @@ function telemetryGrafanaSql(payload){
   for(var i=0;i<values.length;i++){var n=telemetryGrafanaNumber(values[i]);if(n!==null)return n;}
   return null;
 }
+/* This eligibility guard recognizes code macros, not SQL semantics. Strip
+   dialect strings/comments; reject unterminated or ambiguous quoted syntax. */
+function telemetrySqlHistoryQuery(text){
+  var code='',i=0;
+  while(i<text.length){
+    var c=text[i],next=text[i+1];
+    if(c==='#' || c==='-' && next==='-'){
+      while(i<text.length && text[i]!=='\n' && text[i]!=='\r')i++;
+      code+=' ';continue;
+    }
+    if(c==='/' && next==='*'){
+      var depth=1;i+=2;
+      while(i<text.length && depth){
+        if(text[i]==='/' && text[i+1]==='*'){depth++;i+=2;}
+        else if(text[i]==='*' && text[i+1]==='/'){depth--;i+=2;}else i++;
+      }
+      if(depth)return false;code+=' ';continue;
+    }
+    if(c==='$'){
+      var dollar=/^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/.exec(text.slice(i));
+      if(dollar){var end=text.indexOf(dollar[0],i+dollar[0].length);if(end<0)return false;i=end+dollar[0].length;code+=' ';continue;}
+    }
+    if(c==="'" || c==='"' || c==='`' || c==='['){
+      var close=c==='['?']':c,closed=false;i++;
+      while(i<text.length){
+        // Backslash quoting differs by dialect/session. Do not guess which
+        // following characters are executable in a historical query.
+        if(text[i]==='\\')return false;
+        if(text[i]===close){if(text[i+1]===close){i+=2;continue;}i++;closed=true;break;}
+        i++;
+      }
+      if(!closed)return false;code+=' ';continue;
+    }
+    code+=c;i++;
+  }
+  return /\$__timeFilter\s*\(/.test(code) || /\$__from\b/.test(code) && /\$__to\b/.test(code);
+}
 function telemetryGrafanaWindowMs(text){
-  var duration=telemetryWindowDuration(text) || TELEMETRY_DEFAULT_WINDOW;
-  return Number(duration.slice(0,-1))*TELEMETRY_GRAFANA_UNITS[duration.slice(-1)];
+  return telemetryWindowMs(text);
 }
 /* Carriers with at least one signal this adapter runs, signals in authored order. */
 function telemetryGrafanaJobs(bindings){
@@ -230,7 +321,7 @@ function telemetryGrafanaJobs(bindings){
     Object.keys(binding.signals).forEach(function(name){
       var signal=binding.signals[name];
       if(signal && TELEMETRY_GRAFANA_RUN.indexOf(signal.source)>=0 && (signal.source==='cloudwatch'?telemetryCloudwatchQuery(signal.query):signal.source==='cloudwatchLogs'?telemetryCloudwatchLogsQuery(signal.query):typeof signal.query==='string'))
-        signals.push({name:name,source:signal.source,query:signal.query,links:signal.links || {},error:signal.error,breakdownError:signal.breakdownError,unit:typeof signal.unit==='string' && signal.unit?signal.unit:null});
+        signals.push({name:name,source:signal.source,query:signal.query,links:signal.links || {},error:signal.error,breakdownError:signal.breakdownError,trendError:signal.trendError,unit:typeof signal.unit==='string' && signal.unit?signal.unit:null});
     });
     if(signals.length)jobs.push({id:binding.id,signals:signals,binding:binding,links:binding.links && typeof binding.links==='object'?binding.links:{}});
   });
@@ -367,23 +458,26 @@ function createTelemetryGrafana(page,win,now,bound){
     if(note){if(['server_not_connected','server_not_found','not_granted','capability_disabled','capability_removed'].indexOf(kind)>=0 && ctl && ctl.telemetry && typeof ctl.telemetry.setAvailable==='function')ctl.telemetry.setAvailable(false);blocked={signal:signal,error:telemetryGrafanaError(note)};retract(signal);return Promise.reject(blocked.error);}
     return Promise.reject(telemetryGrafanaError('Grafana did not answer'));
   }
-  function provider(bindings,signal,report){
+  function provider(bindings,signal,report,windowRange){
+    if(!windowRange || !telemetryTime(windowRange.from) || !telemetryTime(windowRange.to))windowRange=null;
     var jobs=telemetryGrafanaJobs(bindings);
     if(!jobs.length)return Promise.resolve({});
     if(retired)return Promise.reject(telemetryGrafanaError('Grafana stopped: the signed-in account changed'));
     if(blocked && blocked.signal===signal)return Promise.reject(blocked.error);
     blocked=null;
     var config=telemetryProviderConfig(current || {},ctl),windowMs=telemetryGrafanaWindowMs(config.window);
-    var anchoredEnd=clock(),anchoredRange={from:new Date(anchoredEnd-windowMs).toISOString(),to:new Date(anchoredEnd).toISOString()};
-    var range={from:'now-'+config.window,to:'now'},step=Math.max(60,Math.ceil(windowMs/1000/TELEMETRY_GRAFANA_POINTS));
+    var anchoredEnd=windowRange?Date.parse(windowRange.to):clock(),anchoredRange=windowRange || {from:new Date(anchoredEnd-windowMs).toISOString(),to:new Date(anchoredEnd).toISOString()};
+    windowMs=Date.parse(anchoredRange.to)-Date.parse(anchoredRange.from);
+    var range=windowRange || {from:'now-'+config.window,to:'now'},step=Math.max(60,Math.ceil(windowMs/1000/TELEMETRY_GRAFANA_POINTS));
     var options=signal?{signal:signal}:undefined,notices=[],failures=[],fatal=null,annotations=null,order=0,reportedNote=null;
     function started(job,entry){if(report && report.pending)report.pending(job.id,entry.name);}
     function settled(job,entry){
       if(!report || !report.settled)return;var sample=null;
-      if(entry.points && entry.points.length)sample={value:entry.points[entry.points.length-1][1],series:entry.points,observedAt:new Date(entry.points[entry.points.length-1][0]).toISOString()};
-      else if(typeof entry.value==='number')sample={value:entry.value,observedAt:entry.observedAt || new Date(clock()).toISOString()};
-      else if(entry.points)sample={value:0,series:[],observedAt:new Date(clock()).toISOString()};
-      if(sample){var queryUrl=telemetryQueryUrl(entry.links.query) || telemetryGrafanaUrl(entry.exploreUrl);if(queryUrl)sample.links={query:queryUrl};if(entry.unit)sample.unit=entry.unit;if(entry.breakdown)sample.breakdown=entry.breakdown;}
+      if(typeof entry.value==='number')sample={value:entry.value,observedAt:entry.observedAt || null};
+      else if(entry.points && entry.points.length)sample={value:entry.points[entry.points.length-1][1],series:entry.points,observedAt:new Date(entry.points[entry.points.length-1][0]).toISOString()};
+      if(sample && entry.points)sample.series=entry.points;
+      else if(!sample && entry.points)sample={value:0,series:[],observedAt:new Date(clock()).toISOString()};
+      if(sample){if(['cloudwatch','cloudwatchLogs'].indexOf(entry.source)>=0 || windowRange)sample.window=anchoredRange;var queryUrl=telemetryQueryUrl(entry.links.query) || telemetryGrafanaUrl(entry.exploreUrl);if(queryUrl)sample.links={query:queryUrl};if(entry.unit)sample.unit=entry.unit;if(entry.breakdown)sample.breakdown=entry.breakdown;if(entry.intervalMs)sample.intervalMs=entry.intervalMs;}
       report.settled(job.id,entry.name,sample);
     }
     function progressNote(){failures.sort(function(a,b){return a.rank-b.rank;});var note=!failures.length?'':failures.length===1?'1 Grafana query failed: '+failures[0].text:failures.length+' Grafana queries failed; first '+failures[0].text;var text=[note].concat(notices).filter(Boolean).join('; ');if(report && report.note && text!==reportedNote){reportedNote=text;report.note(text);}}
@@ -400,9 +494,9 @@ function createTelemetryGrafana(page,win,now,bound){
       throw error;
     }).then(function(mcp){
       if(signal && signal.aborted)throw {code:'capability_removed'};
-      function call(tool,input){return Promise.resolve().then(function(){if(signal && signal.aborted)throw {code:'capability_removed'};return mcp.callTool(server,tool,input,options);});}
+      function call(tool,input){function work(){if(signal && signal.aborted)throw {code:'capability_removed'};return mcp.callTool(server,tool,input,options);}return windowRange?liveStatusHistoryCall(work,signal):Promise.resolve().then(work);}
       var probe={tool:'get_annotations',input:{type:'annotation',limit:100}};
-      return (offered.indexOf(probe.tool)>=0?call(probe.tool,probe.input):Promise.resolve(null)).then(function(result){annotations=result && result.payload;},caught(-1,'annotations',probe,null)).then(function(){
+      return (!windowRange && offered.indexOf(probe.tool)>=0?call(probe.tool,probe.input):Promise.resolve(null)).then(function(result){annotations=result && result.payload;},caught(-1,'annotations',probe,null)).then(function(){
         if(fatal)return;
         var tasks=[];
         jobs.forEach(function(job){job.signals.forEach(function(entry){
@@ -415,41 +509,58 @@ function createTelemetryGrafana(page,win,now,bound){
             var query=entry.query;
             if(/\$(?:account\b|\{account\})/.test(query.accountId)){failed(rank,label,'set tracking.telemetry.grafana.accountId for $account');return;}
             var input={datasourceUid:uid,namespace:query.namespace,metricName:query.metric,region:query.region,accountId:query.accountId,
-              dimensions:query.dimensions,statistic:query.statistic,period:Math.ceil(windowMs/1000),start:range.from,end:range.to};
+              dimensions:query.dimensions,statistic:query.statistic,start:anchoredRange.from,end:anchoredRange.to};
+            try{input.period=telemetryCloudwatchPeriod(query,anchoredRange,clock());}catch(error){failed(rank,label,error.message);return;}
             started(job,entry);tasks.push(function(){return call('query_cloudwatch',input).then(function(result){
               var payload=telemetryGrafanaPayload(result);
               if(telemetryGrafanaCloudwatchEmpty(payload)){
-                if(query.missingMeansZero===true){entry.value=0;entry.observedAt=new Date(clock()).toISOString();}
+                if(query.missingMeansZero===true){entry.value=0;entry.observedAt=anchoredRange.to;}
                 else{notices.push(label+': no data points yet');if(report && report.pending)progressNote();}
                 return;
               }
-              var sample=telemetryGrafanaCloudwatch(payload,query.statistic);
-              if(!sample){entry.failed=true;failed(rank,label,'query_cloudwatch returned a malformed observation');return;}
-              entry.value=sample.value;entry.observedAt=sample.observedAt;
+              // A failed weight query leaves no series-only sample that could be
+              // misread as the last bucket's Average for the whole window.
+              return (query.statistic==='Average'?call('query_cloudwatch',Object.assign({},input,{statistic:'SampleCount'})).then(telemetryGrafanaPayload):Promise.resolve(null)).then(function(weights){
+                var sample=telemetryGrafanaCloudwatch(payload,query.statistic,weights,anchoredRange,input.period);
+                if(!sample){entry.failed=true;failed(rank,label,'query_cloudwatch returned malformed observations or missing Average sample weights');return;}
+                entry.value=sample.value;entry.points=sample.series;entry.observedAt=sample.observedAt;entry.intervalMs=input.period*1000;
+              });
             }).catch(caught(rank,label,{tool:'query_cloudwatch',input:input},entry)).finally(function(){settled(job,entry);});});
             return;
           }
           if(entry.source==='cloudwatchLogs'){
-            var q=entry.query,logRange=q.breakdown?anchoredRange:range,input={datasourceUid:uid,region:q.region,logGroups:q.logGroups,queryString:q.query,start:logRange.from,end:logRange.to,limit:100};
+            var q=entry.query,logRange=anchoredRange,input={datasourceUid:uid,region:q.region,logGroups:q.logGroups,queryString:q.query,start:logRange.from,end:logRange.to,limit:100};
             started(job,entry);tasks.push(function(){return call('query_cloudwatch_logs',input).then(function(result){
-              entry.value=telemetryGrafanaCloudwatchLogs(telemetryGrafanaPayload(result),q);entry.observedAt=new Date(clock()).toISOString();
-              if(!q.breakdown || signal && signal.aborted)return;
-              if(entry.breakdownError){entry.breakdown=telemetryLogDetails({status:'error',error:entry.breakdownError});failed(rank,label+' log details',entry.breakdown.error);return;}
-              var detailsInput=Object.assign({},input,{queryString:q.breakdown.query,limit:q.breakdown.limit || 20});
-              return call('query_cloudwatch_logs',detailsInput).then(function(details){entry.breakdown=telemetryGrafanaLogDetails(telemetryGrafanaPayload(details),q.breakdown,logRange);}).catch(function(error){
-                if(signal && signal.aborted)return;
-                if(code(error)==='user_changed'){if(!fatal)fatal={error:error,repeat:{tool:'query_cloudwatch_logs',input:detailsInput}};return;}
-                entry.breakdown=telemetryLogDetails({status:'error',error:detail(error)});failed(rank,label+' log details',entry.breakdown.error);
-              });
+              entry.value=telemetryGrafanaCloudwatchLogs(telemetryGrafanaPayload(result),q);entry.observedAt=null;
+              // Publish the authoritative total before optional trend/details.
+              settled(job,entry);
+              var extras=[],trend=telemetryLogTrend(q,windowMs);
+              if(trend && !(signal && signal.aborted)){
+                if(entry.trendError)failed(rank,label+' trend',entry.trendError);
+                else {var trendInput=Object.assign({},input,{queryString:trend.query,limit:1000});extras.push(call('query_cloudwatch_logs',trendInput).then(function(answer){
+                  var result=telemetryGrafanaLogTrend(telemetryGrafanaPayload(answer),trend,logRange);entry.points=result.series;entry.intervalMs=trend.binSeconds?trend.binSeconds*1000:null;
+                  if(result.truncated){notices.push(label+': trend reached 1000 rows and may be truncated; total is independent');progressNote();}
+                }).catch(function(error){if(!(signal && signal.aborted)){if(code(error)==='user_changed'){if(!fatal)fatal={error:error,repeat:{tool:'query_cloudwatch_logs',input:trendInput}};}else failed(rank,label+' trend',detail(error));}}));}
+              }
+              if(q.breakdown && !(signal && signal.aborted)){
+                if(entry.breakdownError){entry.breakdown=telemetryLogDetails({status:'error',error:entry.breakdownError});failed(rank,label+' log details',entry.breakdown.error);}
+                else {var detailsInput=Object.assign({},input,{queryString:q.breakdown.query,limit:q.breakdown.limit || 20});extras.push(call('query_cloudwatch_logs',detailsInput).then(function(details){entry.breakdown=telemetryGrafanaLogDetails(telemetryGrafanaPayload(details),q.breakdown,logRange);}).catch(function(error){
+                  if(signal && signal.aborted)return;
+                  if(code(error)==='user_changed'){if(!fatal)fatal={error:error,repeat:{tool:'query_cloudwatch_logs',input:detailsInput}};return;}
+                  entry.breakdown=telemetryLogDetails({status:'error',error:detail(error)});failed(rank,label+' log details',entry.breakdown.error);
+                }));}
+              }
+              return Promise.all(extras);
             }).catch(caught(rank,label,{tool:'query_cloudwatch_logs',input:input},entry)).finally(function(){settled(job,entry);});});
             return;
           }
           if(entry.source==='sql'){
             if(offered.indexOf('query_sql')<0){entry.failed=true;failed(rank,label,'the Grafana connector does not offer query_sql');return;}
-            var key=(config.environment || '')+'\n'+uid+'\n'+entry.query,cached=sql[key];
+            if(windowRange && !telemetrySqlHistoryQuery(entry.query)){failed(rank,label,'Historical SQL requires an authored $__timeFilter or both $__from and $__to time constraints');return;}
+            var key=(config.environment || '')+'\n'+uid+'\n'+entry.query+(windowRange?JSON.stringify(range):''),cached=windowRange?null:sql[key];
             if(cached && clock()-cached.at<TELEMETRY_GRAFANA_SQL_MS){if(cached.value!==null)entry.value=cached.value;else entry.failed=true;return;}
-            var input={datasourceUid:uid,query:entry.query},attempt={at:clock(),value:cached?cached.value:null};
-            started(job,entry);tasks.push(function(){sql[key]=attempt;return call('query_sql',input).then(function(result){
+            var input=Object.assign({datasourceUid:uid,query:entry.query},windowRange?{start:range.from,end:range.to}:{}),attempt={at:clock(),value:cached?cached.value:null};
+            started(job,entry);tasks.push(function(){if(!windowRange)sql[key]=attempt;return call('query_sql',input).then(function(result){
               var value=telemetryGrafanaSql(result && result.payload);
               if(value===null){entry.failed=true;failed(rank,label,'query_sql returned no number');return;}
               attempt.value=entry.value=value;
@@ -468,7 +579,7 @@ function createTelemetryGrafana(page,win,now,bound){
               if(points.length)entry.points=points;
               else if(telemetryLokiEmpty(payload) && telemetryLokiCountingQuery(entry.query))entry.value=0;
               else notices.push(label+': no numeric observation');
-            }else entry.points=telemetryGrafanaPrometheus(payload);
+            }else {var promPoints=telemetryGrafanaPrometheus(payload);if(!windowRange || promPoints.length)entry.points=promPoints;else notices.push(label+': no numeric observation in this window');}
             var url=telemetryGrafanaUrl(result && result.payload && result.payload.exploreUrl);if(url)entry.exploreUrl=url;
           }).catch(caught(rank,label,{tool:tool,input:query},entry)).finally(function(){settled(job,entry);});});
         });});
@@ -495,16 +606,17 @@ function createTelemetryGrafana(page,win,now,bound){
         (entry.points || []).forEach(function(point){if(end===null || point[0]>end)end=point[0];});
       });});
       if(end===null)end=clock();
-      var markers=annotations!==null?telemetryGrafanaMarkers(annotations,end-windowMs,end):lastMarkers;
+      var markers=windowRange?[]:annotations!==null?telemetryGrafanaMarkers(annotations,end-windowMs,end):lastMarkers;
       jobs.forEach(function(job){
         var out={signals:{},observedAt:new Date(end).toISOString(),markers:JSON.parse(JSON.stringify(markers)),links:{}};
         job.signals.forEach(function(entry){
           var sample=null,previous=last[job.id] && last[job.id].signals[entry.name];
-          if(entry.points)sample={value:entry.points.length?entry.points[entry.points.length-1][1]:0,series:entry.points};
-          else if(typeof entry.value==='number'){sample={value:entry.value};if(entry.observedAt)sample.observedAt=entry.observedAt;}
-          else if(entry.failed && previous && entry.source!=='cloudwatch' && entry.source!=='cloudwatchLogs' && entry.source!=='loki' && !entry.error)sample=JSON.parse(JSON.stringify(previous));
+          if(typeof entry.value==='number'){sample={value:entry.value,observedAt:entry.observedAt || null};if(entry.points)sample.series=entry.points;}
+          else if(entry.points)sample={value:entry.points.length?entry.points[entry.points.length-1][1]:0,series:entry.points};
+          else if(!windowRange && entry.failed && previous && entry.source!=='cloudwatch' && entry.source!=='cloudwatchLogs' && entry.source!=='loki' && !entry.error)sample=JSON.parse(JSON.stringify(previous));
           if(!sample)return;
-          if(entry.breakdown)sample.breakdown=entry.breakdown;
+          if(['cloudwatch','cloudwatchLogs'].indexOf(entry.source)>=0 || windowRange)sample.window=anchoredRange;
+          if(entry.breakdown)sample.breakdown=entry.breakdown;if(entry.intervalMs)sample.intervalMs=entry.intervalMs;
           if(entry.unit)sample.unit=entry.unit;else delete sample.unit;
           var one={signals:{}};one.signals[entry.name]=entry;
           var query=telemetryQueryUrl(entry.links.query) || (entry.failed && sample.links && sample.links.query) || telemetryGrafanaUrl(entry.exploreUrl) || entry.explore && links[entry.explore];
@@ -526,13 +638,14 @@ function createTelemetryGrafana(page,win,now,bound){
         map[job.id]=out;
       });
       progressNote();
-      last=map;lastMarkers=markers;
+      if(!windowRange){last=map;lastMarkers=markers;}
       return JSON.parse(JSON.stringify(map));
     },function(error){if(signal && signal.aborted)throw telemetryGrafanaError('Grafana refresh cancelled');return refuse(error,signal,null);});
   }
   /* History is one absolute daily range per explicitly bound Prometheus/LogQL
      metric. No annotations, links, SQL, query rewriting or live fallback. */
   function history(bindings,range,signal,report){
+    if(range.window)return provider(bindings,signal,report,range.window);
     var config=telemetryProviderConfig(current || {},ctl),epoch=generation,jobs=telemetryGrafanaJobs(bindings),map=Object.create(null),failures=[],fatal=null;
     function halted(){return retired || epoch!==generation || signal && signal.aborted || !!fatal;}
     if(halted())return Promise.reject(telemetryGrafanaError('Grafana history cancelled'));

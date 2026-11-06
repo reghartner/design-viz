@@ -46,6 +46,10 @@
 
    The first provider call runs when Metrics turns on; refresh pauses while
    the document is hidden and catches up once on return (liveStatusPoller). */
+function telemetryWindowMs(text){
+  var duration=telemetryWindowDuration(text) || TELEMETRY_DEFAULT_WINDOW;
+  return Number(duration.slice(0,-1))*{s:1000,m:60000,h:3600000,d:86400000,w:604800000}[duration.slice(-1)];
+}
 function telemetryTime(value){
   var ms=typeof value==='number'?value:typeof value==='string'?Date.parse(value):NaN;
   var date=new Date(ms);return isFinite(date.getTime())?date.toISOString():null;
@@ -87,13 +91,16 @@ function telemetryLogDetails(raw){
 function telemetrySample(raw){
   if(!telemetryObject(raw))return null;
   var out={signals:{},observedAt:telemetryTime(raw.observedAt),markers:[],links:{}};
+  if(raw.window && telemetryTime(raw.window.from) && telemetryTime(raw.window.to) && Date.parse(raw.window.from)<Date.parse(raw.window.to))out.window={from:telemetryTime(raw.window.from),to:telemetryTime(raw.window.to)};
   if(telemetryObject(raw.signals))Object.keys(raw.signals).forEach(function(name){
     var value=raw.signals[name],entry={};
     if(!telemetryNamePattern.test(name) || !telemetryObject(value))return;
     if(telemetryNumber(value.value))entry.value=value.value;
     if(Array.isArray(value.series))entry.series=value.series.filter(telemetryPoint).map(function(point){return [point[0],point[1]];});
     if(telemetryText(value.unit))entry.unit=value.unit;
+    if(telemetryNumber(value.intervalMs) && value.intervalMs>0)entry.intervalMs=value.intervalMs;
     if(value.links && telemetryQueryUrl(value.links.query))entry.links={query:telemetryQueryUrl(value.links.query)};
+    if(value.window && telemetryTime(value.window.from) && telemetryTime(value.window.to) && Date.parse(value.window.from)<Date.parse(value.window.to))entry.window={from:telemetryTime(value.window.from),to:telemetryTime(value.window.to)};
     if(telemetryOwn(value,'observedAt'))entry.observedAt=telemetryTime(value.observedAt);
     if(telemetryOwn(value,'retrievedAt'))entry.retrievedAt=telemetryTime(value.retrievedAt);
     if(value.provenance==='formatted-text')entry.provenance='formatted-text';
@@ -174,6 +181,24 @@ var TELEMETRY_CUE_CLASSES=['dv-metrics-bound','dv-metrics-flowing','dv-metrics-d
 var TELEMETRY_SEALS={proven:'proven','done-degraded':'degraded','active-failing':'degraded','testing-failing':'degraded','todo-failing':'degraded',degraded:'degraded',
   'done-unproven':'unproven','active-live-early':'live-early','testing-live-early':'live-early','todo-already-live':'live-early'};
 var TELEMETRY_SEAL_GLYPHS={proven:'M-3.2 .2L-1 2.4L3.4-2.2',degraded:'M0-3.6V.8M0 2.7V3',unproven:'M-3 3L3-3','live-early':'M-4 .5Q-2-2.5 0 .5T4 .5'};
+/* Timestamp geometry shared by node and edge mini charts. Missing spans are
+   gaps, not interpolated traffic. Even a sole observation remains visible. */
+function telemetrySparkline(series,width,height,windowMs,range,intervalMs){
+  var points=(series || []).filter(telemetryPoint).map(function(p){return [Date.parse(telemetryTime(p[0])),p[1]];}).filter(function(p){return isFinite(p[0]);}).sort(function(a,b){return a[0]-b[0];});
+  if(!points.length)return {points:[],lines:[]};
+  var end=range?Date.parse(range.to):points[points.length-1][0],start=range?Date.parse(range.from):end-windowMs;
+  if(!(end>start)){start=points[0][0];end=Math.max(start+1,points[points.length-1][0]);}
+  points=points.filter(function(p){return p[0]>=start-(intervalMs || 0) && p[0]<=end;});
+  var low=Math.min.apply(null,points.map(function(p){return p[1];})),high=Math.max.apply(null,points.map(function(p){return p[1];}));
+  var plotted=points.map(function(p){return {x:Math.max(0,width*(p[0]-start)/(end-start)),y:high===low?height/2:height-height*(p[1]-low)/(high-low),at:p[0]};}),lines=[];
+  plotted.forEach(function(p,i){if(i && p.at-plotted[i-1].at<=(intervalMs?intervalMs*1.1:(end-start)/4))lines.push([plotted[i-1],p]);});
+  return {points:plotted,lines:lines};
+}
+function telemetryPaintSparkline(doc,parent,series,x,y,width,height,windowMs,range,intervalMs){
+  var chart=telemetrySparkline(series,width,height,windowMs,range,intervalMs);
+  chart.lines.forEach(function(line){telemetrySvg(doc,'polyline',{'class':'dv-metrics-sparkline',points:line.map(function(p){return (x+p.x).toFixed(1)+','+(y+p.y).toFixed(1);}).join(' ')},parent);});
+  chart.points.forEach(function(p){telemetrySvg(doc,'circle',{'class':'dv-metrics-sparkline',cx:x+p.x,cy:y+p.y,r:1.2},parent);});return chart.points.length;
+}
 function telemetryReading(sample,name){
   var signals=sample && telemetryObject(sample.signals)?sample.signals:null,entry=signals && telemetryOwn(signals,name)?signals[name]:null;
   if(!telemetryObject(entry))return {value:null,series:[]};
@@ -210,7 +235,7 @@ function telemetryClearCues(scope){
 }
 /* Repaints one rendered diagram. view is {map, verdicts} while Metrics is on,
    null to clear. templates are the diagram's page templates. */
-function telemetryPaintCues(scope,diagram,templates,view){
+function telemetryPaintCues(scope,diagram,templates,view,window){
   telemetryClearCues(scope);
   if(!view || !diagram)return;
   var doc=scope.ownerDocument || document;
@@ -254,15 +279,8 @@ function telemetryPaintCues(scope,diagram,templates,view){
     var w=Number(card.getAttribute('width') || card.getAttribute('data-node-width')),h=Number(card.getAttribute('height') || card.getAttribute('data-node-height'));
     if(!isFinite(w) || !isFinite(h) || w<40 || h<30)return;
     var art=telemetrySvg(doc,'g',{'class':'dv-metrics-node','aria-hidden':'true','pointer-events':'none'},el);
-    var primary=telemetryPrimary(binding),series=primary?telemetryReading(view.map[id],primary).series:[];
-    if(series.length>=2){
-      var values=series.map(function(point){return point[1];}),low=Math.min.apply(null,values),high=Math.max.apply(null,values);
-      var left=10,right=w-22,top=h-11,bottom=h-4;
-      telemetrySvg(doc,'polyline',{'class':'dv-metrics-sparkline',points:series.map(function(point,i){
-        var x=left+(right-left)*i/(series.length-1),y=high===low?(top+bottom)/2:bottom-(bottom-top)*(point[1]-low)/(high-low);
-        return x.toFixed(1)+','+y.toFixed(1);
-      }).join(' ')},art);
-    }
+    var shown=telemetryCardBinding(binding),primary=telemetryPrimary(shown,true) || telemetryMetricNames(shown)[0],series=primary?telemetryReading(view.map[id],primary).series:[];
+    if(series.length)telemetryPaintSparkline(doc,art,series,10,h-11,w-32,7,telemetryWindowMs(window),view.map[id] && (view.map[id].signals[primary] && view.map[id].signals[primary].window || view.map[id].window),view.map[id] && view.map[id].signals[primary] && view.map[id].signals[primary].intervalMs);
     var seal=result && TELEMETRY_SEALS[result.verdict];
     if(seal){
       var badge=telemetrySvg(doc,'g',{'class':'dv-metrics-seal','data-seal':seal,transform:'translate('+(w-10)+' '+(h-10)+')'},art);
@@ -388,6 +406,7 @@ function createTelemetry(page,options,hooks){
   var available=permitted && options.available!==false,availabilityNote='';
   var provider=typeof options.provider==='function'?options.provider:null;
   var history=typeof options.history==='function'?options.history:provider && typeof provider.history==='function'?provider.history:null;
+  var windowHistory=options.historyMode==='window',windowCache=Object.create(null);
   var demo=options.demo && typeof options.demo.mount==='function'?options.demo:null;
   var configured=Number(options.refreshMs),authored=trackingTelemetry(page || {}).refreshMs;
   var delay=Math.max(TELEMETRY_MIN_REFRESH_MS,configured>0 && isFinite(configured)?configured:authored || TELEMETRY_MIN_REFRESH_MS);
@@ -409,7 +428,7 @@ function createTelemetry(page,options,hooks){
     return proofVerdicts(telemetryProofInput(typeof hooks.carriers==='function'?hooks.carriers:function(){},typeof hooks.diagrams==='function'?hooks.diagrams:function(){},
       typeof hooks.jira==='function'?hooks.jira():{},map,environment,telemetryEnvironmentConfig(page,environment)));
   }
-  hooks.view=function(){return enabled && !retired?{map:map,pending:past?{}:pending,verdicts:verdicts()}:null;};
+  hooks.view=function(){return enabled && !retired?{map:map,pending:past?(past.pending || {}):pending,verdicts:verdicts()}:null;};
   hooks.jiraChanged=emit;
   function setStatus(next){Object.keys(next).forEach(function(key){status[key]=next[key];});}
   function bindingKeys(){var keys=Object.create(null);bindings().forEach(function(binding){keys[binding.id]=JSON.stringify([telemetryBindingKey(binding),bindingEpochs[binding.id] || 0]);});return keys;}
@@ -449,11 +468,11 @@ function createTelemetry(page,options,hooks){
     error:function(error){clearPending();var next={state:error && error.state==='approval'?'approval':'error',busy:false,note:error && typeof error.message==='string'?error.message:String(error)};if(past)liveStatus=next;else setStatus(next);notify();}
   }):null;
   function stopDemo(){var cleanup=demoCleanup;demoCleanup=null;if(typeof cleanup==='function'){try{cleanup();}catch(ex){}}}
-  function cancelHistory(){historyGeneration++;historyRequests.forEach(function(request){request.abort.abort();});historyRequests=[];}
+  function cancelHistory(){if(past)past.pending={};historyGeneration++;historyRequests.forEach(function(request){request.abort.abort();});historyRequests=[];}
   function showHistory(){
     if(!past || !enabled)return;
     var day=past.days[past.index];
-    map=telemetryHistoryDay(past.map,day);
+    map=windowHistory?past.map:telemetryHistoryDay(past.map,day);
     if(day && !environment && telemetryObject(day.telemetry)){
       map=Object.create(null);Object.keys(day.telemetry).forEach(function(id){
         var sample=telemetrySample(day.telemetry[id]);if(!sample)return;
@@ -470,7 +489,70 @@ function createTelemetry(page,options,hooks){
     });
     setStatus({state:state,busy:!!historyRequests.length,note:notes.join('; ')});
   }
+  /* Built-ins request one selected observation window. Legacy custom adapters
+     retain their endpoint series, batching and slider-without-fetch contract. */
+  function selectedHistoryWindow(day){
+    if(!day || !telemetryTime(day.at))return null;
+    var now=new Date(),end=Date.parse(day.at),key=typeof day.key==='string'?day.key:'';
+    function localKey(date){return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');}
+    var today=localKey(now);
+    // Days end at next local midnight. An explicit key is authoritative;
+    // legacy keyless callers infer the represented local date from at - 1ms.
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(key))key=localKey(new Date(end-1));
+    if(key>today)return null;
+    if(key===today && end>now.getTime())end=now.getTime();
+    if(end>now.getTime())return null;
+    return {from:new Date(end-telemetryWindowMs(api.config().window)).toISOString(),to:new Date(end).toISOString(),mutable:key===today};
+  }
+  function selectedHistoryChanged(force){
+    if(!past || !enabled || !available || retired || !history || past.embedded)return;
+    var day=past.days[past.index],window=selectedHistoryWindow(day);
+    var bound=telemetryBindings(hooks.historyCarriers || hooks.carriers || function(){},environment,telemetryEnvironmentConfig(page,environment)).map(function(b){var signals={};telemetryMetricNames(b).forEach(function(n){signals[n]=b.signals[n];});return Object.assign({},b,{signals:signals});}).filter(function(b){return Object.keys(b.signals).length;});
+    var sourceKey=JSON.stringify([environment,api.config(),typeof options.historyKey==='function'?options.historyKey():options.historyKey || '',day && day.key,day && day.at]),keys=Object.create(null);
+    bound.forEach(function(binding){keys[binding.id]=JSON.stringify([sourceKey,binding,bindingEpochs[binding.id] || 0]);});
+    var identity=JSON.stringify(keys)+'|'+sourceKey;
+    if(!force && identity===past.selection)return;
+    var prior=past.map,loaded=past.windowLoaded || {},sameWindow=past.windowIdentity===sourceKey;
+    // Mounting a detail joins the existing anchored window, not a newer peer
+    // clock. Completed unchanged bindings remain visible and are not refetched.
+    if(sameWindow && past.window)window=Object.assign({},past.window,{mutable:window && window.mutable});
+    cancelHistory();past.selection=identity;past.windowIdentity=sourceKey;past.map={};past.pending={};past.outcomes={};past.windowLoaded={};past.window=window?{from:window.from,to:window.to}:null;
+    if(!window || !bound.length){showHistory();setStatus({state:'ok',busy:false,note:!window?'Future dates have no observed metrics.':''});notify();return;}
+    var needed=bound.filter(function(binding){
+      var id=binding.id,cached=windowCache[keys[id]];
+      if(!force && sameWindow && loaded[id]===keys[id] && prior[id]){past.map[id]=prior[id];past.windowLoaded[id]=keys[id];return false;}
+      if(!force && !window.mutable && cached && Date.now()-cached.at<LIVE_STATUS_HISTORY_CACHE_MS){if(cached.sample)past.map[id]=copy(cached.sample);past.windowLoaded[id]=keys[id];return false;}
+      return true;
+    });showHistory();
+    if(!needed.length){setStatus({state:'ok',busy:false,note:''});notify();return;}
+    var generation=historyGeneration,request={abort:new AbortController(),bound:needed,keys:keys},note='';historyRequests.push(request);
+    var range={from:day.at,to:day.at,endpoints:[{at:day.at,key:day.key}],window:past.window};
+    function current(){return !retired && enabled && available && past && generation===historyGeneration && !request.abort.signal.aborted;}
+    function known(id,name){return current() && bound.some(function(b){return b.id===id && telemetryOwn(b.signals,name);});}
+    var report={note:function(text){if(!current())return;note=typeof text==='string'?text:'';setStatus({note:note});notify();},
+      pending:function(id,name){if(!known(id,name))return;if(!past.pending[id])past.pending[id]={};past.pending[id][name]=true;notify();},
+      settled:function(id,name,reading){
+        if(!known(id,name))return;
+        if(past.pending[id]){delete past.pending[id][name];if(!Object.keys(past.pending[id]).length)delete past.pending[id];}
+        var carrier=past.map[id] || {signals:{},links:{},markers:[],observedAt:null,window:past.window};
+        var sample=reading && telemetrySample({signals:{[name]:reading}});
+        if(sample && sample.signals[name])carrier.signals[name]=sample.signals[name];else delete carrier.signals[name];
+        if(Object.keys(carrier.signals).length)past.map[id]=carrier;else delete past.map[id];showHistory();notify();
+      }};
+    if(!options.managesPending)needed.forEach(function(b){Object.keys(b.signals).forEach(function(n){if(!b.signals[n].error)report.pending(b.id,n);});});
+    setStatus({state:'loading',busy:true,note:''});notify();
+    Promise.resolve().then(function(){return history(needed,range,request.abort.signal,report,{environment:environment,config:api.config()});}).then(function(value){
+      if(!current())return;
+      // Merge settled progress with final metadata. A failing peer cannot erase
+      // another source's completed signal; callbacks already clear owned errors.
+      Object.keys(value || {}).forEach(function(id){var sample=telemetrySample(value[id]);if(!sample)return;sample.window=copy(past.window);var prior=past.map[id];if(prior)sample.signals=Object.assign({},prior.signals,sample.signals);past.map[id]=sample;});
+      if(!note)needed.forEach(function(binding){var id=binding.id;past.windowLoaded[id]=keys[id];if(!window.mutable)windowCache[keys[id]]={at:Date.now(),sample:past.map[id]?copy(past.map[id]):null};});
+      finish(null);
+    },finish);
+    function finish(error){if(!current())return;historyRequests=historyRequests.filter(function(r){return r!==request;});past.pending={};showHistory();setStatus({state:error?(error.state==='approval'?'approval':'error'):'ok',busy:false,note:error?error.message || 'Historical metrics did not answer':note});notify();}
+  }
   function historyBindingsChanged(){
+    if(windowHistory){selectedHistoryChanged(false);return;}
     if(!past || !enabled || !available || retired || !history || past.embedded)return;
     var bound=telemetryBindings(hooks.historyCarriers || hooks.carriers || function(){},environment,telemetryEnvironmentConfig(page,environment));
     var identity=JSON.stringify([environment,api.config(),typeof options.historyKey==='function'?options.historyKey():options.historyKey || '']);
@@ -504,12 +586,12 @@ function createTelemetry(page,options,hooks){
       showHistory();historyStatus();notify();
     }
   }
-  function loadHistory(){
+  function loadHistory(force){
     cancelHistory();if(!past || !enabled || !available || retired)return;
-    past.map={};past.keys=Object.create(null);past.loaded=Object.create(null);past.outcomes=Object.create(null);past.embedded=!environment && past.days.every(function(day){return telemetryObject(day.telemetry);});showHistory();
+    past.selection=null;past.windowIdentity=null;past.windowLoaded={};past.map={};past.keys=Object.create(null);past.loaded=Object.create(null);past.outcomes=Object.create(null);past.embedded=!environment && past.days.every(function(day){return telemetryObject(day.telemetry);});showHistory();
     if(past.embedded){setStatus({state:'ok',busy:false,note:''});notify();return;}
     if(!history || !past.days.some(function(day){return !!telemetryTime(day.at);})){setStatus({state:'ok',busy:false,note:'Historical metrics unavailable; missing samples are unobserved.'});notify();return;}
-    setStatus({state:'ok',busy:false,note:''});historyBindingsChanged();
+    setStatus({state:'ok',busy:false,note:''});if(windowHistory)selectedHistoryChanged(!!force);else historyBindingsChanged();
   }
 
   var api={
@@ -519,7 +601,7 @@ function createTelemetry(page,options,hooks){
       var profiles=trackingTelemetry(page).environments;
       if(retired || !permitted || !profiles || typeof id!=='string' || !telemetryOwn(profiles,id) || id===environment)return false;
       cancelHistory();if(poller)poller.stop();stopDemo();
-      clearPending();environment=id;environmentGeneration++;preload=false;historyCache.clear();
+      clearPending();environment=id;environmentGeneration++;preload=false;historyCache.clear();windowCache=Object.create(null);
       liveMap=map=Object.create(null);resetObservations();liveStatus=null;
       if(past){past.map={};past.keys={};past.loaded={};past.outcomes={};}
       if(typeof options.environmentChanged==='function')options.environmentChanged(id,api.config());
@@ -552,7 +634,7 @@ function createTelemetry(page,options,hooks){
       if(retired)return;cancelHistory();liveStatus=copy(status);past={days:days,index:index,map:{}};map=Object.create(null);
       if(poller)poller.pause();loadHistory();
     },
-    historyDay:function(index){if(retired || !past)return;past.index=index;showHistory();notify();},
+    historyDay:function(index){if(retired || !past)return;past.index=index;if(windowHistory)selectedHistoryChanged(false);else {showHistory();notify();}},
     closeHistory:function(){
       if(!past || retired)return;cancelHistory();past=null;map=enabled?liveMap:Object.create(null);
       if(enabled && heldObservation){heldObservation=false;observed();}
@@ -566,7 +648,7 @@ function createTelemetry(page,options,hooks){
       if(retiredIds.length){
         retiredIds.forEach(function(id){delete pending[id];bindingEpochs[id]=(bindingEpochs[id] || 0)+1;});
         if(typeof hooks.retire==='function')hooks.retire(retiredIds);
-        historyCache.clear();retiredIds.forEach(function(id){if(past && past.keys){delete past.keys[id];delete past.map[id];delete past.loaded[id];delete past.outcomes[id];}});
+        historyCache.clear();windowCache=Object.create(null);retiredIds.forEach(function(id){if(past && past.keys){delete past.keys[id];delete past.map[id];delete past.loaded[id];delete past.outcomes[id];}});
       }
       var keys=bindingKeys();Object.keys(liveMap).forEach(function(id){if(retiredIds.indexOf(id)>=0 || liveKeys[id]!==keys[id])delete liveMap[id];});
       Object.keys(pending).forEach(function(id){if(pendingKeys[id]!==keys[id])delete pending[id];});
@@ -579,20 +661,20 @@ function createTelemetry(page,options,hooks){
       sources.forEach(function(source){bindings().forEach(function(b){Object.keys(b.signals).forEach(function(name){if(b.signals[name].source===source && pending[b.id])delete pending[b.id][name];});});});
       Object.keys(pending).forEach(function(id){if(!Object.keys(pending[id]).length)delete pending[id];});
       function strip(target){Object.keys(target || {}).forEach(function(id){var sample=target[id],changed=false;(owned[id] || []).forEach(function(name){if(telemetryOwn(sample.signals,name)){delete sample.signals[name];changed=true;}});if(changed){sample.links={};sample.markers=[];sample.observedAt=null;}if(!Object.keys(sample.signals).length && !(sample.exemplars || []).length)delete target[id];});}
-      strip(liveMap);strip(map);if(past)strip(past.map);historyCache.clear();notify();
+      strip(liveMap);strip(map);if(past)strip(past.map);historyCache.clear();windowCache=Object.create(null);notify();
     },
     // Explicit consent retry keeps healthy peer data while renewing the session.
-    retry:function(){if(retired || !enabled || !available)return;if(past)loadHistory();else if(poller){poller.stop();poller.start();}},
+    retry:function(){if(retired || !enabled || !available)return;if(past)loadHistory(true);else if(poller){poller.stop();poller.start();}},
     apply:function(value){
       if(retired || !enabled && !preload || !permitted || !available && (provider || demo || options.available===false))return;store(value);
       if(enabled && !past)setStatus({state:'ok',refreshedAt:new Date().toISOString(),note:''});
       notify();
     },
-    clear:function(signal){if(retired)return;clearPending();if(!historyRequests.some(function(request){return request.abort.signal===signal;})){cancelHistory();setStatus({busy:false});}historyCache.clear();liveMap=map=Object.create(null);resetObservations();if(past)past.map={};notify();},
+    clear:function(signal){if(retired)return;clearPending();if(!historyRequests.some(function(request){return request.abort.signal===signal;})){cancelHistory();setStatus({busy:false});}historyCache.clear();windowCache=Object.create(null);liveMap=map=Object.create(null);resetObservations();if(past)past.map={};notify();},
     snapshot:function(){
       var input=telemetryProofInput(hooks.carriers || function(){},hooks.diagrams || function(){},typeof hooks.jira==='function'?hooks.jira():{},map,environment,telemetryEnvironmentConfig(page,environment));
-      return {environment:environment,environments:permitted?Object.keys(trackingTelemetry(page).environments || {}):[],available:available && !retired,enabled:enabled,map:copy(map),pending:enabled && !past?copy(pending):{},status:copy(status),carriers:copy(input.carriers),
-        historical:!!past,at:past && past.days[past.index]?past.days[past.index].at:null,verdicts:copy(proofVerdicts(input))};
+      return {environment:environment,environments:permitted?Object.keys(trackingTelemetry(page).environments || {}):[],available:available && !retired,enabled:enabled,map:copy(map),pending:enabled?copy(past?past.pending || {}:pending):{},status:copy(status),carriers:copy(input.carriers),
+        historical:!!past,window:past && past.window?copy(past.window):null,at:past && past.days[past.index]?past.days[past.index].at:null,verdicts:copy(proofVerdicts(input))};
     },
     verdicts:function(){return copy(verdicts());},
     status:function(){return copy(status);},
@@ -614,11 +696,11 @@ function createTelemetry(page,options,hooks){
     setAvailable:function(value,note){
       if(retired)return;value=!!value && permitted && !!(provider || demo);if(note!==undefined)availabilityNote=permitted?String(note || ''):'';
       if(value===available){if(note!==undefined && status.note!==availabilityNote){setStatus({note:availabilityNote});notify();}return;}
-      if(!value){api.setEnabled(false);historyCache.clear();liveMap=map=Object.create(null);resetObservations();}
+      if(!value){api.setEnabled(false);historyCache.clear();windowCache=Object.create(null);liveMap=map=Object.create(null);resetObservations();}
       available=value;setStatus({state:value?'idle':'absent',busy:false,refreshedAt:null,note:availabilityNote});notify();
     },
     onChange:function(fn){if(typeof fn!=='function' || retired)return function(){};listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
-    destroy:function(){if(retired)return;retired=true;clearPending();cancelHistory();historyCache.clear();past=null;enabled=false;liveMap=map=Object.create(null);resetObservations();setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];if(typeof hooks.changed==='function')hooks.changed();}
+    destroy:function(){if(retired)return;retired=true;clearPending();cancelHistory();historyCache.clear();windowCache=Object.create(null);past=null;enabled=false;liveMap=map=Object.create(null);resetObservations();setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];if(typeof hooks.changed==='function')hooks.changed();}
   };
   return api;
 }

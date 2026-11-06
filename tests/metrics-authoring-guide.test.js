@@ -64,20 +64,26 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
   assert.deepEqual(specProblems(example),[],'the complete documented page parses cleanly');
 
   const template={kind:'call',params:['route'],signals:{
-    rate:{grafana:'sum(rate(http_requests_total{route="$route"}[5m]))',unit:'req/h'},
+    rate:{grafana:'sum(rate(http_requests_total{route="$route"}[5m]))',unit:'req/h',scope:'route $route · ${service} · account ${iotAccount}'},
     errors:{loki:'sum(count_over_time({route="$route"} |= "error" [5m]))',unit:'req/h'}},
     proof:{rate:{min:1,max:1000},errors:{max:0.1,maxRatioOf:'rate'}},
     links:{dashboard:'https://grafana.example/d/api',query:'https://grafana.example/explore?route=$route'}};
-  const authoredRoot={enabled:false,environment:'qa',environments:{qa:{grafana:{prometheus:'prom-qa'}},prd:{}},grafana:{baseUrl:'https://grafana.example',prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'sql-main',cloudwatch:'cw-main',accountId:'123456789012'},
+  const authoredRoot={enabled:false,environment:'qa',variables:{service:'api',iotAccount:'111111111111'},environments:{qa:{grafana:{prometheus:'prom-qa'},variables:{iotAccount:'222222222222'}},prd:{}},grafana:{baseUrl:'https://grafana.example',prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'sql-main',cloudwatch:'cw-main',accountId:'123456789012'},
     honeycomb:{environment:'prod',dataset:'api-prod'},window:'7d',refreshMs:300000,templates:{'http-call':template}};
   const rootWarnings=[],parsed=C.trackingTelemetry({tracking:{telemetry:authoredRoot}},(at,message)=>rootWarnings.push(at+': '+message));
   assert.deepEqual(rootWarnings,[]);
   assert.equal(parsed.environment,'qa');assert.equal(parsed.environments.qa.grafana.prometheus,'prom-qa');assert.deepEqual(plain(parsed.environments.prd),{grafana:{},honeycomb:{}});
   assert.equal(parsed.enabled,false);assert.deepEqual(plain(parsed.grafana),authoredRoot.grafana);
+  assert.deepEqual(plain(parsed.variables),authoredRoot.variables);
+  assert.deepEqual(plain(parsed.environments.qa.variables),authoredRoot.environments.qa.variables);
+  const page={tracking:{telemetry:authoredRoot}},qa=C.telemetryEnvironmentConfig(page,'qa'),prd=C.telemetryEnvironmentConfig(page,'prd');
+  assert.deepEqual(plain(qa.variables),{service:'api',iotAccount:'222222222222'},'profile overrides one shared variable and inherits the other');
+  assert.deepEqual(plain(prd.variables),authoredRoot.variables,'profiles without overrides inherit shared variables');
   assert.deepEqual(plain(parsed.honeycomb),authoredRoot.honeycomb);assert.equal(parsed.window,'7d');assert.equal(parsed.refreshMs,300000);
   const parsedTemplate=parsed.templates['http-call'];
   assert.equal(parsedTemplate.kind,'call');assert.deepEqual(plain(parsedTemplate.params),['route']);
   assert.equal(parsedTemplate.signals.rate.unit,'req/h');assert.equal(parsedTemplate.proof.errors.maxRatioOf,'rate');
+  assert.equal(parsedTemplate.signals.rate.scope,template.signals.rate.scope);
   assert.equal(parsedTemplate.links.dashboard,template.links.dashboard);assert.equal(parsedTemplate.links.query,template.links.query);
 
   const variants=[
@@ -87,9 +93,10 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
     ['sql','SELECT count(*) FROM requests'],
     ['honeycomb',{calculations:[{op:'COUNT'}]}],
     ['cloudwatch',{namespace:'AWS/IoT',metric:'TopicMatch',region:'us-east-1',accountId:'$account',dimensions:{RuleName:'camera_message_camera_stats'},statistic:'Sum'}],
-  ],kinds=['call','queue','service','log-event','device','service'],sides=['right','left','above','below','right','left'];
+    ['cloudwatchLogs',{logGroups:['arn:aws:logs:us-east-1:${iotAccount}:log-group:AWSIotLogsV2'],query:'filter topicName = "$aws/rules/camera_message_power_state" | stats count() as n',region:'us-east-1',valueField:'n'}],
+  ],kinds=['call','queue','service','log-event','device','service','log-event'],sides=['right','left','above','below','right','left','above'];
   variants.forEach(([source,query],index)=>{
-    const rate={[source]:query,unit:'req/h'},warnings=[];
+    const rate={[source]:query,unit:'req/h',scope:'authored counting scope'},warnings=[];
     const raw={kind:kinds[index],signals:{rate,errors:{grafana:'sum(rate(errors_total[5m]))',unit:'req/h'}},
       proof:{rate:{min:0,max:1000},errors:{max:0.01,maxRatioOf:'rate'}},
       links:{dashboard:'https://grafana.example/d/api',query:'https://grafana.example/explore'},
@@ -97,6 +104,12 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
     const binding=C.carrierTelemetry({telemetry:raw},{},(at,message)=>warnings.push(at+': '+message));
     assert.deepEqual(warnings,[],source);assert.equal(binding.kind,kinds[index]);
     assert.equal(binding.signals.rate.source,source);assert.deepEqual(plain(binding.signals.rate.query),query);assert.equal(binding.signals.rate.unit,'req/h');
+    assert.equal(binding.signals.rate.scope,rate.scope);
+    if(source==='cloudwatchLogs'){
+      const effective=C.carrierTelemetry({telemetry:raw},{},undefined,qa);
+      assert.deepEqual(plain(effective.signals.rate.query),{...query,logGroups:['arn:aws:logs:us-east-1:222222222222:log-group:AWSIotLogsV2']});
+      assert.equal(query.logGroups[0],'arn:aws:logs:us-east-1:${iotAccount}:log-group:AWSIotLogsV2','resolving a structured query preserves authored input');
+    }
     assert.deepEqual(plain(binding.proof),raw.proof);assert.deepEqual(plain(binding.links),raw.links);assert.deepEqual(plain(binding.card),raw.card);
   });
 
@@ -106,8 +119,12 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
   assert.deepEqual(useWarnings,[]);assert.equal(used.kind,'call');assert.match(used.signals.rate.query,/v1-items/);
   assert.equal(used.proof.errors.maxRatioOf,'rate');assert.equal(used.links.query,'https://grafana.example/explore?route=v1-items');
   assert.deepEqual(plain(used.card),{side:'below',offset:7});
+  assert.equal(used.signals.rate.scope,'route v1-items · ${service} · account ${iotAccount}');
+  const resolvedUse=C.carrierTelemetry({telemetry:{use:'http-call',route:'v1-items'}},parsed.templates,undefined,qa);
+  assert.equal(resolvedUse.signals.rate.scope,'route v1-items · api · account 222222222222');
+  assert.deepEqual(authoredRoot.variables,{service:'api',iotAccount:'111111111111'},'profile resolution preserves authored defaults');
 
-  const exercised=new Set(['cloudwatch','accountId','baseUrl','environments','enabled','grafana','honeycomb','window','refreshMs','templates','prometheus','loki','tempo','sql','environment','dataset',
+  const exercised=new Set(['cloudwatch','cloudwatchLogs','scope','variables','accountId','baseUrl','environments','enabled','grafana','honeycomb','window','refreshMs','templates','prometheus','loki','tempo','sql','environment','dataset',
     'kind','signals','proof','links','card','use','unit','min','max','maxRatioOf','dashboard','query','side','offset','params']);
   assert.deepEqual([...documentedFields(chapter)].sort(),[...exercised].sort(),'every field named in the chapter table has a parser-backed fixture');
 

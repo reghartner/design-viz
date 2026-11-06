@@ -6,7 +6,7 @@
    step. Imported carriers write the consumer overlay through
    planTopologyTracking('telemetry'), the same path as existsWhen. The
    Workbench never runs a query: nothing here contacts a connector. */
-var TELEMETRY_SOURCE_LABELS={grafana:'Grafana (PromQL)',loki:'Loki (LogQL)',tempo:'Tempo (TraceQL)',sql:'SQL',honeycomb:'Honeycomb',cloudwatch:'CloudWatch (Sum)'};
+var TELEMETRY_SOURCE_LABELS={grafana:'Grafana (PromQL)',loki:'Loki (LogQL)',tempo:'Tempo (TraceQL)',sql:'SQL',honeycomb:'Honeycomb',cloudwatch:'CloudWatch (metric)',cloudwatchLogs:'CloudWatch Logs (Insights)'};
 var TELEMETRY_DATASOURCES={grafana:['prometheus','loki','tempo','sql','cloudwatch','accountId','baseUrl'],honeycomb:['environment','dataset']};
 function telemetrySignalSource(entry){
   return telemetryObject(entry)?TELEMETRY_SOURCES.filter(function(key){return telemetryOwn(entry,key);})[0] || null:null;
@@ -18,9 +18,10 @@ function telemetryQueryText(source,query){
 }
 function telemetryQueryValue(source,text){
   if(typeof text!=='string' || !text.trim())return {error:'A signal needs a query.'};
-  if(source!=='honeycomb' && source!=='cloudwatch')return {value:text.trim()};
+  if(source!=='honeycomb' && source!=='cloudwatch' && source!=='cloudwatchLogs')return {value:text.trim()};
   var parsed=null;try{parsed=JSON.parse(text);}catch(ex){}
-  if(source==='cloudwatch')return telemetryCloudwatchQuery(parsed)?{value:parsed}:{error:'A CloudWatch query is a JSON object with namespace, metric, region, accountId, dimensions and statistic: Sum.'};
+  if(source==='cloudwatchLogs')return telemetryCloudwatchLogsQuery(parsed)?{value:parsed}:{error:'A CloudWatch Logs query is a JSON object with logGroups, query, region and optional valueField.'};
+  if(source==='cloudwatch')return telemetryCloudwatchQuery(parsed)?{value:parsed}:{error:'A CloudWatch query is a JSON object with namespace, metric, region, accountId, dimensions and statistic: Sum, Maximum, Minimum, Average or SampleCount.'};
   if(!telemetryObject(parsed) || !Object.keys(parsed).length)return {error:'A Honeycomb query is a JSON object such as {"calculations":[{"op":"COUNT"}]}.'};
   return {value:parsed};
 }
@@ -85,7 +86,7 @@ function telemetryEditBinding(binding,edit,options){
     var created=!b;if(created)b={kind:TELEMETRY_KINDS.indexOf(edit.kind)>=0?edit.kind:'call',signals:{}};
     if(!telemetryObject(b.signals))b.signals={};
     var named=telemetrySignalName(edit.name,b.signals,null);if(named.error)return named;
-    if(TELEMETRY_SOURCES.indexOf(edit.source)<0)return {error:'Choose a source: Grafana, Loki, Tempo, SQL or Honeycomb.'};
+    if(TELEMETRY_SOURCES.indexOf(edit.source)<0)return {error:'Choose a source: Grafana, Loki, Tempo, SQL, Honeycomb, CloudWatch or CloudWatch Logs.'};
     var query=telemetryQueryValue(edit.source,edit.query);if(query.error)return query;
     var signal={};signal[edit.source]=query.value;
     if(telemetryText(edit.unit))signal.unit=edit.unit.trim();
@@ -132,7 +133,7 @@ function telemetryEditBinding(binding,edit,options){
       return {value:b};
     }
     if(edit.field==='source'){
-      if(TELEMETRY_SOURCES.indexOf(edit.value)<0)return {error:'Choose a source: Grafana, Loki, Tempo, SQL or Honeycomb.'};
+      if(TELEMETRY_SOURCES.indexOf(edit.value)<0)return {error:'Choose a source: Grafana, Loki, Tempo, SQL, Honeycomb, CloudWatch or CloudWatch Logs.'};
       if(edit.value===source)return {value:b};
       var moved=telemetryQueryValue(edit.value,telemetryQueryText(source,source?entry[source]:null));
       if(moved.error)return {error:edit.value==='honeycomb'?'A Honeycomb query is a JSON object such as {"calculations":[{"op":"COUNT"}]}. Enter it as the query first, then choose Honeycomb.':moved.error};
@@ -142,12 +143,13 @@ function telemetryEditBinding(binding,edit,options){
       if(edit.value==null)return {error:'A signal needs a query; use Remove signal to delete it.'};
       var value=telemetryQueryValue(source,edit.value);if(value.error)return value;
       next[source]=value.value;
-    }else if(edit.field==='unit'){
+    }else if(edit.field==='unit' || edit.field==='scope'){
       if(source)next[source]=entry[source];
       if(edit.value!=null && !telemetryText(edit.value))return {error:'A unit is non-empty text.'};
     }else return {error:'Unknown signal field.'};
     var unit=edit.field==='unit'?(edit.value==null?null:edit.value.trim()):(telemetryText(entry.unit)?entry.unit:null);
     if(unit)next.unit=unit;
+    var scope=edit.field==='scope'?edit.value:entry.scope;if(telemetryText(scope))next.scope=scope.trim();
     signals[name]=next;b.signals=signals;
     return {value:b};
   }
@@ -245,13 +247,20 @@ function telemetryEditPage(telemetry,edit){
       if(op==='removeEnvironment'){
         delete profiles[id];if(t.environment===id)t.environment=Object.keys(profiles)[0];
       }else{
-        if(['grafana','honeycomb'].indexOf(edit.source)<0)return {error:'Unknown environment datasource.'};
+        if(['grafana','honeycomb','variables'].indexOf(edit.source)<0)return {error:'Unknown environment datasource.'};
         var changed=telemetryEditPage(profiles[id],{op:edit.source,key:edit.key,value:edit.value});if(changed.error)return changed;
         profiles[id]=changed.value || {};
       }
     }
     if(Object.keys(profiles).length)t.environments=profiles;else {delete t.environments;delete t.environment;}
     return done();
+  }
+  if(op==='variables'){
+    if(edit.value==null || edit.value===''){delete t.variables;return done();}
+    var variables;try{variables=typeof edit.value==='string'?JSON.parse(edit.value):edit.value;}catch(e){return {error:'Variables must be a JSON object of named strings.'};}
+    var errors=[];trackingTelemetry({tracking:{telemetry:{variables:variables}}},function(at,message){errors.push(message);});
+    if(errors.length)return {error:errors[0]};
+    t.variables=telemetryClone(variables);return done();
   }
   if(op==='grafana' || op==='honeycomb'){
     if(TELEMETRY_DATASOURCES[op].indexOf(edit.key)<0)return {error:'Unknown '+op+' setting.'};

@@ -35,6 +35,7 @@ function flowMetricsDom(o){
       row(box,prefix+name+' source',relabel(c.select(TELEMETRY_SOURCES,source || '',function(v){return commit({op:'signal',name:name,field:'source',value:v});}),TELEMETRY_SOURCE_LABELS));
       row(box,prefix+name+' query',c.text(source?telemetryQueryText(source,entry[source]):'',function(v){return commit({op:'signal',name:name,field:'query',value:v});},{textarea:true,placeholder:source==='honeycomb'?'{"calculations":[{"op":"COUNT"}],"filters":[]}':'Query text'}));
       row(box,prefix+name+' unit',c.text(telemetryObject(entry)?entry.unit:null,function(v){return commit({op:'signal',name:name,field:'unit',value:v});},{placeholder:'req/h, msgs, ms'}));
+      row(box,prefix+name+' scope',c.text(telemetryObject(entry)?entry.scope:null,function(v){return commit({op:'signal',name:name,field:'scope',value:v});},{placeholder:'Exact counting scope (optional)'}));
       proofEditors(box,binding.proof,names,name,prefix,commit);
       box.appendChild(c.action(prefix?'Remove '+prefix+'signal '+name:'Remove signal '+name,function(){return commit({op:'removeSignal',name:name});}));
     });
@@ -129,9 +130,10 @@ function createFlowMetricsSettings(o){
     var group=telemetryObject(t[field[0]])?t[field[0]]:{};
     d.row(box,field[2],c.text(group[field[1]],function(v){return commit({op:field[0],key:field[1],value:v});},{placeholder:field[3]}));
   });
+  d.row(box,'Shared metrics variables',c.text(t.variables?JSON.stringify(t.variables):null,function(v){return commit({op:'variables',value:v});},{textarea:true,placeholder:'{"iotAccount":"123456789012"}'}));
   var profiles=telemetryObject(t.environments)?t.environments:{},environmentIds=Object.keys(profiles);
   var environments=d.group(box,'metrics-environments','Environments');
-  d.note(environments,'Optional deployment profiles, such as qa, stg and prd. Blank values inherit shared settings. Readers can switch environments in Live status. Use $env or ${env} in queries, links and datasource values.');
+  d.note(environments,'Optional deployment profiles, such as qa, stg and prd. Blank values inherit shared settings. Readers can switch environments in Live status. Use $env or ${env} in queries, links and datasource values. Use ${name} for named variables in any signal string; profile variables override shared defaults.');
   if(environmentIds.length)d.row(environments,'Default environment',c.select(environmentIds,t.environment || environmentIds[0],function(v){return commit({op:'environment',value:v});}));
   environmentIds.forEach(function(id){
     var profile=telemetryObject(profiles[id])?profiles[id]:{},set=d.group(environments,'metrics-environment','Environment '+id);
@@ -139,6 +141,7 @@ function createFlowMetricsSettings(o){
       var group=telemetryObject(profile[field[0]])?profile[field[0]]:{};
       d.row(set,id+' '+field[2],c.text(group[field[1]],function(v){return commit({op:'environmentSetting',name:id,source:field[0],key:field[1],value:v});},{placeholder:'Inherit shared setting'}));
     });
+    d.row(set,id+' metrics variables',c.text(profile.variables?JSON.stringify(profile.variables):null,function(v){return commit({op:'environmentSetting',name:id,source:'variables',value:v});},{textarea:true,placeholder:'Named string values; inherit shared defaults'}));
     set.appendChild(c.action('Remove environment '+id,function(){return commit({op:'removeEnvironment',name:id});}));
   });
   var environmentName=d.draft(environments,'New environment id','text',null,'');environmentName.placeholder='qa, stg or prd';

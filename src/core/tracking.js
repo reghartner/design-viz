@@ -160,7 +160,7 @@ function trackingExistsWhen(value){
    Templates keep their authored form so `use` can expand them by pure string
    substitution of the declared $param / ${param} placeholders. */
 var TELEMETRY_KINDS=['call','queue','service','log-event','device'];
-var TELEMETRY_SOURCES=['grafana','loki','tempo','sql','honeycomb','cloudwatch'];
+var TELEMETRY_SOURCES=['grafana','loki','tempo','sql','honeycomb','cloudwatch','cloudwatchLogs'];
 var TELEMETRY_CARD_SIDES=['right','left','above','below'];
 var TELEMETRY_LINKS=['dashboard','query'];
 var TELEMETRY_BINDING_FIELDS=['kind','signals','proof','links','card'];
@@ -184,10 +184,13 @@ function telemetryWarn(invalid){return function(path,message){if(invalid)invalid
 function telemetryUnknown(value,allowed,warn,prefix){
   Object.keys(value).forEach(function(key){if(allowed.indexOf(key)<0)warn((prefix || '')+'.'+key,'unknown field — ignored');});
 }
-/* CloudWatch currently supports window totals only. Preserve dimension case. */
+/* CloudWatch supports one full-window scalar. Preserve dimension case. */
 function telemetryCloudwatchQuery(query){
   return telemetryObject(query) && ['namespace','metric','region','accountId'].every(function(key){return telemetryText(query[key]);}) &&
-    query.statistic==='Sum' && telemetryObject(query.dimensions) && Object.keys(query.dimensions).every(function(key){return telemetryText(key) && telemetryText(query.dimensions[key]);});
+    (['Sum','Maximum','Minimum','Average','SampleCount'].indexOf(query.statistic)>=0 || typeof query.statistic==='string' && /^\$(?:[A-Za-z][A-Za-z0-9_]*|\{[A-Za-z][A-Za-z0-9_]*\})$/.test(query.statistic)) && telemetryObject(query.dimensions) && Object.keys(query.dimensions).every(function(key){return telemetryText(key) && telemetryText(query.dimensions[key]);});
+}
+function telemetryCloudwatchLogsQuery(query){
+  return telemetryObject(query) && Array.isArray(query.logGroups) && query.logGroups.length>0 && query.logGroups.every(telemetryText) && telemetryText(query.query) && telemetryText(query.region) && (!telemetryOwn(query,'valueField') || telemetryText(query.valueField));
 }
 /* One signal entry: exactly one source key plus an optional unit. Returns the
    cleaned authored entry ({<source>: query, unit?}) or null. */
@@ -199,8 +202,11 @@ function telemetrySignal(name,value,warn){
   if(sources.length!==1){warn(at,'use exactly one of '+TELEMETRY_SOURCES.join(', ')+' — signal ignored');return null;}
   var source=sources[0],query=value[source];
   if(source==='cloudwatch'){
-    if(!telemetryCloudwatchQuery(query)){warn(at,'cloudwatch requires namespace, metric, region, accountId, string dimensions and statistic: Sum — signal ignored');return null;}
+    if(!telemetryCloudwatchQuery(query)){warn(at,'cloudwatch requires namespace, metric, region, accountId, string dimensions and statistic: Sum, Maximum, Minimum, Average or SampleCount — signal ignored');return null;}
     telemetryUnknown(query,['namespace','metric','region','accountId','dimensions','statistic'],warn,at+'.cloudwatch');
+  }else if(source==='cloudwatchLogs'){
+    if(!telemetryCloudwatchLogsQuery(query)){warn(at,'cloudwatchLogs requires logGroups, query, region and optional valueField — signal ignored');return null;}
+    telemetryUnknown(query,['logGroups','query','region','valueField'],warn,at+'.cloudwatchLogs');
   }else if(source==='honeycomb'){
     if(!telemetryObject(query) || !Object.keys(query).length){warn(at,'honeycomb must be a non-empty query object — signal ignored');return null;}
   }else if(!telemetryText(query)){warn(at,source+' must be a non-empty query string — signal ignored');return null;}
@@ -209,7 +215,8 @@ function telemetrySignal(name,value,warn){
     if(telemetryText(value.unit))out.unit=value.unit;
     else warn(at+'.unit','must be non-empty text — unit ignored');
   }
-  telemetryUnknown(value,[source,'unit'],warn,at);
+  if(telemetryOwn(value,'scope')){if(telemetryText(value.scope))out.scope=value.scope;else warn(at+'.scope','must be non-empty text — ignored');}
+  telemetryUnknown(value,[source,'unit','scope'],warn,at);
   return out;
 }
 /* One proof entry for a known signal. Returns the cleaned entry or null. */
@@ -292,12 +299,12 @@ function telemetryClean(raw,warn,template){
 /* Single pass over every string of a template: declared $name and ${name}
    placeholders are replaced literally; anything else (Grafana's $__interval,
    undeclared names) stays as authored. */
-function telemetrySubstitute(value,values){
+function telemetrySubstitute(value,values,missing){
   if(typeof value==='string')return value.replace(/\$\{([A-Za-z][A-Za-z0-9_]*)\}|\$([A-Za-z][A-Za-z0-9_]*)/g,function(match,braced,bare){
-    var name=braced || bare;return Object.prototype.hasOwnProperty.call(values,name)?values[name]:match;
+    var name=braced || bare;if(telemetryOwn(values,name))return values[name];if(missing && (braced || name==='env' || name==='account'))missing(name);return match;
   });
-  if(Array.isArray(value))return value.map(function(item){return telemetrySubstitute(item,values);});
-  if(telemetryObject(value)){var out={};Object.keys(value).forEach(function(key){out[key]=telemetrySubstitute(value[key],values);});return out;}
+  if(Array.isArray(value))return value.map(function(item){return telemetrySubstitute(item,values,missing);});
+  if(telemetryObject(value)){var out={};Object.keys(value).forEach(function(key){Object.defineProperty(out,key,{value:telemetrySubstitute(value[key],values,missing),enumerable:true,writable:true,configurable:true});});return out;}
   return value;
 }
 /* Authored form of a carrier binding with `use` expanded against templates:
@@ -305,10 +312,10 @@ function telemetrySubstitute(value,values){
    card replacing, and its signals, proof and links laid over per name.
    Returns raw itself (cloned) when there is no `use`, or null when the
    template cannot be applied. */
-function telemetryExpand(raw,templates,invalid){
+function telemetryExpand(raw,templates,invalid,runtime){
   var warn=telemetryWarn(invalid);
   if(!telemetryObject(raw))return null;
-  if(!telemetryOwn(raw,'use'))return telemetryClone(raw);
+  if(!telemetryOwn(raw,'use'))return runtime?runtime.resolve(raw,runtime.values):telemetryClone(raw);
   var name=raw.use,template=typeof name==='string' && telemetryObject(templates) && telemetryOwn(templates,name)?templates[name]:null;
   if(!telemetryObject(template)){warn('.use','names no template in tracking.telemetry.templates — binding ignored');return null;}
   var params=(Array.isArray(template.params)?template.params:[]).filter(function(p){return typeof p==='string' && telemetryParamPattern.test(p);});
@@ -323,13 +330,13 @@ function telemetryExpand(raw,templates,invalid){
   });
   if(missing)return null;
   var base={};Object.keys(template).forEach(function(key){if(key!=='params' && key!=='card')base[key]=telemetryClone(template[key]);});
-  var out=telemetrySubstitute(base,values);
-  ['kind','card'].forEach(function(key){if(telemetryOwn(raw,key))out[key]=telemetryClone(raw[key]);});
+  var out=runtime?runtime.resolve(base,Object.assign(Object.create(null),runtime.values,values)):telemetrySubstitute(base,values);
+  ['kind','card'].forEach(function(key){if(telemetryOwn(raw,key))out[key]=runtime?telemetrySubstitute(raw[key],runtime.values):telemetryClone(raw[key]);});
   ['signals','proof','links'].forEach(function(key){
     if(!telemetryOwn(raw,key))return;
     if(!telemetryObject(raw[key])){warn('.'+key,'must be an object — carrier '+key+' ignored');return;}
     var merged=telemetryObject(out[key])?out[key]:{};
-    Object.keys(raw[key]).forEach(function(entry){merged[entry]=telemetryClone(raw[key][entry]);});
+    Object.keys(raw[key]).forEach(function(entry){merged[entry]=runtime?runtime.resolveField(key,entry,raw[key][entry]):telemetryClone(raw[key][entry]);});
     out[key]=merged;
   });
   return out;
@@ -340,15 +347,32 @@ function carrierTelemetry(obj,templates,invalid,environment){
   if(telemetryTextBox(obj)){warn('','text boxes do not carry telemetry — ignored');return null;}
   var raw=obj.telemetry;
   if(!telemetryObject(raw)){warn('','must be an object {kind, signals, proof?, links?, card?} or {use, ...params} — ignored');return null;}
-  var expanded=telemetryExpand(raw,templates,warn);
+  var config=telemetryObject(environment)?environment:environment?{environment:environment}:null,errors=Object.create(null),runtime=null;
+  if(config){
+    var values=Object.assign(Object.create(null),config.variables || {});
+    if(config.environment)values.env=config.environment;
+    if(config.grafana && config.grafana.accountId)values.account=config.grafana.accountId;
+    function field(key,name,value,vars){
+      if(key==='signals')delete errors[name];
+      return telemetrySubstitute(value,vars,function(missing){if(key==='signals')errors[name]='Set telemetry variable ${'+missing+'} in the active environment'+(missing==='account'?' or tracking.telemetry.grafana.accountId':'')+'.';});
+    }
+    runtime={values:values,resolveField:function(key,name,value){return field(key,name,value,values);},resolve:function(value,vars){
+      var out=telemetryClone(value);Object.keys(out).forEach(function(key){
+        if(key==='signals' && telemetryObject(out[key]))Object.keys(out[key]).forEach(function(name){out[key][name]=field(key,name,out[key][name],vars);});
+        else out[key]=telemetrySubstitute(out[key],vars);
+      });return out;
+    }};
+  }
+  var expanded=telemetryExpand(raw,templates,warn,runtime);
   if(!expanded)return null;
-  if(environment)expanded=telemetrySubstitute(expanded,{env:environment});
   var clean=telemetryClean(expanded,warn,false);
   if(!clean)return null;
   var signals={};
   Object.keys(clean.signals).forEach(function(name){
     var entry=clean.signals[name],source=TELEMETRY_SOURCES.filter(function(key){return telemetryOwn(entry,key);})[0];
     signals[name]={source:source,query:entry[source],unit:telemetryOwn(entry,'unit')?entry.unit:null};
+    if(entry.scope)signals[name].scope=entry.scope;
+    if(errors[name])signals[name].error=errors[name];
   });
   return {kind:clean.kind,signals:signals,proof:clean.proof || {},links:clean.links || {},card:clean.card || null};
 }
@@ -360,7 +384,7 @@ function trackingTelemetry(page,invalid){
   var value=tracking.telemetry;
   if(!telemetryObject(value)){warn('','must be an object {enabled?, grafana?, honeycomb?, window?, refreshMs?, templates?} — ignored');return out;}
   if(telemetryOwn(value,'enabled')){if(typeof value.enabled==='boolean')out.enabled=value.enabled;else warn('.enabled','must be a boolean — using true');}
-  telemetryUnknown(value,['enabled','grafana','honeycomb','window','refreshMs','templates','environment','environments'],warn);
+  telemetryUnknown(value,['enabled','grafana','honeycomb','window','refreshMs','templates','environment','environments','variables'],warn);
   [['grafana',['prometheus','loki','tempo','sql','cloudwatch','accountId','baseUrl'],'datasource UID'],['honeycomb',['environment','dataset'],'name']].forEach(function(group){
     var key=group[0],given=value[key];
     if(!telemetryOwn(value,key))return;
@@ -372,6 +396,13 @@ function trackingTelemetry(page,invalid){
       else out[key][field]=given[field];
     });
   });
+  if(telemetryOwn(value,'variables')){
+    if(!telemetryObject(value.variables))warn('.variables','must be an object of named strings — ignored');
+    else{out.variables={};Object.keys(value.variables).forEach(function(name){
+      if(!telemetryParamPattern.test(name) || ['env','account','constructor','prototype','__proto__'].indexOf(name)>=0 || !telemetryText(value.variables[name]))warn('.variables.'+name,'use a non-reserved name and non-empty string — ignored');
+      else out.variables[name]=value.variables[name];
+    });}
+  }
   if(telemetryOwn(value,'environments')){
     if(!telemetryObject(value.environments))warn('.environments','must be an object of named environment profiles — ignored');
     else{
@@ -379,10 +410,10 @@ function trackingTelemetry(page,invalid){
       Object.keys(value.environments).forEach(function(id){
         var at='.environments.'+id,profile=value.environments[id];
         if(!telemetryNamePattern.test(id)){warn(at,'environment ids start with a letter and use letters, digits, - and _ — ignored');return;}
-        if(!telemetryObject(profile)){warn(at,'must be an object {grafana?, honeycomb?} — ignored');return;}
-        telemetryUnknown(profile,['grafana','honeycomb'],warn,at);
-        var clean=trackingTelemetry({tracking:{telemetry:{grafana:telemetryOwn(profile,'grafana')?profile.grafana:{},honeycomb:telemetryOwn(profile,'honeycomb')?profile.honeycomb:{}}}},function(path,message){warn(at+path,message);});
-        Object.defineProperty(profiles,id,{value:{grafana:clean.grafana,honeycomb:clean.honeycomb},enumerable:true,writable:true,configurable:true});
+        if(!telemetryObject(profile)){warn(at,'must be an object {grafana?, honeycomb?, variables?} — ignored');return;}
+        telemetryUnknown(profile,['grafana','honeycomb','variables'],warn,at);
+        var clean=trackingTelemetry({tracking:{telemetry:{grafana:telemetryOwn(profile,'grafana')?profile.grafana:{},honeycomb:telemetryOwn(profile,'honeycomb')?profile.honeycomb:{},...(telemetryOwn(profile,'variables')?{variables:profile.variables}:{})}}},function(path,message){warn(at+path,message);});
+        Object.defineProperty(profiles,id,{value:Object.assign({grafana:clean.grafana,honeycomb:clean.honeycomb},clean.variables?{variables:clean.variables}:{}),enumerable:true,writable:true,configurable:true});
       });
       if(Object.keys(profiles).length){out.environments=profiles;out.environment=Object.keys(profiles)[0];}
     }
@@ -429,12 +460,28 @@ function trackingTelemetry(page,invalid){
    deployment id is distinct from the Honeycomb environment slug. */
 function telemetryEnvironmentConfig(page,environment){
   var config=trackingTelemetry(page),profiles=config.environments;
-  if(!profiles)return config;
+  if(!profiles){if(typeof environment==='string')config.environment=environment;return config;}
   var id=typeof environment==='string' && telemetryOwn(profiles,environment)?environment:config.environment;
   config.environment=id;
+  if(config.variables || profiles[id].variables)config.variables=Object.assign({},config.variables,profiles[id].variables);
   ['grafana','honeycomb'].forEach(function(key){config[key]=telemetrySubstitute(Object.assign({},config[key],profiles[id][key]),{env:id});});
   return config;
 }
 function telemetryProviderConfig(page,ctl){
   return ctl && ctl.telemetry && typeof ctl.telemetry.config==='function'?ctl.telemetry.config():telemetryEnvironmentConfig(page);
+}
+
+/* Scope is evidence metadata, never inferred from an edge title or arbitrary query text. */
+function telemetrySignalScope(signal){
+  if(!signal)return '';
+  if(signal.scope)return signal.scope;
+  if(signal.source!=='cloudwatch')return '';
+  var q=signal.query,d=q.dimensions || {},scope='';
+  if(d.QueueName)scope='queue only: '+d.QueueName;
+  else if(q.namespace==='AWS/IoT' && d.RuleName)scope='this rule only: '+d.RuleName;
+  else if(q.namespace==='AWS/IoT' && Object.keys(d).every(function(k){return ['Protocol','AccountId'].indexOf(k)>=0;})){
+    if(q.metric==='PublishIn.AuthError')scope='all topics / whole account';
+    if(q.metric==='Connect.AuthError')scope='all connections / whole account';
+  }
+  return scope?scope+' · account '+q.accountId+(d.Protocol?' · '+d.Protocol:''):'';
 }

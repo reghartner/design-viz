@@ -99,11 +99,11 @@ function telemetryTemplates(){
 }
 /* The binding list handed to the provider. eachCarrier(fn) walks every carrier
    as fn(value, id, sourcePage); the Jira overlay's refs() shares that walk. */
-function telemetryBindings(eachCarrier,environment){
+function telemetryBindings(eachCarrier,environment,config){
   var out=[],seen=Object.create(null),templatesOf=telemetryTemplates();
   eachCarrier(function(value,id,source){
     if(typeof id!=='string' || !id || seen[id])return;
-    var binding=carrierTelemetry(value,templatesOf(source),null,environment);if(!binding)return;
+    var binding=carrierTelemetry(value,templatesOf(source),null,config || telemetryEnvironmentConfig(source,environment));if(!binding)return;
     seen[id]=true;
     out.push({id:id,kind:binding.kind,signals:binding.signals,proof:binding.proof,links:binding.links,card:binding.card});
   });
@@ -114,11 +114,11 @@ function telemetryBindings(eachCarrier,environment){
    binding; a repeated id keeps its first bound occurrence, else its first. Steps
    are the authored step ids over their directly selected carriers.
    eachDiagram(fn) walks every diagram as fn(diagram, sourcePage). */
-function telemetryProofInput(eachCarrier,eachDiagram,jiraMap,telemetryMap,environment){
+function telemetryProofInput(eachCarrier,eachDiagram,jiraMap,telemetryMap,environment,config){
   var carriers=[],index=Object.create(null),templatesOf=telemetryTemplates(),steps=[],seen=Object.create(null);
   eachCarrier(function(value,id,source){
     if(typeof id!=='string' || !id || !telemetryObject(value) || isTextBoxNode(value))return;
-    var binding=carrierTelemetry(value,templatesOf(source),null,environment);
+    var binding=carrierTelemetry(value,templatesOf(source),null,config || telemetryEnvironmentConfig(source,environment));
     var entry={id:id,title:value.title || value.label || id,tickets:trackingRefs(value).tickets,kind:binding?binding.kind:null,signals:binding?binding.signals:{},proof:binding?binding.proof:{},links:binding?binding.links:{}};
     if(!(id in index)){index[id]=carriers.length;carriers.push(entry);}
     else if(binding && !Object.keys(carriers[index[id]].signals).length)carriers[index[id]]=entry;
@@ -161,13 +161,14 @@ function telemetryReading(sample,name){
   var series=(Array.isArray(entry.series)?entry.series:[]).filter(function(point){return Array.isArray(point) && telemetryNumber(point[1]);});
   return {value:telemetryNumber(entry.value)?entry.value:series.length?series[series.length-1][1]:null,series:series};
 }
-function telemetryPrimary(binding){
+function telemetryPrimary(binding,display){
   var names=Object.keys(binding.signals),proof=binding.proof || {};
   function numerator(name){return telemetryObject(proof[name]) && typeof proof[name].maxRatioOf==='string';}
   var candidates=names.filter(function(name){return !numerator(name);});
   return candidates.filter(function(name){return names.some(function(other){return numerator(other) && proof[other].maxRatioOf===name;});})[0] ||
     candidates.filter(function(name){return telemetryObject(proof[name]) && telemetryNumber(proof[name].min);})[0] ||
-    candidates.filter(function(name){return TELEMETRY_RATE_UNIT.test(binding.signals[name].unit || '');})[0] || null;
+    candidates.filter(function(name){return TELEMETRY_RATE_UNIT.test(binding.signals[name].unit || '');})[0] ||
+    (display?candidates.find(function(name){return ['cloudwatch','cloudwatchLogs'].indexOf(binding.signals[name].source)>=0;}):null) || null;
 }
 function telemetryErrorSignal(binding,primary){
   var proof=binding.proof || {};
@@ -375,7 +376,7 @@ function createTelemetry(page,options,hooks){
   // Host preload is allowed before the first Metrics decision, never after an explicit off.
   var preload=true,liveKeys=Object.create(null),bindingEpochs=Object.create(null),heldObservation=false;
   function copy(value){return JSON.parse(JSON.stringify(value));}
-  function bindings(){return typeof hooks.carriers==='function'?telemetryBindings(hooks.carriers,environment):[];}
+  function bindings(){return typeof hooks.carriers==='function'?telemetryBindings(hooks.carriers,environment,telemetryEnvironmentConfig(page,environment)):[];}
   function emit(){if(retired || !listeners.length)return;var value=api.snapshot();listeners.slice().forEach(function(fn){fn(value);});}
   function notify(){
     if(retired)return;emit();
@@ -383,7 +384,7 @@ function createTelemetry(page,options,hooks){
   }
   function verdicts(){
     return proofVerdicts(telemetryProofInput(typeof hooks.carriers==='function'?hooks.carriers:function(){},typeof hooks.diagrams==='function'?hooks.diagrams:function(){},
-      typeof hooks.jira==='function'?hooks.jira():{},map,environment));
+      typeof hooks.jira==='function'?hooks.jira():{},map,environment,telemetryEnvironmentConfig(page,environment)));
   }
   hooks.view=function(){return enabled && !retired?{map:map,verdicts:verdicts()}:null;};
   hooks.jiraChanged=emit;
@@ -433,7 +434,7 @@ function createTelemetry(page,options,hooks){
   }
   function historyBindingsChanged(){
     if(!past || !enabled || !available || retired || !history || past.embedded)return;
-    var bound=telemetryBindings(hooks.historyCarriers || hooks.carriers || function(){},environment);
+    var bound=telemetryBindings(hooks.historyCarriers || hooks.carriers || function(){},environment,telemetryEnvironmentConfig(page,environment));
     var identity=JSON.stringify([environment,api.config(),typeof options.historyKey==='function'?options.historyKey():options.historyKey || '']);
     var keys=Object.create(null);bound.forEach(function(binding){keys[binding.id]=JSON.stringify([identity,binding]);});
     if(JSON.stringify(keys)===JSON.stringify(past.keys))return;
@@ -548,7 +549,7 @@ function createTelemetry(page,options,hooks){
     },
     clear:function(signal){if(retired)return;if(!historyRequests.some(function(request){return request.abort.signal===signal;})){cancelHistory();setStatus({busy:false});}historyCache.clear();liveMap=map=Object.create(null);resetObservations();if(past)past.map={};notify();},
     snapshot:function(){
-      var input=telemetryProofInput(hooks.carriers || function(){},hooks.diagrams || function(){},typeof hooks.jira==='function'?hooks.jira():{},map,environment);
+      var input=telemetryProofInput(hooks.carriers || function(){},hooks.diagrams || function(){},typeof hooks.jira==='function'?hooks.jira():{},map,environment,telemetryEnvironmentConfig(page,environment));
       return {environment:environment,environments:permitted?Object.keys(trackingTelemetry(page).environments || {}):[],available:available && !retired,enabled:enabled,map:copy(map),status:copy(status),carriers:copy(input.carriers),
         historical:!!past,at:past && past.days[past.index]?past.days[past.index].at:null,verdicts:copy(proofVerdicts(input))};
     },

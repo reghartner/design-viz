@@ -345,8 +345,8 @@ test('A3 the Grafana connector is picked by its offered tools; a connector missi
  }
  for(const servers of [[JIRA_SERVER,github,missing],[]]){
   const s=await setup({servers});
-  await assert.rejects(s.refresh(),err=>{assert.match(err.message,/Grafana needs connector tools:/);return true;},'A3 no qualifying connector');
-  assert.equal(s.net.calls.length,0,'A3 no tool call without a qualifying connector');
+  if(servers.some(server=>(server.tools || []).some(t=>(typeof t==='string'?t:t.name)==='query_loki_logs'))){const result=await s.refresh();assert.match(result.notes.join(" "),/query_prometheus/);assert.ok(s.net.calls.some(c=>c.tool==='query_loki_logs'));assert.ok(!s.net.calls.some(c=>c.tool==='query_prometheus'));}
+  else {await assert.rejects(s.refresh(),/Grafana needs connector tools:/);assert.equal(s.net.calls.length,0);}
  }
  const {C}=context();
  assert.equal(typeof C.telemetryGrafanaServer,'function','A3 the picker is a named helper');
@@ -580,7 +580,7 @@ test('A10 sql signals call query_sql at most hourly and reuse the value; without
  assert.equal(sqlAnswers.length,2,'A10 query_sql again after an hour');assert.equal(third.map.notify.signals.total.value,148002);
  const {C}=context();assert.equal(typeof C.telemetryGrafanaSql,'function','A10 the query_sql reader is a named helper');
  for(const [payload,want] of [[{rows:[[null,'42']]},42],[{data:[{n:'7.5'}]},7.5],[[[3]],3],[[],null],['oops',null]])assert.equal(C.telemetryGrafanaSql(payload),want,'A10 '+JSON.stringify(payload));
- const without=await setup({page:raw,now:()=>clock});await assert.rejects(without.refresh(),/Grafana needs connector tools:.*query_sql/);
+ const without=await setup({page:raw,now:()=>clock});const partial=await without.refresh();assert.match(partial.notes.join(" "),/query_sql/);assert.ok(partial.map.ingest,'healthy Prometheus evidence remains available');
  assert.equal(without.net.calls.filter(c=>c.tool==='query_sql').length,0,'A10 no query_sql call when the connector does not offer it');
 });
 

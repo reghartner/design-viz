@@ -93,7 +93,7 @@ After the packet, route source/handoff details:
 - [Diagram links](../../../cookbook/diagram-handoffs.md); [design reviews](../../../docs/design-review.md).
 - [Live Jira / metrics proof / `missingWork`](../../../docs/live-status.md): use
   `live-status-board` when requested; its Metrics chapter is conditional.
-  Metrics: Jira/PR resources; qa/stg/prd; CloudWatch Sum; `6h`/`-6h`/`now-6h`.
+  Metrics: Jira/PR; env variables; CloudWatch/Logs scalars; `6h`/`-6h`/`now-6h`.
   Desktop, imported too. Jira: parent minus exclusions plus manual/dependency
   stories once.
 

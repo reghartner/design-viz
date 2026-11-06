@@ -67,7 +67,7 @@ test('validator and desktop editor preserve structured queries and reject unsupp
  assert.equal(C.carrierTelemetry(raw,{},(at,msg)=>warnings.push(msg)).signals.matched.source,'cloudwatch');assert.deepEqual(warnings,[]);assert.equal(JSON.stringify(raw),before);
  assert.deepEqual(plain(C.telemetryQueryValue('cloudwatch',JSON.stringify(query())).value),query());
  assert.deepEqual(JSON.parse(C.telemetryQueryText('cloudwatch',query())),query());
- for(const patch of [{statistic:'Average'},{metric:''},{accountId:''},{dimensions:{RuleName:5}}]){const q={...query(),...patch},warn=[];const b=C.carrierTelemetry({telemetry:{kind:'service',signals:{bad:{cloudwatch:q},good:{grafana:'up'}}}},{},(at,msg)=>warn.push(msg));assert.equal(b.signals.bad,undefined);assert.ok(b.signals.good);assert.match(warn.join(' '),/cloudwatch requires/);assert.ok(C.telemetryQueryValue('cloudwatch',JSON.stringify(q)).error);}
+ for(const patch of [{statistic:'Median'},{metric:''},{accountId:''},{dimensions:{RuleName:5}}]){const q={...query(),...patch},warn=[];const b=C.carrierTelemetry({telemetry:{kind:'service',signals:{bad:{cloudwatch:q},good:{grafana:'up'}}}},{},(at,msg)=>warn.push(msg));assert.equal(b.signals.bad,undefined);assert.ok(b.signals.good);assert.match(warn.join(' '),/cloudwatch requires/);assert.ok(C.telemetryQueryValue('cloudwatch',JSON.stringify(q)).error);}
  const unknown=[];C.carrierTelemetry({telemetry:{kind:'service',signals:{bad:{unknown:'q'}}}},{},(at,msg)=>unknown.push(msg));assert.match(unknown.join(' '),/exactly one of/);
 });
 

@@ -89,7 +89,7 @@ export interface LiveStatusEntry {
 export interface TelemetryBinding {
   id: string;
   kind: 'call' | 'queue' | 'service' | 'log-event' | 'device';
-  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch'; query: string | Record<string, unknown>; unit: string | null}>;
+  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch' | 'cloudwatchLogs'; query: string | Record<string, unknown>; unit: string | null; scope?: string; error?: string}>;
   proof: Record<string, {min?: number; max?: number; maxRatioOf?: string}>;
   links: {dashboard?: string; query?: string};
   card: {side?: 'right' | 'left' | 'above' | 'below'; offset?: number} | null;

@@ -183,8 +183,8 @@ GUIDE_LIMIT = 6 * 1024
 COMMENTS_CAPABILITY = {"composer_only": True, "customAnchors": True}
 JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "getJiraIssue"]
 # Grafana connector qualification follows the query families bound on the page.
-GRAFANA_TOOLS = {"grafana": "query_prometheus", "loki": "query_loki_logs", "sql": "query_sql", "cloudwatch": "query_cloudwatch"}
-GRAFANA_SOURCES = ("grafana", "loki", "sql", "cloudwatch")
+GRAFANA_TOOLS = {"grafana": "query_prometheus", "loki": "query_loki_logs", "sql": "query_sql", "cloudwatch": "query_cloudwatch", "cloudwatchLogs": "query_cloudwatch_logs"}
+GRAFANA_SOURCES = ("grafana", "loki", "sql", "cloudwatch", "cloudwatchLogs")
 HONEYCOMB_TOOLS = ["run_query"]
 
 
@@ -195,7 +195,7 @@ def _telemetry_sources(telemetry: dict) -> set[str]:
     if isinstance(signals, dict):
         for signal in signals.values():
             if isinstance(signal, dict):
-                found.update(source for source in ("grafana", "loki", "tempo", "sql", "honeycomb", "cloudwatch") if source in signal)
+                found.update(source for source in ("grafana", "loki", "tempo", "sql", "honeycomb", "cloudwatch", "cloudwatchLogs") if source in signal)
     templates = telemetry.get("templates")
     if isinstance(templates, dict):
         for template in templates.values():
@@ -455,18 +455,22 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "- Feature first: scoped Jira tickets + linked PR diffs -> new queues/topics/pipes/routes/jobs "
             "and instrumentation -> resource/carrier -> exact metric/query, datasource, deployed environment. "
             "Use feature throughput/lag/errors; no broad dashboards or unrelated CPU/uptime/traffic. "
-            "Name missing instrumentation gaps. Telemetry-only uses supplied code/resources, never invented Jira/PRs.",
+            "Name missing instrumentation; use supplied resources, never invented Jira/PRs.",
             "- `page.tracking.telemetry`: sources, `window` (default `24h`), templates; "
-            "`environment`/`environments` profiles inherit shared values. qa/stg/prd deployment differs "
-            "from Honeycomb slug. Selection is session-only; $env/${env} expand query/link/config "
-            "strings; template env params retain meaning.",
+            "`environment`/`environments` inherit shared values; qa/stg/prd differs from Honeycomb slug. "
+            "Selection is session-only; $env/${env} expand strings. Shared/profile `variables` resolve ${name} once "
+            "in signals; template params win; missing variables block calls.",
             "- Carrier `telemetry`: `kind`, `signals`, `proof`, safe `links`; never derive a query "
             "from names/ids. Include local, imported/nested, overlay and loaded-detail nodes/edges. "
-            "Inspect tool schemas, preserve exact queries/UIDs, verify selected queries once. "
+            "Inspect schemas; preserve queries/UIDs; verify once. "
             "Distinguish returned, empty, zero and failed evidence; missing is unobserved.",
             "- Metrics starts off. Root `enabled:false`/host false grants no query permission; "
             "absent tools hide it. Preview is synthetic, unsaved, no network. Over time uses exact "
             "prior-24h endpoints; never borrow live samples or neighboring days.",
+            "- Sources: grafana/PromQL, loki/LogQL, tempo/TraceQL, sql/hourly scalar, honeycomb; "
+            "cloudwatch: Sum/Maximum/Minimum/Average/SampleCount, full-window scalar; "
+            "cloudwatchLogs/query_cloudwatch_logs: first row valueField/column; Complete+empty+totalFound=0 means zero. "
+            "Neither has history/period/sparklines/breakdowns. Scope: dimensions or explicit label, never titles.",
             "- Honeycomb uses run_query: one scalar, exact JSON, no breakdowns/formulas; COUNT "
             "counts spans/events. Use stable query links, never signed URLs. For traces declare "
             "get_trace and read the trace contract; one request only, retain partial warnings. "

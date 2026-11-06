@@ -1459,7 +1459,7 @@ capabilities: {mcp: {servers: [
 ]}, comments: {"composer_only": true, "customAnchors": true}}
 ```
 
-Add `"query_cloudwatch"` only for bound CloudWatch signals.
+Add `"query_cloudwatch"` only for bound CloudWatch metric signals and `"query_cloudwatch_logs"` only for bound Logs signals.
 Add `"query_sql"` to the Grafana tools only when the page has `sql` signals and the
 server enables that tool; it is off by default in
 [grafana/mcp-grafana](https://github.com/grafana/mcp-grafana), the real server,
@@ -1474,7 +1474,7 @@ provider binding; provider templates expand). A snapshot resolved before
 injection (`tools/page_build.py --resolve-imports`) carries those bindings itself.
 
 The adapter qualifies connectors by the bound signals: `query_prometheus` for
-`grafana`, `query_loki_logs` for `loki`, `query_sql` for `sql`, and `query_cloudwatch` for `cloudwatch`, preferring a
+`grafana`, `query_loki_logs` for `loki`, `query_sql` for `sql`, and `query_cloudwatch` for `cloudwatch` and `query_cloudwatch_logs` for `cloudwatchLogs`, preferring a
 qualifying connector named **Grafana**. Missing required query tools appear as a
 visible diagnostic. `generate_deeplink`, `get_annotations` and
 `search_tempo_traces` are optional; declare these extras only when offered and
@@ -2390,8 +2390,7 @@ contract tests.
 CloudWatch uses a structured `cloudwatch` signal alongside the other sources, on
 all local/imported nodes and edges. See the [CloudWatch authoring example](../.claude/skills/live-status-board/metrics.md#cloudwatch-window-totals).
 Required query fields are `namespace`, `metric`, `region`, `accountId`,
-`dimensions` (string values, preserving case), and `statistic: "Sum"`. Other
-statistics are rejected with a validation warning. The datasource UID is
+`dimensions` (string values, preserving case), and `statistic` (`Sum`, `Maximum`, `Minimum`, `Average`, `SampleCount`). The datasource UID is
 `tracking.telemetry.grafana.cloudwatch`. Shared or environment-profile
 `grafana.accountId` replaces `$account` / `${account}`; an explicit signal account
 remains literal. Existing `$env` substitution applies to nested dimension values.
@@ -2401,13 +2400,78 @@ Tool discovery diagnoses a missing query tool before any data call. Each refresh
 calls it once per bound signal with `{datasourceUid, namespace, metricName,
 region, accountId, dimensions, statistic, period, start, end}`. The page window
 supplies `start: "now-<window>"`, `end: "now"`, and full-window seconds as `period`.
-This yields a scalar Sum, read from `statistics.sum` or a sole numeric returned
-value; it is not a sparkline. Empty arrays or malformed responses clear previous
+This yields a scalar. A sole returned value is authoritative; outer `statistics.count` counts points, not CloudWatch SampleCount. Multiple points require Sum with explicit `statistics.sum`; other statistics are unobserved. No configurable period or sparkline. Empty arrays or malformed responses clear previous
 CloudWatch evidence and remain unobserved; a real `[0]` remains measured zero.
-Transient tool errors retain the prior sample under the existing Grafana policy.
+Failed metric/Logs queries clear the prior observation; other supported sources continue.
 CloudWatch history is unsupported and leaves gaps.
 
 Argument names match the [upstream CloudWatch tool](https://github.com/grafana/mcp-grafana/blob/main/tools/cloudwatch.go).
 User verification on 2026-11-05 reported that the us-east-1 monitoring datasource
 requires a linked account ID (staging `646998985045`); omitting it returned empty
 arrays with hints. Repository checks replay the response and make no live calls.
+
+### Named environment variables and counting scope
+
+Put shared string defaults in `tracking.telemetry.variables`, with per-profile
+`environments.<id>.variables` overrides. `${iotAccount}` and `${queueAccount}`
+can appear in **any signal string value**: Logs ARNs/query/region, metric
+dimensions/account, PromQL, LogQL, SQL, Honeycomb filters, Tempo, `unit` and
+`scope`. `$account` / `${account}` still uses effective `grafana.accountId`;
+`$env` / `${env}` uses the selected deployment. `account` and `env` are reserved
+variable names. `$__interval`, `$__rate_interval` and literal `$aws` stay intact.
+
+Precedence is shared variables < active profile variables < declared template
+parameters for template strings. Carrier signal overrides use environment
+variables. Expansion is a **single pass**: inserted variable/parameter values
+are literal and never recursively expanded. Unknown `${name}` in a signal
+makes that signal unobserved with a configuration reason and prevents its call.
+Never interpolate user secrets; profiles and queries are shipped in the artifact.
+The source and authored default environment stay unchanged when readers switch.
+The desktop editor's shared/profile variables JSON and structured query controls
+round-trip with one Undo/Redo per edit.
+
+A signal may author `scope: "topic $aws/rules/camera_message_power_state · account ${iotAccount}"`.
+Scope is displayed on the card and in Proof and uses the active environment.
+Without explicit scope, CloudWatch `RuleName` means “this rule only”, `QueueName`
+means “queue only”, and AWS/IoT PublishIn.AuthError / Connect.AuthError with only
+account/protocol dimensions mean “all topics / whole account” / “all connections /
+whole account”. Other dimensions, edge titles and arbitrary Logs query text never
+establish topic scope. Use `unit: "refused publishes"` to read “15 refused publishes
+in 24h” on a scalar card.
+
+### CloudWatch Logs Insights
+
+A `cloudwatchLogs` signal is a structured object with `logGroups` (nonempty
+strings), `query`, `region`, and optional `valueField`. It uses the same
+`tracking.telemetry.grafana.cloudwatch` datasource UID as metric queries.
+Use full log-group ARNs for linked source accounts, and don't mix ARNs and names.
+The artifact declares `query_cloudwatch_logs` only when a local/imported/template
+Logs signal exists. Each refresh sends `{datasourceUid, region, logGroups,
+queryString, start, end, limit: 100}` using the page window (`now-24h` to `now`).
+
+The first row's named field, or first column when no field is specified, must be
+numeric. No arbitrary numeric-cell scanning. A Complete response with empty
+`logs` and `totalFound: 0` is a successful empty count, zero. With any row,
+`totalFound` is never the aggregate: it may describe matched input records.
+Failed/running/timeout queries, missing groups/permissions/fields, or malformed
+results are unobserved with a one-line reason. Failed refreshes clear old Logs
+and metric values. Generic empty-result hints alone do not invalidate Complete
+zero. Hosted `payload`, raw MCP `structuredContent`, and JSON text wrappers are
+supported; error wrappers never become observations.
+
+The [Grafana Logs tool source](https://github.com/grafana/mcp-grafana/blob/main/tools/cloudwatch_logs.go)
+returns `{logs: []map[string]string, totalFound, status, hints?}` and polls for
+completion. Repository tests replay this contract; no live connector/account
+verification is claimed. Optional period/sparklines, daily CloudWatch history
+and Logs reason breakdowns are outside this pass.
+
+See the validated [device → IoT → queue example](../examples/cloudwatch-log-signals/cloudwatch-log-signals.spec.json).
+The queue name `camera_message_power_state_${env}` is illustrative: replace it with the real queue name before querying. No queue metric was live verified here.
+Its exact-topic filter uses AWS's documented `topicName`, with eventType
+`Publish-In`, status `Failure`, and supplied reason `AUTHORIZATION_FAILURE`.
+[IoT log schema](https://docs.aws.amazon.com/iot/latest/developerguide/cwl-format.html).
+Staging IoT is `646998985045`, staging queue is `551960222585`; production IoT
+is `139648982912`. Production `970642438387` is an **SNS** account and is not
+used as SQS. QA accounts and production SQS were not supplied: those variable
+values are deliberately absent, so affected signals remain unobserved until
+configured, with no wrong-account call.

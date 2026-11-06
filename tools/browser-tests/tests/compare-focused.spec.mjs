@@ -864,6 +864,18 @@ async function stableCamera(host){
   });
   for(let i=0;i<samples[0].length;i++)expect(Math.max(...samples.map(s=>s[i]))-Math.min(...samples.map(s=>s[i])),'camera stays stable across consecutive paints').toBeLessThan(1.1);
 }
+async function alignedLandmark(host,id,diagramSpace=false){
+  const positions=await host.locator('.compare-pane').evaluateAll((panes,{id,diagramSpace})=>panes.map(p=>{
+    const node=[...p.querySelectorAll('[data-dv-node]')].find(n=>n.getAttribute('data-dv-node')===id && n.getClientRects().length);
+    const box=p.querySelector('.compare-pane-scroll').getBoundingClientRect();
+    if(diagramSpace){
+      const svg=node.ownerSVGElement,r=svg.getBoundingClientRect(),vb=svg.viewBox.baseVal,scale=r.width/vb.width;
+      return {x:r.x-box.x-vb.x*scale,y:r.y-box.y-vb.y*scale,width:scale};
+    }
+    const r=node.getBoundingClientRect();return {x:r.x-box.x,y:r.y-box.y,width:r.width};
+  }),{id,diagramSpace});
+  return Math.max(...['x','y','width'].map(axis=>Math.abs(positions[0][axis]-positions[1][axis])));
+}
 for(const imported of [false,true])test('N1 '+(imported?'imported':'local')+' added node is revealed in Standard and manual zoom tracks both directions',async({page,server},testInfo)=>{
   await page.emulateMedia({reducedMotion:'no-preference'});
   const raw={page:{title:'Navigation',defaultView:'standard',views:[{id:'standard',name:'Standard',presentation:'standard',sections:['c']},{id:'explore',name:'Explore',presentation:'explore',sections:['c']}],sections:[{id:'c',heading:'Chain',diagram:chain('n')}]}},after=plain(raw);
@@ -880,6 +892,7 @@ for(const imported of [false,true])test('N1 '+(imported?'imported':'local')+' ad
   await selectItem(host,imported?/^Added · Imported node child::x/:/^Added · Node Added x/);
   await expect.poll(()=>shown(host,'after',id)).toBe(true);
   await expect(host.locator('.viewer-exploring')).toHaveCount(0);
+  await expect.poll(()=>alignedLandmark(host,imported?'child::p11':'n11',true),{message:'selection aligns both diagrams before manual navigation'}).toBeLessThan(2);
   for(const compareMode of ['Full diagram','Focused']){
     await modeBar(host).getByRole('button',{name:compareMode,exact:true}).click();
     await selectItem(host,imported?/^Added · Imported node child::x/:/^Added · Node Added x/);
@@ -892,7 +905,8 @@ for(const imported of [false,true])test('N1 '+(imported?'imported':'local')+' ad
 
   for(const mode of ['Standard','Explore']){
     if(mode==='Explore'){
-      for(const side of ['before','after'])await host.locator('.compare-pane[data-side="'+side+'"]').locator('.reader-view-picker').selectOption({label:'Explore'});
+      await host.locator('.compare-pane[data-side="before"] .reader-view-picker').selectOption({label:'Explore'});
+      await expect(host.locator('.compare-pane[data-side="after"] .reader-view-picker')).toHaveValue('page:explore');
       await expect.poll(()=>shown(host,'after',id),{message:'switching to Explore opens a visible diagram'}).toBe(true);
       await selectItem(host,imported?/^Added · Imported node child::x/:/^Added · Node Added x/);
       await expect.poll(()=>shown(host,'after',id)).toBe(true);
@@ -909,6 +923,7 @@ for(const imported of [false,true])test('N1 '+(imported?'imported':'local')+' ad
       await expect.poll(async()=>Math.abs((await width(host,'before',ref))-(await width(host,'after',ref)))).toBeLessThan(2);
       // Sample consecutive paints across the old 150 ms retry and 250 ms
       // remount windows; normal motion must not produce a late camera jump.
+      await expect.poll(()=>alignedLandmark(host,ref,true),{message:'the same diagram coordinates occupy the same pane location'}).toBeLessThan(2);
       await stableCamera(host);
     }
     const ref=imported?'child::p11':'n11',position=side=>panes[side].locator('[data-dv-node="'+ref+'"]:visible').first().evaluate(n=>n.getBoundingClientRect().x);
@@ -917,8 +932,13 @@ for(const imported of [false,true])test('N1 '+(imported?'imported':'local')+' ad
       await panes[own].locator('.board:visible').first().hover();await page.mouse.wheel(-90,0);
       await expect.poll(async()=>Math.abs(await position(own)-starts[own])).toBeGreaterThan(20);
       await expect.poll(async()=>Math.abs((await position(0)-starts[0])-(await position(1)-starts[1]))).toBeLessThan(2);
+      await expect.poll(()=>alignedLandmark(host,ref,true),{message:'panning preserves absolute diagram alignment'}).toBeLessThan(2);
     }
     if(mode==='Explore'){await expect.poll(()=>shown(host,'after',ref),{message:'linked camera keeps the changed area on screen'}).toBe(true);}
+    await page.setViewportSize({width:1560,height:960});
+    await expect.poll(()=>alignedLandmark(host,ref,true),{message:'resizing retains the same diagram location'}).toBeLessThan(2);
+    await page.setViewportSize({width:1440,height:900});
+    await expect.poll(()=>alignedLandmark(host,ref,true)).toBeLessThan(2);
     if(mode==='Explore')await testInfo.attach('explore-linked-zoom',{body:await host.screenshot(),contentType:'image/png'});
   }
 });
@@ -968,4 +988,74 @@ test('N4 background completion preserves both painted cameras without manual inp
   const samples=await page.evaluate(()=>window.completionFrames);
   expect(samples.map(s=>s.beforeCount)).toContain(1);expect(samples.map(s=>s.beforeCount)).toContain(3);
   for(let i=0;i<8;i++)expect(Math.max(...samples.map(s=>s.geometry[i]))-Math.min(...samples.map(s=>s.geometry[i])),'background completion preserves each pane coordinate').toBeLessThan(1.1);
+});
+
+for(const imported of [false,true])test('N5 '+(imported?'imported':'local')+' document wheel and keyboard scrolling mirror the same location across reordered sections',async({page,server},testInfo)=>{
+  const pair=providerPair(),current=plain(pair.consumer),proposed=plain(current);
+  if(!imported){current.page.sections[0].diagram=chain('n');proposed.page.sections[0].diagram=chain('n');}
+  const paragraphs=count=>Array.from({length:count},(_,i)=>'Context '+i+'. The section keeps enough prose to scroll independently of the diagram.');
+  current.page.sections[0].text=paragraphs(18);proposed.page.sections[0].text=paragraphs(29);
+  const extra=(id)=>({id,heading:id,text:paragraphs(8),diagram:chain(id)});
+  current.page.sections.unshift(extra('earlier'));current.page.sections.push(extra('later'));
+  proposed.page.sections.unshift(extra('later'),extra('inserted'));proposed.page.sections.push(extra('earlier'));
+  const provider2=plain(pair.provider),ref=imported?'child::p6':'n6';
+  if(imported)provider2.page.sections[0].diagram.nodes.p6.title='Changed six';else proposed.page.sections[2].diagram.nodes.n6.title='Changed six';
+  const script=imported?`function side(c,p){return FlowviewCompare.normalize(FlowviewCompare.resolve(JSON.parse(JSON.stringify(c)),{version:1,id:'consumer',specs:[p,c]}));}
+    var a=side(${inline(current)},${inline(pair.provider)}),b=side(${inline(proposed)},${inline(provider2)});
+    var entries=FlowviewCompare.compare({authored:FlowviewCompare.normalize(${inline(current)}),resolved:a,ledger:null},{authored:FlowviewCompare.normalize(${inline(proposed)}),resolved:b,ledger:null});
+    window.cv=FlowviewCompare.mount(document.getElementById('compare-host'),{before:a,after:b,entries:entries});`:null;
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const host=await mountPage(page,server,'scroll-navigation-'+imported+'-'+Date.now(),current,proposed,null,script);
+  await selectItem(host,imported?/^Modified · Imported node child::p6/:/^Modified · Node Changed six/);
+  // The first gesture also completes a still-partial Before render; section
+  // matching must use identity, not the changed numeric index.
+  for(const own of ['after','before']){
+    const pane=host.locator('.compare-pane[data-side="'+own+'"] .compare-pane-scroll');
+    const start=await pane.evaluate(n=>n.scrollTop),box=await pane.boundingBox();
+    await page.mouse.move(box.x+3,box.y+box.height/2);await page.mouse.wheel(0,-160);
+    await expect.poll(()=>pane.evaluate(n=>n.scrollTop)).toBeLessThan(start-100);
+    await expect.poll(()=>alignedLandmark(host,ref),{message:'outer wheel scroll preserves matching diagram coordinates'}).toBeLessThan(2);
+    await pane.focus();const at=await pane.evaluate(n=>n.scrollTop);await pane.press('ArrowDown');
+    await expect.poll(()=>pane.evaluate(n=>n.scrollTop)).toBeGreaterThan(at+10);
+    await expect.poll(()=>alignedLandmark(host,ref),{message:'keyboard document scroll mirrors in either direction'}).toBeLessThan(2);
+    await stableCamera(host);
+  }
+  await testInfo.attach('linked-document-scroll-'+(imported?'imported':'local'),{body:await host.screenshot(),contentType:'image/png'});
+  expect(errors).toEqual([]);
+});
+
+
+for(const imported of [false,true])test('N6 '+(imported?'imported':'local')+' Explore follows distant graph coordinates beyond either pane extent',async({page,server},testInfo)=>{
+  const diagram=(after)=>({nodes:{common:{title:'Common'},[after?'added':'removed']:{title:after?'Distant added':'Distant removed'}},rows:[[]],edges:[],
+    floats:[{id:'common',side:'below',x:200,y:100},{id:after?'added':'removed',side:'below',x:after?9000:-7000,y:after?6500:-5000}],
+    graphFrame:after?{x:0,y:0,w:10000,h:7500}:{x:-7500,y:-5500,w:8500,h:6500}});
+  const spec=d=>({page:{title:'Distant navigation',defaultView:'explore',views:[{id:'explore',name:'Explore',presentation:'explore',sections:['main']}],sections:[{id:'main',heading:'Main',diagram:d}]}});
+  let current=spec(diagram(false)),proposed=spec(diagram(true)),script;
+  if(imported){
+    const pair=providerPair(),provider2=plain(pair.provider);
+    for(const [provider,after] of [[pair.provider,false],[provider2,true]]){
+      const d=diagram(after);d.topologyExports={public:{nodes:Object.keys(d.nodes),edges:[]}};provider.page.sections[0].diagram=d;
+    }
+    pair.consumer.page.views=current.page.views;pair.consumer.page.defaultView='explore';
+    pair.consumer.page.sections[0].diagram.topologyImports[0].position={x:0,y:0};
+    current=pair.consumer;proposed=plain(current);script=provided(pair,provider2);
+  }
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const host=await mountPage(page,server,'distant-navigation-'+imported+'-'+Date.now(),current,proposed,null,script);
+  const ref=imported?'child::common':'common',added=imported?'child::added':'added';
+  await selectItem(host,imported?/^Added · Imported node child::added/:/^Added · Node Distant added/);
+  await expect.poll(()=>shown(host,'after',added)).toBe(true);
+  await expect.poll(()=>alignedLandmark(host,ref,true),{message:'initial distant crop aligns diagram coordinates'}).toBeLessThan(2);
+  for(const [side,delta] of [['after',900],['before',-30000]]){
+    const board=host.locator('.compare-pane[data-side="'+side+'"] .board:visible');
+    await board.hover();const start=await board.evaluate(n=>({x:n.scrollLeft,y:n.scrollTop}));
+    await page.mouse.wheel(delta,delta);
+    await expect.poll(()=>board.evaluate((n,start)=>Math.max(Math.abs(n.scrollLeft-start.x),Math.abs(n.scrollTop-start.y)),start)).toBeGreaterThan(100);
+    await expect.poll(()=>alignedLandmark(host,ref,true),{message:side+' pans beyond counterpart graph bounds'}).toBeLessThan(2);
+    await page.keyboard.down('Control');await page.mouse.wheel(0,-250);await page.keyboard.up('Control');
+    await expect.poll(()=>alignedLandmark(host,ref,true),{message:side+' zoom retains the distant graph location'}).toBeLessThan(2);
+    await stableCamera(host);
+  }
+  await testInfo.attach('distant-linked-explore-'+(imported?'imported':'local'),{body:await host.screenshot(),contentType:'image/png'});
+  expect(errors).toEqual([]);
 });

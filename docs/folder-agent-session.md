@@ -344,8 +344,10 @@ first change that is not a ledger or metadata change, and on one of those only w
 every change is one. When row-layout bookkeeping precedes a changed node or connection,
 the comparison opens on that object. Local and imported nodes are revealed in the current
 Standard or Explore view. A section excluded from all Views has a source fallback there.
-Diagram pan and zoom track in both directions between panes, as does Standard page zoom;
-ordinary document scrolling stays independent. These controls never edit or accept the proposal, and
+Navigation tracks in both directions between panes: diagram pan and zoom, Standard page zoom,
+document scrolling, and corresponding Views. Matching sections stay at the same visible diagram
+coordinates even when content lengths or graph sizes differ; a section present on only one side
+has no matching location on the other. These controls never edit or accept the proposal, and
 Accept does not depend on which change is selected.
 
 The comparison opens **Focused**. A change to a step's caption, panel values, panel

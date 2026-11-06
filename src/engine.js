@@ -3033,13 +3033,13 @@ function createBoardNavigation(board, group, legend, changed){
     board.scrollLeft=board.scrollTop=0;
     fitGeometry=geometry();fitting=false;refresh();
   }
-  function zoom(next){
+  function zoom(next,external){
     var svg=graph();if(!enabled() || !svg || !board.clientWidth)return;
     var frame=board.getBoundingClientRect(),before=svg.getBoundingClientRect(),display=displayScale();
     var x=frame.left+(board.clientLeft+board.clientWidth/2)*display,y=frame.top+(board.clientTop+legend.offsetHeight+(board.clientHeight-legend.offsetHeight)/2)*display;
     var cx=(x-before.left)/before.width,cy=(y-before.top)/before.height;
     board.style.setProperty('--board-viewport-height',frame.height/display+'px');
-    board.style.setProperty('--board-zoom-width',(svg.viewBox.baseVal.width*Math.max(.15,Math.min(4,next)))+'px');
+    board.style.setProperty('--board-zoom-width',(svg.viewBox.baseVal.width*Math.max(external ? .001 : .15,Math.min(4,next)))+'px');
     board.classList.add('board-zoomed');
     // Updating overflow controls before measuring accounts for their height.
     changed();
@@ -3185,7 +3185,16 @@ function createBoardNavigation(board, group, legend, changed){
   }
   function camera(value){
     var svg=graph();if(!enabled() || !svg || !board.clientWidth)return null;
-    if(value){manual();zoom(value.zoom);}
+    if(value){
+      manual();
+      // A compare host may need blank canvas beyond this side's smaller graph
+      // to display exactly the same coordinates as its counterpart.
+      if(value.unbounded){
+        var ink=boardContentBounds(svg),prior=followFrame || ink && {x:ink.x,y:ink.y,right:ink.x+ink.w,bottom:ink.y+ink.h};
+        if(prior)followFrame={x:Math.min(prior.x,value.x),y:Math.min(prior.y,value.y),right:Math.max(prior.right,value.x),bottom:Math.max(prior.bottom,value.y)};
+      }
+      zoom(value.zoom,!!value.unbounded);
+    }
     var vb=svg.viewBox.baseVal,r=ratio(),display=displayScale(),rect=svg.getBoundingClientRect(),b=board.getBoundingClientRect();
     var x=vb.x+(board.clientWidth/2-(rect.left-b.left)/display)/r;
     var y=vb.y+((board.clientHeight+legend.offsetHeight)/2-(rect.top-b.top)/display)/r;

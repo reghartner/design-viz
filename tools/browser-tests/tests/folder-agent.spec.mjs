@@ -2016,6 +2016,20 @@ test('agent change navigation reaches other Views and paths and preserves stable
     await linkedPan(view,before,'panning the After pane');
     await linkedPan(before,view,'panning the Before pane');
     await page.screenshot({path:info.outputPath('change-navigation-proposed-1280x720.png')});
+    // A View change and ordinary document scrolling are navigation too. The
+    // proposal reordered these sections, so numeric section/scroll ratios fail.
+    await view.locator('.reader-view-picker').selectOption({label:'Overview'});
+    await expect(before.locator('.reader-view-picker')).toHaveValue('page:overview');
+    const documentPoint=scope=>scope.locator('[data-dv-node="b"]:visible').first().evaluate(node=>{
+      const p=node.closest('.compare-pane-scroll').getBoundingClientRect(),r=node.getBoundingClientRect();return {x:r.x-p.x,y:r.y-p.y};
+    });
+    for(const scope of [view,before]){
+      const pane=scope.locator('..'),box=await pane.boundingBox(),start=await pane.evaluate(n=>n.scrollTop);
+      await page.mouse.move(box.x+3,box.y+box.height/2);await page.mouse.wheel(0,150);
+      await expect.poll(()=>pane.evaluate(n=>n.scrollTop)).toBeGreaterThan(start+80);
+      for(const axis of ['x','y'])await expect.poll(async()=>Math.abs((await documentPoint(view))[axis]-(await documentPoint(before))[axis]),{message:'agent proposal document scrolling aligns '+axis}).toBeLessThan(2);
+    }
+    await page.screenshot({path:info.outputPath('change-navigation-document-scroll-1280x720.png')});
     await item(/^Removed · Node Retired worker$/).click();await expect(position).toContainText('Removed');await expect(position).toContainText('not in the proposal');
     await expect(before.locator('[data-dv-node="retired"]')).toBeVisible();await expect(page.locator('#agent-update-commit')).toBeEnabled();
     await item(/^Added · Node Replacement worker$/).click();await expect(view.locator('[data-dv-node="replacement"]')).toBeVisible();await expect(position).toContainText('not in the current document');

@@ -179,8 +179,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function controlsContentScale(){if(!active){var layout=definition && definition.exploreLayout || {};return layout.controlsScale!==undefined?layout.controlsScale:1;}return memory.layout.controlsScale!==undefined?memory.layout.controlsScale:canvasWindow(playerWindow)?1:overlayScale();}
   function windowScale(w){return w.prose?1:w===playerWindow?controlsContentScale():floatingOverlayScale();}
   function zoomFloor(){
-    if(!onCanvas())return workbenchCanvas && fitFloor!==null?Math.min(.15,fitFloor):.15;
-    var extent=canvasExtent();return Math.min(.15,200/Math.max(1,extent.w),200/Math.max(1,extent.h),fitFloor===null?4:fitFloor);
+    var externalFloor=memory && memory.compareCameraBounds?memory.compareCameraBounds.zoom:4;
+    if(!onCanvas())return Math.min(externalFloor,workbenchCanvas && fitFloor!==null?Math.min(.15,fitFloor):.15);
+    var extent=canvasExtent();return Math.min(externalFloor,.15,200/Math.max(1,extent.w),200/Math.max(1,extent.h),fitFloor===null?4:fitFloor);
   }
   function graphScale(){return graphPixels/graphWidth() || 1;}
   function graphRect(r){return {x:r.x,y:r.y,w:r.w,h:r.h};}
@@ -632,13 +633,19 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var prior=graphPixels?camera():null,natural=graphWidth();
     var width=zoom!==null?natural*zoom:boardSize && boardSize.mode()==='readable'?natural:board.clientWidth;
     graphPixels=clamp(width,natural*zoomFloor(),natural*4);
-    var extent=canvasExtent();
+    var extent=canvasExtent(),follow=memory.compareCameraBounds;
+    // A comparison may follow a location outside this version of the graph.
+    // Expand only the scroll runway; Fit still measures the real canvas ink.
+    if(follow){
+      var right=Math.max(extent.x+extent.w,follow.right),bottom=Math.max(extent.y+extent.h,follow.bottom);
+      extent.x=Math.min(extent.x,follow.x);extent.y=Math.min(extent.y,follow.y);extent.w=right-extent.x;extent.h=bottom-extent.y;
+    }
     marginX=Math.max(board.clientWidth*2,-extent.x*graphScale()+board.clientWidth);marginY=Math.max(board.clientHeight*2,-extent.y*graphScale()+board.clientHeight);
     objectLayer.style.transform='translate('+marginX+'px,'+marginY+'px) scale('+graphScale()+')';
     board.style.setProperty('--explore-width',graphPixels+'px');
     board.style.setProperty('--explore-margin-x',marginX+'px');board.style.setProperty('--explore-margin-y',marginY+'px');
     var svg=board.querySelector('.boardcanvas>svg'),graphHeight=svg && svg.viewBox.baseVal.width?graphPixels*svg.viewBox.baseVal.height/svg.viewBox.baseVal.width:0;
-    board.style.setProperty('--explore-canvas-height',(((workbenchCanvas || readerCanvas || onCanvas())?Math.max(board.clientHeight,graphHeight,(extent.y+extent.h)*graphScale()):board.clientHeight)+2*marginY)+'px');
+    board.style.setProperty('--explore-canvas-height',(((workbenchCanvas || readerCanvas || onCanvas() || follow)?Math.max(board.clientHeight,graphHeight,(extent.y+extent.h)*graphScale()):board.clientHeight)+2*marginY)+'px');
     board.style.setProperty('--explore-canvas-width',(Math.max(board.clientWidth,graphPixels,(extent.x+extent.w)*graphScale())+2*marginX)+'px');
     // The browser can otherwise clamp the first camera write against the old
     // scroll extent. A pushed Contents sidebar makes that stale maximum much
@@ -981,7 +988,15 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     graphCamera:function(value){
       var svg=board.querySelector('.boardcanvas>svg'),vb=svg && svg.viewBox.baseVal;
       if(!active || !vb)return null;
-      if(value){cancelDeferredFit();zoom=clamp(value.zoom,zoomFloor(),4);sizeGraph(false);positionCamera({x:(value.x-vb.x)/vb.width,y:(value.y-vb.y)/vb.height,zoom:zoom});}
+      if(value){
+        cancelDeferredFit();
+        if(value.unbounded && [value.x,value.y,value.zoom].every(Number.isFinite) && value.zoom>0){
+          var x=value.x-vb.x,y=value.y-vb.y,bounds=memory.compareCameraBounds;
+          // Transient per-View reader memory, never part of authored layout.
+          memory.compareCameraBounds={x:Math.min(x,bounds?bounds.x:x),y:Math.min(y,bounds?bounds.y:y),right:Math.max(x,bounds?bounds.right:x),bottom:Math.max(y,bounds?bounds.bottom:y),zoom:Math.min(Math.max(.001,value.zoom),bounds?bounds.zoom:4)};
+        }
+        zoom=clamp(value.zoom,zoomFloor(),4);sizeGraph(false);positionCamera({x:(value.x-vb.x)/vb.width,y:(value.y-vb.y)/vb.height,zoom:zoom});
+      }
       var c=camera();return {x:vb.x+c.x*vb.width,y:vb.y+c.y*vb.height,zoom:c.zoom};
     },
     panelPlacement:function(){return onCanvas() && !workbenchFocus?'canvas':'floating';},

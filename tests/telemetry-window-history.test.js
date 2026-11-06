@@ -65,7 +65,7 @@ test('historical Honeycomb evaluates nonadditive scalar once per selected window
  const s=h.api.snapshot().map.local;assert.equal(s.signals.p95.value,123);assert.equal(s.signals.p95.observedAt,null);assert.equal(s.signals.p95.retrievedAt,iso(NOW));assert.equal(s.window.to,days()[0].at);
 });
 test('historical SQL requires authored time-aware macros; unavailable query does not suppress good SQL/Prom/Loki peers',async t=>{
- const h=await setup({signals:{bad:{sql:'select count(*) from mutable'},good:{sql:'select count(*) from requests where $__timeFilter(created_at)'},prom:{grafana:'up'},loki:{loki:'sum(count_over_time({app="x"}[5m]))'}},answer:c=>({payload:c.tool==='query_sql'?{rows:[[42]]}:c.tool==='query_prometheus'?{data:{result:[{values:[[(NOW-HOUR)/1000,'5']]}]}}:{status:'success',data:{resultType:'matrix',result:[{values:[[(NOW-HOUR)/1000+'','3']]}]}}})});t.after(h.close);h.api.openHistory(days(),1);h.api.setEnabled(true);await settle();assert.equal(h.calls.filter(c=>c.tool==='query_sql').length,2);const s=h.api.snapshot().map.local;assert.equal(s.signals.bad,undefined);assert.equal(s.signals.good.value,42);assert.equal(s.signals.prom.value,5);assert.match(h.api.status().note,/Historical SQL/);assert.ok(h.calls.filter(c=>c.tool==='query_sql').every(c=>c.input.start===iso(NOW-DAY)&&c.input.end===iso(NOW)));
+ const h=await setup({signals:{bad:{sql:'select count(*) from mutable'},inert:{sql:'select count(*) as n, $$ $__from $__to $$ as note from requests'},good:{sql:'select count(*) from requests where $__timeFilter(created_at)'},prom:{grafana:'up'},loki:{loki:'sum(count_over_time({app="x"}[5m]))'}},answer:c=>({payload:c.tool==='query_sql'?{rows:[[42]]}:c.tool==='query_prometheus'?{data:{result:[{values:[[(NOW-HOUR)/1000,'5']]}]}}:{status:'success',data:{resultType:'matrix',result:[{values:[[(NOW-HOUR)/1000+'','3']]}]}}})});t.after(h.close);h.api.openHistory(days(),1);h.api.setEnabled(true);await settle();assert.equal(h.calls.filter(c=>c.tool==='query_sql').length,2);const s=h.api.snapshot().map.local;assert.equal(s.signals.bad,undefined);assert.equal(s.signals.inert,undefined);assert.equal(s.signals.good.value,42);assert.equal(s.signals.prom.value,5);assert.match(h.api.status().note,/Historical SQL/);assert.ok(h.calls.filter(c=>c.tool==='query_sql').every(c=>c.input.start===iso(NOW-DAY)&&c.input.end===iso(NOW)));
 });
 test('timestamp-proportional mini charts preserve isolated points and sparse gaps',()=>{
  const C=context(),range={from:iso(NOW-DAY),to:iso(NOW)},g=C.telemetrySparkline([[NOW-DAY,1],[NOW-DAY+HOUR,2],[NOW-HOUR,3]],240,12,DAY,range);assert.equal(g.points.length,3);assert.equal(g.points[1].x,10);assert.equal(g.lines.length,1);assert.equal(C.telemetrySparkline([[NOW-HOUR,0]],240,12,DAY,range).points.length,1);
@@ -136,10 +136,33 @@ test('native custom window providers and sparklines work without hosted connecto
  const sample=api.snapshot().map.local,chart=N.telemetrySparkline(sample.signals.rate.series,100,12,N.telemetryWindowMs('6h'),sample.window);assert.equal(chart.points.length,1);
 });
 
-test('SQL history macros in comments or quoted examples cannot authorize a mutable current query',()=>{
+test('SQL history eligibility ignores dialect strings/comments and rejects ambiguous quoting',()=>{
  const C=context();
- for(const q of ["select count(*) from requests -- $__timeFilter(created_at)","select count(*) from requests /* $__from $__to */", "select '$__from $__to' from requests", 'select count(*) from requests where at > $__from'])assert.equal(C.telemetrySqlHistoryQuery(q),false,q);
- for(const q of ['select count(*) from requests where $__timeFilter(created_at)','select count(*) from requests where at >= $__from and at < $__to'])assert.equal(C.telemetrySqlHistoryQuery(q),true,q);
+ const inert=[
+  "select count(*) from requests -- $__timeFilter(created_at)",
+  "select count(*) from requests # $__timeFilter(created_at)",
+  "select count(*) from requests /* $__from $__to */",
+  "select count(*) from requests /* outer /* nested */ $__from $__to */",
+  "select count(*) as n, $$ $__from $__to $$ as note from requests",
+  "select count(*) as n, $note$ $__timeFilter(created_at) $note$ as note from requests",
+  "select '$__from $__to' from requests",
+  'select count(*) as [name ]] $__from $__to] from requests',
+  'select count(*) as "name "" $__from $__to" from requests',
+  'select count(*) as `name `` $__from $__to` from requests',
+  'select count(*) from requests where at > $__from',
+  'select count(*) where $__timeFilter(at) /* unterminated',
+  'select count(*) where $__timeFilter(at) and note = $tag$ unterminated',
+  "select count(*) where $__timeFilter(at) and note = 'unterminated",
+  "select count(*) where $__timeFilter(at) and note = 'a"+String.fromCharCode(92)+"b'"
+ ];
+ for(const q of inert)assert.equal(C.telemetrySqlHistoryQuery(q),false,q);
+ for(const q of [
+  'select count(*) from requests where $__timeFilter(created_at)',
+  'select count(*) from requests where at >= $__from and at < $__to',
+  'select $$example$$ from requests where $__timeFilter(at) # ignored',
+  'select $note$example$note$ from requests /* outer /* nested */ comment */ where at >= $__from and at < $__to',
+  'select count(*) from requests -- ignored\nwhere $__timeFilter(at)'
+ ])assert.equal(C.telemetrySqlHistoryQuery(q),true,q);
 });
 
 test('direct Honeycomb legacy history cannot accidentally issue a present-day query',async()=>{

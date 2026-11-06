@@ -2196,7 +2196,7 @@ never summed. Structured series remain intact; the published formatted Results
 fallback retains its rounding warning and unknown as-of without invented points.
 SQL passes absolute `start`/`end` only for queries containing `$__timeFilter(...)` in query code (not a comment or quoted example)
 or both `$__from` and `$__to`; unscoped queries receive a per-signal historical
-unavailable note. No timestamp column or historical table semantics are guessed.
+unavailable note. The conservative guard ignores dollar-quoted strings, quoted identifiers and dialect comments; unterminated syntax or ambiguous backslash quoting stays unavailable. No timestamp column or historical table semantics are guessed.
 
 The following endpoint-only contract remains the default for custom providers.
 It preserves batch loading, exact endpoint projection and slider-without-fetch

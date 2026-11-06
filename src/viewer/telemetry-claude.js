@@ -272,9 +272,41 @@ function telemetryGrafanaSql(payload){
   for(var i=0;i<values.length;i++){var n=telemetryGrafanaNumber(values[i]);if(n!==null)return n;}
   return null;
 }
-/* Comments and quoted examples are not an authored historical constraint. */
+/* This eligibility guard recognizes code macros, not SQL semantics. Strip
+   dialect strings/comments; reject unterminated or ambiguous quoted syntax. */
 function telemetrySqlHistoryQuery(text){
-  var code=text.replace(/--[^\n\r]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|`(?:``|[^`])*`/g,' ');
+  var code='',i=0;
+  while(i<text.length){
+    var c=text[i],next=text[i+1];
+    if(c==='#' || c==='-' && next==='-'){
+      while(i<text.length && text[i]!=='\n' && text[i]!=='\r')i++;
+      code+=' ';continue;
+    }
+    if(c==='/' && next==='*'){
+      var depth=1;i+=2;
+      while(i<text.length && depth){
+        if(text[i]==='/' && text[i+1]==='*'){depth++;i+=2;}
+        else if(text[i]==='*' && text[i+1]==='/'){depth--;i+=2;}else i++;
+      }
+      if(depth)return false;code+=' ';continue;
+    }
+    if(c==='$'){
+      var dollar=/^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/.exec(text.slice(i));
+      if(dollar){var end=text.indexOf(dollar[0],i+dollar[0].length);if(end<0)return false;i=end+dollar[0].length;code+=' ';continue;}
+    }
+    if(c==="'" || c==='"' || c==='`' || c==='['){
+      var close=c==='['?']':c,closed=false;i++;
+      while(i<text.length){
+        // Backslash quoting differs by dialect/session. Do not guess which
+        // following characters are executable in a historical query.
+        if(text[i]==='\\')return false;
+        if(text[i]===close){if(text[i+1]===close){i+=2;continue;}i++;closed=true;break;}
+        i++;
+      }
+      if(!closed)return false;code+=' ';continue;
+    }
+    code+=c;i++;
+  }
   return /\$__timeFilter\s*\(/.test(code) || /\$__from\b/.test(code) && /\$__to\b/.test(code);
 }
 function telemetryGrafanaWindowMs(text){

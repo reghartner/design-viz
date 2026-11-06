@@ -51,7 +51,7 @@ function telemetryCardContent(edge,binding,sample,result,window,pending){
   return {rows:rows,countNote:telemetryCountNote(binding),title:title,headline:(queue?'in: ':'')+telemetryCardValue(binding,sample,primary,pending)+(scalar && telemetryReading(sample,primary).value!==null?' in '+window:''),scope:[scope,telemetryCountNote(binding)?'COUNT: source rows/events':''].filter(Boolean).join(' · '),
     details:rows.filter(function(row){return row.name!==primary;}).map(function(row){return row.label+': '+row.text;}),
     note:loading?(measured?'Refreshing…':'Loading…'):state==='silent'?'no traffic · '+window+' window':state==='unobserved'?'unobserved · '+window+' window':window+' window',
-    series:primary?telemetryReading(sample,primary).series:[],state:state};
+    series:primary?telemetryReading(sample,primary).series:[],chartRange:sample && (sample.signals && sample.signals[primary] && sample.signals[primary].window || sample.window),intervalMs:sample && sample.signals && sample.signals[primary] && sample.signals[primary].intervalMs,state:state};
 }
 /* Authoring placeholders never enter ctl.telemetry or the proof engine. Only
    explicit, valid edge bindings get samples; IDs and labels never infer queries. */
@@ -146,9 +146,7 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
         }
         y+=2;
       });
-      if(content.series.length>=2){var values=content.series.map(function(p){return p[1];}),lo=Math.min.apply(null,values),hi=Math.max.apply(null,values);
-        telemetrySvg(doc,'polyline',{'class':'dv-metrics-sparkline',points:values.map(function(v,i){return (10+80*i/(values.length-1))+','+(hi===lo?y+6:y+12-12*(v-lo)/(hi-lo));}).join(' ')},card);y+=20;
-      }
+      if(content.series.length){telemetryPaintSparkline(doc,card,content.series,10,y,Math.min(100,w-20),12,telemetryWindowMs(window),content.chartRange,content.intervalMs);y+=20;}
       if(sharedScope)wrapped(sharedScope,'t2 dv-metrics-card-scope',w-20,2);
       wrapped(content.note,'t2 dv-metrics-card-note',w-20,2);
       if(content.countNote)wrapped('COUNT: source rows/events','t2 dv-metrics-card-scope',w-20,2);

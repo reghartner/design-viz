@@ -3,10 +3,15 @@
 Use this workflow to align an accepted diagram with actual spans, preserving its
 story and placement. Run commands from the repository root or the source-free
 kit's **VIZ** directory. Editing and visual verification are desktop-only.
-For a focused instruction packet:
+Create a unique output directory once per author session, then keep using that
+shell's `TRACE_CHECK_DIR` for the commands below. Concurrent authors must create
+their own directories; never reuse another author's temporary spec or reports.
+Keep this directory out of authored deliverables and retain its path with your
+validation evidence. Source specs and trace inputs remain unchanged.
 
 ```sh
-python3 tools/authoring-packet.py --feature traces --mode edit --out /tmp/trace-packet.md
+TRACE_CHECK_DIR="$(mktemp -d "${PWD}/.trace-check.XXXXXX")"
+python3 tools/authoring-packet.py --feature traces --mode edit --out "$TRACE_CHECK_DIR/trace-packet.md"
 ```
 
 ## 1. Inspect the source and evidence before editing
@@ -96,8 +101,8 @@ Resolve local imports to a temporary validation copy, never over the authored
 file (replace these paths with the actual candidate and registry):
 
 ```sh
-node tools/canon/local-imports.mjs /path/to/candidate.spec.json /path/to/registry.json > /tmp/trace-resolved.spec.json
-node tools/canon/trace-cli.mjs preview --spec /tmp/trace-resolved.spec.json --trace /path/to/request.json --section 0 --out /tmp/trace-mapping.json
+node tools/canon/local-imports.mjs /path/to/candidate.spec.json /path/to/registry.json > "$TRACE_CHECK_DIR/trace-resolved.spec.json"
+node tools/canon/trace-cli.mjs preview --spec "$TRACE_CHECK_DIR/trace-resolved.spec.json" --trace /path/to/request.json --section 0 --out "$TRACE_CHECK_DIR/trace-mapping.json"
 ```
 
 ## 4. Validate mapping before enabling a provider
@@ -108,9 +113,9 @@ of live evidence. The read-only preview command writes a report, not a spec:
 
 ```sh
 node tools/validate.js examples/trace-ready/existing.spec.json
-node tools/canon/trace-cli.mjs preview --spec examples/trace-ready/existing.spec.json --trace examples/trace-ready/normal.json --out /tmp/normal-mapping.json
-node tools/canon/trace-cli.mjs preview --spec examples/trace-ready/existing.spec.json --trace examples/trace-ready/partial.json --out /tmp/partial-mapping.json
-node tools/canon/trace-cli.mjs preview --spec examples/trace-ready/existing.spec.json --trace examples/trace-ready/ambiguous.json --out /tmp/ambiguous-mapping.json
+node tools/canon/trace-cli.mjs preview --spec examples/trace-ready/existing.spec.json --trace examples/trace-ready/normal.json --out "$TRACE_CHECK_DIR/normal-mapping.json"
+node tools/canon/trace-cli.mjs preview --spec examples/trace-ready/existing.spec.json --trace examples/trace-ready/partial.json --out "$TRACE_CHECK_DIR/partial-mapping.json"
+node tools/canon/trace-cli.mjs preview --spec examples/trace-ready/existing.spec.json --trace examples/trace-ready/ambiguous.json --out "$TRACE_CHECK_DIR/ambiguous-mapping.json"
 ```
 
 Inspect `mapping.steps`: normal maps `receive` and `persist`; partial leaves
@@ -125,10 +130,11 @@ them merely to align an existing diagram.
 
 CLI `preview --section N` selects a zero-based diagram section and checks its
 first path (or all steps if no paths). For each additional path, use the same
-production matcher read-only, supplying its exact ID:
+production matcher read-only, supplying its exact ID. Give each path report a
+distinct filename within your session directory if checking multiple paths:
 
 ```sh
-node --input-type=module - /path/to/resolved.spec.json /path/to/request.json 0 PATH_ID <<'JS'
+node --input-type=module - "$TRACE_CHECK_DIR/trace-resolved.spec.json" /path/to/request.json 0 PATH_ID > "$TRACE_CHECK_DIR/path-mapping.json" <<'JS'
 import fs from 'node:fs';
 import C from './tools/canon/core.cjs';
 import {normalizeTrace, mapTrace} from './tools/canon/traces.mjs';

@@ -40,6 +40,7 @@ def folder_agent_kit(root, runtime):
     for name in ['LICENSE', 'tools/widget_doc.py', 'tools/company_overlay.py', 'tools/validate.js',
                  'tools/auto-arrange-spec.cjs', 'tools/size-section-layout.cjs', 'tools/authoring-packet.py', 'tools/visibility-check.cjs',
                  'tools/compatibility.js', 'tools/canon/core.cjs',
+                 'tools/canon/trace-cli.mjs', 'tools/canon/traces.mjs', 'tools/canon/drift.mjs',
                  'tools/canon/manifest.cjs', 'tools/canon/local-imports.mjs']:
         files[name] = (root / name).read_text()
     trace_cli = (root / 'tools/trace2spec.js').read_text()

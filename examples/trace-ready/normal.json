@@ -1,0 +1,24 @@
+{
+  "spans": [
+    {
+      "traceId": "fixture-request",
+      "id": "request",
+      "serviceName": "request-api",
+      "operation": "POST /records",
+      "startMs": 0,
+      "durationMs": 50
+    },
+    {
+      "traceId": "fixture-request",
+      "id": "insert",
+      "parentId": "request",
+      "serviceName": "record-store",
+      "operation": "INSERT record",
+      "startMs": 10,
+      "durationMs": 20,
+      "attributes": {
+        "db.system": "postgresql"
+      }
+    }
+  ]
+}

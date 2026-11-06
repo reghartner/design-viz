@@ -1,0 +1,72 @@
+{
+  "page": {
+    "title": "Trace-ready request \u00b7 fictional fixture",
+    "sections": [
+      {
+        "id": "request",
+        "diagram": {
+          "nodes": {
+            "client": {
+              "title": "Client"
+            },
+            "api": {
+              "title": "Request API"
+            },
+            "store": {
+              "title": "Record store"
+            }
+          },
+          "rows": [
+            [
+              "client",
+              "api",
+              "store"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "client",
+              "to": "api"
+            },
+            {
+              "from": "api",
+              "to": "store"
+            }
+          ],
+          "panels": [
+            {
+              "id": "status",
+              "type": "live-status"
+            }
+          ],
+          "steps": [
+            {
+              "id": "receive",
+              "text": "Receive request",
+              "edge": "client->api",
+              "traceMatch": {
+                "serviceName": "request-api",
+                "operation": "POST /records",
+                "nodeId": "api"
+              }
+            },
+            {
+              "id": "persist",
+              "text": "Write record",
+              "edge": "api->store",
+              "traceMatch": {
+                "serviceName": "record-store",
+                "operation": "INSERT record",
+                "nodeId": "store",
+                "parentStepId": "receive",
+                "attributes": {
+                  "db.system": "postgresql"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -39,12 +39,13 @@ FEATURES = {
     'reveals': ['fragment-level reveals'],
     'groups': ['groups — containment boundaries'],
     'delta': ['Delta markers — nodes, edges, and steps'],
-    'metrics': [], 'bindings': [], 'topology': ['Shared topology references'], 'drilldowns': [],
+    'traces': [], 'metrics': [], 'bindings': [], 'topology': ['Shared topology references'], 'drilldowns': [],
 }
-DEPENDENCIES = {'time': ['steps'], 'paths': ['steps'], 'reveals': ['steps'],
+DEPENDENCIES = {'traces': ['steps'], 'time': ['steps'], 'paths': ['steps'], 'reveals': ['steps'],
                 'visibility': ['steps'], 'audio': ['steps'], 'delta': ['steps'],
                 'drilldowns': ['layouts'], 'explore': ['layouts']}
 ROUTES = {
+    'traces': ['docs/trace-ready-authoring.md', 'docs/provider-traces.md'],
     'metrics': ['docs/live-status.md', '.claude/skills/live-status-board/metrics.md'],
     'layouts': ['docs/tab-views.md', 'docs/section-layouts.md'], 'explore': ['docs/tab-views.md', 'docs/section-layouts.md'],
     'bindings': [REFS + 'bindings-and-code.md'],
@@ -55,7 +56,7 @@ ROUTES = {
 }
 # For dependencies whose rules are not in the contract, embed their maintained
 # owner instead of writing a second set of rules here.
-INLINE = {
+INLINE = {'traces': ['docs/trace-ready-authoring.md'],
           'metrics': ['.claude/skills/live-status-board/metrics.md'],
           'bindings': [REFS + 'bindings-and-code.md'],
           'topology': ['docs/shared-topology.md'],
@@ -154,6 +155,7 @@ def infer(raw):
                     if key in ('revealAt', 'hideAt'): features.add('reveals')
                     if key == 'panelVisibility' or key == 'visible': features.add('visibility')
                     if key in ('audio', 'spotlight', 'alarm'): features.add('audio')
+                    if key == 'traceMatch': features.add('traces')
                     if key == 'delta': features.add('delta')
                     if key == 'detailOnly': features.add('drilldowns')
                     visit(item)

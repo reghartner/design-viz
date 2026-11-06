@@ -88,6 +88,10 @@ errors remain unobserved; never infer zero from an absent cell. COUNT counts
 spans/events, not automatically requests. Honeycomb daily history remains
 unsupported. No live-account verification is claimed.
 
+To align existing local or imported nodes with spans, first follow
+[Trace-ready authoring](../../../docs/trace-ready-authoring.md). Mapping selectors
+do not retrieve data, and ordinary Trace overlays require no reference approval.
+
 Live Honeycomb trace retrieval uses `run_query` followed by `get_trace` for an
 actual returned trace ID. Declare both tools in the artifact's Honeycomb MCP
 capability; the generated scalar declaration lists only `run_query`. Author an

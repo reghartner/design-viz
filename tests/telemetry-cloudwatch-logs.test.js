@@ -77,3 +77,22 @@ test('loaded detail pages use consumer variables and account defaults while reta
 test('scalar display primary does not turn refused-publish counts into traffic animation',()=>{const C=context(),raw=binding();raw.signals.refused=raw.signals.rate;delete raw.signals.rate;delete raw.signals.sent;const b=C.carrierTelemetry({telemetry:raw});assert.equal(C.telemetryPrimary(b),null);assert.equal(C.telemetryPrimary(b,true),'refused');assert.match(C.telemetryCardContent({from:'device',to:'iot'},b,{signals:{refused:{value:15}}},{telemetry:'flowing'},'24h').headline,/15 refused publishes in 24h/);});
 
 test('CloudWatch statistic string can be a named variable in authored templates and resolves before calls',()=>{const C=context(),raw={telemetry:{kind:'service',signals:{count:{cloudwatch:{...metric(),statistic:'${stat}'}}}}};assert.ok(C.carrierTelemetry(raw));const b=C.carrierTelemetry(raw,{},null,{variables:{stat:'SampleCount',queueAccount:'queue'},environment:'qa'});assert.equal(b.signals.count.query.statistic,'SampleCount');assert.equal(b.signals.count.error,undefined);});
+
+test('real local and imported template parameters resolve profile refs in the same final pass, with literal variable values',()=>{
+ const C=context();
+ const template={kind:'service',params:['iotAccount'],signals:{refused:{cloudwatchLogs:logs(),scope:'account ${iotAccount}'}}};
+ const spec=(id,diagram,tracking)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},tracking,sections:[{id:'main',diagram}]}});
+ const provider=spec('provider',{nodes:{api:{telemetry:{use:'counts',iotAccount:'${queueAccount}'}}},rows:[['api']],topologyExports:{core:{nodes:['api'],edges:[]}}},{telemetry:{templates:{counts:template}}});
+ const consumer=spec('consumer',{nodes:{local:{telemetry:{use:'counts',iotAccount:'${queueAccount}'}}},rows:[['local']],topologyImports:[{spec:'provider',export:'core',as:'shared'}]},{telemetry:{templates:{counts:template},variables:{iotAccount:'default-account',queueAccount:'${literalAccount}'},environment:'stg',environments:{stg:{}}}});
+ const before=JSON.stringify([provider,consumer]),p=C.normalize(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]})),d=p.sections[0].diagram,config=C.telemetryEnvironmentConfig(p);
+ const bindings=C.telemetryBindings(fn=>{for(const [id,node] of Object.entries(d.nodes))fn(node,id,p);},'stg',config);
+ assert.equal(bindings.length,2);for(const b of bindings){assert.equal(b.signals.refused.query.logGroups[0],'arn:aws:logs:us-east-1:${literalAccount}:log-group:AWSIotLogsV2');assert.equal(b.signals.refused.scope,'account ${literalAccount}');assert.equal(b.signals.refused.error,undefined);}
+ assert.deepEqual(plain(bindings[0].signals),plain(bindings[1].signals));assert.equal(JSON.stringify([provider,consumer]),before);
+ assert.equal(C.carrierTelemetry({telemetry:{use:'counts',iotAccount:'explicit-account'}},{counts:template},null,config).signals.refused.scope,'account explicit-account');
+});
+test('environment variables require braces and cannot rewrite literal AWS/provider-owned tokens',()=>{
+ const C=context(),b=C.carrierTelemetry({telemetry:{kind:'service',signals:{refused:{cloudwatchLogs:logs()},prom:{grafana:'$aws ${aws} $interval ${interval} $__interval $__rate_interval $env $account'}}}},{},null,{variables:{aws:'collision',interval:'5m',iotAccount:'123'},environment:'stg',grafana:{accountId:'456'}});
+ assert.equal(b.signals.refused.query.query,logs().query);assert.equal(b.signals.prom.query,'$aws collision $interval 5m $__interval $__rate_interval stg 456');assert.equal(b.signals.prom.error,undefined);
+ const template={kind:'service',params:['aws'],signals:{count:{grafana:'$aws ${aws}'}}};assert.equal(C.carrierTelemetry({telemetry:{use:'x',aws:'template-value'}},{x:template},null,{variables:{aws:'environment-value'}}).signals.count.query,'template-value template-value');
+});
+test('no supported CloudWatch tools leaves Metrics unavailable with a one-line actionable Logs diagnostic',async t=>{const h=await setup({tools:[]});t.after(()=>h.close());assert.equal(h.api.snapshot().available,false);assert.match(h.api.status().note,/Grafana needs connector tools:.*query_cloudwatch_logs/);assert.doesNotMatch(h.api.status().note,/\n/);h.api.setEnabled(true);await settle();assert.equal(h.calls.length,0);assert.deepEqual(plain(h.api.snapshot().map),{});});

@@ -299,12 +299,12 @@ function telemetryClean(raw,warn,template){
 /* Single pass over every string of a template: declared $name and ${name}
    placeholders are replaced literally; anything else (Grafana's $__interval,
    undeclared names) stays as authored. */
-function telemetrySubstitute(value,values,missing){
+function telemetrySubstitute(value,values,missing,namedOnly){
   if(typeof value==='string')return value.replace(/\$\{([A-Za-z][A-Za-z0-9_]*)\}|\$([A-Za-z][A-Za-z0-9_]*)/g,function(match,braced,bare){
-    var name=braced || bare;if(telemetryOwn(values,name))return values[name];if(missing && (braced || name==='env' || name==='account'))missing(name);return match;
+    var name=braced || bare;if(telemetryOwn(values,name) && (!namedOnly || braced || name==='env' || name==='account'))return values[name];if(missing && (braced || name==='env' || name==='account'))missing(name);return match;
   });
-  if(Array.isArray(value))return value.map(function(item){return telemetrySubstitute(item,values,missing);});
-  if(telemetryObject(value)){var out={};Object.keys(value).forEach(function(key){Object.defineProperty(out,key,{value:telemetrySubstitute(value[key],values,missing),enumerable:true,writable:true,configurable:true});});return out;}
+  if(Array.isArray(value))return value.map(function(item){return telemetrySubstitute(item,values,missing,namedOnly);});
+  if(telemetryObject(value)){var out={};Object.keys(value).forEach(function(key){Object.defineProperty(out,key,{value:telemetrySubstitute(value[key],values,missing,namedOnly),enumerable:true,writable:true,configurable:true});});return out;}
   return value;
 }
 /* Authored form of a carrier binding with `use` expanded against templates:
@@ -312,10 +312,10 @@ function telemetrySubstitute(value,values,missing){
    card replacing, and its signals, proof and links laid over per name.
    Returns raw itself (cloned) when there is no `use`, or null when the
    template cannot be applied. */
-function telemetryExpand(raw,templates,invalid,runtime){
+function telemetryExpand(raw,templates,invalid){
   var warn=telemetryWarn(invalid);
   if(!telemetryObject(raw))return null;
-  if(!telemetryOwn(raw,'use'))return runtime?runtime.resolve(raw,runtime.values):telemetryClone(raw);
+  if(!telemetryOwn(raw,'use'))return telemetryClone(raw);
   var name=raw.use,template=typeof name==='string' && telemetryObject(templates) && telemetryOwn(templates,name)?templates[name]:null;
   if(!telemetryObject(template)){warn('.use','names no template in tracking.telemetry.templates — binding ignored');return null;}
   var params=(Array.isArray(template.params)?template.params:[]).filter(function(p){return typeof p==='string' && telemetryParamPattern.test(p);});
@@ -330,13 +330,13 @@ function telemetryExpand(raw,templates,invalid,runtime){
   });
   if(missing)return null;
   var base={};Object.keys(template).forEach(function(key){if(key!=='params' && key!=='card')base[key]=telemetryClone(template[key]);});
-  var out=runtime?runtime.resolve(base,Object.assign(Object.create(null),runtime.values,values)):telemetrySubstitute(base,values);
-  ['kind','card'].forEach(function(key){if(telemetryOwn(raw,key))out[key]=runtime?telemetrySubstitute(raw[key],runtime.values):telemetryClone(raw[key]);});
+  var out=telemetrySubstitute(base,values);
+  ['kind','card'].forEach(function(key){if(telemetryOwn(raw,key))out[key]=telemetryClone(raw[key]);});
   ['signals','proof','links'].forEach(function(key){
     if(!telemetryOwn(raw,key))return;
     if(!telemetryObject(raw[key])){warn('.'+key,'must be an object — carrier '+key+' ignored');return;}
     var merged=telemetryObject(out[key])?out[key]:{};
-    Object.keys(raw[key]).forEach(function(entry){merged[entry]=runtime?runtime.resolveField(key,entry,raw[key][entry]):telemetryClone(raw[key][entry]);});
+    Object.keys(raw[key]).forEach(function(entry){merged[entry]=telemetryClone(raw[key][entry]);});
     out[key]=merged;
   });
   return out;
@@ -347,24 +347,24 @@ function carrierTelemetry(obj,templates,invalid,environment){
   if(telemetryTextBox(obj)){warn('','text boxes do not carry telemetry — ignored');return null;}
   var raw=obj.telemetry;
   if(!telemetryObject(raw)){warn('','must be an object {kind, signals, proof?, links?, card?} or {use, ...params} — ignored');return null;}
-  var config=telemetryObject(environment)?environment:environment?{environment:environment}:null,errors=Object.create(null),runtime=null;
+  // Imported templates have already had their template pass in canon-topology.
+  // Local templates take that same pass here, before exactly one environment pass.
+  var expanded=telemetryExpand(raw,templates,warn);
+  if(!expanded)return null;
+  var config=telemetryObject(environment)?environment:environment?{environment:environment}:null,errors=Object.create(null);
   if(config){
     var values=Object.assign(Object.create(null),config.variables || {});
     if(config.environment)values.env=config.environment;
     if(config.grafana && config.grafana.accountId)values.account=config.grafana.accountId;
-    function field(key,name,value,vars){
-      if(key==='signals')delete errors[name];
-      return telemetrySubstitute(value,vars,function(missing){if(key==='signals')errors[name]='Set telemetry variable ${'+missing+'} in the active environment'+(missing==='account'?' or tracking.telemetry.grafana.accountId':'')+'.';});
-    }
-    runtime={values:values,resolveField:function(key,name,value){return field(key,name,value,values);},resolve:function(value,vars){
-      var out=telemetryClone(value);Object.keys(out).forEach(function(key){
-        if(key==='signals' && telemetryObject(out[key]))Object.keys(out[key]).forEach(function(name){out[key][name]=field(key,name,out[key][name],vars);});
-        else out[key]=telemetrySubstitute(out[key],vars);
-      });return out;
-    }};
+    Object.keys(expanded).forEach(function(key){
+      if(key==='signals' && telemetryObject(expanded[key]))Object.keys(expanded[key]).forEach(function(name){
+        expanded[key][name]=telemetrySubstitute(expanded[key][name],values,function(missing){
+          errors[name]='Set telemetry variable ${'+missing+'} in the active environment'+(missing==='account'?' or tracking.telemetry.grafana.accountId':'')+'.';
+        },true);
+      });
+      else expanded[key]=telemetrySubstitute(expanded[key],values,null,true);
+    });
   }
-  var expanded=telemetryExpand(raw,templates,warn,runtime);
-  if(!expanded)return null;
   var clean=telemetryClean(expanded,warn,false);
   if(!clean)return null;
   var signals={};

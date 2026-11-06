@@ -2420,10 +2420,13 @@ dimensions/account, PromQL, LogQL, SQL, Honeycomb filters, Tempo, `unit` and
 `$env` / `${env}` uses the selected deployment. `account` and `env` are reserved
 variable names. `$__interval`, `$__rate_interval` and literal `$aws` stay intact.
 
-Precedence is shared variables < active profile variables < declared template
-parameters for template strings. Carrier signal overrides use environment
-variables. Expansion is a **single pass**: inserted variable/parameter values
-are literal and never recursively expanded. Unknown `${name}` in a signal
+Template parameters expand first (declared parameters win their original
+template occurrences); parameter values may intentionally contain environment
+references. Then one environment pass resolves shared variables overridden by
+the active profile, consistently for local and imported templates. Carrier
+signal overrides use that same environment pass. Arbitrary environment names
+require `${name}`; only legacy `$env` and `$account` also accept bare syntax.
+Inserted environment-variable values are literal and never recursively expanded. Unknown `${name}` in a signal
 makes that signal unobserved with a configuration reason and prevents its call.
 Never interpolate user secrets; profiles and queries are shipped in the artifact.
 The source and authored default environment stay unchanged when readers switch.

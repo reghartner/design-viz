@@ -102,8 +102,10 @@ body.dv-tour-button .explore-tour-button:focus-visible{outline:2px solid var(--a
 .section-viewport:fullscreen>.diagram-views{flex:none;margin:0 0 10px;}
 .section-viewport:fullscreen>.explore-stage{flex:1;height:auto!important;min-height:0;}
 .section-viewport.viewport-expanded:not(:fullscreen)>.explore-stage{height:var(--explore-expanded-height,max(520px,calc(100dvh - 90px)))!important;}
-.section-viewport.viewport-expanded:not(:fullscreen)>.standard-view-surface,
-.section-viewport.viewport-expanded:not(:fullscreen)>.section-layout-grid{height:var(--explore-expanded-height,max(520px,calc(100dvh - 120px)));overflow:auto;border:1px solid var(--explore-border);border-radius:12px;}
+/* Only in-page expansion needs a bounded inner scroller. When the document
+   owns fullscreen, keep section content in its page flow so prose scrolls too. */
+.section-viewport.viewport-expanded:not(:fullscreen, :fullscreen *)>.standard-view-surface,
+.section-viewport.viewport-expanded:not(:fullscreen, :fullscreen *)>.section-layout-grid{height:var(--explore-expanded-height,max(520px,calc(100dvh - 120px)));overflow:auto;border:1px solid var(--explore-border);border-radius:12px;}
 .section-viewport:fullscreen>.section-layout-grid{flex:1;overflow:auto;}
 .section-viewport:fullscreen>.standard-view-surface{flex:1;overflow:auto;min-height:0;}
 @container diagram-section (max-width:640px){

@@ -237,6 +237,33 @@ test('fullscreen is explicit and refusal keeps an exit-able in-page view',async(
  await page.getByRole('button',{name:'Exit expanded diagram view',exact:true}).press('Escape');await expect(page.locator('.section-viewport')).not.toHaveClass(/viewport-expanded/);
  await page.getByRole('button',{name:'Home story',exact:true}).click();await page.getByRole('button',{name:'Expand diagram view',exact:true}).click();await expect(page.locator('.section-viewport')).toHaveClass(/viewport-expanded/);await expect(page.locator('.explore-stage')).toBeHidden();
 });
+for(const arranged of [false,true])test(`fullscreen scrolls section text and the whole page with ${arranged?'an authored arrangement':'an ordinary diagram'}`,async({page,server})=>{
+ await page.setViewportSize({width:1440,height:900});
+ const nodes=Object.fromEntries(Array.from({length:12},(_,index)=>['service'+index,{title:'Service '+index}]));
+ const diagram={nodes,rows:Object.keys(nodes).map(id=>[id]),view:'step',autoplay:false,steps:[{text:'The final page content remains reachable. '+ 'Further reading about each service. '.repeat(60)}]};
+ if(arranged)diagram.layouts=[{id:'reading',name:'Reading',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:32}]}}];
+ const input=path.join(server.root,'page-scroll.json'),out=path.join(server.root,'page-scroll.html');
+ await writeFile(input,JSON.stringify({page:{title:'Full page reading',sections:[
+  {id:'story',heading:'The complete story',text:'Section text must move together with the diagram.',diagram}
+ ]}}));
+ execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),out]);
+ await page.goto(server.origin+'/page-scroll.html');
+ await page.getByRole('button',{name:'Expand diagram view',exact:true}).click();
+ const documentView=page.locator('#docview'),prose=page.locator('#section-story-prose .sec-text');
+ await expect.poll(()=>documentView.evaluate(el=>document.fullscreenElement===el)).toBe(true);
+ const surface=page.locator(arranged?'.section-layout-grid':'.standard-view-surface'),before=await rect(prose),area=await rect(surface);
+ // A wheel over diagram content must move the document, including its prose,
+ // rather than being consumed by a second viewport below stationary text.
+ await page.mouse.move(area.x+area.width/2,Math.max(area.y+120,250));await page.mouse.wheel(0,120);
+ await expect.poll(()=>documentView.evaluate(el=>el.scrollTop)).toBeGreaterThan(60);
+ expect((await rect(prose)).y).toBeLessThan(before.y-60);
+ expect(await surface.evaluate(el=>el.scrollTop)).toBe(0);
+ await documentView.evaluate(el=>{el.scrollTop=el.scrollHeight;});
+ await expect(page.locator('.stepline').filter({hasText:'The final page content remains reachable.'})).toBeInViewport();
+ await page.getByRole('button',{name:'Exit expanded diagram view',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>!!document.fullscreenElement)).toBe(false);
+ await expect(page.locator('.section-viewport')).not.toHaveClass(/viewport-expanded/);
+});
 test('ordinary diagrams can expand without named views, with a bounded fallback',async({page,server})=>{
  const input=path.join(server.root,'plain-expand.json'),out=path.join(server.root,'plain-expand.html');
  await writeFile(input,JSON.stringify({page:{title:'Plain',sections:[{diagram:{nodes:{a:{title:'Service'}},rows:[['a']]}}]}}));

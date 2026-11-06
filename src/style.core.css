@@ -4219,3 +4219,6 @@ svg path.edge.dv-metrics-ghosted{opacity:.35;}
 
 /* Step captions retain scalar evidence independently of Status Trace mode. */
 .dv-proof-caption{font-weight:600;color:var(--ink);}
+
+.dv-metrics-query-link{color:var(--dtext);cursor:pointer;}
+.dv-metrics-query-link:focus{outline:2px solid var(--dv-metrics-blue,#2879d9);outline-offset:2px;}

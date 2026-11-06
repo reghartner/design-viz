@@ -27,8 +27,8 @@
      query_loki_logs metric range call                    one per loki signal
      query_cloudwatch full-window Sum                    one per cloudwatch signal
      query_sql {datasourceUid, query}                     per sql signal, at most hourly
-     generate_deeplink explore link                       optional, once per carrier per page load,
-                                                          unless the carrier authors links.query
+     generate_deeplink explore link                       optional, once per signal per page load,
+                                                          unless the signal authors links.query
    Times are relative to the server clock: now-<window> to now. tempo signals
    (exemplar traces) and honeycomb signals are not run here.
 
@@ -230,7 +230,7 @@ function telemetryGrafanaJobs(bindings){
     Object.keys(binding.signals).forEach(function(name){
       var signal=binding.signals[name];
       if(signal && TELEMETRY_GRAFANA_RUN.indexOf(signal.source)>=0 && (signal.source==='cloudwatch'?telemetryCloudwatchQuery(signal.query):signal.source==='cloudwatchLogs'?telemetryCloudwatchLogsQuery(signal.query):typeof signal.query==='string'))
-        signals.push({name:name,source:signal.source,query:signal.query,error:signal.error,breakdownError:signal.breakdownError,unit:typeof signal.unit==='string' && signal.unit?signal.unit:null});
+        signals.push({name:name,source:signal.source,query:signal.query,links:signal.links || {},error:signal.error,breakdownError:signal.breakdownError,unit:typeof signal.unit==='string' && signal.unit?signal.unit:null});
     });
     if(signals.length)jobs.push({id:binding.id,signals:signals,binding:binding,links:binding.links && typeof binding.links==='object'?binding.links:{}});
   });
@@ -383,7 +383,7 @@ function createTelemetryGrafana(page,win,now,bound){
       if(entry.points && entry.points.length)sample={value:entry.points[entry.points.length-1][1],series:entry.points,observedAt:new Date(entry.points[entry.points.length-1][0]).toISOString()};
       else if(typeof entry.value==='number')sample={value:entry.value,observedAt:entry.observedAt || new Date(clock()).toISOString()};
       else if(entry.points)sample={value:0,series:[],observedAt:new Date(clock()).toISOString()};
-      if(sample){if(entry.unit)sample.unit=entry.unit;if(entry.breakdown)sample.breakdown=entry.breakdown;}
+      if(sample){var queryUrl=telemetryQueryUrl(entry.links.query) || telemetryGrafanaUrl(entry.exploreUrl);if(queryUrl)sample.links={query:queryUrl};if(entry.unit)sample.unit=entry.unit;if(entry.breakdown)sample.breakdown=entry.breakdown;}
       report.settled(job.id,entry.name,sample);
     }
     function progressNote(){failures.sort(function(a,b){return a.rank-b.rank;});var note=!failures.length?'':failures.length===1?'1 Grafana query failed: '+failures[0].text:failures.length+' Grafana queries failed; first '+failures[0].text;var text=[note].concat(notices).filter(Boolean).join('; ');if(report && report.note && text!==reportedNote){reportedNote=text;report.note(text);}}
@@ -472,20 +472,18 @@ function createTelemetryGrafana(page,win,now,bound){
             var url=telemetryGrafanaUrl(result && result.payload && result.payload.exploreUrl);if(url)entry.exploreUrl=url;
           }).catch(caught(rank,label,{tool:tool,input:query},entry)).finally(function(){settled(job,entry);});});
         });});
-        // Explore links: once per carrier and page load, unless the author linked a query.
-        jobs.forEach(function(job){
-          if(job.links.query || offered.indexOf('generate_deeplink')<0)return;
-          var input=telemetryGrafanaExplore(job.binding,config,range);if(!input)return;
-          var key=JSON.stringify([config.environment,input]);job.explore=key;
+        // Each numeric query owns its Explore link. Link failures are optional
+        // navigation failures and never invalidate successful measurements.
+        jobs.forEach(function(job){job.signals.forEach(function(entry){
+          if(entry.links.query || offered.indexOf('generate_deeplink')<0)return;
+          var one={signals:{}};one.signals[entry.name]=entry;
+          var input=telemetryGrafanaExplore(one,config,range);if(!input)return;
+          var key=JSON.stringify([config.environment,input]);entry.explore=key;
           if(Object.prototype.hasOwnProperty.call(links,key))return;
           tasks.push(function(){return call('generate_deeplink',input).then(function(result){
-            if(signal && signal.aborted)return;var url=result && result.payload;links[key]=typeof url==='string' && /^https?:\/\//i.test(url.trim())?url.trim():null;
-          },function(error){
-            if(signal && signal.aborted)return;
-            if(['tool_error','bad_request','transform_error'].indexOf(code(error))>=0){links[key]=null;return;}
-            if(!fatal)fatal={error:error,repeat:{tool:'generate_deeplink',input:input}};
-          });});
-        });
+            if(signal && signal.aborted)return;links[key]=telemetryGrafanaUrl(result && result.payload);
+          },function(){if(!signal || !signal.aborted)links[key]=null;});});
+        });});
         return telemetryGrafanaRun(tasks,TELEMETRY_GRAFANA_PARALLEL,function(){return !!fatal || !!(signal && signal.aborted);});
       });
     }).then(function(){
@@ -508,17 +506,22 @@ function createTelemetryGrafana(page,win,now,bound){
           if(!sample)return;
           if(entry.breakdown)sample.breakdown=entry.breakdown;
           if(entry.unit)sample.unit=entry.unit;else delete sample.unit;
+          var one={signals:{}};one.signals[entry.name]=entry;
+          var query=telemetryQueryUrl(entry.links.query) || (entry.failed && sample.links && sample.links.query) || telemetryGrafanaUrl(entry.exploreUrl) || entry.explore && links[entry.explore];
+          if(!query){
+            var sameRefresh=jobs.reduce(function(all,j){return all.concat(j.signals.map(function(e){return e.exploreUrl || e.explore && links[e.explore];}));},[]).filter(Boolean)[0];
+            var base=sameRefresh || telemetryGrafanaUrl(config.grafana.baseUrl);
+            query=telemetryGrafanaExploreUrl(one,config,range,base);
+          }
+          if(query)sample.links={query:query};
           out.signals[entry.name]=sample;
         });
         if(!Object.keys(out.signals).length)return;
         if(typeof job.links.dashboard==='string')out.links.dashboard=job.links.dashboard;
-        var returned=job.signals.map(function(entry){return entry.exploreUrl;}).filter(Boolean)[0];
-        var query=typeof job.links.query==='string'?job.links.query:returned || job.explore && links[job.explore];
-        if(!query){
-          var sameRefresh=jobs.reduce(function(all,j){return all.concat(j.signals.map(function(e){return e.exploreUrl;}));},[]).filter(Boolean)[0];
-          var base=sameRefresh || telemetryGrafanaUrl(job.links.dashboard) || telemetryGrafanaUrl(job.links.query) || telemetryGrafanaUrl(config.grafana.baseUrl);
-          query=telemetryGrafanaExploreUrl(job.binding,config,range,base);
-        }
+        // Preserve the existing carrier Inspect link, never use it to label a
+        // mixed row. Per-signal links above remain authoritative.
+        var query=telemetryQueryUrl(job.links.query);
+        if(!query)query=out.signals[job.signals[0].name] && out.signals[job.signals[0].name].links && out.signals[job.signals[0].name].links.query;
         if(query)out.links.query=query;
         map[job.id]=out;
       });

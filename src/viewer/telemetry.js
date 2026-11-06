@@ -93,6 +93,7 @@ function telemetrySample(raw){
     if(telemetryNumber(value.value))entry.value=value.value;
     if(Array.isArray(value.series))entry.series=value.series.filter(telemetryPoint).map(function(point){return [point[0],point[1]];});
     if(telemetryText(value.unit))entry.unit=value.unit;
+    if(value.links && telemetryQueryUrl(value.links.query))entry.links={query:telemetryQueryUrl(value.links.query)};
     if(telemetryOwn(value,'observedAt'))entry.observedAt=telemetryTime(value.observedAt);
     if(telemetryOwn(value,'retrievedAt'))entry.retrievedAt=telemetryTime(value.retrievedAt);
     if(value.provenance==='formatted-text')entry.provenance='formatted-text';

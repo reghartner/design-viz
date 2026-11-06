@@ -3,7 +3,7 @@
    local detail copies; external documents have no editable ordinal. */
 function createTelemetryCardLayoutEditor(opts){
   var life=createWorkbenchLifetime(),view=opts.view,win=opts.window,gesture=null,nudge=null,suppress=false;
-  function cardFrom(ev){return ev.target.closest && ev.target.closest('.dv-metrics-card[data-metrics-section]');}
+  function cardFrom(ev){return ev.target.closest && !ev.target.closest('a') && ev.target.closest('.dv-metrics-card[data-metrics-section]');}
   function context(card){
     if(!card || !card.isConnected || opts.disabled())return null;
     var snapshot=opts.session.snapshot();if(snapshot.error || snapshot.renderedText!=null && snapshot.renderedText!==snapshot.text)return null;

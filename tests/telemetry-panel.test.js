@@ -47,7 +47,7 @@ test('Proof uses explicit kind/signals, truthful predicates and units, zero vers
  assert.equal(model.rows[2].kpis[0].text,'0 req/h');assert.equal(model.rows[4].kpis[0].text,'unobserved');assert.match(model.rows[0].since,/First observed traffic/);assert.doesNotMatch(model.rows[0].since,/requests|total|hours|48/);
  const q=input.carriers[0];q.kind='queue';q.title='Errors p95 requests';q.signals={in:{unit:'msg/s'},lag:{unit:'msgs'},age:{unit:'s'}};q.proof={in:{min:1},lag:{max:500},age:{max:60}};
  input.map.a.signals={in:{value:25},lag:{value:0},age:{value:1.5}};
- const result=C.liveStatusProofPresentation(input,'6h');assert.deepEqual(plain(result.rows[0].kpis),[{label:'in',text:'25 msg/s'},{label:'lag',text:'0 msgs'},{label:'age',text:'1.5 s'}]);assert.match(result.predicate,/each carrier/);
+ const result=C.liveStatusProofPresentation(input,'6h');assert.deepEqual(plain(result.rows[0].kpis.map(({label,text})=>({label,text}))),[{label:'in',text:'25 msg/s'},{label:'lag',text:'0 msgs'},{label:'age',text:'1.5 s'}]);assert.match(result.predicate,/each carrier/);
 });
 test('Proof link policy chooses safe authored links first, provider fallback second, and has no dead link',()=>{
  const input=fixture();input.carriers[0].links={dashboard:'https://authored.test/d',query:'https://authored.test/q'};input.map.a.links={dashboard:'https://provider.test/d'};

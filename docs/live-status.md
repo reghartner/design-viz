@@ -1024,13 +1024,33 @@ sections are included from the start.
 
 While Metrics is available and on, each visible explicitly bound edge gets one
 rounded card with a verdict border and left bar, connected to the measured route
-midpoint. Silent cards use a dashed border. The label, primary rate headline and
-sparkline, and errors/p95 (calls) or lag/age (queues) use the authored signals.
-An explicit queue template `topic` parameter joins the label when present; names
-never create queries or bindings. Missing signals say “not bound”; missing samples
-say “unobserved”. The note names the current observation window (default `24h`),
-not an invented duration of silence. Cards grow beyond the compact minimum to fit
-current fonts and text; the default is 138 × 78 SVG units for five readable lines.
+midpoint. Silent cards use a dashed border. Every numeric signal appears in
+authored order; trace bindings are excluded. Each row uses its optional `label`
+(1–120 plain-text characters without control characters) or signal-name fallback.
+Optional boolean `showOnCard` defaults to true; false hides only the canvas row,
+including its displayed series, scope, COUNT note and pending status. Inspect
+and proof retain every numeric signal. No visible numeric rows means no card.
+Missing samples say “unobserved”; no fixed unbound placeholders are added. Loading
+and refresh remain per signal. The note names the observation window (default
+`24h`), not an invented duration of silence. Width is capped at 240 SVG units;
+measured wrapping determines the height used for obstacle packing. Titles, labels,
+units and scope can shorten; numeric values remain readable without glyph scaling.
+Safe integer counts remain exact; fractional gauges use compact significant digits
+and extreme non-safe values use scientific notation. Inspect shows full labels and scope.
+CloudWatch cards say “This rule”, “This queue” or “All topics · whole account”,
+with full rule names and account IDs available in Inspect.
+
+Each metric's small external-link icon opens its source query in a new tab with
+`noopener noreferrer`. An authored `signals.<name>.links.query` takes precedence
+over the runtime sample's `signals.<name>.links.query`. HTTP(S) URLs must have no
+credentials; signed Honeycomb result/download URLs are never shown. Provider
+composition preserves per-signal URLs. A carrier `links.query` is a row fallback
+only when it has one signal; mixed rows never inherit one another's queries.
+Prometheus/Loki Explore links and Honeycomb stable query URLs are automatic when
+available. CloudWatch, Logs and SQL may use authored links. Link generation
+failure never invalidates numeric evidence. Preview invents no provider URLs.
+Workbench Metrics exposes each signal's **label**, **show on card** and **query link** controls;
+source edits and Undo/Redo preserve all three.
 
 `telemetry.card.side` selects `right`, `left`, `above` or `below`; `offset` moves
 along that side in SVG units. Defaults are right of a vertical route and below a
@@ -1522,12 +1542,12 @@ calls:
 | `query_loki_logs` | once per refresh for each `loki` signal | `{datasourceUid, logql, startRfc3339: "now-24h", endRfc3339: "now", queryType: "range", stepSeconds}` |
 | `query_sql` | at most once an hour for each `sql` signal; the value is reused in between | `{datasourceUid, query}` |
 | `query_cloudwatch` | once per refresh for each `cloudwatch` signal; [full-window Sum](#cloudwatch-signals) | `{datasourceUid, namespace, metricName, region, accountId, dimensions, statistic, period, start, end}` |
-| `generate_deeplink` | when offered, once per carrier per page load, unless the carrier authors `links.query` | `{resourceType: "explore", datasourceUid, queries: [{refId, expr}], timeRange: {from: "now-24h", to: "now"}}` |
+| `generate_deeplink` | when offered, once per signal per page load, unless the signal authors `links.query` | `{resourceType: "explore", datasourceUid, queries: [{refId, expr}], timeRange: {from: "now-24h", to: "now"}}` |
 
-Authored `links.query` wins; otherwise a safe `exploreUrl` in the query reply
+Authored `signals.<name>.links.query` wins; otherwise a safe `exploreUrl` in the query reply
 wins over the optional deeplink tool. Without either, an Explore URL can be built
-from the same refresh's returned Explore origin, then the carrier's authored
-`links.dashboard`/`links.query`, then optional `tracking.telemetry.grafana.baseUrl`
+from the same refresh's returned Explore origin, then optional
+`tracking.telemetry.grafana.baseUrl`
 (including an environment override). If none is evidenced, no link is shown.
 Credentials and non-HTTP(S) URLs are rejected. Loki panes carry the exact LogQL,
 datasource UID and window in Grafana's documented [external Explore URL
@@ -1539,8 +1559,7 @@ and `deployment` annotation tags produce deploy markers.
 `.loki`, `.sql` or `.cloudwatch`, also for imported carriers. The window is
 `tracking.telemetry.window` (default `24h`). Times are relative, so the server's
 clock decides "now". `stepSeconds` divides the window into about 240 points, at
-least 60 seconds. The Explore link covers the carrier's signals of the same source
-as its first `grafana` or `loki` signal. `tempo` signals (exemplar traces) and
+least 60 seconds. Each metric row links to its exact PromQL or LogQL query. `tempo` signals (exemplar traces) and
 `honeycomb` signals are not run by this adapter.
 
 PromQL and LogQL query series become ascending `[epoch ms, number]` points. Several series
@@ -2461,8 +2480,8 @@ Without explicit scope, CloudWatch `RuleName` means “this rule only”, `Queue
 means “queue only”, and AWS/IoT PublishIn.AuthError / Connect.AuthError with only
 account/protocol dimensions mean “all topics / whole account” / “all connections /
 whole account”. Other dimensions, edge titles and arbitrary Logs query text never
-establish topic scope. Use `unit: "refused publishes"` to read “15 refused publishes
-in 24h” on a scalar card.
+establish topic scope. Use `unit: "refused publishes"` to read “15 refused publishes”
+with the card’s “24h window” context.
 
 ### CloudWatch Logs Insights
 
@@ -2615,5 +2634,8 @@ wrappers (including by/without grouping). Raw logs, arbitrary expressions and
 misleading function names inside strings remain unobserved. Daily history keeps
 its existing contract. Honeycomb COUNT caveats belong to Honeycomb evidence only.
 
-Arbitrary named-signal display and authored display labels are planned separately;
-this change does not claim that expanded display contract.
+Named numeric rows, compact scope and per-signal source links follow the [edge metric card contract](#edge-metric-cards); their display does not change proof eligibility.
+
+Optional signal labels and query URLs have their own environment substitution.
+An unresolved variable drops only that display field (label falls back to the
+signal name); missing variables in the actual metric query still block it.

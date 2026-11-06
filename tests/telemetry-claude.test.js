@@ -8,7 +8,7 @@
 | A1 | `viewer/telemetry-claude.js` ships in the standalone entrypoint only; the standalone boot builds the adapter with `createTelemetryGrafana(page, window)` when no `window.flowviewTelemetry` host provider is set. | Bundle records plus production boot/rerender with real normalize, adapter and telemetry controller; rendering/navigation boundaries stubbed | Separate A1 cases check placement, initial attachment, host precedence, retirement, current normalized page/config and current-controller approval/retraction | Missing adapter, wrong provider, initial-only attachment, leaked handles, stale page/config or stale controller |
 | A2 | `createTelemetryGrafana(page, win)` is null without `win.claude.use` (absent or throwing getter) and on pages without a grafana, loki or sql signal; otherwise `{options: {provider, source: 'Grafana', available: false}, attach(ctl, page)}`. Imported carriers count. Creating it never calls `use()`. | Runtime gates, local grafana/loki/sql signals, direct imported edge and separate nested imported node/edge bindings; absence-tolerant loader | Named A2 gate, provider/source/attach shape and zero use() assertions | Ungated or eager adapter, ignored imported carriers |
 | A3 | The connector is picked by offered tools: all of query_prometheus, query_loki_logs, search_tempo_traces, get_annotations, generate_deeplink. A connector missing one (query_prometheus) is not picked; Jira-only and GitHub-only connectors are not picked; "Grafana" wins a tie, else the first qualifying one. None → the add-connector note and no tool call. | Partial, Jira, GitHub and competing qualifying connectors; inert provider if absent | Named A3 calls select the expected connector and missing tools produce the add-connector note | Name-only selection, wrong tie-break or calls without a qualifying connector |
-| A4 | One refresh (default 24h window) makes exactly: get_annotations first and alone (no other call starts until it settles), one query_prometheus range call per grafana signal, one query_loki_logs metric range call per loki signal, generate_deeplink once per carrier without an authored query link; relative times now-24h..now, stepSeconds 360, the page's datasource UIDs, the provider's AbortSignal on every call. tempo and honeycomb signals are not queried. A later refresh repeats the queries but not the deeplinks. | One-shot deferred get_annotations, start/settle event log, then a second refresh | Exactly one pending call, no query starts before annotation settlement; exact inputs, budget, signals and cached links | Annotations launched concurrently with queries, early queries, extra calls or repeated deeplinks |
+| A4 | One refresh (default 24h window) makes exactly: get_annotations first and alone (no other call starts until it settles), one query_prometheus range call per grafana signal, one query_loki_logs metric range call per loki signal, generate_deeplink once per numeric signal without an authored query link; relative times now-24h..now, stepSeconds 360, the page's datasource UIDs, the provider's AbortSignal on every call. tempo and honeycomb signals are not queried. A later refresh repeats the queries but not the deeplinks. | One-shot deferred get_annotations, start/settle event log, then a second refresh | Exactly one pending call, no query starts before annotation settlement; exact inputs, budget, signals and cached links | Annotations launched concurrently with queries, early queries, extra calls or repeated deeplinks |
 | A5 | Day 10 recorded payloads map to the provider shape: every Prometheus and Loki series as ascending [ms, number] points (several series added point by point), value = the last point, the authored unit; a query with no data is value 0 with no points; observedAt = the newest point; markers = the window's annotations ascending as {at, kind, label}; links = authored dashboard/query plus the generated Explore link. Imported carriers map by their resolved id. | Pinned Day 10 payloads, local and resolved imported carriers, pure mapper inputs; empty map if absent | Named A5 carrier ids, mapped values/series/units, markers, timestamps and links | Wrong Loki field, missing markers, lost imported ids or incorrect series aggregation |
 | A6 | The page window drives the range and step (6h → now-6h, 90 s; 30m → 60 s floor); Day 11 shows the incident marker and the lagging queue; Day 12 the recovered queue and the still-silent push edge. | 6h/30m/7d windows and pinned Day 11/12/all-todo story; missing calls read as undefined | Named A6 ranges, step floor, incident marker, lag/recovery and silent-edge values | Fixed window/step, missing incident marker or wrong recovery/silence values |
 | A7 | Through ctl.telemetry: Metrics off makes no data call (metadata discovery is permitted); the refresh never runs faster than 60 s even when the page asks for less; a hidden document pauses and returns with one catch-up; Metrics off aborts the signal. | Fake timers and document visibility through ctl.telemetry; page requests 1000 ms | Named A7 off/on calls, delivered map, 60000 ms floor, hidden pause, one catch-up and abort | Eager calls, sub-minute refresh, hidden polling, duplicate catch-up or no abort |
@@ -327,7 +327,7 @@ for(const kind of ['node','edge']){
   const tool=node?'query_loki_logs':'query_prometheus',input=node?LOKI(Q.consumed):PROM(Q.press);
   assert.deepEqual(s.net.calls.filter(c=>c.tool==='query_prometheus' || c.tool==='query_loki_logs').map(c=>[c.tool,c.input]),[[tool,input]],'exactly the nested signal query uses the consumer datasource');
   const payload=record(s.net.handleMcp,{day:9},tool,input),series=(node?lokiPoints:promPoints)(payload);
-  assert.deepEqual(map[id].signals.rate,{value:series.at(-1)[1],series,unit:node?'req/h':'press/h'},'recorded points, latest value and unit reach the nested carrier');
+  assert.deepEqual(map[id].signals.rate,{value:series.at(-1)[1],series,unit:node?'req/h':'press/h',links:{query:map[id].signals.rate.links.query}},'recorded points, latest value and unit reach the nested carrier');
   assert.deepEqual(notes.filter(Boolean),[]);
  });
 }
@@ -374,10 +374,10 @@ test('A4 one refresh makes exactly the budgeted calls with relative 24h times an
   ['query_prometheus',PROM(Q.routeIn)],['query_prometheus',PROM(Q.routeLag)],['query_loki_logs',LOKI(Q.pushSent)],['query_loki_logs',LOKI(Q.pushFailed)]
  ],'A4 one range call per grafana and loki signal, in binding order; tempo and honeycomb signals are not queried');
  const links=calls.filter(c=>c.tool==='generate_deeplink');
- assert.deepEqual(links.map(c=>c.input.queries.map(q=>q.expr)),[[Q.ingestPerCode],[Q.consumed],[Q.press],[Q.eventRate,Q.eventErrors,Q.eventP95],[Q.routeIn,Q.routeLag]],'A4 one Explore link per carrier without an authored query link; the push edge keeps its authored one');
- assert.deepEqual(links[3].input,{resourceType:'explore',datasourceUid:'prom-main',queries:[{refId:'A',expr:Q.eventRate},{refId:'B',expr:Q.eventErrors},{refId:'C',expr:Q.eventP95}],timeRange:{from:'now-24h',to:'now'}});
+ assert.deepEqual(links.map(c=>c.input.queries.map(q=>q.expr)),[Q.ingestPerCode,Q.consumed,Q.press,Q.eventRate,Q.eventErrors,Q.eventP95,Q.routeIn,Q.routeLag,Q.pushSent,Q.pushFailed].map(expr=>[expr]),'A4 each signal owns its exact Explore query; carrier links do not override mixed rows');
+ assert.deepEqual(links[3].input,{resourceType:'explore',datasourceUid:'prom-main',queries:[{refId:'A',expr:Q.eventRate}],timeRange:{from:'now-24h',to:'now'}});
  assert.equal(links[1].input.datasourceUid,'loki-main','A4 a Loki carrier links to its Loki datasource');
- assert.equal(calls.length,1+10+5,'A4 nothing else is called');
+ assert.equal(calls.length,1+10+10,'A4 nothing else is called');
  assert.ok(calls.every(c=>c.signal===signal),'A4 every call carries the provider AbortSignal');
  assert.ok(!calls.some(c=>['search_tempo_traces','get_tempo_trace','query_sql','list_datasources'].includes(c.tool)));
  const before=calls.length;await s.refresh();
@@ -394,22 +394,22 @@ test('A5 Day 10 recorded payloads map to the provider shape: series, values, uni
  for(const [id,name,expr,unit] of [['button->mcu','rate',Q.press,'press/h'],['mcu->ingest','rate',Q.eventRate,'req/h'],['mcu->ingest','errors',Q.eventErrors,'req/h'],['mcu->ingest','p95',Q.eventP95,'ms'],['ingest->notify','in',Q.routeIn,'msg/h'],['ingest->notify','lag',Q.routeLag,'msgs']]){
   const points=promPoints(rec('query_prometheus',PROM(expr)));
   assert.ok(points.length>=100,'A5 '+id+' '+name+' recorded the hours since traffic began');
-  assert.deepEqual(map[id].signals[name],{value:points.at(-1)[1],series:points,unit},'A5 '+id+' '+name);
+  assert.deepEqual(map[id].signals[name],{value:points.at(-1)[1],series:points,unit,links:map[id].signals[name].links},'A5 '+id+' '+name);
  }
  // Several series (an unaggregated query: one per label set) are added point by point.
  const byCode=rec('query_prometheus',PROM(Q.ingestPerCode));assert.ok(byCode.data.length>=2,'the recorded ingest payload has several series: '+byCode.data.length);
  const totals=new Map();for(const entry of byCode.data)for(const [t,v] of entry.values){const ms=Math.round(t*1000);totals.set(ms,(totals.get(ms) || 0)+Number(v));}
  const added=[...totals].sort((a,b)=>a[0]-b[0]);
- assert.deepEqual(map.ingest.signals.rate,{value:added.at(-1)[1],series:added,unit:'req/h'},'A5 several series are added point by point');
+ assert.deepEqual(map.ingest.signals.rate,{value:added.at(-1)[1],series:added,unit:'req/h',links:map.ingest.signals.rate.links},'A5 several series are added point by point');
  // Loki metric queries: data[].values[] of {timestamp, value}. The flip mis-maps this field.
  const consumed=lokiPoints(rec('query_loki_logs',LOKI(Q.consumed)));
  assert.ok(consumed.length>10 && consumed.at(-1)[1]>0,'the recorded notify stream flows on Day 10');
- assert.deepEqual(map.notify.signals.rate,{value:consumed.at(-1)[1],series:consumed,unit:'req/h'},'A5 the Loki metric series and its last value');
+ assert.deepEqual(map.notify.signals.rate,{value:consumed.at(-1)[1],series:consumed,unit:'req/h',links:map.notify.signals.rate.links},'A5 the Loki metric series and its last value');
  assert.deepEqual(Object.keys(map.notify.signals),['rate'],'A5 the tempo signal is not mapped');
  // #994: the demo now authors measured zero, distinct from missing historical evidence.
  for(const [name,query] of [['rate',Q.pushSent],['errors',Q.pushFailed]]){
   const points=lokiPoints(rec('query_loki_logs',LOKI(query)));assert.ok(points.length>0 && points.every(p=>p[1]===0),'A5 explicit push zeros');
-  assert.deepEqual(map['notify->app'].signals[name],{value:0,series:points,unit:'req/h'},'A5 measured silence keeps its samples');
+  assert.deepEqual(map['notify->app'].signals[name],{value:0,series:points,unit:'req/h',links:map['notify->app'].signals[name].links},'A5 measured silence keeps its samples');
  }
  // Story checks: degraded after the firmware 2.4.1 deploy.
  const ratio=map['mcu->ingest'].signals.errors.value/map['mcu->ingest'].signals.rate.value;
@@ -466,10 +466,10 @@ test('A6 the page window drives range and step; Day 11 shows the incident and th
  assert.ok(Math.max(...(m11['ingest->notify']?.signals.lag?.series || []).map(p=>p[1]))>=2000,'A6 Day 11 the route queue lags');
  const day12=await setup({day:11}),{map:m12}=await day12.refresh();
  assert.ok(m12['ingest->notify']?.signals.lag?.value<100,'A6 Day 12 the queue has recovered');
- assert.deepEqual(m12['notify->app']?.signals.rate,{value:0,series:lokiPoints(record(day12.net.handleMcp,{day:11},'query_loki_logs',LOKI(Q.pushSent))),unit:'req/h'},'A6 Day 12 push is explicitly measured silent');
+ assert.deepEqual(m12['notify->app']?.signals.rate,{value:0,series:lokiPoints(record(day12.net.handleMcp,{day:11},'query_loki_logs',LOKI(Q.pushSent))),unit:'req/h',links:m12['notify->app'].signals.rate.links},'A6 Day 12 push is explicitly measured silent');
  assert.deepEqual(m12.ingest?.markers,[],'A6 no annotation inside Day 12');
  const silent=await setup({scenario:'all-todo'}),{map:quiet}=await silent.refresh();
- assert.deepEqual(quiet['button->mcu']?.signals.rate,{value:0,series:[],unit:'press/h'},'A6 a silent scenario reports zeros');
+ assert.deepEqual(quiet['button->mcu']?.signals.rate,{value:0,series:[],unit:'press/h',links:quiet['button->mcu'].signals.rate.links},'A6 a silent scenario reports zeros');
 });
 
 test('A7 through ctl.telemetry: off makes no call, refresh is floored at 60 s, hidden pauses with one catch-up, off aborts',async()=>{
@@ -510,7 +510,7 @@ test('A8 a connector failure keeps the previous map and sets the note; one faile
  assert.deepEqual(map['mcu->ingest'].signals.p95,good['mcu->ingest'].signals.p95,'A8 the failed signal keeps its previous sample');
  for(const [id,carrier] of Object.entries(good))for(const [name,previous] of Object.entries(carrier.signals)){
   if(id==='mcu->ingest' && name==='p95')continue;
-  const expected={value:peerSeries.at(-1)[1],series:peerSeries,unit:previous.unit};
+  const expected={value:peerSeries.at(-1)[1],series:peerSeries,unit:previous.unit,links:map[id].signals[name].links};
   assert.notDeepEqual(expected,previous,'A8 the second-refresh fixture differs for '+id+' '+name);
   assert.deepEqual(map[id]?.signals[name],expected,'A8 the successful peer has the new value and series: '+id+' '+name);
  }
@@ -621,4 +621,13 @@ test('hosted Grafana needs only bound queries and uses returned Explore origins 
  const url=new URL(map.notify.links.query);assert.equal(url.origin,'https://observed.grafana.net');assert.equal(url.pathname,'/explore');assert.equal(url.searchParams.get('schemaVersion'),'1');const pane=JSON.parse(url.searchParams.get('panes')).a;assert.equal(pane.datasource,'loki-main');assert.equal(pane.queries[0].expr,Q.consumed);assert.equal(pane.queries[0].datasource.uid,'loki-main');assert.equal(pane.queries[0].datasource.type,'loki');assert.equal(pane.queries[0].range,true);assert.deepEqual(pane.range,{from:'now-24h',to:'now'});
  assert.ok(h.net.calls.every(c=>['query_prometheus','query_loki_logs'].includes(c.tool)));
  const markers=h.C.telemetryGrafanaMarkers({Payload:[{tags:['deployment'],text:'new feature',time:1000}]},0,2000);assert.equal(markers[0].kind,'deploy');
+});
+test('per-signal Explore links contain only their own expression and optional link failure never loses metrics',async()=>{
+ for(const failure of [null,'approval_required','tool_error','timeout','user_changed']){
+  const h=await setup({overrides:failure?{generate_deeplink:()=>Promise.reject({code:failure,message:'optional link failure'})}:{}}),{map,notes}=await h.refresh();
+  assert.equal(map['mcu->ingest'].signals.rate.value>0,true);assert.deepEqual(notes.filter(Boolean),[]);
+  for(const [name,expr] of [['rate',Q.eventRate],['errors',Q.eventErrors],['p95',Q.eventP95]]){
+   const link=map['mcu->ingest'].signals[name].links.query,pane=JSON.parse(new URL(link).searchParams.get('panes')).a;assert.deepEqual(pane.queries.map(q=>q.expr),[expr],failure+' '+name);
+  }
+ }
 });

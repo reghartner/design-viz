@@ -24,3 +24,9 @@ test('precise adapters mark only dispatched signals, unavailable/disabled provid
  for(const provider of [()=>{throw Error('sync');},()=>Promise.reject(Error('async'))]){const x=setup({provider});t.after(()=>x.api.destroy());x.api.setEnabled(true);await settle();assert.deepEqual(plain(x.api.snapshot().pending),{});assert.equal(x.api.status().state,'error');}
  for(const options of [{available:false},{provider:null}]){const x=setup(options);t.after(()=>x.api.destroy());x.api.setEnabled(true);await settle();assert.deepEqual(plain(x.api.snapshot().pending),{});assert.equal(x.requests.length,0);}
 });
+test('per-signal links settle independently and stale URL callbacks cannot cross an environment or destroyed mount',async t=>{
+ const h=setup();t.after(()=>h.api.destroy());h.api.setEnabled(true);await settle();const first=h.requests[0];first.report.settled('local','rate',{value:2,links:{query:'https://stg.test/rate'}});first.report.settled('local','errors',{value:0,links:{query:'https://stg.test/errors'}});
+ assert.equal(h.api.snapshot().map.local.signals.rate.links.query,'https://stg.test/rate');assert.equal(h.api.snapshot().map.local.signals.errors.links.query,'https://stg.test/errors');
+ h.api.setEnvironment('prd');await settle();assert.equal(h.api.snapshot().map.local,undefined);first.report.settled('local','rate',{value:999,links:{query:'https://stale.test/q'}});first.resolve({local:{signals:{rate:{value:999,links:{query:'https://stale.test/q'}}}}});await settle();assert.equal(h.api.snapshot().map.local,undefined);
+ const next=h.requests[1];next.report.settled('local','rate',{value:3,links:{query:'https://prd.test/rate'}});assert.equal(h.api.snapshot().map.local.signals.rate.links.query,'https://prd.test/rate');h.api.destroy();next.resolve({local:{signals:{rate:{value:999,links:{query:'https://late.test/q'}}}}});await settle();assert.ok(!JSON.stringify(h.api.snapshot().map).includes('late.test'));
+});

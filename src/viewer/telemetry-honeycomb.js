@@ -2,7 +2,7 @@
    raw results are preferred. A bounded first Results row is a visibly rounded
    fallback only when the raw download transport is unavailable. See docs/live-status.md for
    pinned official provenance. Trace retrieval lives in telemetry-traces.js;
-   this scalar adapter does not supply historical Honeycomb measurements.
+   selected numeric history evaluates each window directly.
    No query is inferred from a carrier name; no signed URL escapes this module. */
 var TELEMETRY_HONEYCOMB_BYTES=1048576,TELEMETRY_HONEYCOMB_TIMEOUT=15000;
 function telemetryHoneycombError(message,code){var e=new Error(message);e.code=code || 'query_unobserved';return e;}
@@ -73,7 +73,7 @@ function telemetryHoneycombSchema(value,schema){
   }
   return !Array.isArray(value) || !schema.items || value.every(function(v){return telemetryHoneycombSchema(v,schema.items);});
 }
-function telemetryHoneycombQuery(query,config,contract){
+function telemetryHoneycombQuery(query,config,contract,windowRange){
   if(!telemetryObject(query) || !Array.isArray(query.calculations) || query.calculations.length!==1 || query.breakdowns && (!Array.isArray(query.breakdowns) || query.breakdowns.length) || query.formulas && (!Array.isArray(query.formulas) || query.formulas.length))throw telemetryHoneycombError('Use one scalar calculation without breakdowns or formulas per Honeycomb signal.');
   var fields=['calculations','filters','filter_combination','granularity','orders','limit','havings','time_range','start_time','end_time','calculated_fields','formulas','breakdowns','from','to','start','end'];
   if(Object.keys(query).some(function(key){return fields.indexOf(key)<0;}))throw telemetryHoneycombError('Unsupported Honeycomb query field; use native calculations and filters.');
@@ -85,7 +85,7 @@ function telemetryHoneycombQuery(query,config,contract){
   // Hosted MCP public CI uses relative query_spec.from, not REST time_range.
   // The page owns the window; authored calculations and filters remain exact.
   ['from','to','start','end','start_time','end_time','time_range'].forEach(function(k){delete spec[k];});
-  spec.from='-'+telemetryWindowDuration(config.window);
+  if(windowRange){spec.from=windowRange.from;spec.to=windowRange.to;}else spec.from='-'+telemetryWindowDuration(config.window);
   var input={environment_slug:config.honeycomb.environment,query_spec:contract.type==='string'?JSON.stringify(spec):spec};
   if(telemetryText(config.honeycomb.dataset))input.dataset_slug=config.honeycomb.dataset;
   if(!telemetryHoneycombSchema(input,contract.schema))throw telemetryHoneycombError('The Honeycomb run_query input schema does not support this query/window.');
@@ -228,19 +228,22 @@ function createTelemetryHoneycomb(page,win,now,bound){
   function allow(){if(!approval || retired)return;var input=approval,epoch=generation,attempt=++allowEpoch;approval=null;syncAction();
     connect().then(function(mcp){if(epoch!==generation || attempt!==allowEpoch || retired)return;return mcp.callTool(contract.server,'run_query',input);}).then(function(){if(epoch!==generation || attempt!==allowEpoch || retired)return;blocked=null;if(ctl.telemetry.enabled()){ctl.telemetry.setEnabled(false);ctl.telemetry.setEnabled(true);}},function(error){if(epoch===generation && attempt===allowEpoch && !retired)failure(error,null,input);});
   }
-  async function provider(bindings,signal,report){
+  async function provider(bindings,signal,report,windowRange){
+    if(!windowRange || !telemetryTime(windowRange.from) || !telemetryTime(windowRange.to))windowRange=null;
     if(retired || signal.aborted)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
     if(blocked===signal){var refused=telemetryHoneycombError(approval?'Honeycomb access needs your approval':'Honeycomb unavailable for this Metrics session.');if(approval)refused.state='approval';throw refused;}
     var config=telemetryProviderConfig(current,ctl),epoch=generation,map=Object.create(null),notes=[],jobs=telemetryHoneycombJobs(bindings),mcp;
     if(!jobs.length)return map;
     try{mcp=await connect(signal);}catch(e){if(signal.aborted)throw telemetryHoneycombError('Honeycomb refresh cancelled.');throw failure(e,signal,null);}
+    // Valid queued bindings already belong to this request. Invalid siblings
+    // never load, and one slow hosted query must not disguise queued work.
+    jobs.forEach(function(job){try{job.prepared=telemetryHoneycombQuery(job.query,config,contract,windowRange);if(report && report.pending)report.pending(job.id,job.name);}catch(error){job.inputError=error;}});
     for(var i=0;i<jobs.length;i++){
       if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
       var job=jobs[i],query,stage='Honeycomb run_query input';
       try{
-        query=telemetryHoneycombQuery(job.query,config,contract);
-        if(report && report.pending)report.pending(job.id,job.name);
-        stage='Honeycomb run_query';var result=await mcp.callTool(contract.server,'run_query',query.input,{signal:signal});
+        if(job.inputError)throw job.inputError;query=job.prepared;
+        stage='Honeycomb run_query';var work=function(){return mcp.callTool(contract.server,'run_query',query.input,{signal:signal});};var result=await (windowRange?liveStatusHistoryCall(work,signal):work());
         if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
         if(result && result.isError)throw {code:'tool_error',message:telemetryProviderErrorText(result)};
         stage='Honeycomb run_query result';var meta=telemetryHoneycombMetadata(result),sample=await telemetryHoneycombMeasurement(win,result,meta,signal,query,job.unit);
@@ -263,7 +266,7 @@ function createTelemetryHoneycomb(page,win,now,bound){
     }
     if(report && report.note)report.note(notes.filter(function(n,i){return notes.indexOf(n)===i;}).join('; '));return map;
   }
-  return {options:{environmentChanged:function(){allowEpoch++;approval=null;blocked=null;syncAction();},provider:provider,source:'Honeycomb',available:false},attach:function(next,nextPage){
+  return {options:{environmentChanged:function(){allowEpoch++;approval=null;blocked=null;syncAction();},provider:provider,history:function(bindings,range,signal,report){if(!range || !range.window){if(report && report.note)report.note('Honeycomb history requires a selected observation window.');return Promise.resolve({});}return provider(bindings,signal,report,range.window);},source:'Honeycomb',available:false},attach:function(next,nextPage){
     ctl=next;current=nextPage || current;var epoch=++generation,mine=ctl,offs=[];available(false);
     if(!retired)connect().then(function(){if(epoch===generation && !retired)available(true);},function(e){if(epoch===generation && !retired){if(e && e.code==='user_changed')failure(e,null,null);else available(false);}});
     if(ctl.liveStatus && ctl.liveStatus.onChange)offs.push(ctl.liveStatus.onChange(syncAction));

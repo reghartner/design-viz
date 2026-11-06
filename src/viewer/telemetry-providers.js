@@ -49,18 +49,20 @@ function createTelemetryProviders(page,win){
     });}finally{ensuring=false;}
   }
   async function run(bindings,signal,report,range){
-    ensure();var epoch=generation,notes=[],approval=false;
+    ensure();var epoch=generation,notes=[],progressNotes=Object.create(null),approval=false;
     if(retired || signal.aborted)throw new Error('Metrics session retired.');
     var answers=await Promise.all(parts.map(async function(part){
+      if(range && part.definition.name==='Traces')return {};
       var bound=scoped(bindings,part).map(function(b){var signals={};Object.keys(b.signals).forEach(function(name){var s=b.signals[name];if(s.error)notes.push(b.id+' '+name+': '+s.error);else signals[name]=s;});return Object.assign({},b,{signals:signals});}).filter(function(b){return Object.keys(b.signals).length;});if(!bound.length){if(!range)part.map={};return {};}
       // A missing connector must not prevent its healthy peer from refreshing.
       if(!part.available){notes.push(part.note || part.definition.name+' unavailable.');return {};}
       var fn=range?part.adapter.options.history:part.adapter.options.provider;
       if(!fn){notes.push(part.definition.name+' historical metrics unsupported; samples are unobserved.');return {};}
       try{
-        var note='',waiting={},partReport={note:function(text){note=text;if(!range && !retired && epoch===generation && !signal.aborted){part.resultNote=text;if(report && report.note)report.note(parts.map(function(p){return p.resultNote;}).filter(Boolean).join('; '));}},pending:function(id,name){if(range || retired || epoch!==generation || signal.aborted)return;waiting[JSON.stringify([id,name])]=[id,name];if(report && report.pending)report.pending(id,name);},settled:function(id,name,sample){if(range || retired || epoch!==generation || signal.aborted)return;delete waiting[JSON.stringify([id,name])];if(report && report.settled)report.settled(id,name,sample);}};
+        var note='',waiting={},partReport={note:function(text){note=text;if(!retired && epoch===generation && !signal.aborted){if(!range)part.resultNote=text;progressNotes[part.definition.name]=text;if(report && report.note)report.note(notes.concat(Object.keys(progressNotes).map(function(k){return progressNotes[k];})).filter(Boolean).join('; '));}},pending:function(id,name){if(range && !range.window || retired || epoch!==generation || signal.aborted)return;waiting[JSON.stringify([id,name])]=[id,name];if(report && report.pending)report.pending(id,name);},settled:function(id,name,sample){if(range && !range.window || retired || epoch!==generation || signal.aborted)return;delete waiting[JSON.stringify([id,name])];if(report && report.settled)report.settled(id,name,sample);}};
         var value;
-        if(range){
+        if(range && range.window)value=await fn(bound,range,signal,partReport);
+        else if(range){
           var identity=JSON.stringify([telemetryProviderConfig(current,ctl),part.adapter.options.historyKey?part.adapter.options.historyKey():null]);
           var saved=await part.historyCache.loadBindings(identity,bound,range,signal,function(batch,dates){
             var message='';return Promise.resolve(fn(batch,dates,signal,{note:function(text){message=text;}})).then(function(map){return {map:map,note:message};});
@@ -76,7 +78,7 @@ function createTelemetryProviders(page,win){
         if(part.definition.name==='Honeycomb' || part.definition.name==='Traces')part.map={};
         else Object.keys(part.map).forEach(function(id){var b=bound.find(function(b){return b.id===id;});Object.keys(part.map[id].signals || {}).forEach(function(name){var s=b && b.signals[name];if(!s || s.source==='cloudwatch' || s.source==='cloudwatchLogs' || s.source==='loki')delete part.map[id].signals[name];});if(!Object.keys(part.map[id].signals).length)delete part.map[id];});
         return range?{}:part.map;
-      }finally{if(!range && waiting)Object.keys(waiting).forEach(function(key){var pair=waiting[key];partReport.settled(pair[0],pair[1],null);});}
+      }finally{if((!range || range.window) && waiting)Object.keys(waiting).forEach(function(key){var pair=waiting[key];partReport.settled(pair[0],pair[1],null);});}
     }));
     if(retired || epoch!==generation || signal.aborted)throw new Error('Metrics session retired.');
     if(report && report.note)report.note(notes.join('; '));
@@ -84,7 +86,7 @@ function createTelemetryProviders(page,win){
     if(approval && !Object.keys(map).length){var error=new Error(notes.join('; '));error.state='approval';throw error;}
     return map;
   }
-  var options={managesPending:true,traceStatus:function(){var part=parts.find(function(p){return p.definition.name==='Traces';});return {available:!!(part && part.available),note:part && (part.resultNote || part.note) || ''};},environmentChanged:function(){generation++;bindingKey=bindingIdentity(ctl.telemetry.bindings());parts.forEach(function(p){p.bindingKey=bindingIdentity(scoped(ctl.telemetry.bindings(),p));p.map={};p.resultNote='';p.historyCache.clear();if(p.adapter.options.environmentChanged)p.adapter.options.environmentChanged();});},canChooseExemplar:function(id,token,traceId){var part=parts.find(function(p){return p.definition.name==='Traces';});return !!(!retired && part && part.available && part.adapter.options.canChooseExemplar(id,token,traceId));},chooseExemplar:function(id,token,traceId){var part=parts.find(function(p){return p.definition.name==='Traces';});if(retired || !part || !part.available)throw new Error('Trace selection unavailable.');return part.adapter.options.chooseExemplar(id,token,traceId);},available:false,source:function(){return parts.filter(function(p){return p.available;}).map(function(p){return p.definition.name;}).join(' / ');},provider:function(b,s,r){return run(b,s,r);},history:function(b,r,s,n){return run(b,s,n,r);},historyKey:function(){return parts.map(function(p){return [p.definition.name,p.adapter.options.historyKey?p.adapter.options.historyKey():null];});}};
+  var options={historyMode:'window',managesPending:true,traceStatus:function(){var part=parts.find(function(p){return p.definition.name==='Traces';});return {available:!!(part && part.available),note:part && (part.resultNote || part.note) || ''};},environmentChanged:function(){generation++;bindingKey=bindingIdentity(ctl.telemetry.bindings());parts.forEach(function(p){p.bindingKey=bindingIdentity(scoped(ctl.telemetry.bindings(),p));p.map={};p.resultNote='';p.historyCache.clear();if(p.adapter.options.environmentChanged)p.adapter.options.environmentChanged();});},canChooseExemplar:function(id,token,traceId){var part=parts.find(function(p){return p.definition.name==='Traces';});return !!(!retired && part && part.available && part.adapter.options.canChooseExemplar(id,token,traceId));},chooseExemplar:function(id,token,traceId){var part=parts.find(function(p){return p.definition.name==='Traces';});if(retired || !part || !part.available)throw new Error('Trace selection unavailable.');return part.adapter.options.chooseExemplar(id,token,traceId);},available:false,source:function(){return parts.filter(function(p){return p.available;}).map(function(p){return p.definition.name;}).join(' / ');},provider:function(b,s,r){return run(b,s,r);},history:function(b,r,s,n){return run(b,s,n,r);},historyKey:function(){return parts.map(function(p){return [p.definition.name,p.adapter.options.historyKey?p.adapter.options.historyKey():null];});}};
   return {options:options,attach:function(next,nextPage){
     current=nextPage || current;ctl=next;generation++;parts=[];bindingKey=bindingIdentity(ctl.telemetry.bindings());ensure();availability();
     off=ctl.telemetry.onChange(function(snapshot){
@@ -92,8 +94,12 @@ function createTelemetryProviders(page,win){
       var nextKey=bindingIdentity(ctl.telemetry.bindings());
       if(nextKey!==bindingKey && !ensuring && !retired){
         bindingKey=nextKey;generation++;
-        parts=parts.filter(function(p){if(p.bindingKey===bindingIdentity(scoped(ctl.telemetry.bindings(),p)))return true;if(p.handle)p.handle.destroy();return false;});ensure();
-        if(snapshot.enabled && ctl.telemetry.retry)ctl.telemetry.retry();
+        parts=parts.filter(function(p){var scopedKey=bindingIdentity(scoped(ctl.telemetry.bindings(),p));if(p.bindingKey===scopedKey)return true;
+          // Selected history owns binding invalidation. Retain connected numeric
+          // adapters so adding a detail cannot retract completed peer windows.
+          if(snapshot.historical && p.definition.name!=='Traces'){p.bindingKey=scopedKey;p.map={};p.historyCache.clear();if(p.adapter.options.environmentChanged)p.adapter.options.environmentChanged();return true;}
+          if(p.handle)p.handle.destroy();return false;});ensure();
+        if(snapshot.enabled && !snapshot.historical && ctl.telemetry.retry)ctl.telemetry.retry();
       }else ensure();
     });
     var mine=ctl,handle={destroy:function(){if(ctl!==mine)return;generation++;if(off)off();off=null;parts.forEach(function(p){if(p.handle)p.handle.destroy();});parts=[];ctl=null;}};

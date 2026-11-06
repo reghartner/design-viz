@@ -467,15 +467,15 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "Distinguish returned, empty, zero and failed evidence; missing is unobserved.",
             "- Metrics starts off. Root `enabled:false`/host false grants no query permission; "
             "absent tools hide it. Preview is synthetic, unsaved, no network. Over time uses exact "
-            "prior-24h endpoints; never borrow live samples or neighboring days.",
+            "selected page windows, Today clamped to now; never borrow live samples.",
             "- Sources: grafana/PromQL, loki/LogQL, tempo/TraceQL, sql/hourly scalar, honeycomb; "
-            "cloudwatch: Sum/Maximum/Minimum/Average/SampleCount, full-window scalar; "
+            "cloudwatch: window statistics + period series; Average needs SampleCount weights; "
             "cloudwatchLogs/query_cloudwatch_logs: first row valueField/column; Complete+empty+totalFound=0 means zero. "
-            "Logs breakdown: parse/stats + selected text, bounded Live status rows; card total unchanged. No history/period/sparklines; scope from dimensions/label.",
+            "Logs: independent scalar + safe count trend + optional bounded breakdown. Numeric Over time includes Today/Honeycomb; SQL needs time macros.",
             "- Honeycomb uses run_query: one scalar, exact JSON, no breakdowns/formulas; COUNT "
             "counts spans/events. Use stable query links, never signed URLs. For traces declare "
             "get_trace and read the trace contract; one request only, retain partial warnings. "
-            "No Honeycomb history/raw trace JSON or unverified live-account claim.",
+            "No trace history/raw trace JSON or unverified live-account claim.",
         ]
     if tracked:
         lines += [

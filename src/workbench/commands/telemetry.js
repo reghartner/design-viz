@@ -21,7 +21,7 @@ function telemetryQueryValue(source,text){
   if(source!=='honeycomb' && source!=='cloudwatch' && source!=='cloudwatchLogs')return {value:text.trim()};
   var parsed=null;try{parsed=JSON.parse(text);}catch(ex){}
   if(source==='cloudwatchLogs')return telemetryCloudwatchLogsQuery(parsed)?{value:parsed}:{error:'CloudWatch Logs needs logGroups, query, region. Optional breakdown needs query, labelField, valueField, limit 1–100 and at most 4 text columns.'};
-  if(source==='cloudwatch')return telemetryCloudwatchQuery(parsed)?{value:parsed}:{error:'A CloudWatch query is a JSON object with namespace, metric, region, accountId, dimensions and statistic: Sum, Maximum, Minimum, Average or SampleCount.'};
+  if(source==='cloudwatch')return telemetryCloudwatchQuery(parsed)?{value:parsed}:{error:'A CloudWatch query is a JSON object with namespace, metric, region, accountId, dimensions and statistic: Sum, Maximum, Minimum, Average or SampleCount; optional period is a positive integer in seconds.'};
   if(!telemetryObject(parsed) || !Object.keys(parsed).length)return {error:'A Honeycomb query is a JSON object such as {"calculations":[{"op":"COUNT"}]}.'};
   return {value:parsed};
 }

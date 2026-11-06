@@ -184,9 +184,9 @@ function telemetryWarn(invalid){return function(path,message){if(invalid)invalid
 function telemetryUnknown(value,allowed,warn,prefix){
   Object.keys(value).forEach(function(key){if(allowed.indexOf(key)<0)warn((prefix || '')+'.'+key,'unknown field — ignored');});
 }
-/* CloudWatch supports one full-window scalar. Preserve dimension case. */
+/* Preserve dimension case; period is validated against the selected window at query time. */
 function telemetryCloudwatchQuery(query){
-  return telemetryObject(query) && (!telemetryOwn(query,'missingMeansZero') || typeof query.missingMeansZero==='boolean') && ['namespace','metric','region','accountId'].every(function(key){return telemetryText(query[key]);}) &&
+  return telemetryObject(query) && (!telemetryOwn(query,'period') || Number.isInteger(query.period) && query.period>0) && (!telemetryOwn(query,'missingMeansZero') || typeof query.missingMeansZero==='boolean') && ['namespace','metric','region','accountId'].every(function(key){return telemetryText(query[key]);}) &&
     (['Sum','Maximum','Minimum','Average','SampleCount'].indexOf(query.statistic)>=0 || typeof query.statistic==='string' && /^\$(?:[A-Za-z][A-Za-z0-9_]*|\{[A-Za-z][A-Za-z0-9_]*\})$/.test(query.statistic)) && telemetryObject(query.dimensions) && Object.keys(query.dimensions).every(function(key){return telemetryText(key) && telemetryText(query.dimensions[key]);});
 }
 function telemetryLogBreakdownQuery(value){
@@ -196,8 +196,9 @@ function telemetryLogBreakdownQuery(value){
     (!telemetryOwn(value,'limit') || Number.isInteger(value.limit) && value.limit>=1 && value.limit<=100) &&
     (!telemetryOwn(value,'columns') || Array.isArray(value.columns) && value.columns.length<=4 && value.columns.every(function(column){return telemetryObject(column) && heading(column.field) && heading(column.label);}));
 }
+function telemetryLogTrendQuery(value){return value===false || telemetryObject(value) && ['query','timeField','valueField'].every(function(k){return telemetryText(value[k]);}) && (!telemetryOwn(value,'binSeconds') || Number.isInteger(value.binSeconds) && value.binSeconds>0);}
 function telemetryCloudwatchLogsQuery(query){
-  return telemetryObject(query) && Array.isArray(query.logGroups) && query.logGroups.length>0 && query.logGroups.every(telemetryText) && telemetryText(query.query) && telemetryText(query.region) && (!telemetryOwn(query,'valueField') || telemetryText(query.valueField)) && (!telemetryOwn(query,'breakdown') || telemetryLogBreakdownQuery(query.breakdown));
+  return telemetryObject(query) && Array.isArray(query.logGroups) && query.logGroups.length>0 && query.logGroups.every(telemetryText) && telemetryText(query.query) && telemetryText(query.region) && (!telemetryOwn(query,'valueField') || telemetryText(query.valueField)) && (!telemetryOwn(query,'breakdown') || telemetryLogBreakdownQuery(query.breakdown)) && (!telemetryOwn(query,'trend') || telemetryLogTrendQuery(query.trend));
 }
 /* One signal entry has exactly one source key plus optional display metadata.
    Returns the cleaned authored entry or null. */
@@ -214,10 +215,11 @@ function telemetrySignal(name,value,warn){
   var source=sources[0],query=value[source];
   if(source==='cloudwatch'){
     if(!telemetryCloudwatchQuery(query)){warn(at,'cloudwatch requires namespace, metric, region, accountId, string dimensions and statistic: Sum, Maximum, Minimum, Average or SampleCount — signal ignored');return null;}
-    telemetryUnknown(query,['namespace','metric','region','accountId','dimensions','statistic','missingMeansZero'],warn,at+'.cloudwatch');
+    telemetryUnknown(query,['namespace','metric','region','accountId','dimensions','statistic','missingMeansZero','period'],warn,at+'.cloudwatch');
   }else if(source==='cloudwatchLogs'){
     if(!telemetryCloudwatchLogsQuery(query)){warn(at,'cloudwatchLogs requires logGroups, query, region; breakdown needs query, labelField, valueField, limit 1–100 and at most 4 text columns — signal ignored');return null;}
-    telemetryUnknown(query,['logGroups','query','region','valueField','breakdown'],warn,at+'.cloudwatchLogs');
+    telemetryUnknown(query,['logGroups','query','region','valueField','breakdown','trend'],warn,at+'.cloudwatchLogs');
+    if(query.trend)telemetryUnknown(query.trend,['query','timeField','valueField','binSeconds'],warn,at+'.cloudwatchLogs.trend');
     if(query.breakdown){telemetryUnknown(query.breakdown,['query','labelField','valueField','title','labelTitle','valueTitle','columns','limit'],warn,at+'.cloudwatchLogs.breakdown');(query.breakdown.columns || []).forEach(function(column,i){telemetryUnknown(column,['field','label'],warn,at+'.cloudwatchLogs.breakdown.columns.'+i);});}
   }else if(source==='honeycomb'){
     if(!telemetryObject(query) || !Object.keys(query).length){warn(at,'honeycomb must be a non-empty query object — signal ignored');return null;}
@@ -369,20 +371,20 @@ function carrierTelemetry(obj,templates,invalid,environment){
   // Local templates take that same pass here, before exactly one environment pass.
   var expanded=telemetryExpand(raw,templates,warn);
   if(!expanded)return null;
-  var config=telemetryObject(environment)?environment:environment?{environment:environment}:null,errors=Object.create(null),breakdownErrors=Object.create(null);
+  var config=telemetryObject(environment)?environment:environment?{environment:environment}:null,errors=Object.create(null),breakdownErrors=Object.create(null),trendErrors=Object.create(null);
   if(config){
     var values=Object.assign(Object.create(null),config.variables || {});
     if(config.environment)values.env=config.environment;
     if(config.grafana && config.grafana.accountId)values.account=config.grafana.accountId;
     Object.keys(expanded).forEach(function(key){
       if(key==='signals' && telemetryObject(expanded[key]))Object.keys(expanded[key]).forEach(function(name){
-        var authored=expanded[key][name],logs=telemetryObject(authored) && authored.cloudwatchLogs,hasBreakdown=telemetryObject(logs) && telemetryOwn(logs,'breakdown'),breakdown=hasBreakdown?logs.breakdown:null;
+        var authored=expanded[key][name],logs=telemetryObject(authored) && authored.cloudwatchLogs,hasBreakdown=telemetryObject(logs) && telemetryOwn(logs,'breakdown'),breakdown=hasBreakdown?logs.breakdown:null,hasTrend=telemetryObject(logs) && telemetryOwn(logs,'trend'),trend=hasTrend?logs.trend:null;
         // Display-only fields cannot prevent the metric query from running.
         // Keep their one environment pass separate from source/query errors.
         var display={};if(telemetryObject(authored))['label','links'].forEach(function(field){if(telemetryOwn(authored,field)){display[field]=authored[field];delete authored[field];}});
         // The optional grouped query owns its configuration errors. Resolve it
         // separately, once, so it cannot suppress an otherwise readable total.
-        if(hasBreakdown)delete logs.breakdown;
+        if(hasBreakdown)delete logs.breakdown;if(hasTrend)delete logs.trend;
         function missingReason(missing){return 'Set telemetry variable ${'+missing+'} in the active environment'+(missing==='account'?' or tracking.telemetry.grafana.accountId':'')+'.';}
         expanded[key][name]=telemetrySubstitute(expanded[key][name],values,function(missing){
           errors[name]=missingReason(missing);
@@ -391,6 +393,7 @@ function carrierTelemetry(obj,templates,invalid,environment){
           var unresolved=false,resolved=telemetrySubstitute(display[field],values,function(missing){unresolved=true;warn('.signals.'+name+'.'+field,'unresolved telemetry variable '+missing+' — display metadata ignored');},true);
           if(!unresolved)expanded[key][name][field]=resolved;
         });
+        if(hasTrend)expanded[key][name].cloudwatchLogs.trend=telemetrySubstitute(trend,values,function(missing){trendErrors[name]=missingReason(missing);},true);
         if(hasBreakdown)expanded[key][name].cloudwatchLogs.breakdown=telemetrySubstitute(breakdown,values,function(missing){breakdownErrors[name]=missingReason(missing);},true);
       });
       else expanded[key]=telemetrySubstitute(expanded[key],values,null,true);
@@ -408,6 +411,7 @@ function carrierTelemetry(obj,templates,invalid,environment){
     if(entry.links)signals[name].links=entry.links;
     if(errors[name])signals[name].error=errors[name];
     if(breakdownErrors[name])signals[name].breakdownError=breakdownErrors[name];
+    if(trendErrors[name])signals[name].trendError=trendErrors[name];
   });
   return {kind:clean.kind,signals:signals,proof:clean.proof || {},links:clean.links || {},card:clean.card || null};
 }

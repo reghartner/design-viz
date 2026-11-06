@@ -398,8 +398,7 @@ fourth context argument `{environment, config}`; history receives that context
 as its fifth argument. `environmentChanged(id, config)` lets a custom provider
 synchronously invalidate its own caches before the next request. Custom
 providers must honor request cancellation and key any external caches by
-environment. Grafana daily history remains supported; Honeycomb history remains
-unsupported.
+environment. Built-in Grafana and Honeycomb adapters support selected-window history.
 
 When gathering metrics for a feature board, start from scoped Jira tickets and
 linked PR diffs. Inventory the new queues, topics, pipes, routes, jobs and
@@ -1538,10 +1537,10 @@ calls:
 | tool | how often | input |
 |---|---|---|
 | `get_annotations` | when offered, once per refresh, first and alone | `{type: "annotation", limit: 100}` |
-| `query_prometheus` | once per refresh for each `grafana` signal | `{datasourceUid, expr, startTime: "now-24h", endTime: "now", stepSeconds, queryType: "range"}` |
-| `query_loki_logs` | once per refresh for each `loki` signal | `{datasourceUid, logql, startRfc3339: "now-24h", endRfc3339: "now", queryType: "range", stepSeconds}` |
+| `query_prometheus` | once per refresh for each `grafana` signal | `{datasourceUid, expr, startTime, endTime, stepSeconds, queryType: "range"}` (relative in Live; absolute in Over time) |
+| `query_loki_logs` | once per refresh for each `loki` signal | `{datasourceUid, logql, startRfc3339, endRfc3339, queryType: "range", stepSeconds}` (relative in Live; absolute in Over time) |
 | `query_sql` | at most once an hour for each `sql` signal; the value is reused in between | `{datasourceUid, query}` |
-| `query_cloudwatch` | once per refresh for each `cloudwatch` signal; [full-window Sum](#cloudwatch-signals) | `{datasourceUid, namespace, metricName, region, accountId, dimensions, statistic, period, start, end}` |
+| `query_cloudwatch` | once per signal/window, plus paired SampleCount for Average; [window statistics and series](#cloudwatch-signals) | `{datasourceUid, namespace, metricName, region, accountId, dimensions, statistic, period, start, end}` |
 | `generate_deeplink` | when offered, once per signal per page load, unless the signal authors `links.query` | `{resourceType: "explore", datasourceUid, queries: [{refId, expr}], timeRange: {from: "now-24h", to: "now"}}` |
 
 Authored `signals.<name>.links.query` wins; otherwise a safe `exploreUrl` in the query reply
@@ -2167,21 +2166,41 @@ hosted palette page. Preview skin changes are not saved document settings.
 
 ### Over time with Metrics
 
-Metrics is independent of the Jira mode buttons and off on every load. With
-Metrics off, Over time loads only Jira history. With Metrics on, clicking Over
-time loads one telemetry history batch after Jira supplies the day range.
-Turning Metrics on while the slider is open also loads that batch. Moving the
-slider never queries a tool. There are no slider markers.
+Metrics is off on load and independent of Jira mode. Built-in adapters fetch
+only the selected date's numeric observation window when Over time is opened or
+Metrics is enabled there. Today always fetches; it never borrows the live map.
+The date key identifies the local calendar day, and `at` is its following local
+midnight (including 23h/25h DST transitions). Today clamps that future endpoint
+to now; other future calendar days stay unobserved without a query. Past dates,
+including the last date of a closed board, keep their exact endpoint. The page
+window extends backward from that endpoint, independent of local-day length.
 
-Each day carries an explicit `key` (`YYYY-MM-DD`) and `at` (RFC3339 evaluation
-endpoint), independent of its localized label. Jira reconstructs the end of the
-local calendar day and exposes that same following local-midnight instant in
-`at`. Telemetry evaluates the previous 24 hours ending at exactly that instant.
-Adjacent endpoints can be 23 or 25 hours apart across DST; labels never determine
-the boundary. The date key identifies the displayed local calendar day.
-The demo uses its embedded telemetry block's start plus 24 hours, without network
-calls. The example's explicit window is 24h. Day 9's completed push is UNPROVEN;
-Day 12's event traffic is DEGRADED.
+Built-ins opt into `historyMode: 'window'`. The history range includes one exact
+`endpoints` item plus `window: {from, to}`. The returned carrier map contains
+ordinary complete observations: scalar, inner series, units, per-signal links,
+provenance, measurement `observedAt` and receipt `retrievedAt`. Query bounds stay
+in separate `window` metadata; unknown measurement time remains null. Past
+successful windows cache for seven days by binding, environment and provider
+identity. Today is refreshed when revisited. Selecting a new uncached date loads
+that window, with per-signal Loading and healthy partial results visible.
+All historical tool calls share the six-call Jira/telemetry budget, including
+Average weights, Logs trends and grouped queries; no outer task holds a slot
+while awaiting its own queued child. Traces are excluded from numeric history.
+
+Prometheus/Loki query their authored expressions over the selected window;
+a range step is not an aggregate rewrite. CloudWatch preserves period statistics
+and computes a trustworthy headline. Logs retain an independent authoritative
+total. Honeycomb sends hosted absolute string `query_spec.from`/`to` and evaluates
+one calculation directly: daily percentiles, averages and distinct counts are
+never summed. Structured series remain intact; the published formatted Results
+fallback retains its rounding warning and unknown as-of without invented points.
+SQL passes absolute `start`/`end` only for queries containing `$__timeFilter(...)` in query code (not a comment or quoted example)
+or both `$__from` and `$__to`; unscoped queries receive a per-signal historical
+unavailable note. No timestamp column or historical table semantics are guessed.
+
+The following endpoint-only contract remains the default for custom providers.
+It preserves batch loading, exact endpoint projection and slider-without-fetch
+behavior. Embedded demo observations also remain local and query-free.
 
 A host may supply `telemetry.history(bindings, {from, to, endpoints}, signal, report)` beside
 `provider` (or as `provider.history`). `from` and `to` are inclusive absolute
@@ -2225,21 +2244,10 @@ The MCP namespace also caches exact range calls per viewer and artifact. A new
 controller starts with an empty front cache; exact MCP calls can still be reused.
 Partial-error and aborted batches never extend cached coverage.
 
-Grafana history issues one `query_prometheus` or metric `query_loki_logs` range
-call per explicitly bound supported signal, with `stepSeconds: 86400` and the
-absolute endpoints. A same-offset range is one call per signal. A DST offset
-transition splits only at the discontinuity into contiguous 86400-second runs;
-each run starts and ends at actual selected-day instants, even a single-point run.
-All runs use the same six-call queue with Jira. No nearest UTC sample is accepted.
-It reuses the live parsers, tool qualification, consent and
-abort behavior, with no annotation or deeplink calls in the history batch. It
-never rewrites authored PromQL/LogQL: authors must provide the intended 24-hour
-aggregation themselves; a daily step controls evaluation spacing, not query
-aggregation. SQL and Tempo have no history adapter. Honeycomb history remains
-#946 and is unobserved here. Argument contracts follow the official
-[Prometheus source](https://github.com/grafana/mcp-grafana/blob/main/tools/prometheus.go)
-and [Loki source](https://github.com/grafana/mcp-grafana/blob/main/tools/loki.go);
-validation uses raw MCP fixtures, not a live Grafana or Honeycomb account.
+Direct legacy Grafana history callers without `range.window` retain exact
+endpoint Prometheus/Loki queries with `stepSeconds: 86400`, split only across DST
+discontinuities. Their endpoint samples/cache contract is unchanged. Built-in
+selected-window behavior above uses useful inner series instead.
 
 ### Honeycomb metrics and mixed connectors (#946, metrics leg)
 
@@ -2340,9 +2348,7 @@ Mock COUNT counts hourly measurement rows, not requests or spans.
 While visible and Metrics is on, the controller refreshes no faster than once a
 minute: one `run_query` and at most one raw download per Honeycomb signal. Consent
 uses the shared Allow action without replacing Jira/Grafana's pending action.
-Paint and history-slider movement do not query. Honeycomb daily history is
-unsupported: Over time shows it as unobserved while Grafana keeps its exact-day
-history and cache. Trace/exemplar retrieval is a separate #947-coordinated leg;
+Paint does not query. Selecting an uncached historical window queries Honeycomb directly; Today refreshes when revisited. Trace/exemplar retrieval is a separate #947-coordinated leg;
 this metrics implementation does not complete all of #946 or fabricate trace IDs.
 
 Evidence: [official tools reference](https://docs.honeycomb.io/integrations/mcp/tools),
@@ -2392,7 +2398,7 @@ day selection cannot generate telemetry Activity. New live observations held dur
 history are consumed once on Return Live. Binding replacement/removal retires the
 old scope; clearing or disabling telemetry removes its events and Production while
 preserving Jira Activity and the selected Over time day. No queries originate from
-Production rendering, link preparation, or history slider movement.
+Evidence rendering or link preparation; selecting an uncached history window may query.
 
 Initial host telemetry preload remains accepted before the first Metrics decision. An explicit Metrics off (including off before the first enable), capability removal, or destroy retracts evidence and rejects late `apply()` callbacks. Capability recovery stays off; an intentional enable accepts fresh observations. `clear()` retracts the current map without disabling a current session, so provider recovery can still supply its next observation.
 
@@ -2433,16 +2439,24 @@ Required query fields are `namespace`, `metric`, `region`, `accountId`,
 remains literal. Existing `$env` substitution applies to nested dimension values.
 
 The artifact requests `query_cloudwatch` only for bound CloudWatch signals.
-Tool discovery diagnoses a missing query tool before any data call. Each refresh
-calls it once per bound signal with `{datasourceUid, namespace, metricName,
-region, accountId, dimensions, statistic, period, start, end}`. The page window
-supplies `start: "now-<window>"`, `end: "now"`, and full-window seconds as `period`.
-This yields a scalar. A sole returned value is authoritative; outer `statistics.count` counts points, not CloudWatch SampleCount. Multiple points require Sum with explicit `statistics.sum`; other statistics are unobserved. No configurable period or sparkline. Empty arrays clear previous CloudWatch evidence and normally remain unobserved
-("no data points yet"); `missingMeansZero: true` explicitly opts successful empty
-arrays into zero. Malformed/error responses always stay unobserved. A real `[0]`
-remains measured zero.
-Failed metric/Logs queries clear the prior observation; other supported sources continue.
-CloudWatch history is unsupported and leaves gaps.
+Tool discovery diagnoses a missing query tool before any data call.
+Each request uses one absolute start/end pair for the page window. The default
+period is 300 seconds for windows up to 6h and 3600 seconds for 24h/48h;
+longer windows choose bounded coarser periods. Optional positive integer `period`
+uses regular CloudWatch multiples of 60 seconds, at least 300 seconds for data
+15–63 days old and 3600 seconds beyond 63 days. Invalid periods, more than 1440
+points, or starts beyond 455-day retention are diagnosed before querying.
+Returned timestamps are sorted and must lie within the requested window, allowing
+the first rounded boundary bucket. Boundary buckets can cover a partial window;
+the headline and graph use the same returned buckets, without prorating.
+`Sum` and `SampleCount` sum bucket values; `Maximum`/`Minimum` take their extrema.
+`Average` weights each bucket by its underlying SampleCount from a paired query
+with exactly the same range/period. Missing, invalid or mismatched weights leave
+Average unobserved, never the last bucket or an unweighted mean. Tool summaries
+such as `statistics.avg` and `statistics.count` are not underlying sample weights.
+Actual series remain timestamp-spaced, including isolated points and gaps.
+Empty arrays normally mean no data points yet; `missingMeansZero: true` opts only
+successful empty results into zero. Malformed/error results never become zero.
 
 Argument names match the [upstream CloudWatch tool](https://github.com/grafana/mcp-grafana/blob/main/tools/cloudwatch.go).
 User verification on 2026-11-05 reported that the us-east-1 monitoring datasource
@@ -2546,8 +2560,7 @@ supported; error wrappers never become observations.
 The [Grafana Logs tool source](https://github.com/grafana/mcp-grafana/blob/main/tools/cloudwatch_logs.go)
 returns `{logs: []map[string]string, totalFound, status, hints?}` and polls for
 completion. Repository tests replay this contract; no live connector/account
-verification is claimed. Optional period/sparklines and daily CloudWatch history
-remain unsupported.
+verification is claimed. Live and selected-day history use the same bounded series contracts.
 
 See the validated [device → IoT → queue example](../examples/cloudwatch-log-signals/cloudwatch-log-signals.spec.json).
 The queue name `camera_message_power_state_${env}` is illustrative: replace it with the real queue name before querying. No queue metric was live verified here.
@@ -2589,8 +2602,7 @@ device-ID format or live account result has been verified.
 Place that object under `cloudwatchLogs.breakdown`. It inherits the signal's
 log groups, region and datasource, including environment variables. Both calls
 use one absolute ISO start/end pair anchored at refresh start, with the selected
-page window (including aliases such as `now-6h`). Without `breakdown` only the
-original scalar call runs, retaining its relative-window convention. The details
+page window (including aliases such as `now-6h`). An eligible count query also receives an independent trend call; all calls use the same absolute bounds. The details
 call follows scalar success in the same bounded provider task; it introduces no
 additional polling. Scalar failure skips details. Details failure clears old rows
 and displays a one-line error while retaining a successfully read scalar. Missing
@@ -2679,3 +2691,24 @@ Named numeric rows, compact scope and per-signal source links follow the [edge m
 Optional signal labels and query URLs have their own environment substitution.
 An unresolved variable drops only that display field (label falls back to the
 signal name); missing variables in the actual metric query still block it.
+
+### Logs trends
+
+The scalar query remains the authoritative headline; neither bucket sums nor
+`totalFound` replace it. A plain terminal `stats count() as n` after only
+`filter`/`parse` stages receives an automatic bucketed companion query. Other
+pipelines are left untouched. Automatic bins use valid minutes/hours/days (never
+`bin(300s)`, which AWS caps at 60 seconds), with at most 1000 returned rows.
+Use `trend: false` to disable it, or explicitly author:
+
+```json
+{"trend":{"query":"filter status = 'Failure' | stats count() as n by bin(5m) as t","timeField":"t","valueField":"n","binSeconds":300}}
+```
+
+`binSeconds` is optional for explicit trends; when supplied it permits the first
+bucket to start at the preceding bin boundary. All other timestamps must lie in
+the requested window. No missing buckets are filled with zero. Exactly 1000 rows
+is labeled potentially truncated; the independent scalar remains authoritative.
+Scalar, trend and optional device breakdown share one anchored range. Trend or
+breakdown failures clear their own old evidence while retaining a successful
+scalar. Variables used only in either optional query cannot block the total.

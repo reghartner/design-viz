@@ -573,9 +573,9 @@ test('A10 sql signals call query_sql at most hourly and reuse the value; without
  const s=await setup({page:raw,servers,now:()=>clock,overrides:{query_sql:input=>{sqlAnswers.push(input);return Promise.resolve({content:[],payload:[{events:148000+sqlAnswers.length}]});}}});
  const first=await s.refresh();
  assert.deepEqual(sqlAnswers,[{datasourceUid:'lake',query:'select count(*) as events from push_log'}],'A10 one query_sql call with the sql datasource UID');
- assert.deepEqual(first.map.notify.signals.total,{value:148001,unit:'events'},'A10 the first numeric column of the first row is the value');
+ assert.deepEqual(first.map.notify.signals.total,{value:148001,observedAt:null,unit:'events'},'A10 the first numeric column of the first row is the value');
  clock+=59*60000;const second=await s.refresh();
- assert.equal(sqlAnswers.length,1,'A10 no query_sql call within the hour');assert.deepEqual(second.map.notify.signals.total,{value:148001,unit:'events'},'A10 the hourly value is reused');
+ assert.equal(sqlAnswers.length,1,'A10 no query_sql call within the hour');assert.deepEqual(second.map.notify.signals.total,{value:148001,observedAt:null,unit:'events'},'A10 the hourly value is reused');
  clock+=2*60000;const third=await s.refresh();
  assert.equal(sqlAnswers.length,2,'A10 query_sql again after an hour');assert.equal(third.map.notify.signals.total.value,148002);
  const {C}=context();assert.equal(typeof C.telemetryGrafanaSql,'function','A10 the query_sql reader is a named helper');

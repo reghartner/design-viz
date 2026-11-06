@@ -130,7 +130,7 @@ for(const shape of ['direct','detail','zero'])test('actual mock measurement cloc
  if(shape==='zero')expect(events.find(e=>e.kind==='silent'),'measured zero Honeycomb cannot label a carrier silent while its Grafana rate is positive').toBeUndefined();
  await row.hover();expect(h.bridge.calls).toHaveLength(before);
  await metrics(root).click();h.bridge.day=7;await metrics(root).click();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);
- expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.rate,id)).toBeUndefined();await expect(row.locator('.dv-live-proof-point')).toHaveCount(0);await expect(row).toHaveAttribute('data-telemetry','unobserved');await expect(row).toContainText('rate: unobserved');await expect(row).toHaveAttribute('data-verdict','done');
+ expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.rate,id)).toBeUndefined();await expect(row.locator('.dv-live-proof-point')).toHaveCount(0);await expect(row).toHaveAttribute('data-telemetry','unobserved');await expect(row).toContainText('rate: unobserved');await expect(row).toHaveAttribute('data-verdict','done-traffic-unmeasured');await expect(row).toContainText('DONE · traffic not measured');
  expect(h.requests()).toBe(0);
 });
 
@@ -143,7 +143,7 @@ for(const mode of ['blocked','blocked-zero','blocked-missing'])test('published-p
  expect(JSON.stringify(snapshot)).not.toContain('SYNTHETIC_BROWSER');
  const queries=await page.evaluate(()=>window.calls.filter(c=>c.tool==='run_query').map(c=>JSON.parse(c.input.query_spec)));expect(queries.every(q=>q.from==='-24h')).toBe(true);
  if(mode==='blocked'){
-  await root.getByRole('button',{name:/^Trace(?: · \d+)?$/}).click();await expect(root.locator('.dv-metrics-card')).toHaveCount(0);await expect(root.locator('.dv-trace-selected')).toHaveCount(0);await expect(root.locator('.dv-trace-mode-status')).toContainText('No trace evidence');
+  await root.getByRole('button',{name:/^Trace(?: · \d+)?$/}).click();await expect(root.locator('.dv-metrics-card')).toHaveCount(0);await expect(root.locator('.dv-trace-selected')).toHaveCount(0);await expect(root.locator('.dv-trace-mode-status')).toHaveText('No traceMatch steps on this board');
   await root.getByRole('button',{name:'Jira',exact:true}).click();await expect(root.locator('.dv-metrics-card').filter({hasText:'formatted text; may be rounded'}).first()).toBeVisible();
   await page.screenshot({path:path.join(repo,'.local/step-evidence/screenshots/formatted-text-metrics.png'),fullPage:true});
  }

@@ -36,6 +36,8 @@ function telemetryCardScope(signal){
 }
 function telemetryCountNote(binding){return telemetryMetricNames(binding).some(function(name){var s=binding.signals[name];return s.source==='honeycomb' && Array.isArray(s.query.calculations) && s.query.calculations.some(function(c){return c && c.op==='COUNT';});})?'Honeycomb COUNT counts source rows/events, not automatically requests.':'';}
 function telemetryCardContent(edge,binding,sample,result,window,pending){
+  // Visibility never changes source ownership or legacy-link ambiguity.
+  var rows=telemetryMetricRows(binding,sample,pending).filter(function(row){return binding.signals[row.name].showOnCard!==false;});
   binding=telemetryCardBinding(binding);
   var primary=telemetryPrimary(binding,true) || telemetryMetricNames(binding)[0] || null,queue=binding.kind==='queue',raw=edge.telemetry || {};
   var title=edge.label || edge.from+' → '+edge.to;
@@ -46,7 +48,6 @@ function telemetryCardContent(edge,binding,sample,result,window,pending){
   var loading=telemetryMetricNames(binding).some(function(name){return pending && pending[name];});
   var measured=telemetryMetricNames(binding).some(function(name){return telemetryReading(sample,name).value!==null;});
   if(loading && !measured)state='loading';
-  var rows=telemetryMetricRows(binding,sample,pending);
   return {rows:rows,countNote:telemetryCountNote(binding),title:title,headline:(queue?'in: ':'')+telemetryCardValue(binding,sample,primary,pending)+(scalar && telemetryReading(sample,primary).value!==null?' in '+window:''),scope:[scope,telemetryCountNote(binding)?'COUNT: source rows/events':''].filter(Boolean).join(' · '),
     details:rows.filter(function(row){return row.name!==primary;}).map(function(row){return row.label+': '+row.text;}),
     note:loading?(measured?'Refreshing…':'Loading…'):state==='silent'?'no traffic · '+window+' window':state==='unobserved'?'unobserved · '+window+' window':window+' window',

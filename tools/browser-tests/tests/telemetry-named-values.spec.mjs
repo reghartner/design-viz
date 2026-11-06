@@ -45,3 +45,15 @@ test('queue count-only and showOnCard keep local/imported rows compact while hid
  await expect(root.locator('[data-metrics-card="app->push"]')).toHaveCount(0);await expect(root.locator('[data-metrics-card="shared::api->shared::store"]')).toHaveAttribute('data-verdict','proven');
  await root.locator('g.node[data-dv-node="shared::api"]').click();const evidence=root.locator('.dv-live-production');await expect(evidence.locator('.dv-live-production-kpi')).toHaveCount(4);await expect(evidence).toContainText('lag: 7');await expect(evidence).toContainText('events: 30');await expect(evidence).toContainText('PROVEN');await root.screenshot({path:'/tmp/named-metric-values-hidden-imported-inspect.png'});
 });
+test('hidden source cannot lend its legacy query URL to visible local or imported card rows',async({page,server})=>{
+ const {root}=await mountCues(page,server),spec=cueSpec(),d=spec.page.sections[0].diagram,visible={...binding().signals.matched,label:'Received'};delete visible.links;
+ const mixed={kind:'service',signals:{visible,hidden:{honeycomb:{calculations:[{op:'COUNT'}]},showOnCard:false}}};
+ for(const edge of d.edges)if(edge.telemetry)edge.telemetry={...mixed,links:edge.from==='ingest'?{query:'https://ui.honeycomb.io/team/result/hidden-authored'}:{}};
+ d.nodes['shared::api'].telemetry=mixed;
+ await page.evaluate(spec=>{window.viewer.destroy();window.samples={};window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:bindings=>{window.samples=Object.fromEntries(bindings.map(b=>[b.id,{signals:{visible:{value:12345},hidden:{value:30}},links:{query:'https://ui.honeycomb.io/team/result/hidden-provider'}}]));return Promise.resolve(window.samples);}}});},spec);
+ await root.getByRole('button',{name:'Metrics',exact:true}).click();
+ for(const id of ['ingest->app','shared::api->shared::store']){const card=root.locator('[data-metrics-card="'+id+'"]');await expect(card).toContainText('12,345 events');await expect(card.locator('a')).toHaveCount(0);await expect(card).not.toContainText('COUNT');}
+ await root.locator('g.node[data-dv-node="shared::api"]').click();await expect(root.locator('.dv-live-production-kpi').filter({hasText:'Received:'}).locator('a')).toHaveCount(0);await page.keyboard.press('Escape');
+ await page.evaluate(()=>{for(const [id,sample] of Object.entries(window.samples))sample.signals.visible.links={query:'https://cloudwatch.test/query?carrier='+encodeURIComponent(id)};window.viewer.controller.telemetry.apply(window.samples);});
+ for(const id of ['ingest->app','shared::api->shared::store'])await expect(root.locator('[data-metrics-card="'+id+'"] a')).toHaveAttribute('href','https://cloudwatch.test/query?carrier='+encodeURIComponent(id));
+});

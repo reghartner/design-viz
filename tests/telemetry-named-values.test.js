@@ -54,3 +54,14 @@ test('optional display variables cannot suppress queries across the template and
  const ready=C.carrierTelemetry({telemetry:raw},templates,undefined,{...config,variables:{...config.variables,missingLabel:'accepted',missingUrl:'exact'}}).signals.count;assert.equal(ready.label,'orders accepted');assert.equal(ready.links.query,'https://grafana.test/stg?q=orders&view=exact');
  const once=C.carrierTelemetry({telemetry:{kind:'service',signals:{count:{grafana:'up',label:'${caption}',links:{query:'https://grafana.test/?q=${target}'}}}}},{},undefined,{variables:{caption:'${literal}',target:'${literal}'}}).signals.count;assert.equal(once.error,undefined);assert.equal(once.label,'${literal}');assert.equal(once.links.query,'https://grafana.test/?q=${literal}');
 });
+
+test('hidden peers never enable ambiguous legacy card links; full binding owns URL resolution',()=>{
+ const binding={kind:'service',signals:{visible:{source:'cloudwatch',query:{namespace:'AWS/IoT',metric:'TopicMatch',dimensions:{RuleName:'exact'}}},hidden:{source:'honeycomb',query:{calculations:[{op:'COUNT'}]},showOnCard:false}},proof:{}},sample={signals:{visible:{value:12345},hidden:{value:30}}},edge={from:'a',to:'b'};
+ for(const owner of ['authored','provider']){
+  binding.links=owner==='authored'?{query:'https://ui.honeycomb.io/team/result/hidden'}:{};sample.links=owner==='provider'?{query:'https://ui.honeycomb.io/team/result/hidden'}:{};
+  const card=()=>C.telemetryCardContent(edge,binding,sample,{telemetry:'observed'},'24h');
+  assert.equal(C.telemetryMetricRows(binding,sample)[0].url,null,owner+' Inspect');assert.equal(card().rows[0].url,null,owner+' card');assert.equal(card().rows.length,1);assert.equal(card().countNote,'');
+  sample.signals.visible.links={query:'https://cloudwatch.test/provider-query'};assert.equal(card().rows[0].url,'https://cloudwatch.test/provider-query');
+  binding.signals.visible.links={query:'https://cloudwatch.test/authored-query'};assert.equal(card().rows[0].url,'https://cloudwatch.test/authored-query');delete binding.signals.visible.links;delete sample.signals.visible.links;
+ }
+});

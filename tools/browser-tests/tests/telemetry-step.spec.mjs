@@ -32,6 +32,7 @@ async function setup(page,server,options={}){
   const other=JSON.parse(JSON.stringify(f.spec.page.sections[0]).replaceAll('mcu','other-mcu').replaceAll('ingest','other-ingest').replaceAll('notify','other-notify').replaceAll('app','other-app'));other.id='other';other.heading='Independent duplicate step IDs';f.spec.page.sections.push(other);
   for(const [key,value] of Object.entries(structuredClone(f.samples))){const id=key.replaceAll('mcu','other-mcu').replaceAll('ingest','other-ingest').replaceAll('notify','other-notify').replaceAll('app','other-app');value.signals.rate={value:0};delete value.exemplars;f.samples[id]=value;}
  }
+ if(options.noPanel)f.spec.page.sections[0].diagram.panels=[];
  if(options.views){const d=f.spec.page.sections[0].diagram;d.layouts=['one','two'].map(id=>({id,name:id==='one'?'Full view':'Alternate view',sectionLayout:{columns:24,default:[{x:0,y:0,w:16,h:18},{controls:'steps',attachTo:'diagram',x:0,y:18,w:16,h:6},{panel:'status',x:16,y:0,w:8,h:24}]}}));d.defaultLayout='one';}
  if(options.recordedUrl)f.samples['mcu->ingest'].exemplars=[await recordedUrlEvidence()];
  if(options.traceOnly)Object.values(f.samples).forEach(s=>s.signals={});
@@ -144,4 +145,17 @@ test('reused host token cannot silently replace an explicitly selected trace',as
  const {root,f}=await setup(page,server);await openTrace(root);await root.locator('.dv-trace-candidate[data-trace-id="'+f.alternative.traceId+'"]').first().click();await expect(selected(root)).toHaveAttribute('data-trace-id',f.alternative.traceId);
  await page.evaluate(()=>window.ctl.telemetry.retry());await expect(selected(root)).toHaveAttribute('data-trace-id',f.alternative.traceId);
  await page.evaluate(()=>{const samples=structuredClone(window.fixture.samples);samples['mcu->ingest'].exemplars[0].traceId=samples['mcu->ingest'].exemplars[0].candidates.find(c=>c.traceId!==samples['mcu->ingest'].exemplars[0].traceId).traceId;window.ctl.telemetry.apply(samples);});await expect(selected(root)).toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);await expect(root.locator('.dv-trace-mode-status')).toContainText('expired');
+});
+
+// The former step-owned rail is superseded by the existing Status panel modes.
+for(const noPanel of [false,true])test('desktop trace evidence preserves diagram dimensions '+(noPanel?'without a Status panel':'inside the existing Status panel'),async({page,server})=>{
+ const {root}=await setup(page,server,{noPanel});const diagram=root.locator('.boardcanvas').first();
+ await page.evaluate(()=>window.ctl.telemetry.setEnabled(true));await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);
+ if(noPanel)await expect(root.locator('.pt-live-status')).toHaveCount(0);
+ if(!noPanel){await openTrace(root);await expect(root.locator('.pt-live-status .dv-trace-selected')).toHaveCount(1);await expect(root.locator('.dv-trace-waterfall')).toBeVisible();}
+ await page.evaluate(()=>{const samples=structuredClone(window.fixture.samples);Object.values(samples).forEach(s=>delete s.exemplars);window.ctl.telemetry.apply(samples);});await expect(selected(root)).toHaveCount(0);const before=await diagram.boundingBox();
+ await page.evaluate(()=>window.ctl.telemetry.apply(window.fixture.samples));if(!noPanel){await root.locator('.dv-trace-candidate').first().click();await expect(selected(root)).toBeVisible();}
+ await expect(root.locator('.dv-trace-evidence,.dv-trace-rail,.dv-live-trace-slot')).toHaveCount(0);
+ const after=await diagram.boundingBox();expect(Math.abs(after.width-before.width)).toBeLessThan(2);expect(Math.abs(after.height-before.height)).toBeLessThan(2);
+ await root.getByRole('button',{name:'Next step',exact:true}).click();await expect(root.locator('.dv-trace-evidence,.dv-trace-rail')).toHaveCount(0);await unchanged(page);
 });

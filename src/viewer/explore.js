@@ -976,6 +976,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       enter();
     },
     currentCamera:function(){return camera();},
+    // Shared comparison cameras use graph coordinates, not a fraction of each
+    // diagram's extent: adding a distant node must not move the other pane.
+    graphCamera:function(value){
+      var svg=board.querySelector('.boardcanvas>svg'),vb=svg && svg.viewBox.baseVal;
+      if(!active || !vb)return null;
+      if(value){cancelDeferredFit();zoom=clamp(value.zoom,zoomFloor(),4);sizeGraph(false);positionCamera({x:(value.x-vb.x)/vb.width,y:(value.y-vb.y)/vb.height,zoom:zoom});}
+      var c=camera();return {x:vb.x+c.x*vb.width,y:vb.y+c.y*vb.height,zoom:c.zoom};
+    },
     panelPlacement:function(){return onCanvas() && !workbenchFocus?'canvas':'floating';},
     canvasCommand:function(){return expand;},
     navigationKeydown:keydown,

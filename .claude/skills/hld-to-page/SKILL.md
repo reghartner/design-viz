@@ -93,9 +93,9 @@ After the packet, route source/handoff details:
 - [Diagram links](../../../cookbook/diagram-handoffs.md); [design reviews](../../../docs/design-review.md).
 - [Live Jira / metrics proof / `missingWork`](../../../docs/live-status.md): use
   `live-status-board` when requested; its Metrics chapter is conditional.
-  Metrics: Jira/PR changes → new resources; qa/stg/prd profiles; CloudWatch Sum. Desktop, imported
-  carriers too. Jira counts parent minus exclusions plus
-  manual/dependency stories once.
+  Metrics: Jira/PR resources; qa/stg/prd; CloudWatch Sum; `6h`/`-6h`/`now-6h`.
+  Desktop, imported too. Jira: parent minus exclusions plus manual/dependency
+  stories once.
 
 Deliver spec/ledger files together. Ask unresolved story decisions and, after
 relevant checks, needed Mixed/Engineering source access plainly.

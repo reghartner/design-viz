@@ -9,7 +9,7 @@ export async function stepFixture(){
  class Clock extends Date{static now(){return Date.parse(AT);}}
  const C={URL,AbortController,TextDecoder,TextEncoder,Date:Clock,console,setTimeout:(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;},clearTimeout:id=>timers.delete(id),document:{hidden:false,addEventListener(){},removeEventListener(){}}};
  vm.runInNewContext(sourceLoader.entrypoint('standalone').body,C);
- const signal={honeycomb:{query_spec:{filters:[{column:'service.name',op:'=',value:'event-ingest'}]},raw_row_columns:['trace.trace_id','timestamp','error'],results_limit:20}};
+ const signal={honeycomb:{query_spec:{filters:[{column:'service.name',op:'=',value:'event-ingest'}]},raw_row_columns:['trace.trace_id','error'],results_limit:20}};
  const binding={kind:'call',signals:{rate:{grafana:EVENT_QUERY,unit:'req/h'},trace:signal},proof:{rate:{min:1}}};
  const d={view:'step',autoplay:false,nodes:{mcu:{title:'Doorbell firmware'},ingest:{title:'Event ingest'},notify:{title:'Notification service'},app:{title:'Resident app'}},rows:[['mcu','ingest','notify','app']],
   edges:[{from:'mcu',to:'ingest',label:'Submit event',tickets:['TRACE-1'],telemetry:binding},{from:'ingest',to:'notify',label:'Publish',telemetry:structuredClone(binding)},{from:'notify',to:'app',label:'Push',telemetry:structuredClone(binding)}],

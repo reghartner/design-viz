@@ -14,7 +14,7 @@ An existing opaque Honeycomb value can express native raw-sample intent:
 {
   "honeycomb": {
     "query_spec": {"filters": [{"column":"service.name","op":"=","value":"event-ingest"}]},
-    "raw_row_columns": ["trace.trace_id", "timestamp", "error"],
+    "raw_row_columns": ["trace.trace_id", "error"],
     "results_limit": 20
   }
 }
@@ -34,7 +34,13 @@ hosts may still supply schemas in the list. Each schema must declare supported
 argument types and required fields. Honeycomb `query_spec` may be an object or JSON string, as declared by the
 actual schema; expected-type-plus-null unions are supported. Honeycomb dataset
 is optional when the schema permits omission. Raw columns and limit are top-level. The page window (24h default)
-sets hosted `query_spec.from`, as in the scalar adapter. `get_trace` uses
+accepts `6h`, `-6h` or `now-6h` (surrounding whitespace ignored). These
+lookbacks normalize internally to `6h`. Honeycomb receives signed `-6h` in
+hosted `query_spec.from` and `get_trace.from`, as in the scalar adapter. Other
+providers retain their conventions: Tempo uses the same six-hour RFC3339 bounds. Both search and
+detail use that window for local and imported carriers. The authored spelling
+is preserved; unsupported future offsets, zero and date expressions warn and
+use the default `24h`. `get_trace` uses
 `environment_slug`, returned `trace_id`, `from`, and `view_mode: full` only if
 supported. `run_query` completes results; there is no invented polling contract.
 
@@ -214,3 +220,9 @@ Open `http://localhost:8775/status-trace.html`, choose Trace, and enable traces.
 This is labeled fixture replay without an external authenticated account. Only
 transport IDs and an absolute fixture clock are adapted for the runtime envelope;
 the canonical selectors, relationships, timings and budgets are preserved.
+
+Honeycomb receives signed relative `from` values such as `-24h` for both tools.
+The adapter drops legacy `timestamp` entries from outgoing `raw_row_columns`
+without changing the authored query: Honeycomb always returns that column.
+The Status panel’s Trace mode supersedes the former step-owned trace disclosure
+and fallback rail. Selecting or navigating steps never opens or selects a trace.

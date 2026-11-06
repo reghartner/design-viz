@@ -77,3 +77,11 @@ test('page window supplies full seconds and CloudWatch history stays unobserved 
  const count=h.calls.length;h.api.openHistory([{at:'2026-11-04T21:31:00.000Z'}],0);await settle();
  assert.equal(h.calls.length,count);assert.deepEqual(plain(h.api.snapshot().map),{});assert.match(h.api.status().note,/CloudWatch history unsupported/);
 });
+
+for(const window of ['-6h','now-6h',' -24h '])test('relative '+window+' drives CloudWatch range and full period for local/imported carriers',async t=>{
+ const h=await setup();t.after(()=>h.close());h.p.tracking.telemetry.window=window;const before=JSON.stringify(h.p);
+ h.api.setEnabled(true);await settle();const duration=window.includes('24')?'24h':'6h',seconds=duration==='24h'?86400:21600;
+ assert.equal(h.calls.length,12);assert.ok(h.calls.every(c=>c.input.period===seconds&&c.input.start==='now-'+duration&&c.input.end==='now'));
+ for(const id of ['local','shared::api','local->other','shared::api->shared::store'])assert.equal(h.api.snapshot().map[id].signals.matched.value,24114);
+ assert.equal(JSON.stringify(h.p),before,'querying leaves authored window intact');
+});

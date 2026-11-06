@@ -142,8 +142,8 @@ function telemetryGrafanaSql(payload){
   return null;
 }
 function telemetryGrafanaWindowMs(text){
-  var match=/^([1-9][0-9]*)([smhdw])$/.exec(typeof text==='string'?text:'');
-  return match?Number(match[1])*TELEMETRY_GRAFANA_UNITS[match[2]]:86400000;
+  var duration=telemetryWindowDuration(text) || TELEMETRY_DEFAULT_WINDOW;
+  return Number(duration.slice(0,-1))*TELEMETRY_GRAFANA_UNITS[duration.slice(-1)];
 }
 /* Carriers with at least one signal this adapter runs, signals in authored order. */
 function telemetryGrafanaJobs(bindings){

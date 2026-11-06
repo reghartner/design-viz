@@ -168,7 +168,12 @@ var TELEMETRY_RESERVED=TELEMETRY_BINDING_FIELDS.concat(['use','params']);
 var TELEMETRY_DEFAULT_WINDOW='24h',TELEMETRY_MIN_REFRESH_MS=60000,TELEMETRY_CARD_OFFSET_MAX=1000;
 var telemetryNamePattern=/^[A-Za-z][A-Za-z0-9_-]*$/;
 var telemetryParamPattern=/^[A-Za-z][A-Za-z0-9_]*$/;
-var telemetryWindowPattern=/^[1-9][0-9]*[smhdw]$/;
+var telemetryWindowPattern=/^(?:now-|-)?([1-9][0-9]*[smhdw])$/;
+/* Relative lookbacks normalize for every provider; authored source stays intact. */
+function telemetryWindowDuration(value){
+  var match=typeof value==='string'?telemetryWindowPattern.exec(value.trim()):null;
+  return match?match[1]:null;
+}
 function telemetryObject(v){return !!v && typeof v==='object' && !Array.isArray(v);}
 function telemetryOwn(v,key){return Object.prototype.hasOwnProperty.call(v,key);}
 function telemetryText(v){return typeof v==='string' && v.trim()!=='';}
@@ -387,8 +392,9 @@ function trackingTelemetry(page,invalid){
     else warn('.environment','must name a configured environment — using the first valid profile, or shared settings when none exist');
   }
   if(telemetryOwn(value,'window')){
-    if(typeof value.window==='string' && telemetryWindowPattern.test(value.window))out.window=value.window;
-    else warn('.window','use a duration such as "30m", "1h" or "7d" — using '+TELEMETRY_DEFAULT_WINDOW);
+    var duration=telemetryWindowDuration(value.window);
+    if(duration)out.window=duration;
+    else warn('.window','use a duration such as "30m", "1h", "7d", "-6h" or "now-6h" — using '+TELEMETRY_DEFAULT_WINDOW);
   }
   if(telemetryOwn(value,'refreshMs')){
     var ms=value.refreshMs;

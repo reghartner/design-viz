@@ -1966,7 +1966,7 @@ test('agent change navigation reaches other Views and paths and preserves stable
     await writeFile(path.join(h.session,'candidate.spec.json'),proposed);await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nReviewed recovery evidence.\n');
     h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Review recovery changes');
     await page.locator('#agent-update-open').click();
-    // #848: both panes are visible; the rail selection frames both (one-way); each pane keeps its own camera.
+    // The rail frames both panes; manual zoom and pan track in both directions (Chuck 2026-11-05).
     const rail=page.locator('#agent-update-compare .compare-rail'),view=page.locator('#agent-update-view'),before=page.locator('#agent-update-view-before'),position=page.locator('#agent-update-position');
     await expect(rail,'the change rail is shown').toBeVisible();
     /* #848 PR 2: the view opens Focused; this test covers the full panes. */
@@ -1979,7 +1979,10 @@ test('agent change navigation reaches other Views and paths and preserves stable
     await expect(view.locator('.explore-active-section .schip[aria-current="true"]')).toHaveAttribute('data-step-source','0');
     await expect(before.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','2');
     await expect(before.locator('.explore-active-section .schip[aria-current="true"]')).toHaveAttribute('data-step-source','2');
-    const camera=scope=>scope.locator('.explore-active-section .explore-board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
+    const camera=scope=>scope.locator('.explore-active-section .explore-board').evaluate(board=>{
+      const b=board.getBoundingClientRect(),n=board.querySelector('[data-dv-node="b"]').getBoundingClientRect();
+      return {x:n.x-b.x,y:n.y-b.y,width:n.width};
+    });
     const settle=()=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
     /* Wheel over a point of the pane's board that no floating panel covers. */
     const wheelOnBoard=async scope=>{
@@ -1988,17 +1991,30 @@ test('agent change navigation reaches other Views and paths and preserves stable
         return null;});
       expect(point,'the board has an uncovered point').not.toBeNull();await page.mouse.move(point.x,point.y);await page.mouse.wheel(120,80);
     };
-    /* Each pane's camera must move only from its own input, in both directions, for zoom and pan. */
-    const ownMoveOnly=async(moved,other,label,act)=>{
-      await settle();const otherCam=await camera(other),movedCam=await camera(moved);
-      await act();await expect.poll(async()=>JSON.stringify(await camera(moved)),{message:label+' changes its own camera'}).not.toBe(JSON.stringify(movedCam));
-      await settle();expect(await camera(other),label+' leaves the other pane camera unchanged').toEqual(otherCam);
+    /* Check rendered graph scale and displacement, so changing only a zoom label
+       or moving the panes in unrelated directions cannot satisfy the contract. */
+    const linkedZoom=async(moved,other,label)=>{
+      await settle();const start=await camera(moved),otherStart=await camera(other);
+      await moved.getByRole('button',{name:'Zoom in',exact:true}).click();
+      await expect.poll(async()=>(await camera(moved)).width,{message:label+' enlarges its diagram'}).toBeGreaterThan(start.width*1.1);
+      await expect.poll(async()=>(await camera(other)).width,{message:label+' enlarges the other diagram'}).toBeGreaterThan(otherStart.width*1.1);
+      await expect.poll(async()=>Math.abs((await camera(moved)).width-(await camera(other)).width),{message:label+' keeps rendered node scales equal'}).toBeLessThan(.5);
+    };
+    const linkedPan=async(moved,other,label)=>{
+      await settle();const start=await camera(moved),otherStart=await camera(other);
+      await wheelOnBoard(moved);
+      for(const axis of ['x','y']){
+        await expect.poll(async()=>Math.abs((await camera(moved))[axis]-start[axis]),{message:label+' moves its diagram on '+axis}).toBeGreaterThan(20);
+        await expect.poll(async()=>Math.abs(((await camera(moved))[axis]-start[axis])-((await camera(other))[axis]-otherStart[axis])),{message:label+' tracks the same displacement on '+axis}).toBeLessThan(2);
+      }
+      expect((await camera(moved)).width,label+' preserves its scale').toBeCloseTo(start.width,1);
+      expect((await camera(other)).width,label+' preserves the other scale').toBeCloseTo(otherStart.width,1);
     };
     /* Each pane opens fitted at its minimum zoom, so zoom in (zoom out cannot move a fitted camera). */
-    await ownMoveOnly(view,before,'zooming the After pane',()=>view.getByRole('button',{name:'Zoom in',exact:true}).click());
-    await ownMoveOnly(before,view,'zooming the Before pane',()=>before.getByRole('button',{name:'Zoom in',exact:true}).click());
-    await ownMoveOnly(view,before,'panning the After pane',async()=>{await wheelOnBoard(view);});
-    await ownMoveOnly(before,view,'panning the Before pane',async()=>{await wheelOnBoard(before);});
+    await linkedZoom(view,before,'zooming the After pane');
+    await linkedZoom(before,view,'zooming the Before pane');
+    await linkedPan(view,before,'panning the After pane');
+    await linkedPan(before,view,'panning the Before pane');
     await page.screenshot({path:info.outputPath('change-navigation-proposed-1280x720.png')});
     await item(/^Removed · Node Retired worker$/).click();await expect(position).toContainText('Removed');await expect(position).toContainText('not in the proposal');
     await expect(before.locator('[data-dv-node="retired"]')).toBeVisible();await expect(page.locator('#agent-update-commit')).toBeEnabled();
@@ -2029,7 +2045,7 @@ test('agent change navigation restores legacy Views after reorder and reveals an
     await board.hover();for(let i=0;i<12 && await node.isVisible() && await node.evaluate(el=>{const r=el.getBoundingClientRect();return r.right>0 && r.bottom>0 && r.left<innerWidth && r.top<innerHeight;});i++)await page.mouse.wheel(600,600);
     await expect(node).not.toBeInViewport();
     await page.locator('#agent-update-next').click();await page.locator('#agent-update-previous').click();await expect(node).toBeInViewport();
-    // One-way framing: the Before pane shows the same change in its own section and View.
+    // Selection framing: the Before pane shows the same change in its own section and View.
     await expect(before.locator('[data-navigation-section]')).toHaveAttribute('data-navigation-section','2');await expect(before.locator('.explore-active-section [data-dv-node="b"]')).toContainText('Backend');
     await expect(before.locator('.explore-active-section [data-dv-node="b"]')).toBeInViewport();
     const viewPicker=before.getByRole('combobox',{name:'Choose View',exact:true});

@@ -37,7 +37,7 @@
     if(host._panelMotionCleanup)host._panelMotionCleanup();
     var doc=host.ownerDocument || document,live=true,offChange=null,offDestroy=null,offReady=null,api=null,epoch=0;
     // The shared renderer may have replaced its shell since our previous mount.
-    if(!host._liveHead || host._liveHead.parentNode!==host){host.replaceChildren();host._liveChildren=Object.create(null);}
+    if(!host._liveChildren || !host.querySelector('.dv-status-modes')){host.replaceChildren();host._liveChildren=Object.create(null);}
     function el(parent,tag,key,cls,text){
       var children=parent._liveChildren || (parent._liveChildren=Object.create(null)),node=children[key];
       if(node && node.tagName.toLowerCase()!==tag){node.remove();node=null;}
@@ -128,8 +128,67 @@
       host._liveTicketSort={field:field,direction:current && current.field===field && current.direction==='ascending'?'descending':'ascending'};
       if(api)paint(api.snapshot());
     };
+    function traceBody(value){
+      var trace=value.trace,body=el(host,'div','trace-body','dv-live-panel-body dv-live-trace'),controls=el(body,'div','controls','dv-live-controls');
+      var enable=button(controls,'enable','reader-button dv-trace-enable',trace.enabled?'Disconnect traces':'Enable traces','setMetricsEnabled');enable._liveArgument=!trace.enabled;enable.hidden=!trace.available;
+      if(value.actionLabel)button(controls,'action','reader-button',value.actionLabel,'runAction');
+      var show=button(controls,'show','reader-button dv-trace-show','Show on diagram','setTraceShow');show._liveArgument=!trace.show;show.setAttribute('aria-pressed',String(trace.show));show.disabled=!trace.selected;
+      var metrics=value.metrics;
+      if(metrics.environments && metrics.environments.length){
+        var select=el(controls,'select','environment','reader-button tbtn');select.setAttribute('aria-label','Trace environment');
+        metrics.environments.forEach(function(id){var option=el(select,'option',id,'',id);option.value=id;});select.value=metrics.environment;
+        if(!select._liveChange){select._liveChange=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnvironment(select.value);};select.addEventListener('change',select._liveChange);}
+      }
+      var message=trace.historical?'Traces are unavailable in Over time. Return to Live in Jira to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?'Trace evidence unavailable. Check page bindings and connector permissions.':!trace.enabled?'Enable traces to retrieve the explicitly bound request samples.':!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
+      var status=el(body,'p','status','dv-trace-mode-status',[message,trace.status.note,trace.notice].filter(Boolean).join(' '));status.setAttribute('role','status');
+      if(trace.entries.length){
+        el(body,'h3','candidates-title','','Returned traces');
+        var list;
+        var source=el(body,'select','trace-source','dv-trace-source-select');source.setAttribute('aria-label','Trace source');trace.entries.forEach(function(entry){var option=el(source,'option',entry.key,'',entry.label);option.value=entry.key;});
+        var current=trace.entries.find(function(entry){return trace.selected && entry.key===trace.selected.key;}) || trace.entries[0];source.value=current.key;source._traceEntries=trace.entries;
+        if(!source._traceChange){source._traceChange=function(){var entry=source._traceEntries.find(function(e){return e.key===source.value;}),owner=host._livePanelApi;if(entry && owner)owner.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});};source.addEventListener('change',source._traceChange);}
+        list=el(body,'div','candidates','dv-trace-candidates');
+        [current].forEach(function(entry){
+          var group=el(list,'div',entry.key,'dv-trace-source');
+          entry.candidates.forEach(function(candidate){
+            var active=trace.selected && trace.selected.key===entry.key && trace.selected.exemplar.traceId===candidate.traceId;
+            var choose=button(group,candidate.traceId,'reader-button dv-trace-candidate',candidate.traceId.slice(0,12)+' · '+candidate.status+(candidate.durationMs!=null?' · '+candidate.durationMs+' ms':''),'chooseTrace');
+            choose._liveArgument={key:entry.key,traceId:candidate.traceId};choose.disabled=!candidate.available;choose.setAttribute('aria-pressed',String(!!active));choose.setAttribute('data-trace-id',candidate.traceId);choose.title=candidate.traceId+(candidate.time?' · '+candidate.time:'');
+          });
+        });
+      }
+      if(!trace.selected)return;
+      var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
+      el(detail,'h3','heading','','Selected request');el(detail,'code','identity','dv-trace-identity',e.traceId);
+      var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
+      el(detail,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');
+      var limit=e.warnings.filter(function(w){return /200 spans|timeline unavailable/i.test(w);});if(model.warning)limit.push(model.warning);if(limit.length)el(detail,'p','limit','dv-trace-limit',Array.from(new Set(limit)).join(' '));
+      if(model.mapping)el(detail,'p','coverage','dv-trace-coverage',model.rows.filter(function(r){return r.status==='matched';}).length+'/'+model.rows.length+' steps matched · '+model.mapping.unmatched.length+' spans unmatched');
+      var focusedSpan=e.spans.find(function(s){return host._liveTraceSpan===e.traceId+':'+s.id;}) || e.spans[0];
+      if(focusedSpan){var operation=el(detail,'div','operation','dv-trace-operation-detail'),matched=model.rows.find(function(r){return r.status==='matched' && r.spanIds.indexOf(focusedSpan.id)>=0;});el(operation,'strong','name','',focusedSpan.name);el(operation,'span','duration','',focusedSpan.ms+' ms'+(matched && matched.budget!=null?' / '+matched.budget+' ms budget':''));el(operation,'small','conditions','',matched?matched.conditions.map(function(c){return c.label;}).join(' · '):'No unique authored operation mapping');}
+      var waterfall=el(detail,'div','waterfall','dv-trace-waterfall');waterfall.setAttribute('aria-label','Selected trace waterfall');
+      var extent=Math.max.apply(null,e.spans.map(function(s){return s.startMs+s.ms;}).concat([1]));
+      e.spans.forEach(function(span){
+        var row=el(waterfall,'button',span.id,'dv-trace-span');row.type='button';row.setAttribute('data-error',String(span.error));row.setAttribute('aria-pressed',String(!!focusedSpan && span.id===focusedSpan.id));row._traceSpan=e.traceId+':'+span.id;
+        if(!row._traceClick){row._traceClick=function(){host._liveTraceSpan=row._traceSpan;if(api)paint(api.snapshot());};row.addEventListener('click',row._traceClick);}
+        el(row,'span','name','dv-trace-span-name',span.service+' · '+span.name).title=span.id;
+        var track=el(row,'span','track','dv-trace-track'),bar=el(track,'i','bar','dv-trace-bar');bar.style.marginLeft=100*span.startMs/extent+'%';bar.style.width=Math.max(.4,100*span.ms/extent)+'%';
+        el(row,'span','duration','',span.ms+' ms'+(span.error?' · error':''));
+      });
+      var actions=el(detail,'div','actions','dv-live-controls');button(actions,'pin','reader-button','Pin as evidence','pinSelectedTrace');
+      var url=telemetryTraceUrl(e.url,e.provider);if(url)link(actions,'source','Open trace in '+(e.provider==='tempo'?'Grafana':'Honeycomb'),url);
+      var metadata=el(detail,'details','metadata','dv-trace-metadata');el(metadata,'summary','summary','','Source and limitations');
+      el(metadata,'p','selection','dv-trace-selection',e.selectionReason);el(metadata,'p','time','dv-trace-age',(time?'Observed '+time:'Trace age unavailable')+' · '+e.range.from+' – '+e.range.to);
+      el(metadata,'p','meaning','','Edge labels show operation duration, not network latency. Unobserved operations are not proof of failure or success.');
+      var warnings=el(metadata,'div','warnings','dv-trace-warnings');e.warnings.concat(model.warning?[model.warning]:[]).forEach(function(w,i){el(warnings,'p',String(i),'tr-notice',w);});
+      var all=el(detail,'details','all','dv-trace-all');el(all,'summary','summary','','All operation mappings');var mappings=el(all,'div','mappings','dv-trace-mappings');
+      model.rows.forEach(function(item){var row=el(mappings,'div',item.id,'dv-trace-mapping');row.setAttribute('data-tone',item.tone);el(row,'strong','operation','',item.operation);el(row,'span','duration','',item.label+(item.budget!=null?' / '+item.budget+' ms budget':''));el(row,'small','conditions','',[item.detail].concat(item.conditions.map(function(c){return c.label;})).filter(Boolean).join(' · '));});
+    }
     function paint(value){
       if(!live)return;epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=doc.activeElement;
+      var modes=el(host,'div','modes','dv-status-modes');modes.setAttribute('role','group');modes.setAttribute('aria-label','Status view');
+      ['jira','trace'].forEach(function(mode){var count=value && value.trace?new Set(value.trace.entries.flatMap(function(e){return e.candidates.map(function(c){return c.traceId;});})).size:0;var control=button(modes,mode,'reader-button dv-status-mode',mode==='jira'?'Jira':'Trace'+(count?' · '+count:''),'setStatusMode');control._liveArgument=mode;control.setAttribute('aria-pressed',String((value && value.mode || 'jira')===mode));});
+      if(value && value.mode==='trace'){traceBody(value);sweep(host);return;}
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
       // #986: the first row holds buttons that never move. Everything that changes has a row of its own, whose height depends on the panel's width and never on its text, so it cannot move the buttons or what is below.
       var controls=el(head,'div','controls','dv-live-controls'),statusRow=el(head,'div','status','dv-live-status'),countRow=el(statusRow,'div','counts','dv-live-counts'),statusLine=el(statusRow,'div','text','dv-live-status-text');
@@ -302,11 +361,23 @@
     }
     function cleanup(){if(!live)return;live=false;host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();}
     host._panelMotionCleanup=cleanup;
-    function connect(controller){if(!live || api)return;api=controller;host._livePanelApi=api;if(offReady)offReady();paint(api.snapshot());offChange=api.onChange(paint);offDestroy=api.onDestroy(function(){var value=api.snapshot();value.metrics=Object.assign({},value.metrics,{proof:null,available:false,enabled:false});paint(value);cleanup();});}
+    function connect(controller){if(!live || api)return;api=controller;host._livePanelApi=api;if(offReady)offReady();paint(api.snapshot());offChange=api.onChange(paint);offDestroy=api.onDestroy(function(){var value=api.snapshot();value.metrics=Object.assign({},value.metrics,{proof:null,available:false,enabled:false});value.trace=Object.assign({},value.trace,{entries:[],selected:null,available:false,enabled:false});paint(value);cleanup();});}
     var controller=typeof liveStatusControllerFor==='function'?liveStatusControllerFor(host):null;
     if(controller)connect(controller);else {paint(null);if(typeof liveStatusWhenReady==='function')offReady=liveStatusWhenReady(host,connect);}
   }
-  var LIVE_STYLES=String.raw`.dv-live-toggle{display:flex;gap:4px;align-items:center;}
+  var LIVE_STYLES=String.raw`
+.dv-status-modes{display:flex;gap:6px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--explore-border)}
+.pt-live-status .dv-status-modes .tbtn.dv-status-mode[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-candidate[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-show[aria-pressed="true"]{background:var(--dv-live-active);color:#fff;border-color:var(--dv-live-active)}
+.dv-live-trace{font-size:12px}.dv-live-trace p{margin:6px 0;overflow-wrap:anywhere}.dv-trace-mode-status:empty{display:none}
+.dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
+.dv-trace-selected{min-width:0}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}
+.dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall{max-height:240px;overflow:auto;margin:12px 0;border:1px solid var(--explore-border);border-radius:6px;padding:8px}
+.dv-trace-span{width:100%;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;display:grid;grid-template-columns:minmax(100px,1.2fr) minmax(60px,1fr) minmax(55px,auto);gap:8px;align-items:center;padding:5px 0;font-size:10px}.dv-trace-span[aria-pressed="true"]{background:color-mix(in srgb,var(--dv-live-active) 10%,transparent)}.dv-trace-span:focus-visible{outline:2px solid var(--dv-live-active)}.dv-trace-operation-detail{display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:12px;padding:8px;border:1px solid var(--explore-border);border-radius:6px}.dv-trace-operation-detail small{grid-column:1/-1}.dv-trace-span-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-track{height:10px;background:color-mix(in srgb,var(--dink) 7%,transparent)}.dv-trace-bar{display:block;box-sizing:border-box;max-width:100%;height:10px;background:var(--dv-live-active)}.dv-trace-span[data-error="true"] .dv-trace-bar{background:var(--dv-live-blocked)}
+.dv-trace-mappings{display:grid;gap:5px}.dv-trace-mapping{display:grid;grid-template-columns:1fr auto;gap:2px 8px;border-left:3px solid var(--dfaint);padding:5px 8px}.dv-trace-mapping small{grid-column:1/-1;color:var(--dfaint)}.dv-trace-mapping[data-tone="error"]{border-color:var(--dv-live-blocked)}.dv-trace-mapping[data-tone="warning"]{border-color:#d49620}
+[data-trace-tone="error"]{--dv-trace-color:#d64b68}[data-trace-tone="warning"]{--dv-trace-color:#c88b14}[data-trace-tone="observed"]{--dv-trace-color:#368cc9}[data-trace-tone="unknown"]{--dv-trace-color:#87929e}
+g.node[data-trace-tone],path.edge[data-trace-tone]{opacity:1!important}g.node[data-trace-tone] .card,path.edge[data-trace-tone]{stroke:var(--dv-trace-color)!important;stroke-width:3px!important}g.node[data-trace-tone="unknown"] .card{stroke-dasharray:4 4!important}
+.dv-trace-overlay{fill:#368cc9}.dv-trace-overlay[data-tone="error"]{fill:#d64b68}.dv-trace-overlay[data-tone="warning"]{fill:#c88b14}.dv-trace-overlay[data-tone="unknown"]{fill:#87929e}.dv-trace-overlay text{font:600 10px 'IBM Plex Mono',monospace;paint-order:stroke;stroke:var(--dbg,#fff);stroke-width:3px;stroke-linejoin:round}
+.dv-live-toggle{display:flex;gap:4px;align-items:center;}
 .dv-live-count{border-radius:4px;padding:2px 4px;color:var(--dv-live-on);}
 .dv-live-note{color:var(--dtext);}
 .dv-live-connection,.dv-live-metrics-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}

@@ -1899,47 +1899,32 @@ existing edge-then-node walk). The calculation is scoped to this source section
 and selected path, so duplicate step IDs in imported sections cannot collide.
 With Jira Live off, numeric evidence can still show its telemetry-only verdict.
 
-In Step mode, **Trace evidence** appears below the controls in the diagram column
-only when that primary carrier has a validated exemplar. It reuses the Trace
-panel's span rows, coverage model and notices. The card identifies the actual
-trace, original candidate/span timestamp, selection reason, original range,
-provider completeness and warnings. Receipt time never supplies the trace age.
-Exact authored `traceMatch` selectors use the same FlowCanon matcher as trace
-comparison, on the selected path; no labels or names create bindings. Explicit
-expectations absent from the sample show **never**, with the qualification
-“absence here is one observed request, not proof that this never runs”. Unknown,
-partial, ambiguous and unmapped evidence cannot establish completeness.
+Trace evidence now lives in the existing Status panel's **Trace** view, beside
+**Jira**. It never opens a card over the diagram when stepping. Choose Trace and
+**Enable traces** to retrieve explicit trace bindings, then select an actual
+returned candidate. The selected request stays independent of step navigation;
+path changes remap that same request within its exact source section.
 
-**Play this trace** is a temporary runtime action for uniquely mapped current-step
-edges. Recorded start offsets and durations (including zero and overlapping
-attempts) drive ordinary packet motion. Navigation, path/view changes, history,
-trace replacement, clear, off and destroy retire the temporary packets. Authored
-timing, document source and Undo are unchanged. Reduced motion suppresses motion.
+The compact view shows one waterfall, candidate identity and observation time,
+provider completeness, mapping coverage, operation durations/budgets and recorded
+errors or queue/backpressure conditions. Unknown and unobserved operations never
+imply failure or success. Canvas node IDs and uniquely mapped edges come from
+explicit `traceMatch`, including imported nodes. No display-name joins are used.
+**Show on diagram** controls runtime annotations; Jira/scalar cues return when
+switching back to Jira. No document layout or authored timing is changed.
 
-**Pick passing trace** requires an actual alternative candidate with an observed
-passing status and a current provider capability. Tempo search status is unknown,
-so it does not invent this action. **Open trace** requires an actual safe provider
-UI URL; missing URLs and capabilities hide their actions. **Pin as evidence**
-adds a deduplicated in-memory Activity entry, including when numeric Proof is
-absent. Its pin timestamp is distinct from the trace observation time. Activity
-keeps at most 20 entries; telemetry retirement also retires its pins. Nothing is
-posted externally or persisted.
+**Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
+deduplicated in-memory Jira Activity entry, without posting externally. Trace
+selection uses the existing cached provider API; rendering and stepping never
+fetch alternatives. Telemetry off, invalidated bindings, closed/replaced detail,
+provider/account/environment changes, history and destroy retire stale evidence.
+Historical Over time never borrows live traces.
 
-Metrics remains off by default, uses the page's 24h default window, and is
-independent of Jira Live. Permitted host-preloaded evidence may render before a
-Metrics decision; explicit off retires it. Ambient hides the card, and Over time
-never borrows live exemplars. Root/page/host disable suppresses evidence and its
-dependent controls on local, imported and asynchronously loaded details alike.
-
-For a reproducible desktop fixture using actual shared mock-story IDs/spans and
-explicit mappings, run `python3 tools/build.py --no-config` followed by
-`node tools/step-evidence-demo.mjs`. Open
-`.local/step-evidence/demo/step-evidence.html`, choose **Step**, then **Metrics**.
-The fictional fixture offers Play, Pick passing trace and Pin. Its mock provider
-returns no UI URL, so Open stays absent. Choose **Over time**, then move **Day**:
-numeric Proof follows the selected day and the live Trace card disappears.
-Return to **Live** to restore current evidence. This fixture performs no live
-account queries.
+See [provider traces](provider-traces.md#inspect-a-request-in-status) for setup,
+limits and the reproducible canonical Doorbell example. Build with
+`python3 tools/build.py`, then run `node tools/status-trace-demo.mjs` and serve
+`.local/status-trace-demo`. The example uses the real panel and SVG renderer with
+normal, slow, error, partial and backpressure fixtures; no live account is needed.
 
 Live evidence follows the story's nodes and edges. Diagrams with a Live status
 panel omit the team lane chip from their step captions. In Step mode, each Jira

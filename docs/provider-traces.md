@@ -174,10 +174,55 @@ its trace metadata now uses native lines rather than its old single JSON line.
 See its README for every mock transport distinction. Grafana's existing mock
 service/span shape already matches the pinned current native shape.
 
+## Inspect a request in Status
+
+The existing **Status** panel has **Jira** and **Trace** views. Jira is the default.
+Choose Trace, then **Enable traces** (or the existing connector approval action)
+to retrieve the page's explicit trace bindings. Host and page opt-outs still apply.
+Trace replaces the Jira body and owns the diagram annotations while selected;
+returning to Jira restores its existing status and scalar telemetry presentation.
+There is no separate Metrics view.
+
+Returned candidates are grouped by source section and carrier. The source selector
+shows one group at a time; the Trace count deduplicates trace IDs across sources. Choosing one is
+an explicit cached-provider action. Step navigation never chooses or fetches a
+trace. One selected request stays selected as the path is inspected; mapping is
+recomputed only against that exact source section's current path. Duplicate
+carrier IDs across source diagrams are excluded because the telemetry map cannot
+prove their source. Imported and asynchronously loaded diagrams use the same rules.
+
+Author `traceMatch` on each relevant step using exact `serviceName`, `operation`,
+`nodeId`, and parent/link or attribute context as needed. Existing canonical
+Doorbell selectors demonstrate duration and queue budgets. Service display names
+are never guessed into joins. Only uniquely matched delivered edges receive
+operation-duration annotations; these are not inferred network latency. Missing,
+ambiguous, unmapped and incomplete evidence remain unknown, never passing or failing
+by absence. Provider errors, budget violations and supplied queue/backpressure
+conditions are shown separately. An unavailable or over-200-span timeline retains
+its identity and warnings without asserting missing operations.
+
+The panel has one bounded waterfall and a **Show on diagram** toggle. All canvas
+annotations are runtime-only, with no layout/spec persistence. Pin stores evidence
+in this session's Jira Activity. Historical Over time, telemetry off, rebinding,
+provider/account/environment changes, closed or replaced async detail, and destroy
+retire invalid selected evidence. Returning from history requires explicit selection.
+
+For a reproducible desktop example using the real renderer, canonical diagram and
+existing normal/slow/error/partial/backpressure fixtures:
+
+```sh
+python3 tools/build.py
+node tools/status-trace-demo.mjs
+python3 -m http.server 8775 --directory .local/status-trace-demo
+```
+
+Open `http://localhost:8775/status-trace.html`, choose Trace, and enable traces.
+This is labeled fixture replay without an external authenticated account. Only
+transport IDs and an absolute fixture clock are adapted for the runtime envelope;
+the canonical selectors, relationships, timings and budgets are preserved.
+
 Honeycomb receives signed relative `from` values such as `-24h` for both tools.
 The adapter drops legacy `timestamp` entries from outgoing `raw_row_columns`
 without changing the authored query: Honeycomb always returns that column.
-Trace evidence appears in a collapsed section of the Live status panel. Expand
-**Trace evidence** to inspect its scrolling timeline, choose or play a trace,
-or pin it to Activity. Pages without an active Live status panel use a separate
-trace rail outside the diagram tile. Navigation and Metrics off retire its actions.
+The Status panel’s Trace mode supersedes the former step-owned trace disclosure
+and fallback rail. Selecting or navigating steps never opens or selects a trace.

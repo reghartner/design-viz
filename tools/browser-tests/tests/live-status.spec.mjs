@@ -988,7 +988,7 @@ test('R3 Workbench demo paint has no badges and a card click selects without the
 /* #863 Epic status panel consistency contract matrix (desktop reader and Workbench; no phone layouts):
 | row | required state or element | fixture | scoped assertion | broken implementation it rejects |
 |---|---|---|---|---|
-| V1a | Live, Over time, First blocker, previous day and next day panel buttons | worked example with #live=demo on day 4, in each selectable theme picked from the reader's Contents Theme menu | inside the Epic status section, every visible `.pt-live-status .reader-button` equals that section's `.playback-button` in computed border width, border style, border radius, background color, font family, font size and padding, with no property skipped except the background of the selected mode button; Live is asserted pressed, and Play is also its reference because inside the document no theme gives a pressed `tbtn` its own fill (the only such rule, style.core.css `:is(.mbtn,.tbtn,.schip,.pathbtn)[aria-pressed=true]` for Rose, Lavender and Lilac, is overridden by their later `.docview :is(.mbtn,.tbtn,.schip)` rule), and the reader renders no other pressed `tbtn` (its pressed mode toggles are `.mbtn`, with a different fill) | browser-default buttons (2px outset, radius 0, #efefef); a fixed pastel pill that is wrong in Aurora, Blueprint and Terminal; a special look on any button except the selected mode button, which alone may have its own background (Chuck, 2026-11-04) |
+| V1a | Live, Over time, First blocker, previous day and next day panel buttons | worked example with #live=demo on day 4, in each selectable theme picked from the reader's Contents Theme menu | inside the Epic status section, Jira controls and Jira/Trace mode buttons are asserted separately; every visible `.pt-live-status .reader-button` equals that section's `.playback-button` in computed border width, border style, border radius, background color, font family, font size and padding, with no property skipped except the background of the selected mode button; Live is asserted pressed, Status modes switch their distinct selected fill in every theme; Play is the shape and typography reference because inside the document no theme gives a pressed `tbtn` its own fill (the only such rule, style.core.css `:is(.mbtn,.tbtn,.schip,.pathbtn)[aria-pressed=true]` for Rose, Lavender and Lilac, is overridden by their later `.docview :is(.mbtn,.tbtn,.schip)` rule), and the reader renders no other pressed `tbtn` (its pressed mode toggles are `.mbtn`, with a different fill) | browser-default buttons (2px outset, radius 0, #efefef); a fixed pastel pill that is wrong in Aurora, Blueprint and Terminal; a special look on any button except the selected mode button, which alone may have its own background (Chuck, 2026-11-04) |
 | V1b | the connector action button (Allow Jira) | frozen fixture with the claude connector stub in approval mode, where the Flagged search already answered so Live shows beside it | the visible Live and Allow Jira buttons equal the section's Play button on the same properties | styling only the demo and Live buttons |
 | V2 | in-progress color word in the worked example | worked example with #live=demo on day 2 | the section's first prose paragraph names "blue in progress" and no orange or amber while an active edge renders --dv-live-active blue (the skill description is checked in tests/live-status-panel.test.js) | leaving "orange in progress" |
 | V3 | Workbench Demo live status connection label | frozen fixture pasted into the Workbench, Demo live status checked, then Next day | the Epic status `.dv-live-connection` has data-state demo and its text starts with the source label "Demo", as the reader's #live=demo does (the refresh wording after the comma is not pinned) | the provider labelled "Host"; relabelling only the source while the state stays connected ("Demo connected") |
@@ -996,17 +996,25 @@ test('R3 Workbench demo paint has no badges and a card click selects without the
 test.describe('#863 Epic status panel consistency',()=>{
  const sides=['Top','Right','Bottom','Left'];
  const LOOK=[...sides.map(s=>'border'+s+'Width'),...sides.map(s=>'border'+s+'Style'),'borderTopLeftRadius','borderTopRightRadius','borderBottomRightRadius','borderBottomLeftRadius','backgroundColor','fontFamily','fontSize',...sides.map(s=>'padding'+s)];
- // One read of the section's Play button and every visible Epic status header button.
+ // Compare Jira controls and Status modes separately; both retain Play's shape and typography.
  const looks=section=>section.evaluate((sec,props)=>{
   const read=el=>{const style=getComputedStyle(el);return Object.fromEntries(props.map(p=>[p,style[p]]));};
   const shown=el=>el.getClientRects().length>0,plays=[...sec.querySelectorAll('.playback-button')].filter(shown),buttons=[...sec.querySelectorAll('.pt-live-status .reader-button')].filter(shown);
-  return {plays:plays.length,play:plays.length===1?read(plays[0]):null,buttons:buttons.map(el=>({name:el.textContent.trim(),pressed:el.getAttribute('aria-pressed')==='true',look:read(el)}))};
+  const record=el=>({name:el.textContent.trim(),pressed:el.getAttribute('aria-pressed')==='true',look:read(el)});
+  return {plays:plays.length,play:plays.length===1?read(plays[0]):null,buttons:buttons.filter(el=>!el.classList.contains('dv-status-mode')).map(record),modes:buttons.filter(el=>el.classList.contains('dv-status-mode')).map(record)};
  },LOOK);
- const differences=result=>result.buttons.flatMap(b=>LOOK.filter(p=>b.look[p]!==result.play[p] && !(b.pressed && p==='backgroundColor')).map(p=>b.name+' '+p+': '+b.look[p]+' vs Play '+result.play[p]));
+ const differences=result=>[...result.buttons,...result.modes].flatMap(b=>LOOK.filter(p=>b.look[p]!==result.play[p] && !(b.pressed && p==='backgroundColor')).map(p=>b.name+' '+p+': '+b.look[p]+' vs Play '+result.play[p]));
+ const expectModes=(result,active='Jira')=>{
+  expect(result.modes.map(b=>b.name)).toEqual(['Jira','Trace']);
+  expect(result.modes.map(b=>b.pressed)).toEqual(result.modes.map(b=>b.name===active));
+  const chosen=result.modes.find(b=>b.pressed),other=result.modes.find(b=>!b.pressed);
+  expect(chosen.look.backgroundColor,'selected Status mode has a distinct fill').not.toBe(other.look.backgroundColor);
+  expect(other.look.backgroundColor,'unselected Status mode retains Play fill').toBe(result.play.backgroundColor);
+ };
  test('V1 desktop demo header buttons match the section Play button in every reader theme',async({page,server})=>{
   const root=await openStory(page,server),panel=root.locator('.pt-live-status'),section=root.locator('.doc-sec:has(.pt-live-status)');
   await expect(section).toHaveCount(1);await demoDay(root,4);await expect(panel.getByRole('button',{name:'First blocker',exact:true})).toBeVisible();
-  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','Over time','Metrics','First blocker','<','>']);
+  const first=await looks(section);expectModes(first);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','Over time','Metrics','First blocker','<','>']);
   // The pressed state is the one compared: Live is on throughout.
   expect(first.buttons.map(b=>b.pressed)).toEqual([true,false,false,false,false,false]);
   // Contrasting precondition: the reference is the default theme's pill, not a browser default.
@@ -1019,6 +1027,10 @@ test.describe('#863 Epic status panel consistency',()=>{
    // Theme transitions settle on both buttons before they are compared.
    await expect.poll(async()=>differences(await looks(section)),{message:skin+' Epic status header buttons match Play'}).toEqual([]);
    const settled=await looks(section);expect(settled.buttons.map(b=>b.name),skin).toEqual(['Live','Over time','Metrics','First blocker','<','>']);expect(settled.buttons.map(b=>b.pressed),skin+' Live stays pressed').toEqual([true,false,false,false,false,false]);plays.add(JSON.stringify(settled.play));
+   expectModes(settled);
+   await panel.getByRole('button',{name:'Trace',exact:true}).click();await expect(panel.locator('.dv-live-head')).toHaveCount(0);
+   await expect.poll(async()=>{const result=await looks(section);return differences({...result,buttons:[]});},{message:skin+' Status mode shape matches Play in Trace view'}).toEqual([]);
+   expectModes(await looks(section),'Trace');await panel.getByRole('button',{name:'Jira',exact:true}).click();await expect(panel.getByRole('button',{name:'First blocker',exact:true})).toBeVisible();
   }
   expect(plays.size,'the themes give Play different looks').toBeGreaterThanOrEqual(4);
  });
@@ -1026,7 +1038,7 @@ test.describe('#863 Epic status panel consistency',()=>{
   const {root}=await openClaude(page,server,'approval'),section=root.locator('#section-delivery'),panel=section.locator('.pt-live-status');
   // Approval mode: the Flagged search has answered, so Live shows beside the action.
   await expect(panel.getByRole('button',{name:'Allow Jira',exact:true})).toBeVisible();await expect(panel.locator('.dv-live-toggle')).toBeVisible();
-  const first=await looks(section);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','Allow Jira','No blockers']);
+  const first=await looks(section);expectModes(first);expect(first.plays).toBe(1);expect(first.buttons.map(b=>b.name)).toEqual(['Live','Allow Jira','No blockers']);
   expect(first.play).toMatchObject({borderTopStyle:'solid',borderTopWidth:'1px',borderTopLeftRadius:'999px'});
   await expect.poll(async()=>differences(await looks(section)),{message:'Allow Jira matches Play'}).toEqual([]);
  });

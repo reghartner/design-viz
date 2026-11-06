@@ -1170,7 +1170,7 @@ test('L2 L3 snapshot exposes rollup and all mutations notify; navigation control
 });
 test('L2 L3 L4 panel paints synchronously, controls act, focus survives refresh and cleanup preserves print',()=>{
  const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const mount=mountStatus(h),body=mount.body;
- assert.equal(body.firstChild.className,'dv-live-head');assert.ok(body.querySelector('table.dv-live-tickets'));assert.ok(body.querySelector('.dv-live-epic'));assert.ok(body.querySelector('.dv-live-verdict')===null,'no verdict line');
+ assert.equal(body.firstChild.className,'dv-status-modes');assert.ok(body.querySelector('.dv-live-head'));assert.ok(body.querySelector('table.dv-live-tickets'));assert.ok(body.querySelector('.dv-live-epic'));assert.ok(body.querySelector('.dv-live-verdict')===null,'no verdict line');
  assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Tickets','Blockers and dependency chains','Activity']);
  const toggle=body.querySelector('.dv-live-toggle');assert.equal(toggle.textContent,'Live');toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),false);toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),true);
  let action=0,next=0,prev=0;api.action('Retry',()=>action++);body.querySelector('.dv-live-action').dispatchEvent({type:'click'});assert.equal(action,1);
@@ -2730,4 +2730,13 @@ test('Testing rolls into epic and initiative history while other demo container 
  const days=historyDays(C,[historyTicket('AA-1',historyAt(2026,10,20),'Testing')],today);
  assert.deepEqual(historyStates(days,'EP-1'),['testing','testing','testing','testing','testing']);assert.deepEqual(historyStates(days,'IN-1'),['testing','testing','testing','testing','testing']);
  const D=storyContext();for(const [state,want] of [['blocked','active'],['missing','todo'],['active','active'],['done','done'],['todo','todo']])assert.equal(D.liveStatusDemoMap({issues:{'AA-1':{state,epic:'EP-1'}}},['AA-1'],{'EP-1':{}})['EP-1'].state,want);
+});
+
+test('Status Jira and Trace bodies are exclusive, remain instance-owned and preserve Jira state',()=>{
+ const h=harness(fixture()),peer=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const m=mountStatus(h),other=mountStatus(peer);
+ assert.equal(api.snapshot().mode,'jira');assert.ok(m.body.querySelector('table.dv-live-tickets'));
+ api.setStatusMode('trace');assert.equal(api.snapshot().mode,'trace');assert.ok(m.body.querySelector('.dv-live-trace'));assert.equal(m.body.querySelector('table.dv-live-tickets'),null);assert.match(textOf(m.body),/Trace evidence unavailable/);
+ assert.equal(peer.ctl.liveStatus.snapshot().mode,'jira');assert.equal(other.body.querySelector('.dv-live-trace'),null);
+ api.setStatusMode('jira');assert.ok(m.body.querySelector('table.dv-live-tickets'));assert.equal(m.body.querySelector('.dv-live-trace'),null);assert.equal(api.state('AA-1').state,fixed['AA-1'].state);
+ api.destroy();peer.ctl.liveStatus.destroy();
 });

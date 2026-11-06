@@ -11,69 +11,64 @@ function telemetryStepModel(diagram,index,pathId,page,snapshot,jiraMap,jiraOn){
   var primary=direct[0],binding=primary && carrierTelemetry(primary.value,templates),sample=primary && snapshot.map[primary.id];
   var headline=binding?telemetryCardContent(primary.value,binding,sample,proof.carriers[primary.id],trackingTelemetry(page).window):null;
   var caption=measured?[proof.steps.current.label].concat(headline?[headline.headline].concat(headline.details.filter(function(v){return !/unobserved|not bound/.test(v);})):[]).filter(Boolean).join(' · '):'';
-  var exemplar=!snapshot.historical && sample && sample.exemplars && sample.exemplars[0],trace=null;
-  if(exemplar){
-    try{exemplar=telemetryTraceEnvelope(exemplar);}catch(ex){exemplar=null;}
-    if(exemplar){
-      var candidate=exemplar.candidates.find(function(c){return c.traceId===exemplar.traceId;}),times=exemplar.spans.map(function(s){return s.time;}).filter(Boolean).sort(function(a,b){return Date.parse(a)-Date.parse(b);});
-      var panel={type:'trace',spans:exemplar.spans},data=tracePanelData(panel),mapping=null,warning='';
-      try{
-        if(data.errors.length)throw new Error('trace timeline unavailable');
-        var normalized={spans:exemplar.spans.map(function(s){return {id:s.id,parentId:s.parentId,serviceName:s.service,operation:s.name,startMs:s.startMs,durationMs:s.ms,error:s.error,statusCode:s.attributes['http.response.status_code'] || s.attributes['http.status_code'],attributes:s.attributes,links:s.links.filter(function(l){return l.traceId===exemplar.traceId;}).map(function(l){return l.spanId;})};}),warnings:exemplar.warnings};
-        var path=diagram.paths && diagram.paths.length?pathId:undefined;
-        mapping=FlowTraceMatch.mapTrace(diagram,normalized,path);
-      }catch(ex){warning='Exact mapping unavailable: '+ex.message;}
-      var match=mapping && mapping.steps.find(function(s){return s.stepId===step.id;}),keys=stepDeliveredKeys(step),edges=(diagram.edges || []).filter(function(e){return keys.indexOf(e.from+'->'+e.to)>=0;});
-      // A node selector can identify one receiving hop. Without it, only a
-      // single delivered edge is unambiguous. No service/display-name joins.
-      if(step.traceMatch && step.traceMatch.nodeId)edges=edges.filter(function(e){return e.to===step.traceMatch.nodeId;});
-      var packets=!data.errors.length && match && match.status==='matched' && edges.length===1?match.spans.map(function(s){return {edge:edges[0].from+'->'+edges[0].to,startMs:s.startMs,ms:s.durationMs};}):[];
-      trace={exemplar:exemplar,panel:panel,at:candidate && candidate.time || times[0] || null,mapping:mapping,warning:warning,packets:packets,
-        never:mapping?mapping.steps.filter(function(s){return s.status==='missing' && !s.detail;}):[],primary:primary.id};
-    }
-  }
-  return {caption:caption,verdict:proof.steps.current.verdict,primary:primary && primary.id,trace:trace};
+  return {caption:caption,verdict:proof.steps.current.verdict,primary:primary && primary.id};
 }
+
 function telemetryClearStep(scope){
   var state=scope._telemetryStep;if(!state)return;
-  state.stepper.clearTraceTiming();state.card.remove();if(state.rail)state.rail.remove();delete scope._telemetryStep;
+  state.stepper.clearTraceTiming();state.card.remove();delete scope._telemetryStep;
 }
-function telemetryPaintStep(binding,snapshot,jiraMap,jiraOn,api,pin){
+function telemetryPaintStep(binding,snapshot,jiraMap,jiraOn){
   var scope=binding.el,stepper=binding.stepper,d=binding.section.diagram;
   scope.querySelectorAll('.dv-proof-caption').forEach(function(el){el.remove();});
   var model=stepper && stepper.mode()==='step' && trackingTelemetry(binding.page).enabled?telemetryStepModel(d,stepper.sourceIndex(),stepper.path(),binding.page,snapshot,jiraMap,jiraOn):null;
   var bar=scope.querySelector('.termbar'),host=bar && bar.querySelector('.step-text');
   if(model && model.caption && host){var caption=host.ownerDocument.createElement('span');caption.className='dv-proof-caption';caption.textContent=' · '+model.caption;caption.setAttribute('data-verdict',model.verdict || '');host.appendChild(caption);}
-  var trace=model && model.trace;if(!trace || !bar){telemetryClearStep(scope);return;}
-  var e=trace.exemplar,passing=e.candidates.find(function(c){return c.status==='passing' && c.traceId!==e.traceId && api.canChooseExemplar(trace.primary,e.selectionToken,c.traceId);});
-  var key=JSON.stringify([stepper.sourceIndex(),stepper.path(),trace,!!passing]),old=scope._telemetryStep;
-  // Section composition can hide/remount the panel without changing the trace.
-  var slot=Array.from(scope.querySelectorAll('.dv-live-trace-slot')).find(function(node){return node.closest('.doc-sec')===bar.closest('.doc-sec') && node.getClientRects().length;});
-  if(old && old.key===key && old.card.isConnected && (slot?old.card.parentNode===slot:old.rail))return;
+  // Trace evidence belongs to the Status panel, never to step navigation.
   telemetryClearStep(scope);
-  var doc=bar.ownerDocument,card=doc.createElement('details');card.className='dv-trace-evidence';card.setAttribute('aria-label','Trace evidence');card.setAttribute('data-trace-id',e.traceId);
-  // Use this section's active Live status rail, never a nested detail's panel.
-  var rail=null;if(!slot){rail=doc.createElement('aside');rail.className='panelcol dv-trace-rail';rail.setAttribute('aria-label','Trace evidence panel rail');scope.appendChild(rail);slot=rail;}
-  slot.appendChild(card);
-  scope._telemetryStep={key:key,card:card,stepper:stepper,rail:rail};
-  var body;
-  function el(tag,cls,text,parent){var node=doc.createElement(tag);node.className=cls || '';if(text)node.textContent=text;(parent || body || card).appendChild(node);return node;}
-  el('summary','','Trace evidence',card);body=el('div','dv-trace-evidence-body',null,card);el('code','dv-trace-identity',e.traceId);
-  var age=trace.at?Math.max(0,Math.floor((Date.now()-Date.parse(trace.at))/60000)):null;
-  el('p','dv-trace-age',trace.at?'Observed '+trace.at+' · '+age+' min ago':'Trace age unavailable');
-  el('p','dv-trace-selection',e.selectionReason+' · '+e.range.from+' – '+e.range.to);
-  el('p','dv-trace-completeness','Completeness: '+e.completeness+'. '+(e.completeness==='complete'?'Reported complete by provider.':'Partial or unknown evidence cannot establish completeness.'));
-  e.warnings.concat(trace.warning?[trace.warning]:[]).forEach(function(w){el('p','tr-notice',w);});
-  var actions=el('div','dv-trace-actions'),notice=el('p','dv-trace-action-note');notice.setAttribute('role','status');
-  function button(label,fn){var b=el('button','',label,actions);b.type='button';b.addEventListener('click',fn);return b;}
-  var url=telemetryTraceUrl(e.url,e.provider);if(url){var link=el('a','','Open trace in '+(e.provider==='tempo'?'Grafana':'Honeycomb'),actions);link.href=url;link.target='_blank';link.rel='noopener noreferrer';}
-  if(trace.packets.length)button('Play this trace',function(){var played=stepper.playTraceTiming(trace.packets);notice.textContent=played?'Temporary trace timing · navigation restores authored playback.':'Reduced motion: trace timing is shown without packet motion.';});
-  else el('p','dv-trace-timing-unavailable','Precise packet timing unavailable: the current step needs uniquely matched, timed edges.');
-  if(passing){var choose=button('Pick passing trace',async function(){choose.disabled=true;try{await api.chooseExemplar(trace.primary,e.selectionToken,passing.traceId);}catch(ex){if(card.isConnected){notice.textContent=ex.message;choose.disabled=false;}}});}
-  button('Pin as evidence',function(){notice.textContent=pin(trace.primary,e)?'Pinned in this session’s Activity.':'Already pinned in this session’s Activity.';});
-  var services=[];e.spans.forEach(function(s){if(services.indexOf(s.service)<0)services.push(s.service);});
-  if(!services.length && e.warnings.indexOf('Trace timeline unavailable.')<0)el('p','tr-notice','Trace timeline unavailable.');
-  services.forEach(function(service){var selected=e.spans.find(function(s){return s.service===service;}),body=el('div','dv-trace-timeline');body.innerHTML=tracePanelHTML(trace.panel,{selected:selected.id},[]);});
-  trace.never.forEach(function(m){var row=el('div','dv-trace-never');row.setAttribute('data-step-id',m.stepId);el('b','','never · '+m.stepId,row);el('p','','absence here is one observed request, not proof that this never runs',row);});
-  if(trace.mapping)trace.mapping.steps.filter(function(m){return m.status==='ambiguous' || m.status==='unmapped' || m.detail;}).forEach(function(m){el('p','tr-notice',m.stepId+': '+(m.detail || m.status)+' · precise timing unavailable.');});
+}
+
+/* Read-only mapping for one selected trace and one exact source section/path.
+   The controller owns selection and lifetime; this model never fetches. */
+function telemetryTraceModel(diagram,pathId,exemplar){
+  var mapping=null,warning='';
+  try{
+    if(!exemplar.spans.length)throw new Error('Trace timeline unavailable.');
+    var normalized={spans:exemplar.spans.map(function(s){return {id:s.id,parentId:s.parentId,serviceName:s.service,operation:s.name,startMs:s.startMs,durationMs:s.ms,error:s.error,statusCode:s.attributes['http.response.status_code'] || s.attributes['http.status_code'],attributes:s.attributes,links:s.links.filter(function(l){return l.traceId===exemplar.traceId;}).map(function(l){return l.spanId;})};}),warnings:exemplar.warnings};
+    mapping=FlowTraceMatch.mapTrace(diagram,normalized,diagram.paths && diagram.paths.length?pathId:undefined);
+  }catch(ex){warning=ex.message;}
+  var nodes=Object.create(null),edges=Object.create(null),rows=[];
+  if(mapping)mapping.steps.forEach(function(match){
+    var step=(diagram.steps || []).find(function(s){return s.id===match.stepId;}),selector=step.traceMatch || {},keys=stepDeliveredKeys(step);
+    var exact=(diagram.edges || []).filter(function(e){return keys.indexOf(e.from+'->'+e.to)>=0 && (!match.nodeId || e.to===match.nodeId);});
+    var duration=match.status==='matched'?Math.max.apply(null,match.spans.map(function(s){return s.durationMs;})):null;
+    var kinds=match.conditions.map(function(c){return c.kind;}),tone=match.status!=='matched'?'unknown':kinds.some(function(k){return k==='service-error' || k==='delivery-failed';})?'error':kinds.some(function(k){return ['slow','database-slow','queue-buildup','backpressure'].indexOf(k)>=0;})?'warning':'observed';
+    var label=match.status==='matched'?duration+' ms':match.status==='missing'?'Not observed':match.status==='ambiguous'?'Ambiguous':'Unmapped';
+    var row={id:match.stepId,nodeId:match.nodeId,status:match.status,tone:tone,duration:duration,budget:selector.maxDurationMs,label:label,operation:selector.operation || step.text || step.id,detail:match.detail,conditions:match.conditions,spanIds:match.spans.map(function(s){return s.id;})};rows.push(row);
+    // Only explicit stable node IDs and a uniquely delivered edge may annotate
+    // the canvas. A service name or display title is never a join key.
+    if(match.nodeId && diagram.nodes[match.nodeId]){if(!nodes[match.nodeId])nodes[match.nodeId]=[];nodes[match.nodeId].push(row);}
+    if(match.status==='matched' && exact.length===1){var key=exact[0].from+'->'+exact[0].to;if(!edges[key])edges[key]=[];edges[key].push(row);}
+  });
+  // Multiple authored steps claiming one edge cannot supply one exact duration.
+  Object.keys(edges).forEach(function(key){if(edges[key].length!==1)delete edges[key];});
+  return {mapping:mapping,warning:warning,rows:rows,nodes:nodes,edges:edges};
+}
+function telemetryClearTrace(scope){
+  scope.querySelectorAll('.dv-trace-overlay').forEach(function(el){el.remove();});
+  scope.querySelectorAll('[data-trace-tone]').forEach(function(el){el.removeAttribute('data-trace-tone');el.removeAttribute('data-trace-status');});
+}
+function telemetryPaintTrace(binding,model){
+  var scope=binding.el,d=binding.section.diagram;telemetryClearTrace(scope);if(!model)return;
+  function mark(target,rows,x,y){
+    var ranks={unknown:0,observed:1,warning:2,error:3},tone=rows.reduce(function(a,r){return ranks[r.tone]>ranks[a]?r.tone:a;},'unknown');
+    target.setAttribute('data-trace-tone',tone);target.setAttribute('data-trace-status',rows.map(function(r){return r.status;}).join(' '));
+    var doc=target.ownerDocument,g=doc.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','dv-trace-overlay');g.setAttribute('data-tone',tone);g.setAttribute('pointer-events','none');
+    var text=doc.createElementNS('http://www.w3.org/2000/svg','text');text.setAttribute('x',x);text.setAttribute('y',y);text.setAttribute('text-anchor','middle');var unknown=rows.filter(function(r){return r.status!=='matched';}).length;var label=rows.length===1?rows[0].label:rows.length+' operations'+(unknown?' · '+unknown+' unknown':' · max '+Math.max.apply(null,rows.map(function(r){return r.duration || 0;}))+' ms');text.textContent=label+(tone==='error'?' · error':tone==='warning'?' · warning':'');g.appendChild(text);
+    var title=doc.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=rows.map(function(r){return r.operation+': '+r.label+(r.budget!=null?' / '+r.budget+' ms budget':'')+' '+r.conditions.map(function(c){return c.label;}).join('; ');}).join(' · ');g.appendChild(title);
+    var parent=target.matches('g.node')?target:target.closest('svg');parent.appendChild(g);
+  }
+  scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !card)return;var box=card.getBBox();mark(node,rows,box.x+box.width/2,box.y+box.height-6);});
+  scope.querySelectorAll('g.node.node-text[data-dv-node]').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')];if(rows)node.setAttribute('data-trace-tone','observed');});
+  scope.querySelectorAll('path.edge[data-dv-edge]').forEach(function(path){var edge=d.edges[Number(path.getAttribute('data-dv-edge'))],rows=edge && model.edges[edge.from+'->'+edge.to];if(!rows)return;var point=path.getPointAtLength(path.getTotalLength()/2);mark(path,rows,point.x,point.y-9);});
 }

@@ -142,5 +142,9 @@ for(const mode of ['blocked','blocked-zero','blocked-missing'])test('published-p
  if(mode!=='blocked-missing')await expect(root.locator('.dv-metrics-card').filter({hasText:'formatted text; may be rounded'}).first()).toBeVisible();
  expect(JSON.stringify(snapshot)).not.toContain('SYNTHETIC_BROWSER');
  const queries=await page.evaluate(()=>window.calls.filter(c=>c.tool==='run_query').map(c=>JSON.parse(c.input.query_spec)));expect(queries.every(q=>q.from==='-24h')).toBe(true);
- if(mode==='blocked')await page.screenshot({path:path.join(repo,'.local/step-evidence/screenshots/formatted-text-metrics.png'),fullPage:true});
+ if(mode==='blocked'){
+  await root.getByRole('button',{name:/^Trace(?: · \d+)?$/}).click();await expect(root.locator('.dv-metrics-card')).toHaveCount(0);await expect(root.locator('.dv-trace-selected')).toHaveCount(0);await expect(root.locator('.dv-trace-mode-status')).toContainText('No trace evidence');
+  await root.getByRole('button',{name:'Jira',exact:true}).click();await expect(root.locator('.dv-metrics-card').filter({hasText:'formatted text; may be rounded'}).first()).toBeVisible();
+  await page.screenshot({path:path.join(repo,'.local/step-evidence/screenshots/formatted-text-metrics.png'),fullPage:true});
+ }
 });

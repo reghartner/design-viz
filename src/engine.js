@@ -3066,8 +3066,12 @@ function createBoardNavigation(board, group, legend, changed){
       right:Math.max(followFrame.right,ink.x+ink.w),bottom:Math.max(followFrame.bottom,ink.y+ink.h)};
     function axis(start,size,full,length,available,legacy,center,followStart,followEnd){
       var from=Math.max(start,full),to=Math.min(start+size,full+length);if(to<=from){from=full;to=full+length;}
-      // Whole pixels: a fractional canvas leaves the scroll bottom short of the rounded scrollHeight.
-      var lead=(from-full)*scale,extent=(to-from)*scale,room=Math.ceil(Math.max(available,extent));
+      // client sizes and legend.offsetHeight round independently. Filling that
+      // rounded space can overflow the real viewport under CSS zoom, toggling
+      // both native scrollbars and the Scroll row on every ResizeObserver turn.
+      // Leave a pixel in the empty viewport runway; round real ink up so its
+      // last pixel remains reachable when the graph actually needs scrolling.
+      var lead=(from-full)*scale,extent=(to-from)*scale,room=Math.ceil(Math.max(available-1,extent));
       // Keep existing runway when path ink disappears, and extend both ends
       // for new ink. The scroll compensation below keeps the paused camera
       // fixed when left/top growth moves the canvas coordinate origin.

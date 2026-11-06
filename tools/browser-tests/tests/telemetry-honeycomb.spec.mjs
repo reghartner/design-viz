@@ -118,7 +118,14 @@ for(const shape of ['direct','detail','zero'])test('actual mock measurement cloc
  expect(new Date(sample.signals.peer.series.at(-1)[0]).toISOString()).toBe(sample.signals.rate.observedAt);
  const card=root.locator('[data-metrics-card="'+id+'"]'),row=root.locator('[data-proof-carrier="'+id+'"]');
  await expect(card).toContainText(shape==='zero'?'0':'645.4');
- expect((await card.locator('.dv-metrics-sparkline').getAttribute('points')).trim().split(/\s+/)).toHaveLength(24);
+ const chart=await card.evaluate(el=>{const box=el.querySelector('.dv-metrics-card-box');return {width:+box.getAttribute('width'),height:+box.getAttribute('height'),dots:[...el.querySelectorAll('circle.dv-metrics-sparkline')].map(dot=>[+dot.getAttribute('cx'),+dot.getAttribute('cy')]),segments:[...el.querySelectorAll('polyline.dv-metrics-sparkline')].map(line=>line.getAttribute('points').trim().split(/\s+/).map(p=>p.split(',').map(Number)))};});
+ expect(chart.dots).toHaveLength(24);expect(chart.segments).toHaveLength(23);
+ expect(chart.dots.every(([x,y])=>x>=0&&x<=chart.width&&y>=0&&y<=chart.height)).toBe(true);
+ const times=sample.signals.rate.series.map(p=>typeof p[0]==='number'?p[0]:Date.parse(p[0])),span=times.at(-1)-times[0],width=chart.dots.at(-1)[0]-chart.dots[0][0];
+ chart.dots.forEach(([x],i)=>expect((x-chart.dots[0][0])/width).toBeCloseTo((times[i]-times[0])/span,5));
+ chart.segments.forEach((segment,i)=>{expect(segment).toHaveLength(2);segment.forEach((point,j)=>point.forEach((coordinate,axis)=>expect(Math.abs(coordinate-chart.dots[i+j][axis])).toBeLessThanOrEqual(.051)));});
+ if(shape==='zero')expect(new Set(chart.dots.map(p=>p[1])).size).toBe(1);
+ if(shape==='direct')await card.screenshot({path:'/tmp/pr4-ci-honeycomb-direct.png'});
  await expect(row.locator('.dv-live-proof-point')).toHaveCount(24);await expect(row.locator('.dv-live-proof-series')).toHaveCount(1);
  expect(await page.evaluate(id=>window.ctl.liveStatus.snapshot().metrics.proof.rows.find(r=>r.id===id).chart.observedAt,id)).toBe('2026-11-01T00:00:00.000Z');
  const before=h.bridge.calls.length;

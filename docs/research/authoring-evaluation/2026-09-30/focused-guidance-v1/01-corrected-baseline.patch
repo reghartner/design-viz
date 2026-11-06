@@ -1,0 +1,1283 @@
+diff --git a/.claude/skills/hld-to-page/SKILL.md b/.claude/skills/hld-to-page/SKILL.md
+index 203bd11..3dbea3f 100644
+--- a/.claude/skills/hld-to-page/SKILL.md
++++ b/.claude/skills/hld-to-page/SKILL.md
+@@ -76,11 +76,16 @@ paths below are relative to VIZ. Links to `references/` are relative to this fil
+    starts, and add `drain` for a device operation the source costs (a
+    recorded clip). Never hand-compute or patch a charge at every step. The
+    built-in rates (1 %/h drain, 20 %/h charge) are placeholders, not device
+-   facts. If two anchors cannot both be met at the stated rate, the rate does
+-   not apply between them: hold the earlier value with `charge` patches on
+-   the steps between (no invented in-between values), jump at the next
+-   anchor, and say on the page and in the ledger that the given times and
+-   the stated rate disagree.
++   facts. If two anchors and the source's rate (read with its stated
++   approximations and ranges) cannot be reconciled, keep the anchors and the
++   rate, and say briefly on the page and in the ledger that they are in
++   tension. Do not hold the earlier value or invent another rate between
++   them. Unless the operator clarifies, the actual charge in between is
++   unspecified: patch `charge: null` at the first step whose story time is
++   later than the earlier anchor, keep sourced operations in the caption and
++   ledger without numeric `drain` patches, and let the next anchor's `charge`
++   restore a number (without also applying a drain that reading includes). See
++   [conflicting anchors](references/honesty-rules.md#conflicting-anchors).
+ 6. **Every hop the caption claims is lit in that step.** For each message
+    clause, list the hops from the originating device to the last receiver:
+    the route the source gives, including each relay the source puts on that
+@@ -139,7 +144,14 @@ paths below are relative to VIZ. Links to `references/` are relative to this fil
+ 
+ And always: honesty. No invented facts. Unknown is not failed. End each path
+ at its last source-backed outcome; do not add a user action (opening the
+-clip, noticing the alert) the source does not describe. Edge kinds, node
++clip, noticing the alert) the source does not describe. When the source or
++operator does require one, make it visible at its step: a visible matching
++still scene or thumbnail plus a caption or label naming the action is enough,
++and a clear current label ("Playing the package clip") is best. A neutral tap
++is fine; naming a route ("taps the notification") is a claim that needs a
++source. Do not place a person in a room or state (bedroom, asleep) the source
++does not give; a placed marker keeps claiming that place until you move or
++clear it. Edge kinds, node
+ tones, notifications and outcomes need evidence. Story times and battery
+ rates (your estimate or the built-in placeholders) are allowed as
+ **illustrative** values when the source gives none (never in place of a
+@@ -207,16 +219,18 @@ stated battery, temperature or signal values, and which facts are missing.
+ 
+ Do this before the worksheet. Write one numbered batch of questions to
+ `<OUT>/QUESTIONS.md` (or the file or channel the request names), and copy it
+-into the ledger's Amendments table. Ask at most 7 questions, in plain
++into the ledger's Amendments table. Ask about at most 7 decisions, in plain
+ language, each with your proposed default so the operator can answer "ok".
+-Do not ask what the request already answers.
++Count decisions, not numbers: one item that asks two things the operator could
++answer separately counts as two. Do not ask what the request already answers,
++and do not restate supplied facts or preferences as questions.
+ 
+ **Question 1 is always the technical level** (skip it only if the request
+ states it):
+ 
+ | Level | What the diagram shows | Who it suits |
+ |---|---|---|
+-| Story | People, places, devices, app screens and outcomes. The backend is a few plainly named boxes ("Kestrel cloud"). No protocols, API names, HTTP codes, service names or code anywhere the reader sees: captions, edge labels, the connection legend (name connection kinds in plain words, e.g. "internet", "phone alert"), panel text and section descriptions. Never show file paths such as `input/hld.md`. | Business, product, support, leadership |
++| Story | People, places, devices, app screens and outcomes. The backend is a few plainly named boxes ("Kestrel cloud"). No protocols, API names, HTTP codes, service names or code in any text you write that the reader sees: captions, node and edge labels, the connection legend (name connection kinds in plain words, e.g. "internet", "phone alert"), panel text and section descriptions. Never show file paths such as `input/hld.md`. | Business, product, support, leadership |
+ | Mixed | The story plus the main services by name, with plain captions. | Mixed rooms |
+ | Engineering | Every service hop, API, failure mode and code reference. | Engineers and reviewers |
+ 
+@@ -243,8 +257,13 @@ choose the option that claims least, and list each one in the ledger under
+ technical fact would change what the audience sees, and then ask it as a
+ story question ("Does the app update while the phone is locked?").
+ 
+-Backstage links and code references are still required at every level: they
+-sit behind the nodes and do not add clutter. A node that stands for exactly
++Backstage links and code references are still required at every level. Copy
++them exactly; never drop or rename one to make a story page look plainer. The
++renderer shows them to every reader as its own provenance text (a "Services,
++APIs and source code" disclosure and "Code · …" step links), so do not claim
++they are hidden. That chrome is not your caption text: keep everything you
++write plain, and list the visible chrome as a presentation limitation when you
++deliver. A node that stands for exactly
+ one catalog service is bound. A story-level box that covers several services
+ is not bound; list the services it covers in the ledger, and bind them in an
+ engineering view or drilldown if the page has one.
+diff --git a/.claude/skills/hld-to-page/references/honesty-rules.md b/.claude/skills/hld-to-page/references/honesty-rules.md
+index 298b86e..33866cc 100644
+--- a/.claude/skills/hld-to-page/references/honesty-rules.md
++++ b/.claude/skills/hld-to-page/references/honesty-rules.md
+@@ -40,6 +40,42 @@ every worksheet cell and every spec field. For longer discussion and examples
+ - Separate a system's actual state from what someone knows about it. A service
+   marking a device offline does not mean the device lost power.
+ 
++## Conflicting anchors
++
++Source rates and times are often approximate ("about 1% an hour", "around 4
++AM"). Read them with their stated ranges and the renderer's whole-percent
++display; do not claim that exact point arithmetic disproves them. When the
++anchors and rate still cannot be reconciled:
++
++- Keep both anchors and the rate, and describe the tension briefly on the page
++  and in the ledger. Never hold the earlier value or invent a rate between them.
++- Unless the operator clarifies, the actual charge in between is unspecified:
++  battery `charge: null` from the first step whose story time is later than
++  the earlier anchor (shows NO DATA, no warning, no drift) until the next
++  anchor's numeric `charge`. An optional `label: "Unspecified"` needs
++  `label: null` at that anchor. Keep clocks, other known state and required
++  events.
++- While the charge is unspecified, record sourced operations (a clip) in the
++  caption and ledger but patch no numeric `drain`. Resume numeric operations
++  after the next anchor, and do not re-apply a cost that reading includes.
++- A report the source establishes (a scheduled heartbeat) still happens. When
++  the evidence gives no number, patch the device-app battery card
++  `{"value": null, "status": "ready", "reportedAt": "now", "detail": null}`,
++  using the report's actual time instead of `now` when the step only mentions
++  it in the past. `detail: null` keeps the computed report age visible; an
++  authored detail would hide it. Explain the missing number in the panel
++  `note` or the caption, and clear or update that note at the next known
++  value. `ready` renders "Current"; the source, not the status, shows
++  delivery.
++- Use `unknown` for absent or unknown report data, and `stale` for a known
++  delivered reading aged past its cadence (for example during an outage).
++  Never show an established report as failed or absent. A cached number
++  keeps its real report time; it is not a fresh report. Never put text or a
++  numeric string in a battery value.
++- Prefer `charge: null` to hiding the panel. `visible: false` and
++  `panelVisibility` apply only in step mode, so check the ambient view if
++  you hide one.
++
+ ## Edges, failures and tones
+ 
+ - An edge `kind` is a claim about the mechanism. Use the built-in kind that
+@@ -65,7 +101,17 @@ every worksheet cell and every spec field. For longer discussion and examples
+ - Camera activity, recording, livestreaming and the physical event are
+   separate states (`screen.mode` and `scenePlayback`).
+ - Home signals, markers and subject positions are claims: a notification never
+-  animates toward a camera; a subject that "entered" is inside the room.
++  animates toward a camera; a subject that "entered" is inside the room. A
++  subject placed in a room keeps claiming that room (and any state its label
++  gives, such as asleep) until you move or clear it. Neutral illustration
++  and generic layout are fine; a named route, an ongoing room or state, a
++  cause or a behavior needs a source, and an illustrative label does not
++  excuse it.
++- A required user action is shown minimally: a neutral tap, or a visible
++  matching clip still with a caption or label naming the opening. A specific
++  route ("taps the notification") is a claim that needs a source. A completed
++  fact ("Clip uploaded") may stay after opening, but it does not show the
++  opening; prefer a current label such as "Playing clip".
+ - Radar distance and zone occupancy are geometry; its `alert` is authored.
+   Security alarms, operator verification, dispatch assignment and arrival are
+   separate authored facts (`cookbook/security-response.md`).
+diff --git a/.claude/skills/hld-to-page/references/panel-time-and-icons.md b/.claude/skills/hld-to-page/references/panel-time-and-icons.md
+index 7af6230..c2871bb 100644
+--- a/.claude/skills/hld-to-page/references/panel-time-and-icons.md
++++ b/.claude/skills/hld-to-page/references/panel-time-and-icons.md
+@@ -15,9 +15,9 @@ yours at every clock move.
+ | Panel type | Time-bearing fields to reconsider at every clock move | Notes |
+ |---|---|---|
+ | `phone` | none: `clock`/`date` follow the step time | Do not set `clock`/`date` in new specs; an explicit value pins the panel until story time moves. Notifications (`notify`) accumulate; `clear: true` removes them. |
+-| `deviceapp` | each field's `detail` text, `note` (`clock`/`date` follow the step time) | `detail` is where freshness lives ("Updated just now", "Last report 6:05 PM · 13 h ago"). `status` is explicit: `unknown`, `loading`, `ready`, `stale`, `error`. A new value does not change status or detail by itself. A `kind: "battery"` card is reported: patch it at report steps. |
++| `deviceapp` | each field's `detail` text, `note` (`clock`/`date` follow the step time) | `detail` is where freshness lives ("Updated just now", "Last report 6:05 PM · 13 h ago"). `status` is explicit: `unknown`, `loading`, `ready`, `stale`, `error`. A new value does not change status or detail by itself. A `kind: "battery"` card is reported: patch it at report steps. Its value is a number 0–100 or `null` (shows `—`), never text. An authored `detail` replaces the age computed from `reportedAt`; `detail: null` restores it. |
+ | `appscreens` | none: `clock`/`date` follow the step time | Pick screen images that fit the time of day. |
+-| `battery` | `trend` (`charging`, `draining`, `idle`), extra `drain`, `charge` anchor, `note` | Charge drifts by itself: `drainPerHour`/`chargePerHour` on the panel, else `deviceDefaults.battery`, else built-in placeholders (1 and 20 %/h, never device facts). Charging applies from the step after `trend: "charging"`. `drain` subtracts a one-step operation cost; `charge` sets an exact anchor. `note` can say "illustrative drain estimate". |
++| `battery` | `trend` (`charging`, `draining`, `idle`), extra `drain`, `charge` anchor, `note` | Charge drifts by itself: `drainPerHour`/`chargePerHour` on the panel, else `deviceDefaults.battery`, else built-in placeholders (1 and 20 %/h, never device facts). Charging applies from the step after `trend: "charging"`. `drain` subtracts a one-step operation cost; `charge` sets an exact anchor; `charge: null` makes it unspecified (NO DATA, no drift until the next numeric `charge`; patch no `drain` meanwhile, and never `drain` beside `charge`). The readout shows whole percent. `note` can say "illustrative drain estimate". |
+ | `thermo` | `value` | Moves only with a cause. The zone is computed from `warn`/`crit` (and optional `lowWarn`/`lowCrit`). |
+ | `dispatch` | `timeOfDay` (`day`, `dusk`, `night`), responder `eta` text | ETA is authored text, never a countdown. It holds until a source-backed update arrives; do not decrement it because time passed. If it has gone stale, age or qualify it ("ETA 8 min, as of 2:10 PM"). |
+ | `screen` | declaration `scene` (not patchable per step) | Choose a scene that matches the story and its time, for example `person-at-door-night` only for a night story. Stock scenes: `person-at-door-night`, `person-through-door`, `doorbell-run-away`, `doorbell-runners`, `package-drop`, `kitchen-fire`, `static-noise` (test pattern). If none fits, omit the screen. |
+@@ -107,7 +107,7 @@ security`. Do not use any other ID.
+ - [ ] A reported card value changed only if this step lights the report.
+ - [ ] At a state change, every carried card value (recording, thermal,
+       connection) is still true, or rewritten.
+-- [ ] Battery: drift is automatic; `trend` patched where charging starts or stops, `drain` for an operation the source costs, `charge` only at an anchor.
++- [ ] Battery: drift is automatic; `trend` patched where charging starts or stops, `drain` for an operation the source costs (not while the charge is unspecified), `charge` only at an anchor (or `null` where the charge is unspecified).
+ - [ ] Temperature considered (holds unless there is a cause).
+ - [ ] Every icon whose state changed at this step is patched; every icon whose
+       state cleared is restored.
+diff --git a/.claude/skills/hld-to-page/references/self-audit.md b/.claude/skills/hld-to-page/references/self-audit.md
+index 29f15cf..067f32e 100644
+--- a/.claude/skills/hld-to-page/references/self-audit.md
++++ b/.claude/skills/hld-to-page/references/self-audit.md
+@@ -75,7 +75,9 @@ or write the reason it is correct.
+ The script cannot check anchors or cadence. By hand: every operator-given
+ time is an absolute step `time` and every given value a `charge` (or card)
+ patch at its step; every report step sits on the source's cadence; every
+-battery rate matches section D's header and its source or `illus` label.
++battery rate matches section D's header and its source or `illus` label. A
++`charge: null` interval prints no numeric change; answer a resulting CHECK
++with the anchor tension recorded in the ledger.
+ 
+ ## 2. Transition check
+ 
+@@ -121,7 +123,12 @@ another, and check:
+ - icons changed and changed back where planned;
+ - nothing contradicts the caption (a carried red tone, "no notifications",
+   "Updated just now" hours later, a subject in the wrong room);
+-- labels are readable and not clipped.
++- labels are readable and not clipped;
++- each required moment (an opened clip, a promised card) is actually on
++  screen, not scrolled out of a panel's visible area;
++- at story level, the renderer's provenance text ("Services, APIs and source
++  code", "Code · …" links) is visible: list it as a presentation limitation,
++  and keep the refs.
+ 
+ If browser tools are not available, say which of these checks were not done.
+ Never claim a visual check from reading JSON.
+diff --git a/.claude/skills/hld-to-page/references/storyboard-worksheet.md b/.claude/skills/hld-to-page/references/storyboard-worksheet.md
+index f44c92f..5ca94ac 100644
+--- a/.claude/skills/hld-to-page/references/storyboard-worksheet.md
++++ b/.claude/skills/hld-to-page/references/storyboard-worksheet.md
+@@ -106,11 +106,13 @@ Rules:
+   recorded clip), and a `charge` anchor only where the operator or source
+   states a value. The walk prints the resulting value at every step; copy it
+   into checks, never compute it by hand.
+-- A rate applies only where its condition holds. If two anchors cannot both
+-  be met at the stated rate, hold the earlier value with `charge` patches on
+-  the steps between (no invented in-between values), jump at the next
+-  anchor, and say so on the page and in the ledger. Never invent an
+-  "effective rate" to connect anchors.
++- A rate applies only where its condition holds. Read approximate rates and
++  times with their stated ranges. If two anchors still cannot be reconciled
++  with the rate, write `charge: null` (unspecified) from the first step whose
++  story time is later than the earlier anchor until the next anchor, and
++  describe the tension on the page and in the ledger. In that interval, list
++  sourced operations (a clip) as events but write no numeric `drain`. Never
++  hold the earlier value or invent an "effective rate" to connect anchors.
+ - When the source gives no rate, choose a slow illustrative estimate (for
+   example 0.1 to 0.2 %/h for a low-power sensor), set it explicitly, and
+   label it illustrative in the ledger and on the page. The built-in rates
+@@ -125,10 +127,14 @@ Rules:
+   schedule and nothing in the story (outage, offline) stops it: write
+   "last report 7:30, not shown, illus" and use the physical value at 7:30.
+   During an outage the report column keeps its last value and its freshness
+-  ages. Place reports on the source's cadence from the last depicted report
++  ages; once it is overdue by the source's rule the card is `stale`. Place
++  reports on the source's cadence from the last depicted report
+   (every 15 min from 5:00 means 5:15, 5:30, not a sunrise at 5:22). A
+   device-app battery card shows the whole percent the battery panel showed
+-  at the report time. A physical event (sunrise, a courier arrives) is its
++  at the report time; when that charge is unspecified, the report still
++  happens with value `null`, status `ready`, its actual `reportedAt` and
++  `detail: null` (so its age stays visible), and the panel `note` or caption
++  says the reading is not given. A physical event (sunrise, a courier arrives) is its
+   own row, not a report, unless the source says they coincide.
+ - Freshness text is authored: it is relative to the story time and the last
+   report time. Last report 6:05 PM at 9:40 PM gives "Last report 6:05 PM" or
+@@ -139,7 +145,8 @@ Rules:
+   each side of the threshold must be consistent with that.
+ - Temperatures are authored and change only with a cause (weather over
+   hours, a heater, load, cooling after shutdown). Never invent a reading
+-  between anchors: hold, or use the stated rate and write the arithmetic. A
++  between anchors: use the stated rate and write the arithmetic, or leave
++  the reading unknown when the rate cannot connect them. A
+   device that is off still cools; the app card keeps the last reported value
+   until a report arrives.
+ - Day or night: there is no global day/night switch. Pick the camera `scene`
+diff --git a/contract/authoring-contract.md b/contract/authoring-contract.md
+index 0f9fe43..9d52076 100644
+--- a/contract/authoring-contract.md
++++ b/contract/authoring-contract.md
+@@ -1067,7 +1067,11 @@ perspectives" of one timeline). Types:
+   render on a fixed-height context row, so patching them never reflows the
+   panel. Charge clamps to 0–100; non-finite numbers are ignored with a
+   validator warning and render as NO DATA; a no-data step leaves a gap in
+-  the sparkline. Use it to argue an energy budget: solar input vs event
++  the sparkline. `"charge": null` is the valid way to say the charge is
++  unspecified: it renders NO DATA (or the authored `label`) without a
++  warning, and story-time drift stops until a later numeric `charge` anchor.
++  A `drain` has no effect while the charge is null, and `drain` beside
++  `charge` in one patch is ignored with a warning. Use it to argue an energy budget: solar input vs event
+   load, a two-year drain forecast, or a cold snap limiting charge.
+   With the diagram's `storyTime`, the charge follows elapsed step time:
+   optional `drainPerHour`/`chargePerHour` (percent per hour, ≥ 0) override
+diff --git a/cookbook/battery-level.md b/cookbook/battery-level.md
+index 7ad032e..e7ac125 100644
+--- a/cookbook/battery-level.md
++++ b/cookbook/battery-level.md
+@@ -166,3 +166,46 @@ Complete working spec:
+   Updated just now on Sunday morning and 49% · Updated 10 h ago on Sunday
+   evening. No step types that text.
+ - `drainPerHour: 0` on a panel (for wired or PoE power) keeps it flat.
++
++## Two anchors the stated rate cannot connect
++
++Source rates and times are often approximate ("about 1% an hour", "around 4
++AM"); read them with their ranges before calling them inconsistent. If the
++anchors and the rate still cannot be reconciled (for example 25 percent at
++10:30 PM, 20 percent or less at about 4:00 AM, and a rate that reaches 20
++percent hours earlier), keep both anchors and the rate, and describe the
++tension briefly on the page. Do not hold 25 percent or invent a rate in
++between. Make the charge unspecified at the first step whose story time is
++later than the earlier anchor (not a same-time continuation of it), and let
++the next anchor set a number again:
++
++```json
++{"time": "01:00", "panels": {"batt": {"charge": null, "label": "Unspecified", "note": "Level between the given readings is unspecified"},
++                             "app": {"note": "Battery reading not given for this check-in",
++                                     "battery": {"value": null, "status": "ready", "reportedAt": "now", "detail": null}}}}
++```
++
++The panel shows `—%` with no validator warning, and drift stops until the
++next numeric `charge`. The optional `"label": "Unspecified"` replaces the NO
++DATA chip text so it does not read as a device failure; patch `"label": null`
++at the next anchor so the zone label returns.
++
++While the charge is unspecified, keep sourced events (a recorded clip) in the
++caption and ledger, but do not patch a numeric `drain`: it cannot apply to an
++unknown value, and `drain` beside `charge` is a validator warning. Resume
++numeric operations after the next anchor, and do not also apply a drain that
++the anchored reading already includes.
++
++The app card is a check-in the source establishes whose number the evidence
++does not give. It shows `—`; `detail: null` clears any earlier authored
++detail so the computed report age ("Updated just now", later "Updated 2 h
++ago") stays visible. An authored `detail` would replace that age. Explain the
++missing number in the panel `note` or the caption, and clear or update the
++note (`"note": ""`) at the next known value. `status: "ready"` renders
++"Current"; the source, not the status, establishes that the report arrived.
++When a step only mentions a past report, use that report's time, not `now`.
++Use `unknown` for report data that is absent or unknown, and `stale` for a
++known delivered reading that has aged past its cadence (for example during an
++outage). A cached number keeps its original report time. Never put text or a
++numeric string in a battery value. The panel shows whole percent, so an
++actual 20.42 displays as 20.
+diff --git a/tests/test_agent_authoring_judge.py b/tests/test_agent_authoring_judge.py
+index 27a29f9..880e881 100644
+--- a/tests/test_agent_authoring_judge.py
++++ b/tests/test_agent_authoring_judge.py
+@@ -5,9 +5,11 @@ import importlib.util
+ import io
+ import json
+ import pathlib
++import struct
+ import subprocess
+ import tempfile
+ import unittest
++import zlib
+ from unittest import mock
+ 
+ ROOT = pathlib.Path(__file__).resolve().parents[1]
+@@ -31,6 +33,47 @@ def final_reply(score=None):
+     return 'No deductions.\n\n```json\n' + json.dumps(score or full_score()) + '\n```\n'
+ 
+ 
++def presentation(value=4, **overrides):
++    item = {**dict.fromkeys(judge.PRESENTATION, value), **overrides}
++    item['total'] = sum(item.values())
++    return item
++
++
++def profiled_score(presentation, deferred, renderer=1, **overrides):
++    """A v2 score; callers state presentation and deferral counts explicitly."""
++    return {**full_score(**overrides), 'presentation': presentation,
++            'rendererIssues': renderer, 'deferredFindings': deferred}
++
++
++def profiled_reply(score, rows=None):
++    """A v2 reply whose structured rows match its counts unless rows are given."""
++    if rows is None:
++        rows = (['- renderer | 0 | provenance disclosure | Visible to story-level readers.'] * score['rendererIssues']
++                + ['deferred | 0 | step open | Needs a narrow capture of the phone.'] * score['deferredFindings'])
++    return ('panels | -3 | open | Clip not shown.\n' + ''.join(row + '\n' for row in rows)
++            + '\n```json\n' + json.dumps(score) + '\n```\n')
++
++
++def evidence_reply(packet):
++    """A reviewer that follows the rubric: presentation only with complete captures."""
++    status = json.loads((packet / 'candidate/visual-evidence.json').read_text())['status']
++    return profiled_reply(profiled_score(presentation(), 0) if status == 'complete'
++                          else profiled_score(None, 2))
++
++
++def png(width, height):
++    """A small but complete, decodable 1-bit grayscale PNG."""
++    def chunk(kind, data):
++        return len(data).to_bytes(4, 'big') + kind + data + zlib.crc32(kind + data).to_bytes(4, 'big')
++    rows = (b'\x00' + bytes((width + 7) // 8)) * height
++    return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 1, 0, 0, 0, 0))
++            + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))
++
++
++PROFILE_RUBRIC = b'Profile rubric\nApply interpretations after the separator.\n'
++PROFILE_RULES = b'{"rules": [{"id": "provenance-chrome", "decision": "renderer"}]}\n'
++
++
+ class AuthoringJudgeTests(unittest.TestCase):
+     def setUp(self):
+         self.run = self.enterContext(mock.patch.object(judge.subprocess, 'run'))
+@@ -80,10 +123,54 @@ class AuthoringJudgeTests(unittest.TestCase):
+     def prepare(self, names=None):
+         return judge.prepare(self.bundle, self.runs, self.output, names or [])
+ 
+-    def allow_judges(self, missing=None, error=None, mutate=False):
++    def profile(self):
++        """A synthetic v2 profile pinned like the real one, by its manifest hash."""
++        directory = self.directory / 'review-v2'
++        directory.mkdir()
++        (directory / 'rubric.md').write_bytes(PROFILE_RUBRIC)
++        (directory / 'interpretations.json').write_bytes(PROFILE_RULES)
++        manifest = json.dumps({'profile': 'authoring-review-v2', 'files': [
++            {'path': 'rubric.md', 'sha256': judge.digest(PROFILE_RUBRIC)},
++            {'path': 'interpretations.json', 'sha256': judge.digest(PROFILE_RULES)}]}).encode()
++        (directory / 'manifest.json').write_bytes(manifest)
++        self.enterContext(mock.patch.dict(judge.PROFILES, {'v2': {
++            'id': 'authoring-review-v2', 'directory': directory,
++            'manifestSha256': judge.digest(manifest)}}))
++        return directory
++
++    def captured_run(self, name, spec=None, sections=None, omit=0, renderer='a' * 64, **manifest):
++        """An author run with full-page PNG captures of its spec's step views.
++
++        `sections` limits which diagram sections are captured; `omit` drops the
++        last captures; keyword arguments override manifest fields."""
++        run = self.author_run(name)
++        spec = spec or {'nodes': {'cam': {'title': 'Camera'}}, 'rows': [['cam']], 'edges': [],
++                        'steps': [{'id': 'start'}, {'id': 'open'}]}
++        source = json.dumps(spec).encode()
++        (run / 'final.spec.json').write_bytes(source)
++        mechanical = json.loads((run / 'mechanical-check.json').read_text())
++        mechanical['sourceSha256'] = judge.digest(source)
++        (run / 'mechanical-check.json').write_text(json.dumps(mechanical))
++        visual = run / 'visual'
++        visual.mkdir()
++        # Full-page captures are taller than the logical 1000 px viewport.
++        sizes = {'desktop': (1440, 1300), 'narrow': (800, 2100)}
++        captures = [{'file': '{}-{}.png'.format(view, index), 'viewport': view,
++                     'diagram': section, 'path': path, 'step': step}
++                    for index, (section, path, step) in enumerate(judge.required_views(spec))
++                    if sections is None or section in sections for view in sizes]
++        captures = captures[:len(captures) - omit]
++        for item in captures:
++            (visual / item['file']).write_bytes(png(*sizes[item['viewport']]))
++        (visual / 'manifest.json').write_text(json.dumps({
++            'sourceSha256': judge.digest(source), 'rendererSha256': renderer,
++            'procedure': judge.CAPTURE_PROCEDURE, 'captures': captures, **manifest}))
++        return run
++
++    def allow_judges(self, missing=None, error=None, mutate=False, prompt=RUBRIC, reply=None):
+         def run(command, **kwargs):
+             final = pathlib.Path(command[command.index('-o') + 1])
+-            self.assertEqual(kwargs['input'], RUBRIC)
++            self.assertEqual(kwargs['input'], prompt)
+             self.assertEqual(kwargs['timeout'], 600)
+             self.assertFalse(kwargs['check'])
+             self.assertEqual(pathlib.Path(command[command.index('-C') + 1]), kwargs['cwd'])
+@@ -94,7 +181,7 @@ class AuthoringJudgeTests(unittest.TestCase):
+             if mutate:
+                 (kwargs['cwd'] / 'changed.txt').write_text('mutation')
+             if final.parent.name != missing:
+-                final.write_text(final_reply())
++                final.write_text(reply(kwargs['cwd']) if callable(reply) else reply or final_reply())
+             return subprocess.CompletedProcess(command, 0)
+         self.run.side_effect = run
+ 
+@@ -298,6 +385,307 @@ class AuthoringJudgeTests(unittest.TestCase):
+             judge.run_judges(self.output)
+         self.run.assert_not_called()
+ 
++    def test_default_preparation_is_the_unchanged_legacy_v1_format(self):
++        run = self.author_run()
++        (run / 'visual').mkdir()
++        (run / 'visual/desktop.png').write_bytes(b'png')
++        explicit = self.directory / 'explicit-v1'
++        base = ['--prepare', '--bundle', str(self.bundle), '--runs-root', str(self.runs)]
++        self.assertEqual(judge.main(base + ['--output', str(self.output)]), 0)
++        self.assertEqual(judge.main(base + ['--output', str(explicit), '--profile', 'v1']), 0)
++        self.assertEqual((self.output / 'mapping.json').read_bytes(), (explicit / 'mapping.json').read_bytes())
++        mapping = json.loads((self.output / 'mapping.json').read_text())
++        self.assertEqual(mapping['version'], 1)
++        self.assertEqual(mapping['rubricSha256'], judge.digest(RUBRIC))
++        self.assertNotIn('profile', mapping)
++        self.assertEqual((self.output / 'rubric.md').read_bytes(), RUBRIC)
++        self.assertFalse((self.output / 'reviewer-prompt.md').exists())
++        packet = self.output / 'packets' / mapping['runs'][0]['candidateId']
++        self.assertEqual(set(judge.packet_hashes(packet)), set(judge.BUNDLE_FILES.values())
++                         | set(judge.RUN_FILES.values()) | {'candidate/mechanical-check.json'})
++        # A legacy preparation judges exactly as before: judge2 rubric on stdin, old score shape.
++        self.allow_judges()
++        report = judge.run_judges(self.output)
++        self.assertEqual(report['status'], 'complete')
++        self.assertEqual(report['rubricSha256'], judge.digest(RUBRIC))
++        self.assertNotIn('profile', report)
++        self.assertNotIn('medianPresentation', report['runs'][0])
++        invocation = next((self.output / 'judgments').rglob('invocation.json'))
++        self.assertEqual(set(json.loads(invocation.read_text())), {'command', 'rubricSha256'})
++
++    def test_repository_legacy_rubric_hash_and_v2_profile_are_frozen(self):
++        legacy = ROOT / 'tests/fixtures/authoring-evaluation/overnight/judge-only/judge2-prompt.md'
++        self.assertEqual(judge.digest(legacy.read_bytes()),
++                         'c740ac21b34aae930203dfd1b40afa8bd5dfd5c271a7f868c6762daa502870a9')
++        record, prompt = judge.load_profile('v2')
++        directory = ROOT / 'tests/fixtures/authoring-evaluation/review-v2'
++        self.assertEqual(record['id'], 'authoring-review-v2')
++        for name in judge.PROFILE_FILES:
++            self.assertIn((directory / name).read_bytes().strip(), prompt)
++            self.assertEqual(record['guidanceSha256'][name], judge.digest((directory / name).read_bytes()))
++
++    def test_run_judges_rejects_a_profile_argument(self):
++        self.author_run()
++        self.prepare()
++        for profile in ['v1', 'v2']:
++            with self.subTest(profile=profile), self.assertRaises(SystemExit):
++                judge.main(['--run-judges', '--prepared', str(self.output), '--profile', profile])
++        self.assertFalse((self.output / 'judgments').exists())
++        self.run.assert_not_called()
++
++    def test_v2_delivers_rubric_and_interpretations_and_freezes_hashes(self):
++        self.profile()
++        self.author_run()
++        captured = self.captured_run('run-02')
++        manifest = self.prepare_profiled()
++        expected = PROFILE_RUBRIC.rstrip(b'\n') + b'\n' + judge.PROFILE_SEPARATOR + PROFILE_RULES
++        profile = manifest['profile']
++        self.assertEqual(manifest['version'], 2)
++        self.assertNotIn('rubricSha256', manifest)
++        self.assertEqual((profile['name'], profile['id']), ('v2', 'authoring-review-v2'))
++        self.assertEqual(profile['guidanceSha256'], {'rubric.md': judge.digest(PROFILE_RUBRIC),
++                                                     'interpretations.json': judge.digest(PROFILE_RULES)})
++        self.assertEqual(profile['promptSha256'], judge.digest(expected))
++        self.assertEqual((self.output / 'reviewer-prompt.md').read_bytes(), expected)
++        self.assertFalse((self.output / 'rubric.md').exists())
++        evidence = {}
++        for record in manifest['runs']:
++            packet = self.output / 'packets' / record['candidateId']
++            self.assertEqual(json.loads((packet / 'review/profile.json').read_text()), profile)
++            evidence[pathlib.Path(record['run']).name] = json.loads(
++                (packet / 'candidate/visual-evidence.json').read_text())
++            self.assertEqual(record['visualEvidence'], evidence[pathlib.Path(record['run']).name])
++        self.assertEqual(evidence['run-01'], {'status': 'missing', 'captures': []})
++        complete = evidence[captured.name]
++        self.assertEqual(complete['status'], 'complete')
++        self.assertEqual(complete['rendererSha256'], 'a' * 64)
++        self.assertEqual(complete['sourceSha256'], judge.digest((captured / 'final.spec.json').read_bytes()))
++        self.assertEqual(complete['uncovered'], [])
++        self.assertEqual(complete['procedure'], judge.CAPTURE_PROCEDURE)
++        self.assertEqual((complete['requiredViews'], len(complete['captures'])), (4, 4))
++        self.assertEqual({(item['viewport'], item['pngWidth'], item['pngHeight']) for item in complete['captures']},
++                         {('desktop', 1440, 1300), ('narrow', 800, 2100)})
++        packet = self.output / 'packets' / manifest['runs'][1]['candidateId']
++        self.assertEqual((packet / 'candidate/visual/narrow-1.png').read_bytes(),
++                         (captured / 'visual/narrow-1.png').read_bytes())
++        self.allow_judges(prompt=expected, reply=evidence_reply)
++        report = judge.run_judges(self.output)
++        self.assertEqual(report['profile'], profile)
++        self.assertNotIn('rubricSha256', report)
++        # Source-only review keeps its valid findings but has no headline score.
++        missing, shown = report['runs']
++        self.assertEqual(report['status'], 'incomplete')
++        self.assertEqual((missing['status'], missing['validJudgments']), ('incomplete', 3))
++        self.assertIsNone(missing['medianTotal'])
++        self.assertIsNone(missing['medianPresentation'])
++        self.assertIn('Visual evidence is missing', missing['evidenceBlockers'][0])
++        self.assertEqual([row['score']['total'] for row in missing['judgments']], [100, 100, 100])
++        self.assertEqual(missing['visualEvidence']['status'], 'missing')
++        self.assertEqual((shown['status'], shown['medianTotal'], shown['medianPresentation']), ('complete', 100, 20))
++        self.assertEqual(shown['medianPresentationDimensions'], dict.fromkeys(judge.PRESENTATION, 4))
++        self.assertEqual(shown['evidenceBlockers'], [])
++        self.assertEqual((shown['visualEvidence']['status'], shown['visualEvidence']['captures']), ('complete', 4))
++        self.assertEqual(report['comparisonBlockers'], [])
++        for invocation in (self.output / 'judgments').rglob('invocation.json'):
++            self.assertEqual(json.loads(invocation.read_text())['profile'], profile)
++
++    def test_partial_or_untrusted_visual_evidence_is_never_complete(self):
++        self.profile()
++        self.captured_run('run-01', omit=1)
++        loose = self.author_run('run-02')
++        (loose / 'visual').mkdir()
++        (loose / 'visual/screen.png').write_bytes(png(1440, 1000))
++        unlisted = self.captured_run('run-03')
++        (unlisted / 'visual/extra.png').write_bytes(png(1440, 1000))
++        header_only = self.captured_run('run-04')
++        (header_only / 'visual/desktop-0.png').write_bytes(png(1440, 1300)[:33])
++        other = self.captured_run('run-05', sourceSha256='0' * 64)
++        near = self.captured_run('run-06', procedure={
++            **judge.CAPTURE_PROCEDURE, 'viewports': [{'id': 'desktop', 'width': 1440, 'height': 1000},
++                                                     {'id': 'narrow', 'width': 1439, 'height': 1000}]})
++        scaled = self.captured_run('run-07', procedure={**judge.CAPTURE_PROCEDURE, 'deviceScaleFactor': 2})
++        small = self.captured_run('run-08')
++        (small / 'visual/narrow-0.png').write_bytes(png(800, 999))
++        rows = {pathlib.Path(row['run']).name: row for row in self.prepare_profiled()['runs']}
++        self.assertEqual(rows['run-01']['visualEvidence']['status'], 'partial')
++        self.assertEqual(rows['run-01']['visualEvidence']['uncovered'], ['narrow: sections[0] path main step open'])
++        for name, reason in [('run-02', 'manifest.json'), ('run-03', 'does not list'),
++                             ('run-04', 'PNG'), ('run-05', 'accepted source'),
++                             ('run-06', 'controlled capture procedure'), ('run-07', 'controlled capture procedure'),
++                             ('run-08', 'smaller than its full-page viewport')]:
++            with self.subTest(run=name):
++                self.assertEqual(rows[name]['status'], 'incomplete')
++                self.assertIn(reason, rows[name]['error'])
++        # Partial evidence keeps reviews, but no headline, even if a reviewer defers nothing.
++        self.allow_judges(prompt=(self.output / 'reviewer-prompt.md').read_bytes(),
++                          reply=profiled_reply(profiled_score(None, 0)))
++        row = judge.run_judges(self.output)['runs'][0]
++        self.assertEqual((row['status'], row['validJudgments'], row['medianTotal']), ('incomplete', 3, None))
++        self.assertEqual(self.run.call_count, 3)
++
++    def test_nested_tab_diagrams_must_be_captured_too(self):
++        self.profile()
++        diagram = {'nodes': {'cam': {'title': 'Camera'}}, 'rows': [['cam']], 'edges': [],
++                   'steps': [{'id': 'start'}], 'paths': [{'id': 'night', 'steps': ['start']}]}
++        spec = {'page': {'title': 'Mixed', 'blocks': [
++            {'heading': 'Direct', 'diagram': diagram},
++            {'tabs': [{'label': 'Detail', 'sections': [{'heading': 'Nested', 'diagram': diagram}]}]}]}}
++        self.assertEqual(judge.required_views(spec), [('blocks[0]', 'night', 'start'),
++                                                      ('blocks[1].tabs[0].sections[0]', 'night', 'start')])
++        self.captured_run('run-01', spec=spec, sections={'blocks[0]'})
++        self.captured_run('run-02', spec=spec)
++        rows = self.prepare_profiled()['runs']
++        self.assertEqual(rows[0]['visualEvidence']['status'], 'partial')
++        self.assertEqual(rows[0]['visualEvidence']['uncovered'],
++                         ['desktop: blocks[1].tabs[0].sections[0] path night step start',
++                          'narrow: blocks[1].tabs[0].sections[0] path night step start'])
++        self.assertEqual(rows[1]['visualEvidence']['status'], 'complete')
++
++    def test_mixed_renderers_block_a_completed_comparison(self):
++        self.profile()
++        self.captured_run('run-01')
++        self.captured_run('run-02', renderer='b' * 64)
++        self.prepare_profiled()
++        self.allow_judges(prompt=(self.output / 'reviewer-prompt.md').read_bytes(), reply=evidence_reply)
++        report = judge.run_judges(self.output)
++        self.assertEqual([row['status'] for row in report['runs']], ['complete', 'complete'])
++        self.assertEqual(report['status'], 'incomplete')
++        self.assertIn('mixes renderers', report['comparisonBlockers'][0])
++
++    def test_evidence_blockers_suppress_profiled_headlines(self):
++        def rows(**score):
++            return [{'judge': index, 'status': 'valid', 'score': profiled_score(**score)} for index in (1, 2, 3)]
++        headline = judge.aggregate(rows(presentation=presentation(), deferred=0), True, 'complete')
++        self.assertEqual((headline['status'], headline['medianTotal']), ('complete', 100))
++        for score, evidence, blocker in [({'presentation': presentation(), 'deferred': 1}, 'complete', 'deferred'),
++                                         ({'presentation': None, 'deferred': 0}, 'complete', 'unscored'),
++                                         ({'presentation': None, 'deferred': 0}, 'missing', 'missing'),
++                                         ({'presentation': None, 'deferred': 0}, 'partial', 'partial')]:
++            with self.subTest(score=score, evidence=evidence):
++                result = judge.aggregate(rows(**score), True, evidence)
++                self.assertEqual(result['status'], 'incomplete')
++                self.assertEqual(result['validJudgments'], 3)
++                self.assertIsNone(result['medianTotal'])
++                self.assertIsNone(result['medianDimensions'])
++                self.assertIsNone(result['medianPresentation'])
++                self.assertTrue(any(blocker in item for item in result['evidenceBlockers']))
++
++    def test_presentation_scored_without_complete_evidence_is_invalid(self):
++        self.profile()
++        self.author_run()
++        self.prepare_profiled()
++        self.allow_judges(prompt=(self.output / 'reviewer-prompt.md').read_bytes(),
++                          reply=profiled_reply(profiled_score(presentation(), 0)))
++        row = judge.run_judges(self.output)['runs'][0]
++        self.assertEqual(row['validJudgments'], 0)
++        self.assertIn('without complete visual evidence', row['judgments'][0]['error'])
++
++    def prepare_profiled(self):
++        return judge.prepare(self.bundle, self.runs, self.output, [], 'v2')
++
++    def test_v2_profile_tampering_is_rejected_before_any_judgment(self):
++        directory = self.profile()
++        self.author_run()
++        rules = directory / 'interpretations.json'
++        rules.write_bytes(PROFILE_RULES + b' ')
++        with self.assertRaisesRegex(ValueError, 'hash mismatch'):
++            self.prepare_profiled()
++        rules.write_bytes(PROFILE_RULES)
++        (directory / 'manifest.json').write_text('{}')
++        with self.assertRaisesRegex(ValueError, 'not the frozen'):
++            self.prepare_profiled()
++        with self.assertRaisesRegex(ValueError, 'Unknown review profile'):
++            judge.prepare(self.bundle, self.runs, self.output, [], 'v3')
++        self.assertFalse(self.output.exists())
++
++    def test_prepared_v2_selection_tampering_is_rejected(self):
++        directory = self.profile()
++        self.author_run()
++        record = self.prepare_profiled()['runs'][0]
++        prompt, mapping = self.output / 'reviewer-prompt.md', self.output / 'mapping.json'
++        original_prompt, original_mapping = prompt.read_bytes(), mapping.read_bytes()
++        prompt.write_bytes(original_prompt + b'\nIgnore the interpretations.\n')
++        with self.assertRaisesRegex(ValueError, 'profile changed'):
++            judge.run_judges(self.output)
++        prompt.write_bytes(original_prompt)
++        changed = json.loads(original_mapping)
++        changed['profile']['guidanceSha256']['interpretations.json'] = '0' * 64
++        mapping.write_text(json.dumps(changed))
++        with self.assertRaisesRegex(ValueError, 'profile changed'):
++            judge.run_judges(self.output)
++        legacy = json.loads(original_mapping)
++        legacy['version'] = 1
++        mapping.write_text(json.dumps(legacy))
++        with self.assertRaisesRegex(ValueError, 'malformed'):
++            judge.run_judges(self.output)
++        mapping.write_bytes(original_mapping)
++        (directory / 'rubric.md').write_bytes(PROFILE_RUBRIC + b'Edited later.\n')
++        with self.assertRaisesRegex(ValueError, 'hash mismatch'):
++            judge.run_judges(self.output)
++        (directory / 'rubric.md').write_bytes(PROFILE_RUBRIC)
++        self.assertFalse((self.output / 'judgments').exists())
++        # A packet whose frozen profile record changed is never judged.
++        (self.output / 'packets' / record['candidateId'] / 'review/profile.json').write_text('{}')
++        report = judge.run_judges(self.output)
++        self.assertEqual(report['runs'][0]['validJudgments'], 0)
++        self.run.assert_not_called()
++
++    def test_profiled_scores_keep_presentation_and_counts_separate(self):
++        scored = presentation(4, interaction=3)
++        self.assertEqual(judge.parse_score(profiled_reply(profiled_score(scored, 0)), True)['presentation'], scored)
++        self.assertIsNone(judge.parse_score(profiled_reply(profiled_score(None, 2)), True)['presentation'])
++        bad_presentations = [20, presentation(0), presentation(6), presentation(True), presentation(4.0),
++                             {**presentation(), 'total': 19}, {**presentation(), 'extra': 1},
++                             {key: 4 for key in judge.PRESENTATION}]
++        for score in ([full_score()] + [profiled_score(item, 0) for item in bad_presentations]
++                      + [{**profiled_score(None, 0), 'rendererIssues': -1},
++                         {**profiled_score(None, 0), 'deferredFindings': None},
++                         {**profiled_score(None, 0), 'total': 125}]):
++            with self.subTest(score=score), self.assertRaises(ValueError):
++                judge.parse_score(profiled_reply(score, rows=[]), True)
++        with self.assertRaises(ValueError):
++            judge.parse_score(profiled_reply(profiled_score(scored, 0)))
++        # Presentation totals and dimensions aggregate separately from correctness.
++        rows = [{'judge': index, 'status': 'valid', 'score': profiled_score(presentation(value), 0)}
++                for index, value in enumerate([4, 5, 3], 1)]
++        result = judge.aggregate(rows, True, 'complete')
++        self.assertEqual((result['status'], result['medianTotal'], result['medianPresentation']),
++                         ('complete', 100, 20))
++        self.assertEqual(result['medianPresentationDimensions'], dict.fromkeys(judge.PRESENTATION, 4))
++        # A true deferral stays independently covered and blocks the headline.
++        rows[1]['score'] = profiled_score(presentation(5), 1)
++        deferred = judge.aggregate(rows, True, 'complete')
++        self.assertEqual((deferred['status'], deferred['medianTotal'], deferred['medianPresentation']),
++                         ('incomplete', None, None))
++
++    def test_issue_rows_must_match_their_counts(self):
++        complete = profiled_score(presentation(), 0)
++        # A written deferral with deferredFindings 0 can never headline a complete score.
++        hidden = profiled_reply(complete, rows=['- deferred | 0 | step open | Phone viewport not captured.',
++                                                'renderer | 0 | disclosure | Provenance text is visible.'])
++        with self.assertRaisesRegex(ValueError, 'deferredFindings'):
++            judge.parse_score(hidden, True)
++        table = profiled_reply(profiled_score(None, 1, renderer=1), rows=[
++            '| renderer | 0 | disclosure | Provenance text is visible. |',
++            '2. `deferred` | 0 | step open | Needs the narrow capture.'])
++        self.assertEqual(judge.parse_score(table, True)['deferredFindings'], 1)
++        for row in ['deferred | 0 | step open', 'deferred | -2 | step open | Deducted anyway.',
++                    'renderer | 0 |  | No location.', 'deferred |']:
++            with self.subTest(row=row), self.assertRaisesRegex(ValueError, 'Malformed'):
++                judge.parse_score(profiled_reply(profiled_score(None, 1, renderer=0), rows=[row]), True)
++        with self.assertRaisesRegex(ValueError, 'rendererIssues'):
++            judge.parse_score(profiled_reply(profiled_score(None, 0, renderer=2), rows=[
++                'renderer | 0 | disclosure | Provenance text is visible.']), True)
++        # Legacy replies are parsed exactly as before; issue rows are not counted.
++        self.assertEqual(judge.parse_score('deferred | 0 | x | y\n' + final_reply()), full_score())
++        # The run path rejects the mismatch before any aggregation.
++        self.profile()
++        self.captured_run('run-01')
++        self.prepare_profiled()
++        self.allow_judges(prompt=(self.output / 'reviewer-prompt.md').read_bytes(), reply=hidden)
++        row = judge.run_judges(self.output)['runs'][0]
++        self.assertEqual((row['status'], row['validJudgments'], row['medianTotal']), ('incomplete', 0, None))
++
+ 
+ if __name__ == '__main__':
+     unittest.main()
+diff --git a/tools/agent-authoring-judge.py b/tools/agent-authoring-judge.py
+index 3568082..c598559 100644
+--- a/tools/agent-authoring-judge.py
++++ b/tools/agent-authoring-judge.py
+@@ -5,7 +5,11 @@ Example (preparation does not invoke any model):
+   python3 tools/agent-authoring-judge.py --prepare --runs-root .local/authors --output .local/judges
+   python3 tools/agent-authoring-judge.py --run-judges --prepared .local/judges
+ 
+-The frozen 100-point rubric is passed unchanged on stdin. Run mappings, scores,
++The frozen 100-point rubric is passed unchanged on stdin. `--prepare --profile v2`
++instead freezes a versioned review profile (rubric plus interpretations) into the
++preparation; judging always uses the prepared selection. Profiled candidates
++get headline scores only with complete captures (a validated `visual/manifest.json`)
++and no deferred findings or unscored presentation. Run mappings, scores,
+ and raw judge output stay outside each packet. This is unlabelled evaluation,
+ not a claim of perfect blinding or a filesystem confidentiality boundary.
+ """
+@@ -13,12 +17,15 @@ not a claim of perfect blinding or a filesystem confidentiality boundary.
+ import argparse
+ import concurrent.futures
+ import hashlib
++import importlib.util
+ import json
+ import pathlib
+ import re
+ import statistics
+ import subprocess
++import sys
+ import time
++import zlib
+ 
+ ROOT = pathlib.Path(__file__).resolve().parents[1]
+ DEFAULT_BUNDLE = ROOT / 'tests/fixtures/authoring-evaluation/overnight'
+@@ -42,6 +49,24 @@ BUNDLE_FILES = {
+     'input/code-evidence.md': 'brief/code-evidence.md',
+     'judge-only/facts.md': 'brief/facts.md',
+ }
++# Versioned review profiles. The legacy judge2 rubric (v1) stays the default.
++# Each profile is pinned by its manifest hash; the manifest pins its files.
++PROFILES = {'v2': {'id': 'authoring-review-v2',
++                   'directory': ROOT / 'tests/fixtures/authoring-evaluation/review-v2',
++                   'manifestSha256': '0632d7004bf47d553624b8a97341987ed85ae4cc68ba8f40e07736f0b2f01ec7'}}
++PROFILE_FILES = ('rubric.md', 'interpretations.json')
++PROFILE_SEPARATOR = b'\n--- interpretations.json ---\n'
++# The September 30 presentation assessment: five 1-5 dimensions, total of 25.
++PRESENTATION = ('clarity', 'hierarchy', 'visibleEvidence', 'legibility', 'interaction')
++PROFILE_COUNTS = {'rendererIssues': 'renderer', 'deferredFindings': 'deferred'}
++# A structured `renderer`/`deferred` row, optionally as a list item.
++ISSUE_ROW = re.compile(r'(?im)^[ \t]*(?:[-*+][ \t]+|\d+[.)][ \t]+|\|[ \t]*)?`?(renderer|deferred)`?[ \t]*\|(.*)$')
++# The controlled capture procedure (logical viewports; full-page, scale 1), as on September 30.
++CAPTURE_PROCEDURE = {'viewports': [{'id': 'desktop', 'width': 1440, 'height': 1000},
++                                   {'id': 'narrow', 'width': 800, 'height': 1000}],
++                     'deviceScaleFactor': 1, 'fullPage': True}
++VISUAL_NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.png')
++SHA256 = re.compile(r'[0-9a-f]{64}')
+ METRICS = {'questionsFile', 'questionCount', 'ledger', 'html', 'buildOk',
+            'buildWarnings', 'diagrams', 'boundNodes', 'codeRefNodes', 'codeRefSteps',
+            'totalSteps', 'emptySteps', 'edgeSteps', 'codeEvidenceUsed'}
+@@ -101,6 +126,155 @@ def load_bundle(bundle):
+     return data
+ 
+ 
++def load_profile(name):
++    """Verify a versioned review profile and compose its exact reviewer prompt."""
++    spec = PROFILES.get(name)
++    if spec is None:
++        raise ValueError('Unknown review profile: ' + str(name))
++    directory = pathlib.Path(spec['directory'])
++    raw = regular_bytes(directory / 'manifest.json')
++    if digest(raw) != spec['manifestSha256']:
++        raise ValueError('Review profile manifest is not the frozen ' + spec['id'] + ' manifest.')
++    manifest = strict_json(raw)
++    files = {item['path']: item['sha256'] for item in manifest['files']}
++    if manifest.get('profile') != spec['id'] or len(files) != len(manifest['files']) \
++            or set(files) != set(PROFILE_FILES):
++        raise ValueError('Review profile manifest must list exactly its guidance files.')
++    guidance = {}
++    for path in PROFILE_FILES:
++        value = regular_bytes(directory / path)
++        if digest(value) != files[path]:
++            raise ValueError('Review profile hash mismatch: ' + path)
++        guidance[path] = value
++    strict_json(guidance['interpretations.json'])
++    # The rubric loads its interpretations; both reach the reviewer on stdin.
++    prompt = guidance['rubric.md'].rstrip(b'\n') + b'\n' + PROFILE_SEPARATOR + guidance['interpretations.json']
++    record = {'name': name, 'id': spec['id'], 'manifestSha256': digest(raw),
++              'guidanceSha256': {path: digest(value) for path, value in guidance.items()},
++              'promptSha256': digest(prompt)}
++    return record, prompt
++
++
++def spec_sections(spec):
++    """Sections in renderer order, using the canonical traversal in tools/spec_diff.py."""
++    global SPEC_DIFF
++    if SPEC_DIFF is None:
++        loader = importlib.util.spec_from_file_location('flowview_spec_diff', ROOT / 'tools/spec_diff.py')
++        module = importlib.util.module_from_spec(loader)
++        sys.modules[loader.name] = module  # dataclasses resolve their module while loading
++        loader.loader.exec_module(module)
++        SPEC_DIFF = module
++    return SPEC_DIFF.iter_sections(spec)
++
++
++SPEC_DIFF = None
++
++
++def required_views(spec):
++    """Every (section path, path id, step id) the captures must show, in page order.
++
++    Sections come from a bare diagram, page `sections`, or `blocks`, including
++    `blocks[].tabs[].sections[]`. A diagram without `paths` is one path named `main`."""
++    views = []
++    for ref in spec_sections(spec):
++        diagram = ref.diagram
++        if diagram is None:
++            continue
++        paths = [path for path in diagram.get('paths') or [] if isinstance(path, dict)]
++        if not paths:
++            steps = [step for step in diagram.get('steps') or [] if isinstance(step, dict)]
++            paths = [{'id': 'main', 'steps': [step.get('id', str(i)) for i, step in enumerate(steps)]}]
++        for path in paths:
++            for step in path.get('steps') or []:
++                key = (ref.path, str(path.get('id')), str(step))
++                if key not in views:
++                    views.append(key)
++    return views
++
++
++def png_size(value, name):
++    """Width and height of a structurally valid PNG: IHDR first, CRCs, IDAT, IEND."""
++    if not value.startswith(b'\x89PNG\r\n\x1a\n'):
++        raise ValueError('Visual capture is not a PNG: ' + name)
++    offset, kinds, header = 8, [], None
++    while offset < len(value):
++        if offset + 12 > len(value):
++            raise ValueError('Visual capture PNG is truncated: ' + name)
++        length = int.from_bytes(value[offset:offset + 4], 'big')
++        kind, end = value[offset + 4:offset + 8], offset + 12 + length
++        data = value[offset + 8:end - 4]
++        if end > len(value) or zlib.crc32(kind + data) != int.from_bytes(value[end - 4:end], 'big'):
++            raise ValueError('Visual capture PNG has a damaged chunk: ' + name)
++        if not kinds:
++            header = data
++        kinds.append(kind)
++        offset = end
++        if kind == b'IEND':
++            break
++    if offset != len(value) or not kinds or kinds[0] != b'IHDR' or len(header) != 13 \
++            or kinds[-1] != b'IEND' or b'IDAT' not in kinds:
++        raise ValueError('Visual capture is not a complete PNG: ' + name)
++    width, height = int.from_bytes(header[:4], 'big'), int.from_bytes(header[4:8], 'big')
++    if not width or not height:
++        raise ValueError('Visual capture PNG has no pixels: ' + name)
++    return width, height
++
++
++def visual_evidence(run, spec, source_hash):
++    """Validate optional rendered captures against their manifest and the accepted source.
++
++    Returns (packet summary, capture bytes). Captures must follow CAPTURE_PROCEDURE;
++    the logical viewport is coordinator metadata, since a full-page PNG can be taller
++    (and, with overflow, wider) than its viewport. Status is `complete` only when
++    every required step view has a capture at both viewports; otherwise `partial`,
++    or `missing` without a `visual/` folder. Loose files are never evidence."""
++    folder = run / 'visual'
++    if not folder.exists() and not folder.is_symlink():
++        return {'status': 'missing', 'captures': []}, {}
++    if folder.is_symlink() or not folder.is_dir():
++        raise ValueError('Visual evidence must be a regular directory.')
++    manifest = strict_json(regular_bytes(folder / 'manifest.json'))
++    if not isinstance(manifest, dict) or manifest.get('sourceSha256') != source_hash:
++        raise ValueError('Visual evidence was not captured from the accepted source.')
++    renderer = manifest.get('rendererSha256')
++    if not isinstance(renderer, str) or not SHA256.fullmatch(renderer):
++        raise ValueError('Visual evidence must record rendererSha256.')
++    if manifest.get('procedure') != CAPTURE_PROCEDURE:
++        raise ValueError('Visual evidence must use the controlled capture procedure.')
++    viewports = {view['id']: view for view in CAPTURE_PROCEDURE['viewports']}
++    sections = [ref.path for ref in spec_sections(spec) if ref.diagram is not None]
++    captures, files = [], {}
++    for item in manifest.get('captures') or []:
++        name = item.get('file') if isinstance(item, dict) else None
++        if not isinstance(name, str) or not VISUAL_NAME.fullmatch(name) or name in files:
++            raise ValueError('Visual captures need unique plain .png file names.')
++        if item.get('viewport') not in viewports or item.get('diagram') not in sections:
++            raise ValueError('Visual capture names an unknown viewport or diagram section: ' + name)
++        path = folder / name
++        if path.is_symlink() or not path.is_file():
++            raise ValueError('Missing visual capture: ' + name)
++        value = path.read_bytes()
++        width, height = png_size(value, name)
++        view = viewports[item['viewport']]
++        if width < view['width'] or height < view['height']:
++            raise ValueError('Visual capture is smaller than its full-page viewport: ' + name)
++        files[name] = value
++        captures.append({'file': 'candidate/visual/' + name, 'viewport': item['viewport'],
++                         'diagram': item['diagram'], 'path': str(item.get('path')),
++                         'step': str(item.get('step')), 'pngWidth': width, 'pngHeight': height,
++                         'sha256': digest(value)})
++    if {path.name for path in folder.iterdir()} != {'manifest.json', *files}:
++        raise ValueError('Visual evidence contains files its manifest does not list.')
++    required = required_views(spec)
++    shown = {(item['viewport'], item['diagram'], item['path'], item['step']) for item in captures}
++    uncovered = ['{}: {} path {} step {}'.format(view, *key)
++                 for key in required for view in viewports if (view, *key) not in shown]
++    return {'status': 'complete' if required and not uncovered else 'partial',
++            'sourceSha256': source_hash, 'rendererSha256': renderer, 'procedure': CAPTURE_PROCEDURE,
++            'requiredViews': len(required) * len(viewports), 'captures': captures,
++            'uncovered': uncovered}, files
++
++
+ def clean_mechanical(value, run, source_hash):
+     """Keep historical mechanical findings, excluding workflow and score metadata."""
+     if not isinstance(value, dict) or not isinstance(value.get('metrics'), dict):
+@@ -156,11 +330,12 @@ def packet_hashes(packet):
+     return hashes
+ 
+ 
+-def prepare(bundle, runs_root, output, run_names):
++def prepare(bundle, runs_root, output, run_names, profile='v1'):
+     bundle = pathlib.Path(bundle).resolve()
+     runs_root = pathlib.Path(runs_root).resolve()
+     output = pathlib.Path(output).resolve()
+     frozen = load_bundle(bundle)
++    review, prompt = (None, None) if profile == 'v1' else load_profile(profile)
+     if not run_names:
+         run_names = sorted(path.name for path in runs_root.iterdir()
+                            if re.fullmatch(r'run-\d+', path.name))
+@@ -170,7 +345,10 @@ def prepare(bundle, runs_root, output, run_names):
+     output.mkdir(parents=True, exist_ok=False)
+     write_bytes(output / '.gitignore', b'*\n')
+     rubric = frozen['judge-only/judge2-prompt.md']
+-    write_bytes(output / 'rubric.md', rubric)
++    if review is None:
++        write_bytes(output / 'rubric.md', rubric)
++    else:
++        write_bytes(output / 'reviewer-prompt.md', prompt)
+     records = []
+     for name in run_names:
+         run = runs_root / name
+@@ -181,20 +359,29 @@ def prepare(bundle, runs_root, output, run_names):
+                 raise ValueError('Missing regular run directory: ' + name)
+             inputs = {key: regular_bytes(run / key) for key in RUN_FILES}
+             source = inputs['final.spec.json']
+-            if not isinstance(strict_json(source), dict):
++            spec = strict_json(source)
++            if not isinstance(spec, dict):
+                 raise ValueError('Accepted final.spec.json must contain an object.')
+             mechanical = regular_bytes(run / 'mechanical-check.json')
+             source_hash = digest(source)
+             check = clean_mechanical(strict_json(mechanical), run, source_hash)
++            evidence, visual = visual_evidence(run, spec, source_hash) if review else (None, {})
+             packet = output / 'packets' / anonymous
+             for name_in_bundle, destination in BUNDLE_FILES.items():
+                 write_bytes(packet / destination, frozen[name_in_bundle])
+             for name_in_run, destination in RUN_FILES.items():
+                 write_bytes(packet / destination, inputs[name_in_run])
+             write_json(packet / 'candidate/mechanical-check.json', check)
++            if review:
++                write_json(packet / 'review/profile.json', review)
++                write_json(packet / 'candidate/visual-evidence.json', evidence)
++                for key, value in visual.items():
++                    write_bytes(packet / 'candidate/visual' / key, value)
+             record.update(status='ready', sourceSha256=source_hash,
+                           inputSha256={key: digest(value) for key, value in inputs.items()},
+                           mechanicalSha256=digest(mechanical), packetSha256=packet_hashes(packet))
++            if review:
++                record['visualEvidence'] = evidence
+         except (OSError, ValueError, KeyError, TypeError) as error:
+             record['error'] = str(error)
+         records.append(record)
+@@ -202,46 +389,95 @@ def prepare(bundle, runs_root, output, run_names):
+                 'model': MODEL, 'reasoningEffort': REASONING, 'judgmentsRequired': JUDGES,
+                 'blinding': 'Unlabelled packets; author style/content may reveal method. Not perfect blinding.',
+                 'runs': records}
++    if review:
++        del manifest['rubricSha256']
++        manifest.update(version=2, profile=review)
+     write_json(output / 'mapping.json', manifest)
+     return manifest
+ 
+ 
+-def parse_score(text):
++def parse_score(text, profiled=False):
+     """Require the exact final fenced object, criterion caps, and its actual sum."""
+     if text.count('```') != 2:
+         raise ValueError('Expected exactly one final fenced JSON block.')
+     match = re.search(r'(?m)^```json[ \t]*\r?\n([\s\S]*?)\r?\n```[ \t]*\s*\Z', text)
+     if not match:
+         raise ValueError('The final response must end with a fenced JSON object.')
+-    return validate_score(strict_json(match.group(1)))
++    score = validate_score(strict_json(match.group(1)), profiled)
++    if profiled:
++        check_issue_rows(text[:match.start()], score)
++    return score
+ 
+ 
+-def validate_score(score):
+-    if not isinstance(score, dict) or set(score) != set(CAPS) | {'total'}:
+-        raise ValueError('Scores must contain exactly the seven criteria and total.')
++def check_issue_rows(prose, score):
++    """Profiled counts must equal the structured `renderer`/`deferred` rows in the prose."""
++    counts = dict.fromkeys(PROFILE_COUNTS.values(), 0)
++    for row in ISSUE_ROW.finditer(prose):
++        fields = [item.strip() for item in row.group(2).strip().rstrip('|`').split('|', 2)]
++        if len(fields) != 3 or fields[0] != '0' or not fields[1] or not fields[2]:
++            raise ValueError('Malformed ' + row.group(1).lower() + ' row: ' + row.group(0).strip())
++        counts[row.group(1).lower()] += 1
++    for key, category in PROFILE_COUNTS.items():
++        if score[key] != counts[category]:
++            raise ValueError(key + ' does not match the ' + str(counts[category]) + ' ' + category + ' rows.')
++
++
++def validate_score(score, profiled=False):
++    """Profiled reviews add a separate presentation assessment and issue counts."""
++    extra = {'presentation', *PROFILE_COUNTS} if profiled else set()
++    if not isinstance(score, dict) or set(score) != set(CAPS) | {'total'} | extra:
++        raise ValueError('Scores must contain exactly the seven criteria and total'
++                         + (', presentation, and issue counts.' if profiled else '.'))
+     for key, cap in {**CAPS, 'total': 100}.items():
+         if type(score[key]) is not int or not 0 <= score[key] <= cap:
+             raise ValueError('Score outside integer criterion cap: ' + key)
+     if score['total'] != sum(score[key] for key in CAPS):
+         raise ValueError('Total does not equal the seven criterion scores.')
++    if profiled:
++        # Presentation is null when no complete captures were supplied.
++        value = score['presentation']
++        if value is not None and (
++                not isinstance(value, dict) or set(value) != {*PRESENTATION, 'total'}
++                or any(type(value[key]) is not int or not 1 <= value[key] <= 5 for key in PRESENTATION)
++                or type(value['total']) is not int or value['total'] != sum(value[key] for key in PRESENTATION)):
++            raise ValueError('Presentation must be null or five 1-5 dimensions with their total.')
++        if any(type(score[key]) is not int or score[key] < 0 for key in PROFILE_COUNTS):
++            raise ValueError('Issue counts must be non-negative integers.')
+     return score
+ 
+ 
+-def aggregate(judgments):
++def evidence_blockers(valid, evidence):
++    """Why profiled scores cannot be headlined yet; valid findings stay in the judgments."""
++    blockers = []
++    if evidence != 'complete':
++        blockers.append('Visual evidence is ' + str(evidence) + '; visible-state checks are unresolved.')
++    if any(row['score']['deferredFindings'] for row in valid):
++        blockers.append('A review deferred findings.')
++    if any(row['score']['presentation'] is None for row in valid):
++        blockers.append('Presentation is unscored.')
++    return blockers
++
++
++def aggregate(judgments, profiled=False, evidence=None):
+     valid = []
+     for row in judgments:
+         if row.get('status') == 'valid':
+             try:
+-                validate_score(row.get('score'))
++                validate_score(row.get('score'), profiled)
+             except ValueError:
+                 continue
+             valid.append(row)
+     complete = len(judgments) == JUDGES and len(valid) == JUDGES and {
+         row.get('judge') for row in valid} == {1, 2, 3}
++    blockers = evidence_blockers(valid, evidence) if profiled else []
++    if blockers:
++        complete = False
+     result = {'status': 'complete' if complete else 'incomplete',
+               'requiredJudgments': JUDGES, 'validJudgments': len(valid), 'judgments': judgments,
+               'medianTotal': None, 'totalRange': None, 'medianDimensions': None, 'dimensionRanges': None,
+               'dimensionMedianSum': None, 'dimensionMedianSumEqualsMedianTotal': None}
++    if profiled:
++        result['evidenceBlockers'] = blockers
+     if complete:
+         totals = [row['score']['total'] for row in valid]
+         dimensions = {key: statistics.median(row['score'][key] for row in valid) for key in CAPS}
+@@ -252,6 +488,14 @@ def aggregate(judgments):
+                                              'max': max(row['score'][key] for row in valid)} for key in CAPS},
+                       dimensionMedianSum=sum(dimensions.values()),
+                       dimensionMedianSumEqualsMedianTotal=sum(dimensions.values()) == statistics.median(totals))
++    if profiled:
++        # Kept apart from the correctness total; its total and dimensions are separate medians.
++        presentation = [row['score']['presentation'] for row in valid] if complete else None
++        result['medianPresentation'] = statistics.median(
++            item['total'] for item in presentation) if complete else None
++        result['medianPresentationDimensions'] = {
++            key: statistics.median(item[key] for item in presentation)
++            for key in PRESENTATION} if complete else None
+     return result
+ 
+ 
+@@ -261,7 +505,7 @@ def judge_command(packet, final):
+             '-C', str(packet), '-o', str(final), '--json', '-']
+ 
+ 
+-def judge_one(prepared, record, judge, rubric):
++def judge_one(prepared, record, judge, rubric, profile=None):
+     packet = prepared / 'packets' / record['candidateId']
+     destination = prepared / 'judgments' / record['candidateId'] / ('j' + str(judge))
+     destination.mkdir(parents=True, exist_ok=False)
+@@ -270,8 +514,16 @@ def judge_one(prepared, record, judge, rubric):
+     try:
+         if packet_hashes(packet) != record['packetSha256']:
+             raise ValueError('Prepared packet changed before judgment.')
++        if profile and strict_json(regular_bytes(packet / 'review/profile.json')) != profile:
++            raise ValueError('Prepared packet names a different review profile.')
++        if profile and strict_json(regular_bytes(packet / 'candidate/visual-evidence.json')) \
++                != record.get('visualEvidence'):
++            raise ValueError('Prepared packet evidence differs from the mapping.')
+         command = judge_command(packet, destination / 'final.md')
+-        write_json(destination / 'invocation.json', {'command': command, 'rubricSha256': digest(rubric)})
++        invocation = {'command': command, 'rubricSha256': digest(rubric)}
++        if profile:
++            invocation = {'command': command, 'profile': profile}
++        write_json(destination / 'invocation.json', invocation)
+         with (destination / 'raw.jsonl').open('xb') as stdout, (destination / 'stderr.txt').open('xb') as stderr:
+             process = subprocess.run(command, input=rubric, stdout=stdout, stderr=stderr,
+                                      cwd=packet, timeout=TIMEOUT_SECONDS, check=False)
+@@ -281,7 +533,11 @@ def judge_one(prepared, record, judge, rubric):
+         if packet_hashes(packet) != record['packetSha256']:
+             raise ValueError('Prepared packet changed during judgment.')
+         text = regular_bytes(destination / 'final.md').decode('utf-8')
+-        result.update(status='valid', score=parse_score(text), finalSha256=digest(text.encode()))
++        score = parse_score(text, bool(profile))
++        if profile and record['visualEvidence'].get('status') != 'complete' \
++                and score['presentation'] is not None:
++            raise ValueError('Presentation was scored without complete visual evidence.')
++        result.update(status='valid', score=score, finalSha256=digest(text.encode()))
+     except (OSError, ValueError, subprocess.SubprocessError) as error:
+         result['error'] = str(error)
+     result['seconds'] = round(time.monotonic() - started, 2)
+@@ -289,14 +545,31 @@ def judge_one(prepared, record, judge, rubric):
+     return result
+ 
+ 
++def prepared_prompt(prepared, manifest):
++    """Verify a profiled preparation against its mapping and the frozen profile."""
++    profile = manifest['profile']
++    if manifest.get('version') != 2 or not isinstance(profile, dict) or 'rubricSha256' in manifest:
++        raise ValueError('Prepared review profile selection is malformed.')
++    current, expected = load_profile(profile.get('name'))
++    prompt = regular_bytes(prepared / 'reviewer-prompt.md')
++    if profile != current or prompt != expected or digest(prompt) != profile['promptSha256']:
++        raise ValueError('Prepared review profile changed.')
++    return prompt
++
++
+ def run_judges(prepared, parallel=3):
+     if parallel not in (1, 2, 3, 6):
+         raise ValueError('Parallel judges must be 1, 2, 3, or 6.')
+     prepared = pathlib.Path(prepared).resolve()
+     manifest = strict_json(regular_bytes(prepared / 'mapping.json'))
+-    rubric = regular_bytes(prepared / 'rubric.md')
+-    if digest(rubric) != manifest['rubricSha256'] or digest(rubric) != RUBRIC_SHA256:
+-        raise ValueError('Prepared rubric changed.')
++    profile = manifest.get('profile')
++    if profile is None:
++        # Legacy preparations: the unchanged judge2 rubric, exactly as before.
++        rubric = regular_bytes(prepared / 'rubric.md')
++        if digest(rubric) != manifest['rubricSha256'] or digest(rubric) != RUBRIC_SHA256:
++            raise ValueError('Prepared rubric changed.')
++    else:
++        rubric = prepared_prompt(prepared, manifest)
+     if (manifest['model'], manifest['reasoningEffort'], manifest['judgmentsRequired']) != (MODEL, REASONING, JUDGES):
+         raise ValueError('Prepared judge settings changed.')
+     records = manifest['runs']
+@@ -310,20 +583,38 @@ def run_judges(prepared, parallel=3):
+     (prepared / 'judgments').mkdir(exist_ok=False)
+     jobs = [(row, judge) for row in records if row['status'] == 'ready' for judge in range(1, JUDGES + 1)]
+     with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as pool:
+-        results = list(pool.map(lambda job: judge_one(prepared, *job, rubric), jobs))
++        results = list(pool.map(lambda job: judge_one(prepared, *job, rubric, profile), jobs))
+     grouped = {key: [] for key in ids}
+     for (record, _), result in zip(jobs, results):
+         grouped[record['candidateId']].append(result)
+     summaries = []
+     for record in records:
+         summary = {'candidateId': record['candidateId'], 'run': record['run'],
+-                   'sourceSha256': record.get('sourceSha256'), **aggregate(grouped[record['candidateId']])}
++                   'sourceSha256': record.get('sourceSha256'),
++                   **aggregate(grouped[record['candidateId']], bool(profile),
++                               (record.get('visualEvidence') or {}).get('status', 'missing'))}
+         if record['status'] != 'ready':
+             summary['preparationError'] = record.get('error', 'Candidate incomplete.')
++        if profile:
++            evidence = record.get('visualEvidence') or {'status': 'missing'}
++            summary['visualEvidence'] = {
++                'status': evidence.get('status'), 'rendererSha256': evidence.get('rendererSha256'),
++                'procedure': evidence.get('procedure'), 'requiredViews': evidence.get('requiredViews'),
++                'captures': len(evidence.get('captures') or []), 'uncovered': evidence.get('uncovered')}
+         summaries.append(summary)
+     report = {'model': MODEL, 'reasoningEffort': REASONING, 'rubricSha256': digest(rubric),
+               'status': 'complete' if all(row['status'] == 'complete' for row in summaries) else 'incomplete',
+               'runs': summaries}
++    if profile:
++        del report['rubricSha256']
++        report['profile'] = profile
++        # A comparison needs one renderer and one capture procedure across its evidence.
++        setups = {json.dumps([row['visualEvidence']['rendererSha256'], row['visualEvidence']['procedure']])
++                  for row in summaries if row['visualEvidence']['status'] == 'complete'}
++        report['comparisonBlockers'] = (['Complete evidence mixes renderers or capture procedures.']
++                                        if len(setups) > 1 else [])
++        if report['comparisonBlockers']:
++            report['status'] = 'incomplete'
+     write_json(prepared / 'scores.json', report)
+     return report
+ 
+@@ -339,16 +630,20 @@ def main(argv=None):
+     parser.add_argument('--output', type=pathlib.Path)
+     parser.add_argument('--prepared', type=pathlib.Path)
+     parser.add_argument('--parallel', type=int, choices=[1, 2, 3, 6], default=3)
++    parser.add_argument('--profile', choices=['v1', *PROFILES],
++                        help='Review profile for --prepare (default v1, the frozen judge2 rubric).')
+     args = parser.parse_args(argv)
+     try:
+         if args.prepare:
+             if not args.runs_root or not args.output or args.prepared:
+                 parser.error('--prepare requires --runs-root and a new --output; omit --prepared.')
+-            report = prepare(args.bundle, args.runs_root, args.output, args.run)
++            report = prepare(args.bundle, args.runs_root, args.output, args.run, args.profile or 'v1')
+             complete = all(row['status'] == 'ready' for row in report['runs'])
+         else:
+             if not args.prepared or args.runs_root or args.output or args.run:
+                 parser.error('--run-judges requires --prepared; omit preparation arguments.')
++            if args.profile is not None:
++                parser.error('--run-judges uses the prepared profile; omit --profile.')
+             report = run_judges(args.prepared, args.parallel)
+             complete = report['status'] == 'complete'
+     except (OSError, ValueError, KeyError, TypeError) as error:

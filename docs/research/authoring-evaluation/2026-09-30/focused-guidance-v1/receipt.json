@@ -1,0 +1,64 @@
+{
+  "format": "focused-guidance-research-snapshot-v1",
+  "purpose": "Reconstruct the exact tested v1 source without activating it in the current product.",
+  "baseCommit": "711c89ba38d7fbdd5935b65676218bde1f448ee4",
+  "applyOrder": [
+    "01-corrected-baseline.patch",
+    "02-focused-guidance-v1.patch"
+  ],
+  "patches": {
+    "01-corrected-baseline.patch": {
+      "bytes": 80425,
+      "sha256": "dd664af73ccd99c1fc2e1bc29d586210e7c3330c23b95074732224febcf29c51"
+    },
+    "02-focused-guidance-v1.patch": {
+      "bytes": 85182,
+      "sha256": "8fce8cc941218022cf12599e3b6ad84257e15f0c0e7978d5e8297cf657203cd5"
+    }
+  },
+  "frozenSources": {
+    "control-kit.json": "85051d4f4a305e56770aa572f17fc3116f4eafba91dc0ce63b51c24334713b39",
+    "control-manifest.json": "08d21819c7e4c80f83505ab90efd5408d9b474b6a0bd299a34c0e58d149221e6",
+    "focused-kit.json": "98e62511108c70a87ca0cecc0117d0a496cc47e5812b808e2d759a78af07aada",
+    "focused-manifest.json": "2839a53a0ddba73988bbb632c719b20a899d0fbbb7199097a4f2ce4e87a40e24",
+    "preimplementation.patch": "dd664af73ccd99c1fc2e1bc29d586210e7c3330c23b95074732224febcf29c51"
+  },
+  "derivation": "Second patch is difflib.unified_diff, with original line endings, in focused-manifest changedFromControl order, control-kit files to focused-kit files. New files use /dev/null as the old path.",
+  "orderedChangedPaths": [
+    ".claude/skills/hld-to-page/SKILL.md",
+    ".claude/skills/hld-to-page/references/authoring-details.md",
+    ".claude/skills/hld-to-page/references/operator-questions.md",
+    ".claude/skills/hld-to-page/references/recipe-routing.md",
+    ".claude/skills/hld-to-page/references/spec-skeleton.md",
+    ".claude/skills/hld-to-page/references/story-time-and-reports.md",
+    ".claude/skills/hld-to-page/references/workbench-sessions.md",
+    "docs/folder-agent-session.md",
+    "src/workbench/agent-chat.js",
+    "src/workbench/agent-message.js",
+    "tools/widget_doc.py"
+  ],
+  "focusedTargetSha256": {
+    ".claude/skills/hld-to-page/SKILL.md": "82bed65171269b8989230e173de3f9e792f30457cc3bded56300053ec8c205d6",
+    ".claude/skills/hld-to-page/references/authoring-details.md": "b666ff86c9d9460a386ae563c0a55438811fe4cf3f451b320c8ad1af48d50630",
+    ".claude/skills/hld-to-page/references/operator-questions.md": "73b1f13570badc9a4ac6293e230e4960779adf60842cf8d84279b58d10ac64ef",
+    ".claude/skills/hld-to-page/references/recipe-routing.md": "034fcd1fd96e3ce59361301253af572a7bb32ee8ce9abf507ae3622113f3060e",
+    ".claude/skills/hld-to-page/references/spec-skeleton.md": "3b78a1e7c5fa8041db95d1a1c5119c7f2fa1290f8154adbe1ce244347746cead",
+    ".claude/skills/hld-to-page/references/story-time-and-reports.md": "ea4fc1b911ab187152a86085a0c9d34b7d8984abc1e2cb2fc8e1c0883622582a",
+    ".claude/skills/hld-to-page/references/workbench-sessions.md": "fd445d3b0b4ee3bcf2cd40924dbae2347fdfd73929a613ad9296f77fff0f0152",
+    "docs/folder-agent-session.md": "301cff0b21781e49b23c33ab5d6c7a79ab7f3906e853346f8310703a92c9cf80",
+    "src/workbench/agent-chat.js": "08ffa3d0a61104e2582c426553b5c44e123a955479964115a31275e5b9984f47",
+    "src/workbench/agent-message.js": "47202452dd5814ef284dc833e5ed127b57fcb989ba94ce7858290508b57b2d05",
+    "tools/widget_doc.py": "a207a3e38d1c65f0de358c07aa1abbbd54e57e6cf627c2f9f0787fb9110160c9"
+  },
+  "verification": {
+    "method": "git archive base into a temporary directory; git apply --check then git apply each patch in order; compare the 11 control files/presences and all 11 focused target SHA-256 hashes to the frozen kits/manifests",
+    "controlMatched": true,
+    "focusedMatched": true,
+    "targetCount": 11
+  },
+  "scopeLimits": [
+    "Reconstructs the changed source files, not the original generated runtime or renderer.",
+    "Full raw runs and frozen kits remain in the local experiment archive.",
+    "This snapshot does not adopt v1 and excludes subsequent v2 and composition-cue treatment changes."
+  ]
+}

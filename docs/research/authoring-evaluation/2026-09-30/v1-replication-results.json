@@ -1,0 +1,274 @@
+{
+  "format": "v1-replication-results-v1",
+  "asOfUtc": "2026-10-01T06:37:00+00:00",
+  "headline": "does not qualify; quality comparison incomplete",
+  "promotion": "Not supported. Context screen missed and repeated new correctness-defect guard triggered; strict quality contrast incomplete. No strategy promoted.",
+  "scope": {
+    "comparison": "historical corrected-control guidance versus exact eleven-path historical focused-v1 guidance on one common current runtime",
+    "currentProductBase": "3799dfa25e637290ea828e6acbb1b8bcbea674f4",
+    "notClaimed": [
+      "current-default guidance comparison",
+      "full historical-environment reproduction",
+      "Workbench adoption or compatibility validation",
+      "PR292 or PR293 effect; neither stacked nor measured"
+    ],
+    "inertInputs": "Two historical Workbench JavaScript inputs are inert in this initial-authoring comparison.",
+    "precedingTrial": "v1-replication-feasibility.md; single unscored author with its original recorded deviation, unchanged"
+  },
+  "authors": {
+    "model": "Claude Opus 5.5 high",
+    "fresh": 8,
+    "completedAndAccepted": 8,
+    "byRun": [
+      { "run": "run-01", "arm": "focused", "block": "block-01", "candidate": "C02", "peakRequestContextTokens": 202179, "correctnessMean": 85.5, "presentationMean": 18.25 },
+      { "run": "run-02", "arm": "focused", "block": "block-02", "candidate": "C03", "peakRequestContextTokens": 200351, "correctnessMean": 93.25, "presentationMean": 17.5 },
+      { "run": "run-05", "arm": "focused", "block": "block-01", "candidate": "C03", "peakRequestContextTokens": 190969, "correctnessMean": 86.5, "presentationMean": 18.5 },
+      { "run": "run-06", "arm": "focused", "block": "block-02", "candidate": "C01", "peakRequestContextTokens": 189599, "correctnessMean": 81.0, "presentationMean": 19.0 },
+      { "run": "run-03", "arm": "control", "block": "block-01", "candidate": "C01", "peakRequestContextTokens": 200172, "correctnessMean": null, "presentationMean": null },
+      { "run": "run-04", "arm": "control", "block": "block-01", "candidate": "C05", "peakRequestContextTokens": 211605, "correctnessMean": 92.5, "presentationMean": 21.75 },
+      { "run": "run-07", "arm": "control", "block": "block-02", "candidate": "C05", "peakRequestContextTokens": 228627, "correctnessMean": 92.25, "presentationMean": 19.5 },
+      { "run": "run-08", "arm": "control", "block": "block-02", "candidate": "C02", "peakRequestContextTokens": 234749, "correctnessMean": 90.75, "presentationMean": 19.25 }
+    ],
+    "qualityMeansNote": "Per-author means of four valid grades. run-03 is null under the fixed four-valid-grades rule. No available-case or repaired arm mean or delta is published."
+  },
+  "grading": {
+    "profile": "authoring-review-v3",
+    "commandedReviewer": "gpt-5.6-sol, medium effort (command intent verified)",
+    "actualProviderModelIdentityIndependentlyObserved": false,
+    "blocks": 2,
+    "sessionsPerBlock": 4,
+    "candidatesPerSession": 5,
+    "candidateMix": "2 focused, 2 control, same historical anchor source (C04); anonymous; fixed rotated order",
+    "directImagesPerCandidate": 8,
+    "excludedPilot": {
+      "passedBeforeFanout": true,
+      "substituteGrade": false,
+      "resultSha256": "a30f4e3215f74b83ea9b7346aec934b4884db1d0dd685165eea06f3b53bdc6f6",
+      "inspectionSha256": "90108a99caf910db433b9f1c55fc044ada497cbed2f60935472e66a196d66a20"
+    },
+    "gradesRetained": 40,
+    "fresh": { "retained": 32, "valid": 31 },
+    "anchor": { "retained": 8, "valid": 8 },
+    "invalid": [
+      {
+        "block": "block-01",
+        "reviewer": "R3",
+        "candidate": "C01",
+        "run": "run-03",
+        "arm": "control",
+        "declaredTotal": 87,
+        "sevenCriteriaSum": 92,
+        "rule": "rejected by frozen v3 parser",
+        "repairedRetriedOrReplaced": false
+      }
+    ],
+    "historicalAnchorMeans": {
+      "block-01": { "correctness": 82.25, "presentation": 16.5 },
+      "block-02": { "correctness": 82.0, "presentation": 18.5 },
+      "use": "Block-specific descriptive context; not a control. Same anchor source, but different fresh captures, reviewer sessions and order, so the between-block difference does not isolate reviewer-stage drift or any single cause."
+    }
+  },
+  "context": {
+    "metric": "peakRequestContextTokens",
+    "controlMean": 218788.25,
+    "focusedMean": 195774.5,
+    "focusedMinusControl": -23013.75,
+    "reductionFractionSummaryRounded": 0.1052,
+    "reductionPercentExactFromMeans": 10.5187321531,
+    "firstSpecWriteContextMean": { "control": 184209.25, "focused": 164192.0, "focusedMinusControl": -20017.25 },
+    "preFirstWriteReadBytesMeanFocusedMinusControl": { "guidance": -78259.25, "ownGeneratedWidgetReports": 25600.5, "allReads": -53904.25 },
+    "limits": "Displayed bytes are not per-file tokens. Landmarks locate the difference in the request sequence; they are not causal proof."
+  },
+  "numericScreen": {
+    "allFocusedAuthorsComplete": { "value": true, "meets": true },
+    "meanPeakContextReduction": { "value": 0.1052, "threshold": 0.2, "meets": false },
+    "correctnessDifference": { "value": null, "threshold": -3, "meets": null },
+    "presentationDifference": { "value": null, "threshold": -1, "meets": null },
+    "newRepeatedSourceConfirmedCorrectnessDefect": { "familiesTriggered": 3, "meets": false },
+    "attributableAuthorFlowOrTransportRegression": { "finding": "none found in the bounded public author-flow and grader-integrity audits", "guardTriggered": false },
+    "verdict": "does not qualify",
+    "qualityComparison": "incomplete; the defect guard does not rescore or fill missing primary quality"
+  },
+  "repeatedDefectAudit": {
+    "status": "complete; corrected and terminal",
+    "frozenRule": "same frozen rubric rule and source-level symptom confirmed in at least two focused outputs and zero control outputs; historical anchor excluded",
+    "guardTriggered": true,
+    "families": [
+      { "id": "missing-visible-opened-clip", "rubricRow": "panels", "deduction": -3, "focused": ["run-01", "run-05", "run-06"], "control": [] },
+      { "id": "re-ask-supplied-starting-state", "rubricRow": "questions", "deduction": -1, "focused": ["run-02", "run-05"], "control": [] },
+      { "id": "app-read-claim-without-request-reply-hops", "rubricRow": "edges", "deduction": -2, "focused": ["run-01", "run-05"], "control": [] }
+    ],
+    "rawGradesChanged": false,
+    "rescoringPerformed": false,
+    "correction": {
+      "original": "missing-visible-opened-clip counted 4 focused / 0 control",
+      "corrected": "3 focused / 0 control",
+      "trigger": "root questioned run-02 symmetry",
+      "basis": "Direct folded-state and 1440/800 opening-capture inspection: run-02 retains a visible matching package-drop still at the opening; the frozen rule does not require a Playing label (symmetric with control run-03). Run-05's screen is explicitly hidden at package-alert and not restored at the opening.",
+      "reviewerAllegation": "block-02 R1/C03 contrary allegation unsupported under the frozen interpretation; grade unchanged",
+      "originalPreserved": {
+        "mdSha256": "23c3498da23f2720ad1f1d7aed346e5de621543a90ca3bda2c0edd08cdb2e591",
+        "jsonSha256": "d71f7631dc32020561d600c140f27808dc1f4706541b21cf92745a178900a83c"
+      }
+    },
+    "cause": {
+      "established": false,
+      "notes": [
+        "The matching-still rule and customer-visible-fields rule are byte-equivalent between the two kits.",
+        "Catalog/guide routing without a cross-panel clip-to-Screen cue is a hypothesis only.",
+        "Focused run-02 and run-05 and control run-07 and run-08 read camera-events; run-02 included a Screen and passed; controls run-03 and run-04 passed without reading camera-events. Neither 'focused authors skipped the camera guide' nor 'the guide is necessary' is supported."
+      ],
+      "selectedConditionalRepairCandidate": "See nextStep."
+    }
+  },
+  "nextStep": {
+    "selectedBy": "root coordinator after final Fable consult",
+    "kind": "one conditional quality-repair candidate",
+    "candidate": "Small cue in existing catalog/guide output plus matching agent guidance: a visible matching Screen at the invoked clip opening, covering inherited visibility/state; retaining a matching still qualifies without a Playing label.",
+    "scope": "missing-visible-opened-clip family only; the two other 2/0 families remain unrepaired; the cue cannot clear the guard",
+    "firstAction": "SOL maps feasibility in the exact helper and the current Workbench Copy for agent / Work with agent port",
+    "constraints": [
+      "existing catalog stays under 8,000 B",
+      "no new required helper calls, modes or reports; incidental extra-call variation retained and assessed, not automatically attributed to treatment",
+      "reuse current proven initial-authoring flow; stopped edit pipeline stays closed",
+      "one actual inspected trial before any fanout; new prospective registration before any cohort"
+    ],
+    "implemented": false,
+    "trialed": false,
+    "adopted": false,
+    "contextClaim": false
+  },
+  "fableConsult": {
+    "modelObserved": "claude-fable-5-1",
+    "sessionId": "957fb993-bcbd-46e9-b393-1f36a54dccb3",
+    "firstPassSeconds": 112.07,
+    "sameSessionCorrectionSeconds": 33.55,
+    "correctedAdviceSha256": "6db2e6c34d6aa9fe209a8a7ad3c21fabdb712973bdf83a74e2399cda70871f11",
+    "withdrawn": [
+      "crude bytes-to-tokens estimate",
+      "assumption that control had little helper traffic",
+      "reachability rule built on those",
+      "claim that reordering cannot change peak"
+    ],
+    "attributionLimit": "Existing component-attribution limit recorded; no further pass over the same counters to allocate file tokens.",
+    "contextResultNote": "The measured 10.5187% reduction remains valid; it misses the 20% screen and supports no quality-preserving promotion."
+  },
+  "audits": {
+    "graderIntegrity": {
+      "status": "complete",
+      "distinctNonPilotSessions": 8,
+      "imagesPerReviewer": 40,
+      "imageHashesAndOrderConsistent": true,
+      "publicCommandExecutions": 200,
+      "commandsPacketBounded": true,
+      "automaticReconnectMessages": 32,
+      "reconnectsWithinRetainedInvocations": true,
+      "replacementReviews": 0,
+      "arithmeticFailuresRetained": 1,
+      "strictNullQualityCorrect": true,
+      "commandIntentVerified": true,
+      "artifactIntegrityVerified": true,
+      "actualProviderModelIdentityIndependentlyObserved": false,
+      "reportSha256": "3256193d51dc0dbbc3f8ea3f71592685f16d889ff7f8354544b1213ae07cf929"
+    },
+    "authorFlow": {
+      "finding": "No concrete treatment-attributable cause found in the bounded public command/result audit.",
+      "bound": "Bounded finding, not proof of absolute absence. The grading arithmetic failure is reviewer output, not author flow.",
+      "nonEnumeratedBashStrings": { "focused": 11, "control": 13 },
+      "permissionDenials": 2,
+      "helperUsageErrors": 1,
+      "reportSha256": "af6fd6fb1ed8433ddf179c9e31ef89d65f3596f78b96b9c508d4fee8a7c452a9"
+    },
+    "publicUsage": {
+      "crosschecksMatched": 64,
+      "crosschecksTotal": 64,
+      "privateReasoningInspected": false,
+      "thinkingCountersAreFilePayload": false
+    },
+    "capture": {
+      "slots": 10,
+      "slotsComplete": 10,
+      "views": 376,
+      "pageErrors": 0,
+      "horizontalOverflow": 0,
+      "boundImageRoles": 80,
+      "interpretation": "mechanical evidence only; not quality"
+    }
+  },
+  "intake": {
+    "helperProposal": {
+      "consultModelObserved": "claude-fable-5-1",
+      "adviceSha256": "e2db609e2eda9da5612f79e08e612ff4f2cebdd847acd4b9c17d6a567327e3e6",
+      "proposal": "compact helper index as default output, with details via --section",
+      "decision": "rejected as stated; no helper change or trial",
+      "reasons": [
+        "--catalog already provides a 31-panel type/name/use/shows/file+anchor index (7,351 B)",
+        "--guide provides selected panel details; --section supplies non-panel contract headings and rejects panels",
+        "every focused author read two different report generations (guide, then section), not the same report repeatedly",
+        "source/emitted overlap audit found no meaningful duplication to trim",
+        "higher aggregate bytes alone do not justify a helper change or trial"
+      ]
+    },
+    "nonWidgetGuidance": {
+      "reads": 141,
+      "withinAuthorIdenticalRangeRereads": 0,
+      "exactRepeatGroups": "cross-author only; not savings within any individual author's context",
+      "requestedRangeOverlapPairs": 2,
+      "deliveredByteOverlap": "not established; overlapping requested ranges are not proof of delivered redundancy",
+      "trimProposalJustified": false,
+      "reportSha256": "58bbd2e3712fd12a05df37366b758db4d569738bfb5ca1277a84afdd5be76d85"
+    },
+    "furtherContextCutSelected": false
+  },
+  "unchanged": [
+    "historical focused-v1 screen miss (14.49%)",
+    "focused-v2 failure",
+    "composition cue strict comparison incomplete",
+    "edit pipeline stopped inconclusive; exhausted repairs not reopened",
+    "PR292 and PR293 draft and unmeasured",
+    "all raw grades, including the invalid block-01 R3/C01 grade"
+  ],
+  "archives": {
+    "frozenCurrentInputs": { "paths": 144, "sha256": "5dda0ff09dc911768a830fd38b33f94aa71be70b8ac3ae70b75f201c391255ad" },
+    "exactFrozenInputCapsule": {
+      "paths": 144,
+      "uniqueBlobs": 140,
+      "bytes": 17703823,
+      "receiptSha256": "c0972f3bfb89e83b63b80a71ec178f9897078a39d0e706bccec07cd795c51583",
+      "contents": "frozen experiment inputs, including evidence and report material; not a product-source snapshot"
+    },
+    "reviewOutputArchive": { "paths": 100, "unique": 94, "bytes": 5265686, "receiptSha256": "bc5b5ef95f1ac3364b5e78207f6a59849d1678881ed87cdd5cab3bd224337c30", "kind": "opaque local archive" },
+    "portableRunnablePackage": false,
+    "retention": "Raw logs and session content retained locally only; not published."
+  },
+  "sources": [
+    { "name": "primary-review-summary.json", "sha256": "28d35c94edd1d06adda19807721f6075a1a56ac17ae6cc86073d47aabf21072f" },
+    { "name": "registered-repeated-defect-audit.json (corrected)", "sha256": "87c152c17101b70e36e8d937d2496c7a7876e1a2f4b3c842ac9438e2aff50369" },
+    { "name": "registered-repeated-defect-audit.md (corrected)", "sha256": "c85421e985cf3a4fed6b4d5da6e42c7fa23f99adddfddbdbad2e365ca8ae3ebd" },
+    { "name": "registered-grader-integrity.json", "sha256": "3256193d51dc0dbbc3f8ea3f71592685f16d889ff7f8354544b1213ae07cf929" },
+    { "name": "registered-grader-integrity.md", "sha256": "c0b9aa4de12ea507ca306bf7cbaeaba56ace80585e75d9df5c80bf5f7b02f45e" },
+    { "name": "non-widget-guidance-intake.json", "sha256": "58bbd2e3712fd12a05df37366b758db4d569738bfb5ca1277a84afdd5be76d85" },
+    { "name": "non-widget-guidance-intake.md", "sha256": "f61df86076652f7ce790df57d672b95b8924c96a0e5eab114b22ab20259a9abc" },
+    { "name": "registered-review-run.json", "sha256": "5601a5e24681be3a7198f367d87757c8644c6ce15d9271344aa4be1baf2accc8" },
+    { "name": "registered-review-summary.json", "sha256": "ddffa595cbaeb6ed9b4e1e5e795e92431e3584614eee6a8f49724243790d43a5" },
+    { "name": "contemporary-context-waterfall.json", "sha256": "a33af8a5ba8f209bbc78a0b09ea9bf61e66c859a664b4e3b7178ced015e94402" },
+    { "name": "contemporary-context-waterfall.md", "sha256": "66dcee1ca232dd91a49e864171da42ce9c7af2c3748334435dc9ffc5dce367ea" },
+    { "name": "full-cohort-final-flow-review.json", "sha256": "af6fd6fb1ed8433ddf179c9e31ef89d65f3596f78b96b9c508d4fee8a7c452a9" },
+    { "name": "full-cohort-final-flow-review.md", "sha256": "cd82683126ebc4991c9cc119603bd820e09e886bbf44c7ad627619f4a23c1465" },
+    { "name": "widget-report-intake-inventory.json", "sha256": "192a190c717073b2589f1309ccff558d7afe985ba3097a1d7d60e8e8260457a3" },
+    { "name": "helper-intake-feasibility.md", "sha256": "0b09c8d64f0d833513bb5293271ea5d98d3ac6777f2e585ffd29f52342e299b7" },
+    { "name": "helper-section-overlap.md", "sha256": "a73c43240a37a2a08c9e836b1fff20b8caf735454ccc472129d481cf66cd714c" },
+    { "name": "fable-contemporary-context-advice.md", "sha256": "e2db609e2eda9da5612f79e08e612ff4f2cebdd847acd4b9c17d6a567327e3e6" },
+    { "name": "fable-post-results-corrected-advice.md", "sha256": "6db2e6c34d6aa9fe209a8a7ad3c21fabdb712973bdf83a74e2399cda70871f11" },
+    { "name": "registered metrics.json", "sha256": "f937962be61067360ddbcdefe7ccb89d64ad9a045c5c5e90182397e0b69073cd" },
+    { "name": "review config", "sha256": "7e71aa183b68d12654df57990cef6c91f43ea0149cb633649c3b673fc3fb17a6" },
+    { "name": "review launch", "sha256": "3b3fe5bcc6bbc5b157121eb85a54fb2cb846e2a9055789e94c9a3ef1a3aac814" },
+    { "name": "v3 profile manifest", "sha256": "22bda3abb270fb9c6e5e7f3fa64f5bdfe86752efa1ed970167b940c198794949" }
+  ],
+  "limits": [
+    "Four authors per arm are the experimental units; grades and reviewer-block contrasts are not independent samples.",
+    "Historical and contemporary deltas are non-contemporaneous and are not pooled.",
+    "The repeated-defect guard is a source diagnosis; it does not rescore authors or complete the primary quality comparison.",
+    "Audit findings of no attributable author-flow or transport regression are bounded to public evidence."
+  ]
+}

@@ -2787,8 +2787,10 @@ test('local and nested imported domains preserve authored styles until status pr
  const provider=model('provider',[{id:'main',diagram:{nodes:{domain:{style:'rose'}},rows:[['domain']],topologyExports:{core:{nodes:['domain'],edges:[]}}}}]);
  const middle=model('middle',[{id:'main',diagram:{topologyImports:[{spec:'provider',export:'core',as:'nested'}],topologyExports:{core:{nodes:['nested::domain'],edges:[]}}}}]);
  for(const missing of [false,true]){
-  const consumer=model('consumer',[{id:'main',diagram:{nodes:{local:{style:'rose',detail:{section:'child'}}},rows:[['local']],topologyImports:[{spec:'middle',export:'core',as:'shared',nodeDetails:{'nested::domain':{section:'child'}}}]}},{id:'child',detailOnly:true,diagram:{nodes:{leaf:missing?{missingWork:true}:{}},rows:[['leaf']]}}]);
+  const consumer=model('consumer',[{id:'main',diagram:{nodes:{local:{style:'rose',detail:{section:'child'}}},rows:[['local']],steps:[{id:'visit',nodes:['local','shared::nested::domain']}],topologyImports:[{spec:'middle',export:'core',as:'shared',nodeDetails:{'nested::domain':{section:'child'}}}]}},{id:'child',detailOnly:true,diagram:{nodes:{leaf:missing?{missingWork:true}:{}},rows:[['leaf']]}}]);
   const h=harness(seed.C.FlowTopology.materialize([provider,middle,consumer])[2]),api=h.ctl.liveStatus;
+  let beforeAdvance;
+  h.ctl.sections[0].stepper={path:()=>h.C.diagramPathList(h.ctl.page.sections[0].diagram)[0].id,sourceIndex:()=>0,mode:()=>'ambient',onBeforeAdvance(fn){beforeAdvance=fn;return ()=>{};}};
   for(const id of ['local','shared::nested::domain']){
    const node=h.view.querySelector('[data-dv-node="'+id+'"]');
    assert.equal(node.getAttribute('data-live-appearance'),missing?'missing':null);
@@ -2797,6 +2799,11 @@ test('local and nested imported domains preserve authored styles until status pr
   if(!missing){h.view.dispatchEvent({type:'diagram-view-change'});h.flush();for(const id of ['local','shared::nested::domain'])assert.ok(h.view.querySelector('[data-dv-node="'+id+'"]').classList.contains('ns-rose'));}
   api.apply({});
   for(const id of ['local','shared::nested::domain']){const node=h.view.querySelector('[data-dv-node="'+id+'"]');assert.equal(node.getAttribute('data-live-appearance'),missing?'missing':'unchanged');assert.ok(node.querySelector('.card').classList.contains('dv-live-target'));}
+  assert.equal(beforeAdvance(0),!missing,'Jira mode stops at descendant Missing work');
+  api.setStatusMode('trace');
+  for(const id of ['local','shared::nested::domain']){const node=h.view.querySelector('[data-dv-node="'+id+'"]');assert.equal(node.getAttribute('data-live-appearance'),missing?'missing':'unchanged','Trace retains domain summary ink');assert.ok(!node.querySelector('.card').classList.contains('dv-live-target'));}
+  assert.equal(beforeAdvance(0),true,'Trace inspection does not introduce Jira auto-stops');
+  api.setStatusMode('jira');assert.equal(beforeAdvance(0),!missing);
   api.clear();
   for(const id of ['local','shared::nested::domain']){const node=h.view.querySelector('[data-dv-node="'+id+'"]');assert.equal(node.getAttribute('data-live-appearance'),null);assert.ok(!node.querySelector('.card').classList.contains('dv-live-target'),'Clear removes summary-only controls');}
   api.apply({});

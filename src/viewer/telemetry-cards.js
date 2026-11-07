@@ -38,6 +38,10 @@ function telemetryCountNote(binding){return telemetryMetricNames(binding).some(f
 function telemetryCardContent(edge,binding,sample,result,window,pending){
   // Visibility never changes source ownership or legacy-link ambiguity.
   var rows=telemetryMetricRows(binding,sample,pending).filter(function(row){return binding.signals[row.name].showOnCard!==false;});
+  rows.forEach(function(row){
+    var observed=telemetryReading(sample,row.name).value!==null;
+    row.health=observed?(result && (result.failing || []).indexOf(row.name)>=0?'failing':'observed'):pending && pending[row.name]?'loading':'unobserved';
+  });
   binding=telemetryCardBinding(binding);
   var primary=telemetryPrimary(binding,true) || telemetryMetricNames(binding)[0] || null,queue=binding.kind==='queue',raw=edge.telemetry || {};
   var title=edge.label || edge.from+' → '+edge.to;
@@ -136,6 +140,8 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
           value=wrapped(display,'t1 dv-metrics-card-value',w-42,3);value.setAttribute('data-signal',row.name);
         }
         label.setAttribute('data-signal',row.name);
+        value.setAttribute('data-metric-health',view.preview?'preview':row.health);
+        if(row.health==='failing' && !view.preview)wrapped('Outside limit','t2 dv-metrics-card-failure',w-42,1).setAttribute('data-signal',row.name);
         if(formatted)wrapped('formatted text; may be rounded','t2 dv-metrics-card-provenance',w-42,2);
         if(!sharedScope && scopes[index])wrapped(scopes[index],'t2 dv-metrics-card-scope',w-42,2);
         if(row.url){

@@ -293,6 +293,25 @@ function liveStatusInk(el,state){
   el.style.setProperty('--dv-live-ink',ink(rgb));
   // Print uses white board grounds; retain contrast even with a fully opaque tint.
   el.style.setProperty('--dv-live-print-ink',ink([255,255,255]));
+  if(el.classList.contains('dv-metrics-card')){
+    // Numeric health retains its hue, but must stay readable on user-selected
+    // work fills, including fully opaque green, black and white.
+    var surface=rgb.map(function(v,i){return v*(1-amount)+tint[i]*amount;});
+    if(!state){var backing=rgba(computed.getPropertyValue('--explore-bg'));if(backing)surface=backing.slice(0,3);}
+    function luminance(color){var c=color.map(function(v){var n=v/255;return n<=.04045?n/12.92:Math.pow((n+.055)/1.055,2.4);});return c[0]*.2126+c[1]*.7152+c[2]*.0722;}
+    function healthInk(name,fallback,ground){
+      var color=(rgba(computed.getPropertyValue(name)) || fallback).slice(0,3),light=luminance(ground || surface),end=light>.179?0:255;
+      for(var step=0;step<=20;step++){
+        var candidate=color.map(function(v){return Math.round(v+(end-v)*step/20);}),lum=luminance(candidate);
+        if((Math.max(light,lum)+.05)/(Math.min(light,lum)+.05)>=4.5 || step===20)return 'rgb('+candidate.join(',')+')';
+      }
+    }
+    el.style.setProperty('--dv-metrics-observed-ink',healthInk(state?'--dv-live-'+state:'--dtext',[138,147,163]));
+    el.style.setProperty('--dv-metrics-failing-ink',healthInk('--dv-metrics-amber',[232,163,0]));
+    var printSurface=[255,255,255].map(function(v,i){return v*(1-amount)+tint[i]*amount;});
+    el.style.setProperty('--dv-metrics-observed-print-ink',healthInk(state?'--dv-live-'+state:'--dtext',[138,147,163],printSurface));
+    el.style.setProperty('--dv-metrics-failing-print-ink',healthInk('--dv-metrics-amber',[232,163,0],printSurface));
+  }
 }
 /* Preserve authored Node Styles while live classes supply shared appearance.
    Presets also support the unknown-evidence construction fallback. */
@@ -810,12 +829,22 @@ function createLiveStatus(ctl,page,options,renderOptions){
       telemetryPaintCues(scope,d,templates,metricsView,trackingTelemetry(page).window);
       var cardsView=statusMode!=='trace' && metricsPreview && trackingTelemetry(binding.page).enabled?telemetryCardPreview(d,templates):metricsView;
       telemetryPaintCards(scope,d,templates,cardsView,trackingTelemetry(page).window,function(card,path,edge,index){
+        // The bound carrier owns its work presentation, including all resolved
+        // imported tickets. Telemetry proof and endpoint states cannot override it.
+        // Unticketed metric cards may show no-change without painting ordinary edges.
+        var appearance=!cardsView.preview && api.enabled() && availabilityOn?liveStatusPresentation(edge,map):null;
+        liveStatusClass(card,appearance);
+        if(!appearance)liveStatusInk(card,null);
+        if(appearance){
+          var halo=card.querySelector('.dv-metrics-card-box').cloneNode(false);
+          halo.setAttribute('class','dv-live-halo');halo.setAttribute('aria-hidden','true');card.insertBefore(halo,card.firstChild);
+        }
         if(authoring){
           if(binding.ordinal!=null){card.setAttribute('data-metrics-section',binding.ordinal);card.setAttribute('tabindex','0');card.setAttribute('role','button');card.setAttribute('aria-label',(edge.label || edge.from+' to '+edge.to)+'. Drag metrics card to move. Arrow keys move 10 units; Shift moves 50.');}
           return;
         }
         var previous=path._livePointerTarget || path,c=previous._liveCarrier;
-        carrierTarget(card,edge.from+'->'+edge.to,edge,c && c.state,binding.page.tracking,edge.label || edge.from+' → '+edge.to,c && c.waiting,c && c.availability,binding.ordinal!=null?{section:binding.ordinal,kind:'edge',index:index}:null);
+        carrierTarget(card,edge.from+'->'+edge.to,edge,appearance,binding.page.tracking,edge.label || edge.from+' → '+edge.to,c && c.waiting,c && c.availability,binding.ordinal!=null?{section:binding.ordinal,kind:'edge',index:index}:null);
         carrierPointer(path,card);carrierPointer(path.closest('svg').querySelector('path.halo[data-dv-edge="'+index+'"]'),card);
       },telemetry.config());
       scope.querySelectorAll('svg').forEach(function(svg){if(svg._layoutStatusCoins)svg._layoutStatusCoins();});

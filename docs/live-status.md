@@ -1022,8 +1022,21 @@ sections are included from the start.
 ### Edge metric cards
 
 While Metrics is available and on, each visible explicitly bound edge gets one
-rounded card with a verdict border and left bar, connected to the measured route
-midpoint. Silent cards use a dashed border. Every numeric signal appears in
+rounded card connected to the measured route midpoint. While Live is on, its
+outline, fill and glow follow the bound edge's shared work presentation and status
+appearance preferences. Every attached ticket participates, including inherited
+provider and import-overlay tickets: blocked/missing/active/testing take precedence,
+unknown evidence cannot claim completion, and an unticketed carrier shows the thin
+1px green no-change outline with no default glow. Endpoint tickets do not supply
+an edge's work state. Telemetry proof never overrides the work outline.
+
+Observed numeric values follow the carrier’s configured tone (green for no-change,
+blue for active by default), adjusted for readable contrast against its fill;
+without work presentation they use neutral ink. A failing bound limit is amber and labeled
+“Outside limit”, even when the work outline is green. Unobserved values stay distinct
+from observed zero. Loading keeps the inherited outline and says “Loading…”. Live
+off or Clear removes inherited work styling; Metrics off removes the cards.
+Every numeric signal appears in
 authored order; trace bindings are excluded. Each row uses its optional `label`
 (1–120 plain-text characters without control characters) or signal-name fallback.
 Optional boolean `showOnCard` defaults to true; false hides only the canvas row,

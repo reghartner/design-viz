@@ -4207,13 +4207,15 @@ svg path.edge.dv-metrics-ghosted{opacity:.35;}
 
 /* Metrics edge cards (#940): measured with the same fonts as node cards. */
 .dv-metrics-label-hidden{display:none!important;}
-.dv-metrics-card{--metric-verdict:var(--dv-metrics-packet);cursor:pointer;}
-.dv-metrics-card[data-state="preview"],.dv-metrics-card[data-state="silent"],.dv-metrics-card[data-state="unobserved"]{--metric-verdict:var(--dv-metrics-ghost);}
-.dv-metrics-card[data-state="loading"]{--metric-verdict:var(--dv-metrics-blue,#2879d9);}
-.dv-metrics-card[data-state="degraded"]{--metric-verdict:var(--dv-metrics-amber);}
-.dv-metrics-card-box{fill:var(--explore-bg,#fff);stroke:var(--metric-verdict);stroke-width:1.5;}
-.dv-metrics-card[data-state="preview"] .dv-metrics-card-box,.dv-metrics-card[data-state="silent"] .dv-metrics-card-box{stroke-dasharray:4 3;}
-.dv-metrics-card-bar{fill:none;stroke:var(--metric-verdict);stroke-width:4;stroke-linecap:round;}
+.dv-metrics-card{cursor:pointer;}
+.dv-metrics-card-box{fill:var(--explore-bg,#fff);stroke:var(--dv-metrics-ghost);stroke-width:1.5;}
+.dv-metrics-card[data-state="preview"] .dv-metrics-card-box{stroke-dasharray:4 3;}
+.dv-metrics-card-bar{fill:none;stroke:var(--dv-metrics-ghost);stroke-width:4;stroke-linecap:round;}
+/* Work appearance uses the same tokens and halo as nodes; metric health is local
+   to each numeric row and never turns an unknown/active carrier into Done. */
+.dv-metrics-card[data-live-appearance] .dv-metrics-card-box{fill:color-mix(in srgb,var(--dv-live-color) var(--dv-live-fill),var(--dv-board-ground));stroke:var(--dv-live-line);stroke-width:var(--dv-live-width);stroke-dasharray:var(--dv-live-dash,none);stroke-linecap:round;}
+.dv-metrics-card[data-live-appearance] .dv-metrics-card-bar{display:none;}
+.dv-metrics-card[data-live-appearance] :is(.t1,.t2){fill:var(--dv-live-ink,#000);}
 .dv-metrics-card .t1{fill:var(--dtext);font-size:11px;font-weight:600;}
 .dv-metrics-card .t2{fill:var(--dtext);font-size:10px;}
 .dv-metrics-card-note{opacity:.7;}
@@ -4221,7 +4223,15 @@ svg path.edge.dv-metrics-ghosted{opacity:.35;}
 .dv-metrics-card:focus{outline:none;}
 .dv-metrics-card:focus .dv-metrics-card-box{stroke-width:3;}
 
-.dv-metrics-card[data-verdict="proven"]{--metric-verdict:var(--dv-metrics-proven);}
+.dv-metrics-card .dv-metrics-card-value[data-metric-health="observed"]{fill:var(--dv-metrics-observed-ink,var(--dv-metrics-proven));}
+.dv-metrics-card .dv-metrics-card-value[data-metric-health="failing"],.dv-metrics-card .dv-metrics-card-failure[data-signal]{fill:var(--dv-metrics-failing-ink,var(--dv-metrics-amber));}
+.dv-metrics-card .dv-metrics-card-value[data-metric-health="unobserved"]{fill:var(--dv-live-ink,var(--dv-metrics-ghost));}
+.dv-metrics-card .dv-metrics-card-value[data-metric-health="loading"]{fill:var(--dv-live-ink,var(--dv-metrics-blue,#2879d9));}
+@media print{
+  .dv-metrics-card{--dv-metrics-observed-ink:var(--dv-metrics-observed-print-ink,#000)!important;--dv-metrics-failing-ink:var(--dv-metrics-failing-print-ink,#000)!important;}
+  .dv-metrics-card:not([data-live-appearance]){--dv-live-ink:#000!important;}
+  .dv-metrics-card:not([data-live-appearance]) .dv-metrics-card-box{fill:#fff;}
+}
 
 /* Step captions retain scalar evidence independently of Status Trace mode. */
 .dv-proof-caption{font-weight:600;color:var(--ink);}

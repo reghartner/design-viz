@@ -224,6 +224,12 @@
       var toggle=button(controls,'toggle','reader-button dv-live-toggle','Live',past?'overTimeClose':'setEnabled');toggle.hidden=!hasData;
       toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled) && !past));
       var overTime=button(controls,'over-time','reader-button dv-live-over-time',over && over.loading?'Loading history'+(over.progress?' '+over.progress:'')+'…':'Over time','overTime');overTime.hidden=!hasData || !over || !over.available;overTime.disabled=!!(over && (over.loading || over.disabled));overTime.setAttribute('aria-pressed',String(past));
+      countRow.setAttribute('role','region');countRow.setAttribute('aria-label','Status counts');countRow.setAttribute('tabindex','0');countRow.setAttribute('title','Scroll horizontally to see all counts.');
+      // Preserve native count scrolling when the page presenter also owns arrow keys.
+      if(!countRow._liveKeys){countRow._liveKeys=function(event){if(event.target===countRow && ['ArrowLeft','ArrowRight','Home','End'].indexOf(event.key)>=0)event.stopPropagation();};countRow.addEventListener('keydown',countRow._liveKeys);}
+      var missingWork=value && value.missingWork || {count:0,painted:false};
+      var missingCount=el(countRow,'span','count-missing-work','dv-live-count'+(hasData && missingWork.count && missingWork.painted?' dv-live-missing':''),'Missing work '+missingWork.count);
+      missingCount.setAttribute('data-live-count','missing-work');missingCount.setAttribute('title','Authored nodes and connections marked as missing work; each occurrence counts.');missingCount.hidden=!hasData || !missingWork.count;
       states.forEach(function(state){var count=el(countRow,'span','count-'+state,'dv-live-count'+(hasData && value && value.enabled && value.counts[state]?' dv-live-'+state:''),state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
       // Metrics (#939): the telemetry switch beside Live, shown only with a telemetry provider or demo, off by default, never persisted.
       var metrics=value && value.metrics || {available:false,enabled:false},proof=metrics.proof;
@@ -383,6 +389,7 @@
       sweep(host);
       if(value && !value.enabled && typeof liveStatusClass==='function')host.querySelectorAll('[data-live-appearance],.dv-live-state-pill,.dv-live-count').forEach(function(node){liveStatusClass(node,null);});
       if(typeof liveStatusClass==='function')states.forEach(function(state){host.querySelectorAll('.dv-live-'+state).forEach(function(node){liveStatusClass(node,state);});});
+      if(typeof liveStatusClass==='function')liveStatusClass(missingCount,hasData && missingWork.count && missingWork.painted?'missing':null);
       if(typeof liveStatusInk==='function')host.querySelectorAll('.dv-live-state-pill:not([data-live-appearance])').forEach(function(node){liveStatusInk(node,null);});
       if(focused && host.contains(focused) && doc.activeElement!==focused && focused.focus)focused.focus({preventScroll:true});
     }
@@ -553,14 +560,17 @@ g.node[data-trace-tone],path.edge[data-trace-tone]{opacity:1!important}g.node[da
 .pt-live-status .pbody{flex:1;min-width:0;min-height:0;overflow:auto;color:var(--dtext);font:13px/1.5 'IBM Plex Sans',sans-serif}
 .dv-live-head{container-type:inline-size;display:flex;flex-direction:column;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--explore-border);font:11px/1.5 'IBM Plex Mono',monospace}
 .dv-live-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
-.dv-live-status{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:0 8px;height:28px;overflow:hidden;white-space:nowrap;}
-.dv-live-counts{display:flex;align-items:center;gap:8px;}
+.dv-live-status{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);align-items:center;gap:0 8px;height:36px;overflow:hidden;white-space:nowrap;}
+/* A fixed count row reserves room for the scrollbar; changing counts never moves the header below it. */
+.dv-live-counts{display:flex;align-items:center;gap:8px;min-width:0;height:36px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;}
+.dv-live-counts>.dv-live-count{flex:none;}
+.dv-live-counts:focus-visible{outline:2px solid var(--dv-live-active);outline-offset:-2px;}
 .dv-live-status-text{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden;}
 .dv-live-status-text>*{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;}
 .dv-live-connection>span{min-width:0;overflow:hidden;text-overflow:ellipsis;}
 .dv-live-controls[hidden],.dv-live-status[hidden]{display:none!important;}
 /* A narrow panel gives counts and text a line each: the height follows the panel's width, never its text. */
-@container (max-width:560px){.dv-live-status{grid-template-columns:minmax(0,1fr);height:56px;}}
+@container (max-width:560px){.dv-live-status{grid-template-columns:minmax(0,1fr);grid-template-rows:36px 28px;height:64px;}}
 .pt-live-status [hidden]{display:none!important}
 .dv-live-panel-body{min-width:0;color:var(--dtext)}
 .dv-live-panel-body h3{margin:18px 0 8px;font:600 14px/1.4 'IBM Plex Sans',sans-serif;color:var(--dink)}

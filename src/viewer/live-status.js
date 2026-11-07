@@ -937,8 +937,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       initiatives:initiatives.slice(),epics:coverage.epics.slice(),
       stories:storyKeys.length,done:storyKeys.filter(function(key){return map[key] && map[key].state==='done';}).length,onDiagram:storyKeys.filter(function(key){return coverage.onDiagram.indexOf(key)>=0;}).length,
       blocked:blocked,waiting:waiting,outside:outside,ready:readiness.ready};
-    return {states:copy(map),counts:counts,updatedAt:cacheUpdatedAt || latest,enabled:on,
-      available:!!(refs().tickets.length || refs().epics.length || coverage.excluded.length || hasMissingWork()),hasData:!!(provider || applied || hasMissingWork()),
+    var missingWork=missingWorkCount();
+    return {states:copy(map),counts:counts,missingWork:{count:missingWork,painted:on && availabilityOn},updatedAt:cacheUpdatedAt || latest,enabled:on,
+      available:!!(refs().tickets.length || refs().epics.length || coverage.excluded.length || missingWork),hasData:!!(provider || applied || missingWork),
       note:{text:noteText,kind:noteKind},actionLabel:actionFn?actionLabel:'',firstBlocker:!!firstBlocker(),
       lanes:panelLanes(pages),blockers:panelBlockers(pages),tickets:tickets,excluded:excluded,
       dependencies:copy(dependencies),waiting:copy(boardWaiting),chains:liveStatusDependencyChains(boardWaiting),suggestions:suggestions,epic:epic,
@@ -992,8 +993,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var index=result.index;if(typeof index!=='number' || index<0 || index>=days.length)index=days.length-1;
     over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null};on=true;availabilityOn=true;telemetry.openHistory(days,index);overShow();
   }
-  function hasMissingWork(){return sources().some(function(source){return sectionRecords(source).some(function(record){var d=record.section.diagram || {};return Object.values(d.nodes || {}).some(function(node){return !isTextBoxNode(node) && node.missingWork===true;}) || (d.edges || []).some(function(edge){return edge.missingWork===true;});});});}
-  function presentationActive(){return applied || hasMissingWork();}
+  // Authored carrier occurrences, independent of distinct Jira ticket totals.
+  // The shared walk includes resolved imports, nested sections and loaded details.
+  function missingWorkCount(){var count=0;eachDiagram(function(d){
+    Object.values(d.nodes || {}).forEach(function(node){if(!isTextBoxNode(node) && node.missingWork===true)count++;});
+    (d.edges || []).forEach(function(edge){if(edge.missingWork===true)count++;});
+  });return count;}
+  function presentationActive(){return applied || missingWorkCount()>0;}
   function connectPanels(){liveStatusPending.slice().forEach(function(pending){if(liveStatusControllerFor(pending.host)===api)pending.connect(api);});}
   function notify(){connectPanels();var value=snapshot();listeners.slice().forEach(function(fn){fn(value);});}
   function element(tag,cls,text,parent){var el=document.createElement(tag);el.className=cls;if(text!=null)el.textContent=String(text);if(parent)parent.appendChild(el);return el;}

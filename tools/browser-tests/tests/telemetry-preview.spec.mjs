@@ -133,11 +133,18 @@ test('P6 nested imports render placeholders through the same reader geometry wit
  await expect(a.locator('.dv-metrics-card')).toHaveAttribute('data-metrics-card','outer::inner::a->outer::inner::b');
  await page.evaluate(spec=>{
   const host=document.createElement('div');host.id='metrics-reader';host.style.width='1400px';document.body.append(host);
-  window.geometryReader=window.__editorTest.renderPage(host,window.__editorTest.normalize(spec),'pastel',null,{autoplay:false,telemetry:{provider:()=>({'outer::inner::a->outer::inner::b':{signals:{rate:{value:12,series:[[0,12],[1,12]]},errors:{value:12,series:[[0,12],[1,12]]}}}})}});
+  window.geometryReader=window.__editorTest.renderPage(host,window.__editorTest.normalize(spec),'pastel',null,{autoplay:false,telemetry:{provider:()=>({'outer::inner::a->outer::inner::b':{signals:{rate:{value:12,series:[[0,12],[1,12]]},errors:{value:0,series:[[0,0],[1,0]]}}}})}});
   window.geometryReader.telemetry.setEnabled(true);
  },spec);
- const reader=page.locator('#metrics-reader .dv-metrics-card');await expect(reader).toHaveCount(1);const measured=await box(reader);
+ const reader=page.locator('#metrics-reader .dv-metrics-card');await expect(reader).toHaveCount(1);
+ // Compare equal-height content: synthetic preview has no proof claim; healthy
+ // reader evidence has no failure annotation to add another measured text row.
+ await expect(reader).toHaveAttribute('data-state','flowing');await expect(reader.locator('.dv-metrics-card-failure')).toHaveCount(0);
+ const measured=await box(reader);
  expect(preview.side).toBe('right');expect(preview.x).toBe(measured.x);expect(preview.y).toBe(measured.y);expect(preview.h).toBe(measured.h);expect(preview.w).toBe(measured.w);
+ await page.evaluate(()=>window.geometryReader.telemetry.apply({'outer::inner::a->outer::inner::b':{signals:{rate:{value:12,series:[[0,12],[1,12]]},errors:{value:12,series:[[0,12],[1,12]]}}}}));
+ await expect(reader.locator('.dv-metrics-card-failure')).toHaveText('Outside limit');
+ const failing=await box(reader);expect(failing.h).toBeGreaterThan(measured.h);expect(failing.y+failing.h/2).toBe(measured.y+measured.h/2);expect(failing.x).toBe(measured.x);expect(failing.side).toBe(measured.side);expect(failing.w).toBe(measured.w);
  await page.evaluate(()=>{window.geometryReader.destroy();window.previewOwners.forEach(p=>p.destroy());});
 });
 

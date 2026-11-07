@@ -2073,6 +2073,8 @@ missing-work appearance. It counts marked node and connection occurrences across
 local and imported diagrams, nested sections and loaded details; text boxes do
 not count. It appears even without tickets or a connector and hides when no
 markers remain. The count stays separate from the `missing` Jira-ticket total.
+In narrow desktop panels, Missing work appears first; focus **Status counts**
+and use the arrow keys, or scroll horizontally, to reach the other counts.
 Turning Live off or clearing live paint removes its styling along with the
 diagram's styling; the authored marker count remains until the markers are cleared.
 

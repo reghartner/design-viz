@@ -40,6 +40,7 @@ test('authored Missing work count stays distinct from Jira counts and shares nat
  for(const action of ['toggle','clear']){
   if(action==='toggle')await panel.getByRole('button',{name:'Live',exact:true}).click();else await page.evaluate(()=>window.viewer.controller.liveStatus.clear());
   await expect(count).toHaveText('Missing work 4');await expect(count).not.toHaveAttribute('data-live-appearance');
+  expect(await count.evaluate(el=>el.style.getPropertyValue('--dv-live-ink'))).toBe('');
   for(const node of [local,imported])await expect(node).not.toHaveAttribute('data-live-appearance');
   if(action==='toggle')await panel.getByRole('button',{name:'Live',exact:true}).click();else await page.evaluate(()=>window.viewer.controller.liveStatus.apply({}));
   await expect(count).toHaveAttribute('data-live-appearance','missing');
@@ -83,5 +84,33 @@ test('Missing work counts every nested section and loaded detail occurrence, inc
  // Reopening the same loaded source replaces its cache entry; no duplicate count.
  await root.getByRole('button',{name:'Explore Local peer',exact:true}).click();await expect(preview.locator('.sec-h')).toHaveText('Loaded detail');
  await preview.locator('.detail-breadcrumb button').first().click();await expect(count).toHaveText('Missing work 7');
+ await page.evaluate(()=>window.viewer.destroy());
+});
+
+test('480px desktop status panel keeps Missing work visible and every Jira count keyboard reachable without header growth',async({page,server},info)=>{
+ await setup(page,server);const spec=fixture(),states=['todo','active','testing','done','blocked','missing'];
+ spec.page.sections[0].diagram.nodes.local.tickets=states.map((state,i)=>'COUNT-'+(i+1));
+ const root=await mount(page,spec),panel=root.locator('.pt-live-status');
+ await panel.evaluate(el=>{el.style.setProperty('width','480px','important');el.style.setProperty('max-width','480px','important');el.style.boxSizing='border-box';});
+ const map=Object.fromEntries(states.map((state,i)=>['COUNT-'+(i+1),{state}]));
+ await page.evaluate(map=>window.viewer.controller.liveStatus.apply(map),map);
+ expect((await panel.boundingBox()).width).toBeCloseTo(480,0);
+ const counts=panel.getByRole('region',{name:'Status counts',exact:true}),missingWork=counts.locator('[data-live-count="missing-work"]');
+ await expect(counts.locator('[data-live-count]:visible')).toHaveCount(7);
+ expect(await counts.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
+ // toBeVisible alone allows clipped elements; compare the badge with the actual scroll viewport.
+ const fullyShown=badge=>badge.evaluate(el=>{const b=el.getBoundingClientRect(),row=el.parentElement,r=row.getBoundingClientRect();return b.left>=r.left-1 && b.right<=r.left+row.clientWidth+1 && b.top>=r.top-1 && b.bottom<=r.top+row.clientHeight+1;});
+ expect(await fullyShown(missingWork)).toBe(true);
+ const headerHeight=await panel.locator('.dv-live-head').evaluate(el=>el.getBoundingClientRect().height);
+ await counts.focus();await expect(counts).toBeFocused();
+ for(let i=0;i<12;i++)await counts.press('ArrowRight');
+ await expect.poll(()=>fullyShown(counts.locator('[data-live-count="missing"]'))).toBe(true);
+ expect(await counts.evaluate(el=>el.scrollLeft)).toBeGreaterThan(0);
+ await panel.screenshot({path:info.outputPath('missing-work-count-desktop-480.png')});
+ await page.evaluate(()=>window.viewer.controller.liveStatus.apply({'COUNT-1':{state:'done'}}));
+ await expect(counts.locator('[data-live-count]:visible')).toHaveCount(2);
+ expect(await panel.locator('.dv-live-head').evaluate(el=>el.getBoundingClientRect().height)).toBe(headerHeight);
+ await panel.getByRole('button',{name:'Live',exact:true}).click();
+ expect(await panel.locator('.dv-live-head').evaluate(el=>el.getBoundingClientRect().height)).toBe(headerHeight);
  await page.evaluate(()=>window.viewer.destroy());
 });

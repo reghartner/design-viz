@@ -620,12 +620,19 @@ class InjectTests(unittest.TestCase):
         spec["page"]["tracking"]["telemetry"] = {"grafana": {"prometheus": "prom", "loki": "logs", "tempo": "traces", "cloudwatch": "cw"}, "honeycomb": {"environment": "stg", "dataset": "api"}}
         signals = {"requests": {"grafana": "requests"}, "logs": {"loki": 'count_over_time({app="api"}[5m])'}, "tempo": {"tempo": "{}"}, "hc": {"honeycomb": {"calculations": [{"op": "COUNT"}]}}, "trace": {"honeycomb": {"query_spec": {"limit": 1}}}, "cloud": {"cloudwatch": {"namespace": "AWS/IoT", "metric": "Failure", "region": "us-east-1", "accountId": "111111111111", "dimensions": {}, "statistic": "Sum", "missingMeansZero": True}}, "insights": {"cloudwatchLogs": {"logGroups": ["iot"], "region": "us-east-1", "query": "stats count() as n"}}, "sql": {"sql": "select count(*) from events"}}
         spec["page"]["blocks"] = [{"diagram": {"nodes": {"api": {"telemetry": {"kind": "service", "signals": signals}}}, "rows": [["api"]]}}]
+        profile = json.loads((ROOT / "tests/fixtures/trace-connection-profile.json").read_text())
         for two_file in (False, True):
-            guide = GUIDE_BLOCK.search(inject.agent_guide(spec, "a" * 40, two_file))[1]
-            self.assertIn("get_trace", guide)  # Explicit trace extras stay author-declared.
+            # Inheritance adds an exact detail tool even though this board has no
+            # traceConnections field. Exercise the real shared profile resolver.
+            with mock.patch.object(inject, "company_agent_context", return_value={"traceConnections": {"company": profile}}):
+                guide = GUIDE_BLOCK.search(inject.agent_guide(spec, "a" * 40, two_file))[1]
+            self.assertIn("get_trace", guide)
+            self.assertIn("Company profiles inherit", guide)
             board_text = "Board evidence: " + "x" * (540 - len("Board evidence: "))
             manifest = re.search(r"```json\n(.*?)\n```", guide, re.S)
             declaration = json.loads(manifest[1])
+            direct = [entry for entry in declaration["mcp"]["servers"] if entry["server"] == profile["server"]]
+            self.assertEqual(direct, [{"server": profile["server"], "tools": ["get_trace"]}])
             # Publishing authors explicitly add offered trace tools to the real
             # capability declaration; the injector must not infer these extras.
             for server in declaration["mcp"]["servers"]:

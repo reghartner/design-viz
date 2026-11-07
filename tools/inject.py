@@ -42,6 +42,7 @@ import subprocess
 import sys
 
 from crossrefs import CrossrefError, discovered_page_backlinks, inject_backlink_block
+from company_overlay import company_agent_context
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -306,6 +307,34 @@ def source_commit() -> str | None:
     return sha if re.fullmatch(r"[0-9a-f]{40}", sha) else None
 
 
+def direct_trace_connections(page: dict) -> dict:
+    """Resolve company inheritance/board restrictions with the viewer validator.
+    Source-free kits use the generated backend and reduced company context."""
+    tracking = page.get("tracking") if isinstance(page.get("tracking"), dict) else {}
+    config = tracking.get("telemetry") or {}
+    if not isinstance(config, dict):
+        config = {}
+    if config.get("enabled") is False:
+        return {}
+    company = company_agent_context(REPO_ROOT).get("traceConnections", {})
+    if "traceConnections" not in config and not company or config.get("traceConnections") == {}:
+        return {}
+    script = r"""
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const input=JSON.parse(fs.readFileSync(0,'utf8')),root=process.argv[1],loader=path.join(root,'tools/source-loader.cjs');
+let api;if(fs.existsSync(loader) && fs.existsSync(path.join(root,'src/source-bundles.json'))){const scope={URL};vm.runInNewContext(require(loader).entrypoint('backend').body,scope);api=scope.FlowTraceConnections;}
+else api=require(path.join(root,'tools/canon/generated-runtime.cjs')).traceConnections;
+if(!api)throw new Error('Direct trace profile validator unavailable; rebuild this kit.');
+process.stdout.write(JSON.stringify(api.resolve(input.page,input.company)));
+"""
+    result = subprocess.run(["node", "-e", script, str(REPO_ROOT)],
+                            input=json.dumps({"page": page, "company": company}),
+                            capture_output=True, text=True, timeout=120, check=False)
+    if result.returncode:
+        raise ValueError("Cannot validate direct trace connections for the capability manifest; rebuild the runtime.")
+    return json.loads(result.stdout)
+
+
 def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology: dict | None = None) -> str:
     """Markdown an editor's agent follows to change this page and republish it.
 
@@ -345,6 +374,14 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
     servers = ([{"server": "Atlassian", "tools": JIRA_TOOLS}] if tracked else []) + \
         ([{"server": "Grafana", "tools": [tool for source, tool in GRAFANA_TOOLS.items() if source in sources]}] if grafana else []) + \
         ([{"server": "Honeycomb", "tools": HONEYCOMB_TOOLS}] if honeycomb else [])
+    direct = direct_trace_connections(page)
+    for profile in direct.values():
+        server = next((entry for entry in servers if entry["server"] == profile["server"]), None)
+        if server is None:
+            server = {"server": profile["server"], "tools": []}
+            servers.append(server)
+        if profile["tool"] not in server["tools"]:
+            server["tools"].append(profile["tool"])
     capabilities = {"mcp": {"servers": servers}} if servers else {}
     capabilities["comments"] = COMMENTS_CAPABILITY
     if two_file and (tracked or metrics):
@@ -477,6 +514,10 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "get_trace and read the trace contract; one request only, retain partial warnings. "
             "No trace history/raw trace JSON or unverified live-account claim.",
         ]
+    if direct:
+        lines += ["", "## Direct trace connections",
+                  "Company profiles inherit; traceConnections:{} disables. Load/Verify calls only the configured detail tool after schema/host permission checks. No search, numeric fetch or board write.",
+                  f"Connection handoff: {PUBLIC_REPO}/blob/{ref}/docs/trace-connections.md ."]
     if tracked:
         lines += [
             "", "## Tracking rules", "",

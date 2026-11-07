@@ -8,6 +8,7 @@
     "core/document.js",
     "core/contracts.js",
     "core/tracking.js",
+    "core/trace-connections.js",
     "core/paths.js",
     "core/design-review.js",
     "core/story-time.js",
@@ -51,6 +52,8 @@
     "viewer/history.js",
     "viewer/live-status.js",
     "viewer/telemetry-evidence.js",
+    "viewer/telemetry-trace-codecs.js",
+    "viewer/telemetry-direct.js",
     "viewer/telemetry.js",
     "viewer/telemetry-cards.js",
     "viewer/telemetry-step.js",
@@ -164,6 +167,7 @@
         "viewer/telemetry-claude.js",
         "viewer/telemetry-honeycomb.js",
         "viewer/telemetry-traces.js",
+        "viewer/telemetry-direct-mcp.js",
         "viewer/telemetry-providers.js",
         "workbench/source-edit.js",
         "workbench/targets.js",
@@ -240,7 +244,8 @@
         "autoArrangeInput": "autoArrangeInput",
         "arrangeGraph": "autoArrangeGraph",
         "containerSize": "FlowContainerSize",
-        "traceMatch": "FlowTraceMatch"
+        "traceMatch": "FlowTraceMatch",
+        "traceConnections": "FlowTraceConnections"
       },
       "defaultExport": "FlowCanon"
     },

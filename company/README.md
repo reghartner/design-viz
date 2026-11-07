@@ -20,3 +20,5 @@ Everything below is discovered automatically. No upstream list needs an edit.
 | `company/company.json` | The fork's name, repository, revision, brand file, Backstage UI base URL, internal site base URL and package identity, used for workbench links and labels, the global brand, agent packets and `tools/backstage-pack.mjs`. |
 
 See [docs/company-overlay.md](../docs/company-overlay.md) for details.
+
+Company MCP trace defaults may be declared in `company.json.traceConnections`. They contain no credentials, are inherited by default, and fetch only on explicit Load/Verify. Boards may restrict profiles or disable them with `traceConnections: {}`. See [direct trace profiles and the verification handoff](../docs/trace-connections.md).

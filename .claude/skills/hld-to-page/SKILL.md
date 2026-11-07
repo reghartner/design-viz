@@ -95,3 +95,5 @@ Deliver spec/ledger together. Ask unresolved story decisions and needed
 Mixed/Engineering access after relevant checks. HTML needs an explicit
 standalone-output request. Commit, publish and Canon enrollment require user
 authorization. Never modify the renderer to make a spec pass.
+
+Direct trace IDs/links: read [connection profiles](../../../../docs/trace-connections.md) or the `traces` packet. Company defaults inherit; `traceConnections: {}` disables. Verify the actual schema; never infer mappings.

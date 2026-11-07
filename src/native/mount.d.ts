@@ -166,6 +166,24 @@ export interface TelemetrySample {
   markers?: Array<{at: string | number; kind?: string; label?: string}>;
   links?: {query?: string; dashboard?: string};
 }
+export interface DirectTraceRequest {
+  connection: string;
+  environment: string;
+  profile: {
+    version: 1;
+    label: string;
+    provider: 'honeycomb' | 'tempo';
+    server: string;
+    tool: string;
+    readOnly: true;
+    adapter: 'honeycomb-table-v1' | 'tempo-v1';
+    arguments: {traceId: string; start: string; end?: string; environment?: string; context?: Record<string, string>};
+    time: {encoding: 'relative' | 'iso8601' | 'unix-seconds' | 'unix-milliseconds'; type: 'string' | 'number'; defaultLookback: string};
+    literals: Record<string, string | number | boolean | null>;
+    environments: Record<string, {label?: string; value?: string; context?: Record<string, string | number | boolean | null>; literals?: Record<string, string | number | boolean | null>}>;
+    links: Array<{origin: string; path: string; query: Record<string, string>; timeEncoding: 'relative' | 'iso8601' | 'unix-seconds' | 'unix-milliseconds'}>;
+  };
+}
 export interface NativeViewerOptions {
   /** Host-owned telemetry transport behind the Live status panel's Metrics button,
    * which is off by default. The provider runs only while Metrics is on, every
@@ -173,6 +191,20 @@ export interface NativeViewerOptions {
    * false suppresses telemetry, including demo fallback. Page
    * tracking.telemetry.enabled:false also wins and preserves bindings. */
   telemetry?: false | {
+    /** Explicit Load/Verify only; independent of Metrics polling. The host must
+     * authorize the configured exact connection using its own read-only access.
+     * No MCP or credentials are bundled in the native viewer. Both methods receive
+     * the same request object and AbortSignal. Return actual runtime metadata and
+     * the original supported provider result; do not fabricate an envelope.
+     * Profile/schema validation and the registered decoder run in the viewer. */
+    directTrace?: {
+      describe: (request: DirectTraceRequest, signal: AbortSignal) => Promise<{
+        name: string;
+        inputSchema: Record<string, unknown>;
+        annotations?: {readOnlyHint?: boolean; destructiveHint?: boolean};
+      }>;
+      call: (request: DirectTraceRequest, args: Record<string, string | number | boolean | null>, signal: AbortSignal) => Promise<unknown>;
+    };
     /** Opt into explicit report.pending/settled lifecycle for dispatched numeric signals.
      * By default legacy providers mark their supplied numeric bindings pending for the call. */
     managesPending?: boolean;

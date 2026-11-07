@@ -419,11 +419,12 @@ function telemetryConfigUrl(value){try{var u=new URL(value);return typeof value=
 function trackingTelemetry(page,invalid){
   var warn=telemetryWarn(invalid),out={enabled:true,grafana:{},honeycomb:{},window:TELEMETRY_DEFAULT_WINDOW,refreshMs:null,templates:{}};
   var tracking=page && page.tracking;
+  if(typeof FlowTraceConnections!=='undefined'){var direct=FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS);if(Object.keys(direct).length)out.traceConnections=direct;}
   if(!telemetryObject(tracking) || !telemetryOwn(tracking,'telemetry'))return out;
   var value=tracking.telemetry;
   if(!telemetryObject(value)){warn('','must be an object {enabled?, grafana?, honeycomb?, window?, refreshMs?, templates?} — ignored');return out;}
   if(telemetryOwn(value,'enabled')){if(typeof value.enabled==='boolean')out.enabled=value.enabled;else warn('.enabled','must be a boolean — using true');}
-  telemetryUnknown(value,['enabled','grafana','honeycomb','window','refreshMs','templates','environment','environments','variables'],warn);
+  telemetryUnknown(value,['enabled','grafana','honeycomb','window','refreshMs','templates','environment','environments','variables','traceConnections'],warn);
   [['grafana',['prometheus','loki','tempo','sql','cloudwatch','accountId','baseUrl'],'datasource UID'],['honeycomb',['environment','dataset'],'name']].forEach(function(group){
     var key=group[0],given=value[key];
     if(!telemetryOwn(value,key))return;
@@ -492,6 +493,7 @@ function trackingTelemetry(page,invalid){
       clean.params=params;out.templates[name]=clean;
     });
   }
+  if(typeof FlowTraceConnections!=='undefined' && (telemetryOwn(value,'traceConnections') || out.traceConnections))out.traceConnections=FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS,warn);
   return out;
 }
 

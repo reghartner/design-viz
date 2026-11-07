@@ -154,6 +154,37 @@
       host._liveTicketSort={field:field,direction:current && current.field===field && current.direction==='ascending'?'descending':'ascending'};
       if(api)paint(api.snapshot());
     };
+    function directTraceBody(body,direct){
+      if(!direct || !direct.profiles.length)return;
+      var box=el(body,'section','direct','dv-trace-direct');el(box,'h3','heading','','Load trace');
+      el(box,'p','help','','Load one exact request. This session only; diagram mappings use authored traceMatch steps.');
+      function field(key,label,options,placeholder){
+        var wrap=el(box,'label',key+'-label','dv-trace-input-label');el(wrap,'span','label','',label);
+        var control=el(wrap,options?'select':'input',key,'dv-trace-input');control.setAttribute('aria-label',label);
+        if(options){el(control,'option','empty','','Choose…').value='';options.forEach(function(o){el(control,'option',o.id,'',o.label).value=o.id;});}
+        else {control.type='text';control.maxLength=4096;control.autocomplete='off';control.spellcheck=false;control.placeholder=placeholder || '';}
+        if(control.value!==direct.form[key])control.value=direct.form[key];
+        if(!control._directChange){control._directChange=function(){var owner=host._livePanelApi;if(owner)owner.setDirectTraceField({field:key,value:control.value});};control.addEventListener(options?'change':'input',control._directChange);}
+        return control;
+      }
+      field('connection','Trace connection',direct.profiles);
+      var profile=direct.profiles.find(function(p){return p.id===direct.form.connection;});field('environment','Connection environment',profile?profile.environments:[]);
+      if(direct.sections.length)field('section','Mapping diagram',direct.sections);
+      field('input','Trace ID or link',null,'Paste a trace ID or supported Honeycomb link');
+      var time=el(box,'p','time-help','','Optional time overrides. Leave blank to use link bounds or the connection lookback.');
+      field('start','Trace start',null,'-2h or UTC ISO timestamp');field('end','Trace end',null,'UTC ISO timestamp (absolute start only)');
+      var controls=el(box,'div','actions','dv-live-controls');
+      var load=button(controls,'load','reader-button dv-trace-load','Load trace','loadDirectTrace');load._liveArgument=false;load.disabled=!direct.available || !direct.form.input.trim();
+      var verify=button(controls,'verify','reader-button dv-trace-verify','Verify trace connection','loadDirectTrace');verify._liveArgument=true;verify.disabled=load.disabled;
+      if(direct.busy || direct.exemplar || direct.report)button(controls,'clear','reader-button',direct.busy?'Cancel request':'Clear loaded trace','clearDirectTrace');
+      if(!direct.available)el(box,'p','unavailable','dv-trace-direct-status','Direct trace retrieval is unavailable in this host or view.').setAttribute('role','status');
+      if(direct.report){var r=direct.report,report=el(box,'section','report','dv-trace-direct-report');report.setAttribute('aria-label','Trace connection report');report.setAttribute('role','status');
+        el(report,'p','stage','',r.error || (r.stage==='complete'?'Request accepted · trace ID matched · '+r.spanCount+' displayed spans · '+r.completeness+' completeness':r.stage==='schema'?'Checking runtime tool schema…':'Loading exact trace…'));
+        el(report,'p','identity','', [r.connection,r.server,r.tool,r.environment].filter(Boolean).join(' · '));
+        el(report,'p','receipt','', 'Stage: '+r.stage+' · request accepted: '+(r.requestAccepted?'yes':'no')+' · ID matched: '+(r.idMatched?'yes':'no'));
+        if(r.arguments){el(report,'p','argument-note','','Resolved arguments (configured literals and context redacted):');el(report,'pre','arguments','dv-trace-arguments',JSON.stringify(r.arguments,null,2));}
+      }
+    }
     function traceBody(value){
       var trace=value.trace,body=el(host,'div','trace-body','dv-live-panel-body dv-live-trace'),controls=el(body,'div','controls','dv-live-controls');
       var enable=button(controls,'enable','reader-button dv-trace-enable',trace.enabled?'Disconnect traces':'Enable traces','setMetricsEnabled');enable._liveArgument=!trace.enabled;enable.hidden=!trace.available;
@@ -165,7 +196,8 @@
         metrics.environments.forEach(function(id){var option=el(select,'option',id,'',id);option.value=id;});select.value=metrics.environment;
         if(!select._liveChange){select._liveChange=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnvironment(select.value);};select.addEventListener('change',select._liveChange);}
       }
-      var message=!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live in Jira to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Enable traces to refresh explicit bindings.':'Enable traces to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
+      directTraceBody(body,trace.direct);
+      var message=trace.direct && trace.direct.profiles.length?(!trace.hasMappings?'Diagram mapping is not configured. Loaded traces still show a waterfall.':''):!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live in Jira to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Enable traces to refresh explicit bindings.':'Enable traces to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
       var status=el(body,'p','status','dv-trace-mode-status',[message,trace.hasMappings?trace.status.note:'',trace.hasMappings?trace.notice:''].filter(Boolean).join(' '));status.setAttribute('role','status');
       if(trace.entries.length){
         el(body,'h3','candidates-title','','Returned traces');
@@ -185,7 +217,7 @@
       }
       if(!trace.selected)return;
       var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
-      el(detail,'h3','heading','','Selected request');el(detail,'code','identity','dv-trace-identity',e.traceId);
+      el(detail,'h3','heading','','Selected request');el(detail,'code','identity','dv-trace-identity',e.traceId);if(selected.manual && !selected.hasMappings)el(detail,'p','mapping-unavailable','','Diagram mapping is not configured for this section.');
       var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
       el(detail,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');
       var limit=e.warnings.filter(function(w){return /200 spans|timeline unavailable/i.test(w);});if(model.warning)limit.push(model.warning);if(limit.length)el(detail,'p','limit','dv-trace-limit',Array.from(new Set(limit)).join(' '));
@@ -201,7 +233,7 @@
         var track=el(row,'span','track','dv-trace-track'),bar=el(track,'i','bar','dv-trace-bar');bar.style.marginLeft=100*span.startMs/extent+'%';bar.style.width=Math.max(.4,100*span.ms/extent)+'%';
         el(row,'span','duration','',span.ms+' ms'+(span.error?' · error':''));
       });
-      var actions=el(detail,'div','actions','dv-live-controls');button(actions,'pin','reader-button','Pin as evidence','pinSelectedTrace');
+      var actions=el(detail,'div','actions','dv-live-controls');if(!selected.manual)button(actions,'pin','reader-button','Pin as evidence','pinSelectedTrace');
       var url=telemetryTraceUrl(e.url,e.provider);if(url)link(actions,'source','Open trace in '+(e.provider==='tempo'?'Grafana':'Honeycomb'),url);
       var metadata=el(detail,'details','metadata','dv-trace-metadata');el(metadata,'summary','summary','','Source and limitations');
       el(metadata,'p','selection','dv-trace-selection',e.selectionReason);el(metadata,'p','time','dv-trace-age',(time?'Observed '+time:'Trace age unavailable')+' · '+e.range.from+' – '+e.range.to);
@@ -403,6 +435,7 @@
 .dv-status-modes{display:flex;gap:6px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--explore-border)}
 .pt-live-status .dv-status-modes .tbtn.dv-status-mode[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-candidate[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-show[aria-pressed="true"]{background:var(--dv-live-active);color:#fff;border-color:var(--dv-live-active)}
 .dv-live-trace{font-size:12px}.dv-live-trace p{margin:6px 0;overflow-wrap:anywhere}.dv-trace-mode-status:empty{display:none}
+.dv-trace-direct{border:1px solid var(--explore-border);border-radius:6px;padding:10px;margin:10px 0}.dv-trace-input-label{display:grid;gap:4px;margin:8px 0}.dv-trace-input{box-sizing:border-box;width:100%;min-width:0;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);border-radius:4px;padding:6px}.dv-trace-arguments{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:10px}.dv-trace-direct-report{padding:8px;border:1px solid var(--explore-border);margin-top:8px}
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
 .dv-trace-selected{min-width:0}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}
 .dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall{max-height:240px;overflow:auto;margin:12px 0;border:1px solid var(--explore-border);border-radius:6px;padding:8px}

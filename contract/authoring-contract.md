@@ -2733,3 +2733,7 @@ read-only intent; resolved JSON snapshots edit their consumer-owned annotation.
 An unlinked, unmarked node is automatically No change needed when live evidence
 is applied. Linked tickets awaiting evidence remain unknown. No-change is neutral
 in mixed step rollups and never creates a Jira ticket or increments its counts.
+
+### Direct trace connections
+
+Company trace profiles are inherited by default. `page.tracking.telemetry.traceConnections` optionally restricts them to named company profiles or full inline v1 profiles; `{}` disables direct loading. Every fetch requires an explicit Load/Verify gesture. Use the [profile schema and company agent handoff](../docs/trace-connections.md) for exact connector/tool arguments, runtime-schema verification, registered response adapters, link patterns and native host callbacks. Load/Verify do not modify the board, numeric metrics or proof. Apply authored traceMatch mappings equally to local and imported nodes and choose an exact section context.

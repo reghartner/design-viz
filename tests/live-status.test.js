@@ -2782,6 +2782,30 @@ test('live status supports prose-only pages and prose alongside domain summaries
   api.destroy();
  }
 });
+test('local and nested imported domains preserve authored styles until status presentation is active',()=>{
+ const seed=harness(),model=(id,sections)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections}});
+ const provider=model('provider',[{id:'main',diagram:{nodes:{domain:{style:'rose'}},rows:[['domain']],topologyExports:{core:{nodes:['domain'],edges:[]}}}}]);
+ const middle=model('middle',[{id:'main',diagram:{topologyImports:[{spec:'provider',export:'core',as:'nested'}],topologyExports:{core:{nodes:['nested::domain'],edges:[]}}}}]);
+ for(const missing of [false,true]){
+  const consumer=model('consumer',[{id:'main',diagram:{nodes:{local:{style:'rose',detail:{section:'child'}}},rows:[['local']],topologyImports:[{spec:'middle',export:'core',as:'shared',nodeDetails:{'nested::domain':{section:'child'}}}]}},{id:'child',detailOnly:true,diagram:{nodes:{leaf:missing?{missingWork:true}:{}},rows:[['leaf']]}}]);
+  const h=harness(seed.C.FlowTopology.materialize([provider,middle,consumer])[2]),api=h.ctl.liveStatus;
+  for(const id of ['local','shared::nested::domain']){
+   const node=h.view.querySelector('[data-dv-node="'+id+'"]');
+   assert.equal(node.getAttribute('data-live-appearance'),missing?'missing':null);
+   if(!missing){assert.ok(!node.classList.contains('ns-moss'));assert.ok(!node.querySelector('.card').classList.contains('dv-live-target'));node.classList.add('node-styled','ns-rose');}
+  }
+  if(!missing){h.view.dispatchEvent({type:'diagram-view-change'});h.flush();for(const id of ['local','shared::nested::domain'])assert.ok(h.view.querySelector('[data-dv-node="'+id+'"]').classList.contains('ns-rose'));}
+  api.apply({});
+  for(const id of ['local','shared::nested::domain']){const node=h.view.querySelector('[data-dv-node="'+id+'"]');assert.equal(node.getAttribute('data-live-appearance'),missing?'missing':'unchanged');assert.ok(node.querySelector('.card').classList.contains('dv-live-target'));}
+  api.clear();
+  for(const id of ['local','shared::nested::domain']){const node=h.view.querySelector('[data-dv-node="'+id+'"]');assert.equal(node.getAttribute('data-live-appearance'),null);assert.ok(!node.querySelector('.card').classList.contains('dv-live-target'),'Clear removes summary-only controls');}
+  api.apply({});
+  api.setEnabled(false);
+  for(const id of ['local','shared::nested::domain']){const node=h.view.querySelector('[data-dv-node="'+id+'"]');assert.equal(node.getAttribute('data-live-appearance'),null);assert.ok(!node.querySelector('.card').classList.contains('dv-live-target'));if(!missing)assert.ok(node.classList.contains('ns-rose'));}
+  api.destroy();
+ }
+ seed.ctl.liveStatus.destroy();
+});
 test('domain summaries include unopened recursive local/imported nodes and connections without adding board totals',()=>{
  const raw={page:{sections:[{id:'main',diagram:{nodes:{domain:{title:'Domain',tickets:['AA-1'],detail:{section:'inside',mode:'focus'}}},rows:[['domain']],steps:[{id:'domain',nodes:['domain']}]}},{id:'inside',detailOnly:true,diagram:{nodes:{'shared::nested::a':{tickets:['AA-1','AA-2'],detail:{section:'deep',mode:'focus'}},shared:{detail:{section:'deep',mode:'focus'}},note:{type:'text',text:'Note',tickets:['IGNORE-1'],missingWork:true}},rows:[['shared::nested::a','shared']],edges:[{from:'shared::nested::a',to:'shared',tickets:['AA-3']}]}},{id:'deep',detailOnly:true,diagram:{nodes:{child:{missingWork:true,tickets:['AA-2']}},rows:[['child']]}}]}};
  const h=harness(raw),node=h.view.querySelector('[data-dv-node="domain"]'),summary=h.C.liveStatusDomainSummary(h.ctl.page,h.ctl.page.sections[0].diagram.nodes.domain,{});

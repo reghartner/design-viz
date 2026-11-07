@@ -1621,7 +1621,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var scope=binding.el,d=binding.section.diagram;if(!d)return;
     var waiting=on?liveStatusCarrierWaiting(d,map,ticketWaiting):{},coverageActive=presentationActive();
     scope.querySelectorAll('g.node[data-dv-node]').forEach(function(el){
-      var id=el.getAttribute('data-dv-node'),value=(d.nodes || {})[id],summary=domainSummary(binding.page,value),statusValue=summary || value,state=on && availabilityOn && !el.classList.contains('node-text')?(summary || coverageActive?liveStatusPresentation(statusValue,map):liveStatusCarrier(value,map)):null;
+      var id=el.getAttribute('data-dv-node'),value=(d.nodes || {})[id],summary=on && availabilityOn && coverageActive?domainSummary(binding.page,value):null,statusValue=summary || value,state=on && availabilityOn && !el.classList.contains('node-text')?(coverageActive?liveStatusPresentation(statusValue,map):liveStatusCarrier(value,map)):null;
       // A blocked or missing carrier keeps its own paint (solid or dotted rose): the stronger state wins
       // over the dashed waiting stroke; the popover and panel still record what it waits on.
       var unavailable=on && availabilityOn?liveStatusAvailability(value,map):null;liveStatusAvailabilityClass(el,unavailable);

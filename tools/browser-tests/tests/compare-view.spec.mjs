@@ -108,6 +108,54 @@ test('V1 Before is the left column and After the right column; the side toggle a
     for(const id of ['current','proposed','highlights'])await expect(page.locator('#agent-update-'+id)).toHaveCount(0);
   });
 });
+test('proposal reader navigation stays anchored inside each desktop compare pane',async({page},testInfo)=>{
+  const h=await setup(page);
+  try{
+    const {current,proposed}=fixture();
+    // Separate top-level tabs produce the numbered document-part rail.
+    for(const raw of [current,proposed])raw.page.blocks=[{tabs:raw.page.blocks.map(section=>({label:section.heading,sections:[section]}))}];
+    await openProposal(page,h,current,proposed);
+    const host=page.locator('#agent-update-compare');
+    for(const side of ['before','after'])await expect(dialogPane(page,side).locator('.doc-sec')).toHaveCount(2);
+    for(const width of [1440,2400]){
+      await page.setViewportSize({width,height:1000});
+      for(const mode of ['Focused','Full diagram']){
+        await host.getByRole('button',{name:mode,exact:true}).click();
+        for(const side of ['before','after']){
+          const target=dialogPane(page,side),nav=target.locator('.reader-navigation');
+          await expect(nav).toBeVisible();
+          const toggle=nav.locator('.reader-top > button').first();
+          if(await toggle.getAttribute('aria-expanded')==='true')await toggle.click();
+          await expect.poll(()=>nav.evaluate(el=>{
+            const rail=el.querySelector('.reader-rail'),n=el.getBoundingClientRect(),r=rail.getBoundingClientRect();
+            return rail.hidden || Math.abs(r.left-n.left)<=1 && Math.abs(r.top-n.bottom)<=1;
+          }),{message:side+' section rail aligns with its own navigation'}).toBe(true);
+          if(width===2400)await expect(nav.locator('.reader-rail')).toBeVisible();
+          await toggle.click();
+          const contents=nav.locator('.reader-contents');await expect(contents).toBeVisible();
+          await expect.poll(()=>contents.evaluate(el=>{
+            const r=el.getBoundingClientRect(),n=el.closest('.reader-navigation').getBoundingClientRect(),p=el.closest('.compare-pane-scroll').getBoundingClientRect();
+            return Math.abs(r.left-n.left)<=1 && Math.abs(r.top-n.bottom)<=1 && r.right<=p.right+1 && r.bottom<=p.bottom+1;
+          }),{message:side+' Contents stays inside its pane below its own toolbar'}).toBe(true);
+          await contents.getByRole('button',{name:'Close Contents',exact:true}).click();
+          if(width===2400){
+            await nav.locator('.reader-rail-mark').last().hover();
+            await expect(contents).toBeVisible();await expect(contents).toHaveClass(/reader-contents-overlay/);
+            await expect.poll(()=>contents.evaluate(el=>{
+              const r=el.getBoundingClientRect(),n=el.closest('.reader-navigation').getBoundingClientRect();
+              return Math.abs(r.left-n.left-44)<=1 && Math.abs(r.top-n.bottom)<=1;
+            }),{message:side+' hover Contents sits beside its numbered rail'}).toBe(true);
+            await nav.locator('.reader-rail-mark').last().click();
+            await expect(nav.locator('.reader-page-label')).toHaveText('Page 2 of 2');
+            await nav.locator('.reader-rail-mark').first().click();
+            await expect(nav.locator('.reader-page-label')).toHaveText('Page 1 of 2');
+          }
+        }
+      }
+    }
+    await page.screenshot({path:testInfo.outputPath('proposal-reader-navigation.png')});
+  }finally{await h.cleanup();}
+});
 test('V2 the rail groups changes by section with exact labels',async({page})=>{
   await withProposal(page,async()=>{
     const groups=rail(page.locator('#agent-update-compare')).locator('.compare-rail-group');await expect(groups).toHaveCount(RAIL.length);

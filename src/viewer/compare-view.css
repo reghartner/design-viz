@@ -28,6 +28,11 @@
 /* renderPage replaces the view element's class, so pane rules hang off .compare-pane-scroll.
    Each pane keeps its own +/- zoom buttons even when the pane is narrow. */
 .compare-pane-scroll .reader-narrow .reader-zoom-controls>.reader-button{display:inline-flex;}
+/* Pane containment makes fixed reader overlays use pane-relative coordinates, while
+   the reader measures their offsets in the viewport. Anchor them to the sticky
+   toolbar instead, keeping Contents and the numbered rail inside their own pane. */
+.compare-pane-scroll .reader-navigation>:is(.reader-rail,.reader-contents,.reader-scrim){position:absolute;left:0!important;top:100%!important;}
+.compare-pane-scroll .reader-navigation>.reader-contents-overlay{left:44px!important;}
 /* Mode bar and stage: the Focused view and the two full panes share one grid cell. */
 .compare-main{display:flex;flex-direction:column;min-height:0;min-width:0;}
 .compare-mode{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line,#d6dbe4);background:var(--card,#fff);flex-wrap:wrap;}

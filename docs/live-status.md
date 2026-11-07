@@ -2736,6 +2736,27 @@ Scalar, trend and optional device breakdown share one anchored range. Trend or
 breakdown failures clear their own old evidence while retaining a successful
 scalar. Variables used only in either optional query cannot block the total.
 
+### Domain summaries
+
+A node with a detail target summarizes its own Jira tickets and Missing work plus
+all descendant nodes and connections. Local detail-only sections participate even
+before they are opened. Direct and nested imported nodes participate identically;
+text boxes are excluded. Shared targets and ticket keys are deduplicated within
+each summary. Existing status precedence applies, and an unknown ticket cannot
+make a domain look Done. Missing work stays visible when tickets are all Done.
+
+The domain popover explicitly describes its summary. External targets contribute
+only after the detail controller has approved and loaded that exact spec/revision;
+status traversal performs no fetch. Unloaded targets, URL-only targets, depth limits,
+and recursive links retain unknown completion evidence. Explicit domain references
+in steps use the same summary for their status and ticket caption. An ordinary edge
+reference does not silently include its endpoint domains.
+
+Summaries add no carriers or tickets to board totals, do not change telemetry
+bindings, and do not make child work control the parent's `existsWhen` availability.
+Live off restores the authored node appearance. Ticket editing and Missing work
+clearing still address the original carrier; descendant work is edited at its source.
+
 ### Direct trace loading
 
 Status → Trace can load one exact trace ID or a supported provider link using an inherited company or board [trace connection profile](trace-connections.md). Load/Verify are read-only session actions independent of Metrics polling. Imported and local nodes share authored traceMatch mapping behavior; choose the exact mapping diagram when several are available.

@@ -777,7 +777,8 @@ function textBoxForm(val){
   }
 
 function handoffControls(val){
-    var target=session.target,fold=document.createElement('details'),summary=document.createElement('summary');
+    var target=Object.assign({},session.target),detailSnapshot=session.text(),detailContext=session.topologyContext(),detailContextKey=JSON.stringify(detailContext),fold=document.createElement('details'),summary=document.createElement('summary');
+    function freshDetail(){if(session.text()!==detailSnapshot || JSON.stringify(session.topologyContext())!==detailContextKey){formError('The source or provider context changed. Render and reselect.');return false;}return true;}
     fold.className='node-handoff-editor';summary.textContent='Diagram handoff';fold.appendChild(summary);
     var note=document.createElement('p');note.className='fnote';
     note.textContent='Continue to another diagram in this spec or a separate document. This spec switches to the destination’s tab and offers a return breadcrumb. Apply saves the destination.';
@@ -822,7 +823,8 @@ function handoffControls(val){
   }
 
 function detailControls(val,ctx){
-    var target=session.target,fold=document.createElement('details'),summary=document.createElement('summary');
+    var target=Object.assign({},session.target),detailSnapshot=session.text(),detailContext=session.topologyContext(),detailContextKey=JSON.stringify(detailContext),fold=document.createElement('details'),summary=document.createElement('summary');
+    function freshDetail(){if(session.text()!==detailSnapshot || JSON.stringify(session.topologyContext())!==detailContextKey){formError('The source or provider context changed. Render and reselect.');return false;}return true;}
     fold.className='node-detail-editor';summary.textContent='Domain detail';fold.appendChild(summary);
     var note=document.createElement('p');note.className='fnote';
     note.textContent='Open an ordinary section as this node’s inner flow, or link to an approved spec. Apply saves these fields together. Changing the child section or target type resets its entry position, mappings and boundary ports.';
@@ -877,11 +879,11 @@ function detailControls(val,ctx){
         listen(path,'change',function(){pending=true;});listen(step,'change',function(){pending=true;});
         if(val.detail && chosen && String(val.detail.section)===String(draft.section)){
           var expected=JSON.stringify(val.detail);
-          function ready(){if(pending){formError('Apply the detail settings before editing or previewing mappings.');return false;}return true;}
+          function ready(){if(!freshDetail())return false;if(pending){formError('Apply the detail settings before editing or previewing mappings.');return false;}return true;}
           body.appendChild(createDetailMappingControl({document:document,detail:val.detail,parent:ctx.diagram,child:d,listen:listen,
             controls:{row:frow,action:actionButton},error:formError,
             change:function(edit){if(!ready())return false;return commitCascade(function(raw){
-              return planDetailMapping(session.text(),raw,target,edit,expected);
+              return planDetailMapping(session.text(),raw,target,edit,expected,detailContext);
             },{after:refreshFormSoon});},
             preview:function(parentId){if(!ready())return;var result=opts.preview.detail && opts.preview.detail(target,parentId);if(result && result.error)formError(result.error);}}));
         }else{
@@ -910,13 +912,15 @@ function detailControls(val,ctx){
         return detail;
       };
       actions.appendChild(actionButton('Apply detail',function(){
+        if(!freshDetail())return false;
         var detail;
         try{detail=collect();}catch(ex){formError('Step mapping must be valid JSON.');return;}
-        var ok=commitCascade(function(raw){return planSetNodeDetail(session.text(),raw,target.section,target.id,detail);});
-        if(ok)refreshFormSoon();
+        var ok=commitCascade(function(raw){return planSetNodeDetail(session.text(),raw,target.section,target.id,detail,detailContext);});
+        if(ok){detailSnapshot=session.text();refreshFormSoon();}
       },'igroup-apply'));
       if(val.detail)actions.appendChild(actionButton('Remove detail',function(){
-        var ok=commitCascade(function(raw){return planSetNodeDetail(session.text(),raw,target.section,target.id,null);});
+        if(!freshDetail())return false;
+        var ok=commitCascade(function(raw){return planSetNodeDetail(session.text(),raw,target.section,target.id,null,detailContext);});
         if(ok)refreshFormSoon();
       },'bdanger'));
     }
@@ -2434,6 +2438,7 @@ function renderExtractionPreview(multiSel){
     var snapshot=parseEditor();
     if(snapshot.error){formError(snapshot.error);return;}
     var selected=multiSel.map(function(t){return {kind:t.kind,section:t.section,id:t.id};});
+    var extractionContext=session.topologyContext(),extractionContextKey=JSON.stringify(extractionContext);
     var identity=multiIdentity(selected),previous=beginForm('extraction:'+identity),lifetime=formLife;
     var draft=null,draftKey=null,downloadedKey=null,downloadReleases=[],stale=false;
     var panel=document.createElement('div');panel.className='extraction-preview';guide.appendChild(panel);
@@ -2508,7 +2513,7 @@ function renderExtractionPreview(multiSel){
     }
     function current(){
       var now=parseEditor(),targets=opts.selection.current?opts.selection.current():multiSel;
-      return !stale && lifetime.alive() && now.project===snapshot.project && now.text===snapshot.text && multiIdentity(targets || [])===identity;
+      return !stale && lifetime.alive() && now.project===snapshot.project && now.text===snapshot.text && JSON.stringify(session.topologyContext())===extractionContextKey && multiIdentity(targets || [])===identity;
     }
     function invalidate(){
       stale=true;draft=null;downloadedKey=null;releaseDownloads();apply.disabled=true;download.disabled=true;
@@ -2532,7 +2537,7 @@ function renderExtractionPreview(multiSel){
       if(key===draftKey)return;
       releaseDownloads();downloadedKey=null;draftKey=key;draft=null;apply.disabled=true;download.disabled=true;status.textContent='';report.innerHTML='';
       if(!config.title){showError('Give the domain a title.');return;}
-      var plan=planExtractIndependentDiagram(snapshot.text,snapshot.raw,selected[0].section,selected.map(function(t){return t.id;}),config,session.validate);
+      var plan=planExtractIndependentDiagram(snapshot.text,snapshot.raw,selected[0].section,selected.map(function(t){return t.id;}),config,session.validate,extractionContext);
       if(plan.error){showError(plan.error);return;}
       showError('');draft={plan:plan,childText:JSON.stringify(plan.childSpec,null,2)+'\n'};
       var summary=document.createElement('p');summary.className='extraction-summary';
@@ -2679,7 +2684,7 @@ function renderMultiInspector(multiSel){
     }
     var acts = actionGroup('Selected '+kind+' actions','inspector-actions');
     if(kind==='node' || kind==='edge')acts.appendChild(clearCustomEdgesAction({targets:multiSel},function(){renderMultiInspector(multiSel);}));
-    if(kind==='node' && !includesImported)acts.appendChild(actionButton('Create domain from selected nodes',function(){
+    if(kind==='node')acts.appendChild(actionButton('Create domain from selected nodes',function(){
       if(multiSel.some(function(t){return t.section!==multiSel[0].section;})){
         formError('Choose nodes from a single section to create a domain.');return;
       }
@@ -2857,6 +2862,21 @@ function renderInspector(){
         }}));
       }else if(t.kind==='node' || t.kind==='edge'){
         guide.appendChild(trackingControls(resolvedValue));
+      }
+      if(hasAuthoredImport && t.kind==='node' && !isTextBoxNode(resolvedValue)){
+        guide.appendChild(detailControls(resolvedValue,{diagram:resolvedDiagram}));
+        var detailOwner=builderNodeDetailOwner(parsed.text,parsed.raw,t.section,t.id,session.topologyContext());
+        var inheritedNote=document.createElement('p');inheritedNote.className='fnote';
+        inheritedNote.textContent=Object.prototype.hasOwnProperty.call(detailOwner.import.nodeDetails || {},detailOwner.relative)?'This consumer overrides the source detail. Remove detail hides it here; Restore source detail removes the override.':'Source detail is inherited. Apply or create saves a consumer-owned detail; Remove detail hides an inherited detail here.';
+        guide.appendChild(inheritedNote);
+        var detailContext=session.topologyContext(),detailKey=JSON.stringify(detailContext);
+        function importedDetailAction(create){
+          if(session.text()!==parsed.text || JSON.stringify(session.topologyContext())!==detailKey){formError('The source or provider context changed. Render and reselect.');return false;}
+          var plan=create?planCreateNodeDetail(parsed.text,parsed.raw,t.section,t.id,detailContext):planSetNodeDetail(parsed.text,parsed.raw,t.section,t.id,null,detailContext,true);
+          var ok=applyPlan(plan,null,parsed);if(ok)refreshFormSoon();return ok;
+        }
+        if(!resolvedValue.detail && resolvedValue.handoff==null)guide.appendChild(actionButton('Create detail flow',function(){return importedDetailAction(true);}));
+        if(Object.prototype.hasOwnProperty.call(detailOwner.import.nodeDetails || {},detailOwner.relative))guide.appendChild(actionButton('Restore source detail',function(){return importedDetailAction(false);}));
       }
       if(hasAuthoredImport && t.kind==='node'){
         var localImport=authoredDiagram.topologyImports.find(function(imp){return imp.as===imported.as;}),relativeNode=t.id.slice(imported.as.length+2);

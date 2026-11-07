@@ -247,9 +247,11 @@ function builderDocumentDetailResult(plan,raw,mapPath,copies){
     var nextOwner=nextRecords.find(function(rec){return JSON.stringify(rec.path)===JSON.stringify(ownerPath);});
     if(!nextOwner)return;
     var d=specValueAt(raw,record.diagram);
-    Object.keys(d && d.nodes || {}).forEach(function(id){
+    var owners=Object.keys(d && d.nodes || {}).map(function(id){return {path:nextOwner.diagram.concat(['nodes',id]),value:d.nodes[id]};});
+    (d && d.topologyImports || []).forEach(function(imp,index){Object.keys(imp.nodeDetails || {}).forEach(function(id){owners.push({path:nextOwner.diagram.concat(['topologyImports',index,'nodeDetails']),field:id,value:{detail:imp.nodeDetails[id]},imported:true});});});
+    owners.forEach(function(item){
       ['detail','handoff'].forEach(function(field){
-        var value=d.nodes[id] && d.nodes[id][field],key=field==='handoff'?'localSection':'section';
+        var value=item.value && item.value[field],key=field==='handoff'?'localSection':'section';
         if(!value || (field==='handoff' && value.localSection==null))return;
         var index=builderDetailIndex(records,field==='handoff'?{section:value.localSection}:value);
         if(index<0 || error)return;
@@ -257,7 +259,7 @@ function builderDocumentDetailResult(plan,raw,mapPath,copies){
         if(target && String(value[key])===target.reference)return;
         var copy=target?builderClone(value):null;
         if(copy)copy[key]=target.reference;
-        var changed=jsonSetField(out,nextOwner.diagram.concat(['nodes',id]),field,copy?JSON.stringify(copy,null,2):null);
+        var changed=jsonSetField(out,item.path,item.field || field,copy?JSON.stringify(copy,null,2):item.imported?'null':null);
         if(!changed){error={error:'could not update a '+field+' reference'};return;}
         out=changed.text;
       });
@@ -332,11 +334,11 @@ function planSetNodeHandoff(text,raw,sectionIdx,nodeId,handoff){
   }
   return planSetField(text,raw,path,'handoff',handoff==null?null:JSON.stringify(handoff,null,2));
 }
-function planCreateNodeDetail(text,raw,sectionIdx,nodeId){
+function planCreateNodeDetail(text,raw,sectionIdx,nodeId,context){
   var got=builderDiagram(text,raw,sectionIdx);
   if(got.error)return got;
-  var node=got.d.nodes && got.d.nodes[nodeId];
-  if(!node)return {error:'Select a node first.'};
+  var owner=builderNodeDetailOwner(text,raw,sectionIdx,nodeId,context);if(owner.error)return owner;
+  var node=owner.node;
   if(node.detail)return {error:'Remove the existing detail before creating a new flow.'};
   if(node.handoff!=null)return {error:'Remove the existing diagram handoff before creating a detail flow.'};
   var page=raw && raw.page || raw,base=raw && raw.page?['page']:[];
@@ -352,7 +354,7 @@ function planCreateNodeDetail(text,raw,sectionIdx,nodeId){
     rows:[[]],floats:[{id:'start',side:'below',x:590,y:69}],edges:[],steps:[{id:'start',text:'Describe what happens inside '+(node.title || nodeId),nodes:['start']}]}};
   var added=jsonInsertMember(text,listPath,null,JSON.stringify(section,null,2));
   if(!added)return {error:'could not create the detail section'};
-  var assigned=planSetNodeDetail(added.text,JSON.parse(added.text),sectionIdx,nodeId,{section:id,mode:'focus'});
+  var assigned=planSetNodeDetail(added.text,JSON.parse(added.text),sectionIdx,nodeId,{section:id,mode:'focus'},context);
   if(assigned.error)return assigned;
   var index=specSectionPaths(raw).length,newPath=specSectionPaths(JSON.parse(assigned.text))[index].section;
   var range=jsonLocate(assigned.text,newPath);

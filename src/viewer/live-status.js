@@ -341,7 +341,37 @@ function liveStatusEvidence(value,map){
 function liveStatusPresentation(value,map){
   var keys=trackingRefs(value).tickets,states=keys.map(function(key){return map[key] && map[key].state || 'unknown';});
   if(value && value.missingWork===true)states.push('missing');
+  if(value && value._detailUnavailable)states.push('unknown');
   return liveStatusPresentationRollup(states.length?states:['unchanged']);
+}
+/* A domain is a presentation summary, never a new evidence/availability carrier.
+   Walk authored links only; external pages must already have been approved and
+   loaded by the detail controller. Shared targets are counted once per summary. */
+function liveStatusDomainSummary(page,node,loaded){
+  if(!node || !node.detail || isTextBoxNode(node))return null;
+  var tickets=new Set(),ticketSources=Object.create(null),missing=0,unavailable=[],seen=new Set(),active=new Set(),count=0;
+  function add(source,value){
+    trackingRefs(value).tickets.forEach(function(key){
+      tickets.add(key);
+      var owner={tracking:source.tracking,authoredURL:trackingTicketURL(value,key)},previous=ticketSources[key];
+      if(!previous || !previous.authoredURL && !(previous.tracking && previous.tracking.jira && previous.tracking.jira.site))ticketSources[key]=owner;
+    });
+    if(value && value.missingWork===true)missing++;
+  }
+  function descend(source,value,depth){
+    add(source,value);var detail=value && value.detail;if(!detail)return;
+    var targetPage=detail.spec?(loaded || {})[JSON.stringify([detail.spec,detail.revision || ''])]:source;
+    var target=targetPage && (detail.section?detailSection(targetPage,detail.section):detail.spec?sectionRecords(targetPage).find(function(r){return r.section.diagram;}):null);
+    var child=target && target.section.diagram;
+    if(!child){unavailable.push(detail.spec || detail.url || detail.section || 'Unknown detail');return;}
+    if(active.has(child) || depth>=DETAIL_MAX_DEPTH){unavailable.push('Recursive detail '+target.reference);return;}
+    if(seen.has(child))return;seen.add(child);active.add(child);
+    Object.keys(child.nodes || {}).forEach(function(id){var next=child.nodes[id];if(!isTextBoxNode(next)){count++;descend(targetPage,next,depth+1);}});
+    (child.edges || []).forEach(function(edge){count++;add(targetPage,edge);});active.delete(child);
+  }
+  descend(page,node,0);
+  return {tickets:Array.from(tickets),ticketSources:ticketSources,prs:trackingRefs(node).prs,missingWork:missing>0,_detailUnavailable:unavailable.length>0,
+    missing:missing,unavailable:Array.from(new Set(unavailable)),carriers:count};
 }
 // Unmarked edges retain evidence-only paint; a marker adds authored missing
 // intent without turning an ordinary unticketed connection into a status carrier.
@@ -585,7 +615,7 @@ function liveStatusLanes(page,map){
 }
 function liveStatusCaption(diagram,step,map,waiting){
   var keys=liveStatusStepTickets(diagram,step,true).filter(function(key){return map[key];}),state=liveStatusStep(diagram,step,map);
-  if(!state)return liveStatusStepTickets(diagram,step,true).length?'AWAITING TICKET STATUS':'';
+  if(!state)return liveStatusStepCarriers(diagram,step,true).some(function(c){return c.value._detailUnavailable;})?'DETAIL EVIDENCE UNAVAILABLE':liveStatusStepTickets(diagram,step,true).length?'AWAITING TICKET STATUS':'';
   if(state==='done')return 'DONE';
   if(state==='unchanged')return 'NO CHANGE NEEDED';
   if(state==='missing' && !keys.some(function(key){return map[key].state==='missing';}))return 'MISSING WORK · unlinked work remains';
@@ -752,6 +782,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
   if(motion && motion.addEventListener)motion.addEventListener('change',motionChanged);
   var remotePages=Object.create(null),originalLoad=renderOptions && renderOptions.loadDetail,wrappedLoad=null;
   function copy(value){return JSON.parse(JSON.stringify(value));}
+  function domainSummary(source,value){return liveStatusDomainSummary(source,value,remotePages);}
+  function statusDiagram(binding){
+    var d=binding.section.diagram,nodes=Object.assign({},d.nodes);
+    Object.keys(nodes).forEach(function(id){var summary=domainSummary(binding.page,nodes[id]);if(summary)nodes[id]=Object.assign({},nodes[id],summary);});
+    return Object.assign({},d,{nodes:nodes});
+  }
   function remoteKey(ref){return JSON.stringify([ref.spec,ref.revision || '']);}
   /* Loaded approved details join the same runtime map; they have their own
      page tracking site. The host still owns transport and cancellation. */
@@ -1114,9 +1150,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
     pop.replaceChildren();pop.setAttribute('aria-label',(trackingRefs(value).tickets.length?'Live tickets for ':'Work status for ')+label);
     element('strong','node-link-title','Work status · '+label,pop);
     var dismiss=element('button','node-link-close','×',pop);dismiss.type='button';dismiss.setAttribute('aria-label','Close live tickets');dismiss.addEventListener('click',function(){close(true);});
-    var found=trackingRefs(value);
+    var summary=trigger._liveCarrier && trigger._liveCarrier.summary,found=trackingRefs(summary || value);
+    if(summary)element('p','dv-live-domain-summary','Domain summary: this node and '+summary.carriers+' descendant nodes/connections · '+summary.tickets.length+' unique tickets.'+(summary.missing?' Missing work: '+summary.missing+' marked carriers.':'')+(summary.unavailable.length?' Detail evidence unavailable: '+summary.unavailable.join(', ')+'. Completion is unknown.':''),pop);
     if(value && value.missingWork===true)element('p','dv-live-coverage-detail','Missing work: additional work remains without a linked ticket. Clear this Missing work marker when covered.',pop);
-    else if(!found.tickets.length)element('p','dv-live-coverage-detail','No change needed: no linked tickets or missing-work marker.',pop);
+    else if(!summary && !found.tickets.length)element('p','dv-live-coverage-detail','No change needed: no linked tickets or missing-work marker.',pop);
     // #855 Edit mode: clear a marker set on this board; an inherited one names its source diagram.
     var marker=ref && editing() && value && value.missingWork===true?editor.missingWork(ref):null;
     if(asking && !(marker && marker.clearable)){editor.endQuestion();asking=null;}
@@ -1158,7 +1195,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         var remove=element('button','reader-button dv-live-remove','Remove',row);remove.type='button';remove.setAttribute('aria-label','Remove '+key+' from '+label);
         remove.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();close(false);setTimeout(function(){editor.remove(ref,key);},0);});
       }
-      link(row,key,liveStatusTicketURL(tracking,key,entry,trackingTicketURL(value,key) || (availability || []).map(function(cause){return trackingTicketURL(cause.value,key);}).filter(Boolean)[0]));
+      var ticketSource=summary && summary.ticketSources[key];
+      link(row,key,liveStatusTicketURL(ticketSource?ticketSource.tracking:tracking,key,entry,(ticketSource && ticketSource.authoredURL) || trackingTicketURL(value,key) || (availability || []).map(function(cause){return trackingTicketURL(cause.value,key);}).filter(Boolean)[0]));
       var pill=element('span','dv-live-ticket-state dv-live-state-pill',entry?entry.state:'No status',row);liveStatusClass(pill,entry?entry.state:null);
       if(entry){
         if(entry.title)element('span','dv-live-ticket-title',entry.title,row);
@@ -1186,13 +1224,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
      the Workbench owns carrier clicks, selection and focus, so the trigger
      stays inert and the Tickets table remains the route to the popover. */
   var CARRIER_ATTRS=['role','tabindex','aria-label','aria-haspopup','aria-expanded'];
-  function carrierTarget(el,id,value,state,tracking,label,waiting,availability,ref){
+  function carrierTarget(el,id,value,state,tracking,label,waiting,availability,ref,summary){
     if(!el._liveSaved){el._liveSaved={};CARRIER_ATTRS.forEach(function(name){el._liveSaved[name]=el.getAttribute(name);});}
     el.classList.add('dv-live-target');el.setAttribute('data-live-carrier',id);
-    el._liveCarrier={value:value,state:state,tracking:tracking,label:label,waiting:waiting,availability:availability,ref:ref || null};
+    el._liveCarrier={value:value,state:state,tracking:tracking,label:label,waiting:waiting,availability:availability,ref:ref || null,summary:summary || null};
     if(authoring)return el;
     el.setAttribute('role','button');el.setAttribute('tabindex','0');el.setAttribute('aria-haspopup','dialog');el.setAttribute('aria-expanded','false');
-    el.setAttribute('aria-label',(trackingRefs(value).tickets.length?'Live tickets for ':'Work status for ')+label+(state?' · '+(state==='unchanged'?'No change needed':state==='missing' && value.missingWork===true?'Missing work':state):'')+(availability?' · '+liveStatusAvailabilityLabel(availability):'')+(waiting && waiting.keys?' · waiting on '+waiting.keys.join(', '):''));
+    el.setAttribute('aria-label',(trackingRefs(value).tickets.length?'Live tickets for ':'Work status for ')+label+(state?' · '+(state==='unchanged'?'No change needed':state==='missing' && value.missingWork===true?'Missing work':state):'')+(summary?' · Domain summary'+(summary.missing?' · Missing work':'')+(summary.unavailable.length?' · Detail evidence unavailable':''):'')+(availability?' · '+liveStatusAvailabilityLabel(availability):'')+(waiting && waiting.keys?' · waiting on '+waiting.keys.join(', '):''));
     return el;
   }
   function clearTarget(el){
@@ -1318,7 +1356,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var added=telemetryActivity.pin(binding,exemplar,new Date().toISOString());notify();return added;
   }
   function paintStory(binding){
-    var stepper=binding.stepper,d=binding.section.diagram,scope=binding.el;
+    var stepper=binding.stepper,d=statusDiagram(binding),scope=binding.el;
     scope.querySelectorAll('.dv-live-caption').forEach(function(el){el.remove();});
     if(statusMode==='trace'){scope.querySelectorAll('.dv-live-step-tickets,.dv-proof-caption').forEach(function(el){el.remove();});telemetryClearStep(scope);return;}
     var step=on && stepper && stepper.mode()==='step' && (d.steps || [])[stepper.sourceIndex()];
@@ -1327,7 +1365,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
     scope.querySelectorAll('.dv-live-step-tickets').forEach(function(el){if(el!==row || !keys.length)el.remove();});
     if(!host){telemetryPaintStep(binding,telemetry.snapshot(),map,on);return;}
     if(keys.length){
-      var tickets=keys.map(function(key){return {key:key,url:liveStatusTicketURL(binding.page.tracking,key,map[key],liveStatusPageTicketURL(binding.page,key))};});
+      var tickets=keys.map(function(key){
+        var owner=liveStatusStepCarriers(d,step,true).map(function(carrier){return carrier.value.ticketSources && carrier.value.ticketSources[key];}).filter(Boolean)[0];
+        return {key:key,url:liveStatusTicketURL(owner?owner.tracking:binding.page.tracking,key,map[key],owner?owner.authoredURL:liveStatusPageTicketURL(binding.page,key))};
+      });
       var signature=JSON.stringify(tickets);
       // Keep keyboard focus on an unchanged link when fresh status arrives.
       if(!row || row._liveStepTickets!==signature){
@@ -1376,12 +1417,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
     for(var b=0;b<candidates.length;b++){
       var binding=candidates[b],stepper=binding.stepper,d=binding.section.diagram;
       var path=diagramPathList(d).find(function(path){return path.id===stepper.path();});
-      var index=path && path.indices.find(function(index){return ['blocked','missing'].indexOf(liveStatusStep(d,d.steps[index],evidence))>=0;});
+      var index=path && path.indices.find(function(index){return ['blocked','missing'].indexOf(liveStatusStep(statusDiagram(binding),d.steps[index],evidence))>=0;});
       if(index!=null)return {binding:binding,index:index};
     }return null;
   }
   function focusBlocker(binding,index){
-    var d=binding.section.diagram,carriers=liveStatusStepCarriers(d,d.steps[index],true);
+    var d=statusDiagram(binding),carriers=liveStatusStepCarriers(d,d.steps[index],true);
     var carrier=carriers.find(function(carrier){return liveStatusBlockingKeys(carrier.value,map).length || carrier.value.missingWork===true;});if(!carrier)return;
     focusCarrier(binding,carrier.id);
   }
@@ -1579,7 +1620,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var scope=binding.el,d=binding.section.diagram;if(!d)return;
     var waiting=on?liveStatusCarrierWaiting(d,map,ticketWaiting):{},coverageActive=presentationActive();
     scope.querySelectorAll('g.node[data-dv-node]').forEach(function(el){
-      var id=el.getAttribute('data-dv-node'),value=(d.nodes || {})[id],state=on && availabilityOn && !el.classList.contains('node-text')?(coverageActive?liveStatusPresentation(value,map):liveStatusCarrier(value,map)):null;
+      var id=el.getAttribute('data-dv-node'),value=(d.nodes || {})[id],summary=domainSummary(binding.page,value),statusValue=summary || value,state=on && availabilityOn && !el.classList.contains('node-text')?(summary || coverageActive?liveStatusPresentation(statusValue,map):liveStatusCarrier(value,map)):null;
       // A blocked or missing carrier keeps its own paint (solid or dotted rose): the stronger state wins
       // over the dashed waiting stroke; the popover and panel still record what it waits on.
       var unavailable=on && availabilityOn?liveStatusAvailability(value,map):null;liveStatusAvailabilityClass(el,unavailable);
@@ -1588,10 +1629,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
       liveStatusPreset(el,unavailable?(state==='active'?'azure':state==='testing'?'violet':state==='blocked' || state==='missing'?'rose':'slate'):painted?(painted.tone==='red'?'rose':'slate'):state?LIVE_STATUS_PRESETS[state]:null);
       liveStatusNodeConstruction(el,value,state,unavailable);
       if(statusMode==='trace')return;
-      if(!state && !waits && !unavailable && !trackingRefs(value).tickets.length)return;
+      if(!summary && !state && !waits && !unavailable && !trackingRefs(value).tickets.length)return;
       var card=el.querySelector('.card');if(!card)return;
       if(state || waits || unavailable){var halo=card.cloneNode(false);halo.setAttribute('class','dv-live-halo');halo.removeAttribute('id');halo.setAttribute('aria-hidden','true');el.insertBefore(halo,el.firstChild);}
-      carrierTarget(card,id,value,state,binding.page.tracking,value.title || id,waits,unavailable,binding.ordinal!=null?{section:binding.ordinal,kind:'node',id:id}:null);
+      carrierTarget(card,id,value,state,binding.page.tracking,value.title || id,waits,unavailable,binding.ordinal!=null?{section:binding.ordinal,kind:'node',id:id}:null,summary);
     });
     scope.querySelectorAll('path.edge[data-dv-edge],path.halo[data-dv-edge],text.lbl[data-dv-edge]').forEach(function(el){
       var index=Number(el.getAttribute('data-dv-edge')),value=(d.edges || [])[index],state=on?liveStatusEdgePresentation(value,map,availabilityOn):null;
@@ -1618,7 +1659,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });
     scope.querySelectorAll('g.coin[data-dv-step],button.schip[data-step-source]').forEach(function(el){
       var index=Number(el.getAttribute(el.classList.contains('coin')?'data-dv-step':'data-step-source')),step=(d.steps || [])[index];
-      liveStatusClass(el,on && availabilityOn && step && coverageActive?liveStatusStep(d,step,map):null);
+      liveStatusClass(el,on && availabilityOn && step && coverageActive?liveStatusStep(statusDiagram(binding),step,map):null);
     });
   }
   function releaseBindings(){
@@ -1631,7 +1672,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     bindings.forEach(function(binding){
       ['dv:pathrender','dv:pathchange','dv:stepchange'].forEach(function(type){binding.el.addEventListener(type,schedule);});
       if(binding.stepper && binding.stepper.onBeforeAdvance)stepHooks.push(binding.stepper.onBeforeAdvance(function(index){
-        var d=binding.section.diagram,state=statusMode!=='trace' && on && liveStatusStep(d,d.steps[index],map);
+        var d=binding.section.diagram,state=statusMode!=='trace' && on && liveStatusStep(statusDiagram(binding),d.steps[index],map);
         if(state!=='blocked' && state!=='missing')return true;
         paint();focusBlocker(binding,index);return false;
       }));

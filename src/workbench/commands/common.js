@@ -145,16 +145,18 @@ function builderEditDetails(text,raw,edit){
   var out=text,records=builderDetailRecords(raw),error=null;
   records.forEach(function(record,owner){
     var diagram=specValueAt(raw,record.diagram);
-    Object.keys(diagram && diagram.nodes || {}).forEach(function(id){
+    var owners=Object.keys(diagram && diagram.nodes || {}).map(function(id){return {id:id,path:record.diagram.concat(['nodes',id]),field:'detail',detail:diagram.nodes[id] && diagram.nodes[id].detail};});
+    (diagram && diagram.topologyImports || []).forEach(function(imp,index){Object.keys(imp.nodeDetails || {}).forEach(function(id){owners.push({id:imp.as+'::'+id,path:record.diagram.concat(['topologyImports',index,'nodeDetails']),field:id,detail:imp.nodeDetails[id],imported:true});});});
+    owners.forEach(function(item){
       if(error)return;
-      var detail=diagram.nodes[id] && diagram.nodes[id].detail;
+      var id=item.id,detail=item.detail;
       if(!detail || typeof detail!=='object' || Array.isArray(detail))return;
       var next=builderClone(detail),target=builderDetailIndex(records,detail);
       var result=edit(next,owner,target,id);
       if(result && result.error){error=result;return;}
       if(result===null)next=null;
       if(JSON.stringify(next)===JSON.stringify(detail))return;
-      var changed=jsonSetField(out,record.diagram.concat(['nodes',id]),'detail',next==null?null:JSON.stringify(next,null,2));
+      var changed=jsonSetField(out,item.path,item.field,next==null?(item.imported?'null':null):JSON.stringify(next,null,2));
       if(!changed){error={error:'could not update a detail reference'};return;}
       out=changed.text;
     });
@@ -174,11 +176,23 @@ function builderDetailCascade(plan,sectionIdx,edit){
   if(range){plan.start=range.start;plan.end=range.end;}
   return plan;
 }
-function planSetNodeDetail(text,raw,sectionIdx,nodeId,detail){
-  var path=builderTargetPath(raw,{kind:'node',section:sectionIdx,id:nodeId});
-  if(!path || !specValueAt(raw,path))return {error:'node not found — reselect and try again'};
+function builderNodeDetailOwner(text,raw,sectionIdx,nodeId,context){
+  var path=builderTargetPath(raw,{kind:'node',section:sectionIdx,id:nodeId}),node=path && specValueAt(raw,path);
+  if(node)return {path:path,node:node};
+  if(!context)return {error:'Open the authored consumer with its providers to edit this imported detail.'};
+  try{
+    var resolved=FlowTopology.resolveSource(raw,context),record=specSectionPaths(resolved)[sectionIdx],d=record && specValueAt(resolved,record.diagram);
+    var origin=d && FlowTopology.origin(d,'nodes',nodeId),authored=specSectionPaths(raw)[sectionIdx],source=authored && specValueAt(raw,authored.diagram);
+    var index=origin?(source.topologyImports || []).findIndex(function(imp){return imp.as===origin.as;}):-1;
+    if(index<0 || !d.nodes[nodeId])return {error:'Node not found in an authored import. Render and reselect.'};
+    return {path:authored.diagram.concat(['topologyImports',index]),node:d.nodes[nodeId],relative:nodeId.slice(origin.as.length+2),import:source.topologyImports[index]};
+  }catch(ex){return {error:ex.message};}
+}
+function planSetNodeDetail(text,raw,sectionIdx,nodeId,detail,context,restore){
+  var owner=builderNodeDetailOwner(text,raw,sectionIdx,nodeId,context);if(owner.error)return owner;
+  var path=owner.path;
   if(detail!=null){
-    if(specValueAt(raw,path).handoff!=null)return {error:'Remove the existing diagram handoff before applying a domain detail.'};
+    if(owner.node.handoff!=null)return {error:'Remove the existing diagram handoff before applying a domain detail.'};
     if(!detail || typeof detail!=='object' || Array.isArray(detail))return {error:'Detail must be a JSON object.'};
     if(['focus','link'].indexOf(detail.mode)<0)return {error:'Choose focus for a drilldown or link for an external destination. Inline expansion is no longer supported.'};
     if(!detail.section && !detail.spec && !detail.url)return {error:'Choose a local section or enter an external detail target.'};
@@ -194,10 +208,16 @@ function planSetNodeDetail(text,raw,sectionIdx,nodeId,detail){
     }
     if(detail.url!=null && !isValidLinkBase(detail.url))return {error:'Detail URL must be an absolute http or https URL.'};
   }
-  var plan=planSetField(text,raw,path,'detail',detail==null?null:JSON.stringify(detail,null,2));
+  var plan;
+  if(owner.import){
+    var map=builderClone(owner.import.nodeDetails || {});
+    if(restore)delete map[owner.relative];else Object.defineProperty(map,owner.relative,{value:detail,enumerable:true,writable:true,configurable:true});
+    plan=planSetField(text,raw,path,'nodeDetails',Object.keys(map).length?JSON.stringify(map,null,2):null);
+  }else plan=planSetField(text,raw,path,'detail',detail==null?null:JSON.stringify(detail,null,2));
   if(plan.error)return plan;
   if(typeof validateDetails==='function'){
-    var errors=[];validateDetails(normalize(JSON.parse(plan.text)),errors,[]);
+    var candidate;try{candidate=context?FlowTopology.resolveSource(JSON.parse(plan.text),context):JSON.parse(plan.text);}catch(ex){return {error:ex.message};}
+    var errors=[];validateDetails(normalize(candidate),errors,[]);
     if(errors.length)return {error:errors.join('\n')};
   }
   return plan;

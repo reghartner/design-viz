@@ -1,6 +1,7 @@
 /* Edit one mapping without rebuilding the detail or its advanced targets. */
-function planDetailMapping(text,raw,target,edit,expected){
-  var path=builderTargetPath(raw,target),node=path && specValueAt(raw,path),detail=node && node.detail;
+function planDetailMapping(text,raw,target,edit,expected,context){
+  var owner=builderNodeDetailOwner(text,raw,target.section,target.id,context);if(owner.error)return owner;
+  var node=owner.node,detail=node && node.detail;
   if(target.kind!=='node' || !specObject(detail))return {error:'Apply a local detail target first.'};
   if(expected!==undefined && JSON.stringify(detail)!==expected)return {error:'The detail changed. Select the node again.'};
   var page=normalize(raw),child=detailTarget(page,detail);
@@ -29,5 +30,5 @@ function planDetailMapping(text,raw,target,edit,expected){
     }else return {error:'Unknown mapping action.'};
     if(Object.keys(map).length)next.stepMap=map;else delete next.stepMap;
   }
-  return planSetNodeDetail(text,raw,target.section,target.id,next);
+  return planSetNodeDetail(text,raw,target.section,target.id,next,context);
 }

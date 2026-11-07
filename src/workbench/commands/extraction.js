@@ -51,7 +51,7 @@ function extractionChildSpec(raw, section, report){
   return {page:page};
 }
 
-function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options,validateSource){
+function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options,validateSource,context){
   options=options || {};
   try{
     var before=builderValidateSource(raw,validateSource);
@@ -60,11 +60,23 @@ function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options,validateS
     // restores the exact caller text because only the returned plan is applied.
     if(raw && !raw.page && !raw.blocks && !raw.sections && raw.nodes && raw.rows){
       var wrapped={page:{sections:[{heading:'Overview',diagram:builderClone(raw)}]}};
-      return planExtractIndependentDiagram(JSON.stringify(wrapped,null,2),wrapped,sectionIdx,ids,options,validateSource);
+      return planExtractIndependentDiagram(JSON.stringify(wrapped,null,2),wrapped,sectionIdx,ids,options,validateSource,context);
     }
     var got=builderDiagram(text,raw,sectionIdx);
     if(got.error)return got;
-    var d=builderClone(got.d),selected=new Set(Array.isArray(ids)?ids:[]);
+    var d=builderClone(got.d),selected=new Set(Array.isArray(ids)?ids:[]),importedSelection=false,resolvedDiagram=null;
+    if(context && (d.topologyImports || []).length){
+      resolvedDiagram=specValueAt(FlowTopology.resolveSource(raw,context),got.path);
+      importedSelection=Array.from(selected).some(function(id){return FlowTopology.origin(resolvedDiagram,'nodes',id);});
+      if(importedSelection)d=builderClone(resolvedDiagram);
+    }
+    var affectedExports=Object.keys(got.d.topologyExports || {}).filter(function(name){return got.d.topologyExports[name].nodes.some(function(id){return selected.has(id);});});
+    if(affectedExports.length)return {error:'This selection is used by shared topology exports: '+affectedExports.join(', ')+'. Update or remove those exports before creating a domain.'};
+    if(importedSelection){
+      if(options.mode==='external')return {error:'Imported selections support Local zoom. Use Local zoom to retain the approved provider references.'};
+      var crossings=(d.edges || []).filter(function(edge){return selected.has(edge.from)!==selected.has(edge.to) && FlowTopology.origin(d,'edges',builderEdgeKey(edge));});
+      if(crossings.length)return {error:'Provider-owned boundary connections cannot move independently: '+crossings.map(builderEdgeKey).join(', ')+'. Select both endpoints of these connections (or the whole connected imported block), then preview again.'};
+    }
     if(!Array.isArray(ids) || selected.size<2 || ids.some(function(id){return typeof id!=='string' || !Object.prototype.hasOwnProperty.call(d.nodes || {},id);}))
       return {error:'Choose at least two existing nodes in one section.'};
     ids=Array.from(selected);
@@ -131,12 +143,12 @@ function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options,validateS
     var domain={title:title,icon:'package',tint:'cmd'};
     if(mode==='local')domain.detail={section:sectionId,mode:'focus'};else domain.handoff=handoff;
     var commonGroup=originalNodes[ids[0]].group;
-    if(commonGroup && ids.every(function(id){return originalNodes[id].group===commonGroup;}))domain.group=commonGroup;
+    if(commonGroup && (!importedSelection || Object.prototype.hasOwnProperty.call(got.d.groups || {},commonGroup)) && ids.every(function(id){return originalNodes[id].group===commonGroup;}))domain.group=commonGroup;
     nextNodes[domainId]=domain;
     ports.forEach(function(port,id){
       var original=originalNodes[id];
       nextNodes[port]={title:original.title || id,sub:'Domain boundary',icon:original.icon || 'package',tint:original.tint || 'cmd'};
-      if(original.group)nextNodes[port].group=original.group;
+      if(original.group && (!importedSelection || Object.prototype.hasOwnProperty.call(got.d.groups || {},original.group)))nextNodes[port].group=original.group;
     });
     d.nodes=nextNodes;
     var placedDomain=false;
@@ -232,6 +244,41 @@ function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options,validateS
     report.notes.push('The destination starts with no steps or alternates. Author its own timeline; opening it does not inherit parent playback or state.');
     if(child.edges.length)report.notes.push('Internal connections use fresh automatic routing with no inherited reveal/hide step windows.');
 
+    if(importedSelection){
+      var parentImports=[],childImports=[],generatedNodes=new Set(),generatedEdges=new Set(),generatedGroups=new Set();
+      (resolvedDiagram.topologyProvenance.imports || []).forEach(function(imp){
+        (imp.nodes || []).forEach(function(id){generatedNodes.add(id);});(imp.edges || []).forEach(function(id){generatedEdges.add(id);});(imp.groups || []).forEach(function(id){generatedGroups.add(id);});
+      });
+      (got.d.topologyImports || []).forEach(function(imp){
+        var provenance=resolvedDiagram.topologyProvenance.imports.find(function(p){return p.as===imp.as;}),prefix=imp.as+'::';
+        function part(moving){
+          var nodes=provenance.nodes.filter(function(id){return selected.has(id)===moving;}),edges=provenance.edges.filter(function(key){return key.split('->').every(function(id){return selected.has(id)===moving;});});
+          if(!nodes.length)return null;
+          var next=builderClone(imp);
+          // Preserve complete declarations, including future provider growth, when moving a whole block.
+          if(nodes.length!==provenance.nodes.length){next.nodes=nodes.map(function(id){return id.slice(prefix.length);});next.edges=edges.map(function(key){return key.split('->').map(function(id){return id.slice(prefix.length);}).join('->');});}
+          ['nodePositions','nodeCodeRefs','nodeOverrides','nodeDetails','nodeTracking','edgeOverrides','edgeTracking'].forEach(function(field){
+            if(!next[field])return;
+            var keep=new Set((field.startsWith('node')?nodes:edges).map(function(key){return key.split('->').map(function(id){return id.slice(prefix.length);}).join('->');}));
+            Object.keys(next[field]).forEach(function(key){if(!keep.has(key))delete next[field][key];});if(!Object.keys(next[field]).length)delete next[field];
+          });
+          if(moving && next.nodeDetails)Object.values(next.nodeDetails).forEach(function(detail){if(detail)delete detail.stepMap;});
+          return next;
+        }
+        var stay=part(false),move=part(true);if(stay)parentImports.push(stay);if(move)childImports.push(move);
+      });
+      [d,child].forEach(function(diagram){
+        generatedNodes.forEach(function(id){delete diagram.nodes[id];});
+        diagram.edges=(diagram.edges || []).filter(function(edge){return !generatedEdges.has(builderEdgeKey(edge));});
+        diagram.rows=extractionRows(diagram.rows,function(id){return generatedNodes.has(id)?[]:[id];});if(!diagram.rows.length)diagram.rows=[[]];
+        if(diagram.floats){diagram.floats=diagram.floats.filter(function(f){return !generatedNodes.has(f.id);});if(!diagram.floats.length)delete diagram.floats;}
+        if(diagram.groups){generatedGroups.forEach(function(id){delete diagram.groups[id];});if(!Object.keys(diagram.groups).length)delete diagram.groups;}
+        delete diagram.topologyProvenance;
+      });
+      if(parentImports.length)d.topologyImports=parentImports;else delete d.topologyImports;
+      if(childImports.length)child.topologyImports=childImports;
+      report.notes.push('Imported nodes remain provider-owned references. Namespaces and consumer annotations move with their selected nodes.');
+    }
     var section={id:sectionId,heading:title,detailOnly:true,accent:'cyan',diagram:child};
     var childSpec=extractionChildSpec(raw,section,report);
     var rewritten=jsonReplaceValue(text,got.path,JSON.stringify(d,null,2));
@@ -247,7 +294,7 @@ function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options,validateS
     });
     if(cascaded.error)return cascaded;
     result.text=cascaded.text;
-    var findings=builderValidateSource(JSON.parse(result.text),validateSource),childFindings=builderValidateSource(childSpec);
+    var findings=builderValidateSource(JSON.parse(result.text),validateSource),childFindings=importedSelection?{errors:[]}:builderValidateSource(childSpec);
     if(findings.errors.length || childFindings.errors.length)return {error:'Extraction could not preserve valid references: '+findings.errors.concat(childFindings.errors).join('\n')};
     var range=jsonLocate(result.text,got.path.concat(['nodes',domainId]));
     return {text:result.text,start:range.start,end:range.end,kind:'node',id:domainId,section:sectionIdx,

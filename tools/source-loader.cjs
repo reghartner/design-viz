@@ -125,11 +125,17 @@ function companyConfig(root = sourceRoot) {
   let raw;
   try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { throw companyError(file, error.message); }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw companyError(file, 'expected a JSON object');
-  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package', 'backstage', 'site', 'awsAccounts'];
+  const allowed = ['version', 'companyName', 'repository', 'revision', 'brand', 'package', 'backstage', 'site', 'awsAccounts', 'traceConnections'];
   const unknown = Object.keys(raw).filter(key => !allowed.includes(key));
   if (unknown.length) throw companyError(file, 'unknown field ' + unknown.join(', ') + '; allowed: ' + allowed.join(', '));
   if (raw.version !== 1) throw companyError(file, 'version must be 1');
   const config = {companyName:null, repository:null, revision:null, brand:null, package:{}};
+  if (Object.hasOwn(raw, 'traceConnections')) {
+    const scope = {URL};
+    vm.runInNewContext(fs.readFileSync(path.join(sourceRoot, 'core/trace-connections.js'), 'utf8'), scope);
+    try { config.traceConnections = JSON.parse(JSON.stringify(scope.FlowTraceConnections.profiles(raw.traceConnections))); }
+    catch (error) { throw companyError(file, error.message); }
+  }
   if (Object.hasOwn(raw, 'awsAccounts')) config.awsAccounts = companyAwsAccounts(raw.awsAccounts, file);
   if (raw.companyName != null) config.companyName = plainText(raw.companyName, file, 'companyName', 40);
   if (raw.repository != null) config.repository = repositoryUrl(raw.repository, file);
@@ -172,9 +178,9 @@ function companyConfig(root = sourceRoot) {
   return config;
 }
 // Only public authoring context travels into prompts and the offline kit: the
-// repository address, link bases and AWS account defaults (not credentials).
+// repository address, link bases, account defaults and trace profiles (never credentials).
 function companyAgentContext(config = companyConfig()) {
-  return Object.assign({}, config && config.awsAccounts ? {awsAccounts: config.awsAccounts} : {}, config && config.repository ? {repository: config.repository} : {}, config && config.backstage ? {backstage: {baseUrl: config.backstage.baseUrl}} : {}, config && config.site ? {site: {baseUrl: config.site.baseUrl}} : {});
+  return Object.assign({}, config && config.traceConnections ? {traceConnections: config.traceConnections} : {}, config && config.awsAccounts ? {awsAccounts: config.awsAccounts} : {}, config && config.repository ? {repository: config.repository} : {}, config && config.backstage ? {backstage: {baseUrl: config.backstage.baseUrl}} : {}, config && config.site ? {site: {baseUrl: config.site.baseUrl}} : {});
 }
 /* Marked literals keep today's text unless the company config replaces it:
    `/*@company:name*\/'Company service'` replaces the word Company,
@@ -273,6 +279,7 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
     if (substitute) source = companyText(source, file, company);
     if (file === 'workbench/agent-chat.js' && substitute)
       source = source.replace('/* @company-agent-context */ {}', () => JSON.stringify(companyAgentContext(company)).replace(/</g, '\\u003c'));
+    if (file === 'core/trace-connections.js' && substitute) source = source.replace('/* @company-trace-connections */ {}', () => JSON.stringify(company && company.traceConnections || {}).replace(/</g, '\\u003c'));
     if (file === 'core/tracking.js' && substitute) source = source.replace('/* @company-aws-accounts */ {}', () => JSON.stringify(company && company.awsAccounts || {}).replace(/</g, '\\u003c'));
     if (file === 'core/document-links.js' && substitute) source = source.replace('/* @company-site-base */ null', () => JSON.stringify(company && company.site ? company.site.baseUrl : null).replace(/</g, '\\u003c'));
     if (file === 'company-brand.config.js' && company && company.brand) source = companyBrandSource(company.brand);

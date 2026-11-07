@@ -1,5 +1,7 @@
 # Runtime provider exemplars (#946)
 
+For explicit ID/link retrieval without search or bindings, use [direct trace connection profiles](trace-connections.md). The query-candidate contract below remains unchanged.
+
 This runtime contract supplies #947 with trace evidence. It adds no caption, card,
 packet UI, authoring fields, save writes, or numerical Proof classification.
 Document editing remains desktop-only. Local, direct/nested imported, and actual

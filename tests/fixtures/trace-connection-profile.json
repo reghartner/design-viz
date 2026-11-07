@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "label": "Fixture Honeycomb",
+  "provider": "honeycomb",
+  "server": "Company observability",
+  "tool": "get_trace",
+  "readOnly": true,
+  "adapter": "honeycomb-table-v1",
+  "arguments": {"traceId": "trace_id", "start": "from", "environment": "environment_slug", "context": {"team": "team_slug"}},
+  "time": {"encoding": "relative", "type": "string", "defaultLookback": "2h"},
+  "literals": {"view_mode": "full"},
+  "environments": {
+    "prod": {"label": "Production", "value": "production", "context": {"team": "example-team"}},
+    "stage": {"label": "Staging", "value": "staging", "context": {"team": "example-team"}}
+  },
+  "links": [{"origin": "https://ui.honeycomb.io", "path": "/{team}/environments/{environment}/trace", "query": {"traceId": "trace_id", "start": "trace_start_ts", "end": "trace_end_ts"}, "timeEncoding": "unix-seconds"}]
+}

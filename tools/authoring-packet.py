@@ -45,7 +45,7 @@ DEPENDENCIES = {'traces': ['steps'], 'time': ['steps'], 'paths': ['steps'], 'rev
                 'visibility': ['steps'], 'audio': ['steps'], 'delta': ['steps'],
                 'drilldowns': ['layouts'], 'explore': ['layouts']}
 ROUTES = {
-    'traces': ['docs/trace-ready-authoring.md', 'docs/provider-traces.md'],
+    'traces': ['docs/trace-ready-authoring.md', 'docs/provider-traces.md', 'docs/trace-connections.md'],
     'metrics': ['docs/live-status.md', '.claude/skills/live-status-board/metrics.md'],
     'layouts': ['docs/tab-views.md', 'docs/section-layouts.md'], 'explore': ['docs/tab-views.md', 'docs/section-layouts.md'],
     'bindings': [REFS + 'bindings-and-code.md'],
@@ -56,7 +56,7 @@ ROUTES = {
 }
 # For dependencies whose rules are not in the contract, embed their maintained
 # owner instead of writing a second set of rules here.
-INLINE = {'traces': ['docs/trace-ready-authoring.md'],
+INLINE = {'traces': ['docs/trace-ready-authoring.md', 'docs/trace-connections.md'],
           'metrics': ['.claude/skills/live-status-board/metrics.md'],
           'bindings': [REFS + 'bindings-and-code.md'],
           'topology': ['docs/shared-topology.md'],
@@ -155,7 +155,7 @@ def infer(raw):
                     if key in ('revealAt', 'hideAt'): features.add('reveals')
                     if key == 'panelVisibility' or key == 'visible': features.add('visibility')
                     if key in ('audio', 'spotlight', 'alarm'): features.add('audio')
-                    if key == 'traceMatch': features.add('traces')
+                    if key in ('traceMatch', 'traceConnections'): features.add('traces')
                     if key == 'delta': features.add('delta')
                     if key == 'detailOnly': features.add('drilldowns')
                     visit(item)
@@ -189,6 +189,11 @@ def generate(panel_names, feature_names, mode='new', raw=None):
         features = expanded
     parts, provenance, loaded = [], [], {}
     company_context = company_agent_context(ROOT)
+    if company_context.get('traceConnections'):
+        parts.append('## Company direct trace profiles\n\n' +
+                     json.dumps(company_context['traceConnections'], sort_keys=True) +
+                     '\n\nThese are inherited non-secret configuration defaults, not permission. Restrict profiles at '
+                     '`page.tracking.telemetry.traceConnections`; use {} to disable direct loading. See the trace connections handoff contract.')
     if company_context.get('awsAccounts'):
         parts.append('## Company AWS account defaults\n\n' +
                      json.dumps(company_context['awsAccounts'], sort_keys=True) +

@@ -2735,3 +2735,7 @@ is labeled potentially truncated; the independent scalar remains authoritative.
 Scalar, trend and optional device breakdown share one anchored range. Trend or
 breakdown failures clear their own old evidence while retaining a successful
 scalar. Variables used only in either optional query cannot block the total.
+
+### Direct trace loading
+
+Status → Trace can load one exact trace ID or a supported provider link using an inherited company or board [trace connection profile](trace-connections.md). Load/Verify are read-only session actions independent of Metrics polling. Imported and local nodes share authored traceMatch mapping behavior; choose the exact mapping diagram when several are available.

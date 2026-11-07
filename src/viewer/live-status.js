@@ -860,6 +860,21 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // Selection belongs to a section object and carrier token, never to a step.
   var statusMode='jira',traceSelection=null,traceInitial=true,traceRequest=0,traceNotice='',traceShow=true,tracePending=null;
   var traceSections=new WeakMap(),traceSectionSerial=0;
+  function traceObjectId(object){if(!traceSections.has(object))traceSections.set(object,++traceSectionSerial);return traceSections.get(object);}
+  function directTraceSections(){
+    var mounted=sourceBindings(),out=[];
+    sources().forEach(function(source){sectionRecords(source).forEach(function(record){var section=record.section,d=section.diagram;if(!d || !trackingTelemetry(source).enabled)return;
+      var binding=mounted.find(function(b){return b.section===section && b.page===source;}),id=[traceObjectId(source),traceObjectId(section),traceObjectId(d),binding?traceObjectId(binding.el):0].join('/');
+      out.push({id:id,label:(source.title || 'Board')+' · '+(section.heading || section.id || record.reference || 'Diagram'),binding:binding || {section:section,page:source,stepper:null,el:null}});
+    });});return out;
+  }
+  var directTrace=createTelemetryDirect(page,telemetryOptions && telemetryOptions.directTrace,{
+    sections:directTraceSections,
+    identity:function(){return [telemetry.environment(),telemetry.snapshot().historical];},
+    disabled:function(){return retired || telemetryOptions===false || !trackingTelemetry(page).enabled || telemetry.snapshot().historical;},
+    accountChanged:function(){telemetry.clear();telemetry.setAvailable(false);},
+    changed:function(){if(!retired){paint();notify();}}
+  });
   function traceSources(){
     var evidence=telemetry.snapshot(),entries=[],owners=Object.create(null),mounted=sourceBindings(),ambiguous=new Set();
     eachDiagram(function(d,source){Object.keys(d.nodes || {}).concat((d.edges || []).map(function(e){return e.from+'->'+e.to;})).forEach(function(id){if(!owners[id])owners[id]=[];if(owners[id].indexOf(d)<0)owners[id].push(d);});});
@@ -877,6 +892,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
         });
       });
     });
+    var manual=directTrace.snapshot();
+    if(manual.exemplar){var context=directTraceSections().find(function(s){return s.id===manual.section;}),binding=context?context.binding:{section:{diagram:{steps:[]}},page:page,stepper:null,el:null};
+      entries.unshift({key:'direct/'+manual.section+'/'+manual.exemplar.selectionToken,carrier:null,binding:binding,exemplar:manual.exemplar,manual:true,label:'Loaded trace'+(context?' · '+context.label:'')});
+    }
     return {entries:entries,evidence:evidence,ambiguous:ambiguous.size};
   }
   function traceSnapshot(){
@@ -889,7 +908,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(traceSelection && !selected){traceSelection=null;tracePending=null;traceInitial=false;traceRequest++;traceNotice='Trace selection expired. Select current evidence.';}
     if(!selected && traceInitial && statusMode==='trace' && entries.length){selected=entries[0];traceSelection={key:selected.key,traceId:selected.exemplar.traceId};traceInitial=false;}
     var model=selected?telemetryTraceModel(selected.binding.section.diagram,selected.binding.stepper && selected.binding.stepper.path(),selected.exemplar):null;
-    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,carrier:selected.carrier,exemplar:selected.exemplar,model:model}:null,
+    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:directTrace.snapshot(),
       hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
   function paintTrace(){
@@ -1663,6 +1682,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     refs:refs,
     snapshot:snapshot,
     setStatusMode:function(mode){if(retired || ['jira','trace'].indexOf(mode)<0)return;statusMode=mode;close(false);paint();notify();},
+    setDirectTraceField:function(change){if(!retired && change){traceRequest++;traceSelection=null;traceInitial=true;traceNotice='';directTrace.set(change.field,change.value);}},
+    loadDirectTrace:async function(verify){if(retired)return;traceRequest++;traceSelection=null;traceInitial=true;traceNotice='';var result=await directTrace.load(!!verify);if(result){traceSelection=null;traceInitial=true;}paint();notify();return result;},
+    clearDirectTrace:function(){if(retired)return;traceSelection=null;traceInitial=true;directTrace.clear();},
     setTraceShow:function(value){if(retired)return;traceShow=!!value;paint();notify();},
     chooseTrace:async function(choice){
       if(retired || statusMode!=='trace')return;
@@ -1742,7 +1764,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     editSave:function(){if(!retired && editor)editor.save();},
     editDiscard:function(){if(!retired && editor)editor.discard();},
     destroy:function(){
-      if(retired)return;on=false;paintLanes();retired=true;bindings.forEach(function(b){telemetryClearStep(b.el);telemetryClearTrace(b.el);b.el.querySelectorAll('.dv-proof-caption').forEach(function(el){el.remove();});});releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);telemetryClearCards(view);if(demoDestroy)demoDestroy();
+      if(retired)return;on=false;paintLanes();retired=true;directTrace.destroy();bindings.forEach(function(b){telemetryClearStep(b.el);telemetryClearTrace(b.el);b.el.querySelectorAll('.dv-proof-caption').forEach(function(el){el.remove();});});releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);telemetryClearCards(view);if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];

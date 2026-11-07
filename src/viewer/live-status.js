@@ -1683,7 +1683,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     snapshot:snapshot,
     setStatusMode:function(mode){if(retired || ['jira','trace'].indexOf(mode)<0)return;statusMode=mode;close(false);paint();notify();},
     setDirectTraceField:function(change){if(!retired && change){traceRequest++;traceSelection=null;traceInitial=true;traceNotice='';directTrace.set(change.field,change.value);}},
-    loadDirectTrace:async function(verify){if(retired)return;traceRequest++;traceSelection=null;traceInitial=true;traceNotice='';var result=await directTrace.load(!!verify);if(result){traceSelection=null;traceInitial=true;}paint();notify();},
+    loadDirectTrace:async function(verify){if(retired)return;traceRequest++;traceSelection=null;traceInitial=true;traceNotice='';var result=await directTrace.load(!!verify);if(result){traceSelection=null;traceInitial=true;}paint();notify();return result;},
     clearDirectTrace:function(){if(retired)return;traceSelection=null;traceInitial=true;directTrace.clear();},
     setTraceShow:function(value){if(retired)return;traceShow=!!value;paint();notify();},
     chooseTrace:async function(choice){

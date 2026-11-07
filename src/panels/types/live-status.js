@@ -182,7 +182,20 @@
       el(time,'p','help','','Leave blank to use link bounds or the connection lookback.');
       field(time,'start','Trace start',null,'-2h or UTC ISO timestamp');field(time,'end','Trace end',null,'UTC ISO timestamp (absolute start only)');
       var controls=el(config,'div','actions','dv-live-controls');
-      var load=button(controls,'load','reader-button dv-trace-load','Load trace','loadDirectTrace');load._liveArgument=false;load.disabled=!direct.available || !direct.form.input.trim();
+      var load=el(controls,'button','load','reader-button dv-trace-load tbtn','Load trace');load.type='button';load.disabled=!direct.available || !direct.form.input.trim();
+      // Reveal only the successful gesture's own panel, after its render. A
+      // routine repaint, Verify, cancellation or remount must not move the view.
+      load._directLoadAction=function(){
+        var owner=host._livePanelApi;if(!owner || load.disabled)return;
+        var request=host._directRevealRequest=(host._directRevealRequest || 0)+1;
+        Promise.resolve(owner.loadDirectTrace(false)).then(function(result){
+          if(!live || !result || host._livePanelApi!==owner || host._directRevealRequest!==request)return;
+          var value=owner.snapshot(),selected=value.trace && value.trace.selected;
+          if(value.mode!=='trace' || !selected || !selected.manual || selected.exemplar.selectionToken!==result.selectionToken)return;
+          var target=host.querySelector('.dv-trace-selected');if(target && target.getClientRects().length && target.scrollIntoView)target.scrollIntoView({block:'nearest',inline:'nearest'});
+        });
+      };
+      if(!load._directLoadClick){load._directLoadClick=function(){load._directLoadAction();};load.addEventListener('click',load._directLoadClick);}
       var verify=button(controls,'verify','reader-button dv-trace-verify','Verify trace connection','loadDirectTrace');verify._liveArgument=true;verify.disabled=load.disabled;
       if(!direct.available)el(box,'p','unavailable','dv-trace-direct-status','Direct trace retrieval is unavailable in this host or view.').setAttribute('role','status');
       if(r){var report=el(box,'section','report','dv-trace-direct-report'+(loaded?' dv-trace-report-compact':''));report.setAttribute('aria-label','Trace connection report');

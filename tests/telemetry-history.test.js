@@ -175,3 +175,14 @@ test('H18 a successful new-detail batch cannot erase a pending peer failure or i
  api.openHistory(days,0);api.setEnabled(true);await settle();state.bound.push(['child',carrier('child')]);api.bindingsChanged();await settle();calls[0].reject(new Error('root history unavailable'));await settle();assert.equal(api.status().state,'error');assert.equal(api.status().busy,true);
  calls[1].resolve({child:{signals:{rate:{series:[[T,7]]}}}});await settle();assert.equal(api.snapshot().map.child.signals.rate.value,7);assert.equal(api.status().state,'error');assert.equal(api.status().busy,false);assert.match(api.status().note,/root history unavailable/);api.destroy();
 });
+
+
+test('opening history notifies direct-trace consumers when numeric metrics are off or unavailable',()=>{
+ for(const unavailable of [false,true]){
+  const C=context(),seen=[];let historyCalls=0,liveCalls=0;
+  const api=C.createTelemetry({}, {available:!unavailable,provider(){liveCalls++;return Promise.resolve({});},history(){historyCalls++;return Promise.resolve({});}}, {changed(){seen.push(api.snapshot().historical);}});
+  assert.equal(api.enabled(),false);api.openHistory(days,0);
+  assert.deepEqual(seen,[true]);assert.equal(historyCalls,0);assert.equal(liveCalls,0);assert.equal(api.enabled(),false);
+  api.closeHistory();assert.deepEqual(seen,[true,false]);api.destroy();
+ }
+});

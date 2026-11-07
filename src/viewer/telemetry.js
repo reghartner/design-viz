@@ -632,7 +632,10 @@ function createTelemetry(page,options,hooks){
     retractExemplars:function(){[liveMap,map].forEach(function(m){Object.keys(m).forEach(function(id){delete m[id].exemplars;if(!Object.keys(m[id].signals).length)delete m[id];});});notify();},
     openHistory:function(days,index){
       if(retired)return;cancelHistory();liveStatus=copy(status);past={days:days,index:index,map:{}};map=Object.create(null);
-      if(poller)poller.pause();loadHistory();
+      if(poller)poller.pause();
+      // Direct traces remain usable while Metrics is off. The history boundary
+      // must still retire their UI even when no numeric history can be loaded.
+      if(!enabled || !available)notify();else loadHistory();
     },
     historyDay:function(index){if(retired || !past)return;past.index=index;if(windowHistory)selectedHistoryChanged(false);else {showHistory();notify();}},
     closeHistory:function(){

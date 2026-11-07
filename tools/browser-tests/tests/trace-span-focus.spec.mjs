@@ -41,6 +41,23 @@ const row=(root,span)=>root.locator('.dv-trace-span[data-span-id="'+span.id+'"]'
 const node=(root,id)=>root.locator('g.node[data-dv-node="'+id+'"]:not(.node-text)');
 async function state(page){return page.evaluate(()=>({step:window.sp.current().id,path:window.sp.path(),playing:window.sp.playing(),focus:window.api.snapshot().trace.selected?.focus?.spanId}));}
 async function border(locator){return locator.locator('.card').evaluate(el=>{const s=getComputedStyle(el);return {stroke:s.stroke,dash:s.strokeDasharray,width:s.strokeWidth};});}
+// Screenshots must show settled JS-camera framing, not an intermediate RAF.
+async function expectTraceVisible(root){
+ await expect(root.locator('.dv-trace-focus-overlay')).toHaveCount(1);
+ await expect.poll(()=>root.locator('.dv-trace-focus-overlay').evaluate(marker=>{
+  const box=marker.getBoundingClientRect(),board=marker.closest('.board'),frame=board.getBoundingClientRect(),toolbar=board.querySelector('.lg').getBoundingClientRect();
+  return box.width>0 && box.height>0 && box.left>=frame.left+2 && box.right<=frame.right-2 && box.top>=toolbar.bottom+2 && box.bottom<=frame.bottom-2;
+ }),{message:'Complete Trace brackets and tag fit below the diagram toolbar'}).toBe(true);
+}
+async function expectPanelFits(root){
+ const regions=root.locator('.dv-trace-operation-detail,.dv-trace-focus-summary');
+ await expect.poll(()=>regions.evaluateAll(nodes=>nodes.every(node=>{
+  const box=node.getBoundingClientRect();return node.scrollWidth<=node.clientWidth+1 && Array.from(node.children).every(child=>{
+   const bounds=child.getBoundingClientRect();return bounds.left>=box.left && bounds.right<=box.right+1 && child.scrollWidth<=child.clientWidth+1;
+  });
+ })),{message:'Operation, duration, step labels and choices fit the desktop panel'}).toBe(true);
+}
+async function captureFocus(root,info,name){await expectTraceVisible(root);await expectPanelFits(root);await info.attach(name,{body:await root.screenshot(),contentType:'image/png'});}
 
 test('desktop native trace focus selects source steps, preserves imported/local missing-work borders, and clears without playback',async({page,server},info)=>{
  const {root,local,imported}=await setup(page,server,{reducedMotion:'no-preference'});
@@ -50,15 +67,15 @@ test('desktop native trace focus selects source steps, preserves imported/local 
  await row(root,local).focus();expect(await page.evaluate(()=>{window.sp.toggleAuto();return window.sp.playing();})).toBe(true);await page.keyboard.press('Enter');
  await expect(node(root,'local')).toHaveAttribute('data-trace-focus','true');expect(await state(page)).toMatchObject({step:'local',path:'checkout',playing:false,focus:local.id});
  await expect(row(root,local)).toHaveAttribute('aria-pressed','true');expect(await border(node(root,'local'))).toEqual(ink.local);
- await info.attach('trace-focus-local-step-and-missing-work',{body:await root.screenshot(),contentType:'image/png'});
+ await captureFocus(root,info,'trace-focus-local-step-and-missing-work');
  // A wholly filtered alternate still receives its exact source step preview.
  await page.evaluate(()=>{window.sp.setViewFilter(['checkout'],['local']);});await row(root,imported).click();
  await expect(node(root,'outer::inner::b')).toHaveAttribute('data-trace-focus','true');expect(await state(page)).toMatchObject({step:'currency',path:'imported',playing:false,focus:imported.id});
- expect(await border(node(root,'outer::inner::b'))).toEqual(ink.imported);
+ expect(await border(node(root,'outer::inner::b'))).toEqual(ink.imported);await expectTraceVisible(root);
  await page.evaluate(()=>window.sp.jumpSource(0,'checkout'));await expect(node(root,'outer::inner::b')).toHaveCSS('opacity','1');
  await page.evaluate(()=>window.sp.jumpSource(1,'imported'));await expect(root.locator('.dv-trace-focus-overlay')).toHaveCount(1);
  await expect(page.locator('#peer [data-trace-focus]')).toHaveCount(0);expect(await page.evaluate(()=>window.peer.controller.sections[0].stepper.current().id)).toBe('local');
- await info.attach('trace-focus-nested-import-hidden-alternate',{body:await root.screenshot(),contentType:'image/png'});
+ await captureFocus(root,info,'trace-focus-nested-import-hidden-alternate');
  const scrolls=await page.evaluate(()=>window.traceScrolls);await page.evaluate(()=>{for(let i=0;i<4;i++)window.api.setTraceShow(true);});
  await expect(root.locator('.dv-trace-focus-overlay')).toHaveCount(1);expect(await page.evaluate(()=>window.traceScrolls)).toBe(scrolls);
  await root.getByRole('button',{name:'Clear trace focus',exact:true}).click();await expect(root.locator('[data-trace-focus]')).toHaveCount(0);await expect(root.locator('.dv-trace-span[aria-pressed="true"]')).toHaveCount(0);expect(await state(page)).toMatchObject({step:'currency',playing:false});
@@ -69,7 +86,7 @@ test('desktop ambiguous and unmapped spans pause for inspection without guessing
  const {root,imported,e}=await setup(page,server,{ambiguous:true,reducedMotion:'no-preference'});
  await row(root,imported).scrollIntoViewIfNeeded();expect(await page.evaluate(()=>{window.sp.toggleAuto();return window.sp.playing();})).toBe(true);
  await row(root,imported).click();await expect(root.getByRole('group',{name:'Choose trace step'})).toBeVisible();expect(await state(page)).toMatchObject({step:'local',playing:false});await expect(root.locator('.dv-trace-focus-overlay')).toHaveCount(0);
- await info.attach('trace-focus-explicit-operation-choice',{body:await root.screenshot(),contentType:'image/png'});
+ await expectPanelFits(root);await info.attach('trace-focus-explicit-operation-choice',{body:await root.screenshot(),contentType:'image/png'});
  await root.getByRole('button',{name:'Step 1: Retry currency lookup · Recovery',exact:true}).click();expect(await state(page)).toMatchObject({step:'retry',path:'retry',playing:false});await expect(node(root,'outer::inner::b')).toHaveAttribute('data-trace-focus','true');
  const unmapped=e.spans.find(s=>s.service!=='currency' && s.service!=='frontend');await row(root,unmapped).scrollIntoViewIfNeeded();expect(await page.evaluate(()=>{window.sp.toggleAuto();return window.sp.playing();})).toBe(true);await row(root,unmapped).click();await expect(root.locator('.dv-trace-focus-status')).toContainText('Inspection only');expect(await state(page)).toMatchObject({step:'retry',path:'retry',playing:false});await expect(root.locator('.dv-trace-focus-overlay')).toHaveCount(0);
 });
@@ -86,6 +103,7 @@ for(const change of ['environment','connection','clear','history','remount'])tes
   window.staleResult=window.staleAPI.selectTraceSpan(window.staleAction);
  },change);
  expect(await page.evaluate(()=>window.staleResult)).toBe(false);expect(await page.evaluate(()=>window.jumpCalls)).toBe(0);await expect(root.locator('.dv-trace-focus-overlay')).toHaveCount(0);
+ if(change==='history'){await expect(root.locator('.dv-trace-selected')).toHaveCount(0);expect(await page.evaluate(()=>window.viewer.controller.telemetry.enabled())).toBe(false);}
 });
 
 
@@ -96,7 +114,10 @@ test('desktop focused baseline local and imported nodes retain full opacity and 
   await row(root,span).click();await expect(target).toHaveCSS('opacity','1');await expect(target.locator('.dv-trace-focus-overlay')).toHaveCount(1);expect(await border(target)).toEqual(ink);
   // Both lit and non-lit baseline states must yield to explicit trace focus.
   await page.evaluate(()=>window.sp.jumpSource(2,'checkout'));await expect(target).toHaveCSS('opacity','1');
-  await info.attach('trace-focus-baseline-'+(id==='local'?'local':'imported'),{body:await root.screenshot(),contentType:'image/png'});
+  // This scene deliberately moved to another step to prove non-lit opacity.
+  // Fit pauses follow and makes the focused comparison target visible again.
+  await root.getByRole('button',{name:'Fit diagram',exact:true}).click();
+  await captureFocus(root,info,'trace-focus-baseline-'+(id==='local'?'local':'imported'));
   await root.getByRole('button',{name:'Clear trace focus',exact:true}).click();await page.mouse.move(0,0);await expect(target).toHaveCSS('opacity','0.25');expect(await border(target)).toEqual(ink);
   await page.evaluate(({index,path})=>window.sp.jumpSource(index,path),{index,path});await expect(target).toHaveCSS('opacity','0.82');
  }
@@ -107,6 +128,6 @@ test('desktop actual text-box trace target receives brackets and restores baseli
  await expect(text).toHaveAttribute('data-dv-text-box','true');await expect(text.locator('.text-box-hit')).toHaveCount(1);await expect(text.locator('.card')).toHaveCount(0);
  await row(root,local).click();await expect(text).toHaveAttribute('data-trace-focus','true');await expect(text).toHaveCSS('opacity','1');await expect(text.locator('.dv-trace-focus-overlay')).toHaveCount(1);
  await page.evaluate(()=>window.sp.jumpSource(2,'checkout'));await expect(text).toHaveCSS('opacity','1');
- await info.attach('trace-focus-authored-text-box',{body:await root.screenshot(),contentType:'image/png'});
+ await root.getByRole('button',{name:'Fit diagram',exact:true}).click();await captureFocus(root,info,'trace-focus-authored-text-box');
  await root.getByRole('button',{name:'Clear trace focus',exact:true}).click();await page.mouse.move(0,0);await expect(text).toHaveCSS('opacity','0.25');await expect(text.locator('.dv-trace-focus-overlay')).toHaveCount(0);
 });

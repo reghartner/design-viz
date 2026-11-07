@@ -81,12 +81,14 @@ for(const native of [false,true])test((native?'native':'standalone')+' metric ca
  expect(await paint(unchanged)).toMatchObject({appearance:'unchanged',width:'1px',stroke:'rgb(46, 214, 0)'});
  for(const selector of ['.dv-metrics-card-value[data-signal="errors"]','.dv-metrics-card-failure']){const health=await textContrast(unchanged,selector);expect(health.contrast).toBeGreaterThanOrEqual(4.5);expect(health.ink[0]).toBeGreaterThan(health.ink[1]);expect(health.ink[1]).toBeGreaterThan(health.ink[2]);}
  await capture(root,testInfo,'inherited-failing');
- await unchanged.evaluate(el=>el.closest('.board').style.setProperty('--dv-board-ground','#0b1220'));
+ // Media changes repaint metric cards; the board owns this test tint and stays mounted.
+ const board=root.locator('.board');await expect(board).toHaveCount(1);
+ await board.evaluate(el=>el.style.setProperty('--dv-board-ground','#0b1220'));
  await page.evaluate(()=>window.cardCtl.liveStatus.setEnabled(true));
  await page.emulateMedia({media:'print'});
  for(const selector of ['.dv-metrics-card-value[data-signal="rate"]','.dv-metrics-card-value[data-signal="errors"]','.dv-metrics-card-failure'])expect((await textContrast(unchanged,selector)).contrast).toBeGreaterThanOrEqual(4.5);
  await capture(root,testInfo,'inherited-print');
- await page.emulateMedia({media:'screen'});await unchanged.evaluate(el=>el.closest('.board').style.removeProperty('--dv-board-ground'));
+ await page.emulateMedia({media:'screen'});await board.evaluate(el=>el.style.removeProperty('--dv-board-ground'));
 
  // Scope the same user appearance tokens consumed by nodes and metric cards.
  await page.evaluate(()=>{localStorage.setItem('flowview.status-colors.v1',JSON.stringify({version:2,colors:{'live-unchanged':'#765432'},appearance:{'live-unchanged':{borderColor:'#123456',borderWidth:2.25,fillStrength:40,glowStrength:100}}}));window.dispatchEvent(new CustomEvent('flowview-status-colors-change'));});

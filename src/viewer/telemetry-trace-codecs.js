@@ -1,7 +1,15 @@
 /* Registered, versioned response decoders shared by native and portable hosts.
    Provenance and limitations: docs/provider-traces.md. No provider transport. */
+function telemetryTraceErrorText(error){
+  var value=typeof error==='string'?error:error && typeof error.message==='string'?error.message:error && typeof error.payload==='string'?error.payload:error && Array.isArray(error.content)?error.content.slice(0,8).filter(function(c){return c && c.type==='text' && typeof c.text==='string';}).map(function(c){return c.text.slice(0,2048);}).join(' '):'';
+  return value.slice(0,16384).replace(/(?:https?:\/\/|honeycomb:\/\/)\S+/gi,'[link omitted]')
+    .replace(/\b(Bearer|Basic)\s+\S+/gi,'$1 [redacted]')
+    .replace(/((?:x-honeycomb-team|api[_-]?key|access[_-]?token|refresh[_-]?token|token|password|secret|authorization|cookie|credential)["']?\s*[=:]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi,'$1[redacted]')
+    .replace(/\b[A-Za-z0-9_+\/-]{40,}(?:\.[A-Za-z0-9_+\/-]+)*={0,2}/g,'[opaque value omitted]')
+    .replace(/[\x00-\x1f\x7f]/g,' ').slice(0,400).trim();
+}
 function telemetryTraceText(result){
-  if(result && result.isError)telemetryTraceFail('Trace tool returned an error.');
+  if(result && result.isError)telemetryTraceFail(telemetryTraceErrorText(result) || 'Trace tool returned an error.');
   var text=typeof (result && result.payload)==='string'?result.payload:(result && Array.isArray(result.content)?result.content:[]).filter(function(c){return c && c.type==='text' && typeof c.text==='string';}).map(function(c){return c.text;}).join('\n');
   if(text.length>TELEMETRY_EVIDENCE_BYTES || new TextEncoder().encode(text).byteLength>TELEMETRY_EVIDENCE_BYTES)telemetryTraceFail('Trace response exceeds the byte limit.');return text;
 }

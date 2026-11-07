@@ -167,7 +167,7 @@ only from the Load/Verify gesture. Responses retain parser warnings and the
 Native mounts contain no MCP transport. Hosts may implement
 `telemetry.directTrace.describe(request, signal)` and
 `telemetry.directTrace.call(request, args, signal)` as declared in
-[`src/native/mount.d.ts`](../src/native/mount.d.ts). The host must authorize that
+[`src/native/mount.d.ts`](https://github.com/reghartner/design-viz/blob/main/src/native/mount.d.ts). The host must authorize that
 exact configured connection using its own read-only policy, return current tool
 metadata/schema, and return the original provider response. The viewer uses the
 same validation and decoder as portable artifacts. Without those callbacks the

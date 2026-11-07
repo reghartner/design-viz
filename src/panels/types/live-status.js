@@ -156,10 +156,17 @@
     };
     function directTraceBody(body,direct){
       if(!direct || !direct.profiles.length)return;
-      var box=el(body,'section','direct','dv-trace-direct');el(box,'h3','heading','','Load trace');
-      el(box,'p','help','','Load one exact request. This session only; diagram mappings use authored traceMatch steps.');
-      function field(key,label,options,placeholder){
-        var wrap=el(box,'label',key+'-label','dv-trace-input-label');el(wrap,'span','label','',label);
+      var box=el(body,'section','direct','dv-trace-direct'),r=direct.report,loaded=!!(direct.exemplar && r && r.stage==='complete');
+      var profile=direct.profiles.find(function(p){return p.id===direct.form.connection;}),environment=profile && profile.environments.find(function(e){return e.id===direct.form.environment;});
+      var config=el(box,'details','config','dv-trace-config'),token=loaded?direct.exemplar.selectionToken:null,focusConfig=config.contains(doc.activeElement);
+      if(config._directLoaded!==loaded || config._directToken!==token){config.open=!loaded;config._directLoaded=loaded;config._directToken=token;}
+      var summary=el(config,'summary','summary','');summary.setAttribute('aria-label',loaded?'Change or load another trace':'Load trace options');
+      el(summary,'strong','title','',loaded?[profile && profile.label,environment && environment.label].filter(Boolean).join(' · '):'Load trace');
+      if(loaded)el(summary,'span','change','dv-trace-config-action','Change / load another trace');
+      if(loaded && !config.open && focusConfig)summary.focus({preventScroll:true});
+      el(config,'p','help','','Load one exact request. This session only; diagram mappings use authored traceMatch steps.');
+      function field(parent,key,label,options,placeholder){
+        var wrap=el(parent,'label',key+'-label','dv-trace-input-label');el(wrap,'span','label','',label);
         var control=el(wrap,options?'select':'input',key,'dv-trace-input');control.setAttribute('aria-label',label);
         if(options){el(control,'option','empty','','Choose…').value='';options.forEach(function(o){el(control,'option',o.id,'',o.label).value=o.id;});}
         else {control.type='text';control.maxLength=4096;control.autocomplete='off';control.spellcheck=false;control.placeholder=placeholder || '';}
@@ -167,23 +174,27 @@
         if(!control._directChange){control._directChange=function(){var owner=host._livePanelApi;if(owner)owner.setDirectTraceField({field:key,value:control.value});};control.addEventListener(options?'change':'input',control._directChange);}
         return control;
       }
-      field('connection','Trace connection',direct.profiles);
-      var profile=direct.profiles.find(function(p){return p.id===direct.form.connection;});field('environment','Connection environment',profile?profile.environments:[]);
-      if(direct.sections.length)field('section','Mapping diagram',direct.sections);
-      field('input','Trace ID or link',null,'Paste a trace ID or supported Honeycomb link');
-      var time=el(box,'p','time-help','','Optional time overrides. Leave blank to use link bounds or the connection lookback.');
-      field('start','Trace start',null,'-2h or UTC ISO timestamp');field('end','Trace end',null,'UTC ISO timestamp (absolute start only)');
-      var controls=el(box,'div','actions','dv-live-controls');
+      field(config,'connection','Trace connection',direct.profiles);
+      field(config,'environment','Connection environment',profile?profile.environments:[]);
+      if(direct.sections.length)field(config,'section','Mapping diagram',direct.sections);
+      field(config,'input','Trace ID or link',null,'Paste a trace ID or supported Honeycomb link');
+      var time=el(config,'details','time','dv-trace-time');el(time,'summary','summary','','Time overrides (optional)');
+      el(time,'p','help','','Leave blank to use link bounds or the connection lookback.');
+      field(time,'start','Trace start',null,'-2h or UTC ISO timestamp');field(time,'end','Trace end',null,'UTC ISO timestamp (absolute start only)');
+      var controls=el(config,'div','actions','dv-live-controls');
       var load=button(controls,'load','reader-button dv-trace-load','Load trace','loadDirectTrace');load._liveArgument=false;load.disabled=!direct.available || !direct.form.input.trim();
       var verify=button(controls,'verify','reader-button dv-trace-verify','Verify trace connection','loadDirectTrace');verify._liveArgument=true;verify.disabled=load.disabled;
-      if(direct.busy || direct.exemplar || direct.report)button(controls,'clear','reader-button',direct.busy?'Cancel request':'Clear loaded trace','clearDirectTrace');
       if(!direct.available)el(box,'p','unavailable','dv-trace-direct-status','Direct trace retrieval is unavailable in this host or view.').setAttribute('role','status');
-      if(direct.report){var r=direct.report,report=el(box,'section','report','dv-trace-direct-report');report.setAttribute('aria-label','Trace connection report');report.setAttribute('role','status');
-        el(report,'p','stage','',r.error || (r.stage==='complete'?'Request accepted · trace ID matched · '+r.spanCount+' displayed spans · '+r.completeness+' completeness':r.stage==='schema'?'Checking runtime tool schema…':'Loading exact trace…'));
-        el(report,'p','identity','', [r.connection,r.server,r.tool,r.environment].filter(Boolean).join(' · '));
-        el(report,'p','receipt','', 'Stage: '+r.stage+' · request accepted: '+(r.requestAccepted?'yes':'no')+' · ID matched: '+(r.idMatched?'yes':'no'));
-        if(r.arguments){el(report,'p','argument-note','','Resolved arguments (configured literals and context redacted):');el(report,'pre','arguments','dv-trace-arguments',JSON.stringify(r.arguments,null,2));}
+      if(r){var report=el(box,'section','report','dv-trace-direct-report'+(loaded?' dv-trace-report-compact':''));report.setAttribute('aria-label','Trace connection report');
+        el(report,'p','stage','dv-trace-direct-status',r.error || (r.stage==='complete'?'Loaded · ID matched · '+r.spanCount+' spans · '+r.completeness+' completeness':r.stage==='schema'?'Checking runtime tool schema…':'Loading exact trace…')).setAttribute('role','status');
+        if(r.error)el(report,'p','error-stage','','Stage: '+r.stage);
+        var diagnostics=el(report,'details','diagnostics','dv-trace-diagnostics');el(diagnostics,'summary','summary','',r.mode==='verify'?'Verification details':'Connection details');
+        if(diagnostics._directMode!==r.mode || diagnostics._directBusy!==direct.busy){diagnostics.open=r.mode==='verify';diagnostics._directMode=r.mode;diagnostics._directBusy=direct.busy;}
+        el(diagnostics,'p','identity','', [r.connection,r.server,r.tool,r.environment].filter(Boolean).join(' · '));
+        el(diagnostics,'p','receipt','', 'Stage: '+r.stage+' · request accepted: '+(r.requestAccepted?'yes':'no')+' · ID matched: '+(r.idMatched?'yes':'no'));
+        if(r.arguments){el(diagnostics,'p','argument-note','','Resolved arguments (configured literals and context redacted):');el(diagnostics,'pre','arguments','dv-trace-arguments',JSON.stringify(r.arguments,null,2));}
       }
+      if(direct.busy || direct.exemplar || r)button(el(box,'div','actions','dv-live-controls'),'clear','reader-button',direct.busy?'Cancel request':'Clear loaded trace','clearDirectTrace');
     }
     function traceBody(value){
       var trace=value.trace,body=el(host,'div','trace-body','dv-live-panel-body dv-live-trace'),controls=el(body,'div','controls','dv-live-controls');
@@ -436,6 +447,7 @@
 .pt-live-status .dv-status-modes .tbtn.dv-status-mode[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-candidate[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-show[aria-pressed="true"]{background:var(--dv-live-active);color:#fff;border-color:var(--dv-live-active)}
 .dv-live-trace{font-size:12px}.dv-live-trace p{margin:6px 0;overflow-wrap:anywhere}.dv-trace-mode-status:empty{display:none}
 .dv-trace-direct{border:1px solid var(--explore-border);border-radius:6px;padding:10px;margin:10px 0}.dv-trace-input-label{display:grid;gap:4px;margin:8px 0}.dv-trace-input{box-sizing:border-box;width:100%;min-width:0;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);border-radius:4px;padding:6px}.dv-trace-arguments{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:10px}.dv-trace-direct-report{padding:8px;border:1px solid var(--explore-border);margin-top:8px}
+.dv-trace-config>summary,.dv-trace-time>summary,.dv-trace-diagnostics>summary{cursor:pointer;overflow-wrap:anywhere}.dv-trace-config-action{display:block;margin:3px 0 0 14px;color:var(--dfaint)}.dv-trace-time{margin:10px 0}.dv-trace-diagnostics{margin:6px 0}.dv-trace-report-compact{border:0;padding:0;margin:6px 0}.dv-trace-direct>.dv-live-controls{margin-top:6px}
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
 .dv-trace-selected{min-width:0}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}
 .dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall{max-height:240px;overflow:auto;margin:12px 0;border:1px solid var(--explore-border);border-radius:6px;padding:8px}

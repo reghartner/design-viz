@@ -19,7 +19,7 @@ test('compiled source-free runtime, packet, kit and detail-only manifest share e
  for(const [file,body] of Object.entries(files)){const output=path.join(kit,file);fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,body);}
  assert.equal(fs.existsSync(path.join(kit,'src/core/trace-connections.js')),false);assert.equal(fs.existsSync(path.join(kit,'company/company.json')),false);
  const runtime=require(path.join(kit,'tools/canon/generated-runtime.cjs'));assert.equal(runtime.traceConnections.resolve(board().page,expected).reader.tool,'get_trace');
- for(const cwd of [root,kit]){execFileSync('python3',['tools/authoring-packet.py','--mode','edit','--features','traces','--out','trace-packet.md'],{cwd,encoding:'utf8'});const packet=fs.readFileSync(path.join(cwd,'trace-packet.md'),'utf8');assert.match(packet,/Company direct trace profiles/);assert.match(packet,/Verify trace connection/);assert.ok(packet.includes(PROFILE.server));}
+ for(const cwd of [root,kit]){execFileSync('python3',['tools/authoring-packet.py','--mode','edit','--feature','traces','--out','trace-packet.md'],{cwd,encoding:'utf8'});const packet=fs.readFileSync(path.join(cwd,'trace-packet.md'),'utf8');assert.match(packet,/Company direct trace profiles/);assert.match(packet,/Verify trace connection/);assert.ok(packet.includes(PROFILE.server));}
  // Injection is a source publishing tool; exercise its source-free compiled
  // resolver with only its direct dependencies, never the source tree.
  for(const file of ['inject.py','crossrefs.py'])fs.copyFileSync(path.join(root,'tools',file),path.join(kit,'tools',file));

@@ -83,6 +83,9 @@ test('native shares validation and recorded decoders, exposes no MCP and reports
  const C=context('native');assert.equal(typeof C.createTelemetryDirectMcp,'undefined');assert.equal(typeof C.createTelemetryTraces,'undefined');const p=board(),calls=[];const api=C.createTelemetryDirect(p,{describe:async request=>{assert.equal(request.profile.server,fixture.server);return tool();},call:async(request,args)=>{calls.push(args);return {payload:recorded};}},{sections:()=>[]});api.set('environment','prod');api.set('input',ID);assert.equal((await api.load()).spans.length,55);assert.equal(calls.length,1);api.destroy();
  const absent=C.createTelemetryDirect(p,null);absent.set('input',ID);assert.equal(absent.snapshot().available,false);await absent.load();assert.equal(absent.snapshot().report.stage,'host');assert.equal(absent.snapshot().exemplar,null);absent.destroy();
 });
+test('shared native decoder preserves bounded useful tool failures without portable transport dependencies',()=>{
+ const C=context('native');assert.throws(()=>C.telemetryHoneycombTrace({isError:true,content:[{type:'text',text:'column timestamp is always returned; token=private-token https://mcp.honeycomb.io/trace_results/private'}]},ID),error=>{assert.match(error.message,/column timestamp is always returned/);assert.doesNotMatch(error.message,/private|https:\/\//);assert.ok(error.message.length<=400);return true;});
+});
 
 test('detail errors retain actionable invalid-time/column diagnostics while redacting credential and transport text',async()=>{
  const messages=[

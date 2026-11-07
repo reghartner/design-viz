@@ -73,3 +73,17 @@ test('one ambiguous operation with concurrent spans still requires a choice',asy
  const span=e.spans.find(s=>s.name==='POST /v1/events');e.spans.push({...structuredClone(span),id:'concurrent'});
  const choices=plain(C.telemetryTraceChoices(d,'event',e,span.id));assert.equal(choices.length,1);assert.equal(choices[0].row.status,'ambiguous');
 });
+
+
+test('compact trace milliseconds retain raw evidence and exact delivered-edge identity',async()=>{
+ for(const [ms,label] of [[0,'0 ms'],[.00013,'<0.01 ms'],[8.735083,'8.74 ms'],[196.114973,'196.1 ms'],[4650.643585,'4,651 ms'],[604800000,'604,800,000 ms']])assert.equal(C.telemetryTraceDuration(ms),label);
+ const f=structuredClone(await story()),d=f.spec.page.sections[0].diagram,e=f.samples['mcu->ingest'].exemplars[0];
+ const raw=e.spans.find(s=>s.name==='POST /v1/events');raw.ms=4650.643585;
+ let row=C.telemetryTraceModel(d,'event',e).rows[0];assert.equal(row.label,'4,651 ms');assert.equal(row.duration,4650.643585);assert.equal(row.edgeIndex,0);assert.equal(raw.ms,4650.643585);
+ delete d.steps[0].traceMatch.nodeId;row=C.telemetryTraceModel(d,'event',e).rows[0];assert.equal(row.edgeIndex,0);assert.equal(row.nodeId,null);
+ d.steps[0].edges=['mcu->ingest','ingest->notify'];delete d.steps[0].edge;assert.equal(C.telemetryTraceModel(d,'event',e).rows[0].edgeIndex,null);
+ d.steps[0].edges=['mcu->ingest'];d.steps[0].failures={'mcu->ingest':'dropped'};assert.equal(C.telemetryTraceModel(d,'event',e).rows[0].edgeIndex,null);
+ delete d.steps[0].failures;d.edges.push({...d.edges[0]});assert.equal(C.telemetryTraceModel(d,'event',e).rows[0].edgeIndex,null,'parallel duplicate endpoints cannot select an arbitrary path');
+ d.edges.pop();d.steps.push({...structuredClone(d.steps[0]),id:'duplicate'});d.paths[0].steps.push('duplicate');
+ const choices=plain(C.telemetryTraceChoices(d,'event',e,raw.id));assert.equal(choices.length,2);assert.ok(choices.every(choice=>choice.row.status==='ambiguous' && choice.row.edgeIndex===0),'an explicit step choice may select its unique delivered edge');
+});

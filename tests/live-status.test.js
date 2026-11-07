@@ -2758,11 +2758,12 @@ test('span focus controller pauses, jumps exact source steps, shares state, and 
  assert.equal(h.ctl.telemetry.snapshot().map['mcu->ingest'].exemplars[0].traceId,exemplar.traceId);
  api.setStatusMode('trace');
  let selected=api.snapshot().trace.selected;assert.ok(selected);assert.equal(selected.exemplar.traceId,exemplar.traceId);assert.equal(selected.focus,null);
+ const edge=h.view.querySelector('path.edge[data-dv-edge="0"]');edge.setAttribute('id','focus-edge');edge.setAttribute('d','M0 0 C30 40 70 40 100 0');edge.setAttribute('transform','translate(5 7)');
  const span=selected.exemplar.spans.find(s=>s.service==='event-ingest' && s.name==='POST /v1/events'),action={context:selected.context,spanId:span.id};
  assert.equal(api.selectTraceSpan(action),true);assert.equal(pauses,1);assert.deepEqual(jumps,[[0,'short']]);
  selected=api.snapshot().trace.selected;assert.equal(selected.focus.spanId,span.id);assert.equal(selected.focus.choice.stepId,'submit');
- assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,1);
- api.setTraceShow(true);api.setTraceShow(true);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,1);
- api.clearTraceFocus({context:selected.context});assert.equal(api.snapshot().trace.selected.focus,null);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,0);assert.equal(pauses,1);assert.equal(api.selectTraceSpan(action),false);
+ assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,1);assert.equal(h.view.querySelectorAll('.dv-trace-edge-focus').length,1);assert.equal(h.view.querySelector('.dv-trace-edge-focus').getAttribute('transform'),'translate(5 7)');assert.equal(h.view.querySelector('.dv-trace-edge-outline').getAttribute('d'),edge.getAttribute('d'));
+ api.setTraceShow(true);api.setTraceShow(true);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,1);assert.equal(h.view.querySelectorAll('.dv-trace-edge-focus').length,1);assert.equal(h.view.querySelectorAll('mask').length,1);assert.equal(edge.getAttribute('d'),'M0 0 C30 40 70 40 100 0');
+ api.clearTraceFocus({context:selected.context});assert.equal(api.snapshot().trace.selected.focus,null);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay,.dv-trace-edge-focus').length,0);assert.equal(h.view.querySelectorAll('mask').length,0);assert.equal(pauses,1);assert.equal(api.selectTraceSpan(action),false);
  const next={context:api.snapshot().trace.selected.context,spanId:span.id};api.destroy();assert.equal(api.selectTraceSpan(next),false);assert.equal(jumps.length,1);
 });

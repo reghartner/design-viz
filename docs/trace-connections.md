@@ -191,13 +191,23 @@ this choice; the viewer never picks the first match. Unmapped spans stay availab
 for inspection and do not change the current step.
 
 The focused operation has exterior cyan corner brackets and a **Trace** label.
+Its uniquely authored delivered edge receives a cyan floating outline with a
+transparent gap around the original line. Curves, protocol dashes, status colors
+and arrows retain their original geometry and ink. Failure/availability breaks
+remain broken; focus never paints a continuous delivery over a hidden line.
 Work-status borders, including dotted red Missing work, retain their own ink.
 All applicable nodes use this treatment, including imported and nested topology
 and loaded detail diagrams. The selected span lives in the controller, so every
 Status panel agrees with the diagram. A mapping without an explicit `nodeId` can
-select its authored step but has no invented diagram target.
+select its authored step and its unique delivered edge. Multiple eligible edges
+or duplicate endpoints have no edge focus; the viewer never guesses an edge.
+Millisecond annotations use larger, compact numbers; exact provider values remain
+in accessible labels and tooltips without changing the trace evidence. Larger
+labels stay within the existing SVG clip: edge timings can switch sides of an
+extreme curve, and bottom-node timings retain stroke padding. These transient
+placements do not change the diagram frame or camera on routine repaint.
 
-**Clear trace focus** removes the brackets and span selection without restarting
+**Clear trace focus** removes the brackets, edge outline and span selection without restarting
 playback or changing the chosen step. Whole-request annotations remain available.
 Changing the trace, environment, connection, mapping source, historical context,
 or source mount expires focus. Old panel callbacks cannot navigate a replacement
@@ -207,3 +217,7 @@ Desktop CI scenes in `trace-span-focus.spec.mjs` capture local and nested import
 Missing work borders beside selected steps, a filtered alternate, and explicit
 ambiguity choices. They also exercise native sibling isolation, keyboard
 selection, reduced motion, repeated repaint, history and retired callbacks.
+
+Revision scenes also cover curved local and nested imported edge outlines,
+baseline/status ink, exact loaded-source ownership, edge-only and ambiguous
+mappings, compact long timings, and overlay cleanup across native mounts.

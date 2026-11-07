@@ -16,7 +16,7 @@ async function expectCompactTrace(root){
  const body=await root.locator('.dv-live-trace').boundingBox(),config=await root.locator('.dv-trace-direct').boundingBox(),selected=await root.locator('.dv-trace-selected').boundingBox(),waterfall=await root.locator('.dv-trace-waterfall').boundingBox();
  expect(config.height,'loaded connection summary stays compact').toBeLessThan(240);expect(selected.y-body.y,'selected request stays beside the diagram').toBeLessThan(470);expect(waterfall.y-body.y,'waterfall is not pushed below expanded configuration').toBeLessThan(720);
 }
-function detailSpec(){const detail=nestedSpec(),d=detail.page.sections[0].diagram;detail.page.title='Loaded detail';detail.page.sections[0].heading='Imported detail';delete d.edges[0].telemetry;
+function detailSpec(){const detail=nestedSpec(),d=detail.page.sections[0].diagram;detail.page.title='Loaded detail';detail.page.sections[0].heading='Imported detail';delete d.edges[0].telemetry;d.edges[0].curvePoints=[{t:.5,dx:0,dy:70}];
  d.nodes.local={title:'Local frontend'};d.rows.push(['local']);d.steps=[{id:'local',nodes:['local'],text:'Local checkout',traceMatch:{serviceName:'frontend',operation:'/cart/checkout',nodeId:'local'}},{id:'imported',edge:'outer::inner::a->outer::inner::b',text:'Imported currency',traceMatch:{serviceName:'currency',operation:'grpc.msdemo.CurrencyService/GetSupportedCurrencies',nodeId:'outer::inner::b'}}];return detail;}
 async function portable(page,server,{held=false,absolute=false,inherited=false,duplicates=false}={}){
  await page.setViewportSize({width:1500,height:1100});const profile=clone(PROFILE),tools=[schema()],calls=[],permissions=[],releases=[];let hold=held;
@@ -87,11 +87,15 @@ test('desktop loaded detail span focus owns its exact source despite duplicate r
  await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);
  const span=await page.evaluate(()=>window.ctl.liveStatus.snapshot().trace.selected.exemplar.spans.find(s=>s.service==='currency' && s.name==='grpc.msdemo.CurrencyService/GetSupportedCurrencies').id);
  const before=await page.evaluate(()=>window.ctl.sections[0].stepper.current().id);
+ const edge=h.root.locator('path.edge[data-dv-edge="0"]'),geometry=await edge.getAttribute('d'),arrow=await edge.getAttribute('marker-end');
  await h.root.locator('.dv-trace-span[data-span-id="'+span+'"]').click();
  await expect(h.root.locator('g.node[data-dv-node="outer::inner::b"]:not(.node-text)')).toHaveAttribute('data-trace-focus','true');
  expect(await page.evaluate(()=>window.ctl.details.activeSections()[1].stepper.current().id)).toBe('imported');expect(await page.evaluate(()=>window.ctl.sections[0].stepper.current().id)).toBe(before);
+ await expect(h.root.locator('.dv-trace-edge-focus')).toHaveCount(1);await expect(h.root.locator('.dv-trace-edge-outline')).toHaveAttribute('d',geometry);await expect(edge).toHaveAttribute('marker-end',arrow);await expect(h.root.locator('.dv-trace-overlay[data-trace-edge="0"] text')).toHaveCSS('font-size','14px');
+ await h.root.getByRole('button',{name:'Fit diagram',exact:true}).click();
+ await expect.poll(()=>h.root.locator('.dv-trace-edge-focus').evaluate(g=>{const box=g.getBoundingClientRect(),board=g.closest('.board'),frame=board.getBoundingClientRect(),toolbar=board.querySelector('.lg').getBoundingClientRect();return box.width>0 && box.left>=frame.left && box.right<=frame.right && box.top>=toolbar.bottom && box.bottom<=frame.bottom;})).toBe(true);
  await info.attach('trace-focus-exact-loaded-source',{body:await h.root.screenshot(),contentType:'image/png'});
  await page.evaluate(()=>{const selected=window.ctl.liveStatus.snapshot().trace.selected;window.oldSpanAction={context:selected.context,spanId:selected.focus.spanId};});
  await openTraceConfiguration(h.root);await h.root.getByRole('combobox',{name:'Mapping diagram',exact:true}).selectOption(h.choices.find(o=>o.value && o.value!==h.selected.value).value);
- expect(await page.evaluate(()=>window.ctl.liveStatus.selectTraceSpan(window.oldSpanAction))).toBe(false);await expect(h.root.locator('.dv-trace-focus-overlay')).toHaveCount(0);
+ expect(await page.evaluate(()=>window.ctl.liveStatus.selectTraceSpan(window.oldSpanAction))).toBe(false);await expect(h.root.locator('.dv-trace-focus-overlay,.dv-trace-edge-focus')).toHaveCount(0);
 });

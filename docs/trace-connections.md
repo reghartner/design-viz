@@ -8,7 +8,11 @@ acceptance, returned ID match, span count and completeness. Both are explicit
 reader actions. Changing an input never fetches. Clear/cancel, connection,
 environment, mapping diagram, document identity and remount changes retire old
 requests; late responses cannot replace current evidence. Schema/detail requests
-time out after 30 seconds.
+time out after 30 seconds. Changing the connection or environment also clears
+the pasted ID/link and time controls: supply a trace for the selected environment
+before loading again. Changing only the mapping diagram retains that input.
+An authenticated host account change retires the shared telemetry session,
+retracts direct and numeric evidence, and requires reopening the viewer.
 
 The result stays in this viewing session. No board edits, metrics, numeric proof,
 trace history or new traceMatch rules are created. Choose a mapping diagram when

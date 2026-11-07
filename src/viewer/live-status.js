@@ -872,6 +872,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     sections:directTraceSections,
     identity:function(){return [telemetry.environment(),telemetry.snapshot().historical];},
     disabled:function(){return retired || telemetryOptions===false || !trackingTelemetry(page).enabled || telemetry.snapshot().historical;},
+    accountChanged:function(){telemetry.clear();telemetry.setAvailable(false);},
     changed:function(){if(!retired){paint();notify();}}
   });
   function traceSources(){

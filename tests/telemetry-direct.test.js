@@ -13,7 +13,7 @@ function setup({C=context(),p=board(),metadataOnly=false,permission='granted',re
  const win={claude:{use:async n=>n==='permissions'?{request:async keys=>{permissions.push(...keys);return Object.fromEntries(keys.map(k=>[k,permission]));}}:mcp}};
  const adapter=C.createTelemetryProviders(p,win),api=C.createTelemetryDirect(p,adapter.options.directTrace,{sections:()=>[{id:'source/section/diagram/mount',label:'Diagram'}],...hooks});
  api.set('environment','prod');api.set('input',ID);
- return {C,p,api,calls,permissions,counts,mcp,win,setTools:v=>tools=v};
+ return {C,p,api,adapter,calls,permissions,counts,mcp,win,setTools:v=>tools=v};
 }
 test('company config is inherited without calls; board restrictions/overrides are bounded, immutable and exact',()=>{
  const C=context('backend'),F=C.FlowTraceConnections,p=profile(),company={ops:p},page={tracking:{telemetry:{traceConnections:{chosen:{profile:'ops',label:'Chosen',literals:{view_mode:'full'},environments:{prod:{value:'production-2',context:{team:'team-2'}}}}}}}},before=JSON.stringify([page,company]);
@@ -28,6 +28,14 @@ test('raw ID, exact recognized link, environment/context checks and ambiguity do
  for(const input of [link+'&trace_id='+ID,link+'&token=secret',link.replace('production','other'),link.replace('example-team','other-team'),link.replace('ui.honeycomb.io','evil.example'),link+'#fragment','not-a-trace'])assert.throws(()=>F.input(p,{input},NOW),/input/);
  assert.throws(()=>F.input(p,{input:link,environment:'stage'},NOW),/conflicts/);assert.throws(()=>F.input(p,{input:ID},NOW),/Choose an environment/);
  const ambiguous=profile();ambiguous.links.push(clone(ambiguous.links[0]));assert.throws(()=>F.input(F.profile(ambiguous),{input:link},NOW),/Ambiguous/);
+});
+test('present empty, whitespace or malformed link fields fail before discovery, consent or any detail call',async()=>{
+ const base='https://ui.honeycomb.io/example-team/environments/production/trace?trace_id='+ID;
+ const links=[base+'&trace_start_ts=&trace_end_ts=',base+'&trace_start_ts=',base+'&trace_end_ts=',base+'&trace_start_ts=%20&trace_end_ts=1791779592',base+'&trace_start_ts=invalid&trace_end_ts=1791779592',base.replace('/production/','//'),base.replace('/production/','/%20/'),base.replace('/example-team/','//'),base.replace('/example-team/','/%00/'),base.replace(ID,'')];
+ for(const input of links){const h=setup({metadataOnly:true});h.api.set('input',input);assert.equal(await h.api.load(true),null,input);assert.equal(h.api.snapshot().report.stage,'input',input);assert.equal(h.counts.lists,0,input);assert.equal(h.counts.describes,0,input);assert.equal(h.permissions.length,0,input);assert.equal(h.calls.length,0,input);h.api.destroy();}
+ // Environment/context may be extracted from query fields as well as paths.
+ const p=profile();p.links[0].path='/trace';p.links[0].query.environment='env';p.links[0].query.team='team';
+ for(const input of ['https://ui.honeycomb.io/trace?trace_id='+ID+'&env=&team=example-team','https://ui.honeycomb.io/trace?trace_id='+ID+'&env=production&team=']){const h=setup({p:board(p)});h.api.set('input',input);assert.equal(await h.api.load(),null);assert.equal(h.api.snapshot().report.stage,'input');assert.equal(h.counts.lists,0);assert.equal(h.calls.length,0);h.api.destroy();}
 });
 test('explicit second/millisecond encodings and nanoseconds preserve older absolute bounds; relative-only fails',()=>{
  const F=context().FlowTraceConnections,p=profile(),url='https://ui.honeycomb.io/example-team/environments/production/trace?trace_id='+ID+'&trace_start_ts=1791779586.602194688&trace_end_ts=1791779592.123456789';
@@ -65,7 +73,7 @@ test('response failures remain stage-specific; errors/unknown/oversize/mismatche
 });
 test('late A cannot overwrite B across profile/environment/input/section/source identity/cancel/destroy changes',async()=>{
  for(const mode of ['environment','connection','input','section','identity','clear','destroy']){
-  let release,identity='source-A',p=board();if(mode==='connection')p.tracking.telemetry.traceConnections.second=profile();const h=setup({p,hooks:{identity:()=>identity,sections:()=>[{id:'one',label:'One'},{id:'two',label:'Two'}]},call:async()=>{await new Promise(r=>release=r);return {payload:recorded};}});if(mode==='connection'){h.api.set('connection','company');h.api.set('environment','prod');}h.api.set('section','one');const pending=h.api.load();for(let i=0;i<10 && !release;i++)await new Promise(setImmediate);assert.ok(release);
+  let release,identity='source-A',p=board();if(mode==='connection')p.tracking.telemetry.traceConnections.second=profile();const h=setup({p,hooks:{identity:()=>identity,sections:()=>[{id:'one',label:'One'},{id:'two',label:'Two'}]},call:async()=>{await new Promise(r=>release=r);return {payload:recorded};}});if(mode==='connection'){h.api.set('connection','company');h.api.set('environment','prod');h.api.set('input',ID);}h.api.set('section','one');const pending=h.api.load();for(let i=0;i<10 && !release;i++)await new Promise(setImmediate);assert.ok(release);
   if(mode==='identity')identity='source-B';else if(mode==='clear')h.api.clear();else if(mode==='destroy')h.api.destroy();else h.api.set(mode,mode==='environment'?'stage':mode==='connection'?'second':mode==='section'?'two':'f'.repeat(32));
   release();assert.equal(await pending,null);assert.equal(h.api.snapshot().exemplar,null);h.api.destroy();
  }
@@ -100,4 +108,49 @@ test('registered Tempo profile uses the same direct-only path and preserves prov
  const C=context('native'),raw=JSON.parse(fs.readFileSync('tests/fixtures/provider-traces/grafana-source-test.json','utf8')),p={version:1,label:'Company Tempo',provider:'tempo',server:'Company Grafana',tool:'get_tempo_trace',readOnly:true,adapter:'tempo-v1',arguments:{traceId:'trace_id',start:'start',end:'end'},time:{encoding:'iso8601',type:'string',defaultLookback:'2h'},literals:{datasourceUid:'tempo-main'},environments:{prod:{}},links:[]},calls=[];
  const api=C.createTelemetryDirect(board(p),{describe:async()=>({name:p.tool,annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{datasourceUid:{type:'string'},trace_id:{type:'string'},start:{type:'string'},end:{type:'string'}},required:['datasourceUid','trace_id','start','end'],additionalProperties:false}}),call:async(request,args)=>{calls.push(clone(args));return {payload:raw};}});
  api.set('input',raw.traceId);const e=await api.load(true);assert.equal(e.provider,'tempo');assert.equal(e.completeness,'unknown');assert.equal(e.spans[0].ms,125);assert.equal(calls.length,1);assert.equal(calls[0].trace_id,raw.traceId);assert.match(calls[0].start,/Z$/);assert.equal(api.snapshot().report.idMatched,true);api.destroy();
+});
+
+const settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
+async function sharedAccountSetup(t,call){
+ const p=board();p.tracking.telemetry.grafana={prometheus:'direct-account-fixture'};
+ const carrier=p.sections[0].diagram.nodes.a;carrier.tickets=['AA-1'];carrier.telemetry={kind:'service',signals:{rate:{grafana:'explicit_rate',unit:'req/h'}},proof:{rate:{min:1}}};
+ const numeric=()=>({payload:{data:[{values:[[Math.floor(Date.now()/1000),'42']]}]}});
+ const h=setup({p,call:(server,name,args,options)=>call?call(name,numeric,options):name==='get_trace'?{payload:recorded}:name==='query_prometheus'?numeric():{payload:[]}});
+ h.mcp.listTools=async()=>{h.counts.lists++;return [{server:fixture.server,tools:[tool()]},{server:'Grafana',tools:['query_prometheus','query_loki_logs','search_tempo_traces','get_annotations','generate_deeplink']}];};
+ const log=h.C.liveStatusTelemetryActivity(),metrics=h.C.createTelemetry(p,h.adapter.options,{carriers:fn=>fn(carrier,'a',p),jira:()=>({'AA-1':{state:'done',updatedAt:new Date(Date.now()-3600000).toISOString()}}),observed:log.observe,reset:log.clear,retire:log.retire});
+ const live={snapshot:()=>({actionLabel:''}),action(){},onChange:()=>()=>{},onDestroy:()=>()=>{}},handle=h.adapter.attach({telemetry:metrics,liveStatus:live},p);
+ t.after(()=>{h.api.destroy();handle.destroy();metrics.destroy();});await settle();metrics.setEnabled(true);await settle();assert.equal(metrics.snapshot().map.a.signals.rate.value,42);assert.ok(log.snapshot().length,'observed first-traffic activity exists before the account boundary');
+ return {...h,metrics,log,numeric};
+}
+for(const origin of ['discovery','detail'])test('direct '+origin+' user_changed retires shared numeric/proof/history and ignores late results',async t=>{
+ let changed=false,holdNumeric=false,release;
+ const h=await sharedAccountSetup(t,(name,numeric,options)=>{if(name==='get_trace'){if(changed)throw {code:'user_changed'};return {payload:recorded};}if(name==='query_prometheus'){if(holdNumeric)return new Promise(r=>release=()=>r(numeric()));return numeric();}return {payload:[]};});
+ // Populate selected history, then return live. Account retirement must not
+ // leave a cached result that a later history visit can restore.
+ const days=[{at:new Date().toISOString()}];h.metrics.openHistory(days,0);await settle();assert.equal(h.metrics.snapshot().map.a.signals.rate.value,42);h.metrics.closeHistory();await settle();
+ holdNumeric=true;h.metrics.retry();await settle();assert.ok(release);
+ if(origin==='discovery')h.mcp.listTools=async()=>{h.counts.lists++;throw {code:'user_changed'};};else changed=true;
+ assert.equal(await h.api.load(true),null);assert.equal(h.api.snapshot().available,false);assert.equal(h.api.snapshot().report.code,'user_changed');assert.equal(h.metrics.enabled(),false);assert.equal(h.metrics.snapshot().available,false);assert.deepEqual(clone(h.metrics.snapshot().map),{});assert.equal(h.log.snapshot().length,0);assert.equal(h.C.liveStatusProofPresentation(h.metrics.snapshot(),'24h',true).rows[0].kpis[0].text,'unobserved');
+ release();await settle();assert.deepEqual(clone(h.metrics.snapshot().map),{});assert.equal(h.log.snapshot().length,0);
+ const counts=[h.calls.length,h.counts.lists];h.metrics.setEnabled(true);h.metrics.openHistory(days,0);await settle();assert.deepEqual(clone(h.metrics.snapshot().map),{});h.api.set('environment','stage');await h.api.load();assert.deepEqual([h.calls.length,h.counts.lists],counts);
+ // Recreating just the direct controller cannot reopen the retired provider.
+ const replacement=h.C.createTelemetryDirect(h.p,h.adapter.options.directTrace);replacement.set('environment','prod');replacement.set('input',ID);assert.equal(replacement.snapshot().available,false);await replacement.load();assert.deepEqual([h.calls.length,h.counts.lists],counts);replacement.destroy();
+});
+for(const pending of [false,true])test('query account change retracts '+(pending?'pending':'loaded')+' direct evidence and prevents further calls',async t=>{
+ let changed=false,holdDirect=false,release,heldSignal;
+ const h=await sharedAccountSetup(t,(name,numeric,options)=>{if(name==='get_trace'){if(holdDirect){heldSignal=options.signal;return new Promise(r=>release=()=>r({payload:recorded}));}return {payload:recorded};}if(name==='query_prometheus'){if(changed)throw {code:'user_changed'};return numeric();}return {payload:[]};});
+ await h.api.load();assert.equal(h.api.snapshot().exemplar.traceId,ID);let request;
+ if(pending){holdDirect=true;request=h.api.load();await settle();assert.ok(release);}
+ changed=true;h.metrics.retry();await settle();assert.equal(h.api.snapshot().available,false);assert.equal(h.api.snapshot().exemplar,null);assert.equal(h.api.snapshot().report.code,'user_changed');assert.deepEqual(clone(h.metrics.snapshot().map),{});assert.equal(h.log.snapshot().length,0);
+ if(pending){assert.equal(heldSignal.aborted,true);release();assert.equal(await request,null);assert.equal(h.api.snapshot().exemplar,null);}
+ const counts=[h.calls.length,h.counts.lists];changed=false;h.api.clear();h.api.set('environment','stage');await h.api.load(true);h.metrics.setEnabled(true);await settle();assert.deepEqual([h.calls.length,h.counts.lists],counts);assert.equal(h.api.snapshot().exemplar,null);
+});
+test('ordinary direct form cancellation preserves the shared numeric account session',async t=>{
+ const h=await sharedAccountSetup(t);const before=clone(h.metrics.snapshot().map);await h.api.load();h.api.set('environment','stage');h.api.clear();assert.equal(h.metrics.enabled(),true);assert.equal(h.metrics.snapshot().available,true);assert.deepEqual(clone(h.metrics.snapshot().map),before);assert.equal(h.api.snapshot().available,true);assert.equal(h.api.snapshot().form.input,'');h.api.set('input',ID);assert.equal((await h.api.load()).traceId,ID);
+});
+test('connection and environment changes require fresh trace input; section-only changes preserve it',async()=>{
+ for(const change of ['environment','connection','global']){let global='prod';const p=board();p.tracking.telemetry.traceConnections.other=profile();const h=setup({p,hooks:{identity:()=>[global,false]}});h.api.set('connection','company');h.api.set('environment','prod');h.api.set('input',ID);h.api.set('start','2026-10-12T00:00:00Z');h.api.set('end','2026-10-12T02:00:00Z');
+  if(change==='global')global='stage';else h.api.set(change,change==='environment'?'stage':'other');const form=h.api.snapshot().form;assert.equal(form.input,'',change);assert.equal(form.start,'',change);assert.equal(form.end,'',change);assert.equal(await h.api.load(),null);assert.equal(h.counts.lists,0,change);assert.equal(h.calls.length,0,change);h.api.destroy();
+ }
+ const h=setup({hooks:{sections:()=>[{id:'one',label:'One'},{id:'two',label:'Two'}]}});h.api.set('section','one');h.api.set('start','-2h');h.api.set('section','two');assert.equal(h.api.snapshot().form.input,ID);assert.equal(h.api.snapshot().form.start,'-2h');assert.equal(h.calls.length,0);assert.equal((await h.api.load()).traceId,ID);h.api.destroy();
 });

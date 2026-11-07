@@ -95,14 +95,14 @@ var FlowTraceConnections=(function(){
       });
       if(found.length!==1)fail('input',found.length?'Ambiguous trace link descriptors.':'This connection does not support that trace link.');
     }else found=[{traceId:value}];
-    var parsed=found[0];if(!/^[0-9a-f]{16,32}$/i.test(parsed.traceId || ''))fail('input','Invalid trace ID.');
-    var ids=Object.keys(p.environments).filter(function(id){var e=p.environments[id];if(parsed.environment && parsed.environment!==e.value)return false;return Object.keys(p.arguments.context || {}).every(function(k){return !own(parsed,k) || String(e.context[k])===parsed[k];});});
+    var parsed=found[0];Object.keys(parsed).forEach(function(k){var v=parsed[k];if(typeof v!=='string' || !v.length || v!==v.trim() || /[\x00-\x1f\x7f]/.test(v))fail('input','Supplied trace link fields must be nonempty and well formed.');});if(!/^[0-9a-f]{16,32}$/i.test(parsed.traceId || ''))fail('input','Invalid trace ID.');
+    var ids=Object.keys(p.environments).filter(function(id){var e=p.environments[id];if(own(parsed,'environment') && parsed.environment!==e.value)return false;return Object.keys(p.arguments.context || {}).every(function(k){return !own(parsed,k) || String(e.context[k])===parsed[k];});});
     if(request.environment){if(ids.indexOf(request.environment)<0)fail('input','Trace link conflicts with the selected environment/context.');ids=[request.environment];}
     if(ids.length!==1)fail('input',ids.length?'Choose an environment; the request is ambiguous.':'Trace link does not match a configured environment/context.');
-    ['start','end'].forEach(function(k){if(parsed[k] && request[k])fail('input','Time supplied in both the link and controls; clear the time control.');});
-    var start=parsed.start || request.start || '-'+p.time.defaultLookback,end=parsed.end || request.end,encoding=parsed.start?parsed.encoding:'iso8601',relative=start[0]==='-',to=BigInt(now)*1000000n,from;
-    if(relative){if(parsed.start && encoding!=='relative' || end)fail('input','Relative time cannot be combined with an absolute end.');from=to-BigInt(lookback(start))*1000000000n;}
-    else {if(!end)fail('input','Absolute trace time requires both start and end.');from=instant(start,encoding);to=instant(end,parsed.end?parsed.encoding:'iso8601');}
+    ['start','end'].forEach(function(k){if(own(parsed,k) && request[k])fail('input','Time supplied in both the link and controls; clear the time control.');});
+    var start=own(parsed,'start')?parsed.start:request.start || '-'+p.time.defaultLookback,end=own(parsed,'end')?parsed.end:request.end,encoding=own(parsed,'start')?parsed.encoding:'iso8601',relative=start[0]==='-',to=BigInt(now)*1000000n,from;
+    if(relative){if(own(parsed,'start') && encoding!=='relative' || end)fail('input','Relative time cannot be combined with an absolute end.');from=to-BigInt(lookback(start))*1000000000n;}
+    else {if(!end)fail('input','Absolute trace time requires both start and end.');from=instant(start,encoding);to=instant(end,own(parsed,'end')?parsed.encoding:'iso8601');}
     if(from<0n || from>to)fail('input','Invalid trace time bounds.');
     if(p.time.encoding==='relative' && !relative)fail('arguments','This connection supports only relative time; it cannot honor absolute trace-link bounds.');
     if(p.time.encoding!=='relative' && !p.arguments.end)fail('arguments','Absolute time requires an end argument mapping.');

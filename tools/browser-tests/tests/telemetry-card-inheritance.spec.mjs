@@ -90,14 +90,13 @@ for(const native of [false,true])test((native?'native':'standalone')+' metric ca
 
  // Scope the same user appearance tokens consumed by nodes and metric cards.
  await page.evaluate(()=>{localStorage.setItem('flowview.status-colors.v1',JSON.stringify({version:2,colors:{'live-unchanged':'#765432'},appearance:{'live-unchanged':{borderColor:'#123456',borderWidth:2.25,fillStrength:40,glowStrength:100}}}));window.dispatchEvent(new CustomEvent('flowview-status-colors-change'));});
- await page.evaluate(()=>window.cardCtl.liveStatus.setEnabled(true));
- expect(await paint(unchanged)).toMatchObject({appearance:'unchanged',stroke:'rgb(18, 52, 86)',width:'2.25px',glow:'0.35'});
+ await expect.poll(()=>paint(unchanged)).toMatchObject({appearance:'unchanged',stroke:'rgb(18, 52, 86)',width:'2.25px',glow:'0.35'});
+ await expect.poll(async()=>{const {ink}=await textContrast(unchanged,'.dv-metrics-card-value[data-signal="rate"]');return ink[0]>ink[1] && ink[1]>ink[2];}).toBe(true);
  expect(await unchanged.evaluate(el=>getComputedStyle(el).getPropertyValue('--dv-live-fill').trim())).toBe('40%');
  await capture(root,testInfo,'inherited-preferences');
  for(const tint of ['#2ed600','#000000','#ffffff']){
   await page.evaluate(tint=>{const palette=JSON.parse(localStorage.getItem('flowview.status-colors.v1'));palette.colors['live-unchanged']=tint;palette.appearance['live-unchanged'].fillStrength=100;localStorage.setItem('flowview.status-colors.v1',JSON.stringify(palette));window.dispatchEvent(new CustomEvent('flowview-status-colors-change'));},tint);
-  await page.evaluate(()=>window.cardCtl.liveStatus.setEnabled(true));
-  for(const selector of ['.dv-metrics-card-value[data-signal="rate"]','.dv-metrics-card-value[data-signal="errors"]','.dv-metrics-card-failure'])expect((await textContrast(unchanged,selector)).contrast).toBeGreaterThanOrEqual(4.5);
+  for(const selector of ['.dv-metrics-card-value[data-signal="rate"]','.dv-metrics-card-value[data-signal="errors"]','.dv-metrics-card-failure'])await expect.poll(async()=>(await textContrast(unchanged,selector)).contrast).toBeGreaterThanOrEqual(4.5);
   await capture(root,testInfo,'inherited-opaque-'+tint.slice(1));
  }
 

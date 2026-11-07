@@ -179,3 +179,31 @@ the compiled resolver. Injection declares only resolved exact detail tools,
 including a detail-only connection with no search signal. The `traces` authoring
 packet includes this contract and company context. `--no-config` removes company
 defaults; inline board profiles remain authored configuration.
+
+### Focus a span and its authored step
+
+Selecting a waterfall span pauses the owning diagram. A unique authored mapping
+selects its exact source step, including a step hidden by the current View or on
+an alternate path. A shared step keeps the current path when that path contains
+it. When more than one authored operation or path can own the span, choose the
+step explicitly in the panel. Concurrent/ambiguous selector results also require
+this choice; the viewer never picks the first match. Unmapped spans stay available
+for inspection and do not change the current step.
+
+The focused operation has exterior cyan corner brackets and a **Trace** label.
+Work-status borders, including dotted red Missing work, retain their own ink.
+All applicable nodes use this treatment, including imported and nested topology
+and loaded detail diagrams. The selected span lives in the controller, so every
+Status panel agrees with the diagram. A mapping without an explicit `nodeId` can
+select its authored step but has no invented diagram target.
+
+**Clear trace focus** removes the brackets and span selection without restarting
+playback or changing the chosen step. Whole-request annotations remain available.
+Changing the trace, environment, connection, mapping source, historical context,
+or source mount expires focus. Old panel callbacks cannot navigate a replacement
+diagram. Routine repainting updates the existing panel without scrolling it.
+
+Desktop CI scenes in `trace-span-focus.spec.mjs` capture local and nested imported
+Missing work borders beside selected steps, a filtered alternate, and explicit
+ambiguity choices. They also exercise native sibling isolation, keyboard
+selection, reduced motion, repeated repaint, history and retired callbacks.

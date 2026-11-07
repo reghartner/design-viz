@@ -246,13 +246,25 @@
       el(detail,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');
       var limit=e.warnings.filter(function(w){return /200 spans|timeline unavailable/i.test(w);});if(model.warning)limit.push(model.warning);if(limit.length)el(detail,'p','limit','dv-trace-limit',Array.from(new Set(limit)).join(' '));
       if(model.mapping)el(detail,'p','coverage','dv-trace-coverage',model.rows.filter(function(r){return r.status==='matched';}).length+'/'+model.rows.length+' steps matched · '+model.mapping.unmatched.length+' spans unmatched');
-      var focusedSpan=e.spans.find(function(s){return host._liveTraceSpan===e.traceId+':'+s.id;}) || e.spans[0];
-      if(focusedSpan){var operation=el(detail,'div','operation','dv-trace-operation-detail'),matched=model.rows.find(function(r){return r.status==='matched' && r.spanIds.indexOf(focusedSpan.id)>=0;});el(operation,'strong','name','',focusedSpan.name);el(operation,'span','duration','',focusedSpan.ms+' ms'+(matched && matched.budget!=null?' / '+matched.budget+' ms budget':''));el(operation,'small','conditions','',matched?matched.conditions.map(function(c){return c.label;}).join(' · '):'No unique authored operation mapping');}
+      var focus=selected.focus,focusedSpan=focus && e.spans.find(function(s){return s.id===focus.spanId;});
+      var focusBox=el(detail,'div','focus','dv-trace-focus-summary');
+      el(focusBox,'span','hint','dv-trace-focus-hint',focusedSpan?'Trace focus · '+focusedSpan.name:'Select a span to focus its operation and pause playback.');
+      if(focusedSpan){
+        var clear=button(focusBox,'clear','reader-button','Clear trace focus','clearTraceFocus');clear._liveArgument={context:selected.context};
+        var operation=el(detail,'div','operation','dv-trace-operation-detail'),matched=focus.choice && focus.choice.row;
+        el(operation,'strong','name','',focusedSpan.name);el(operation,'span','duration','',focusedSpan.ms+' ms'+(matched && matched.budget!=null?' / '+matched.budget+' ms budget':''));
+        el(operation,'small','conditions','',matched?matched.conditions.map(function(c){return c.label;}).join(' · '):'');
+        el(operation,'small','navigation','dv-trace-focus-status',focus.choice?'Step: '+focus.choice.label+(!focus.choice.row.nodeId?' · no authored diagram target':'')+(!focus.navigable?' · open this diagram to navigate':''):focus.choices.length?'Choose the authored step for this span.':'No authored step maps this span. Inspection only.').setAttribute('role','status');
+        if(!focus.choice && focus.choices.length){
+          var choices=el(operation,'div','choices','dv-trace-step-choices');choices.setAttribute('role','group');choices.setAttribute('aria-label','Choose trace step');
+          focus.choices.forEach(function(choice){var pick=button(choices,choice.key,'reader-button dv-trace-step-choice',choice.label,'selectTraceSpan');pick._liveArgument={context:selected.context,spanId:focusedSpan.id,choiceKey:choice.key};});
+        }
+      }
       var waterfall=el(detail,'div','waterfall','dv-trace-waterfall');waterfall.setAttribute('aria-label','Selected trace waterfall');
       var extent=Math.max.apply(null,e.spans.map(function(s){return s.startMs+s.ms;}).concat([1]));
       e.spans.forEach(function(span){
-        var row=el(waterfall,'button',span.id,'dv-trace-span');row.type='button';row.setAttribute('data-error',String(span.error));row.setAttribute('aria-pressed',String(!!focusedSpan && span.id===focusedSpan.id));row._traceSpan=e.traceId+':'+span.id;
-        if(!row._traceClick){row._traceClick=function(){host._liveTraceSpan=row._traceSpan;if(api)paint(api.snapshot());};row.addEventListener('click',row._traceClick);}
+        var row=el(waterfall,'button',span.id,'dv-trace-span');row.type='button';row.setAttribute('data-error',String(span.error));row.setAttribute('aria-pressed',String(!!focusedSpan && span.id===focusedSpan.id));row._traceSpan={context:selected.context,spanId:span.id};row.setAttribute('data-span-id',span.id);
+        if(!row._traceClick){row._traceClick=function(){var owner=host._livePanelApi;if(owner && row.isConnected)owner.selectTraceSpan(row._traceSpan);};row.addEventListener('click',row._traceClick);}
         el(row,'span','name','dv-trace-span-name',span.service+' · '+span.name).title=span.id;
         var track=el(row,'span','track','dv-trace-track'),bar=el(track,'i','bar','dv-trace-bar');bar.style.marginLeft=100*span.startMs/extent+'%';bar.style.width=Math.max(.4,100*span.ms/extent)+'%';
         el(row,'span','duration','',span.ms+' ms'+(span.error?' · error':''));
@@ -467,7 +479,17 @@
 .dv-trace-span{width:100%;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;display:grid;grid-template-columns:minmax(100px,1.2fr) minmax(60px,1fr) minmax(55px,auto);gap:8px;align-items:center;padding:5px 0;font-size:10px}.dv-trace-span[aria-pressed="true"]{background:color-mix(in srgb,var(--dv-live-active) 10%,transparent)}.dv-trace-span:focus-visible{outline:2px solid var(--dv-live-active)}.dv-trace-operation-detail{display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:12px;padding:8px;border:1px solid var(--explore-border);border-radius:6px}.dv-trace-operation-detail small{grid-column:1/-1}.dv-trace-span-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-track{height:10px;background:color-mix(in srgb,var(--dink) 7%,transparent)}.dv-trace-bar{display:block;box-sizing:border-box;max-width:100%;height:10px;background:var(--dv-live-active)}.dv-trace-span[data-error="true"] .dv-trace-bar{background:var(--dv-live-blocked)}
 .dv-trace-mappings{display:grid;gap:5px}.dv-trace-mapping{display:grid;grid-template-columns:1fr auto;gap:2px 8px;border-left:3px solid var(--dfaint);padding:5px 8px}.dv-trace-mapping small{grid-column:1/-1;color:var(--dfaint)}.dv-trace-mapping[data-tone="error"]{border-color:var(--dv-live-blocked)}.dv-trace-mapping[data-tone="warning"]{border-color:#d49620}
 [data-trace-tone="error"]{--dv-trace-color:#d64b68}[data-trace-tone="warning"]{--dv-trace-color:#c88b14}[data-trace-tone="observed"]{--dv-trace-color:#368cc9}[data-trace-tone="unknown"]{--dv-trace-color:#87929e}
-g.node[data-trace-tone],path.edge[data-trace-tone]{opacity:1!important}g.node[data-trace-tone] .card,path.edge[data-trace-tone]{stroke:var(--dv-trace-color)!important;stroke-width:3px!important}g.node[data-trace-tone="unknown"] .card{stroke-dasharray:4 4!important}
+/* Evidence never replaces status or missing-work borders. Only the selected
+   operation escapes step/ambient dimming; whole-trace annotations stay quiet. */
+g.node[data-trace-focus="true"]{opacity:1!important}
+.dv-trace-focus-overlay .dv-trace-focus-brackets{fill:none;stroke:#009fc7;stroke-width:3;stroke-linecap:square;stroke-linejoin:round;stroke-dasharray:none;filter:drop-shadow(0 0 2px var(--dbg,#fff))}
+.dv-trace-focus-overlay rect{fill:#007d9c;stroke:var(--dbg,#fff);stroke-width:2}
+.dv-trace-focus-overlay text{fill:#fff;font:700 10px 'IBM Plex Mono',monospace;letter-spacing:.3px}
+.dv-trace-focus-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid color-mix(in srgb,#009fc7 40%,var(--dfaint));border-radius:7px;background:color-mix(in srgb,#009fc7 7%,var(--dbg));font-size:12px}
+.dv-trace-focus-hint{min-width:0;overflow-wrap:anywhere}.dv-trace-focus-summary .reader-button{flex:none}
+.dv-trace-focus-status{color:var(--dtext)}.dv-trace-step-choices{display:flex;flex-wrap:wrap;gap:7px;grid-column:1/-1}.dv-trace-step-choice{white-space:normal;text-align:left}
+.dv-trace-span:focus-visible,.dv-trace-step-choice:focus-visible{outline:2px solid #009fc7;outline-offset:3px}
+
 .dv-trace-overlay{fill:#368cc9}.dv-trace-overlay[data-tone="error"]{fill:#d64b68}.dv-trace-overlay[data-tone="warning"]{fill:#c88b14}.dv-trace-overlay[data-tone="unknown"]{fill:#87929e}.dv-trace-overlay text{font:600 10px 'IBM Plex Mono',monospace;paint-order:stroke;stroke:var(--dbg,#fff);stroke-width:3px;stroke-linejoin:round}
 .dv-live-toggle{display:flex;gap:4px;align-items:center;}
 .dv-live-count{border-radius:4px;padding:2px 4px;color:var(--dv-live-on);}

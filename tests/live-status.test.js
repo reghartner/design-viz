@@ -2744,3 +2744,18 @@ test('Status Jira and Trace bodies are exclusive, remain instance-owned and pres
  api.setStatusMode('jira');assert.ok(m.body.querySelector('table.dv-live-tickets'));assert.equal(m.body.querySelector('.dv-live-trace'),null);assert.equal(api.state('AA-1').state,fixed['AA-1'].state);
  api.destroy();peer.ctl.liveStatus.destroy();
 });
+
+test('span focus controller pauses, jumps exact source steps, shares state, and rejects retired evidence',async()=>{
+ const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),h=harness(f.spec,{}, {telemetry:{}}),api=h.ctl.liveStatus;
+ let path='short',index=3,pauses=0;const jumps=[];
+ h.ctl.sections[0].stepper={path:()=>path,sourceIndex:()=>index,mode:()=> 'ambient',pause(){pauses++;},jumpSource(i,p){jumps.push([i,p]);index=i;path=p;return true;}};
+ h.ctl.telemetry.apply(f.samples);api.setStatusMode('trace');
+ let selected=api.snapshot().trace.selected;assert.ok(selected);assert.equal(selected.focus,null);
+ const span=selected.exemplar.spans.find(s=>s.service==='event-ingest' && s.name==='POST /v1/events'),action={context:selected.context,spanId:span.id};
+ assert.equal(api.selectTraceSpan(action),true);assert.equal(pauses,1);assert.deepEqual(jumps,[[0,'short']]);
+ selected=api.snapshot().trace.selected;assert.equal(selected.focus.spanId,span.id);assert.equal(selected.focus.choice.stepId,'submit');
+ assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,1);
+ api.setTraceShow(true);api.setTraceShow(true);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,1);
+ api.clearTraceFocus({context:selected.context});assert.equal(api.snapshot().trace.selected.focus,null);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,0);assert.equal(pauses,1);assert.equal(api.selectTraceSpan(action),false);
+ const next={context:api.snapshot().trace.selected.context,spanId:span.id};api.destroy();assert.equal(api.selectTraceSpan(next),false);assert.equal(jumps.length,1);
+});

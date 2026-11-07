@@ -4004,13 +4004,13 @@ body .docview .termbar[data-playback-position][hidden]{display:none;}
 /* Presentation hiding retains graph identity and geometry for story references. */
 [data-dv-hidden="true"]{visibility:hidden!important;pointer-events:none!important;}
 /* Design-review annotations are orthogonal to protocol paint and runtime tones. */
-.board :is(.node,.edge,.lbl,.pkt).review-baseline{opacity:.55 !important;}
+.board :is(.node,.edge,.lbl,.pkt).review-baseline:not([data-trace-focus]){opacity:.55 !important;}
 .board .halo.review-baseline{opacity:.025 !important;}
 .board.stepmode :is(.edge,.lbl).review-baseline.lit{opacity:.82 !important;}
-.board.stepmode .node.review-baseline:not(.lit){opacity:.25 !important;}
+.board.stepmode .node.review-baseline:not(.lit):not([data-trace-focus]){opacity:.25 !important;}
 .board.stepmode :is(.edge,.lbl).review-baseline:not(.lit){opacity:.15 !important;}
-.board.stepmode .node.review-baseline.lit{opacity:.82 !important;}
-.board .node.review-baseline:is(:hover,:focus-within),.board.stepmode .node.review-baseline:is(:hover,:focus-within){opacity:.9 !important;}
+.board.stepmode .node.review-baseline.lit:not([data-trace-focus]){opacity:.82 !important;}
+.board .node.review-baseline:is(:hover,:focus-within):not([data-trace-focus]),.board.stepmode .node.review-baseline:is(:hover,:focus-within):not([data-trace-focus]){opacity:.9 !important;}
 .board.stepmode :is(.edge,.lbl,.pkt,.halo).review-baseline.comm-hidden{opacity:0 !important;}
 .review-badge{display:inline-block;padding:2px 7px;border:1px solid currentColor;border-radius:5px;font:600 11px/1.35 'IBM Plex Sans',sans-serif;white-space:nowrap;}
 .review-proposed,.review-replace{color:#087f9b;}
@@ -4035,7 +4035,7 @@ body .docview .termbar[data-playback-position][hidden]{display:none;}
 .review-alignment,.review-targets,.review-no-step{font-size:11px;opacity:.75;}
 .review-targets{margin-top:5px;}
 @media print{
-  .board :is(.node,.edge,.lbl).review-baseline,.board.stepmode :is(.node,.edge,.lbl).review-baseline:is(.lit,:not(.lit)),.board.stepmode :is(.edge,.lbl,.pkt,.halo).review-baseline.comm-hidden{opacity:.55 !important;}
+  .board :is(.node,.edge,.lbl).review-baseline:not([data-trace-focus]),.board.stepmode :is(.node,.edge,.lbl).review-baseline:is(.lit,:not(.lit)):not([data-trace-focus]),.board.stepmode :is(.edge,.lbl,.pkt,.halo).review-baseline.comm-hidden{opacity:.55 !important;}
   .node-review-badge rect{fill:#fff;}
   .node-review-badge,.review-badge{color:#333 !important;}
 }
@@ -4075,7 +4075,7 @@ text.lbl[data-live-appearance]{fill:var(--dv-live-ink,#000)!important;}
 /* Keep the current-step marker inside the chip so fitted tracks do not scroll. */
 .schip[data-live-appearance][aria-current="true"]::after{content:"";position:absolute;width:12px;height:2px;left:50%;bottom:2px;transform:translateX(-50%);background:var(--dv-live-ink,#000);border-radius:1px;}
 .docview .schip.step-colored[data-live-appearance]:focus-visible{outline:2px solid var(--dv-live-ink,#000);outline-offset:3px;}
-.stepmode:not(.dv-deltaonly) :is(.node,.coin)[data-live-appearance]:not(.lit):not(.node-text):not(.comm-hidden):not(.dv-live-comm-hidden):not(.review-baseline):not(.dv-live-unavailable){opacity:max(var(--dv-dim,.45),.55)!important;}
+.stepmode:not(.dv-deltaonly) :is(.node,.coin)[data-live-appearance]:not(.lit):not(.node-text):not(.comm-hidden):not(.dv-live-comm-hidden):not(.review-baseline):not(.dv-live-unavailable):not([data-trace-focus]){opacity:max(var(--dv-dim,.45),.55)!important;}
 @media(prefers-reduced-motion:reduce){.dv-live-active>.dv-live-halo{animation:none!important;opacity:calc(.35 * var(--dv-live-glow));}.coin.dv-live-active>circle,[data-live-appearance="active"]::before{animation:none!important;}}
 @media print{[data-live-appearance]{--dv-live-ink:var(--dv-live-print-ink,#000)!important;print-color-adjust:exact;-webkit-print-color-adjust:exact;}.dv-live-active>.dv-live-halo,.coin.dv-live-active>circle,[data-live-appearance="active"]::before{animation:none!important;}}
 .dv-live-target,.dv-live-pointer,g.node:has(>.card.dv-live-target){cursor:pointer;}
@@ -4176,7 +4176,7 @@ path.edge.dv-live-missing:not(.dv-live-waiting){stroke-dasharray:6 4!important;}
 .dv-live-reservation-divider{fill:none;stroke:var(--ns-line);stroke-width:.6;opacity:.45;}
 .dv-live-reservation-title,.dv-live-reservation-tickets{fill:var(--ns-sub);font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0;}
 .dv-live-reservation-title{font-weight:600;}
-.stepmode .node.dv-live-unavailable:not(.lit){opacity:max(var(--dv-dim,.45),.65)!important;}
+.stepmode .node.dv-live-unavailable:not(.lit):not([data-trace-focus]){opacity:max(var(--dv-dim,.45),.65)!important;}
 .dv-live-comm-failure.dv-live-unavailable{--comm-color:var(--dv-live-color,var(--dv-live-todo))!important;}
 .dv-live-availability-detail{font-size:12px;line-height:1.5;max-width:36em;}
 

@@ -54,11 +54,31 @@ function telemetryTraceModel(diagram,pathId,exemplar){
   Object.keys(edges).forEach(function(key){if(edges[key].length!==1)delete edges[key];});
   return {mapping:mapping,warning:warning,rows:rows,nodes:nodes,edges:edges};
 }
+/* Span navigation considers every authored path in this exact diagram. A shared
+   step keeps its current path; without that context the reader chooses a path.
+   Ambiguous match rows always require a deliberate choice, even a single row. */
+function telemetryTraceChoices(diagram,pathId,exemplar,spanId){
+  var choices=[];
+  diagramPathList(diagram).forEach(function(path){
+    var model=telemetryTraceModel(diagram,path.id,exemplar);
+    model.rows.forEach(function(row){
+      if(row.spanIds.indexOf(spanId)<0)return;
+      var resolved=resolveSourceStep(diagram,path.id,row.id);
+      if(!resolved || resolved.sourceIndex<0)return;
+      var caption=String(diagram.steps[resolved.sourceIndex].text || row.operation).replace(/\s+/g,' ').trim();
+      if(caption.length>96)caption=caption.slice(0,95)+'…';
+      choices.push({key:JSON.stringify([path.id,row.id]),pathId:path.id,pathLabel:path.label,stepId:row.id,sourceIndex:resolved.sourceIndex,
+        label:'Step '+(resolved.pathIndex+1)+': '+caption+' · '+path.label,row:row});
+    });
+  });
+  return choices.filter(function(choice){return choice.pathId===pathId || !choices.some(function(other){return other.stepId===choice.stepId && other.pathId===pathId;});});
+}
 function telemetryClearTrace(scope){
-  scope.querySelectorAll('.dv-trace-overlay').forEach(function(el){el.remove();});
+  scope.querySelectorAll('.dv-trace-overlay,.dv-trace-focus-overlay').forEach(function(el){el.remove();});
+  scope.querySelectorAll('[data-trace-focus]').forEach(function(el){el.removeAttribute('data-trace-focus');});
   scope.querySelectorAll('[data-trace-tone]').forEach(function(el){el.removeAttribute('data-trace-tone');el.removeAttribute('data-trace-status');});
 }
-function telemetryPaintTrace(binding,model){
+function telemetryPaintTrace(binding,model,focus){
   var scope=binding.el,d=binding.section.diagram;telemetryClearTrace(scope);if(!model)return;
   function mark(target,rows,x,y){
     var ranks={unknown:0,observed:1,warning:2,error:3},tone=rows.reduce(function(a,r){return ranks[r.tone]>ranks[a]?r.tone:a;},'unknown');
@@ -71,4 +91,23 @@ function telemetryPaintTrace(binding,model){
   scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !card)return;var box=card.getBBox();mark(node,rows,box.x+box.width/2,box.y+box.height-6);});
   scope.querySelectorAll('g.node.node-text[data-dv-node]').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')];if(rows)node.setAttribute('data-trace-tone','observed');});
   scope.querySelectorAll('path.edge[data-dv-edge]').forEach(function(path){var edge=d.edges[Number(path.getAttribute('data-dv-edge'))],rows=edge && model.edges[edge.from+'->'+edge.to];if(!rows)return;var point=path.getPointAtLength(path.getTotalLength()/2);mark(path,rows,point.x,point.y-9);});
+  telemetryPaintTraceFocus(scope,focus);
+}
+
+/* Exterior brackets carry selection, independently of status/missing-work ink.
+   Never replace a card/edge stroke or use a service name as a node identity. */
+function telemetryPaintTraceFocus(scope,focus){
+  if(!focus || !focus.choice)return;
+  var row=focus.choice.row;if(!row.nodeId)return;
+  scope.querySelectorAll('g.node[data-dv-node]').forEach(function(node){
+    if(node.getAttribute('data-dv-node')!==row.nodeId)return;
+    node.setAttribute('data-trace-focus','true');
+    var card=node.querySelector('.card,.text-box-hit');if(!card)return;
+    var box=card.getBBox(),x=box.x-7,y=box.y-7,w=box.width+14,h=box.height+14,k=12,doc=node.ownerDocument;
+    var g=doc.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','dv-trace-focus-overlay');g.setAttribute('pointer-events','none');g.setAttribute('aria-hidden','true');
+    var brackets=doc.createElementNS('http://www.w3.org/2000/svg','path');brackets.setAttribute('class','dv-trace-focus-brackets');
+    brackets.setAttribute('d','M'+x+','+(y+k)+'v-'+k+'h'+k+' M'+(x+w-k)+','+y+'h'+k+'v'+k+' M'+(x+w)+','+(y+h-k)+'v'+k+'h-'+k+' M'+(x+k)+','+(y+h)+'h-'+k+'v-'+k);g.appendChild(brackets);
+    var tag=doc.createElementNS('http://www.w3.org/2000/svg','rect');tag.setAttribute('x',x+13);tag.setAttribute('y',y-9);tag.setAttribute('width','45');tag.setAttribute('height','18');tag.setAttribute('rx','5');g.appendChild(tag);
+    var text=doc.createElementNS('http://www.w3.org/2000/svg','text');text.setAttribute('x',x+35.5);text.setAttribute('y',y+3);text.setAttribute('text-anchor','middle');text.textContent='Trace';g.appendChild(text);node.appendChild(g);
+  });
 }

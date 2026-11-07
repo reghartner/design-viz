@@ -56,3 +56,20 @@ test('ambiguous and unavailable traces never produce timed edge annotations or i
  d.steps.push({...structuredClone(d.steps[0]),id:'duplicate'});d.paths[0].steps.push('duplicate');m=C.telemetryTraceModel(d,'event',e);assert.equal(m.nodes.ingest[0].tone,'unknown');assert.equal(m.edges['mcu->ingest'],undefined);
  e.spans=[];m=C.telemetryTraceModel(d,'event',e);assert.deepEqual(plain(m.nodes),{});assert.deepEqual(plain(m.edges),{});assert.match(m.warning,/timeline unavailable/);
 });
+
+// Span focus resolves source registries, including steps hidden by a view. It
+// never infers navigation from a service title, an edge, or declaration order.
+test('span choices preserve shared current context and expose alternate-path ambiguity',async()=>{
+ const f=structuredClone(await story()),d=f.spec.page.sections[0].diagram,e=f.samples['mcu->ingest'].exemplars[0];
+ const span=C.telemetryTraceModel(d,'event',e).rows[0].spanIds[0];
+ let choices=plain(C.telemetryTraceChoices(d,'event',e,span));assert.equal(choices.length,1);assert.equal(choices[0].pathId,'event');assert.equal(choices[0].sourceIndex,0);
+ choices=plain(C.telemetryTraceChoices(d,'absent',e,span));assert.deepEqual(choices.map(c=>c.pathId),['event','short']);
+ d.steps.push({...structuredClone(d.steps[0]),id:'alternate',text:'Alternative owner'});d.paths.push({id:'hidden',label:'Hidden path',steps:['alternate']});
+ choices=plain(C.telemetryTraceChoices(d,'event',e,span));assert.deepEqual(choices.map(c=>c.stepId),['submit','alternate']);assert.equal(choices[1].sourceIndex,4);
+ assert.deepEqual(plain(C.telemetryTraceChoices(d,'event',e,'not-a-span')),[]);
+});
+test('one ambiguous operation with concurrent spans still requires a choice',async()=>{
+ const f=structuredClone(await story()),d=f.spec.page.sections[0].diagram,e=f.samples['mcu->ingest'].exemplars[0];
+ const span=e.spans.find(s=>s.name==='POST /v1/events');e.spans.push({...structuredClone(span),id:'concurrent'});
+ const choices=plain(C.telemetryTraceChoices(d,'event',e,span.id));assert.equal(choices.length,1);assert.equal(choices[0].row.status,'ambiguous');
+});

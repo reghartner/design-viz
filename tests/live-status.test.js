@@ -2768,6 +2768,20 @@ test('span focus controller pauses, jumps exact source steps, shares state, and 
  const next={context:api.snapshot().trace.selected.context,spanId:span.id};api.destroy();assert.equal(api.selectTraceSpan(next),false);assert.equal(jumps.length,1);
 });
 
+test('live status supports prose-only pages and prose alongside domain summaries',()=>{
+ for(const mixed of [false,true]){
+  const prose={id:'notes',text:'Keep the authored notes intact.'},sections=[prose];
+  if(mixed)sections.push({id:'main',diagram:{nodes:{domain:{detail:{section:'child'}}},rows:[['domain']]}},{id:'child',detailOnly:true,diagram:{nodes:{'shared::child':{tickets:['AA-1']}},rows:[['shared::child']]}});
+  const h=harness({page:{sections}}),api=h.ctl.liveStatus,original=plain(h.ctl.page);
+  assert.deepEqual(plain(api.refs().tickets),mixed?['AA-1']:[]);
+  api.apply({'AA-1':{state:'blocked'}});
+  if(mixed)assert.equal(h.view.querySelector('[data-dv-node="domain"]').getAttribute('data-live-appearance'),'blocked');
+  h.view.dispatchEvent({type:'diagram-view-change'});h.flush();
+  api.setEnabled(false);api.setEnabled(true);api.clear();
+  assert.deepEqual(plain(h.ctl.page),original,'status projection must not add a diagram to prose or mutate authored content');
+  api.destroy();
+ }
+});
 test('domain summaries include unopened recursive local/imported nodes and connections without adding board totals',()=>{
  const raw={page:{sections:[{id:'main',diagram:{nodes:{domain:{title:'Domain',tickets:['AA-1'],detail:{section:'inside',mode:'focus'}}},rows:[['domain']],steps:[{id:'domain',nodes:['domain']}]}},{id:'inside',detailOnly:true,diagram:{nodes:{'shared::nested::a':{tickets:['AA-1','AA-2'],detail:{section:'deep',mode:'focus'}},shared:{detail:{section:'deep',mode:'focus'}},note:{type:'text',text:'Note',tickets:['IGNORE-1'],missingWork:true}},rows:[['shared::nested::a','shared']],edges:[{from:'shared::nested::a',to:'shared',tickets:['AA-3']}]}},{id:'deep',detailOnly:true,diagram:{nodes:{child:{missingWork:true,tickets:['AA-2']}},rows:[['child']]}}]}};
  const h=harness(raw),node=h.view.querySelector('[data-dv-node="domain"]'),summary=h.C.liveStatusDomainSummary(h.ctl.page,h.ctl.page.sections[0].diagram.nodes.domain,{});

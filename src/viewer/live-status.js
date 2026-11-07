@@ -784,7 +784,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function domainSummary(source,value){return liveStatusDomainSummary(source,value,remotePages);}
   function statusDiagram(binding){
-    var d=binding.section.diagram,nodes=Object.assign({},d.nodes);
+    // Prose sections participate in viewer repainting without owning a diagram.
+    var d=binding.section.diagram || {},nodes=Object.assign({},d.nodes);
     Object.keys(nodes).forEach(function(id){var summary=domainSummary(binding.page,nodes[id]);if(summary)nodes[id]=Object.assign({},nodes[id],summary);});
     return Object.assign({},d,{nodes:nodes});
   }

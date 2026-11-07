@@ -21,14 +21,14 @@ test('desktop CloudWatch editor round-trip and local/imported zero versus unobse
  const input=path.join(server.root,'cloudwatch.spec.json'),output=path.join(server.root,'cloudwatch.html');await writeFile(input,after);execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output],{stdio:'pipe'});
  await page.addInitScript(()=>{
   window.cloudwatchEmpty=false;window.cloudwatchCalls=[];
-  window.claude={use:async()=>({listTools:async()=>[{server:'Grafana',tools:['query_cloudwatch']}],callTool:async(server,tool,input)=>{window.cloudwatchCalls.push({tool,input});return {payload:window.cloudwatchEmpty?{timestamps:[],values:[],statistics:{sum:0},hints:['No data']}:{timestamps:[1793827860000],values:[0],statistics:{sum:0}}};}})};
+  window.claude={use:async()=>({listTools:async()=>[{server:'Grafana',tools:['query_cloudwatch']}],callTool:async(server,tool,input)=>{window.cloudwatchCalls.push({tool,input});return {payload:window.cloudwatchEmpty?{timestamps:[],values:[],statistics:{sum:0},hints:['No data']}:{timestamps:[Date.parse(input.end)-3600000],values:[0],statistics:{sum:0}}};}})};
   window.flowviewBooted=ctl=>window.cloudwatchController=ctl;
  });
  await page.goto(server.origin+'/cloudwatch.html');await page.waitForFunction(()=>!!window.cloudwatchController);
  const panel=page.locator('#docview .pt-live-status').first();await panel.getByRole('button',{name:'Metrics',exact:true}).click();
  for(const id of ['ingest->app','shared::api->shared::store'])await expect(page.locator('[data-metrics-card="'+id+'"]').first()).toContainText('0 events');
  for(const id of ['ingest','shared::api'])expect(await page.evaluate(id=>window.cloudwatchController.telemetry.snapshot().map[id]?.signals.rate?.value,id)).toBe(0);
- const calls=await page.evaluate(()=>window.cloudwatchCalls);expect(calls.every(c=>c.tool==='query_cloudwatch'&&c.input.accountId==='646998985045'&&c.input.period===86400&&c.input.start==='now-24h'&&c.input.end==='now')).toBe(true);expect(calls.some(c=>c.input.dimensions.ActionType==='SQS')).toBe(true);
+ const calls=await page.evaluate(()=>window.cloudwatchCalls);expect(calls.every(c=>c.tool==='query_cloudwatch'&&c.input.accountId==='646998985045'&&c.input.period===3600&&Date.parse(c.input.end)-Date.parse(c.input.start)===86400000)).toBe(true);expect(calls.some(c=>c.input.dimensions.ActionType==='SQS')).toBe(true);
  await page.locator('#docview .board').first().screenshot({path:testInfo.outputPath('cloudwatch-zero.png')});
  await page.evaluate(()=>{window.cloudwatchEmpty=true;window.cloudwatchController.telemetry.retry();});
  await expect.poll(()=>page.evaluate(()=>Object.keys(window.cloudwatchController.telemetry.snapshot().map))).toEqual([]);

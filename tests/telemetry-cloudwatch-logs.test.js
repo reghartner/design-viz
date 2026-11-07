@@ -14,15 +14,15 @@ function page(C){
 }
 async function setup({answer=()=>({payload:{logs:[{n:'15'}],totalFound:900,status:'Complete'}}),tools=['query_cloudwatch_logs','query_cloudwatch'],edit}={}){
  const C=context(),p=page(C),calls=[];if(edit)edit(p);
- const adapter=C.createTelemetryProviders(p,{claude:{use:async()=>({listTools:async()=>[{server:'Grafana',tools}],callTool:async(server,tool,input,options)=>{calls.push({tool,input:plain(input),signal:options?.signal});if(tool==='query_cloudwatch')return {payload:{timestamps:[1793827860000],values:[37],statistics:{sum:37}}};return answer(input);}})}});
+ const adapter=C.createTelemetryProviders(p,{claude:{use:async()=>({listTools:async()=>[{server:'Grafana',tools}],callTool:async(server,tool,input,options)=>{calls.push({tool,input:plain(input),signal:options?.signal});if(tool==='query_cloudwatch')return {payload:{timestamps:[Date.parse(input.end)-3600000],values:[37],statistics:{sum:37}}};if(input.limit===1000)return {payload:{status:'Complete',logs:[],totalFound:0}};return answer(input);}})}});
  const carriers=fn=>C.sectionRecords(p).forEach(r=>{Object.entries(r.section.diagram.nodes).forEach(([id,n])=>fn(n,id,p));r.section.diagram.edges.forEach(e=>fn(e,e.from+'->'+e.to,p));});
  const api=C.createTelemetry(p,adapter.options,{carriers}),handle=adapter.attach({telemetry:api},p);await settle();return {C,p,calls,api,close(){handle.destroy();api.destroy();}};
 }
 const ids=['local','local->queue','shared::api','shared::api->shared::store'];
 test('recorded Logs rows read exact first named numeric cell on local/imported nodes and edges; independent accounts and scope',async t=>{
  const h=await setup();t.after(()=>h.close());const before=JSON.stringify(h.p);h.api.setEnabled(true);await settle();
- assert.equal(h.calls.length,8);const q=h.calls.find(c=>c.tool==='query_cloudwatch_logs').input;
- assert.deepEqual(q,{datasourceUid:'cw-monitor',region:'us-east-1',logGroups:['arn:aws:logs:us-east-1:646998985045:log-group:AWSIotLogsV2'],queryString:logs().query,start:'now-24h',end:'now',limit:100});
+ assert.equal(h.calls.length,12);const q=h.calls.find(c=>c.tool==='query_cloudwatch_logs').input;
+ assert.equal(Date.parse(q.end)-Date.parse(q.start),86400000);assert.deepEqual(q,{datasourceUid:'cw-monitor',region:'us-east-1',logGroups:['arn:aws:logs:us-east-1:646998985045:log-group:AWSIotLogsV2'],queryString:logs().query,start:q.start,end:q.end,limit:100});
  assert.ok(h.calls.filter(c=>c.tool==='query_cloudwatch').every(c=>c.input.accountId==='551960222585'));
  for(const id of ids){assert.equal(h.api.snapshot().map[id].signals.rate.value,15);const b=h.api.bindings().find(b=>b.id===id);assert.match(h.C.telemetrySignalScope(b.signals.rate),/646998985045/);assert.match(h.C.telemetrySignalScope(b.signals.sent),/queue only: camera_stg.*551960222585/);}
  assert.equal(JSON.stringify(h.p),before);
@@ -41,11 +41,11 @@ test('payload, nested structuredContent and raw MCP text wrappers preserve first
  assert.throws(()=>C.telemetryGrafanaCloudwatchLogs({status:'Complete',logs:[{message:'hello',n:'15'}],totalFound:15},{}),/./);
  assert.equal(C.telemetryGrafanaCloudwatchLogs({status:'Complete',logs:[{message:'hello',n:'15'}]}, {valueField:'n'}),15);
 });
-test('all five CloudWatch statistics use sole observation, never misleading outer summaries; non-Sum multiple periods unobserved',()=>{
+test('all five CloudWatch statistics ignore misleading outer summaries; Average requires matching sample weights',()=>{
  const C=context();for(const statistic of ['Sum','Maximum','Minimum','Average','SampleCount']){
-  assert.ok(C.telemetryCloudwatchQuery({...metric(),statistic}));assert.equal(C.telemetryGrafanaCloudwatch({timestamps:[1793827860000],values:['12.5'],statistics:{count:1,sum:999,avg:777}},statistic).value,12.5);
-  if(statistic!=='Sum')assert.equal(C.telemetryGrafanaCloudwatch({timestamps:[1,2],values:[12,15],statistics:{sum:27,count:2}},statistic),null);
+  assert.ok(C.telemetryCloudwatchQuery({...metric(),statistic}));assert.equal(C.telemetryGrafanaCloudwatch({timestamps:[1793827860000],values:['12.5'],statistics:{count:1,sum:999,avg:777}},statistic,{timestamps:[1793827860000],values:[0.5]}).value,12.5);
  }
+ assert.equal(C.telemetryGrafanaCloudwatch({timestamps:[1,2],values:[12,15]},'Average'),null);
 });
 test('partial connector availability keeps supported CloudWatch healthy; missing named variable blocks only affected signal',async t=>{
  const h=await setup({tools:['query_cloudwatch']});t.after(()=>h.close());assert.equal(h.api.snapshot().available,true);h.api.setEnabled(true);await settle();assert.ok(h.calls.every(c=>c.tool==='query_cloudwatch'));assert.match(h.api.status().note,/query_cloudwatch_logs/);assert.equal(h.api.snapshot().map.local.signals.sent.value,37);
@@ -104,7 +104,7 @@ const detailsRows=()=>[{clientId:'cam-123',n:'12',sampleReason:'AUTHORIZATION_FA
 const grouped=input=>typeof input.queryString==='string' && input.queryString.includes('by clientId');
 test('paired Logs queries preserve scalar15 beside grouped12+2, share an anchored range, and expose all local/imported carriers',async t=>{
  const h=await setup({edit:p=>{withDetails(p);p.tracking.telemetry.window='now-6h';},answer:input=>({payload:{status:'Complete',logs:grouped(input)?detailsRows():[{n:'15'}],totalFound:99999}})});t.after(()=>h.close());h.api.setEnabled(true);await settle();
- const calls=h.calls.filter(c=>c.tool==='query_cloudwatch_logs');assert.equal(calls.length,8);
+ const calls=h.calls.filter(c=>c.tool==='query_cloudwatch_logs');assert.equal(calls.length,12);
  const ranges=new Set(calls.map(c=>JSON.stringify([c.input.start,c.input.end])));assert.equal(ranges.size,1);assert.equal(Date.parse(calls[0].input.end)-Date.parse(calls[0].input.start),6*3600000);
  assert.ok(calls.every(c=>c.input.logGroups[0].includes('646998985045')));assert.equal(calls.filter(c=>grouped(c.input)).every(c=>c.input.limit===20),true);
  for(const id of ids){const entry=h.api.snapshot().map[id].signals.rate;assert.equal(entry.value,15);assert.deepEqual(plain(entry.breakdown.rows),[{label:'cam-123',value:12,cells:['AUTHORIZATION_FAILURE']},{label:'cam-456',value:2,cells:['<img src=x onerror=alert(1)>']}]);assert.equal(entry.breakdown.returnedRows,2);assert.equal(entry.breakdown.limit,20);}
@@ -156,7 +156,7 @@ test('missing breakdown-only variables preserve totals across local/imported env
  const h=await setup({edit,answer});t.after(()=>h.close());const before=JSON.stringify(h.p);h.api.setEnabled(true);await settle();
  for(const id of ids)assert.equal(h.api.snapshot().map[id].signals.rate.breakdown.status,'complete');
  const count=h.calls.length;h.api.setEnvironment('prd');assert.deepEqual(plain(h.api.snapshot().map),{});await settle();
- const fresh=h.calls.slice(count).filter(c=>c.tool==='query_cloudwatch_logs');assert.equal(fresh.length,4);assert.ok(fresh.every(c=>!grouped(c.input)&&c.input.logGroups[0].includes('139648982912')));
+ const fresh=h.calls.slice(count).filter(c=>c.tool==='query_cloudwatch_logs');assert.equal(fresh.length,8);assert.ok(fresh.every(c=>!grouped(c.input)&&c.input.logGroups[0].includes('139648982912')));
  for(const id of ids){const sample=h.api.snapshot().map[id].signals.rate,b=h.api.bindings().find(b=>b.id===id).signals.rate;assert.equal(sample.value,15);assert.equal(sample.breakdown.status,'error');assert.match(sample.breakdown.error,/deviceFilter/);assert.equal(sample.breakdown.rows,undefined);assert.equal(b.error,undefined);assert.match(b.breakdownError,/deviceFilter/);}
  assert.ok(h.C.liveStatusLogDetails(h.api.snapshot()).every(row=>row.total.includes('15')&&row.details.error.includes('deviceFilter')));
  h.api.setEnvironment('stg');await settle();for(const id of ids)assert.equal(h.api.snapshot().map[id].signals.rate.breakdown.status,'complete');assert.equal(JSON.stringify(h.p),before);

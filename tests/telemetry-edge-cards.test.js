@@ -41,3 +41,21 @@ test('scalar observation window follows only an observed number, never a pending
   assert.equal(content({signals:{events:{value:12}}},{events:true}).headline,'12 events · Refreshing… in 24h');
  }
 });
+
+
+test('card row health keeps failing bounds, pending data and observed zero distinct from work status',()=>{
+ const binding={kind:'call',signals:{rate:{unit:'req/s'},errors:{unit:'errors/s'},missing:{unit:'ms'}},proof:{rate:{min:1},errors:{maxRatioOf:'rate',max:.01}}};
+ const sample={signals:{rate:{value:100},errors:{value:5}}};
+ const result=C.proofVerdicts({carriers:[{id:'a->b',...binding,tickets:['WORK-1']}],jiraMap:{'WORK-1':{state:'done'}},telemetryMap:{'a->b':sample}}).carriers['a->b'];
+ const content=C.telemetryCardContent({from:'a',to:'b'},binding,sample,result,'24h',{missing:true});
+ assert.deepEqual(Array.from(content.rows,r=>[r.name,r.health,r.text]),[['rate','observed','100 req/s'],['errors','failing','5 errors/s'],['missing','loading','Loading…']]);
+ const zero={signals:{rate:{value:0},errors:{value:0}}};
+ const zeroResult=C.proofVerdicts({carriers:[{id:'a->b',...binding}],telemetryMap:{'a->b':zero}}).carriers['a->b'];
+ const rows=C.telemetryCardContent({from:'a',to:'b'},binding,zero,zeroResult,'24h').rows;
+ assert.deepEqual(Array.from(rows,r=>[r.health,r.text]),[['failing','0 req/s'],['observed','0 errors/s'],['unobserved','unobserved']]);
+});
+
+
+test('metric work rollups retain shared no-change, completion and unknown precedence',()=>{
+ for(const [states,want] of [[['unchanged','unchanged'],'unchanged'],[['done','unchanged'],'done'],[['done','unknown'],null],[['blocked','unknown'],'blocked'],[['missing','active'],'missing'],[['active','done'],'active'],[['testing','done'],'testing']])assert.equal(C.liveStatusPresentationRollup(states),want);
+});

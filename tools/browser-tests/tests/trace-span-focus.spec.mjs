@@ -211,18 +211,32 @@ for(const mode of ['multiple delivered edges','broken status edge'])test('deskto
 
 for(const extremeCurve of [false,true])test('desktop timing ink fits the SVG clip at '+(extremeCurve?'an extreme curve':'a bottom float')+' without reframing',async({page,server},info)=>{
  const {root,local,imported}=await setup(page,server,{edgeScene:true,extremeCurve});const span=extremeCurve?imported:local;
- const target=extremeCurve?root.locator('path.edge[data-dv-edge="0"]'):node(root,'local').locator('.card');
- // Prove this fixture exercises the 24-unit canvas gutter, not only the board.
- const gutter=await target.evaluate(el=>{
-  const svg=el.closest('svg'),frame=svg.viewBox.baseVal,m=svg.getCTM().inverse().multiply(el.getCTM()),b=el.getBBox();
-  const bottom=Math.max(...[[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>m.b*x+m.d*y+m.f));return frame.y+frame.height-bottom;
- });expect(gutter).toBeGreaterThanOrEqual(22);expect(gutter).toBeLessThanOrEqual(26);
- const svg=root.locator('.board svg:has(path.edge)').first(),frame=await svg.getAttribute('viewBox');
+ // The bottom float has the layout's 24-unit gutter. A route can have a
+ // larger measured/status gutter; prove its preferred timing would clip below.
+ if(!extremeCurve){
+  const gutter=await node(root,'local').locator('.card').evaluate(el=>{
+   const svg=el.closest('svg'),frame=svg.viewBox.baseVal,m=svg.getCTM().inverse().multiply(el.getCTM()),b=el.getBBox();
+   const bottom=Math.max(...[[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>m.b*x+m.d*y+m.f));return frame.y+frame.height-bottom;
+  });expect(gutter).toBeGreaterThanOrEqual(22);expect(gutter).toBeLessThanOrEqual(26);
+ }
+ const svg=root.locator('.board svg:has(path.edge)').first();
  await row(root,span).click();await root.getByRole('button',{name:'Fit diagram',exact:true}).click();
  const text=extremeCurve?root.locator('.dv-trace-overlay[data-trace-edge="0"] text'):node(root,'local').locator('.dv-trace-overlay text');
  await expectTimingUnclipped(text);await expect(text).toHaveCSS('font-size','14px');
- if(extremeCurve)await expectLargeTiming(root,0,span);
- else expect(await text.evaluate(el=>{const a=el.getBoundingClientRect(),b=el.closest('g.node').querySelector('.card').getBoundingClientRect();return a.top>b.bottom;})).toBe(true);
+ if(extremeCurve){
+  await expectLargeTiming(root,0,span);
+  const placement=await text.evaluate(el=>{
+   const svg=el.closest('svg'),path=svg.querySelector('path.edge[data-dv-edge="0"]'),mid=path.getTotalLength()/2,p=path.getPointAtLength(mid),a=path.getPointAtLength(mid-1),b=path.getPointAtLength(mid+1),m=path.getScreenCTM(),box=el.getBoundingClientRect();
+   const unit=Math.hypot(m.c,m.d),centerY=m.b*p.x+m.d*p.y+m.f;
+   return {horizontal:Math.abs(b.y-a.y)/Math.hypot(b.x-a.x,b.y-a.y),preferredOverflow:centerY+18*unit+box.height+1.5*unit-svg.getBoundingClientRect().bottom,aboveCoin:box.bottom+1.5*unit<centerY-12*unit};
+  });
+  expect(placement.horizontal).toBeLessThan(.01);
+  expect(placement.preferredOverflow,'Normal below-edge placement would clip actual timing glyphs/stroke').toBeGreaterThan(0);
+  expect(placement.aboveCoin,'Timing moved above the extreme curve and its step marker').toBe(true);
+ }else expect(await text.evaluate(el=>{const a=el.getBoundingClientRect(),b=el.closest('g.node').querySelector('.card').getBoundingClientRect();return a.top>b.bottom;})).toBe(true);
+ // Path selection may legitimately change coins/framing. From the settled
+ // selected source onward, trace repaint/clear/hide must leave that frame alone.
+ const frame=await svg.getAttribute('viewBox');
  await info.attach(extremeCurve?'trace-timing-extreme-curve-svg-clip':'trace-timing-bottom-float-svg-clip',{body:await root.screenshot(),contentType:'image/png'});
  await page.evaluate(()=>{for(let i=0;i<3;i++)window.api.setTraceShow(true);});await expectTimingUnclipped(text);await expect(svg).toHaveAttribute('viewBox',frame);
  await root.getByRole('button',{name:'Clear trace focus',exact:true}).click();await expect(svg).toHaveAttribute('viewBox',frame);

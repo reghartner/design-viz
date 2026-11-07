@@ -2734,6 +2734,15 @@ An unlinked, unmarked node is automatically No change needed when live evidence
 is applied. Linked tickets awaiting evidence remain unknown. No-change is neutral
 in mixed step rollups and never creates a Jira ticket or increments its counts.
 
+Imported domain authoring: `topologyImports[].nodeDetails` maps provider-relative
+node IDs (including nested `::` IDs) to consumer-owned detail objects, or `null` to
+suppress inherited detail. Omitting an entry inherits the provider detail verbatim, including its mode,
+step mapping, and boundary ports; local section references resolve in the consumer. Detail objects follow
+the ordinary `nodes[id].detail` contract, including local destination and step-map
+validation, and cannot coexist with an inherited handoff. This annotation requires
+`flow.imported-details` and `flow.drilldown`. Authoring is desktop-only. See
+`docs/shared-topology.md` for a complete example and extraction constraints.
+
 ### Direct trace connections
 
 Company trace profiles are inherited by default. `page.tracking.telemetry.traceConnections` optionally restricts them to named company profiles or full inline v1 profiles; `{}` disables direct loading. Every fetch requires an explicit Load/Verify gesture. Use the [profile schema and company agent handoff](../docs/trace-connections.md) for exact connector/tool arguments, runtime-schema verification, registered response adapters, link patterns and native host callbacks. Load/Verify do not modify the board, numeric metrics or proof. Apply authored traceMatch mappings equally to local and imported nodes and choose an exact section context.

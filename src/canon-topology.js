@@ -123,7 +123,7 @@ var FlowTopology = (function(){
 
   function validateOverlaySelection(imp,nodes,edges,where){
     var selectedNodes=nodes && new Set(nodes),selectedEdges=edges && new Set(edges);
-    ['nodePositions','nodeOverrides','nodeCodeRefs','edgeOverrides','nodeTracking','edgeTracking'].forEach(function(field){
+    ['nodePositions','nodeOverrides','nodeCodeRefs','nodeDetails','edgeOverrides','nodeTracking','edgeTracking'].forEach(function(field){
       var selected=field.startsWith('node')?selectedNodes:selectedEdges;
       if(selected)Object.keys(imp[field] || {}).forEach(function(key){if(!selected.has(key))fail(where,field+' identity is not selected/exported: '+key);});
     });
@@ -168,7 +168,7 @@ var FlowTopology = (function(){
         if(own(d,'topologyImports') && !Array.isArray(d.topologyImports))fail(at,'topologyImports must be an array');
         var namespaces=new Set();
         (d.topologyImports || []).forEach(function(imp,i){
-          var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges','nodePositions','nodeCodeRefs','nodeOverrides','edgeOverrides','nodeTracking','edgeTracking','presentation'],where);
+          var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges','nodePositions','nodeCodeRefs','nodeOverrides','nodeDetails','edgeOverrides','nodeTracking','edgeTracking','presentation'],where);
           if(!validExports(imp.export))fail(where,'export must be a name or a nonempty array of unique export names');
           if(typeof imp.spec!=='string' || !imp.spec || !token(imp.as))fail(where,'requires spec, export, and a namespace as (letters, digits, dot, dash, underscore)');
           var reference=at+' import '+imp.as+' ('+imp.spec+' export '+imp.export+')';
@@ -181,6 +181,10 @@ var FlowTopology = (function(){
             if(!object(imp[field]))fail(where,field+' must be an object keyed by exported identity');
             Object.keys(imp[field]).forEach(function(key){validateTracking(imp[field][key],where+' '+field+' '+key);});
           });
+          if(own(imp,'nodeDetails')){
+            if(!object(imp.nodeDetails))fail(where,'nodeDetails must be an object keyed by exported node identity');
+            Object.keys(imp.nodeDetails).forEach(function(key){if(imp.nodeDetails[key]!==null && !object(imp.nodeDetails[key]))fail(where,'nodeDetails '+key+' must be a detail object or null');});
+          }
           if(own(imp,'nodeOverrides')){
             if(!object(imp.nodeOverrides))fail(where,'nodeOverrides must be an object keyed by exported node identity');
             Object.keys(imp.nodeOverrides).forEach(function(key){validateNodeOverride(imp.nodeOverrides[key],where+' nodeOverrides '+key);});
@@ -271,6 +275,10 @@ var FlowTopology = (function(){
           exp.nodes.forEach(function(key){
             if(!own(nodes,key) || !object(nodes[key]))fail(where,'missing exported node '+key);
             var value=clone(nodes[key]);if(value.group){group(value.group,new Set());value.group=prefix+value.group;}
+            if(own(imp.nodeDetails || {},key)){
+              if(imp.nodeDetails[key]===null)delete value.detail;
+              else {if(value.handoff!=null)fail(where,'nodeDetails '+key+' conflicts with its inherited handoff');value.detail=clone(imp.nodeDetails[key]);}
+            }
             if(own(imp.nodeCodeRefs || {},key))value.codeRefs=(value.codeRefs || []).concat(clone(imp.nodeCodeRefs[key]));
             inheritTelemetry(value,providerTemplates,(imp.nodeTracking || {})[key],dropped('nodes',prefix+key,providerAt+'.nodes.'+key));applyTracking(value,(imp.nodeTracking || {})[key]);
             if(imp.presentation)value.presentation=imp.presentation;

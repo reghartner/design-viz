@@ -2767,3 +2767,88 @@ test('span focus controller pauses, jumps exact source steps, shares state, and 
  api.clearTraceFocus({context:selected.context});assert.equal(api.snapshot().trace.selected.focus,null);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay,.dv-trace-edge-focus').length,0);assert.equal(h.view.querySelectorAll('mask').length,0);assert.equal(pauses,1);assert.equal(api.selectTraceSpan(action),false);
  const next={context:api.snapshot().trace.selected.context,spanId:span.id};api.destroy();assert.equal(api.selectTraceSpan(next),false);assert.equal(jumps.length,1);
 });
+
+test('live status supports prose-only pages and prose alongside domain summaries',()=>{
+ for(const mixed of [false,true]){
+  const prose={id:'notes',text:'Keep the authored notes intact.'},sections=[prose];
+  if(mixed)sections.push({id:'main',diagram:{nodes:{domain:{detail:{section:'child'}}},rows:[['domain']]}},{id:'child',detailOnly:true,diagram:{nodes:{'shared::child':{tickets:['AA-1']}},rows:[['shared::child']]}});
+  const h=harness({page:{sections}}),api=h.ctl.liveStatus,original=plain(h.ctl.page);
+  assert.deepEqual(plain(api.refs().tickets),mixed?['AA-1']:[]);
+  api.apply({'AA-1':{state:'blocked'}});
+  if(mixed)assert.equal(h.view.querySelector('[data-dv-node="domain"]').getAttribute('data-live-appearance'),'blocked');
+  h.view.dispatchEvent({type:'diagram-view-change'});h.flush();
+  api.setEnabled(false);api.setEnabled(true);api.clear();
+  assert.deepEqual(plain(h.ctl.page),original,'status projection must not add a diagram to prose or mutate authored content');
+  api.destroy();
+ }
+});
+test('local and nested imported domains preserve authored styles until status presentation is active',()=>{
+ const seed=harness(),model=(id,sections)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections}});
+ const provider=model('provider',[{id:'main',diagram:{nodes:{domain:{style:'rose'}},rows:[['domain']],topologyExports:{core:{nodes:['domain'],edges:[]}}}}]);
+ const middle=model('middle',[{id:'main',diagram:{topologyImports:[{spec:'provider',export:'core',as:'nested'}],topologyExports:{core:{nodes:['nested::domain'],edges:[]}}}}]);
+ for(const missing of [false,true]){
+  const consumer=model('consumer',[{id:'main',diagram:{nodes:{local:{style:'rose',detail:{section:'child'}}},rows:[['local']],steps:[{id:'visit',nodes:['local','shared::nested::domain']}],topologyImports:[{spec:'middle',export:'core',as:'shared',nodeDetails:{'nested::domain':{section:'child'}}}]}},{id:'child',detailOnly:true,diagram:{nodes:{leaf:missing?{missingWork:true}:{}},rows:[['leaf']]}}]);
+  const h=harness(seed.C.FlowTopology.materialize([provider,middle,consumer])[2]),api=h.ctl.liveStatus;
+  let beforeAdvance;
+  h.ctl.sections[0].stepper={path:()=>h.C.diagramPathList(h.ctl.page.sections[0].diagram)[0].id,sourceIndex:()=>0,mode:()=>'ambient',onBeforeAdvance(fn){beforeAdvance=fn;return ()=>{};}};
+  for(const id of ['local','shared::nested::domain']){
+   const node=h.view.querySelector('[data-dv-node="'+id+'"]');
+   assert.equal(node.getAttribute('data-live-appearance'),missing?'missing':null);
+   if(!missing){assert.ok(!node.classList.contains('ns-moss'));assert.ok(!node.querySelector('.card').classList.contains('dv-live-target'));node.classList.add('node-styled','ns-rose');}
+  }
+  if(!missing){h.view.dispatchEvent({type:'diagram-view-change'});h.flush();for(const id of ['local','shared::nested::domain'])assert.ok(h.view.querySelector('[data-dv-node="'+id+'"]').classList.contains('ns-rose'));}
+  api.apply({});
+  for(const id of ['local','shared::nested::domain']){const node=h.view.querySelector('[data-dv-node="'+id+'"]');assert.equal(node.getAttribute('data-live-appearance'),missing?'missing':'unchanged');assert.ok(node.querySelector('.card').classList.contains('dv-live-target'));}
+  assert.equal(beforeAdvance(0),!missing,'Jira mode stops at descendant Missing work');
+  api.setStatusMode('trace');
+  for(const id of ['local','shared::nested::domain']){const node=h.view.querySelector('[data-dv-node="'+id+'"]');assert.equal(node.getAttribute('data-live-appearance'),missing?'missing':'unchanged','Trace retains domain summary ink');assert.ok(!node.querySelector('.card').classList.contains('dv-live-target'));}
+  assert.equal(beforeAdvance(0),true,'Trace inspection does not introduce Jira auto-stops');
+  api.setStatusMode('jira');assert.equal(beforeAdvance(0),!missing);
+  api.clear();
+  for(const id of ['local','shared::nested::domain']){const node=h.view.querySelector('[data-dv-node="'+id+'"]');assert.equal(node.getAttribute('data-live-appearance'),null);assert.ok(!node.querySelector('.card').classList.contains('dv-live-target'),'Clear removes summary-only controls');}
+  api.apply({});
+  api.setEnabled(false);
+  for(const id of ['local','shared::nested::domain']){const node=h.view.querySelector('[data-dv-node="'+id+'"]');assert.equal(node.getAttribute('data-live-appearance'),null);assert.ok(!node.querySelector('.card').classList.contains('dv-live-target'));if(!missing)assert.ok(node.classList.contains('ns-rose'));}
+  api.destroy();
+ }
+ seed.ctl.liveStatus.destroy();
+});
+test('domain summaries include unopened recursive local/imported nodes and connections without adding board totals',()=>{
+ const raw={page:{sections:[{id:'main',diagram:{nodes:{domain:{title:'Domain',tickets:['AA-1'],detail:{section:'inside',mode:'focus'}}},rows:[['domain']],steps:[{id:'domain',nodes:['domain']}]}},{id:'inside',detailOnly:true,diagram:{nodes:{'shared::nested::a':{tickets:['AA-1','AA-2'],detail:{section:'deep',mode:'focus'}},shared:{detail:{section:'deep',mode:'focus'}},note:{type:'text',text:'Note',tickets:['IGNORE-1'],missingWork:true}},rows:[['shared::nested::a','shared']],edges:[{from:'shared::nested::a',to:'shared',tickets:['AA-3']}]}},{id:'deep',detailOnly:true,diagram:{nodes:{child:{missingWork:true,tickets:['AA-2']}},rows:[['child']]}}]}};
+ const h=harness(raw),node=h.view.querySelector('[data-dv-node="domain"]'),summary=h.C.liveStatusDomainSummary(h.ctl.page,h.ctl.page.sections[0].diagram.nodes.domain,{});
+ assert.deepEqual(plain(summary.tickets),['AA-1','AA-2','AA-3']);assert.equal(summary.carriers,4);assert.equal(summary.missing,1);
+ h.ctl.liveStatus.apply({'AA-1':{state:'done'},'AA-2':{state:'done'},'AA-3':{state:'done'}});
+ assert.equal(node.getAttribute('data-live-appearance'),'missing');assert.ok(!node.classList.contains('dv-live-unavailable'));
+ assert.equal(h.view.querySelector('[data-step-source="0"]').getAttribute('data-live-appearance'),'missing');
+ const target=node.querySelector('.card');h.view.dispatchEvent({type:'click',target,preventDefault(){},stopPropagation(){}});
+ assert.match(h.view.querySelector('.dv-live-domain-summary').textContent,/3 unique tickets.*Missing work/);
+ assert.equal(h.view.querySelector('.dv-live-coverage-detail'),null);
+ h.ctl.liveStatus.setEnabled(false);assert.equal(node.getAttribute('data-live-appearance'),null);h.ctl.liveStatus.destroy();
+});
+test('domain summary preserves unknown tickets, unloaded links, recursion and loaded remote revisions without fetching',()=>{
+ const h=harness(),C=h.C,page={sections:[{id:'root',diagram:{nodes:{domain:{tickets:['AA-1'],detail:{section:'child'}}},rows:[['domain']]}},{id:'child',diagram:{nodes:{external:{detail:{spec:'remote',revision:'rev',section:'remote'}},other:{tickets:['AA-2']}},rows:[['external','other']]}}]},node=page.sections[0].diagram.nodes.domain;
+ let summary=C.liveStatusDomainSummary(page,node,{});assert.equal(summary._detailUnavailable,true);assert.equal(C.liveStatusPresentation(summary,{'AA-1':{state:'done'},'AA-2':{state:'done'}}),null);
+ const loaded={['["remote","rev"]']:{sections:[{id:'remote',diagram:{nodes:{remote:{tickets:['AA-3']}},rows:[['remote']]}}]}};
+ summary=C.liveStatusDomainSummary(page,node,loaded);assert.equal(summary._detailUnavailable,false);assert.equal(C.liveStatusPresentation(summary,{'AA-1':{state:'done'},'AA-2':{state:'done'}}),null);
+ assert.equal(C.liveStatusPresentation(summary,{'AA-1':{state:'done'},'AA-2':{state:'done'},'AA-3':{state:'testing'}}),'testing');
+ page.sections[1].diagram.nodes.external.detail={section:'root'};summary=C.liveStatusDomainSummary(page,node,loaded);assert.equal(summary._detailUnavailable,true);assert.match(summary.unavailable.join(),/Recursive/);h.ctl.liveStatus.destroy();
+});
+test('domain summary popovers retain own PRs and descendant ticket URLs',()=>{
+ const raw={page:{sections:[{id:'main',diagram:{nodes:{domain:{title:'Domain',prs:['https://github.com/acme/repo/pull/1'],detail:{section:'child'}}},rows:[['domain']]}},{id:'child',detailOnly:true,diagram:{nodes:{child:{tickets:['https://child-jira.test/browse/AA-1']}},rows:[['child']]}}]}};
+ const h=harness(raw);h.ctl.liveStatus.apply({'AA-1':{state:'blocked'}});const target=h.view.querySelector('[data-dv-node="domain"] .card');
+ h.view.dispatchEvent({type:'click',target,button:0,preventDefault(){},stopPropagation(){}});
+ const links=h.view.querySelector('.dv-live-popover').querySelectorAll('a').map(el=>el.getAttribute('href'));assert.ok(links.includes('https://child-jira.test/browse/AA-1'));assert.ok(links.includes('https://github.com/acme/repo/pull/1'));h.ctl.liveStatus.destroy();
+});
+test('loaded external domain tickets retain their owning Jira site',async()=>{
+ const raw={page:{tracking:{jira:{site:'https://parent-jira.test'}},sections:[{id:'main',diagram:{nodes:{domain:{title:'Domain',detail:{spec:'remote',section:'child',mode:'link'}}},rows:[['domain']]}}]}},remote={page:{tracking:{jira:{site:'https://remote-jira.test'}},sections:[{id:'child',diagram:{nodes:{child:{tickets:['AA-1']}},rows:[['child']]}}]}};
+ const options={loadDetail:async()=>remote},h=harness(raw,{},options);await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.ctl.liveStatus.apply({'AA-1':{state:'blocked'}});
+ const target=h.view.querySelector('[data-dv-node="domain"] .card');h.view.dispatchEvent({type:'click',target,button:0,preventDefault(){},stopPropagation(){}});
+ const links=h.view.querySelector('.dv-live-popover').querySelectorAll('a').map(el=>el.getAttribute('href'));assert.ok(links.includes('https://remote-jira.test/browse/AA-1'));assert.ok(!links.includes('https://parent-jira.test/browse/AA-1'));h.ctl.liveStatus.destroy();
+});
+test('First blocker focuses an explicit domain whose only blocker is in its detail',()=>{
+ const raw={page:{sections:[{id:'main',diagram:{nodes:{domain:{title:'Domain',detail:{section:'child'}}},rows:[['domain']],steps:[{id:'visit',nodes:['domain']}]}},{id:'child',detailOnly:true,diagram:{nodes:{child:{tickets:['AA-1']}},rows:[['child']]}}]}};
+ const h=harness(raw),api=h.ctl.liveStatus;mountStatus(h);let jumped=false,focused=false;
+ h.ctl.sections[0].stepper={path:()=>h.C.diagramPathList(h.ctl.page.sections[0].diagram)[0].id,sourceIndex:()=>0,mode:()=>'ambient',jumpSource(){jumped=true;}};
+ h.view.querySelector('[data-dv-node="domain"] .card').focus=()=>{focused=true;};api.apply({'AA-1':{state:'blocked'}});
+ assert.equal(api.snapshot().firstBlocker,true);h.view.querySelector('.dv-live-first').dispatchEvent({type:'click'});assert.equal(jumped,true);assert.equal(focused,true);api.destroy();
+});

@@ -534,3 +534,53 @@ dependency presentation and readiness calculations as locally authored carriers.
 A repeated key counts once in ticket totals but each carrier contributes to
 carrier coverage; board coverage buttons focus the imported node or connection.
 Reader node menus and node/edge ticket popovers expose the merged links.
+
+### Consumer-owned domain details
+
+In the desktop Workbench, an imported node has the same **Domain detail** controls
+as a local node. Assign an existing section, create a detail flow, or remove the
+detail here without editing its provider. This includes nested imported nodes.
+The authored reference stores this separately from presentation and tracking:
+
+```json
+{
+  "spec": "platform",
+  "export": "services",
+  "as": "shared",
+  "nodeDetails": {
+    "api": {"section": "checkout-internals", "mode": "focus"},
+    "storage::database": null
+  }
+}
+```
+
+Keys are provider-relative exported identities, including nested `::` identities.
+A detail object replaces the inherited detail in this consumer. `null` suppresses
+it here. **Restore source detail** deletes that map entry and restores inheritance;
+**Remove detail** suppresses it. Inherited details retain their existing declaration verbatim: a local section
+reference resolves in the consumer, including its step mapping and boundary ports.
+Use an explicit `nodeDetails` override with a spec ID to link to the provider. An inherited
+handoff cannot be replaced with a detail. Invalid or missing local destinations
+and invalid step mappings are rejected before publication. Section identity edits
+and removal cascade through these annotations. Each apply/create/remove/restore
+operation is one Undo action.
+
+These annotations require `flow.imported-details` and `flow.drilldown`. Older
+resolvers do not understand `nodeDetails`; retain the stamped compatibility
+metadata when distributing authored sources.
+
+**Create domain from selected nodes** accepts local, imported, nested imported,
+and mixed selections. Local zoom moves the selected authored references and their
+consumer annotations into an ordinary detail section. Whole blocks retain their
+original import declaration; a closed subset creates explicit node/edge selections
+on each side, retaining the namespace. Imported nodes are never flattened into
+local definitions. Consumer boundary connections and parent narrative references
+are rewritten to the new domain using the extraction preview.
+
+A provider-owned connection crossing the selection prevents extraction: the
+preview lists the exact edges and asks for both endpoints (or the whole connected
+block). Exports referencing moved nodes also prevent extraction until those exports
+are updated or removed. These refusals leave the source untouched. Imported
+selections support Local zoom; Separate document remains available for local
+selections. Moved details keep their own target and entry point, but discard
+mappings from the old parent timeline.

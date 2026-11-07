@@ -464,3 +464,11 @@ test('missing-work nodes, later edges and consumer overlays declare coverage and
   const features=C.detect({page:{sections:[{diagram}]}});assert.ok(features.includes('flow.missing-work'));assert.ok(features.includes('flow.live-status'));
  }
 });
+
+test('imported detail overrides and suppressions require their own capability and drilldown',()=>{
+ for(const detail of [{section:'child',mode:'focus'},null]){
+  const raw={page:{sections:[{diagram:{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'all',as:'shared',nodeDetails:{'inner::a':detail}}]}}]}};
+  assert.ok(C.detect(raw).includes('flow.imported-details'));assert.ok(C.detect(raw).includes('flow.drilldown'));
+  const older={...C.features};delete older['flow.imported-details'];assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:older}).missingFeatures.includes('flow.imported-details'));
+ }
+});

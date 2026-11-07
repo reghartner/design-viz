@@ -313,3 +313,17 @@ IDs that would redirect an old link to another section are rejected.
 Legacy navigation snapshots may include `expanded` arrays. These are ignored;
 restoration keeps the containing flow and restores any ordinary focused trail.
 New snapshots emit empty arrays for existing host type compatibility.
+
+Imported nodes support domain authoring in the desktop Workbench through
+`topologyImports[].nodeDetails`. This includes nested imports and mixed selections
+when creating a domain. See [consumer-owned details](shared-topology.md#consumer-owned-domain-details)
+for override, suppression, restoration, and extraction boundaries.
+
+Live Jira/Missing work status on a domain summarizes its own work and descendant
+nodes and connections, including imported nodes and unopened local details. The
+popover labels this as a domain summary and lists unique tickets. Shared detail
+targets count once per summary. Missing work remains visible even when all linked
+tickets are Done. An unavailable external detail or recursive detail loop keeps
+completion unknown; summaries never fetch external documents. External details
+participate only after the host has approved and loaded them. Switching Live off
+restores authored appearance.

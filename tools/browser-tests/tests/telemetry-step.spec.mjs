@@ -128,7 +128,7 @@ test('canonical doorbell normal, slow database, service error, partial and backp
  await expect(db).toBeVisible();await expect(db).toHaveAttribute('data-trace-tone','observed');
  for(const [name,node,tone] of [['database-slow',db,'warning'],['service-error',root.locator('g.node[data-dv-node="cloud"]'),'error'],['partial',db,'unknown'],['backpressure',queue,'warning']]){
   await root.locator('.dv-trace-candidate[data-trace-id="'+f.ids[name]+'"]').click();await expect(selected(root)).toHaveAttribute('data-trace-id',f.ids[name]);await expect(node).toHaveAttribute('data-trace-tone',tone);
-  if(name==='database-slow'){await expect(root.locator('.dv-trace-mappings')).toContainText('900 ms / 150 ms budget');const before=await page.evaluate(()=>({...window.calls}));await root.locator('.dv-trace-span').filter({hasText:'INSERT clip'}).click();await expect(root.locator('.dv-trace-operation-detail')).toContainText('900 ms / 150 ms budget');expect(await page.evaluate(()=>window.calls)).toEqual(before);await capture(page,'canonical-database-slow');}
+  if(name==='database-slow'){await expect(root.locator('.dv-trace-mappings')).toContainText('900 ms / 150 ms budget');const before=await page.evaluate(()=>({...window.calls}));await root.locator('.dv-trace-span').filter({hasText:'INSERT clip'}).click();await expect(root.locator('.dv-trace-operation-detail .dv-trace-duration')).toHaveText('900 ms');await expect(root.locator('.dv-trace-operation-detail')).toContainText('150 ms budget');expect(await page.evaluate(()=>window.calls)).toEqual(before);await capture(page,'canonical-database-slow');}
  }
  await unchanged(page);
 });

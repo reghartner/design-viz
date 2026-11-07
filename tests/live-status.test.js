@@ -47,7 +47,7 @@ function harness(raw,options={},renderOptions={}){
  const doc=new Element('document');doc.hidden=false;doc.visibilityState='visible';doc.createElement=tag=>new Element(tag);doc.createElementNS=(_,tag)=>new Element(tag);doc.body=new Element('body');doc.getElementById=id=>doc.querySelector('[id="'+id+'"]');doc.documentElement=new Element('html');
  const schedule=(collection,fn,ms)=>{const id=++serial;collection.set(id,{fn,ms});return id;};
  const win=new Element('window');Object.assign(win,{document:doc,innerWidth:1440,innerHeight:900,setTimeout:(f,ms)=>schedule(timers,f,ms),clearTimeout:id=>timers.delete(id),setInterval:(f,ms)=>schedule(timers,f,ms),clearInterval:id=>timers.delete(id)});
- const C={URL,console,AbortController,document:doc,window:win,requestAnimationFrame:f=>schedule(frames,f),cancelAnimationFrame:id=>frames.delete(id),setTimeout:win.setTimeout,clearTimeout:win.clearTimeout,setInterval:win.setInterval,clearInterval:win.clearInterval,
+ const C={URL,console,AbortController,TextEncoder,document:doc,window:win,requestAnimationFrame:f=>schedule(frames,f),cancelAnimationFrame:id=>frames.delete(id),setTimeout:win.setTimeout,clearTimeout:win.clearTimeout,setInterval:win.setInterval,clearInterval:win.clearInterval,
   MutationObserver:class{constructor(f){this.callback=f;this.targets=[];observers.push(this);}observe(t,opts){this.targets.push({t,opts});}disconnect(){this.targets=[];}}};
  vm.runInNewContext(entrypoint('native').source,C);
  const page=C.normalize(raw||{nodes:{a:{}},rows:[['a']]}),view=new Element();view.ownerDocument=doc;
@@ -2743,4 +2743,27 @@ test('Status Jira and Trace bodies are exclusive, remain instance-owned and pres
  assert.equal(peer.ctl.liveStatus.snapshot().mode,'jira');assert.equal(other.body.querySelector('.dv-live-trace'),null);
  api.setStatusMode('jira');assert.ok(m.body.querySelector('table.dv-live-tickets'));assert.equal(m.body.querySelector('.dv-live-trace'),null);assert.equal(api.state('AA-1').state,fixed['AA-1'].state);
  api.destroy();peer.ctl.liveStatus.destroy();
+});
+
+test('span focus controller pauses, jumps exact source steps, shares state, and rejects retired evidence',async t=>{
+ const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),h=harness(f.spec,{}, {telemetry:{}}),api=h.ctl.liveStatus;
+ t.after(()=>api.destroy());
+ const exemplar=f.samples['mcu->ingest'].exemplars[0];
+ // Use the real envelope validator in this VM. Missing browser primitives must
+ // fail here rather than being swallowed as rejected evidence by telemetrySample.
+ assert.doesNotThrow(()=>h.C.telemetryTraceEnvelope(exemplar));
+ let path='short',index=3,pauses=0;const jumps=[];
+ h.ctl.sections[0].stepper={path:()=>path,sourceIndex:()=>index,mode:()=> 'ambient',pause(){pauses++;},jumpSource(i,p){jumps.push([i,p]);index=i;path=p;return true;}};
+ h.ctl.telemetry.apply(f.samples);
+ assert.equal(h.ctl.telemetry.snapshot().map['mcu->ingest'].exemplars[0].traceId,exemplar.traceId);
+ api.setStatusMode('trace');
+ let selected=api.snapshot().trace.selected;assert.ok(selected);assert.equal(selected.exemplar.traceId,exemplar.traceId);assert.equal(selected.focus,null);
+ const edge=h.view.querySelector('path.edge[data-dv-edge="0"]');edge.setAttribute('id','focus-edge');edge.setAttribute('d','M0 0 C30 40 70 40 100 0');edge.setAttribute('transform','translate(5 7)');
+ const span=selected.exemplar.spans.find(s=>s.service==='event-ingest' && s.name==='POST /v1/events'),action={context:selected.context,spanId:span.id};
+ assert.equal(api.selectTraceSpan(action),true);assert.equal(pauses,1);assert.deepEqual(jumps,[[0,'short']]);
+ selected=api.snapshot().trace.selected;assert.equal(selected.focus.spanId,span.id);assert.equal(selected.focus.choice.stepId,'submit');
+ assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,1);assert.equal(h.view.querySelectorAll('.dv-trace-edge-focus').length,1);assert.equal(h.view.querySelector('.dv-trace-edge-focus').getAttribute('transform'),'translate(5 7)');assert.equal(h.view.querySelector('.dv-trace-edge-outline').getAttribute('d'),edge.getAttribute('d'));
+ api.setTraceShow(true);api.setTraceShow(true);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,1);assert.equal(h.view.querySelectorAll('.dv-trace-edge-focus').length,1);assert.equal(h.view.querySelectorAll('mask').length,1);assert.equal(edge.getAttribute('d'),'M0 0 C30 40 70 40 100 0');
+ api.clearTraceFocus({context:selected.context});assert.equal(api.snapshot().trace.selected.focus,null);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay,.dv-trace-edge-focus').length,0);assert.equal(h.view.querySelectorAll('mask').length,0);assert.equal(pauses,1);assert.equal(api.selectTraceSpan(action),false);
+ const next={context:api.snapshot().trace.selected.context,spanId:span.id};api.destroy();assert.equal(api.selectTraceSpan(next),false);assert.equal(jumps.length,1);
 });

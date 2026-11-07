@@ -858,7 +858,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return typeof source==='string'?source.trim():'';
   }
   // Selection belongs to a section object and carrier token, never to a step.
-  var statusMode='jira',traceSelection=null,traceInitial=true,traceRequest=0,traceNotice='',traceShow=true,tracePending=null;
+  var statusMode='jira',traceSelection=null,traceInitial=true,traceRequest=0,traceNotice='',traceShow=true,tracePending=null,traceFocus=null,traceFocusEpoch=0;
   var traceSections=new WeakMap(),traceSectionSerial=0;
   function traceObjectId(object){if(!traceSections.has(object))traceSections.set(object,++traceSectionSerial);return traceSections.get(object);}
   function directTraceSections(){
@@ -883,7 +883,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var d=binding.section.diagram;if(!d || !trackingTelemetry(binding.page).enabled)return;
       if(!traceSections.has(binding.section))traceSections.set(binding.section,++traceSectionSerial);
       if(!traceSections.has(d))traceSections.set(d,++traceSectionSerial);
-      var sectionId=traceSections.get(binding.section)+'/'+traceSections.get(d),seen=new Set();
+      var sectionId=[traceObjectId(binding.page),traceObjectId(binding.section),traceObjectId(d),traceObjectId(binding.el),traceObjectId(binding.stepper || binding.el)].join('/'),seen=new Set();
       Object.keys(d.nodes || {}).concat((d.edges || []).map(function(e){return e.from+'->'+e.to;})).forEach(function(id){
         if(seen.has(id) || !owners[id])return;seen.add(id);if(owners[id].length!==1){if(evidence.map[id] && (evidence.map[id].exemplars || []).length)ambiguous.add(id);return;}
         var sample=evidence.map[id];(sample && sample.exemplars || []).forEach(function(exemplar){
@@ -898,6 +898,19 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }
     return {entries:entries,evidence:evidence,ambiguous:ambiguous.size};
   }
+  function traceContext(entry){
+    var b=entry.binding;
+    return JSON.stringify([traceRequest,traceFocusEpoch,entry.key,entry.exemplar.traceId,entry.exemplar.selectionToken,telemetry.environment(),telemetry.snapshot().historical,
+      traceObjectId(b.page),traceObjectId(b.section),traceObjectId(b.section.diagram),b.el?traceObjectId(b.el):0,b.stepper?traceObjectId(b.stepper):0]);
+  }
+  function clearTraceFocus(){traceFocus=null;traceFocusEpoch++;}
+  function traceFocusSnapshot(entry,context){
+    if(!traceFocus)return null;
+    if(!entry || traceFocus.context!==context || !entry.exemplar.spans.some(function(s){return s.id===traceFocus.spanId;})){traceFocus=null;return null;}
+    var choices=telemetryTraceChoices(entry.binding.section.diagram,entry.binding.stepper && entry.binding.stepper.path(),entry.exemplar,traceFocus.spanId);
+    var choice=traceFocus.choiceKey && choices.find(function(c){return c.key===traceFocus.choiceKey;});
+    return {spanId:traceFocus.spanId,choices:choices,choice:choice || null,navigable:!!entry.binding.stepper};
+  }
   function traceSnapshot(){
     var source=traceSources(),entries=source.entries,evidence=source.evidence,hasMappings=false;
     eachDiagram(function(d){if((d.steps || []).some(function(step){return !!step.traceMatch;}))hasMappings=true;});
@@ -907,13 +920,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(!selected && traceSelection && tracePending && tracePending.request===traceRequest && tracePending.key===traceSelection.key){selected=entries.find(function(e){return e.key===tracePending.key && e.exemplar.traceId===tracePending.traceId;});if(selected)traceSelection.traceId=selected.exemplar.traceId;}
     if(traceSelection && !selected){traceSelection=null;tracePending=null;traceInitial=false;traceRequest++;traceNotice='Trace selection expired. Select current evidence.';}
     if(!selected && traceInitial && statusMode==='trace' && entries.length){selected=entries[0];traceSelection={key:selected.key,traceId:selected.exemplar.traceId};traceInitial=false;}
+    var context=selected?traceContext(selected):null,focus=traceFocusSnapshot(selected,context);
     var model=selected?telemetryTraceModel(selected.binding.section.diagram,selected.binding.stepper && selected.binding.stepper.path(),selected.exemplar):null;
-    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:directTrace.snapshot(),
+    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:directTrace.snapshot(),
       hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
   function paintTrace(){
     var trace=traceSnapshot(),selected=trace.selected,sources=traceSources().entries;
-    bindings.forEach(function(binding){telemetryPaintTrace(binding,statusMode==='trace' && traceShow && selected && traceSelection && sources.some(function(e){return e.key===selected.key && e.binding.section===binding.section && e.binding.el===binding.el;})?selected.model:null);});
+    bindings.forEach(function(binding){telemetryPaintTrace(binding,statusMode==='trace' && traceShow && selected && traceSelection && sources.some(function(e){return e.key===selected.key && e.binding.section===binding.section && e.binding.el===binding.el;})?selected.model:null,selected && selected.focus);});
   }
   function metricsSnapshot(){
     var evidence=telemetry.snapshot(),status=evidence.status;
@@ -1561,7 +1575,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });
   }
   function paintBinding(binding){
-    var on=statusMode!=='trace' && api.enabled();
+    var on=api.enabled();
     var scope=binding.el,d=binding.section.diagram;if(!d)return;
     var waiting=on?liveStatusCarrierWaiting(d,map,ticketWaiting):{},coverageActive=presentationActive();
     scope.querySelectorAll('g.node[data-dv-node]').forEach(function(el){
@@ -1681,15 +1695,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var api={
     refs:refs,
     snapshot:snapshot,
-    setStatusMode:function(mode){if(retired || ['jira','trace'].indexOf(mode)<0)return;statusMode=mode;close(false);paint();notify();},
-    setDirectTraceField:function(change){if(!retired && change){traceRequest++;traceSelection=null;traceInitial=true;traceNotice='';directTrace.set(change.field,change.value);}},
-    loadDirectTrace:async function(verify){if(retired)return;traceRequest++;traceSelection=null;traceInitial=true;traceNotice='';var result=await directTrace.load(!!verify);if(result){traceSelection=null;traceInitial=true;}paint();notify();return result;},
-    clearDirectTrace:function(){if(retired)return;traceSelection=null;traceInitial=true;directTrace.clear();},
+    setStatusMode:function(mode){if(retired || ['jira','trace'].indexOf(mode)<0)return;if(mode!==statusMode)clearTraceFocus();statusMode=mode;close(false);paint();notify();},
+    setDirectTraceField:function(change){if(!retired && change){traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';directTrace.set(change.field,change.value);}},
+    loadDirectTrace:async function(verify){if(retired)return;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';var result=await directTrace.load(!!verify);if(result){traceSelection=null;traceInitial=true;}paint();notify();return result;},
+    clearDirectTrace:function(){if(retired)return;clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();},
     setTraceShow:function(value){if(retired)return;traceShow=!!value;paint();notify();},
     chooseTrace:async function(choice){
       if(retired || statusMode!=='trace')return;
       var entry=traceSources().entries.find(function(e){return e.key===choice.key;});if(!entry)return;
-      var request=++traceRequest;tracePending=null;traceInitial=false;traceNotice='';
+      var request=++traceRequest;clearTraceFocus();tracePending=null;traceInitial=false;traceNotice='';
       if(choice.traceId===entry.exemplar.traceId){traceSelection={key:entry.key,traceId:choice.traceId};paint();notify();return;}
       if(!telemetry.canChooseExemplar(entry.carrier,entry.exemplar.selectionToken,choice.traceId))return;
       tracePending={request:request,key:entry.key,traceId:choice.traceId};traceNotice='Loading selected trace…';notify();
@@ -1697,6 +1711,26 @@ function createLiveStatus(ctl,page,options,renderOptions){
       catch(ex){if(retired || request!==traceRequest)return;traceNotice=ex.message;}
       tracePending=null;paint();notify();
     },
+    selectTraceSpan:function(action){
+      if(retired || statusMode!=='trace' || !action)return false;
+      var selected=traceSnapshot().selected;
+      if(!selected || action.context!==selected.context)return false;
+      var entry=traceSources().entries.find(function(e){return e.key===selected.key;});
+      if(!entry || traceContext(entry)!==action.context || !entry.exemplar.spans.some(function(s){return s.id===action.spanId;}))return false;
+      var binding=entry.binding,choices=telemetryTraceChoices(binding.section.diagram,binding.stepper && binding.stepper.path(),entry.exemplar,action.spanId);
+      var choice=action.choiceKey?choices.find(function(c){return c.key===action.choiceKey;}):choices.length===1 && choices[0].row.status==='matched'?choices[0]:null;
+      if(action.choiceKey && (!traceFocus || traceFocus.spanId!==action.spanId || !choice))return false;
+      traceFocus={context:action.context,spanId:action.spanId,choiceKey:choice && choice.key};
+      if(binding.stepper){
+        binding.stepper.pause();
+        if(choice){
+          var resolved=resolveSourceStep(binding.section.diagram,choice.pathId,choice.stepId);
+          if(!resolved || resolved.sourceIndex!==choice.sourceIndex || !binding.stepper.jumpSource(resolved.sourceIndex,resolved.path.id))traceFocus.choiceKey=null;
+        }
+      }
+      paint();notify();return true;
+    },
+    clearTraceFocus:function(action){if(retired || !action || action.context!==(traceSnapshot().selected || {}).context)return;clearTraceFocus();paint();notify();},
     pinSelectedTrace:function(){var selected=traceSnapshot().selected;if(selected){traceNotice=pinTrace(selected.carrier,selected.exemplar)?'Pinned in this session’s Activity.':'Already pinned in this session’s Activity.';notify();}},
     firstBlocker:jumpFirstBlocker,
     focusCarrier:showCarrier,
@@ -1764,7 +1798,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     editSave:function(){if(!retired && editor)editor.save();},
     editDiscard:function(){if(!retired && editor)editor.discard();},
     destroy:function(){
-      if(retired)return;on=false;paintLanes();retired=true;directTrace.destroy();bindings.forEach(function(b){telemetryClearStep(b.el);telemetryClearTrace(b.el);b.el.querySelectorAll('.dv-proof-caption').forEach(function(el){el.remove();});});releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);telemetryClearCards(view);if(demoDestroy)demoDestroy();
+      if(retired)return;clearTraceFocus();on=false;paintLanes();retired=true;directTrace.destroy();bindings.forEach(function(b){telemetryClearStep(b.el);telemetryClearTrace(b.el);b.el.querySelectorAll('.dv-proof-caption').forEach(function(el){el.remove();});});releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);telemetryClearCards(view);if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];

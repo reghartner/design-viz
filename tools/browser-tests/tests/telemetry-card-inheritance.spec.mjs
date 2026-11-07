@@ -46,11 +46,17 @@ async function apply(page,first,second){
 }
 async function paint(card){return card.evaluate(el=>{const box=getComputedStyle(el.querySelector('.dv-metrics-card-box')),halo=el.querySelector('.dv-live-halo');return {appearance:el.getAttribute('data-live-appearance'),stroke:box.stroke,width:box.strokeWidth,fill:box.fill,dash:box.strokeDasharray,glow:halo?getComputedStyle(halo).opacity:null};});}
 async function textContrast(card,selector){return card.evaluate((el,selector)=>{
+ // A media/font repaint can replace the card after the locator resolves it.
+ // Empty computed fills are not black ink: Canvas retains its previous color.
+ const text=el.querySelector(selector),box=el.querySelector('.dv-metrics-card-box');
+ if(!el.isConnected || !text || !box)return {ink:[],contrast:0,connected:false};
+ const inkFill=getComputedStyle(text).fill,groundFill=getComputedStyle(box).fill;
+ if(!inkFill || !groundFill)return {ink:[],contrast:0,connected:false};
  const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const ctx=canvas.getContext('2d');
  function rgb(value){ctx.clearRect(0,0,1,1);ctx.fillStyle=value;ctx.fillRect(0,0,1,1);return [...ctx.getImageData(0,0,1,1).data].slice(0,3);}
  function luminance(rgb){const c=rgb.map(v=>{const n=v/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4;});return c[0]*.2126+c[1]*.7152+c[2]*.0722;}
- const ink=rgb(getComputedStyle(el.querySelector(selector)).fill),ground=rgb(getComputedStyle(el.querySelector('.dv-metrics-card-box')).fill),a=luminance(ink),b=luminance(ground);
- return {ink,contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
+ const ink=rgb(inkFill),ground=rgb(groundFill),a=luminance(ink),b=luminance(ground);
+ return {ink,contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),connected:true};
  },selector);}
 async function capture(root,testInfo,name){const file=testInfo.outputPath(name+'.png');await root.screenshot({path:file});await testInfo.attach(name,{path:file,contentType:'image/png'});}
 
@@ -86,7 +92,9 @@ for(const native of [false,true])test((native?'native':'standalone')+' metric ca
  await board.evaluate(el=>el.style.setProperty('--dv-board-ground','#0b1220'));
  await page.evaluate(()=>window.cardCtl.liveStatus.setEnabled(true));
  await page.emulateMedia({media:'print'});
- for(const selector of ['.dv-metrics-card-value[data-signal="rate"]','.dv-metrics-card-value[data-signal="errors"]','.dv-metrics-card-failure'])expect((await textContrast(unchanged,selector)).contrast).toBeGreaterThanOrEqual(4.5);
+ // Re-resolve after print's asynchronous font/layout repaint, retaining the
+ // same contrast requirement for all three visible health text treatments.
+ for(const selector of ['.dv-metrics-card-value[data-signal="rate"]','.dv-metrics-card-value[data-signal="errors"]','.dv-metrics-card-failure'])await expect.poll(async()=>(await textContrast(unchanged,selector)).contrast).toBeGreaterThanOrEqual(4.5);
  await capture(root,testInfo,'inherited-print');
  await page.emulateMedia({media:'screen'});await board.evaluate(el=>el.style.removeProperty('--dv-board-ground'));
 

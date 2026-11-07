@@ -16,15 +16,16 @@ async function expectCompactTrace(root){
  const body=await root.locator('.dv-live-trace').boundingBox(),config=await root.locator('.dv-trace-direct').boundingBox(),selected=await root.locator('.dv-trace-selected').boundingBox(),waterfall=await root.locator('.dv-trace-waterfall').boundingBox();
  expect(config.height,'loaded connection summary stays compact').toBeLessThan(240);expect(selected.y-body.y,'selected request stays beside the diagram').toBeLessThan(470);expect(waterfall.y-body.y,'waterfall is not pushed below expanded configuration').toBeLessThan(720);
 }
-function detailSpec(){const detail=nestedSpec(),d=detail.page.sections[0].diagram;detail.page.title='Loaded detail';detail.page.sections[0].heading='Imported detail';delete d.edges[0].telemetry;
+function detailSpec(){const detail=nestedSpec(),d=detail.page.sections[0].diagram;detail.page.title='Loaded detail';detail.page.sections[0].heading='Imported detail';delete d.edges[0].telemetry;d.edges[0].curvePoints=[{t:.5,dx:0,dy:70}];
  d.nodes.local={title:'Local frontend'};d.rows.push(['local']);d.steps=[{id:'local',nodes:['local'],text:'Local checkout',traceMatch:{serviceName:'frontend',operation:'/cart/checkout',nodeId:'local'}},{id:'imported',edge:'outer::inner::a->outer::inner::b',text:'Imported currency',traceMatch:{serviceName:'currency',operation:'grpc.msdemo.CurrencyService/GetSupportedCurrencies',nodeId:'outer::inner::b'}}];return detail;}
-async function portable(page,server,{held=false,absolute=false,inherited=false}={}){
+async function portable(page,server,{held=false,absolute=false,inherited=false,duplicates=false}={}){
  await page.setViewportSize({width:1500,height:1100});const profile=clone(PROFILE),tools=[schema()],calls=[],permissions=[],releases=[];let hold=held;
  if(absolute){profile.time={encoding:'iso8601',type:'string',defaultLookback:'2h'};profile.arguments.end='to';tools[0].inputSchema.properties.to={type:'string'};tools[0].inputSchema.required.push('to');}
  await page.exposeFunction('traceTools',()=>[{server:profile.server,tools:tools.map(t=>({name:t.name,annotations:t.annotations}))}]);
  await page.exposeFunction('traceDescribe',()=>tools[0]);await page.exposeFunction('tracePermission',keys=>{permissions.push(...keys);return Object.fromEntries(keys.map(k=>[k,'granted']));});
  await page.exposeFunction('traceCall',async(server,tool,args)=>{calls.push({server,tool,args});if(hold)await new Promise(resolve=>releases.push(resolve));return {payload:RECORDED};});
  const spec={page:{title:'Direct traces',tracking:{telemetry:{traceConnections:{company:profile,alternate:{...profile,label:'Alternate connection'}}}},sections:[{id:'main',diagram:{nodes:{parent:{title:'Imported service',detail:{spec:'approved-detail',revision:'r1',section:'main'}}},rows:[['parent']],panels:[PANEL]}}]}},detail=detailSpec();
+ if(duplicates){const root=spec.page.sections[0].diagram;root.nodes.local={title:'Root decoy'};root.nodes['outer::inner::b']={title:'Duplicate imported ID'};root.rows.push(['local','outer::inner::b']);root.steps=clone(detail.page.sections[0].diagram.steps).map(step=>({...step,edge:undefined,nodes:['local']}));}
  await page.addInitScript(({detail})=>{
   window.claude={use:async name=>name==='permissions'?{request:keys=>window.tracePermission(keys)}:{listTools:()=>window.traceTools(),describeTool:()=>window.traceDescribe(),callTool:(s,n,a)=>window.traceCall(s,n,a)}};
   window.directDetail=detail;window.flowviewBooted=ctl=>{window.ctl=ctl;window.sourceBefore=JSON.stringify(window.directDetail);};
@@ -78,4 +79,23 @@ test('desktop native direct-only callbacks show an unmapped waterfall and reject
  expect(await page.evaluate(()=>window.traceReveals.length)).toBe(1);expect(await root.locator('.dv-trace-selected').evaluate(selected=>window.traceReveals[0]===selected)).toBe(true);await info.attach('native-direct-unmapped-viewport',{body:await page.screenshot(),contentType:'image/png'});
  await openTraceConfiguration(root);await page.evaluate(()=>window.holdDirect=true);await root.getByRole('button',{name:'Verify trace connection',exact:true}).click();await page.waitForFunction(()=>!!window.releaseDirect);await page.evaluate(()=>{window.nativeViewer.destroy();window.releaseDirect();});await expect(root.locator('.dv-trace-selected')).toHaveCount(0);expect(await page.evaluate(()=>window.traceReveals.length)).toBe(1);
  await page.evaluate(spec=>window.nativeViewer=window.mount(document.querySelector('#host'),spec,{}),spec);await root.getByRole('button',{name:'Trace',exact:true}).click();await expect(root).toContainText('Direct trace retrieval is unavailable');await expect(root.getByRole('button',{name:'Load trace',exact:true})).toBeDisabled();expect(await page.evaluate(()=>window.nativeCalls.length)).toBe(2);
+});
+
+
+test('desktop loaded detail span focus owns its exact source despite duplicate root node and step IDs',async({page,server},info)=>{
+ const h=await portable(page,server,{duplicates:true});await h.root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();
+ await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);
+ const span=await page.evaluate(()=>window.ctl.liveStatus.snapshot().trace.selected.exemplar.spans.find(s=>s.service==='currency' && s.name==='grpc.msdemo.CurrencyService/GetSupportedCurrencies').id);
+ const before=await page.evaluate(()=>window.ctl.sections[0].stepper.current().id);
+ const edge=h.root.locator('path.edge[data-dv-edge="0"]'),geometry=await edge.getAttribute('d'),arrow=await edge.getAttribute('marker-end');
+ await h.root.locator('.dv-trace-span[data-span-id="'+span+'"]').click();
+ await expect(h.root.locator('g.node[data-dv-node="outer::inner::b"]:not(.node-text)')).toHaveAttribute('data-trace-focus','true');
+ expect(await page.evaluate(()=>window.ctl.details.activeSections()[1].stepper.current().id)).toBe('imported');expect(await page.evaluate(()=>window.ctl.sections[0].stepper.current().id)).toBe(before);
+ await expect(h.root.locator('.dv-trace-edge-focus')).toHaveCount(1);await expect(h.root.locator('.dv-trace-edge-outline')).toHaveAttribute('d',geometry);await expect(edge).toHaveAttribute('marker-end',arrow);await expect(h.root.locator('.dv-trace-overlay[data-trace-edge="0"] text')).toHaveCSS('font-size','14px');
+ await h.root.getByRole('button',{name:'Fit diagram',exact:true}).click();
+ await expect.poll(()=>h.root.locator('.dv-trace-edge-focus').evaluate(g=>{const box=g.getBoundingClientRect(),board=g.closest('.board'),frame=board.getBoundingClientRect(),toolbar=board.querySelector('.lg').getBoundingClientRect();return box.width>0 && box.left>=frame.left && box.right<=frame.right && box.top>=toolbar.bottom && box.bottom<=frame.bottom;})).toBe(true);
+ await info.attach('trace-focus-exact-loaded-source',{body:await h.root.screenshot(),contentType:'image/png'});
+ await page.evaluate(()=>{const selected=window.ctl.liveStatus.snapshot().trace.selected;window.oldSpanAction={context:selected.context,spanId:selected.focus.spanId};});
+ await openTraceConfiguration(h.root);await h.root.getByRole('combobox',{name:'Mapping diagram',exact:true}).selectOption(h.choices.find(o=>o.value && o.value!==h.selected.value).value);
+ expect(await page.evaluate(()=>window.ctl.liveStatus.selectTraceSpan(window.oldSpanAction))).toBe(false);await expect(h.root.locator('.dv-trace-focus-overlay,.dv-trace-edge-focus')).toHaveCount(0);
 });

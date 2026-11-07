@@ -2068,6 +2068,14 @@ it when that work is covered: here, or on a shared board in Edit mode
 marker; the marker takes precedence over active, testing, done and todo. It participates
 in step appearance and readiness without inventing a ticket or increasing Jira counts.
 
+The Live status header shows a separate **Missing work** count with the shared
+missing-work appearance. It counts marked node and connection occurrences across
+local and imported diagrams, nested sections and loaded details; text boxes do
+not count. It appears even without tickets or a connector and hides when no
+markers remain. The count stays separate from the `missing` Jira-ticket total.
+Turning Live off or clearing live paint removes its styling along with the
+diagram's styling; the authored marker count remains until the markers are cleared.
+
 A marked connection shows a broken line with the communication-break glyph and
 stops packet traffic while Live is enabled, including when every linked ticket
 is Done or no tickets/provider exist. Its label or break glyph opens the Missing

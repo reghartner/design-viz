@@ -1081,14 +1081,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var now=new Date();base.today=days[over.index].key===new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())).toISOString().slice(0,10);return base;
   }
   /* #1132: the selected day as a UTC search window for trace and log searches, or null in Live. It
-     starts at the local midnight that opens `day.key`, so a DST day runs 23 h or 25 h, and ends at
-     `day.at`, never after the next local midnight and, today, never after now. Metrics plays no part.
-     A day without a YYYY-MM-DD key has no window. */
+     runs from the local midnight that opens `day.key` to the next one, so a DST day runs 23 h or 25 h,
+     and today ends now. `day.at` is not read: a demo day's is a UTC midnight. Metrics plays no part.
+     A day without a YYYY-MM-DD key has no window. On today `to` changes with every snapshot, so key a
+     request on `day.key` and the today flag, never on the window. */
   function overTimeWindow(){
     var day=over && over.days[over.index],date=day && typeof day.key==='string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(day.key);
     if(!date)return null;
-    var from=new Date(+date[1],date[2]-1,+date[3]).getTime(),midnight=new Date(+date[1],date[2]-1,+date[3]+1).getTime(),at=Date.parse(day.at);
-    var to=Math.min(isFinite(at)?at:midnight,midnight,Date.now());if(!(to>from))return null;
+    var from=new Date(+date[1],date[2]-1,+date[3]).getTime(),midnight=new Date(+date[1],date[2]-1,+date[3]+1).getTime();
+    var to=Math.min(midnight,Date.now());if(!(to>from))return null;
     var end=new Date(to),pad=function(n){return String(n).padStart(2,'0');};
     return {from:new Date(from).toISOString(),to:end.toISOString(),label:(day.label || day.key)+' 00:00–'+(to===midnight?'24:00':pad(end.getHours())+':'+pad(end.getMinutes()))+' local'};
   }

@@ -2371,7 +2371,7 @@ test('M10 the action button shows on a metrics-only page so Allow Grafana reache
 | OT15 | status row and day buttons (#986) | counts, connection and notes are in `.dv-live-status` with their full text in its title; buttons are in `.dv-live-controls`; a board's `<` and `>` step the slider, are disabled at the ends, and are absent on Live | changing text beside static buttons; step buttons on a board with no slider |
 | OT14 | the two mode buttons (Chuck, 2026-11-04) | Live and Over time are the first two header controls, exactly one is pressed, the selected Over time click does nothing, Live returns to today without turning colors off, the selected Live click still turns colors off, and Over time turns colors back on | a Back to today button; a past day with colors off |
 | OT17 | days dated two days ago to today, then a history ending before today and one with no dates (#1082) | the Over time row's heading shows the selected day's label large; on a day dated today it reads TODAY with the label beside it; the slider and `<` `>` update it; Live has no heading | a date only in the small note; TODAY on a last day that is not today |
-| OT18 | Metrics off; days from the product builder in America/New_York: a normal day, the 23 h and 25 h DST days, today; days with no date key (#1132) | `snapshot().overTime.window` is `{from, to, label}`: from the day key's local midnight to `day.at` in UTC, today ending now; null in Live and on a day with no key | a UTC-midnight day; a fixed 24 h day; a window that needs Metrics; a today window ending in the future |
+| OT18 | Metrics off; days from the product builders in America/New_York: a normal day, the 23 h and 25 h DST days, a demo day, today; days with no date key (#1132) | `snapshot().overTime.window` is `{from, to, label}`: from the day key's local midnight to the next local midnight in UTC, today ending now; null in Live and on a day with no key | a UTC-midnight day; a fixed 24 h day; a demo day cut at its UTC `at`; a window that needs Metrics; a today window ending in the future |
 */
 const overFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:'EP-1'}},lanes:{APP:{label:'App',color:'#34d399'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',tickets:['AA-1']},b:{title:'Beta',tickets:['BB-1']},planned:{title:'Planned',tickets:['AA-1'],existsWhen:'tickets-done'}},rows:[['a','b','planned']],edges:[{from:'a',to:'b',tickets:['EE-1']}],steps:[{id:'hop',edge:'a->b',lane:'APP'},{id:'beta',nodes:['b'],lane:'APP'}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
 const overStale='2000-01-01T00:00:00Z';
@@ -2712,6 +2712,10 @@ test('OT18 the selected Over time day gives its local-day search window, with Me
   await open(build(historyAt(2025,11,2),historyAt(2025,11,3)));api.overTimeDay(0);
   assert.deepEqual(plain(over().window),{from:'2025-11-02T04:00:00.000Z',to:'2025-11-03T05:00:00.000Z',label:'Nov 2 00:00–24:00 local'},'25 h day');
   overBackToLive(api);await historySettle();
+  // A demo day's key is its UTC date and its at is the next UTC midnight; the window is still the whole local day.
+  await open({days:plain(storyContext().liveStatusDemoDays({days:[{label:'kickoff',telemetry:{start:'2025-03-07T00:00:00Z'},issues:{'AA-1':{state:'active'}}},{label:'next',telemetry:{start:'2025-03-08T00:00:00Z'},issues:{'AA-1':{state:'done'}}}]},['AA-1']))});api.overTimeDay(0);
+  assert.deepEqual(plain(over().window),{from:'2025-03-07T05:00:00.000Z',to:'2025-03-08T05:00:00.000Z',label:'Day 1 — kickoff 00:00–24:00 local'},'demo day');
+  overBackToLive(api);await historySettle();
   // Today ends at the moment of the snapshot, not at the coming midnight.
   const today=build(Date.now()-86400000,Date.now());await open(today);
   const before=Date.now(),range=over().window,after=Date.now(),midnight=new Date();midnight.setHours(0,0,0,0);
@@ -2727,7 +2731,7 @@ test('OT18 the selected Over time day gives its local-day search window, with Me
   }
  }finally{if(zone===undefined)delete process.env.TZ;else process.env.TZ=zone;}
 });
-test('OT16First blocker cannot reach a ticket that has no status on the day, and a real blocker on another day still counts',async()=>{
+test('OT16 First blocker cannot reach a ticket that has no status on the day, and a real blocker on another day still counts',async()=>{
  const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);h.ctl.sections[0].stepper={path:()=>'happy',sourceIndex:()=>0,mode:()=>'ambient',jumpSource(){}};api.apply(overToday());
  const rest={'EP-1':{state:'active'},'AA-1':{state:'todo'},'BB-1':{state:'todo'},'ZZ-2':{state:'todo'}},first=()=>h.view.querySelector('.dv-live-first'),edge=h.view.querySelector('path.edge');
  api.setHistory({load:()=>({days:[{label:'One',short:'One',states:{...rest}},{label:'Two',short:'Two',states:{...rest,'EE-1':{state:'blocked'}}}]})});api.overTime();await historySettle();h.flush();

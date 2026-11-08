@@ -4,10 +4,9 @@ Use this workflow to align an accepted diagram with actual spans, preserving its
 story and placement. Run commands from the repository root or the source-free
 kit's **VIZ** directory. Editing and visual verification are desktop-only.
 Create a unique output directory once per author session, then keep using that
-shell's `TRACE_CHECK_DIR` for the commands below. Concurrent authors must create
-their own directories; never reuse another author's temporary spec or reports.
-Keep this directory out of authored deliverables and retain its path with your
-validation evidence. Source specs and trace inputs remain unchanged.
+shell's `TRACE_CHECK_DIR` for the commands below. Never reuse another author's
+temporary spec or reports. Keep this directory out of authored deliverables and
+retain its path with your validation evidence. Source specs and trace inputs remain unchanged.
 
 ```sh
 TRACE_CHECK_DIR="$(mktemp -d "${PWD}/.trace-check.XXXXXX")"
@@ -66,36 +65,10 @@ the [normalizer](canon.md) can disambiguate: `service.namespace`,
 `http.response.status_code` / `http.status_code`, `db.system` / `db.system.name`,
 `messaging.queue.depth` / `queue.depth`, `messaging.message.age_ms`,
 `flow.backpressure`, `flow.delivery_failed`, `retry.attempt`, and `flow.step.id`.
-Arbitrary tags, payload fields and request IDs are dropped; do not write selectors
-against them. Prefer stable instrumentation meaning over incidental timings.
-
-A [trace connection profile](trace-connections.md#allowed-match-attributes) may
-add attribute names with `allowedAttributes`. Traces loaded with that profile
-keep those attributes, and `traceMatch.attributes` may use them. Values still
-match exactly. This works for Tempo profiles. Honeycomb `get_trace` does not
-return span attributes (verified, company report 2026-11-07), so on a Honeycomb
-connection neither `allowedAttributes` nor the built-in attributes above can
-disambiguate; only `http.status_code` comes from a fixed column, as text.
-Validation warns when only Honeycomb connections list an attribute a step uses.
-For example, when a Tempo profile lists `device.model`, this step maps only the
-message-consumer span for device model X:
-
-```json
-{
-  "id": "consume-x",
-  "text": "This is the message for device model X",
-  "edge": "broker->consumer",
-  "traceMatch": {
-    "serviceName": "telemetry-consumer",
-    "operation": "consume device.report",
-    "nodeId": "consumer",
-    "attributes": {"device.model": "X"}
-  }
-}
-```
-
-Without a profile that lists the attribute, validation rejects it as today
-(`traceMatch.attributes: use supported operational attributes only`).
+Other tags, payload fields and request IDs are dropped (Tempo profiles may keep
+[`allowedAttributes`](provider-traces.md#allowed-match-attributes)); do not write
+selectors against them. Prefer stable instrumentation meaning over incidental
+timings.
 
 For duplicate calls, first use a verified parent/link or retained attribute.
 `occurrence:1` is only valid for fully timed, non-overlapping serial calls;
@@ -136,8 +109,8 @@ node tools/canon/trace-cli.mjs preview --spec "$TRACE_CHECK_DIR/trace-resolved.s
 ## 4. Validate mapping before enabling a provider
 
 The following fictional example is bundled in the repository **and portable
-kit**. It demonstrates mapping only, with no account, invented budget or claim
-of live evidence. The read-only preview command writes a report, not a spec:
+kit**. It demonstrates mapping only; it is not live evidence. The read-only
+preview command writes a report, not a spec:
 
 ```sh
 node tools/validate.js examples/trace-ready/existing.spec.json

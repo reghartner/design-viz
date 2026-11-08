@@ -2,8 +2,9 @@
    and selected path; a duplicate step ID elsewhere is never consulted. */
 function telemetryStepModel(diagram,index,pathId,page,snapshot,jiraMap,jiraOn){
   var step=(diagram.steps || [])[index];if(!step || !snapshot)return null;
-  var direct=liveStatusStepCarriers(diagram,step,true),templates=telemetryTemplates()(page);
-  var carriers=direct.map(function(c){var b=carrierTelemetry(c.value,templates);return {id:c.id,tickets:jiraOn?trackingRefs(c.value).tickets:[],kind:b && b.kind,signals:b?b.signals:{},proof:b?b.proof:{}};});
+  var direct=liveStatusStepCarriers(diagram,step,true),templates=telemetryTemplates()(page),filter=trackingStepFilter(step);
+  // A step ticketFilter (#1103) narrows the Jira half of this step's verdict too.
+  var carriers=direct.map(function(c){var b=carrierTelemetry(c.value,templates);return {id:c.id,tickets:jiraOn?trackingRefs(c.value).tickets.filter(function(key){return !filter || filter.indexOf(key)>=0;}):[],kind:b && b.kind,signals:b?b.signals:{},proof:b?b.proof:{}};});
   var proof=proofVerdicts({carriers:carriers,jiraMap:jiraMap,telemetryMap:snapshot.map,steps:[{id:'current',carriers:carriers.map(function(c){return c.id;})}]});
   var measured=carriers.some(function(c){return telemetryMetricNames(c).some(function(n){return telemetryReading(snapshot.map[c.id],n).value!==null;});});
   // Primary is the first directly selected carrier in the existing carrier walk

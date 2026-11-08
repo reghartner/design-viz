@@ -521,6 +521,15 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         if (COMM_FAILURE_MODES.indexOf(st.failures[key]) < 0) errors.push(FP + '.' + key + ': expected dropped or blocked');
       });
     }
+    if (st && Object.prototype.hasOwnProperty.call(st, 'ticketFilter')){
+      var TF = DP + '.steps[' + ti + '].ticketFilter', lit = trackingStepLitTickets(d, st);
+      trackingStepFilter(st, function(index){
+        errors.push(index === null ? TF + ': expected a nonempty array of Jira keys from the nodes and edges this step lights; remove it to show every ticket' : TF + '[' + index + ']: use a Jira key like HW-123');
+      });
+      if (Array.isArray(st.ticketFilter)) st.ticketFilter.forEach(function(key, index){
+        if (typeof key === 'string' && trackingKeyPattern.test(key) && lit.indexOf(key) < 0) errors.push(TF + '[' + index + ']: "' + key + '" is not on a node or edge this step lights');
+      });
+    }
     var nds = stepNodes(st);
     var patch = stepPanelPatch(st);
     var tonePatch = stepTonePatch(st);

@@ -52,6 +52,41 @@ function trackingRefs(obj, invalid){
   });
   return refs;
 }
+/* Carrier identities are section-local; ticket keys are deduplicated only when
+   counting work. Broad aggregates may include the endpoints of selected hops;
+   visible step state, captions and ticket lists use direct carriers only. */
+function trackingStepCarriers(diagram,step,directOnly){
+  var out=[],nodes=stepNodes(step).slice(),keys=stepKeys(step).concat(Object.keys(stepFailures(step)));
+  (diagram.edges || []).forEach(function(edge){
+    var key=edge.from+'->'+edge.to;if(keys.indexOf(key)<0)return;
+    out.push({id:key,value:edge});if(!directOnly)nodes.push(edge.from,edge.to);
+  });
+  nodes.filter(function(id,i){return nodes.indexOf(id)===i;}).forEach(function(id){
+    var node=(diagram.nodes || {})[id];if(node && !isTextBoxNode(node))out.push({id:id,value:node});
+  });return out;
+}
+/* #1103: `ticketFilter` names the subset of the tickets on a step's directly lit
+   carriers that the step shows. It never adds a ticket, and carriers keep all of
+   theirs. The value is a self-contained array of Jira keys so an imported step's
+   override can carry the same shape. Malformed entries are skipped like carrier
+   tickets; with no valid entry every ticket shows. `invalid` reports them. */
+function trackingStepFilter(step,invalid){
+  if(!step || typeof step!=='object' || !Object.prototype.hasOwnProperty.call(step,'ticketFilter'))return null;
+  var value=step.ticketFilter,out=[];
+  if(!Array.isArray(value) || !value.length){if(invalid)invalid(null);return null;}
+  value.forEach(function(key,index){
+    if(typeof key!=='string' || !trackingKeyPattern.test(key)){if(invalid)invalid(index);}
+    else if(out.indexOf(key)<0)out.push(key);
+  });
+  return out.length?out:null;
+}
+/* Ticket keys on the carriers a step lights directly, before any filter: the
+   keys a filter may name. */
+function trackingStepLitTickets(diagram,step){
+  var keys=[];trackingStepCarriers(diagram || {},step,true).forEach(function(carrier){
+    trackingRefs(carrier.value).tickets.forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});
+  });return keys;
+}
 /* Page-level parent roots (legacy `epic` field) share the ticket key grammar.
    Jira metadata determines whether each root is an Epic or an Initiative. */
 function trackingEpics(page,invalid){

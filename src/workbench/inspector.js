@@ -1054,6 +1054,33 @@ function chipRow(labelText, items, emptyText, onRemove, onBody, ownerKind){
     return frow(labelText, box);
   }
 
+/* #1103: the tickets on the nodes and edges this step lights, as a checklist.
+   Every ticket checked means no filter. A filter key the step no longer lights
+   stays listed, so it can be unchecked. */
+function stepTicketFilterControl(val, ctx, t){
+    var lit=trackingStepLitTickets(ctx.diagram,val),chosen=Array.isArray(val.ticketFilter)?val.ticketFilter.filter(function(key){return typeof key==='string' && trackingKeyPattern.test(key);}):null;
+    var keys=lit.concat((chosen || []).filter(function(key,index,list){return lit.indexOf(key)<0 && list.indexOf(key)===index;}));
+    if(!keys.length)return null;
+    var box=document.createElement('fieldset'),legend=document.createElement('legend'),entries=[];
+    box.className='step-ticket-filter';legend.textContent='Tickets on this step';box.appendChild(legend);
+    var help=document.createElement('p');help.className='fnote';
+    help.textContent='Uncheck tickets this step should not show. Its circle, caption and ticket list use the checked tickets; the nodes and edges keep all of theirs.';
+    box.appendChild(help);
+    keys.forEach(function(key){
+      var control=checkboxControl(!chosen || chosen.indexOf(key)>=0,function(){
+        var next=entries.filter(function(entry){return entry.input.checked;}).map(function(entry){return entry.key;});
+        if(!next.length){formError('Keep at least one ticket on this step. Check every ticket to show them all.');return false;}
+        var all=next.length===lit.length && lit.every(function(k){return next.indexOf(k)>=0;});
+        return commitCascade(function(raw){
+          var path=builderTargetPath(raw,t);if(!path)return {error:'Step not found. Reselect it and try again.'};
+          return planSetField(session.text(),raw,path,'ticketFilter',all?null:JSON.stringify(next));
+        },{after:refreshFormSoon});
+      });
+      entries.push({key:key,input:control.firstChild});
+      box.appendChild(frow(lit.indexOf(key)<0?key+' (not on a lit node or edge)':key,control));
+    });
+    return box;
+  }
 function stepForm(val, ctx){
     var t = session.target, panelRows=[];
     function toggled(planFn){
@@ -1158,6 +1185,8 @@ function stepForm(val, ctx){
     rows.push(chipRow('nodes',
       (Array.isArray(val.nodes) ? val.nodes : []).map(function(n){ return {key: n, label: n}; }),
       'none', toggled(planStepToggleNode)));
+    var ticketFilter = stepTicketFilterControl(val, ctx, t);
+    if (ticketFilter) rows.push(ticketFilter);
 
     /* ---- per-node tone patches: this step's node-color claims ---- */
     var toneMap = (val.tone && typeof val.tone === 'object' && !Array.isArray(val.tone)) ? val.tone : {};

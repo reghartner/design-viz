@@ -578,27 +578,21 @@ function liveStatusEdgeBreaks(scope,diagram,map,on,availabilityOn){
     if(svg._layoutStatusCoins)svg._layoutStatusCoins();
   });
 }
+/* With a ticketFilter (#1103) the step state is the rollup of the filtered
+   tickets alone; carrier markers (missingWork, unavailable detail) stay on the
+   carriers. Without one, each direct carrier contributes its presentation. */
 function liveStatusStep(diagram,step,map){
+  if(trackingStepFilter(step))return liveStatusPresentationRollup(liveStatusStepTickets(diagram,step,true).map(function(key){return map[key] && map[key].state || 'unknown';}));
   return liveStatusPresentationRollup(liveStatusStepCarriers(diagram,step,true).map(function(carrier){
     return liveStatusPresentation(carrier.value,map) || 'unknown';
   }));
 }
-/* Carrier identities are section-local; ticket keys are deduplicated only when
-   counting work. Broad aggregates may include the endpoints of selected hops;
-   visible step state, captions and ticket lists use direct carriers only. */
-function liveStatusStepCarriers(diagram,step,directOnly){
-  var out=[],nodes=stepNodes(step).slice(),keys=stepKeys(step).concat(Object.keys(stepFailures(step)));
-  (diagram.edges || []).forEach(function(edge){
-    var key=edge.from+'->'+edge.to;if(keys.indexOf(key)<0)return;
-    out.push({id:key,value:edge});if(!directOnly)nodes.push(edge.from,edge.to);
-  });
-  nodes.filter(function(id,i){return nodes.indexOf(id)===i;}).forEach(function(id){
-    var node=(diagram.nodes || {})[id];if(node && !isTextBoxNode(node))out.push({id:id,value:node});
-  });return out;
-}
+function liveStatusStepCarriers(diagram,step,directOnly){return trackingStepCarriers(diagram,step,directOnly);}
+/* The filter narrows only the direct view (state, caption, ticket list). Broad
+   aggregates (lanes and the Tickets table's lane stripes) keep every ticket. */
 function liveStatusStepTickets(diagram,step,directOnly){
-  var keys=[];liveStatusStepCarriers(diagram,step,directOnly).forEach(function(carrier){
-    trackingRefs(carrier.value).tickets.forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});
+  var keys=[],filter=directOnly?trackingStepFilter(step):null;liveStatusStepCarriers(diagram,step,directOnly).forEach(function(carrier){
+    trackingRefs(carrier.value).tickets.forEach(function(key){if(keys.indexOf(key)<0 && (!filter || filter.indexOf(key)>=0))keys.push(key);});
   });return keys;
 }
 function liveStatusLanes(page,map){
@@ -615,7 +609,7 @@ function liveStatusLanes(page,map){
 }
 function liveStatusCaption(diagram,step,map,waiting){
   var keys=liveStatusStepTickets(diagram,step,true).filter(function(key){return map[key];}),state=liveStatusStep(diagram,step,map);
-  if(!state)return liveStatusStepCarriers(diagram,step,true).some(function(c){return c.value._detailUnavailable;})?'DETAIL EVIDENCE UNAVAILABLE':liveStatusStepTickets(diagram,step,true).length?'AWAITING TICKET STATUS':'';
+  if(!state)return !trackingStepFilter(step) && liveStatusStepCarriers(diagram,step,true).some(function(c){return c.value._detailUnavailable;})?'DETAIL EVIDENCE UNAVAILABLE':liveStatusStepTickets(diagram,step,true).length?'AWAITING TICKET STATUS':'';
   if(state==='done')return 'DONE';
   if(state==='unchanged')return 'NO CHANGE NEEDED';
   if(state==='missing' && !keys.some(function(key){return map[key].state==='missing';}))return 'MISSING WORK · unlinked work remains';
@@ -625,8 +619,9 @@ function liveStatusCaption(diagram,step,map,waiting){
   }
   var text=(state==='active'?'IN PROGRESS':state==='testing'?'TESTING':'TODO')+' · '+keys.length+' tickets';
   if(state==='todo' && waiting){
-    var carriers=liveStatusCarrierWaiting(diagram,map,waiting),upstream=[];
-    liveStatusStepCarriers(diagram,step,true).forEach(function(carrier){(carriers[carrier.id] ? carriers[carrier.id].keys : []).forEach(function(key){if(upstream.indexOf(key)<0)upstream.push(key);});});
+    // Per shown ticket, so a filtered step waits only on what its tickets wait on.
+    var upstream=[];
+    liveStatusStepTickets(diagram,step,true).forEach(function(ticket){((waiting[ticket] || {}).on || []).forEach(function(up){if(upstream.indexOf(up.key)<0)upstream.push(up.key);});});
     if(upstream.length)text+=' · waiting on '+upstream.sort().join(', ');
   }
   return text;
@@ -1423,8 +1418,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }return null;
   }
   function focusBlocker(binding,index){
-    var d=statusDiagram(binding),carriers=liveStatusStepCarriers(d,d.steps[index],true);
-    var carrier=carriers.find(function(carrier){return liveStatusBlockingKeys(carrier.value,map).length || carrier.value.missingWork===true;});if(!carrier)return;
+    var d=statusDiagram(binding),carriers=liveStatusStepCarriers(d,d.steps[index],true),filter=trackingStepFilter(d.steps[index]);
+    var carrier=carriers.find(function(carrier){return liveStatusBlockingKeys(carrier.value,map).some(function(key){return !filter || filter.indexOf(key)>=0;}) || !filter && carrier.value.missingWork===true;});if(!carrier)return;
     focusCarrier(binding,carrier.id);
   }
   function focusCarrier(binding,id){
@@ -1506,7 +1501,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var downstreamTickets=liveStatusDownstreamTickets(key,ticketWaiting),partial=Object.create(null);downstreamTickets.forEach(function(ticket){partial[ticket]=ticketWaiting[ticket];});
       sectionRecords(page).forEach(function(record){var d=record.section.diagram;if(!d)return;var waiting=liveStatusCarrierWaiting(d,map,partial);
         carriers+=Object.keys(waiting).length;
-        steps+=(d.steps || []).filter(function(step){return liveStatusStepCarriers(d,step).some(function(carrier){return waiting[carrier.id];});}).length;
+        // A step with a ticketFilter counts only when one of its shown tickets waits.
+        steps+=(d.steps || []).filter(function(step){return trackingStepFilter(step)?liveStatusStepTickets(d,step,true).some(function(ticket){return partial[ticket];}):liveStatusStepCarriers(d,step).some(function(carrier){return waiting[carrier.id];});}).length;
       });
       return {key:key,url:liveStatusTicketURL(page.tracking,key,entry,liveStatusPageTicketURL(page,key)),state:entry.state,lanes:labels.join(', '),
         downstream:carriers+' downstream carriers · '+steps+' steps'};

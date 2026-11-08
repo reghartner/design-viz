@@ -66,7 +66,7 @@ function render(raw,map,index=0){
   coin:i=>(view.querySelector('g.coin[data-dv-step="'+i+'"]').className.match(/dv-live-(todo|active|testing|done|blocked|missing|unchanged)\b/)||[])[1]||null,
   node:id=>(view.querySelector('g.node[data-dv-node="'+id+'"]').className.match(/dv-live-(todo|active|testing|done|blocked|missing|unchanged)\b/)||[])[1]||null};
 }
-const STEP='page.sections[0].diagram.steps[0]';
+const STEP='sections[0].diagram.steps[0]';
 const spec=step=>({page:{tracking:{jira:{site:'https://jira.test'}},sections:[{id:'main',diagram:{
  nodes:{api:{title:'API',tickets:['ST-1','ST-2','ST-3']},db:{title:'DB',tickets:['DB-1']}},rows:[['api','db']],
  edges:[{from:'api',to:'db',label:'Write',tickets:['ED-1']}],panels:[{id:'status',type:'live-status'}],
@@ -123,5 +123,21 @@ test('T4 an imported node\'s merged provider and nodeTracking tickets can be fil
  assert.equal(C.liveStatusPresentation(d.nodes['imp::api'],map),'blocked');
  assert.deepEqual(filterErrors(C,resolved),[]);
  const r=render(resolved,map);assert.deepEqual(r.listed(),['CAN-2','LOC-1']);assert.equal(r.coin(0),'done');assert.equal(r.node('imp::api'),'blocked');
- assert.deepEqual(filterErrors(C,resolve(consumer(['LOC-1','CAN-9']))),[STEP+'.ticketFilter[1]: "CAN-9" is not on a node or edge this step lights']);
+ // Topology resolution validates the materialized consumer, so a stale key stops it with the field path.
+ assert.throws(()=>resolve(consumer(['LOC-1','CAN-9'])),e=>e.message.includes(STEP+'.ticketFilter[1]: "CAN-9" is not on a node or edge this step lights'));
+});
+/* Beyond the plan (written with GREEN): removing a hop or node in the Workbench
+   takes its tickets out of the filter, so the edit never leaves a stale key. */
+test('Workbench hop and node removal prune the step ticket filter',()=>{
+ const c={URL,TextEncoder};vm.createContext(c);
+ vm.runInContext(require('../tools/source-loader.cjs').composeSources(['canon.js','validator.js','workbench/source-edit.js','workbench/targets.js','workbench/commands/common.js','workbench/commands/narrative.js']),c);
+ const steps=raw=>raw.page.sections[0].diagram.steps,apply=(raw,fn)=>{const text=JSON.stringify(raw,null,2),plan=fn(text,raw);assert.equal(plan.error,undefined,plan.error);return JSON.parse(plan.text);};
+ let raw=spec({});steps(raw)[1].ticketFilter=['ST-3','ED-1'];
+ raw=apply(raw,(t,r)=>c.planStepToggleHop(t,r,0,1,'api->db'));assert.deepEqual(steps(raw)[1].ticketFilter,['ST-3']);
+ raw=apply(raw,(t,r)=>c.planStepToggleNode(t,r,0,1,'db'));assert.deepEqual(steps(raw)[1].ticketFilter,['ST-3'],'adding a node keeps the filter');
+ raw=apply(raw,(t,r)=>c.planStepToggleNode(t,r,0,1,'api'));assert.equal(steps(raw)[1].ticketFilter,undefined,'an emptied filter is dropped');
+});
+test('a step ticket filter is a declared capability',()=>{
+ const C=load();assert.ok(C.FlowviewCompatibility.detect(spec({ticketFilter:['ST-2']})).includes('flow.step-ticket-filter'));
+ assert.ok(!C.FlowviewCompatibility.detect({page:{sections:[{diagram:{nodes:{a:{}},rows:[['a']],steps:[{nodes:['a']}]}}]}}).includes('flow.step-ticket-filter'));
 });

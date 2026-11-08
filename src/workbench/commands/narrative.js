@@ -271,6 +271,14 @@ function builderStepAt(raw, sectionIdx, stepIdx){
           path: rec.diagram.concat(['steps', stepIdx])};
 }
 
+/* #1103: removing a hop or node also removes its tickets from the step's
+   ticketFilter; an emptied filter is dropped, so the step shows every ticket. */
+function builderPruneStepTicketFilter(d, st){
+  if (!Array.isArray(st.ticketFilter)) return;
+  var lit = trackingStepLitTickets(d, st), kept = st.ticketFilter.filter(function(key){ return lit.indexOf(key) >= 0; });
+  if (kept.length) st.ticketFilter = kept; else delete st.ticketFilter;
+}
+
 function planStepToggleHop(text, raw, sectionIdx, stepIdx, key){
   var got = builderStepAt(raw, sectionIdx, stepIdx);
   if (!got) return {error: 'step not found — reselect and try again'};
@@ -292,6 +300,7 @@ function planStepToggleHop(text, raw, sectionIdx, stepIdx, key){
     if (delivered.length === 1) st.edge = delivered[0];
     else if (delivered.length > 1) st.edges = delivered;
     if (Object.keys(failures).length) st.failures = failures; else delete st.failures;
+    if (has) builderPruneStepTicketFilter(got.d, st);
   });
   if (r.error) return r;
   r.added = !has;
@@ -374,6 +383,7 @@ function planStepToggleNode(text, raw, sectionIdx, stepIdx, nodeId){
     var next = (Array.isArray(st.nodes) ? st.nodes : []).filter(function(n){ return n !== nodeId; });
     if (!has) next.push(nodeId);
     if (next.length) st.nodes = next; else delete st.nodes;
+    if (has) builderPruneStepTicketFilter(got.d, st);
   });
   if (r.error) return r;
   r.added = !has;

@@ -53,6 +53,10 @@ test('3: [$__range] or a span equal to the board window adds no label',()=>{
   [{loki:LOKI_1H,window:'24h'},'24h'],
   [{loki:LOKI_1H,window:'now-1d'},'24h'],
  ]){const shown=texts(signal,window);assert.deepEqual(shown,{card:'42',inspect:'42'},JSON.stringify(signal)+' on '+window);}
+ // #1080: the adapter answers a [$__range] query with one total over the board window.
+ for(const query of ['sum(count_over_time({app="x"} |= "y" [$__range]))','sum by (service) (count_over_time({app="a"} [ $__range ]))'])for(const window of ['24h','6h']){
+  assert.equal(C.telemetryLokiWindowTotal(query),true,query);assert.deepEqual(texts({loki:query},window),{card:'42',inspect:'42'},query+' on '+window);
+ }
 });
 
 test('4: without a declaration, a query with no range selector or several adds no label',()=>{

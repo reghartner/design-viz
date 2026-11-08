@@ -1091,7 +1091,7 @@ A signal's span is, in order:
    literals are not range selectors. The range must be one positive
    `s`/`m`/`h`/`d`/`w` duration such as `[1h]` or `[7d]`.
 
-Everything else derives no span: `[$__range]` (always the board window, #1080), other variables such as
+Everything else derives no span: `[$__range]` (always the board window; see [Loki window totals](#loki-window-totals)), other variables such as
 `[$__rate_interval]`, subqueries (`[1h:5m]`), compound durations (`[1h30m]`),
 several range selectors, and per-second queries such as `rate(...)`. Declare
 `window` for those when the value covers a different span.

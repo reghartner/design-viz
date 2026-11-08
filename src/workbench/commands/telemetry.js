@@ -199,8 +199,12 @@ function telemetryEditBinding(binding,edit,options){
       if(edit.value!=null && !(telemetryNumber(edit.value) && Math.abs(edit.value)<=TELEMETRY_CARD_OFFSET_MAX))return {error:'Use a number of pixels between -'+TELEMETRY_CARD_OFFSET_MAX+' and '+TELEMETRY_CARD_OFFSET_MAX+'.'};
     }else if(edit.field==='position'){
       if(edit.value!=null && !(telemetryObject(edit.value) && telemetryNumber(edit.value.x) && telemetryNumber(edit.value.y)))return {error:'Card position needs finite x and y coordinates.'};
+    }else if(edit.field==='title'){
+      if(edit.value!=null && !telemetryCardTitle(edit.value))return {error:'A card title is 1–120 plain-text characters without control characters.'};
+    }else if(edit.field==='width'){
+      if(edit.value!=null && !telemetryCardWidth(edit.value))return {error:'Use a card width in pixels between '+TELEMETRY_CARD_WIDTH_MIN+' and '+TELEMETRY_CARD_WIDTH_MAX+'.'};
     }else return {error:'Unknown card field.'};
-    if(edit.value==null)delete card[edit.field];else card[edit.field]=edit.field==='position'?{x:edit.value.x,y:edit.value.y}:edit.value;
+    if(edit.value==null)delete card[edit.field];else card[edit.field]=edit.field==='position'?{x:edit.value.x,y:edit.value.y}:edit.field==='title'?edit.value.trim():edit.value;
     b.card=card;telemetryDropEmpty(b,'card');
     return {value:b};
   }

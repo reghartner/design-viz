@@ -44,10 +44,10 @@ function telemetryCardContent(edge,binding,sample,result,window,pending){
   });
   binding=telemetryCardBinding(binding);
   var primary=telemetryPrimary(binding,true) || telemetryMetricNames(binding)[0] || null,queue=binding.kind==='queue',raw=edge.telemetry || {};
-  var title=edge.label || edge.from+' → '+edge.to;
+  var title=binding.card && binding.card.title || edge.label || edge.from+' → '+edge.to;
   // A template parameter is explicit author input. Never extract a queue name
-  // or a query from the title, id, or query text.
-  if(queue && raw.use && telemetryText(raw.topic) && title.indexOf(raw.topic)<0)title+=' · '+raw.topic;
+  // or a query from the title, id, or query text. An authored card title is used as written.
+  if(queue && raw.use && telemetryText(raw.topic) && !(binding.card && binding.card.title) && title.indexOf(raw.topic)<0)title+=' · '+raw.topic;
   var state=result && result.telemetry || 'unobserved',signal=primary && binding.signals[primary],scope=telemetryCardScope(signal),scalar=signal && (signal.source==='cloudwatch' || signal.source==='cloudwatchLogs');
   var loading=telemetryMetricNames(binding).some(function(name){return pending && pending[name];});
   var measured=telemetryMetricNames(binding).some(function(name){return telemetryReading(sample,name).value!==null;});
@@ -104,9 +104,9 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       var id=edge.from+'->'+edge.to,result=view.verdicts.carriers[id],content=telemetryCardContent(edge,binding,view.map[id],result,window,view.pending && view.pending[id]);
       if(view.preview){content.note='Preview · synthetic';content.state='preview';}
       var card=telemetrySvg(doc,'g',{'class':'dv-metrics-card','data-dv-edge':index,'data-metrics-card':id,'data-state':content.state,'data-verdict':view.preview?'preview':result && result.verdict || 'unobserved'},svg);
-      // Fixed maximum width with measured wrapping, never stretched glyphs.
+      // Authored card.width or 240, with measured wrapping, never stretched glyphs.
       // Height is the actual rendered content and participates in obstacle packing.
-      var w=240,y=15,rect=telemetrySvg(doc,'rect',{'class':'dv-metrics-card-box',rx:7,width:w},card);
+      var w=binding.card && binding.card.width || 240,y=15,rect=telemetrySvg(doc,'rect',{'class':'dv-metrics-card-box',rx:7,width:w},card);
       var bar=telemetrySvg(doc,'path',{'class':'dv-metrics-card-bar'},card);
       function wrapped(value,cls,width,maxLines,x){
         x=x==null?10:x;
@@ -131,8 +131,8 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
         var display=formatted?row.text.replace(' (formatted text; may be rounded)',''):row.text;
         var value=telemetrySvg(doc,'text',{'class':'t1 dv-metrics-card-value',x:10,y:top,'data-signal':row.name},card);value.textContent=display;
         var valueWidth=value.getComputedTextLength(),label;
-        if(valueWidth<=132){
-          // A small table: numbers align at the right, labels use the remainder.
+        if(valueWidth<=w-108){
+          // A small table: numbers align at the right, labels use the remainder (at least 56 units).
           value.setAttribute('x',w-32-valueWidth);
           label=wrapped(row.label,'t2 dv-metrics-card-label',w-52-valueWidth,2);
         }else{

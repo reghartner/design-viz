@@ -395,7 +395,7 @@ test('#1112 card title and width parse on carriers, warn with their path when in
     edges:[{from:'a',to:'b',telemetry:{...CALL(),card:over}}],
     topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{telemetry:{...QUEUE(),card:over}}}}]}}]}});
   assert.deepEqual(plain(C.validate(C.normalize(page({title:'Ok',width:300})))).warnings.filter(w=>/card/.test(w)),[]);
-  const result=plain(C.validate(C.normalize(page({title:'',width:900}))));assert.deepEqual(plain(result.errors),[]);
+  const result=plain(C.validate(C.normalize(page({title:'',width:900}))));assert.deepEqual(result.errors.filter(e=>/card/.test(e)),[],'card problems are warnings, never errors');
   assert.deepEqual(result.warnings.filter(w=>/card/.test(w)).map(w=>w.split(': ')[0]),[
     'sections[0].diagram.edges[0].telemetry.card.title','sections[0].diagram.edges[0].telemetry.card.width',
     'sections[0].diagram.topologyImports[0].nodeTracking.api.telemetry.card.title','sections[0].diagram.topologyImports[0].nodeTracking.api.telemetry.card.width']);

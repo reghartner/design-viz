@@ -109,8 +109,10 @@ function createFlowMetricsEditor(o){
       var card=telemetryObject(b.card)?b.card:{};
       d.row(box,'Card side',d.relabel(c.select(TELEMETRY_CARD_SIDES,typeof card.side==='string'?card.side:'',function(v){return commit({op:'card',field:'side',value:v});},true),{'':'(automatic)'}));
       d.row(box,'Card offset',c.number(telemetryNumber(card.offset)?card.offset:null,function(v){return commit({op:'card',field:'offset',value:v});}));
+      d.row(box,'Card title',c.text(typeof card.title==='string'?card.title:'',function(v){return commit({op:'card',field:'title',value:v});},{placeholder:'(connection label)'}));
+      d.row(box,'Card width',c.number(telemetryNumber(card.width)?card.width:null,function(v){return commit({op:'card',field:'width',value:v});}));
       if(card.position)box.appendChild(c.action('Reset card to automatic',function(){return commit({op:'card',field:'position',value:null});}));
-      d.note(box,'Drag the card in Preview metrics layout, or focus it and use Arrow keys (10 units; Shift moves 50). Manual placement overrides Card side and offset; Reset card to automatic restores them. Readers see the saved placement when Metrics is on.');
+      d.note(box,'Drag the card in Preview metrics layout, or focus it and use Arrow keys (10 units; Shift moves 50). Manual placement overrides Card side and offset; Reset card to automatic restores them. Card width is 140–480 units (default 240); an empty Card title shows the connection label. Readers see the saved placement when Metrics is on.');
     }
     box.appendChild(c.action('Remove metrics',function(){return commit({op:'remove'});}));
   }

@@ -239,7 +239,7 @@ from Prometheus:
 | `signals.<name>.honeycomb` | A Honeycomb query object, kept as authored. |
 | `proof` | Optional per-signal limits: `min`, `max` (finite numbers) and `maxRatioOf`. With `maxRatioOf: "<other signal>"`, `max` is the highest allowed ratio of this signal to the other one, so `"errors": {"maxRatioOf": "rate", "max": 0.01}` means at most 1 % errors. `maxRatioOf` needs `max` and another signal of the same binding. `min` stays an absolute floor. |
 | `links` | Optional authored link-outs: `dashboard` and `query`, absolute HTTP(S) URLs. |
-| `card` | Optional edge-card placement: `side` (`right`, `left`, `above`, `below`) and `offset` (pixels, -1000 to 1000). |
+| `card` | Optional edge card: `side` (`right`, `left`, `above`, `below`), `offset` (pixels, -1000 to 1000), `title` (1–120 plain-text characters shown instead of the edge label) and `width` (pixels, 140 to 480; default 240). |
 
 Shared settings live on the page beside the Jira settings, in
 `tracking.telemetry`:
@@ -488,7 +488,8 @@ into editable raw signals.
 
 **Dashboard link** and **Query link** take absolute http(s) URLs. On a connection,
 **Card side** (right, left, above or below) and **Card offset** (pixels, -1000 to
-1000) place its metrics card. The validator's warnings for the binding are listed
+1000) place its metrics card. **Card title** replaces the connection label on the card
+and **Card width** (140 to 480; default 240) sets its width; empty restores the default. The validator's warnings for the binding are listed
 under the controls with the same text. An imported node or connection shows the
 provider's binding read only. A binding saved there is stored in the consumer's
 `nodeTracking` or `edgeTracking` entry and replaces the inherited binding for this
@@ -1044,7 +1045,7 @@ including its displayed series, scope, COUNT note and pending status. Inspect
 and proof retain every numeric signal. No visible numeric rows means no card.
 Missing samples say “unobserved”; no fixed unbound placeholders are added. Loading
 and refresh remain per signal. The note names the observation window (default
-`24h`), not an invented duration of silence. Width is capped at 240 SVG units;
+`24h`), not an invented duration of silence. Width is 240 SVG units unless `card.width` sets it;
 measured wrapping determines the height used for obstacle packing. Titles, labels,
 units and scope can shorten; numeric values remain readable without glyph scaling.
 Safe integer counts remain exact; fractional gauges use compact significant digits
@@ -1070,6 +1071,12 @@ horizontal route. Optional `position: {"x": -180, "y": 90}` sets the card’s to
 in SVG units relative to the edge path midpoint. Both coordinates must be finite
 numbers. This manual position overrides side/offset and automatic collision packing;
 text width and zoom do not shift it. Removing `position` restores automatic placement.
+Optional `card.title` (1–120 plain-text characters without control characters) is shown
+as the card title instead of the edge label, without the queue topic suffix. Optional
+`card.width` (140 to 480 SVG units; default 240) sets the card width: titles, labels and
+values wrap or shorten within it, and placement and collision packing use it. Both work
+on imported carriers through `edgeTracking` overlays. Like placement, they belong on the
+carrier; templates cannot set them. An invalid title or width warns at its path and is ignored.
 Automatic cards avoid manual cards. Placement shares board control measurements and collision tests;
 card rectangles reserve space in the coin packer even without a live break. Jira
 cues repack around cards and coins, and the frame includes cards and displaced

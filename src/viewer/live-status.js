@@ -807,7 +807,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         if(old)sectionRecords(old).forEach(function(record){var d=record.section.diagram;if(d){retiredIds=retiredIds.concat(Object.keys(d.nodes || {}),(d.edges || []).map(function(edge){return edge.from+'->'+edge.to;}));}});
         remotePages[remoteKey(ref)]=normalize(raw);telemetry.bindingsChanged(retiredIds);schedule();
         // #1136: a board that opened on Trace for want of references opens Jira once a loaded detail brings some, unless the reader chose a view.
-        if(boardJiraFree && snapshot().available){boardJiraFree=false;if(statusAuto){statusAuto=false;clearTraceFocus();statusMode='jira';}}
+        if(statusAuto && referencesAvailable()){statusAuto=false;clearTraceFocus();statusMode='jira';}
         if(JSON.stringify(refs())!==previous)notify();
       }
       return raw;
@@ -869,19 +869,19 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // Metrics canvas cues on every bound section, beside the Jira paint (src/viewer/telemetry.js).
   var metricsPreview=authoring && !!(renderOptions && renderOptions.metricsPreview) && trackingTelemetry(page).enabled;
   function paintMetrics(){
-    // The Trace view owns the canvas, except on a Jira-free board (#1136), where it is the only view and Metrics overlay paints there.
-    var metricsView=statusMode==='trace' && !boardJiraFree?null:telemetryHooks.view(),references=referencesAvailable();
+    // The Metrics overlay draws in every view (Chuck 2026-11-08, D13); the Trace view keeps Jira work colouring off its cards.
+    var metricsView=telemetryHooks.view(),references=referencesAvailable(),workPaint=statusMode!=='trace';
     bindings.forEach(function(binding){
       var scope=binding.el,d=binding.section.diagram;if(!d)return;
       var templates=trackingTelemetry(binding.page).templates;
       telemetryPaintCues(scope,d,templates,metricsView,trackingTelemetry(page).window);
-      var cardsView=statusMode!=='trace' && metricsPreview && trackingTelemetry(binding.page).enabled?telemetryCardPreview(d,templates):metricsView;
+      var cardsView=metricsPreview && trackingTelemetry(binding.page).enabled?telemetryCardPreview(d,templates):metricsView;
       telemetryPaintCards(scope,d,templates,cardsView,trackingTelemetry(page).window,function(card,path,edge,index,bound){
         // The bound carrier owns its work presentation, including all resolved
         // imported tickets. Telemetry proof and endpoint states cannot override it.
         // Unticketed metric cards may show no-change without painting ordinary edges,
         // but only on a board with ticket references (#1137).
-        var appearance=!cardsView.preview && api.enabled() && availabilityOn && references?liveStatusPresentation(edge,map):null;
+        var appearance=!cardsView.preview && workPaint && api.enabled() && availabilityOn && references?liveStatusPresentation(edge,map):null;
         liveStatusClass(card,appearance);
         if(!appearance)liveStatusInk(card,null);
         if(appearance){
@@ -1954,7 +1954,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var releaseColors=options.colorsPreview?function(){}:FlowStatusColors.connect(view,schedule);
   liveStatusControllers.set(view,api);
   // #1136: a board with no ticket or epic references after imports has no Jira view. It opens on Trace; the panel shows no switch.
-  var boardJiraFree=!snapshot().available,statusAuto=boardJiraFree;if(boardJiraFree)statusMode='trace';
+  var statusAuto=!referencesAvailable();if(statusAuto)statusMode='trace';
   connectPanels();
   paint();events.forEach(function(type){view.addEventListener(type,schedule);});
   var metricFonts=view.ownerDocument && view.ownerDocument.fonts;

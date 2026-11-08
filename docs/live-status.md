@@ -750,7 +750,7 @@ an **Env** select when the board names environments, **Edit** (then **Save N cha
 at the right edge. The Metrics connector line follows (#1136), then **Live** | **Over time**,
 the day row and any Over time error, in both views. A board with no ticket or epic
 references after imports has no Jira view (#1136): the panel opens on Trace with no
-**Jira** | **Trace** switch, and Metrics overlay paints its cards there. If a loaded detail
+**Jira** | **Trace** switch. If a loaded detail
 brings ticket references, the switch appears and the panel moves to Jira unless the reader
 chose a view. The Jira view then has two rows. The first holds only buttons, which keep
 their place: any provider action and, on the far right, **First blocker**. **First blocker** keeps one size; with no blockers it reads
@@ -765,6 +765,8 @@ fetch, not a ticket's change time), and the provider note. Text too long for the
 is cut off and stays available in the row's tooltip and to screen readers. Demo
 controls supply **<** and **>** on the day row, below **Live** | **Over time**. The engine's panel title stays above this header.
 
+While it is on, the Metrics overlay draws its cards and cues in both views on every board
+(Chuck 2026-11-08, D13); in the Trace view its cards carry no Jira work colouring.
 The **Metrics overlay** switch shows when the host supplies a telemetry
 provider or a demo telemetry source (see [Telemetry provider](#telemetry-provider));
 without one it is hidden. It is off on every load and its state is never saved.

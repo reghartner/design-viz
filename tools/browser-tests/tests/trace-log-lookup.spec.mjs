@@ -15,12 +15,12 @@ const LINES={data:[
  {timestamp:'1794044533123456789',line:'Handling camera stats message',labels:{env:'stg',severity_text:'DEBUG'},structuredMetadata:{cameraModel:'arch',trace_id:ID,span_id:SPAN}},
  {timestamp:'1794040000000000000',line:'Handling camera stats message',labels:{env:'stg',severity_text:'DEBUG'},structuredMetadata:{cameraModel:'arch'}}
 ],metadata:{linesReturned:2,maxLinesAllowed:10,resultsTruncated:false}};
-async function open(page,server,{grafana=true,lookups=true}={}){
+async function open(page,server,{grafana=true,lookups=true,lines=LINES}={}){
  await page.setViewportSize({width:1500,height:1100});const calls=[];
  const servers=[{server:PROFILE.server,tools:[{name:'get_trace',annotations:{readOnlyHint:true,destructiveHint:false}}]}].concat(grafana?[{server:'Grafana',tools:[{name:'query_loki_logs',annotations:{readOnlyHint:true}}]}]:[]);
  await page.exposeFunction('logTools',()=>servers);await page.exposeFunction('logDescribe',()=>schema());
  await page.exposeFunction('logPermission',keys=>Object.fromEntries(keys.map(k=>[k,'granted'])));
- await page.exposeFunction('logCall',(server,tool,args)=>{calls.push({server,tool,args});return tool==='query_loki_logs'?{content:[{type:'text',text:JSON.stringify(LINES)}]}:{payload:RECORDED};});
+ await page.exposeFunction('logCall',(server,tool,args)=>{calls.push({server,tool,args});return tool==='query_loki_logs'?{content:[{type:'text',text:JSON.stringify(lines)}]}:{payload:args.trace_id===ID?RECORDED:notFound(args.trace_id)};});
  await page.addInitScript(()=>{window.claude={use:async name=>name==='permissions'?{request:keys=>window.logPermission(keys)}:{listTools:()=>window.logTools(),describeTool:()=>window.logDescribe(),callTool:(s,n,a)=>window.logCall(s,n,a)}};window.flowviewBooted=ctl=>{window.ctl=ctl;};});
  const telemetry={grafana:{loki:'loki-$env'},environment:'stg',environments:{stg:{},prd:{}},traceConnections:{company:PROFILE}};
  if(lookups)telemetry.lookups={camera:{label:'Camera model',query:QUERY,values:['arch','wren']}};
@@ -33,6 +33,8 @@ async function open(page,server,{grafana=true,lookups=true}={}){
  return {root,logs:root.locator('.dv-trace-logs'),calls};
 }
 // Accessible names of the Load trace controls outside the log lookup section.
+// A Honeycomb get_trace answer for a trace it did not keep.
+const notFound=id=>'---\nMetadata:\n  environment: production\n  navigation_hints: no spans found\n  total_spans: 0\n  trace_id: '+id+'\n  view_mode: full\n  visible_spans: 0\n';
 const formControls=root=>root.locator('.dv-trace-config').evaluate(config=>Array.from(config.querySelectorAll('input,select,textarea,button')).filter(n=>!n.closest('.dv-trace-logs')).map(n=>[n.tagName,n.getAttribute('aria-label') || n.textContent.trim(),n.disabled]));
 
 test('desktop authored log lookup lists the newest matching lines and loads the chosen trace focused on its span',async({page,server},info)=>{
@@ -62,4 +64,17 @@ test('desktop without a Grafana connector the log lookup is disabled with a mess
  await info.attach('log-lookup-no-grafana',{body:await h.root.screenshot(),contentType:'image/png'});
  await h.root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();
  await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);expect(h.calls.map(c=>c.tool)).toEqual(['get_trace']);
+});
+
+test('desktop a log-line trace the provider did not keep says so and loads the next log line',async({page,server},info)=>{
+ const MISSING='5ab0'.repeat(8),ns=ago=>(BigInt(Date.now()-ago)*1000000n).toString(),line=(ago,meta)=>({timestamp:ns(ago),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:meta});
+ const h=await open(page,server,{lines:{data:[line(600000,{cameraModel:'arch',trace_id:MISSING}),line(900000,{cameraModel:'arch'}),line(1200000,{cameraModel:'arch',trace_id:ID,span_id:SPAN})]}});
+ await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');await h.logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(h.logs.locator('.dv-trace-log-row')).toHaveCount(3);
+ await h.logs.getByRole('button',{name:'Load trace '+MISSING,exact:true}).click();
+ const report=h.root.locator('.dv-trace-direct-report');await expect(report).toContainText('Trace not found. The provider may not have kept this trace (sampling). Try the next log line.');
+ await expect(report).not.toContainText('longer lookback');await expect(h.root.locator('.dv-trace-time')).toHaveJSProperty('open',false);
+ await info.attach('log-line-not-kept',{body:await h.root.screenshot(),contentType:'image/png'});
+ await report.getByRole('button',{name:'Try the next log line',exact:true}).click();
+ await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);await expect(h.root.locator('.dv-trace-span[data-span-id="'+SPAN+'"]')).toHaveAttribute('aria-pressed','true');
+ expect(h.calls.filter(c=>c.tool==='get_trace').map(c=>c.args.trace_id)).toEqual([MISSING,ID]);
 });

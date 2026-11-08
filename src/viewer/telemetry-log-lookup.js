@@ -78,7 +78,7 @@ function createTelemetryLogLookup(page,transport,hooks){
     var s=state();
     return {available:s==='ready',state:s,note:TELEMETRY_LOG_NOTES[s] || '',busy:busy,form:Object.assign({},form),typed:TELEMETRY_LOG_TYPED,
       lookups:Object.keys(ls).map(function(id){var l=ls[id];return {id:id,label:l.label,slot:telemetryLookupSlot(l.query),values:(l.values || []).slice()};}),
-      result:result?JSON.parse(JSON.stringify(result)):null};
+      result:result?Object.assign(JSON.parse(JSON.stringify(result)),{next:next()}):null};
   }
   function set(field,value){
     if(dead || !telemetryOwn(form,field) || typeof value!=='string' || value.length>2000)return;
@@ -136,6 +136,8 @@ function createTelemetryLogLookup(page,transport,hooks){
   // The row a reader chose, and what happened when its trace loaded.
   function row(index){var r=result && result.rows[index];return r?JSON.parse(JSON.stringify(r)):null;}
   function chosen(index,note){if(!result || !result.rows[index])return;result.chosen=index;result.chosenNote=note || '';changed();}
+  // The next row with a trace id after `from` (default: the chosen row), or -1 (#1124).
+  function next(from){if(!result)return -1;if(from===undefined)from=result.chosen;if(typeof from!=='number')return -1;for(var i=from+1;i<result.rows.length;i++)if(result.rows[i].traceId)return i;return -1;}
   if(transport && typeof transport.onAccountChanged==='function')off=transport.onAccountChanged(retire);
-  return {snapshot:snapshot,set:set,find:find,row:row,chosen:chosen,clear:function(){cancel();result=null;changed();},destroy:function(){cancel();dead=true;if(off)off();}};
+  return {snapshot:snapshot,set:set,find:find,row:row,chosen:chosen,next:next,clear:function(){cancel();result=null;changed();},destroy:function(){cancel();dead=true;if(off)off();}};
 }

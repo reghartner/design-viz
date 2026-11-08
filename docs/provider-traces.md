@@ -361,6 +361,9 @@ section once for that result and reports, using the window that was sent:
   Lookback." for absolute Trace start and Trace end.
 - "Trace not found in the time range of the pasted link. Paste the trace ID
   alone, then set Lookback." for link bounds.
+- A trace loaded from a log line says the provider may not have kept it
+  (sampling) and offers the next log line instead; see [Find a trace from a log
+  line](live-status.md#find-a-trace-from-a-log-line).
 
 This provider answer is the only response reported as not found; errors,
 unknown shapes and a span table that is present but lacks a required column

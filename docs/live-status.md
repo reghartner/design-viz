@@ -2949,6 +2949,13 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   exactly as a pasted ID, then focuses the line's span ID in the waterfall and
   the diagram. A span ID that is not in the trace is reported, and the trace
   stays loaded.
+- A log line's trace may never have been kept by the provider (sampling)
+  (#1124). When it is not found, the report says "Trace not found. The provider
+  may not have kept this trace (sampling). Try the next log line." and offers
+  **Try the next log line**, which loads the next listed line that has a trace
+  ID. The lookback hint ("The log line is older than the last 2h; try a longer
+  lookback under Lookback.") is added, and Lookback opens, only when the line
+  is outside the window. A pasted ID or link keeps the lookback text.
 - Lookups need the Grafana connector. When no connector offers
   `query_loki_logs`, or in a host without one (native mounts), the lookup
   controls are disabled with a message and the rest of Load trace is unchanged.

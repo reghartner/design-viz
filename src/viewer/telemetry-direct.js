@@ -45,8 +45,19 @@ function createTelemetryDirect(page,transport,hooks){
   function snapshot(){var ps=sync();return {available:available(),busy:busy,form:Object.assign({},form),bounds:bounds(ps),profiles:Object.keys(ps).map(function(id){return {id:id,label:ps[id].label,lookback:ps[id].time.defaultLookback,environments:Object.keys(ps[id].environments).map(function(e){return {id:e,label:ps[id].environments[e].label || e};})};}),sections:sections().map(function(s){return {id:s.id,label:s.label};}),report:report?JSON.parse(JSON.stringify(report)):null,exemplar:exemplar,section:form.section};}
   function set(field,value){if(dead || !Object.prototype.hasOwnProperty.call(form,field) || typeof value!=='string' || value.length>4096)return;sync();if(value===form[field])return;cancel();form[field]=value;if(field==='connection' || field==='environment')clearInput();if(field==='connection'){form.environment='';environmentChosen=false;}if(field==='environment')environmentChosen=true;sync();changed();}
   function errorText(e){var known={not_granted:'Connector permission was not granted.',needs_reauth:'Reconnect this connector in the host.',user_changed:'Host account changed; start a new trace request.',server_not_connected:'The configured connector is not connected.',server_not_found:'The configured connector was not found.',capability_removed:'The configured tool capability was removed.',capability_disabled:'The configured tool capability is disabled.'};return known[e && e.code] || telemetryTraceErrorText(e) || 'The host could not complete the read-only detail request.';}
-  function notFoundText(r){return r.linkTime?'Trace not found in the time range of the pasted link. Paste the trace ID alone, then set Lookback.':r.lookback?'Trace not found in the last '+r.lookback+'. Try a longer lookback under Lookback.':'Trace not found between '+r.range.from.replace(/\.0+Z$/,'Z')+' and '+r.range.to.replace(/\.0+Z$/,'Z')+'. Try a wider range under Lookback.';}
-  async function load(verify){
+  function lookbackText(r){return r.linkTime?'Trace not found in the time range of the pasted link. Paste the trace ID alone, then set Lookback.':r.lookback?'Trace not found in the last '+r.lookback+'. Try a longer lookback under Lookback.':'Trace not found between '+r.range.from.replace(/\.0+Z$/,'Z')+' and '+r.range.to.replace(/\.0+Z$/,'Z')+'. Try a wider range under Lookback.';}
+  /* #1124: a trace chosen from a log line may never have been kept (sampling).
+     The lookback hint stays only when the line is outside the window. */
+  function lineOutside(r,line){var at=line.at?Date.parse(line.at):NaN,ms=function(v){return Date.parse(v.replace(/(\.\d{3})\d*Z$/,'$1Z'));};return isFinite(at) && (at<ms(r.range.from) || at>ms(r.range.to));}
+  function notFoundText(r,line){
+    if(!line)return lookbackText(r);
+    var text='Trace not found. The provider may not have kept this trace (sampling).'+(line.next?' Try the next log line.':'');
+    if(!lineOutside(r,line))return text;
+    return text+' '+(r.lookback?'The log line is older than the last '+r.lookback+'; try a longer lookback under Lookback.':'The log line is outside '+r.range.from.replace(/\.0+Z$/,'Z')+' – '+r.range.to.replace(/\.0+Z$/,'Z')+'; try a wider range under Lookback.');
+  }
+  // line: {at, next} when the trace ID came from a log line (#1124).
+  async function load(verify,line){
+    line=line && typeof line==='object'?{at:typeof line.at==='string'?line.at:null,next:!!line.next}:null;
     sync();cancel();var mine=serial,key=lastIdentity,ps=profiles(),p=ps[form.connection],request=Object.assign({},form),stage='configuration',resolved=null;abort=new AbortController();var signal=abort.signal;
     function active(){return !dead && mine===serial && !signal.aborted && key===identity() && available();}
     function check(){if(!active())FlowTraceConnections.fail('cancelled','Trace request expired.');}
@@ -70,7 +81,7 @@ function createTelemetryDirect(page,transport,hooks){
     }catch(e){
       if(!dead && e && e.code==='user_changed'){if(transport && typeof transport.accountChanged==='function')transport.accountChanged();if(typeof hooks.accountChanged==='function')hooks.accountChanged();retireAccount();return null;}
       if(dead || mine!==serial || signal.aborted || key!==identity())return null;
-      busy=false;report=Object.assign(report || {mode:verify?'verify':'load',requestAccepted:false,idMatched:false},{stage:e.stage || stage,error:e && e.code==='trace_not_found' && resolved?notFoundText(resolved):errorText(e),serial:++telemetryDirectReports});if(e.code && /^[A-Za-z0-9_.-]{1,64}$/.test(e.code))report.code=e.code;changed();return null;
+      busy=false;report=Object.assign(report || {mode:verify?'verify':'load',requestAccepted:false,idMatched:false},{stage:e.stage || stage,error:e && e.code==='trace_not_found' && resolved?notFoundText(resolved,line):errorText(e),serial:++telemetryDirectReports,logLine:!!line});if(line && e && e.code==='trace_not_found' && resolved)report.lookbackHint=lineOutside(resolved,line);if(e.code && /^[A-Za-z0-9_.-]{1,64}$/.test(e.code))report.code=e.code;changed();return null;
     }finally{if(mine===serial && timeout){clearTimeout(timeout);timeout=null;}}
   }
   /* #1078: a board Edit-mode change re-renders the page. The loaded trace moves to

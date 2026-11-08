@@ -5,7 +5,7 @@ import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 import {createMockBridge,nativeQuery,EVENT_QUERY,expected} from '../../../tests/helpers/honeycomb-bridge.mjs';
 import {nestedSpec,PANEL,mountCues} from '../helpers/telemetry-cards.mjs';
-const metrics=root=>root.getByRole('button',{name:'Metrics',exact:true});
+const metrics=root=>root.getByRole('switch',{name:'Metrics overlay',exact:true});
 async function setup(page,server,{source='honeycomb',disabled,held=false}={}){
  const bridge=createMockBridge({day:9});let release,hold=held;const original=bridge.callTool;
  bridge.callTool=async(...args)=>{const result=await original(...args);if(hold&&args[1]==='get_trace')await new Promise(r=>release=r);return result;};
@@ -29,7 +29,7 @@ async function setup(page,server,{source='honeycomb',disabled,held=false}={}){
  return {root,bridge,release(){hold=false;release?.();}};
 }
 for(const source of ['honeycomb','tempo'])test(`desktop ${source} runtime API through real async nested import, cached alternate and Over time`,async({page,server})=>{
- const h=await setup(page,server,{source}),root=h.root,id='outer::inner::a->outer::inner::b';await expect(metrics(root)).toHaveAttribute('aria-pressed','false');expect(h.bridge.calls).toHaveLength(0);await metrics(root).click();
+ const h=await setup(page,server,{source}),root=h.root,id='outer::inner::a->outer::inner::b';await expect(metrics(root)).toHaveAttribute('aria-checked','false');expect(h.bridge.calls).toHaveLength(0);await metrics(root).click();
  await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.exemplars?.length,id)).toBe(1);
  await expect(root.locator('g.node[data-dv-node="local"] .dv-metrics-node')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.telemetry.verdicts().carriers.local.bound)).toBe(false);
  const all=await page.evaluate(()=>window.ctl.telemetry.bindings().map(b=>({id:b.id,sample:window.ctl.telemetry.snapshot().map[b.id]})));expect(all.some(b=>b.id==='local')).toBe(true);for(const b of all)expect(b.sample?.exemplars?.length,b.id).toBe(1);

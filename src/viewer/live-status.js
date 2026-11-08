@@ -925,7 +925,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // #1099: find a trace from a Loki log line; the chosen line loads through directTrace.
   var logLookup=createTelemetryLogLookup(page,telemetryOptions && telemetryOptions.directTrace,{
     identity:function(){return [telemetry.environment(),telemetry.snapshot().historical];},
-    disabled:function(){return retired || telemetryOptions===false || !trackingTelemetry(page).enabled || telemetry.snapshot().historical;},
+    disabled:function(){return retired?'closed':telemetryOptions===false?'host':!trackingTelemetry(page).enabled?'board':telemetry.snapshot().historical?'history':'';},
     wanted:function(){return statusMode==='trace';},
     config:function(){return telemetry.config();},
     lookback:function(){var form=directTrace.snapshot().form,p=FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS)[form.connection];return {start:form.start,end:form.end,lookback:p?p.time.defaultLookback:''};},
@@ -1075,10 +1075,24 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function overTimeState(){
     if(!overSource)return null;
     var base={active:!!over,loading:overLoading,progress:overProgress,error:overError,available:!!(applied && Object.keys(map).length),disabled:editing()};
+    base.window=overTimeWindow();
     if(!over)return base;
     var days=over.days;base.index=over.index;base.count=days.length;base.first=days[0].short;base.last=days[days.length-1].short;base.label=days[over.index].label;
     // #1082: a day is today only when its key is today's date in the viewer's time zone, whatever the source. An undated day never is.
     var now=new Date();base.today=days[over.index].key===new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())).toISOString().slice(0,10);return base;
+  }
+  /* #1132: the selected day as a UTC search window for trace and log searches, or null in Live. It
+     runs from the local midnight that opens `day.key` to the next one, so a DST day runs 23 h or 25 h,
+     and today ends now. `day.at` is not read: a demo day's is a UTC midnight. Metrics plays no part.
+     A day without a YYYY-MM-DD key has no window. On today `to` changes with every snapshot, so key a
+     request on `day.key` and the today flag, never on the window. */
+  function overTimeWindow(){
+    var day=over && over.days[over.index],date=day && typeof day.key==='string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(day.key);
+    if(!date)return null;
+    var from=new Date(+date[1],date[2]-1,+date[3]).getTime(),midnight=new Date(+date[1],date[2]-1,+date[3]+1).getTime();
+    var to=Math.min(midnight,Date.now());if(!(to>from))return null;
+    var end=new Date(to),pad=function(n){return String(n).padStart(2,'0');};
+    return {from:new Date(from).toISOString(),to:end.toISOString(),label:(day.label || day.key)+' 00:00–'+(to===midnight?'24:00':pad(end.getHours())+':'+pad(end.getMinutes()))+' local'};
   }
   function overShow(){map=liveStatusDayMap(over.today,over.days[over.index].states);changedKeys=[];telemetry.historyDay(over.index);paint();notify();telemetryHooks.jiraChanged();}
   // Returning to Live restores the live map, then applies any evidence that arrived meanwhile as a normal refresh.

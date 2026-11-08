@@ -27,12 +27,12 @@ test('desktop environment profiles author with Undo and switch local/imported re
   window.flowviewBooted=ctl=>window.envController=ctl;
  });
  await page.goto(server.origin+'/environment.html');await page.waitForFunction(()=>!!window.envController);
- const panel=page.locator('#docview .pt-live-status').first(),selector=panel.getByRole('combobox',{name:'Environment',exact:true}),metrics=panel.getByRole('button',{name:'Metrics',exact:true});
+ const panel=page.locator('#docview .pt-live-status').first(),selector=panel.getByRole('combobox',{name:'Env',exact:true}),metrics=panel.getByRole('switch',{name:'Metrics overlay',exact:true});
  await expect(selector).toHaveValue('stg');await expect(metrics).toBeVisible();expect(await page.evaluate(()=>window.envCalls.length)).toBe(0);
  await selector.selectOption('qa');expect(await page.evaluate(()=>window.envCalls.length)).toBe(0);
  await metrics.click();await expect.poll(()=>page.evaluate(()=>window.envController.telemetry.snapshot().map['shared::api']?.signals.rate?.value)).toBe(12);
  await expect.poll(()=>page.evaluate(()=>window.envController.telemetry.snapshot().map.ingest?.signals.rate?.value)).toBe(12);
- await selector.selectOption('prd');await expect(metrics).toHaveAttribute('aria-pressed','true');
+ await selector.selectOption('prd');await expect(metrics).toHaveAttribute('aria-checked','true');
  await expect.poll(()=>page.evaluate(()=>window.envController.telemetry.snapshot().map['shared::api']?.signals.rate?.value)).toBe(91);
  expect(await page.evaluate(()=>window.envController.telemetry.snapshot().map.ingest.signals.rate.value)).toBe(91);
  const calls=await page.evaluate(()=>window.envCalls.filter(c=>c.tool==='query_prometheus'));
@@ -50,7 +50,7 @@ test('desktop delayed queries distinguish loading, refresh, empty, failure and e
  function bind(v){if(!v||typeof v!=='object')return;if(v.telemetry?.signals){v.telemetry.signals={rate:{cloudwatch:{namespace:'AWS/IoT',metric:'Success',region:'us-east-1',accountId:'111111111111',dimensions:{},statistic:'Sum'},unit:'req/s'}};v.telemetry.proof={rate:{min:1}};}Object.values(v).forEach(bind);}bind(raw);
  const input=path.join(server.root,'loading.spec.json'),output=path.join(server.root,'loading.html');await writeFile(input,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output],{stdio:'pipe'});
  await page.addInitScript(()=>{window.requests=[];window.flowviewBooted=ctl=>window.loadingCtl=ctl;window.claude={use:async()=>({listTools:async()=>[{server:'Grafana',tools:['query_cloudwatch']}],callTool:async(server,tool,input)=>new Promise((resolve,reject)=>window.requests.push({tool,input,resolve,reject,done:false}))})};window.finishQueries=(mode,value=12)=>{window.requests.filter(r=>!r.done).forEach(r=>{r.done=true;if(mode==='failure')r.reject({code:'tool_error',message:'query failed'});else r.resolve({payload:{values:mode==='empty'?[]:[value],timestamps:mode==='empty'?[]:[Date.parse(r.input.end)-3600000]}});});};});
- await page.goto(server.origin+'/loading.html');await page.waitForFunction(()=>!!window.loadingCtl);const root=page.locator('#docview'),panel=root.locator('.pt-live-status').first(),metrics=panel.getByRole('button',{name:'Metrics',exact:true}),env=panel.getByRole('combobox',{name:'Environment',exact:true});
+ await page.goto(server.origin+'/loading.html');await page.waitForFunction(()=>!!window.loadingCtl);const root=page.locator('#docview'),panel=root.locator('.pt-live-status').first(),metrics=panel.getByRole('switch',{name:'Metrics overlay',exact:true}),env=panel.getByRole('combobox',{name:'Env',exact:true});
  await expect(root.locator('.dv-metrics-card')).toHaveCount(0);expect(await page.evaluate(()=>window.requests.length)).toBe(0);await metrics.click();
  const card=root.locator('[data-metrics-card="ingest->app"]');await expect(card.locator('text.t1').nth(1)).toHaveText('Loading…');await expect(card).toHaveAttribute('data-state','loading');await expect(card).not.toContainText('unobserved');
  for(const id of ['ingest','shared::api']){await root.locator('g.node[data-dv-node="'+id+'"]').click();await expect(page.locator('.dv-live-production-heading')).toHaveText('STG Evidence');await expect(page.locator('.dv-live-production')).toContainText('Loading…');if(id==='shared::api')await page.screenshot({path:'/tmp/evidence-status-loading-stg.png'});await page.keyboard.press('Escape');}

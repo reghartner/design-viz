@@ -97,6 +97,26 @@ function trackingWarnings(value, path, warnings){
       ? 'use a Jira key like HW-123 or an absolute http(s) Jira browse URL' : 'must be an absolute http(s) URL') + ' — entry ignored');
   });
 }
+/* #1103 step ticketFilter. The lit set includes same-page detail sections, so
+   this runs per page. Tickets churn (board Edit mode adds and removes them), so
+   a key no lit carrier has warns and is ignored; it never stops a spec from
+   validating or resolving. Malformed filters are errors. */
+function validateStepTicketFilters(page, errors, warnings){
+  sectionRecords(page).forEach(function(record){
+    var d = record.section.diagram;
+    (d && Array.isArray(d.steps) ? d.steps : []).forEach(function(st, ti){
+      if (!st || !Object.prototype.hasOwnProperty.call(st, 'ticketFilter')) return;
+      var TF = record.path + '.diagram.steps[' + ti + '].ticketFilter', lit = trackingStepLitTickets(d, st, page);
+      trackingStepFilter(st, function(index){
+        errors.push(index === null ? TF + ': expected a nonempty array of Jira keys from the nodes and edges this step lights; remove it to show every ticket' : TF + '[' + index + ']: use a Jira key like HW-123');
+      });
+      if (Array.isArray(st.ticketFilter)) st.ticketFilter.forEach(function(key, index){
+        if (typeof key === 'string' && trackingKeyPattern.test(key) && lit.indexOf(key) < 0) warnings.push(TF + '[' + index + ']: "' + key + '" is not on a node or edge this step lights — ignored');
+      });
+      if (trackingStepFilter(st) && !trackingStepTicketFilter(d, st, page)) warnings.push(TF + ': no key is on a node or edge this step lights — the step shows every ticket');
+    });
+  });
+}
 function resolveProtocols(page){
   var out = Object.create(null);
   Object.keys(BUILTIN_PROTOCOLS).forEach(function(k){ out[k] = BUILTIN_PROTOCOLS[k]; });
@@ -521,18 +541,6 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         if (COMM_FAILURE_MODES.indexOf(st.failures[key]) < 0) errors.push(FP + '.' + key + ': expected dropped or blocked');
       });
     }
-    if (st && Object.prototype.hasOwnProperty.call(st, 'ticketFilter')){
-      var TF = DP + '.steps[' + ti + '].ticketFilter', lit = trackingStepLitTickets(d, st);
-      trackingStepFilter(st, function(index){
-        errors.push(index === null ? TF + ': expected a nonempty array of Jira keys from the nodes and edges this step lights; remove it to show every ticket' : TF + '[' + index + ']: use a Jira key like HW-123');
-      });
-      // Tickets churn (board Edit mode adds and removes them), so a key no lit carrier
-      // has warns and is ignored; it never stops a spec from validating or resolving.
-      if (Array.isArray(st.ticketFilter)) st.ticketFilter.forEach(function(key, index){
-        if (typeof key === 'string' && trackingKeyPattern.test(key) && lit.indexOf(key) < 0) warnings.push(TF + '[' + index + ']: "' + key + '" is not on a node or edge this step lights — ignored');
-      });
-      if (trackingStepFilter(st) && !trackingStepTicketFilter(d, st)) warnings.push(TF + ': no key is on a node or edge this step lights — the step shows every ticket');
-    }
     var nds = stepNodes(st);
     var patch = stepPanelPatch(st);
     var tonePatch = stepTonePatch(st);
@@ -769,6 +777,7 @@ function validate(page){
         '; rendering proceeds but re-check the spec against the current authoring contract');
   }
   validateDetails(page, errors, warnings);
+  validateStepTicketFilters(page, errors, warnings);
   validateTabViews(page, errors);
   validateLocalHandoffs(page, errors);
   var protos = resolveProtocols(page);

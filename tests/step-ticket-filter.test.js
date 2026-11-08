@@ -255,7 +255,7 @@ test('a step filter narrows the step proof verdict in the caption model and in b
  const page=C.normalize(raw),nd=page.sections[0].diagram,jira={'ST-1':{state:'active'},'ST-2':{state:'done'},'ST-3':{state:'active'}},telemetryMap={api:{signals:{rate:{value:50,unit:'req/h'}},observedAt:'2026-11-07T00:00:00Z'}};
  const model=C.telemetryStepModel(nd,0,C.diagramPathList(nd)[0].id,page,{map:telemetryMap},jira,true);assert.equal(model.verdict,'proven');
  const input=C.telemetryProofInput(fn=>Object.keys(nd.nodes).forEach(id=>fn(nd.nodes[id],id,page)),fn=>fn(nd,page),jira,telemetryMap);
- const verdicts=C.proofVerdicts(input);assert.equal(verdicts.steps.build.verdict,'proven');assert.equal(verdicts.carriers.api.verdict,'live-early','the carrier verdict keeps every ticket');
+ const verdicts=C.proofVerdicts(input);assert.equal(verdicts.steps.build.verdict,'proven');assert.equal(verdicts.carriers.api.verdict,'active-live-early','the carrier verdict keeps every ticket');
 });
 test('the Workbench checklist can drop stale keys from a step that lights no tickets',()=>{
  const raw=spec({nodes:['empty'],ticketFilter:['ZZ-1','ZZ-2']});raw.page.sections[0].diagram.nodes.empty={title:'Empty'};raw.page.sections[0].diagram.rows[0].push('empty');

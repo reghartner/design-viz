@@ -80,20 +80,45 @@ function trackingStepFilter(step,invalid){
   });
   return out.length?out:null;
 }
-/* Ticket keys on the carriers a step lights directly, before any filter: the
-   keys a filter may name. */
-function trackingStepLitTickets(diagram,step){
+/* The tickets a step filter may name on one carrier: its own, plus, for a node
+   whose detail is a section of the same `page`, that section's carriers'
+   tickets, recursively. A remote detail (detail.spec) never counts, so the set is
+   the same in the viewer, validator and Workbench, before and after it loads. */
+function trackingCarrierStepTickets(page,value){
+  var keys=[],seen=[];
+  function add(carrier){trackingRefs(carrier).tickets.forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});}
+  function descend(node,depth){
+    add(node);
+    var record=page && node && !isTextBoxNode(node)?detailTarget(page,node.detail):null,child=record && record.section.diagram;
+    if(!child || seen.indexOf(child)>=0 || depth>=DETAIL_MAX_DEPTH)return;
+    seen.push(child);
+    Object.keys(child.nodes || {}).forEach(function(id){if(!isTextBoxNode(child.nodes[id]))descend(child.nodes[id],depth+1);});
+    (child.edges || []).forEach(add);
+  }
+  descend(value,0);return keys;
+}
+/* Ticket keys a step lights directly, before any filter: the keys a filter may
+   name. `diagram` is the authored (resolved) section diagram of `page`. */
+function trackingStepLitTickets(diagram,step,page){
   var keys=[];trackingStepCarriers(diagram || {},step,true).forEach(function(carrier){
-    trackingRefs(carrier.value).tickets.forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});
+    trackingCarrierStepTickets(page,carrier.value).forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});
   });return keys;
 }
-/* The filter a step applies over `diagram`: its keys that are on a carrier it
-   lights. Tickets churn, so a key on no lit carrier is ignored (the validator
-   warns), and with none left the step shows every ticket. */
-function trackingStepTicketFilter(diagram,step){
+/* The filter a step applies: its keys that are lit, in lit order. Tickets
+   churn, so a key on no lit carrier is ignored (the validator warns), and with
+   none left the step shows every ticket. */
+function trackingStepTicketFilter(diagram,step,page){
   var keys=trackingStepFilter(step);if(!keys)return null;
-  var lit=trackingStepLitTickets(diagram,step),shown=keys.filter(function(key){return lit.indexOf(key)>=0;});
+  var shown=trackingStepLitTickets(diagram,step,page).filter(function(key){return keys.indexOf(key)>=0;});
   return shown.length?shown:null;
+}
+/* Per direct carrier id, the filtered tickets a step's proof verdict uses; null
+   without a filter, so verdicts keep each carrier's own tickets. */
+function trackingStepProofTickets(diagram,step,page){
+  var filter=trackingStepTicketFilter(diagram,step,page),out=Object.create(null);if(!filter)return null;
+  trackingStepCarriers(diagram || {},step,true).forEach(function(carrier){
+    out[carrier.id]=trackingCarrierStepTickets(page,carrier.value).filter(function(key){return filter.indexOf(key)>=0;});
+  });return out;
 }
 /* Page-level parent roots (legacy `epic` field) share the ticket key grammar.
    Jira metadata determines whether each root is an Epic or an Initiative. */

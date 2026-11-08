@@ -149,10 +149,11 @@ function telemetryProofInput(eachCarrier,eachDiagram,jiraMap,telemetryMap,enviro
     if(!(id in index)){index[id]=carriers.length;carriers.push(entry);}
     else if(binding && !Object.keys(carriers[index[id]].signals).length)carriers[index[id]]=entry;
   });
-  eachDiagram(function(diagram){(Array.isArray(diagram.steps)?diagram.steps:[]).forEach(function(step){
+  eachDiagram(function(diagram,page){(Array.isArray(diagram.steps)?diagram.steps:[]).forEach(function(step){
     if(!telemetryObject(step) || typeof step.id!=='string' || !step.id || seen[step.id])return;
     seen[step.id]=true;
-    steps.push({id:step.id,carriers:liveStatusStepCarriers(diagram,step,true).map(function(carrier){return carrier.id;})});
+    var narrowed=trackingStepProofTickets(diagram,step,page);
+    steps.push(Object.assign({id:step.id,carriers:liveStatusStepCarriers(diagram,step,true).map(function(carrier){return carrier.id;})},narrowed?{tickets:narrowed}:{}));
   });});
   return {carriers:carriers,jiraMap:jiraMap || {},telemetryMap:telemetryMap || {},steps:steps};
 }

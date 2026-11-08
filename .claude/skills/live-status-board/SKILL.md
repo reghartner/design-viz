@@ -98,7 +98,8 @@ Ask the author, in one batch, only what the source does not already state:
 - **Step subsets.** When a step is about only some of a lit node's or edge's
   stories, set the step's `ticketFilter` to those keys (`"ticketFilter":["FW-45"]`).
   The step's coin, caption and ticket list then use only them; carriers keep all
-  of theirs. A key on no node or edge the step lights warns and is ignored.
+  of theirs. Keys may come from a lit node's same-page drill-down section, not from a
+  remote detail. A key the step does not light warns and is ignored.
   See `docs/live-status.md` § Step ticket filters.
 - **Blocked.** The overlay marks a ticket blocked when Jira has it Flagged
   (JQL `Flagged = Impediment`) or its status name contains "block". Confirm

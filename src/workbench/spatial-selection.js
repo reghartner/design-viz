@@ -236,7 +236,7 @@ function createBuilderSpatialSelection(opts){
         });
       }
     }
-    item('Delete',function(){var plan=planBulkDelete(s.text,targets);if(opts.apply(plan,null,s))opts.select([]);},containsImported?'Imported structure belongs to its provider.':targets.some(function(t){return t.kind==='step-controls';})?'Step controls belong to the section and cannot be deleted.':!spatial && targets.length>1?'Select one kind to delete.':null);
+    item('Delete',function(){var plan=planBulkDelete(s.text,targets,opts.session.resolve);if(opts.apply(plan,null,s))opts.select([]);},containsImported?'Imported structure belongs to its provider.':targets.some(function(t){return t.kind==='step-controls';})?'Step controls belong to the section and cannot be deleted.':!spatial && targets.length>1?'Select one kind to delete.':null);
     item('Duplicate',function(){opts.apply(planDuplicateSpatial(s.text,s.raw,targets,id,geometry),null,s);},containsImported?'Imported structure belongs to its provider.':spatial?null:'Duplicate supports nodes and canvas panels.');
     var optimal=spatial && selectedNodes.length===targets.length?planPlaceOptimally(s.text,s.raw,selectedNodes,topologyContext):{error:'Select nodes from one section.'};
     item('Place optimally',function(){opts.apply(optimal,null,s);},optimal.error || optimal.noop && 'All selected positions are locked or already placed.');

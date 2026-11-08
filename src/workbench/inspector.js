@@ -1059,11 +1059,12 @@ function chipRow(labelText, items, emptyText, onRemove, onBody, ownerKind){
     return frow(labelText, box);
   }
 
-/* #1103: the tickets on the nodes and edges this step lights, as a checklist.
-   Every lit ticket checked means no filter. A filter key the step no longer
-   lights (ignored, with a warning) stays listed, so it can be unchecked. */
+/* #1103: the tickets on the nodes and edges this step lights (with same-page
+   detail sections), as a checklist. Every lit ticket checked means no filter. A
+   filter key the step no longer lights (ignored, with a warning) stays listed,
+   so it can be unchecked. */
 function stepTicketFilterControl(val, ctx, t){
-    var lit=trackingStepLitTickets(ctx.diagram,val),shown=trackingStepTicketFilter(ctx.diagram,val),chosen=trackingStepFilter(val) || [];
+    var lit=trackingStepLitTickets(ctx.diagram,val,ctx.resolvedPage),shown=trackingStepTicketFilter(ctx.diagram,val,ctx.resolvedPage),chosen=trackingStepFilter(val) || [];
     var keys=lit.concat(chosen.filter(function(key){return lit.indexOf(key)<0;}));
     if(!keys.length)return null;
     var box=document.createElement('fieldset'),legend=document.createElement('legend'),entries=[];
@@ -1074,8 +1075,9 @@ function stepTicketFilterControl(val, ctx, t){
     keys.forEach(function(key){
       var control=checkboxControl(lit.indexOf(key)<0 || !shown || shown.indexOf(key)>=0,function(){
         var next=entries.filter(function(entry){return entry.input.checked;}).map(function(entry){return entry.key;});
-        if(!next.some(function(k){return lit.indexOf(k)>=0;})){formError('Keep at least one ticket on this step. Check every ticket to show them all.');return false;}
-        var all=lit.every(function(k){return next.indexOf(k)>=0;});
+        if(lit.length && !next.some(function(k){return lit.indexOf(k)>=0;})){formError('Keep at least one ticket on this step. Check every ticket to show them all.');return false;}
+        // Every lit ticket checked, or nothing left when the step lights no tickets: no filter.
+        var all=lit.length?lit.every(function(k){return next.indexOf(k)>=0;}):!next.length;
         return commitCascade(function(raw){
           var path=builderTargetPath(raw,t);if(!path)return {error:'Step not found. Reselect it and try again.'};
           return planSetField(session.text(),raw,path,'ticketFilter',all?null:JSON.stringify(next));
@@ -3019,6 +3021,7 @@ function renderInspector(){
       var rec = specSectionPaths(parsed.raw)[t.section];
       var ctx = {
         page: normalize(parsed.raw) || {},
+        resolvedPage: normalize(resolved) || {},
         diagram: resolvedDiagram,
         sourcePath: commonNode ? p : null
       };

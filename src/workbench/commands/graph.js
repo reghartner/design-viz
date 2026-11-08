@@ -570,7 +570,7 @@ function planRenamePanel(text, raw, sectionIdx, panelIdx, newId){
   });
 }
 
-function planDeleteNode(text, raw, sectionIdx, id){
+function planDeleteNode(text, raw, sectionIdx, id, resolve){
   /* Remove a node plus its row/float placement and every edge touching it;
      step references to the removed edges and the node are pruned (a step
      may legally stay as caption-only). */
@@ -616,7 +616,7 @@ function planDeleteNode(text, raw, sectionIdx, id){
       }
     });
   });
-  plan = builderPruneTicketFilters(plan, sectionIdx, removedTickets);
+  plan = builderPruneTicketFilters(plan, sectionIdx, removedTickets, resolve);
   return builderDetailCascade(plan,sectionIdx,function(detail,owner,target){
     if(target!==sectionIdx || !detail.ports)return;
     Object.keys(detail.ports).forEach(function(port){
@@ -626,7 +626,7 @@ function planDeleteNode(text, raw, sectionIdx, id){
   });
 }
 
-function planDeleteEdge(text, raw, sectionIdx, edgeIdx){
+function planDeleteEdge(text, raw, sectionIdx, edgeIdx, resolve){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
   var e = (got.d.edges || [])[edgeIdx];
@@ -636,7 +636,7 @@ function planDeleteEdge(text, raw, sectionIdx, edgeIdx){
     d.edges.splice(edgeIdx, 1);
     var stillThere = d.edges.some(function(o){ return o && builderEdgeKey(o) === key; });
     if (!stillThere) builderRetargetStepKeys(d.steps, key, null);
-  }), sectionIdx, trackingRefs(e).tickets);
+  }), sectionIdx, trackingRefs(e).tickets, resolve);
 }
 
 function planDeletePanel(text, raw, sectionIdx, panelIdx){

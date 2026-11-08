@@ -2372,7 +2372,7 @@ test('M10 the action button shows on a metrics-only page so Allow Grafana reache
 | OT14 | the two mode buttons (Chuck, 2026-11-04) | Live and Over time are the only two buttons of their header row (#1131), exactly one is pressed, the selected Over time click does nothing, Live returns to today without turning colors off, the selected Live click still turns colors off, and Over time turns colors back on | a Back to today button; a past day with colors off |
 | OT17 | days dated two days ago to today, then a history ending before today and one with no dates (#1082) | the Over time row's heading shows the selected day's label large; on a day dated today it reads TODAY with the label beside it; the slider and `<` `>` update it; Live has no heading | a date only in the small note; TODAY on a last day that is not today |
 | OT18 | Metrics off; days from the product builders in America/New_York: a normal day, the 23 h and 25 h DST days, a demo day, today; days with no date key (#1132) | `snapshot().overTime.window` is `{from, to, label}`: from the day key's local midnight to the next local midnight in UTC, today ending now; null in Live and on a day with no key | a UTC-midnight day; a fixed 24 h day; a demo day cut at its UTC `at`; a window that needs Metrics; a today window ending in the future |
-| OT19 | a board with no ticket or epic references and two telemetry carriers, a window-mode history spy; the local day builder at fixed times in America/New_York (#1138) | Over time shows and opens on 7 days keyed by local date, ending today, each ending at the next local midnight; no provider or history call with Metrics off; with Metrics on one history window per new day and none for a past day already loaded | Over time only with a Jira history source; a UTC or fixed 24 h day list; a day list that calls a connector; a refetch of a loaded past day |
+| OT19 | a board with no ticket or epic references and two telemetry carriers, a window-mode history spy; the local day builder at fixed times in America/New_York; a detail with a ticket or a Jira history source arriving while it is open; a click on the selected Live (#1138) | Over time shows and opens on 7 days keyed by local date, ending today, each ending at the next local midnight; no provider or history call with Metrics off; with Metrics on one history window per new day and none for a past day already loaded; the local Over time ends when the board gains a ticket or a Jira source arrives; Live stays selected | Over time only with a Jira history source; a UTC or fixed 24 h day list; a day list that calls a connector; a refetch of a loaded past day; a reader left on a past day with no Live; a Live click that un-presses Live with nothing to turn off |
 */
 const overFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:'EP-1'}},lanes:{APP:{label:'App',color:'#34d399'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',tickets:['AA-1']},b:{title:'Beta',tickets:['BB-1']},planned:{title:'Planned',tickets:['AA-1'],existsWhen:'tickets-done'}},rows:[['a','b','planned']],edges:[{from:'a',to:'b',tickets:['EE-1']}],steps:[{id:'hop',edge:'a->b',lane:'APP'},{id:'beta',nodes:['b'],lane:'APP'}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
 const overStale='2000-01-01T00:00:00Z';
@@ -2763,6 +2763,27 @@ test('OT19 a Jira-free board offers Over time on the local days, with no calls u
  assert.ok(windows.every(w=>Date.parse(w.to)-Date.parse(w.from)===86400000),'each is the Metrics window ending at the day end');
  api.overTimeDay(6);await historySettle();assert.equal(windows.length,3);assert.ok(Date.parse(windows[2].to)<=Date.now() && windows[2].to>=localMidnight(0),'today ends now');
  overBackToLive(api);await historySettle();assert.equal(over().active,false);
+ api.destroy();
+});
+const freeTelemetry=()=>({historyMode:'window',provider:async()=>({}),history:async()=>({})});
+test('OT19 a local Over time ends when a detail with tickets loads or a Jira history source arrives (#1138)',async()=>{
+ let resolve;const renderOptions={telemetry:freeTelemetry(),loadDetail:()=>new Promise(r=>resolve=r)},h=harness(freeFixture(),{},renderOptions),api=h.ctl.liveStatus;mountStatus(h);
+ api.overTime();await historySettle();api.overTimeDay(2);assert.equal(api.snapshot().overTime.active,true);
+ const pending=renderOptions.loadDetail({spec:'approved-detail'},new AbortController().signal);resolve({nodes:{child:{tickets:['DD-1']}},rows:[['child']]});await pending;h.flush();
+ assert.equal(api.snapshot().available,true,'the board now has a ticket');
+ assert.ok(!api.snapshot().overTime?.active,'the local Over time ends, so the reader is not left on a past day');
+ assert.equal(h.ctl.telemetry.snapshot().historical,false,'Metrics is back on Live');assert.equal(h.view.querySelector('.dv-live-over-time-row'),null);
+ api.destroy();
+ const j=harness(freeFixture(),{},{telemetry:freeTelemetry()}),jira=j.ctl.liveStatus;mountStatus(j);
+ jira.overTime();await historySettle();jira.overTimeDay(1);assert.equal(jira.snapshot().overTime.active,true);
+ let loads=0;jira.setHistory({load(){loads++;return {days:overDays()};}});
+ assert.equal(jira.snapshot().overTime.active,false,'a Jira history source closes the local Over time');assert.equal(j.ctl.telemetry.snapshot().historical,false);assert.equal(loads,0,'and loads nothing until the reader asks');
+ jira.destroy();
+});
+test('OT19 on a Jira-free board a click on the selected Live changes nothing (#1138)',()=>{
+ const h=harness(freeFixture(),{},{telemetry:freeTelemetry()}),api=h.ctl.liveStatus,live=()=>h.view.querySelector('button.dv-live-toggle');mountStatus(h);
+ assert.equal(live().hidden,false);assert.equal(live().getAttribute('aria-pressed'),'true');
+ live().dispatchEvent({type:'click'});assert.equal(api.enabled(),true,'there are no ticket colors to turn off');assert.equal(live().getAttribute('aria-pressed'),'true','Live stays selected');
  api.destroy();
 });
 test('OT16 First blocker cannot reach a ticket that has no status on the day, and a real blocker on another day still counts',async()=>{

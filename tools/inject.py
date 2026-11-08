@@ -370,11 +370,16 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
     root_disabled = telemetry_config.get("enabled") is False
     grafana = not root_disabled and any(source in GRAFANA_SOURCES for source in sources)
     honeycomb = not root_disabled and "honeycomb" in sources
+    direct = direct_trace_connections(page)
+    # #1099: Load trace log lookups call query_loki_logs, so they need Load trace.
+    log_lookups = not root_disabled and bool(direct) and isinstance(telemetry_config.get("lookups"), dict)
+    grafana_tools = [tool for source, tool in GRAFANA_TOOLS.items() if source in sources]
+    if log_lookups and "query_loki_logs" not in grafana_tools:
+        grafana_tools.append("query_loki_logs")
 
     servers = ([{"server": "Atlassian", "tools": JIRA_TOOLS}] if tracked else []) + \
-        ([{"server": "Grafana", "tools": [tool for source, tool in GRAFANA_TOOLS.items() if source in sources]}] if grafana else []) + \
+        ([{"server": "Grafana", "tools": grafana_tools}] if grafana or log_lookups else []) + \
         ([{"server": "Honeycomb", "tools": HONEYCOMB_TOOLS}] if honeycomb else [])
-    direct = direct_trace_connections(page)
     for profile in direct.values():
         server = next((entry for entry in servers if entry["server"] == profile["server"]), None)
         if server is None:
@@ -517,6 +522,7 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
     if direct:
         lines += ["", "## Direct trace connections",
                   "Company profiles inherit; traceConnections:{} disables. Load/Verify calls only the configured detail tool after schema/host permission checks. No search, numeric fetch or board write.",
+                  *(["Log lookups (`lookups`): each Find calls Grafana query_loki_logs once; keep that tool declared."] if log_lookups else []),
                   f"Connection handoff: {PUBLIC_REPO}/blob/{ref}/docs/trace-connections.md ."]
     if tracked:
         lines += [

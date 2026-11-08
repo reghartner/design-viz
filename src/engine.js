@@ -281,7 +281,7 @@ function nodeReferenceLinks(diagram,id,options){
     if(!step || !Array.isArray(step.codeRefs))return;
     var keys=stepKeys(step).concat(Object.keys(stepFailures(step)));
     var involved=(Array.isArray(step.nodes) && step.nodes.indexOf(id)>=0) ||
-      (step.traceMatch && step.traceMatch.nodeId===id) ||
+      [].concat(step.traceMatch || []).some(function(m){return m && m.nodeId===id;}) ||
       (step.tone && Object.prototype.hasOwnProperty.call(step.tone,id)) ||
       (Array.isArray(step.conditions) && step.conditions.some(function(c){return c && c.nodeId===id;})) ||
       (diagram.edges || []).some(function(e){return (e.from===id || e.to===id) && keys.indexOf(e.from+'->'+e.to)>=0;});

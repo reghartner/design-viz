@@ -222,8 +222,9 @@ const withPlaceholder=lines=>[lines[0],lines[1],placeholderRow,...lines.slice(2)
 test('#1076 missing-root placeholder row loads, warns and is partial',()=>{const {C}=context(),out=C.telemetryHoneycombTrace({payload:withPlaceholder(rootless())},recordedId);
  assert.equal(out.spans.length,54);assert.ok(out.spans.every(s=>s.id!=='missing-root'));assert.equal(out.completeness,'partial');assert.ok(out.warnings.includes('Root span not stored; timeline starts at the earliest stored span.'));assert.ok(!out.warnings.some(w=>/Annotation/.test(w)));
  assert.equal(Math.min(...out.spans.map(s=>s.startMs)),0);const e=envelope(C,out);assert.equal(e.spans.length,54);assert.equal(e.completeness,'partial');assert.ok(e.warnings.includes('Missing parent spans.'));
- const full=withPlaceholder(rootless()).replace('collapsed_nodes: 1','collapsed_nodes: 0').replace('total_spans: 77','total_spans: 55').replace('visible_spans: 55','visible_spans: 54').replace('view_mode: auto','view_mode: full').replaceAll('| true |','| false |');
- const f=C.telemetryHoneycombTrace({payload:full},recordedId);assert.equal(f.completeness,'partial');assert.deepEqual(f.warnings,['Root span not stored; timeline starts at the earliest stored span.']);
+ // total_spans counts the placeholder; visible_spans with or without it never adds a collapsed warning or reads complete.
+ for(const visible of ['55','54']){const full=withPlaceholder(rootless()).replace('collapsed_nodes: 1','collapsed_nodes: 0').replace('total_spans: 77','total_spans: 55').replace('visible_spans: 55','visible_spans: '+visible).replace('view_mode: auto','view_mode: full').replaceAll('| true |','| false |');
+  const f=C.telemetryHoneycombTrace({payload:full},recordedId);assert.equal(f.completeness,'partial');assert.deepEqual(plain(f.warnings),['Root span not stored; timeline starts at the earliest stored span.']);}
 });
 test('#1076 the same table without the placeholder row is unchanged',()=>{const {C}=context(),without=C.telemetryHoneycombTrace({payload:rootless().join('\n')},recordedId),withRow=C.telemetryHoneycombTrace({payload:withPlaceholder(rootless())},recordedId);
  assert.deepEqual(plain(withRow.spans),plain(without.spans));assert.ok(!without.warnings.some(w=>/Root span not stored/.test(w)));

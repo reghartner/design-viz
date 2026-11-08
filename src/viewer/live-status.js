@@ -1121,7 +1121,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     Object.values(d.nodes || {}).forEach(function(node){if(!isTextBoxNode(node) && node.missingWork===true)count++;});
     (d.edges || []).forEach(function(edge){if(edge.missingWork===true)count++;});
   });return count;}
-  function presentationActive(){return applied || missingWorkCount()>0;}
+  function presentationActive(){return missingWorkCount()>0 || applied && referencesAvailable();}
   // snapshot().available: ticket, epic or exclusion references, or a missing-work marker.
   function referencesAvailable(coverage){var found=refs();return !!(found.tickets.length || found.epics.length || (coverage || liveStatusCoverage(page,map,found,sources())).excluded.length || missingWorkCount());}
   function connectPanels(){liveStatusPending.slice().forEach(function(pending){if(liveStatusControllerFor(pending.host)===api)pending.connect(api);});}

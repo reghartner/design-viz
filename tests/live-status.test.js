@@ -2814,7 +2814,8 @@ test('local and nested imported domains preserve authored styles until status pr
  const provider=model('provider',[{id:'main',diagram:{nodes:{domain:{style:'rose'}},rows:[['domain']],topologyExports:{core:{nodes:['domain'],edges:[]}}}}]);
  const middle=model('middle',[{id:'main',diagram:{topologyImports:[{spec:'provider',export:'core',as:'nested'}],topologyExports:{core:{nodes:['nested::domain'],edges:[]}}}}]);
  for(const missing of [false,true]){
-  const consumer=model('consumer',[{id:'main',diagram:{nodes:{local:{style:'rose',detail:{section:'child'}}},rows:[['local']],steps:[{id:'visit',nodes:['local','shared::nested::domain']}],topologyImports:[{spec:'middle',export:'core',as:'shared',nodeDetails:{'nested::domain':{section:'child'}}}]}},{id:'child',detailOnly:true,diagram:{nodes:{leaf:missing?{missingWork:true}:{}},rows:[['leaf']]}}]);
+  // #1137: the ticketed node gives the board ticket references; a board without any gets no status presentation.
+  const consumer=model('consumer',[{id:'main',diagram:{nodes:{local:{style:'rose',detail:{section:'child'}},tracked:{tickets:['AA-1']}},rows:[['local','tracked']],steps:[{id:'visit',nodes:['local','shared::nested::domain']}],topologyImports:[{spec:'middle',export:'core',as:'shared',nodeDetails:{'nested::domain':{section:'child'}}}]}},{id:'child',detailOnly:true,diagram:{nodes:{leaf:missing?{missingWork:true}:{}},rows:[['leaf']]}}]);
   const h=harness(seed.C.FlowTopology.materialize([provider,middle,consumer])[2]),api=h.ctl.liveStatus;
   let beforeAdvance;
   h.ctl.sections[0].stepper={path:()=>h.C.diagramPathList(h.ctl.page.sections[0].diagram)[0].id,sourceIndex:()=>0,mode:()=>'ambient',onBeforeAdvance(fn){beforeAdvance=fn;return ()=>{};}};

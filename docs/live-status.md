@@ -1034,9 +1034,10 @@ appearance preferences. Every attached ticket participates, including inherited
 provider and import-overlay tickets: blocked/missing/active/testing take precedence,
 unknown evidence cannot claim completion, and an unticketed carrier shows the thin
 1px green no-change outline with no default glow. On a board with no ticket, epic,
-exclusion or missing-work references (`snapshot().available === false`), cards get
-no work presentation: no outline state, no "No change needed" label or popover line;
-they show their own verdict only. Endpoint tickets do not supply
+exclusion or missing-work references (`snapshot().available === false`), carriers and
+cards get no work presentation, even after a status map is applied: no outline state,
+no "No change needed" label, caption or popover line; cards show their own verdict only.
+Endpoint tickets do not supply
 an edge's work state. Telemetry proof never overrides the work outline.
 
 Observed numeric values follow the carrier’s configured tone (green for no-change,
@@ -2252,8 +2253,8 @@ connection and any independently authored communication failure. Local,
 imported, nested and resolved-snapshot connections follow the same behavior;
 a provider-inherited marker stays read-only in authored import overlays.
 
-With Live status data applied, nodes with no linked tickets and no missing-work
-marker automatically show **No change needed** (green, faint fill, solid outline, no
+With Live status data applied on a board with ticket references, nodes with no linked
+tickets and no missing-work marker automatically show **No change needed** (green, faint fill, solid outline, no
 glow). This state is neutral in mixed step rollups: done plus no-change stays
 done. Linked tickets without provider evidence remain unknown. Text boxes stay
 inert. Clear, disable and destroy restore authored paint. Existing ticket-gated

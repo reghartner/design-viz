@@ -151,7 +151,7 @@ def infer(raw):
             if isinstance(value, dict):
                 for key, item in value.items():
                     if key in ('binding', 'codeRefs'): features.add('bindings')
-                    if key in ('topologyImports', 'topologyExports', 'topologyProvenance'): features.add('topology')
+                    if key in ('topologyImports', 'topologyExports', 'stepExports', 'topologyProvenance'): features.add('topology')
                     if key in ('revealAt', 'hideAt'): features.add('reveals')
                     if key == 'panelVisibility' or key == 'visible': features.add('visibility')
                     if key in ('audio', 'spotlight', 'alarm'): features.add('audio')

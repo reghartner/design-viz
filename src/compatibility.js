@@ -18,6 +18,7 @@ var FlowviewCompatibility = (function(){
   // Capabilities added after the baseline, with their first release.
   var released={
     'flow.imported-details':['Consumer-owned imported domain details','0.2.0'],
+    'flow.imported-steps':['Imported provider steps','0.2.0'],
     'flow.live-status':['Live ticket status references','0.2.0'],
     'flow.missing-work':['Authored missing-work coverage markers','0.2.0'],
     'flow.ticket-availability':['Ticket-gated node and connection availability','0.2.0'],
@@ -101,6 +102,7 @@ var FlowviewCompatibility = (function(){
       if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff && n.handoff.localSection!=null;}))used['flow.local-handoff']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.detail;}))used['flow.drilldown']=true;
       if((Array.isArray(d.topologyImports)?d.topologyImports:[]).some(function(imp){return imp && Object.prototype.hasOwnProperty.call(imp,'nodeDetails');})){used['flow.imported-details']=true;used['flow.drilldown']=true;}
+      if((Array.isArray(d.topologyImports)?d.topologyImports:[]).some(function(imp){return imp && Object.prototype.hasOwnProperty.call(imp,'stepImports');}))used['flow.imported-steps']=true;
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
         if(!p || typeof p.type!=='string')return;
         used['panel.'+p.type]=true;

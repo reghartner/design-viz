@@ -707,6 +707,10 @@ function validate(page){
       if(drop.kind==='edges')(Array.isArray(d.edges)?d.edges:[]).some(function(e,i){if(e && e.from+'->'+e.to===drop.id){at=DP+'.edges['+i+']';return true;}return false;});
       warnings.push(at+'.telemetry: provider "'+drop.spec+'" '+drop.path+': '+drop.message);
     });
+    if(typeof FlowTopology!=='undefined' && FlowTopology.stepTimeDrops)FlowTopology.stepTimeDrops(d).forEach(function(drop){
+      var index=(Array.isArray(d.steps)?d.steps:[]).findIndex(function(st){return st && st.id===drop.id;});
+      warnings.push(DP+'.steps['+index+'].time: provider "'+drop.spec+'" '+drop.path+' "'+drop.time+'" is not a relative time and was not imported; only relative times (+…) cross');
+    });
     // A resolved snapshot already carries overlay bindings on its imported carriers.
     if(!d.topologyProvenance)(Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp,i){
       if(!specObject(imp))return;

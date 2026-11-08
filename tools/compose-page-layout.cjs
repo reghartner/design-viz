@@ -64,7 +64,7 @@ function seed(d,originalTiles){
 }
 const own=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
 function topology(raw,context){
- const records=graph.diagramRecords(raw).filter(r=>own(r.diagram,'topologyImports')||own(r.diagram,'topologyExports'));
+ const records=graph.diagramRecords(raw).filter(r=>own(r.diagram,'topologyImports')||own(r.diagram,'topologyExports')||own(r.diagram,'stepExports'));
  const importing=records.find(r=>(r.diagram.topologyImports||[]).length);
  if(importing&&!context){
   const providers=[...new Set(importing.diagram.topologyImports.map(imp=>imp?.spec))].join(', ');

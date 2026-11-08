@@ -31,7 +31,7 @@ export function prepareCanonSnapshot(authoredSpecs,{authorize=()=>true,...option
     loadWorkspace:id=>readable.has(id)?{source:C.clone(byId.get(id)),topologyContext:{version:1,id,specs:[...closure(id)].map(key=>C.clone(byId.get(key)))}}:null};
 }
 export function buildEntityDiagramIndex(specs,{publicBaseUrl='',diagramUrls}={}){
-  if(specs.some(spec=>C.sections(spec).some(s=>Object.hasOwn(s.diagram,'topologyImports') || Object.hasOwn(s.diagram,'topologyExports'))))specs=materializeCanonSpecs(specs);
+  if(specs.some(spec=>C.sections(spec).some(s=>Object.hasOwn(s.diagram,'topologyImports') || Object.hasOwn(s.diagram,'topologyExports') || Object.hasOwn(s.diagram,'stepExports'))))specs=materializeCanonSpecs(specs);
   if(publicBaseUrl && (!C.http(publicBaseUrl) || new URL(publicBaseUrl).search || new URL(publicBaseUrl).hash))throw new Error('Configure an HTTP(S) public base URL without credentials, query or fragment.');
   if(diagramUrls!==undefined && typeof diagramUrls!=='function')throw new Error('diagramUrls must be a function returning viewerUrl and editUrl.');
   const base=(C.http(publicBaseUrl) || '').replace(/\/$/,''),routing=C.viewerRouting(),entities=new Map(),ids=new Set();

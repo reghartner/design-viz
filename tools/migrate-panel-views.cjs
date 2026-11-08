@@ -6,8 +6,8 @@ const {readSource}=require('./source-loader.cjs'),core=require('./canon/core.cjs
 const own=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
 function declaresTopology(raw){
   if(!raw || typeof raw!=='object' || Array.isArray(raw))return false;
-  if(own(raw,'topologyImports') || own(raw,'topologyExports'))return true;
-  return core.sections(raw).some(s=>s.diagram && typeof s.diagram==='object' && (own(s.diagram,'topologyImports') || own(s.diagram,'topologyExports')));
+  if(own(raw,'topologyImports') || own(raw,'topologyExports') || own(raw,'stepExports'))return true;
+  return core.sections(raw).some(s=>s.diagram && typeof s.diagram==='object' && (own(s.diagram,'topologyImports') || own(s.diagram,'topologyExports') || own(s.diagram,'stepExports')));
 }
 // Validation sees imported topology resolved from the authored providers; the migrated spec keeps its declarations.
 function resolved(document,providers){

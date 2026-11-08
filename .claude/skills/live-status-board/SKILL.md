@@ -336,8 +336,9 @@ the Workbench and sees no live state there.
 
 A published two-file board changes without you: editors move tickets on it in
 Edit mode (add a ticket to a node or edge, remove one, clear a Missing work
-marker). Each Save rewrites the artifact's `flowspec.json` and appends one
-`page.editHistory` entry. Those are the only edits the board allows, so a local
+marker, map a trace span to a step that has no `traceMatch`). Each Save rewrites
+the artifact's `flowspec.json` and appends one `page.editHistory` entry. Those
+are the only edits the board allows, so a local
 spec that lacks them is not broken or out of date in any other way: fold them in
 and carry on. Every time you change a published board:
 
@@ -349,8 +350,10 @@ and carry on. Every time you change a published board:
      moved from Door API to Cloud sync"), and go on.
    - Exit 2, nothing written: the same ticket was placed differently on the
      board and in your local spec, or a board edit added a ticket to a node or
-     edge your local spec no longer has. Show the author the printed conflict, ask which placement
-     to keep, then rerun with `--resolve KEY=live` or `--resolve KEY=local`.
+     edge your local spec no longer has, or a board edit mapped a span to a step
+     your local spec maps differently or deleted. Show the author the printed conflict, ask which placement
+     to keep, then rerun with `--resolve KEY=live` or `--resolve KEY=local`
+     (KEY `step:<step id>` for a step).
    - Exit 3, nothing written: another agent republished the board from a
      different copy. Copy `live.json` over your local spec and redo the
      requested change on it. If your local spec has changes of its own that
@@ -365,7 +368,9 @@ and carry on. Every time you change a published board:
    changed the board. Exit 2 means your change overrides a board edit saved
    after the newest agent entry: a board edit added, moved or removed a ticket,
    and your change puts that ticket somewhere else, removes it, puts it back,
-   or deletes its node or edge. This is the one case
+   or deletes its node or edge; or a board edit mapped a span to a step and your
+   change maps another span, removes the `traceMatch` or deletes the step
+   (`--confirm step:<step id>`). This is the one case
    to stop and ask the author, quoting the printed line. Rerun with
    `--confirm KEY` once they agree; if they do not, put that ticket back where
    the board has it and rerun. Do not ask about board edits older than the

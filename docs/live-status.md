@@ -1797,8 +1797,9 @@ mode:
 Board edits change only the artifact's `flowspec.json`. An agent that keeps its own copy
 of the spec (a repository file or a working copy) brings them in before it changes
 anything, with `tools/board-sync.js`. Board edits can only add a ticket to a node or edge,
-remove one, or clear a Missing work marker, so folding them in is mechanical; the agent
-asks the author only about a real conflict.
+remove one, clear a Missing work marker, or map a trace span to a step that has no
+`traceMatch` (#1078), so folding them in is mechanical; the agent asks the author only
+about a real conflict.
 
 1. Read the artifact's current `flowspec.json` (Artifact tool, read action with `path`)
    and save it, for example as `live.json`.
@@ -1806,16 +1807,19 @@ asks the author only about a real conflict.
    copy does not have, one line each
    (`2026-11-03 14:02 UTC  Bo: DOOR-104 moved from Door API to Cloud sync`), and writes
    them into the local file: the tickets and Missing work markers on the nodes and edges
-   those edits touched, plus their `page.editHistory` entries. Every other line stays as
+   those edits touched, the `traceMatch` of each step a board edit mapped (found by
+   section and step id; a local step that already maps the same service and operation
+   keeps its own), plus their `page.editHistory` entries. Every other line stays as
    written and changes made only in the local copy are kept. Tell the author the listed
    lines.
    - Exit 2, nothing written: a conflict. The same ticket was placed differently on the
      board and in the local copy, or a board edit added a ticket to a node or edge the
      local copy no longer has. (A board edit that removed a ticket from, or cleared the
      marker of, a node or edge the local copy deleted needs no question: both sides agree
-     the ticket is not there.) Ask the author, then rerun with `--resolve KEY=live` (keep the board's
+     the ticket is not there.) A board edit that mapped a span to a step is a conflict
+     when the local step maps a different span or was deleted. Ask the author, then rerun with `--resolve KEY=live` (keep the board's
      placement) or `--resolve KEY=local` (keep the local one, after placing the ticket
-     where the author says).
+     where the author says). For a step, KEY is `step:<step id>`.
    - Exit 3, nothing written: the live board was republished by an agent from another
      copy, so its structure may differ. Start again from `live.json`: copy it over the
      local file and redo the requested change. If the local file has changes of its own
@@ -1827,7 +1831,10 @@ asks the author only about a real conflict.
    with exit 2 when the change alters where a ticket sits (moves it, removes it, adds it
    anywhere, or deletes the node or edge holding it) and a board edit saved after the
    newest agent entry added, moved or removed that ticket; the message names who made the
-   board edit, when, and what it did. Ask the
+   board edit, when, and what it did. It also refuses when the change maps a different
+   span to a step, removes its `traceMatch` or deletes the step, and a board edit saved
+   after the newest agent entry mapped that step (KEY `step:<step id>`); the summary
+   counts added, changed and removed step mappings. Ask the
    author and rerun with `--confirm KEY` once they agree. Board edits older than the
    newest agent entry were already in front of the author and need no question
    (Chuck 2026-11-04). Exit 3: pull first.

@@ -908,6 +908,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var directTrace=createTelemetryDirect(page,telemetryOptions && telemetryOptions.directTrace,{
     sections:directTraceSections,
     identity:function(){return [telemetry.environment(),telemetry.snapshot().historical];},
+    environment:function(){return telemetry.environment();},
     disabled:function(){return retired || telemetryOptions===false || !trackingTelemetry(page).enabled || telemetry.snapshot().historical;},
     accountChanged:function(){telemetry.clear();telemetry.setAvailable(false);},
     changed:function(){if(!retired){paint();notify();}}

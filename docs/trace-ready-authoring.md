@@ -40,6 +40,7 @@ fetches a trace**. In the existing step that represents the observed operation,
 add `traceMatch`, preserving the step's ID, narrative and delivered `edge` or
 `edges`. `nodeId` names an existing stable node in this source section, normally
 the receiving node for that operation. It is not a provider service-name guess.
+`traceMatch` on a node or edge is ignored, with a validator warning.
 
 ```json
 {
@@ -107,9 +108,9 @@ node tools/canon/trace-cli.mjs preview --spec "$TRACE_CHECK_DIR/trace-resolved.s
 
 ## 4. Validate mapping before enabling a provider
 
-The following fictional example is bundled in the repository **and portable
-kit**. It demonstrates mapping only, with no account, invented budget or claim
-of live evidence. The read-only preview command writes a report, not a spec:
+This fictional example, bundled in the repository **and portable kit**,
+demonstrates mapping only. The read-only preview command writes a report, not a
+spec:
 
 ```sh
 node tools/validate.js examples/trace-ready/existing.spec.json

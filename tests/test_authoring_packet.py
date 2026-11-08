@@ -94,7 +94,7 @@ class AuthoringPacketTests(unittest.TestCase):
                 self.assertEqual(result['eligible'], name == 'normal')
                 self.assertEqual(evidence.read_bytes(), original)
             self.assertEqual(source.read_bytes(), before)
-            # Resolve direct and nested provider nodes only into a temporary copy.
+            # Resolve direct and nested provider nodes in memory with --resolve-imports.
             def canonical(identity, diagram):
                 return {'page': {'title': identity, 'canon': {'version': 1, 'id': identity, 'kind': 'canonical', 'owner': 'group:default/fixture'}, 'sections': [{'diagram': diagram}]}}
             provider = canonical('provider', {'nodes': {'store': {'title': 'Record store'}}, 'rows': [['store']], 'topologyExports': {'core': {'nodes': ['store'], 'edges': []}}})
@@ -112,10 +112,7 @@ class AuthoringPacketTests(unittest.TestCase):
                 d['edges'][1]['to'] = node
                 d['steps'][1]['edge'] = 'api->' + node; d['steps'][1]['traceMatch']['nodeId'] = node
                 authored = kit / 'imported.json'; authored.write_text(json.dumps(raw)); saved = authored.read_bytes()
-                resolved = subprocess.run(['node', 'tools/canon/local-imports.mjs', str(authored), str(registry)], cwd=kit, text=True, capture_output=True)
-                self.assertEqual(resolved.returncode, 0, resolved.stderr)
-                temporary = kit / 'resolved.json'; temporary.write_text(resolved.stdout)
-                mapped = subprocess.run(['node', 'tools/canon/trace-cli.mjs', 'preview', '--spec', str(temporary), '--trace', 'examples/trace-ready/normal.json'], cwd=kit, text=True, capture_output=True)
+                mapped = subprocess.run(['node', 'tools/canon/trace-cli.mjs', 'preview', '--spec', str(authored), '--resolve-imports', str(registry), '--trace', 'examples/trace-ready/normal.json'], cwd=kit, text=True, capture_output=True)
                 self.assertEqual(mapped.returncode, 0, mapped.stderr)
                 rows = json.loads(mapped.stdout)['mapping']['steps']
                 self.assertEqual(rows[1]['nodeId'], node); self.assertEqual(rows[1]['status'], 'matched')

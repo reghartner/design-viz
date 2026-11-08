@@ -354,7 +354,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!d) return;
   var DP = P + '.diagram';
   if(d.graphFrame!==undefined && !validGraphFrame(d.graphFrame))warnings.push(DP+'.graphFrame: expected finite x/y/w/h bounded to 100000, with positive width and height; ignored');
-  if(Object.prototype.hasOwnProperty.call(d,'topologyImports') || Object.prototype.hasOwnProperty.call(d,'topologyExports'))
+  if(Object.prototype.hasOwnProperty.call(d,'topologyImports') || Object.prototype.hasOwnProperty.call(d,'topologyExports') || Object.prototype.hasOwnProperty.call(d,'stepExports'))
     errors.push(DP+': unresolved topology declarations — resolve the approved authored provider snapshot in memory before rendering or validating this spec');
   validatePaths(d, DP, errors);
   storyTimeWarnings(d, DP, warnings);

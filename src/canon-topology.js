@@ -30,7 +30,7 @@ var FlowTopology = (function(){
     return FlowCanon.sections(spec);
   }
   function edgeKey(e){return e.from+'->'+e.to;}
-  function declarations(spec){return sections(spec).some(function(s){return own(s.diagram,'topologyImports') || own(s.diagram,'topologyExports');});}
+  function declarations(spec){return sections(spec).some(function(s){return own(s.diagram,'topologyImports') || own(s.diagram,'topologyExports') || own(s.diagram,'stepExports');});}
   function stable(value){
     if(Array.isArray(value))return '['+value.map(stable).join(',')+']';
     if(object(value))return '{'+Object.keys(value).sort().map(function(key){return JSON.stringify(key)+':'+stable(value[key]);}).join(',')+'}';
@@ -129,18 +129,50 @@ var FlowTopology = (function(){
     });
   }
 
+  // Fields a step set carries across the boundary that name provider nodes
+  // and edges. Layout and local fields (coinOffsets, packets, panels, ...) are
+  // stripped on import, so they are not part of the closure.
+  function stepReferences(s){
+    var refs=[];
+    function keys(value){return object(value)?Object.keys(value):[];}
+    function add(field,kind,ids){ids.forEach(function(id){refs.push({field:field,kind:kind,id:id});});}
+    if(typeof s.edge==='string')add('edge','edge',[s.edge]);
+    if(Array.isArray(s.edges))add('edges','edge',s.edges);
+    add('failures','edge',keys(s.failures));add('contracts','edge',keys(s.contracts));
+    if(Array.isArray(s.nodes))add('nodes','node',s.nodes);
+    add('tone','node',keys(s.tone));
+    if(object(s.traceMatch) && typeof s.traceMatch.nodeId==='string' && s.traceMatch.nodeId)add('traceMatch.nodeId','node',[s.traceMatch.nodeId]);
+    if(Array.isArray(s.conditions))s.conditions.forEach(function(c,i){if(object(c) && typeof c.nodeId==='string' && c.nodeId)add('conditions['+i+'].nodeId','node',[c.nodeId]);});
+    return refs;
+  }
+  function validateStepSet(source){
+    var d=source.d,set=source.set,names=exportNames(set.export);
+    var exp=Array.isArray(set.export)?mergeExports(d,names):d.topologyExports[set.export];
+    var nodes=new Set(exp.nodes),edges=new Set(exp.edges),members=new Set(set.steps),bound=' export '+names.join(', ');
+    set.steps.forEach(function(stepId){
+      if(!namespacePath(stepId))fail(source.at,'step '+stepId+' needs a stable id of letters, digits, dot, dash and underscore');
+      var matches=(d.steps || []).filter(function(s){return s && s.id===stepId;});
+      if(matches.length!==1)fail(source.at,'missing or ambiguous exported step '+stepId);
+      stepReferences(matches[0]).forEach(function(ref){
+        if(!(ref.kind==='edge'?edges:nodes).has(ref.id))fail(source.at,'step '+stepId+' '+ref.field+' references '+ref.kind+' '+ref.id+' outside'+bound);
+      });
+      var parent=object(matches[0].traceMatch) && matches[0].traceMatch.parentStepId;
+      if(parent && !members.has(parent))fail(source.at,'step '+stepId+' traceMatch.parentStepId '+parent+' is not in this step set');
+    });
+  }
+
   function materialize(specs){return materializeSources(specs,false);}
   function materializeSources(specs,declarationsOnly){
     if(!Array.isArray(specs))fail('snapshot','expected an array of specs');
-    var copies=specs.map(clone),byId=new Map(),states=new Map(),exportsById=new Map();
+    var copies=specs.map(clone),byId=new Map(),states=new Map(),exportsById=new Map(),stepExportsById=new Map();
     copies.forEach(function(spec){
       var id=spec && spec.page && spec.page.canon && spec.page.canon.id;
       if(typeof id!=='string' || !id || byId.has(id))fail('snapshot','specs require unique page.canon.id identities: '+id);
       byId.set(id,spec);
-      var exports=new Map();exportsById.set(id,exports);
+      var exports=new Map(),stepSets=new Map();exportsById.set(id,exports);stepExportsById.set(id,stepSets);
       sections(spec).forEach(function(sec,si){
         var d=sec.diagram,at=id+' section '+(sec.id || si);
-        if(own(d,'topologyImports') || own(d,'topologyExports') || d.topologyProvenance){
+        if(own(d,'topologyImports') || own(d,'topologyExports') || own(d,'stepExports') || d.topologyProvenance){
           ['nodes','groups'].forEach(function(key){if(d[key]!=null && !object(d[key]))fail(at,key+' must be an object');});
           ['rows','floats','edges','steps'].forEach(function(key){if(d[key]!=null && !Array.isArray(d[key]))fail(at,key+' must be an array');});
           (d.edges || []).forEach(function(e){if(!object(e) || typeof e.from!=='string' || typeof e.to!=='string')fail(at,'edges require from/to node identities');});
@@ -163,6 +195,19 @@ var FlowTopology = (function(){
             shape(exp,['nodes','edges'],where);list(exp.nodes,where+' nodes');list(exp.edges,where+' edges');
             if(!exp.nodes.length)fail(where,'export at least one node');
             exports.set(name,{d:d,exp:exp,at:where});
+          });
+        }
+        if(own(d,'stepExports')){
+          if(!object(d.stepExports))fail(at,'stepExports must be a named object');
+          Object.keys(d.stepExports).forEach(function(name){
+            if(!token(name) || stepSets.has(name))fail(at,'invalid or duplicate step set '+name);
+            var set=d.stepExports[name],where=at+' step set '+name;
+            shape(set,['export','steps'],where);
+            if(!validExports(set.export))fail(where,'export must be a name or a nonempty array of unique export names');
+            exportNames(set.export).forEach(function(exportName){if(!own(d.topologyExports || {},exportName))fail(where,'export '+exportName+' is not declared in this section');});
+            list(set.steps,where+' steps');
+            if(!set.steps.length)fail(where,'export at least one step');
+            stepSets.set(name,{d:d,set:set,at:where});
           });
         }
         if(own(d,'topologyImports') && !Array.isArray(d.topologyImports))fail(at,'topologyImports must be an array');
@@ -367,11 +412,12 @@ var FlowTopology = (function(){
         exp.nodes.forEach(function(key){if(!own(d.nodes || {},key) || placed.filter(function(x){return x===key;}).length!==1)fail(source.at,'missing exported node or broken placement '+key);});
         exp.edges.forEach(function(key){var matches=(d.edges || []).filter(function(e){return e && edgeKey(e)===key;});if(matches.length!==1)fail(source.at,'missing or ambiguous exported edge '+key);if(!exp.nodes.includes(matches[0].from) || !exp.nodes.includes(matches[0].to))fail(source.at,'exported edge '+key+' requires both endpoint nodes');});
       });
+      stepExportsById.get(id).forEach(validateStepSet);
       states.set(id,'done');
     }
     copies.forEach(function(spec){visit(spec.page.canon.id,[]);});
     copies.forEach(function(spec){
-      sections(spec).forEach(function(sec){delete sec.diagram.topologyImports;delete sec.diagram.topologyExports;});
+      sections(spec).forEach(function(sec){delete sec.diagram.topologyImports;delete sec.diagram.topologyExports;delete sec.diagram.stepExports;});
       var errors=FlowCanon.validate(spec).concat(validate(normalize(spec)).errors);
       if(errors.length)fail(spec.page.canon.id,'invalid materialized spec: '+errors.join('; '));
     });
@@ -456,7 +502,7 @@ var FlowTopology = (function(){
   function resolveSource(raw,context){
     if(!context){
       if(raw && raw.nodes && raw.rows && !raw.page && !raw.blocks && !raw.sections){
-        if(!own(raw,'topologyExports') && !own(raw,'topologyImports'))return raw;
+        if(!own(raw,'topologyExports') && !own(raw,'topologyImports') && !own(raw,'stepExports'))return raw;
         return resolveSource({page:{sections:[{diagram:raw}]}},null).page.sections[0].diagram;
       }
       if(!declarations(raw))return raw;

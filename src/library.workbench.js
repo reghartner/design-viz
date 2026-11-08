@@ -92,7 +92,8 @@ function parseCanonLibrary(raw){
     if(raw.version===3 && !/^[a-f0-9]{64}$/.test(entry.revision || ''))throw new Error('Invalid source revision: '+entry.id);
     var services=Array.isArray(entry.services)?entry.services.filter(function(name){return typeof name==='string';}):[];
     var exports=Array.isArray(entry.exports)?entry.exports.filter(function(name){return typeof name==='string';}):undefined;
-    return {id:entry.id,namespace:libraryNamespace(entry.folder),title:title,preview:libraryPreviewData(entry.preview,entry.revision),description:libraryDescription(entry.description),contentText:libraryDescription(entry.contentText),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,boundServices:Array.isArray(entry.boundServices)?libraryBoundServices(entry.boundServices):undefined,exports:exports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
+    var stepExports=Array.isArray(entry.stepExports)?entry.stepExports.filter(function(name){return typeof name==='string';}):undefined;
+    return {id:entry.id,namespace:libraryNamespace(entry.folder),title:title,preview:libraryPreviewData(entry.preview,entry.revision),description:libraryDescription(entry.description),contentText:libraryDescription(entry.contentText),tags:libraryTags(entry.tags),canon:entry.canon,counts:entry.counts,services:services,boundServices:Array.isArray(entry.boundServices)?libraryBoundServices(entry.boundServices):undefined,exports:exports,stepExports:stepExports,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
   });
 }
 

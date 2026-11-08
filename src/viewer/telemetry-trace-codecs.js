@@ -71,17 +71,22 @@ function telemetryHoneycombTrace(result,id){
   var text=telemetryTraceText(result),meta=telemetryTraceMeta(text);
   if(meta.trace_id!==id)telemetryTraceFail('Returned trace ID differs from requested candidate.');
   var rows=telemetryTraceTable(text,['span_id','parent_id','start_unix_ns','duration_ns','kind','status_code','error','http_status','service','route','name']);
+  // Honeycomb adds a synthetic start-0 row when the root span was not stored; it is not a span.
+  // total_spans counts it; visible_spans may or may not.
+  var dropped=rows.filter(function(r){return r.span_id==='missing-root' || r.start_unix_ns==='0' && !telemetryTraceId(r.span_id) && !r.annotation_type && !r.link_span_id && !r.link_trace_id;}),placeholders=new Set(dropped.map(function(r){return r.span_id;}));
+  rows=rows.filter(function(r){return dropped.indexOf(r)<0;});
   var spans=rows.filter(function(r){return !r.annotation_type && !r.link_span_id && !r.link_trace_id;});
   var warnings=[],complete='unknown',total=Number(meta.total_spans),visible=Number(meta.visible_spans),collapsed=Number(meta.collapsed_nodes);
-  if(collapsed>0 || total>visible || rows.some(function(r){return r.is_collapsed==='true';}) || ['focused','compact'].indexOf(meta.view_mode)>=0){complete='partial';warnings.push('Provider returned a partial or collapsed trace.');}
-  else if([total,visible,collapsed].every(function(n){return Number.isSafeInteger(n) && n>=0;}) && visible===spans.length && total===visible && collapsed===0 && meta.view_mode==='full')complete='complete';
+  if(dropped.length){complete='partial';warnings.push('Root span not stored; timeline starts at the earliest stored span.');}
+  if(collapsed>0 || total-dropped.length>visible || rows.some(function(r){return r.is_collapsed==='true';}) || ['focused','compact'].indexOf(meta.view_mode)>=0){complete='partial';warnings.push('Provider returned a partial or collapsed trace.');}
+  else if(!dropped.length && [total,visible,collapsed].every(function(n){return Number.isSafeInteger(n) && n>=0;}) && visible===spans.length && total===visible && collapsed===0 && meta.view_mode==='full')complete='complete';
   if(complete==='unknown')warnings.push('Trace completeness unknown.');
   if(rows.length!==spans.length)warnings.push('Annotation/log/link rows excluded from the span timeline.');
   if(rows.some(function(r){return r.annotation_type==='link' || r.link_span_id || r.link_trace_id;}))warnings.push('Honeycomb link-row ownership is unverified; relationship mapping unavailable.');
   if(!spans.length)telemetryTraceFail('No timed spans returned.');
   var starts=spans.map(function(r){if(!/^\d{1,22}$/.test(r.start_unix_ns) || !/^\d{1,22}$/.test(r.duration_ns))telemetryTraceFail('Invalid exact nanosecond timing.');return BigInt(r.start_unix_ns);}),base=starts.reduce(function(a,b){return a<b?a:b;});
   var normalized=spans.map(function(r,i){var offset=starts[i]-base,duration=BigInt(r.duration_ns);if(offset>86400000000000n || duration>86400000000000n)telemetryTraceFail('Trace timing exceeds bounds.');
-    return {id:r.span_id,parentId:r.parent_id || null,service:r.service,name:r.name,startMs:Number(offset)/1e6,ms:Number(duration)/1e6,time:telemetryTime(Number(starts[i]/1000000n)),error:r.error==='true' || r.status_code==='ERROR' || /^5\d\d$/.test(r.http_status),attributes:telemetryTraceAttrs({'service.name':r.service,'http.route':r.route,'span.kind':r.kind,'status.code':r.status_code,error:r.error==='true','http.status_code':r.http_status}),events:[],links:[]};
+    return {id:r.span_id,parentId:r.parent_id && !placeholders.has(r.parent_id)?r.parent_id:null,service:r.service,name:r.name,startMs:Number(offset)/1e6,ms:Number(duration)/1e6,time:telemetryTime(Number(starts[i]/1000000n)),error:r.error==='true' || r.status_code==='ERROR' || /^5\d\d$/.test(r.http_status),attributes:telemetryTraceAttrs({'service.name':r.service,'http.route':r.route,'span.kind':r.kind,'status.code':r.status_code,error:r.error==='true','http.status_code':r.http_status}),events:[],links:[]};
   });
   telemetryTraceCheckSpans(normalized);
   if(normalized.length>TELEMETRY_TRACE_SPANS){normalized=[];complete='partial';warnings.push('More than 200 spans; trace timeline unavailable.');}

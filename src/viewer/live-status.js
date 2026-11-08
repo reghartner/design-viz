@@ -920,7 +920,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   var directTrace=createTelemetryDirect(page,telemetryOptions && telemetryOptions.directTrace,{
     sections:directTraceSections,
-    identity:function(){return [telemetry.environment(),telemetry.snapshot().historical];},
+    // #1145 (D5): Live / Over time is not part of it; a loaded trace sets the day (traceFollow, traceViewChanged).
+    identity:function(){return [telemetry.environment()];},
     environment:function(){return telemetry.environment();},
     // #1142: Over time searches the selected day. A day without a date has no window, so Load stays off there.
     day:function(){var state=over && overTimeState();return state && state.window?{key:over.days[over.index].key,today:state.today,label:state.label,window:state.window}:null;},
@@ -942,6 +943,29 @@ function createLiveStatus(ctl,page,options,renderOptions){
   });
   // The selected Over time day for the log search, or null in Live or on a day without a date.
   function logSearchDay(){var state=over && overTimeState(),day=over && over.days[over.index];return state && state.window?{key:day.key,today:!!state.today,from:state.window.from,to:state.window.to,label:state.window.label,short:day.short || day.label || day.key}:null;}
+  /* #1145 (D5): a loaded trace sets the view's day. Its day is the local date of its first span. Loading
+     moves the view there (Live for today); a view change to another day clears the trace with one note. */
+  var traceDayNote='',overTarget=null;
+  function localDayKey(ms){var d=new Date(ms);return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())).toISOString().slice(0,10);}
+  function traceDayOf(e){
+    var at=Math.min.apply(null,(e && e.spans || []).map(function(s){return Date.parse(s.time);}).filter(function(t){return isFinite(t);}));if(!isFinite(at))return null;
+    var d=new Date(at),pad=function(n){return String(n).padStart(2,'0');};
+    return {at:d.toISOString(),key:localDayKey(at),label:d.toLocaleDateString([],{month:'short',day:'numeric'}),time:pad(d.getHours())+':'+pad(d.getMinutes())};
+  }
+  function viewDay(){var day=over && over.days[over.index];return day?{key:day.key,label:day.short || day.label || day.key}:{key:localDayKey(Date.now()),label:'Live'};}
+  function outsideNote(d){return 'This trace is from '+d.label+', a day Over time does not list.';}
+  function traceFollow(e){
+    var d=traceDayOf(e);if(!d || d.key===viewDay().key)return;
+    if(d.key===localDayKey(Date.now())){overClose();return;}
+    if(over){var index=over.days.findIndex(function(day){return day.key===d.key;});if(index>=0)api.overTimeDay(index);else traceDayNote=outsideNote(d);return;}
+    // Without an Over time that can open here there is no day list to move to; the card still shows the date.
+    openOver(d);
+  }
+  function traceViewChanged(){
+    var e=directTrace.snapshot().exemplar,d=traceDayOf(e),view=viewDay();if(!d || d.key===view.key)return;
+    traceDayNote='Cleared trace '+e.traceId.slice(0,12)+' ('+d.label+'): the view moved to '+view.label+'.';
+    clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();
+  }
   function traceSources(){
     var evidence=telemetry.snapshot(),entries=[],owners=Object.create(null),mounted=sourceBindings(),ambiguous=new Set();
     eachDiagram(function(d,source){Object.keys(d.nodes || {}).concat((d.edges || []).map(function(e){return e.from+'->'+e.to;})).forEach(function(id){if(!owners[id])owners[id]=[];if(owners[id].indexOf(d)<0)owners[id].push(d);});});
@@ -967,7 +991,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function traceContext(entry){
     var b=entry.binding;
-    return JSON.stringify([traceRequest,traceFocusEpoch,entry.key,entry.exemplar.traceId,entry.exemplar.selectionToken,telemetry.environment(),telemetry.snapshot().historical,
+    return JSON.stringify([traceRequest,traceFocusEpoch,entry.key,entry.exemplar.traceId,entry.exemplar.selectionToken,telemetry.environment(),
       traceObjectId(b.page),traceObjectId(b.section),traceObjectId(b.section.diagram),b.el?traceObjectId(b.el):0,b.stepper?traceObjectId(b.stepper):0]);
   }
   function clearTraceFocus(){traceFocus=null;traceFocusEpoch++;}
@@ -1019,7 +1043,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var context=selected?traceContext(selected):null,focus=traceFocusSnapshot(selected,context);
     var model=selected?telemetryTraceModel(selected.binding.section.diagram,selected.binding.stepper && selected.binding.stepper.path(),selected.exemplar):null;
     if(selected)model.mapSteps=traceMapSteps(selected.binding);
-    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot()}),
+    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,day:traceDayOf(selected.exemplar),context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot(),dayNote:traceDayNote,movesDay:!!overTimeState()}),
       hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
   function paintTrace(){
@@ -1104,10 +1128,18 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var end=new Date(to),pad=function(n){return String(n).padStart(2,'0');};
     return {from:new Date(from).toISOString(),to:end.toISOString(),label:(day.label || day.key)+' 00:00–'+(to===midnight?'24:00':pad(end.getHours())+':'+pad(end.getMinutes()))+' local'};
   }
-  function overShow(){map=liveStatusDayMap(over.today,over.days[over.index].states);changedKeys=[];telemetry.historyDay(over.index);paint();notify();telemetryHooks.jiraChanged();}
+  // The reader's click (Over time, or a Load that moves the view to a trace's day) is the only thing that loads history.
+  function openOver(day){
+    if(retired || overLoading || over)return false;
+    if(!overSource || !applied || !Object.keys(map).length || editing())return false;
+    var request=++overRequest;overLoading=true;overError='';overProgress='';overTarget=day?{request:request,day:day}:null;notify();
+    Promise.resolve().then(function(){return overSource.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result);},function(){overLoad(request,null);});
+    return true;
+  }
+  function overShow(){traceViewChanged();map=liveStatusDayMap(over.today,over.days[over.index].states);changedKeys=[];telemetry.historyDay(over.index);paint();notify();telemetryHooks.jiraChanged();}
   // Returning to Live restores the live map, then applies any evidence that arrived meanwhile as a normal refresh.
   function overClose(){
-    var left=over;over=null;map=left.live;changedKeys=[];telemetry.closeHistory();
+    var left=over;over=null;traceViewChanged();map=left.live;changedKeys=[];telemetry.closeHistory();
     if(overSource.close)overSource.close();
     if(left.held)api.apply(left.value);else{paint();notify();telemetryHooks.jiraChanged();}
   }
@@ -1137,6 +1169,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var days=result && Array.isArray(result.days)?result.days:[];
     if(!days.length){overError='History could not load. Try Over time again.';notify();return;}
     var index=result.index;if(typeof index!=='number' || index<0 || index>=days.length)index=days.length-1;
+    // #1145: opened by a loaded trace: its own day, or stay in Live when the list does not have it.
+    var target=overTarget && overTarget.request===request?overTarget.day:null;overTarget=null;
+    if(target){index=days.findIndex(function(day){return day.key===target.key;});if(index<0){traceDayNote=outsideNote(target);notify();return;}}
     over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null};on=true;availabilityOn=true;telemetry.openHistory(days,index);overShow();
   }
   // Authored carrier occurrences, independent of distinct Jira ticket totals.
@@ -1826,9 +1861,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     refs:refs,
     snapshot:snapshot,
     setStatusMode:function(mode){if(retired || ['jira','trace'].indexOf(mode)<0)return;if(mode!==statusMode)clearTraceFocus();statusMode=mode;statusAuto=false;close(false);paint();notify();},
-    setDirectTraceField:function(change){if(!retired && change){traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';directTrace.set(change.field,change.value);}},
-    loadDirectTrace:async function(verify,line){if(retired)return;statusAuto=false;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';var result=await directTrace.load(!!verify,line);if(result){traceSelection=null;traceInitial=true;}paint();notify();return result;},
-    clearDirectTrace:function(){if(retired)return;clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();},
+    setDirectTraceField:function(change){if(!retired && change){traceDayNote='';traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';directTrace.set(change.field,change.value);}},
+    loadDirectTrace:async function(verify,line){if(retired)return;statusAuto=false;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';traceDayNote='';var result=await directTrace.load(!!verify,line);if(result){traceSelection=null;traceInitial=true;if(!retired)traceFollow(result);}paint();notify();return result;},
+    clearDirectTrace:function(){if(retired)return;traceDayNote='';clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();},
     setLogLookupField:function(change){if(!retired && change)logLookup.set(change.field,change.value);},
     findLogLines:function(){return retired?Promise.resolve(null):logLookup.find();},
     // Load the chosen line's trace exactly as a pasted ID, then focus the line's span.
@@ -1919,12 +1954,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     },
     setHistory:function(source){if(retired)return;if(over)overClose();overRequest++;overLoading=false;overError='';overSource=source && typeof source.load==='function'?source:null;notify();},
     // The reader's click is the only thing that loads history.
-    overTime:function(){
-      if(retired || overLoading || over)return;
-      if(!overSource || !applied || !Object.keys(map).length || editing())return;
-      var request=++overRequest;overLoading=true;overError='';overProgress='';notify();
-      Promise.resolve().then(function(){return overSource.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result);},function(){overLoad(request,null);});
-    },
+    overTime:function(){openOver(null);},
     overTimeClose:function(){if(!retired && over)overClose();},
     overTimeStep:function(delta){if(!retired && over)api.overTimeDay(over.index+delta);},
     overTimeDay:function(index){

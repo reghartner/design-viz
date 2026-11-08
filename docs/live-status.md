@@ -2941,6 +2941,18 @@ Status → Trace can load one exact trace ID or a supported provider link using 
 
 Selecting a span in the loaded trace shows its exact **Service** and **Operation** (#1078), the strings a step's `traceMatch.serviceName` and `traceMatch.operation` must match; copy them from there. A span that no step maps says "No authored step maps this span. Add a traceMatch to a step to map this span." and links to [Make an existing diagram Trace-ready](trace-ready-authoring.md). On a shared board in Edit mode, that span also offers **Map this span to a step**, which writes the two values to a step that has no `traceMatch` yet ([Edit mode](#edit-mode-on-the-shared-board-828)); add `nodeId`, `parentStepId` or `attributes` in the Workbench when one span name is not enough.
 
+### A loaded trace sets the day
+
+A loaded trace is one request with its own start time, the earliest span's (#1145, D5). The request card
+says "Started Nov 6 12:00 local". Loading it moves the view to that local day: Over time on that day, or
+Live when it is today. Opening Over time for it is part of the Load click. When Over time is open and its
+day list has no such day, or the history it loads has none, the view stays and the Load trace section says
+"This trace is from Nov 3, a day Over time does not list." A board without Over time stays in Live.
+Over time on today is the same day as Live. Moving the view to any other day, or back to Live from a past
+day, clears the trace without a call, and the section says "Cleared trace 8413cd87a9f1 (Nov 6): the view
+moved to Nov 7." The typed trace ID stays. Ticket colours on nodes follow the day shown (D14). Opening a
+drill-down keeps the loaded trace; it is cleared when its mapping diagram goes away.
+
 ### Find a trace from a log line
 
 Sometimes the field that tells requests apart is not on any span. A company's
@@ -3011,17 +3023,19 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   Loki before 3.0 reports every label as a stream label. A line without the
   trace ID field says "This log line has no trace_id" (with the configured
   field name) and has no Load button. A metric query returns no lines and says so.
-- **Load** on a line loads that trace ID through the selected connection,
-  exactly as a pasted ID, then focuses the line's span ID in the waterfall and
-  the diagram. A span ID that is not in the trace is reported, and the trace
-  stays loaded.
+- **Load** on a line loads that trace ID through the selected connection and
+  searches the line's time ± 1 h (#1145; see [Honeycomb lookback](provider-traces.md#honeycomb-lookback)),
+  then focuses the line's span ID in the waterfall and the diagram. A span ID
+  that is not in the trace is reported, and the trace stays loaded. The list
+  says "Loading a trace moves the view to its date." when the board has Over time.
 - A log line's trace may never have been kept by the provider (sampling)
   (#1124). When it is not found, the report says "Trace not found. The provider
   may not have kept this trace (sampling). Try the next log line." and offers
   **Try the next log line**, which loads the next listed line that has a trace
   ID. The lookback hint ("The log line is older than the last 2h; try a longer
-  lookback under Lookback.") is added, and Lookback opens, only when the line
-  is outside the window. A pasted ID or link keeps the lookback text.
+  lookback under Lookback.") is added, and Lookback opens, only when a typed
+  Trace start or end leaves the line outside the window. A pasted ID or link
+  keeps the lookback text.
 - Lookups need the Grafana connector. When no connector offers
   `query_loki_logs`, or in a host without one (native mounts), the lookup
   controls are disabled with a message and the rest of Load trace is unchanged.

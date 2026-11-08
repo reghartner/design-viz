@@ -378,11 +378,13 @@
       var available=value && value.available,hasData=available && value.hasData;
       // Live and Over time are the two modes (#929, Chuck 2026-11-04), in a row of their own. The selected one is filled. Live returns from a past day; while selected it still turns colors off (D6).
       var over=value && value.overTime,past=!!(over && over.active);
-      // #1138: a board with no Jira references has Live | Over time whenever the controller offers its local day list.
-      var timed=hasData || !available && !!over;
+      // #1138: a board with no Jira references has Live | Over time whenever the controller offers its local day list,
+      // and a past day always keeps its way back to Live.
+      var timed=hasData || past || !available && !!over;
       var time=el(header,'div','time','dv-live-time dv-status-segmented');time.setAttribute('role','group');time.setAttribute('aria-label','Status time');
       var toggle=button(time,'toggle','reader-button dv-live-toggle','Live',past?'overTimeClose':'setEnabled');toggle.hidden=!timed;time.hidden=!timed;
-      toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled) && !past));
+      // On a board with no Jira references there are no ticket colors, so a click on the selected Live changes nothing.
+      toggle._liveArgument=value?!available || !value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled) && !past));
       var overTime=button(time,'over-time','reader-button dv-live-over-time',over && over.loading?'Loading history'+(over.progress?' '+over.progress:'')+'…':'Over time','overTime');overTime.hidden=!timed || !over || !over.available;overTime.disabled=!!(over && (over.loading || over.disabled));overTime.setAttribute('aria-pressed',String(past));
       var overStatus=el(header,'p','over-time-status','dv-live-over-time-status',timed && over && over.error?over.error:'');overStatus.setAttribute('role','status');overStatus.hidden=!overStatus.textContent;
       // Day buttons: on the slider row, and on a row of their own for a demo in Live mode, which has no slider. A demo's buttons move its own day.

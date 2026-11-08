@@ -818,6 +818,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         var previous=JSON.stringify(refs()),old=remotePages[remoteKey(ref)],retiredIds=[];
         if(old)sectionRecords(old).forEach(function(record){var d=record.section.diagram;if(d){retiredIds=retiredIds.concat(Object.keys(d.nodes || {}),(d.edges || []).map(function(edge){return edge.from+'->'+edge.to;}));}});
         remotePages[remoteKey(ref)]=normalize(raw);telemetry.bindingsChanged(retiredIds);schedule();
+        // #1138: a local Over time ends when a loaded detail gives the board Jira references.
+        if(over && over.source===localHistory && referencesAvailable())overClose();
         if(JSON.stringify(refs())!==previous)notify();
       }
       return raw;
@@ -1087,9 +1089,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // #1138 (D2, V2): a board with no ticket, epic, exclusion or missing-work reference after imports has no Jira
   // history, so when it has Metrics, Over time uses the local day list. The reader's click still opens it.
   var localHistory={load:function(){return liveStatusLocalDays(Date.now());}};
-  // The same test as snapshot().available, negated.
-  function jiraFreeBoard(){var found=refs();return !(found.tickets.length || found.epics.length || liveStatusCoverage(page,map,found,sources()).excluded.length || missingWorkCount());}
-  function historySource(){return overSource || (!authoring && telemetry.status().state!=='absent' && jiraFreeBoard()?localHistory:null);}
+  function historySource(){return overSource || (!authoring && telemetry.status().state!=='absent' && !referencesAvailable()?localHistory:null);}
   function overTimeState(){
     var source=over?over.source:historySource();if(!source)return null;
     var base={active:!!over,loading:overLoading,progress:overProgress,error:overError,available:source===localHistory || !!(applied && Object.keys(map).length),disabled:editing()};

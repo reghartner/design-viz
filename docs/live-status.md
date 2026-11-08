@@ -1407,6 +1407,8 @@ missing-work reference, after imports, still shows **Live** and **Over time**. T
 lists the last 7 local days ending today, built with no calls. With the Metrics
 overlay off nothing is fetched; with it on, each day's metrics window is fetched
 when the day is first shown, and a past day already loaded is not fetched again.
+A click on the selected **Live** changes nothing there. If a loaded detail gives the
+board a ticket, Over time ends and the board returns to Live.
 
 The `getJiraIssue` reply shape was checked with one real call on a live Atlassian
 connector: the issue sits in `issues.nodes[0]`, and a plain top-level REST issue is

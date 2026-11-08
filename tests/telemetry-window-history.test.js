@@ -213,3 +213,14 @@ test('Over time past day reads a dense end-stamped CloudWatch series while Live 
  const n=Math.ceil((Date.parse(past.end)-Math.floor(Date.parse(past.start)/HOUR)*HOUR)/HOUR);
  s=h.api.snapshot().map.local;assert.equal(s.signals.total.value,5*n,'past-day dense Sum is the in-window sum, not Unobserved');assert.equal(s.signals.avg.value,5);assert.doesNotMatch(h.api.status().note || '',/malformed/);
 });
+test('a CloudWatch series whose only buckets are at or after the window end is an empty in-window result',async t=>{
+ for(const missingMeansZero of [undefined,true]){
+  const signals={total:{cloudwatch:{...cw(),missingMeansZero}},avg:{cloudwatch:{...cw('Average'),missingMeansZero}}};
+  const h=await setup({signals,answer:c=>{const end=Date.parse(c.input.end);return {payload:end===NOW?rows([2,4],[end-2*HOUR,end-HOUR]):rows([5,6],[end,end+HOUR])};}});t.after(h.close);
+  h.api.openHistory(days(),0);h.api.setEnabled(true);await settle();const past=days()[0].at;
+  assert.ok(h.calls.length>0 && h.calls.every(c=>c.input.end===past && c.input.statistic!=='SampleCount'),'no weight query for an empty window');
+  const s=h.api.snapshot().map.local,note=h.api.status().note || '';assert.doesNotMatch(note,/malformed|failed/);
+  if(missingMeansZero){assert.equal(s.signals.total.value,0);assert.equal(s.signals.avg.value,0);assert.equal(s.signals.total.observedAt,past);}
+  else {assert.equal(s?.signals.total,undefined);assert.equal(s?.signals.avg,undefined);assert.match(note,/no data points yet/);}
+ }
+});

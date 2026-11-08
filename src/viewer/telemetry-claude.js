@@ -149,6 +149,8 @@ function telemetryCloudwatchPoints(payload){
   }
   return points.sort(function(a,b){return a[0]-b[0];});
 }
+// Only buckets at or after range.to: nothing inside the window was observed.
+function telemetryCloudwatchAfterWindow(payload,range){var points=telemetryCloudwatchPoints(payload),end=Date.parse(range.to);return !!points && points.every(function(p){return p[0]>=end;});}
 function telemetryGrafanaCloudwatch(payload,statistic,weights,range,period){
   var points=telemetryCloudwatchPoints(payload);if(!points)return null;
   // A bucket that starts at or after range.to is outside the window: query_cloudwatch
@@ -517,7 +519,7 @@ function createTelemetryGrafana(page,win,now,bound){
             try{input.period=telemetryCloudwatchPeriod(query,anchoredRange,clock());}catch(error){failed(rank,label,error.message);return;}
             started(job,entry);tasks.push(function(){return call('query_cloudwatch',input).then(function(result){
               var payload=telemetryGrafanaPayload(result);
-              if(telemetryGrafanaCloudwatchEmpty(payload)){
+              if(telemetryGrafanaCloudwatchEmpty(payload) || telemetryCloudwatchAfterWindow(payload,anchoredRange)){
                 if(query.missingMeansZero===true){entry.value=0;entry.observedAt=anchoredRange.to;}
                 else{notices.push(label+': no data points yet');if(report && report.pending)progressNote();}
                 return;

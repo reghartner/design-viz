@@ -13,11 +13,13 @@ const NO_TRACES={
   'plain board':page({},{}),
   'Jira live-status board without telemetry':page({tracking:{jira:{site:'https://jira.test'}}},{nodes:{a:{title:'A',tickets:['ACME-1']},b:{title:'B'}},panels:[PANEL]}),
   'live-status panel without tracking':page({},{panels:[PANEL]}),
+  'empty traceMatch alternatives list':page({},{steps:[{id:'checkout',nodes:['a'],traceMatch:[]}]}),
   'node detail reference without a live-status panel':page({},{nodes:{a:{title:'A',detail:{spec:'approved-detail',revision:'r1',section:'main'}},b:{title:'B'}}}),
   'telemetry board without a live-status panel':page({tracking:{telemetry:{honeycomb:{environment:'prod',dataset:'api'}}}},{nodes:{a:{title:'A',telemetry:clone(SIGNALS)},b:{title:'B'}}}),
 };
 const USES_TRACES={
   'traceMatch step':page({},{steps:[{id:'checkout',nodes:['a'],traceMatch:clone(MATCH)}]}),
+  'traceMatch alternatives list (#1100)':page({},{steps:[{id:'checkout',nodes:['a'],traceMatch:[clone(MATCH),{serviceName:'checkout',operation:'/cart/retry'}]}]}),
   'traceMatch step in a tab section':{title:'Tabs',blocks:[{tabs:[{label:'One',sections:[{id:'plain',diagram:diagram({})}]},{label:'Two',sections:[{id:'traced',diagram:diagram({steps:[{id:'checkout',nodes:['a'],traceMatch:clone(MATCH)}]})}]}]}]},
   'traceMatch step in a nested tab under a tab blocks key':{title:'Nested tabs',blocks:[{tabs:[{label:'Outer',blocks:[{id:'plain',diagram:diagram({})},{tabs:[{label:'Inner',sections:[{id:'traced',diagram:diagram({steps:[{id:'checkout',nodes:['a'],traceMatch:clone(MATCH)}]})}]}]}]}]}]},
   'live-status panel with page telemetry':page({tracking:{telemetry:{}}},{panels:[PANEL]}),

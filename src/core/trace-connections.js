@@ -60,7 +60,7 @@ var FlowTraceConnections=(function(){
     walk(page.blocks || page.sections);
     function values(v){return object(v)?Object.keys(v).map(function(k){return v[k];}):[];}
     function bound(v){return object(v) && own(v,'telemetry');}
-    if(diagrams.some(function(d){return list(d.steps).some(function(s){return object(s) && !!s.traceMatch;});}))return true;
+    if(diagrams.some(function(d){return list(d.steps).some(function(s){var m=object(s) && s.traceMatch;return Array.isArray(m)?m.length>0:!!m;});}))return true;
     if(!diagrams.some(function(d){return list(d.panels).some(function(p){return object(p) && p.type==='live-status';});}))return false;
     if(object(page.tracking) && own(page.tracking,'telemetry'))return true;
     return diagrams.some(function(d){return values(d.nodes).some(function(n){return bound(n) || object(n) && !!n.detail;}) || list(d.edges).some(bound) || list(d.topologyImports).some(function(imp){return object(imp) && (values(imp.nodeTracking).some(bound) || values(imp.edgeTracking).some(bound));});});

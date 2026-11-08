@@ -1033,7 +1033,10 @@ outline, fill and glow follow the bound edge's shared work presentation and stat
 appearance preferences. Every attached ticket participates, including inherited
 provider and import-overlay tickets: blocked/missing/active/testing take precedence,
 unknown evidence cannot claim completion, and an unticketed carrier shows the thin
-1px green no-change outline with no default glow. Endpoint tickets do not supply
+1px green no-change outline with no default glow. On a board with no ticket, epic,
+exclusion or missing-work references (`snapshot().available === false`), cards get
+no work presentation: no outline state, no "No change needed" label or popover line;
+they show their own verdict only. Endpoint tickets do not supply
 an edge's work state. Telemetry proof never overrides the work outline.
 
 Observed numeric values follow the carrier’s configured tone (green for no-change,

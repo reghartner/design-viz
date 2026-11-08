@@ -867,7 +867,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // Metrics canvas cues on every bound section, beside the Jira paint (src/viewer/telemetry.js).
   var metricsPreview=authoring && !!(renderOptions && renderOptions.metricsPreview) && trackingTelemetry(page).enabled;
   function paintMetrics(){
-    var metricsView=statusMode==='trace'?null:telemetryHooks.view();
+    var metricsView=statusMode==='trace'?null:telemetryHooks.view(),references=referencesAvailable();
     bindings.forEach(function(binding){
       var scope=binding.el,d=binding.section.diagram;if(!d)return;
       var templates=trackingTelemetry(binding.page).templates;
@@ -876,8 +876,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       telemetryPaintCards(scope,d,templates,cardsView,trackingTelemetry(page).window,function(card,path,edge,index,bound){
         // The bound carrier owns its work presentation, including all resolved
         // imported tickets. Telemetry proof and endpoint states cannot override it.
-        // Unticketed metric cards may show no-change without painting ordinary edges.
-        var appearance=!cardsView.preview && api.enabled() && availabilityOn?liveStatusPresentation(edge,map):null;
+        // Unticketed metric cards may show no-change without painting ordinary edges,
+        // but only on a board with ticket references (#1137).
+        var appearance=!cardsView.preview && api.enabled() && availabilityOn && references?liveStatusPresentation(edge,map):null;
         liveStatusClass(card,appearance);
         if(!appearance)liveStatusInk(card,null);
         if(appearance){
@@ -1058,7 +1059,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       blocked:blocked,waiting:waiting,outside:outside,ready:readiness.ready};
     var missingWork=missingWorkCount();
     return {states:copy(map),counts:counts,missingWork:{count:missingWork,painted:on && availabilityOn},updatedAt:cacheUpdatedAt || latest,enabled:on,
-      available:!!(refs().tickets.length || refs().epics.length || coverage.excluded.length || missingWork),hasData:!!(provider || applied || missingWork),
+      available:referencesAvailable(coverage),hasData:!!(provider || applied || missingWork),
       note:{text:noteText,kind:noteKind},actionLabel:actionFn?actionLabel:'',firstBlocker:!!firstBlocker(),
       lanes:panelLanes(pages),blockers:panelBlockers(pages),tickets:tickets,excluded:excluded,
       dependencies:copy(dependencies),waiting:copy(boardWaiting),chains:liveStatusDependencyChains(boardWaiting),suggestions:suggestions,epic:epic,
@@ -1121,6 +1122,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     (d.edges || []).forEach(function(edge){if(edge.missingWork===true)count++;});
   });return count;}
   function presentationActive(){return applied || missingWorkCount()>0;}
+  // snapshot().available: ticket, epic or exclusion references, or a missing-work marker.
+  function referencesAvailable(coverage){var found=refs();return !!(found.tickets.length || found.epics.length || (coverage || liveStatusCoverage(page,map,found,sources())).excluded.length || missingWorkCount());}
   function connectPanels(){liveStatusPending.slice().forEach(function(pending){if(liveStatusControllerFor(pending.host)===api)pending.connect(api);});}
   function notify(){connectPanels();var value=snapshot();listeners.slice().forEach(function(fn){fn(value);});}
   function element(tag,cls,text,parent){var el=document.createElement(tag);el.className=cls;if(text!=null)el.textContent=String(text);if(parent)parent.appendChild(el);return el;}
@@ -1205,7 +1208,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var summary=trigger._liveCarrier && trigger._liveCarrier.summary,found=trackingRefs(summary || value);
     if(summary)element('p','dv-live-domain-summary','Domain summary: this node and '+summary.carriers+' descendant nodes/connections · '+summary.tickets.length+' unique tickets.'+(summary.missing?' Missing work: '+summary.missing+' marked carriers.':'')+(summary.unavailable.length?' Detail evidence unavailable: '+summary.unavailable.join(', ')+'. Completion is unknown.':''),pop);
     if(value && value.missingWork===true)element('p','dv-live-coverage-detail','Missing work: additional work remains without a linked ticket. Clear this Missing work marker when covered.',pop);
-    else if(!summary && !found.tickets.length)element('p','dv-live-coverage-detail','No change needed: no linked tickets or missing-work marker.',pop);
+    else if(!summary && !found.tickets.length && referencesAvailable())element('p','dv-live-coverage-detail','No change needed: no linked tickets or missing-work marker.',pop);
     // #855 Edit mode: clear a marker set on this board; an inherited one names its source diagram.
     var marker=ref && editing() && value && value.missingWork===true?editor.missingWork(ref):null;
     if(asking && !(marker && marker.clearable)){editor.endQuestion();asking=null;}

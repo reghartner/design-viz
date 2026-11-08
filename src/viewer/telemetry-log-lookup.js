@@ -108,9 +108,9 @@ function createTelemetryLogLookup(page,transport,hooks){
       var values=Object.assign(Object.create(null),config.variables || {}),missing=null;delete values.value;
       if(config.environment)values.env=config.environment;
       if(config.grafana && config.grafana.accountId)values.account=config.grafana.accountId;
-      // ${value} is the lookup slot, never an environment variable.
-      function expand(text){return telemetrySubstitute(text,values,function(name){if(name!=='value' && !missing)missing=name;},true);}
-      var logql=expand(query),uid=lookup && lookup.datasource?expand(lookup.datasource):config.grafana && config.grafana.loki;
+      // In an authored slot query ${value} is the slot; anywhere else it is an unset variable.
+      function expand(text,slotted){return telemetrySubstitute(text,values,function(name){if((!slotted || name!=='value') && !missing)missing=name;},true);}
+      var logql=expand(query,slot),uid=lookup && lookup.datasource?expand(lookup.datasource,false):config.grafana && config.grafana.loki;
       if(missing)fail('Set telemetry variable ${'+missing+'} in the active environment.');
       if(slot)logql=logql.replace(/\$\{value\}|\$value(?![A-Za-z0-9_])/g,function(){return value;});
       if(!uid)fail('Set tracking.telemetry.grafana.loki to the Loki datasource UID.');

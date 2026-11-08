@@ -92,6 +92,9 @@ test('review: a ${value} slot is filled like $value and never reported as a miss
  const braced=QUERY.replace('"$value"','"${value}"'),h=setup({p:board({camera:{label:'Camera model',query:braced,values:['arch']}})});await settle();
  assert.equal(h.api.snapshot().lookups[0].slot,true);h.api.set('value','arch');await h.api.find();
  assert.equal(h.api.snapshot().result.error,undefined);assert.deepEqual(h.calls.map(c=>c.args.logql),[EXPANDED]);
+ // Outside an authored slot query, ${value} is an unset variable: a typed query or a datasource is not sent with it.
+ const typed=setup({p:board({camera:{label:'Camera model',query:braced,datasource:'loki-${value}'}})});await settle();typed.api.set('value','arch');assert.equal(await typed.api.find(),null);assert.match(typed.api.snapshot().result.error,/\$\{value\}/);
+ typed.api.set('lookup',typed.C.TELEMETRY_LOG_TYPED);typed.api.set('logql','{env="$env"} | cameraModel="${value}"');assert.equal(await typed.api.find(),null);assert.match(typed.api.snapshot().result.error,/\$\{value\}/);assert.equal(typed.calls.length,0);
 });
 
 test('review: a non-object lookups value is ignored by the viewer as it is by inject',()=>{
@@ -110,6 +113,10 @@ test('review: a Grafana call that never answers times out after 30 s and its lat
  const timeout=pending.find(t=>t.ms===30000 && t.fn);assert.ok(timeout,'Find arms a 30 s timeout');timeout.fn();
  let s=h.api.snapshot();assert.equal(s.busy,false);assert.match(s.result.error,/timed out/);
  release();assert.equal(await found,null);await settle();s=h.api.snapshot();assert.match(s.result.error,/timed out/);assert.deepEqual(clone(s.result.rows),[]);
+ // An answered Find clears its timer: firing a left-over one must not turn its lines into a timeout.
+ const before=pending.length,again=h.api.find();await settle();const armed=pending.slice(before).find(t=>t.ms===30000);assert.ok(armed,'the second Find arms its own timeout');
+ release();assert.equal(clone(await again).rows.length,1);if(armed.fn)armed.fn();
+ s=h.api.snapshot();assert.equal(s.result.error,undefined);assert.equal(s.result.rows.length,1);assert.equal(armed.fn,null,'an answered Find clears its 30 s timer');
 });
 
 test('review: hex trace and span ids from a log line are lowercased',async()=>{

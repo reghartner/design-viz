@@ -167,7 +167,7 @@ test('V8 V9 V11 external detail refs create a deferred control and retired mount
  api.apply({'DD-1':{state:'done',updatedAt:'2026-10-26T12:00:00Z'}});api.note('Detail loaded','info');assert.equal(h.view.querySelectorAll('.dv-live-toggle').filter(el=>!el.hidden).length,0);
  const pending=renderOptions.loadDetail({spec:'approved-detail'},new AbortController().signal);resolve({nodes:{child:{tickets:['DD-1']}},rows:[['child']]});await pending;h.flush();
  assert.deepEqual(plain(api.refs().tickets),['DD-1']);assert.equal(removed.children.length,0);assert.equal(host.querySelectorAll('.dv-live-toggle').length,1);
- const root=host.querySelector('.dv-live-head'),toggle=root.querySelector('.dv-live-toggle');assert.equal(root.hidden,false);assert.equal(root.querySelector('[data-live-count="done"]').textContent,'done 1');assert.equal(root.querySelector('.dv-live-note').textContent,'Detail loaded');assert.equal(root.querySelector('time'),null,'V8 no ticket-change time in the header (#769)');assert.equal(h.ctl.liveStatus.snapshot().updatedAt,'2026-10-26T12:00:00Z');
+ const root=host.querySelector('.dv-live-head'),toggle=host.querySelector('.dv-live-toggle');assert.equal(root.hidden,false);assert.equal(root.querySelector('[data-live-count="done"]').textContent,'done 1');assert.equal(root.querySelector('.dv-live-note').textContent,'Detail loaded');assert.equal(root.querySelector('time'),null,'V8 no ticket-change time in the header (#769)');assert.equal(h.ctl.liveStatus.snapshot().updatedAt,'2026-10-26T12:00:00Z');
  toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),false);assert.equal(toggle.getAttribute('aria-pressed'),'false');
  h.view.dispatchEvent({type:'detail-navigation'});h.flush();assert.equal(host.querySelectorAll('.dv-live-toggle').length,1);
  mount.destroy();api.apply({});h.view.dispatchEvent({type:'navigation-mounted'});h.flush();assert.equal(host.children.length,0);
@@ -1170,7 +1170,7 @@ test('L2 L3 snapshot exposes rollup and all mutations notify; navigation control
 });
 test('L2 L3 L4 panel paints synchronously, controls act, focus survives refresh and cleanup preserves print',()=>{
  const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const mount=mountStatus(h),body=mount.body;
- assert.equal(body.firstChild.className,'dv-status-modes');assert.ok(body.querySelector('.dv-live-head'));assert.ok(body.querySelector('table.dv-live-tickets'));assert.ok(body.querySelector('.dv-live-epic'));assert.ok(body.querySelector('.dv-live-verdict')===null,'no verdict line');
+ assert.equal(body.firstChild.className,'dv-status-header');assert.ok(body.firstChild.querySelector('.dv-status-modes'));assert.ok(body.querySelector('.dv-live-head'));assert.ok(body.querySelector('table.dv-live-tickets'));assert.ok(body.querySelector('.dv-live-epic'));assert.ok(body.querySelector('.dv-live-verdict')===null,'no verdict line');
  assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Tickets','Blockers and dependency chains','Activity']);
  const toggle=body.querySelector('.dv-live-toggle');assert.equal(toggle.textContent,'Live');toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),false);toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),true);
  let action=0,next=0,prev=0;api.action('Retry',()=>action++);body.querySelector('.dv-live-action').dispatchEvent({type:'click'});assert.equal(action,1);
@@ -2039,16 +2039,16 @@ test('M5 apply keeps the provider result contract, snapshots are copies, clear e
  h.ctl.liveStatus.destroy();
 });
 
-test('M6 Metrics sits beside Live, off by default; on calls the provider and updates its connector text; off clears; Live is untouched',async()=>{
+test('M6 the Metrics overlay switch is in the shared header, off by default; on calls the provider and updates its connector text; off clears; Live is untouched',async()=>{
  let calls=0,seen=null,fail=false;const sample={a:{signals:{lag:{value:3}}}};
  const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)},{telemetry:{provider:b=>{calls++;seen=b;return fail?Promise.reject(Error('Grafana timeout')):Promise.resolve(sample);}}});
  const panel=mountStatus(h);h.flush();h.flush();await settle();
- const head=h.view.querySelector('.dv-live-head'),live=head.querySelector('.dv-live-toggle'),metrics=head.querySelector('button.dv-live-metrics'),conn=head.querySelector('.dv-live-metrics-connection'),jira=head.querySelector('.dv-live-connection');
- assert.ok(metrics,'M6 Metrics button in the panel header');assert.equal(metrics.hidden,false);assert.equal(metrics.textContent,'Metrics');assert.equal(metrics.type,'button');
- assert.ok(metrics.classList.contains('tbtn') && metrics.classList.contains('reader-button'),'M6 Metrics wears the header button look');
- assert.equal(metrics.getAttribute('aria-pressed'),'false','M6 off by default');assert.equal(calls,0,'M6 no provider call while off');
- const controls=head.querySelector('.dv-live-controls'),order=controls.children;
- assert.ok(order.indexOf(live)<order.indexOf(metrics),'M6 Metrics follows the Jira mode controls');
+ const head=h.view.querySelector('.dv-live-head'),header=h.view.querySelector('.dv-status-header'),live=header.querySelector('.dv-live-toggle'),metrics=header.querySelector('button.dv-live-metrics'),conn=head.querySelector('.dv-live-metrics-connection'),jira=head.querySelector('.dv-live-connection');
+ assert.ok(metrics,'M6 Metrics switch in the panel header');assert.equal(metrics.hidden,false);assert.equal(textOf(metrics).trim(),'Metrics overlay');assert.equal(metrics.type,'button');assert.equal(metrics.getAttribute('role'),'switch');
+ assert.ok(!metrics.classList.contains('tbtn'),'#1131 a switch, not a button that looks like a third view');
+ assert.equal(metrics.getAttribute('aria-checked'),'false','M6 off by default');assert.equal(calls,0,'M6 no provider call while off');
+ const top=header.querySelector('.dv-status-top'),controls=head.querySelector('.dv-live-controls');
+ assert.equal(top.children.at(-1),metrics,'#1131 the switch ends the top row');assert.ok(header.children.indexOf(top)<header.children.indexOf(live.parentElement),'#1131 Live | Over time is the row below');
  assert.ok(head.children.indexOf(controls)<head.children.indexOf(head.querySelector('.dv-live-status')),'M6 controls precede status text');
  assert.ok(conn,'M6 metrics connector text');assert.ok(!conn.classList.contains('dv-live-connection'),'M6 distinct connector');
  assert.equal(head.querySelectorAll('.dv-live-connection').length,1);
@@ -2059,7 +2059,7 @@ test('M6 Metrics sits beside Live, off by default; on calls the provider and upd
  assert.equal(conn.getAttribute('data-state'),'disconnected');assert.equal(conn.getAttribute('data-busy'),'false');assert.equal(text(),'Metrics: not connected');
  const livePressed=live.getAttribute('aria-pressed');assert.equal(livePressed,'true');
  metrics.dispatchEvent({type:'click'});
- assert.equal(metrics.getAttribute('aria-pressed'),'true');assert.equal(conn.getAttribute('data-state'),'connecting');assert.equal(conn.getAttribute('data-busy'),'true');assert.equal(text(),'Metrics: connecting');
+ assert.equal(metrics.getAttribute('aria-checked'),'true');assert.equal(conn.getAttribute('data-state'),'connecting');assert.equal(conn.getAttribute('data-busy'),'true');assert.equal(text(),'Metrics: connecting');
  await settle();assert.equal(calls,1);assert.deepEqual(plain(seen),LOCAL_BINDINGS,'M6 the click hands the provider the bound carriers');
  const at=h.ctl.telemetry.status().refreshedAt;
  assert.equal(conn.getAttribute('data-state'),'connected');assert.equal(conn.getAttribute('data-busy'),'false');assert.equal(text(),'Metrics: connected, refreshed '+metricsClock(at));
@@ -2068,17 +2068,17 @@ test('M6 Metrics sits beside Live, off by default; on calls the provider and upd
  assert.equal(conn.getAttribute('data-state'),'error');assert.equal(text(),'Metrics: did not answer · Grafana timeout');
  assert.equal(live.getAttribute('aria-pressed'),livePressed,'M6 Jira Live is untouched');assert.equal(h.ctl.liveStatus.enabled(),true);
  metrics.dispatchEvent({type:'click'});
- assert.equal(metrics.getAttribute('aria-pressed'),'false');assert.deepEqual(plain(h.ctl.telemetry.snapshot().map),{},'M6 off clears the map');
+ assert.equal(metrics.getAttribute('aria-checked'),'false');assert.deepEqual(plain(h.ctl.telemetry.snapshot().map),{},'M6 off clears the map');
  assert.equal(conn.getAttribute('data-state'),'disconnected');assert.equal(text(),'Metrics: not connected');
- live.dispatchEvent({type:'click'});assert.equal(h.ctl.liveStatus.enabled(),false);assert.equal(h.ctl.telemetry.snapshot().enabled,false,'M6 Live does not drive Metrics');assert.equal(metrics.getAttribute('aria-pressed'),'false');
+ live.dispatchEvent({type:'click'});assert.equal(h.ctl.liveStatus.enabled(),false);assert.equal(h.ctl.telemetry.snapshot().enabled,false,'M6 Live does not drive Metrics');assert.equal(metrics.getAttribute('aria-checked'),'false');
  panel.destroy();h.ctl.liveStatus.destroy();
 });
 
 test('M7 a page with a telemetry provider and no Jira evidence still shows Metrics in the header',()=>{
  const h=harness(telemetryPage(),{},{telemetry:{provider:()=>Promise.resolve({})}});
- const panel=mountStatus(h),head=h.view.querySelector('.dv-live-head'),metrics=head && head.querySelector('button.dv-live-metrics');
- assert.equal(head.hidden,false,'M7 the header shows for Metrics alone');assert.ok(metrics && !metrics.hidden,'M7 Metrics button');
- assert.equal(head.querySelector('.dv-live-toggle').hidden,true,'M7 Live stays hidden without Jira evidence');
+ const panel=mountStatus(h),head=h.view.querySelector('.dv-live-head'),metrics=h.view.querySelector('.dv-status-header button.dv-live-metrics');
+ assert.equal(head.hidden,false,'M7 the header shows for Metrics alone');assert.ok(metrics && !metrics.hidden,'M7 Metrics overlay switch');
+ assert.equal(h.view.querySelector('.dv-live-toggle').hidden,true,'M7 Live stays hidden without Jira evidence');
  panel.destroy();h.ctl.liveStatus.destroy();
 });
 
@@ -2369,8 +2369,9 @@ test('M10 the action button shows on a metrics-only page so Allow Grafana reache
 | OT12 | demo timeline with a late ticket, a ticket that later disappears, and one never named | not created yet: no status entry; absent after existing: missing; epic state per day; last day matches the live demo | treating every absent ticket the same |
 | OT13 | provider entry without a state | apply() still drops it | widening the provider contract |
 | OT15 | status row and day buttons (#986) | counts, connection and notes are in `.dv-live-status` with their full text in its title; buttons are in `.dv-live-controls`; a board's `<` and `>` step the slider, are disabled at the ends, and are absent on Live | changing text beside static buttons; step buttons on a board with no slider |
-| OT14 | the two mode buttons (Chuck, 2026-11-04) | Live and Over time are the first two header controls, exactly one is pressed, the selected Over time click does nothing, Live returns to today without turning colors off, the selected Live click still turns colors off, and Over time turns colors back on | a Back to today button; a past day with colors off |
+| OT14 | the two mode buttons (Chuck, 2026-11-04) | Live and Over time are the only two buttons of their header row (#1131), exactly one is pressed, the selected Over time click does nothing, Live returns to today without turning colors off, the selected Live click still turns colors off, and Over time turns colors back on | a Back to today button; a past day with colors off |
 | OT17 | days dated two days ago to today, then a history ending before today and one with no dates (#1082) | the Over time row's heading shows the selected day's label large; on a day dated today it reads TODAY with the label beside it; the slider and `<` `>` update it; Live has no heading | a date only in the small note; TODAY on a last day that is not today |
+| OT18 | Metrics off; days from the product builders in America/New_York: a normal day, the 23 h and 25 h DST days, a demo day, today; days with no date key (#1132) | `snapshot().overTime.window` is `{from, to, label}`: from the day key's local midnight to the next local midnight in UTC, today ending now; null in Live and on a day with no key | a UTC-midnight day; a fixed 24 h day; a demo day cut at its UTC `at`; a window that needs Metrics; a today window ending in the future |
 */
 const overFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:'EP-1'}},lanes:{APP:{label:'App',color:'#34d399'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',tickets:['AA-1']},b:{title:'Beta',tickets:['BB-1']},planned:{title:'Planned',tickets:['AA-1'],existsWhen:'tickets-done'}},rows:[['a','b','planned']],edges:[{from:'a',to:'b',tickets:['EE-1']}],steps:[{id:'hop',edge:'a->b',lane:'APP'},{id:'beta',nodes:['b'],lane:'APP'}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
 const overStale='2000-01-01T00:00:00Z';
@@ -2649,9 +2650,9 @@ test('C13 a plain top-level REST issue loads like the connector shape',async()=>
 test('OT14 Live and Over time are two mode buttons: Live returns to today and the selected Over time stays',async()=>{
  const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);api.apply(overToday());let loads=0;api.setHistory({load(){loads++;return {days:overDays()};}});
  const pressed=()=>[overLiveButton(h).getAttribute('aria-pressed'),overButton(h).getAttribute('aria-pressed')];
- assert.ok(h.view.querySelector('.dv-live-controls'),'#986 a row of static buttons');assert.deepEqual(h.view.querySelector('.dv-live-controls').children.slice(0,2).map(el=>el.className.split(' ').find(name=>/^dv-live-(toggle|over-time)$/.test(name))),['dv-live-toggle','dv-live-over-time']);assert.deepEqual(pressed(),['true','false']);
+ assert.ok(h.view.querySelector('.dv-live-time'),'#1131 a row of their own');assert.deepEqual(h.view.querySelector('.dv-live-time').children.map(el=>el.className.split(' ').find(name=>/^dv-live-(toggle|over-time)$/.test(name))),['dv-live-toggle','dv-live-over-time']);assert.deepEqual(pressed(),['true','false']);
  overButton(h).dispatchEvent({type:'click'});await historySettle();assert.deepEqual(pressed(),['false','true']);assert.equal(overButton(h).textContent,'Over time');assert.equal(api.enabled(),true);
- assert.ok(!textOf(h.view.querySelector('.dv-live-head')).includes('Back to today'),'no separate return button');
+ assert.ok(!textOf(h.view).includes('Back to today'),'no separate return button');
  overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,true,'the selected mode stays');assert.equal(loads,1);
  overLiveButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,false);assert.equal(api.enabled(),true,'returning to Live keeps colors on');assert.deepEqual(pressed(),['true','false']);
  overLiveButton(h).dispatchEvent({type:'click'});assert.equal(api.enabled(),false,'the selected Live still turns colors off');assert.deepEqual(pressed(),['false','false']);
@@ -2695,6 +2696,41 @@ test('OT17 the selected day is shown large, today reads TODAY, and changing the 
  api.setHistory({load:()=>built});api.overTime();await historySettle();
  assert.equal(api.snapshot().overTime.index,built.days.length-1);assert.equal(api.snapshot().overTime.today,true);assert.equal(big().textContent,'TODAY');assert.equal(beside().textContent,built.days.at(-1).label);
 });
+test('OT18 the selected Over time day gives its local-day search window, with Metrics off (#1132)',async()=>{
+ const zone=process.env.TZ;process.env.TZ='America/New_York';
+ try{
+  const h=harness(overFixture()),api=overReady(h.ctl.liveStatus);api.apply(overToday());
+  const over=()=>api.snapshot().overTime,open=async days=>{api.setHistory({load:()=>days});api.overTime();await historySettle();assert.equal(over().active,true);};
+  const build=(created,now)=>historyDays(providerContext(),[historyTicket('AA-1',created,'In Progress')],{'AA-1':{state:'active'}},now);
+  assert.equal(api.snapshot().metrics.enabled,false,'Metrics is off');
+  api.setHistory({load:()=>({days:overDays()})});assert.ok('window' in over(),'#1132: overTime carries the day window');assert.equal(over().window,null,'Live has no day window');
+  // Mar 7 2025 is a normal day; Mar 9 springs forward (23 h); Nov 2 falls back (25 h).
+  await open(build(historyAt(2025,3,7),historyAt(2025,3,9)));
+  assert.deepEqual(plain(over().window),{from:'2025-03-09T05:00:00.000Z',to:'2025-03-10T04:00:00.000Z',label:'Mar 9 00:00–24:00 local'},'23 h day');
+  api.overTimeDay(0);assert.deepEqual(plain(over().window),{from:'2025-03-07T05:00:00.000Z',to:'2025-03-08T05:00:00.000Z',label:'Mar 7 00:00–24:00 local'},'normal day');
+  overBackToLive(api);await historySettle();assert.equal(over().window,null,'Live again');
+  await open(build(historyAt(2025,11,2),historyAt(2025,11,3)));api.overTimeDay(0);
+  assert.deepEqual(plain(over().window),{from:'2025-11-02T04:00:00.000Z',to:'2025-11-03T05:00:00.000Z',label:'Nov 2 00:00–24:00 local'},'25 h day');
+  overBackToLive(api);await historySettle();
+  // A demo day's key is its UTC date and its at is the next UTC midnight; the window is still the whole local day.
+  await open({days:plain(storyContext().liveStatusDemoDays({days:[{label:'kickoff',telemetry:{start:'2025-03-07T00:00:00Z'},issues:{'AA-1':{state:'active'}}},{label:'next',telemetry:{start:'2025-03-08T00:00:00Z'},issues:{'AA-1':{state:'done'}}}]},['AA-1']))});api.overTimeDay(0);
+  assert.deepEqual(plain(over().window),{from:'2025-03-07T05:00:00.000Z',to:'2025-03-08T05:00:00.000Z',label:'Day 1 — kickoff 00:00–24:00 local'},'demo day');
+  overBackToLive(api);await historySettle();
+  // Today ends at the moment of the snapshot, not at the coming midnight.
+  const today=build(Date.now()-86400000,Date.now());await open(today);
+  const before=Date.now(),range=over().window,after=Date.now(),midnight=new Date();midnight.setHours(0,0,0,0);
+  const end=new Date(range.to),pad=n=>String(n).padStart(2,'0');
+  assert.equal(over().today,true);assert.equal(range.from,midnight.toISOString());
+  assert.ok(end.getTime()>=before && end.getTime()<=after,'today is clamped to now');
+  assert.equal(range.label,today.days.at(-1).label+' 00:00–'+pad(end.getHours())+':'+pad(end.getMinutes())+' local');
+  overBackToLive(api);await historySettle();
+  // A day without a date key has no window, even when it carries an end time.
+  for(const days of [overDays(),overDays().map(day=>({...day,at:'2025-03-08T05:00:00.000Z'}))]){
+   await open({days});assert.equal(over().window,null);api.overTimeDay(0);assert.equal(over().window,null);
+   overBackToLive(api);await historySettle();
+  }
+ }finally{if(zone===undefined)delete process.env.TZ;else process.env.TZ=zone;}
+});
 test('OT16 First blocker cannot reach a ticket that has no status on the day, and a real blocker on another day still counts',async()=>{
  const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);h.ctl.sections[0].stepper={path:()=>'happy',sourceIndex:()=>0,mode:()=>'ambient',jumpSource(){}};api.apply(overToday());
  const rest={'EP-1':{state:'active'},'AA-1':{state:'todo'},'BB-1':{state:'todo'},'ZZ-2':{state:'todo'}},first=()=>h.view.querySelector('.dv-live-first'),edge=h.view.querySelector('path.edge');
@@ -2702,6 +2738,44 @@ test('OT16 First blocker cannot reach a ticket that has no status on the day, an
  assert.equal(api.snapshot().firstBlocker,true,'contrasting day: EE-1 is really blocked');assert.equal(first().textContent,'First blocker');assert.equal(first().disabled,false);assert.equal(api.snapshot().epic.blocked,1);
  api.overTimeDay(0);h.flush();assert.ok(edge.classList.contains('dv-live-missing'),'the step edge wears the Missing paint');
  assert.equal(api.snapshot().firstBlocker,false);assert.equal(first().textContent,'No blockers');assert.equal(first().disabled,true);assert.equal(api.snapshot().epic.blocked,0);
+});
+/* #1131 (epic #1130, Chuck D1 D6 D8 D12): one header above the Jira and the Trace view. Top row: Jira | Trace, an Env
+   select, a "Metrics overlay" switch. Second row: Live | Over time. The day row and the Over time error below it.
+   Rejects: a header drawn only in the Jira view; Over time that leaves the Trace view; a second environment select or a
+   second Metrics control; "Enable traces". */
+const headerFixture=()=>{const raw=overFixture();raw.page.tracking.telemetry={environment:'prd',environments:{prd:{},stg:{}}};return raw;};
+const accessibleName=el=>el.getAttribute('aria-label') || textOf(el).replace(/\s+/g,' ').trim();
+const shownIn=(el,root)=>{for(let node=el;node && node!==root;node=node.parentElement)if(node.hidden)return false;return true;};
+const namedControls=(root,name,role)=>root.querySelectorAll('button,select,input').filter(el=>shownIn(el,root) && accessibleName(el)===name && (!role || el.getAttribute('role')===role));
+test('OT18 #1131 the shared header shows Live | Over time, the day row, one Env and one Metrics overlay switch in the Jira and the Trace view',async()=>{
+ const h=harness(headerFixture(),{},{telemetry:{provider:()=>Promise.resolve({})}}),api=overReady(h.ctl.liveStatus),m=mountStatus(h);api.apply(overToday());
+ let fail=false;api.setHistory({load:()=>fail?{days:[]}:{days:overDays()}});
+ const header=view=>{
+  assert.equal(namedControls(m.body,'Live').length,1,view+': one Live');assert.equal(namedControls(m.body,'Over time').length,1,view+': one Over time');
+  const env=namedControls(m.body,'Env');assert.equal(env.length,1,view+': one control named Env');assert.equal(env[0].tagName,'select');
+  const metrics=namedControls(m.body,'Metrics overlay','switch');assert.equal(metrics.length,1,view+': one Metrics overlay switch');
+  for(const gone of ['Enable traces','Disconnect traces','Metrics','Environment','Trace environment'])assert.equal(namedControls(m.body,gone).length,0,view+': no control named '+gone);
+  return {env:env[0],metrics:metrics[0],live:namedControls(m.body,'Live')[0],over:namedControls(m.body,'Over time')[0]};
+ };
+ api.setStatusMode('trace');assert.ok(m.body.querySelector('.dv-live-trace'));assert.equal(m.body.querySelector('table.dv-live-tickets'),null);
+ let c=header('Trace');
+ // The switch and Env call the controller actions the old Metrics button and Environment select called.
+ assert.equal(c.metrics.getAttribute('aria-checked'),'false');c.metrics.dispatchEvent({type:'click'});assert.equal(api.snapshot().metrics.enabled,true);
+ c=header('Trace');assert.equal(c.metrics.getAttribute('aria-checked'),'true');c.metrics.dispatchEvent({type:'click'});assert.equal(api.snapshot().metrics.enabled,false);
+ c.env.value='stg';c.env.dispatchEvent({type:'change'});assert.equal(api.snapshot().metrics.environment,'stg');
+ assert.equal(c.live.getAttribute('aria-pressed'),'true');assert.equal(c.over.getAttribute('aria-pressed'),'false');
+ c.over.dispatchEvent({type:'click'});await historySettle();
+ assert.equal(api.snapshot().mode,'trace','Over time from the Trace view keeps the Trace view');assert.equal(api.snapshot().overTime.active,true);assert.ok(m.body.querySelector('.dv-live-trace'));
+ c=header('Trace, Over time');assert.equal(c.over.getAttribute('aria-pressed'),'true');assert.equal(c.live.getAttribute('aria-pressed'),'false');
+ const row=()=>m.body.querySelector('.dv-live-over-time-row');assert.ok(row() && shownIn(row(),m.body),'the day row shows in the Trace view');
+ assert.equal(row().querySelector('.dv-live-over-time-day').textContent,'Oct 22');assert.ok(row().querySelector('input.dv-live-over-time-slider'));
+ const [prev]=row().querySelectorAll('.dv-live-step');prev.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,1);assert.equal(row().querySelector('.dv-live-over-time-day').textContent,'Oct 21');assert.equal(api.snapshot().mode,'trace');
+ c.live.dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,false);assert.equal(api.snapshot().mode,'trace');assert.equal(row(),null);
+ // The Over time error shows in the Trace view too.
+ fail=true;c=header('Trace');c.over.dispatchEvent({type:'click'});await historySettle();
+ const error=m.body.querySelector('.dv-live-over-time-status');assert.ok(error && shownIn(error,m.body),'the Over time error shows in the Trace view');assert.equal(error.textContent,'History could not load. Try Over time again.');
+ api.setStatusMode('jira');header('Jira');assert.ok(m.body.querySelector('table.dv-live-tickets'));assert.ok(shownIn(m.body.querySelector('.dv-live-over-time-status'),m.body),'and in the Jira view');
+ m.destroy();api.destroy();
 });
 
 test('Proof is cleared from retained panels on telemetry and live-status controller destruction',()=>{

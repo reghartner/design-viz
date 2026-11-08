@@ -8,7 +8,7 @@ import {cueSpec,nestedSpec,importedDetailSpec,PANEL} from '../helpers/telemetry-
 const RAW='https://mcp.honeycomb.io/query_results/SYNTHETIC_BROWSER_TEST_ONLY';
 const recorded=await readFile(path.join(repo,'tests/fixtures/honeycomb/recorded-query-response-redacted.txt'),'utf8');
 const metadata=recorded.replace('https://mcp.honeycomb.io/query_results/REDACTED_EXPIRED_TOKEN',RAW);
-const metrics=root=>root.getByRole('button',{name:'Metrics',exact:true});
+const metrics=root=>root.getByRole('switch',{name:'Metrics overlay',exact:true});
 async function setup(page,server,audit,{disabled,missing=false,detail=false,nested=false,mode='ok',real=null}={}){
  let bridge=real?createMockBridge(real):null;
  if(bridge){await page.exposeFunction('mockTools',()=>bridge.listTools());await page.exposeFunction('mockCall',(server,tool,input)=>bridge.callTool(server,tool,input));}
@@ -79,7 +79,7 @@ async function assertHistoricalEvidence(page,id,to,value){
 }
 for(const shape of ['direct','nested','detail'])test('desktop mixed '+shape+': real fetch, Metrics and Over time retain independent evidence',async({page,server,audit})=>{
  const h=await setup(page,server,audit,{nested:shape==='nested',detail:shape==='detail'}),root=h.root;
- await expect(metrics(root)).toHaveAttribute('aria-pressed','false');expect(await page.evaluate(()=>window.calls.length)).toBe(0);await metrics(root).click();
+ await expect(metrics(root)).toHaveAttribute('aria-checked','false');expect(await page.evaluate(()=>window.calls.length)).toBe(0);await metrics(root).click();
  const id=shape==='nested'?'outer::inner::a->outer::inner::b':'shared::api->shared::store';
  await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(12.3456789);
  expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id].signals.rate.value,id)).toBe(42);
@@ -108,7 +108,7 @@ test('desktop account change retires all mixed samples',async({page,server,audit
 for(const shape of ['direct','nested','detail'])test('actual mock '+shape+': native from and exact mixed values coexist with Jira Over time',async({page,server,audit})=>{
  const h=await setup(page,server,audit,{real:{day:11},nested:shape==='nested',detail:shape==='detail'}),root=h.root;
  const id=shape==='direct'?'shared::api->shared::store':'outer::inner::a->outer::inner::b';
- await expect(metrics(root)).toHaveAttribute('aria-pressed','false');expect(h.bridge.calls).toHaveLength(0);
+ await expect(metrics(root)).toHaveAttribute('aria-checked','false');expect(h.bridge.calls).toHaveLength(0);
  if(shape==='detail'){expect(await page.evaluate(()=>window.detailResolved)).toBe(true);await expect(root.locator('.sec-h')).toHaveText('Selected nested imported detail');expect(await page.evaluate(()=>window.loadedDetail)).toMatchObject({section:'selected',revision:'r1'});}
  await metrics(root).click();await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(expected());
  const bound=await page.evaluate(()=>{const c=window.ctl;return c.telemetry.bindings().filter(b=>b.signals.latency).map(b=>({id:b.id,sample:c.telemetry.snapshot().map[b.id]}));});
@@ -146,7 +146,7 @@ for(const shape of ['direct','detail','zero'])test('actual mock measurement cloc
  await page.clock.setFixedTime(new Date('2026-11-05T00:00:00Z'));
  const h=await setup(page,server,audit,{detail:shape==='detail',real:{day:11,clockRegression:true,zero:shape==='zero'}}),root=h.root;
  const id=shape==='detail'?'outer::inner::a->outer::inner::b':'shared::api->shared::store';
- await expect(metrics(root)).toHaveAttribute('aria-pressed','false');expect(h.bridge.calls).toHaveLength(0);await metrics(root).click();
+ await expect(metrics(root)).toHaveAttribute('aria-checked','false');expect(h.bridge.calls).toHaveLength(0);await metrics(root).click();
  await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.rate?.value,id)).toBe(shape==='zero'?0:expected());
  const sample=await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id],id);
  expect(sample.signals.rate.observedAt).toBe('2026-11-01T00:00:00.000Z');expect(sample.signals.rate.retrievedAt).toBe('2026-11-05T00:00:00.000Z');

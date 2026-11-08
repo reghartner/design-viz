@@ -2,9 +2,9 @@
 | row | rule | fixture | assertion |
 |---|---|---|---|
 | P1 | Metrics is hidden without a telemetry provider or demo | native mount of an imported-topology consumer with Jira evidence and no `telemetry` option | Live is visible; no visible Metrics button and no metrics connector text |
-| P2 | With a provider, Metrics is present and off by default | same page with `telemetry.provider` | Metrics visible with aria-pressed false, "Metrics: not connected", provider never called after first paint |
+| P2 | With a provider, Metrics is present and off by default | same page with `telemetry.provider` | Metrics visible with aria-checked false, "Metrics: not connected", provider never called after first paint |
 | P3 | Turning Metrics on calls the provider with every bound carrier, local and imported | click Metrics | one call with local node + edge and imported node + edge ids (unbound carriers absent); "Metrics: connected, refreshed <time>"; ctl.telemetry holds the map; Live stays pressed |
-| P4 | Turning Metrics off stops and clears | click Metrics again | aria-pressed false, "Metrics: not connected", map empty, the signal aborted, no further call |
+| P4 | Turning Metrics off stops and clears | click Metrics again | aria-checked false, "Metrics: not connected", map empty, the signal aborted, no further call |
 | P5 | Standalone boot hands `window.flowviewTelemetry` to the page | built template with an init script provider | Metrics visible; on calls the provider with the bound carrier |
 | P6 | Metrics streams local and imported flowing edges; ordinary packets and Jira paint stay unchanged | independent native mount, no required ordinary-packet count; Metrics off then on | no cue before on; named stream counts (4 local, 3 imported), no cue on the unbound edge; ordinary packet counts equal before/after. Rejects missing streams or replacing ordinary/Jira paint |
 | P7 | Silent Done edge gets a ghost over a dimmed stroke | independent native mount; click Metrics with no cue precondition | first contract assertion is named `P7 the silent Done edge has a ghost`; dimmed stroke and no stream follow. Rejects omitting the silent-edge ghost |
@@ -64,7 +64,7 @@ async function mountNative(page,server,withTelemetry){
  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(resolve,50)))));
  return panel;
 }
-const metricsButton=panel=>panel.getByRole('button',{name:'Metrics',exact:true});
+const metricsButton=panel=>panel.getByRole('switch',{name:'Metrics overlay',exact:true});
 
 test('P1 the Metrics button is hidden without a telemetry provider',async({page,server})=>{
  const panel=await mountNative(page,server,false);
@@ -75,13 +75,13 @@ test('P1 the Metrics button is hidden without a telemetry provider',async({page,
 
 test('P2 P3 P4 Metrics is off by default, turns the provider on for local and imported carriers, and clears when off',async({page,server})=>{
  const panel=await mountNative(page,server,true),metrics=metricsButton(panel),status=panel.locator('.dv-live-metrics-connection');
- await expect(metrics).toBeVisible();await expect(metrics).toHaveAttribute('aria-pressed','false');
+ await expect(metrics).toBeVisible();await expect(metrics).toHaveAttribute('aria-checked','false');
  await expect(status).toBeVisible();await expect(status).toHaveText('Metrics: not connected');await expect(status).toHaveAttribute('data-state','disconnected');
  expect(await page.evaluate(()=>window.telemetryCalls.length),'P2 no provider call while Metrics is off').toBe(0);
  const live=panel.getByRole('button',{name:'Live',exact:true});await expect(live).toHaveAttribute('aria-pressed','true');
 
  await metrics.click();
- await expect(metrics).toHaveAttribute('aria-pressed','true');
+ await expect(metrics).toHaveAttribute('aria-checked','true');
  await expect(status).toHaveText(/^Metrics: connected, refreshed /);await expect(status).toHaveAttribute('data-state','connected');
  const calls=await page.evaluate(()=>window.telemetryCalls);
  expect(calls.length,'P3 one provider call per click').toBe(1);
@@ -95,7 +95,7 @@ test('P2 P3 P4 Metrics is off by default, turns the provider on for local and im
  await expect(live,'P3 Jira Live is untouched').toHaveAttribute('aria-pressed','true');
 
  await metrics.click();
- await expect(metrics).toHaveAttribute('aria-pressed','false');
+ await expect(metrics).toHaveAttribute('aria-checked','false');
  await expect(status).toHaveText('Metrics: not connected');await expect(status).toHaveAttribute('data-state','disconnected');
  const off=await page.evaluate(()=>({snapshot:window.viewer.controller.telemetry.snapshot(),aborts:window.telemetryAborts,calls:window.telemetryCalls.length}));
  expect(off.snapshot.enabled).toBe(false);expect(off.snapshot.map,'P4 off clears the map').toEqual({});
@@ -111,7 +111,7 @@ test('P5 standalone boot passes window.flowviewTelemetry to the page',async({pag
  await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);
  await page.goto(server.origin+'/telemetry-boot.html');
  const panel=page.locator('#docview .pt-live-status'),metrics=metricsButton(panel);
- await expect(metrics).toBeVisible();await expect(metrics).toHaveAttribute('aria-pressed','false');
+ await expect(metrics).toBeVisible();await expect(metrics).toHaveAttribute('aria-checked','false');
  expect(await page.evaluate(()=>window.telemetryCalls.length)).toBe(0);
  await metrics.click();
  await expect(panel.locator('.dv-live-metrics-connection')).toHaveText(/^Metrics: connected, refreshed /);
@@ -149,7 +149,7 @@ test('P8 Metrics seals bound local and imported nodes and leaves unbound nodes u
  const spec=cueSpec(),samples=structuredClone(CUE_SAMPLES),local=spec.page.sections[0].diagram.nodes.ingest.telemetry;
  local.signals.in={grafana:'sum(rate(queue_received_total[5m]))*3600',unit:'msg/h'};local.proof.in={min:1};samples.ingest.signals.in={value:100};
  await page.evaluate(({spec,samples,jira})=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>samples}});window.viewer.controller.liveStatus.apply(jira);},{spec,samples,jira:CUE_JIRA});
- await root.getByRole('button',{name:'Metrics',exact:true}).click();
+ await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();
  await expect(node('ingest').locator('.dv-metrics-seal'),'P8 the bound local node has a proven seal').toHaveAttribute('data-seal','proven');
  await expect(node('shared::api').locator('.dv-metrics-seal'),'P8 the bound imported node has a proven seal').toHaveAttribute('data-seal','proven');
  await expect(node('shared::api').locator('polyline.dv-metrics-sparkline'),'P8 imported node sparkline').toHaveCount(1);
@@ -246,7 +246,7 @@ async function demoDay(root,day){
 }
 test('P11 #live=demo mounts the demo telemetry: Metrics reports Demo and the cues follow the demo day',async({page,server})=>{
  const root=await openDemo(page,server),panel=root.locator('.pt-live-status'),metrics=metricsButton(panel),status=panel.locator('.dv-live-metrics-connection');
- await expect(metrics,'P11 the demo telemetry source shows Metrics').toBeVisible();await expect(metrics).toHaveAttribute('aria-pressed','false');
+ await expect(metrics,'P11 the demo telemetry source shows Metrics').toBeVisible();await expect(metrics).toHaveAttribute('aria-checked','false');
  await expect(root.locator(CUES)).toHaveCount(0);
  await demoDay(root,8);await metrics.click();
  await expect(status).toHaveAttribute('data-state','demo');await expect(status).toHaveText(/^Metrics: demo, refreshed /);

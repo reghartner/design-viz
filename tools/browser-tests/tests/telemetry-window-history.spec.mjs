@@ -29,7 +29,7 @@ async function fixture(page,server,native){
  return page.locator(native?'#host':'#docview');
 }
 for(const native of [false,true])test((native?'native shadow DOM':'standalone')+' selected numeric history: Today, partial loading, past cache, future, env, off/on and Live',async({page,server})=>{
- const root=await fixture(page,server,native),panel=root.locator('.pt-live-status').first(),metrics=panel.getByRole('button',{name:'Metrics',exact:true}),over=panel.getByRole('button',{name:'Over time',exact:true}),live=panel.getByRole('button',{name:'Live',exact:true}),slider=panel.getByRole('slider',{name:'Day',exact:true});
+ const root=await fixture(page,server,native),panel=root.locator('.pt-live-status').first(),metrics=panel.getByRole('switch',{name:'Metrics overlay',exact:true}),over=panel.getByRole('button',{name:'Over time',exact:true}),live=panel.getByRole('button',{name:'Live',exact:true}),slider=panel.getByRole('slider',{name:'Day',exact:true});
  await over.click();await expect(slider).toHaveValue('1');expect(await page.evaluate(()=>window.historyCalls.length)).toBe(0);await metrics.click();
  const local=root.locator('[data-metrics-card="ingest->app"]').first(),imported=root.locator('[data-metrics-card="shared::api->shared::store"]').first();
  for(const card of [local,imported]){await expect(card).toContainText('20 events');await expect(card).toContainText('15 events');await expect(card).toContainText('Loading…');}
@@ -41,7 +41,7 @@ for(const native of [false,true])test((native?'native shadow DOM':'standalone')+
  await slider.focus();await slider.press('Home');await expect(local).toContainText('9 events');await expect(local).toContainText('75 ms');const pastCalls=await page.evaluate(()=>window.historyCalls.length);
  await slider.press('End');await expect(local).toContainText('unobserved');expect(await page.evaluate(()=>window.historyCalls.length)).toBe(pastCalls);await slider.press('Home');await expect(local).toContainText('9 events');expect(await page.evaluate(()=>window.historyCalls.length)).toBe(pastCalls);
  if(!native){await root.screenshot({path:'/tmp/metric-history-yesterday.png'});await local.screenshot({path:'/tmp/metric-history-card.png'});}
- await panel.getByRole('combobox',{name:'Environment',exact:true}).selectOption('prd');await expect(local).toContainText('9 events');expect(await page.evaluate(()=>window.historyCalls.filter(c=>c.tool==='query_cloudwatch').at(-1).input.dimensions.RuleName.endsWith('_prd'))).toBe(true);
+ await panel.getByRole('combobox',{name:'Env',exact:true}).selectOption('prd');await expect(local).toContainText('9 events');expect(await page.evaluate(()=>window.historyCalls.filter(c=>c.tool==='query_cloudwatch').at(-1).input.dimensions.RuleName.endsWith('_prd'))).toBe(true);
  await page.evaluate(()=>{window.failCloud=true;window.historyCtl.telemetry.retry();});await expect(local).toContainText('unobserved');await expect(local).toContainText('15 events');await expect(local).toContainText('75 ms');await expect(panel.locator('.dv-live-metrics-connection')).toContainText('CloudWatch unavailable');
  await metrics.click();await expect(local).toHaveCount(0);await page.evaluate(()=>window.failCloud=false);await metrics.click();await expect(local).toContainText('9 events');await live.click();await expect(slider).toBeHidden();await expect(local).toContainText('20 events');await expect(local).toContainText('95 ms');expect(await page.evaluate(()=>window.historyCalls.some(c=>/trace/i.test(c.tool)))).toBe(false);
 });

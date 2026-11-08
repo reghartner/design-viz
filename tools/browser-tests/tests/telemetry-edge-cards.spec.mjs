@@ -9,7 +9,7 @@ for(const mode of ['available','host-disabled','page-disabled'])test('handoff Ji
   window.viewer.destroy();window.handoffQueries=0;
   window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:mode==='host-disabled'?false:{provider:async()=>{window.handoffQueries++;return {'a->b':{signals:{rate:{value:10},errors:{value:0}}}};}}});
  },{spec,mode});
- const section=root.locator('#section-main'),metrics=section.getByRole('button',{name:'Metrics',exact:true}),pop=root.locator('.dv-live-popover');
+ const section=root.locator('#section-main'),metrics=section.getByRole('switch',{name:'Metrics overlay',exact:true}),pop=root.locator('.dv-live-popover');
  const carriers=[['h','LOC-1'],['direct::h','IMP-1'],['nested::inner::h','IMP-1']];
  async function checkTargets(){
   for(const [id,ticket] of carriers){
@@ -33,7 +33,7 @@ for(const mode of ['available','host-disabled','page-disabled'])test('handoff Ji
   }
   await checkTargets();expect((await geometry(root)).overlaps).toEqual([]);
   await page.evaluate(()=>window.viewer.controller.telemetry.setAvailable(false));await expect(metrics).toBeHidden();await expect(section.locator(cards)).toHaveCount(0);await checkTargets();
-  await page.evaluate(()=>window.viewer.controller.telemetry.setAvailable(true));await expect(metrics).toHaveAttribute('aria-pressed','false');await checkTargets();
+  await page.evaluate(()=>window.viewer.controller.telemetry.setAvailable(true));await expect(metrics).toHaveAttribute('aria-checked','false');await checkTargets();
  }else{
   await expect(metrics).toBeHidden();
   await page.evaluate(()=>{window.viewer.controller.telemetry.setAvailable(true);window.viewer.controller.liveStatus.apply({'LOC-1':{state:'done'},'IMP-1':{state:'done'}});});
@@ -92,7 +92,7 @@ test('card click and keyboard open existing carrier popover and keep ticket link
 test('authored left and offset, absent samples, no inferred binding, safe label',async({page,server})=>{
  const {root}=await mountCues(page,server);const spec=cueSpec(),edge=spec.page.sections[0].diagram.edges[0];edge.telemetry.card={side:'left',offset:180};edge.label='<script>unsafe</script>';
  await page.evaluate(({spec})=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>({})}});}, {spec});
- await root.getByRole('button',{name:'Metrics',exact:true}).click();await expect(root.locator(cards)).toHaveCount(3);
+ await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();await expect(root.locator(cards)).toHaveCount(3);
  const card=root.locator('[data-metrics-card="ingest->app"]');await expect(card).toHaveAttribute('data-side','left');await expect(card).toContainText('<script>unsafe</script>');await expect(card).toContainText('unobserved');expect(await card.locator('script').count()).toBe(0);
  const placement=await card.evaluate(el=>{const p=el.closest('svg').querySelector('path.edge[data-dv-edge="0"]'),mid=p.getPointAtLength(p.getTotalLength()/2),b=el.getBBox(),m=el.transform.baseVal.consolidate().matrix;return {right:m.e+b.width,mid:mid.x,dy:m.f+b.height/2-mid.y};});
  expect(placement.right).toBeLessThan(placement.mid);expect([0,24,-24,48,-48,96,-96]).toContain(placement.dy-180);expect((await geometry(root)).overlaps).toEqual([]);
@@ -104,13 +104,13 @@ test('production loaded detail cards clean their retained DOM on destroy',async(
 for(const pageEnabled of [true,false])for(const hostEnabled of [true,false])test('native page '+pageEnabled+' host '+hostEnabled+' precedence',async({page,server})=>{
  const {root}=await mountCues(page,server);const spec=cueSpec();spec.page.tracking.telemetry={enabled:pageEnabled};
  await page.evaluate(({spec,hostEnabled})=>{window.viewer.destroy();window.calls=0;window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:hostEnabled?{provider:async()=>{window.calls++;return {};}}:false});}, {spec,hostEnabled});
- const metrics=root.getByRole('button',{name:'Metrics',exact:true});if(pageEnabled&&hostEnabled){await expect(metrics).toBeVisible();await expect(metrics).toHaveAttribute('aria-pressed','false');}else{await expect(metrics).toBeHidden();await page.evaluate(()=>{window.viewer.controller.telemetry.setEnabled(true);window.viewer.controller.telemetry.apply({'ingest->app':{signals:{rate:{value:200}}}});});}
+ const metrics=root.getByRole('switch',{name:'Metrics overlay',exact:true});if(pageEnabled&&hostEnabled){await expect(metrics).toBeVisible();await expect(metrics).toHaveAttribute('aria-checked','false');}else{await expect(metrics).toBeHidden();await page.evaluate(()=>{window.viewer.controller.telemetry.setEnabled(true);window.viewer.controller.telemetry.apply({'ingest->app':{signals:{rate:{value:200}}}});});}
  expect(await page.evaluate(()=>window.calls)).toBe(0);await expect(root.locator(cards)).toHaveCount(0);
 });
 test('live breaks, path and view changes repack cards and controls',async({page,server})=>{
  const {root}=await mountCues(page,server);const spec=cueSpec(),d=spec.page.sections[0].diagram;d.paths=[{id:'all',label:'All',steps:['notify','retry']},{id:'few',label:'Fewer',steps:['notify']}];d.graphFrame={x:0,y:0,w:800,h:400};
  await page.evaluate(({spec,jira,samples})=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>samples}});window.viewer.controller.liveStatus.apply({...jira,'LOC-3':{state:'blocked'},'IMP-2':{state:'blocked'}});},{spec,jira:CUE_JIRA,samples:CUE_SAMPLES});
- await root.getByRole('button',{name:'Metrics',exact:true}).click();await expect(root.locator('.dv-live-comm-failure')).toHaveCount(2);await expect(root.locator(cards)).toHaveCount(3);
+ await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();await expect(root.locator('.dv-live-comm-failure')).toHaveCount(2);await expect(root.locator(cards)).toHaveCount(3);
  expect((await geometry(root)).overlaps).toEqual([]);expect((await geometry(root)).outside).toEqual([]);
  await root.locator('.path-chip[data-dv-path="few"]').click();await expect.poll(async()=>(await geometry(root)).overlaps).toEqual([]);
  await root.getByRole('button',{name:'Step',exact:true}).click();await expect.poll(async()=>(await geometry(root)).overlaps).toEqual([]);
@@ -134,10 +134,10 @@ test('capability removal clears cards and cues without touching sibling native m
 test('nested imported bound edge has the same card and root disable',async({page,server})=>{
  const {nestedSpec}=await import('../helpers/telemetry-cards.mjs'),{root}=await mountCues(page,server),spec=nestedSpec();
  await page.evaluate(spec=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>({'outer::inner::a->outer::inner::b':{signals:{rate:{value:88},errors:{value:1}}}})}});},spec);
- await root.getByRole('button',{name:'Metrics',exact:true}).click();const card=root.locator('[data-metrics-card="outer::inner::a->outer::inner::b"]');await expect(card).toHaveCount(1);await expect(card).toContainText('88 req/h');expect((await geometry(root)).overlaps).toEqual([]);
+ await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();const card=root.locator('[data-metrics-card="outer::inner::a->outer::inner::b"]');await expect(card).toHaveCount(1);await expect(card).toContainText('88 req/h');expect((await geometry(root)).overlaps).toEqual([]);
  spec.page.tracking={telemetry:{enabled:false}};
  await page.evaluate(spec=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>{throw Error('disabled provider invoked');}}});window.viewer.controller.telemetry.setEnabled(true);},spec);
- await expect(root.getByRole('button',{name:'Metrics',exact:true})).toBeHidden();await expect(root.locator(cards)).toHaveCount(0);
+ await expect(root.getByRole('switch',{name:'Metrics overlay',exact:true})).toBeHidden();await expect(root.locator(cards)).toHaveCount(0);
 });
 
 async function standalone(page,server,{mode='valid',disabled=null}={}){
@@ -152,36 +152,36 @@ async function standalone(page,server,{mode='valid',disabled=null}={}){
  const file=path.join(server.root,'cards-auto.json'),out=path.join(server.root,'cards-auto.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/cards-auto.html');await page.waitForFunction(()=>!!window.ctl);return page.locator('#docview');
 }
 for(const mode of ['valid','missing','throw'])test('standalone '+mode+' capability metadata gates Metrics without data calls',async({page,server})=>{
- const root=await standalone(page,server,{mode});await expect.poll(()=>page.evaluate(()=>window.metadata)).toBe(1);const button=root.getByRole('button',{name:'Metrics',exact:true});
- if(mode==='valid'){await expect(button).toBeVisible();await expect(button).toHaveAttribute('aria-pressed','false');}else await expect(button).toBeHidden();
+ const root=await standalone(page,server,{mode});await expect.poll(()=>page.evaluate(()=>window.metadata)).toBe(1);const button=root.getByRole('switch',{name:'Metrics overlay',exact:true});
+ if(mode==='valid'){await expect(button).toBeVisible();await expect(button).toHaveAttribute('aria-checked','false');}else await expect(button).toBeHidden();
  if(mode==='missing'){await expect(root.locator('.dv-live-metrics-connection')).toBeVisible();await expect(root.locator('.dv-live-metrics-connection')).toContainText('query_prometheus');}
  expect(await page.evaluate(()=>window.queries)).toEqual([]);await expect(root.locator(cards)).toHaveCount(0);
  if(mode==='valid'){await button.click();await expect(root.locator(cards)).toHaveCount(1);await expect(root.locator(cards)).toContainText('25 req/s');}
 });
 for(const disabled of ['host','page'])test('standalone explicit '+disabled+' disable prevents automatic discovery',async({page,server})=>{
- const root=await standalone(page,server,{disabled});await expect(root.getByRole('button',{name:'Metrics',exact:true})).toBeHidden();expect(await page.evaluate(()=>window.namespaces.filter(n=>n==='mcp'))).toEqual([]);expect(await page.evaluate(()=>window.metadata)).toBe(0);expect(await page.evaluate(()=>window.queries)).toEqual([]);
+ const root=await standalone(page,server,{disabled});await expect(root.getByRole('switch',{name:'Metrics overlay',exact:true})).toBeHidden();expect(await page.evaluate(()=>window.namespaces.filter(n=>n==='mcp'))).toEqual([]);expect(await page.evaluate(()=>window.metadata)).toBe(0);expect(await page.evaluate(()=>window.queries)).toEqual([]);
 });
 test('standalone pending metadata after controller destroy stays retired',async({page,server})=>{
- const root=await standalone(page,server,{mode:'delayed'});await expect(root.getByRole('button',{name:'Metrics',exact:true})).toBeHidden();await page.evaluate(()=>{window.ctl.destroy();window.release();});
+ const root=await standalone(page,server,{mode:'delayed'});await expect(root.getByRole('switch',{name:'Metrics overlay',exact:true})).toBeHidden();await page.evaluate(()=>{window.ctl.destroy();window.release();});
  // Yield two browser tasks for both promise continuations to settle.
  await page.evaluate(()=>new Promise(r=>setTimeout(r,0)));expect(await page.evaluate(()=>window.metadata)).toBe(0);expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().available)).toBe(false);
 });
 test('standalone qualified tools retain a user initiated consent path',async({page,server})=>{
- const root=await standalone(page,server,{mode:'approval'});await root.getByRole('button',{name:'Metrics',exact:true}).click();await expect(root.getByRole('button',{name:'Allow Grafana',exact:true})).toBeVisible();expect(await page.evaluate(()=>window.queries)).toEqual(['get_annotations']);
+ const root=await standalone(page,server,{mode:'approval'});await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();await expect(root.getByRole('button',{name:'Allow Grafana',exact:true})).toBeVisible();expect(await page.evaluate(()=>window.queries)).toEqual(['get_annotations']);
  await page.evaluate(()=>window.allowed=true);await root.getByRole('button',{name:'Allow Grafana',exact:true}).click();await expect(root.locator(cards)).toContainText('25 req/s');
 });
 test('vertical route defaults right and leader starts at the measured midpoint',async({page,server})=>{
  const {root}=await mountCues(page,server),spec=cueSpec(),d=spec.page.sections[0].diagram;
  d.rows=[[]];d.floats=[{id:'ingest',x:100,y:50},{id:'app',x:100,y:500},{id:'push',x:500,y:500},{id:'shared::api',x:700,y:50},{id:'shared::store',x:700,y:500}];
  await page.evaluate(({spec,samples})=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>samples}});},{spec,samples:CUE_SAMPLES});
- await root.getByRole('button',{name:'Metrics',exact:true}).click();const card=root.locator('[data-metrics-card="ingest->app"]');await expect(card).toHaveAttribute('data-side','right');
+ await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();const card=root.locator('[data-metrics-card="ingest->app"]');await expect(card).toHaveAttribute('data-side','right');
  const leader=await card.evaluate(card=>{const path=card.closest('svg').querySelector('path.edge[data-dv-edge="0"]'),mid=path.getPointAtLength(path.getTotalLength()/2),line=card.previousElementSibling;return {start:line.getAttribute('d').split('L')[0],expected:'M'+mid.x+' '+mid.y};});expect(leader.start).toBe(leader.expected);const g=await geometry(root);expect(g.overlaps).toEqual([]);expect(g.outside).toEqual([]);
 });
 test('dense coin reservation keeps cards clear with Live off and no break',async({page,server})=>{
  const {root}=await mountCues(page,server),binding=cueSpec().page.sections[0].diagram.edges[0].telemetry;
  const spec={page:{title:'Dense coins',sections:[{diagram:{view:'ambient',nodes:{a:{title:'Source'},b:{title:'Sink'}},rows:[[]],floats:[{id:'a',x:100,y:100},{id:'b',x:420,y:100}],edges:[{from:'a',to:'b',telemetry:binding}],steps:Array.from({length:12},(_,i)=>({id:'s'+i,edge:'a->b',text:'Delivery '+i})),panels:[{id:'status',type:'live-status'}]}}]}};
  await page.evaluate(({spec})=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>({'a->b':{signals:{rate:{value:99},errors:{value:0}}}})}});window.viewer.controller.liveStatus.setEnabled(false);},{spec});
- await root.getByRole('button',{name:'Metrics',exact:true}).click();await expect(root.locator(cards)).toHaveCount(1);await expect(root.locator('.coin')).toHaveCount(12);await expect(root.locator('.dv-live-comm-failure')).toHaveCount(0);
+ await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();await expect(root.locator(cards)).toHaveCount(1);await expect(root.locator('.coin')).toHaveCount(12);await expect(root.locator('.dv-live-comm-failure')).toHaveCount(0);
  const g=await geometry(root);expect(g.overlaps,'card reservations must repack a dense coin grid').toEqual([]);expect(g.outside).toEqual([]);
  // Repacked coins and the new Metrics card must fit the visible board, not
  // merely its expanded SVG viewBox; the sticky legend must not cover a coin.
@@ -193,7 +193,7 @@ for(const disabled of ['host','page'])test('demo fallback respects '+disabled+' 
  const raw=JSON.parse(await readFile(path.join(repo,'examples/live-status/live-status.spec.json'),'utf8'));
  if(disabled==='page'){raw.page.tracking.telemetry={...raw.page.tracking.telemetry,enabled:false};}else await page.addInitScript(()=>window.flowviewTelemetry=false);
  const file=path.join(server.root,'cards-demo.json'),out=path.join(server.root,'cards-demo.html');await writeFile(file,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out,'--timeline',path.join(repo,'examples/live-status/live-status.timeline.json')]);await page.goto(server.origin+'/cards-demo.html#live=demo');
- const root=page.locator('#docview');await expect(root.getByRole('button',{name:'Metrics',exact:true})).toBeHidden();await expect(root.getByRole('button',{name:'Live',exact:true})).toBeVisible();await root.getByRole('button',{name:'Next day',exact:true}).click();await expect(root.locator(cards+',.dv-metrics-node,.dv-metrics-stream')).toHaveCount(0);
+ const root=page.locator('#docview');await expect(root.getByRole('switch',{name:'Metrics overlay',exact:true})).toBeHidden();await expect(root.getByRole('button',{name:'Live',exact:true})).toBeVisible();await root.getByRole('button',{name:'Next day',exact:true}).click();await expect(root.locator(cards+',.dv-metrics-node,.dv-metrics-stream')).toHaveCount(0);
 });
 test('sample repaint preserves card focus and off restores authored label visibility',async({page,server})=>{
  const {root,metrics}=await mountCues(page,server),label=root.locator('text.lbl[data-dv-edge="0"]');await label.evaluate(el=>el.style.visibility='hidden');await metrics.click();
@@ -204,7 +204,7 @@ test('crossing route coin reserves a bound card even when Live is off',async({pa
  const {root}=await mountCues(page,server),binding=cueSpec().page.sections[0].diagram.edges[0].telemetry;
  const spec={page:{title:'Crossing coin',sections:[{diagram:{view:'ambient',nodes:{a:{title:'A'},b:{title:'B'},c:{title:'C'},d:{title:'D'}},rows:[[]],floats:[{id:'a',x:100,y:100},{id:'b',x:600,y:100},{id:'c',x:350,y:-150},{id:'d',x:350,y:450}],edges:[{from:'a',to:'b',telemetry:binding},{from:'c',to:'d'}],steps:[{id:'cross',edge:'c->d',text:'Cross the bound route'}],panels:[{id:'status',type:'live-status'}]}}]}};
  await page.evaluate(spec=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>({'a->b':{signals:{rate:{value:10},errors:{value:0}}}})}});window.viewer.controller.liveStatus.setEnabled(false);},spec);
- await root.getByRole('button',{name:'Metrics',exact:true}).click();await expect(root.locator(cards)).toHaveCount(1);await expect(root.locator('.coin')).toHaveCount(1);await expect(root.locator('.comm-break')).toHaveCount(0);
+ await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();await expect(root.locator(cards)).toHaveCount(1);await expect(root.locator('.coin')).toHaveCount(1);await expect(root.locator('.comm-break')).toHaveCount(0);
  const layout=await root.evaluate(el=>{const svg=(el.shadowRoot || el).querySelector('.board svg');return [...svg.querySelectorAll('.dv-metrics-card-box,.coin,path.edge')].map(e=>{const b=e.getBBox(),m=svg.getCTM().inverse().multiply(e.getCTM());return {type:e.getAttribute('class'),x:b.x+m.e,y:b.y+m.f,w:b.width,h:b.height,mid:e.matches('path')?{x:e.getPointAtLength(e.getTotalLength()/2).x,y:e.getPointAtLength(e.getTotalLength()/2).y}:null};});});
  await test.info().attach('crossing-layout',{body:JSON.stringify(layout),contentType:'application/json'});
  await root.locator('.board').first().screenshot({path:test.info().outputPath('crossing.png')});
@@ -214,7 +214,7 @@ test('crossing route coin reserves a bound card even when Live is off',async({pa
 test('manual card positions reserve frame and cue space and survive live text remeasurement',async({page,server})=>{
  const {root}=await mountCues(page,server),spec=cueSpec();spec.page.sections[0].diagram.edges[0].telemetry.card={position:{x:840,y:420}};
  await page.evaluate(({spec,samples})=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>samples}});},{spec,samples:CUE_SAMPLES});
- await root.getByRole('button',{name:'Metrics',exact:true}).click();const card=root.locator('[data-metrics-card="ingest->app"]');await expect(card).toBeVisible();
+ await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();const card=root.locator('[data-metrics-card="ingest->app"]');await expect(card).toBeVisible();
  const position=()=>card.evaluate(el=>{const m=el.transform.baseVal.consolidate().matrix;return {x:Math.round((m.e-Number(el.dataset.metricsAnchorX))*100)/100,y:Math.round((m.f-Number(el.dataset.metricsAnchorY))*100)/100};});
  expect(await position()).toEqual({x:840,y:420});expect((await geometry(root)).outside).toEqual([]);expect((await geometry(root)).overlaps).toEqual([]);
  await page.evaluate(()=>window.viewer.controller.telemetry.apply({'ingest->app':{signals:{rate:{value:9876543210},errors:{value:0}}}}));
@@ -234,7 +234,7 @@ test('#1112 authored card title and width replace the label and default width; p
   window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:()=>Promise.resolve(JSON.parse(JSON.stringify(samples)))}});
   window.viewer.controller.liveStatus.apply(jira);
  },{spec,jira:CUE_JIRA,samples:CUE_SAMPLES});
- await root.getByRole('button',{name:'Metrics',exact:true}).click();await expect(root.locator(cards)).toHaveCount(3);
+ await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();await expect(root.locator(cards)).toHaveCount(3);
  await expect(card('ingest->app').locator('.dv-metrics-card-title')).toHaveText('Camera stats consumer · RabbitMQ');
  await expect(card('app->push').locator('.dv-metrics-card-title')).toHaveText('push');
  await expect(card('shared::api->shared::store').locator('.dv-metrics-card-title')).toHaveText('Postgres writes');

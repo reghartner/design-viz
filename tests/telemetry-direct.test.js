@@ -184,5 +184,6 @@ test('a pasted link with time on a relative-only connection is reported as unusa
   assert.equal(await h.api.load(),null);assert.equal(h.calls.length,0);assert.match(h.api.snapshot().report.error,/both the link and controls/);
   h.api.set('start','');assert.equal(await h.api.load(),null);assert.equal(h.calls.length,0);assert.match(h.api.snapshot().report.error,error);h.api.destroy();
  }
- const p=profile();p.time.encoding='iso8601';p.arguments.end='to';const h=setup({p:board(p)});h.api.set('input',startOnly);assert.deepEqual(clone(h.api.snapshot().bounds),{lookback:null,linkTime:true,linkUsable:false},'a start-only link is unusable on an absolute-capable connection');h.api.destroy();
+ const p=profile();p.time.encoding='iso8601';p.arguments.end='to';const h=setup({p:board(p)});h.api.set('input',startOnly);assert.deepEqual(clone(h.api.snapshot().bounds),{lookback:null,linkTime:true,linkUsable:false},'a start-only link is unusable on an absolute-capable connection');
+ h.api.set('end','2026-10-12T05:00:00Z');assert.deepEqual(clone(h.api.snapshot().bounds),{lookback:null,linkTime:true,linkUsable:true},'a start-only link plus Trace end is usable');h.api.destroy();
 });

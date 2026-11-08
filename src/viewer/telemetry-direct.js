@@ -17,12 +17,13 @@ function createTelemetryDirect(page,transport,hooks){
   function available(){return !dead && !accountRetired && !!transport && typeof transport.describe==='function' && typeof transport.call==='function' && !(hooks.disabled && hooks.disabled());}
   // The time window a load would send now, so the form can say which one applies.
   // Link time is detected from the parsed link alone; linkUsable says whether
-  // this connection can send it once the time controls are blank.
+  // this connection can send it once the controls the link supplies are blank.
   function bounds(ps){
     var p=ps[form.connection],parsed;if(!p || !form.input.trim())return null;
     try{parsed=FlowTraceConnections.parseInput(p,form.input);}catch(e){return null;}
     function at(request){try{return FlowTraceConnections.timeWindow(p,parsed,request,Date.now());}catch(e){return null;}}
-    if(Object.prototype.hasOwnProperty.call(parsed,'start') || Object.prototype.hasOwnProperty.call(parsed,'end'))return {lookback:null,linkTime:true,linkUsable:!!at({start:'',end:''})};
+    var start=Object.prototype.hasOwnProperty.call(parsed,'start'),end=Object.prototype.hasOwnProperty.call(parsed,'end');
+    if(start || end)return {lookback:null,linkTime:true,linkUsable:!!at({start:start?'':form.start,end:end?'':form.end})};
     var w=at(form);return w?{lookback:w.relative?w.start.slice(1):null,linkTime:false,linkUsable:false}:null;
   }
   function snapshot(){var ps=sync();return {available:available(),busy:busy,form:Object.assign({},form),bounds:bounds(ps),profiles:Object.keys(ps).map(function(id){return {id:id,label:ps[id].label,lookback:ps[id].time.defaultLookback,environments:Object.keys(ps[id].environments).map(function(e){return {id:e,label:ps[id].environments[e].label || e};})};}),sections:sections().map(function(s){return {id:s.id,label:s.label};}),report:report?JSON.parse(JSON.stringify(report)):null,exemplar:exemplar,section:form.section};}

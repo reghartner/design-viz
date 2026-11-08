@@ -242,15 +242,15 @@ would send:
   otherwise the profile's `time.defaultLookback`.
 - "Uses the time set under Lookback." when Trace start is an absolute
   timestamp (or not yet a valid lookback).
-- "Uses the time range in the pasted link." when the pasted link carries time
-  this connection can send (both start and end, on a connection whose
-  `time.encoding` is not `relative`). Those bounds are sent, and a Trace start
-  cannot be combined with them.
+- "Uses the time range in the pasted link." when the pasted link carries a
+  start or end and the request can be sent as given, with Trace start and
+  Trace end filling only what the link leaves out. A time control that repeats
+  a field the link supplies is rejected when loading.
 - "This link's time range cannot be used with this connection; paste the trace
-  ID alone." when the link carries time the connection cannot send: any link
-  time on a relative-only connection (such as the `relative` Honeycomb profile
-  in [trace connections](trace-connections.md)), or a link with a start but no
-  end. Loading that link fails before any tool call.
+  ID alone." when the link's time cannot be sent as given: for example
+  absolute link bounds on a connection whose `time.encoding` is `relative`
+  (such as the Honeycomb profile in [trace connections](trace-connections.md)),
+  or a start-only or end-only link that the time controls do not complete.
 
 When `get_trace` answers with only a Metadata block whose `navigation_hints`
 starts with `no spans found` and no span table, the panel opens the Lookback

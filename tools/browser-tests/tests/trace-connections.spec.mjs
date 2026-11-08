@@ -63,7 +63,8 @@ test('desktop Load trace shows the active lookback, and a no-spans load names it
  await expect(status).toHaveText('Trace not found in the last 2h. Try a longer lookback under Lookback.');await expect(time).toHaveJSProperty('open',true);await expect(h.root.locator('.dv-trace-selected')).toHaveCount(0);expect(h.calls).toHaveLength(1);expect(h.calls[0].args.from).toBe('-2h');
  await time.locator('summary').click();await expect(time).toHaveJSProperty('open',false);await h.root.getByRole('button',{name:'Jira',exact:true}).click();await h.root.getByRole('button',{name:'Trace',exact:true}).click();
  await expect(status).toHaveText('Trace not found in the last 2h. Try a longer lookback under Lookback.');await expect(h.root.locator('.dv-trace-time')).toHaveJSProperty('open',false);await h.root.locator('.dv-trace-time > summary').click();
- await h.root.getByRole('textbox',{name:'Trace start',exact:true}).fill('-7d');await expect(note).toHaveText('Looks back 7d; change under Lookback.');await expect(time).toHaveJSProperty('open',true);
+ await h.root.getByRole('textbox',{name:'Trace start',exact:true}).fill('-7d');await expect(note).toHaveText('Looks back 7d; change under Lookback.');
+ const end=h.root.getByRole('textbox',{name:'Trace end',exact:true});await end.fill('2026-11-06T06:00:00Z');await expect(note).toHaveText('Uses the time set under Lookback.');await end.fill('');await expect(note).toHaveText('Looks back 7d; change under Lookback.');await expect(time).toHaveJSProperty('open',true);
  h.respond(RECORDED);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);expect(h.calls).toHaveLength(2);expect(h.calls[1].args.from).toBe('-7d');
 });
 for(const change of ['environment','connection','section'])test('desktop changing '+change+' cancels pending detail without fetching again',async({page,server})=>{

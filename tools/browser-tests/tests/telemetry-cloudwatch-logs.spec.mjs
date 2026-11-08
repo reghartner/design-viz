@@ -77,6 +77,8 @@ test('native grouped evidence follows loaded imported details and stays isolated
   }}};}
   window.a=window.mount(document.querySelector('#a'),spec,options('A'));window.b=window.mount(document.querySelector('#b'),spec,options('B'));
   window.a.controller.telemetry.setEnabled(true);window.b.controller.telemetry.setEnabled(true);
+  // #1136: this board has no ticket references, so it opens on Trace with no switch; its log details are in the Jira view, which only the controller can still open.
+  window.a.controller.liveStatus.setStatusMode('jira');window.b.controller.liveStatus.setStatusMode('jira');
  },{spec,detail});
  const a=page.locator('#a'),b=page.locator('#b');await expect(a.locator('[data-log-carrier="local"]')).toHaveCount(1);await expect(b.locator('[data-log-carrier="local"]')).toHaveCount(1);
  await b.locator('[data-log-carrier="local"] summary').click();await expect(b.locator('.dv-live-log-table')).toContainText('B-cam1');

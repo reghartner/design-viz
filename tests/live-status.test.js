@@ -1181,7 +1181,8 @@ test('L2 L3 L4 panel paints synchronously, controls act, focus survives refresh 
  mount.remount();api.note('Once');assert.equal(body.querySelectorAll('.dv-live-head').length,1);api.destroy();assert.equal(textOf(body).includes('Once'),true);
 });
 test('L2 empty page and disconnected provider render only the appropriate message',()=>{
- const empty=harness(),mount=mountStatus(empty);assert.match(textOf(mount.body),/This page has no ticket references\./);assert.equal(mount.body.querySelector('table'),null);
+ // #1136: a page without ticket references opens on the Trace view, not on a Jira view that says it has none.
+ const empty=harness(),mount=mountStatus(empty);assert.equal(empty.ctl.liveStatus.snapshot().mode,'trace');assert.match(textOf(mount.body),/No traceMatch steps on this board/);assert.doesNotMatch(textOf(mount.body),/This page has no ticket references/);assert.equal(mount.body.querySelector('table'),null);
  const h=harness(fixture());h.ctl.liveStatus.note('Add the Atlassian connector');const m=mountStatus(h);assert.equal(m.body.querySelector('.dv-live-note').textContent,'Add the Atlassian connector');assert.equal(m.body.querySelector('table'),null);assert.ok(m.body.querySelector('.dv-live-toggle').hidden);
  empty.ctl.liveStatus.destroy();h.ctl.liveStatus.destroy();
 });
@@ -2043,7 +2044,7 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
  let calls=0,seen=null,fail=false;const sample={a:{signals:{lag:{value:3}}}};
  const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)},{telemetry:{provider:b=>{calls++;seen=b;return fail?Promise.reject(Error('Grafana timeout')):Promise.resolve(sample);}}});
  const panel=mountStatus(h);h.flush();h.flush();await settle();
- const head=h.view.querySelector('.dv-live-head'),header=h.view.querySelector('.dv-status-header'),live=header.querySelector('.dv-live-toggle'),metrics=header.querySelector('button.dv-live-metrics'),conn=head.querySelector('.dv-live-metrics-connection'),jira=head.querySelector('.dv-live-connection');
+ const head=h.view.querySelector('.dv-live-head'),header=h.view.querySelector('.dv-status-header'),live=header.querySelector('.dv-live-toggle'),metrics=header.querySelector('button.dv-live-metrics'),conn=header.querySelector('.dv-live-metrics-connection'),jira=head.querySelector('.dv-live-connection');
  assert.ok(metrics,'M6 Metrics switch in the panel header');assert.equal(metrics.hidden,false);assert.equal(textOf(metrics).trim(),'Metrics overlay');assert.equal(metrics.type,'button');assert.equal(metrics.getAttribute('role'),'switch');
  assert.ok(!metrics.classList.contains('tbtn'),'#1131 a switch, not a button that looks like a third view');
  assert.equal(metrics.getAttribute('aria-checked'),'false','M6 off by default');assert.equal(calls,0,'M6 no provider call while off');
@@ -2052,8 +2053,7 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
  assert.ok(head.children.indexOf(controls)<head.children.indexOf(head.querySelector('.dv-live-status')),'M6 controls precede status text');
  assert.ok(conn,'M6 metrics connector text');assert.ok(!conn.classList.contains('dv-live-connection'),'M6 distinct connector');
  assert.equal(head.querySelectorAll('.dv-live-connection').length,1);
- const statuses=head.querySelector('.dv-live-status-text').children;
- assert.equal(statuses.indexOf(conn),statuses.indexOf(jira)+1,'M6 the connector indicators are adjacent');
+ assert.equal(h.view.querySelectorAll('.dv-live-metrics-connection').length,1,'#1136 one metrics connector line, in the shared header for both views');assert.equal(conn.parentElement,header);
  const text=()=>conn.querySelectorAll('span')[0].textContent;
  assert.equal(conn.hidden,false);assert.equal(conn.tagName,jira.tagName,'M6 same markup as the Jira connector');assert.equal(conn.getAttribute('role'),'status');assert.ok(conn.querySelector('i.dv-live-metrics-dot'),'M6 its own status dot');
  assert.equal(conn.getAttribute('data-state'),'disconnected');assert.equal(conn.getAttribute('data-busy'),'false');assert.equal(text(),'Metrics: not connected');
@@ -2076,8 +2076,8 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
 
 test('M7 a page with a telemetry provider and no Jira evidence still shows Metrics in the header',()=>{
  const h=harness(telemetryPage(),{},{telemetry:{provider:()=>Promise.resolve({})}});
- const panel=mountStatus(h),head=h.view.querySelector('.dv-live-head'),metrics=h.view.querySelector('.dv-status-header button.dv-live-metrics');
- assert.equal(head.hidden,false,'M7 the header shows for Metrics alone');assert.ok(metrics && !metrics.hidden,'M7 Metrics overlay switch');
+ const panel=mountStatus(h),header=h.view.querySelector('.dv-status-header'),metrics=header.querySelector('button.dv-live-metrics'),line=header.querySelector('.dv-live-metrics-connection');
+ assert.ok(metrics && !metrics.hidden,'M7 Metrics overlay switch');assert.ok(line && !line.hidden,'M7 and its connector line (#1136: in the shared header)');
  assert.equal(h.view.querySelector('.dv-live-toggle').hidden,true,'M7 Live stays hidden without Jira evidence');
  panel.destroy();h.ctl.liveStatus.destroy();
 });
@@ -2342,11 +2342,12 @@ test('M10 the action button shows on a metrics-only page so Allow Grafana reache
  const page={page:{tracking:{telemetry:{grafana:{prometheus:'prom-main'}}},sections:[{id:'main',diagram:{nodes:{a:{title:'A',telemetry:TQUEUE()}},rows:[['a']]}}]}};
  const h=harness(page,{},{telemetry:{source:'Grafana',provider:()=>Promise.resolve({})}}),panel=mountStatus(h);
  assert.equal(h.ctl.liveStatus.snapshot().available,false,'M10 no Jira evidence on this page');
- let ran=0;h.ctl.liveStatus.action('Allow Grafana',()=>ran++);
- const action=h.view.querySelector('.dv-live-action');
- assert.ok(action,'M10 the action button');assert.equal(action.hidden,false,'M10 visible beside Metrics');assert.equal(action.textContent,'Allow Grafana');
- action.dispatchEvent({type:'click'});assert.equal(ran,1,'M10 it runs the adapter action');
- h.ctl.liveStatus.action('',null);assert.equal(h.view.querySelector('.dv-live-action').hidden,true,'M10 cleared, it hides');
+ // #1136: a metrics-only page opens on the Trace view, which carries the action button.
+ let ran=0;h.ctl.liveStatus.action('Allow Grafana',()=>ran++);assert.equal(h.ctl.liveStatus.snapshot().mode,'trace');
+ const action=namedControls(h.view,'Allow Grafana');
+ assert.equal(action.length,1,'M10 the action button');
+ action[0].dispatchEvent({type:'click'});assert.equal(ran,1,'M10 it runs the adapter action');
+ h.ctl.liveStatus.action('',null);assert.equal(namedControls(h.view,'Allow Grafana').length,0,'M10 cleared, it hides');
  panel.destroy();h.ctl.liveStatus.destroy();
 });
 
@@ -2833,6 +2834,102 @@ test('OT18 #1131 the shared header shows Live | Over time, the day row, one Env 
  api.setStatusMode('jira');header('Jira');assert.ok(m.body.querySelector('table.dv-live-tickets'));assert.ok(shownIn(m.body.querySelector('.dv-live-over-time-status'),m.body),'and in the Jira view');
  m.destroy();api.destroy();
 });
+/* #1136 (epic #1130, Chuck 2026-11-08 "just show the trace part with the metrics toggle - same thing just no jira"):
+   a board with no ticket or epic references after imports (snapshot().available false) opens on the Trace view and
+   shows no Jira | Trace switch. Edit is in the shared header for any editor, in both views.
+   Rejects: a Jira view that says "This page has no ticket references."; Edit gated on tickets; a board whose tickets
+   come only through an import treated as Jira-free. */
+const jiraFreeEditor=()=>({starts:0,state(){return {editable:true,blocked:'',active:false,pending:0,saving:false,readOnly:false,notice:null};},onChange:()=>()=>{},rememberMap(){},lastMap:()=>null,question:()=>null,start(){this.starts++;}});
+const jiraFreeBoard=tickets=>({page:{tracking:{...(tickets?{jira:{site:'https://jira.test'}}:{}),telemetry:{environment:'prd',environments:{prd:{},stg:{}}}},sections:[{id:'main',diagram:{
+ nodes:{web:{title:'Web',...(tickets?{tickets:['AA-1']}:{})},api:{title:'API',telemetry:TSERVICE()}},rows:[['web','api']],edges:[{from:'web',to:'api',label:'call',telemetry:TCALL()}],
+ steps:[{id:'call',edge:'web->api',traceMatch:{serviceName:'api',operation:'GET /cart'}}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
+test('#1136 a board without ticket references opens on Trace with no Jira | Trace switch, and Edit is in the shared header for an editor',()=>{
+ const viewButtons=root=>root.querySelectorAll('button').filter(el=>shownIn(el,root) && /^(Jira|Trace)( · \d+)?$/.test(accessibleName(el)));
+ const open=raw=>{const editor=jiraFreeEditor(),h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({})},boardEditor:editor}),m=mountStatus(h);return {h,m,api:h.ctl.liveStatus,editor};};
+ const free=open(jiraFreeBoard(false));
+ assert.equal(free.api.snapshot().available,false,'contrasting precondition: no ticket or epic references');
+ assert.equal(free.api.snapshot().mode,'trace','a Jira-free board opens on the Trace view');
+ assert.deepEqual(viewButtons(free.m.body).map(accessibleName),[],'no Jira | Trace switch');
+ assert.ok(free.m.body.querySelector('.dv-live-trace'));assert.ok(!textOf(free.m.body).includes('This page has no ticket references.'));
+ assert.equal(namedControls(free.m.body,'Env').length,1,'Env stays');assert.equal(namedControls(free.m.body,'Metrics overlay','switch').length,1,'the Metrics overlay switch stays');
+ const edit=namedControls(free.m.body,'Edit');assert.equal(edit.length,1,'an editor sees one Edit');assert.ok(edit[0].closest('.dv-status-header'),'Edit is in the shared header');
+ edit[0].dispatchEvent({type:'click'});assert.equal(free.editor.starts,1,'Edit starts board editing');
+ // The Metrics overlay's connector line is in the shared header, so the only view shows it.
+ const metricsLines=b=>b.m.body.querySelectorAll('.dv-live-metrics-connection').filter(el=>shownIn(el,b.m.body));
+ assert.equal(metricsLines(free).length,1,'the metrics status line shows on a Jira-free board');assert.ok(metricsLines(free)[0].closest('.dv-status-header'));assert.match(textOf(metricsLines(free)[0]),/Metrics: not connected/);
+ free.m.destroy();free.api.destroy();
+ // Boards with tickets, local or only through an import, keep the switch and open on Jira; Edit is in the header in both views.
+ const seed=harness(),C=seed.C;seed.ctl.liveStatus.destroy();
+ const model=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}});
+ const provider=model('provider',{nodes:{api:{title:'API'},db:{title:'DB'}},rows:[['api','db']],edges:[{from:'api',to:'db',label:'Persist'}],topologyExports:{core:{nodes:['api','db'],edges:['api->db']}}});
+ const consumer=model('consumer',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'canon',nodeTracking:{api:{tickets:['AA-1']}}}],panels:[{id:'status',type:'live-status',title:'Status'}]});
+ consumer.page.tracking={jira:{site:'https://jira.test'}};
+ for(const [name,raw] of [['local tickets',jiraFreeBoard(true)],['tickets only through an import',C.FlowTopology.materialize([provider,consumer])[1]]]){
+  const b=open(raw);
+  assert.equal(b.api.snapshot().available,true,name+': has references');assert.equal(b.api.snapshot().mode,'jira',name+': opens on Jira');
+  assert.deepEqual(viewButtons(b.m.body).map(accessibleName),['Jira','Trace'],name+': keeps the Jira | Trace switch');
+  for(const view of ['jira','trace']){b.api.setStatusMode(view);const edits=namedControls(b.m.body,'Edit');assert.equal(edits.length,1,name+' '+view+': one Edit');assert.ok(edits[0].closest('.dv-status-header'),name+' '+view+': Edit is in the shared header');
+   assert.equal(b.m.body.querySelectorAll('.dv-live-metrics-connection').filter(el=>shownIn(el,b.m.body)).length,1,name+' '+view+': one metrics status line');}
+  b.m.destroy();b.api.destroy();
+ }
+});
+
+test('#1136 a board that opened on Trace for want of references moves to Jira when a loaded detail brings tickets, unless the reader chose a view',async()=>{
+ const raw={page:{tracking:{jira:{site:'https://jira.test'}},sections:[{id:'main',diagram:{nodes:{domain:{title:'Domain',detail:{spec:'remote',section:'child',mode:'link'}}},rows:[['domain']]}}]}},remote={page:{sections:[{id:'child',diagram:{nodes:{child:{tickets:['AA-1']}},rows:[['child']]}}]}};
+ const switchShown=body=>body.querySelectorAll('button.dv-status-mode').filter(el=>shownIn(el,body)).map(accessibleName);
+ for(const chose of [false,true]){
+  const options={loadDetail:async()=>remote},h=harness(raw,{},options),api=h.ctl.liveStatus,m=mountStatus(h);
+  assert.equal(api.snapshot().available,false);assert.equal(api.snapshot().mode,'trace');assert.deepEqual(switchShown(m.body),[]);
+  if(chose)api.setStatusMode('trace');
+  await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.flush();
+  assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().mode,chose?'trace':'jira',chose?'the chosen view stays':'the board now has Jira');
+  assert.deepEqual(switchShown(m.body),['Jira','Trace'],'the switch appears with the references');
+  m.destroy();api.destroy();
+ }
+});
+
+test('#1136 a reader working on a loaded trace keeps the Trace view when a loaded detail brings tickets',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),ID='8413cd87a9f15b6bfe8e1acf5b3346d0';
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{domain:{title:'Domain',detail:{spec:'remote',section:'child',mode:'link'}}},rows:[['domain']]}}]}},remote={page:{sections:[{id:'child',diagram:{nodes:{child:{tickets:['AA-1']}},rows:[['child']]}}]}};
+ const options={loadDetail:async()=>remote,telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async()=>({payload:recorded})}}};
+ const h=harness(raw,{},options),api=h.ctl.liveStatus,m=mountStatus(h);
+ assert.equal(api.snapshot().available,false);assert.equal(api.snapshot().mode,'trace');
+ api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:ID});
+ assert.ok(await api.loadDirectTrace(false),'contrasting precondition: the trace loads');assert.ok(api.snapshot().trace.selected,'and is shown');
+ await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.flush();
+ // The detail adds a mapping diagram, which resets the loaded trace as before; the reader stays in the Trace view to load again.
+ assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().mode,'trace','trace work keeps the Trace view');
+ assert.deepEqual(m.body.querySelectorAll('button.dv-status-mode').filter(el=>shownIn(el,m.body)).map(accessibleName),['Jira','Trace'],'the switch appears with the references');
+ m.destroy();api.destroy();
+});
+test('#1136 choosing a trace or focusing a span keeps the Trace view when a loaded detail brings tickets',async()=>{
+ const remote={page:{sections:[{id:'child',diagram:{nodes:{child:{tickets:['AA-1']}},rows:[['child']]}}]}};
+ for(const work of ['none','choose','span']){
+  const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),d=f.spec.page.sections[0].diagram;
+  delete f.spec.page.tracking.jira;d.edges.forEach(e=>delete e.tickets);Object.values(d.nodes).forEach(n=>delete n.tickets);d.nodes.app.detail={spec:'remote',section:'child',mode:'link'};
+  const options={telemetry:{},loadDetail:async()=>remote},h=harness(f.spec,{},options),api=h.ctl.liveStatus;
+  h.ctl.sections[0].stepper={path:()=>'short',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+  h.ctl.telemetry.apply(f.samples);
+  assert.equal(api.snapshot().available,false);assert.equal(api.snapshot().mode,'trace');
+  const selected=api.snapshot().trace.selected;assert.ok(selected,'contrasting precondition: an example trace is shown');
+  if(work==='choose')await api.chooseTrace({key:selected.key,traceId:selected.exemplar.traceId});
+  if(work==='span')assert.equal(api.selectTraceSpan({context:selected.context,spanId:selected.exemplar.spans[0].id}),true);
+  await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.flush();
+  assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().mode,work==='none'?'jira':'trace',work==='none'?'an example trace alone is not the reader choosing Trace':work+' keeps the Trace view');
+  api.destroy();
+ }
+});
+test('#1136 D13 Metrics overlay paints its cues in the Trace view on every board, and nothing while it is off',async()=>{
+ const raw=cuePage();delete raw.page.tracking.jira;const d=raw.page.sections[0].diagram;Object.values(d.nodes).forEach(n=>delete n.tickets);d.edges.forEach(e=>delete e.tickets);
+ const free=cueHarness(raw);await free.on();
+ assert.equal(free.ctl.liveStatus.snapshot().available,false);assert.equal(free.ctl.liveStatus.snapshot().mode,'trace');
+ assert.equal(free.stream(0).length,1,'the overlay paints in the only view');free.ctl.liveStatus.destroy();
+ // Chuck 2026-11-08 (D13): the Metrics overlay draws in both views on every board.
+ const jira=cueHarness();await jira.on();assert.equal(jira.stream(0).length,1,'the Jira view paints the overlay');
+ jira.ctl.liveStatus.setStatusMode('trace');assert.equal(jira.stream(0).length,1,'so does the Trace view of a board with tickets');
+ jira.ctl.telemetry.setEnabled(false);assert.equal(jira.cues().length,0,'off, the overlay draws nothing');jira.ctl.liveStatus.destroy();
+});
 
 test('Proof is cleared from retained panels on telemetry and live-status controller destruction',()=>{
  for(const owner of ['telemetry','liveStatus']){
@@ -3175,6 +3272,8 @@ function workPresentation(h,card){
 test('#1137 metric cards on a board without tickets get no Jira presentation; ticketed boards keep unchanged',async()=>{
  const free=await paintedCard({a:{},b:{}});
  assert.equal(free.h.ctl.liveStatus.snapshot().available,false,'fixture has no ticket references');
+ // #1136: a Jira-free board opens on Trace; its Jira view (reached through the controller) is where the references guard matters.
+ free.h.ctl.liveStatus.setStatusMode('jira');free.h.flush();free.card=free.h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]');
  assert.ok(free.card,'the degraded carrier has a metric card');
  assert.equal(free.card.getAttribute('data-verdict'),'degraded');
  assert.deepEqual(workPresentation(free.h,free.card),{appearance:null,classes:[],halo:false,label:false,popover:false},'no Jira presentation on a Jira-free board');
@@ -3188,6 +3287,39 @@ test('#1137 metric cards on a board without tickets get no Jira presentation; ti
  assert.equal(ticketed.card.getAttribute('data-verdict'),'degraded');
  assert.deepEqual(workPresentation(ticketed.h,ticketed.card),{appearance:'unchanged',classes:['unchanged'],halo:true,label:true,popover:true},'an unticketed edge on a ticketed board stays unchanged');
  ticketed.h.ctl.liveStatus.destroy();
+});
+// Chuck 2026-11-08 (D13): the Metrics overlay draws in every view. In the Trace view its cards carry no Jira work colouring,
+// and the Workbench card preview still draws there.
+test('D13 metric cards draw in the Trace view of a board with tickets without Jira work colouring, and the Workbench preview draws there too',async()=>{
+ const shim=h=>{const matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+  h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+  const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+  for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;};
+ const ticketed=await paintedCard({a:{tickets:['AA-1']},b:{}}),api=ticketed.h.ctl.liveStatus,card=()=>ticketed.h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]');
+ assert.equal(card().getAttribute('data-live-appearance'),'unchanged','contrasting precondition: the Jira view colours the card');
+ api.setStatusMode('trace');ticketed.h.flush();
+ assert.ok(card(),'the Trace view draws the card');assert.equal(card().getAttribute('data-verdict'),'degraded');
+ const classes=Array.from(ticketed.h.C.LIVE_STATUS_APPEARANCES).filter(s=>card().classList.contains('dv-live-'+s));
+ assert.deepEqual({appearance:card().getAttribute('data-live-appearance'),classes,halo:!!card().querySelector('.dv-live-halo')},{appearance:null,classes:[],halo:false},'no Jira work colouring in the Trace view');
+ const presented=workPresentation(ticketed.h,card());assert.deepEqual({label:presented.label,popover:presented.popover},{label:false,popover:false},'in Trace a card opens only its metrics detail, with no Jira work status');
+ assert.doesNotMatch(card().getAttribute('aria-label') || '',/Work status/,'and its name is not a Jira work status');
+ assert.equal(ticketed.h.view.querySelector('.dv-live-popover .node-link-close').getAttribute('aria-label'),'Close metrics','its close button names the metrics');
+ api.destroy();
+ const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{tickets:['AA-1']},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
+ const w=harness(raw,{},{authoring:true,metricsPreview:true});shim(w);w.ctl.liveStatus.setStatusMode('trace');w.flush();
+ assert.ok(w.view.querySelector('g.dv-metrics-card'),'the Workbench preview draws a card in the Trace view');w.ctl.liveStatus.destroy();
+});
+// The board frame grows for the overlay's cards through svg._refreshStatusFrame (src/engine.js); the Trace view must call it too,
+// or a card placed below the authored frame is cut off (#1148 review: GetCart hidden in Trace).
+test('D13 the Trace view grows the diagram frame for its metric cards, on boards with and without tickets',async()=>{
+ for(const nodes of [{a:{tickets:['AA-1']},b:{}},{a:{},b:{}}]){
+  const {h}=await paintedCard(nodes),api=h.ctl.liveStatus;let grown=0;
+  for(const svg of h.view.querySelectorAll('svg'))svg._refreshStatusFrame=()=>{if(svg.querySelector('g.dv-metrics-card'))grown++;};
+  api.setStatusMode('jira');assert.ok(grown>0,'contrasting precondition: the Jira view refreshes the frame after its cards');
+  grown=0;api.setStatusMode('trace');assert.ok(h.view.querySelector('g.dv-metrics-card'),'the Trace view draws the card');
+  assert.ok(grown>0,(nodes.a.tickets?'ticketed':'Jira-free')+' board: the Trace view refreshes the frame after its cards');
+  api.destroy();
+ }
 });
 test('#1137 an applied status map on a board without tickets gives nodes, step coins and captions no Jira presentation',()=>{
  const seed=harness(),model=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});

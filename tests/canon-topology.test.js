@@ -448,6 +448,9 @@ test('step sets fail closure when a crossing reference leaves the bound export, 
     [s=>stepById(s,'persist').traceMatch.nodeId='audit','step persist traceMatch.nodeId references node audit outside export core'],
     [s=>stepById(s,'persist').conditions[0].nodeId='audit','step persist conditions[0].nodeId references node audit outside export core'],
     [s=>stepById(s,'persist').traceMatch.parentStepId='record','step persist traceMatch.parentStepId record is not in this step set'],
+    // traceMatch may list alternatives (#1100); each one is checked.
+    [s=>{const step=stepById(s,'authorize');step.traceMatch=[step.traceMatch,{serviceName:'audit',operation:'write',nodeId:'audit'}];},'step authorize traceMatch[1].nodeId references node audit outside export core'],
+    [s=>{const step=stepById(s,'persist');step.traceMatch=[{serviceName:'ledger',operation:'read'},{...step.traceMatch,parentStepId:'record'}];},'step persist traceMatch[1].parentStepId record is not in this step set'],
     [s=>stepDiagram(s).stepExports.payment.steps.push('record'),'step record edge references edge ledger->audit outside export core'],
     [s=>stepDiagram(s).stepExports.payment.steps=['authorize','absent'],'missing or ambiguous exported step absent'],
     [s=>stepDiagram(s).steps.push({id:'authorize',edge:'gateway->auth'}),'missing or ambiguous exported step authorize'],
@@ -504,7 +507,7 @@ test('step-set closure reads step references the way checkReferences does',()=>{
   const specs=[stepProvider()];stepById(specs[0],'persist').edge='ledger->audit';
   assert.equal(stepDiagram(resolve(specs)[0]).stepExports,undefined);
 });
-test('a stepExports-only section fails its binding wherever topology declarations are detected',async t=>{
+test('a stepExports-only section fails its binding in the resolver, HTML snapshot, validate.js, library build, entity index and visibility check',async t=>{
   const message='step set payment: export core is not declared in this section';
   const lone=()=>{const s=stepProvider();delete stepDiagram(s).topologyExports;return s;};
   const vm=require('node:vm'),loader=require('../tools/source-loader.cjs'),ctx={URL,TextEncoder};vm.createContext(ctx);
@@ -526,6 +529,9 @@ test('a stepExports-only section fails its binding wherever topology declaration
   assert.ok(!cli.stdout.includes('unresolved topology declarations'),cli.stdout);
   const {buildLibraryFromDirectory}=await import('../tools/canon/library.mjs');
   await assert.rejects(buildLibraryFromDirectory(dir),error=>error.message.includes(message));
+  const {buildEntityDiagramIndex}=await import('../tools/canon/entity-diagrams.mjs');
+  assert.throws(()=>buildEntityDiagramIndex([lone()]),error=>error.message.includes(message));
+  assert.throws(()=>require('../tools/visibility-check.cjs').check(lone(),{version:1,expectations:[]}),error=>error.message.includes(message));
 });
 test('a consumer can declare a step set over its own steps on imported topology it re-exports',()=>{
   const specs=source(),consumer=diagram(specs[1]);
@@ -534,4 +540,159 @@ test('a consumer can declare a step set over its own steps on imported topology 
   const out=resolve(specs);assert.equal(diagram(out[1]).stepExports,undefined);assert.deepEqual(diagram(out[1]).steps,consumer.steps);
   consumer.stepExports.orders.steps.unshift('request');
   assert.throws(()=>resolve(specs),/checkout section checkout step set orders: step request edge references edge client->platform::api outside export story/);
+});
+// #1104 PR 2: consumers splice imported step sets (stepImports) with namespaced, remapped references.
+function stepImporter(stepImports,diagramPatch={}){
+  const s=stepConsumer(),d=stepDiagram(s);
+  d.topologyImports[0].stepImports=stepImports;
+  d.nodes.receipt={title:'Receipt'};d.rows=[['cart','receipt']];d.edges.push({from:'pay::ledger',to:'receipt'});
+  d.steps.push({id:'receipt',edge:'pay::ledger->receipt',text:'Show the receipt'},{id:'done',nodes:['cart'],text:'Done'});
+  Object.assign(d,diagramPatch);return s;
+}
+const stepIds=s=>stepDiagram(s).steps.map(step=>step.id);
+test('imported step sets splice after their anchor with namespaced ids and remapped references; local fields are stripped',()=>{
+  const provider=stepProvider(),persist=stepById(provider,'persist');
+  Object.assign(persist,{verdict:'keep',ref:'R-1',sticky:true,delta:true,deltaText:'New in v2',link:'https://example.test/persist'});
+  const specs=[provider,stepImporter([{set:'payment',after:'checkout'}])],before=structuredClone(specs),out=resolve(specs),consumer=out[1];
+  assert.deepEqual(specs,before);assert.deepEqual(resolve(specs),out);assert.deepEqual(resolve(out),out);
+  assert.deepEqual(stepIds(consumer),['checkout','pay::authorize','pay::persist','pay::declined','receipt','done']);
+  assert.deepEqual(stepById(consumer,'pay::authorize'),{id:'pay::authorize',edge:'pay::gateway->pay::auth',text:'Authorize the payment',
+    traceMatch:{serviceName:'auth',operation:'POST /authorize',nodeId:'pay::auth'}});
+  assert.deepEqual(stepById(consumer,'pay::persist'),{id:'pay::persist',edges:['pay::auth->pay::ledger'],nodes:['pay::ledger'],tone:{'pay::ledger':'ok'},
+    contracts:{'pay::auth->pay::ledger':{json:{amount:1}}},conditions:[{kind:'slow',label:'Ledger is slow',nodeId:'pay::ledger'}],
+    traceMatch:{serviceName:'ledger',operation:'INSERT payment',nodeId:'pay::ledger',parentStepId:'pay::authorize'},
+    delta:true,deltaText:'New in v2',link:'https://example.test/persist'});
+  assert.deepEqual(stepById(consumer,'pay::declined'),{id:'pay::declined',failures:{'pay::auth->pay::ledger':'blocked'},text:'Ledger rejects the write'});
+  assert.equal(stepById(consumer,'pay::record'),undefined);
+  assert.deepEqual(stepDiagram(consumer).topologyProvenance.imports[0].steps,['pay::authorize','pay::persist','pay::declined']);
+  assert.deepEqual(C.validateSpec(consumer).errors,[]);
+  // An array import covers an array binding's merged closure.
+  const merged=stepProvider();stepDiagram(merged).topologyExports.core.edges=['gateway->auth'];stepDiagram(merged).stepExports.payment.export=['core'];
+  const arrayImport=stepImporter([{set:'payment'}]);stepDiagram(arrayImport).topologyImports[0].export=['core'];
+  assert.deepEqual(stepById(resolve([merged,arrayImport])[1],'pay::persist').edges,['pay::auth->pay::ledger']);
+  // Each traceMatch alternative is remapped, and its local panelId is stripped.
+  const alternatives=stepProvider(),alt=stepById(alternatives,'persist');
+  alt.traceMatch=[{serviceName:'ledger',operation:'INSERT payment',nodeId:'ledger',panelId:'jobs'},{serviceName:'ledger',operation:'UPSERT payment',parentStepId:'authorize'}];
+  assert.deepEqual(stepById(resolve([alternatives,stepImporter([{set:'payment'}])])[1],'pay::persist').traceMatch,
+    [{serviceName:'ledger',operation:'INSERT payment',nodeId:'pay::ledger'},{serviceName:'ledger',operation:'UPSERT payment',parentStepId:'pay::authorize'}]);
+  // An import without stepImports keeps its provenance shape.
+  assert.equal(Object.hasOwn(diagram(resolve(source())[1]).topologyProvenance.imports[0],'steps'),false);
+});
+test('step sets without an anchor append; several sets keep declaration order; an earlier imported step can anchor a later set',()=>{
+  const two=()=>{const p=stepProvider();stepDiagram(p).stepExports={payment:{export:'core',steps:['authorize','persist']},retry:{export:'core',steps:['declined']}};return p;};
+  const ids=stepImports=>stepIds(resolve([two(),stepImporter(stepImports)])[1]);
+  assert.deepEqual(ids([{set:'payment'}]),['checkout','receipt','done','pay::authorize','pay::persist']);
+  assert.deepEqual(ids([{set:'payment',after:'checkout'},{set:'retry',after:'checkout'}]),['checkout','pay::authorize','pay::persist','pay::declined','receipt','done']);
+  assert.deepEqual(ids([{set:'payment',after:'checkout'},{set:'retry',after:'pay::authorize'}]),['checkout','pay::authorize','pay::declined','pay::persist','receipt','done']);
+  assert.deepEqual(ids([{set:'retry',after:'receipt'},{set:'payment',after:'checkout'}]),['checkout','pay::authorize','pay::persist','receipt','pay::declined','done']);
+});
+test('reveal indices at or after the insertion point shift by the inserted count; consumers with paths do not shift',()=>{
+  const revealing=(stepImports,patch)=>{
+    const s=stepImporter(stepImports,patch),d=stepDiagram(s),sec=s.page.sections[0];
+    d.edges[0].revealAt=1;d.edges[1].revealAt=0;d.edges[1].hideAt=2;
+    sec.bullets=['plain',{text:'a',revealAt:0},{text:'b',revealAt:1,sub:[{text:'c',hideAt:2},'d']}];
+    sec.contracts=[{title:'Order',fields:[{k:'id',revealAt:2},{k:'total'}]}];return s;};
+  const reveals=s=>{const d=stepDiagram(s),sec=s.page.sections[0];
+    return {edges:d.edges.filter(e=>!e.from.startsWith('pay::') || e.to==='receipt').map(e=>[e.revealAt,e.hideAt]),
+      bullets:[sec.bullets[1].revealAt,sec.bullets[2].revealAt,sec.bullets[2].sub[0].hideAt],row:sec.contracts[0].fields[0].revealAt};};
+  // Three steps land at index 1: every index >= 1 moves by 3, index 0 stays.
+  const shifted=resolve([stepProvider(),revealing([{set:'payment',after:'checkout'}])])[1];
+  assert.deepEqual(reveals(shifted),{edges:[[4,undefined],[0,5]],bullets:[0,4,5],row:5});
+  assert.deepEqual(C.validateSpec(shifted).errors,[]);
+  // Two insertions apply in order: three steps at 1, then one at the end of the resolved array.
+  const two=stepProvider();stepDiagram(two).stepExports.retry={export:'core',steps:['declined']};stepDiagram(two).stepExports.payment.steps=['authorize','persist'];
+  assert.deepEqual(reveals(resolve([two,revealing([{set:'payment',after:'checkout'},{set:'retry',after:'receipt'}])])[1]),{edges:[[3,undefined],[0,5]],bullets:[0,3,5],row:5});
+  // Appending at the end moves nothing that is in range.
+  assert.deepEqual(reveals(resolve([stepProvider(),revealing([{set:'payment'}])])[1]),{edges:[[1,undefined],[0,2]],bullets:[0,1,2],row:2});
+  // Paths order the steps: imported steps join the registry and nothing shifts.
+  const paths=[{id:'happy',steps:['checkout','pay::authorize','pay::persist','receipt']}];
+  const withPaths=resolve([stepProvider(),revealing([{set:'payment'}],{paths})])[1];
+  assert.deepEqual(stepIds(withPaths),['checkout','receipt','done','pay::authorize','pay::persist','pay::declined']);
+  assert.deepEqual(reveals(withPaths),{edges:[[1,undefined],[0,2]],bullets:[0,1,2],row:2});
+  assert.deepEqual(C.validateSpec(withPaths).errors,[]);
+  assert.deepEqual(C.viewerRouting().diagramForPath(stepDiagram(withPaths),'happy').steps.map(s=>s.id),paths[0].steps);
+});
+test('relative step time crosses; absolute and time-of-day times are stripped and listed in validator output',()=>{
+  const provider=stepProvider();provider.page.sections[0].diagram.storyTime={start:'2026-09-25T06:00'};
+  stepById(provider,'authorize').time='+5m';stepById(provider,'persist').time='2026-09-25T06:50';stepById(provider,'declined').time='07:10';
+  const consumer=stepImporter([{set:'payment',after:'checkout'}],{storyTime:{start:'2026-09-25T09:00'}});
+  const out=resolve([provider,consumer])[1];
+  assert.equal(stepById(out,'pay::authorize').time,'+5m');
+  assert.equal(Object.hasOwn(stepById(out,'pay::persist'),'time'),false);assert.equal(Object.hasOwn(stepById(out,'pay::declined'),'time'),false);
+  const warnings=C.validateSpec(out).warnings.filter(w=>w.includes('was not imported'));
+  assert.deepEqual(warnings,[
+    'sections[0].diagram.steps[2].time: provider "payments" sections[0].diagram.steps[1].time "2026-09-25T06:50" is not a relative time and was not imported; only relative times (+…) cross',
+    'sections[0].diagram.steps[3].time: provider "payments" sections[0].diagram.steps[2].time "07:10" is not a relative time and was not imported; only relative times (+…) cross',
+  ]);
+  assert.equal(JSON.stringify(out).includes('was not imported'),false);
+});
+test('step imports fail with consumer, namespace, provider, set and step named',()=>{
+  const at='Topology shop section buy import pay (payments export core)';
+  const cases=[
+    [()=>[stepProvider(),stepImporter([{set:'absent'}])],at+' step set absent: missing step set absent'],
+    [()=>{const p=stepProvider(),d=stepDiagram(p);d.topologyExports.side={nodes:['gateway','auth'],edges:['gateway->auth']};d.stepExports.side={export:'side',steps:['authorize']};
+      return [p,stepImporter([{set:'side'}])];},at+' step set side: step set binds export side, which this import does not include'],
+    [()=>{const c=stepImporter([{set:'payment'}]),imp=stepDiagram(c).topologyImports[0];imp.nodes=['gateway','auth'];imp.edges=['gateway->auth'];
+      stepDiagram(c).edges=[{from:'cart',to:'pay::gateway'}];stepDiagram(c).steps=[{id:'checkout',edge:'cart->pay::gateway'}];stepDiagram(c).rows=[['cart']];delete stepDiagram(c).nodes.receipt;
+      return [stepProvider(),c];},at+' step set payment: imported step persist edges references edge auth->ledger, which this import does not select'],
+    // An array binding closes over connections between its nodes; a scalar import keeps the declared edges only.
+    [()=>{const p=stepProvider(),d=stepDiagram(p);d.topologyExports.core.edges=['gateway->auth'];d.stepExports.payment.export=['core'];return [p,stepImporter([{set:'payment'}])];},
+      at+' step set payment: imported step persist edges references edge auth->ledger, which this import does not select'],
+    [()=>[stepProvider(),stepImporter([{set:'payment',after:'absent'}])],at+' step set payment: after absent is not a step in this diagram'],
+    [()=>[stepProvider(),stepImporter([{set:'payment',after:'pay::authorize'}])],at+' step set payment: after pay::authorize is not a step in this diagram'],
+    [()=>{const p=stepProvider();stepDiagram(p).stepExports.retry={export:'core',steps:['authorize']};return [p,stepImporter([{set:'payment'},{set:'retry'}])];},
+      at+' step set retry: duplicate imported step pay::authorize'],
+    [()=>[stepProvider(),stepImporter([{set:'payment'},{set:'payment'}])],at+' stepImports 1: requires a unique step set name'],
+    [()=>[stepProvider(),stepImporter([{set:'payment',hidden:true}])],at+' stepImports 0: expected an object with fields set, after'],
+    [()=>[stepProvider(),stepImporter({set:'payment'})],'Topology shop section buy import 0: stepImports must be an array'],
+    [()=>[stepProvider(),stepImporter([{set:'payment',after:'checkout'}],{paths:[{id:'happy',steps:['checkout']}]})],at+' stepImports 0: this diagram has paths, which order its steps; remove after'],
+    [()=>{const c=stepImporter([{set:'payment'}]);stepDiagram(c).steps.push({id:'pay::local',nodes:['cart']});return [stepProvider(),c];},
+      'Topology shop section buy: local step id pay::local cannot contain ::'],
+  ];
+  for(const [build,message] of cases){
+    const specs=build(),before=structuredClone(specs);
+    assert.throws(()=>resolve(specs),error=>error.message.startsWith(message),message);assert.deepEqual(specs,before);
+  }
+});
+test('removing or renaming a provider step the consumer uses fails the build naming the import and set',()=>{
+  const at='Topology shop section buy import pay (payments export core) step sets payment: ';
+  const uses={
+    path:[{paths:[{id:'happy',steps:['checkout','pay::authorize','pay::persist']}]},'path happy references missing step pay::persist'],
+    parent:[{},'step done traceMatch references missing step pay::persist'],
+    alternative:[{},'step done traceMatch references missing step pay::persist'],
+    view:[{layouts:[{id:'focus',steps:['pay::persist']}]},'view focus references missing step pay::persist'],
+    stepMap:[{},'node cart detail stepMap references missing step pay::persist'],
+  };
+  for(const [kind,[patch,message]] of Object.entries(uses))for(const change of ['remove','rename']){
+    const consumer=stepImporter([{set:'payment'}],patch),d=stepDiagram(consumer);
+    if(kind==='parent')stepById(consumer,'done').traceMatch={serviceName:'shop',operation:'GET /done',parentStepId:'pay::persist'};
+    if(kind==='alternative')stepById(consumer,'done').traceMatch=[{serviceName:'shop',operation:'GET /done'},{serviceName:'shop',operation:'GET /done',parentStepId:'pay::persist'}];
+    if(kind==='stepMap')d.nodes.cart.detail={url:'https://example.test/payments',mode:'link',stepMap:{'pay::persist':{}}};
+    assert.equal(stepDiagram(resolve([stepProvider(),structuredClone(consumer)])[1]).steps.length,6,kind+': resolves before the change');
+    const provider=stepProvider(),pd=stepDiagram(provider);
+    if(change==='remove')pd.stepExports.payment.steps=['authorize','declined'];
+    else{stepById(provider,'persist').id='persist-v2';pd.stepExports.payment.steps=['authorize','persist-v2','declined'];}
+    assert.throws(()=>resolve([provider,consumer]),error=>error.message.startsWith(at+message),kind+' '+change);
+  }
+});
+test('nested providers re-export imported steps under nested namespaces and provenance',()=>{
+  const middle=stepImporter([{set:'payment',after:'checkout'}]),md=stepDiagram(middle);
+  middle.page.canon.id='middle';
+  md.topologyExports={flow:{nodes:['cart','pay::gateway','pay::auth','pay::ledger'],edges:['cart->pay::gateway','pay::gateway->pay::auth','pay::auth->pay::ledger']}};
+  md.stepExports={buy:{export:'flow',steps:['checkout','pay::authorize','pay::persist']}};
+  const outer={page:{title:'Outer',canon:{version:1,id:'outer',kind:'canonical',owner:'group:default/outer'},sections:[{id:'o',diagram:{
+    topologyImports:[{spec:'middle',export:'flow',as:'mid',stepImports:[{set:'buy'}]}]}}]}};
+  const out=resolve([stepProvider(),middle,outer])[2],od=stepDiagram(out);
+  assert.deepEqual(stepIds(out),['mid::checkout','mid::pay::authorize','mid::pay::persist']);
+  assert.equal(stepById(out,'mid::pay::persist').traceMatch.parentStepId,'mid::pay::authorize');
+  assert.deepEqual(stepById(out,'mid::pay::persist').edges,['mid::pay::auth->mid::pay::ledger']);
+  assert.deepEqual(od.topologyProvenance.imports.map(imp=>[imp.as,imp.steps]),[['mid',['mid::checkout','mid::pay::authorize','mid::pay::persist']],['mid::pay',['mid::pay::authorize','mid::pay::persist']]]);
+  assert.deepEqual(C.validateSpec(out).errors,[]);
+});
+test('step imports declare the flow.imported-steps capability',()=>{
+  const vm=require('node:vm'),ctx={};vm.runInNewContext(require('../tools/source-loader.cjs').readSource('compatibility.js'),ctx);
+  const F=ctx.FlowviewCompatibility,raw=stepImporter([{set:'payment'}]);
+  assert.ok(F.detect(raw).includes('flow.imported-steps'));assert.ok(!F.detect(stepConsumer()).includes('flow.imported-steps'));
+  const older={...F.features};delete older['flow.imported-steps'];
+  assert.ok(F.check(F.stamp(raw),{version:F.version,contract:'1',features:older}).missingFeatures.includes('flow.imported-steps'));
 });

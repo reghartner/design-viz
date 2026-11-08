@@ -1,0 +1,33 @@
+{
+  "page": {
+    "title": "Shared payment steps",
+    "canon": {"version":1,"id":"payments","kind":"canonical","owner":"group:default/payments"},
+    "sections": [{
+      "id": "payments", "heading": "Payment service",
+      "diagram": {
+        "nodes": {
+          "gateway": {"title":"Payment gateway"},
+          "auth": {"title":"Authorizer"},
+          "ledger": {"title":"Ledger"}
+        },
+        "rows": [["gateway", "auth", "ledger"]],
+        "edges": [
+          {"from":"gateway", "to":"auth", "kind":"https", "label":"Authorize"},
+          {"from":"auth", "to":"ledger", "kind":"https", "label":"Record"}
+        ],
+        "topologyExports": {
+          "core": {"nodes":["gateway","auth","ledger"], "edges":["gateway->auth","auth->ledger"]}
+        },
+        "steps": [
+          {"id":"authorize", "edge":"gateway->auth", "text":"Authorize the card",
+           "traceMatch":{"serviceName":"payments", "operation":"POST /authorize", "nodeId":"auth"}},
+          {"id":"record", "edge":"auth->ledger", "text":"Record the charge",
+           "traceMatch":{"serviceName":"ledger", "operation":"INSERT charge", "nodeId":"ledger", "parentStepId":"authorize"}}
+        ],
+        "stepExports": {
+          "charge": {"export":"core", "steps":["authorize","record"]}
+        }
+      }
+    }]
+  }
+}

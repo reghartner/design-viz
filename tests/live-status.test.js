@@ -2852,3 +2852,14 @@ test('First blocker focuses an explicit domain whose only blocker is in its deta
  h.view.querySelector('[data-dv-node="domain"] .card').focus=()=>{focused=true;};api.apply({'AA-1':{state:'blocked'}});
  assert.equal(api.snapshot().firstBlocker,true);h.view.querySelector('.dv-live-first').dispatchEvent({type:'click'});assert.equal(jumped,true);assert.equal(focused,true);api.destroy();
 });
+/* #1081 wiring: the controller hands the board Environment to the Load-trace form. */
+test('#1081 Load-trace connection environment follows the board Environment until the user picks one',()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json')));
+ const raw={tracking:{telemetry:{environment:'prd',environments:{prd:{},stg:{},perf:{}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){}}}}),api=h.ctl.liveStatus,form=()=>api.snapshot().trace.direct.form;
+ assert.equal(form().connection,'company');assert.equal(form().environment,'prod','board prd starts the trace dropdown at prod');
+ api.setMetricsEnvironment('stg');assert.equal(form().environment,'stage','board change is followed');
+ api.setMetricsEnvironment('perf');assert.equal(form().environment,'','no match shows Choose…');
+ api.setMetricsEnvironment('prd');api.setDirectTraceField({field:'environment',value:'stage'});api.setMetricsEnvironment('stg');api.setMetricsEnvironment('prd');assert.equal(form().environment,'stage','the user pick stays');
+ api.destroy();
+});

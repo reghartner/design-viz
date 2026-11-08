@@ -156,9 +156,11 @@ function trackingExistsWhen(value){
       honeycomb: {environment?, dataset?},
       window: <duration such as '1h'; default '24h', the previous 24 hours>,
       refreshMs: <number of ms, at least 60000>|null,
-      templates: {<name>: {kind?, params: [<name>], signals, proof?, links?}}}
+      templates: {<name>: {kind?, params: [<name>], signals, proof?, links?}},
+      lookups?: {<id>: {label, query, values?, datasource?, fields: {traceId, spanId}}}}
    Templates keep their authored form so `use` can expand them by pure string
-   substitution of the declared $param / ${param} placeholders. */
+   substitution of the declared $param / ${param} placeholders. Lookups are
+   present only when authored; see telemetryLookups. */
 var TELEMETRY_KINDS=['call','queue','service','log-event','device'];
 var TELEMETRY_SOURCES=['grafana','loki','tempo','sql','honeycomb','cloudwatch','cloudwatchLogs'];
 var TELEMETRY_CARD_SIDES=['right','left','above','below'];
@@ -416,6 +418,50 @@ function carrierTelemetry(obj,templates,invalid,environment){
   return {kind:clean.kind,signals:signals,proof:clean.proof || {},links:clean.links || {},card:clean.card || null};
 }
 function telemetryConfigUrl(value){try{var u=new URL(value);return typeof value==='string' && /^https?:\/\//i.test(value) && !/[\s\\]/.test(value) && !u.username && !u.password;}catch(e){return false;}}
+/* Load trace log lookups (#1099): a Loki log query whose lines carry a trace id
+   and span id (structured metadata, parsed or stream labels). The query keeps
+   its $value slot and environment placeholders; the viewer fills them when the
+   reader finds lines. A value never contains a quote, backtick or backslash, so
+   it cannot leave the LogQL string it is placed in. */
+var TELEMETRY_LOOKUP_FIELDS=['label','query','values','datasource','fields'];
+var telemetryLogFieldPattern=/^[A-Za-z_][A-Za-z0-9_]{0,79}$/;
+var telemetryLookupValuePattern=/^[^"`\\\x00-\x1f\x7f]{1,200}$/;
+function telemetryLookupSlot(query){return typeof query==='string' && /\$\{value\}|\$value(?![A-Za-z0-9_])/.test(query);}
+function telemetryLookups(raw,warn){
+  var out={};
+  if(!telemetryObject(raw)){warn('.lookups','must be an object of named log lookups {label, query, values?, datasource?, fields?} — ignored');return out;}
+  Object.keys(raw).forEach(function(id){
+    var at='.lookups.'+id,entry=raw[id],ok=true;
+    function bad(path,message){warn(at+path,message+' — lookup ignored');ok=false;}
+    if(!telemetryNamePattern.test(id)){bad('','lookup ids start with a letter and use letters, digits, - and _');return;}
+    if(Object.keys(out).length>=16){bad('','a board has at most 16 lookups');return;}
+    if(!telemetryObject(entry)){bad('','must be an object {label, query, values?, datasource?, fields?}');return;}
+    Object.keys(entry).forEach(function(key){if(TELEMETRY_LOOKUP_FIELDS.indexOf(key)<0)bad('.'+key,'unknown field');});
+    if(!telemetryText(entry.label) || entry.label.length>80 || /[\x00-\x1f\x7f]/.test(entry.label))bad('.label','must be plain text of 1–80 characters');
+    if(!telemetryText(entry.query) || entry.query.length>2000)bad('.query','must be a non-empty LogQL log query of at most 2000 characters');
+    if(telemetryOwn(entry,'values')){
+      if(!Array.isArray(entry.values) || !entry.values.length || entry.values.length>50)bad('.values','must be an array of 1–50 suggested values');
+      else entry.values.forEach(function(v,i){if(typeof v!=='string' || v.trim()!==v || !telemetryLookupValuePattern.test(v))bad('.values['+i+']','must be text of 1–200 characters without quotes, backticks, backslashes or control characters');});
+      if(telemetryText(entry.query) && !telemetryLookupSlot(entry.query))bad('.query','has suggested values but no $value slot');
+    }
+    if(telemetryOwn(entry,'datasource') && !telemetryText(entry.datasource))bad('.datasource','must be a non-empty Loki datasource UID');
+    var fields={traceId:'trace_id',spanId:'span_id'};
+    if(telemetryOwn(entry,'fields')){
+      if(!telemetryObject(entry.fields))bad('.fields','must be an object {traceId?, spanId?}');
+      else Object.keys(entry.fields).forEach(function(key){
+        if(['traceId','spanId'].indexOf(key)<0)bad('.fields.'+key,'unknown field');
+        else if(typeof entry.fields[key]!=='string' || !telemetryLogFieldPattern.test(entry.fields[key]))bad('.fields.'+key,'must be a Loki label name: letters, digits and _, not starting with a digit');
+        else fields[key]=entry.fields[key];
+      });
+    }
+    if(!ok)return;
+    var clean={label:entry.label.trim(),query:entry.query};
+    if(entry.values)clean.values=entry.values.slice();
+    if(entry.datasource)clean.datasource=entry.datasource;
+    clean.fields=fields;out[id]=clean;
+  });
+  return out;
+}
 function trackingTelemetry(page,invalid){
   var warn=telemetryWarn(invalid),out={enabled:true,grafana:{},honeycomb:{},window:TELEMETRY_DEFAULT_WINDOW,refreshMs:null,templates:{}};
   var tracking=page && page.tracking;
@@ -424,7 +470,7 @@ function trackingTelemetry(page,invalid){
   var value=tracking.telemetry;
   if(!telemetryObject(value)){warn('','must be an object {enabled?, grafana?, honeycomb?, window?, refreshMs?, templates?} — ignored');return out;}
   if(telemetryOwn(value,'enabled')){if(typeof value.enabled==='boolean')out.enabled=value.enabled;else warn('.enabled','must be a boolean — using true');}
-  telemetryUnknown(value,['enabled','grafana','honeycomb','window','refreshMs','templates','environment','environments','variables','traceConnections'],warn);
+  telemetryUnknown(value,['enabled','grafana','honeycomb','window','refreshMs','templates','environment','environments','variables','traceConnections','lookups'],warn);
   [['grafana',['prometheus','loki','tempo','sql','cloudwatch','accountId','baseUrl'],'datasource UID'],['honeycomb',['environment','dataset'],'name']].forEach(function(group){
     var key=group[0],given=value[key];
     if(!telemetryOwn(value,key))return;
@@ -493,6 +539,7 @@ function trackingTelemetry(page,invalid){
       clean.params=params;out.templates[name]=clean;
     });
   }
+  if(telemetryOwn(value,'lookups'))out.lookups=telemetryLookups(value.lookups,warn);
   if(typeof FlowTraceConnections!=='undefined' && (telemetryOwn(value,'traceConnections') || out.traceConnections))out.traceConnections=FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS,warn);
   return out;
 }

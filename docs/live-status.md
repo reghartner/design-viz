@@ -1510,6 +1510,7 @@ capabilities: {mcp: {servers: [
 ```
 
 Add `"query_cloudwatch"` only for bound CloudWatch metric signals and `"query_cloudwatch_logs"` only for bound Logs signals.
+A board with Load trace log lookups (`tracking.telemetry.lookups`, [Find a trace from a log line](trace-connections.md#find-a-trace-from-a-log-line)) also declares `"query_loki_logs"`.
 Add `"query_sql"` to the Grafana tools only when the page has `sql` signals and the
 server enables that tool; it is off by default in
 [grafana/mcp-grafana](https://github.com/grafana/mcp-grafana), the real server,

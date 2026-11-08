@@ -2,6 +2,7 @@
 (function(){
   var LIVE_SAMPLE=[["BE-67", "Build the notification service", "Riley"], ["BE-68", "Accept firmware events over HTTPS", "Riley"], ["FW-45", "Deliver firmware events", "Sam"], ["FW-46", "Integrate hardware interrupts", "Sam"], ["HW-123", "Debounce the doorbell button", "Alex"], ["HW-124", "Stabilize the hardware event signal", "Alex"], ["UX-89", "Show resident notifications", "Morgan"], ["UX-90", "Alert sound setting", "Morgan"]];
   var states=['todo','active','testing','done','blocked','missing'];
+  var logValueLists=0;
   var ticketStateOrder=['blocked','missing','active','testing','todo','done'];
   var ticketCollator=new Intl.Collator('en',{numeric:true,sensitivity:'base'});
   function ticketText(value){return String(value == null?'':value).trim();}
@@ -154,6 +155,52 @@
       host._liveTicketSort={field:field,direction:current && current.field===field && current.direction==='ascending'?'descending':'ascending'};
       if(api)paint(api.snapshot());
     };
+    // #1099: find a trace from a Loki log line. A chosen line loads through the
+    // form above it (connection, environment, lookback) and focuses its span.
+    function logLookupBody(config,box,logs,direct){
+      var section=el(config,'section','logs','dv-trace-logs');section.setAttribute('aria-label','Find a trace from a log line');
+      el(section,'h4','title','dv-trace-logs-title','Find a trace from a log line');
+      if(!logs.available)el(section,'p','unavailable','dv-trace-logs-status',logs.note).setAttribute('role','status');
+      function control(key,label,tag){
+        var wrap=el(section,'label',key+'-label','dv-trace-input-label');el(wrap,'span','label','',label);
+        var node=el(wrap,tag,key,'dv-trace-input');node.setAttribute('aria-label',label);node.disabled=!logs.available;
+        if(!node._logChange){node._logChange=function(){var owner=host._livePanelApi;if(owner)owner.setLogLookupField({field:key,value:node.value});};node.addEventListener(tag==='select'?'change':'input',node._logChange);}
+        return node;
+      }
+      var choose=control('lookup','Log lookup','select');
+      logs.lookups.forEach(function(l){el(choose,'option',l.id,'',l.label).value=l.id;});el(choose,'option',logs.typed,'','Type a LogQL query').value=logs.typed;
+      if(choose.value!==logs.form.lookup)choose.value=logs.form.lookup;
+      var lookup=logs.lookups.find(function(l){return l.id===logs.form.lookup;});
+      if(lookup && lookup.slot){
+        var value=control('value',lookup.label,'input');value.type='text';value.maxLength=200;value.autocomplete='off';value.spellcheck=false;value.placeholder=lookup.values.length?'Type or pick a value':'Type a value';
+        if(lookup.values.length){var list=el(section,'datalist','values','');list.id=host._logValuesId || (host._logValuesId='dv-trace-log-values-'+(++logValueLists));lookup.values.forEach(function(v,i){el(list,'option',String(i),'').value=v;});value.setAttribute('list',list.id);}
+        else value.removeAttribute('list');
+        if(value.value!==logs.form.value)value.value=logs.form.value;
+      }
+      if(!lookup){var typed=control('logql','LogQL log query','textarea');typed.maxLength=2000;typed.rows=3;typed.spellcheck=false;typed.placeholder='{env="prod"} |= "message" | field="value"';if(typed.value!==logs.form.logql)typed.value=logs.form.logql;}
+      var find=button(el(section,'div','actions','dv-live-controls'),'find','reader-button dv-trace-log-find','Find log lines','findLogLines');find.disabled=!logs.available || logs.busy;
+      var r=logs.result;if(!r)return;
+      var text=r.error || (logs.busy?'Finding log lines…':r.note || '');
+      if(text)el(section,'p','status','dv-trace-logs-status',text).setAttribute('role','status');
+      if(r.chosenNote)el(box,'p','log-note','dv-trace-direct-status',r.chosenNote).setAttribute('role','status');
+      if(!r.rows.length)return;
+      var rows=el(section,'ol','results','dv-trace-log-results');rows.setAttribute('aria-label','Matching log lines');
+      r.rows.forEach(function(row,i){
+        var item=el(rows,'li',String(i),'dv-trace-log-row');item.setAttribute('data-chosen',String(r.chosen===i));
+        el(item,'time','time','dv-trace-log-time',row.time?row.time.replace('T',' ').replace(/\.\d+Z$/,'Z'):'time unavailable');
+        el(item,'span','value','dv-trace-log-value',row.value).title=row.line;
+        if(!row.traceId){el(item,'span','missing','dv-trace-log-missing',row.missing);return;}
+        el(item,'code','trace','dv-trace-log-id',row.traceId);
+        var load=el(item,'button','load','reader-button dv-trace-log-load tbtn','Load');load.type='button';load.setAttribute('aria-label','Load trace '+row.traceId);load._logIndex=i;load.disabled=!direct.available || direct.busy;
+        if(!load._logClick){load._logClick=function(){
+          var owner=host._livePanelApi;if(!owner || load.disabled)return;var request=host._directRevealRequest=(host._directRevealRequest || 0)+1;
+          Promise.resolve(owner.loadLogTrace(load._logIndex)).then(function(result){
+            if(!live || !result || host._livePanelApi!==owner || host._directRevealRequest!==request)return;
+            var target=host.querySelector('.dv-trace-selected');if(target && target.getClientRects().length && target.scrollIntoView)target.scrollIntoView({block:'nearest',inline:'nearest'});
+          });
+        };load.addEventListener('click',load._logClick);}
+      });
+    }
     function directTraceBody(body,direct){
       if(!direct || !direct.profiles.length)return;
       var box=el(body,'section','direct','dv-trace-direct'),r=direct.report,loaded=!!(direct.exemplar && r && r.stage==='complete');
@@ -197,6 +244,7 @@
       };
       if(!load._directLoadClick){load._directLoadClick=function(){load._directLoadAction();};load.addEventListener('click',load._directLoadClick);}
       var verify=button(controls,'verify','reader-button dv-trace-verify','Verify trace connection','loadDirectTrace');verify._liveArgument=true;verify.disabled=load.disabled;
+      if(direct.logs)logLookupBody(config,box,direct.logs,direct);
       if(!direct.available)el(box,'p','unavailable','dv-trace-direct-status','Direct trace retrieval is unavailable in this host or view.').setAttribute('role','status');
       if(r){var report=el(box,'section','report','dv-trace-direct-report'+(loaded?' dv-trace-report-compact':''));report.setAttribute('aria-label','Trace connection report');
         el(report,'p','stage','dv-trace-direct-status',r.error || (r.stage==='complete'?'Loaded · ID matched · '+r.spanCount+' spans · '+r.completeness+' completeness':r.stage==='schema'?'Checking runtime tool schema…':'Loading exact trace…')).setAttribute('role','status');
@@ -474,6 +522,7 @@
 .dv-trace-direct{border:1px solid var(--explore-border);border-radius:6px;padding:10px;margin:10px 0}.dv-trace-input-label{display:grid;gap:4px;margin:8px 0}.dv-trace-input{box-sizing:border-box;width:100%;min-width:0;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);border-radius:4px;padding:6px}.dv-trace-arguments{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:10px}.dv-trace-direct-report{padding:8px;border:1px solid var(--explore-border);margin-top:8px}
 .dv-trace-config>summary,.dv-trace-time>summary,.dv-trace-diagnostics>summary{cursor:pointer;overflow-wrap:anywhere}.dv-trace-config-action{display:block;margin:3px 0 0 14px;color:var(--dfaint)}.dv-trace-time{margin:10px 0}.dv-trace-diagnostics{margin:6px 0}.dv-trace-report-compact{border:0;padding:0;margin:6px 0}.dv-trace-direct>.dv-live-controls{margin-top:6px}
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
+.dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}
 .dv-trace-selected{min-width:0}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}
 .dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall{max-height:240px;overflow:auto;margin:12px 0;border:1px solid var(--explore-border);border-radius:6px;padding:8px}
 .dv-trace-span{width:100%;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;align-items:center;padding:5px 0;font-size:10px}.dv-trace-span[aria-pressed="true"]{background:color-mix(in srgb,var(--dv-live-active) 10%,transparent)}.dv-trace-span:focus-visible{outline:2px solid var(--dv-live-active)}.dv-trace-operation-detail{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;gap:6px;margin-top:12px;padding:8px;border:1px solid var(--explore-border);border-radius:6px}.dv-trace-operation-detail>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}.dv-trace-operation-detail small{grid-column:1/-1}.dv-trace-duration{font:700 13px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}.dv-trace-span .dv-trace-duration{grid-column:2;grid-row:1;white-space:nowrap}.dv-trace-operation-detail .dv-trace-duration{font-size:20px;line-height:1.4}.dv-trace-span-name{grid-column:1;grid-row:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-track{grid-column:1/-1;grid-row:2;height:10px;background:color-mix(in srgb,var(--dink) 7%,transparent)}.dv-trace-bar{display:block;box-sizing:border-box;max-width:100%;height:10px;background:var(--dv-live-active)}.dv-trace-span[data-error="true"] .dv-trace-bar{background:var(--dv-live-blocked)}

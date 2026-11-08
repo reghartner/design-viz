@@ -222,3 +222,43 @@ test('#1078 an edit re-render carries a loaded trace with the environment the re
  assert.equal(form.environment,'prod','the picked environment survives the re-render');assert.equal(form.input,ID);assert.equal(form.section,'next/section/diagram/mount');
  assert.equal(after.snapshot().exemplar.traceId,ID);
 });
+
+/* #1142: on a selected Over time day, a blank Trace start / end searches that day. The controller's day
+   hook gives the day; the clock is fixed at 12:00 local on Nov 8 and the day is Nov 6. */
+test('#1142 an Over time day sets the window: shortest lookback or the day bounds; typed and link time win',async()=>{
+ const zone=process.env.TZ;process.env.TZ='America/New_York';
+ try{
+  const now=new Date(2026,10,8,12).getTime(),from=new Date(2026,10,6).toISOString(),to=new Date(2026,10,7).toISOString();
+  const nov6={key:'2026-11-06',today:false,label:'Nov 6',window:{from,to,label:'Nov 6 00:00–24:00 local'}};let selected=nov6;
+  const clocked=(name='standalone')=>{const C=context(name);vm.runInContext('Date.now=function(){return '+now+';};',C);return C;};
+  // Lookback-only Honeycomb: Nov 6 00:00 to Nov 8 12:00 is 60 h. One call per Load and per Verify.
+  let h=setup({C:clocked(),hooks:{day:()=>selected}});
+  assert.ok(await h.api.load(false));assert.ok(await h.api.load(true));
+  assert.deepEqual(h.calls.map(c=>c.args.from),['-60h','-60h'],'the shortest lookback that reaches the day start');
+  assert.equal(h.api.snapshot().bounds.lookback,'60h');assert.deepEqual(clone(h.api.snapshot().day),{label:'Nov 6',range:'Nov 6 00:00–24:00 local',lookback:'60h'});
+  h.api.set('start','-3h');assert.ok(await h.api.load());assert.equal(h.calls.at(-1).args.from,'-3h','a typed Trace start wins');
+  h.api.set('start','');selected=null;assert.ok(await h.api.load());assert.equal(h.calls.at(-1).args.from,'-2h','Live keeps the profile lookback');assert.equal(h.api.snapshot().day,null);
+  // Today: the window end moves with every read and is not part of the request identity.
+  let tick=0;selected=null;h.api.destroy();
+  h=setup({C:clocked(),hooks:{day:()=>({key:'2026-11-08',today:true,label:'Nov 8',window:{from:new Date(2026,10,8).toISOString(),to:new Date(now+(++tick)).toISOString(),label:'Nov 8 00:00–12:00 local'}})}});
+  assert.ok(await h.api.load(),'a moving end does not cancel the request');assert.equal(h.calls.at(-1).args.from,'-12h');
+  h.api.destroy();
+  // A day change retires a pending request; the typed trace ID stays.
+  let release;selected=nov6;h=setup({C:clocked(),hooks:{day:()=>selected},call:async()=>{await new Promise(r=>release=r);return {payload:recorded};}});
+  const pending=h.api.load();for(let i=0;i<10 && !release;i++)await new Promise(setImmediate);assert.ok(release);
+  selected={...nov6,key:'2026-11-05',label:'Nov 5'};release();assert.equal(await pending,null);assert.equal(h.api.snapshot().form.input,ID);h.api.destroy();
+  // Absolute Honeycomb (iso8601 with an end argument): the day's bounds; a link's own time still wins.
+  selected=nov6;const abs=profile();abs.time.encoding='iso8601';abs.arguments.end='to';const t=tool();t.inputSchema.properties.to={type:'string'};
+  h=setup({C:clocked(),p:board(abs),hooks:{day:()=>selected}});h.setTools([t]);
+  assert.ok(await h.api.load());assert.equal(h.calls.at(-1).args.from,'2026-11-06T05:00:00.000000000Z');assert.equal(h.calls.at(-1).args.to,'2026-11-07T05:00:00.000000000Z');
+  assert.equal(h.api.snapshot().day.lookback,null);
+  h.api.set('input','https://ui.honeycomb.io/example-team/environments/production/trace?trace_id='+ID+'&trace_start_ts=1791779586.602194688&trace_end_ts=1791779592.123456789');
+  assert.equal(h.api.snapshot().bounds.linkTime,true);assert.ok(await h.api.load());assert.equal(h.calls.at(-1).args.from,'2026-10-12T04:33:06.602194688Z','the link time wins');assert.equal(h.calls.at(-1).args.to,'2026-10-12T04:33:12.123456789Z');
+  h.api.set('input',ID);h.api.set('start','2026-11-05T00:00:00Z');h.api.set('end','2026-11-05T06:00:00Z');assert.ok(await h.api.load());assert.equal(h.calls.at(-1).args.from,'2026-11-05T00:00:00.000000000Z','typed start and end win');
+  h.api.destroy();
+  // Tempo: start and end are the day's bounds.
+  const C=clocked('native'),raw=JSON.parse(fs.readFileSync('tests/fixtures/provider-traces/grafana-source-test.json','utf8')),tempo={version:1,label:'Company Tempo',provider:'tempo',server:'Company Grafana',tool:'get_tempo_trace',readOnly:true,adapter:'tempo-v1',arguments:{traceId:'trace_id',start:'start',end:'end'},time:{encoding:'iso8601',type:'string',defaultLookback:'2h'},literals:{datasourceUid:'tempo-main'},environments:{prod:{}},links:[]},calls=[];
+  const api=C.createTelemetryDirect(board(tempo),{describe:async()=>({name:tempo.tool,annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{datasourceUid:{type:'string'},trace_id:{type:'string'},start:{type:'string'},end:{type:'string'}},required:['datasourceUid','trace_id','start','end'],additionalProperties:false}}),call:async(request,args)=>{calls.push(clone(args));return {payload:raw};}},{day:()=>selected});
+  api.set('input',raw.traceId);assert.ok(await api.load(true));assert.equal(calls.length,1);assert.equal(calls[0].start,'2026-11-06T05:00:00.000000000Z');assert.equal(calls[0].end,'2026-11-07T05:00:00.000000000Z');api.destroy();
+ }finally{if(zone===undefined)delete process.env.TZ;else process.env.TZ=zone;}
+});

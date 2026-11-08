@@ -2987,3 +2987,25 @@ test('#1124 a log-line trace that is not found says it may not have been kept an
  api.setDirectTraceField({field:'input',value:ids[0]});assert.equal(await api.loadDirectTrace(false),null);assert.equal(report().error,'Trace not found in the last 2h. Try a longer lookback under Lookback.');
  api.destroy();
 });
+/* #1142: in Over time, Load trace and Verify call the transport and search the selected day. */
+test('#1142 Over time Load trace and Verify call the transport with the selected day window',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),ID='8413cd87a9f15b6bfe8e1acf5b3346d0',calls=[];
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const raw=overFixture();raw.page.tracking.telemetry={traceConnections:{company:profile}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async(request,args)=>{calls.push(plain(args));return {payload:recorded};}}}}),api=overReady(h.ctl.liveStatus),m=mountStatus(h);
+ api.apply(overToday());api.setStatusMode('trace');api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:ID});
+ const days=historyDays(providerContext(),[historyTicket('AA-1',Date.now()-4*86400000,'In Progress')],{'AA-1':{state:'active'}},Date.now());
+ api.setHistory({load:()=>days});api.overTime();await historySettle();api.overTimeDay(days.days.length-3);
+ const day=api.snapshot().overTime,hours=()=>Math.max(1,Math.ceil((Date.now()-Date.parse(day.window.from))/3600000)),before=hours();
+ assert.equal(day.active,true);assert.equal(day.today,false);
+ assert.ok(await api.loadDirectTrace(false),'Over time loads a trace');assert.ok(await api.loadDirectTrace(true),'Over time verifies');
+ assert.equal(calls.length,2,'one get_trace per Load and per Verify');
+ calls.forEach(args=>assert.ok(['-'+before+'h','-'+hours()+'h'].includes(args.from),args.from+' reaches the day start'));
+ assert.equal(api.snapshot().trace.direct.available,true);
+ const note=m.body.querySelector('.dv-trace-lookback-note');assert.ok(note);
+ assert.equal(note.textContent,'Searches '+day.label+' · looks back '+calls[1].from.slice(1)+' (this connection cannot stop at a past time)');
+ // A day without a date has no window; Load trace stays off there.
+ overBackToLive(api);await historySettle();api.setHistory({load:()=>({days:overDays()})});api.overTime();await historySettle();
+ assert.equal(api.snapshot().overTime.window,null);assert.equal(api.snapshot().trace.direct.available,false);assert.equal(await api.loadDirectTrace(false),null);assert.equal(calls.length,2);
+ api.destroy();
+});

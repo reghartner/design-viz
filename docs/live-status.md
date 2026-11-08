@@ -1400,6 +1400,13 @@ connector: the issue sits in `issues.nodes[0]`, and a plain top-level REST issue
 also accepted. A ticket with a very long changelog has not been tested. Past-day
 Blocked from Flagged assumes Flagged changes appear in the changelog.
 
+**Selected day window.** `ctl.liveStatus.snapshot().overTime.window` is the selected
+day's time range for trace and log searches, `{from, to, label}`, or null in Live. `from` is
+the local midnight that starts the day's `key`; `to` is the day's `at`, the next
+local midnight, so a DST day covers 23 or 25 hours, and today ends now. Both are
+UTC RFC3339 strings; `label` reads like `Nov 6 00:00–24:00 local`. It does not
+need Metrics. A day without a `YYYY-MM-DD` key has no window.
+
 ## Dependencies
 
 Edge direction is data flow and infers nothing about delivery. A dependency is

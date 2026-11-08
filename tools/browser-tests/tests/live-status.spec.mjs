@@ -281,9 +281,11 @@ test('O1 O2 O3 O4 O5 O6 O7 demo Over time moves through days without changing an
  const before=await activity();expect(before.length).toBeGreaterThan(0);
  await overTime.click();await expect(overTime).toHaveAttribute('aria-pressed','true');await expect(live).toHaveAttribute('aria-pressed','false');await expect(slider).toHaveValue('3');await expect(slider).toHaveAttribute('min','0');await expect(slider).toHaveAttribute('max','11');await expect(slider).toHaveAttribute('step','1');
  await expect(row.locator('.dv-live-over-time-end')).toHaveText(['Day 1','Day 12']);await expect(row.locator('.dv-live-over-time-note')).toHaveText('Status as of Day 4 — signal blocker · other columns show today');await expect(row).toBeVisible();
+ // #1082: a demo day is a scripted date, so its heading shows the day's label and never TODAY.
+ const heading=row.locator('.dv-live-over-time-day');await expect(heading).toHaveText('Day 4 — signal blocker');await expect(row.locator('.dv-live-over-time-date')).toBeHidden();
  // O2 O3. Keyboard back to Day 1.
  await slider.focus();for(const value of ['2','1','0']){await page.keyboard.press('ArrowLeft');await expect(slider).toHaveValue(value);await expect(slider).toBeFocused();}
- await expect(note).toHaveText('Day 1 — kickoff');await expect(slider).toHaveAttribute('aria-valuetext','Day 1 — kickoff');await expect(edge).toHaveClass(/dv-live-todo/);await expect(edge).not.toHaveClass(/dv-live-blocked/);await expect(coin).toHaveClass(/dv-live-todo/);
+ await expect(note).toHaveText('Day 1 — kickoff');await expect(slider).toHaveAttribute('aria-valuetext','Day 1 — kickoff');await expect(heading).toHaveText('Day 1 — kickoff');await expect(edge).toHaveClass(/dv-live-todo/);await expect(edge).not.toHaveClass(/dv-live-blocked/);await expect(coin).toHaveClass(/dv-live-todo/);
  await expect(panel.locator('[data-live-count="todo"]')).toHaveText('todo 7');await expect(panel.locator('[data-live-count="blocked"]')).toBeHidden();await expect(panel.locator('[data-live-count="missing"]')).toHaveText('missing 1');await expect(panel.locator('.dv-live-blocker')).toHaveCount(0);await expect(state('HW-124')).toHaveText('todo');
  await expect(state('UX-90')).toHaveText('missing');await expect(state('UX-90')).toHaveClass(/dv-live-missing/);await expect(ticket('UX-90').locator('.dv-live-ticket-title')).toHaveText('Alert sound setting');await expect(progress).toHaveText('0 of 8 stories done · 7 of 8 on diagram');await expect(completion).toContainText('0/11');await expect(panel.getByRole('button',{name:'No blockers',exact:true})).toBeDisabled();
  expect(await activity(),'O4 Day 1').toEqual(before);
@@ -298,7 +300,7 @@ test('O1 O2 O3 O4 O5 O6 O7 demo Over time moves through days without changing an
  expect(await activity(),'O4 Live with no player move').toEqual(before);
  // O5. Next day shares the slider's day: Day 2 → Day 3, then on to Day 5, which Live keeps.
  await overTime.click();await expect(slider).toHaveValue('3');await slider.focus();await page.keyboard.press('ArrowLeft');await page.keyboard.press('ArrowLeft');await expect(slider).toHaveValue('1');await expect(note).toHaveText('Day 2 — hardware starts');
- await next.click();await expect(slider).toHaveValue('2');await expect(note).toHaveText('Day 3 — firmware starts');await expect(state('HW-124')).toHaveText('active');await expect(overTime).toHaveAttribute('aria-pressed','true');expect(await activity(),'O4 Next day on a past day').toEqual(before);
+ await next.click();await expect(slider).toHaveValue('2');await expect(note).toHaveText('Day 3 — firmware starts');await expect(heading).toHaveText('Day 3 — firmware starts');await expect(state('HW-124')).toHaveText('active');await expect(overTime).toHaveAttribute('aria-pressed','true');expect(await activity(),'O4 Next day on a past day').toEqual(before);
  for(const value of ['3','4']){await next.click();await expect(slider).toHaveValue(value);}await expect(note).toContainText('Day 5 —');
  await live.click();await expect(note).toContainText('Day 5 —');await expect(state('BE-67')).toHaveText('active');await expect(panel.locator('.dv-live-activity')).toContainText('BE-67 · todo → active');
  expect(requests,'O7 no network').toEqual([]);expect(await page.locator('#flowspec').textContent(),'O7 spec').toBe(spec);

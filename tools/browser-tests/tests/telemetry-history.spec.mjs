@@ -58,6 +58,19 @@ test('tandem native: Metrics off incurs Jira only; on within history, keyboard d
  const boxes=await root.evaluate(host=>{const scope=host.shadowRoot;return [...scope.querySelectorAll('.dv-metrics-card-box')].map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};});});expect(boxes).toHaveLength(3);expect(boxes.every(b=>b.w>0&&b.h>0)).toBe(true);
 });
 
+test('#1082 Over time shows the selected day large, TODAY on a day dated today, and the slider and day buttons update it',async({page,server})=>{
+ const root=await setup(page,server);
+ // Date the three days two days ago, yesterday and today in the page's own time zone.
+ await page.evaluate(()=>{const now=new Date();window.historyDays.forEach((day,i)=>{day.key=new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()+i-2)).toISOString().slice(0,10);});});
+ const row=root.locator('.dv-live-over-time-row'),day=row.locator('.dv-live-over-time-day'),date=row.locator('.dv-live-over-time-date'),next=root.getByRole('button',{name:'Next day',exact:true});
+ await over(root).click();await expect(slider(root)).toHaveValue('2');await expect(day).toHaveText('TODAY');await expect(date).toHaveText('Day 3');
+ const size=locator=>locator.evaluate(el=>parseFloat(getComputedStyle(el).fontSize)),note=await size(row.locator('.dv-live-over-time-note'));
+ expect(await size(day),'heading-sized').toBeGreaterThanOrEqual(18);expect(await size(day)).toBeGreaterThan(await size(date));expect(await size(date)).toBeGreaterThan(note);
+ await select(root,0);await expect(day).toHaveText('Day 1');await expect(date).toBeHidden();
+ await next.click();await expect(slider(root)).toHaveValue('1');await expect(day).toHaveText('Day 2');
+ await next.click();await expect(day).toHaveText('TODAY');
+ await live(root).click();await expect(row).toHaveCount(0);
+});
 test('pending history cancels on Metrics off and cannot resurrect; returning Live remains usable',async({page,server})=>{
  const root=await setup(page,server,{pending:true});await metrics(root).click();await expect(root.locator('.dv-metrics-card')).toHaveCount(3);await over(root).click();await expect(slider(root)).toBeVisible();await expect.poll(()=>page.evaluate(()=>window.calls.history.length)).toBe(1);
  await select(root,0);await metrics(root).click();expect(await page.evaluate(()=>window.calls.aborts)).toBe(1);await page.evaluate(()=>window.releases.splice(0).forEach(fn=>fn()));await expect(root.locator('.dv-metrics-card')).toHaveCount(0);

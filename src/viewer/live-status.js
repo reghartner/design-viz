@@ -917,7 +917,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     sections:directTraceSections,
     identity:function(){return [telemetry.environment(),telemetry.snapshot().historical];},
     environment:function(){return telemetry.environment();},
-    disabled:function(){return retired || telemetryOptions===false || !trackingTelemetry(page).enabled || telemetry.snapshot().historical;},
+    // #1142: Over time searches the selected day. A day without a date has no window, so Load stays off there.
+    day:function(){var state=over && overTimeState();return state && state.window?{key:over.days[over.index].key,today:state.today,label:state.label,window:state.window}:null;},
+    disabled:function(){return retired || telemetryOptions===false || !trackingTelemetry(page).enabled || telemetry.snapshot().historical && !overTimeWindow();},
     accountChanged:function(){telemetry.clear();telemetry.setAvailable(false);},
     changed:function(){if(!retired){paint();notify();}}
   });

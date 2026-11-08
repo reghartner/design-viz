@@ -352,6 +352,23 @@ would send:
   (such as the Honeycomb profile in [trace connections](trace-connections.md)),
   or a start-only or end-only link that the time controls do not complete.
 
+In Over time, Load trace and Verify search the selected day
+([Selected day window](live-status.md#over-time)) when Trace start and Trace
+end are blank and the link has no time of its own (#1142):
+
+- "Searches Nov 6 00:00–24:00 local" on a connection with absolute time
+  (Tempo, or Honeycomb with `time.encoding: iso8601`): start and end are the
+  day's bounds.
+- "Searches Nov 6 · looks back 60h (this connection cannot stop at a past
+  time)" on a relative-only connection: the shortest lookback that reaches the
+  day's start, `-Nh` with N = ceil((now − start) / 1 h), or `-Nd` beyond
+  9999 h. The window runs to now.
+
+A link's own time and a typed Trace start / Trace end still win, and Live is
+unchanged. Changing the day retires a pending or loaded trace and keeps the
+typed trace ID. A day without a date has no window; Load trace is unavailable
+on it.
+
 When `get_trace` answers with only a Metadata block whose `navigation_hints`
 starts with `no spans found` and no span table, the panel opens the Lookback
 section once for that result and reports, using the window that was sent:

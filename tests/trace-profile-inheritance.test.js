@@ -18,6 +18,7 @@ const NO_TRACES={
 const USES_TRACES={
   'traceMatch step':page({},{steps:[{id:'checkout',nodes:['a'],traceMatch:clone(MATCH)}]}),
   'traceMatch step in a tab section':{title:'Tabs',blocks:[{tabs:[{label:'One',sections:[{id:'plain',diagram:diagram({})}]},{label:'Two',sections:[{id:'traced',diagram:diagram({steps:[{id:'checkout',nodes:['a'],traceMatch:clone(MATCH)}]})}]}]}]},
+  'traceMatch step in a nested tab under a tab blocks key':{title:'Nested tabs',blocks:[{tabs:[{label:'Outer',blocks:[{id:'plain',diagram:diagram({})},{tabs:[{label:'Inner',sections:[{id:'traced',diagram:diagram({steps:[{id:'checkout',nodes:['a'],traceMatch:clone(MATCH)}]})}]}]}]}]}]},
   'live-status panel with page telemetry':page({tracking:{telemetry:{}}},{panels:[PANEL]}),
   'live-status panel with a node telemetry binding':page({},{nodes:{a:{title:'A',telemetry:clone(SIGNALS)},b:{title:'B'}},panels:[PANEL]}),
   'live-status panel with an edge telemetry binding':page({},{edges:[{from:'a',to:'b',telemetry:clone(SIGNALS)}],panels:[PANEL]}),

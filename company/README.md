@@ -21,4 +21,4 @@ Everything below is discovered automatically. No upstream list needs an edit.
 
 See [docs/company-overlay.md](../docs/company-overlay.md) for details.
 
-Company MCP trace defaults may be declared in `company.json.traceConnections`. They contain no credentials, are inherited by default, and fetch only on explicit Load/Verify. Boards may restrict profiles or disable them with `traceConnections: {}`. See [direct trace profiles and the verification handoff](../docs/trace-connections.md).
+Company MCP trace defaults may be declared in `company.json.traceConnections`. They contain no credentials, are inherited only by boards that use traces (`traceMatch` steps, or a live-status panel with telemetry), and fetch only on explicit Load/Verify. Boards may restrict profiles or disable them with `traceConnections: {}`. See [direct trace profiles and the verification handoff](../docs/trace-connections.md).

@@ -516,7 +516,7 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
         ]
     if direct:
         lines += ["", "## Direct trace connections",
-                  "Company profiles inherit; traceConnections:{} disables. Load/Verify calls only the configured detail tool after schema/host permission checks. No search, numeric fetch or board write.",
+                  "Company profiles inherit on boards that use traces; traceConnections:{} disables. Load/Verify calls only the configured detail tool after schema/host permission checks. No search, numeric fetch or board write.",
                   f"Connection handoff: {PUBLIC_REPO}/blob/{ref}/docs/trace-connections.md ."]
     if tracked:
         lines += [

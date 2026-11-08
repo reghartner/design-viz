@@ -47,10 +47,27 @@ var FlowTraceConnections=(function(){
     });return p;
   }
   function profiles(raw){if(!object(raw) || Object.keys(raw).length>16)fail('configuration','traceConnections must be an object of at most 16 profiles.');var out={};Object.keys(raw).forEach(function(id){if(!name(id))fail('configuration','Invalid connection id.');out[id]=profile(raw[id]);});return out;}
+  /* #1095: company profiles are inherited only by a board that uses traces: a
+     step with traceMatch, or a live-status panel (Status -> Trace) on a page
+     that authors telemetry (tracking.telemetry, or a node, edge or imported
+     carrier overlay telemetry binding). The section walk mirrors FlowCanon
+     sections() (src/canon.js): tab sections or blocks, nested tabs included. */
+  function usesTraces(page){
+    var diagrams=[];if(!object(page))return false;
+    function list(v){return Array.isArray(v)?v:[];}
+    function walk(items){list(items).forEach(function(s){if(!object(s))return;if(object(s.diagram))diagrams.push(s.diagram);list(s.tabs).forEach(function(t){if(object(t))walk(t.sections || t.blocks);});});}
+    walk(page.blocks || page.sections);
+    function values(v){return object(v)?Object.keys(v).map(function(k){return v[k];}):[];}
+    function bound(v){return object(v) && own(v,'telemetry');}
+    if(diagrams.some(function(d){return list(d.steps).some(function(s){return object(s) && !!s.traceMatch;});}))return true;
+    if(!diagrams.some(function(d){return list(d.panels).some(function(p){return object(p) && p.type==='live-status';});}))return false;
+    if(object(page.tracking) && own(page.tracking,'telemetry'))return true;
+    return diagrams.some(function(d){return values(d.nodes).some(bound) || list(d.edges).some(bound) || list(d.topologyImports).some(function(imp){return object(imp) && (values(imp.nodeTracking).some(bound) || values(imp.edgeTracking).some(bound));});});
+  }
   function resolve(page,company,invalid){
     var config=page && page.tracking && page.tracking.telemetry,out={};config=object(config)?config:{};
     if(config.enabled===false)return out;
-    if(!own(config,'traceConnections')){try{return profiles(company || {});}catch(e){if(invalid)invalid('.traceConnections',e.message);return out;}}
+    if(!own(config,'traceConnections')){if(!usesTraces(page))return out;try{return profiles(company || {});}catch(e){if(invalid)invalid('.traceConnections',e.message);return out;}}
     var raw=config.traceConnections;
     try{if(!object(raw) || Object.keys(raw).length>16)fail('configuration','traceConnections must be a bounded object.');}catch(e){if(invalid)invalid('.traceConnections',e.message);return out;}
     Object.keys(raw).forEach(function(id){try{
@@ -135,5 +152,5 @@ var FlowTraceConnections=(function(){
     if(t.inputSchema.type!=='object' || !object(t.inputSchema.properties))fail('schema','Runtime detail tool requires an object input schema.');
     validate(args,t.inputSchema);
   }
-  return {profile:profile,profiles:profiles,resolve:resolve,input:input,validate:validate,tool:tool,fail:fail};
+  return {profile:profile,profiles:profiles,resolve:resolve,usesTraces:usesTraces,input:input,validate:validate,tool:tool,fail:fail};
 })();

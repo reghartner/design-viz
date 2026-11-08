@@ -192,7 +192,7 @@ def generate(panel_names, feature_names, mode='new', raw=None):
     if company_context.get('traceConnections'):
         parts.append('## Company direct trace profiles\n\n' +
                      json.dumps(company_context['traceConnections'], sort_keys=True) +
-                     '\n\nThese are inherited non-secret configuration defaults, not permission. Restrict profiles at '
+                     '\n\nThese are non-secret configuration defaults, not permission, inherited only by boards that use traces (a traceMatch step, or a live-status panel on a page with telemetry). Restrict profiles at '
                      '`page.tracking.telemetry.traceConnections`; use {} to disable direct loading. See the trace connections handoff contract.')
     if company_context.get('awsAccounts'):
         parts.append('## Company AWS account defaults\n\n' +

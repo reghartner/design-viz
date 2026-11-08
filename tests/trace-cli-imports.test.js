@@ -27,38 +27,45 @@ test('preview --resolve-imports maps steps to the imported namespaced nodes with
   assert.deepEqual(fs.readFileSync(h.spec),before);h.unchanged();
 });
 
-test('reference and compare --resolve-imports produce output and leave the authored spec byte-identical',t=>{
+test('reference and compare --resolve-imports output the authored spec with the new evidence and leave the input byte-identical',t=>{
   const h=setup(t),before=fs.readFileSync(h.spec),out=path.join(h.dir,'reference.json');
   const reference=cli('reference','--spec',h.spec,'--trace',h.happy,'--resolve-imports',REGISTRY,'--reason','Reviewed checkout mapping','--out',out);
   assert.equal(reference.status,0,reference.stderr);
-  const referenceTrace=JSON.parse(fs.readFileSync(out,'utf8')).page.sections[0].diagram.referenceTrace;
+  const approved=JSON.parse(fs.readFileSync(out,'utf8')),referenceTrace=approved.page.sections[0].diagram.referenceTrace;
   assert.equal(referenceTrace.approval.reason,'Reviewed checkout mapping');
   assert.deepEqual(referenceTrace.mapping,[{stepId:'request',spanIds:['submit']},{stepId:'persist',spanIds:['insert']}]);
+  // The authored board plus referenceTrace: imports kept, no provider content inlined.
+  delete approved.page.sections[0].diagram.referenceTrace;assert.deepEqual(approved,h.raw);
   assert.deepEqual(fs.readFileSync(h.spec),before);
-  // The resolved copy must never replace the authored file.
   const overwrite=cli('reference','--spec',h.spec,'--trace',h.happy,'--resolve-imports',REGISTRY,'--reason','Reviewed','--out',h.spec);
   assert.equal(overwrite.status,1);assert.match(overwrite.stderr,/authored spec/);
   assert.deepEqual(fs.readFileSync(h.spec),before);
-  // An authored consumer that keeps its imports and carries the approved reference.
-  const approved=structuredClone(h.raw);approved.page.sections[0].diagram.referenceTrace=referenceTrace;
-  const authored=h.write('approved.spec.json',approved),saved=fs.readFileSync(authored);
-  const compare=cli('compare','--spec',authored,'--trace',h.failed,'--resolve-imports',REGISTRY);
+  const saved=fs.readFileSync(out),compare=cli('compare','--spec',out,'--trace',h.failed,'--resolve-imports',REGISTRY);
   assert.equal(compare.status,0,compare.stderr);
   assert.equal(JSON.parse(compare.stderr).firstDivergence,'persist');
   const d=JSON.parse(compare.stdout).page.sections[0].diagram,incident=d.paths.at(-1);
   assert.match(incident.id,/^incident-/);
   assert.deepEqual(d.steps.find(s=>s.id===incident.steps.at(-1)).nodes,['platform::store']);
-  assert.ok(d.nodes['platform::store']);
-  assert.deepEqual(fs.readFileSync(authored),saved);h.unchanged();
+  assert.deepEqual(d.topologyImports,h.raw.page.sections[0].diagram.topologyImports);
+  assert.equal(d.topologyProvenance,undefined);assert.deepEqual(Object.keys(d.nodes),['client']);
+  // The same overlay compare writes for the authored board without the option.
+  const unresolved=cli('compare','--spec',out,'--trace',h.failed);
+  assert.equal(unresolved.status,0,unresolved.stderr);assert.equal(unresolved.stdout,compare.stdout);assert.equal(unresolved.stderr,compare.stderr);
+  assert.deepEqual(fs.readFileSync(out),saved);h.unchanged();
 });
 
-test('without --resolve-imports a spec with topology imports exits 1 and names the option',t=>{
+test('without --resolve-imports preview and reference exit 1 naming the option; resolver errors name it too',t=>{
   const h=setup(t),before=fs.readFileSync(h.spec);
-  for(const command of ['preview','reference','compare']){
+  for(const command of ['preview','reference']){
     const run=cli(command,'--spec',h.spec,'--trace',h.happy,'--reason','Reviewed');
     assert.equal(run.status,1,command);assert.match(run.stderr,/--resolve-imports <repository folder or registry JSON>/,command);
   }
   const usage=cli('preview');
   assert.equal(usage.status,1);assert.match(usage.stderr,/\[--resolve-imports <repository folder or registry JSON>\]/);
-  assert.deepEqual(fs.readFileSync(h.spec),before);
+  const registry=cli('preview','--spec',h.spec,'--trace',h.happy,'--resolve-imports',path.join(h.dir,'missing.json'));
+  assert.equal(registry.status,1);assert.match(registry.stderr,/^--resolve-imports .*missing\.json: ENOENT/);
+  const orphan=structuredClone(h.raw);orphan.page.sections[0].diagram.topologyImports[0].spec='inventory';
+  const provider=cli('preview','--spec',h.write('orphan.spec.json',orphan),'--trace',h.happy,'--resolve-imports',REGISTRY);
+  assert.equal(provider.status,1);assert.match(provider.stderr,/^--resolve-imports .*missing spec inventory/);
+  assert.deepEqual(fs.readFileSync(h.spec),before);h.unchanged();
 });

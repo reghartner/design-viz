@@ -745,10 +745,10 @@ The generic desktop Workbench picker lists **Delivery → Live status**; inserti
 and Export project preserve the panel. There are no authored state or patch fields.
 
 The Jira and Trace views share one header (#1131). Its top row holds **Jira** | **Trace**,
-an **Env** select when the board names environments, and the **Metrics overlay** switch at
-the right edge. The next row holds **Live** | **Over time** and, at its right edge, **Edit**
-(then **Save N changes**, **Discard** or **Done**) for anyone who can edit the board; the
-day row and any Over time error follow it in both views. A board with no ticket or epic
+an **Env** select when the board names environments, **Edit** (then **Save N changes**,
+**Discard** or **Done**) for anyone who can edit the board, and the **Metrics overlay** switch
+at the right edge. The Metrics connector line follows (#1136), then **Live** | **Over time**,
+the day row and any Over time error, in both views. A board with no ticket or epic
 references after imports has no Jira view (#1136): the panel opens on Trace with no
 **Jira** | **Trace** switch, and Metrics overlay paints its cards there. If a loaded detail
 brings ticket references, the switch appears and the panel moves to Jira unless the reader
@@ -770,8 +770,8 @@ provider or a demo telemetry source (see [Telemetry provider](#telemetry-provide
 without one it is hidden. It is off on every load and its state is never saved.
 Turning it on calls the telemetry provider at once in Live mode and keeps it refreshing; turning
 it off stops the provider and clears the telemetry map. It never changes Live or the
-Jira paint, and Live never changes it. A second connector indicator follows the Jira
-one, with the same dot colors: “Metrics: not connected” while off, “Metrics:
+Jira paint, and Live never changes it. Its connector line in the shared header uses the
+Jira connector's dot colors: “Metrics: not connected” while off, “Metrics:
 connecting” until the first answer, “Metrics: connected, refreshed 3:42:15 PM” (“Metrics:
 demo, …” for a demo source) and “Metrics: did not answer · <message>” after a failed
 call. The header shows whenever Metrics is available, even on a page without Jira

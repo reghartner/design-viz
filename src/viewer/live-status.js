@@ -807,7 +807,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         if(old)sectionRecords(old).forEach(function(record){var d=record.section.diagram;if(d){retiredIds=retiredIds.concat(Object.keys(d.nodes || {}),(d.edges || []).map(function(edge){return edge.from+'->'+edge.to;}));}});
         remotePages[remoteKey(ref)]=normalize(raw);telemetry.bindingsChanged(retiredIds);schedule();
         // #1136: a board that opened on Trace for want of references opens Jira once a loaded detail brings some, unless the reader chose a view.
-        if(jiraFree && snapshot().available){jiraFree=false;if(statusAuto){statusAuto=false;clearTraceFocus();statusMode='jira';}}
+        if(boardJiraFree && snapshot().available){boardJiraFree=false;if(statusAuto){statusAuto=false;clearTraceFocus();statusMode='jira';}}
         if(JSON.stringify(refs())!==previous)notify();
       }
       return raw;
@@ -870,7 +870,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var metricsPreview=authoring && !!(renderOptions && renderOptions.metricsPreview) && trackingTelemetry(page).enabled;
   function paintMetrics(){
     // The Trace view owns the canvas, except on a Jira-free board (#1136), where it is the only view and Metrics overlay paints there.
-    var metricsView=statusMode==='trace' && !jiraFree?null:telemetryHooks.view();
+    var metricsView=statusMode==='trace' && !boardJiraFree?null:telemetryHooks.view();
     bindings.forEach(function(binding){
       var scope=binding.el,d=binding.section.diagram;if(!d)return;
       var templates=trackingTelemetry(binding.page).templates;
@@ -1951,7 +1951,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var releaseColors=options.colorsPreview?function(){}:FlowStatusColors.connect(view,schedule);
   liveStatusControllers.set(view,api);
   // #1136: a board with no ticket or epic references after imports has no Jira view. It opens on Trace; the panel shows no switch.
-  var jiraFree=!snapshot().available,statusAuto=jiraFree;if(jiraFree)statusMode='trace';
+  var boardJiraFree=!snapshot().available,statusAuto=boardJiraFree;if(boardJiraFree)statusMode='trace';
   connectPanels();
   paint();events.forEach(function(type){view.addEventListener(type,schedule);});
   var metricFonts=view.ownerDocument && view.ownerDocument.fonts;

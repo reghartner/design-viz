@@ -368,10 +368,36 @@
         environmentSelect.value=metrics.environment;
         if(!environmentSelect._liveChange){environmentSelect._liveChange=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnvironment(environmentSelect.value);};environmentSelect.addEventListener('change',environmentSelect._liveChange);}
       }
+      // #828 shared-board Edit mode: Edit for editors, then a prominent Save N changes and Discard. On the top row, in both views, with or without tickets (#1136).
+      var edit=value && value.edit || null,pending=edit?edit.pending:0,editing=!!(edit && edit.active),editRow=el(top,'div','edit','dv-live-edit-controls');
+      var editControl=button(editRow,'edit','reader-button dv-live-edit','Edit','editStart');editControl.hidden=!(edit && edit.editable && !editing);editControl.disabled=!!(edit && (edit.blocked || edit.saving));
+      var saveControl=button(editRow,'save','reader-button dv-live-save',edit && edit.saving?'Saving…':'Save '+pending+' change'+(pending===1?'':'s'),'editSave');saveControl.hidden=!(editing && pending);saveControl.disabled=!!(edit && edit.saving);
+      var discardControl=button(editRow,'discard','reader-button dv-live-discard','Discard','editDiscard');discardControl.hidden=!(editing && pending);discardControl.disabled=!!(edit && edit.saving);
+      var doneControl=button(editRow,'done','reader-button dv-live-edit-done','Done','editDone');doneControl.hidden=!(editing && !pending);
+      editRow.hidden=editControl.hidden && saveControl.hidden && discardControl.hidden && doneControl.hidden;
       // Metrics (#939): an on/off switch, not a third view (D12). Shown only with a telemetry provider or demo, off by default, never persisted.
       var metricsSwitch=el(top,'button','metrics','dv-live-metrics');metricsSwitch.type='button';metricsSwitch.setAttribute('role','switch');metricsSwitch.setAttribute('aria-checked',String(!!metrics.enabled));metricsSwitch.hidden=!metrics.available;metricsSwitch._liveArgument=!metrics.enabled;
       el(el(metricsSwitch,'span','track','dv-live-switch-track'),'i','thumb','dv-live-switch-thumb').parentNode.setAttribute('aria-hidden','true');el(metricsSwitch,'span','label','','Metrics overlay');
       if(!metricsSwitch._liveClick){metricsSwitch._liveClick=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnabled(metricsSwitch._liveArgument);};metricsSwitch.addEventListener('click',metricsSwitch._liveClick);}
+      // The Metrics overlay's connector line, in the shared header so both views show it once (#1136). Same markup and dot
+      // tokens as the Jira connector, its own class names so `.dv-live-connection` keeps naming the Jira connector alone.
+      var metricsState=metrics.state==='ok'?(metrics.demo?'demo':'connected'):{loading:'connecting',error:'error',approval:'approval'}[metrics.state] || 'disconnected';
+      var metricsLabel={connected:'connected',demo:'demo',connecting:'connecting',error:'did not answer',approval:'needs approval'}[metricsState] || 'not connected';
+      var metricsConnection=el(header,'span','metrics-connection','dv-live-metrics-connection');metricsConnection.setAttribute('data-state',metricsState);metricsConnection.setAttribute('data-busy',String(!!metrics.busy));metricsConnection.setAttribute('role','status');
+      el(metricsConnection,'i','dot','dv-live-metrics-dot');
+      // A note on a good answer (a failed query beside answered ones) follows the refreshed time.
+      var answered=metricsState==='connected' || metricsState==='demo',metricsText;
+      if(metrics.source){
+        // #943: "Grafana connected · 24h window · refreshed 10:42:13"; an error shows its note, which names the fix.
+        var named=metrics.source+' '+metricsLabel;
+        metricsText=metricsState==='error'?metrics.note || named:metricsState==='disconnected'?named:
+          [named,metrics.window?metrics.window+' window':'',answered?metrics.checkedText:'',answered?metrics.note:''].filter(Boolean).join(' · ');
+      }else metricsText=metricsState==='error'?'Metrics: '+metricsLabel+(metrics.note?' · '+metrics.note:''):
+        ['Metrics: '+metricsLabel,metrics.checkedText].filter(Boolean).join(', ')+(answered && metrics.note?' · '+metrics.note:'');
+      if(!metrics.available && metrics.note)metricsText=metrics.note;
+      if(metrics.environment)metricsText+=' · '+metrics.environment;
+      el(metricsConnection,'span','text','',metricsText);metricsConnection.title=metricsText;
+      metricsConnection.hidden=!metrics.available && !metrics.note;
       var available=value && value.available,hasData=available && value.hasData;
       // Live and Over time are the two modes (#929, Chuck 2026-11-04), in a row of their own. The selected one is filled. Live returns from a past day; while selected it still turns colors off (D6).
       var over=value && value.overTime,past=!!(over && over.active);
@@ -379,13 +405,6 @@
       var toggle=button(time,'toggle','reader-button dv-live-toggle','Live',past?'overTimeClose':'setEnabled');toggle.hidden=!hasData;time.hidden=!hasData;
       toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled) && !past));
       var overTime=button(time,'over-time','reader-button dv-live-over-time',over && over.loading?'Loading history'+(over.progress?' '+over.progress:'')+'…':'Over time','overTime');overTime.hidden=!hasData || !over || !over.available;overTime.disabled=!!(over && (over.loading || over.disabled));overTime.setAttribute('aria-pressed',String(past));
-      // #828 shared-board Edit mode: Edit for editors, then a prominent Save N changes and Discard. In both views, with or without tickets (#1136).
-      var edit=value && value.edit || null,pending=edit?edit.pending:0,editing=!!(edit && edit.active),editRow=el(header,'div','edit','dv-live-edit-controls');
-      var editControl=button(editRow,'edit','reader-button dv-live-edit','Edit','editStart');editControl.hidden=!(edit && edit.editable && !editing);editControl.disabled=!!(edit && (edit.blocked || edit.saving));
-      var saveControl=button(editRow,'save','reader-button dv-live-save',edit && edit.saving?'Saving…':'Save '+pending+' change'+(pending===1?'':'s'),'editSave');saveControl.hidden=!(editing && pending);saveControl.disabled=!!(edit && edit.saving);
-      var discardControl=button(editRow,'discard','reader-button dv-live-discard','Discard','editDiscard');discardControl.hidden=!(editing && pending);discardControl.disabled=!!(edit && edit.saving);
-      var doneControl=button(editRow,'done','reader-button dv-live-edit-done','Done','editDone');doneControl.hidden=!(editing && !pending);
-      editRow.hidden=editControl.hidden && saveControl.hidden && discardControl.hidden && doneControl.hidden;
       var overStatus=el(header,'p','over-time-status','dv-live-over-time-status',hasData && over && over.error?over.error:'');overStatus.setAttribute('role','status');overStatus.hidden=!overStatus.textContent;
       // Day buttons: on the slider row, and on a row of their own for a demo in Live mode, which has no slider. A demo's buttons move its own day.
       // The demo's Live row and the note about other columns belong to the Jira view.
@@ -428,25 +447,6 @@
       var gh=conn.github || {state:'none'},ghLabel={connecting:'GitHub connecting',connected:'GitHub connected',error:'GitHub did not answer'}[gh.state];
       var github=el(connection,'span','github','dv-live-connection-github',ghLabel || '');github.setAttribute('data-state',gh.state);github.setAttribute('data-busy',String(!!gh.busy));github.hidden=!ghLabel;
       connection.hidden=!available || conn.state==='none';
-      // The telemetry connector beside the Jira one: same markup and dot tokens, its own class
-      // names so `.dv-live-connection` keeps naming the Jira connector alone.
-      var metricsState=metrics.state==='ok'?(metrics.demo?'demo':'connected'):{loading:'connecting',error:'error',approval:'approval'}[metrics.state] || 'disconnected';
-      var metricsLabel={connected:'connected',demo:'demo',connecting:'connecting',error:'did not answer',approval:'needs approval'}[metricsState] || 'not connected';
-      var metricsConnection=el(statusLine,'span','metrics-connection','dv-live-metrics-connection');metricsConnection.setAttribute('data-state',metricsState);metricsConnection.setAttribute('data-busy',String(!!metrics.busy));metricsConnection.setAttribute('role','status');
-      el(metricsConnection,'i','dot','dv-live-metrics-dot');
-      // A note on a good answer (a failed query beside answered ones) follows the refreshed time.
-      var answered=metricsState==='connected' || metricsState==='demo',metricsText;
-      if(metrics.source){
-        // #943: "Grafana connected · 24h window · refreshed 10:42:13"; an error shows its note, which names the fix.
-        var named=metrics.source+' '+metricsLabel;
-        metricsText=metricsState==='error'?metrics.note || named:metricsState==='disconnected'?named:
-          [named,metrics.window?metrics.window+' window':'',answered?metrics.checkedText:'',answered?metrics.note:''].filter(Boolean).join(' · ');
-      }else metricsText=metricsState==='error'?'Metrics: '+metricsLabel+(metrics.note?' · '+metrics.note:''):
-        ['Metrics: '+metricsLabel,metrics.checkedText].filter(Boolean).join(', ')+(answered && metrics.note?' · '+metrics.note:'');
-      if(!metrics.available && metrics.note)metricsText=metrics.note;
-      if(metrics.environment)metricsText+=' · '+metrics.environment;
-      el(metricsConnection,'span','text','',metricsText);
-      metricsConnection.hidden=!metrics.available && !metrics.note;
       var note=el(statusLine,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
       var actionLabel=(available || metrics.available) && value && value.actionLabel || '';
       var action=button(controls,'action','reader-button dv-live-action',actionLabel,'runAction');action.hidden=!actionLabel;
@@ -456,10 +456,10 @@
       var first=button(controls,'first','reader-button dv-live-first',value && (value.firstBlocker || (value.blockers || []).length)?'First blocker':'No blockers','firstBlocker');first.hidden=!hasData;first.disabled=!(value && value.firstBlocker);
       var reason=el(statusLine,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
       var editNotice=el(statusLine,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
-      controls.hidden=!actionLabel && !hasData;statusRow.hidden=!metrics.note && !metrics.available && (!available || !(hasData || value.note.text)) && !reason.textContent && !editNotice.textContent;
+      controls.hidden=!actionLabel && !hasData;statusRow.hidden=(!available || !(hasData || value.note.text)) && !reason.textContent && !editNotice.textContent;
       head.hidden=controls.hidden && statusRow.hidden;
       // Long text is cut off on screen; the tooltip and the status elements keep all of it.
-      var statusText=[connection.hidden?'':[connWho,conn.checkedText].filter(Boolean).concat(ghLabel?[ghLabel]:[]).join(', '),metricsConnection.hidden?'':metricsText,note.textContent,reason.textContent,editNotice.textContent].filter(Boolean).join(' · ');
+      var statusText=[connection.hidden?'':[connWho,conn.checkedText].filter(Boolean).concat(ghLabel?[ghLabel]:[]).join(', '),note.textContent,reason.textContent,editNotice.textContent].filter(Boolean).join(' · ');
       if(statusText)statusRow.setAttribute('title',statusText);else statusRow.removeAttribute('title');
       if(!available && !proof)el(host,'p','empty','dv-live-empty','This page has no ticket references.');
       if(hasData || proof || (metrics.logDetails || []).length || value && value.activity.length){
@@ -559,11 +559,10 @@
   }
   var LIVE_STYLES=String.raw`
 /* #1131: the header shared by the Jira and Trace views. Segments keep the reader's button look (#863); the selected one is filled. */
-.dv-status-header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--explore-border)}
-.dv-status-header>*{flex:0 0 100%;min-width:0}
-/* Live | Over time and the Edit buttons (#1136) share the second row; Edit sits at its right edge. */
-.dv-status-header>.dv-live-time{flex:0 1 auto}
-.dv-status-header>.dv-live-edit-controls{flex:0 1 auto;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-left:auto}
+.dv-status-header{display:flex;flex-direction:column;gap:8px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--explore-border)}
+.dv-live-edit-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.dv-status-header>.dv-live-metrics-connection{min-width:0;font:11px/1.5 'IBM Plex Mono',monospace}
+.dv-status-header>.dv-live-metrics-connection>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .dv-status-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .dv-status-segmented{display:flex;flex-wrap:wrap;align-items:center;gap:4px}
 .dv-live-environment{display:inline-flex;align-items:center;gap:6px;font:11px/1.5 'IBM Plex Mono',monospace;color:var(--dtext)}

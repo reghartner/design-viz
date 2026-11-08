@@ -488,6 +488,24 @@ test('signal show on card is one reversible edit and survives label, source and 
  oneStep(ui,()=>{const toggle=ui.control('received show on card').querySelector('input');toggle.checked=true;toggle.fire('change');ui.h.flush();});assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,true);
 });
 
+test('#1111 loki and grafana signals get an empty result reads 0 toggle that survives other edits; checking it removes the key; other sources drop it',()=>{
+ const ui=harness(board({kind:'queue',signals:{received:{loki:LOKI_IN},sent:{grafana:'sent',missingMeansZero:true},trace:{tempo:'{}'}}}),EDGE);ui.metrics();
+ assert.equal(ui.row('trace empty result reads 0'),null,'no toggle where the field means nothing');
+ const toggle=()=>ui.control('received empty result reads 0').querySelector('input');
+ assert.equal(ui.control('sent empty result reads 0').querySelector('input').checked,true);
+ oneStep(ui,()=>ui.set('sent unit','req'));assert.equal(edgeOf(ui).telemetry.signals.sent.missingMeansZero,true,'an authored true survives other edits');
+ assert.equal(toggle().checked,true,'absent reads as the default');
+ oneStep(ui,()=>{const t=toggle();t.checked=false;t.fire('change');ui.h.flush();});
+ assert.equal(edgeOf(ui).telemetry.signals.received.missingMeansZero,false);assert.equal(toggle().checked,false);
+ oneStep(ui,()=>ui.set('received unit','events'));oneStep(ui,()=>ui.set('received label','Received'));oneStep(ui,()=>ui.set('received query','sum(count_over_time({app="x"}[5m]))'));
+ assert.equal(edgeOf(ui).telemetry.signals.received.missingMeansZero,false);
+ oneStep(ui,()=>ui.set('received source','grafana'));assert.equal(edgeOf(ui).telemetry.signals.received.missingMeansZero,false,'kept between loki and grafana');
+ oneStep(ui,()=>{const t=toggle();t.checked=true;t.fire('change');ui.h.flush();});assert.equal(Object.hasOwn(edgeOf(ui).telemetry.signals.received,'missingMeansZero'),false,'checking returns to the default without writing true');
+ oneStep(ui,()=>{const t=toggle();t.checked=false;t.fire('change');ui.h.flush();});
+ oneStep(ui,()=>ui.set('received source','tempo'));assert.equal(Object.hasOwn(edgeOf(ui).telemetry.signals.received,'missingMeansZero'),false,'dropped where it means nothing');
+ assert.deepEqual(ui.warnings(),[]);
+});
+
 test('#1112 Inspect sets connection card title and width with one Undo each; invalid values are refused; nodes get neither row',()=>{
   const ui=harness(board({kind:'call',signals:{rate:{grafana:PROM_RATE}},card:{side:'below'}}),EDGE);ui.metrics();
   oneStep(ui,()=>ui.set('Card title','  Camera stats consumer · RabbitMQ '));oneStep(ui,()=>ui.set('Card width','360'));

@@ -116,12 +116,9 @@ for the complete wrapper example, tool schemas, bounds and selection behavior.
 - `tempo`: explicit TraceQL trace search; one observed request, not an aggregate metric.
 
 All sources apply to local, imported/nested, overlay and detail nodes/edges. Missing tools give an actionable source/tool diagnostic; other supported sources keep working.
+A source the page cannot call must remain unobserved with a one-line source/tool diagnostic.
 
 ### CloudWatch window totals
-
-Supported sources are `grafana` (PromQL), `loki` (LogQL), `tempo` (TraceQL),
-`sql`, `honeycomb` (query object) , `cloudwatch` and `cloudwatchLogs` (query objects). A source the
-page cannot call must remain unobserved with a one-line source/tool diagnostic.
 
 CloudWatch accepts `Sum`, `Maximum`, `Minimum`, `Average` and `SampleCount`. Use the Grafana datasource
 UID at `tracking.telemetry.grafana.cloudwatch`; shared
@@ -284,7 +281,7 @@ The accepted authored fields are:
 | `tracking.telemetry.grafana` | `prometheus`, `loki`, `tempo`, `sql`, `cloudwatch` datasource UIDs; optional `accountId` for CloudWatch; optional `baseUrl` for evidenced Grafana UI origin |
 | `tracking.telemetry.honeycomb` | `environment`, optional `dataset` |
 | carrier `telemetry` | `kind`, `signals`, `proof`, `links`, `card`, or `use` plus declared template parameters |
-| signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope`, `label`, `showOnCard`, `links`, `window` |
+| signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope`, `label`, `showOnCard`, `links`, `window`; `loki`/`grafana` also `missingMeansZero` |
 | `cloudwatch` query | `namespace`, `metric`, `region`, `accountId`, `dimensions`, `statistic`; optional `missingMeansZero`, `period` |
 | Logs `trend` | `query`, `timeField`, `valueField`; optional `binSeconds` (or false instead of an object) |
 | `cloudwatchLogs` query | `logGroups`, `query`, `region`, optional `valueField`, `breakdown`, `trend` |
@@ -376,7 +373,7 @@ Interpret evidence this way:
 | traffic returned and a limit fails | observed degraded in this window |
 | explicit returned zero | silent in this window, not nonexistent |
 | empty CloudWatch arrays | unobserved / no data points yet, unless explicit `missingMeansZero: true` |
-| successful empty recognized Loki count/rate | observed zero |
+| successful empty recognized Loki count/rate | observed zero; unobserved with `missingMeansZero: false` |
 | missing sample, error or unsupported source | unobserved |
 | one trace | this one request was observed |
 

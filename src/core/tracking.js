@@ -146,6 +146,7 @@ function trackingExistsWhen(value){
       signals: {<name>: {source: 'grafana'|'loki'|'tempo'|'sql'|'honeycomb'|'cloudwatch',
                          query: <string; a cloned query object for honeycomb/cloudwatch>,
                          unit: <string>|null, scope?: string, label?: string, showOnCard?: boolean, links?: {query?: string},
+                         missingMeansZero?: boolean (loki and grafana only),
                          window?: <duration such as '1h'; a display label, never a query change>}},
       proof: {<signal name>: {min?: number, max?: number, maxRatioOf?: <other signal name>}},
       links: {dashboard?: <absolute http(s) URL>, query?: <absolute http(s) URL>},
@@ -238,12 +239,17 @@ function telemetrySignal(name,value,warn){
   if(telemetryOwn(value,'scope')){if(telemetryText(value.scope))out.scope=value.scope;else warn(at+'.scope','must be non-empty text — ignored');}
   if(telemetryOwn(value,'label')){if(telemetryText(value.label) && value.label.length<=120 && !/[\x00-\x1f\x7f]/.test(value.label))out.label=value.label.trim();else warn(at+'.label','must be plain text of 1–120 characters without control characters — ignored');}
   if(telemetryOwn(value,'showOnCard')){if(typeof value.showOnCard==='boolean')out.showOnCard=value.showOnCard;else warn(at+'.showOnCard','must be a boolean — ignored');}
+  if(telemetryOwn(value,'missingMeansZero')){
+    if(source!=='loki' && source!=='grafana')warn(at+'.missingMeansZero','only loki and grafana signals take this field'+(source==='cloudwatch'?'; CloudWatch reads it inside the cloudwatch query':'')+' — ignored');
+    else if(typeof value.missingMeansZero==='boolean')out.missingMeansZero=value.missingMeansZero;
+    else warn(at+'.missingMeansZero','must be a boolean — ignored');
+  }
   if(telemetryOwn(value,'window')){var span=telemetryWindowDuration(value.window);if(source==='cloudwatch')warn(at+'.window','cloudwatch signals always cover the page window — ignored');else if(span)out.window=span;else warn(at+'.window','use a duration such as "1h", "7d" or "now-7d" — ignored');}
   if(telemetryOwn(value,'links')){
     if(!telemetryObject(value.links))warn(at+'.links','must be an object {query?} — ignored');
     else {out.links={};telemetryUnknown(value.links,['query'],warn,at+'.links');if(telemetryOwn(value.links,'query')){if(telemetryQueryUrl(value.links.query))out.links.query=value.links.query;else warn(at+'.links.query','must be an absolute HTTP(S) URL without credentials — ignored');}}
   }
-  telemetryUnknown(value,[source,'unit','scope','label','showOnCard','links','window'],warn,at);
+  telemetryUnknown(value,[source,'unit','scope','label','showOnCard','missingMeansZero','links','window'],warn,at);
   return out;
 }
 /* One proof entry for a known signal. Returns the cleaned entry or null. */
@@ -417,6 +423,7 @@ function carrierTelemetry(obj,templates,invalid,environment){
     if(entry.scope)signals[name].scope=entry.scope;
     if(entry.label)signals[name].label=entry.label;
     if(telemetryOwn(entry,'showOnCard'))signals[name].showOnCard=entry.showOnCard;
+    if(telemetryOwn(entry,'missingMeansZero'))signals[name].missingMeansZero=entry.missingMeansZero;
     if(entry.window)signals[name].window=entry.window;
     if(entry.links)signals[name].links=entry.links;
     if(errors[name])signals[name].error=errors[name];

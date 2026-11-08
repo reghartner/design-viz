@@ -75,11 +75,12 @@ function createTelemetryDirect(page,transport,hooks){
   }
   /* #1078: a board Edit-mode change re-renders the page. The loaded trace moves to
      the next controller; its diagram context is kept by position, since section
-     ids name this render's objects. */
-  function carry(){if(dead || !exemplar)return null;var ss=sections();return {form:Object.assign({},form),exemplar:exemplar,report:report?JSON.parse(JSON.stringify(report)):null,section:ss.findIndex(function(s){return s.id===form.section;})};}
+     ids name this render's objects. A picked environment stays picked (#1081). */
+  function carry(){if(dead || !exemplar)return null;var ss=sections();return {form:Object.assign({},form),environmentChosen:environmentChosen,exemplar:exemplar,report:report?JSON.parse(JSON.stringify(report)):null,section:ss.findIndex(function(s){return s.id===form.section;})};}
   function restore(state){
     if(dead || accountRetired || !state || !state.exemplar)return false;sync();
     Object.keys(form).forEach(function(key){if(typeof state.form[key]==='string')form[key]=state.form[key];});
+    environmentChosen=state.environmentChosen===true;
     var section=sections()[state.section];form.section=section?section.id:'';sync();
     exemplar=state.exemplar;report=state.report;return true;
   }

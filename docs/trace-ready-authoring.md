@@ -102,12 +102,11 @@ identity, import aliases and provenance; do not strip prefixes or join identical
 node/step IDs across sections. Async details must be inspected and validated in
 their selected source section, then checked after load and replacement in the UI.
 
-Resolve local imports to a temporary validation copy, never over the authored
-file (replace these paths with the actual candidate and registry):
+`--resolve-imports` resolves imports in memory; the authored file is never
+written (use the actual candidate, and its registry or repository folder):
 
 ```sh
-node tools/canon/local-imports.mjs /path/to/candidate.spec.json /path/to/registry.json > "$TRACE_CHECK_DIR/trace-resolved.spec.json"
-node tools/canon/trace-cli.mjs preview --spec "$TRACE_CHECK_DIR/trace-resolved.spec.json" --trace /path/to/request.json --section 0 --out "$TRACE_CHECK_DIR/trace-mapping.json"
+node tools/canon/trace-cli.mjs preview --spec /path/to/candidate.spec.json --resolve-imports /path/to/registry.json --trace /path/to/request.json --section 0 --out "$TRACE_CHECK_DIR/trace-mapping.json"
 ```
 
 ## 4. Validate mapping before enabling a provider

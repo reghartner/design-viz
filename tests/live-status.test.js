@@ -2370,6 +2370,7 @@ test('M10 the action button shows on a metrics-only page so Allow Grafana reache
 | OT13 | provider entry without a state | apply() still drops it | widening the provider contract |
 | OT15 | status row and day buttons (#986) | counts, connection and notes are in `.dv-live-status` with their full text in its title; buttons are in `.dv-live-controls`; a board's `<` and `>` step the slider, are disabled at the ends, and are absent on Live | changing text beside static buttons; step buttons on a board with no slider |
 | OT14 | the two mode buttons (Chuck, 2026-11-04) | Live and Over time are the first two header controls, exactly one is pressed, the selected Over time click does nothing, Live returns to today without turning colors off, the selected Live click still turns colors off, and Over time turns colors back on | a Back to today button; a past day with colors off |
+| OT17 | days dated two days ago to today, then a history ending before today and one with no dates (#1082) | the Over time row's heading shows the selected day's label large; on a day dated today it reads TODAY with the label beside it; the slider and `<` `>` update it; Live has no heading | a date only in the small note; TODAY on a last day that is not today |
 */
 const overFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:'EP-1'}},lanes:{APP:{label:'App',color:'#34d399'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',tickets:['AA-1']},b:{title:'Beta',tickets:['BB-1']},planned:{title:'Planned',tickets:['AA-1'],existsWhen:'tickets-done'}},rows:[['a','b','planned']],edges:[{from:'a',to:'b',tickets:['EE-1']}],steps:[{id:'hop',edge:'a->b',lane:'APP'},{id:'beta',nodes:['b'],lane:'APP'}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
 const overStale='2000-01-01T00:00:00Z';
@@ -2667,6 +2668,32 @@ test('OT15 changing text has its own row, and a board steps days with < and > on
  const [prev,next]=steps;assert.equal(api.snapshot().overTime.index,2);assert.equal(next.disabled,true);assert.equal(prev.disabled,false);
  prev.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,1);prev.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,0);assert.equal(prev.disabled,true);assert.equal(next.disabled,false);
  next.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,1);
+});
+// #1082: a day's key is its calendar date in the viewer's time zone, as liveStatusHistoryDays writes it.
+const overDayKey=offset=>{const now=new Date();return new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()+offset)).toISOString().slice(0,10);};
+test('OT17 the selected day is shown large, today reads TODAY, and changing the day updates it (#1082)',async()=>{
+ const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);api.apply(overToday());
+ api.setHistory({load:()=>({days:overDays().map((day,index)=>({...day,key:overDayKey(index-2)}))})});overButton(h).dispatchEvent({type:'click'});await historySettle();
+ const heading=()=>h.view.querySelector('.dv-live-over-time-row .dv-live-over-time-heading'),big=()=>heading().querySelector('.dv-live-over-time-day'),beside=()=>heading().querySelector('.dv-live-over-time-date');
+ assert.ok(heading(),'a date heading on the Over time row');
+ assert.equal(api.snapshot().overTime.today,true,'the last day is today');assert.equal(big().textContent,'TODAY');assert.equal(beside().textContent,'Oct 22');assert.equal(beside().hidden,false);
+ const slider=h.view.querySelector('input.dv-live-over-time-slider');slider.value='0';slider.dispatchEvent({type:'input'});
+ assert.equal(api.snapshot().overTime.today,false);assert.equal(big().textContent,'Oct 20','a past day shows its date');assert.ok(beside().hidden,'no second date on a past day');
+ const [prev,next]=h.view.querySelectorAll('.dv-live-over-time-row .dv-live-step');
+ next.dispatchEvent({type:'click'});assert.equal(big().textContent,'Oct 21','> updates it');
+ next.dispatchEvent({type:'click'});assert.equal(big().textContent,'TODAY');
+ prev.dispatchEvent({type:'click'});assert.equal(big().textContent,'Oct 21','< updates it');
+ overBackToLive(api);await historySettle();assert.equal(h.view.querySelector('.dv-live-over-time-heading'),null,'Live has no date heading');
+ // A history whose last day is not today's date (every ticket done earlier), or whose days carry no date, never reads TODAY.
+ for(const days of [overDays().map((day,index)=>({...day,key:overDayKey(index-5)})),overDays()]){
+  api.setHistory({load:()=>({days})});api.overTime();await historySettle();
+  assert.equal(api.snapshot().overTime.index,2);assert.equal(api.snapshot().overTime.today,false);assert.equal(big().textContent,'Oct 22');assert.ok(beside().hidden);
+  overBackToLive(api);await historySettle();
+ }
+ // The product's own day builder, run now: its last day reads TODAY.
+ const built=historyDays(providerContext(),[historyTicket('AA-1',Date.now()-2*86400000,'In Progress')],{'AA-1':{state:'active'}},Date.now());
+ api.setHistory({load:()=>built});api.overTime();await historySettle();
+ assert.equal(api.snapshot().overTime.index,built.days.length-1);assert.equal(api.snapshot().overTime.today,true);assert.equal(big().textContent,'TODAY');assert.equal(beside().textContent,built.days.at(-1).label);
 });
 test('OT16 First blocker cannot reach a ticket that has no status on the day, and a real blocker on another day still counts',async()=>{
  const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);h.ctl.sections[0].stepper={path:()=>'happy',sourceIndex:()=>0,mode:()=>'ambient',jumpSource(){}};api.apply(overToday());

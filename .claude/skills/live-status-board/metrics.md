@@ -284,7 +284,7 @@ The accepted authored fields are:
 | `tracking.telemetry.grafana` | `prometheus`, `loki`, `tempo`, `sql`, `cloudwatch` datasource UIDs; optional `accountId` for CloudWatch; optional `baseUrl` for evidenced Grafana UI origin |
 | `tracking.telemetry.honeycomb` | `environment`, optional `dataset` |
 | carrier `telemetry` | `kind`, `signals`, `proof`, `links`, `card`, or `use` plus declared template parameters |
-| signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope`, `label`, `showOnCard`, `links` |
+| signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope`, `label`, `showOnCard`, `links`, `window` |
 | `cloudwatch` query | `namespace`, `metric`, `region`, `accountId`, `dimensions`, `statistic`; optional `missingMeansZero`, `period` |
 | Logs `trend` | `query`, `timeField`, `valueField`; optional `binSeconds` (or false instead of an object) |
 | `cloudwatchLogs` query | `logGroups`, `query`, `region`, optional `valueField`, `breakdown`, `trend` |
@@ -293,7 +293,7 @@ The accepted authored fields are:
 | proof entry | `min`, `max`, optional `maxRatioOf` another signal |
 | carrier links | absolute HTTP(S) `dashboard`, `query` |
 | signal links | absolute HTTP(S) `query` without credentials |
-| edge card | `side`, `offset` |
+| edge card | `side`, `offset`, `title`, `width` |
 | template | optional `kind`, `params`; required `signals`; optional `proof`, `links` |
 
 Deployment profiles are optional. Set `tracking.telemetry.environment` to the
@@ -424,9 +424,9 @@ its existing contract. Honeycomb COUNT caveats belong to Honeycomb evidence only
 
 Cards and node Inspect display every numeric signal in authored order, excluding
 trace bindings. Optional boolean `showOnCard: false` hides only that canvas row;
-Inspect and proof still use the signal. With no visible numeric rows, no card is
-shown. Optional `label` is plain text (1–120 characters, no control
-characters); otherwise the signal name labels the row. For example:
+Inspect and proof still use the signal. No visible numeric rows means no
+card. Optional `label` is plain text (1–120 characters, no control
+characters), else the signal name. For example:
 
 ```json
 {"telemetry":{"kind":"service","signals":{"matched":{"cloudwatch":{"namespace":"AWS/IoT","metric":"TopicMatch","dimensions":{"RuleName":"camera_message_camera_stats"},"statistic":"Sum","region":"us-east-1","accountId":"123456789012"},"unit":"events","label":"Matched events","showOnCard":true,"links":{"query":"https://grafana.example/explore?query=matched"}}}}}
@@ -437,11 +437,11 @@ Each row's external-link icon opens its own query in a new tab. Author
 provider-returned URL. Grafana Prometheus/Loki and Honeycomb can supply stable
 per-signal query links. CloudWatch/Logs/SQL can use authored URLs. Never use
 credentials or a signed Honeycomb result/download URL. A legacy carrier query
-link is a row fallback only for a single-signal carrier. Preview makes no provider
-URLs. A missing link does not invalidate a measured value.
+link is a row fallback only for a single-signal carrier.
 
-Cards cap width and wrap values; long labels/titles/scopes are shortened. Their
-height participates in layout packing. CloudWatch cards use “This rule”, “This
+Cards shorten long labels/titles/scopes. A span unlike the board window (signal
+`window`, or a counting query's one `[1h]`) shows as `42 · last 1h`
+([rules](../../../docs/live-status.md#signal-span)). CloudWatch cards use “This rule”, “This
 queue” or “All topics · whole account”; Inspect retains full rule/account/scope
 and label text. Displaying a named counter does not make it traffic evidence.
 

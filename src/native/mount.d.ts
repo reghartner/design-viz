@@ -108,10 +108,10 @@ export interface TelemetryProgress {
 export interface TelemetryBinding {
   id: string;
   kind: 'call' | 'queue' | 'service' | 'log-event' | 'device';
-  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch' | 'cloudwatchLogs'; query: string | TelemetryCloudWatchQuery | TelemetryCloudWatchLogsQuery | Record<string, unknown>; unit: string | null; scope?: string; label?: string; showOnCard?: boolean; links?: {query?: string}; error?: string; /** Derived configuration error: skip only the optional grouped query; never save this into the authored query. */ breakdownError?: string; trendError?: string}>;
+  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch' | 'cloudwatchLogs'; query: string | TelemetryCloudWatchQuery | TelemetryCloudWatchLogsQuery | Record<string, unknown>; unit: string | null; scope?: string; label?: string; showOnCard?: boolean; links?: {query?: string}; window?: string; error?: string; /** Derived configuration error: skip only the optional grouped query; never save this into the authored query. */ breakdownError?: string; trendError?: string}>;
   proof: Record<string, {min?: number; max?: number; maxRatioOf?: string}>;
   links: {dashboard?: string; query?: string};
-  card: {side?: 'right' | 'left' | 'above' | 'below'; offset?: number} | null;
+  card: {side?: 'right' | 'left' | 'above' | 'below'; offset?: number; title?: string; width?: number} | null;
 }
 /** Runtime evidence only; never authored, saved, or numerical proof. */
 export interface TelemetryExemplar {

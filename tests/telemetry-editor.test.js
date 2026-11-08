@@ -487,3 +487,36 @@ test('signal show on card is one reversible edit and survives label, source and 
  assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,false);
  oneStep(ui,()=>{const toggle=ui.control('received show on card').querySelector('input');toggle.checked=true;toggle.fire('change');ui.h.flush();});assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,true);
 });
+
+test('#1112 Inspect sets connection card title and width with one Undo each; invalid values are refused; nodes get neither row',()=>{
+  const ui=harness(board({kind:'call',signals:{rate:{grafana:PROM_RATE}},card:{side:'below'}}),EDGE);ui.metrics();
+  oneStep(ui,()=>ui.set('Card title','  Camera stats consumer · RabbitMQ '));oneStep(ui,()=>ui.set('Card width','360'));
+  assert.deepEqual(edgeOf(ui).telemetry.card,{side:'below',title:'Camera stats consumer · RabbitMQ',width:360});
+  assert.equal(ui.control('Card title').value,'Camera stats consumer · RabbitMQ');assert.equal(ui.control('Card width').value,'360');
+  for(const [label,value] of [['Card title','x'.repeat(121)],['Card width','139'],['Card width','481'],['Card width','wide']]){
+    const before=ui.text;ui.set(label,value);assert.equal(ui.text,before,label+' '+value+' is refused');assert.ok(ui.error(),label+' explains the refusal');ui.select(EDGE);
+  }
+  const C=api(ui.e.C);
+  for(const bad of [NaN,Infinity,'300'])assert.match(C.telemetryEditBinding(edgeOf(ui).telemetry,{op:'card',field:'width',value:bad},{}).error || '',/140 and 480/,'card width refuses '+String(bad));
+  assert.match(C.telemetryEditBinding(edgeOf(ui).telemetry,{op:'card',field:'title',value:'bell\u0007'},{}).error || '',/1–120/);
+  oneStep(ui,()=>ui.set('Card title',''));oneStep(ui,()=>ui.set('Card width',''));assert.deepEqual(edgeOf(ui).telemetry.card,{side:'below'});
+  const node=harness(board(),{kind:'node',section:0,id:'ingest'});node.metrics();assert.equal(node.row('Card title'),null);assert.equal(node.row('Card width'),null);
+});
+
+test('#1112 an inherited imported connection without an overlay shows the card rows in Inspect; Card width creates the consumer overlay in one Undo step',()=>{
+  const f=topologyFixtures(),ui=harness(f.consumer),providerBefore=JSON.stringify(f.provider);
+  ui.h.session.replaceProject(JSON.stringify(f.consumer,null,2),null,{topologyContext:f.context});
+  const C=ui.e.C,resolved=()=>diagramOf(C.FlowTopology.resolveSource(ui.raw,f.context));
+  const edge={kind:'edge',section:0,index:resolved().edges.findIndex(e=>e.from==='shared::api' && e.to==='shared::store')};ui.select(edge);
+  assert.equal(Object.hasOwn(diagramOf(ui.raw).topologyImports[0],'edgeTracking'),false,'no overlay before the edit');
+  ui.metrics();for(const label of ['Card side','Card offset','Card title'])assert.ok(ui.row(label),label+' is in Inspect for the inherited card');
+  assert.equal(ui.control('Card width').value,'');const before=ui.text;
+  for(const field of ['title','width','position'])assert.equal(C.planCarrierTelemetry(before,ui.raw,edge,{op:'card',field,value:null},f.context).text,before,'clearing an unset inherited '+field+' creates no overlay');
+  oneStep(ui,()=>ui.set('Card width','400'),edge);
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking,{'api->store':{telemetry:{kind:'call',signals:{rate:{loki:LOKI_IN}},card:{width:400}}}});
+  assert.equal(C.carrierTelemetry(resolved().edges[edge.index],{}).card.width,400);assert.equal(ui.control('Card width').value,'400');
+  assert.equal(JSON.stringify(f.provider),providerBefore,'the provider spec is untouched');
+  const after=ui.text;assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,before,'one Undo removes the created overlay');
+  assert.equal(ui.h.session.redo(),true);assert.equal(ui.text,after,'Redo restores the created overlay');
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking['api->store'].telemetry.card,{width:400});
+});

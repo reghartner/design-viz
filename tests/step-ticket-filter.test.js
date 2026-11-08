@@ -1,0 +1,127 @@
+/* #1103 step ticket filter. A step may name, in `ticketFilter`, the subset of
+   the tickets on the nodes and edges it lights that the step shows. Test plan:
+| row | rule |
+|---|---|
+| T1 | A step lighting a node with tickets A, B, C and filter [B]: the step rollup (coin state), caption and ticket list use only B; the node still shows A, B, C. |
+| T2 | Without a filter the step uses every ticket on its lit carriers (today's behaviour). |
+| T3 | A filter key that is not on a node or edge the step lights fails validation with its field path. |
+| T4 | An imported node's merged tickets (provider + consumer nodeTracking) can be filtered. |
+| T5 | (browser) tools/browser-tests/tests/step-ticket-filter.spec.mjs: Workbench Inspect checklist writes the filter. |
+*/
+const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
+const {entrypoint}=require('../tools/source-loader.cjs');
+const plain=v=>JSON.parse(JSON.stringify(v));
+/* Minimal DOM, the same shape as tests/live-status.test.js uses. */
+class Element {
+ constructor(tag='div',attrs={}){this.tagName=tag;this.attrs={...attrs};this.children=[];this.events={};this.props={};this.hidden=false;this.isConnected=true;
+  this.style={setProperty:(k,v)=>this.props[k]=v,removeProperty:k=>delete this.props[k],getPropertyValue:k=>this.props[k]||''};
+  this.classList={contains:x=>(this.attrs.class||'').split(' ').includes(x),add:(...xs)=>this.attrs.class=[...new Set((this.attrs.class||'').split(' ').filter(Boolean).concat(xs))].join(' '),remove:(...xs)=>this.attrs.class=(this.attrs.class||'').split(' ').filter(x=>!xs.includes(x)).join(' '),toggle:(x,on)=>{on??=!this.classList.contains(x);this.classList[on?'add':'remove'](x);return on;}};
+ }
+ get className(){return this.attrs.class||'';}set className(v){this.attrs.class=v;}
+ setAttribute(k,v){this.attrs[k]=String(v);}getAttribute(k){return this.attrs[k]??null;}removeAttribute(k){delete this.attrs[k];}
+ appendChild(el){if(el.parentNode)el.parentNode.children=el.parentNode.children.filter(c=>c!==el);el.parentNode=el.parentElement=this;el.ownerDocument=this.ownerDocument;this.children.push(el);return el;}
+ insertBefore(el,before){if(el===before)return el;if(el.parentNode)el.parentNode.children=el.parentNode.children.filter(c=>c!==el);el.parentNode=el.parentElement=this;const i=this.children.indexOf(before);this.children.splice(i<0?this.children.length:i,0,el);return el;}
+ remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(c=>c!==this);this.isConnected=false;}
+ replaceChildren(...els){this.children=[];els.forEach(el=>this.appendChild(el));}
+ cloneNode(){return new Element(this.tagName,this.attrs);}
+ matches(selector){return selector.split(',').some(s=>{s=s.trim();if(s.includes(' '))s=s.split(' ').pop();let excluded=false;s=s.replace(/:not\(([^)]+)\)/g,(_,q)=>{excluded=this.matches(q);return '';});if(excluded)return false;
+  const tag=s.match(/^[a-z][a-z0-9]*/);if(tag&&tag[0]!==this.tagName)return false;
+  for(const [,c] of s.matchAll(/\.([\w-]+)/g))if(!this.classList.contains(c))return false;
+  for(const [,k,v] of s.matchAll(/\[([\w-]+)(?:="([^"\]]*)")?\]/g))if(this.getAttribute(k)===null || v!==undefined&&this.getAttribute(k)!==v)return false;return true;});}
+ querySelectorAll(s){return this.children.flatMap(c=>[...(c.matches(s)?[c]:[]),...c.querySelectorAll(s)]);}querySelector(s){return this.querySelectorAll(s)[0]||null;}
+ closest(s){return this.matches(s)?this:this.parentElement?.closest(s)||null;}contains(el){return this===el||this.children.some(c=>c.contains(el));}
+ addEventListener(t,f){(this.events[t]??=new Set()).add(f);}removeEventListener(t,f){this.events[t]?.delete(f);}dispatchEvent(ev){ev.target??=this;for(const f of this.events[ev.type]||[])f(ev);}
+ getBoundingClientRect(){return {left:0,top:0,right:100,bottom:50,width:100,height:50};}getBBox(){return {x:50,y:30,width:60,height:12};}
+ getTotalLength(){return 100;}getPointAtLength(){return {x:50,y:30};}focus(){}get firstChild(){return this.children[0]||null;}
+ // A failing deepEqual on two elements must print one line, never two circular trees.
+ [Symbol.for('nodejs.util.inspect.custom')](){const a=this.attrs;return '<'+this.tagName+(a.class?' class="'+a.class+'"':'')+(a['data-dv-node']?' data-dv-node="'+a['data-dv-node']+'"':'')+' children='+this.children.length+'>';}
+ toJSON(){return this[Symbol.for('nodejs.util.inspect.custom')]();}
+}
+const filterErrors=(C,raw)=>plain(C.validate(C.normalize(raw)).errors).filter(e=>/ticketFilter/.test(e));
+function load(){const C={URL,console,AbortController,TextEncoder};vm.runInNewContext(entrypoint('native').source,C);return C;}
+/* Renders one section with a Step-mode stepper on step `index` and paints `map`. */
+function render(raw,map,index=0){
+ const frames=new Map(),timers=new Map();let serial=0;
+ const doc=new Element('document');doc.hidden=false;doc.visibilityState='visible';doc.createElement=tag=>new Element(tag);doc.createElementNS=(_,tag)=>new Element(tag);doc.body=new Element('body');doc.getElementById=id=>doc.querySelector('[id="'+id+'"]');doc.documentElement=new Element('html');
+ const schedule=(collection,fn,ms)=>{const id=++serial;collection.set(id,{fn,ms});return id;};
+ const win=new Element('window');Object.assign(win,{document:doc,innerWidth:1440,innerHeight:900,setTimeout:(f,ms)=>schedule(timers,f,ms),clearTimeout:id=>timers.delete(id),setInterval:(f,ms)=>schedule(timers,f,ms),clearInterval:id=>timers.delete(id)});
+ const C={URL,console,AbortController,TextEncoder,document:doc,window:win,requestAnimationFrame:f=>schedule(frames,f),cancelAnimationFrame:id=>frames.delete(id),setTimeout:win.setTimeout,clearTimeout:win.clearTimeout,setInterval:win.setInterval,clearInterval:win.clearInterval,
+  MutationObserver:class{observe(){}disconnect(){}}};
+ vm.runInNewContext(entrypoint('native').source,C);
+ const page=C.normalize(raw),view=new Element();view.ownerDocument=doc;
+ const sections=C.sectionRecords(page).map(r=>{const sectionEl=view.appendChild(new Element('section',{'class':'doc-sec'})),d=r.section.diagram||{},svg=sectionEl.appendChild(new Element('svg'));
+  for(const id of Object.keys(d.nodes||{})){const node=svg.appendChild(new Element('g',{'class':'node','data-dv-node':id}));node.appendChild(new Element('rect',{'class':'card',width:'120',height:'55'}));}
+  (d.edges||[]).forEach((e,i)=>{for(const [tag,cls] of [['path','edge'],['path','halo'],['text','lbl']])svg.appendChild(new Element(tag,{'class':cls,'data-dv-edge':String(i),x:'50',y:'30'}));});
+  (d.steps||[]).forEach((st,i)=>svg.appendChild(new Element('g',{'class':'coin','data-dv-step':String(i)})));
+  return {sectionEl,reference:r.reference,number:r.number};});
+ const ctl={view,page,sections},rec=sections[0];
+ rec.stepper={sourceIndex:()=>index,mode:()=>'step',path:()=>'default'};
+ const host=rec.sectionEl.appendChild(new Element('div',{class:'termbar'})).appendChild(new Element('div',{class:'step-text'}));host.textContent='Step prose';
+ ctl.liveStatus=C.createLiveStatus(ctl,page,{},{});
+ const flush=()=>{for(let i=0;i<3;i++){const work=[...frames.values()];frames.clear();work.forEach(x=>x.fn());}};
+ rec.sectionEl.dispatchEvent({type:'dv:stepchange'});flush();ctl.liveStatus.apply(map);flush();
+ return {C,ctl,view,host,
+  listed:()=>host.querySelectorAll('.dv-live-step-tickets .nbacklink').map(el=>el.textContent),
+  caption:()=>(host.querySelector('.dv-live-caption')||{}).textContent||'',
+  coin:i=>(view.querySelector('g.coin[data-dv-step="'+i+'"]').className.match(/dv-live-(todo|active|testing|done|blocked|missing|unchanged)\b/)||[])[1]||null,
+  node:id=>(view.querySelector('g.node[data-dv-node="'+id+'"]').className.match(/dv-live-(todo|active|testing|done|blocked|missing|unchanged)\b/)||[])[1]||null};
+}
+const STEP='page.sections[0].diagram.steps[0]';
+const spec=step=>({page:{tracking:{jira:{site:'https://jira.test'}},sections:[{id:'main',diagram:{
+ nodes:{api:{title:'API',tickets:['ST-1','ST-2','ST-3']},db:{title:'DB',tickets:['DB-1']}},rows:[['api','db']],
+ edges:[{from:'api',to:'db',label:'Write',tickets:['ED-1']}],panels:[{id:'status',type:'live-status'}],
+ steps:[Object.assign({id:'build',text:'Build the API',nodes:['api']},step),{id:'write',text:'Write rows',edge:'api->db',nodes:['api'],ticketFilter:['ST-3','ED-1']}]}}]}});
+const evidence={'ST-1':{state:'blocked'},'ST-2':{state:'done'},'ST-3':{state:'active'},'DB-1':{state:'todo'},'ED-1':{state:'todo'}};
+
+test('T1 a filter [B] makes the step rollup, caption and ticket list use only B while the node keeps A, B, C',()=>{
+ const raw=spec({ticketFilter:['ST-2']}),C=load(),d=C.normalize(raw).sections[0].diagram;
+ assert.deepEqual(plain(C.liveStatusStepTickets(d,d.steps[0],true)),['ST-2']);
+ assert.equal(C.liveStatusStep(d,d.steps[0],evidence),'done');
+ assert.equal(C.liveStatusCaption(d,d.steps[0],evidence),'DONE');
+ assert.deepEqual(plain(C.liveStatusStepTickets(d,d.steps[1],true)),['ED-1','ST-3'],'the filter spans the lit edge and node');
+ assert.equal(C.liveStatusStep(d,d.steps[1],evidence),'active');
+ assert.equal(C.liveStatusCaption(d,d.steps[1],evidence),'IN PROGRESS · 2 tickets');
+ assert.equal(C.liveStatusPresentation(d.nodes.api,evidence),'blocked','the carrier keeps every ticket');
+ const r=render(raw,evidence);
+ assert.deepEqual(r.listed(),['ST-2']);assert.equal(r.caption(),'DONE');assert.equal(r.coin(0),'done');assert.equal(r.coin(1),'active');
+ assert.equal(r.node('api'),'blocked','node paint still rolls up A, B, C');
+ for(const key of ['ST-1','ST-2','ST-3'])assert.ok(r.ctl.liveStatus.refs().tickets.includes(key),key+' stays in the page refs and Tickets table');
+ const second=render(raw,evidence,1);assert.deepEqual(second.listed(),['ED-1','ST-3']);assert.equal(second.caption(),'IN PROGRESS · 2 tickets');
+});
+test('T2 without a filter the step uses every ticket on its lit carriers',()=>{
+ const raw=spec({}),C=load(),d=C.normalize(raw).sections[0].diagram;
+ assert.deepEqual(plain(C.liveStatusStepTickets(d,d.steps[0],true)),['ST-1','ST-2','ST-3']);
+ assert.equal(C.liveStatusStep(d,d.steps[0],evidence),'blocked');
+ assert.equal(C.liveStatusCaption(d,d.steps[0],evidence),'BLOCKED · ST-1');
+ const r=render(raw,evidence);
+ assert.deepEqual(r.listed(),['ST-1','ST-2','ST-3']);assert.equal(r.caption(),'BLOCKED · ST-1');assert.equal(r.coin(0),'blocked');assert.equal(r.node('api'),'blocked');
+ assert.deepEqual(filterErrors(C,raw),[]);
+});
+test('T3 a filter key not on a lit node or edge fails validation with its field path',()=>{
+ const C=load(),errors=raw=>filterErrors(C,raw);
+ assert.deepEqual(errors(spec({ticketFilter:['ST-2']})),[]);
+ assert.deepEqual(errors(spec({ticketFilter:['ST-2','DB-1','ED-1','ZZ-9']})),[
+  STEP+'.ticketFilter[1]: "DB-1" is not on a node or edge this step lights',
+  STEP+'.ticketFilter[2]: "ED-1" is not on a node or edge this step lights',
+  STEP+'.ticketFilter[3]: "ZZ-9" is not on a node or edge this step lights']);
+ assert.deepEqual(errors(spec({nodes:[],edge:'api->db',ticketFilter:['ED-1','ST-1']})),[STEP+'.ticketFilter[1]: "ST-1" is not on a node or edge this step lights'],'edge endpoints are not lit carriers');
+ assert.deepEqual(errors(spec({ticketFilter:['ST-2','not a key']})),[STEP+'.ticketFilter[1]: use a Jira key like HW-123']);
+ for(const value of [[],'ST-2'])assert.deepEqual(errors(spec({ticketFilter:value})),[STEP+'.ticketFilter: expected a nonempty array of Jira keys from the nodes and edges this step lights; remove it to show every ticket'],JSON.stringify(value));
+});
+test('T4 an imported node\'s merged provider and nodeTracking tickets can be filtered',()=>{
+ const C=load(),model=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=model('provider',{nodes:{api:{title:'API',tickets:['CAN-1','CAN-2']},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+ const consumer=filter=>model('consumer',{nodes:{},rows:[[]],panels:[{id:'status',type:'live-status'}],
+  topologyImports:[{spec:'provider',export:'core',as:'imp',nodeTracking:{api:{tickets:['LOC-1']}}}],
+  steps:[{id:'imported',text:'Imported API',nodes:['imp::api'],ticketFilter:filter}]});
+ const resolve=source=>C.FlowTopology.resolveSource(source,{version:1,id:'consumer',specs:[provider,source]});
+ const map={'CAN-1':{state:'blocked'},'CAN-2':{state:'done'},'LOC-1':{state:'done'}};
+ const resolved=resolve(consumer(['CAN-2','LOC-1'])),d=C.normalize(resolved).sections[0].diagram;
+ assert.deepEqual(plain(C.trackingRefs(d.nodes['imp::api']).tickets),['CAN-1','CAN-2','LOC-1'],'provider and local tickets merge');
+ assert.deepEqual(plain(C.liveStatusStepTickets(d,d.steps[0],true)),['CAN-2','LOC-1']);
+ assert.equal(C.liveStatusStep(d,d.steps[0],map),'done');assert.equal(C.liveStatusCaption(d,d.steps[0],map),'DONE');
+ assert.equal(C.liveStatusPresentation(d.nodes['imp::api'],map),'blocked');
+ assert.deepEqual(filterErrors(C,resolved),[]);
+ const r=render(resolved,map);assert.deepEqual(r.listed(),['CAN-2','LOC-1']);assert.equal(r.coin(0),'done');assert.equal(r.node('imp::api'),'blocked');
+ assert.deepEqual(filterErrors(C,resolve(consumer(['LOC-1','CAN-9']))),[STEP+'.ticketFilter[1]: "CAN-9" is not on a node or edge this step lights']);
+});

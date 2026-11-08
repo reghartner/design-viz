@@ -165,7 +165,7 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       if(view.preview)leader.setAttribute('data-metrics-preview','true');
       svg.insertBefore(leader,card);boxes.push(box);
       var label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');if(label){label.classList.add('dv-metrics-label-hidden');if(view.preview)label.setAttribute('data-metrics-preview','true');}
-      if(activate)activate(card,path,edge,index);
+      if(activate)activate(card,path,edge,index,binding);
     });
   });
 }

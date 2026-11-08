@@ -865,7 +865,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var templates=trackingTelemetry(binding.page).templates;
       telemetryPaintCues(scope,d,templates,metricsView,trackingTelemetry(page).window);
       var cardsView=statusMode!=='trace' && metricsPreview && trackingTelemetry(binding.page).enabled?telemetryCardPreview(d,templates):metricsView;
-      telemetryPaintCards(scope,d,templates,cardsView,trackingTelemetry(page).window,function(card,path,edge,index){
+      telemetryPaintCards(scope,d,templates,cardsView,trackingTelemetry(page).window,function(card,path,edge,index,bound){
         // The bound carrier owns its work presentation, including all resolved
         // imported tickets. Telemetry proof and endpoint states cannot override it.
         // Unticketed metric cards may show no-change without painting ordinary edges.
@@ -877,7 +877,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
           halo.setAttribute('class','dv-live-halo');halo.setAttribute('aria-hidden','true');card.insertBefore(halo,card.firstChild);
         }
         if(authoring){
-          if(binding.ordinal!=null){card.setAttribute('data-metrics-section',binding.ordinal);card.setAttribute('tabindex','0');card.setAttribute('role','button');card.setAttribute('aria-label',(edge.label || edge.from+' to '+edge.to)+'. Drag metrics card to move. Arrow keys move 10 units; Shift moves 50.');}
+          if(binding.ordinal!=null){card.setAttribute('data-metrics-section',binding.ordinal);card.setAttribute('tabindex','0');card.setAttribute('role','button');card.setAttribute('aria-label',(bound.card && bound.card.title || edge.label || edge.from+' to '+edge.to)+'. Drag metrics card to move. Arrow keys move 10 units; Shift moves 50.');}
           return;
         }
         var previous=path._livePointerTarget || path,c=previous._liveCarrier;

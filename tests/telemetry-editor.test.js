@@ -516,5 +516,7 @@ test('#1112 an inherited imported connection without an overlay shows the card r
   assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking,{'api->store':{telemetry:{kind:'call',signals:{rate:{loki:LOKI_IN}},card:{width:400}}}});
   assert.equal(C.carrierTelemetry(resolved().edges[edge.index],{}).card.width,400);assert.equal(ui.control('Card width').value,'400');
   assert.equal(JSON.stringify(f.provider),providerBefore,'the provider spec is untouched');
-  assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,before,'one Undo removes the created overlay');
+  const after=ui.text;assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,before,'one Undo removes the created overlay');
+  assert.equal(ui.h.session.redo(),true);assert.equal(ui.text,after,'Redo restores the created overlay');
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking['api->store'].telemetry.card,{width:400});
 });

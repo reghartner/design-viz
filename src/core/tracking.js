@@ -268,7 +268,7 @@ function telemetryProofEntry(name,value,signals,warn){
    their $param placeholders are not substituted yet. */
 function telemetryClean(raw,warn,template){
   var allowed=template?['kind','params','signals','proof','links']:TELEMETRY_BINDING_FIELDS,ok=true,out={};
-  if(template && telemetryOwn(raw,'card'))warn('.card','card placement belongs on the carrier — ignored');
+  if(template && telemetryOwn(raw,'card'))warn('.card','card fields belong on the carrier — ignored');
   telemetryUnknown(raw,allowed.concat(template?['card']:[]),warn);
   if(telemetryOwn(raw,'kind') || !template){
     if(TELEMETRY_KINDS.indexOf(raw.kind)<0){warn('.kind','use one of '+TELEMETRY_KINDS.join(', ')+' — '+(template?'template':'binding')+' ignored');ok=false;}

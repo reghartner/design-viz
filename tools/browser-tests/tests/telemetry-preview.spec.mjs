@@ -319,6 +319,7 @@ test('#1112 Inspect sets the card title and width; the preview card redraws at t
  await title.fill(name);await title.press('Enter');
  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.title).toBe(name);
  await expect(cards(page).locator('.dv-metrics-card-title')).toHaveText(name);const titled=await source.inputValue();
+ await expect(cards(page)).toHaveAttribute('aria-label',/^Camera stats consumer · RabbitMQ\. Drag metrics card to move\./);
  await cards(page).click();await width.fill('420');await width.press('Enter');
  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.width).toBe(420);
  await expect.poll(async()=>(await box(cards(page))).w).toBe(420);const sized=await source.inputValue();
@@ -343,6 +344,9 @@ test('#1112 an inherited imported connection without an overlay sets Card width 
  expect(overlay(await source.inputValue())['a->b'].telemetry.signals).toEqual(binding.signals);
  await expect.poll(async()=>(await box(inherited)).w).toBe(400);
  expect(await page.evaluate(()=>window.metricsImportContext.specs[0])).toEqual(provider);
+ const created=await source.inputValue();
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await expect.poll(async()=>(await box(inherited)).w).toBe(240);
+ await page.locator('#redo-builder').click();await expect(source).toHaveValue(created);
+ expect(overlay(await source.inputValue())['a->b'].telemetry.card).toEqual({side:'below',offset:0,width:400});await expect.poll(async()=>(await box(inherited)).w).toBe(400);
  expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
 });

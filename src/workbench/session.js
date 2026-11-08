@@ -1,6 +1,19 @@
 /* Source/history/project policy without DOM ownership. Always read the source
    adapter at a transaction boundary: handwritten text may include invalid JSON
    or whitespace that has never been published through a builder command. */
+/* #1104: a Workbench command may not change the authored steps of a section
+   that imports provider steps (stepImports); see stepImportsEditError. */
+function importedStepsEditError(before,after){
+  if(typeof FlowCanon==='undefined' || typeof stepImportsEditError!=='function' || !before || !after)return null;
+  function list(raw){return raw.nodes && Array.isArray(raw.rows) && !raw.page && !raw.blocks && !raw.sections?[{diagram:raw}]:FlowCanon.sections(raw);}
+  var next=list(after),error=null;
+  list(before).forEach(function(sec,index){
+    var message=!error && stepImportsEditError(sec.diagram);if(!message)return;
+    var target=sec.id?next.find(function(s){return s.id===sec.id;}):next[index];
+    if(target && JSON.stringify(target.diagram.steps)!==JSON.stringify(sec.diagram.steps))error=message;
+  });
+  return error;
+}
 function createBuilderSession(options){
   var persistence=options.persistence, recovered=persistence.read();
   var initialDraft=recovered.draft, recoveredBaseline=recovered.baseline;
@@ -193,6 +206,11 @@ function createBuilderSession(options){
       if(typeof FlowTopology!=='undefined'){
         var topologyError=FlowTopology.editError(parse(before).raw,parse(plan.text).raw);
         if(topologyError){plan.error=topologyError;if(options.editError)options.editError(topologyError);return false;}
+      }
+      // Agent proposals and file imports replace the whole source; they are not positional.
+      if(!(hooks && (hooks.exactSource || hooks.lockGuard==='same-document'))){
+        var stepError=importedStepsEditError(parse(before).raw,parse(plan.text).raw);
+        if(stepError){plan.error=stepError;if(options.editError)options.editError(stepError);return false;}
       }
       pushUndo(hooks && hooks.history || before);
       if(nextContext!==topologyContext){topologyContext=JSON.parse(JSON.stringify(nextContext));topologyRevision++;}

@@ -24,6 +24,14 @@
     {
       "id": "checkout-nested",
       "path": "checkout-nested.json"
+    },
+    {
+      "id": "payments",
+      "path": "payments.json"
+    },
+    {
+      "id": "checkout-steps",
+      "path": "checkout-steps.json"
     }
   ]
 }

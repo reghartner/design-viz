@@ -189,6 +189,26 @@ class ValidateCliTest(unittest.TestCase):
                         self.assertIn(f"{good}: 0 errors, 0 warnings", r.stdout)
                         self.assertLess(r.stdout.index(str(bad)), r.stdout.index(str(good)))
 
+    # Issue #1104 PR 2: examples/canon/topology checkout-steps imports the payments
+    # step set "charge" after its submit step; its confirm step names pay::record
+    # as traceMatch parent. Removing record from the provider set fails the batch
+    # with the consumer, import, step set and step named.
+    def test_imported_step_set_resolves_and_a_removed_step_fails(self):
+        consumer, provider = TOPOLOGY / "checkout-steps.json", TOPOLOGY / "payments.json"
+        resolved = run_cli(str(consumer), str(provider))
+        self.assertEqual(resolved.returncode, 0, resolved.stdout + resolved.stderr)
+        self.assertIn(f"{consumer}: 0 errors", resolved.stdout)
+        self.assertIn(f"{provider}: 0 errors", resolved.stdout)
+        with tempfile.TemporaryDirectory() as temp:
+            changed = pathlib.Path(temp) / "payments.json"
+            raw = json.loads(provider.read_text())
+            raw["page"]["sections"][0]["diagram"]["stepExports"]["charge"]["steps"] = ["authorize"]
+            changed.write_text(json.dumps(raw))
+            failed = run_cli(str(consumer), str(changed))
+            self.assertEqual(failed.returncode, 1, failed.stdout + failed.stderr)
+            self.assertIn(f"{consumer}: ERROR Topology checkout-steps section checkout import pay (payments export core) "
+                          "step sets charge: step confirm traceMatch references missing step pay::record", failed.stdout)
+
     def test_both_alias_topology_batch_resolves_and_missing_provider_fails(self):
         with tempfile.TemporaryDirectory() as temp:
             consumer, provider = write_alias_topology(pathlib.Path(temp))

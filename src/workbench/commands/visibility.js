@@ -3,6 +3,9 @@ function planFragmentVisibility(text,raw,target,key,value,expected){
   if(['edge','bullet','crow'].indexOf(target.kind)<0 || ['revealAt','hideAt'].indexOf(key)<0)
     return {error:'Select a connection, bullet, or contract row.'};
   if(value!==null && (!Number.isInteger(value) || value<0))return {error:'Use a whole path position of 1 or later.'};
+  // Without paths, a preview position counts imported steps (#1104).
+  var rec=specSectionPaths(raw)[target.section],d=rec && specValueAt(raw,rec.diagram);
+  if(d && !(Array.isArray(d.paths) && d.paths.length) && stepImportsEditError(d))return {error:stepImportsEditError(d)};
   var path=builderTargetPath(raw,target),item=path && specValueAt(raw,path);
   if(item==null || (expected!==undefined && JSON.stringify(item)!==expected))
     return {error:'The selected item changed. Select it again before editing visibility.'};

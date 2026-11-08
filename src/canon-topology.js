@@ -133,13 +133,18 @@ var FlowTopology = (function(){
   // with the same helpers as checkReferences. Layout and local fields
   // (coinOffsets, packets, panels, ...) are stripped on import, so they are
   // not part of the closure.
+  // traceMatch is one matcher or a list of alternatives (#1100).
+  function traceMatches(s){
+    if(Array.isArray(s.traceMatch))return s.traceMatch.map(function(m,i){return {match:m,field:'traceMatch['+i+']'};});
+    return s.traceMatch?[{match:s.traceMatch,field:'traceMatch'}]:[];
+  }
   function stepReferences(s){
     var refs=[];
     function add(field,kind,ids){ids.forEach(function(id){refs.push({field:field,kind:kind,id:id});});}
     add(Array.isArray(s.edges)?'edges':'edge','edge',stepKeys(s));
     add('failures','edge',Object.keys(stepFailures(s)));add('contracts','edge',Object.keys(s.contracts || {}));
     add('nodes','node',stepNodes(s));add('tone','node',Object.keys(stepTonePatch(s) || {}));
-    if(s.traceMatch && s.traceMatch.nodeId)add('traceMatch.nodeId','node',[s.traceMatch.nodeId]);
+    traceMatches(s).forEach(function(t){if(t.match && t.match.nodeId)add(t.field+'.nodeId','node',[t.match.nodeId]);});
     if(Array.isArray(s.conditions))s.conditions.forEach(function(c,i){if(c && c.nodeId)add('conditions['+i+'].nodeId','node',[c.nodeId]);});
     return refs;
   }
@@ -154,10 +159,50 @@ var FlowTopology = (function(){
       stepReferences(matches[0]).forEach(function(ref){
         if(!(ref.kind==='edge'?edges:nodes).has(ref.id))fail(source.at,'step '+stepId+' '+ref.field+' references '+ref.kind+' '+ref.id+' outside'+bound);
       });
-      var parent=object(matches[0].traceMatch) && matches[0].traceMatch.parentStepId;
-      if(parent && !members.has(parent))fail(source.at,'step '+stepId+' traceMatch.parentStepId '+parent+' is not in this step set');
+      traceMatches(matches[0]).forEach(function(t){
+        var parent=t.match && t.match.parentStepId;
+        if(parent && !members.has(parent))fail(source.at,'step '+stepId+' '+t.field+'.parentStepId '+parent+' is not in this step set');
+      });
     });
   }
+
+  // Content that crosses with an imported step. Layout and local fields
+  // (coinOffsets, packets, sticky, color, lane, panels, panelVisibility,
+  // verdict, ref) stay with the provider's own board.
+  var stepContentFields=['id','text','edge','edges','nodes','failures','contracts','tone','traceMatch','conditions','time','delta','deltaText','deltaLinks','link','codeRefs'];
+  function importedStep(step,prefix,edgeId){
+    var copy={};
+    function node(id){return prefix+id;}
+    function rekey(value,map){var out={};Object.keys(value).forEach(function(key){out[map(key)]=value[key];});return out;}
+    stepContentFields.forEach(function(field){if(own(step,field))copy[field]=clone(step[field]);});
+    copy.id=prefix+copy.id;
+    // stepKeys reads edges before edge, so a stale edge beside edges never crosses.
+    if(Array.isArray(copy.edges)){copy.edges=copy.edges.map(edgeId);delete copy.edge;}
+    else if(typeof copy.edge==='string')copy.edge=edgeId(copy.edge);
+    if(Array.isArray(copy.nodes))copy.nodes=copy.nodes.map(node);
+    if(object(copy.failures))copy.failures=rekey(copy.failures,edgeId);
+    if(object(copy.contracts))copy.contracts=rekey(copy.contracts,edgeId);
+    if(object(copy.tone))copy.tone=rekey(copy.tone,node);
+    traceMatches(copy).forEach(function(t){
+      if(!object(t.match))return;
+      delete t.match.panelId;
+      if(t.match.nodeId)t.match.nodeId=node(t.match.nodeId);
+      if(t.match.parentStepId)t.match.parentStepId=prefix+t.match.parentStepId;
+    });
+    if(Array.isArray(copy.conditions))copy.conditions.forEach(function(c){if(object(c) && c.nodeId)c.nodeId=node(c.nodeId);});
+    return copy;
+  }
+  function shiftReveals(sec,d,at,count){
+    function shift(item){
+      if(object(item))['revealAt','hideAt'].forEach(function(key){if(Number.isInteger(item[key]) && item[key]>=at)item[key]+=count;});
+    }
+    function bullets(items){(Array.isArray(items)?items:[]).forEach(function(item){if(object(item)){shift(item);bullets(item.sub);}});}
+    (d.edges || []).forEach(shift);bullets(sec.bullets);
+    sectionContracts(sec).forEach(function(record){(Array.isArray(record.value.fields)?record.value.fields:[]).forEach(shift);});
+  }
+  // Absolute and time-of-day step times tied to the provider's storyTime are
+  // stripped on import and kept per resolved diagram for the validator.
+  var stepTimeDrops=new WeakMap();
 
   function materialize(specs){return materializeSources(specs,false);}
   function materializeSources(specs,declarationsOnly){
@@ -178,9 +223,10 @@ var FlowTopology = (function(){
           if(d.topologyProvenance){
             if(!object(d.topologyProvenance) || d.topologyProvenance.version!==1 || !Array.isArray(d.topologyProvenance.imports))fail(at,'invalid generated topologyProvenance');
             d.topologyProvenance.imports.forEach(function(imp){
-              shape(imp,['spec','export','as','nodes','edges','groups','position','destination'],at+' provenance');
+              shape(imp,['spec','export','as','nodes','edges','groups','steps','position','destination'],at+' provenance');
               if(typeof imp.spec!=='string' || !validExports(imp.export) || !namespacePath(imp.as))fail(at,'invalid generated import provenance');
               ['nodes','edges','groups'].forEach(function(key){list(imp[key],at+' provenance '+key);});
+              if(own(imp,'steps'))list(imp.steps,at+' provenance steps');
             });
           }
         }
@@ -211,7 +257,7 @@ var FlowTopology = (function(){
         if(own(d,'topologyImports') && !Array.isArray(d.topologyImports))fail(at,'topologyImports must be an array');
         var namespaces=new Set();
         (d.topologyImports || []).forEach(function(imp,i){
-          var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges','nodePositions','nodeCodeRefs','nodeOverrides','nodeDetails','edgeOverrides','nodeTracking','edgeTracking','presentation'],where);
+          var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges','nodePositions','nodeCodeRefs','nodeOverrides','nodeDetails','edgeOverrides','nodeTracking','edgeTracking','presentation','stepImports'],where);
           if(!validExports(imp.export))fail(where,'export must be a name or a nonempty array of unique export names');
           if(typeof imp.spec!=='string' || !imp.spec || !token(imp.as))fail(where,'requires spec, export, and a namespace as (letters, digits, dot, dash, underscore)');
           var reference=at+' import '+imp.as+' ('+imp.spec+' export '+imp.export+')';
@@ -250,6 +296,17 @@ var FlowTopology = (function(){
             if(!object(imp.edgeOverrides))fail(where,'edgeOverrides must be an object keyed by exported edge identity');
             Object.keys(imp.edgeOverrides).forEach(function(key){validateEdgeOverride(imp.edgeOverrides[key],where+' edgeOverrides '+key);});
           }
+          if(own(imp,'stepImports')){
+            if(!Array.isArray(imp.stepImports))fail(where,'stepImports must be an array');
+            var sets=new Set();
+            imp.stepImports.forEach(function(entry,j){
+              var entryAt=reference+' stepImports '+j;shape(entry,['set','after'],entryAt);
+              if(!token(entry.set) || sets.has(entry.set))fail(entryAt,'requires a unique step set name');sets.add(entry.set);
+              if(!own(entry,'after'))return;
+              if(typeof entry.after!=='string' || !entry.after)fail(entryAt,'after must name a step id');
+              if(Array.isArray(d.paths) && d.paths.length)fail(entryAt,'this diagram has paths, which order its steps; remove after and add the imported step ids to the paths');
+            });
+          }
           validateOverlaySelection(imp,imp.nodes,imp.edges,reference);
           if(d.rows!=null && d.rows.some(function(row){return !Array.isArray(row) || row.some(function(slot){return typeof slot!=='string' && (!Array.isArray(slot) || slot.some(function(key){return typeof key!=='string';}));});}))fail(reference,'broken consumer row placement');
           if(Object.keys(d.nodes || {}).some(function(key){return key.startsWith(imp.as+'::');}))fail(reference,'namespace collision with existing node '+imp.as+'::');
@@ -257,6 +314,9 @@ var FlowTopology = (function(){
             shape(imp.position,['x','y'],where+' position');
             if(!positionedFloat(imp.position))fail(where,'position requires finite x/y coordinates between -100000 and 100000');
           }
+        });
+        if((d.topologyImports || []).some(function(imp){return own(imp,'stepImports');}))(d.steps || []).forEach(function(s){
+          if(typeof s.id==='string' && s.id.indexOf('::')>=0)fail(at,'local step id '+s.id+' cannot contain ::, which is reserved for imported steps');
         });
       });
     });
@@ -268,6 +328,7 @@ var FlowTopology = (function(){
       var spec=byId.get(id);
       sections(spec).forEach(function(sec,si){
         var d=sec.diagram,at=id+' section '+(sec.id || si),imports=d.topologyImports || [],provenance=[],defaultPlacements=Object.create(null),drops=[];
+        var timeDrops=[],lastAfter=Object.create(null);
         imports.forEach(function(imp){
           var where=at+' import '+imp.as+' ('+imp.spec+' export '+imp.export+')',prefix=imp.as+'::';
           if(!byId.has(imp.spec))fail(where,'missing spec '+imp.spec);
@@ -376,9 +437,46 @@ var FlowTopology = (function(){
             if(custom)defaultPlacements[key]={id:key,side:'below',x:position.x+p.cx-minX,y:position.y+p.cy-minY};
             d.floats.push(f);
           });
+          var stepIds=[];
+          (imp.stepImports || []).forEach(function(entry){
+            var setAt=where+' step set '+entry.set,source=stepExportsById.get(imp.spec).get(entry.set);
+            if(!source)fail(setAt,'missing step set '+entry.set);
+            if(source.d!==provider)fail(setAt,'step set '+entry.set+' is declared in a different provider section');
+            exportNames(source.set.export).forEach(function(name){if(names.indexOf(name)<0)fail(setAt,'step set binds export '+name+', which this import does not include');});
+            if(d.steps==null)d.steps=[];
+            var added=source.set.steps.map(function(stepId){
+              var index=provider.steps.findIndex(function(s){return s && s.id===stepId;}),step=provider.steps[index];
+              stepReferences(step).forEach(function(ref){
+                if((ref.kind==='edge'?exp.edges:exp.nodes).indexOf(ref.id)<0)fail(setAt,'imported step '+stepId+' '+ref.field+' references '+ref.kind+' '+ref.id+', which this import does not select');
+              });
+              var copy=importedStep(step,prefix,importedEdge);
+              if(own(copy,'time') && storyTimeDuration(copy.time,true)==null){
+                timeDrops.push({id:copy.id,spec:imp.spec,path:providerAt+'.steps['+index+'].time',time:copy.time});delete copy.time;
+              }
+              if(d.steps.some(function(s){return s && s.id===copy.id;}))fail(setAt,'duplicate imported step '+copy.id);
+              return copy;
+            });
+            var insertAt=d.steps.length;
+            if(own(entry,'after')){
+              if(d.steps.filter(function(s){return s && s.id===entry.after;}).length!==1)fail(setAt,'after '+entry.after+' is not a step in this diagram');
+              // Several sets after the same step keep their declaration order.
+              var anchor=lastAfter[entry.after] || entry.after;
+              insertAt=d.steps.findIndex(function(s){return s && s.id===anchor;})+1;
+              lastAfter[entry.after]=added[added.length-1].id;
+            }
+            // Without paths, reveal indices are positions in this steps array.
+            if(!(Array.isArray(d.paths) && d.paths.length))shiftReveals(sec,d,insertAt,added.length);
+            d.steps.splice.apply(d.steps,[insertAt,0].concat(added));
+            added.forEach(function(step){stepIds.push(step.id);});
+          });
+          (stepTimeDrops.get(provider) || []).forEach(function(drop){
+            if(stepIds.indexOf(prefix+drop.id)>=0)timeDrops.push({id:prefix+drop.id,spec:drop.spec,path:drop.path,time:drop.time});
+          });
           var providerPage=byId.get(imp.spec).page,sourceSection=typeof sectionRecords==='function'?sectionRecords(providerPage).find(function(record){return record.section.diagram===provider;}):null;
           var destination=typeof documentReference==='function'?documentReference(providerPage):{spec:imp.spec};if(sourceSection)destination.section=sourceSection.reference;
-          provenance.push({destination:destination,spec:imp.spec,export:imp.export,as:imp.as,position:position,nodes:nodeIds,edges:edgeIds,groups:Object.keys(groups).map(function(key){return prefix+key;})});
+          var direct={destination:destination,spec:imp.spec,export:imp.export,as:imp.as,position:position,nodes:nodeIds,edges:edgeIds,groups:Object.keys(groups).map(function(key){return prefix+key;})};
+          if(own(imp,'stepImports'))direct.steps=stepIds;
+          provenance.push(direct);
           // Retain nested provenance as derived editor metadata so the
           // Workbench can frame both the outer reference and its inner source
           // blocks. The direct import stays first and remains the authored
@@ -394,12 +492,16 @@ var FlowTopology = (function(){
             var nestedNodes=(nested.nodes || []).map(function(key){return prefix+key;}).filter(function(key){return nodeIds.includes(key);});
             var nestedEdges=(nested.edges || []).map(function(key){var parts=key.split('->');return prefix+parts[0]+'->'+prefix+parts[1];}).filter(function(key){return edgeIds.includes(key);});
             var nestedGroups=(nested.groups || []).map(function(key){return prefix+key;}).filter(function(key){return own(d.groups || {},key);});
-            if(nestedNodes.length)provenance.push({destination:clone(nested.destination || {spec:nested.spec}),spec:nested.spec,export:nested.export,as:imp.as+'::'+nested.as,position:position,nodes:nestedNodes,edges:nestedEdges,groups:nestedGroups});
+            var nestedSteps=(nested.steps || []).map(function(key){return prefix+key;}).filter(function(key){return stepIds.includes(key);});
+            var nestedImport={destination:clone(nested.destination || {spec:nested.spec}),spec:nested.spec,export:nested.export,as:imp.as+'::'+nested.as,position:position,nodes:nestedNodes,edges:nestedEdges,groups:nestedGroups};
+            if(nestedSteps.length)nestedImport.steps=nestedSteps;
+            if(nestedNodes.length)provenance.push(nestedImport);
           });
         });
         if(provenance.length)d.topologyProvenance={version:1,imports:provenance};
         if(drops.length)telemetryDrops.set(d,drops);
-        if(provenance.length || d.topologyProvenance)checkReferences(d,at);
+        if(timeDrops.length)stepTimeDrops.set(d,timeDrops);
+        if(provenance.length || d.topologyProvenance)checkReferences(d,at,sec);
       });
       // Validate exports even when nobody imports them, so broken declarations
       // cannot silently become the next approved provider contract.
@@ -421,14 +523,25 @@ var FlowTopology = (function(){
     });
     return copies;
   }
-  function checkReferences(d,at){
+  function checkReferences(d,at,sec){
     var nodes=d.nodes || {},edges=new Set((d.edges || []).map(edgeKey));
     function context(key){
       return ((d.topologyProvenance || {}).imports || []).filter(function(imp){return key.indexOf(imp.as+'::')>=0;}).map(function(imp){return ' import '+imp.as+' ('+imp.spec+' export '+imp.export+')';}).join('');
     }
     function node(id,where){if(!own(nodes,id))fail(at+context(String(id)),where+' references missing node '+id);}
     function edge(id,where){if(!edges.has(id))fail(at+context(String(id)),where+' references missing edge '+id);}
-    ((d.topologyProvenance || {}).imports || []).forEach(function(imp){imp.nodes.forEach(function(id){node(id,'import provenance');});imp.edges.forEach(function(id){edge(id,'import provenance');});});
+    // Namespaced step ids come from step imports; local ids stay with the validator.
+    var steps=new Set((d.steps || []).map(function(s){return s.id;}));
+    function step(id,where){
+      if(typeof id!=='string' || id.indexOf('::')<0 || steps.has(id))return;
+      var sets=(d.topologyImports || []).filter(function(imp){return id.indexOf(imp.as+'::')===0 && (imp.stepImports || []).length;}).map(function(imp){return imp.stepImports.map(function(entry){return entry.set;}).join(', ');});
+      fail(at+context(id)+(sets.length?' step sets '+sets.join(', '):''),where+' references missing step '+id);
+    }
+    ((d.topologyProvenance || {}).imports || []).forEach(function(imp){imp.nodes.forEach(function(id){node(id,'import provenance');});imp.edges.forEach(function(id){edge(id,'import provenance');});(imp.steps || []).forEach(function(id){step(id,'import provenance');});});
+    (Array.isArray(d.paths)?d.paths:[]).forEach(function(p,i){if(p && Array.isArray(p.steps))p.steps.forEach(function(id){step(id,'path '+(p.id || i));});});
+    (Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v,i){if(v && Array.isArray(v.steps))v.steps.forEach(function(id){step(id,'view '+(v.id || i));});});
+    Object.keys(nodes).forEach(function(id){var detail=nodes[id] && nodes[id].detail;if(object(detail) && object(detail.stepMap))Object.keys(detail.stepMap).forEach(function(key){step(key,'node '+id+' detail stepMap');});});
+    if(sec)sectionContracts(sec).forEach(function(record){(Array.isArray(record.value.wires)?record.value.wires:[]).forEach(function(wire){if(object(wire))step(wire.step,'contract wire');});});
     (d.edges || []).forEach(function(e){node(e.from,'edge '+edgeKey(e));node(e.to,'edge '+edgeKey(e));});
     (d.steps || []).forEach(function(s,i){
       var where='step '+(s.id || i);
@@ -437,7 +550,7 @@ var FlowTopology = (function(){
       Object.keys(stepPanelPatch(s) || {}).concat(Object.keys(s.panelVisibility || {})).forEach(function(id){
         if(!(d.panels || []).some(function(p){return p && p.id===id;}))fail(at,where+' references missing panel '+id);
       });
-      [].concat(s.traceMatch || []).forEach(function(m){if(m && m.nodeId)node(m.nodeId,where+' traceMatch');});
+      [].concat(s.traceMatch || []).forEach(function(m){if(m && m.nodeId)node(m.nodeId,where+' traceMatch');if(m && m.parentStepId)step(m.parentStepId,where+' traceMatch');});
       (s.conditions || []).forEach(function(c){if(c.nodeId)node(c.nodeId,where+' condition');});
     });
   }
@@ -530,7 +643,8 @@ var FlowTopology = (function(){
     return mode==='wrapped'?result:mode==='diagram'?result.page.sections[0].diagram:result.page;
   }
   return {validateDeclarations:function(specs){materializeSources(specs,true);},validateTracking:validateTracking,
-    telemetryDrops:function(d){return (telemetryDrops.get(d) || []).map(function(drop){return clone(drop);});},mergeExports:mergeExports,validateNodeOverride:validateNodeOverride,validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
+    telemetryDrops:function(d){return (telemetryDrops.get(d) || []).map(function(drop){return clone(drop);});},
+    stepTimeDrops:function(d){return (stepTimeDrops.get(d) || []).map(function(drop){return clone(drop);});},mergeExports:mergeExports,validateNodeOverride:validateNodeOverride,validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
 })();
 FlowCanon.materializeTopology=FlowTopology.materialize;
 FlowCanon.topologyDependencies=FlowTopology.dependencies;

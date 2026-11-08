@@ -113,7 +113,7 @@ export function propose(specs,state,{id,spec,baseRevision,review:resolves},now=n
   if(!current || digest(current)!==baseRevision)throw new Error('Spec changed; reload the current revision before proposing.');
   if(spec.page?.canon?.id!==id)throw new Error('A proposal cannot change the diagram identity.');
   const candidate=effectiveSpecs(specs,state).map(s=>s.page.canon.id===id?spec:s);
-  const topology=candidate.some(s=>C.sections(s).some(section=>section.diagram.topologyImports || section.diagram.topologyExports));
+  const topology=candidate.some(s=>C.sections(s).some(section=>section.diagram.topologyImports || section.diagram.topologyExports || section.diagram.stepExports));
   const rendered=topology?C.materializeTopology(candidate).find(s=>s.page.canon.id===id):spec;
   const errors=C.validateSpec(rendered).errors;if(errors.length)throw new Error(errors.join('\n'));
   const prior=state.reviews[resolves];let supersedes;

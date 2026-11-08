@@ -5,10 +5,10 @@ const core=require('./arrange/core.cjs');
 const own=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
 function hasTopologyDeclarations(raw){
   if(!raw || typeof raw!=='object' || Array.isArray(raw))return false;
-  if(own(raw,'topologyImports') || own(raw,'topologyExports'))return true;
+  if(own(raw,'topologyImports') || own(raw,'topologyExports') || own(raw,'stepExports'))return true;
   return core.sections(raw).some(section=>{
     const diagram=section.diagram;
-    return diagram && typeof diagram==='object' && (own(diagram,'topologyImports') || own(diagram,'topologyExports'));
+    return diagram && typeof diagram==='object' && (own(diagram,'topologyImports') || own(diagram,'topologyExports') || own(diagram,'stepExports'));
   });
 }
 function check(raw,expectations,providers){

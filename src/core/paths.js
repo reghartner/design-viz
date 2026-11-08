@@ -54,6 +54,15 @@ function stepTonePatch(st){
   if (!st || !st.tone || typeof st.tone !== 'object' || Array.isArray(st.tone)) return null;
   return st.tone;
 }
+/* #1104: imported provider steps are spliced into the resolved steps, so a
+   position in the preview is not a position in this diagram's authored steps.
+   The Workbench refuses positional step edits here until it maps positions. */
+function stepImportsEditError(d){
+  var imports = d && Array.isArray(d.topologyImports) ? d.topologyImports : [];
+  if (!imports.some(function(imp){ return imp && Array.isArray(imp.stepImports) && imp.stepImports.length; })) return null;
+  return 'This diagram imports provider steps (stepImports). Positions in the preview include those steps, so the Workbench ' +
+    'cannot edit this diagram\'s steps or reveal positions yet. Edit them in the JSON source; Workbench support comes in a later part of #1104.';
+}
 
 /* Paths reference a shared step registry. Folding always receives just the
    selected sequence, so another outcome cannot leak state into this one. */

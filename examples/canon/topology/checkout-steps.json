@@ -1,0 +1,25 @@
+{
+  "page": {
+    "title": "Checkout with shared payment steps",
+    "canon": {"version":1,"id":"checkout-steps","kind":"canonical","owner":"group:default/commerce"},
+    "sections": [{
+      "id": "checkout", "heading": "Checkout narrative",
+      "bullets": [{"text":"The receipt appears after the charge is recorded", "revealAt":1}],
+      "diagram": {
+        "topologyImports": [{"spec":"payments", "export":"core", "as":"pay",
+          "stepImports":[{"set":"charge", "after":"submit"}]}],
+        "nodes": {"client":{"title":"Checkout client"}, "receipt":{"title":"Receipt"}},
+        "rows": [["client", "receipt"]],
+        "edges": [
+          {"from":"client", "to":"pay::gateway", "kind":"https"},
+          {"from":"pay::ledger", "to":"receipt", "kind":"https", "revealAt":1}
+        ],
+        "steps": [
+          {"id":"submit", "edge":"client->pay::gateway", "text":"Submit checkout"},
+          {"id":"confirm", "edge":"pay::ledger->receipt", "text":"Show the receipt",
+           "traceMatch":{"serviceName":"checkout", "operation":"GET /receipt", "parentStepId":"pay::record"}}
+        ]
+      }
+    }]
+  }
+}

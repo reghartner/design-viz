@@ -487,3 +487,17 @@ test('signal show on card is one reversible edit and survives label, source and 
  assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,false);
  oneStep(ui,()=>{const toggle=ui.control('received show on card').querySelector('input');toggle.checked=true;toggle.fire('change');ui.h.flush();});assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,true);
 });
+
+test('#1111 loki and grafana signals get an empty means zero toggle that survives other edits; other sources drop it',()=>{
+ const ui=harness(board({kind:'queue',signals:{received:{loki:LOKI_IN},trace:{tempo:'{}'}}}),EDGE);ui.metrics();
+ assert.equal(ui.row('trace empty means zero'),null,'no toggle where the field means nothing');
+ const toggle=()=>ui.control('received empty means zero').querySelector('input');
+ assert.equal(toggle().checked,true,'absent reads as the default');
+ oneStep(ui,()=>{const t=toggle();t.checked=false;t.fire('change');ui.h.flush();});
+ assert.equal(edgeOf(ui).telemetry.signals.received.missingMeansZero,false);assert.equal(toggle().checked,false);
+ oneStep(ui,()=>ui.set('received unit','events'));oneStep(ui,()=>ui.set('received label','Received'));oneStep(ui,()=>ui.set('received query','sum(count_over_time({app="x"}[5m]))'));
+ assert.equal(edgeOf(ui).telemetry.signals.received.missingMeansZero,false);
+ oneStep(ui,()=>ui.set('received source','grafana'));assert.equal(edgeOf(ui).telemetry.signals.received.missingMeansZero,false,'kept between loki and grafana');
+ oneStep(ui,()=>ui.set('received source','tempo'));assert.equal(Object.hasOwn(edgeOf(ui).telemetry.signals.received,'missingMeansZero'),false,'dropped where it means nothing');
+ assert.deepEqual(ui.warnings(),[]);
+});

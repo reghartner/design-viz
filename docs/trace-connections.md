@@ -68,21 +68,10 @@ actually declares the chosen `team_slug`/`from` arguments before using it.
 }
 ```
 
-Company profiles are inherited only by boards built with that company
-configuration that use traces (#1095). A board uses traces when either:
-
-- a step in any section or tab section has `traceMatch`, or
-- a section declares a `live-status` panel (the panel that holds Status → Trace
-  and the Load trace form) and the page authors telemetry: `tracking.telemetry`
-  is present (`{}` is enough), or a node, edge, or topology import
-  `nodeTracking`/`edgeTracking` overlay has a `telemetry` binding.
-
-Other boards, for example a Jira-only status board or a board without a
-live-status panel, inherit nothing, so their capability declaration has no trace
-connector. Telemetry that only a provider supplies for imported carriers does
-not count; add `tracking.telemetry` or an explicit `traceConnections` map.
-Profiles grant no permission and never make a call before the reader clicks
-Load/Verify. A board may optionally narrow or override those defaults:
+Only boards that use traces inherit company profiles: a `traceMatch` step, or a
+`live-status` panel on a page with page or carrier `telemetry`. Profiles grant
+no permission and never call before Load/Verify. A board may narrow or override
+them:
 
 ```json
 {"tracking":{"telemetry":{"traceConnections":{
@@ -90,16 +79,16 @@ Load/Verify. A board may optionally narrow or override those defaults:
 }}}}
 ```
 
-Omitting `traceConnections` inherits all configured company profiles on a board
-that uses traces. An explicit map selects only its entries on any board; `"traceConnections": {}` disables direct loading for
+Omitting `traceConnections` inherits all company profiles there. An explicit
+map selects only its entries; `"traceConnections": {}` disables direct loading for
 that board. Omitting `environments` in an entry enables all environments declared
 in that profile. An
 environment subset can override its declared `label`, `value`, `context` and
 `literals`; board `label` and existing top-level `literals` may also be overridden.
 Overrides cannot introduce literal/context keys or change server, tool, argument
 mapping or adapter. Alternatively a board may contain a full inline v1 profile
-instead of a company reference. Readers can choose only the resolved company/board
-connections. `tracking.telemetry.enabled:false` and host `telemetry:false` win.
+instead of a company reference. Readers choose only resolved connections.
+`tracking.telemetry.enabled:false` and host `telemetry:false` win.
 
 ## Absolute bounds and supported links
 

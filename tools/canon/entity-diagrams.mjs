@@ -78,7 +78,7 @@ export function buildEntityDiagramIndex(specs,{publicBaseUrl='',diagramUrls}={})
               if(edge){involved.add(edge.from);involved.add(edge.to);}
             }
             for(const nodeId of Object.keys(step.tone || {}))involved.add(nodeId);
-            if(step.traceMatch?.nodeId)involved.add(step.traceMatch.nodeId);
+            for(const m of [].concat(step.traceMatch || []))if(m?.nodeId)involved.add(m.nodeId);
             for(const condition of step.conditions || [])if(condition.nodeId)involved.add(condition.nodeId);
             if(![...nodeIds].some(id=>involved.has(id)))return;
             const stepRef=routing.stepReference(ids,position);

@@ -130,7 +130,10 @@ claim. Alternatives are never synthesized or fetched speculatively.
 The envelope is validated again by `telemetrySample`, survives mixed-provider
 composition, and cannot change numeric signal values or classification. Duplicate
 span IDs, cycles, malformed timing and conflicting candidate duplicates fail.
-Missing parents warn. More than 200 spans yields no timeline and a partial/limited
+Missing parents warn. Honeycomb's synthetic `missing-root` row (start 0, written
+when the root span was not stored) is dropped before the timeline base is chosen;
+the trace is partial with a root-not-stored warning, and spans whose parent is
+absent render as roots. More than 200 spans yields no timeline and a partial/limited
 warning; no silent truncation. Input is capped at 1 MiB, 10,000 table rows,
 20 candidates, 32 events/links per span, and a 24h span-timeline extent. Native
 Honeycomb annotation/log/link rows are excluded from timed spans with a warning.
@@ -179,6 +182,65 @@ service/span shape already matches the pinned current native shape.
 For step-by-step setup on an existing local or imported diagram, follow
 [Trace-ready authoring](trace-ready-authoring.md).
 
+## Allowed match attributes
+
+A [direct trace connection profile](trace-connections.md) may list
+`allowedAttributes`: span attribute names it retains from loaded traces and
+permits in `traceMatch.attributes`, in addition to the built-in operational list
+in [Trace-ready authoring](trace-ready-authoring.md). It takes effect for Tempo
+(`tempo-v1`) profiles. Add it next to the other profile fields:
+
+```json
+"allowedAttributes": ["device.model"]
+```
+
+With that profile, this step maps only the message-consumer span for device
+model X:
+
+```json
+{
+  "id": "consume-x",
+  "text": "This is the message for device model X",
+  "edge": "broker->consumer",
+  "traceMatch": {
+    "serviceName": "telemetry-consumer",
+    "operation": "consume device.report",
+    "nodeId": "consumer",
+    "attributes": {"device.model": "X"}
+  }
+}
+```
+
+Honeycomb `get_trace` does not return span attributes (verified on a real trace,
+company report 2026-11-07). It returns the 19 fixed table columns only. Its linked
+raw JSON resource (`honeycomb://trace/<pk>/json`) holds only `duration_ms`, `name`,
+`service.name`, `span.kind`, `trace.parent_id`, `trace.span_id`, `trace.trace_id`
+and internal IDs, and its input schema has no column parameter. An attribute
+present in Honeycomb `run_query` raw rows (`messaging.rabbitmq.routing_key`) was
+absent from `get_trace`. So on a Honeycomb profile neither `allowedAttributes` nor
+the built-in attribute list can match today. The one exception is
+`http.status_code`, which comes from the fixed `http_status` column as text.
+
+- `allowedAttributes` must be an array of at most 32 non-empty attribute names
+  (letters, digits, `_ . : / -`, starting with a letter). A malformed entry fails
+  with its field path, for example `allowedAttributes[1]`. Credential-shaped names
+  are rejected: names containing token, secret, password, passwd, credential,
+  authorization, cookie, header, bearer, private key, access key or api key, and
+  names with an `auth`, `pwd`, `jwt` or `session` part.
+- Values match exactly, with the same rules as built-in attributes. Tempo keeps the
+  span attribute value and its type.
+- Validation accepts an attribute that any connection for the page lists, also
+  while `tracking.telemetry.enabled` is `false`. Without such a profile it rejects
+  the attribute as before (`traceMatch.attributes: use supported operational
+  attributes only`). A trace loaded through a profile that does not list it does
+  not carry it, so the step shows Not observed.
+- Validation warns (it does not fail) when only Honeycomb connections list an
+  attribute that a step uses, because Honeycomb `get_trace` does not return span
+  attributes. It also warns when such an attribute has a number or boolean value,
+  which a Honeycomb text cell never matches.
+- A board entry that references a company profile inherits its `allowedAttributes`
+  and cannot change them; an inline board profile may declare its own.
+
 ## Inspect a request in Status
 
 The existing **Status** panel has **Jira** and **Trace** views. Jira is the default.
@@ -206,6 +268,44 @@ by absence. Provider errors, budget violations and supplied queue/backpressure
 conditions are shown separately. An unavailable or over-200-span timeline retains
 its identity and warnings without asserting missing operations.
 
+### traceMatch alternatives
+
+When the same logical operation is recorded by different root spans depending on
+the path it took, `traceMatch` may be an array of alternatives instead of
+duplicating the step. Each entry is a complete selector with the
+[selector rules](trace-ready-authoring.md#2-attach-exact-selectors-to-existing-steps).
+For example, one message is consumed through RabbitMQ or through Pulsar, and
+each transport's consumer span has its own operation name:
+
+```json
+{
+  "id": "consume-stats",
+  "text": "Consume camera stats",
+  "edge": "camera->stats",
+  "traceMatch": [
+    {"serviceName": "stats-consumer", "operation": "camera_stats_message process", "nodeId": "stats"},
+    {"serviceName": "stats-consumer", "operation": "persistent://stats/camera process", "nodeId": "stats"}
+  ]
+}
+```
+
+Alternatives are tried in order and the first one that matches maps the step;
+its own `nodeId`, budgets and `panelId` then apply. If none matches, the step
+shows the first ambiguous result, so a selector that needs refinement stays
+visible; otherwise it shows the last alternative's **not observed** result. A
+child step's `parentStepId` refers to whichever alternative of the parent step
+matched. On a path that does not contain an alternative's `parentStepId` step,
+that alternative is skipped, so a child shared by two paths can name each path's
+parent; if every alternative is skipped the step is **not observed**. (A single
+object whose parent step is not on the path is still an error.) The array must
+not be empty; validation reports an invalid entry with its index, for example
+`traceMatch[1].occurrence`. Alternatives do not make two spans in one trace
+acceptable: the matched alternative still needs one unique span (or a
+`repeat:"attempts"` group). The alternative is chosen per step before the check
+that one span maps to only one step, so if the chosen alternative's span is also
+claimed by another step, the step becomes ambiguous and later alternatives are
+not tried.
+
 The panel has one bounded waterfall and a **Show on diagram** toggle. All canvas
 annotations are runtime-only, with no layout/spec persistence. Pin stores evidence
 in this session's Jira Activity. Historical Over time, telemetry off, rebinding,
@@ -231,3 +331,61 @@ The adapter drops legacy `timestamp` entries from outgoing `raw_row_columns`
 without changing the authored query: Honeycomb always returns that column.
 The Status panel’s Trace mode supersedes the former step-owned trace disclosure
 and fallback rail. Selecting or navigating steps never opens or selects a trace.
+
+## Honeycomb lookback
+
+The Load trace form says under the trace ID field which time window a load
+would send:
+
+- "Looks back 2h; change under Lookback." for a signed lookback: the
+  **Trace start** value in the **Lookback (optional)** section when one is set,
+  otherwise the profile's `time.defaultLookback`.
+- "Uses the time set under Lookback." when Trace start is an absolute
+  timestamp (or not yet a valid lookback).
+- "Uses the time range in the pasted link." when the pasted link carries a
+  start or end and the request can be sent as given, with Trace start and
+  Trace end filling only what the link leaves out. A time control that repeats
+  a field the link supplies is rejected when loading.
+- "This link's time range cannot be used with this connection; paste the trace
+  ID alone." when the link's time cannot be sent as given: for example
+  absolute link bounds on a connection whose `time.encoding` is `relative`
+  (such as the Honeycomb profile in [trace connections](trace-connections.md)),
+  or a start-only or end-only link that the time controls do not complete.
+
+When `get_trace` answers with only a Metadata block whose `navigation_hints`
+starts with `no spans found` and no span table, the panel opens the Lookback
+section once for that result and reports, using the window that was sent:
+
+- "Trace not found in the last 2h. Try a longer lookback under Lookback."
+- "Trace not found between <from> and <to>. Try a wider range under
+  Lookback." for absolute Trace start and Trace end.
+- "Trace not found in the time range of the pasted link. Paste the trace ID
+  alone, then set Lookback." for link bounds.
+
+This provider answer is the only response reported as not found; errors,
+unknown shapes and a span table that is present but lacks a required column
+(`Unsupported trace table header.`) are not.
+
+`time.defaultLookback` replaces the trace tool's own default whenever no start
+is given: Load trace always sends a start. In the November 2026 company report,
+Honeycomb `get_trace` looked back 7 days when called without `from` and
+accepted at least `-7d`. A profile with the `2h` example therefore finds only
+traces from the last 2 hours, where the tool alone would also find older ones.
+Choose `defaultLookback` for the age of the traces people paste.
+
+Largest useful lookback: this repo can verify that `from` is a signed duration
+of at most four digits and a unit (`s`, `m`, `h`, `d`, `w`), and the November
+2026 company report observed `from: -7d` returning a trace about 5 h old that
+`-2h` did not return. This repo cannot verify the longest `from` Honeycomb
+accepts or how long an account retains trace data; both depend on the account.
+Use the shortest lookback that covers the trace's age.
+
+## Load trace environment
+
+The Load trace **Connection environment** dropdown starts at the connection
+environment that matches the board **Environment**: the exact id first, then the
+id or label ignoring case, then a common alias (`prd`/`prod`/`production`,
+`stg`/`stage`/`staging`, `dev`/`development`, `qa`). With no single match it
+starts empty, or at the only environment when the connection has one. It follows
+later board Environment changes until the reader picks a connection environment;
+that pick is kept. Picking a different connection starts matching again.

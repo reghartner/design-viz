@@ -59,3 +59,9 @@ test('card row health keeps failing bounds, pending data and observed zero disti
 test('metric work rollups retain shared no-change, completion and unknown precedence',()=>{
  for(const [states,want] of [[['unchanged','unchanged'],'unchanged'],[['done','unchanged'],'done'],[['done','unknown'],null],[['blocked','unknown'],'blocked'],[['missing','active'],'missing'],[['active','done'],'active'],[['testing','done'],'testing']])assert.equal(C.liveStatusPresentationRollup(states),want);
 });
+test('an authored card title replaces the label and drops the queue topic suffix',()=>{
+ const edge={from:'a',to:'b',label:'Publish',telemetry:{use:'topic',topic:'device-events',card:{title:'Camera stats consumer · RabbitMQ'}}};
+ const binding={kind:'queue',signals:{in:{unit:'msg/s'}},proof:{in:{min:1}},card:{title:'Camera stats consumer · RabbitMQ'}};
+ assert.equal(C.telemetryCardContent(edge,binding,{signals:{in:{value:25}}},{telemetry:'flowing'},'6h').title,'Camera stats consumer · RabbitMQ');
+ assert.equal(C.telemetryCardContent(edge,{...binding,card:{width:300}},{signals:{in:{value:25}}},{telemetry:'flowing'},'6h').title,'Publish · device-events','width alone keeps the label and suffix');
+});

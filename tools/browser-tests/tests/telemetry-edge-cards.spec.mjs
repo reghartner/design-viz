@@ -220,3 +220,25 @@ test('manual card positions reserve frame and cue space and survive live text re
  await page.evaluate(()=>window.viewer.controller.telemetry.apply({'ingest->app':{signals:{rate:{value:9876543210},errors:{value:0}}}}));
  expect(await position()).toEqual({x:840,y:420});expect((await geometry(root)).outside).toEqual([]);expect((await geometry(root)).overlaps).toEqual([]);
 });
+test('#1112 authored card title and width replace the label and default width; placement packs the wider cards, including an imported edge',async({page,server})=>{
+ const {root,metrics}=await mountCues(page,server),card=id=>root.locator('[data-metrics-card="'+id+'"]');
+ await metrics.click();await expect(root.locator(cards)).toHaveCount(3);
+ await expect(card('app->push').locator('.dv-metrics-card-title')).toHaveText('push');
+ for(const id of ['ingest->app','app->push','shared::api->shared::store'])await expect(card(id).locator('.dv-metrics-card-box')).toHaveAttribute('width','240');
+ const spec=cueSpec(d=>{
+  d.edges[0].telemetry.card={title:'Camera stats consumer · RabbitMQ',width:480};
+  d.edges[1].telemetry.card={width:480};
+  d.topologyImports[0].edgeTracking['api->store'].telemetry.card={title:'Postgres writes',width:140};
+ });
+ await page.evaluate(({spec,jira,samples})=>{
+  window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:()=>Promise.resolve(JSON.parse(JSON.stringify(samples)))}});
+  window.viewer.controller.liveStatus.apply(jira);
+ },{spec,jira:CUE_JIRA,samples:CUE_SAMPLES});
+ await root.getByRole('button',{name:'Metrics',exact:true}).click();await expect(root.locator(cards)).toHaveCount(3);
+ await expect(card('ingest->app').locator('.dv-metrics-card-title')).toHaveText('Camera stats consumer · RabbitMQ');
+ await expect(card('app->push').locator('.dv-metrics-card-title')).toHaveText('push');
+ await expect(card('shared::api->shared::store').locator('.dv-metrics-card-title')).toHaveText('Postgres writes');
+ for(const [id,width] of [['ingest->app','480'],['app->push','480'],['shared::api->shared::store','140']])await expect(card(id).locator('.dv-metrics-card-box')).toHaveAttribute('width',width);
+ // The two adjacent 480-wide cards, nodes, coins and cues stay clear; text stays inside each card, including the 140-wide one.
+ const g=await geometry(root);expect(g.overlaps).toEqual([]);expect(g.outside).toEqual([]);expect(g.labels).toEqual([]);
+});

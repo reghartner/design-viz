@@ -8,9 +8,9 @@ acceptance, returned ID match, span count and completeness. Both are explicit
 reader actions. Changing an input never fetches. Clear/cancel, connection,
 environment, mapping diagram, document identity and remount changes retire old
 requests; late responses cannot replace current evidence. Schema/detail requests
-time out after 30 seconds. Changing the connection or environment also clears
-the pasted ID/link and time controls: supply a trace for the selected environment
-before loading again. Changing only the mapping diagram retains that input.
+time out after 30 seconds. Connection or environment changes clear the pasted
+ID/link and times; mapping diagram changes keep them. The environment starts
+at the board's match ([rules](provider-traces.md#load-trace-environment)).
 An authenticated host account change retires the shared telemetry session,
 retracts direct and numeric evidence, and requires reopening the viewer.
 
@@ -88,6 +88,8 @@ Overrides cannot introduce literal/context keys or change server, tool, argument
 mapping or adapter. Alternatively a board may contain a full inline v1 profile
 instead of a company reference. Readers can choose only the resolved company/board
 connections. `tracking.telemetry.enabled:false` and host `telemetry:false` win.
+Optional `allowedAttributes`:
+[provider traces](provider-traces.md#allowed-match-attributes).
 
 ## Absolute bounds and supported links
 
@@ -122,10 +124,8 @@ and a probe establish that the connected detail tool supports absolute `from` an
 }
 ```
 
-This example does not claim that all Honeycomb accounts support absolute strings.
-The runtime validates the discovered schema before every call. Numeric timestamps
-require explicit `unix-seconds` or `unix-milliseconds` and `type:"number"` (or
-`"string"` if the tool accepts decimal strings). Conversion preserves nanosecond
+Numeric timestamps require explicit `unix-seconds` or `unix-milliseconds` and
+`type:"number"` (or `"string"` if the tool accepts decimal strings). Conversion preserves nanosecond
 precision; values that cannot be represented exactly as a declared number fail.
 Raw-ID time controls accept a signed lookback such as `-2h`, or paired UTC ISO
 timestamps. A time-bearing link and explicit time controls cannot be combined.

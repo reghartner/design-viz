@@ -487,3 +487,54 @@ test('signal show on card is one reversible edit and survives label, source and 
  assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,false);
  oneStep(ui,()=>{const toggle=ui.control('received show on card').querySelector('input');toggle.checked=true;toggle.fire('change');ui.h.flush();});assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,true);
 });
+
+test('#1111 loki and grafana signals get an empty result reads 0 toggle that survives other edits; checking it removes the key; other sources drop it',()=>{
+ const ui=harness(board({kind:'queue',signals:{received:{loki:LOKI_IN},sent:{grafana:'sent',missingMeansZero:true},trace:{tempo:'{}'}}}),EDGE);ui.metrics();
+ assert.equal(ui.row('trace empty result reads 0'),null,'no toggle where the field means nothing');
+ const toggle=()=>ui.control('received empty result reads 0').querySelector('input');
+ assert.equal(ui.control('sent empty result reads 0').querySelector('input').checked,true);
+ oneStep(ui,()=>ui.set('sent unit','req'));assert.equal(edgeOf(ui).telemetry.signals.sent.missingMeansZero,true,'an authored true survives other edits');
+ assert.equal(toggle().checked,true,'absent reads as the default');
+ oneStep(ui,()=>{const t=toggle();t.checked=false;t.fire('change');ui.h.flush();});
+ assert.equal(edgeOf(ui).telemetry.signals.received.missingMeansZero,false);assert.equal(toggle().checked,false);
+ oneStep(ui,()=>ui.set('received unit','events'));oneStep(ui,()=>ui.set('received label','Received'));oneStep(ui,()=>ui.set('received query','sum(count_over_time({app="x"}[5m]))'));
+ assert.equal(edgeOf(ui).telemetry.signals.received.missingMeansZero,false);
+ oneStep(ui,()=>ui.set('received source','grafana'));assert.equal(edgeOf(ui).telemetry.signals.received.missingMeansZero,false,'kept between loki and grafana');
+ oneStep(ui,()=>{const t=toggle();t.checked=true;t.fire('change');ui.h.flush();});assert.equal(Object.hasOwn(edgeOf(ui).telemetry.signals.received,'missingMeansZero'),false,'checking returns to the default without writing true');
+ oneStep(ui,()=>{const t=toggle();t.checked=false;t.fire('change');ui.h.flush();});
+ oneStep(ui,()=>ui.set('received source','tempo'));assert.equal(Object.hasOwn(edgeOf(ui).telemetry.signals.received,'missingMeansZero'),false,'dropped where it means nothing');
+ assert.deepEqual(ui.warnings(),[]);
+});
+
+test('#1112 Inspect sets connection card title and width with one Undo each; invalid values are refused; nodes get neither row',()=>{
+  const ui=harness(board({kind:'call',signals:{rate:{grafana:PROM_RATE}},card:{side:'below'}}),EDGE);ui.metrics();
+  oneStep(ui,()=>ui.set('Card title','  Camera stats consumer · RabbitMQ '));oneStep(ui,()=>ui.set('Card width','360'));
+  assert.deepEqual(edgeOf(ui).telemetry.card,{side:'below',title:'Camera stats consumer · RabbitMQ',width:360});
+  assert.equal(ui.control('Card title').value,'Camera stats consumer · RabbitMQ');assert.equal(ui.control('Card width').value,'360');
+  for(const [label,value] of [['Card title','x'.repeat(121)],['Card width','139'],['Card width','481'],['Card width','wide']]){
+    const before=ui.text;ui.set(label,value);assert.equal(ui.text,before,label+' '+value+' is refused');assert.ok(ui.error(),label+' explains the refusal');ui.select(EDGE);
+  }
+  const C=api(ui.e.C);
+  for(const bad of [NaN,Infinity,'300'])assert.match(C.telemetryEditBinding(edgeOf(ui).telemetry,{op:'card',field:'width',value:bad},{}).error || '',/140 and 480/,'card width refuses '+String(bad));
+  assert.match(C.telemetryEditBinding(edgeOf(ui).telemetry,{op:'card',field:'title',value:'bell\u0007'},{}).error || '',/1–120/);
+  oneStep(ui,()=>ui.set('Card title',''));oneStep(ui,()=>ui.set('Card width',''));assert.deepEqual(edgeOf(ui).telemetry.card,{side:'below'});
+  const node=harness(board(),{kind:'node',section:0,id:'ingest'});node.metrics();assert.equal(node.row('Card title'),null);assert.equal(node.row('Card width'),null);
+});
+
+test('#1112 an inherited imported connection without an overlay shows the card rows in Inspect; Card width creates the consumer overlay in one Undo step',()=>{
+  const f=topologyFixtures(),ui=harness(f.consumer),providerBefore=JSON.stringify(f.provider);
+  ui.h.session.replaceProject(JSON.stringify(f.consumer,null,2),null,{topologyContext:f.context});
+  const C=ui.e.C,resolved=()=>diagramOf(C.FlowTopology.resolveSource(ui.raw,f.context));
+  const edge={kind:'edge',section:0,index:resolved().edges.findIndex(e=>e.from==='shared::api' && e.to==='shared::store')};ui.select(edge);
+  assert.equal(Object.hasOwn(diagramOf(ui.raw).topologyImports[0],'edgeTracking'),false,'no overlay before the edit');
+  ui.metrics();for(const label of ['Card side','Card offset','Card title'])assert.ok(ui.row(label),label+' is in Inspect for the inherited card');
+  assert.equal(ui.control('Card width').value,'');const before=ui.text;
+  for(const field of ['title','width','position'])assert.equal(C.planCarrierTelemetry(before,ui.raw,edge,{op:'card',field,value:null},f.context).text,before,'clearing an unset inherited '+field+' creates no overlay');
+  oneStep(ui,()=>ui.set('Card width','400'),edge);
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking,{'api->store':{telemetry:{kind:'call',signals:{rate:{loki:LOKI_IN}},card:{width:400}}}});
+  assert.equal(C.carrierTelemetry(resolved().edges[edge.index],{}).card.width,400);assert.equal(ui.control('Card width').value,'400');
+  assert.equal(JSON.stringify(f.provider),providerBefore,'the provider spec is untouched');
+  const after=ui.text;assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,before,'one Undo removes the created overlay');
+  assert.equal(ui.h.session.redo(),true);assert.equal(ui.text,after,'Redo restores the created overlay');
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking['api->store'].telemetry.card,{width:400});
+});

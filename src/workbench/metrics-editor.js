@@ -37,6 +37,7 @@ function flowMetricsDom(o){
       row(box,prefix+name+' unit',c.text(telemetryObject(entry)?entry.unit:null,function(v){return commit({op:'signal',name:name,field:'unit',value:v});},{placeholder:'req/h, msgs, ms'}));
       row(box,prefix+name+' label',c.text(telemetryObject(entry)?entry.label:null,function(v){return commit({op:'signal',name:name,field:'label',value:v});},{placeholder:'Display name (optional, up to 120 characters)'}));
       row(box,prefix+name+' show on card',c.checkbox(!entry || entry.showOnCard!==false,function(v){return commit({op:'signal',name:name,field:'showOnCard',value:v});}));
+      if(source==='loki' || source==='grafana')row(box,prefix+name+' empty result reads 0',c.checkbox(entry.missingMeansZero!==false,function(v){return commit({op:'signal',name:name,field:'missingMeansZero',value:v});})).setAttribute('title','On: an empty Prometheus result reads 0 in Live; an empty Loki count/rate reads 0 in Live and Over time. Off: empty stays unobserved (missingMeansZero: false).');
       row(box,prefix+name+' query link',c.text(entry && entry.links?entry.links.query:null,function(v){return commit({op:'signal',name:name,field:'queryLink',value:v});},{placeholder:'https://… (stable source query)'}));
       row(box,prefix+name+' scope',c.text(telemetryObject(entry)?entry.scope:null,function(v){return commit({op:'signal',name:name,field:'scope',value:v});},{placeholder:'Exact counting scope (optional)'}));
       proofEditors(box,binding.proof,names,name,prefix,commit);
@@ -75,6 +76,15 @@ function flowMetricsDom(o){
 function createFlowMetricsEditor(o){
   var d=flowMetricsDom(o),c=o.controls,s=o.state,commit=o.commit,b=s.binding,templateNames=Object.keys(s.templates || {});
   var box=d.el('fieldset','metrics-editor');box.appendChild(d.el('legend',null,'Metrics'));
+  function cardRows(card){
+    card=telemetryObject(card)?card:{};
+    d.row(box,'Card side',d.relabel(c.select(TELEMETRY_CARD_SIDES,typeof card.side==='string'?card.side:'',function(v){return commit({op:'card',field:'side',value:v});},true),{'':'(automatic)'}));
+    d.row(box,'Card offset',c.number(telemetryNumber(card.offset)?card.offset:null,function(v){return commit({op:'card',field:'offset',value:v});}));
+    d.row(box,'Card title',c.text(typeof card.title==='string'?card.title:'',function(v){return commit({op:'card',field:'title',value:v});},{placeholder:'(connection label)'}));
+    d.row(box,'Card width',c.number(telemetryNumber(card.width)?card.width:null,function(v){return commit({op:'card',field:'width',value:v});}));
+    if(card.position)box.appendChild(c.action('Reset card to automatic',function(){return commit({op:'card',field:'position',value:null});}));
+    d.note(box,'Drag the card in Preview metrics layout, or focus it and use Arrow keys (10 units; Shift moves 50). Manual placement overrides Card side and offset; Reset card to automatic restores them. Card width is 140–480 units (default 240); an empty Card title shows the connection label. Readers see the saved placement when Metrics is on.');
+  }
   if(s.imported)d.note(box,'Inherited metrics from '+s.provider+' (read only): '+(s.inherited?telemetrySummary(s.inherited)+'. A binding saved here replaces it in this consumer.':'none. A binding saved here applies only in this consumer.'),'metrics-inherited');
   // An imported carrier that inherits a provider binding is bound; only a carrier with neither is unbound.
   if(!b && !s.inherited)d.note(box,'Unbound: no metrics overlay and no proof verdict. Choose a kind, then add a signal'+(templateNames.length?' or pick a template':'')+'.','metrics-status');
@@ -105,16 +115,13 @@ function createFlowMetricsEditor(o){
   if(b){
     d.note(box,'Proof limits: min is a floor and max a ceiling; with ratio of, max is the highest allowed ratio to that signal.');
     d.linkEditors(box,b.links,'',commit,s.templateBase && s.templateBase.links);
-    if(s.edge){
-      var card=telemetryObject(b.card)?b.card:{};
-      d.row(box,'Card side',d.relabel(c.select(TELEMETRY_CARD_SIDES,typeof card.side==='string'?card.side:'',function(v){return commit({op:'card',field:'side',value:v});},true),{'':'(automatic)'}));
-      d.row(box,'Card offset',c.number(telemetryNumber(card.offset)?card.offset:null,function(v){return commit({op:'card',field:'offset',value:v});}));
-      if(card.position)box.appendChild(c.action('Reset card to automatic',function(){return commit({op:'card',field:'position',value:null});}));
-      d.note(box,'Drag the card in Preview metrics layout, or focus it and use Arrow keys (10 units; Shift moves 50). Manual placement overrides Card side and offset; Reset card to automatic restores them. Readers see the saved placement when Metrics is on.');
-    }
+    if(s.edge)cardRows(b.card);
     box.appendChild(c.action('Remove metrics',function(){return commit({op:'remove'});}));
+  }else if(s.edge && s.inherited){
+    // The first card edit of an inherited connection saves this consumer's copy of the binding.
+    cardRows(s.inherited.card);
+    d.note(box,'A card edit saves the inherited binding with that change as this consumer\'s override; the provider is unchanged.');
   }
-  if(!b && s.edge && s.inherited && s.inherited.card && s.inherited.card.position)box.appendChild(c.action('Reset card to automatic',function(){return commit({op:'card',field:'position',value:null});}));
   d.warnings(box,s.warnings || [],'Metrics warnings');
   return box;
 }

@@ -108,6 +108,7 @@ for the complete wrapper example, tool schemas, bounds and selection behavior.
 ### Supported metrics sources and limits
 
 - `grafana`: PromQL; `loki`: metric LogQL. Range series in Live and selected-window Over time.
+  Loki daily counts: use `[$__range]`, one instant query for the window total ([details](../../../docs/live-status.md#loki-window-totals)).
 - `cloudwatch`: metric object; Sum, Maximum, Minimum, Average or SampleCount. Per-period series plus a correct window headline; optional `period` and selected-window history.
 - `cloudwatchLogs`: Logs Insights object; first row's `valueField` (or first column), numeric strings accepted. Optional trends and bounded grouped details, including selected-window history.
 - `sql`: query string, first numeric scalar, at most once/hour in Live. History requires authored time macros.
@@ -115,12 +116,9 @@ for the complete wrapper example, tool schemas, bounds and selection behavior.
 - `tempo`: explicit TraceQL trace search; one observed request, not an aggregate metric.
 
 All sources apply to local, imported/nested, overlay and detail nodes/edges. Missing tools give an actionable source/tool diagnostic; other supported sources keep working.
+A source the page cannot call must remain unobserved with a one-line source/tool diagnostic.
 
 ### CloudWatch window totals
-
-Supported sources are `grafana` (PromQL), `loki` (LogQL), `tempo` (TraceQL),
-`sql`, `honeycomb` (query object) , `cloudwatch` and `cloudwatchLogs` (query objects). A source the
-page cannot call must remain unobserved with a one-line source/tool diagnostic.
 
 CloudWatch accepts `Sum`, `Maximum`, `Minimum`, `Average` and `SampleCount`. Use the Grafana datasource
 UID at `tracking.telemetry.grafana.cloudwatch`; shared
@@ -283,7 +281,7 @@ The accepted authored fields are:
 | `tracking.telemetry.grafana` | `prometheus`, `loki`, `tempo`, `sql`, `cloudwatch` datasource UIDs; optional `accountId` for CloudWatch; optional `baseUrl` for evidenced Grafana UI origin |
 | `tracking.telemetry.honeycomb` | `environment`, optional `dataset` |
 | carrier `telemetry` | `kind`, `signals`, `proof`, `links`, `card`, or `use` plus declared template parameters |
-| signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope`, `label`, `showOnCard`, `links` |
+| signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope`, `label`, `showOnCard`, `links`, `window`; `loki`/`grafana` also `missingMeansZero` |
 | `cloudwatch` query | `namespace`, `metric`, `region`, `accountId`, `dimensions`, `statistic`; optional `missingMeansZero`, `period` |
 | Logs `trend` | `query`, `timeField`, `valueField`; optional `binSeconds` (or false instead of an object) |
 | `cloudwatchLogs` query | `logGroups`, `query`, `region`, optional `valueField`, `breakdown`, `trend` |
@@ -292,7 +290,7 @@ The accepted authored fields are:
 | proof entry | `min`, `max`, optional `maxRatioOf` another signal |
 | carrier links | absolute HTTP(S) `dashboard`, `query` |
 | signal links | absolute HTTP(S) `query` without credentials |
-| edge card | `side`, `offset` |
+| edge card | `side`, `offset`, `title`, `width` |
 | template | optional `kind`, `params`; required `signals`; optional `proof`, `links` |
 
 Deployment profiles are optional. Set `tracking.telemetry.environment` to the
@@ -375,7 +373,7 @@ Interpret evidence this way:
 | traffic returned and a limit fails | observed degraded in this window |
 | explicit returned zero | silent in this window, not nonexistent |
 | empty CloudWatch arrays | unobserved / no data points yet, unless explicit `missingMeansZero: true` |
-| successful empty recognized Loki count/rate | observed zero |
+| successful empty recognized Loki count/rate | observed zero; unobserved with `missingMeansZero: false` |
 | missing sample, error or unsupported source | unobserved |
 | one trace | this one request was observed |
 
@@ -416,17 +414,16 @@ Successful empty CloudWatch `values` and `timestamps` mean **no data points yet*
 not a failed query. Optional query boolean `missingMeansZero: true` opts only
 that successful empty shape into zero; absent/false stays unobserved. Errors,
 timeouts and malformed results never become zero. A real numeric zero remains
-observed. For live Loki, successful empty numeric count/rate queries become zero
-only for recognized `count_over_time`/`rate` log-range expressions and `sum`
-wrappers (including by/without grouping). Raw logs, arbitrary expressions and
-misleading function names inside strings remain unobserved. Daily history keeps
+observed. For live Loki, successful empty `count_over_time`/`rate` queries (also
+in `sum`, by/without) become zero; raw logs and other expressions stay
+unobserved. Daily history keeps
 its existing contract. Honeycomb COUNT caveats belong to Honeycomb evidence only.
 
 Cards and node Inspect display every numeric signal in authored order, excluding
 trace bindings. Optional boolean `showOnCard: false` hides only that canvas row;
-Inspect and proof still use the signal. With no visible numeric rows, no card is
-shown. Optional `label` is plain text (1–120 characters, no control
-characters); otherwise the signal name labels the row. For example:
+Inspect and proof still use the signal. No visible numeric rows means no
+card. Optional `label` is plain text (1–120 characters, no control
+characters), else the signal name. For example:
 
 ```json
 {"telemetry":{"kind":"service","signals":{"matched":{"cloudwatch":{"namespace":"AWS/IoT","metric":"TopicMatch","dimensions":{"RuleName":"camera_message_camera_stats"},"statistic":"Sum","region":"us-east-1","accountId":"123456789012"},"unit":"events","label":"Matched events","showOnCard":true,"links":{"query":"https://grafana.example/explore?query=matched"}}}}}
@@ -437,11 +434,11 @@ Each row's external-link icon opens its own query in a new tab. Author
 provider-returned URL. Grafana Prometheus/Loki and Honeycomb can supply stable
 per-signal query links. CloudWatch/Logs/SQL can use authored URLs. Never use
 credentials or a signed Honeycomb result/download URL. A legacy carrier query
-link is a row fallback only for a single-signal carrier. Preview makes no provider
-URLs. A missing link does not invalidate a measured value.
+link is a row fallback only for a single-signal carrier.
 
-Cards cap width and wrap values; long labels/titles/scopes are shortened. Their
-height participates in layout packing. CloudWatch cards use “This rule”, “This
+Cards shorten long labels/titles/scopes. A span unlike the board window (signal
+`window`, or a counting query's one `[1h]`) shows as `42 · last 1h`
+([rules](../../../docs/live-status.md#signal-span)). CloudWatch cards use “This rule”, “This
 queue” or “All topics · whole account”; Inspect retains full rule/account/scope
 and label text. Displaying a named counter does not make it traffic evidence.
 

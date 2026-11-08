@@ -170,3 +170,57 @@ test('direct Honeycomb legacy history cannot accidentally issue a present-day qu
  const result=await adapter.options.history([],{from:iso(NOW-DAY),to:iso(NOW)},new AbortController().signal,{note:s=>notes.push(s)});
  assert.deepEqual(plain(result),{});assert.match(notes[0],/selected observation window/);
 });
+
+// #1075: Grafana query_cloudwatch returns a bucket stamped exactly at `end` for dense metrics.
+const PAST_TO=Date.UTC(2026,10,6),PAST={from:iso(PAST_TO-DAY),to:iso(PAST_TO)};
+const dense=(from,to,value=t=>(t-from)/HOUR%5===2?7:0,last=100)=>{const times=[];for(let t=Math.floor(from/HOUR)*HOUR;t<to;t+=HOUR)times.push(t);return rows([...times.map(value),last],[...times,to]);};
+test('dense hourly Sum with explicit zeros and a bucket stamped at the window end returns the in-window sum',()=>{
+ const C=context(),payload=dense(PAST_TO-DAY,PAST_TO);assert.equal(payload.timestamps.length,25);assert.equal(payload.timestamps.at(-1),PAST_TO);
+ const s=C.telemetryGrafanaCloudwatch(payload,'Sum',null,PAST,3600);assert.ok(s,'end bucket must not reject the series');
+ assert.equal(s.value,5*7);assert.equal(s.series.length,24);assert.equal(s.series.at(-1)[0],PAST_TO-HOUR);assert.equal(s.observedAt,iso(PAST_TO-HOUR));
+ assert.equal(C.telemetryGrafanaCloudwatch(payload,'SampleCount',null,PAST,3600).value,5*7);
+});
+test('dense hourly Maximum ignores the bucket stamped at the window end',()=>{
+ const C=context(),s=C.telemetryGrafanaCloudwatch(dense(PAST_TO-DAY,PAST_TO),'Maximum',null,PAST,3600);assert.ok(s);assert.equal(s.value,7);assert.equal(s.series.length,24);
+ assert.equal(C.telemetryGrafanaCloudwatch(dense(PAST_TO-DAY,PAST_TO,()=>0,0),'Maximum',null,PAST,3600).value,0);
+});
+test('dense hourly Average drops the window-end bucket from values and SampleCount weights alike',()=>{
+ const C=context(),from=PAST_TO-DAY,payload=dense(from,PAST_TO,t=>(t-from)/HOUR<12?10:20,1000);
+ const weights=dense(from,PAST_TO,t=>(t-from)/HOUR<12?1:3,1000000);
+ const s=C.telemetryGrafanaCloudwatch(payload,'Average',weights,PAST,3600);assert.ok(s);assert.equal(s.value,(12*10*1+12*20*3)/(12+36));assert.equal(s.series.length,24);
+ const trimmed={...weights,timestamps:weights.timestamps.slice(0,-1),values:weights.values.slice(0,-1)};
+ assert.equal(C.telemetryGrafanaCloudwatch(payload,'Average',trimmed,PAST,3600).value,(12*10*1+12*20*3)/(12+36),'weights without the end bucket still pair exactly');
+ const shifted={...weights,timestamps:weights.timestamps.map((t,i)=>i===3?t+60000:t)};assert.equal(C.telemetryGrafanaCloudwatch(payload,'Average',shifted,PAST,3600),null,'in-window pairing stays exact');
+ assert.equal(C.telemetryGrafanaCloudwatch(payload,'Average',{...trimmed,timestamps:trimmed.timestamps.slice(1),values:trimmed.values.slice(1)},PAST,3600),null,'a missing in-window weight still fails');
+});
+test('sparse CloudWatch series inside the window is unchanged',()=>{
+ const C=context(),payload=rows([3,9],[PAST_TO-20*HOUR,PAST_TO-4*HOUR]);
+ for(const [stat,value] of [['Sum',12],['Maximum',9],['Minimum',3]]){const s=C.telemetryGrafanaCloudwatch(payload,stat,null,PAST,3600);assert.equal(s.value,value);assert.deepEqual(plain(s.series),[[PAST_TO-20*HOUR,3],[PAST_TO-4*HOUR,9]]);assert.equal(s.observedAt,iso(PAST_TO-4*HOUR));}
+});
+test('a CloudWatch point before the rounded window start still fails even with a window-end bucket',()=>{
+ const C=context(),payload=dense(PAST_TO-DAY,PAST_TO);payload.timestamps.unshift(PAST_TO-DAY-HOUR);payload.values.unshift(1);
+ assert.equal(C.telemetryGrafanaCloudwatch(payload,'Sum',null,PAST,3600),null);
+ const from=PAST_TO-DAY+3*60000,range={from:iso(from),to:iso(PAST_TO)};assert.equal(C.telemetryGrafanaCloudwatch(dense(from,PAST_TO,()=>1),'Sum',null,range,3600).value,24,'the rounded start bucket is in the window');
+});
+test('Over time past day reads a dense end-stamped CloudWatch series while Live and Today are unchanged',async t=>{
+ const h=await setup({signals:{total:{cloudwatch:cw()},avg:{cloudwatch:cw('Average')}},answer:c=>{const end=Date.parse(c.input.end),start=Date.parse(c.input.start);
+  if(end===NOW)return {payload:rows([2,4],[end-2*HOUR,end-HOUR])};
+  return {payload:dense(start,end,c.input.statistic==='SampleCount'?()=>2:()=>5,100)};}});t.after(h.close);
+ h.api.setEnabled(true);await settle();let s=h.api.snapshot().map.local;assert.equal(s.signals.total.value,6);assert.equal(s.signals.total.series.length,2);assert.equal(s.signals.avg.value,(2*2+4*4)/6,'Live Average unchanged');
+ assert.ok(h.calls.every(c=>c.input.end===iso(NOW)));
+ h.api.openHistory(days(),1);await settle();s=h.api.snapshot().map.local;assert.equal(s.signals.total.value,6,'Today unchanged');
+ h.api.historyDay(0);await settle();const past=h.calls.at(-1).input;assert.equal(past.end,days()[0].at);
+ const n=Math.ceil((Date.parse(past.end)-Math.floor(Date.parse(past.start)/HOUR)*HOUR)/HOUR);
+ s=h.api.snapshot().map.local;assert.equal(s.signals.total.value,5*n,'past-day dense Sum is the in-window sum, not Unobserved');assert.equal(s.signals.avg.value,5);assert.doesNotMatch(h.api.status().note || '',/malformed/);
+});
+test('a CloudWatch series whose only buckets are at or after the window end is an empty in-window result',async t=>{
+ for(const missingMeansZero of [undefined,true]){
+  const signals={total:{cloudwatch:{...cw(),missingMeansZero}},avg:{cloudwatch:{...cw('Average'),missingMeansZero}}};
+  const h=await setup({signals,answer:c=>{const end=Date.parse(c.input.end);return {payload:end===NOW?rows([2,4],[end-2*HOUR,end-HOUR]):rows([5,6],[end,end+HOUR])};}});t.after(h.close);
+  h.api.openHistory(days(),0);h.api.setEnabled(true);await settle();const past=days()[0].at;
+  assert.ok(h.calls.length>0 && h.calls.every(c=>c.input.end===past && c.input.statistic!=='SampleCount'),'no weight query for an empty window');
+  const s=h.api.snapshot().map.local,note=h.api.status().note || '';assert.doesNotMatch(note,/malformed|failed/);
+  if(missingMeansZero){assert.equal(s.signals.total.value,0);assert.equal(s.signals.avg.value,0);assert.equal(s.signals.total.observedAt,past);}
+  else {assert.equal(s?.signals.total,undefined);assert.equal(s?.signals.avg,undefined);assert.match(note,/no data points yet/);}
+ }
+});

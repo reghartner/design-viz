@@ -15,7 +15,7 @@ var TELEMETRY_LOG_ABSENT='Log lookups need a Grafana connector with query_loki_l
 var TELEMETRY_LOG_NOTES={absent:TELEMETRY_LOG_ABSENT,unsupported:'Log lookups need a Grafana connector, which this host does not provide.',checking:'Checking for the Grafana connector…',
   disabled:'Log lookups are unavailable in this view.',account:'Host account changed. Reopen this view to start a new telemetry session.'};
 // Why hooks.disabled() turned lookups off (#1125); true keeps the general note.
-var TELEMETRY_LOG_DISABLED={history:'Log lookups work in Live, not in Over time. Switch to Live to use them.',board:'Log lookups need telemetry, which this board turns off.',
+var TELEMETRY_LOG_DISABLED={history:'Log lookups need a dated Over time day; this day has none.',board:'Log lookups need telemetry, which this board turns off.',
   host:'Log lookups need telemetry, which this host turns off.',closed:'This view was closed. Reopen it to look up log lines.'};
 /* grafana/mcp-grafana tools/loki.go LogEntry (format full): {timestamp: '<unix ns>',
    line, labels, structuredMetadata?, parsed?}. Without Loki label types every
@@ -79,11 +79,16 @@ function createTelemetryLogLookup(page,transport,hooks){
     return mine.pending;
   }
   function retire(){if(dead || retired)return;retired=true;cancel();result=null;changed();}
+  /* #1141: the selected Over time day {key, today, from, to, label, short} or null in Live. A Trace
+     start or end typed under Lookback wins over the day; otherwise Find searches the whole day. */
+  function day(){var d=typeof hooks.day==='function'?hooks.day():null;return d && typeof d.from==='string' && typeof d.to==='string'?d:null;}
+  function daySearch(back){var d=day();return d && !(back && (back.start || back.end))?d:null;}
   function snapshot(){
     var ls=lookups();if(!ls)return null;sync();
     if(typeof hooks.wanted!=='function' || hooks.wanted())discover();
     var s=state();
-    return {available:s==='ready',state:s,note:note(s),busy:busy,form:Object.assign({},form),typed:TELEMETRY_LOG_TYPED,
+    var searched=s==='ready' && daySearch(typeof hooks.lookback==='function'?hooks.lookback():null);
+    return {available:s==='ready',state:s,note:note(s),busy:busy,form:Object.assign({},form),typed:TELEMETRY_LOG_TYPED,search:searched?'Loki · '+searched.label:'',
       lookups:Object.keys(ls).map(function(id){var l=ls[id];return {id:id,label:l.label,slot:telemetryLookupSlot(l.query),values:(l.values || []).slice()};}),
       result:result?Object.assign(JSON.parse(JSON.stringify(result)),{next:next()}):null};
   }
@@ -121,7 +126,7 @@ function createTelemetryLogLookup(page,transport,hooks){
       if(missing)fail('Set telemetry variable ${'+missing+'} in the active environment.');
       if(slot)logql=logql.replace(/\$\{value\}|\$value(?![A-Za-z0-9_])/g,function(){return value;});
       if(!uid)fail('Set tracking.telemetry.grafana.loki to the Loki datasource UID.');
-      var back=typeof hooks.lookback==='function'?hooks.lookback() || {}:{},range=telemetryLogRange(back.start,back.end,back.lookback);
+      var back=typeof hooks.lookback==='function'?hooks.lookback() || {}:{},searched=daySearch(back),range=searched?{startRfc3339:searched.from,endRfc3339:searched.to,lookback:null}:telemetryLogRange(back.start,back.end,back.lookback);
       var args={datasourceUid:uid,logql:logql,startRfc3339:range.startRfc3339,endRfc3339:range.endRfc3339,limit:TELEMETRY_LOG_LIMIT,direction:'backward',queryType:'range'};
       busy=true;result={lookup:request.lookup,query:logql,lookback:range.lookback,rows:[]};changed();
       // As the direct trace load: a call that never answers is retired after 30 s.
@@ -131,7 +136,7 @@ function createTelemetryLogLookup(page,transport,hooks){
       var parsed=telemetryLogLines(payload,lookup?lookup.fields:{traceId:'trace_id',spanId:'span_id'});
       parsed.rows.forEach(function(row){row.value=slot?value:row.line;});
       busy=false;abort=null;result.rows=parsed.rows;
-      if(!parsed.rows.length)result.note=parsed.metric?'That is a metric query; type a log query that returns lines.':'No matching log lines '+(range.lookback?'in the last '+range.lookback:'in the selected range')+'.';
+      if(!parsed.rows.length)result.note=parsed.metric?'That is a metric query; type a log query that returns lines.':'No matching log lines '+(searched?'on '+(searched.short || searched.key):range.lookback?'in the last '+range.lookback:'in the selected range')+'.';
       changed();return JSON.parse(JSON.stringify(result));
     }catch(e){
       if(dead || mine!==serial || signal.aborted)return null;

@@ -18,11 +18,11 @@ function entry({at='1794044533123456789',meta={cameraModel:'arch',deviceId:'cam-
  return {timestamp:at,line,labels,...(meta?{structuredMetadata:meta}:{})};
 }
 const GRAFANA={server:'Grafana',tools:[{name:'query_loki_logs',annotations:{readOnlyHint:true}}]},DETAIL={server:fixture.server,tools:[{name:'get_trace',annotations:{readOnlyHint:true}}]};
-function setup({p=board(),data=[entry()],servers=[DETAIL,GRAFANA],lookback={start:'',end:'',lookback:'2h'},C=context(),answer}={}){
+function setup({p=board(),data=[entry()],servers=[DETAIL,GRAFANA],lookback={start:'',end:'',lookback:'2h'},C=context(),answer,day}={}){
  const calls=[],counts={lists:0};let changes=0;
  const mcp={listTools:async()=>{counts.lists++;return clone(servers);},callTool:async(server,tool,args)=>{calls.push({server,tool,args:clone(args)});if(answer)return answer();return {content:[{type:'text',text:JSON.stringify({data,metadata:{linesReturned:data.length,maxLinesAllowed:10,resultsTruncated:false}})}]};}};
  const transport=C.createTelemetryProviders(p,{claude:{use:async()=>mcp}}).options.directTrace;
- const api=C.createTelemetryLogLookup(p,transport,{config:()=>C.telemetryEnvironmentConfig(p,'stg'),lookback:()=>lookback,changed:()=>changes++});
+ const api=C.createTelemetryLogLookup(p,transport,{config:()=>C.telemetryEnvironmentConfig(p,'stg'),lookback:()=>lookback,changed:()=>changes++,...(day?{day}:{})});
  return {C,p,api,calls,counts,changes:()=>changes};
 }
 const rows=api=>clone(api.snapshot().result.rows).map(r=>[r.time,r.value,r.traceId,r.spanId,r.missing]);
@@ -122,4 +122,20 @@ test('review: a Grafana call that never answers times out after 30 s and its lat
 test('review: hex trace and span ids from a log line are lowercased',async()=>{
  const C=context(),out=C.telemetryLogLines({data:[entry({meta:{trace_id:TRACE.toUpperCase(),span_id:SPAN.toUpperCase()}})]},{traceId:'trace_id',spanId:'span_id'});
  assert.deepEqual([out.rows[0].traceId,out.rows[0].spanId],[TRACE,SPAN]);
+});
+
+test('#1141 with a selected day Find searches exactly that day; typed Lookback still wins; Live keeps now-2h',async()=>{
+ const DAY={key:'2026-11-06',today:false,from:'2026-11-06T05:00:00.000Z',to:'2026-11-07T05:00:00.000Z',label:'Nov 6 00:00–24:00 local',short:'Nov 6'};
+ let day=null;const h=setup({day:()=>day});await settle();h.api.set('value','arch');
+ assert.equal(h.api.snapshot().search,'','Live names no day');await h.api.find();
+ assert.deepEqual([h.calls[0].args.startRfc3339,h.calls[0].args.endRfc3339],['now-2h','now']);
+ day=DAY;assert.equal(h.api.snapshot().search,'Loki · Nov 6 00:00–24:00 local');await h.api.find();
+ assert.deepEqual(h.calls[1].args,{...h.calls[0].args,startRfc3339:DAY.from,endRfc3339:DAY.to},'the same call with the day as its window');
+ const typed=setup({day:()=>DAY,lookback:{start:'-6h',end:'',lookback:'2h'}});await settle();typed.api.set('value','arch');
+ assert.equal(typed.api.snapshot().search,'');await typed.api.find();assert.deepEqual([typed.calls[0].args.startRfc3339,typed.calls[0].args.endRfc3339],['now-6h','now'],'Trace start under Lookback wins');
+ const empty=setup({day:()=>DAY,data:[]});await settle();empty.api.set('value','arch');await empty.api.find();
+ assert.equal(empty.api.snapshot().result.note,'No matching log lines on Nov 6.');
+ // The day line shows only when the search can run.
+ const C=context(),native=C.createTelemetryLogLookup(board(),{describe(){},call(){}},{day:()=>DAY});
+ assert.equal(native.snapshot().available,false);assert.equal(native.snapshot().search,'','no day line above a disabled Find');
 });

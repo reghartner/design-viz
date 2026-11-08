@@ -114,3 +114,14 @@ test('company-level profile allowedAttributes feed validation, inherited or refe
   C.TELEMETRY_COMPANY_TRACE_CONNECTIONS={acme:TEMPO};
   assert.deepEqual(attributeErrors(C,inherited),['traceMatch.attributes: use supported operational attributes only']);
 });
+
+test('array traceMatch: an alternative using a Honeycomb-only attribute warns under traceMatch[i]',()=>{
+  const C=context(),honeycomb=clone(fixture);honeycomb.allowedAttributes=['device.model'];
+  const p=page(honeycomb),step=p.sections[0].diagram.steps[0];
+  step.traceMatch=[{serviceName:'productcatalog',operation:'msdemo.ProductCatalogService/GetProduct',nodeId:'catalog'},{...step.traceMatch,attributes:{'device.model':7}}];
+  assert.deepEqual(attributeErrors(C,p),[]);
+  assert.deepEqual(clone(C.validate(p).warnings.filter(w=>/traceMatch/.test(w))),[
+    'steps.lookup.traceMatch[1].attributes.device.model: only Honeycomb connections list this attribute; Honeycomb get_trace does not return span attributes, so this step shows Not observed',
+    'steps.lookup.traceMatch[1].attributes.device.model: Honeycomb table cells are text; a number value never matches'
+  ]);
+});

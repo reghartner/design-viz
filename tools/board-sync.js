@@ -134,6 +134,8 @@ function describe(entry){
   (Array.isArray(entry.changes)?entry.changes:[]).forEach(change=>{
     if(!isObject(change))return;
     if(change.op==='clear-missing-work'){lines.push({text:'Missing work cleared from '+changeLabel(change)});return;}
+    // #1078: Edit mode mapped a trace span to a step; it moves no ticket.
+    if(change.op==='trace-match'){const m=isObject(change.traceMatch)?change.traceMatch:{};lines.push({text:m.serviceName+' · '+m.operation+' mapped to step '+(typeof change.label==='string' && change.label?change.label:change.step)});return;}
     if(typeof change.ticket!=='string')return;
     if(!seen.has(change.ticket)){const item={ticket:change.ticket,adds:[],removes:[]};seen.set(change.ticket,item);lines.push(item);}
     seen.get(change.ticket)[change.op==='remove'?'removes':'adds'].push(changeLabel(change));
@@ -199,7 +201,7 @@ function pull(localText,liveText,options){
   const touched=new Map(),unplaced=[];
   sortedByTime(fresh).reverse().forEach(entry=>{
     (Array.isArray(entry.changes)?entry.changes:[]).slice().reverse().forEach(change=>{
-      if(!isObject(change))return;
+      if(!isObject(change) || change.op==='trace-match')return;
       const key=changeKey(liveRaw,live.map,change);
       if(key===null){unplaced.push(who(entry)+' '+when(entry.at)+': '+describe({changes:[change]}).join('; '));return;}
       if(!base.has(key)){const chain=JSON.parse(key);base.set(key,{key,chain,path:change.path,kind:isOverlayChain(chain)?'overlay':'unknown',label:changeLabel(change),tickets:[],missingWork:false});}

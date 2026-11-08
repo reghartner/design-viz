@@ -1672,6 +1672,15 @@ mode:
   if the consumer overlay repeats it) shows "Missing work comes from the source
   diagram "<spec>" and must be cleared there." instead, with no Clear and no
   post-drop question.
+- **Map a span to a step** (#1078): Edit, Save, Discard and Done also show in the
+  Trace view. With a loaded trace, a focused span that no step maps offers **Map
+  this span to a step**: pick one of the diagram's steps that has no `traceMatch`
+  yet, and that step gets `traceMatch: {"serviceName": …, "operation": …}` with the
+  span's exact service and operation. Steps are page-local, so the step itself is
+  written even when it draws on an imported node or edge. The board re-renders
+  with the loaded trace and the focused span kept, and the span then maps to the
+  step. A step that already has a `traceMatch` is not offered; edit it in the
+  Workbench.
 - Imported nodes and edges write the consumer overlay
   (`topologyImports[].nodeTracking` / `edgeTracking`, as the Workbench does); the
   provider spec never changes.
@@ -1881,7 +1890,9 @@ hand-written. The panel shows them newest first:
      {"op": "add", "ticket": "EX-1", "node": "payment-api", "label": "Payment API",
       "path": ["sections", 0, "diagram", "nodes", "payment-api"]},
      {"op": "remove", "ticket": "AA-1", "edge": ["door", "cloud"], "label": "Door → Cloud"},
-     {"op": "clear-missing-work", "edge": ["door", "cloud"], "label": "Door → Cloud"}]}
+     {"op": "clear-missing-work", "edge": ["door", "cloud"], "label": "Door → Cloud"},
+     {"op": "trace-match", "step": "charge", "label": "Charge the card",
+      "traceMatch": {"serviceName": "payment", "operation": "grpc.msdemo.PaymentService/Charge"}}]}
 ]
 ```
 
@@ -1892,7 +1903,12 @@ non-empty `changes` array
 whose items carry `op` (`"add"` or `"remove"`), `ticket` (a Jira key) and the
 carrier (`node` id, or `edge: [from, to]`). A `"clear-missing-work"` change
 records a Missing work marker cleared in Edit mode (#855): it carries only the
-carrier (and the optional `path` and `label`), never a `ticket`. Optional: `by` (`id` and `name`
+carrier (and the optional `path` and `label`), never a `ticket`. A `"trace-match"`
+change records a span mapped to a step in Edit mode (#1078): it carries `step` (the
+step id) and `traceMatch` (`serviceName` and `operation` strings), the optional
+`path` and `label` (the step text), and no `ticket`, `node` or `edge`; the panel
+reads it as "payment · grpc.msdemo.PaymentService/Charge mapped to step Charge the
+card". Optional: `by` (`id` and `name`
 strings, either may be empty), each change's `path` (array) and `label` (the
 carrier's display name at save time, so history stays readable after a rename).
 Validation follows the warning-only policy of the other tracking fields: a

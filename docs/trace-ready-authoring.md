@@ -43,7 +43,10 @@ the receiving node for that operation. It is not a provider service-name guess.
 
 On a board, the Trace view shows the exact Service and Operation of a selected
 span; copy those into `serviceName` and `operation`. A span no step maps says so
-and links to this guide.
+and links to this guide. On a shared board in Edit mode, **Map this span to a
+step** writes those two values to a step that has no `traceMatch` yet
+([Edit mode](live-status.md#edit-mode-on-the-shared-board-828)); add `nodeId`,
+`parentStepId` or `attributes` in the Workbench when one span name is not enough.
 
 ```json
 {

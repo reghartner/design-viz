@@ -209,11 +209,23 @@
       }
       if(direct.busy || direct.exemplar || r)button(el(box,'div','actions','dv-live-controls'),'clear','reader-button',direct.busy?'Cancel request':'Clear loaded trace','clearDirectTrace');
     }
+    // #1078: board Edit mode is reachable from the Trace view too, so a span can be mapped and saved here.
+    function traceEditControls(body,controls,edit){
+      if(!edit || !(edit.editable || edit.active || edit.notice))return;
+      var editing=!!edit.active,pending=edit.pending;
+      var start=button(controls,'edit','reader-button dv-live-edit','Edit','editStart');start.hidden=!(edit.editable && !editing);start.disabled=!!(edit.blocked || edit.saving);
+      var save=button(controls,'save','reader-button dv-live-save',edit.saving?'Saving…':'Save '+pending+' change'+(pending===1?'':'s'),'editSave');save.hidden=!(editing && pending);save.disabled=!!edit.saving;
+      var discard=button(controls,'discard','reader-button dv-live-discard','Discard','editDiscard');discard.hidden=!(editing && pending);discard.disabled=!!edit.saving;
+      button(controls,'done','reader-button dv-live-edit-done','Done','editDone').hidden=!(editing && !pending);
+      var text=edit.notice?edit.notice.text:edit.editable && edit.blocked?edit.blocked:'';
+      if(text){var notice=el(body,'p','edit-notice','dv-live-edit-notice',text);notice.setAttribute('role','status');notice.setAttribute('data-kind',edit.notice?edit.notice.kind:'info');}
+    }
     function traceBody(value){
       var trace=value.trace,body=el(host,'div','trace-body','dv-live-panel-body dv-live-trace'),controls=el(body,'div','controls','dv-live-controls');
       var enable=button(controls,'enable','reader-button dv-trace-enable',trace.enabled?'Disconnect traces':'Enable traces','setMetricsEnabled');enable._liveArgument=!trace.enabled;enable.hidden=!trace.available;
       if(value.actionLabel)button(controls,'action','reader-button',value.actionLabel,'runAction');
       var show=button(controls,'show','reader-button dv-trace-show','Show on diagram','setTraceShow');show._liveArgument=!trace.show;show.setAttribute('aria-pressed',String(trace.show));show.disabled=!trace.selected;
+      traceEditControls(body,controls,value.edit);
       var metrics=value.metrics;
       if(metrics.environments && metrics.environments.length){
         var select=el(controls,'select','environment','reader-button tbtn');select.setAttribute('aria-label','Trace environment');
@@ -259,6 +271,18 @@
         el(operation,'small','conditions','',matched?matched.conditions.map(function(c){return c.label;}).join(' · '):'');
         el(operation,'small','navigation','dv-trace-focus-status',focus.choice?focus.choice.label+(!focus.choice.row.nodeId && focus.choice.row.edgeIndex==null?' · no authored diagram target':'')+(!focus.navigable?' · open this diagram to navigate':''):focus.choices.length?'Choose the authored step for this span.':'No authored step maps this span. Add a traceMatch to a step to map this span.').setAttribute('role','status');
         if(!focus.choice && !focus.choices.length)link(operation,'map-guide','How to map a span','https://github.com/reghartner/design-viz/blob/main/docs/trace-ready-authoring.md').classList.add('dv-trace-map-guide');
+        // #1078: Edit mode only. The chosen step gets traceMatch {serviceName, operation} with this span's exact values.
+        var mapSteps=model.mapSteps;
+        if(!focus.choice && !focus.choices.length && mapSteps){
+          var mapper=el(operation,'div','map','dv-trace-map-step');mapper.setAttribute('role','group');mapper.setAttribute('aria-label','Map this span to a step');
+          if(mapSteps.length){
+            var pick=el(mapper,'select','step','reader-button tbtn dv-trace-map-select');pick.setAttribute('aria-label','Step to map');
+            mapSteps.forEach(function(step){el(pick,'option',step.id,'',step.label).value=step.id;});
+            if(!mapSteps.some(function(step){return step.id===pick.value;}))pick.value=mapSteps[0].id;
+            var apply=button(mapper,'apply','reader-button dv-trace-map-apply','Map this span to a step','mapTraceSpan');apply._liveArgument={context:selected.context,spanId:focusedSpan.id,stepId:pick.value};pick._mapApply=apply;
+            if(!pick._mapChange){pick._mapChange=function(){if(pick._mapApply && pick._mapApply._liveArgument)pick._mapApply._liveArgument.stepId=pick.value;};pick.addEventListener('change',pick._mapChange);}
+          }else el(mapper,'p','none','dv-trace-map-none','Every step of this diagram already has a traceMatch.');
+        }
         if(!focus.choice && focus.choices.length){
           var choices=el(operation,'div','choices','dv-trace-step-choices');choices.setAttribute('role','group');choices.setAttribute('aria-label','Choose trace step');
           focus.choices.forEach(function(choice){var pick=button(choices,choice.key,'reader-button dv-trace-step-choice',choice.label,'selectTraceSpan');pick._liveArgument={context:selected.context,spanId:focusedSpan.id,choiceKey:choice.key};});
@@ -491,7 +515,7 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 .dv-trace-focus-overlay text{fill:#fff;font:700 10px 'IBM Plex Mono',monospace;letter-spacing:.3px}
 .dv-trace-focus-summary{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:10px 12px;border:1px solid color-mix(in srgb,#009fc7 40%,var(--dfaint));border-radius:7px;background:color-mix(in srgb,#009fc7 7%,var(--dbg));font-size:12px}
 .dv-trace-focus-hint{min-width:0;overflow-wrap:anywhere}.dv-trace-focus-summary .reader-button{align-self:flex-start;max-width:100%;white-space:normal;overflow-wrap:anywhere}
-.dv-trace-focus-status{color:var(--dtext)}.dv-trace-span-identity{display:grid;gap:3px;min-width:0}.dv-trace-span-field{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px;align-items:baseline;min-width:0;font-size:10px}.dv-trace-span-label{color:var(--dtext)}.dv-trace-span-field code{min-width:0;overflow-wrap:anywhere;user-select:all}.dv-trace-map-guide{justify-self:start;max-width:100%;overflow-wrap:anywhere}.dv-trace-step-choices{display:flex;flex-wrap:wrap;gap:7px;grid-column:1/-1}.dv-trace-step-choice{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}
+.dv-trace-focus-status{color:var(--dtext)}.dv-trace-span-identity{display:grid;gap:3px;min-width:0}.dv-trace-span-field{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px;align-items:baseline;min-width:0;font-size:10px}.dv-trace-span-label{color:var(--dtext)}.dv-trace-span-field code{min-width:0;overflow-wrap:anywhere;user-select:all}.dv-trace-map-guide{justify-self:start;max-width:100%;overflow-wrap:anywhere}.dv-trace-map-step{display:flex;flex-wrap:wrap;gap:7px;min-width:0}.dv-trace-map-select{min-width:0;max-width:100%}.dv-trace-map-apply{min-width:0;max-width:100%;white-space:normal}.dv-trace-map-none{margin:0;color:var(--dtext)}.dv-trace-step-choices{display:flex;flex-wrap:wrap;gap:7px;grid-column:1/-1}.dv-trace-step-choice{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}
 .dv-trace-span:focus-visible,.dv-trace-step-choice:focus-visible{outline:2px solid #009fc7;outline-offset:3px}
 
 .dv-trace-overlay{fill:#368cc9}.dv-trace-overlay[data-tone="error"]{fill:#d64b68}.dv-trace-overlay[data-tone="warning"]{fill:#c88b14}.dv-trace-overlay[data-tone="unknown"]{fill:#87929e}.dv-trace-overlay text{font:700 14px 'IBM Plex Mono',monospace;paint-order:stroke;stroke:var(--dbg,#fff);stroke-width:3px;stroke-linejoin:round}

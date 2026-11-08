@@ -941,6 +941,32 @@ function createLiveStatus(ctl,page,options,renderOptions){
       traceObjectId(b.page),traceObjectId(b.section),traceObjectId(b.section.diagram),b.el?traceObjectId(b.el):0,b.stepper?traceObjectId(b.stepper):0]);
   }
   function clearTraceFocus(){traceFocus=null;traceFocusEpoch++;}
+  /* #1078: in board Edit mode, the steps of the trace's own diagram a span can be
+     mapped to (those without a traceMatch); null outside Edit mode. */
+  function traceMapSteps(binding){
+    var state=editor && editor.state();if(!state || !state.active || state.saving || binding.ordinal==null)return null;
+    return (binding.section.diagram.steps || []).map(function(step,i){
+      if(!step || step.traceMatch || typeof step.id!=='string')return null;
+      var caption=String(step.text || step.id).replace(/\s+/g,' ').trim();if(caption.length>96)caption=caption.slice(0,95)+'…';
+      return {id:step.id,label:'Step '+(i+1)+': '+caption};
+    }).filter(Boolean);
+  }
+  // An edit re-renders the page (#828): the next controller reopens this Trace view, loaded trace and focused span.
+  function traceCarry(){
+    if(statusMode!=='trace')return null;
+    var selected=traceSelection && traceSources().entries.find(function(e){return e.key===traceSelection.key;});
+    return {direct:directTrace.carry(),spanId:selected && selected.manual && traceFocus?traceFocus.spanId:null,show:traceShow};
+  }
+  function traceRestore(carried){
+    statusMode='trace';traceShow=carried.show!==false;
+    if(!carried.direct || !directTrace.restore(carried.direct) || !carried.spanId)return;
+    // After the render settles its opening step, so the mapped step it jumps to stays shown.
+    requestAnimationFrame(function(){
+      if(retired || statusMode!=='trace')return;
+      var selected=traceSnapshot().selected;
+      if(selected && selected.manual && selected.exemplar.spans.some(function(s){return s.id===carried.spanId;}))api.selectTraceSpan({context:selected.context,spanId:carried.spanId});
+    });
+  }
   function traceFocusSnapshot(entry,context){
     if(!traceFocus)return null;
     if(!entry || traceFocus.context!==context || !entry.exemplar.spans.some(function(s){return s.id===traceFocus.spanId;})){traceFocus=null;return null;}
@@ -959,6 +985,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(!selected && traceInitial && statusMode==='trace' && entries.length){selected=entries[0];traceSelection={key:selected.key,traceId:selected.exemplar.traceId};traceInitial=false;}
     var context=selected?traceContext(selected):null,focus=traceFocusSnapshot(selected,context);
     var model=selected?telemetryTraceModel(selected.binding.section.diagram,selected.binding.stepper && selected.binding.stepper.path(),selected.exemplar):null;
+    if(selected)model.mapSteps=traceMapSteps(selected.binding);
     return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:directTrace.snapshot(),
       hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
@@ -1753,6 +1780,16 @@ function createLiveStatus(ctl,page,options,renderOptions){
       catch(ex){if(retired || request!==traceRequest)return;traceNotice=ex.message;}
       tracePending=null;paint();notify();
     },
+    // #1078: write the focused span's exact service and operation as the chosen step's traceMatch.
+    mapTraceSpan:function(action){
+      if(retired || !editing() || statusMode!=='trace' || !action || typeof action.stepId!=='string')return false;
+      var selected=traceSnapshot().selected;if(!selected || action.context!==selected.context)return false;
+      var entry=traceSources().entries.find(function(e){return e.key===selected.key;}),span=entry && entry.exemplar.spans.find(function(s){return s.id===action.spanId;});
+      var steps=entry && traceMapSteps(entry.binding);
+      if(!span || !steps || !steps.some(function(step){return step.id===action.stepId;}))return false;
+      var ref={section:entry.binding.ordinal,kind:'step',id:action.stepId},match={serviceName:span.service,operation:span.name};
+      if(!editor.mapSpan)return false;setTimeout(function(){if(!retired)editor.mapSpan(ref,match);},0);return true;
+    },
     selectTraceSpan:function(action){
       if(retired || statusMode!=='trace' || !action)return false;
       var selected=traceSnapshot().selected;
@@ -1840,7 +1877,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     editSave:function(){if(!retired && editor)editor.save();},
     editDiscard:function(){if(!retired && editor)editor.discard();},
     destroy:function(){
-      if(retired)return;clearTraceFocus();on=false;paintLanes();retired=true;directTrace.destroy();bindings.forEach(function(b){telemetryClearStep(b.el);telemetryClearTrace(b.el);b.el.querySelectorAll('.dv-proof-caption').forEach(function(el){el.remove();});});releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);telemetryClearCards(view);if(demoDestroy)demoDestroy();
+      if(retired)return;if(editor && editor.rememberTrace)editor.rememberTrace(traceCarry());clearTraceFocus();on=false;paintLanes();retired=true;directTrace.destroy();bindings.forEach(function(b){telemetryClearStep(b.el);telemetryClearTrace(b.el);b.el.querySelectorAll('.dv-proof-caption').forEach(function(el){el.remove();});});releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);telemetryClearCards(view);if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];
@@ -1866,6 +1903,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   if(metricFonts && metricFonts.addEventListener){metricFonts.addEventListener('loadingdone',metricsFontsChanged);destroyListeners.push(function(){metricFonts.removeEventListener('loadingdone',metricsFontsChanged);});}
   // An edit re-renders the page: the new controller starts from the last live map so colors never reset.
   if(editor && editor.lastMap())api.apply(editor.lastMap());
+  var carriedTrace=editor && editor.takeTrace && editor.takeTrace();if(carriedTrace){traceRestore(carriedTrace);paint();notify();}
   if(poller)firstPaint=requestAnimationFrame(function(){firstPaint=requestAnimationFrame(function(){firstPaint=0;poller.start();});});
   if(options.demo && typeof options.demo.mount==='function')demoDestroy=options.demo.mount(api);
   return api;

@@ -244,7 +244,7 @@ the built-in attribute list can match today. The one exception is
 ## Inspect a request in Status
 
 The existing **Status** panel has **Jira** and **Trace** views. Jira is the default.
-Choose Trace, then **Enable traces** (or the existing connector approval action)
+Choose Trace, then turn on **Metrics overlay** (or the existing connector approval action)
 to retrieve the page's explicit trace bindings. Host and page opt-outs still apply.
 Trace replaces the Jira body and owns the diagram annotations while selected;
 returning to Jira restores its existing status and scalar telemetry presentation.
@@ -321,7 +321,7 @@ node tools/status-trace-demo.mjs
 python3 -m http.server 8775 --directory .local/status-trace-demo
 ```
 
-Open `http://localhost:8775/status-trace.html`, choose Trace, and enable traces.
+Open `http://localhost:8775/status-trace.html`, choose Trace, and turn on **Metrics overlay**.
 This is labeled fixture replay without an external authenticated account. Only
 transport IDs and an absolute fixture clock are adapted for the runtime envelope;
 the canonical selectors, relationships, timings and budgets are preserved.

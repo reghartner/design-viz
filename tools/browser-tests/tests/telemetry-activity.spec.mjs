@@ -2,7 +2,7 @@ import {test,expect} from '../helpers/test.mjs';
 import {setup} from '../helpers/telemetry-proof.mjs';
 import {handoffSpec} from '../helpers/telemetry-cards.mjs';
 const T=Date.UTC(2026,10,4,12),H=3600000;
-const metrics=root=>root.getByRole('button',{name:'Metrics',exact:true}),live=root=>root.getByRole('button',{name:'Live',exact:true}),over=root=>root.getByRole('button',{name:'Over time',exact:true});
+const metrics=root=>root.getByRole('switch',{name:'Metrics overlay',exact:true}),live=root=>root.getByRole('button',{name:'Live',exact:true}),over=root=>root.getByRole('button',{name:'Over time',exact:true});
 const activity=root=>root.locator('.dv-live-activity-entry[data-activity-type="telemetry"]');
 const trigger=(root,id)=>root.locator('[data-live-carrier="'+id+'"][tabindex="0"]:visible');
 const production=root=>root.locator('.dv-live-popover:visible .dv-live-production');
@@ -82,7 +82,7 @@ test('local/direct/nested handoff cues keep Production separate from the existin
 
 test('late host callback after Metrics off cannot resurrect Production, Proof or Activity; initial preload and fresh enable still work',async({page,server})=>{
  const root=await setup(page,server,{pending:true});await page.evaluate(()=>window.seed());
- await expect(metrics(root)).toHaveAttribute('aria-pressed','false');await expect(root.locator('.dv-live-proof')).toHaveCount(1);await open(root,'ingest->app');await expect(production(root)).toContainText('rate: 100 req/h');await page.keyboard.press('Escape');
+ await expect(metrics(root)).toHaveAttribute('aria-checked','false');await expect(root.locator('.dv-live-proof')).toHaveCount(1);await open(root,'ingest->app');await expect(production(root)).toContainText('rate: 100 req/h');await page.keyboard.press('Escape');
  await metrics(root).click();await expect.poll(()=>page.evaluate(()=>window.liveReleases.length)).toBe(1);await metrics(root).click();
  await deliver(page,{rate:777});
  await expect(activity(root),'late host callback must not recreate telemetry Activity after explicit off').toHaveCount(0);

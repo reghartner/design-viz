@@ -5,11 +5,11 @@ import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 import {setup,spec} from '../helpers/telemetry-proof.mjs';
 const T=Date.UTC(2026,10,4,12),H=3600000,DAY=24*H;
-const metrics=root=>root.getByRole('button',{name:'Metrics',exact:true}),over=root=>root.getByRole('button',{name:'Over time',exact:true}),live=root=>root.getByRole('button',{name:'Live',exact:true});
+const metrics=root=>root.getByRole('switch',{name:'Metrics overlay',exact:true}),over=root=>root.getByRole('button',{name:'Over time',exact:true}),live=root=>root.getByRole('button',{name:'Live',exact:true});
 const carrier=(root,id)=>root.locator('[data-proof-carrier="'+id+'"]');
 async function day(root,index){const s=root.getByRole('slider',{name:'Day',exact:true});await s.focus();await s.press('Home');for(let i=0;i<index;i++)await s.press('ArrowRight');await expect(s).toHaveValue(String(index));}
 test('Proof exact bound rows, ring denominator and neutral remainder across local/direct/nested carriers, safe links, retained section order',async({page,server},testInfo)=>{
- const root=await setup(page,server);await expect(metrics(root)).toHaveAttribute('aria-pressed','false');await expect(root.locator('.dv-live-proof')).toHaveCount(0);await metrics(root).click();
+ const root=await setup(page,server);await expect(metrics(root)).toHaveAttribute('aria-checked','false');await expect(root.locator('.dv-live-proof')).toHaveCount(0);await metrics(root).click();
  const panel=root.locator('.pt-live-status');await expect(panel.locator('.dv-live-proof-row')).toHaveCount(6);
  expect(await panel.locator('.dv-live-proof-row').evaluateAll(rows=>rows.map(r=>r.dataset.proofCarrier))).toEqual(['ingest','shared::api','ingest->app','app->push','shared::api->shared::store','outer::inner::a->outer::inner::b']);
  await expect(panel.locator('.dv-live-proof-ratio')).toHaveText('1/6 bound proven');await expect(panel.locator('.dv-live-proof')).toHaveAttribute('data-proof-bound','6');await expect(panel.locator('.dv-live-proof')).toHaveAttribute('data-proof-unbound','6');
@@ -25,7 +25,7 @@ test('Proof exact bound rows, ring denominator and neutral remainder across loca
  await panel.getByRole('button',{name:'Key',exact:true}).click();expect(await page.evaluate(()=>window.calls.live.length)).toBe(1);await metrics(root).click();await expect(root.locator('.dv-live-proof')).toHaveCount(0);
 });
 test('telemetry-only host apply while Metrics is off shows Proof without Jira totals and isolates sibling lifetime',async({page,server})=>{
- const root=await setup(page,server,{telemetryOnly:true,siblings:true});await page.evaluate(()=>window.seed());await expect(root.locator('.dv-live-proof-row')).toHaveCount(6);await expect(metrics(root)).toHaveAttribute('aria-pressed','false');await expect(root.locator('.dv-metrics-card')).toHaveCount(0);await expect(root.locator('.dv-live-epic:not(.dv-live-proof),.dv-live-tickets:not(.dv-live-proof-table),.dv-live-empty')).toHaveCount(0);await expect(root.locator('.dv-live-proof-row').first()).toContainText('No tickets');
+ const root=await setup(page,server,{telemetryOnly:true,siblings:true});await page.evaluate(()=>window.seed());await expect(root.locator('.dv-live-proof-row')).toHaveCount(6);await expect(metrics(root)).toHaveAttribute('aria-checked','false');await expect(root.locator('.dv-metrics-card')).toHaveCount(0);await expect(root.locator('.dv-live-epic:not(.dv-live-proof),.dv-live-tickets:not(.dv-live-proof-table),.dv-live-empty')).toHaveCount(0);await expect(root.locator('.dv-live-proof-row').first()).toContainText('No tickets');
  await expect(page.locator('#sibling .dv-live-proof')).toHaveCount(0);expect(await page.evaluate(()=>window.calls.live.length)).toBe(0);await page.evaluate(()=>window.viewer.controller.telemetry.setAvailable(false));await expect(metrics(root)).toBeHidden();await expect(root.locator('.dv-live-proof')).toHaveCount(0);await page.evaluate(()=>window.seed());await expect(root.locator('.dv-live-proof')).toHaveCount(0);
  await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();await metrics(page.locator('#sibling')).click();await expect(page.locator('#sibling .dv-live-proof')).toHaveCount(1);await page.evaluate(()=>{window.retiredProof=document.querySelector('#sibling').shadowRoot.querySelector('.pt-live-status');window.sibling.destroy();});await expect(page.locator('#sibling')).toBeEmpty();expect(await page.evaluate(()=>window.retiredProof.querySelectorAll('.dv-live-proof,.dv-live-proof-table').length)).toBe(0);
 });
@@ -56,7 +56,7 @@ test('Proof activation ignores unknown, unbound and unobserved data but accepts 
    await expect(root.locator('.dv-live-proof,.dv-live-proof-table')).toHaveCount(0);
   }
  }
- await expect(metrics(root)).toHaveAttribute('aria-pressed','false');await expect(root.locator('.dv-metrics-card')).toHaveCount(0);
+ await expect(metrics(root)).toHaveAttribute('aria-checked','false');await expect(root.locator('.dv-metrics-card')).toHaveCount(0);
  expect(await page.evaluate(()=>[window.calls.live.length,window.calls.history.length])).toEqual([0,0]);
 });
 test('Proof activation uses actual loader-selected detail identities and bound signals without querying',async({page,server})=>{
@@ -73,7 +73,7 @@ test('Proof activation uses actual loader-selected detail identities and bound s
   await expect(scope.locator('.dv-live-proof')).toHaveCount(1);await expect(carrier(scope,id)).toContainText('rate: 0 req/h');
   await expect(carrier(scope,'ingest->app')).toContainText('unobserved');await expect(scope.locator('.dv-live-proof-table')).not.toContainText('Decoy');
  }
- await expect(metrics(scope)).toHaveAttribute('aria-pressed','false');expect(await page.evaluate(()=>[window.calls.live.length,window.calls.history.length,window.calls.detail.length])).toEqual([0,0,1]);
+ await expect(metrics(scope)).toHaveAttribute('aria-checked','false');expect(await page.evaluate(()=>[window.calls.live.length,window.calls.history.length,window.calls.detail.length])).toEqual([0,0,1]);
  await scope.locator('.detail-breadcrumb button').first().click();await page.evaluate(()=>window.viewer.controller.telemetry.apply({}));await expect(root.locator('.dv-live-proof,.dv-live-proof-table')).toHaveCount(0);
 });
 for(const disabled of ['page','host','tools'])test(disabled+' disable hides controls, rejects seeded Proof and preserves Jira',async({page,server})=>{
@@ -103,7 +103,7 @@ test('discovered missing tools hide Metrics and reject Proof without starting qu
  await page.evaluate(()=>window.ctl.telemetry.apply({ingest:{signals:{lag:{value:10}}},'shared::api':{signals:{rate:{value:10}}}}));await expect(root.locator('.dv-live-proof')).toHaveCount(0);expect(await page.evaluate(()=>window.toolCalls)).toEqual([]);
 });
 test('discovered Prometheus-only tools qualify local and imported Proof after Metrics is enabled',async({page,server})=>{
- const root=await discoveredTools(page,server,['query_prometheus']);await expect(metrics(root)).toBeVisible();await expect(metrics(root)).toHaveAttribute('aria-pressed','false');expect(await page.evaluate(()=>window.toolCalls)).toEqual([]);
+ const root=await discoveredTools(page,server,['query_prometheus']);await expect(metrics(root)).toBeVisible();await expect(metrics(root)).toHaveAttribute('aria-checked','false');expect(await page.evaluate(()=>window.toolCalls)).toEqual([]);
  await metrics(root).click();await expect(carrier(root,'ingest')).toContainText('lag: 25');await expect(carrier(root,'shared::api')).toContainText('rate: 25');
  expect(await page.evaluate(()=>window.toolCalls.map(call=>call[1]))).toEqual(expect.arrayContaining(['query_prometheus']));expect(await page.evaluate(()=>window.toolCalls.every(call=>call[1]==='query_prometheus'))).toBe(true);
 });

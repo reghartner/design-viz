@@ -18,7 +18,7 @@ async function mount(page,server,kind,{missing=false,denied=false}={}){
    callTool:async(server,tool,input)=>{window.hostedEvents.push({kind:'query',server,tool,input});return tool==='run_query'?{structuredContent:{results:[{data:{'SUM(messaging.batch.message_count)':125}}],series:[]}}:{payload:{data:[{values:[{timestamp:'1793894400.000',value:7}]}]}};}
   }:null};window.flowviewBooted=ctl=>window.hostedController=ctl;
  },{kind,missing,denied});
- await page.goto(server.origin+'/hosted.html');await page.waitForFunction(()=>!!window.hostedController);const panel=page.locator('#docview .pt-live-status').first();return {panel,metrics:panel.getByRole('button',{name:'Metrics',exact:true})};
+ await page.goto(server.origin+'/hosted.html');await page.waitForFunction(()=>!!window.hostedController);const panel=page.locator('#docview .pt-live-status').first();return {panel,metrics:panel.getByRole('switch',{name:'Metrics overlay',exact:true})};
 }
 test('hosted Grafana without optional tools runs local/imported Loki and builds evidenced Explore links',async({page,server,audit})=>{
  const h=await mount(page,server,'grafana');await expect(h.metrics).toBeVisible();expect(await page.evaluate(()=>window.hostedEvents.length)).toBe(0);await h.metrics.click();await expect.poll(()=>page.evaluate(()=>window.hostedController.telemetry.snapshot().map['shared::api']?.signals.rate?.value)).toBe(7);

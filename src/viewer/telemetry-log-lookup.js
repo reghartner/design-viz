@@ -14,6 +14,9 @@ var TELEMETRY_LOG_LIMIT=10,TELEMETRY_LOG_TYPED=':logql';
 var TELEMETRY_LOG_ABSENT='Log lookups need a Grafana connector with query_loki_logs. Add it in claude.ai Settings → Connectors.';
 var TELEMETRY_LOG_NOTES={absent:TELEMETRY_LOG_ABSENT,unsupported:'Log lookups need a Grafana connector, which this host does not provide.',checking:'Checking for the Grafana connector…',
   disabled:'Log lookups are unavailable in this view.',account:'Host account changed. Reopen this view to start a new telemetry session.'};
+// Why hooks.disabled() turned lookups off (#1125); true keeps the general note.
+var TELEMETRY_LOG_DISABLED={history:'Log lookups work in Live, not in Over time. Switch to Live to use them.',board:'Log lookups need telemetry, which this board turns off.',
+  host:'Log lookups need telemetry, which this host turns off.',closed:'This view was closed. Reopen it to look up log lines.'};
 /* grafana/mcp-grafana tools/loki.go LogEntry (format full): {timestamp: '<unix ns>',
    line, labels, structuredMetadata?, parsed?}. Without Loki label types every
    label arrives in labels, so a field is looked up in all three. */
@@ -54,7 +57,9 @@ function createTelemetryLogLookup(page,transport,hooks){
   var form={lookup:'',value:'',logql:''};
   function lookups(){return trackingTelemetry(page).lookups || null;}
   function supported(){return !!transport && typeof transport.logsConnector==='function' && typeof transport.queryLogs==='function';}
-  function disabled(){return typeof hooks.disabled==='function' && !!hooks.disabled();}
+  // '' when enabled, else the cause: a TELEMETRY_LOG_DISABLED key, or true for an unnamed one.
+  function disabled(){var cause=typeof hooks.disabled==='function'?hooks.disabled():'';return cause || '';}
+  function note(s){return s==='disabled'?TELEMETRY_LOG_DISABLED[disabled()] || TELEMETRY_LOG_NOTES.disabled:TELEMETRY_LOG_NOTES[s] || '';}
   function changed(){if(!dead && typeof hooks.changed==='function')hooks.changed();}
   function cancel(){serial++;if(timer)clearTimeout(timer);timer=null;if(abort)abort.abort();abort=null;busy=false;}
   function sync(){
@@ -63,7 +68,9 @@ function createTelemetryLogLookup(page,transport,hooks){
     if(form.lookup!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,form.lookup)){form.lookup=ids.length?ids[0]:TELEMETRY_LOG_TYPED;form.value='';}
     return ls;
   }
-  function state(){return retired?'account':!supported()?'unsupported':disabled()?'disabled':connector?connector.state:'checking';}
+  // A closed view and host telemetry off name themselves; without a logs connector the
+  // other causes would send the reader to a fix that cannot work here (#1125).
+  function state(){var cause=disabled();return retired?'account':cause==='closed' || cause==='host'?'disabled':!supported()?'unsupported':cause?'disabled':connector?connector.state:'checking';}
   // Tool metadata only, once per controller; Find checks the connector again.
   function discover(){
     if(connector || dead || retired || !supported() || disabled())return connector && connector.pending;
@@ -76,7 +83,7 @@ function createTelemetryLogLookup(page,transport,hooks){
     var ls=lookups();if(!ls)return null;sync();
     if(typeof hooks.wanted!=='function' || hooks.wanted())discover();
     var s=state();
-    return {available:s==='ready',state:s,note:TELEMETRY_LOG_NOTES[s] || '',busy:busy,form:Object.assign({},form),typed:TELEMETRY_LOG_TYPED,
+    return {available:s==='ready',state:s,note:note(s),busy:busy,form:Object.assign({},form),typed:TELEMETRY_LOG_TYPED,
       lookups:Object.keys(ls).map(function(id){var l=ls[id];return {id:id,label:l.label,slot:telemetryLookupSlot(l.query),values:(l.values || []).slice()};}),
       result:result?Object.assign(JSON.parse(JSON.stringify(result)),{next:next()}):null};
   }
@@ -99,7 +106,7 @@ function createTelemetryLogLookup(page,transport,hooks){
     function fail(message){throw {code:'input',message:message};}
     try{
       if(state()==='checking'){await discover();if(dead || mine!==serial || signal.aborted)return null;}
-      if(state()!=='ready')fail(TELEMETRY_LOG_NOTES[state()] || 'Log lookups are unavailable.');
+      if(state()!=='ready')fail(note(state()) || 'Log lookups are unavailable.');
       var config=typeof hooks.config==='function'?hooks.config():telemetryEnvironmentConfig(page),query=typed?request.logql.trim():lookup.query,slot=!typed && telemetryLookupSlot(query),value=request.value.trim();
       if(!query)fail('Type a LogQL log query.');
       if(slot && !value)fail('Enter a value for '+lookup.label+'.');

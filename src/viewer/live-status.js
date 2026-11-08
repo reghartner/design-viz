@@ -924,7 +924,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // #1099: find a trace from a Loki log line; the chosen line loads through directTrace.
   var logLookup=createTelemetryLogLookup(page,telemetryOptions && telemetryOptions.directTrace,{
     identity:function(){return [telemetry.environment(),telemetry.snapshot().historical];},
-    disabled:function(){return retired || telemetryOptions===false || !trackingTelemetry(page).enabled || telemetry.snapshot().historical;},
+    disabled:function(){return retired?'closed':telemetryOptions===false?'host':!trackingTelemetry(page).enabled?'board':telemetry.snapshot().historical?'history':'';},
     wanted:function(){return statusMode==='trace';},
     config:function(){return telemetry.config();},
     lookback:function(){var form=directTrace.snapshot().form,p=FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS)[form.connection];return {start:form.start,end:form.end,lookback:p?p.time.defaultLookback:''};},

@@ -45,7 +45,7 @@ function telemetryTraceModel(diagram,pathId,exemplar){
   }catch(ex){warning=ex.message;}
   var nodes=Object.create(null),edges=Object.create(null),rows=[];
   if(mapping)mapping.steps.forEach(function(match){
-    var step=(diagram.steps || []).find(function(s){return s.id===match.stepId;}),selector=step.traceMatch || {},keys=stepDeliveredKeys(step);
+    var step=(diagram.steps || []).find(function(s){return s.id===match.stepId;}),selector=FlowTraceMatch.selector(step,match) || {},keys=stepDeliveredKeys(step);
     var exact=(diagram.edges || []).filter(function(e){return keys.indexOf(e.from+'->'+e.to)>=0 && (!match.nodeId || e.to===match.nodeId);});
     var duration=match.status==='matched'?Math.max.apply(null,match.spans.map(function(s){return s.durationMs;})):null;
     var kinds=match.conditions.map(function(c){return c.kind;}),tone=match.status!=='matched'?'unknown':kinds.some(function(k){return k==='service-error' || k==='delivery-failed';})?'error':kinds.some(function(k){return ['slow','database-slow','queue-buildup','backpressure'].indexOf(k)>=0;})?'warning':'observed';

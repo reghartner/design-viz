@@ -19,7 +19,15 @@ function mapTrace(d,trace,pathId){
     if(visiting.has(step.id))throw new Error('Cyclic traceMatch.parentStepId.');
     visiting.add(step.id);
     const m=step.traceMatch;
-    if(!m){visiting.delete(step.id);return {stepId:step.id,status:'unmapped',spans:[],conditions:[]};}
+    if(!m || Array.isArray(m) && !m.length){visiting.delete(step.id);return {stepId:step.id,status:'unmapped',spans:[],conditions:[]};}
+    // Alternatives are tried in order; the first match wins. Without a match the
+    // first ambiguous result is kept (it needs a selector fix), else the last tried.
+    let result=null;
+    if(Array.isArray(m))m.some((alternative,i)=>{const r=attempt(step,alternative || {});r.alternative=i;if(!result || result.status!=='ambiguous' || r.status==='matched')result=r;return r.status==='matched';});
+    else result=attempt(step,m);
+    visiting.delete(step.id);results.set(step.id,result);return result;
+  }
+  function attempt(step,m){
     let candidates=trace.spans.filter(s=>s.serviceName===m.serviceName && s.operation===m.operation &&
       (!m.namespace || s.attributes['service.namespace']===m.namespace) &&
       Object.entries(m.attributes || {}).every(([k,v])=>s.attributes[k]===v));
@@ -62,7 +70,7 @@ function mapTrace(d,trace,pathId){
       if(candidates.some(s=>truth(s.attributes['flow.backpressure'])))condition('backpressure','Backpressure reported by service');
       if(retries)condition('retry',candidates.length+' recorded attempts',{attempts:candidates.length});
     }else result.conditions.push({kind:status==='missing'?'unknown':'ambiguous',nodeId:m.nodeId,label:status==='missing'?'Not observed · outcome unknown':'Ambiguous span mapping',spanIds:candidates.map(s=>s.id)});
-    visiting.delete(step.id);results.set(step.id,result);return result;
+    return result;
   }
   const mapped=steps.map(match),owners=new Map();
   for(const item of mapped.filter(r=>r.status==='matched'))for(const span of item.spans){if(!owners.has(span.id))owners.set(span.id,[]);owners.get(span.id).push(item);}
@@ -70,5 +78,11 @@ function mapTrace(d,trace,pathId){
   const used=new Set(mapped.filter(r=>r.status==='matched').flatMap(r=>r.spans.map(s=>s.id)));
   return {steps:mapped,unmatched:trace.spans.filter(s=>!used.has(s.id)).map(s=>({id:s.id,serviceName:s.serviceName,operation:s.operation})),warnings:trace.warnings};
 }
-return {baseSteps:baseSteps,mapTrace:mapTrace};
+/* The authored selector behind one mapTrace step result: the alternative that
+   produced it when traceMatch is an array. */
+function selector(step,result){
+  const m=step && step.traceMatch;
+  return Array.isArray(m)?m[result && result.alternative || 0] || null:m || null;
+}
+return {baseSteps:baseSteps,mapTrace:mapTrace,selector:selector};
 })();

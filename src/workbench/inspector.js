@@ -1100,7 +1100,7 @@ function stepForm(val, ctx){
     var evidence=document.createElement('details');
     var evidenceTitle=document.createElement('summary'); evidenceTitle.textContent='Code and trace evidence';evidence.appendChild(evidenceTitle);
     evidence.appendChild(frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr')));
-    evidence.appendChild(frow('Trace match JSON',jsonFieldControl('traceMatch',val.traceMatch,'json')));
+    evidence.appendChild(frow('Trace match JSON',jsonFieldControl('traceMatch',val.traceMatch,'jsonAny')));
     evidence.appendChild(frow('Runtime conditions JSON',jsonFieldControl('conditions',val.conditions,'jsonArr')));
     rows.push(evidence);
     ((ctx.diagram && ctx.diagram.panels) || []).forEach(function(p){

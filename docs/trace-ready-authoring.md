@@ -77,6 +77,34 @@ One span matching two steps is ambiguous. Do not silence ambiguity by renaming
 nodes, taking the first array entry or inventing attributes. Leave the unresolved
 mapping visible and report what instrumentation/context is missing.
 
+When the same logical operation is recorded by different root spans depending on
+the path it took, `traceMatch` may be an array of alternatives instead of
+duplicating the step. Each entry is a complete selector with the rules above. For
+example, one message is consumed through RabbitMQ or through Pulsar, and each
+transport's consumer span has its own operation name:
+
+```json
+{
+  "id": "consume-stats",
+  "text": "Consume camera stats",
+  "edge": "camera->stats",
+  "traceMatch": [
+    {"serviceName": "stats-consumer", "operation": "camera_stats_message process", "nodeId": "stats"},
+    {"serviceName": "stats-consumer", "operation": "persistent://stats/camera process", "nodeId": "stats"}
+  ]
+}
+```
+
+Alternatives are tried in order and the first one that matches maps the step;
+its own `nodeId`, budgets and `panelId` then apply. If none matches, the step
+shows the first ambiguous result, so a selector that needs refinement stays
+visible; otherwise it shows the last alternative's **not observed** result. A
+child step's `parentStepId` refers to whichever alternative of the parent step
+matched. The array must not be empty; validation reports an invalid entry with
+its index, for example `traceMatch[1].occurrence`. Alternatives do not make two
+spans in one trace acceptable: the matched alternative still needs one unique
+span (or a `repeat:"attempts"` group).
+
 Only uniquely matched delivered edges receive operation-duration annotations.
 Multiple steps claiming the same edge cannot supply one exact edge duration.
 These durations are not network latency. Add `maxDurationMs` or `maxQueueDepth`

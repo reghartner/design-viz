@@ -144,7 +144,7 @@ test('desktop Load on a log line from two days back moves the view to that day',
  await info.attach('trace-day-live-log-line',{body:await root.screenshot(),contentType:'image/png'});
  const reach=()=>'-'+Math.ceil((Date.now()-(at+60000-3600000))/3600000)+'h',before=reach();
  await logs.getByRole('button',{name:'Load trace '+ID,exact:true}).click();
- await expect(root.locator('.dv-live-over-time-day')).toHaveText('Day '+dayKey);
+ await expect(root.locator('.dv-live-over-time-day')).toHaveText('Day '+dayKey);await expect(logs.locator('.dv-trace-log-row'),'the list survives the move').toHaveCount(1);
  await expect(root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);await expect(root.locator('.dv-trace-date')).toHaveText('Started '+label+' 12:00 local');
  const sent=await page.evaluate(()=>window.traceCalls);expect(sent).toHaveLength(1);expect([before,reach()]).toContain(sent[0].from);
  await info.attach('trace-day-moved',{body:await root.screenshot(),contentType:'image/png'});

@@ -953,11 +953,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return {at:d.toISOString(),key:localDayKey(at),label:d.toLocaleDateString([],{month:'short',day:'numeric'}),time:pad(d.getHours())+':'+pad(d.getMinutes())};
   }
   function viewDay(){var day=over && over.days[over.index];return day?{key:day.key,label:day.short || day.label || day.key}:{key:localDayKey(Date.now()),label:'Live'};}
-  function outsideNote(d){return 'This trace is from '+d.label+', a day Over time does not list.';}
+  function outsideNote(d){return 'This trace is from '+d.label+', which Over time does not list.';}
+  // A move the trace itself causes keeps the log results it may have come from (Q2).
+  function traceMoved(fn){logLookup.hold(true);try{fn();}finally{logLookup.hold(false);}}
   function traceFollow(e){
     var d=traceDayOf(e);if(!d || d.key===viewDay().key)return;
-    if(d.key===localDayKey(Date.now())){overClose();return;}
-    if(over){var index=over.days.findIndex(function(day){return day.key===d.key;});if(index>=0)api.overTimeDay(index);else traceDayNote=outsideNote(d);return;}
+    if(d.key===localDayKey(Date.now())){traceMoved(overClose);return;}
+    if(over){var index=over.days.findIndex(function(day){return day.key===d.key;});if(index>=0)traceMoved(function(){api.overTimeDay(index);});else traceDayNote=outsideNote(d);return;}
     // Without an Over time that can open here there is no day list to move to; the card still shows the date.
     openOver(d);
   }
@@ -1172,7 +1174,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // #1145: opened by a loaded trace: its own day, or stay in Live when the list does not have it.
     var target=overTarget && overTarget.request===request?overTarget.day:null;overTarget=null;
     if(target){index=days.findIndex(function(day){return day.key===target.key;});if(index<0){traceDayNote=outsideNote(target);notify();return;}}
-    over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null};on=true;availabilityOn=true;telemetry.openHistory(days,index);overShow();
+    var show=function(){over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null};on=true;availabilityOn=true;telemetry.openHistory(days,index);overShow();};
+    if(target)traceMoved(show);else show();
   }
   // Authored carrier occurrences, independent of distinct Jira ticket totals.
   // The shared walk includes resolved imports, nested sections and loaded details.

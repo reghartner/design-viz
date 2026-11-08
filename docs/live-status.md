@@ -2947,10 +2947,10 @@ A loaded trace is one request with its own start time, the earliest span's (#114
 says "Started Nov 6 12:00 local". Loading it moves the view to that local day: Over time on that day, or
 Live when it is today. Opening Over time for it is part of the Load click. When Over time is open and its
 day list has no such day, or the history it loads has none, the view stays and the Load trace section says
-"This trace is from Nov 3, a day Over time does not list." A board without Over time stays in Live.
+"This trace is from Nov 3, which Over time does not list." A board without Over time stays in Live.
 Over time on today is the same day as Live. Moving the view to any other day, or back to Live from a past
 day, clears the trace without a call, and the section says "Cleared trace 8413cd87a9f1 (Nov 6): the view
-moved to Nov 7." The typed trace ID stays. Ticket colours on nodes follow the day shown (D14). Opening a
+moved to Nov 7." The typed trace ID stays, and log results stay across a move the loaded trace itself causes. Ticket colours on nodes follow the day shown (D14). Opening a
 drill-down keeps the loaded trace; it is cleared when its mapping diagram goes away.
 
 ### Find a trace from a log line
@@ -3012,7 +3012,7 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   for example "Loki · Nov 6 00:00–24:00 local", and an empty result says "No
   matching log lines on Nov 6." A Trace start or end typed under Lookback still
   wins. Changing the day clears the results without a call; the typed value
-  stays. Live is unchanged.
+  stays. A move that a loaded trace causes keeps them (#1145). Live is unchanged.
 - A value cannot contain quotes, backticks, backslashes or control characters,
   so it cannot leave the LogQL string it is placed in. The typed box is limited
   to 2000 characters. LogQL cannot write; the call is bounded by the window and

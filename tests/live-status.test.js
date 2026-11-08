@@ -2902,12 +2902,15 @@ test('#1125 the log lookup note names why it is unavailable, and Live restores i
  api.destroy();seen.closed=logs(live);
  const board=harness(raw(false),{},host());seen.boardOff=logs(board);board.ctl.liveStatus.destroy();
  const off=harness(raw(),{},{telemetry:false});seen.hostOff=logs(off);off.ctl.liveStatus.destroy();
+ // A host without a logs connector cannot run lookups in Live either, so Over time does not outrank that note.
+ const bare=harness(raw(),{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){}}}});bare.ctl.telemetry.openHistory([{at:'2026-11-01T00:00:00.000Z'}],0);seen.noConnectorOverTime=logs(bare);bare.ctl.liveStatus.destroy();
  assert.deepEqual(seen,{
   overTime:[false,'Log lookups work in Live, not in Over time. Switch to Live to use them.'],
   backToLive:[true,''],
   closed:[false,'This view was closed. Reopen it to look up log lines.'],
   boardOff:[false,'Log lookups need telemetry, which this board turns off.'],
-  hostOff:[false,'Log lookups need telemetry, which this host turns off.']});
+  hostOff:[false,'Log lookups need telemetry, which this host turns off.'],
+  noConnectorOverTime:[false,'Log lookups need a Grafana connector, which this host does not provide.']});
 });
 test('#1124 a log-line trace that is not found says it may not have been kept and offers the next line',async()=>{
  const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};

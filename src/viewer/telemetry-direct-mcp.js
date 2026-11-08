@@ -17,6 +17,17 @@ function createTelemetryDirectMcp(win){
       var described=await telemetryDescribeTools(claude,mcp,p.server,tools,active);if(!active())throw {code:'capability_removed'};
       contracts.set(request,mcp);return described[0];
     },
-    call:async function(request,args,signal){var mcp=contracts.get(request);contracts.delete(request);if(!mcp || signal.aborted)throw {code:'capability_removed'};return mcp.callTool(request.profile.server,request.profile.tool,args,{signal:signal});}
+    call:async function(request,args,signal){var mcp=contracts.get(request);contracts.delete(request);if(!mcp || signal.aborted)throw {code:'capability_removed'};return mcp.callTool(request.profile.server,request.profile.tool,args,{signal:signal});},
+    // Log lookups (#1099): the connector qualified by query_loki_logs, as for
+    // loki signals (telemetryGrafanaServer). Listing reads tool metadata only.
+    logsConnector:async function(){var mcp=await win.claude.use('mcp');if(!mcp)throw {code:'capability_disabled'};return telemetryGrafanaServer(await mcp.listTools(),['query_loki_logs']);},
+    queryLogs:async function(args,signal){
+      function check(){if(signal.aborted)throw {code:'capability_removed'};}
+      var mcp=await win.claude.use('mcp');check();if(!mcp)throw {code:'capability_disabled'};
+      var list=await mcp.listTools();check();var server=telemetryGrafanaServer(list,['query_loki_logs']);if(!server)throw {code:'server_not_found'};
+      var tool=telemetryGrafanaListed(list).filter(function(s){return (s.server || s.name)===server;}).map(function(s){return (s.tools || []).find(function(t){return t && t.name==='query_loki_logs';});})[0],annotations=tool && tool.annotations || {};
+      if(annotations.readOnlyHint===false || annotations.destructiveHint===true)FlowTraceConnections.fail('schema','The Grafana query_loki_logs tool is marked write/destructive.');
+      var answer=await mcp.callTool(server,'query_loki_logs',args,{signal:signal});check();return telemetryGrafanaPayload(answer);
+    }
   };
 }

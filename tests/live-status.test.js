@@ -2926,21 +2926,24 @@ async function paintedCard(nodes){
  h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
  return {h,card:h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]')};
 }
+function workPresentation(h,card){
+ h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});
+ const pop=h.view.querySelector('.dv-live-popover');
+ return {appearance:card.getAttribute('data-live-appearance'),classes:h.C.LIVE_STATUS_APPEARANCES.filter(s=>card.classList.contains('dv-live-'+s)),halo:!!card.querySelector('.dv-live-halo'),
+  label:/No change needed/.test(card.getAttribute('aria-label')||''),popover:!!pop && pop.querySelectorAll('.dv-live-coverage-detail').some(p=>/No change needed/.test(p.textContent||''))};
+}
 test('#1137 metric cards on a board without tickets get no Jira presentation; ticketed boards keep unchanged',async()=>{
  const free=await paintedCard({a:{},b:{}});
  assert.equal(free.h.ctl.liveStatus.snapshot().available,false,'fixture has no ticket references');
  assert.ok(free.card,'the degraded carrier has a metric card');
  assert.equal(free.card.getAttribute('data-verdict'),'degraded');
- assert.equal(free.card.getAttribute('data-live-appearance'),null,'no Jira appearance on a Jira-free board');
- assert.doesNotMatch(free.card.className,/dv-live-/);
- assert.equal(free.card.querySelector('.dv-live-halo'),null);
- assert.doesNotMatch(free.card.getAttribute('aria-label')||'',/No change needed/);
+ assert.deepEqual(workPresentation(free.h,free.card),{appearance:null,classes:[],halo:false,label:false,popover:false},'no Jira presentation on a Jira-free board');
+ assert.equal(free.card.getAttribute('data-verdict'),'degraded','the card keeps its own verdict');
  free.h.ctl.liveStatus.destroy();
  const ticketed=await paintedCard({a:{tickets:['AA-1']},b:{}});
  assert.equal(ticketed.h.ctl.liveStatus.snapshot().available,true);
  assert.ok(ticketed.card);
  assert.equal(ticketed.card.getAttribute('data-verdict'),'degraded');
- assert.equal(ticketed.card.getAttribute('data-live-appearance'),'unchanged','an unticketed edge on a ticketed board stays unchanged');
- assert.match(ticketed.card.getAttribute('aria-label')||'',/No change needed/);
+ assert.deepEqual(workPresentation(ticketed.h,ticketed.card),{appearance:'unchanged',classes:['unchanged'],halo:true,label:true,popover:true},'an unticketed edge on a ticketed board stays unchanged');
  ticketed.h.ctl.liveStatus.destroy();
 });

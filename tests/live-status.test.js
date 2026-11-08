@@ -2847,6 +2847,23 @@ test('#1136 a reader working on a loaded trace keeps the Trace view when a loade
  assert.deepEqual(m.body.querySelectorAll('button.dv-status-mode').filter(el=>shownIn(el,m.body)).map(accessibleName),['Jira','Trace'],'the switch appears with the references');
  m.destroy();api.destroy();
 });
+test('#1136 choosing a trace or focusing a span keeps the Trace view when a loaded detail brings tickets',async()=>{
+ const remote={page:{sections:[{id:'child',diagram:{nodes:{child:{tickets:['AA-1']}},rows:[['child']]}}]}};
+ for(const work of ['none','choose','span']){
+  const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),d=f.spec.page.sections[0].diagram;
+  delete f.spec.page.tracking.jira;d.edges.forEach(e=>delete e.tickets);Object.values(d.nodes).forEach(n=>delete n.tickets);d.nodes.app.detail={spec:'remote',section:'child',mode:'link'};
+  const options={telemetry:{},loadDetail:async()=>remote},h=harness(f.spec,{},options),api=h.ctl.liveStatus;
+  h.ctl.sections[0].stepper={path:()=>'short',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+  h.ctl.telemetry.apply(f.samples);
+  assert.equal(api.snapshot().available,false);assert.equal(api.snapshot().mode,'trace');
+  const selected=api.snapshot().trace.selected;assert.ok(selected,'contrasting precondition: an example trace is shown');
+  if(work==='choose')await api.chooseTrace({key:selected.key,traceId:selected.exemplar.traceId});
+  if(work==='span')assert.equal(api.selectTraceSpan({context:selected.context,spanId:selected.exemplar.spans[0].id}),true);
+  await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.flush();
+  assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().mode,work==='none'?'jira':'trace',work==='none'?'an example trace alone is not the reader choosing Trace':work+' keeps the Trace view');
+  api.destroy();
+ }
+});
 test('#1136 D13 Metrics overlay paints its cues in the Trace view on every board, and nothing while it is off',async()=>{
  const raw=cuePage();delete raw.page.tracking.jira;const d=raw.page.sections[0].diagram;Object.values(d.nodes).forEach(n=>delete n.tickets);d.edges.forEach(e=>delete e.tickets);
  const free=cueHarness(raw);await free.on();
@@ -3143,6 +3160,7 @@ test('D13 metric cards draw in the Trace view of a board with tickets without Ji
  assert.deepEqual({appearance:card().getAttribute('data-live-appearance'),classes,halo:!!card().querySelector('.dv-live-halo')},{appearance:null,classes:[],halo:false},'no Jira work colouring in the Trace view');
  const presented=workPresentation(ticketed.h,card());assert.deepEqual({label:presented.label,popover:presented.popover},{label:false,popover:false},'in Trace a card opens only its metrics detail, with no Jira work status');
  assert.doesNotMatch(card().getAttribute('aria-label') || '',/Work status/,'and its name is not a Jira work status');
+ assert.equal(ticketed.h.view.querySelector('.dv-live-popover .node-link-close').getAttribute('aria-label'),'Close metrics','its close button names the metrics');
  api.destroy();
  const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{tickets:['AA-1']},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
  const w=harness(raw,{},{authoring:true,metricsPreview:true});shim(w);w.ctl.liveStatus.setStatusMode('trace');w.flush();

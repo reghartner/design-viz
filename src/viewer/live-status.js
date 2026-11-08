@@ -1223,7 +1223,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var metricsOnly=!!(trigger._liveCarrier && trigger._liveCarrier.metricsOnly);
     pop.replaceChildren();pop.setAttribute('aria-label',metricsOnly?'Metrics for '+label:(trackingRefs(value).tickets.length?'Live tickets for ':'Work status for ')+label);
     element('strong','node-link-title',(metricsOnly?'Metrics · ':'Work status · ')+label,pop);
-    var dismiss=element('button','node-link-close','×',pop);dismiss.type='button';dismiss.setAttribute('aria-label','Close live tickets');dismiss.addEventListener('click',function(){close(true);});
+    var dismiss=element('button','node-link-close','×',pop);dismiss.type='button';dismiss.setAttribute('aria-label',metricsOnly?'Close metrics':'Close live tickets');dismiss.addEventListener('click',function(){close(true);});
     if(metricsOnly){paintProduction(trigger);reveal(trigger,dismiss,false);return;}
     var summary=trigger._liveCarrier && trigger._liveCarrier.summary,found=trackingRefs(summary || value);
     if(summary)element('p','dv-live-domain-summary','Domain summary: this node and '+summary.carriers+' descendant nodes/connections · '+summary.tickets.length+' unique tickets.'+(summary.missing?' Missing work: '+summary.missing+' marked carriers.':'')+(summary.unavailable.length?' Detail evidence unavailable: '+summary.unavailable.join(', ')+'. Completion is unknown.':''),pop);

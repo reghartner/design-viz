@@ -321,7 +321,7 @@ node tools/status-trace-demo.mjs
 python3 -m http.server 8775 --directory .local/status-trace-demo
 ```
 
-Open `http://localhost:8775/status-trace.html`, choose Trace, and enable traces.
+Open `http://localhost:8775/status-trace.html`, choose Trace, and turn on **Metrics overlay**.
 This is labeled fixture replay without an external authenticated account. Only
 transport IDs and an absolute fixture clock are adapted for the runtime envelope;
 the canonical selectors, relationships, timings and budgets are preserved.

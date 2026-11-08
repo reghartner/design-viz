@@ -374,7 +374,7 @@ underscores. Invalid entries warn and are ignored. An absent or invalid default
 uses the first valid profile in document order; no valid profiles means shared
 settings. Deployment ids and Honeycomb environment slugs are separate values.
 
-The **Environment** selector in Live status changes only this reader session;
+The **Env** selector in Live status changes only this reader session;
 it never writes the default into the document. Metrics starts off. Selecting
 while off makes no data queries. Switching while on aborts old requests, clears
 live/history evidence, proof/activity observations, trace candidates and source

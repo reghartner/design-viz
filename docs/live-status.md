@@ -1609,7 +1609,8 @@ sum(count_over_time({app="notify"} |= "event consumed" [$__range]))
 
 The adapter replaces every `$__range` with the signal window in whole seconds
 (Live: `tracking.telemetry.window`, default `24h`, so `86400s`; Over time: the
-selected day's window) and sends ONE instant query, `queryType: "instant"`, at
+selected day's page window, which ends at the day's end and has the same length,
+so `$__range` is always the page window) and sends ONE instant query, `queryType: "instant"`, at
 the window end (`endRfc3339: "now"` in Live, the window's absolute end in Over
 time), with no `startRfc3339` or `stepSeconds`. The signal's `value` is that one
 result (several series are added), with no series. Loki scans the window once;
@@ -2235,8 +2236,9 @@ while awaiting its own queued child. Traces are excluded from numeric history.
 Prometheus/Loki query their authored expressions over the selected window;
 a range step is not an aggregate rewrite. A Loki query with `$__range` is one
 instant query at the selected day's window end with `$__range` set to that
-window ([Loki window totals](#loki-window-totals)), so its Over time value is the
-whole day's total, not the last hour of the day. CloudWatch preserves period statistics
+window ([Loki window totals](#loki-window-totals)), so its Over time value covers
+the selected day's page window (the whole day at the default 24h window), not the
+last hour of the day. CloudWatch preserves period statistics
 and computes a trustworthy headline. Logs retain an independent authoritative
 total. Honeycomb sends hosted absolute string `query_spec.from`/`to` and evaluates
 one calculation directly: daily percentiles, averages and distinct counts are

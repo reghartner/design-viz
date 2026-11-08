@@ -110,7 +110,7 @@ for the complete wrapper example, tool schemas, bounds and selection behavior.
 - `grafana`: PromQL; `loki`: metric LogQL. Range series in Live and selected-window Over time.
   For a daily count, write the Loki range as `[$__range]`, e.g.
   `sum(count_over_time({app="x"} |= "y" [$__range]))`: `$__range` becomes the window
-  (`86400s` for `24h`; the selected day in Over time) and the signal is ONE instant query
+  (`86400s` for `24h`; in Over time, the selected day's page window, the whole day at the default 24h window) and the signal is ONE instant query
   whose value is the whole-window total. Prefer it over `[1h]`/`[6h]`, which report only the
   last part of the window and do not match 24-hour Prometheus cards.
 - `cloudwatch`: metric object; Sum, Maximum, Minimum, Average or SampleCount. Per-period series plus a correct window headline; optional `period` and selected-window history.

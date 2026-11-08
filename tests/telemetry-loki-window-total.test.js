@@ -38,7 +38,7 @@ test('Over time: a $__range query is one instant call at the selected day window
 test('a $__range instant result in the Loki vector shape is read; an empty result follows the counting-query empty rules',async t=>{
  const vector=result=>({payload:{status:'success',data:{resultType:'vector',result}}});
  let h=await setup({signals:{total:{loki:TOTAL}},answer:()=>vector([{metric:{app:'x'},value:[NOW/1000,'5']},{metric:{app:'z'},value:[NOW/1000,'2']}])});t.after(h.close);h.api.setEnabled(true);await settle();
- assert.equal(h.api.snapshot().map.local.signals.total.value,7);
+ assert.equal(h.api.snapshot().map.local?.signals?.total?.value,7);
  h=await setup({signals:{total:{loki:TOTAL},raw:{loki:'sum(sum_over_time({app="x"} | unwrap n [$__range]))'}},answer:()=>vector([])});t.after(h.close);h.api.setEnabled(true);await settle();
  const s=h.api.snapshot().map.local.signals;assert.equal(s.total.value,0);assert.equal(s.raw,undefined);assert.match(h.api.status().note,/no numeric observation/);
 });

@@ -389,3 +389,115 @@ test('source and packaged validators agree on browse URL imports and ordinary ca
   const result=C.validateSpec(carrier);assert.deepEqual(result,plain(ctx.validate(ctx.normalize(carrier))));
   assert.equal(result.errors.length,0);assert.ok(result.warnings.some(w=>w.includes('tickets[1]')));
 });
+// #1104 PR 1: provider step sets (stepExports). Nothing crosses to consumers yet.
+function stepProvider(){
+  return {page:{title:'Payments',canon:{version:1,id:'payments',kind:'canonical',owner:'group:default/payments'},sections:[{id:'flow',diagram:{
+    nodes:{gateway:{title:'Gateway'},auth:{title:'Auth'},ledger:{title:'Ledger'},audit:{title:'Audit'}},
+    rows:[['gateway','auth','ledger','audit']],
+    edges:[{from:'gateway',to:'auth'},{from:'auth',to:'ledger'},{from:'ledger',to:'audit'}],
+    panels:[{id:'jobs',type:'queue'}],
+    topologyExports:{core:{nodes:['gateway','auth','ledger'],edges:['gateway->auth','auth->ledger']},audit:{nodes:['audit'],edges:[]}},
+    steps:[
+      {id:'authorize',edge:'gateway->auth',text:'Authorize the payment',traceMatch:{serviceName:'auth',operation:'POST /authorize',nodeId:'auth'}},
+      {id:'persist',edges:['auth->ledger'],nodes:['ledger'],tone:{ledger:'ok'},contracts:{'auth->ledger':{json:{amount:1}}},
+        conditions:[{kind:'slow',label:'Ledger is slow',nodeId:'ledger'}],
+        traceMatch:{serviceName:'ledger',operation:'INSERT payment',nodeId:'ledger',parentStepId:'authorize',panelId:'jobs'},
+        // Local fields are stripped on import, so they may name provider-only panels and edges.
+        panels:{jobs:{state:'full'}},panelVisibility:{jobs:true},coinOffsets:{'auth->ledger':{dx:4,dy:2}},packets:[{edge:'ledger->audit'}],lane:'payments',color:'#123456'},
+      {id:'declined',failures:{'auth->ledger':'blocked'},text:'Ledger rejects the write'},
+      {id:'record',edge:'ledger->audit',text:'Record the audit entry'},
+    ],
+    stepExports:{payment:{export:'core',steps:['authorize','persist','declined']}},
+  }}]}};
+}
+function stepConsumer(){
+  return {page:{title:'Shop',canon:{version:1,id:'shop',kind:'canonical',owner:'group:default/shop'},sections:[{id:'buy',diagram:{
+    topologyImports:[{spec:'payments',export:'core',as:'pay'}],nodes:{cart:{title:'Cart'}},rows:[['cart']],
+    edges:[{from:'cart',to:'pay::gateway'}],steps:[{id:'checkout',edge:'cart->pay::gateway',text:'Check out'}],
+  }}]}};
+}
+const stepDiagram=s=>s.page.sections[0].diagram,stepById=(s,id)=>stepDiagram(s).steps.find(step=>step.id===id);
+test('provider stepExports declare named step sets; materialization drops the declaration and no step crosses yet',()=>{
+  const specs=[stepProvider(),stepConsumer()],before=structuredClone(specs),out=resolve(specs);
+  assert.deepEqual(specs,before);assert.deepEqual(resolve(specs),out);
+  assert.equal(stepDiagram(out[0]).stepExports,undefined);assert.equal(stepDiagram(out[0]).topologyExports,undefined);
+  assert.deepEqual(stepDiagram(out[0]).steps,stepDiagram(before[0]).steps);
+  assert.deepEqual(stepDiagram(out[1]).steps,stepDiagram(before[1]).steps);
+  assert.deepEqual(out.map(s=>C.validateSpec(s).errors),[[],[]]);
+  // Closure checks run even when nobody imports the provider.
+  assert.equal(stepDiagram(resolve([stepProvider()])[0]).stepExports,undefined);
+  const vm=require('node:vm'),loader=require('../tools/source-loader.cjs'),ctx={URL,TextEncoder};vm.createContext(ctx);
+  vm.runInContext(loader.composeSources(['canon.js','validator.js']),ctx);
+  const local=stepProvider();delete local.page.canon;
+  assert.equal(ctx.FlowTopology.resolveSource(local,null).page.sections[0].diagram.stepExports,undefined);
+  // A section that declares only stepExports is still a topology declaration.
+  const lone=stepProvider();delete stepDiagram(lone).topologyExports;
+  assert.equal(ctx.FlowTopology.hasDeclarations(lone),true);
+  assert.throws(()=>resolve([lone]),/payments section flow step set payment: export core is not declared in this section/);
+  assert.ok(C.validateSpec(lone).errors.some(e=>e.includes('unresolved topology declarations')));
+});
+test('step sets fail closure when a crossing reference leaves the bound export, naming spec, section, set and step',()=>{
+  const at='Topology payments section flow step set payment: ';
+  const cases=[
+    [s=>stepById(s,'authorize').edge='ledger->audit','step authorize edge references edge ledger->audit outside export core'],
+    [s=>stepById(s,'persist').edges.push('ledger->audit'),'step persist edges references edge ledger->audit outside export core'],
+    [s=>stepById(s,'persist').nodes=['audit'],'step persist nodes references node audit outside export core'],
+    [s=>stepById(s,'persist').tone={audit:'warn'},'step persist tone references node audit outside export core'],
+    [s=>stepById(s,'persist').contracts={'ledger->audit':{json:{}}},'step persist contracts references edge ledger->audit outside export core'],
+    [s=>stepById(s,'declined').failures={'ledger->audit':'dropped'},'step declined failures references edge ledger->audit outside export core'],
+    [s=>stepById(s,'persist').traceMatch.nodeId='audit','step persist traceMatch.nodeId references node audit outside export core'],
+    [s=>stepById(s,'persist').conditions[0].nodeId='audit','step persist conditions[0].nodeId references node audit outside export core'],
+    [s=>stepById(s,'persist').traceMatch.parentStepId='record','step persist traceMatch.parentStepId record is not in this step set'],
+    [s=>stepDiagram(s).stepExports.payment.steps.push('record'),'step record edge references edge ledger->audit outside export core'],
+    [s=>stepDiagram(s).stepExports.payment.steps=['authorize','absent'],'missing or ambiguous exported step absent'],
+    [s=>stepDiagram(s).steps.push({id:'authorize',edge:'gateway->auth'}),'missing or ambiguous exported step authorize'],
+    [s=>{stepDiagram(s).steps.push({id:'bad id',edge:'gateway->auth'});stepDiagram(s).stepExports.payment.steps.push('bad id');},'step bad id needs a stable id'],
+  ];
+  for(const [mutate,message] of cases)for(const withConsumer of [false,true]){
+    const specs=withConsumer?[stepProvider(),stepConsumer()]:[stepProvider()];mutate(specs[0]);
+    const before=structuredClone(specs);
+    assert.throws(()=>resolve(specs),error=>error.message.startsWith(at+message),message);
+    assert.deepEqual(specs,before);
+  }
+});
+test('malformed step-set declarations and bindings fail',()=>{
+  const at='Topology payments section flow';
+  const cases=[
+    [s=>stepDiagram(s).stepExports=[],at+': stepExports must be a named object'],
+    [s=>stepDiagram(s).stepExports={'bad name':{export:'core',steps:['authorize']}},at+': invalid or duplicate step set bad name'],
+    [s=>stepDiagram(s).stepExports.payment.hidden=true,at+' step set payment: expected an object with fields export, steps'],
+    [s=>delete stepDiagram(s).stepExports.payment.export,at+' step set payment: export must be a name'],
+    [s=>stepDiagram(s).stepExports.payment.export=[],at+' step set payment: export must be a name'],
+    [s=>stepDiagram(s).stepExports.payment.export=['core','core'],at+' step set payment: export must be a name'],
+    [s=>stepDiagram(s).stepExports.payment.export='absent',at+' step set payment: export absent is not declared in this section'],
+    [s=>stepDiagram(s).stepExports.payment.export=['core','absent'],at+' step set payment: export absent is not declared in this section'],
+    [s=>stepDiagram(s).stepExports.payment.steps=[],at+' step set payment: export at least one step'],
+    [s=>stepDiagram(s).stepExports.payment.steps=['authorize','authorize'],at+' step set payment steps: expected an array of unique identities'],
+    [s=>stepDiagram(s).stepExports.payment.steps='authorize',at+' step set payment steps: expected an array of unique identities'],
+    [s=>{s.page.sections.push({id:'other',diagram:{nodes:{x:{title:'X'}},rows:[['x']],topologyExports:{side:{nodes:['x'],edges:[]}},steps:[{id:'x-step',nodes:['x']}],
+      stepExports:{payment:{export:'side',steps:['x-step']}}}});},'Topology payments section other: invalid or duplicate step set payment'],
+    [s=>{s.page.sections.push({id:'other',diagram:{nodes:{x:{title:'X'}},rows:[['x']],topologyExports:{side:{nodes:['x'],edges:[]}}}});
+      stepDiagram(s).stepExports.payment.export='side';},at+' step set payment: export side is not declared in this section'],
+  ];
+  for(const [mutate,message] of cases){
+    const specs=[stepProvider()];mutate(specs[0]);
+    assert.throws(()=>resolve(specs),error=>error.message.startsWith(message),message);
+  }
+});
+test('array-bound step sets close over the merged export union; scalar sets keep the declared edge boundary',()=>{
+  const split=binding=>{const s=stepProvider(),d=stepDiagram(s);
+    d.topologyExports={entry:{nodes:['gateway','auth'],edges:['gateway->auth']},store:{nodes:['ledger'],edges:[]}};
+    d.stepExports.payment.export=binding;return s;};
+  // auth->ledger spans entry and store; only the merged union includes it.
+  assert.equal(stepDiagram(resolve([split(['entry','store'])])[0]).stepExports,undefined);
+  assert.throws(()=>resolve([split('entry')]),/step set payment: step persist edges references edge auth->ledger outside export entry$/);
+  assert.throws(()=>resolve([split(['entry'])]),/step set payment: step persist edges references edge auth->ledger outside export entry$/);
+});
+test('a consumer can declare a step set over its own steps on imported topology it re-exports',()=>{
+  const specs=source(),consumer=diagram(specs[1]);
+  consumer.topologyExports={story:{nodes:['platform::api','platform::store'],edges:['platform::api->platform::store']}};
+  consumer.stepExports={orders:{export:'story',steps:['persist','unavailable']}};
+  const out=resolve(specs);assert.equal(diagram(out[1]).stepExports,undefined);assert.deepEqual(diagram(out[1]).steps,consumer.steps);
+  consumer.stepExports.orders.steps.unshift('request');
+  assert.throws(()=>resolve(specs),/checkout section checkout step set orders: step request edge references edge client->platform::api outside export story/);
+});

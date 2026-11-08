@@ -1786,6 +1786,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
       // Handoffs transfer their ticket target from the card to the cue; a second
       // cue paint would discard that target after its source has been cleared.
       bindings.forEach(function(binding){if(statusMode!=='trace' && binding.section.diagram)paintJiraCues(binding.el,binding.section.diagram);});
+      // paintJiraCues ends by growing the board frame for the overlay; the Trace view has no Jira cues but draws metric cards (D13).
+      if(statusMode==='trace')bindings.forEach(function(binding){binding.el.querySelectorAll('svg').forEach(function(svg){if(svg._refreshStatusFrame)svg._refreshStatusFrame();});});
       view.querySelectorAll('.dv-edit-target').forEach(function(el){el.classList.remove('dv-edit-target');});
       if(editing())bindings.forEach(function(binding){if(binding.ordinal!=null)binding.el.querySelectorAll('g.node[data-dv-node]:not(.node-text),path.edge[data-dv-edge]').forEach(function(el){el.classList.add('dv-edit-target');});});
       if(focusBinding){var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier && !el.classList.contains('dv-metrics-label-hidden');});if(replacement)replacement.focus({preventScroll:true});}

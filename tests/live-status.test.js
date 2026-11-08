@@ -2777,6 +2777,41 @@ test('OT18 #1131 the shared header shows Live | Over time, the day row, one Env 
  api.setStatusMode('jira');header('Jira');assert.ok(m.body.querySelector('table.dv-live-tickets'));assert.ok(shownIn(m.body.querySelector('.dv-live-over-time-status'),m.body),'and in the Jira view');
  m.destroy();api.destroy();
 });
+/* #1136 (epic #1130, Chuck 2026-11-08 "just show the trace part with the metrics toggle - same thing just no jira"):
+   a board with no ticket or epic references after imports (snapshot().available false) opens on the Trace view and
+   shows no Jira | Trace switch. Edit is in the shared header for any editor, in both views.
+   Rejects: a Jira view that says "This page has no ticket references."; Edit gated on tickets; a board whose tickets
+   come only through an import treated as Jira-free. */
+const jiraFreeEditor=()=>({starts:0,state(){return {editable:true,blocked:'',active:false,pending:0,saving:false,readOnly:false,notice:null};},onChange:()=>()=>{},rememberMap(){},lastMap:()=>null,question:()=>null,start(){this.starts++;}});
+const jiraFreeBoard=tickets=>({page:{tracking:{...(tickets?{jira:{site:'https://jira.test'}}:{}),telemetry:{environment:'prd',environments:{prd:{},stg:{}}}},sections:[{id:'main',diagram:{
+ nodes:{web:{title:'Web',...(tickets?{tickets:['AA-1']}:{})},api:{title:'API',telemetry:TSERVICE()}},rows:[['web','api']],edges:[{from:'web',to:'api',label:'call',telemetry:TCALL()}],
+ steps:[{id:'call',edge:'web->api',traceMatch:{serviceName:'api',operation:'GET /cart'}}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
+test('#1136 a board without ticket references opens on Trace with no Jira | Trace switch, and Edit is in the shared header for an editor',()=>{
+ const viewButtons=root=>root.querySelectorAll('button').filter(el=>shownIn(el,root) && /^(Jira|Trace)( · \d+)?$/.test(accessibleName(el)));
+ const open=raw=>{const editor=jiraFreeEditor(),h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({})},boardEditor:editor}),m=mountStatus(h);return {h,m,api:h.ctl.liveStatus,editor};};
+ const free=open(jiraFreeBoard(false));
+ assert.equal(free.api.snapshot().available,false,'contrasting precondition: no ticket or epic references');
+ assert.equal(free.api.snapshot().mode,'trace','a Jira-free board opens on the Trace view');
+ assert.deepEqual(viewButtons(free.m.body).map(accessibleName),[],'no Jira | Trace switch');
+ assert.ok(free.m.body.querySelector('.dv-live-trace'));assert.ok(!textOf(free.m.body).includes('This page has no ticket references.'));
+ assert.equal(namedControls(free.m.body,'Env').length,1,'Env stays');assert.equal(namedControls(free.m.body,'Metrics overlay','switch').length,1,'the Metrics overlay switch stays');
+ const edit=namedControls(free.m.body,'Edit');assert.equal(edit.length,1,'an editor sees one Edit');assert.ok(edit[0].closest('.dv-status-header'),'Edit is in the shared header');
+ edit[0].dispatchEvent({type:'click'});assert.equal(free.editor.starts,1,'Edit starts board editing');
+ free.m.destroy();free.api.destroy();
+ // Boards with tickets, local or only through an import, keep the switch and open on Jira; Edit is in the header in both views.
+ const seed=harness(),C=seed.C;seed.ctl.liveStatus.destroy();
+ const model=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}});
+ const provider=model('provider',{nodes:{api:{title:'API'},db:{title:'DB'}},rows:[['api','db']],edges:[{from:'api',to:'db',label:'Persist'}],topologyExports:{core:{nodes:['api','db'],edges:['api->db']}}});
+ const consumer=model('consumer',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'canon',nodeTracking:{api:{tickets:['AA-1']}}}],panels:[{id:'status',type:'live-status',title:'Status'}]});
+ consumer.page.tracking={jira:{site:'https://jira.test'}};
+ for(const [name,raw] of [['local tickets',jiraFreeBoard(true)],['tickets only through an import',C.FlowTopology.materialize([provider,consumer])[1]]]){
+  const b=open(raw);
+  assert.equal(b.api.snapshot().available,true,name+': has references');assert.equal(b.api.snapshot().mode,'jira',name+': opens on Jira');
+  assert.deepEqual(viewButtons(b.m.body).map(accessibleName),['Jira','Trace'],name+': keeps the Jira | Trace switch');
+  for(const view of ['jira','trace']){b.api.setStatusMode(view);const edits=namedControls(b.m.body,'Edit');assert.equal(edits.length,1,name+' '+view+': one Edit');assert.ok(edits[0].closest('.dv-status-header'),name+' '+view+': Edit is in the shared header');}
+  b.m.destroy();b.api.destroy();
+ }
+});
 
 test('Proof is cleared from retained panels on telemetry and live-status controller destruction',()=>{
  for(const owner of ['telemetry','liveStatus']){

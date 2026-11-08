@@ -182,6 +182,65 @@ service/span shape already matches the pinned current native shape.
 For step-by-step setup on an existing local or imported diagram, follow
 [Trace-ready authoring](trace-ready-authoring.md).
 
+## Allowed match attributes
+
+A [direct trace connection profile](trace-connections.md) may list
+`allowedAttributes`: span attribute names it retains from loaded traces and
+permits in `traceMatch.attributes`, in addition to the built-in operational list
+in [Trace-ready authoring](trace-ready-authoring.md). It takes effect for Tempo
+(`tempo-v1`) profiles. Add it next to the other profile fields:
+
+```json
+"allowedAttributes": ["device.model"]
+```
+
+With that profile, this step maps only the message-consumer span for device
+model X:
+
+```json
+{
+  "id": "consume-x",
+  "text": "This is the message for device model X",
+  "edge": "broker->consumer",
+  "traceMatch": {
+    "serviceName": "telemetry-consumer",
+    "operation": "consume device.report",
+    "nodeId": "consumer",
+    "attributes": {"device.model": "X"}
+  }
+}
+```
+
+Honeycomb `get_trace` does not return span attributes (verified on a real trace,
+company report 2026-11-07). It returns the 19 fixed table columns only. Its linked
+raw JSON resource (`honeycomb://trace/<pk>/json`) holds only `duration_ms`, `name`,
+`service.name`, `span.kind`, `trace.parent_id`, `trace.span_id`, `trace.trace_id`
+and internal IDs, and its input schema has no column parameter. An attribute
+present in Honeycomb `run_query` raw rows (`messaging.rabbitmq.routing_key`) was
+absent from `get_trace`. So on a Honeycomb profile neither `allowedAttributes` nor
+the built-in attribute list can match today. The one exception is
+`http.status_code`, which comes from the fixed `http_status` column as text.
+
+- `allowedAttributes` must be an array of at most 32 non-empty attribute names
+  (letters, digits, `_ . : / -`, starting with a letter). A malformed entry fails
+  with its field path, for example `allowedAttributes[1]`. Credential-shaped names
+  are rejected: names containing token, secret, password, passwd, credential,
+  authorization, cookie, header, bearer, private key, access key or api key, and
+  names with an `auth`, `pwd`, `jwt` or `session` part.
+- Values match exactly, with the same rules as built-in attributes. Tempo keeps the
+  span attribute value and its type.
+- Validation accepts an attribute that any connection for the page lists, also
+  while `tracking.telemetry.enabled` is `false`. Without such a profile it rejects
+  the attribute as before (`traceMatch.attributes: use supported operational
+  attributes only`). A trace loaded through a profile that does not list it does
+  not carry it, so the step shows Not observed.
+- Validation warns (it does not fail) when only Honeycomb connections list an
+  attribute that a step uses, because Honeycomb `get_trace` does not return span
+  attributes. It also warns when such an attribute has a number or boolean value,
+  which a Honeycomb text cell never matches.
+- A board entry that references a company profile inherits its `allowedAttributes`
+  and cannot change them; an inline board profile may declare its own.
+
 ## Inspect a request in Status
 
 The existing **Status** panel has **Jira** and **Trace** views. Jira is the default.

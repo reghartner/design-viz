@@ -7,6 +7,7 @@ var FlowTraceConnections=(function(){
   function object(v){return !!v && typeof v==='object' && !Array.isArray(v);}
   function fail(stage,message){var e=new Error(stage+': '+message);e.stage=stage;throw e;}
   function name(v){return typeof v==='string' && /^[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(v) && reserved.indexOf(v)<0;}
+  function attribute(v){return typeof v==='string' && /^[A-Za-z][A-Za-z0-9_.:\/-]{0,199}$/.test(v) && reserved.indexOf(v)<0 && !/(?:secret|password|passwd|credential|token|authorization|cookie|header|bearer|private.?key|access.?key|api.?key)/i.test(v) && !/(?:^|[._:\/-])(?:auth|pwd|jwt|session)(?:$|[._:\/-])/i.test(v);}
   function text(v){return typeof v==='string' && v.length>0 && v.length<=200 && !/[\x00-\x1f<>]/.test(v);}
   function fields(v,allowed,at){if(!object(v) || Object.keys(v).some(function(k){return allowed.indexOf(k)<0 || reserved.indexOf(k)>=0;}))fail('configuration',at+' has an unsupported shape or field.');}
   function copy(v){return JSON.parse(JSON.stringify(v));}
@@ -16,7 +17,7 @@ var FlowTraceConnections=(function(){
     return copy(v);
   }
   function profile(raw){
-    fields(raw,['version','label','provider','server','tool','readOnly','adapter','arguments','time','literals','environments','links'],'profile');
+    fields(raw,['version','label','provider','server','tool','readOnly','adapter','arguments','time','literals','environments','links','allowedAttributes'],'profile');
     if(raw.version!==1 || !text(raw.label) || !text(raw.server) || !name(raw.tool) || raw.readOnly!==true || !({honeycomb:'honeycomb-table-v1',tempo:'tempo-v1'}[raw.provider]===raw.adapter))fail('configuration','Use version 1, an exact server/tool, readOnly:true and a registered provider adapter.');
     var p=copy(raw),a=p.arguments;
     fields(a,['traceId','start','end','environment','context'],'arguments');
@@ -35,6 +36,13 @@ var FlowTraceConnections=(function(){
       if(Object.keys(env.literals).some(function(k){return targets.indexOf(k)>=0;}))fail('configuration','Environment literals conflict with mapped arguments.');
       Object.keys(a.context || {}).forEach(function(k){if(!own(env.context,k))fail('configuration','Every environment must supply mapped context '+k+'.');});
     });
+    // Span attribute names this profile retains from its traces and permits in
+    // traceMatch.attributes, in addition to the built-in operational list.
+    if(own(p,'allowedAttributes')){
+      if(!Array.isArray(p.allowedAttributes) || p.allowedAttributes.length>32)fail('configuration','allowedAttributes must be an array of at most 32 attribute names.');
+      p.allowedAttributes.forEach(function(k,i){if(!attribute(k))fail('configuration','allowedAttributes['+i+'] must be a non-empty, non-secret span attribute name.');});
+      p.allowedAttributes=p.allowedAttributes.filter(function(k,i,all){return all.indexOf(k)===i;});
+    }
     p.links=p.links || [];
     if(!Array.isArray(p.links) || p.links.length>8)fail('configuration','links must contain at most eight descriptors.');
     p.links.forEach(function(link){fields(link,['origin','path','query','timeEncoding'],'link');

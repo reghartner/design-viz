@@ -88,6 +88,8 @@ Overrides cannot introduce literal/context keys or change server, tool, argument
 mapping or adapter. Alternatively a board may contain a full inline v1 profile
 instead of a company reference. Readers can choose only the resolved company/board
 connections. `tracking.telemetry.enabled:false` and host `telemetry:false` win.
+Optional `allowedAttributes`:
+[provider traces](provider-traces.md#allowed-match-attributes).
 
 ## Absolute bounds and supported links
 
@@ -122,10 +124,8 @@ and a probe establish that the connected detail tool supports absolute `from` an
 }
 ```
 
-This example does not claim that all Honeycomb accounts support absolute strings.
-The runtime validates the discovered schema before every call. Numeric timestamps
-require explicit `unix-seconds` or `unix-milliseconds` and `type:"number"` (or
-`"string"` if the tool accepts decimal strings). Conversion preserves nanosecond
+Numeric timestamps require explicit `unix-seconds` or `unix-milliseconds` and
+`type:"number"` (or `"string"` if the tool accepts decimal strings). Conversion preserves nanosecond
 precision; values that cannot be represented exactly as a declared number fail.
 Raw-ID time controls accept a signed lookback such as `-2h`, or paired UTC ISO
 timestamps. A time-bearing link and explicit time controls cannot be combined.

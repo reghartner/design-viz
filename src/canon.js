@@ -197,6 +197,39 @@ var FlowCanon = (function(){
     });
     return out;
   }
+  var traceAttributes=['service.namespace','service.version','deployment.environment.name','deployment.environment','http.response.status_code','http.status_code','db.system','db.system.name','messaging.queue.depth','queue.depth','messaging.message.age_ms','flow.backpressure','flow.delivery_failed','retry.attempt','flow.step.id'];
+  /* Attribute name -> providers of the page's trace connections that list it in
+     allowedAttributes. Read with telemetry paused too: enabled:false stops loading,
+     not authoring. */
+  function profileAttributes(raw){
+    var out=Object.create(null),page=pageOf(raw);
+    if(typeof FlowTraceConnections==='undefined' || !object(page))return out;
+    var telemetry=page.tracking && page.tracking.telemetry;
+    if(object(telemetry) && telemetry.enabled===false)page=Object.assign({},page,{tracking:Object.assign({},page.tracking,{telemetry:Object.assign({},telemetry,{enabled:true})})});
+    var connections=FlowTraceConnections.resolve(page,typeof TELEMETRY_COMPANY_TRACE_CONNECTIONS!=='undefined'?TELEMETRY_COMPANY_TRACE_CONNECTIONS:{});
+    Object.keys(connections).forEach(function(id){(connections[id].allowedAttributes || []).forEach(function(k){(out[k]=out[k] || []).push(connections[id].provider);});});
+    return out;
+  }
+  /* Honeycomb get_trace returns only its fixed table columns, as text, and no span
+     attributes (company report 2026-11-07), so an attribute only Honeycomb
+     connections list is never observed. */
+  function traceWarnings(raw){
+    var listed=profileAttributes(raw),warnings=[];
+    sections(raw).forEach(function(sec){(Array.isArray(sec.diagram.steps)?sec.diagram.steps:[]).forEach(function(st){
+      // An array lists alternatives; report each under traceMatch[index].
+      var many=Array.isArray(st && st.traceMatch);
+      (many?st.traceMatch:[st && st.traceMatch]).forEach(function(m,index){
+        if(!object(m) || !object(m.attributes))return;
+        Object.keys(m.attributes).forEach(function(k){
+          if(!Object.prototype.hasOwnProperty.call(listed,k) || listed[k].some(function(p){return p!=='honeycomb';}))return;
+          var at='steps.'+(st.id || '?')+'.traceMatch'+(many?'['+index+']':'')+'.attributes.'+k+': ';
+          if(!traceAttributes.includes(k))warnings.push(at+'only Honeycomb connections list this attribute; Honeycomb get_trace does not return span attributes, so this step shows Not observed');
+          if(typeof m.attributes[k]!=='string')warnings.push(at+'Honeycomb table cells are text; a '+typeof m.attributes[k]+' value never matches');
+        });
+      });
+    });});
+    return warnings;
+  }
   function validate(raw){
     var errors=[], p=pageOf(raw);
     if (!object(p)) return errors;
@@ -223,6 +256,7 @@ var FlowCanon = (function(){
         if (b && b.api && !entityRef(b.api.entityRef)) errors.push('nodes.'+id+'.binding.api: expected an API entityRef');
       });
     });
+    var listed=profileAttributes(raw);
     sections(raw).forEach(function(sec){
       var d=sec.diagram, steps=Array.isArray(d.steps)?d.steps:[], ids=new Set(steps.map(function(s){return s && s.id;}));
       if(d.referenceTrace!=null){var r=d.referenceTrace;if(!object(r) || r.version!==1 || !object(r.trace) || !object(r.trace.context) || !Array.isArray(r.trace.spans) || typeof r.trace.traceId!=='string' || !object(r.approval) || typeof r.approval.reason!=='string' || typeof r.contract!=='string')errors.push('referenceTrace: expected an approved version-1 trace mapping');}
@@ -249,8 +283,7 @@ var FlowCanon = (function(){
             if(m.occurrence!=null && (!Number.isInteger(m.occurrence) || m.occurrence<1))errors.push('traceMatch.occurrence: positive integer required');
             if(m.repeat!=null && m.repeat!=='attempts')errors.push('traceMatch.repeat: expected attempts');
             if(m.repeat && m.occurrence)errors.push('traceMatch: occurrence and repeat cannot be combined');
-            var allowed=['service.namespace','service.version','deployment.environment.name','deployment.environment','http.response.status_code','http.status_code','db.system','db.system.name','messaging.queue.depth','queue.depth','messaging.message.age_ms','flow.backpressure','flow.delivery_failed','retry.attempt','flow.step.id'];
-            if(m.attributes!=null && (!object(m.attributes) || Object.keys(m.attributes).some(function(k){return !allowed.includes(k) || !['string','number','boolean'].includes(typeof m.attributes[k]);})))errors.push('traceMatch.attributes: use supported operational attributes only');
+            if(m.attributes!=null && (!object(m.attributes) || Object.keys(m.attributes).some(function(k){return !traceAttributes.includes(k) && !Object.prototype.hasOwnProperty.call(listed,k) || !['string','number','boolean'].includes(typeof m.attributes[k]);})))errors.push('traceMatch.attributes: use supported operational attributes only');
           }
         }
         if(many)for(var j=first;j<errors.length;j++)errors[j]=errors[j].replace(/^traceMatch/,'traceMatch['+index+']');
@@ -279,6 +312,6 @@ var FlowCanon = (function(){
     (value && Array.isArray(value.codeRefs) ? value.codeRefs : []).forEach(function(ref){add('Code · '+(ref.label || ref.id),codeUrl(ref));});
     return out;
   }
-  return {version:1,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
+  return {version:1,traceWarnings:traceWarnings,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
     referenceErrors:referenceErrors,locate:locate,codeUrl:codeUrl,references:references,validate:validate,links:links};
 })();

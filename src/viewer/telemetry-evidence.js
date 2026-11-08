@@ -35,7 +35,8 @@ function telemetryTraceString(v){return typeof v==='string' && v.length>0 && v.l
 function telemetryTraceId(v){return typeof v==='string' && /^[0-9a-f]{16,32}$/i.test(v);}
 function telemetryTraceTime(v){return typeof v==='string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?(?:Z|[+-]\d\d:\d\d)$/.test(v) && isFinite(Date.parse(v))?v:null;}
 function telemetryTraceInstantNs(v){var m=/^(.*T\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?(Z|[+-]\d\d:\d\d)$/.exec(v);return BigInt(Date.parse(m[1]+m[3]))*1000000n+BigInt((m[2] || '').padEnd(9,'0'));}
-function telemetryTraceAttrs(v){var out={};if(!telemetryObject(v))return out;TELEMETRY_TRACE_ATTRS.forEach(function(k){var x=v[k];if(typeof x==='boolean' || telemetryNumber(x) || telemetryTraceString(x))out[k]=x;});return out;}
+// allowed: extra attribute names from the trace connection profile (allowedAttributes).
+function telemetryTraceAttrs(v,allowed){var out={};if(!telemetryObject(v))return out;TELEMETRY_TRACE_ATTRS.concat(Array.isArray(allowed)?allowed:[]).forEach(function(k){var x=v[k];if(typeof x==='boolean' || telemetryNumber(x) || telemetryTraceString(x))out[k]=x;});return out;}
 function telemetryTraceUrl(v,provider){
   if(typeof v!=='string' || v.length>8192)return null;
   try{var u=new URL(v);if(provider==='honeycomb' && (u.hostname!=='ui.honeycomb.io' || u.port || u.hash || /^\/(?:img|query_results)(?:\/|$)/.test(u.pathname)))return null;return u.protocol==='https:' && !u.username && !u.password && !/(?:query_results|trace_results)\//.test(u.pathname)?u.href:null;}catch(e){return null;}
@@ -70,7 +71,7 @@ function telemetryTraceClocks(spans){
 }
 /* Canonical envelope validation is shared by provider output and telemetrySample.
    Never silently truncate spans/candidates and claim a complete trace. */
-function telemetryTraceEnvelope(value){
+function telemetryTraceEnvelope(value,allowed){
   var v=telemetryEvidenceJson(value);
   if(!telemetryObject(v) || v.version!==1 || ['honeycomb','tempo'].indexOf(v.provider)<0 || !telemetryTraceId(v.traceId) || !telemetryTraceString(v.signal) || !telemetryTraceString(v.selectionReason) || !telemetryTraceString(v.selectionToken) || !telemetryTraceTime(v.observedAt) || !v.range || !telemetryTraceTime(v.range.from) || !telemetryTraceTime(v.range.to) || Date.parse(v.range.from)>Date.parse(v.range.to) || ['complete','partial','unknown'].indexOf(v.completeness)<0 || !Array.isArray(v.spans) || v.spans.length>TELEMETRY_TRACE_SPANS || !Array.isArray(v.candidates) || !Array.isArray(v.warnings) || v.warnings.length>30 || v.warnings.some(function(w){return !telemetryTraceString(w);}))telemetryTraceFail('Invalid exemplar envelope.');
   var out={version:1,provider:v.provider,traceId:v.traceId,signal:v.signal,selectionReason:v.selectionReason,selectionToken:v.selectionToken,observedAt:v.observedAt,range:{from:v.range.from,to:v.range.to},completeness:v.completeness,warnings:v.warnings.slice(),spans:[],candidates:telemetryTraceCandidates(v.candidates.map(function(c){var x=telemetryTraceCandidate(c.traceId,c.time,c.durationMs,c.status),url=telemetryTraceUrl(c.url,v.provider);if(url)x.url=url;return x;}))};
@@ -78,7 +79,7 @@ function telemetryTraceEnvelope(value){
   var url=telemetryTraceUrl(v.url,v.provider);if(url)out.url=url;
   var ids=Object.create(null);v.spans.forEach(function(s){
     if(!telemetryObject(s) || !telemetryTraceId(s.id) || ids[s.id] || s.parentId!==null && !telemetryTraceId(s.parentId) || !telemetryTraceString(s.name) || !telemetryTraceString(s.service) || !telemetryNumber(s.startMs) || s.startMs<0 || !telemetryNumber(s.ms) || s.ms<0 || s.startMs+s.ms>86400000 || typeof s.error!=='boolean' || !telemetryTraceTime(s.time))telemetryTraceFail('Duplicate ID or invalid trace span/time.');
-    var span={id:s.id,parentId:s.parentId,name:s.name,service:s.service,startMs:s.startMs,ms:s.ms,error:s.error,time:s.time,attributes:telemetryTraceAttrs(s.attributes),events:[],links:[]};
+    var span={id:s.id,parentId:s.parentId,name:s.name,service:s.service,startMs:s.startMs,ms:s.ms,error:s.error,time:s.time,attributes:telemetryTraceAttrs(s.attributes,allowed),events:[],links:[]};
     if(s.events!==undefined && (!Array.isArray(s.events) || s.events.length>32) || s.links!==undefined && (!Array.isArray(s.links) || s.links.length>32))telemetryTraceFail('Span events/links exceed bounds.');
     (s.events || []).forEach(function(e){if(!telemetryTraceString(e.name) || !telemetryNumber(e.timeMs))telemetryTraceFail('Invalid span event.');span.events.push({name:e.name,timeMs:e.timeMs,attributes:telemetryTraceAttrs(e.attributes)});});
     (s.links || []).forEach(function(l){if(!telemetryTraceId(l.traceId) || !telemetryTraceId(l.spanId))telemetryTraceFail('Invalid span link.');span.links.push({traceId:l.traceId,spanId:l.spanId,attributes:telemetryTraceAttrs(l.attributes)});});

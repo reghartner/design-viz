@@ -182,6 +182,8 @@ export interface DirectTraceRequest {
     literals: Record<string, string | number | boolean | null>;
     environments: Record<string, {label?: string; value?: string; context?: Record<string, string | number | boolean | null>; literals?: Record<string, string | number | boolean | null>}>;
     links: Array<{origin: string; path: string; query: Record<string, string>; timeEncoding: 'relative' | 'iso8601' | 'unix-seconds' | 'unix-milliseconds'}>;
+    /** Span attribute names retained for traceMatch.attributes. */
+    allowedAttributes?: string[];
   };
 }
 export interface NativeViewerOptions {

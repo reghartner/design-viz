@@ -78,3 +78,31 @@ test('desktop a log-line trace the provider did not keep says so and loads the n
  await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);await expect(h.root.locator('.dv-trace-span[data-span-id="'+SPAN+'"]')).toHaveAttribute('aria-pressed','true');
  expect(h.calls.filter(c=>c.tool==='get_trace').map(c=>c.args.trace_id)).toEqual([MISSING,ID]);
 });
+
+test('desktop Over time Find searches the selected day',async({page,server},info)=>{
+ await page.setViewportSize({width:1500,height:1100});
+ await writeFile(path.join(server.root,'log-day-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'log-day.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./log-day-native.js";window.mount=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/log-day.html');await page.waitForFunction(()=>!!window.mount);
+ const spec={page:{title:'Camera stats',tracking:{jira:{site:'https://jira.test'},telemetry:{grafana:{loki:'loki-$env'},environment:'stg',environments:{stg:{},prd:{}},lookups:{camera:{label:'Camera model',query:QUERY,values:['arch','wren']}},traceConnections:{company:PROFILE}}},
+  sections:[{id:'main',diagram:{nodes:{consumer:{title:'Camera stats consumer',tickets:['CAM-1']}},rows:[['consumer']],panels:[PANEL]}}]}};
+ await page.evaluate(({spec,lines})=>{
+  window.logCalls=[];
+  window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{directTrace:{describe:async()=>null,call:async()=>null,logsConnector:async()=>'Grafana',queryLogs:async args=>{window.logCalls.push(args);return lines;}}}});
+  const api=window.viewer.controller.liveStatus,pad=n=>String(n).padStart(2,'0'),key=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),now=new Date();
+  const days=[2,1,0].map(back=>{const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-back);return {key:key(d),label:key(d),short:key(d),states:{'CAM-1':{state:back?'todo':'active'}}};});
+  api.apply({'CAM-1':{state:'active'}});api.setHistory({load:()=>({days})});
+ },{spec,lines:LINES});
+ const root=page.locator('#host');await root.getByRole('button',{name:'Over time',exact:true}).click();
+ await page.evaluate(()=>window.viewer.controller.liveStatus.overTimeDay(1));
+ await root.getByRole('button',{name:'Trace',exact:true}).click();
+ const logs=root.locator('.dv-trace-logs'),window_=await page.evaluate(()=>window.viewer.controller.liveStatus.snapshot().overTime.window);
+ await expect(logs.locator('.dv-trace-logs-window')).toHaveText('Loki · '+window_.label);
+ await logs.getByLabel('Camera model',{exact:true}).fill('arch');await logs.getByRole('button',{name:'Find log lines',exact:true}).click();
+ await expect(logs.locator('.dv-trace-log-row')).toHaveCount(2);
+ const calls=await page.evaluate(()=>window.logCalls);expect(calls).toHaveLength(1);
+ expect([calls[0].startRfc3339,calls[0].endRfc3339,calls[0].limit,calls[0].direction]).toEqual([window_.from,window_.to,10,'backward']);
+ await info.attach('log-search-over-time-day',{body:await root.screenshot(),contentType:'image/png'});
+ await page.evaluate(()=>window.viewer.controller.liveStatus.overTimeDay(0));await expect(logs.locator('.dv-trace-log-row')).toHaveCount(0);
+ await expect(logs.getByLabel('Camera model',{exact:true})).toHaveValue('arch');expect(await page.evaluate(()=>window.logCalls.length)).toBe(1);
+});

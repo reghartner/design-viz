@@ -2979,7 +2979,7 @@ test('#1125 the log lookup note names why it is unavailable, and Live restores i
  // A host without a logs connector cannot run lookups in Live either, so Over time does not outrank that note.
  const bare=harness(raw(),{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){}}}});bare.ctl.telemetry.openHistory([{at:'2026-11-01T00:00:00.000Z'}],0);seen.noConnectorOverTime=logs(bare);bare.ctl.liveStatus.destroy();
  assert.deepEqual(seen,{
-  overTime:[false,'Log lookups work in Live, not in Over time. Switch to Live to use them.'],
+  overTime:[false,'Log lookups need a dated Over time day; this day has none.'],
   backToLive:[true,''],
   closed:[false,'This view was closed. Reopen it to look up log lines.'],
   boardOff:[false,'Log lookups need telemetry, which this board turns off.'],
@@ -3007,5 +3007,24 @@ test('#1124 a log-line trace that is not found says it may not have been kept an
  assert.equal(m.body.querySelector('.dv-trace-log-next'),null);
  // A pasted ID keeps today's text.
  api.setDirectTraceField({field:'input',value:ids[0]});assert.equal(await api.loadDirectTrace(false),null);assert.equal(report().error,'Trace not found in the last 2h. Try a longer lookback under Lookback.');
+ api.destroy();
+});
+test('#1141 in Over time the log search runs on the selected day, a day change clears results, and the Over time note is gone',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);},calls=[];
+ const raw=overFixture();raw.page.tracking.telemetry={grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}},traceConnections:{company:profile}};
+ const lines={data:[{timestamp:'1794044533123456789',line:'Handling camera stats message',labels:{app:'cams'},structuredMetadata:{trace_id:'ab'.repeat(16)}}]};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async args=>{calls.push(plain(args));return lines;}}}});
+ const api=overReady(h.ctl.liveStatus),logs=()=>api.snapshot().trace.direct.logs,day=()=>api.snapshot().overTime.window;api.apply(overToday());api.setStatusMode('trace');await settle();
+ const days=historyDays(providerContext(),[historyTicket('AA-1',Date.now()-3*86400000,'In Progress')],{'AA-1':{state:'active'}},Date.now());
+ api.setHistory({load:()=>days});api.overTime();await historySettle();api.overTimeDay(0);await settle();
+ assert.deepEqual([logs().available,logs().note],[true,''],'Over time no longer disables the log search');
+ api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();
+ assert.equal(calls.length,1,'one call per Find');assert.deepEqual([calls[0].startRfc3339,calls[0].endRfc3339],[day().from,day().to]);
+ assert.equal(logs().search,'Loki · '+day().label);assert.equal(logs().result.rows.length,1);
+ api.overTimeDay(1);assert.equal(logs().result,null,'a day change clears the results');assert.equal(calls.length,1,'without a call');assert.equal(logs().form.value,'arch','the typed value stays');
+ overBackToLive(api);await historySettle();await api.findLogLines();assert.deepEqual([calls[1].startRfc3339,calls[1].endRfc3339],['now-2h','now'],'Live is unchanged');
+ // Days without a date have no window: the search names that instead of the old Over time note.
+ api.setHistory({load:()=>({days:overDays()})});api.overTime();await historySettle();
+ assert.deepEqual([logs().available,logs().note],[false,'Log lookups need a dated Over time day; this day has none.']);
  api.destroy();
 });

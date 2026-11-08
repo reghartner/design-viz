@@ -2929,7 +2929,7 @@ async function paintedCard(nodes){
 function workPresentation(h,card){
  h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});
  const pop=h.view.querySelector('.dv-live-popover');
- return {appearance:card.getAttribute('data-live-appearance'),classes:h.C.LIVE_STATUS_APPEARANCES.filter(s=>card.classList.contains('dv-live-'+s)),halo:!!card.querySelector('.dv-live-halo'),
+ return {appearance:card.getAttribute('data-live-appearance'),classes:Array.from(h.C.LIVE_STATUS_APPEARANCES).filter(s=>card.classList.contains('dv-live-'+s)),halo:!!card.querySelector('.dv-live-halo'),
   label:/No change needed/.test(card.getAttribute('aria-label')||''),popover:!!pop && pop.querySelectorAll('.dv-live-coverage-detail').some(p=>/No change needed/.test(p.textContent||''))};
 }
 test('#1137 metric cards on a board without tickets get no Jira presentation; ticketed boards keep unchanged',async()=>{

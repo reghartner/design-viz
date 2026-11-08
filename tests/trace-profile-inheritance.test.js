@@ -13,6 +13,7 @@ const NO_TRACES={
   'plain board':page({},{}),
   'Jira live-status board without telemetry':page({tracking:{jira:{site:'https://jira.test'}}},{nodes:{a:{title:'A',tickets:['ACME-1']},b:{title:'B'}},panels:[PANEL]}),
   'live-status panel without tracking':page({},{panels:[PANEL]}),
+  'node detail reference without a live-status panel':page({},{nodes:{a:{title:'A',detail:{spec:'approved-detail',revision:'r1',section:'main'}},b:{title:'B'}}}),
   'telemetry board without a live-status panel':page({tracking:{telemetry:{honeycomb:{environment:'prod',dataset:'api'}}}},{nodes:{a:{title:'A',telemetry:clone(SIGNALS)},b:{title:'B'}}}),
 };
 const USES_TRACES={
@@ -22,6 +23,7 @@ const USES_TRACES={
   'live-status panel with page telemetry':page({tracking:{telemetry:{}}},{panels:[PANEL]}),
   'live-status panel with a node telemetry binding':page({},{nodes:{a:{title:'A',telemetry:clone(SIGNALS)},b:{title:'B'}},panels:[PANEL]}),
   'live-status panel with an edge telemetry binding':page({},{edges:[{from:'a',to:'b',telemetry:clone(SIGNALS)}],panels:[PANEL]}),
+  'live-status panel with a node detail reference':page({},{nodes:{a:{title:'A',detail:{spec:'approved-detail',revision:'r1',section:'main'}},b:{title:'B'}},panels:[PANEL]}),
   'live-status panel with an imported carrier telemetry overlay':page({},{panels:[PANEL],topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{telemetry:clone(SIGNALS)}}}]}),
 };
 
@@ -59,4 +61,12 @@ test('an explicit page map still selects on any board; {} and enabled:false stil
     p.tracking=Object.assign({},p.tracking,{telemetry:Object.assign({},p.tracking && p.tracking.telemetry,{enabled:false})});
     assert.deepEqual(clone(C.FlowTraceConnections.resolve(p,company)),{});
   }
+});
+
+test('an empty company map resolves nothing without walking the page',()=>{
+  const C=context();let reads=0;
+  const p=page({},{panels:[PANEL]});Object.defineProperty(p,'sections',{enumerable:true,get(){reads++;return [{id:'main',diagram:diagram({panels:[PANEL],steps:[{id:'checkout',nodes:['a'],traceMatch:clone(MATCH)}]})}];}});
+  for(const company of [{},null,undefined])assert.deepEqual(clone(C.FlowTraceConnections.resolve(p,company)),{});
+  assert.equal(reads,0);
+  assert.deepEqual(Object.keys(C.FlowTraceConnections.resolve(p,C.TELEMETRY_COMPANY_TRACE_CONNECTIONS)),['operations']);assert.ok(reads>0);
 });

@@ -687,6 +687,56 @@ class InjectTests(unittest.TestCase):
         traced["page"]["tracking"] = {"telemetry": {"traceConnections": {}}}
         self.assertNotIn(profile["server"], [entry["server"] for entry in servers(traced, True)])
 
+    def test_company_trace_profile_follows_the_page_the_runtime_resolves(self):
+        # #1095 review: the declaration must match what the viewer resolves after
+        # FlowTopology.resolveSource + normalize (src/boot.flowview.js), so
+        # provider-only imported telemetry, bare diagrams and unwrapped pages count.
+        inject = load_inject()
+        profile = json.loads((ROOT / "tests/fixtures/trace-connection-profile.json").read_text())
+        panel = {"id": "status", "type": "live-status"}
+        direct = {"server": profile["server"], "tools": ["get_trace"]}
+
+        def servers(spec, topology=None):
+            with mock.patch.object(inject, "company_agent_context", return_value={"traceConnections": {"operations": profile}}):
+                guide = GUIDE_BLOCK.search(inject.agent_guide(spec, "a" * 40, False, topology))[1]
+            return json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S)[1]).get("mcp", {}).get("servers", [])
+
+        def spec(spec_id, diagram):
+            return {"page": {"title": spec_id, "canon": {"version": 1, "id": spec_id, "kind": "canonical", "owner": "group:default/test"},
+                             "sections": [{"id": "main", "diagram": diagram}]}}
+
+        honey = {"kind": "service", "signals": {"p95": {"honeycomb": {"calculations": [{"op": "P95", "column": "duration_ms"}]}}}}
+        provider = spec("provider", {"nodes": {"api": {"title": "API", "telemetry": honey}, "store": {"title": "Store"}}, "rows": [["api", "store"]],
+                                     "topologyExports": {"core": {"nodes": ["api", "store"]}}})
+        consumer = spec("consumer", {"nodes": {"local": {"title": "Local"}}, "rows": [["local"]], "panels": [panel],
+                                     "topologyImports": [{"spec": "provider", "export": "core", "as": "shared"}]})
+        topology = {"version": 1, "id": "consumer", "specs": [provider, consumer]}
+        with self.subTest('provider-only imported telemetry'):
+            self.assertIn(direct, servers(consumer, topology))
+        quiet = json.loads(json.dumps(provider))
+        del quiet["page"]["sections"][0]["diagram"]["nodes"]["api"]["telemetry"]
+        with self.subTest('imported carriers without telemetry'):
+            self.assertNotIn(direct, servers(consumer, {"version": 1, "id": "consumer", "specs": [quiet, consumer]}))
+
+        step = {"id": "checkout", "nodes": ["a"], "traceMatch": {"serviceName": "checkout", "operation": "/cart/checkout"}}
+        bare = {"nodes": {"a": {}}, "rows": [["a"]], "steps": [step], "panels": [panel]}
+        with self.subTest('bare diagram'):
+            self.assertIn(direct, servers(bare))
+        with self.subTest('unwrapped page'):
+            self.assertIn(direct, servers({"title": "Unwrapped", "sections": [{"id": "main", "diagram": bare}]}))
+        with self.subTest('bare diagram without trace use'):
+            self.assertNotIn(direct, servers({"nodes": {"a": {}}, "rows": [["a"]]}))
+
+        # A node detail reference on a live-status board: the Trace view offers
+        # the loaded detail's sections, whose traceMatch steps inject cannot read.
+        detail = spec("parent", {"nodes": {"parent": {"title": "Service", "detail": {"spec": "approved-detail", "revision": "r1", "section": "main"}}},
+                                 "rows": [["parent"]], "panels": [panel]})
+        with self.subTest('detail reference on a live-status board'):
+            self.assertIn(direct, servers(detail))
+        del detail["page"]["sections"][0]["diagram"]["panels"]
+        with self.subTest('detail reference without a live-status panel'):
+            self.assertNotIn(direct, servers(detail))
+
     def test_agent_guide_replaces_a_stale_guide_when_reinjecting_a_built_page(self):
         built = TEMPLATE.replace("</script>\n" + BACKLINK_OPEN,
                                  '</script>\n<script type="text/markdown" id="dv-agent-guide">\nold guide\n</script>\n' + BACKLINK_OPEN, 1)

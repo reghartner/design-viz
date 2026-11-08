@@ -502,3 +502,18 @@ test('#1112 Inspect sets connection card title and width with one Undo each; inv
   oneStep(ui,()=>ui.set('Card title',''));oneStep(ui,()=>ui.set('Card width',''));assert.deepEqual(edgeOf(ui).telemetry.card,{side:'below'});
   const node=harness(board(),{kind:'node',section:0,id:'ingest'});node.metrics();assert.equal(node.row('Card title'),null);assert.equal(node.row('Card width'),null);
 });
+
+test('#1112 an inherited imported connection without an overlay shows the card rows in Inspect; Card width creates the consumer overlay in one Undo step',()=>{
+  const f=topologyFixtures(),ui=harness(f.consumer),providerBefore=JSON.stringify(f.provider);
+  ui.h.session.replaceProject(JSON.stringify(f.consumer,null,2),null,{topologyContext:f.context});
+  const C=ui.e.C,resolved=()=>diagramOf(C.FlowTopology.resolveSource(ui.raw,f.context));
+  const edge={kind:'edge',section:0,index:resolved().edges.findIndex(e=>e.from==='shared::api' && e.to==='shared::store')};ui.select(edge);
+  assert.equal(Object.hasOwn(diagramOf(ui.raw).topologyImports[0],'edgeTracking'),false,'no overlay before the edit');
+  ui.metrics();for(const label of ['Card side','Card offset','Card title'])assert.ok(ui.row(label),label+' is in Inspect for the inherited card');
+  assert.equal(ui.control('Card width').value,'');const before=ui.text;
+  oneStep(ui,()=>ui.set('Card width','400'),edge);
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking,{'api->store':{telemetry:{kind:'call',signals:{rate:{loki:LOKI_IN}},card:{width:400}}}});
+  assert.equal(C.carrierTelemetry(resolved().edges[edge.index],{}).card.width,400);assert.equal(ui.control('Card width').value,'400');
+  assert.equal(JSON.stringify(f.provider),providerBefore,'the provider spec is untouched');
+  assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,before,'one Undo removes the created overlay');
+});

@@ -162,7 +162,7 @@ test('P7 local/direct/nested bindings and inherited read-only forms keep provide
  await toggle(page).check();await expect(cards(page)).toHaveCount(3);
  expect(await cards(page).evaluateAll(els=>els.map(e=>e.dataset.metricsCard).sort())).toEqual(['direct::a->direct::b','outer::inner::a->outer::inner::b','x->y']);
  const inherited=page.locator('#docview .dv-metrics-card[data-metrics-card="direct::a->direct::b"]');await inherited.click();await page.locator('#editor-tab-inspect').click();
- const guide=page.locator('#guide');await expect(guide.locator('.metrics-inherited')).toContainText('provider / core (read only)');await expect(guide.getByLabel('rate query',{exact:true})).toHaveCount(0);await expect(guide.getByLabel('Card side',{exact:true})).toHaveCount(0);
+ const guide=page.locator('#guide');await expect(guide.locator('.metrics-inherited')).toContainText('provider / core (read only)');await expect(guide.getByLabel('rate query',{exact:true})).toHaveCount(0);await expect(guide.getByLabel('Card side',{exact:true})).toHaveValue('below');
  const before=await page.locator('#src').inputValue();await guide.getByLabel('New signal name',{exact:true}).fill('localRate');await guide.getByLabel('New signal query',{exact:true}).fill('consumer_rate');await guide.getByRole('button',{name:'Add signal',exact:true}).click();
  await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.topologyImports[0].edgeTracking?.['a->b']?.telemetry?.signals?.localRate).toEqual({grafana:'consumer_rate'});
  const after=await page.locator('#src').inputValue();await expect(cards(page)).toHaveCount(3);await inherited.click();await guide.getByLabel('Card side',{exact:true}).selectOption('above');await expect(inherited).toHaveAttribute('data-side','above');
@@ -327,5 +327,22 @@ test('#1112 Inspect sets the card title and width; the preview card redraws at t
  await expect(guide.locator('.ierr')).toContainText('140 and 480');await expect(source).toHaveValue(sized);expect((await box(cards(page))).w).toBe(420);
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(titled);await expect.poll(async()=>(await box(cards(page))).w).toBe(240);
  await page.locator('#redo-builder').click();await expect(source).toHaveValue(sized);await expect.poll(async()=>(await box(cards(page))).w).toBe(420);
+ expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
+});
+test('#1112 an inherited imported connection without an overlay sets Card width in Inspect; one Undo removes the created overlay',async({page,server})=>{
+ await open(page,server);const {provider,middle,consumer}=imports();
+ await page.evaluate(({provider,middle,consumer})=>{window.metricsImportContext={version:1,id:'consumer',specs:[provider,middle,consumer]};window.__editorTest.builder.loadText(JSON.stringify(consumer),window.metricsImportContext);},{provider,middle,consumer});
+ await toggle(page).check();await expect(cards(page)).toHaveCount(3);
+ const inherited=page.locator('#docview .dv-metrics-card[data-metrics-card="direct::a->direct::b"]'),source=page.locator('#src'),guide=page.locator('#guide');
+ const overlay=text=>JSON.parse(text).page.sections[0].diagram.topologyImports[0].edgeTracking;
+ const before=await source.inputValue();expect(overlay(before)).toBeUndefined();expect((await box(inherited)).w).toBe(240);
+ await inherited.click();await page.locator('#editor-tab-inspect').click();await expect(guide.locator('.metrics-inherited')).toContainText('provider / core (read only)');
+ const width=guide.getByLabel('Card width',{exact:true});await expect(width).toHaveValue('');await expect(guide.getByLabel('Card title',{exact:true})).toHaveValue('');
+ await width.fill('400');await width.press('Enter');
+ await expect.poll(async()=>overlay(await source.inputValue())?.['a->b']?.telemetry?.card).toEqual({side:'below',offset:0,width:400});
+ expect(overlay(await source.inputValue())['a->b'].telemetry.signals).toEqual(binding.signals);
+ await expect.poll(async()=>(await box(inherited)).w).toBe(400);
+ expect(await page.evaluate(()=>window.metricsImportContext.specs[0])).toEqual(provider);
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await expect.poll(async()=>(await box(inherited)).w).toBe(240);
  expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
 });

@@ -216,12 +216,16 @@ var FlowCanon = (function(){
   function traceWarnings(raw){
     var listed=profileAttributes(raw),warnings=[];
     sections(raw).forEach(function(sec){(Array.isArray(sec.diagram.steps)?sec.diagram.steps:[]).forEach(function(st){
-      var m=st && st.traceMatch;if(!object(m) || !object(m.attributes))return;
-      Object.keys(m.attributes).forEach(function(k){
-        if(!Object.prototype.hasOwnProperty.call(listed,k) || listed[k].some(function(p){return p!=='honeycomb';}))return;
-        var at='steps.'+(st.id || '?')+'.traceMatch.attributes.'+k+': ';
-        if(!traceAttributes.includes(k))warnings.push(at+'only Honeycomb connections list this attribute; Honeycomb get_trace does not return span attributes, so this step shows Not observed');
-        if(typeof m.attributes[k]!=='string')warnings.push(at+'Honeycomb table cells are text; a '+typeof m.attributes[k]+' value never matches');
+      // An array lists alternatives; report each under traceMatch[index].
+      var many=Array.isArray(st && st.traceMatch);
+      (many?st.traceMatch:[st && st.traceMatch]).forEach(function(m,index){
+        if(!object(m) || !object(m.attributes))return;
+        Object.keys(m.attributes).forEach(function(k){
+          if(!Object.prototype.hasOwnProperty.call(listed,k) || listed[k].some(function(p){return p!=='honeycomb';}))return;
+          var at='steps.'+(st.id || '?')+'.traceMatch'+(many?'['+index+']':'')+'.attributes.'+k+': ';
+          if(!traceAttributes.includes(k))warnings.push(at+'only Honeycomb connections list this attribute; Honeycomb get_trace does not return span attributes, so this step shows Not observed');
+          if(typeof m.attributes[k]!=='string')warnings.push(at+'Honeycomb table cells are text; a '+typeof m.attributes[k]+' value never matches');
+        });
       });
     });});
     return warnings;

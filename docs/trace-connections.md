@@ -88,7 +88,7 @@ Overrides cannot introduce literal/context keys or change server, tool, argument
 mapping or adapter. Alternatively a board may contain a full inline v1 profile
 instead of a company reference. Readers can choose only the resolved company/board
 connections. `tracking.telemetry.enabled:false` and host `telemetry:false` win.
-For optional `allowedAttributes`, see
+Optional `allowedAttributes`:
 [provider traces](provider-traces.md#allowed-match-attributes).
 
 ## Absolute bounds and supported links

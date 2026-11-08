@@ -11,6 +11,14 @@ requests; late responses cannot replace current evidence. Schema/detail requests
 time out after 30 seconds. Changing the connection or environment also clears
 the pasted ID/link and time controls: supply a trace for the selected environment
 before loading again. Changing only the mapping diagram retains that input.
+The **Connection environment** dropdown starts at the connection environment
+that matches the board **Environment**: the exact id first, then the id or
+label ignoring case, then a common alias (`prd`/`prod`/`production`,
+`stg`/`stage`/`staging`, `dev`/`development`, `qa`). With no single match it
+starts empty, or at the only environment when the connection has one. It
+follows later board Environment changes until the reader picks a connection
+environment; that pick is kept. Picking a different connection starts
+matching again.
 An authenticated host account change retires the shared telemetry session,
 retracts direct and numeric evidence, and requires reopening the viewer.
 

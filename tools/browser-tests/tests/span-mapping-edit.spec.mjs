@@ -66,7 +66,7 @@ test('M1 desktop Edit mode maps spans to a step on an imported edge and a local 
  await expect(mapper(panel)).toHaveCount(0);
  await panel.getByRole('button',{name:'Edit',exact:true}).click();
  const pick=mapper(panel).getByRole('combobox',{name:'Step to map',exact:true});
- await expect(pick.locator('option')).toHaveText(['Step 2: Resolve supported currencies','Step 3: Charge the card']);
+ await expect(pick.locator('option')).toHaveText(['Step 2: Resolve supported currencies · Happy path','Step 3: Charge the card · Happy path']);
  await pick.selectOption('rates');
  await mapper(panel).getByRole('button',{name:'Map this span to a step',exact:true}).click();
  // The board re-renders from the edited text; the loaded trace and focused span carry over and now map.
@@ -74,7 +74,7 @@ test('M1 desktop Edit mode maps spans to a step on an imported edge and a local 
  await expect(panel.getByRole('button',{name:'Save 1 change',exact:true})).toBeVisible();
 
  await span(panel,PAYMENT).click();
- await expect(pick.locator('option')).toHaveText(['Step 3: Charge the card']);
+ await expect(pick.locator('option')).toHaveText(['Step 3: Charge the card · Happy path']);
  await mapper(panel).getByRole('button',{name:'Map this span to a step',exact:true}).click();
  await expectMapped(page,panel,PAYMENT,'Step 3: Charge the card','charge');
 

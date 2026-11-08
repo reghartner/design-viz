@@ -324,7 +324,8 @@
         el(operation,'small','navigation','dv-trace-focus-status',focus.choice?focus.choice.label+(!focus.choice.row.nodeId && focus.choice.row.edgeIndex==null?' · no authored diagram target':'')+(!focus.navigable?' · open this diagram to navigate':''):focus.choices.length?'Choose the authored step for this span.':'No authored step maps this span. Add a traceMatch to a step to map this span.').setAttribute('role','status');
         if(!focus.choice && !focus.choices.length)link(operation,'map-guide','How to map a span','https://github.com/reghartner/design-viz/blob/main/docs/trace-ready-authoring.md').classList.add('dv-trace-map-guide');
         // #1078: Edit mode only. The chosen step gets traceMatch {serviceName, operation} with this span's exact values.
-        var mapSteps=model.mapSteps;
+        // A span without a service or operation name has nothing exact to write.
+        var mapSteps=focusedSpan.service && focusedSpan.name?model.mapSteps:null;
         if(!focus.choice && !focus.choices.length && mapSteps){
           var mapper=el(operation,'div','map','dv-trace-map-step');mapper.setAttribute('role','group');mapper.setAttribute('aria-label','Map this span to a step');
           if(mapSteps.length){

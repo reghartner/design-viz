@@ -956,10 +956,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
      mapped to (those without a traceMatch); null outside Edit mode. */
   function traceMapSteps(binding){
     var state=editor && editor.state();if(!state || !state.active || state.saving || binding.ordinal==null)return null;
-    return (binding.section.diagram.steps || []).map(function(step,i){
+    // Numbered as the trace status line numbers a choice: position on the shown path, else on the first path holding the step.
+    var d=binding.section.diagram,paths=diagramPathList(d),shown=binding.stepper && binding.stepper.path();
+    return (d.steps || []).map(function(step,i){
       if(!step || step.traceMatch || typeof step.id!=='string')return null;
       var caption=String(step.text || step.id).replace(/\s+/g,' ').trim();if(caption.length>96)caption=caption.slice(0,95)+'…';
-      return {id:step.id,label:'Step '+(i+1)+': '+caption};
+      var holds=function(p){return p.indices.indexOf(i)>=0;},path=paths.find(function(p){return p.id===shown && holds(p);}) || paths.find(holds);
+      return {id:step.id,label:path?'Step '+(path.indices.indexOf(i)+1)+': '+caption+' · '+path.label:caption};
     }).filter(Boolean);
   }
   // An edit re-renders the page (#828): the next controller reopens this Trace view, loaded trace and focused span.
@@ -1810,7 +1813,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var selected=traceSnapshot().selected;if(!selected || action.context!==selected.context)return false;
       var entry=traceSources().entries.find(function(e){return e.key===selected.key;}),span=entry && entry.exemplar.spans.find(function(s){return s.id===action.spanId;});
       var steps=entry && traceMapSteps(entry.binding);
-      if(!span || !steps || !steps.some(function(step){return step.id===action.stepId;}))return false;
+      if(!span || !span.service || !span.name || !steps || !steps.some(function(step){return step.id===action.stepId;}))return false;
       var ref={section:entry.binding.ordinal,kind:'step',id:action.stepId},match={serviceName:span.service,operation:span.name};
       if(!editor.mapSpan)return false;setTimeout(function(){if(!retired)editor.mapSpan(ref,match);},0);return true;
     },

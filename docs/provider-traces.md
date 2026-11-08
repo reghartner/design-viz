@@ -273,6 +273,54 @@ without changing the authored query: Honeycomb always returns that column.
 The Status panel’s Trace mode supersedes the former step-owned trace disclosure
 and fallback rail. Selecting or navigating steps never opens or selects a trace.
 
+## Honeycomb lookback
+
+The Load trace form says under the trace ID field which time window a load
+would send:
+
+- "Looks back 2h; change under Lookback." for a signed lookback: the
+  **Trace start** value in the **Lookback (optional)** section when one is set,
+  otherwise the profile's `time.defaultLookback`.
+- "Uses the time set under Lookback." when Trace start is an absolute
+  timestamp (or not yet a valid lookback).
+- "Uses the time range in the pasted link." when the pasted link carries a
+  start or end and the request can be sent as given, with Trace start and
+  Trace end filling only what the link leaves out. A time control that repeats
+  a field the link supplies is rejected when loading.
+- "This link's time range cannot be used with this connection; paste the trace
+  ID alone." when the link's time cannot be sent as given: for example
+  absolute link bounds on a connection whose `time.encoding` is `relative`
+  (such as the Honeycomb profile in [trace connections](trace-connections.md)),
+  or a start-only or end-only link that the time controls do not complete.
+
+When `get_trace` answers with only a Metadata block whose `navigation_hints`
+starts with `no spans found` and no span table, the panel opens the Lookback
+section once for that result and reports, using the window that was sent:
+
+- "Trace not found in the last 2h. Try a longer lookback under Lookback."
+- "Trace not found between <from> and <to>. Try a wider range under
+  Lookback." for absolute Trace start and Trace end.
+- "Trace not found in the time range of the pasted link. Paste the trace ID
+  alone, then set Lookback." for link bounds.
+
+This provider answer is the only response reported as not found; errors,
+unknown shapes and a span table that is present but lacks a required column
+(`Unsupported trace table header.`) are not.
+
+`time.defaultLookback` replaces the trace tool's own default whenever no start
+is given: Load trace always sends a start. In the November 2026 company report,
+Honeycomb `get_trace` looked back 7 days when called without `from` and
+accepted at least `-7d`. A profile with the `2h` example therefore finds only
+traces from the last 2 hours, where the tool alone would also find older ones.
+Choose `defaultLookback` for the age of the traces people paste.
+
+Largest useful lookback: this repo can verify that `from` is a signed duration
+of at most four digits and a unit (`s`, `m`, `h`, `d`, `w`), and the November
+2026 company report observed `from: -7d` returning a trace about 5 h old that
+`-2h` did not return. This repo cannot verify the longest `from` Honeycomb
+accepts or how long an account retains trace data; both depend on the account.
+Use the shortest lookback that covers the trace's age.
+
 ## Load trace environment
 
 The Load trace **Connection environment** dropdown starts at the connection

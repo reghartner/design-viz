@@ -225,7 +225,11 @@
       field(config,'environment','Connection environment',profile?profile.environments:[]);
       if(direct.sections.length)field(config,'section','Mapping diagram',direct.sections);
       field(config,'input','Trace ID or link',null,'Paste a trace ID or supported Honeycomb link');
-      var time=el(config,'details','time','dv-trace-time');el(time,'summary','summary','','Time overrides (optional)');
+      var start=direct.form.start,relative=/^-([1-9][0-9]{0,3}[smhdw])$/.exec(start),bounds=direct.bounds,back=bounds?bounds.lookback:direct.form.end?null:start?relative && relative[1]:profile && profile.lookback;
+      if(start || profile)el(config,'p','lookback','dv-trace-lookback-note',bounds && bounds.linkTime?(bounds.linkUsable?'Uses the time range in the pasted link.':'This link\'s time range cannot be used with this connection; paste the trace ID alone.'):back?'Looks back '+back+'; change under Lookback.':'Uses the time set under Lookback.');
+      var time=el(config,'details','time','dv-trace-time');el(time,'summary','summary','','Lookback (optional)');
+      // Open once per not-found report; the section may be rebuilt when Trace mode is re-entered.
+      if(r && r.code==='trace_not_found' && host._directNotFoundReport!==r.serial){time.open=true;host._directNotFoundReport=r.serial;}
       el(time,'p','help','','Leave blank to use link bounds or the connection lookback.');
       field(time,'start','Trace start',null,'-2h or UTC ISO timestamp');field(time,'end','Trace end',null,'UTC ISO timestamp (absolute start only)');
       var controls=el(config,'div','actions','dv-live-controls');

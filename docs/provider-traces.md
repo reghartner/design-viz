@@ -206,6 +206,37 @@ by absence. Provider errors, budget violations and supplied queue/backpressure
 conditions are shown separately. An unavailable or over-200-span timeline retains
 its identity and warnings without asserting missing operations.
 
+### traceMatch alternatives
+
+When the same logical operation is recorded by different root spans depending on
+the path it took, `traceMatch` may be an array of alternatives instead of
+duplicating the step. Each entry is a complete selector with the
+[selector rules](trace-ready-authoring.md#2-attach-exact-selectors-to-existing-steps).
+For example, one message is consumed through RabbitMQ or through Pulsar, and
+each transport's consumer span has its own operation name:
+
+```json
+{
+  "id": "consume-stats",
+  "text": "Consume camera stats",
+  "edge": "camera->stats",
+  "traceMatch": [
+    {"serviceName": "stats-consumer", "operation": "camera_stats_message process", "nodeId": "stats"},
+    {"serviceName": "stats-consumer", "operation": "persistent://stats/camera process", "nodeId": "stats"}
+  ]
+}
+```
+
+Alternatives are tried in order and the first one that matches maps the step;
+its own `nodeId`, budgets and `panelId` then apply. If none matches, the step
+shows the first ambiguous result, so a selector that needs refinement stays
+visible; otherwise it shows the last alternative's **not observed** result. A
+child step's `parentStepId` refers to whichever alternative of the parent step
+matched. The array must not be empty; validation reports an invalid entry with
+its index, for example `traceMatch[1].occurrence`. Alternatives do not make two
+spans in one trace acceptable: the matched alternative still needs one unique
+span (or a `repeat:"attempts"` group).
+
 The panel has one bounded waterfall and a **Show on diagram** toggle. All canvas
 annotations are runtime-only, with no layout/spec persistence. Pin stores evidence
 in this session's Jira Activity. Historical Over time, telemetry off, rebinding,

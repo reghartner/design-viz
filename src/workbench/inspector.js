@@ -579,7 +579,12 @@ function trackingControls(val,overlay){
         if(index>=0){formError('');return true;}
         refs.push(ref);
       }
-      var ok=commitSimple(field,refs.length?JSON.stringify(refs):null);
+      var value=refs.length?JSON.stringify(refs):null;
+      // #1103: a removed ticket also leaves the step filters that named it, in the same Undo step.
+      var ok=remove && field==='tickets'?commitCascade(function(raw){
+        var target=builderTargetPath(raw,session.target);if(!target)return {error:'element not found — click Render, then reselect'};
+        return builderPruneTicketFilters(planSetField(session.text(),raw,target,field,value),session.target.section,[identity],session.resolve);
+      }):commitSimple(field,value);
       if(ok)refreshFormSoon();
       return ok;
     }
@@ -1055,11 +1060,11 @@ function chipRow(labelText, items, emptyText, onRemove, onBody, ownerKind){
   }
 
 /* #1103: the tickets on the nodes and edges this step lights, as a checklist.
-   Every ticket checked means no filter. A filter key the step no longer lights
-   stays listed, so it can be unchecked. */
+   Every lit ticket checked means no filter. A filter key the step no longer
+   lights (ignored, with a warning) stays listed, so it can be unchecked. */
 function stepTicketFilterControl(val, ctx, t){
-    var lit=trackingStepLitTickets(ctx.diagram,val),chosen=Array.isArray(val.ticketFilter)?val.ticketFilter.filter(function(key){return typeof key==='string' && trackingKeyPattern.test(key);}):null;
-    var keys=lit.concat((chosen || []).filter(function(key,index,list){return lit.indexOf(key)<0 && list.indexOf(key)===index;}));
+    var lit=trackingStepLitTickets(ctx.diagram,val),shown=trackingStepTicketFilter(ctx.diagram,val),chosen=trackingStepFilter(val) || [];
+    var keys=lit.concat(chosen.filter(function(key){return lit.indexOf(key)<0;}));
     if(!keys.length)return null;
     var box=document.createElement('fieldset'),legend=document.createElement('legend'),entries=[];
     box.className='step-ticket-filter';legend.textContent='Tickets on this step';box.appendChild(legend);
@@ -1067,10 +1072,10 @@ function stepTicketFilterControl(val, ctx, t){
     help.textContent='Uncheck tickets this step should not show. Its circle, caption and ticket list use the checked tickets; the nodes and edges keep all of theirs.';
     box.appendChild(help);
     keys.forEach(function(key){
-      var control=checkboxControl(!chosen || chosen.indexOf(key)>=0,function(){
+      var control=checkboxControl(lit.indexOf(key)<0 || !shown || shown.indexOf(key)>=0,function(){
         var next=entries.filter(function(entry){return entry.input.checked;}).map(function(entry){return entry.key;});
-        if(!next.length){formError('Keep at least one ticket on this step. Check every ticket to show them all.');return false;}
-        var all=next.length===lit.length && lit.every(function(k){return next.indexOf(k)>=0;});
+        if(!next.some(function(k){return lit.indexOf(k)>=0;})){formError('Keep at least one ticket on this step. Check every ticket to show them all.');return false;}
+        var all=lit.every(function(k){return next.indexOf(k)>=0;});
         return commitCascade(function(raw){
           var path=builderTargetPath(raw,t);if(!path)return {error:'Step not found. Reselect it and try again.'};
           return planSetField(session.text(),raw,path,'ticketFilter',all?null:JSON.stringify(next));
@@ -2886,6 +2891,7 @@ function renderInspector(){
         if(!trackingTarget.error)guide.appendChild(trackingControls(trackingTarget.local,{inherited:trackingTarget.inherited,textBox:isTextBoxNode(resolvedValue),update:function(field,ref,remove){
           if(session.text()!==parsed.text || JSON.stringify(session.topologyContext())!==trackingContextKey){formError('The source or provider context changed. Render and reselect.');return false;}
           var plan=planTopologyTracking(parsed.text,parsed.raw,t.section,t.kind,trackingId,field,ref,remove,trackingContext,t.index);
+          if(remove && field==='tickets')plan=builderPruneTicketFilters(plan,t.section,[trackingTicket(ref).key],function(raw){return FlowTopology.resolveSource(raw,trackingContext);});
           if(!plan.error && plan.text===parsed.text){formError('');return true;}
           var ok=applyPlan(plan,null,parsed);if(ok)refreshFormSoon();return ok;
         }}));

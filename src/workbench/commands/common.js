@@ -163,6 +163,33 @@ function builderEditDetails(text,raw,edit){
   });
   return error || {text:out};
 }
+/* #1103: after a plan removes tickets from section `sectionIdx` (a deleted node
+   or edge, or a ticket taken off a carrier), drop each removed key from that
+   section's step ticketFilters when no carrier the step still lights has it. An
+   emptied filter is removed. `resolve(raw)` gives the resolved spec, so imported
+   carriers count; without it, or when it fails, a step that lights a carrier
+   missing from the authored diagram keeps its keys (a stale key only warns). */
+function builderPruneTicketFilters(plan,sectionIdx,removed,resolve){
+  if(plan.error || !removed || !removed.length)return plan;
+  var raw=JSON.parse(plan.text),rec=specSectionPaths(raw)[sectionIdx],d=rec && specValueAt(raw,rec.diagram),view=null,text=plan.text;
+  if(!d || !Array.isArray(d.steps))return plan;
+  if(resolve){try{var resolved=resolve(raw),record=specSectionPaths(resolved)[sectionIdx];view=record && specValueAt(resolved,record.diagram);}catch(ex){view=null;}}
+  var edges=(d.edges || []).map(builderEdgeKey);
+  d.steps.forEach(function(st,index){
+    if(!st || !Array.isArray(st.ticketFilter) || !st.ticketFilter.some(function(key){return removed.indexOf(key)>=0;}))return;
+    if(!view && !(stepNodes(st).every(function(id){return !!d.nodes && Object.prototype.hasOwnProperty.call(d.nodes,id);}) &&
+      stepKeys(st).concat(Object.keys(stepFailures(st))).every(function(key){return edges.indexOf(key)>=0;})))return;
+    var lit=trackingStepLitTickets(view || d,st),kept=st.ticketFilter.filter(function(key){return removed.indexOf(key)<0 || lit.indexOf(key)>=0;});
+    if(kept.length===st.ticketFilter.length)return;
+    var next=jsonSetField(text,rec.diagram.concat(['steps',index]),'ticketFilter',kept.length?JSON.stringify(kept):null);
+    if(next)text=next.text;
+  });
+  if(text===plan.text)return plan;
+  plan.text=text;
+  var range=jsonLocate(text,rec.diagram);
+  if(range){plan.start=range.start;plan.end=range.end;}
+  return plan;
+}
 function builderDetailCascade(plan,sectionIdx,edit){
   if(plan.error)return plan;
   var updated=builderEditDetails(plan.text,JSON.parse(plan.text),function(detail,owner,target,id){

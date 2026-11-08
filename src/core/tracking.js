@@ -87,6 +87,14 @@ function trackingStepLitTickets(diagram,step){
     trackingRefs(carrier.value).tickets.forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});
   });return keys;
 }
+/* The filter a step applies over `diagram`: its keys that are on a carrier it
+   lights. Tickets churn, so a key on no lit carrier is ignored (the validator
+   warns), and with none left the step shows every ticket. */
+function trackingStepTicketFilter(diagram,step){
+  var keys=trackingStepFilter(step);if(!keys)return null;
+  var lit=trackingStepLitTickets(diagram,step),shown=keys.filter(function(key){return lit.indexOf(key)>=0;});
+  return shown.length?shown:null;
+}
 /* Page-level parent roots (legacy `epic` field) share the ticket key grammar.
    Jira metadata determines whether each root is an Epic or an Initiative. */
 function trackingEpics(page,invalid){

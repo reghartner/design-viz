@@ -526,9 +526,12 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       trackingStepFilter(st, function(index){
         errors.push(index === null ? TF + ': expected a nonempty array of Jira keys from the nodes and edges this step lights; remove it to show every ticket' : TF + '[' + index + ']: use a Jira key like HW-123');
       });
+      // Tickets churn (board Edit mode adds and removes them), so a key no lit carrier
+      // has warns and is ignored; it never stops a spec from validating or resolving.
       if (Array.isArray(st.ticketFilter)) st.ticketFilter.forEach(function(key, index){
-        if (typeof key === 'string' && trackingKeyPattern.test(key) && lit.indexOf(key) < 0) errors.push(TF + '[' + index + ']: "' + key + '" is not on a node or edge this step lights');
+        if (typeof key === 'string' && trackingKeyPattern.test(key) && lit.indexOf(key) < 0) warnings.push(TF + '[' + index + ']: "' + key + '" is not on a node or edge this step lights — ignored');
       });
+      if (trackingStepFilter(st) && !trackingStepTicketFilter(d, st)) warnings.push(TF + ': no key is on a node or edge this step lights — the step shows every ticket');
     }
     var nds = stepNodes(st);
     var patch = stepPanelPatch(st);

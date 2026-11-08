@@ -578,6 +578,8 @@ function planDeleteNode(text, raw, sectionIdx, id){
   if (got.error) return got;
   if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, id))
     return {error: 'node "' + id + '" not found'};
+  var removedTickets = trackingRefs(got.d.nodes[id]).tickets;
+  (got.d.edges || []).forEach(function(e){ if (e && (e.from === id || e.to === id)) removedTickets = removedTickets.concat(trackingRefs(e).tickets); });
   var plan=builderRewrite(text, raw, got.path, function(d){
     delete d.nodes[id];
     var panelNodes=Object.create(null);panelNodes[id]=null;
@@ -614,6 +616,7 @@ function planDeleteNode(text, raw, sectionIdx, id){
       }
     });
   });
+  plan = builderPruneTicketFilters(plan, sectionIdx, removedTickets);
   return builderDetailCascade(plan,sectionIdx,function(detail,owner,target){
     if(target!==sectionIdx || !detail.ports)return;
     Object.keys(detail.ports).forEach(function(port){
@@ -629,11 +632,11 @@ function planDeleteEdge(text, raw, sectionIdx, edgeIdx){
   var e = (got.d.edges || [])[edgeIdx];
   if (!e) return {error: 'edge not found — reselect and try again'};
   var key = builderEdgeKey(e);
-  return builderRewrite(text, raw, got.path, function(d){
+  return builderPruneTicketFilters(builderRewrite(text, raw, got.path, function(d){
     d.edges.splice(edgeIdx, 1);
     var stillThere = d.edges.some(function(o){ return o && builderEdgeKey(o) === key; });
     if (!stillThere) builderRetargetStepKeys(d.steps, key, null);
-  });
+  }), sectionIdx, trackingRefs(e).tickets);
 }
 
 function planDeletePanel(text, raw, sectionIdx, panelIdx){

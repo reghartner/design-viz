@@ -2057,14 +2057,20 @@ lane rollups, readiness and coverage still use every ticket. Without
 `ticketFilter` a step shows every ticket on its lit carriers. The capability is
 `flow.step-ticket-filter`.
 
-Validation fails, with the field path, for an empty or non-array filter, an entry
-that is not a Jira key, and a key that is on no node or edge the step lights
-(endpoint nodes of its edges count only when they are in `nodes`). Topology
-resolution validates the consumer, so a provider removing a filtered ticket from
-an exported node stops the consumer until the step's filter is changed. In the
-desktop Workbench, the step's Inspect lists the lit carriers' tickets as **Tickets
-on this step** checkboxes; every box checked removes the filter, and removing a
-hop or node from the step also removes its tickets from the filter.
+An empty or non-array filter, or an entry that is not a Jira key, is a validation
+error with its field path. Tickets churn, so a key that is on no node or edge the
+step lights (endpoint nodes of its edges count only when they are in `nodes`) is a
+warning with its field path and is ignored; when no listed key is lit, the step
+shows every ticket. A provider dropping a filtered ticket therefore never stops a
+consumer from resolving. In the desktop Workbench, the step's Inspect lists the
+lit carriers' tickets as **Tickets on this step** checkboxes, and every box
+checked removes the filter. Removing a hop or node from the step, deleting a node
+or edge, or removing a ticket from a carrier (local, or an imported carrier's
+consumer overlay) also removes those keys from step filters, in the same Undo
+step. A step that lights an imported carrier keeps its keys when a node or edge is
+deleted, since the provider's tickets are not known there; they only warn. Board
+Edit mode on the live board does not change step filters; a ticket it removes is
+ignored by the filter as above.
 
 ## Delivery boards over imported Canon topology
 

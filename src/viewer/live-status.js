@@ -582,7 +582,7 @@ function liveStatusEdgeBreaks(scope,diagram,map,on,availabilityOn){
    tickets alone; carrier markers (missingWork, unavailable detail) stay on the
    carriers. Without one, each direct carrier contributes its presentation. */
 function liveStatusStep(diagram,step,map){
-  if(trackingStepFilter(step))return liveStatusPresentationRollup(liveStatusStepTickets(diagram,step,true).map(function(key){return map[key] && map[key].state || 'unknown';}));
+  if(trackingStepTicketFilter(diagram,step))return liveStatusPresentationRollup(liveStatusStepTickets(diagram,step,true).map(function(key){return map[key] && map[key].state || 'unknown';}));
   return liveStatusPresentationRollup(liveStatusStepCarriers(diagram,step,true).map(function(carrier){
     return liveStatusPresentation(carrier.value,map) || 'unknown';
   }));
@@ -591,7 +591,7 @@ function liveStatusStepCarriers(diagram,step,directOnly){return trackingStepCarr
 /* The filter narrows only the direct view (state, caption, ticket list). Broad
    aggregates (lanes and the Tickets table's lane stripes) keep every ticket. */
 function liveStatusStepTickets(diagram,step,directOnly){
-  var keys=[],filter=directOnly?trackingStepFilter(step):null;liveStatusStepCarriers(diagram,step,directOnly).forEach(function(carrier){
+  var keys=[],filter=directOnly?trackingStepTicketFilter(diagram,step):null;liveStatusStepCarriers(diagram,step,directOnly).forEach(function(carrier){
     trackingRefs(carrier.value).tickets.forEach(function(key){if(keys.indexOf(key)<0 && (!filter || filter.indexOf(key)>=0))keys.push(key);});
   });return keys;
 }
@@ -609,7 +609,7 @@ function liveStatusLanes(page,map){
 }
 function liveStatusCaption(diagram,step,map,waiting){
   var keys=liveStatusStepTickets(diagram,step,true).filter(function(key){return map[key];}),state=liveStatusStep(diagram,step,map);
-  if(!state)return !trackingStepFilter(step) && liveStatusStepCarriers(diagram,step,true).some(function(c){return c.value._detailUnavailable;})?'DETAIL EVIDENCE UNAVAILABLE':liveStatusStepTickets(diagram,step,true).length?'AWAITING TICKET STATUS':'';
+  if(!state)return !trackingStepTicketFilter(diagram,step) && liveStatusStepCarriers(diagram,step,true).some(function(c){return c.value._detailUnavailable;})?'DETAIL EVIDENCE UNAVAILABLE':liveStatusStepTickets(diagram,step,true).length?'AWAITING TICKET STATUS':'';
   if(state==='done')return 'DONE';
   if(state==='unchanged')return 'NO CHANGE NEEDED';
   if(state==='missing' && !keys.some(function(key){return map[key].state==='missing';}))return 'MISSING WORK · unlinked work remains';
@@ -1418,7 +1418,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }return null;
   }
   function focusBlocker(binding,index){
-    var d=statusDiagram(binding),carriers=liveStatusStepCarriers(d,d.steps[index],true),filter=trackingStepFilter(d.steps[index]);
+    var d=statusDiagram(binding),carriers=liveStatusStepCarriers(d,d.steps[index],true),filter=trackingStepTicketFilter(d,d.steps[index]);
     var carrier=carriers.find(function(carrier){return liveStatusBlockingKeys(carrier.value,map).some(function(key){return !filter || filter.indexOf(key)>=0;}) || !filter && carrier.value.missingWork===true;});if(!carrier)return;
     focusCarrier(binding,carrier.id);
   }
@@ -1502,7 +1502,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       sectionRecords(page).forEach(function(record){var d=record.section.diagram;if(!d)return;var waiting=liveStatusCarrierWaiting(d,map,partial);
         carriers+=Object.keys(waiting).length;
         // A step with a ticketFilter counts only when one of its shown tickets waits.
-        steps+=(d.steps || []).filter(function(step){return trackingStepFilter(step)?liveStatusStepTickets(d,step,true).some(function(ticket){return partial[ticket];}):liveStatusStepCarriers(d,step).some(function(carrier){return waiting[carrier.id];});}).length;
+        steps+=(d.steps || []).filter(function(step){return trackingStepTicketFilter(d,step)?liveStatusStepTickets(d,step,true).some(function(ticket){return partial[ticket];}):liveStatusStepCarriers(d,step).some(function(carrier){return waiting[carrier.id];});}).length;
       });
       return {key:key,url:liveStatusTicketURL(page.tracking,key,entry,liveStatusPageTicketURL(page,key)),state:entry.state,lanes:labels.join(', '),
         downstream:carriers+' downstream carriers · '+steps+' steps'};

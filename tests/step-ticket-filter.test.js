@@ -152,6 +152,28 @@ test('Workbench hop and node removal prune the step ticket filter',()=>{
  raw=apply(raw,(t,r)=>c.planStepToggleNode(t,r,0,1,'db'));assert.deepEqual(steps(raw)[1].ticketFilter,['ST-3'],'adding a node keeps the filter');
  raw=apply(raw,(t,r)=>c.planStepToggleNode(t,r,0,1,'api'));assert.equal(steps(raw)[1].ticketFilter,undefined,'an emptied filter is dropped');
 });
+/* Review cycle 2: hop and node removal prune with the same lit set, so keys still lit through a lit
+   node's same-page drill-down stay. Plans receive the resolved spec, as the Workbench passes it. */
+test('Workbench hop and node removal keep keys still lit through a same-page drill-down, and imported keys',()=>{
+ const c={URL,TextEncoder};vm.createContext(c);
+ vm.runInContext(require('../tools/source-loader.cjs').composeSources(['canon.js','validator.js','workbench/source-edit.js','workbench/targets.js','workbench/commands/common.js','workbench/commands/narrative.js']),c);
+ const apply=(raw,fn,resolved=raw)=>{const text=JSON.stringify(raw,null,2),plan=fn(text,resolved);assert.equal(plan.error,undefined,plan.error);return JSON.parse(plan.text);};
+ const withDb=filter=>{const raw=domainSpec({section:'child'},filter);stepsOf(raw)[0].nodes=['dom','db'];return raw;};
+ let raw=apply(withDb(['CH-1']),(t,r)=>c.planStepToggleNode(t,r,0,0,'db'));
+ assert.deepEqual(stepsOf(raw)[0].ticketFilter,['CH-1'],'a child ticket of the still-lit drill-down stays');
+ raw=apply(withDb(['DM-1','CH-1','DB-1']),(t,r)=>c.planStepToggleNode(t,r,0,0,'db'));
+ assert.deepEqual(stepsOf(raw)[0].ticketFilter,['DM-1','CH-1'],'only the removed node\'s key goes');
+ const hop=domainSpec({section:'child'},['CH-1']);Object.assign(stepsOf(hop)[0],{edge:'dom->db'});
+ raw=apply(hop,(t,r)=>c.planStepToggleHop(t,r,0,0,'dom->db'));assert.deepEqual(stepsOf(raw)[0].ticketFilter,['CH-1'],'hop removal keeps the drill-down key');
+ const model=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=model('provider',{nodes:{api:{title:'API',tickets:['CAN-1','CAN-2']},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+ const consumer=model('consumer',{nodes:{local:{title:'Local',tickets:['LOC-2']}},rows:[['local']],panels:[{id:'status',type:'live-status'}],
+  topologyImports:[{spec:'provider',export:'core',as:'imp',nodeTracking:{api:{tickets:['LOC-1']}}}],
+  steps:[{id:'imported',text:'Imported API',nodes:['imp::api','local'],ticketFilter:['CAN-2','LOC-1','LOC-2']}]});
+ const resolved=c.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]});
+ raw=apply(consumer,(t,r)=>c.planStepToggleNode(t,r,0,0,'local'),resolved);
+ assert.deepEqual(stepsOf(raw)[0].ticketFilter,['CAN-2','LOC-1'],'imported provider and overlay keys stay; the removed local node\'s key goes');
+});
 test('a step ticket filter is a declared capability',()=>{
  const C=load();assert.ok(C.FlowviewCompatibility.detect(spec({ticketFilter:['ST-2']})).includes('flow.step-ticket-filter'));
  assert.ok(!C.FlowviewCompatibility.detect({page:{sections:[{diagram:{nodes:{a:{}},rows:[['a']],steps:[{nodes:['a']}]}}]}}).includes('flow.step-ticket-filter'));

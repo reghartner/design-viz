@@ -237,6 +237,7 @@ from Prometheus:
 | `signals.<name>.tempo` | A TraceQL query string, used for exemplar traces. |
 | `signals.<name>.sql` | A SQL query string for a Grafana SQL datasource, such as a data lake. |
 | `signals.<name>.honeycomb` | A Honeycomb query object, kept as authored. |
+| `signals.<name>.window` | Optional span of the signal's value, a duration in the page `window` form (`"1h"`, `"7d"`, `"now-7d"`). A display label only; the query is unchanged. See [Signal span](#signal-span). |
 | `proof` | Optional per-signal limits: `min`, `max` (finite numbers) and `maxRatioOf`. With `maxRatioOf: "<other signal>"`, `max` is the highest allowed ratio of this signal to the other one, so `"errors": {"maxRatioOf": "rate", "max": 0.01}` means at most 1 % errors. `maxRatioOf` needs `max` and another signal of the same binding. `min` stays an absolute floor. |
 | `links` | Optional authored link-outs: `dashboard` and `query`, absolute HTTP(S) URLs. |
 | `card` | Optional edge-card placement: `side` (`right`, `left`, `above`, `below`) and `offset` (pixels, -1000 to 1000). |
@@ -1062,7 +1063,36 @@ Prometheus/Loki Explore links and Honeycomb stable query URLs are automatic when
 available. CloudWatch, Logs and SQL may use authored links. Link generation
 failure never invalidates numeric evidence. Preview invents no provider URLs.
 Workbench Metrics exposes each signal's **label**, **show on card** and **query link** controls;
-source edits and Undo/Redo preserve all three.
+source edits and Undo/Redo preserve all three, and signal edits keep an authored `window`.
+
+#### Signal span
+
+The card note names the board window (`tracking.telemetry.window`), but a value
+can cover a different span. The last point of a Prometheus or Loki query covers
+its range selector, so `sum(count_over_time({app="notify"} |= "event consumed" [1h]))`
+on a 24h board is a one-hour count. When a signal's span is not the board window,
+its value carries the span on the card row, in Inspect and in the Proof table:
+`42 events · last 1h`. Nothing is added when the spans are equal (`60m` on a `1h`
+board, `1d` on a `24h` board), when no span is known, or when there is no value.
+Over time uses the same rule: each day's value is evaluated over its own span at
+that day's window end.
+
+A signal's span is, in order:
+
+1. `signals.<name>.window`, a duration in the page `window` form (`"1h"`, `"7d"`,
+   `"now-7d"`). It is a label only and never changes the query. Any source can
+   declare it. A malformed value is a validation warning at
+   `...telemetry.signals.<name>.window` and is ignored.
+2. For a `grafana` or `loki` query without a declaration: the range of its one
+   range selector when the query counts, that is, it calls `count_over_time`,
+   `sum_over_time`, `bytes_over_time` or `increase`. Brackets inside string
+   literals are not range selectors. The range must be one positive
+   `s`/`m`/`h`/`d`/`w` duration such as `[1h]` or `[7d]`.
+
+Everything else derives no span: `[$__range]` (always the board window, #1080), other variables such as
+`[$__rate_interval]`, subqueries (`[1h:5m]`), compound durations (`[1h30m]`),
+several range selectors, and per-second queries such as `rate(...)`. Declare
+`window` for those when the value covers a different span.
 
 `telemetry.card.side` selects `right`, `left`, `above` or `below`; `offset` moves
 along that side in SVG units. Defaults are right of a vertical route and below a

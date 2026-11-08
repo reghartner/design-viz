@@ -5,7 +5,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {entrypoint,composeSources}=require('../tools/source-loader.cjs');
 const C={URL,AbortController,document:{addEventListener(){},removeEventListener(){}},setTimeout,clearTimeout};vm.runInNewContext(entrypoint('standalone').body,C);
-const V={URL,TextEncoder};vm.createContext(V);vm.runInContext(composeSources(['canon.js','validator.js']),V);
+const V={URL,TextEncoder};vm.createContext(V);vm.runInContext(composeSources(['canon.js','validator.js','workbench/commands/telemetry.js']),V);
 const plain=x=>JSON.parse(JSON.stringify(x));
 const LOKI_1H='sum(count_over_time({app="notify"} |= "event consumed" [1h]))';
 
@@ -72,5 +72,13 @@ test('5: a malformed window is a validation warning at its field path; the signa
   assert.match(warnings[0],/^sections\[0\]\.diagram\.edges\[0\]\.telemetry\.signals\.count\.window: use a duration such as/,JSON.stringify(window));
   const binding=V.carrierTelemetry(spec(window).page.sections[0].diagram.edges[0],{});
   assert.equal(binding.signals.count.window,undefined);assert.equal(binding.signals.count.query,LOKI_1H);
+ }
+});
+
+test('Workbench edits of other signal fields keep an authored window',()=>{
+ const binding={kind:'service',signals:{count:{loki:LOKI_1H,window:'7d'}}};
+ for(const [field,value] of [['unit','events'],['label','Count'],['scope','notify'],['showOnCard',false],['query','sum(count_over_time({app="x"}[1h]))'],['source','grafana']]){
+  const result=V.telemetryEditBinding(plain(binding),{op:'signal',name:'count',field,value},{});
+  assert.equal(result.error,undefined,field);assert.equal(result.value.signals.count.window,'7d',field);
  }
 });

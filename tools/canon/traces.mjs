@@ -81,11 +81,11 @@ export function compareTrace(spec,raw,{section=0,label='Incident trace'}={}){
   if(!d.paths?.length)d.paths=[{id:'happy',label:'Happy path',color:'#38bdf8',steps:base.map(s=>s.id)}];
   const ids=base.slice(0,first).map(s=>s.id),existing=new Set(d.steps.map(s=>s.id));
   for(let i=first;i<base.length;i++){
-    const originalStep=base[i],evidence=mapping.steps[i],id=originalStep.id+'-'+suffix;
+    const originalStep=base[i],evidence=mapping.steps[i],id=originalStep.id+'-'+suffix,selector=C.traceMatch.selector(originalStep,evidence);
     if(existing.has(id))throw new Error('Incident step ID collision.');
     // No copied success patches beyond the fork: a server span cannot prove a
     // notification appeared, a door opened, or a physical device started recording.
-    const step={id,text:(evidence.status==='unmapped'?'Uninstrumented step · outcome unknown':evidence.conditions.length?evidence.conditions.map(c=>c.label).join('; '):'Observed '+originalStep.traceMatch.serviceName+' · '+originalStep.traceMatch.operation),
+    const step={id,text:(evidence.status==='unmapped'?'Uninstrumented step · outcome unknown':evidence.conditions.length?evidence.conditions.map(c=>c.label).join('; '):'Observed '+selector.serviceName+' · '+selector.operation),
       conditions:C.clone(evidence.conditions),nodes:evidence.nodeId?[evidence.nodeId]:[],
       codeRefs:C.clone(originalStep.codeRefs || []),evidence:{traceId:trace.traceId,spanIds:evidence.spans.map(s=>s.id),canonicalStepId:originalStep.id,status:evidence.status}};
     if(trace.sourceUrl)step.link=trace.sourceUrl;
@@ -95,7 +95,7 @@ export function compareTrace(spec,raw,{section=0,label='Incident trace'}={}){
       if(evidence.conditions.some(c=>c.kind==='delivery-failed'))step.failures={[originalStep.edge]:'dropped'};
       else step.edge=originalStep.edge;
     }
-    const queue=evidence.conditions.find(c=>c.kind==='queue-buildup'),panelId=originalStep.traceMatch?.panelId;
+    const queue=evidence.conditions.find(c=>c.kind==='queue-buildup'),panelId=selector?.panelId;
     if(queue && panelId && d.panels?.some(p=>p.id===panelId && p.type==='queue'))step.panels={[panelId]:{state:'held',reason:'Last measured · '+queue.label+(evidence.conditions.some(c=>c.kind==='backpressure')?' · backpressure':'')}};
     if(evidence.nodeId)step.tone={[evidence.nodeId]:evidence.conditions.some(c=>['service-error','delivery-failed'].includes(c.kind))?'alert':evidence.conditions.length?'warn':'ok'};
     d.steps.push(step);ids.push(id);

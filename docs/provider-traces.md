@@ -130,7 +130,10 @@ claim. Alternatives are never synthesized or fetched speculatively.
 The envelope is validated again by `telemetrySample`, survives mixed-provider
 composition, and cannot change numeric signal values or classification. Duplicate
 span IDs, cycles, malformed timing and conflicting candidate duplicates fail.
-Missing parents warn. More than 200 spans yields no timeline and a partial/limited
+Missing parents warn. Honeycomb's synthetic `missing-root` row (start 0, written
+when the root span was not stored) is dropped before the timeline base is chosen;
+the trace is partial with a root-not-stored warning, and spans whose parent is
+absent render as roots. More than 200 spans yields no timeline and a partial/limited
 warning; no silent truncation. Input is capped at 1 MiB, 10,000 table rows,
 20 candidates, 32 events/links per span, and a 24h span-timeline extent. Native
 Honeycomb annotation/log/link rows are excluded from timed spans with a warning.
@@ -206,6 +209,44 @@ by absence. Provider errors, budget violations and supplied queue/backpressure
 conditions are shown separately. An unavailable or over-200-span timeline retains
 its identity and warnings without asserting missing operations.
 
+### traceMatch alternatives
+
+When the same logical operation is recorded by different root spans depending on
+the path it took, `traceMatch` may be an array of alternatives instead of
+duplicating the step. Each entry is a complete selector with the
+[selector rules](trace-ready-authoring.md#2-attach-exact-selectors-to-existing-steps).
+For example, one message is consumed through RabbitMQ or through Pulsar, and
+each transport's consumer span has its own operation name:
+
+```json
+{
+  "id": "consume-stats",
+  "text": "Consume camera stats",
+  "edge": "camera->stats",
+  "traceMatch": [
+    {"serviceName": "stats-consumer", "operation": "camera_stats_message process", "nodeId": "stats"},
+    {"serviceName": "stats-consumer", "operation": "persistent://stats/camera process", "nodeId": "stats"}
+  ]
+}
+```
+
+Alternatives are tried in order and the first one that matches maps the step;
+its own `nodeId`, budgets and `panelId` then apply. If none matches, the step
+shows the first ambiguous result, so a selector that needs refinement stays
+visible; otherwise it shows the last alternative's **not observed** result. A
+child step's `parentStepId` refers to whichever alternative of the parent step
+matched. On a path that does not contain an alternative's `parentStepId` step,
+that alternative is skipped, so a child shared by two paths can name each path's
+parent; if every alternative is skipped the step is **not observed**. (A single
+object whose parent step is not on the path is still an error.) The array must
+not be empty; validation reports an invalid entry with its index, for example
+`traceMatch[1].occurrence`. Alternatives do not make two spans in one trace
+acceptable: the matched alternative still needs one unique span (or a
+`repeat:"attempts"` group). The alternative is chosen per step before the check
+that one span maps to only one step, so if the chosen alternative's span is also
+claimed by another step, the step becomes ambiguous and later alternatives are
+not tried.
+
 The panel has one bounded waterfall and a **Show on diagram** toggle. All canvas
 annotations are runtime-only, with no layout/spec persistence. Pin stores evidence
 in this session's Jira Activity. Historical Over time, telemetry off, rebinding,
@@ -231,3 +272,13 @@ The adapter drops legacy `timestamp` entries from outgoing `raw_row_columns`
 without changing the authored query: Honeycomb always returns that column.
 The Status panel’s Trace mode supersedes the former step-owned trace disclosure
 and fallback rail. Selecting or navigating steps never opens or selects a trace.
+
+## Load trace environment
+
+The Load trace **Connection environment** dropdown starts at the connection
+environment that matches the board **Environment**: the exact id first, then the
+id or label ignoring case, then a common alias (`prd`/`prod`/`production`,
+`stg`/`stage`/`staging`, `dev`/`development`, `qa`). With no single match it
+starts empty, or at the only environment when the connection has one. It follows
+later board Environment changes until the reader picks a connection environment;
+that pick is kept. Picking a different connection starts matching again.

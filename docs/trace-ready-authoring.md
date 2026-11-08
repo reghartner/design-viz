@@ -35,11 +35,12 @@ Keep missing evidence as a gap. Do not invent budgets, protocols or outcomes.
 
 ## 2. Attach exact selectors to existing steps
 
-Steps store mapping metadata; **clicking or navigating steps never selects or
-fetches a trace**. In the existing step that represents the observed operation,
-add `traceMatch`, preserving the step's ID, narrative and delivered `edge` or
+**Clicking or navigating steps never selects or fetches a trace**. In the
+existing step that represents the observed operation, add `traceMatch`,
+preserving the step's ID, narrative and delivered `edge` or
 `edges`. `nodeId` names an existing stable node in this source section, normally
 the receiving node for that operation. It is not a provider service-name guess.
+`traceMatch` on a node or edge is ignored, with a validator warning.
 
 ```json
 {
@@ -74,8 +75,9 @@ For duplicate calls, first use a verified parent/link or retained attribute.
 concurrent calls remain ambiguous. `repeat:"attempts"` requires distinct numeric
 `retry.attempt` values and a common parent; do not combine it with `occurrence`.
 One span matching two steps is ambiguous. Do not silence ambiguity by renaming
-nodes, taking the first array entry or inventing attributes. Leave the unresolved
-mapping visible and report what instrumentation/context is missing.
+nodes, taking the first span or inventing attributes. Leave the unresolved
+mapping visible and report what instrumentation/context is missing. Per-transport
+root spans of one step: [alternatives](provider-traces.md#tracematch-alternatives).
 
 Only uniquely matched delivered edges receive operation-duration annotations.
 Multiple steps claiming the same edge cannot supply one exact edge duration.
@@ -107,9 +109,9 @@ node tools/canon/trace-cli.mjs preview --spec "$TRACE_CHECK_DIR/trace-resolved.s
 
 ## 4. Validate mapping before enabling a provider
 
-The following fictional example is bundled in the repository **and portable
-kit**. It demonstrates mapping only, with no account, invented budget or claim
-of live evidence. The read-only preview command writes a report, not a spec:
+This fictional example, bundled in the repository **and portable kit**,
+demonstrates mapping only. The read-only preview command writes a report, not a
+spec:
 
 ```sh
 node tools/validate.js examples/trace-ready/existing.spec.json
@@ -192,4 +194,4 @@ the ledger. Do not auto-accept renamed operations or rewrite narrative outcomes
 from missing spans. If the document already uses an approved canonical reference,
 selector/budget changes require that optional workflow's reference reapproval.
 Deliver the candidate spec/ledger and report paths through the existing desktop
-review workflow. Do not save the temporary resolved import copy as authored source.
+review workflow.

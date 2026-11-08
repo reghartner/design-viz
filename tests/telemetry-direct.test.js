@@ -159,3 +159,23 @@ test('connection and environment changes require fresh trace input; section-only
  }
  const h=setup({hooks:{sections:()=>[{id:'one',label:'One'},{id:'two',label:'Two'}]}});h.api.set('section','one');h.api.set('start','-2h');h.api.set('section','two');assert.equal(h.api.snapshot().form.input,ID);assert.equal(h.api.snapshot().form.start,'-2h');assert.equal(h.calls.length,0);assert.equal((await h.api.load()).traceId,ID);h.api.destroy();
 });
+/* #1081: the Load-trace environment starts at the profile environment that matches the board Environment,
+   and follows board changes until the user picks a trace environment. */
+test('#1081 matchTraceEnvironment: exact id, then case-insensitive id or label, then aliases; ambiguous or unknown is no match',()=>{
+ const M=context().matchTraceEnvironment,envs={prod:{label:'Production'},stage:{label:'Staging'}};
+ assert.equal(M('prd',envs),'prod','1: board prd matches profile prod by alias');assert.equal(M('production',envs),'prod');assert.equal(M('stg',envs),'stage');assert.equal(M('STAGING',envs),'stage','label match ignores case');
+ assert.equal(M('prd',{production:{label:'Prod'},prd:{label:'Other'}}),'prd','2: exact id wins over an alias match');assert.equal(M('PROD',{production:{},prod:{}}),'prod','case-insensitive id wins over an alias match');
+ assert.equal(M('Live',{live:{label:'Live'},prod:{label:'Production'}}),'live');assert.equal(M('development',{dev:{}}),'dev');assert.equal(M('QA',{qa:{}}),'qa');
+ for(const [b,e] of [['perf',envs],['',envs],[null,envs],['prd',{}],['prd',{prod:{},production:{}}]])assert.equal(M(b,e),'',String(b)+' → no match');
+});
+test('#1081 Load-trace environment seeds from the board, keeps today\'s fallback, and follows board changes until the user picks',()=>{
+ const envs={prod:{label:'Production',value:'production',context:{team:'example-team'}},stage:{label:'Staging',value:'staging',context:{team:'example-team'}}};
+ let current='prd';const api=(()=>{const p=profile();p.environments=clone(envs);return context().createTelemetryDirect(board(p),{describe(){},call(){}},{sections:()=>[],environment:()=>current});})();
+ assert.equal(api.snapshot().form.environment,'prod','1: board prd starts the dropdown at prod');
+ current='stg';assert.equal(api.snapshot().form.environment,'stage','4: board change is followed before a user pick');
+ current='perf';assert.equal(api.snapshot().form.environment,'','3: no match shows Choose…');
+ current='prd';assert.equal(api.snapshot().form.environment,'prod');
+ api.set('environment','stage');assert.equal(api.snapshot().form.environment,'stage');current='stg';assert.equal(api.snapshot().form.environment,'stage');current='prd';assert.equal(api.snapshot().form.environment,'stage','4: the user pick stays after board changes');
+ api.destroy();
+ const one=profile();one.environments={stage:clone(envs.stage)};const single=context().createTelemetryDirect(board(one),{describe(){},call(){}},{sections:()=>[],environment:()=>'perf'});assert.equal(single.snapshot().form.environment,'stage','3: no match keeps the single-environment default');single.destroy();
+});

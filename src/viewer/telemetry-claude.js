@@ -24,7 +24,8 @@
    refresh's AbortSignal:
      get_annotations {type: 'annotation', limit: 100}     optional, once, first and alone
      query_prometheus range call                          one per grafana signal
-     query_loki_logs metric range call                    one per loki signal
+     query_loki_logs metric range call                    one per loki signal; a query with
+                                                          $__range is one instant call instead
      query_cloudwatch full-window Sum                    one per cloudwatch signal
      query_sql {datasourceUid, query}                     per sql signal, at most hourly
      generate_deeplink explore link                       optional, once per signal per page load,
@@ -94,7 +95,8 @@ function telemetryGrafanaPrometheus(payload){
   }));
 }
 /* query_loki_logs metric results: {data: [{values: [{timestamp: 'seconds.mmm', value}], labels}]}
-   (range), [{timestamp, value, labels}] (instant) or Loki's [[seconds, 'value']] pairs.
+   (range), [{timestamp, value, labels}] (instant) or Loki's [[seconds, 'value']] pairs
+   and vector {value: [seconds, 'value']}.
    Log lines carry no value and are not a metric. */
 function telemetryGrafanaLoki(payload){
   var data=Array.isArray(payload)?payload:payload && typeof payload==='object' && Array.isArray(payload.data)?payload.data:null;
@@ -104,7 +106,7 @@ function telemetryGrafanaLoki(payload){
     if(Array.isArray(entry.values))return entry.values.map(function(point){
       return Array.isArray(point)?telemetryGrafanaPoint(point[0],point[1]):point && typeof point==='object'?telemetryGrafanaPoint(point.timestamp,point.value):null;
     }).filter(Boolean);
-    var single=Object.prototype.hasOwnProperty.call(entry,'value')?telemetryGrafanaPoint(entry.timestamp,entry.value):null;
+    var single=Array.isArray(entry.value)?telemetryGrafanaPoint(entry.value[0],entry.value[1]):Object.prototype.hasOwnProperty.call(entry,'value')?telemetryGrafanaPoint(entry.timestamp,entry.value):null;
     return single?[single]:[];
   }));
 }
@@ -127,10 +129,16 @@ function telemetryLokiCountingQuery(query){
     var sum=/^sum\s*(?:(?:by|without)\s*\([A-Za-z_][A-Za-z0-9_,\s]*\)\s*)?(\(.*?\))(?:\s*(?:by|without)\s*\([A-Za-z_][A-Za-z0-9_,\s]*\))?$/.exec(value);
     if(sum){inner=unwrap(sum[1]);return inner!==null && metric(inner,depth+1);}
     var range=/^(count_over_time|rate)\s*\((.*)\)$/.exec(value);
-    return !!range && /^\{\s*[A-Za-z_][A-Za-z0-9_]*\s*(?:=|!=|=~|!~)\s*Q(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*\s*(?:=|!=|=~|!~)\s*Q)*\s*\}(?:\s*(?:\|=|\|~|!=|!~)\s*Q)*\s*\[\s*(?:\d+(?:ms|s|m|h|d|w|y))+\s*\]$/.test(range[2].trim());
+    return !!range && /^\{\s*[A-Za-z_][A-Za-z0-9_]*\s*(?:=|!=|=~|!~)\s*Q(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*\s*(?:=|!=|=~|!~)\s*Q)*\s*\}(?:\s*(?:\|=|\|~|!=|!~)\s*Q)*\s*\[\s*(?:\$__range|(?:\d+(?:ms|s|m|h|d|w|y))+)\s*\]$/.test(range[2].trim());
   }
   return metric(text,0);
 }
+/* A LogQL query with $__range asks for the whole-window total: $__range
+   becomes the window in seconds and the query runs once, as an instant query
+   at the window end. $__range_s and $__range_ms are other names. */
+var TELEMETRY_LOKI_RANGE=/\$__range\b/g;
+function telemetryLokiWindowTotal(query){return typeof query==='string' && query.search(TELEMETRY_LOKI_RANGE)>=0;}
+function telemetryLokiWindowQuery(query,windowMs){return query.replace(TELEMETRY_LOKI_RANGE,Math.round(windowMs/1000)+'s');}
 function telemetryLokiEmpty(payload){
   return !!payload && !payload.error && payload.status==='success' && payload.data &&
     ['matrix','vector'].indexOf(payload.data.resultType)>=0 && Array.isArray(payload.data.result) && !payload.data.result.length ||
@@ -149,12 +157,18 @@ function telemetryCloudwatchPoints(payload){
   }
   return points.sort(function(a,b){return a[0]-b[0];});
 }
+// Only buckets at or after range.to: nothing inside the window was observed.
+function telemetryCloudwatchAfterWindow(payload,range){var points=telemetryCloudwatchPoints(payload),end=Date.parse(range.to);return !!points && points.every(function(p){return p[0]>=end;});}
 function telemetryGrafanaCloudwatch(payload,statistic,weights,range,period){
   var points=telemetryCloudwatchPoints(payload);if(!points)return null;
-  if(range && points.some(function(p){return p[0]<Math.floor(Date.parse(range.from)/(period*1000))*period*1000 || p[0]>=Date.parse(range.to);}))return null;
+  // A bucket that starts at or after range.to is outside the window: query_cloudwatch
+  // returns one stamped exactly at end for dense metrics. Points before the rounded start fail.
+  var end=range?Date.parse(range.to):Infinity,inWindow=function(p){return p[0]<end;};
+  if(range && points.some(function(p){return p[0]<Math.floor(Date.parse(range.from)/(period*1000))*period*1000;}))return null;
+  points=points.filter(inWindow);if(!points.length)return null;
   var values=points.map(function(p){return p[1];}),value;
   if(statistic==='Average'){
-    var counts=telemetryCloudwatchPoints(weights);if(!counts || counts.length!==points.length)return null;
+    var counts=telemetryCloudwatchPoints(weights);if(counts)counts=counts.filter(inWindow);if(!counts || counts.length!==points.length)return null;
     var sum=0,count=0;
     for(var i=0;i<points.length;i++){if(counts[i][0]!==points[i][0] || counts[i][1]<=0)return null;sum+=points[i][1]*counts[i][1];count+=counts[i][1];}
     value=sum/count;
@@ -513,7 +527,7 @@ function createTelemetryGrafana(page,win,now,bound){
             try{input.period=telemetryCloudwatchPeriod(query,anchoredRange,clock());}catch(error){failed(rank,label,error.message);return;}
             started(job,entry);tasks.push(function(){return call('query_cloudwatch',input).then(function(result){
               var payload=telemetryGrafanaPayload(result);
-              if(telemetryGrafanaCloudwatchEmpty(payload)){
+              if(telemetryGrafanaCloudwatchEmpty(payload) || telemetryCloudwatchAfterWindow(payload,anchoredRange)){
                 if(query.missingMeansZero===true){entry.value=0;entry.observedAt=anchoredRange.to;}
                 else{notices.push(label+': no data points yet');if(report && report.pending)progressNote();}
                 return;
@@ -567,8 +581,9 @@ function createTelemetryGrafana(page,win,now,bound){
             },caught(rank,label,{tool:'query_sql',input:input},entry)).finally(function(){settled(job,entry);});});
             return;
           }
-          var loki=entry.source==='loki',tool=loki?'query_loki_logs':'query_prometheus';
-          var query=loki?{datasourceUid:uid,logql:entry.query,startRfc3339:range.from,endRfc3339:range.to,queryType:'range',stepSeconds:step}:
+          var loki=entry.source==='loki',tool=loki?'query_loki_logs':'query_prometheus',total=loki && telemetryLokiWindowTotal(entry.query);
+          var query=total?{datasourceUid:uid,logql:telemetryLokiWindowQuery(entry.query,windowMs),endRfc3339:range.to,queryType:'instant'}:
+            loki?{datasourceUid:uid,logql:entry.query,startRfc3339:range.from,endRfc3339:range.to,queryType:'range',stepSeconds:step}:
             {datasourceUid:uid,expr:entry.query,startTime:range.from,endTime:range.to,stepSeconds:step,queryType:'range'};
           started(job,entry);tasks.push(function(){return call(tool,query).then(function(result){
             var payload=telemetryGrafanaPayload(result);
@@ -576,7 +591,8 @@ function createTelemetryGrafana(page,win,now,bound){
               if(payload && payload.status && payload.status!=='success' || payload && payload.error)throw {code:'tool_error',message:'Loki query failed'};
               var data=payload && payload.data && Array.isArray(payload.data.result)?{data:payload.data.result}:payload;
               var points=payload && payload.data && payload.data.resultType==='streams'?[]:telemetryGrafanaLoki(data);
-              if(points.length)entry.points=points;
+              if(points.length && total){entry.value=points[points.length-1][1];entry.observedAt=new Date(points[points.length-1][0]).toISOString();}
+              else if(points.length)entry.points=points;
               else if(telemetryLokiEmpty(payload) && telemetryLokiCountingQuery(entry.query))entry.value=0;
               else notices.push(label+': no numeric observation');
             }else {var promPoints=telemetryGrafanaPrometheus(payload);if(!windowRange || promPoints.length)entry.points=promPoints;else notices.push(label+': no numeric observation in this window');}
@@ -665,7 +681,8 @@ function createTelemetryGrafana(page,win,now,bound){
         // DST preserves local-day endpoints: only a discontinuity starts a new
         // 86400-second run. Ordinary same-offset days remain one query/signal.
         runs.forEach(function(run){
-          var input=loki?{datasourceUid:uid,logql:entry.query,startRfc3339:run.from,endRfc3339:run.to,queryType:'range',stepSeconds:86400}:
+          // Each endpoint is the previous 24 hours, so $__range is that day.
+          var input=loki?{datasourceUid:uid,logql:telemetryLokiWindowTotal(entry.query)?telemetryLokiWindowQuery(entry.query,86400000):entry.query,startRfc3339:run.from,endRfc3339:run.to,queryType:'range',stepSeconds:86400}:
             {datasourceUid:uid,expr:entry.query,startTime:run.from,endTime:run.to,queryType:'range',stepSeconds:86400};
           tasks.push(function(){return liveStatusHistoryCall(function(){
             if(halted())return;

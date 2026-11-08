@@ -108,6 +108,7 @@ for the complete wrapper example, tool schemas, bounds and selection behavior.
 ### Supported metrics sources and limits
 
 - `grafana`: PromQL; `loki`: metric LogQL. Range series in Live and selected-window Over time.
+  Loki daily counts: use `[$__range]`, one instant query for the window total ([details](../../../docs/live-status.md#loki-window-totals)).
 - `cloudwatch`: metric object; Sum, Maximum, Minimum, Average or SampleCount. Per-period series plus a correct window headline; optional `period` and selected-window history.
 - `cloudwatchLogs`: Logs Insights object; first row's `valueField` (or first column), numeric strings accepted. Optional trends and bounded grouped details, including selected-window history.
 - `sql`: query string, first numeric scalar, at most once/hour in Live. History requires authored time macros.
@@ -416,10 +417,9 @@ Successful empty CloudWatch `values` and `timestamps` mean **no data points yet*
 not a failed query. Optional query boolean `missingMeansZero: true` opts only
 that successful empty shape into zero; absent/false stays unobserved. Errors,
 timeouts and malformed results never become zero. A real numeric zero remains
-observed. For live Loki, successful empty numeric count/rate queries become zero
-only for recognized `count_over_time`/`rate` log-range expressions and `sum`
-wrappers (including by/without grouping). Raw logs, arbitrary expressions and
-misleading function names inside strings remain unobserved. Daily history keeps
+observed. For live Loki, successful empty `count_over_time`/`rate` queries (also
+in `sum`, by/without) become zero; raw logs and other expressions stay
+unobserved. Daily history keeps
 its existing contract. Honeycomb COUNT caveats belong to Honeycomb evidence only.
 
 Cards and node Inspect display every numeric signal in authored order, excluding

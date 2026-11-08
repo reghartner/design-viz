@@ -87,7 +87,7 @@ function createTelemetryLogLookup(page,transport,hooks){
     var ls=lookups();if(!ls)return null;sync();
     if(typeof hooks.wanted!=='function' || hooks.wanted())discover();
     var s=state();
-    var searched=daySearch(typeof hooks.lookback==='function'?hooks.lookback():null);
+    var searched=s==='ready' && daySearch(typeof hooks.lookback==='function'?hooks.lookback():null);
     return {available:s==='ready',state:s,note:note(s),busy:busy,form:Object.assign({},form),typed:TELEMETRY_LOG_TYPED,search:searched?'Loki · '+searched.label:'',
       lookups:Object.keys(ls).map(function(id){var l=ls[id];return {id:id,label:l.label,slot:telemetryLookupSlot(l.query),values:(l.values || []).slice()};}),
       result:result?Object.assign(JSON.parse(JSON.stringify(result)),{next:next()}):null};

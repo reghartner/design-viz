@@ -135,4 +135,7 @@ test('#1141 with a selected day Find searches exactly that day; typed Lookback s
  assert.equal(typed.api.snapshot().search,'');await typed.api.find();assert.deepEqual([typed.calls[0].args.startRfc3339,typed.calls[0].args.endRfc3339],['now-6h','now'],'Trace start under Lookback wins');
  const empty=setup({day:()=>DAY,data:[]});await settle();empty.api.set('value','arch');await empty.api.find();
  assert.equal(empty.api.snapshot().result.note,'No matching log lines on Nov 6.');
+ // The day line shows only when the search can run.
+ const C=context(),native=C.createTelemetryLogLookup(board(),{describe(){},call(){}},{day:()=>DAY});
+ assert.equal(native.snapshot().available,false);assert.equal(native.snapshot().search,'','no day line above a disabled Find');
 });

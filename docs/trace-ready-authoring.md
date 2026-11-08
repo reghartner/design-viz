@@ -4,8 +4,8 @@ Use this workflow to align an accepted diagram with actual spans, preserving its
 story and placement. Run commands from the repository root or the source-free
 kit's **VIZ** directory. Editing and visual verification are desktop-only.
 Create a unique output directory once per author session, then keep using that
-shell's `TRACE_CHECK_DIR` for the commands below. Concurrent authors must create
-their own directories; never reuse another author's temporary spec or reports.
+shell's `TRACE_CHECK_DIR` for the commands below. Never reuse another
+author's directory, temporary spec or reports.
 Keep this directory out of authored deliverables and retain its path with your
 validation evidence. Source specs and trace inputs remain unchanged.
 
@@ -40,6 +40,8 @@ fetches a trace**. In the existing step that represents the observed operation,
 add `traceMatch`, preserving the step's ID, narrative and delivered `edge` or
 `edges`. `nodeId` names an existing stable node in this source section, normally
 the receiving node for that operation. It is not a provider service-name guess.
+
+The board Trace view shows each span's exact service and operation ([details](live-status.md#direct-trace-loading)).
 
 ```json
 {
@@ -130,8 +132,8 @@ them merely to align an existing diagram.
 
 CLI `preview --section N` selects a zero-based diagram section and checks its
 first path (or all steps if no paths). For each additional path, use the same
-production matcher read-only, supplying its exact ID. Give each path report a
-distinct filename within your session directory if checking multiple paths:
+production matcher read-only, supplying its exact ID. Give each path report its
+own filename:
 
 ```sh
 node --input-type=module - "$TRACE_CHECK_DIR/trace-resolved.spec.json" /path/to/request.json 0 PATH_ID > "$TRACE_CHECK_DIR/path-mapping.json" <<'JS'
@@ -167,8 +169,7 @@ Honeycomb signal for the fictional service could be:
 
 This fragment belongs on an existing carrier; it is not a complete connection.
 Use real verified environment/dataset values and authorized provider capabilities,
-never derive them from node names. Do not invent account access to make a fixture
-live. Exported evidence alone can be validated offline; it does not automatically
+never derive them from node names. Exported evidence alone can be validated offline; it does not automatically
 populate the Status Trace list. Runtime host-preloaded evidence needs the validated
 provider envelope, not an arbitrary exported JSON file. Live timelines have a
 200-span display limit; offline mapper input has a different 10,000-span bound.

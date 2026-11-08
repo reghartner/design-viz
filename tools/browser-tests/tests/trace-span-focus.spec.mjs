@@ -97,7 +97,26 @@ test('desktop ambiguous and unmapped spans pause for inspection without guessing
  await row(root,imported).click();await expect(root.getByRole('group',{name:'Choose trace step'})).toBeVisible();expect(await state(page)).toMatchObject({step:'local',playing:false});await expect(root.locator('.dv-trace-focus-overlay,.dv-trace-edge-focus')).toHaveCount(0);
  await expectPanelFits(root);await info.attach('trace-focus-explicit-operation-choice',{body:await root.screenshot(),contentType:'image/png'});
  await root.getByRole('button',{name:'Step 1: Retry currency lookup · Recovery',exact:true}).click();expect(await state(page)).toMatchObject({step:'retry',path:'retry',playing:false});await expect(node(root,'outer::inner::b')).toHaveAttribute('data-trace-focus','true');await expect(root.locator('.dv-trace-edge-focus')).toHaveCount(1);
- const unmapped=e.spans.find(s=>s.service!=='currency' && s.service!=='frontend');await row(root,unmapped).scrollIntoViewIfNeeded();expect(await page.evaluate(()=>{window.sp.toggleAuto();return window.sp.playing();})).toBe(true);await row(root,unmapped).click();await expect(root.locator('.dv-trace-focus-status')).toContainText('Inspection only');expect(await state(page)).toMatchObject({step:'retry',path:'retry',playing:false});await expect(root.locator('.dv-trace-focus-overlay,.dv-trace-edge-focus')).toHaveCount(0);
+ const unmapped=e.spans.find(s=>s.service!=='currency' && s.service!=='frontend');await row(root,unmapped).scrollIntoViewIfNeeded();expect(await page.evaluate(()=>{window.sp.toggleAuto();return window.sp.playing();})).toBe(true);await row(root,unmapped).click();await expect(root.locator('.dv-trace-focus-status')).toContainText('Add a traceMatch to a step to map this span');expect(await state(page)).toMatchObject({step:'retry',path:'retry',playing:false});await expect(root.locator('.dv-trace-focus-overlay,.dv-trace-edge-focus')).toHaveCount(0);
+});
+
+// #1078 (a)+(c): an unmapped span says how to map it, and every focused span shows
+// the exact service and operation a traceMatch must name.
+test('desktop unmapped span links the traceMatch guide; span detail shows exact service and operation',async({page,server})=>{
+ const DOC='https://github.com/reghartner/design-viz/blob/main/docs/trace-ready-authoring.md';
+ const {root,local,e}=await setup(page,server),detail=root.locator('.dv-trace-operation-detail');
+ const unmapped=e.spans.find(s=>s.service!=='currency' && s.service!=='frontend');
+ await row(root,unmapped).scrollIntoViewIfNeeded();await row(root,unmapped).click();
+ await expect(root.locator('.dv-trace-focus-status')).toHaveText('No authored step maps this span. Add a traceMatch to a step to map this span.');
+ const guide=detail.getByRole('link',{name:'How to map a span',exact:true});
+ await expect(guide).toHaveAttribute('href',DOC);await expect(guide).toHaveAttribute('target','_blank');
+ const service=detail.locator('.dv-trace-span-service'),operation=detail.locator('.dv-trace-span-operation');
+ await expect(detail.locator('.dv-trace-span-field')).toHaveText(['Service'+unmapped.service,'Operation'+unmapped.name]);
+ expect(await service.textContent()).toBe(unmapped.service);expect(await operation.textContent()).toBe(unmapped.name);
+ await expectPanelFits(root);
+ await row(root,local).click();
+ expect(await service.textContent()).toBe('frontend');expect(await operation.textContent()).toBe('/cart/checkout');
+ await expect(guide).toHaveCount(0);await expect(root.locator('.dv-trace-focus-status')).not.toContainText('Add a traceMatch');
 });
 
 for(const change of ['environment','connection','clear','history','remount'])test('desktop stale span callbacks cannot navigate after '+change,async({page,server})=>{

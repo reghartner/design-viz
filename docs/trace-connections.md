@@ -89,6 +89,34 @@ mapping or adapter. Alternatively a board may contain a full inline v1 profile
 instead of a company reference. Readers can choose only the resolved company/board
 connections. `tracking.telemetry.enabled:false` and host `telemetry:false` win.
 
+## Allowed match attributes
+
+A profile may list `allowedAttributes`: span attribute names it retains from loaded
+traces and permits in `traceMatch.attributes`, in addition to the built-in
+operational list in [trace-ready authoring](trace-ready-authoring.md). Add it
+next to the other fields of a profile, such as `operations` above:
+
+```json
+"allowedAttributes": ["device.model"]
+```
+
+With that profile, a step can tell traces for different device models apart
+("this is the message for device model X"):
+`"traceMatch": {"serviceName": "telemetry-consumer", "operation": "consume device.report", "attributes": {"device.model": "X"}}`.
+
+- `allowedAttributes` must be an array of at most 32 non-empty attribute names
+  (letters, digits, `_ . : / -`, starting with a letter). A malformed entry fails
+  with its field path, for example `allowedAttributes[1]`. Credential-shaped names
+  (token, secret, header, cookie, password, authorization, api key) are rejected.
+- Values match exactly, with the same rules as built-in attributes. Tempo keeps the
+  span attribute value and its type. Honeycomb `get_trace` tables keep a column with
+  the same name as text, so match it with a string value.
+- Validation accepts an attribute that any resolved connection for the page lists.
+  A trace loaded through a profile that does not list it does not carry it, so the
+  step shows Not observed.
+- A board entry that references a company profile inherits its `allowedAttributes`
+  and cannot change them; an inline board profile may declare its own.
+
 ## Absolute bounds and supported links
 
 A pasted URL is parsed locally, never fetched. Origin and literal path must match

@@ -69,6 +69,29 @@ the [normalizer](canon.md) can disambiguate: `service.namespace`,
 Arbitrary tags, payload fields and request IDs are dropped; do not write selectors
 against them. Prefer stable instrumentation meaning over incidental timings.
 
+A [trace connection profile](trace-connections.md#allowed-match-attributes) may
+add attribute names with `allowedAttributes`. Traces loaded with that profile keep
+those attributes, and `traceMatch.attributes` may use them. Values still match
+exactly. For example, when the profile lists `device.model`, this step maps only
+the message-consumer span for device model X:
+
+```json
+{
+  "id": "consume-x",
+  "text": "This is the message for device model X",
+  "edge": "broker->consumer",
+  "traceMatch": {
+    "serviceName": "telemetry-consumer",
+    "operation": "consume device.report",
+    "nodeId": "consumer",
+    "attributes": {"device.model": "X"}
+  }
+}
+```
+
+Without a profile that lists the attribute, validation rejects it as today
+(`traceMatch.attributes: use supported operational attributes only`).
+
 For duplicate calls, first use a verified parent/link or retained attribute.
 `occurrence:1` is only valid for fully timed, non-overlapping serial calls;
 concurrent calls remain ambiguous. `repeat:"attempts"` requires distinct numeric

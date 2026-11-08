@@ -223,6 +223,9 @@ var FlowCanon = (function(){
         if (b && b.api && !entityRef(b.api.entityRef)) errors.push('nodes.'+id+'.binding.api: expected an API entityRef');
       });
     });
+    // Attributes a resolved trace connection profile lists are also accepted.
+    var profileAttributes=[];
+    if(typeof FlowTraceConnections!=='undefined'){var connections=FlowTraceConnections.resolve(pageOf(raw),typeof TELEMETRY_COMPANY_TRACE_CONNECTIONS!=='undefined'?TELEMETRY_COMPANY_TRACE_CONNECTIONS:{});Object.keys(connections).forEach(function(id){profileAttributes=profileAttributes.concat(connections[id].allowedAttributes || []);});}
     sections(raw).forEach(function(sec){
       var d=sec.diagram, steps=Array.isArray(d.steps)?d.steps:[], ids=new Set(steps.map(function(s){return s && s.id;}));
       if(d.referenceTrace!=null){var r=d.referenceTrace;if(!object(r) || r.version!==1 || !object(r.trace) || !object(r.trace.context) || !Array.isArray(r.trace.spans) || typeof r.trace.traceId!=='string' || !object(r.approval) || typeof r.approval.reason!=='string' || typeof r.contract!=='string')errors.push('referenceTrace: expected an approved version-1 trace mapping');}
@@ -243,7 +246,7 @@ var FlowCanon = (function(){
             if(m.repeat!=null && m.repeat!=='attempts')errors.push('traceMatch.repeat: expected attempts');
             if(m.repeat && m.occurrence)errors.push('traceMatch: occurrence and repeat cannot be combined');
             var allowed=['service.namespace','service.version','deployment.environment.name','deployment.environment','http.response.status_code','http.status_code','db.system','db.system.name','messaging.queue.depth','queue.depth','messaging.message.age_ms','flow.backpressure','flow.delivery_failed','retry.attempt','flow.step.id'];
-            if(m.attributes!=null && (!object(m.attributes) || Object.keys(m.attributes).some(function(k){return !allowed.includes(k) || !['string','number','boolean'].includes(typeof m.attributes[k]);})))errors.push('traceMatch.attributes: use supported operational attributes only');
+            if(m.attributes!=null && (!object(m.attributes) || Object.keys(m.attributes).some(function(k){return !allowed.includes(k) && !profileAttributes.includes(k) || !['string','number','boolean'].includes(typeof m.attributes[k]);})))errors.push('traceMatch.attributes: use supported operational attributes only');
           }
         }
         if(st.conditions!=null){

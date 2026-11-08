@@ -48,7 +48,7 @@ function topologyImportRemovalBlockers(diagram,provenance){
     stepNodes(step).forEach(function(id){if(nodes.has(id))add(bucket('Step node references'),name+' → '+id);});
     Object.keys(stepTonePatch(step) || {}).forEach(function(id){if(nodes.has(id))add(bucket('Tone patches'),name+' → '+id);});
     (step.conditions || []).forEach(function(condition){if(condition && nodes.has(condition.nodeId))add(bucket('Conditions'),name+' → '+condition.nodeId);});
-    if(step.traceMatch && nodes.has(step.traceMatch.nodeId))add(bucket('Trace matches'),name+' → '+step.traceMatch.nodeId);
+    [].concat(step.traceMatch || []).forEach(function(m){if(m && nodes.has(m.nodeId))add(bucket('Trace matches'),name+' → '+m.nodeId);});
   });
   Object.keys(diagram.topologyExports || {}).forEach(function(name){
     var exp=diagram.topologyExports[name] || {};

@@ -946,16 +946,20 @@ class FolderAgentTests(unittest.TestCase):
                     return value
                 errors = io.StringIO()
                 with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Terminal change']), patch.object(helper, 'write', side_effect=write), patch.object(helper, 'read', side_effect=read), patch.object(helper.time, 'sleep', side_effect=AssertionError('Terminal acknowledgement errors must not retry')) as sleeping, patch.object(sys, 'stderr', errors):
-                    with self.assertRaises(ValueError):
+                    with self.assertRaises(SystemExit if change == 'owner' else ValueError) as raised:
                         helper.main()
                     sleeping.assert_not_called()
-                self.assertIn('Workbench acknowledgement failed', errors.getvalue())
                 self.assertNotIn('in time', errors.getvalue())
                 attempt = helper.read(self.folder, 'agent-request.json')
                 if change == 'owner':
+                    # #1109: one line naming both identities replaces the acknowledgement failure.
+                    self.assertEqual(raised.exception.code, 1)
                     self.assertEqual(attempt, {'id': 'replacement-request'})
-                    self.assertIn('Withdrawal could not be confirmed', errors.getvalue())
+                    self.assertIn('Session ownership changed (old session session, connection connection; '
+                                  'new session session, connection replacement).', errors.getvalue())
+                    self.assertNotIn('Workbench acknowledgement failed', errors.getvalue())
                 else:
+                    self.assertIn('Workbench acknowledgement failed', errors.getvalue())
                     self.assertTrue(attempt['withdrawn'])
 
     def test_native_begin_retries_only_missing_or_empty_acknowledgement_files(self):

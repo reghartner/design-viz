@@ -696,3 +696,29 @@ test('step imports declare the flow.imported-steps capability',()=>{
   const older={...F.features};delete older['flow.imported-steps'];
   assert.ok(F.check(F.stamp(raw),{version:F.version,contract:'1',features:older}).missingFeatures.includes('flow.imported-steps'));
 });
+test('Workbench step edits on a consumer that imports steps are refused instead of changing another local step',()=>{
+  const vm=require('node:vm'),loader=require('../tools/source-loader.cjs'),context={URL,TextEncoder};vm.createContext(context);
+  vm.runInContext(loader.composeSources(['validator.js','canon.js','workbench/source-edit.js','workbench/targets.js','workbench/commands/common.js',
+    'workbench/commands/narrative.js','workbench/commands/visibility.js','workbench/session.js']),context);
+  const specs=['payments','checkout-steps'].map(id=>JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/canon/topology/'+id+'.json'),'utf8')));
+  const original=JSON.stringify(specs[1],null,2);let text='',writes=0,shown=null;
+  const session=context.createBuilderSession({source:{read:()=>text,write:value=>{text=value;writes++;}},
+    persistence:{read:()=>({}),preserve(){},cancel(){},save(){}},render(){},editError:message=>{shown=message;}});
+  session.replaceProject(original,null,{topologyContext:{version:1,id:'checkout-steps',specs}});writes=0;
+  // The preview shows [submit, pay::authorize, pay::record, confirm]; the source holds [submit, confirm].
+  const resolved=diagram(session.resolve(JSON.parse(text)));
+  assert.deepEqual(JSON.parse(JSON.stringify(resolved.steps.map(s=>s.id))),['submit','pay::authorize','pay::record','confirm']);
+  const imported=resolved.steps.findIndex(s=>s.id==='pay::authorize');
+  for(const plan of [context.planDeleteStep(text,JSON.parse(text),0,imported),context.planRenameStep(text,JSON.parse(text),0,imported,'renamed')]){
+    shown=null;
+    assert.equal(session.accept(plan,{snapshot:session.snapshot()}),false);
+    assert.equal(text,original);assert.equal(writes,0);assert.equal(session.canUndo(),false);
+    assert.match(shown,/imports provider steps/);
+  }
+  // Reveal positions in the preview include the imported steps too.
+  const reveal=context.planFragmentVisibility(text,JSON.parse(text),{kind:'edge',section:0,index:1},'revealAt',2);
+  assert.match(reveal.error,/imports provider steps/);
+  // Edits that leave the steps alone still apply.
+  const titled=JSON.parse(text);diagram(titled).nodes.client.title='Checkout app';
+  assert.equal(session.accept({text:JSON.stringify(titled,null,2)},{snapshot:session.snapshot()}),true);assert.equal(writes,1);
+});

@@ -287,9 +287,10 @@ node tools/canon/trace-cli.mjs compare --spec /tmp/doorbell-reference.json --tra
 
 For a spec with `topologyImports`, add
 `--resolve-imports <repository folder or registry JSON>` (the resolver
-`tools/validate.js` uses). Imports resolve in memory: the authored spec is never
-written, and `reference` and `compare` output the resolved copy. Without the
-option, such a spec stops with an error naming it.
+`tools/validate.js` uses). Imports resolve in memory for mapping and validation
+only. `reference` and `compare` output the authored spec, imports kept, with the
+approved reference or the incident overlay; `--out` may not name the authored
+spec. Without the option, `preview` and `reference` stop with an error naming it.
 
 These commands write proposed files; committing a reference or incident into the
 central repository remains a reviewed change. See the

@@ -10,20 +10,20 @@ const declares=d=>!!d && typeof d==='object' && ['topologyImports','topologyExpo
 const physical=file=>realpath(file).catch(()=>path.resolve(file));
 try{
   if(!['preview','reference','compare'].includes(command) || !flag('spec') || !flag('trace'))throw new Error('Usage: node tools/canon/trace-cli.mjs preview|reference|compare --spec flow.json --trace trace.json ['+IMPORTS+'] [--section 0] [--out result.json] [--reason "review reason"]');
-  const imports=flag('resolve-imports');let spec;
+  const imports=flag('resolve-imports'),authored=JSON.parse(await readFile(flag('spec'),'utf8'));let spec=authored;
   if(args.includes('--resolve-imports')){
     if(!imports || imports.startsWith('--'))throw new Error('--resolve-imports requires a repository folder or registry JSON');
-    // Imports resolve in memory; the output is the resolved copy, never the authored file.
-    if(flag('out') && await physical(flag('out'))===await physical(flag('spec')))throw new Error('--out names the authored spec; write the resolved output to another file.');
-    spec=(await resolveLocalImports(flag('spec'),imports)).resolved;
-  }else{
-    spec=JSON.parse(await readFile(flag('spec'),'utf8'));
-    if(declares(spec) || C.sections(spec).some(s=>declares(s?.diagram)))throw new Error(flag('spec')+': unresolved topology declarations. To load providers, pass '+IMPORTS+'.');
-  }
+    if(flag('out') && await physical(flag('out'))===await physical(flag('spec')))throw new Error('--out names the authored spec; write the output to another file.');
+    // The resolved copy is used for mapping and validation only; outputs keep the authored form.
+    spec=(await resolveLocalImports(flag('spec'),imports).catch(e=>{throw new Error('--resolve-imports '+imports+': '+e.message);})).resolved;
+  }else if(command!=='compare' && (declares(spec) || C.sections(spec).some(s=>declares(s?.diagram))))throw new Error(flag('spec')+': unresolved topology declarations. To resolve them, pass '+IMPORTS+'.');
   const trace=JSON.parse(await readFile(flag('trace'),'utf8')),section=Number(flag('section') || 0);
   let output;
   if(command==='preview')output=referencePreview(spec,trace,section);
-  else if(command==='reference')output=approveReference(spec,trace,{section,reason:flag('reason'),actor:'CLI reviewer'});
-  else{const result=compareTrace(spec,trace,{section,label:flag('label') || 'Incident trace'});output=result.spec;console.error(JSON.stringify({firstDivergence:result.firstDivergence,pathId:result.pathId,warnings:result.warnings,unmatched:result.mapping.unmatched}));}
+  else if(command==='reference'){
+    const approved=approveReference(spec,trace,{section,reason:flag('reason'),actor:'CLI reviewer'}),target=C.sections(output=C.clone(authored))[section]?.diagram;
+    if(!target)throw new Error('Diagram section not found.');
+    target.referenceTrace=C.sections(approved)[section].diagram.referenceTrace;
+  }else{const options={section,label:flag('label') || 'Incident trace'},result=compareTrace(spec,trace,options);output=spec===authored?result.spec:compareTrace(authored,trace,options).spec;console.error(JSON.stringify({firstDivergence:result.firstDivergence,pathId:result.pathId,warnings:result.warnings,unmatched:result.mapping.unmatched}));}
   const json=JSON.stringify(output,null,2)+'\n';if(flag('out'))await writeFile(flag('out'),json);else process.stdout.write(json);
 }catch(e){console.error(e.message);process.exitCode=1;}

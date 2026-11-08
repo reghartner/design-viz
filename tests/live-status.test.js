@@ -2372,6 +2372,7 @@ test('M10 the action button shows on a metrics-only page so Allow Grafana reache
 | OT14 | the two mode buttons (Chuck, 2026-11-04) | Live and Over time are the only two buttons of their header row (#1131), exactly one is pressed, the selected Over time click does nothing, Live returns to today without turning colors off, the selected Live click still turns colors off, and Over time turns colors back on | a Back to today button; a past day with colors off |
 | OT17 | days dated two days ago to today, then a history ending before today and one with no dates (#1082) | the Over time row's heading shows the selected day's label large; on a day dated today it reads TODAY with the label beside it; the slider and `<` `>` update it; Live has no heading | a date only in the small note; TODAY on a last day that is not today |
 | OT18 | Metrics off; days from the product builders in America/New_York: a normal day, the 23 h and 25 h DST days, a demo day, today; days with no date key (#1132) | `snapshot().overTime.window` is `{from, to, label}`: from the day key's local midnight to the next local midnight in UTC, today ending now; null in Live and on a day with no key | a UTC-midnight day; a fixed 24 h day; a demo day cut at its UTC `at`; a window that needs Metrics; a today window ending in the future |
+| OT19 | a board with no ticket or epic references and two telemetry carriers, a window-mode history spy; the local day builder at fixed times in America/New_York (#1138) | Over time shows and opens on 7 days keyed by local date, ending today, each ending at the next local midnight; no provider or history call with Metrics off; with Metrics on one history window per new day and none for a past day already loaded | Over time only with a Jira history source; a UTC or fixed 24 h day list; a day list that calls a connector; a refetch of a loaded past day |
 */
 const overFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:'EP-1'}},lanes:{APP:{label:'App',color:'#34d399'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',tickets:['AA-1']},b:{title:'Beta',tickets:['BB-1']},planned:{title:'Planned',tickets:['AA-1'],existsWhen:'tickets-done'}},rows:[['a','b','planned']],edges:[{from:'a',to:'b',tickets:['EE-1']}],steps:[{id:'hop',edge:'a->b',lane:'APP'},{id:'beta',nodes:['b'],lane:'APP'}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
 const overStale='2000-01-01T00:00:00Z';
@@ -2730,6 +2731,39 @@ test('OT18 the selected Over time day gives its local-day search window, with Me
    overBackToLive(api);await historySettle();
   }
  }finally{if(zone===undefined)delete process.env.TZ;else process.env.TZ=zone;}
+});
+// #1138 (D2): a board with no Jira references gets Over time from the last 7 local days, built with no calls.
+const freeFixture=()=>({page:{tracking:{telemetry:{window:'24h'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',telemetry:TQUEUE()},b:{title:'Beta'}},rows:[['a','b']],edges:[{from:'a',to:'b',telemetry:TCALL()}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
+const localMidnight=back=>{const now=new Date();return new Date(now.getFullYear(),now.getMonth(),now.getDate()-back).toISOString();};
+test('OT19 the local day list is the last 7 local days ending today, keyed, each ending at the next local midnight (#1138)',()=>{
+ const zone=process.env.TZ;process.env.TZ='America/New_York';
+ try{
+  const C={URL};vm.runInNewContext(entrypoint('native').source,C);assert.equal(typeof C.liveStatusLocalDays,'function','#1138: a local day list builder');
+  const spring=plain(C.liveStatusLocalDays(new Date(2025,2,10,12).getTime(),'en-US'));assert.equal(spring.index,6);
+  assert.deepEqual(spring.days.map(d=>[d.key,d.at,d.label,d.short]),[['2025-03-04','2025-03-05T05:00:00.000Z','Mar 4','Mar 4'],['2025-03-05','2025-03-06T05:00:00.000Z','Mar 5','Mar 5'],['2025-03-06','2025-03-07T05:00:00.000Z','Mar 6','Mar 6'],
+   ['2025-03-07','2025-03-08T05:00:00.000Z','Mar 7','Mar 7'],['2025-03-08','2025-03-09T05:00:00.000Z','Mar 8','Mar 8'],['2025-03-09','2025-03-10T04:00:00.000Z','Mar 9','Mar 9'],['2025-03-10','2025-03-11T04:00:00.000Z','Mar 10','Mar 10']],'Mar 9 is 23 h');
+  assert.ok(spring.days.every(d=>Object.keys(d.states).length===0),'no ticket states');
+  const turn=plain(C.liveStatusLocalDays(new Date(2026,0,2,9).getTime(),'en-US'));
+  assert.deepEqual(turn.days.map(d=>d.key),['2025-12-27','2025-12-28','2025-12-29','2025-12-30','2025-12-31','2026-01-01','2026-01-02']);assert.equal(turn.days[0].label,'Dec 27, 2025','a list over a new year carries the year');assert.equal(turn.days[6].label,'Jan 2, 2026');
+ }finally{if(zone===undefined)delete process.env.TZ;else process.env.TZ=zone;}
+});
+test('OT19 a Jira-free board offers Over time on the local days, with no calls until Metrics is on, then one window per new day (#1138)',async()=>{
+ let live=0;const windows=[];
+ const h=harness(freeFixture(),{},{telemetry:{historyMode:'window',provider:async()=>{live++;return {};},history:async(bindings,range)=>{windows.push(plain(range.window));return {};}}});
+ const api=h.ctl.liveStatus,over=()=>api.snapshot().overTime;mountStatus(h);
+ assert.equal(api.snapshot().available,false,'the board has no Jira references');
+ assert.ok(over(),'#1138: a Jira-free board offers Over time');assert.equal(overButton(h).hidden,false,'the Over time button shows');
+ overButton(h).dispatchEvent({type:'click'});await historySettle();
+ assert.equal(over().active,true);assert.equal(over().count,7);assert.equal(over().index,6,'it opens on today');assert.equal(over().today,true);assert.ok(h.view.querySelector('input.dv-live-over-time-slider'),'the day row shows');
+ for(let index=0;index<7;index++){api.overTimeDay(index);assert.equal(over().window.from,localMidnight(6-index),'day '+index+' starts at its local midnight');}
+ await historySettle();assert.equal(live,0,'Metrics off: no live call');assert.equal(windows.length,0,'Metrics off: no history call');
+ api.overTimeDay(5);api.setMetricsEnabled(true);await historySettle();
+ for(const index of [4,5,4]){api.overTimeDay(index);await historySettle();}
+ assert.deepEqual(windows.map(w=>w.to),[localMidnight(0),localMidnight(1)],'one window per new day; a loaded past day comes from the cache');
+ assert.ok(windows.every(w=>Date.parse(w.to)-Date.parse(w.from)===86400000),'each is the Metrics window ending at the day end');
+ api.overTimeDay(6);await historySettle();assert.equal(windows.length,3);assert.ok(Date.parse(windows[2].to)<=Date.now() && windows[2].to>=localMidnight(0),'today ends now');
+ overBackToLive(api);await historySettle();assert.equal(over().active,false);
+ api.destroy();
 });
 test('OT16 First blocker cannot reach a ticket that has no status on the day, and a real blocker on another day still counts',async()=>{
  const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);h.ctl.sections[0].stepper={path:()=>'happy',sourceIndex:()=>0,mode:()=>'ambient',jumpSource(){}};api.apply(overToday());

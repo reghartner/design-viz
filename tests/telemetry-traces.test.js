@@ -215,3 +215,26 @@ for(const tool of ['run_query','get_trace'])test('trace '+tool+' failures retain
  const h=await setup({wrap:bridge=>{const call=bridge.callTool;bridge.callTool=async(s,n,a,o)=>n===tool?{isError:true,content:[{type:'text',text:'column timestamp is always returned; token=private-token https://mcp.honeycomb.io/trace_results/private'}]}:call(s,n,a,o);}});t.after(()=>h.close());h.api.setEnabled(true);await settle();
  const note=h.api.status().note;assert.match(note,new RegExp(tool+' trace (search|detail)'));assert.match(note,/column timestamp is always returned/);assert.ok(!note.includes('private'));assert.equal(h.api.snapshot().map.a?.exemplars,undefined);
 });
+// #1076: Honeycomb get_trace adds a synthetic `missing-root` row (start 0) when the root span was not stored.
+const placeholderRow='| missing-root |  | 0 | 0 |  | UNSET | false |  |  |  | missing root span |  |  |  | 0 | 141 | 4544 | 0 | false |';
+const rootless=()=>traceText.split('\n').filter(l=>!l.includes('| dbd662d250034c44 |  |'));
+const withPlaceholder=lines=>[lines[0],lines[1],placeholderRow,...lines.slice(2)].join('\n');
+test('#1076 missing-root placeholder row loads, warns and is partial',()=>{const {C}=context(),out=C.telemetryHoneycombTrace({payload:withPlaceholder(rootless())},recordedId);
+ assert.equal(out.spans.length,54);assert.ok(out.spans.every(s=>s.id!=='missing-root'));assert.equal(out.completeness,'partial');assert.ok(out.warnings.includes('Root span not stored; timeline starts at the earliest stored span.'));assert.ok(!out.warnings.some(w=>/Annotation/.test(w)));
+ assert.equal(Math.min(...out.spans.map(s=>s.startMs)),0);const e=envelope(C,out);assert.equal(e.spans.length,54);assert.equal(e.completeness,'partial');assert.ok(e.warnings.includes('Missing parent spans.'));
+ const full=withPlaceholder(rootless()).replace('collapsed_nodes: 1','collapsed_nodes: 0').replace('total_spans: 77','total_spans: 55').replace('visible_spans: 55','visible_spans: 54').replace('view_mode: auto','view_mode: full').replaceAll('| true |','| false |');
+ const f=C.telemetryHoneycombTrace({payload:full},recordedId);assert.equal(f.completeness,'partial');assert.deepEqual(f.warnings,['Root span not stored; timeline starts at the earliest stored span.']);
+});
+test('#1076 the same table without the placeholder row is unchanged',()=>{const {C}=context(),without=C.telemetryHoneycombTrace({payload:rootless().join('\n')},recordedId),withRow=C.telemetryHoneycombTrace({payload:withPlaceholder(rootless())},recordedId);
+ assert.deepEqual(plain(withRow.spans),plain(without.spans));assert.ok(!without.warnings.some(w=>/Root span not stored/.test(w)));
+ const recorded=C.telemetryHoneycombTrace({payload:traceText},recordedId);assert.equal(recorded.spans.length,55);assert.equal(recorded.completeness,'partial');assert.deepEqual(plain(recorded.warnings),['Provider returned a partial or collapsed trace.']);
+});
+test('#1076 a stored span more than 24h from the rest still fails with a missing root',()=>{const {C}=context(),lines=rootless(),starts=lines.slice(2).filter(l=>/^\| [0-9a-f]{16} /.test(l)).map(l=>BigInt(l.split('|')[3].trim())),base=starts.reduce((a,b)=>a<b?a:b);
+ const move=offset=>withPlaceholder(lines.map(l=>l.startsWith('| c27df9e4c7b8bd96 |')?l.replace('| 1791779590953999872 | 14477 |',`| ${base+offset} | 0 |`):l));
+ const edge=C.telemetryHoneycombTrace({payload:move(86400000000000n)},recordedId);assert.equal(edge.spans.find(s=>s.id==='c27df9e4c7b8bd96').startMs,86400000);
+ assert.throws(()=>C.telemetryHoneycombTrace({payload:move(86400000000001n)},recordedId),/Trace timing exceeds bounds/);
+});
+test('#1076 a missing-root trace over 200 spans keeps the 200-span limit',()=>{const {C}=context(),lines=traceText.split('\n'),row=lines[3];
+ const huge=[lines[0],lines[1],placeholderRow,...Array.from({length:201},(_,i)=>row.replace('011114cbd1fd62de',i.toString(16).padStart(16,'0'))),'','Metadata:',`  trace_id: ${recordedId}`].join('\n');
+ const out=C.telemetryHoneycombTrace({payload:huge},recordedId);assert.equal(out.spans.length,0);assert.equal(out.completeness,'partial');assert.ok(out.warnings.includes('More than 200 spans; trace timeline unavailable.'));assert.ok(out.warnings.includes('Root span not stored; timeline starts at the earliest stored span.'));
+});

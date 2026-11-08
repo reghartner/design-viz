@@ -375,3 +375,44 @@ test('manual card coordinates validate atomically, preserve legacy placement, an
     assert.deepEqual(plain(carrierTelemetry({telemetry},{},seen.fn).card),{side:'right',offset:15});assert.ok(seen.paths.includes('.card.position'));
   }
 });
+
+test('#1112 card title and width parse on carriers, warn with their path when invalid, and pass through nodeTracking/edgeTracking overlays',()=>{
+  const {carrierTelemetry}=api();
+  const telemetry={...CALL(),card:{side:'left',title:'  Camera stats consumer · RabbitMQ ',width:320}},before=JSON.stringify(telemetry),seen=recorder();
+  assert.deepEqual(plain(carrierTelemetry({telemetry},{},seen.fn).card),{side:'left',title:'Camera stats consumer · RabbitMQ',width:320});
+  assert.deepEqual(seen.paths,[]);assert.equal(JSON.stringify(telemetry),before);
+  for(const width of [140,480,212.5])assert.deepEqual(plain(carrierTelemetry({telemetry:{...CALL(),card:{width}}},{}).card),{width});
+  // Plan 4: a bad title or width warns at its field path and is ignored; the other card fields stay.
+  for(const title of ['','   ','x'.repeat(121),7,null,'bell\u0007']){
+    const r=recorder();assert.deepEqual(plain(carrierTelemetry({telemetry:{...CALL(),card:{side:'above',title}}},{},r.fn).card),{side:'above'},JSON.stringify(title));
+    assert.deepEqual(r.paths,['.card.title']);assert.match(r.messages[0],/1–120 .*ignored/);
+  }
+  for(const width of ['320',139,481,-200,NaN,Infinity,null]){
+    const r=recorder();assert.deepEqual(plain(carrierTelemetry({telemetry:{...CALL(),card:{offset:8,width}}},{},r.fn).card),{offset:8},String(width));
+    assert.deepEqual(r.paths,['.card.width']);assert.match(r.messages[0],/140 and 480.*ignored/);
+  }
+  const page=over=>({page:{tracking:{},sections:[{diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],panels:[{id:'status',type:'live-status'}],
+    edges:[{from:'a',to:'b',telemetry:{...CALL(),card:over}}],
+    topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{telemetry:{...QUEUE(),card:over}}}}]}}]}});
+  assert.deepEqual(plain(C.validate(C.normalize(page({title:'Ok',width:300})))).warnings.filter(w=>/card/.test(w)),[]);
+  const result=plain(C.validate(C.normalize(page({title:'',width:900}))));assert.deepEqual(result.errors.filter(e=>/card/.test(e)),[],'card problems are warnings, never errors');
+  assert.deepEqual(result.warnings.filter(w=>/card/.test(w)).map(w=>w.split(': ')[0]),[
+    'sections[0].diagram.edges[0].telemetry.card.title','sections[0].diagram.edges[0].telemetry.card.width',
+    'sections[0].diagram.topologyImports[0].nodeTracking.api.telemetry.card.title','sections[0].diagram.topologyImports[0].nodeTracking.api.telemetry.card.width']);
+  // Plan 3: an imported node and edge get title and width through the consumer overlay; the provider is unchanged.
+  const f=topologyFixtures(),imp=diagramOf(f.consumer).topologyImports[0],providerBefore=JSON.stringify(f.provider);
+  imp.nodeTracking.api.telemetry.card={title:'Imported API · queue depth',width:360};
+  imp.edgeTracking['api->store'].telemetry.card={side:'below',title:'Persist · Postgres writes',width:200};
+  const d=diagramOf(C.FlowTopology.resolveSource(f.consumer,f.context));
+  assert.deepEqual(plain(carrierTelemetry(d.nodes['shared::api'],{}).card),{title:'Imported API · queue depth',width:360});
+  assert.deepEqual(plain(carrierTelemetry(d.edges.find(e=>e.from==='shared::api' && e.to==='shared::store'),{}).card),{side:'below',title:'Persist · Postgres writes',width:200});
+  assert.equal(JSON.stringify(f.provider),providerBefore);
+});
+
+test('#1112 a template card title or width is rejected; only the carrier card applies',()=>{
+  const {trackingTelemetry,carrierTelemetry}=api(),seen=recorder();
+  const parsed=trackingTelemetry({tracking:{telemetry:{templates:{titled:{kind:'call',params:['route'],signals:{rate:{grafana:'up{route="$route"}'}},card:{title:'Template title',width:400}}}}}},seen.fn);
+  assert.deepEqual(seen.messages,['.templates.titled.card: card fields belong on the carrier — ignored']);assert.equal(parsed.templates.titled.card,undefined);
+  assert.equal(carrierTelemetry({telemetry:{use:'titled',route:'v1'}},parsed.templates).card,null,'a template never supplies a card title or width');
+  assert.deepEqual(plain(carrierTelemetry({telemetry:{use:'titled',route:'v1',card:{title:'Carrier title',width:200}}},parsed.templates).card),{title:'Carrier title',width:200});
+});

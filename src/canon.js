@@ -227,12 +227,19 @@ var FlowCanon = (function(){
       var d=sec.diagram, steps=Array.isArray(d.steps)?d.steps:[], ids=new Set(steps.map(function(s){return s && s.id;}));
       if(d.referenceTrace!=null){var r=d.referenceTrace;if(!object(r) || r.version!==1 || !object(r.trace) || !object(r.trace.context) || !Array.isArray(r.trace.spans) || typeof r.trace.traceId!=='string' || !object(r.approval) || typeof r.approval.reason!=='string' || typeof r.contract!=='string')errors.push('referenceTrace: expected an approved version-1 trace mapping');}
       if(d.incidents!=null && (!Array.isArray(d.incidents) || d.incidents.some(function(i){return !object(i) || typeof i.pathId!=='string' || typeof i.traceId!=='string' || typeof i.firstDivergence!=='string';})))errors.push('incidents: expected comparison provenance objects');
-      var parents=new Map(steps.filter(function(s){return s && s.traceMatch;}).map(function(s){return [s.id,s.traceMatch.parentStepId];}));
-      parents.forEach(function(parent,id){var seen=new Set([id]);while(parent){if(seen.has(parent)){errors.push('traceMatch: cyclic parentStepId');break;}seen.add(parent);parent=parents.get(parent);}});
+      // Every alternative's parentStepId is an edge; a cycle through any of them fails.
+      var parents=new Map(steps.filter(function(s){return s && s.traceMatch;}).map(function(s){return [s.id,[].concat(s.traceMatch).map(function(m){return m && m.parentStepId;}).filter(Boolean)];})),acyclic=new Set();
+      var cyclic=function(id,path){if(acyclic.has(id))return false;if(path.has(id))return true;path.add(id);var hit=(parents.get(id) || []).some(function(p){return cyclic(p,path);});path.delete(id);if(!hit)acyclic.add(id);return hit;};
+      parents.forEach(function(_,id){if(cyclic(id,new Set()))errors.push('traceMatch: cyclic parentStepId');});
       steps.forEach(function(st){
         if(!st)return;
-        var m=st.traceMatch;
-        if(m!=null){
+        // An array lists alternatives; each entry is validated as one selector and
+        // its findings are reported under traceMatch[index].
+        var many=Array.isArray(st.traceMatch),list=many?st.traceMatch:[st.traceMatch];
+        if(many && !list.length)errors.push('traceMatch: expected at least one alternative');
+        list.forEach(function(m,index){
+        var first=errors.length;
+        if(m!=null || many){
           if(!object(m) || typeof m.serviceName!=='string' || !m.serviceName.trim() || typeof m.operation!=='string' || !m.operation.trim() || !st.id)errors.push('traceMatch: stable step ID, serviceName and operation required');
           else {
             if(m.panelId && !(Array.isArray(d.panels)?d.panels:[]).some(function(p){return p && p.id===m.panelId && p.type==='queue';}))errors.push('traceMatch.panelId: expected a declared queue panel');
@@ -246,6 +253,8 @@ var FlowCanon = (function(){
             if(m.attributes!=null && (!object(m.attributes) || Object.keys(m.attributes).some(function(k){return !allowed.includes(k) || !['string','number','boolean'].includes(typeof m.attributes[k]);})))errors.push('traceMatch.attributes: use supported operational attributes only');
           }
         }
+        if(many)for(var j=first;j<errors.length;j++)errors[j]=errors[j].replace(/^traceMatch/,'traceMatch['+index+']');
+        });
         if(st.conditions!=null){
           if(!Array.isArray(st.conditions))errors.push('conditions: expected an array');
           else st.conditions.forEach(function(c){

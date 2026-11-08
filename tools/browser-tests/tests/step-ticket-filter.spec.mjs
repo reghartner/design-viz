@@ -43,7 +43,8 @@ test('desktop step Inspect checklist writes the step ticket filter over local an
   list=await inspectStep(page);
   for(const [key,on] of [['CAN-1',false],['API-2',true],['LOC-1',true],['LOC-2',false]])await expect(box(key)).toBeChecked({checked:on});
   await box('API-2').uncheck();await expect.poll(async()=>step(await source(page)).ticketFilter).toEqual(['LOC-1']);
-  list=await inspectStep(page);await box('LOC-1').uncheck();
+  // The guard puts the box back, so click rather than uncheck (uncheck asserts the new state).
+  list=await inspectStep(page);await box('LOC-1').click();
   await expect(page.locator('#guide .ierr')).toContainText('Keep at least one ticket');
   await expect(box('LOC-1')).toBeChecked();expect(step(await source(page)).ticketFilter).toEqual(['LOC-1']);
   for(const key of ['CAN-1','API-2','LOC-2']){list=await inspectStep(page);await box(key).check();}

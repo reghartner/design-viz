@@ -163,6 +163,38 @@ function builderEditDetails(text,raw,edit){
   });
   return error || {text:out};
 }
+/* #1103: after a plan removes tickets (a deleted node or edge, or a ticket taken
+   off a carrier), drop each removed key from every step ticketFilter on the page
+   that no longer lights it. A step lights a same-page detail section's tickets
+   through its node, so a removal in one section can prune another's step. An
+   emptied filter is removed. `resolve(raw)` gives the resolved spec so imported
+   carriers count; when it is missing or fails on a spec with topology imports,
+   filters are left alone (a stale key only warns). */
+function builderPruneTicketFilters(plan,sectionIdx,removed,resolve){
+  if(plan.error || !removed || !removed.length)return plan;
+  var raw=JSON.parse(plan.text),paths=specSectionPaths(raw),source=null,text=plan.text;
+  if(resolve){try{source=resolve(raw);}catch(ex){source=null;}}
+  if(!source){
+    if(paths.some(function(rec){var d=specValueAt(raw,rec.diagram);return d && Array.isArray(d.topologyImports) && d.topologyImports.length;}))return plan;
+    source=raw;
+  }
+  var page=normalize(source),records=sectionRecords(page);
+  paths.forEach(function(rec,sectionAt){
+    var d=specValueAt(raw,rec.diagram),view=records[sectionAt] && records[sectionAt].section.diagram;
+    (d && view && Array.isArray(d.steps)?d.steps:[]).forEach(function(st,index){
+      if(!st || !Array.isArray(st.ticketFilter) || !st.ticketFilter.some(function(key){return removed.indexOf(key)>=0;}))return;
+      var lit=trackingStepLitTickets(view,st,page),kept=st.ticketFilter.filter(function(key){return removed.indexOf(key)<0 || lit.indexOf(key)>=0;});
+      if(kept.length===st.ticketFilter.length)return;
+      var next=jsonSetField(text,rec.diagram.concat(['steps',index]),'ticketFilter',kept.length?JSON.stringify(kept):null);
+      if(next)text=next.text;
+    });
+  });
+  if(text===plan.text)return plan;
+  plan.text=text;
+  var at=specSectionPaths(JSON.parse(text))[sectionIdx],range=at && jsonLocate(text,at.diagram);
+  if(range){plan.start=range.start;plan.end=range.end;}
+  return plan;
+}
 function builderDetailCascade(plan,sectionIdx,edit){
   if(plan.error)return plan;
   var updated=builderEditDetails(plan.text,JSON.parse(plan.text),function(detail,owner,target,id){
@@ -239,11 +271,11 @@ function planDeleteListItem(text, raw, containerPath, index){
    per section so earlier deletions cannot shift later targets. */
 var BUILDER_MULTI_KINDS = ['node', 'edge', 'step', 'panel', 'bullet', 'crow'];
 
-function builderDeletePlan(text, raw, t){
+function builderDeletePlan(text, raw, t, resolve){
   if (t.kind === 'tab') return planDeleteTab(text, raw, t.block, t.tab);
   if (t.kind === 'group') return planDeleteGroup(text, raw, t.section, t.id);
-  if (t.kind === 'node') return planDeleteNode(text, raw, t.section, t.id);
-  if (t.kind === 'edge') return planDeleteEdge(text, raw, t.section, t.index);
+  if (t.kind === 'node') return planDeleteNode(text, raw, t.section, t.id, resolve);
+  if (t.kind === 'edge') return planDeleteEdge(text, raw, t.section, t.index, resolve);
   if (t.kind === 'step') return planDeleteStep(text, raw, t.section, t.index);
   if (t.kind === 'panel') return planDeletePanel(text, raw, t.section, t.index);
   var rec = specSectionPaths(raw)[t.section];
@@ -286,7 +318,7 @@ function planBulkSetField(text, targets, key, valueTextOrNull){
   return {text: cur, count: targets.length};
 }
 
-function planBulkDelete(text, targets){
+function planBulkDelete(text, targets, resolve){
   if(targets.length && targets.some(function(t){return t.kind!==targets[0].kind;}) && !targets.every(function(t){return t.kind==='node' || t.kind==='panel';}))return {error:'Mixed topology selections support export authoring only. Select one kind to delete.'};
   if(targets.some(function(t){return t.kind==='bullet' && !builderBulletIndices(t);}))return {error:'Invalid bullet selection.'};
   var list = targets.filter(function(t,i){
@@ -313,7 +345,7 @@ function planBulkDelete(text, targets){
     catch (ex){ return {error: 'bulk stopped: the JSON no longer parses (' + ex.message + ')'}; }
     var target=list[i];
     if(target.kind==='panel' && target.id){var got=builderDiagram(cur,raw,target.section),index=got.error?-1:(got.d.panels || []).findIndex(function(p){return p.id===target.id;});if(index<0)return {error:'Selected panel no longer exists.'};target=Object.assign({},target,{index:index});}
-    var plan = builderDeletePlan(cur, raw, target);
+    var plan = builderDeletePlan(cur, raw, target, resolve);
     if (plan.error) return {error: 'selection ' + (i + 1) + ': ' + plan.error};
     cur = plan.text;
   }

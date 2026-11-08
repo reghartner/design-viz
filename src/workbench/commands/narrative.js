@@ -271,6 +271,16 @@ function builderStepAt(raw, sectionIdx, stepIdx){
           path: rec.diagram.concat(['steps', stepIdx])};
 }
 
+/* #1103: removing a hop or node drops every key the step no longer lights from
+   its ticketFilter; an emptied filter is dropped, so the step shows every ticket.
+   `raw` is the resolved spec the Workbench passes, so imported carriers and a lit
+   node's same-page drill-down count, as in the shared lit set. */
+function builderPruneStepTicketFilter(raw, d, st){
+  if (!Array.isArray(st.ticketFilter)) return;
+  var lit = trackingStepLitTickets(d, st, normalize(raw)), kept = st.ticketFilter.filter(function(key){ return lit.indexOf(key) >= 0; });
+  if (kept.length) st.ticketFilter = kept; else delete st.ticketFilter;
+}
+
 function planStepToggleHop(text, raw, sectionIdx, stepIdx, key){
   var got = builderStepAt(raw, sectionIdx, stepIdx);
   if (!got) return {error: 'step not found — reselect and try again'};
@@ -292,6 +302,7 @@ function planStepToggleHop(text, raw, sectionIdx, stepIdx, key){
     if (delivered.length === 1) st.edge = delivered[0];
     else if (delivered.length > 1) st.edges = delivered;
     if (Object.keys(failures).length) st.failures = failures; else delete st.failures;
+    if (has) builderPruneStepTicketFilter(raw, got.d, st);
   });
   if (r.error) return r;
   r.added = !has;
@@ -374,6 +385,7 @@ function planStepToggleNode(text, raw, sectionIdx, stepIdx, nodeId){
     var next = (Array.isArray(st.nodes) ? st.nodes : []).filter(function(n){ return n !== nodeId; });
     if (!has) next.push(nodeId);
     if (next.length) st.nodes = next; else delete st.nodes;
+    if (has) builderPruneStepTicketFilter(raw, got.d, st);
   });
   if (r.error) return r;
   r.added = !has;

@@ -187,6 +187,7 @@ var BUILDER_GUIDES = {
       ['time', 'story time: +45m from the previous step, 06:50 (next 6:50) or 2026-09-25T06:50; empty keeps the previous time. Needs the section\'s story start'],
       ['lane', 'lane pill on the caption line — declare colors in page.lanes'],
       ['nodes', 'node ids to light directly (allows an edgeless step)'],
+      ['ticketFilter', 'Jira keys from the lit nodes and edges that this step shows; omit to show every ticket'],
       ['tone', 'node-color claims: {"gateway": "alert"} — alert warn ok dim; base (or null) clears; folds forward across steps'],
       ['panelVisibility', 'whole panels: {"<panel id>": true|false}; omission inherits the selected path'],
       ['panels', 'sparse widget patches: {"<panel id>": {..only what changed..}}'],

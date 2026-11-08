@@ -2964,6 +2964,28 @@ test('#1081 Load-trace connection environment follows the board Environment unti
  api.setMetricsEnvironment('prd');api.setDirectTraceField({field:'environment',value:'stage'});api.setMetricsEnvironment('stg');api.setMetricsEnvironment('prd');assert.equal(form().environment,'stage','the user pick stays');
  api.destroy();
 });
+test('#1125 the log lookup note names why it is unavailable, and Live restores it',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
+ const raw=(enabled=true)=>({tracking:{telemetry:{...(enabled?{}:{enabled:false}),grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]});
+ const host=()=>({telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async()=>({data:[]})}}});
+ const logs=h=>{const value=h.ctl.liveStatus.snapshot().trace.direct.logs;return [value.available,value.note];},seen={};
+ const live=harness(raw(),{},host()),api=live.ctl.liveStatus;api.setStatusMode('trace');await settle();
+ assert.deepEqual(logs(live),[true,'']);
+ live.ctl.telemetry.openHistory([{at:'2026-11-01T00:00:00.000Z'}],0);seen.overTime=logs(live);
+ live.ctl.telemetry.closeHistory();await settle();seen.backToLive=logs(live);
+ api.destroy();seen.closed=logs(live);
+ const board=harness(raw(false),{},host());seen.boardOff=logs(board);board.ctl.liveStatus.destroy();
+ const off=harness(raw(),{},{telemetry:false});seen.hostOff=logs(off);off.ctl.liveStatus.destroy();
+ // A host without a logs connector cannot run lookups in Live either, so Over time does not outrank that note.
+ const bare=harness(raw(),{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){}}}});bare.ctl.telemetry.openHistory([{at:'2026-11-01T00:00:00.000Z'}],0);seen.noConnectorOverTime=logs(bare);bare.ctl.liveStatus.destroy();
+ assert.deepEqual(seen,{
+  overTime:[false,'Log lookups work in Live, not in Over time. Switch to Live to use them.'],
+  backToLive:[true,''],
+  closed:[false,'This view was closed. Reopen it to look up log lines.'],
+  boardOff:[false,'Log lookups need telemetry, which this board turns off.'],
+  hostOff:[false,'Log lookups need telemetry, which this host turns off.'],
+  noConnectorOverTime:[false,'Log lookups need a Grafana connector, which this host does not provide.']});
+});
 test('#1124 a log-line trace that is not found says it may not have been kept and offers the next line',async()=>{
  const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
  const ids=['a1'.repeat(16),'b2'.repeat(16),'c3'.repeat(16)],calls=[];

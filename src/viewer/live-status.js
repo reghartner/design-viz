@@ -1782,7 +1782,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     snapshot:snapshot,
     setStatusMode:function(mode){if(retired || ['jira','trace'].indexOf(mode)<0)return;if(mode!==statusMode)clearTraceFocus();statusMode=mode;close(false);paint();notify();},
     setDirectTraceField:function(change){if(!retired && change){traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';directTrace.set(change.field,change.value);}},
-    loadDirectTrace:async function(verify){if(retired)return;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';var result=await directTrace.load(!!verify);if(result){traceSelection=null;traceInitial=true;}paint();notify();return result;},
+    loadDirectTrace:async function(verify,line){if(retired)return;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';var result=await directTrace.load(!!verify,line);if(result){traceSelection=null;traceInitial=true;}paint();notify();return result;},
     clearDirectTrace:function(){if(retired)return;clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();},
     setLogLookupField:function(change){if(!retired && change)logLookup.set(change.field,change.value);},
     findLogLines:function(){return retired?Promise.resolve(null):logLookup.find();},
@@ -1790,11 +1790,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
     loadLogTrace:async function(index){
       if(retired)return null;var row=logLookup.row(index);if(!row || !row.traceId)return null;
       api.setDirectTraceField({field:'input',value:row.traceId});logLookup.chosen(index,'');
-      var result=await api.loadDirectTrace(false);if(retired || !result || !row.spanId)return result;
+      // #1124: a not-found report knows the line's time and whether a next line exists.
+      var result=await api.loadDirectTrace(false,{at:row.time,next:logLookup.next(index)>=0});if(retired || !result || !row.spanId)return result;
       var selected=traceSnapshot().selected;
       if(!(selected && selected.manual && selected.exemplar.selectionToken===result.selectionToken && api.selectTraceSpan({context:selected.context,spanId:row.spanId})))logLookup.chosen(index,'Span '+row.spanId+' from the log line is not in this trace.');
       return result;
     },
+    loadNextLogTrace:function(){if(retired)return Promise.resolve(null);var next=logLookup.next();return next<0?Promise.resolve(null):api.loadLogTrace(next);},
     setTraceShow:function(value){if(retired)return;traceShow=!!value;paint();notify();},
     chooseTrace:async function(choice){
       if(retired || statusMode!=='trace')return;

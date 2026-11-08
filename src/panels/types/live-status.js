@@ -229,7 +229,8 @@
       if(start || profile)el(config,'p','lookback','dv-trace-lookback-note',bounds && bounds.linkTime?(bounds.linkUsable?'Uses the time range in the pasted link.':'This link\'s time range cannot be used with this connection; paste the trace ID alone.'):back?'Looks back '+back+'; change under Lookback.':'Uses the time set under Lookback.');
       var time=el(config,'details','time','dv-trace-time');el(time,'summary','summary','','Lookback (optional)');
       // Open once per not-found report; the section may be rebuilt when Trace mode is re-entered.
-      if(r && r.code==='trace_not_found' && host._directNotFoundReport!==r.serial){time.open=true;host._directNotFoundReport=r.serial;}
+      // A log-line trace that was not kept opens Lookback only when the line is outside it (#1124).
+      if(r && r.code==='trace_not_found' && (!r.logLine || r.lookbackHint) && host._directNotFoundReport!==r.serial){time.open=true;host._directNotFoundReport=r.serial;}
       el(time,'p','help','','Leave blank to use link bounds or the connection lookback.');
       field(time,'start','Trace start',null,'-2h or UTC ISO timestamp');field(time,'end','Trace end',null,'UTC ISO timestamp (absolute start only)');
       var controls=el(config,'div','actions','dv-live-controls');
@@ -253,6 +254,8 @@
       if(r){var report=el(box,'section','report','dv-trace-direct-report'+(loaded?' dv-trace-report-compact':''));report.setAttribute('aria-label','Trace connection report');
         el(report,'p','stage','dv-trace-direct-status',r.error || (r.stage==='complete'?'Loaded · ID matched · '+r.spanCount+' spans · '+r.completeness+' completeness':r.stage==='schema'?'Checking runtime tool schema…':'Loading exact trace…')).setAttribute('role','status');
         if(r.error)el(report,'p','error-stage','','Stage: '+r.stage);
+        // #1124: the provider may not have kept a log line's trace; offer the next line with a trace ID.
+        if(r.code==='trace_not_found' && r.logLine && direct.logs && direct.logs.result && direct.logs.result.next>=0){var nextLine=button(el(report,'div','next-line','dv-live-controls'),'next','reader-button dv-trace-log-next','Try the next log line','loadNextLogTrace');nextLine.disabled=!direct.available || direct.busy;}
         var diagnostics=el(report,'details','diagnostics','dv-trace-diagnostics');el(diagnostics,'summary','summary','',r.mode==='verify'?'Verification details':'Connection details');
         if(diagnostics._directMode!==r.mode || diagnostics._directBusy!==direct.busy){diagnostics.open=r.mode==='verify';diagnostics._directMode=r.mode;diagnostics._directBusy=direct.busy;}
         el(diagnostics,'p','identity','', [r.connection,r.server,r.tool,r.environment].filter(Boolean).join(' · '));

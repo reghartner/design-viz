@@ -154,6 +154,7 @@ function telemetryEditBinding(binding,edit,options){
     if(unit)next.unit=unit;
     var scope=edit.field==='scope'?edit.value:entry.scope;if(telemetryText(scope))next.scope=scope.trim();
     var showOnCard=edit.field==='showOnCard'?edit.value:entry.showOnCard;if(typeof showOnCard==='boolean')next.showOnCard=showOnCard;
+    if(telemetryOwn(entry,'window'))next.window=entry.window;
     var label=edit.field==='label'?edit.value:entry.label;
     if(label!=null){if(!telemetryText(label) || label.length>120 || /[\x00-\x1f\x7f]/.test(label))return {error:'A label is 1–120 plain-text characters without control characters.'};next.label=label.trim();}
     var queryLink=edit.field==='queryLink'?edit.value:entry.links && entry.links.query;

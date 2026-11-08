@@ -145,7 +145,8 @@ function trackingExistsWhen(value){
      {kind: 'call'|'queue'|'service'|'log-event'|'device',
       signals: {<name>: {source: 'grafana'|'loki'|'tempo'|'sql'|'honeycomb'|'cloudwatch',
                          query: <string; a cloned query object for honeycomb/cloudwatch>,
-                         unit: <string>|null, scope?: string, label?: string, showOnCard?: boolean, links?: {query?: string}}},
+                         unit: <string>|null, scope?: string, label?: string, showOnCard?: boolean, links?: {query?: string},
+                         window?: <duration such as '1h'; a display label, never a query change>}},
       proof: {<signal name>: {min?: number, max?: number, maxRatioOf?: <other signal name>}},
       links: {dashboard?: <absolute http(s) URL>, query?: <absolute http(s) URL>},
       card: null | {side?: 'right'|'left'|'above'|'below', offset?: number, position?: {x:number,y:number},
@@ -237,11 +238,12 @@ function telemetrySignal(name,value,warn){
   if(telemetryOwn(value,'scope')){if(telemetryText(value.scope))out.scope=value.scope;else warn(at+'.scope','must be non-empty text — ignored');}
   if(telemetryOwn(value,'label')){if(telemetryText(value.label) && value.label.length<=120 && !/[\x00-\x1f\x7f]/.test(value.label))out.label=value.label.trim();else warn(at+'.label','must be plain text of 1–120 characters without control characters — ignored');}
   if(telemetryOwn(value,'showOnCard')){if(typeof value.showOnCard==='boolean')out.showOnCard=value.showOnCard;else warn(at+'.showOnCard','must be a boolean — ignored');}
+  if(telemetryOwn(value,'window')){var span=telemetryWindowDuration(value.window);if(source==='cloudwatch')warn(at+'.window','cloudwatch signals always cover the page window — ignored');else if(span)out.window=span;else warn(at+'.window','use a duration such as "1h", "7d" or "now-7d" — ignored');}
   if(telemetryOwn(value,'links')){
     if(!telemetryObject(value.links))warn(at+'.links','must be an object {query?} — ignored');
     else {out.links={};telemetryUnknown(value.links,['query'],warn,at+'.links');if(telemetryOwn(value.links,'query')){if(telemetryQueryUrl(value.links.query))out.links.query=value.links.query;else warn(at+'.links.query','must be an absolute HTTP(S) URL without credentials — ignored');}}
   }
-  telemetryUnknown(value,[source,'unit','scope','label','showOnCard','links'],warn,at);
+  telemetryUnknown(value,[source,'unit','scope','label','showOnCard','links','window'],warn,at);
   return out;
 }
 /* One proof entry for a known signal. Returns the cleaned entry or null. */
@@ -388,7 +390,7 @@ function carrierTelemetry(obj,templates,invalid,environment){
         var authored=expanded[key][name],logs=telemetryObject(authored) && authored.cloudwatchLogs,hasBreakdown=telemetryObject(logs) && telemetryOwn(logs,'breakdown'),breakdown=hasBreakdown?logs.breakdown:null,hasTrend=telemetryObject(logs) && telemetryOwn(logs,'trend'),trend=hasTrend?logs.trend:null;
         // Display-only fields cannot prevent the metric query from running.
         // Keep their one environment pass separate from source/query errors.
-        var display={};if(telemetryObject(authored))['label','links'].forEach(function(field){if(telemetryOwn(authored,field)){display[field]=authored[field];delete authored[field];}});
+        var display={};if(telemetryObject(authored))['label','links','window'].forEach(function(field){if(telemetryOwn(authored,field)){display[field]=authored[field];delete authored[field];}});
         // The optional grouped query owns its configuration errors. Resolve it
         // separately, once, so it cannot suppress an otherwise readable total.
         if(hasBreakdown)delete logs.breakdown;if(hasTrend)delete logs.trend;
@@ -415,6 +417,7 @@ function carrierTelemetry(obj,templates,invalid,environment){
     if(entry.scope)signals[name].scope=entry.scope;
     if(entry.label)signals[name].label=entry.label;
     if(telemetryOwn(entry,'showOnCard'))signals[name].showOnCard=entry.showOnCard;
+    if(entry.window)signals[name].window=entry.window;
     if(entry.links)signals[name].links=entry.links;
     if(errors[name])signals[name].error=errors[name];
     if(breakdownErrors[name])signals[name].breakdownError=breakdownErrors[name];
@@ -579,4 +582,23 @@ function telemetrySignalScope(signal){
     if(q.metric==='Connect.AuthError')scope='all connections / whole account';
   }
   return scope?scope+' · account '+q.accountId+(d.Protocol?' · '+d.Protocol:''):'';
+}
+/* A signal's own time span (#1108): its declared `window`, else the one range
+   selector of a PromQL/LogQL counting query. String literals are not scanned.
+   [$__range], variables, subqueries and several selectors derive nothing. */
+var TELEMETRY_COUNTING=/\b(?:count_over_time|sum_over_time|bytes_over_time|increase)\s*\(/;
+function telemetrySignalSpan(signal){
+  if(!signal)return null;
+  if(signal.window)return signal.window;
+  if(signal.source!=='grafana' && signal.source!=='loki' || typeof signal.query!=='string')return null;
+  var text=signal.query.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`[^`]*`/g,'Q'),ranges=text.match(/\[[^\]]*\]/g);
+  if(/["'`]/.test(text) || !TELEMETRY_COUNTING.test(text) || !ranges || ranges.length!==1)return null;
+  var match=/^\[\s*([1-9][0-9]*[smhdw])\s*\]$/.exec(ranges[0]);
+  return match?match[1]:null;
+}
+/* 'last 1h' when the signal's span differs from the board window, else ''. */
+function telemetrySpanNote(signal,window){
+  var span=telemetrySignalSpan(signal),board=telemetryWindowDuration(window);
+  function seconds(d){return Number(d.slice(0,-1))*{s:1,m:60,h:3600,d:86400,w:604800}[d.slice(-1)];}
+  return span && board && seconds(span)!==seconds(board)?'last '+span:'';
 }

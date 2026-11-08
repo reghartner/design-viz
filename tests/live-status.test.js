@@ -2372,7 +2372,8 @@ test('M10 the action button shows on a metrics-only page so Allow Grafana reache
 | OT14 | the two mode buttons (Chuck, 2026-11-04) | Live and Over time are the only two buttons of their header row (#1131), exactly one is pressed, the selected Over time click does nothing, Live returns to today without turning colors off, the selected Live click still turns colors off, and Over time turns colors back on | a Back to today button; a past day with colors off |
 | OT17 | days dated two days ago to today, then a history ending before today and one with no dates (#1082) | the Over time row's heading shows the selected day's label large; on a day dated today it reads TODAY with the label beside it; the slider and `<` `>` update it; Live has no heading | a date only in the small note; TODAY on a last day that is not today |
 | OT18 | Metrics off; days from the product builders in America/New_York: a normal day, the 23 h and 25 h DST days, a demo day, today; days with no date key (#1132) | `snapshot().overTime.window` is `{from, to, label}`: from the day key's local midnight to the next local midnight in UTC, today ending now; null in Live and on a day with no key | a UTC-midnight day; a fixed 24 h day; a demo day cut at its UTC `at`; a window that needs Metrics; a today window ending in the future |
-| OT19 | a board with no ticket or epic references and two telemetry carriers, a window-mode history spy; the local day builder at fixed times in America/New_York; a detail with a ticket or a Jira history source arriving while it is open; a click on the selected Live (#1138) | Over time shows and opens on 7 days keyed by local date, ending today, each ending at the next local midnight; no provider or history call with Metrics off; with Metrics on one history window per new day and none for a past day already loaded; the local Over time ends when the board gains a ticket or a Jira source arrives; Live stays selected | Over time only with a Jira history source; a UTC or fixed 24 h day list; a day list that calls a connector; a refetch of a loaded past day; a reader left on a past day with no Live; a Live click that un-presses Live with nothing to turn off |
+| OT19 | log lookup with a Grafana transport; a dated past day, today (the default day) with the clock moved 2 min, Previous day, Live, an undated day (#1141) | Find sends exactly the day's window (today: local midnight to now) once; results survive repaints while today's end moves; a day change clears results with no call and keeps the typed value; Live sends now-2h..now; an undated day names itself | an identity keyed on the window (today's rows vanish on the next paint); a day search that refetches on repaint |
+| OT20 | a board with no ticket or epic references and two telemetry carriers, a window-mode history spy; the local day builder at fixed times in America/New_York; a detail with a ticket or a Jira history source arriving while it is open; a click on the selected Live (#1138) | Over time shows and opens on 7 days keyed by local date, ending today, each ending at the next local midnight; no provider or history call with Metrics off; with Metrics on one history window per new day and none for a past day already loaded; the local Over time ends when the board gains a ticket or a Jira source arrives; Live stays selected | Over time only with a Jira history source; a UTC or fixed 24 h day list; a day list that calls a connector; a refetch of a loaded past day; a reader left on a past day with no Live; a Live click that un-presses Live with nothing to turn off |
 */
 const overFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:'EP-1'}},lanes:{APP:{label:'App',color:'#34d399'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',tickets:['AA-1']},b:{title:'Beta',tickets:['BB-1']},planned:{title:'Planned',tickets:['AA-1'],existsWhen:'tickets-done'}},rows:[['a','b','planned']],edges:[{from:'a',to:'b',tickets:['EE-1']}],steps:[{id:'hop',edge:'a->b',lane:'APP'},{id:'beta',nodes:['b'],lane:'APP'}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
 const overStale='2000-01-01T00:00:00Z';
@@ -2735,7 +2736,7 @@ test('OT18 the selected Over time day gives its local-day search window, with Me
 // #1138 (D2): a board with no Jira references gets Over time from the last 7 local days, built with no calls.
 const freeFixture=()=>({page:{tracking:{telemetry:{window:'24h'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',telemetry:TQUEUE()},b:{title:'Beta'}},rows:[['a','b']],edges:[{from:'a',to:'b',telemetry:TCALL()}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
 const localMidnight=back=>{const now=new Date();return new Date(now.getFullYear(),now.getMonth(),now.getDate()-back).toISOString();};
-test('OT19 the local day list is the last 7 local days ending today, keyed, each ending at the next local midnight (#1138)',()=>{
+test('OT20 the local day list is the last 7 local days ending today, keyed, each ending at the next local midnight (#1138)',()=>{
  const zone=process.env.TZ;process.env.TZ='America/New_York';
  try{
   const C={URL};vm.runInNewContext(entrypoint('native').source,C);assert.equal(typeof C.liveStatusLocalDays,'function','#1138: a local day list builder');
@@ -2747,7 +2748,7 @@ test('OT19 the local day list is the last 7 local days ending today, keyed, each
   assert.deepEqual(turn.days.map(d=>d.key),['2025-12-27','2025-12-28','2025-12-29','2025-12-30','2025-12-31','2026-01-01','2026-01-02']);assert.equal(turn.days[0].label,'Dec 27, 2025','a list over a new year carries the year');assert.equal(turn.days[6].label,'Jan 2, 2026');
  }finally{if(zone===undefined)delete process.env.TZ;else process.env.TZ=zone;}
 });
-test('OT19 a Jira-free board offers Over time on the local days, with no calls until Metrics is on, then one window per new day (#1138)',async()=>{
+test('OT20 a Jira-free board offers Over time on the local days, with no calls until Metrics is on, then one window per new day (#1138)',async()=>{
  let live=0;const windows=[];
  const h=harness(freeFixture(),{},{telemetry:{historyMode:'window',provider:async()=>{live++;return {};},history:async(bindings,range)=>{windows.push(plain(range.window));return {};}}});
  const api=h.ctl.liveStatus,over=()=>api.snapshot().overTime;mountStatus(h);
@@ -2766,7 +2767,7 @@ test('OT19 a Jira-free board offers Over time on the local days, with no calls u
  api.destroy();
 });
 const freeTelemetry=()=>({historyMode:'window',provider:async()=>({}),history:async()=>({})});
-test('OT19 a local Over time ends when a detail with tickets loads or a Jira history source arrives (#1138)',async()=>{
+test('OT20 a local Over time ends when a detail with tickets loads or a Jira history source arrives (#1138)',async()=>{
  let resolve;const renderOptions={telemetry:freeTelemetry(),loadDetail:()=>new Promise(r=>resolve=r)},h=harness(freeFixture(),{},renderOptions),api=h.ctl.liveStatus;mountStatus(h);
  api.overTime();await historySettle();api.overTimeDay(2);assert.equal(api.snapshot().overTime.active,true);
  const pending=renderOptions.loadDetail({spec:'approved-detail'},new AbortController().signal);resolve({nodes:{child:{tickets:['DD-1']}},rows:[['child']]});await pending;h.flush();
@@ -2780,7 +2781,7 @@ test('OT19 a local Over time ends when a detail with tickets loads or a Jira his
  assert.equal(jira.snapshot().overTime.active,false,'a Jira history source closes the local Over time');assert.equal(j.ctl.telemetry.snapshot().historical,false);assert.equal(loads,0,'and loads nothing until the reader asks');
  jira.destroy();
 });
-test('OT19 on a Jira-free board a click on the selected Live changes nothing (#1138)',()=>{
+test('OT20 on a Jira-free board a click on the selected Live changes nothing (#1138)',()=>{
  const h=harness(freeFixture(),{},{telemetry:freeTelemetry()}),api=h.ctl.liveStatus,live=()=>h.view.querySelector('button.dv-live-toggle');mountStatus(h);
  assert.equal(live().hidden,false);assert.equal(live().getAttribute('aria-pressed'),'true');
  live().dispatchEvent({type:'click'});assert.equal(api.enabled(),true,'there are no ticket colors to turn off');assert.equal(live().getAttribute('aria-pressed'),'true','Live stays selected');
@@ -3035,7 +3036,7 @@ test('#1125 the log lookup note names why it is unavailable, and Live restores i
  // A host without a logs connector cannot run lookups in Live either, so Over time does not outrank that note.
  const bare=harness(raw(),{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){}}}});bare.ctl.telemetry.openHistory([{at:'2026-11-01T00:00:00.000Z'}],0);seen.noConnectorOverTime=logs(bare);bare.ctl.liveStatus.destroy();
  assert.deepEqual(seen,{
-  overTime:[false,'Log lookups work in Live, not in Over time. Switch to Live to use them.'],
+  overTime:[false,'Log lookups need a dated Over time day; this day has none.'],
   backToLive:[true,''],
   closed:[false,'This view was closed. Reopen it to look up log lines.'],
   boardOff:[false,'Log lookups need telemetry, which this board turns off.'],
@@ -3063,6 +3064,43 @@ test('#1124 a log-line trace that is not found says it may not have been kept an
  assert.equal(m.body.querySelector('.dv-trace-log-next'),null);
  // A pasted ID keeps today's text.
  api.setDirectTraceField({field:'input',value:ids[0]});assert.equal(await api.loadDirectTrace(false),null);assert.equal(report().error,'Trace not found in the last 2h. Try a longer lookback under Lookback.');
+ api.destroy();
+});
+test('#1141 in Over time the log search runs on the selected day, a day change clears results, and the Over time note is gone',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);},calls=[];
+ const raw=overFixture();raw.page.tracking.telemetry={grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}},traceConnections:{company:profile}};
+ const lines={data:[{timestamp:'1794044533123456789',line:'Handling camera stats message',labels:{app:'cams'},structuredMetadata:{trace_id:'ab'.repeat(16)}}]};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async args=>{calls.push(plain(args));return lines;}}}});
+ const api=overReady(h.ctl.liveStatus),logs=()=>api.snapshot().trace.direct.logs,day=()=>api.snapshot().overTime.window;api.apply(overToday());api.setStatusMode('trace');await settle();
+ const days=historyDays(providerContext(),[historyTicket('AA-1',Date.now()-3*86400000,'In Progress')],{'AA-1':{state:'active'}},Date.now());
+ api.setHistory({load:()=>days});api.overTime();await historySettle();api.overTimeDay(0);await settle();
+ assert.deepEqual([logs().available,logs().note],[true,''],'Over time no longer disables the log search');
+ api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();
+ assert.equal(calls.length,1,'one call per Find');assert.deepEqual([calls[0].startRfc3339,calls[0].endRfc3339],[day().from,day().to]);
+ assert.equal(logs().search,'Loki · '+day().label);assert.equal(logs().result.rows.length,1);
+ api.overTimeDay(1);assert.equal(logs().result,null,'a day change clears the results');assert.equal(calls.length,1,'without a call');assert.equal(logs().form.value,'arch','the typed value stays');
+ overBackToLive(api);await historySettle();await api.findLogLines();assert.deepEqual([calls[1].startRfc3339,calls[1].endRfc3339],['now-2h','now'],'Live is unchanged');
+ // Days without a date have no window: the search names that instead of the old Over time note.
+ api.setHistory({load:()=>({days:overDays()})});api.overTime();await historySettle();
+ assert.deepEqual([logs().available,logs().note],[false,'Log lookups need a dated Over time day; this day has none.']);
+ api.destroy();
+});
+test('OT19 #1141 on today Find searches local midnight to now, and its results survive repaints as now moves',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);},calls=[];
+ const raw=overFixture();raw.page.tracking.telemetry={grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}},traceConnections:{company:profile}};
+ const lines={data:[{timestamp:'1794044533123456789',line:'Handling camera stats message',labels:{app:'cams'},structuredMetadata:{trace_id:'ab'.repeat(16)}}]};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async args=>{calls.push(plain(args));return lines;}}}});
+ const api=overReady(h.ctl.liveStatus),logs=()=>api.snapshot().trace.direct.logs;api.apply(overToday());api.setStatusMode('trace');await settle();
+ const days=historyDays(providerContext(),[historyTicket('AA-1',Date.now()-2*86400000,'In Progress')],{'AA-1':{state:'active'}},Date.now());
+ api.setHistory({load:()=>days});api.overTime();await historySettle();await settle();assert.equal(api.snapshot().overTime.today,true,'Over time opens on today');
+ api.setLogLookupField({field:'value',value:'arch'});const before=Date.now();await api.findLogLines();const after=Date.now();
+ const now=new Date();assert.equal(calls.length,1);assert.equal(calls[0].startRfc3339,new Date(now.getFullYear(),now.getMonth(),now.getDate()).toISOString(),'today starts at local midnight');
+ const end=Date.parse(calls[0].endRfc3339);assert.ok(end>=before && end<=after,'today ends now');assert.equal(logs().result && logs().result.rows.length,1,'the results are listed');
+ // Two minutes later in the viewer's clock, repaints move today's end but keep the results and call nothing.
+ vm.runInContext('(function(){var real=Date.now;Date.now=function(){return real()+120000;};globalThis.__restoreNow=function(){Date.now=real;};})()',h.C);
+ try{for(let i=0;i<5;i++){api.snapshot();h.flush();}await settle();
+  assert.equal(logs().result && logs().result.rows.length,1,'today\'s results survive repaints');assert.equal(calls.length,1,'no call without a click');
+ }finally{vm.runInContext('__restoreNow()',h.C);}
  api.destroy();
 });
 

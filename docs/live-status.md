@@ -573,7 +573,7 @@ Steps, coins and chips derive their state only from the edges and nodes explicit
 added to that step, including failed communications and imported elements, and
 never carry tickets. A step can narrow them with a [ticket filter](#step-ticket-filters).
 An edge does not bring its endpoint nodes into a step's
-status unless they are also listed in `nodes`. Unlinked, unmarked nodes derive No change needed; an
+status unless they are also listed in `nodes`. Unlinked, unmarked nodes derive No change needed (on boards with ticket references); an
 explicit `missingWork: true` contributes Missing. No-change is neutral in mixed
 rollups. Linked tickets without evidence never imply Done or No change needed.
 Pull requests never carry live state: an authored `prs` URL is an icon, and the

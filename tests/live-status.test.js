@@ -2951,13 +2951,17 @@ test('#1137 metric cards on a board without tickets get no Jira presentation; ti
  ticketed.h.ctl.liveStatus.destroy();
 });
 test('#1137 an applied status map on a board without tickets gives nodes, step coins and captions no Jira presentation',()=>{
- const h=harness({nodes:{a:{title:'Sender'},b:{title:'Receiver'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],steps:[{nodes:['a']},{edge:'a->b'}]}),api=h.ctl.liveStatus,rec=h.ctl.sections[0],controls=stepTicketControls(h,rec);
+ const seed=harness(),model=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=model('provider',{nodes:{api:{title:'Imported API'}},rows:[['api']],topologyExports:{core:{nodes:['api'],edges:[]}}});
+ const consumer=model('consumer',{nodes:{a:{title:'Sender'},b:{title:'Receiver'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],steps:[{nodes:['a','shared::api']},{edge:'a->b'}],topologyImports:[{spec:'provider',export:'core',as:'shared'}]});
+ const h=harness(seed.C.FlowTopology.materialize([provider,consumer])[1]),api=h.ctl.liveStatus,rec=h.ctl.sections[0],controls=stepTicketControls(h,rec);seed.ctl.liveStatus.destroy();
  api.apply({});controls.change(0);
  assert.equal(api.snapshot().available,false,'fixture has no ticket references');
- const node=h.view.querySelector('g.node[data-dv-node="a"]'),card=node.querySelector('.card'),caption=controls.host.querySelector('.dv-live-caption');
- assert.deepEqual({node:node.getAttribute('data-live-appearance'),label:/No change needed/.test(card.getAttribute('aria-label')||''),
+ const presentation=id=>{const node=h.view.querySelector('g.node[data-dv-node="'+id+'"]');return {node:node.getAttribute('data-live-appearance'),label:/No change needed/.test(node.querySelector('.card').getAttribute('aria-label')||'')};};
+ const caption=controls.host.querySelector('.dv-live-caption');
+ assert.deepEqual({local:presentation('a'),imported:presentation('shared::api'),
   coin:rec.sectionEl.querySelector('g.coin[data-dv-step="0"]').getAttribute('data-live-appearance'),chip:rec.sectionEl.querySelector('button.schip[data-step-source="0"]').getAttribute('data-live-appearance'),
   caption:caption?caption.textContent:null,painted:h.view.querySelectorAll('[data-live-appearance]').length},
-  {node:null,label:false,coin:null,chip:null,caption:null,painted:0});
+  {local:{node:null,label:false},imported:{node:null,label:false},coin:null,chip:null,caption:null,painted:0});
  api.destroy();
 });

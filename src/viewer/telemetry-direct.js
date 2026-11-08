@@ -1,5 +1,6 @@
 /* One user-requested detail at a time. Independent of query polling, carrier
    maps, numeric proof and history. Native hosts supply the two read-only hooks. */
+var telemetryDirectReports=0;
 function createTelemetryDirect(page,transport,hooks){
   hooks=hooks || {};var dead=false,accountRetired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),offAccount=null,serial=0,abort=null,timeout=null,busy=false,exemplar=null,report=null,form={connection:'',environment:'',section:'',input:'',start:'',end:''},lastIdentity=null,lastContext=null;
   function profiles(){return FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS);}
@@ -14,10 +15,17 @@ function createTelemetryDirect(page,transport,hooks){
   function retireAccount(){if(dead || accountRetired)return;accountRetired=true;cancel();report={stage:'account',code:'user_changed',error:'Host account changed. Reopen this view to start a new telemetry session.',requestAccepted:false,idMatched:false};changed();}
   function sync(){var key=identity(),context=contextIdentity();if(lastIdentity!==key){if(lastIdentity!==null && lastContext!==context)clearInput();cancel();lastIdentity=key;lastContext=context;}var ps=profiles(),ids=Object.keys(ps);if(!ps[form.connection]){form.connection=ids.length===1?ids[0]:'';form.environment='';}var p=ps[form.connection],envs=p?Object.keys(p.environments):[];if(envs.indexOf(form.environment)<0)form.environment=envs.length===1?envs[0]:'';var ss=sections();if(!ss.some(function(s){return s.id===form.section;}))form.section=ss.length===1?ss[0].id:'';return ps;}
   function available(){return !dead && !accountRetired && !!transport && typeof transport.describe==='function' && typeof transport.call==='function' && !(hooks.disabled && hooks.disabled());}
-  function snapshot(){var ps=sync();return {available:available(),busy:busy,form:Object.assign({},form),profiles:Object.keys(ps).map(function(id){return {id:id,label:ps[id].label,lookback:ps[id].time.defaultLookback,environments:Object.keys(ps[id].environments).map(function(e){return {id:e,label:ps[id].environments[e].label || e};})};}),sections:sections().map(function(s){return {id:s.id,label:s.label};}),report:report?JSON.parse(JSON.stringify(report)):null,exemplar:exemplar,section:form.section};}
+  // The time window a load would send now, so the form can say which one applies.
+  // A link with its own bounds still reports linkTime when time controls conflict.
+  function bounds(ps){
+    var p=ps[form.connection];if(!p || !form.input.trim())return null;
+    function at(request){try{var r=FlowTraceConnections.input(p,request,Date.now());return {lookback:r.lookback,linkTime:r.linkTime};}catch(e){return null;}}
+    var b=at(form);if(!b && (form.start || form.end)){b=at(Object.assign({},form,{start:'',end:''}));if(b && !b.linkTime)b=null;}return b;
+  }
+  function snapshot(){var ps=sync();return {available:available(),busy:busy,form:Object.assign({},form),bounds:bounds(ps),profiles:Object.keys(ps).map(function(id){return {id:id,label:ps[id].label,lookback:ps[id].time.defaultLookback,environments:Object.keys(ps[id].environments).map(function(e){return {id:e,label:ps[id].environments[e].label || e};})};}),sections:sections().map(function(s){return {id:s.id,label:s.label};}),report:report?JSON.parse(JSON.stringify(report)):null,exemplar:exemplar,section:form.section};}
   function set(field,value){if(dead || !Object.prototype.hasOwnProperty.call(form,field) || typeof value!=='string' || value.length>4096)return;sync();if(value===form[field])return;cancel();form[field]=value;if(field==='connection' || field==='environment')clearInput();if(field==='connection')form.environment='';sync();changed();}
   function errorText(e){var known={not_granted:'Connector permission was not granted.',needs_reauth:'Reconnect this connector in the host.',user_changed:'Host account changed; start a new trace request.',server_not_connected:'The configured connector is not connected.',server_not_found:'The configured connector was not found.',capability_removed:'The configured tool capability was removed.',capability_disabled:'The configured tool capability is disabled.'};return known[e && e.code] || telemetryTraceErrorText(e) || 'The host could not complete the read-only detail request.';}
-  function notFoundText(r){return r.lookback?'Trace not found in the last '+r.lookback+'. Try a longer lookback under Lookback.':'Trace not found between '+r.range.from.replace(/\.0+Z$/,'Z')+' and '+r.range.to.replace(/\.0+Z$/,'Z')+'. Try a wider range under Lookback.';}
+  function notFoundText(r){return r.linkTime?'Trace not found in the time range of the pasted link. Paste the trace ID alone, then set Lookback.':r.lookback?'Trace not found in the last '+r.lookback+'. Try a longer lookback under Lookback.':'Trace not found between '+r.range.from.replace(/\.0+Z$/,'Z')+' and '+r.range.to.replace(/\.0+Z$/,'Z')+'. Try a wider range under Lookback.';}
   async function load(verify){
     sync();cancel();var mine=serial,key=lastIdentity,ps=profiles(),p=ps[form.connection],request=Object.assign({},form),stage='configuration',resolved=null;abort=new AbortController();var signal=abort.signal;
     function active(){return !dead && mine===serial && !signal.aborted && key===identity() && available();}
@@ -42,7 +50,7 @@ function createTelemetryDirect(page,transport,hooks){
     }catch(e){
       if(!dead && e && e.code==='user_changed'){if(transport && typeof transport.accountChanged==='function')transport.accountChanged();if(typeof hooks.accountChanged==='function')hooks.accountChanged();retireAccount();return null;}
       if(dead || mine!==serial || signal.aborted || key!==identity())return null;
-      busy=false;report=Object.assign(report || {mode:verify?'verify':'load',requestAccepted:false,idMatched:false},{stage:e.stage || stage,error:e && e.code==='trace_not_found' && resolved?notFoundText(resolved):errorText(e)});if(e.code && /^[A-Za-z0-9_.-]{1,64}$/.test(e.code))report.code=e.code;changed();return null;
+      busy=false;report=Object.assign(report || {mode:verify?'verify':'load',requestAccepted:false,idMatched:false},{stage:e.stage || stage,error:e && e.code==='trace_not_found' && resolved?notFoundText(resolved):errorText(e),serial:++telemetryDirectReports});if(e.code && /^[A-Za-z0-9_.-]{1,64}$/.test(e.code))report.code=e.code;changed();return null;
     }finally{if(mine===serial && timeout){clearTimeout(timeout);timeout=null;}}
   }
   if(transport && typeof transport.onAccountChanged==='function')offAccount=transport.onAccountChanged(retireAccount);

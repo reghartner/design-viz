@@ -234,15 +234,31 @@ and fallback rail. Selecting or navigating steps never opens or selects a trace.
 
 ## Honeycomb lookback
 
-The Load trace form shows the active lookback under the trace ID field ("Looks
-back 2h; change under Lookback."): the profile's `time.defaultLookback`, or the
-**Trace start** value in the **Lookback (optional)** section when one is set.
+The Load trace form says under the trace ID field which time window a load
+would send:
+
+- "Looks back 2h; change under Lookback." for a signed lookback: the
+  **Trace start** value in the **Lookback (optional)** section when one is set,
+  otherwise the profile's `time.defaultLookback`.
+- "Uses the time set under Lookback." when Trace start is an absolute
+  timestamp (or not yet a valid lookback).
+- "Uses the time range in the pasted link." when the pasted link carries its
+  own start and end. Those bounds are sent, and a Trace start cannot be
+  combined with them.
+
 When `get_trace` answers with only a Metadata block whose `navigation_hints`
-starts with `no spans found` and no span table, the panel reports "Trace not
-found in the last 2h. Try a longer lookback under Lookback." with the lookback
-that was sent, and opens the Lookback section. This provider answer is the only
-response reported as not found; errors, unknown shapes and a span table that is
-present but lacks a required column (`Unsupported trace table header.`) are not.
+starts with `no spans found` and no span table, the panel opens the Lookback
+section once for that result and reports, using the window that was sent:
+
+- "Trace not found in the last 2h. Try a longer lookback under Lookback."
+- "Trace not found between <from> and <to>. Try a wider range under
+  Lookback." for absolute Trace start and Trace end.
+- "Trace not found in the time range of the pasted link. Paste the trace ID
+  alone, then set Lookback." for link bounds.
+
+This provider answer is the only response reported as not found; errors,
+unknown shapes and a span table that is present but lacks a required column
+(`Unsupported trace table header.`) are not.
 
 Largest useful lookback: this repo can verify that `from` is a signed duration
 of at most four digits and a unit (`s`, `m`, `h`, `d`, `w`), and the November

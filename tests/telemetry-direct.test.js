@@ -161,13 +161,16 @@ test('connection and environment changes require fresh trace input; section-only
 test('a metadata-only no-spans response names the active lookback; a present but wrong table keeps the header message',async()=>{
  const notFound='---\nMetadata:\n  environment: ms-demo\n  navigation_hints: no spans found\n  total_spans: 0\n  trace_id: '+ID+'\n  view_mode: full\n  visible_spans: 0\n';
  for(const [start,label] of [['','2h'],['-7d','7d']]){
-  const h=setup({result:{payload:notFound}});if(start)h.api.set('start',start);assert.equal(await h.api.load(),null);const s=h.api.snapshot();
+  const h=setup({result:{payload:notFound}});if(start)h.api.set('start',start);assert.deepEqual(clone(h.api.snapshot().bounds),{lookback:label,linkTime:false});assert.equal(await h.api.load(),null);const s=h.api.snapshot();
   assert.equal(s.exemplar,null);assert.equal(s.report.stage,'response');assert.equal(s.report.requestAccepted,true);assert.equal(s.report.idMatched,false);assert.equal(s.report.arguments.from,'-'+label);
   assert.equal(s.report.code,'trace_not_found');assert.equal(s.report.error,'Trace not found in the last '+label+'. Try a longer lookback under Lookback.');h.api.destroy();
  }
  const p=profile();p.time.encoding='iso8601';p.arguments.end='to';const t=tool();t.inputSchema.properties.to={type:'string'};t.inputSchema.required.push('to');
  const absolute=setup({p:board(p),result:{payload:notFound}});absolute.setTools([t]);absolute.api.set('start','2026-11-06T00:00:00Z');absolute.api.set('end','2026-11-06T06:00:00Z');assert.equal(await absolute.api.load(),null);
  assert.equal(absolute.api.snapshot().report.code,'trace_not_found');assert.equal(absolute.api.snapshot().report.error,'Trace not found between 2026-11-06T00:00:00Z and 2026-11-06T06:00:00Z. Try a wider range under Lookback.');absolute.api.destroy();
+ const url='https://ui.honeycomb.io/example-team/environments/production/trace?trace_id='+ID+'&trace_start_ts=1791779586.602194688&trace_end_ts=1791779592.123456789',linked=setup({p:board(clone(p)),result:{payload:notFound}});linked.setTools([t]);linked.api.set('input',url);
+ assert.deepEqual(clone(linked.api.snapshot().bounds),{lookback:null,linkTime:true});assert.equal(await linked.api.load(),null);const first=linked.api.snapshot().report;assert.equal(first.code,'trace_not_found');assert.equal(first.error,'Trace not found in the time range of the pasted link. Paste the trace ID alone, then set Lookback.');
+ assert.equal(await linked.api.load(),null);assert.notEqual(linked.api.snapshot().report.serial,first.serial,'each not-found report is distinct');linked.api.set('start','-2h');assert.deepEqual(clone(linked.api.snapshot().bounds),{lookback:null,linkTime:true},'conflicting time controls do not hide link bounds');linked.api.set('input','');assert.equal(linked.api.snapshot().bounds,null);linked.api.destroy();
  const wrong=recorded.replace('| route |','| path |'),hinted=wrong.replace(/^  navigation_hints: .*$/m,'  navigation_hints: no spans found');assert.notEqual(hinted,wrong);
  for(const payload of [wrong,hinted]){const h=setup({result:{payload}});assert.equal(await h.api.load(),null);const s=h.api.snapshot();assert.equal(s.report.stage,'response');assert.equal(s.report.error,'Unsupported trace table header.');assert.notEqual(s.report.code,'trace_not_found');h.api.destroy();}
 });

@@ -361,6 +361,8 @@
       // Day buttons: on the slider row, and on a row of their own for a demo in Live mode, which has no slider. A demo's buttons move its own day.
       if(hasData && (past || value.demo)){
         var demoDays=value.demo,row=el(host,'div','day-row','dv-live-day-row'+(past?' dv-live-over-time-row':'')+(demoDays?' dv-live-demo':''));
+        // #1082: the selected day, larger than the epic key; a day dated today reads TODAY with its date beside it.
+        if(past){var heading=el(row,'div','heading','dv-live-over-time-heading');el(heading,'strong','day','dv-live-over-time-day',over.today?'TODAY':over.label);el(heading,'span','date','dv-live-over-time-date',over.today?over.label:'').hidden=!over.today;}
         var previousDay=button(row,'previous','reader-button dv-live-step','<',demoDays?'prevDemo':'overTimeStep');previousDay._liveArgument=-1;previousDay.setAttribute('aria-label','Previous day');previousDay.disabled=demoDays?demoDays.first:over.index<=0;
         if(past){
           el(row,'span','first','dv-live-over-time-end',over.first);
@@ -522,6 +524,9 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 .dv-live-over-time-slider::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:var(--dv-live-past);}
 .dv-live-over-time-slider:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:2px;}
 .dv-live-over-time-note{flex:0 0 100%;margin:0;color:var(--dtext);}
+.dv-live-over-time-heading{flex:0 0 100%;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;min-width:0;margin-bottom:2px;}
+.dv-live-over-time-day{font:700 28px/1.15 'IBM Plex Mono',monospace;letter-spacing:.02em;color:var(--dink);overflow-wrap:anywhere;}
+.dv-live-over-time-date{font:600 16px/1.3 'IBM Plex Mono',monospace;color:var(--dtext);}
 .dv-live-epic,.dv-live-proof{display:flex;gap:16px;align-items:center;padding:14px 16px;margin-top:12px;border:1px solid var(--explore-border);border-radius:10px;background:color-mix(in srgb,var(--dink) 4%,transparent);}
 .dv-live-epic-main{display:flex;flex-direction:column;gap:4px;min-width:0;}
 .dv-live-epic-keys{display:flex;align-items:baseline;gap:8px;font:700 20px/1.2 'IBM Plex Mono',monospace;letter-spacing:.02em;}

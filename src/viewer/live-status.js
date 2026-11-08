@@ -1027,7 +1027,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(!overSource)return null;
     var base={active:!!over,loading:overLoading,progress:overProgress,error:overError,available:!!(applied && Object.keys(map).length),disabled:editing()};
     if(!over)return base;
-    var days=over.days;base.index=over.index;base.count=days.length;base.first=days[0].short;base.last=days[days.length-1].short;base.label=days[over.index].label;return base;
+    var days=over.days;base.index=over.index;base.count=days.length;base.first=days[0].short;base.last=days[days.length-1].short;base.label=days[over.index].label;
+    // #1082: a day is today only when its key is today's date in the viewer's time zone, whatever the source. An undated day never is.
+    var now=new Date();base.today=days[over.index].key===new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())).toISOString().slice(0,10);return base;
   }
   function overShow(){map=liveStatusDayMap(over.today,over.days[over.index].states);changedKeys=[];telemetry.historyDay(over.index);paint();notify();telemetryHooks.jiraChanged();}
   // Returning to Live restores the live map, then applies any evidence that arrived meanwhile as a normal refresh.

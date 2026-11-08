@@ -1292,7 +1292,10 @@ then adds a thin amber-tinted slider row to the panel. Clicking **Live** returns
 to today; while Live is already selected, clicking it turns colors off as it
 always has, and Over time turns them back on. The slider moves one whole day at a
 time by pointer or arrow keys, Home and End jump to the first and last day, and
-**<** and **>** on the same row step one day. Each day repaints
+**<** and **>** on the same row step one day. The row's heading shows the
+selected day in large type; on a day dated today it reads **TODAY** with the date
+beside it. TODAY shows only when the selected day's date is today; any other day,
+including the shipped demo's past dates, shows its label. Each day repaints
 nodes and edges (local and imported), step coins and captions, lane rollups,
 panel counts, the progress ring, blockers, the Tickets table State column and
 planned-node treatment.

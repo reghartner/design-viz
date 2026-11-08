@@ -94,11 +94,20 @@ connections. `tracking.telemetry.enabled:false` and host `telemetry:false` win.
 A profile may list `allowedAttributes`: span attribute names it retains from loaded
 traces and permits in `traceMatch.attributes`, in addition to the built-in
 operational list in [trace-ready authoring](trace-ready-authoring.md). It takes
-effect for Tempo (`tempo-v1`) profiles. The verified Honeycomb `get_trace` table
-has a fixed set of columns and no custom span-attribute columns (see
-[provider traces](provider-traces.md)), so on a Honeycomb profile the field has an
-effect only if a recorded response from that connected tool shows a column with
-that exact name. Add it next to the other fields of a profile:
+effect for Tempo (`tempo-v1`) profiles.
+
+Honeycomb `get_trace` does not return span attributes (verified on a real trace,
+company report 2026-11-07). It returns the 19 fixed table columns only. Its linked
+raw JSON resource (`honeycomb://trace/<pk>/json`) holds only `duration_ms`, `name`,
+`service.name`, `span.kind`, `trace.parent_id`, `trace.span_id`, `trace.trace_id`
+and internal IDs, and its input schema has no column parameter. An attribute
+present in Honeycomb `run_query` raw rows (`messaging.rabbitmq.routing_key`) was
+absent from `get_trace`. So on a Honeycomb profile neither `allowedAttributes` nor
+the built-in attribute list can match today. The one exception is
+`http.status_code`, which comes from the fixed `http_status` column as text. See
+also [provider traces](provider-traces.md).
+
+Add the field next to the other fields of a profile:
 
 ```json
 "allowedAttributes": ["device.model"]
@@ -115,13 +124,14 @@ With that profile, a step can tell traces for different device models apart
   authorization, cookie, header, bearer, private key, access key or api key, and
   names with an `auth`, `pwd`, `jwt` or `session` part.
 - Values match exactly, with the same rules as built-in attributes. Tempo keeps the
-  span attribute value and its type. A Honeycomb table cell, if present, is text.
+  span attribute value and its type.
 - Validation accepts an attribute that any connection for the page lists, also
   while `tracking.telemetry.enabled` is `false`. A trace loaded through a profile
   that does not list it does not carry it, so the step shows Not observed.
 - Validation warns (it does not fail) when only Honeycomb connections list an
-  attribute that a step uses, and when such an attribute has a number or boolean
-  value, which a text cell never matches.
+  attribute that a step uses, because Honeycomb `get_trace` does not return span
+  attributes. It also warns when such an attribute has a number or boolean value,
+  which a Honeycomb text cell never matches.
 - A board entry that references a company profile inherits its `allowedAttributes`
   and cannot change them; an inline board profile may declare its own.
 

@@ -210,8 +210,9 @@ var FlowCanon = (function(){
     Object.keys(connections).forEach(function(id){(connections[id].allowedAttributes || []).forEach(function(k){(out[k]=out[k] || []).push(connections[id].provider);});});
     return out;
   }
-  /* The verified Honeycomb get_trace table has fixed columns and text cells, so an
-     attribute only Honeycomb connections list may never be observed. */
+  /* Honeycomb get_trace returns only its fixed table columns, as text, and no span
+     attributes (company report 2026-11-07), so an attribute only Honeycomb
+     connections list is never observed. */
   function traceWarnings(raw){
     var listed=profileAttributes(raw),warnings=[];
     sections(raw).forEach(function(sec){(Array.isArray(sec.diagram.steps)?sec.diagram.steps:[]).forEach(function(st){
@@ -219,7 +220,7 @@ var FlowCanon = (function(){
       Object.keys(m.attributes).forEach(function(k){
         if(!Object.prototype.hasOwnProperty.call(listed,k) || listed[k].some(function(p){return p!=='honeycomb';}))return;
         var at='steps.'+(st.id || '?')+'.traceMatch.attributes.'+k+': ';
-        if(!traceAttributes.includes(k))warnings.push(at+'only Honeycomb connections list this attribute; the verified Honeycomb get_trace table has no custom attribute columns, so this step may show Not observed');
+        if(!traceAttributes.includes(k))warnings.push(at+'only Honeycomb connections list this attribute; Honeycomb get_trace does not return span attributes, so this step shows Not observed');
         if(typeof m.attributes[k]!=='string')warnings.push(at+'Honeycomb table cells are text; a '+typeof m.attributes[k]+' value never matches');
       });
     });});

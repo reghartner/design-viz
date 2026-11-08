@@ -6,9 +6,9 @@ const fixture=require('./fixtures/trace-connection-profile.json'),recorded=fs.re
 const ID='8413cd87a9f15b6bfe8e1acf5b3346d0',clone=x=>JSON.parse(JSON.stringify(x));
 const X_SPAN='b01a8fd7791f709b',Y_SPAN='3b8c2e88761b259e';
 function context(name='standalone'){const C={URL,AbortController,TextEncoder,TextDecoder,console,setTimeout,clearTimeout,document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint(name).body,C);return C;}
-// SYNTHETIC: the recorded Honeycomb table has a fixed 19 columns and no custom
-// span-attribute columns. This variant adds a device.model column only to
-// exercise the retention path. Two productcatalog GetProduct server spans
+// SYNTHETIC: Honeycomb get_trace returns a fixed 19 columns and no span
+// attributes (company report 2026-11-07). This variant adds a device.model
+// column only to exercise the retention path. Two productcatalog GetProduct server spans
 // carry X and Y; the rest are blank.
 function withDeviceModel(text){
   return text.split('\n').map(line=>{
@@ -90,9 +90,9 @@ test('validation warns when only Honeycomb connections list the attribute, and w
   const warn=p=>clone(C.validate(p).warnings.filter(w=>/traceMatch\.attributes/.test(w)));
   const only=page(honeycomb);
   assert.deepEqual(attributeErrors(C,only),[]);
-  assert.deepEqual(warn(only),['steps.lookup.traceMatch.attributes.device.model: only Honeycomb connections list this attribute; the verified Honeycomb get_trace table has no custom attribute columns, so this step may show Not observed']);
+  assert.deepEqual(warn(only),['steps.lookup.traceMatch.attributes.device.model: only Honeycomb connections list this attribute; Honeycomb get_trace does not return span attributes, so this step shows Not observed']);
   const numeric=page(honeycomb);numeric.sections[0].diagram.steps[0].traceMatch.attributes['device.model']=7;
-  assert.deepEqual(warn(numeric).map(w=>w.replace(/^.*?: /,'')),['only Honeycomb connections list this attribute; the verified Honeycomb get_trace table has no custom attribute columns, so this step may show Not observed','Honeycomb table cells are text; a number value never matches']);
+  assert.deepEqual(warn(numeric).map(w=>w.replace(/^.*?: /,'')),['only Honeycomb connections list this attribute; Honeycomb get_trace does not return span attributes, so this step shows Not observed','Honeycomb table cells are text; a number value never matches']);
   const tempo=clone(TEMPO);tempo.allowedAttributes=['device.model'];
   const mixed=page(null,{company:honeycomb,tempo});
   assert.deepEqual(attributeErrors(C,mixed),[]);

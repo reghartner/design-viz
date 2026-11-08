@@ -429,7 +429,7 @@ var telemetryLookupValuePattern=/^[^"`\\\x00-\x1f\x7f]{1,200}$/;
 function telemetryLookupSlot(query){return typeof query==='string' && /\$\{value\}|\$value(?![A-Za-z0-9_])/.test(query);}
 function telemetryLookups(raw,warn){
   var out={};
-  if(!telemetryObject(raw)){warn('.lookups','must be an object of named log lookups {label, query, values?, datasource?, fields?} — ignored');return out;}
+  if(!telemetryObject(raw)){warn('.lookups','must be an object of named log lookups {label, query, values?, datasource?, fields?} — ignored');return null;}
   Object.keys(raw).forEach(function(id){
     var at='.lookups.'+id,entry=raw[id],ok=true;
     function bad(path,message){warn(at+path,message+' — lookup ignored');ok=false;}
@@ -539,7 +539,7 @@ function trackingTelemetry(page,invalid){
       clean.params=params;out.templates[name]=clean;
     });
   }
-  if(telemetryOwn(value,'lookups'))out.lookups=telemetryLookups(value.lookups,warn);
+  if(telemetryOwn(value,'lookups')){var lookups=telemetryLookups(value.lookups,warn);if(lookups)out.lookups=lookups;}
   if(typeof FlowTraceConnections!=='undefined' && (telemetryOwn(value,'traceConnections') || out.traceConnections))out.traceConnections=FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS,warn);
   return out;
 }

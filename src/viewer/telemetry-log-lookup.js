@@ -32,7 +32,7 @@ function telemetryLogLines(payload,fields){
   return {metric:!lines.length && payload.data.some(function(e){return telemetryObject(e) && (Array.isArray(e.values) || telemetryOwn(e,'value'));}),
     rows:lines.slice(0,TELEMETRY_LOG_LIMIT).map(function(e){
       var trace=telemetryLogField(e,fields.traceId),span=telemetryLogField(e,fields.spanId),valid=!!trace && /^[0-9a-f]{16,32}$/i.test(trace);
-      return {time:telemetryLogTime(e.timestamp),line:e.line.replace(/[\x00-\x1f\x7f]+/g,' ').trim().slice(0,240),traceId:valid?trace:null,spanId:valid && span && /^[0-9a-f]{16}$/i.test(span)?span:null,
+      return {time:telemetryLogTime(e.timestamp),line:e.line.replace(/[\x00-\x1f\x7f]+/g,' ').trim().slice(0,240),traceId:valid?trace.toLowerCase():null,spanId:valid && span && /^[0-9a-f]{16}$/i.test(span)?span.toLowerCase():null,
         missing:valid?'':trace?'This log line\'s '+fields.traceId+' is not a trace ID':'This log line has no '+fields.traceId};
     })};
 }
@@ -50,13 +50,13 @@ function telemetryLogRange(start,end,lookback){
 }
 function createTelemetryLogLookup(page,transport,hooks){
   hooks=hooks || {};
-  var dead=false,retired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),off=null,serial=0,abort=null,busy=false,connector=null,lastIdentity=null,result=null;
+  var dead=false,retired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),off=null,serial=0,abort=null,timer=null,busy=false,connector=null,lastIdentity=null,result=null;
   var form={lookup:'',value:'',logql:''};
   function lookups(){return trackingTelemetry(page).lookups || null;}
   function supported(){return !!transport && typeof transport.logsConnector==='function' && typeof transport.queryLogs==='function';}
   function disabled(){return typeof hooks.disabled==='function' && !!hooks.disabled();}
   function changed(){if(!dead && typeof hooks.changed==='function')hooks.changed();}
-  function cancel(){serial++;if(abort)abort.abort();abort=null;busy=false;}
+  function cancel(){serial++;if(timer)clearTimeout(timer);timer=null;if(abort)abort.abort();abort=null;busy=false;}
   function sync(){
     var key=JSON.stringify(typeof hooks.identity==='function'?hooks.identity():null),ls=lookups() || {},ids=Object.keys(ls);
     if(key!==lastIdentity){if(lastIdentity!==null){cancel();result=null;}lastIdentity=key;}
@@ -108,7 +108,8 @@ function createTelemetryLogLookup(page,transport,hooks){
       var values=Object.assign(Object.create(null),config.variables || {}),missing=null;delete values.value;
       if(config.environment)values.env=config.environment;
       if(config.grafana && config.grafana.accountId)values.account=config.grafana.accountId;
-      function expand(text){return telemetrySubstitute(text,values,function(name){if(!missing)missing=name;},true);}
+      // ${value} is the lookup slot, never an environment variable.
+      function expand(text){return telemetrySubstitute(text,values,function(name){if(name!=='value' && !missing)missing=name;},true);}
       var logql=expand(query),uid=lookup && lookup.datasource?expand(lookup.datasource):config.grafana && config.grafana.loki;
       if(missing)fail('Set telemetry variable ${'+missing+'} in the active environment.');
       if(slot)logql=logql.replace(/\$\{value\}|\$value(?![A-Za-z0-9_])/g,function(){return value;});
@@ -116,6 +117,8 @@ function createTelemetryLogLookup(page,transport,hooks){
       var back=typeof hooks.lookback==='function'?hooks.lookback() || {}:{},range=telemetryLogRange(back.start,back.end,back.lookback);
       var args={datasourceUid:uid,logql:logql,startRfc3339:range.startRfc3339,endRfc3339:range.endRfc3339,limit:TELEMETRY_LOG_LIMIT,direction:'backward',queryType:'range'};
       busy=true;result={lookup:request.lookup,query:logql,lookback:range.lookback,rows:[]};changed();
+      // As the direct trace load: a call that never answers is retired after 30 s.
+      timer=setTimeout(function(){if(dead || mine!==serial)return;timer=null;serial++;controller.abort();abort=null;busy=false;result.error='The log query timed out after 30 seconds. Retry, or use a shorter lookback.';changed();},30000);
       var payload=await transport.queryLogs(args,signal);
       if(dead || mine!==serial || signal.aborted)return null;
       var parsed=telemetryLogLines(payload,lookup?lookup.fields:{traceId:'trace_id',spanId:'span_id'});
@@ -128,7 +131,7 @@ function createTelemetryLogLookup(page,transport,hooks){
       busy=false;abort=null;
       if(e && e.code==='user_changed'){if(transport && typeof transport.accountChanged==='function')transport.accountChanged();if(typeof hooks.accountChanged==='function')hooks.accountChanged();retire();return null;}
       result={lookup:request.lookup,rows:[],error:errorText(e)};changed();return null;
-    }
+    }finally{if(mine===serial && timer){clearTimeout(timer);timer=null;}}
   }
   // The row a reader chose, and what happened when its trace loaded.
   function row(index){var r=result && result.rows[index];return r?JSON.parse(JSON.stringify(r)):null;}

@@ -9,7 +9,7 @@ const clone=x=>JSON.parse(JSON.stringify(x)),settle=async()=>{for(let i=0;i<12;i
 const TRACE='1e4cef70fde7bde26ca79f1e74c05bcb',SPAN='b4be3d5412c33b2e',OTHER='8413cd87a9f15b6bfe8e1acf5b3346d0';
 const QUERY='{env="$env", k8s_namespace_name="${namespace}"} |= "Handling camera stats message" | cameraModel="$value"';
 const EXPANDED='{env="stg", k8s_namespace_name="cameras-stg"} |= "Handling camera stats message" | cameraModel="arch"';
-function context(name='standalone'){const C={URL,AbortController,TextEncoder,TextDecoder,console,setTimeout,clearTimeout,document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint(name).body,C);return C;}
+function context(name='standalone',timers={setTimeout,clearTimeout}){const C={URL,AbortController,TextEncoder,TextDecoder,console,setTimeout:timers.setTimeout,clearTimeout:timers.clearTimeout,document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint(name).body,C);return C;}
 function board(lookups={camera:{label:'Camera model',query:QUERY,values:['arch','wren']}}){
  return {tracking:{telemetry:{grafana:{loki:'loki-$env'},environment:'stg',environments:{stg:{variables:{namespace:'cameras-stg'}},prd:{variables:{namespace:'cameras-prd'}}},lookups,traceConnections:{company:clone(fixture)}}},sections:[{id:'one',diagram:{nodes:{a:{}},rows:[['a']]}}]};
 }
@@ -18,9 +18,9 @@ function entry({at='1794044533123456789',meta={cameraModel:'arch',deviceId:'cam-
  return {timestamp:at,line,labels,...(meta?{structuredMetadata:meta}:{})};
 }
 const GRAFANA={server:'Grafana',tools:[{name:'query_loki_logs',annotations:{readOnlyHint:true}}]},DETAIL={server:fixture.server,tools:[{name:'get_trace',annotations:{readOnlyHint:true}}]};
-function setup({p=board(),data=[entry()],servers=[DETAIL,GRAFANA],lookback={start:'',end:'',lookback:'2h'}}={}){
- const C=context(),calls=[],counts={lists:0};let changes=0;
- const mcp={listTools:async()=>{counts.lists++;return clone(servers);},callTool:async(server,tool,args)=>{calls.push({server,tool,args:clone(args)});return {content:[{type:'text',text:JSON.stringify({data,metadata:{linesReturned:data.length,maxLinesAllowed:10,resultsTruncated:false}})}]};}};
+function setup({p=board(),data=[entry()],servers=[DETAIL,GRAFANA],lookback={start:'',end:'',lookback:'2h'},C=context(),answer}={}){
+ const calls=[],counts={lists:0};let changes=0;
+ const mcp={listTools:async()=>{counts.lists++;return clone(servers);},callTool:async(server,tool,args)=>{calls.push({server,tool,args:clone(args)});if(answer)return answer();return {content:[{type:'text',text:JSON.stringify({data,metadata:{linesReturned:data.length,maxLinesAllowed:10,resultsTruncated:false}})}]};}};
  const transport=C.createTelemetryProviders(p,{claude:{use:async()=>mcp}}).options.directTrace;
  const api=C.createTelemetryLogLookup(p,transport,{config:()=>C.telemetryEnvironmentConfig(p,'stg'),lookback:()=>lookback,changed:()=>changes++});
  return {C,p,api,calls,counts,changes:()=>changes};
@@ -86,4 +86,33 @@ test('plan 6: without a Grafana connector lookups are disabled with a message an
  h.api.set('value','arch');assert.equal(await h.api.find(),null);assert.equal(h.calls.length,0);
  const C=context(),native=C.createTelemetryLogLookup(board(),{describe(){},call(){}},{});assert.equal(native.snapshot().available,false);assert.match(native.snapshot().note,/Grafana connector/);
  assert.equal(C.createTelemetryLogLookup({tracking:{telemetry:{}}},null,{}).snapshot(),null,'a board without lookups has no log section');
+});
+
+test('review: a ${value} slot is filled like $value and never reported as a missing variable',async()=>{
+ const braced=QUERY.replace('"$value"','"${value}"'),h=setup({p:board({camera:{label:'Camera model',query:braced,values:['arch']}})});await settle();
+ assert.equal(h.api.snapshot().lookups[0].slot,true);h.api.set('value','arch');await h.api.find();
+ assert.equal(h.api.snapshot().result.error,undefined);assert.deepEqual(h.calls.map(c=>c.args.logql),[EXPANDED]);
+});
+
+test('review: a non-object lookups value is ignored by the viewer as it is by inject',()=>{
+ for(const lookups of [[],null,'camera',3]){
+  const C=context(),warnings=[],p=board(lookups);
+  assert.equal(C.trackingTelemetry(p,at=>warnings.push(at)).lookups,undefined,JSON.stringify(lookups));assert.deepEqual(warnings,['.lookups']);
+  assert.equal(C.createTelemetryLogLookup(p,{logsConnector(){},queryLogs(){}},{}).snapshot(),null,'no log section for '+JSON.stringify(lookups));
+ }
+});
+
+test('review: a Grafana call that never answers times out after 30 s and its late answer is ignored',async()=>{
+ const pending=[];let release;const timers={setTimeout:(fn,ms)=>{pending.push({fn,ms});return pending.length;},clearTimeout:id=>{if(pending[id-1])pending[id-1].fn=null;}};
+ const h=setup({C:context('standalone',timers),answer:()=>new Promise(resolve=>release=()=>resolve({content:[{type:'text',text:JSON.stringify({data:[entry()]})}]}))});
+ h.api.set('value','arch');const found=h.api.find();await settle();
+ assert.equal(h.calls.length,1);assert.equal(h.api.snapshot().busy,true);
+ const timeout=pending.find(t=>t.ms===30000 && t.fn);assert.ok(timeout,'Find arms a 30 s timeout');timeout.fn();
+ let s=h.api.snapshot();assert.equal(s.busy,false);assert.match(s.result.error,/timed out/);
+ release();assert.equal(await found,null);await settle();s=h.api.snapshot();assert.match(s.result.error,/timed out/);assert.deepEqual(clone(s.result.rows),[]);
+});
+
+test('review: hex trace and span ids from a log line are lowercased',async()=>{
+ const C=context(),out=C.telemetryLogLines({data:[entry({meta:{trace_id:TRACE.toUpperCase(),span_id:SPAN.toUpperCase()}})]},{traceId:'trace_id',spanId:'span_id'});
+ assert.deepEqual([out.rows[0].traceId,out.rows[0].spanId],[TRACE,SPAN]);
 });

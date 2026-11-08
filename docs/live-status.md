@@ -2819,7 +2819,7 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
 - A value cannot contain quotes, backticks, backslashes or control characters,
   so it cannot leave the LogQL string it is placed in. The typed box is limited
   to 2000 characters. LogQL cannot write; the call is bounded by the window and
-  10 lines.
+  10 lines. A Find with no answer after 30 seconds stops with a timeout message.
 - The result lists up to 10 lines, newest first: time (UTC), the value (or the
   line text for a typed query), and the trace ID. The IDs are read from the
   line's structured metadata, then parsed labels, then stream labels, because

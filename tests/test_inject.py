@@ -592,6 +592,7 @@ class InjectTests(unittest.TestCase):
         self.assertEqual(servers(base, {"logs": {"loki": 'count_over_time({app="a"}[5m])'}}), [{"server": "Grafana", "tools": ["query_loki_logs"]}, detail])
         self.assertEqual(servers(base, {"rate": {"grafana": "up"}}), [{"server": "Grafana", "tools": ["query_prometheus", "query_loki_logs"]}, detail])
         self.assertEqual(servers({k: v for k, v in base.items() if k != "lookups"}), [detail])
+        self.assertEqual(servers({**base, "lookups": []}), [detail])
         self.assertEqual(servers({**base, "traceConnections": {}}), [])
         self.assertEqual(servers({**base, "enabled": False}), [])
 

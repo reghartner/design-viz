@@ -501,7 +501,7 @@ var FlowTopology = (function(){
         if(provenance.length)d.topologyProvenance={version:1,imports:provenance};
         if(drops.length)telemetryDrops.set(d,drops);
         if(timeDrops.length)stepTimeDrops.set(d,timeDrops);
-        if(provenance.length || d.topologyProvenance)checkReferences(d,at);
+        if(provenance.length || d.topologyProvenance)checkReferences(d,at,sec);
       });
       // Validate exports even when nobody imports them, so broken declarations
       // cannot silently become the next approved provider contract.
@@ -523,7 +523,7 @@ var FlowTopology = (function(){
     });
     return copies;
   }
-  function checkReferences(d,at){
+  function checkReferences(d,at,sec){
     var nodes=d.nodes || {},edges=new Set((d.edges || []).map(edgeKey));
     function context(key){
       return ((d.topologyProvenance || {}).imports || []).filter(function(imp){return key.indexOf(imp.as+'::')>=0;}).map(function(imp){return ' import '+imp.as+' ('+imp.spec+' export '+imp.export+')';}).join('');
@@ -541,6 +541,7 @@ var FlowTopology = (function(){
     (Array.isArray(d.paths)?d.paths:[]).forEach(function(p,i){if(p && Array.isArray(p.steps))p.steps.forEach(function(id){step(id,'path '+(p.id || i));});});
     (Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v,i){if(v && Array.isArray(v.steps))v.steps.forEach(function(id){step(id,'view '+(v.id || i));});});
     Object.keys(nodes).forEach(function(id){var detail=nodes[id] && nodes[id].detail;if(object(detail) && object(detail.stepMap))Object.keys(detail.stepMap).forEach(function(key){step(key,'node '+id+' detail stepMap');});});
+    if(sec)sectionContracts(sec).forEach(function(record){(Array.isArray(record.value.wires)?record.value.wires:[]).forEach(function(wire){if(object(wire))step(wire.step,'contract wire');});});
     (d.edges || []).forEach(function(e){node(e.from,'edge '+edgeKey(e));node(e.to,'edge '+edgeKey(e));});
     (d.steps || []).forEach(function(s,i){
       var where='step '+(s.id || i);

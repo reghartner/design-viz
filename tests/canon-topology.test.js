@@ -662,18 +662,32 @@ test('removing or renaming a provider step the consumer uses fails the build nam
     alternative:[{},'step done traceMatch references missing step pay::persist'],
     view:[{layouts:[{id:'focus',steps:['pay::persist']}]},'view focus references missing step pay::persist'],
     stepMap:[{},'node cart detail stepMap references missing step pay::persist'],
+    wire:[{},'contract wire references missing step pay::persist'],
   };
   for(const [kind,[patch,message]] of Object.entries(uses))for(const change of ['remove','rename']){
     const consumer=stepImporter([{set:'payment'}],patch),d=stepDiagram(consumer);
     if(kind==='parent')stepById(consumer,'done').traceMatch={serviceName:'shop',operation:'GET /done',parentStepId:'pay::persist'};
     if(kind==='alternative')stepById(consumer,'done').traceMatch=[{serviceName:'shop',operation:'GET /done'},{serviceName:'shop',operation:'GET /done',parentStepId:'pay::persist'}];
     if(kind==='stepMap')d.nodes.cart.detail={url:'https://example.test/payments',mode:'link',stepMap:{'pay::persist':{}}};
+    if(kind==='wire')consumer.page.sections[0].contracts=[{title:'Ledger write',fields:[{k:'amount'}],wires:[{step:'pay::persist',edge:'pay::auth->pay::ledger'}]}];
     assert.equal(stepDiagram(resolve([stepProvider(),structuredClone(consumer)])[1]).steps.length,6,kind+': resolves before the change');
     const provider=stepProvider(),pd=stepDiagram(provider);
     if(change==='remove')pd.stepExports.payment.steps=['authorize','declined'];
     else{stepById(provider,'persist').id='persist-v2';pd.stepExports.payment.steps=['authorize','persist-v2','declined'];}
     assert.throws(()=>resolve([provider,consumer]),error=>error.message.startsWith(at+message),kind+' '+change);
   }
+});
+test('two imports that both carry stepImports splice, shift reveals and record provenance per import',()=>{
+  const consumer=stepImporter([{set:'payment',after:'checkout'}]),d=stepDiagram(consumer);
+  d.topologyImports.push({spec:'payments',export:'core',as:'alt',stepImports:[{set:'payment',after:'pay::persist'}]});
+  d.edges[1].revealAt=1;
+  const out=resolve([stepProvider(),consumer])[1],od=stepDiagram(out);
+  assert.deepEqual(stepIds(out),['checkout','pay::authorize','pay::persist','alt::authorize','alt::persist','alt::declined','pay::declined','receipt','done']);
+  // receipt moves from position 1 to 7: three steps at 1, then three more at 3.
+  assert.equal(od.edges.find(e=>e.to==='receipt').revealAt,7);
+  assert.deepEqual(od.topologyProvenance.imports.map(imp=>[imp.as,imp.steps]),[['pay',['pay::authorize','pay::persist','pay::declined']],['alt',['alt::authorize','alt::persist','alt::declined']]]);
+  assert.equal(stepById(out,'alt::persist').traceMatch.parentStepId,'alt::authorize');
+  assert.deepEqual(C.validateSpec(out).errors,[]);
 });
 test('nested providers re-export imported steps under nested namespaces and provenance',()=>{
   const middle=stepImporter([{set:'payment',after:'checkout'}]),md=stepDiagram(middle);

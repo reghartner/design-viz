@@ -487,3 +487,18 @@ test('signal show on card is one reversible edit and survives label, source and 
  assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,false);
  oneStep(ui,()=>{const toggle=ui.control('received show on card').querySelector('input');toggle.checked=true;toggle.fire('change');ui.h.flush();});assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,true);
 });
+
+test('#1112 Inspect sets connection card title and width with one Undo each; invalid values are refused; nodes get neither row',()=>{
+  const ui=harness(board({kind:'call',signals:{rate:{grafana:PROM_RATE}},card:{side:'below'}}),EDGE);ui.metrics();
+  oneStep(ui,()=>ui.set('Card title','  Camera stats consumer · RabbitMQ '));oneStep(ui,()=>ui.set('Card width','360'));
+  assert.deepEqual(edgeOf(ui).telemetry.card,{side:'below',title:'Camera stats consumer · RabbitMQ',width:360});
+  assert.equal(ui.control('Card title').value,'Camera stats consumer · RabbitMQ');assert.equal(ui.control('Card width').value,'360');
+  for(const [label,value] of [['Card title','x'.repeat(121)],['Card width','139'],['Card width','481'],['Card width','wide']]){
+    const before=ui.text;ui.set(label,value);assert.equal(ui.text,before,label+' '+value+' is refused');assert.ok(ui.error(),label+' explains the refusal');ui.select(EDGE);
+  }
+  const C=api(ui.e.C);
+  for(const bad of [NaN,Infinity,'300'])assert.match(C.telemetryEditBinding(edgeOf(ui).telemetry,{op:'card',field:'width',value:bad},{}).error || '',/140 and 480/,'card width refuses '+String(bad));
+  assert.match(C.telemetryEditBinding(edgeOf(ui).telemetry,{op:'card',field:'title',value:'bell\u0007'},{}).error || '',/1–120/);
+  oneStep(ui,()=>ui.set('Card title',''));oneStep(ui,()=>ui.set('Card width',''));assert.deepEqual(edgeOf(ui).telemetry.card,{side:'below'});
+  const node=harness(board(),{kind:'node',section:0,id:'ingest'});node.metrics();assert.equal(node.row('Card title'),null);assert.equal(node.row('Card width'),null);
+});

@@ -309,3 +309,23 @@ test('authored query link in desktop preview opens source without selection, dra
  expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
  await card.focus();await card.press('ArrowRight');await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.position?.x).toBeDefined();const moved=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(moved);
 });
+test('#1112 Inspect sets the card title and width; the preview card redraws at that width and Undo/Redo restore both',async({page,server})=>{
+ await open(page,server);const source=page.locator('#src'),guide=page.locator('#guide'),name='Camera stats consumer · RabbitMQ';
+ await toggle(page).check();await expect(cards(page)).toHaveCount(1);expect((await box(cards(page))).w).toBe(240);
+ await expect(cards(page).locator('.dv-metrics-card-title')).not.toHaveText(name);
+ await cards(page).click();await page.locator('#editor-tab-inspect').click();
+ const title=guide.getByLabel('Card title',{exact:true}),width=guide.getByLabel('Card width',{exact:true});
+ await expect(title).toHaveValue('');await expect(width).toHaveValue('');
+ await title.fill(name);await title.press('Enter');
+ await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.title).toBe(name);
+ await expect(cards(page).locator('.dv-metrics-card-title')).toHaveText(name);const titled=await source.inputValue();
+ await cards(page).click();await width.fill('420');await width.press('Enter');
+ await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.width).toBe(420);
+ await expect.poll(async()=>(await box(cards(page))).w).toBe(420);const sized=await source.inputValue();
+ expect(edge(sized).telemetry.card).toEqual({side:'below',offset:0,title:name,width:420});
+ await cards(page).click();await width.fill('900');await width.press('Enter');
+ await expect(guide.locator('.ierr')).toContainText('140 and 480');await expect(source).toHaveValue(sized);expect((await box(cards(page))).w).toBe(420);
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(titled);await expect.poll(async()=>(await box(cards(page))).w).toBe(240);
+ await page.locator('#redo-builder').click();await expect(source).toHaveValue(sized);await expect.poll(async()=>(await box(cards(page))).w).toBe(420);
+ expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
+});

@@ -41,6 +41,10 @@ add `traceMatch`, preserving the step's ID, narrative and delivered `edge` or
 `edges`. `nodeId` names an existing stable node in this source section, normally
 the receiving node for that operation. It is not a provider service-name guess.
 
+On a board, the Trace view shows the exact Service and Operation of a selected
+span; copy those into `serviceName` and `operation`. A span no step maps says so
+and links to this guide.
+
 ```json
 {
   "id": "persist",

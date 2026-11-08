@@ -95,7 +95,8 @@ function overlayInfo(imp,field,rel){
   return {kind:'overlay',field,rel,edge:ends,label:ends.join(' → ')};
 }
 /* #1078: every step with an id, keyed by its identity chain (section id, step id), with its
-   traceMatch. Duplicate keys are ambiguous and never merged. */
+   traceMatch: an object, or an alternatives array (#1100). Duplicate keys are ambiguous and
+   never merged. */
 function stepInventory(raw){
   const map=new Map(),ambiguous=new Set();
   C.specSectionPaths(raw).forEach(record=>{
@@ -106,12 +107,13 @@ function stepInventory(raw){
       if(map.has(key)){ambiguous.add(key);map.delete(key);return;}
       if(ambiguous.has(key))return;
       const text=typeof step.text==='string'?step.text.replace(/\s+/g,' ').trim():'';
-      map.set(key,{key,path,id:step.id,label:text || step.id,traceMatch:isObject(step.traceMatch)?step.traceMatch:null});
+      map.set(key,{key,path,id:step.id,label:text || step.id,traceMatch:step.traceMatch!=null?step.traceMatch:null});
     });
   });
   return map;
 }
-const spanText=match=>match.serviceName+' · '+match.operation;
+const spanText=match=>Array.isArray(match)?match.map(spanText).join(' or '):isObject(match)?match.serviceName+' · '+match.operation:JSON.stringify(match);
+// The same single span. An alternatives array is never the board's one mapping.
 const sameSpan=(a,b)=>isObject(a) && isObject(b) && a.serviceName===b.serviceName && a.operation===b.operation;
 // The step a trace-match change names in `raw`: its recorded path when that still holds the same step id, else the step id when unique.
 function stepKey(raw,steps,change){

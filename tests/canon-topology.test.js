@@ -492,6 +492,40 @@ test('array-bound step sets close over the merged export union; scalar sets keep
   assert.equal(stepDiagram(resolve([split(['entry','store'])])[0]).stepExports,undefined);
   assert.throws(()=>resolve([split('entry')]),/step set payment: step persist edges references edge auth->ledger outside export entry$/);
   assert.throws(()=>resolve([split(['entry'])]),/step set payment: step persist edges references edge auth->ledger outside export entry$/);
+  // One export whose declared edges leave out auth->ledger: the scalar binding
+  // keeps that boundary, the one-name array adds the edge between its nodes.
+  const narrow=binding=>{const s=stepProvider(),d=stepDiagram(s);
+    d.topologyExports.core={nodes:['gateway','auth','ledger'],edges:['gateway->auth']};d.stepExports.payment.export=binding;return s;};
+  assert.throws(()=>resolve([narrow('core')]),/step set payment: step persist edges references edge auth->ledger outside export core$/);
+  assert.equal(stepDiagram(resolve([narrow(['core'])])[0]).stepExports,undefined);
+});
+test('step-set closure reads step references the way checkReferences does',()=>{
+  // stepKeys ignores a stale edge when edges is present, so closure ignores it too.
+  const specs=[stepProvider()];stepById(specs[0],'persist').edge='ledger->audit';
+  assert.equal(stepDiagram(resolve(specs)[0]).stepExports,undefined);
+});
+test('a stepExports-only section fails its binding wherever topology declarations are detected',async t=>{
+  const message='step set payment: export core is not declared in this section';
+  const lone=()=>{const s=stepProvider();delete stepDiagram(s).topologyExports;return s;};
+  const vm=require('node:vm'),loader=require('../tools/source-loader.cjs'),ctx={URL,TextEncoder};vm.createContext(ctx);
+  vm.runInContext(loader.composeSources(['canon.js','validator.js','workbench/io-model.js']),ctx);
+  // A bare diagram without a context resolves instead of passing through.
+  assert.throws(()=>ctx.FlowTopology.resolveSource(stepDiagram(lone()),null),new RegExp('Topology local-export section 0 '+message));
+  const bare=stepDiagram(stepProvider());
+  assert.equal(ctx.FlowTopology.resolveSource(bare,null).stepExports,undefined);
+  // With a context, a candidate holding only stepExports is a bare diagram.
+  assert.throws(()=>ctx.FlowTopology.resolveSource({stepExports:stepDiagram(stepProvider()).stepExports},{version:1,id:'payments',specs:[stepProvider()]}),
+    new RegExp('Topology payments section 0 '+message));
+  // The HTML snapshot drops the declaration even when the resolver leaves it.
+  const snapshot=ctx.prepareExportSnapshot(JSON.stringify(stepProvider()),raw=>raw);
+  assert.equal(snapshot.error,undefined);assert.equal(stepDiagram(JSON.parse(snapshot.text)).stepExports,undefined);
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-step-sets-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  fs.writeFileSync(path.join(dir,'payments.json'),JSON.stringify(lone()));
+  const cli=require('node:child_process').spawnSync(process.execPath,[path.join(__dirname,'../tools/validate.js'),path.join(dir,'payments.json')],{encoding:'utf8'});
+  assert.equal(cli.status,1,cli.stdout+cli.stderr);assert.ok(cli.stdout.includes(message),cli.stdout);
+  assert.ok(!cli.stdout.includes('unresolved topology declarations'),cli.stdout);
+  const {buildLibraryFromDirectory}=await import('../tools/canon/library.mjs');
+  await assert.rejects(buildLibraryFromDirectory(dir),error=>error.message.includes(message));
 });
 test('a consumer can declare a step set over its own steps on imported topology it re-exports',()=>{
   const specs=source(),consumer=diagram(specs[1]);

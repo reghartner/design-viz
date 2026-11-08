@@ -379,7 +379,7 @@ function prepareExportSnapshot(specText, resolve){
     if(page && FLOWVIEW_SITE_BASE_URL && !(page.documentLinks || {}).siteBaseUrl){page.documentLinks=Object.assign({},page.documentLinks,{siteBaseUrl:FLOWVIEW_SITE_BASE_URL});changed=true;}
     diagrams.forEach(function(diagram){
       if(diagram.topologyProvenance){diagram.sourceDiagrams=((diagram.sourceDiagrams || []).concat(diagram.topologyProvenance.imports.map(function(item){return Object.assign(diagramLinkReference(item.destination || {spec:item.spec}),{nodes:item.nodes});})));changed=true;}
-      ['topologyImports','topologyExports','topologyProvenance'].forEach(function(key){
+      ['topologyImports','topologyExports','stepExports','topologyProvenance'].forEach(function(key){
         if(Object.prototype.hasOwnProperty.call(diagram,key)){delete diagram[key];changed=true;}
       });
     });

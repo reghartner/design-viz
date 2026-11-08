@@ -129,20 +129,18 @@ var FlowTopology = (function(){
     });
   }
 
-  // Fields a step set carries across the boundary that name provider nodes
-  // and edges. Layout and local fields (coinOffsets, packets, panels, ...) are
-  // stripped on import, so they are not part of the closure.
+  // The node and edge references a step set carries across the boundary, read
+  // with the same helpers as checkReferences. Layout and local fields
+  // (coinOffsets, packets, panels, ...) are stripped on import, so they are
+  // not part of the closure.
   function stepReferences(s){
     var refs=[];
-    function keys(value){return object(value)?Object.keys(value):[];}
     function add(field,kind,ids){ids.forEach(function(id){refs.push({field:field,kind:kind,id:id});});}
-    if(typeof s.edge==='string')add('edge','edge',[s.edge]);
-    if(Array.isArray(s.edges))add('edges','edge',s.edges);
-    add('failures','edge',keys(s.failures));add('contracts','edge',keys(s.contracts));
-    if(Array.isArray(s.nodes))add('nodes','node',s.nodes);
-    add('tone','node',keys(s.tone));
-    if(object(s.traceMatch) && typeof s.traceMatch.nodeId==='string' && s.traceMatch.nodeId)add('traceMatch.nodeId','node',[s.traceMatch.nodeId]);
-    if(Array.isArray(s.conditions))s.conditions.forEach(function(c,i){if(object(c) && typeof c.nodeId==='string' && c.nodeId)add('conditions['+i+'].nodeId','node',[c.nodeId]);});
+    add(Array.isArray(s.edges)?'edges':'edge','edge',stepKeys(s));
+    add('failures','edge',Object.keys(stepFailures(s)));add('contracts','edge',Object.keys(s.contracts || {}));
+    add('nodes','node',stepNodes(s));add('tone','node',Object.keys(stepTonePatch(s) || {}));
+    if(s.traceMatch && s.traceMatch.nodeId)add('traceMatch.nodeId','node',[s.traceMatch.nodeId]);
+    if(Array.isArray(s.conditions))s.conditions.forEach(function(c,i){if(c && c.nodeId)add('conditions['+i+'].nodeId','node',[c.nodeId]);});
     return refs;
   }
   function validateStepSet(source){
@@ -518,7 +516,7 @@ var FlowTopology = (function(){
       return wrapped?result:result.page;
     }
     if(context.version!==1 || !Array.isArray(context.specs) || typeof context.id!=='string')fail('editor','invalid authored provider snapshot');
-    var candidate=clone(raw),bareDiagram=candidate && (own(candidate,'nodes') || own(candidate,'rows') || own(candidate,'topologyImports') || own(candidate,'topologyExports'));
+    var candidate=clone(raw),bareDiagram=candidate && (own(candidate,'nodes') || own(candidate,'rows') || own(candidate,'topologyImports') || own(candidate,'topologyExports') || own(candidate,'stepExports'));
     var mode=object(candidate.page)?'wrapped':bareDiagram?'diagram':'page';
     var input=mode==='wrapped'?candidate:mode==='diagram'?{page:{sections:[{diagram:candidate}]}}:{page:candidate};
     var original=context.specs.find(function(spec){return spec.page && spec.page.canon && spec.page.canon.id===context.id;});

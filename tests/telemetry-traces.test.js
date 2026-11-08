@@ -239,3 +239,11 @@ test('#1076 a missing-root trace over 200 spans keeps the 200-span limit',()=>{c
  const huge=[lines[0],lines[1],placeholderRow,...Array.from({length:201},(_,i)=>row.replace('011114cbd1fd62de',i.toString(16).padStart(16,'0'))),'','Metadata:',`  trace_id: ${recordedId}`].join('\n');
  const out=C.telemetryHoneycombTrace({payload:huge},recordedId);assert.equal(out.spans.length,0);assert.equal(out.completeness,'partial');assert.ok(out.warnings.includes('More than 200 spans; trace timeline unavailable.'));assert.ok(out.warnings.includes('Root span not stored; timeline starts at the earliest stored span.'));
 });
+test('#1076 an annotation row with start 0 and no span ID is not a missing-root placeholder',()=>{const {C}=context(),lines=traceText.split('\n'),note='|  |  | 0 | 0 |  | UNSET | false |  |  |  | exception | span_event |  |  | 0 | 0 | 0 | 0 | false |';
+ const out=C.telemetryHoneycombTrace({payload:[lines[0],lines[1],note,...lines.slice(2)].join('\n')},recordedId);assert.equal(out.spans.length,55);assert.ok(!out.warnings.some(w=>/Root span not stored/.test(w)));assert.ok(out.warnings.includes('Annotation/log/link rows excluded from the span timeline.'));
+});
+test('#1076 a start-0 row with no span ID is dropped as a missing-root placeholder; metadata that matches the stored spans stays partial',()=>{const {C}=context(),blank=withPlaceholder(rootless()).replace('| missing-root |','|  |'),out=C.telemetryHoneycombTrace({payload:blank},recordedId);
+ assert.equal(out.spans.length,54);assert.equal(out.completeness,'partial');assert.ok(out.warnings.includes('Root span not stored; timeline starts at the earliest stored span.'));assert.ok(!out.warnings.some(w=>/Annotation/.test(w)));
+ const matched=withPlaceholder(rootless()).replace('collapsed_nodes: 1','collapsed_nodes: 0').replace('total_spans: 77','total_spans: 54').replace('visible_spans: 55','visible_spans: 54').replace('view_mode: auto','view_mode: full').replaceAll('| true |','| false |');
+ const m=C.telemetryHoneycombTrace({payload:matched},recordedId);assert.equal(m.completeness,'partial');assert.deepEqual(plain(m.warnings),['Root span not stored; timeline starts at the earliest stored span.']);
+});

@@ -70,7 +70,7 @@ function telemetryHoneycombTrace(result,id){
   var rows=telemetryTraceTable(text,['span_id','parent_id','start_unix_ns','duration_ns','kind','status_code','error','http_status','service','route','name']);
   // Honeycomb adds a synthetic start-0 row when the root span was not stored; it is not a span.
   // total_spans counts it; visible_spans may or may not.
-  var dropped=rows.filter(function(r){return r.span_id==='missing-root' || r.start_unix_ns==='0' && !telemetryTraceId(r.span_id);}),placeholders=new Set(dropped.map(function(r){return r.span_id;}));
+  var dropped=rows.filter(function(r){return r.span_id==='missing-root' || r.start_unix_ns==='0' && !telemetryTraceId(r.span_id) && !r.annotation_type && !r.link_span_id && !r.link_trace_id;}),placeholders=new Set(dropped.map(function(r){return r.span_id;}));
   rows=rows.filter(function(r){return dropped.indexOf(r)<0;});
   var spans=rows.filter(function(r){return !r.annotation_type && !r.link_span_id && !r.link_trace_id;});
   var warnings=[],complete='unknown',total=Number(meta.total_spans),visible=Number(meta.visible_spans),collapsed=Number(meta.collapsed_nodes);

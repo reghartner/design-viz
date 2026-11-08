@@ -16,11 +16,14 @@ function createTelemetryDirect(page,transport,hooks){
   function sync(){var key=identity(),context=contextIdentity();if(lastIdentity!==key){if(lastIdentity!==null && lastContext!==context)clearInput();cancel();lastIdentity=key;lastContext=context;}var ps=profiles(),ids=Object.keys(ps);if(!ps[form.connection]){form.connection=ids.length===1?ids[0]:'';form.environment='';}var p=ps[form.connection],envs=p?Object.keys(p.environments):[];if(envs.indexOf(form.environment)<0)form.environment=envs.length===1?envs[0]:'';var ss=sections();if(!ss.some(function(s){return s.id===form.section;}))form.section=ss.length===1?ss[0].id:'';return ps;}
   function available(){return !dead && !accountRetired && !!transport && typeof transport.describe==='function' && typeof transport.call==='function' && !(hooks.disabled && hooks.disabled());}
   // The time window a load would send now, so the form can say which one applies.
-  // A link with its own bounds still reports linkTime when time controls conflict.
+  // Link time is detected from the parsed link alone; linkUsable says whether
+  // this connection can send it once the time controls are blank.
   function bounds(ps){
-    var p=ps[form.connection];if(!p || !form.input.trim())return null;
-    function at(request){try{var r=FlowTraceConnections.input(p,request,Date.now());return {lookback:r.lookback,linkTime:r.linkTime};}catch(e){return null;}}
-    var b=at(form);if(!b && (form.start || form.end)){b=at(Object.assign({},form,{start:'',end:''}));if(b && !b.linkTime)b=null;}return b;
+    var p=ps[form.connection],parsed;if(!p || !form.input.trim())return null;
+    try{parsed=FlowTraceConnections.parseInput(p,form.input);}catch(e){return null;}
+    function at(request){try{return FlowTraceConnections.timeWindow(p,parsed,request,Date.now());}catch(e){return null;}}
+    if(Object.prototype.hasOwnProperty.call(parsed,'start') || Object.prototype.hasOwnProperty.call(parsed,'end'))return {lookback:null,linkTime:true,linkUsable:!!at({start:'',end:''})};
+    var w=at(form);return w?{lookback:w.relative?w.start.slice(1):null,linkTime:false,linkUsable:false}:null;
   }
   function snapshot(){var ps=sync();return {available:available(),busy:busy,form:Object.assign({},form),bounds:bounds(ps),profiles:Object.keys(ps).map(function(id){return {id:id,label:ps[id].label,lookback:ps[id].time.defaultLookback,environments:Object.keys(ps[id].environments).map(function(e){return {id:e,label:ps[id].environments[e].label || e};})};}),sections:sections().map(function(s){return {id:s.id,label:s.label};}),report:report?JSON.parse(JSON.stringify(report)):null,exemplar:exemplar,section:form.section};}
   function set(field,value){if(dead || !Object.prototype.hasOwnProperty.call(form,field) || typeof value!=='string' || value.length>4096)return;sync();if(value===form[field])return;cancel();form[field]=value;if(field==='connection' || field==='environment')clearInput();if(field==='connection')form.environment='';sync();changed();}

@@ -242,9 +242,15 @@ would send:
   otherwise the profile's `time.defaultLookback`.
 - "Uses the time set under Lookback." when Trace start is an absolute
   timestamp (or not yet a valid lookback).
-- "Uses the time range in the pasted link." when the pasted link carries its
-  own start and end. Those bounds are sent, and a Trace start cannot be
-  combined with them.
+- "Uses the time range in the pasted link." when the pasted link carries time
+  this connection can send (both start and end, on a connection whose
+  `time.encoding` is not `relative`). Those bounds are sent, and a Trace start
+  cannot be combined with them.
+- "This link's time range cannot be used with this connection; paste the trace
+  ID alone." when the link carries time the connection cannot send: any link
+  time on a relative-only connection (such as the `relative` Honeycomb profile
+  in [trace connections](trace-connections.md)), or a link with a start but no
+  end. Loading that link fails before any tool call.
 
 When `get_trace` answers with only a Metadata block whose `navigation_hints`
 starts with `no spans found` and no span table, the panel opens the Lookback
@@ -259,6 +265,13 @@ section once for that result and reports, using the window that was sent:
 This provider answer is the only response reported as not found; errors,
 unknown shapes and a span table that is present but lacks a required column
 (`Unsupported trace table header.`) are not.
+
+`time.defaultLookback` replaces the trace tool's own default whenever no start
+is given: Load trace always sends a start. In the November 2026 company report,
+Honeycomb `get_trace` looked back 7 days when called without `from` and
+accepted at least `-7d`. A profile with the `2h` example therefore finds only
+traces from the last 2 hours, where the tool alone would also find older ones.
+Choose `defaultLookback` for the age of the traces people paste.
 
 Largest useful lookback: this repo can verify that `from` is a signed duration
 of at most four digits and a unit (`s`, `m`, `h`, `d`, `w`), and the November

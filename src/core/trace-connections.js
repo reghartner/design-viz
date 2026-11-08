@@ -81,9 +81,9 @@ var FlowTraceConnections=(function(){
   function iso(ns){var ms=ns/1000000n,remainder=ns%1000000000n;return new Date(Number(ms)).toISOString().replace(/\.\d{3}Z$/,'.'+remainder.toString().padStart(9,'0')+'Z');}
   function lookback(value){var m=/^-([1-9][0-9]{0,3})([smhdw])$/.exec(value || '');if(!m)fail('input','Use a signed lookback such as -2h.');return Number(m[1])*({s:1,m:60,h:3600,d:86400,w:604800}[m[2]]);}
   function encode(ns,time){if(time.encoding==='iso8601')return iso(ns);var digits=time.encoding==='unix-seconds'?9:6,unit=10n**BigInt(digits),whole=ns/unit,tail=(ns%unit).toString().padStart(digits,'0').replace(/0+$/,''),s=whole.toString()+(tail?'.'+tail:'');if(time.type==='string')return s;var n=Number(s);if(decimalNs(String(n),time.encoding)!==ns)fail('arguments','Timestamp cannot be represented exactly as a number; configure a string argument.');return n;}
-  function input(p,request,now){
-    if(!object(request) || typeof request.input!=='string' || request.input.length>4096)fail('input','Enter a trace ID or supported trace link.');
-    var value=request.input.trim(),found=[];
+  // Parse a trace ID or recognized link without resolving environment or time.
+  function parseInput(p,text){
+    var value=text.trim(),found=[];
     if(/^https?:/i.test(value)){
       var url;try{url=new URL(value);}catch(e){fail('input','Invalid trace link.');}
       if(url.username || url.password || url.hash || /[\\\s]/.test(value))fail('input','Unsupported trace link.');
@@ -96,9 +96,10 @@ var FlowTraceConnections=(function(){
       if(found.length!==1)fail('input',found.length?'Ambiguous trace link descriptors.':'This connection does not support that trace link.');
     }else found=[{traceId:value}];
     var parsed=found[0];Object.keys(parsed).forEach(function(k){var v=parsed[k];if(typeof v!=='string' || !v.length || v!==v.trim() || /[\x00-\x1f\x7f]/.test(v))fail('input','Supplied trace link fields must be nonempty and well formed.');});if(!/^[0-9a-f]{16,32}$/i.test(parsed.traceId || ''))fail('input','Invalid trace ID.');
-    var ids=Object.keys(p.environments).filter(function(id){var e=p.environments[id];if(own(parsed,'environment') && parsed.environment!==e.value)return false;return Object.keys(p.arguments.context || {}).every(function(k){return !own(parsed,k) || String(e.context[k])===parsed[k];});});
-    if(request.environment){if(ids.indexOf(request.environment)<0)fail('input','Trace link conflicts with the selected environment/context.');ids=[request.environment];}
-    if(ids.length!==1)fail('input',ids.length?'Choose an environment; the request is ambiguous.':'Trace link does not match a configured environment/context.');
+    return parsed;
+  }
+  // The time window for a parsed request. Checks only the time fields.
+  function timeWindow(p,parsed,request,now){
     ['start','end'].forEach(function(k){if(own(parsed,k) && request[k])fail('input','Time supplied in both the link and controls; clear the time control.');});
     var start=own(parsed,'start')?parsed.start:request.start || '-'+p.time.defaultLookback,end=own(parsed,'end')?parsed.end:request.end,encoding=own(parsed,'start')?parsed.encoding:'iso8601',relative=start[0]==='-',to=BigInt(now)*1000000n,from;
     if(relative){if(own(parsed,'start') && encoding!=='relative' || end)fail('input','Relative time cannot be combined with an absolute end.');from=to-BigInt(lookback(start))*1000000000n;}
@@ -106,10 +107,19 @@ var FlowTraceConnections=(function(){
     if(from<0n || from>to)fail('input','Invalid trace time bounds.');
     if(p.time.encoding==='relative' && !relative)fail('arguments','This connection supports only relative time; it cannot honor absolute trace-link bounds.');
     if(p.time.encoding!=='relative' && !p.arguments.end)fail('arguments','Absolute time requires an end argument mapping.');
+    return {start:start,relative:relative,from:from,to:to};
+  }
+  function input(p,request,now){
+    if(!object(request) || typeof request.input!=='string' || request.input.length>4096)fail('input','Enter a trace ID or supported trace link.');
+    var parsed=parseInput(p,request.input);
+    var ids=Object.keys(p.environments).filter(function(id){var e=p.environments[id];if(own(parsed,'environment') && parsed.environment!==e.value)return false;return Object.keys(p.arguments.context || {}).every(function(k){return !own(parsed,k) || String(e.context[k])===parsed[k];});});
+    if(request.environment){if(ids.indexOf(request.environment)<0)fail('input','Trace link conflicts with the selected environment/context.');ids=[request.environment];}
+    if(ids.length!==1)fail('input',ids.length?'Choose an environment; the request is ambiguous.':'Trace link does not match a configured environment/context.');
+    var w=timeWindow(p,parsed,request,now),start=w.start,relative=w.relative,from=w.from,to=w.to;
     var env=p.environments[ids[0]],args=Object.assign({},p.literals,env.literals),a=p.arguments;args[a.traceId]=parsed.traceId;
     args[a.start]=p.time.encoding==='relative'?start:encode(from,p.time);if(a.end && p.time.encoding!=='relative')args[a.end]=encode(to,p.time);
     if(a.environment)args[a.environment]=env.value;Object.keys(a.context || {}).forEach(function(k){args[a.context[k]]=env.context[k];});
-    return {traceId:parsed.traceId,environment:ids[0],args:args,range:{from:iso(from),to:iso(to)},lookback:relative?start.slice(1):null,linkTime:own(parsed,'start')};
+    return {traceId:parsed.traceId,environment:ids[0],args:args,range:{from:iso(from),to:iso(to)},lookback:relative?start.slice(1):null,linkTime:own(parsed,'start') || own(parsed,'end')};
   }
   /* Fail closed on schema features we cannot honor. anyOf/oneOf nullable unions
      and all required arguments are validated before a tool call. */
@@ -135,5 +145,5 @@ var FlowTraceConnections=(function(){
     if(t.inputSchema.type!=='object' || !object(t.inputSchema.properties))fail('schema','Runtime detail tool requires an object input schema.');
     validate(args,t.inputSchema);
   }
-  return {profile:profile,profiles:profiles,resolve:resolve,input:input,validate:validate,tool:tool,fail:fail};
+  return {profile:profile,profiles:profiles,resolve:resolve,input:input,parseInput:parseInput,timeWindow:timeWindow,validate:validate,tool:tool,fail:fail};
 })();

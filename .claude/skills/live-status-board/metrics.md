@@ -108,6 +108,11 @@ for the complete wrapper example, tool schemas, bounds and selection behavior.
 ### Supported metrics sources and limits
 
 - `grafana`: PromQL; `loki`: metric LogQL. Range series in Live and selected-window Over time.
+  For a daily count, write the Loki range as `[$__range]`, e.g.
+  `sum(count_over_time({app="x"} |= "y" [$__range]))`: `$__range` becomes the window
+  (`86400s` for `24h`; the selected day in Over time) and the signal is ONE instant query
+  whose value is the whole-window total. Prefer it over `[1h]`/`[6h]`, which report only the
+  last part of the window and do not match 24-hour Prometheus cards.
 - `cloudwatch`: metric object; Sum, Maximum, Minimum, Average or SampleCount. Per-period series plus a correct window headline; optional `period` and selected-window history.
 - `cloudwatchLogs`: Logs Insights object; first row's `valueField` (or first column), numeric strings accepted. Optional trends and bounded grouped details, including selected-window history.
 - `sql`: query string, first numeric scalar, at most once/hour in Live. History requires authored time macros.
@@ -418,7 +423,7 @@ that successful empty shape into zero; absent/false stays unobserved. Errors,
 timeouts and malformed results never become zero. A real numeric zero remains
 observed. For live Loki, successful empty numeric count/rate queries become zero
 only for recognized `count_over_time`/`rate` log-range expressions and `sum`
-wrappers (including by/without grouping). Raw logs, arbitrary expressions and
+wrappers (including by/without grouping), with a duration or `[$__range]`. Raw logs, arbitrary expressions and
 misleading function names inside strings remain unobserved. Daily history keeps
 its existing contract. Honeycomb COUNT caveats belong to Honeycomb evidence only.
 

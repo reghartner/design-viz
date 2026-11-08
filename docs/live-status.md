@@ -233,7 +233,7 @@ from Prometheus:
 | `kind` | Required. `call`, `queue`, `service`, `log-event` or `device`. |
 | `signals` | Required. Named signals such as `rate`, `errors`, `p95`, `in`, `lag`, `age`. Names start with a letter and use letters, digits, `-` and `_`. Each signal has exactly one source key and an optional `unit` text. |
 | `signals.<name>.grafana` | A PromQL query string. |
-| `signals.<name>.loki` | A LogQL metric query string. |
+| `signals.<name>.loki` | A LogQL metric query string. A query with `$__range`, such as `sum(count_over_time({app="x"} \|= "y" [$__range]))`, reports one total for the whole window; see [Loki window totals](#loki-window-totals). |
 | `signals.<name>.tempo` | A TraceQL query string, used for exemplar traces. |
 | `signals.<name>.sql` | A SQL query string for a Grafana SQL datasource, such as a data lake. |
 | `signals.<name>.honeycomb` | A Honeycomb query object, kept as authored. |
@@ -1551,7 +1551,7 @@ calls:
 |---|---|---|
 | `get_annotations` | when offered, once per refresh, first and alone | `{type: "annotation", limit: 100}` |
 | `query_prometheus` | once per refresh for each `grafana` signal | `{datasourceUid, expr, startTime, endTime, stepSeconds, queryType: "range"}` (relative in Live; absolute in Over time) |
-| `query_loki_logs` | once per refresh for each `loki` signal | `{datasourceUid, logql, startRfc3339, endRfc3339, queryType: "range", stepSeconds}` (relative in Live; absolute in Over time) |
+| `query_loki_logs` | once per refresh for each `loki` signal | `{datasourceUid, logql, startRfc3339, endRfc3339, queryType: "range", stepSeconds}` (relative in Live; absolute in Over time); a query with `$__range` sends `{datasourceUid, logql, endRfc3339, queryType: "instant"}` instead ([Loki window totals](#loki-window-totals)) |
 | `query_sql` | at most once an hour for each `sql` signal; the value is reused in between | `{datasourceUid, query}` |
 | `query_cloudwatch` | once per signal/window, plus paired SampleCount for Average; [window statistics and series](#cloudwatch-signals) | `{datasourceUid, namespace, metricName, region, accountId, dimensions, statistic, period, start, end}` |
 | `generate_deeplink` | when offered, once per signal per page load, unless the signal authors `links.query` | `{resourceType: "explore", datasourceUid, queries: [{refId, expr}], timeRange: {from: "now-24h", to: "now"}}` |
@@ -1580,7 +1580,8 @@ samples are dropped. `value` is the last point. A PromQL or LogQL query that mat
 `value: 0` with no points. CloudWatch empty results stay unobserved; see
 [CloudWatch signals](#cloudwatch-signals). `unit` is the authored one. A `sql` signal's value is
 the first number of the first returned row. `observedAt` is the newest point of
-the refresh. Every carrier carries the window's annotations as markers `{at, kind,
+the refresh. A Loki query with `$__range` is the exception: see [Loki window
+totals](#loki-window-totals). Every carrier carries the window's annotations as markers `{at, kind,
 label}`: kind `deploy` when tagged deploy, else `incident`, else the first tag.
 Links are the authored `dashboard` and `query`, with the Explore link standing in
 for a missing `query`.
@@ -1596,6 +1597,27 @@ Tool argument names and result shapes follow grafana/mcp-grafana's source as the
 mock mirrors it; they are unverified against a live Grafana server, and
 `query_sql`'s result shape is the least certain. Confirm with the connector's tool
 list before relying on a parameter name.
+
+#### Loki window totals
+
+A daily count needs the whole window, not the last step of a range query. Write
+the LogQL range as `[$__range]`:
+
+```
+sum(count_over_time({app="notify"} |= "event consumed" [$__range]))
+```
+
+The adapter replaces every `$__range` with the signal window in whole seconds
+(Live: `tracking.telemetry.window`, default `24h`, so `86400s`; Over time: the
+selected day's window) and sends ONE instant query, `queryType: "instant"`, at
+the window end (`endRfc3339: "now"` in Live, the window's absolute end in Over
+time), with no `startRfc3339` or `stepSeconds`. The signal's `value` is that one
+result (several series are added), with no series. Loki scans the window once;
+a range query with a 24-hour log range at 240 steps scans it about 240 times. An
+empty result follows the empty rules above: zero for a recognized count/rate
+query, otherwise unobserved. `$__range_s` and `$__range_ms` are not substituted.
+Queries without `$__range` keep the range call and its last point. Use
+`[$__range]` for daily counts so Loki cards match 24-hour Prometheus cards.
 
 ### Two-file publish: `index.html` + `flowspec.json`
 
@@ -2211,7 +2233,10 @@ Average weights, Logs trends and grouped queries; no outer task holds a slot
 while awaiting its own queued child. Traces are excluded from numeric history.
 
 Prometheus/Loki query their authored expressions over the selected window;
-a range step is not an aggregate rewrite. CloudWatch preserves period statistics
+a range step is not an aggregate rewrite. A Loki query with `$__range` is one
+instant query at the selected day's window end with `$__range` set to that
+window ([Loki window totals](#loki-window-totals)), so its Over time value is the
+whole day's total, not the last hour of the day. CloudWatch preserves period statistics
 and computes a trustworthy headline. Logs retain an independent authoritative
 total. Honeycomb sends hosted absolute string `query_spec.from`/`to` and evaluates
 one calculation directly: daily percentiles, averages and distinct counts are
@@ -2269,7 +2294,8 @@ Partial-error and aborted batches never extend cached coverage.
 
 Direct legacy Grafana history callers without `range.window` retain exact
 endpoint Prometheus/Loki queries with `stepSeconds: 86400`, split only across DST
-discontinuities. Their endpoint samples/cache contract is unchanged. Built-in
+discontinuities. Each endpoint covers the previous 24 hours, so a Loki `$__range`
+there becomes `86400s`. Their endpoint samples/cache contract is unchanged. Built-in
 selected-window behavior above uses useful inner series instead.
 
 ### Honeycomb metrics and mixed connectors (#946, metrics leg)
@@ -2705,7 +2731,8 @@ that successful empty shape into zero; absent/false stays unobserved. Errors,
 timeouts and malformed results never become zero. A real numeric zero remains
 observed. For live Loki, successful empty numeric count/rate queries become zero
 only for recognized `count_over_time`/`rate` log-range expressions and `sum`
-wrappers (including by/without grouping). Raw logs, arbitrary expressions and
+wrappers (including by/without grouping), with a duration or `[$__range]` as the
+range. Raw logs, arbitrary expressions and
 misleading function names inside strings remain unobserved. Daily history keeps
 its existing contract. Honeycomb COUNT caveats belong to Honeycomb evidence only.
 

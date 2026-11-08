@@ -378,7 +378,8 @@ function planCarrierTelemetry(text,raw,target,edit,context){
   // the resolver's expanded binding, never a reference to a provider template.
   var binding=t.binding;
   if(!binding && t.owner && edit && edit.op==='card')binding=telemetryObject(t.resolved.telemetry)?t.resolved.telemetry:null;
-  if(!t.binding && binding && edit.field==='position' && edit.value==null && !(binding.card && binding.card.position))return {text:text};
+  // Clearing a card field the inherited binding does not set creates no override.
+  if(!t.binding && binding && edit.value==null && !(telemetryObject(binding.card) && binding.card[edit.field]!=null))return {text:text};
   var result=telemetryEditBinding(binding,edit,{templates:telemetryPageTemplates(raw)});if(result.error)return result;
   // A non-object authored value is replaced or removed like any other binding.
   if(JSON.stringify(result.value)===JSON.stringify(t.binding) && !(t.hasField && !t.binding))return {text:text};

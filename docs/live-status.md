@@ -491,7 +491,9 @@ into editable raw signals.
 1000) place its metrics card. **Card title** replaces the connection label on the card
 and **Card width** (140 to 480; default 240) sets its width; empty restores the default. The validator's warnings for the binding are listed
 under the controls with the same text. An imported node or connection shows the
-provider's binding read only. A binding saved there is stored in the consumer's
+provider's binding read only. An inherited connection still shows the four card
+controls; its first card edit saves the inherited binding with that change in the
+consumer's `edgeTracking` entry, one Undo step. A binding saved there is stored in the consumer's
 `nodeTracking` or `edgeTracking` entry and replaces the inherited binding for this
 consumer only; **Remove metrics** restores the inherited one.
 

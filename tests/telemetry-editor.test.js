@@ -511,6 +511,7 @@ test('#1112 an inherited imported connection without an overlay shows the card r
   assert.equal(Object.hasOwn(diagramOf(ui.raw).topologyImports[0],'edgeTracking'),false,'no overlay before the edit');
   ui.metrics();for(const label of ['Card side','Card offset','Card title'])assert.ok(ui.row(label),label+' is in Inspect for the inherited card');
   assert.equal(ui.control('Card width').value,'');const before=ui.text;
+  for(const field of ['title','width','position'])assert.equal(C.planCarrierTelemetry(before,ui.raw,edge,{op:'card',field,value:null},f.context).text,before,'clearing an unset inherited '+field+' creates no overlay');
   oneStep(ui,()=>ui.set('Card width','400'),edge);
   assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking,{'api->store':{telemetry:{kind:'call',signals:{rate:{loki:LOKI_IN}},card:{width:400}}}});
   assert.equal(C.carrierTelemetry(resolved().edges[edge.index],{}).card.width,400);assert.equal(ui.control('Card width').value,'400');

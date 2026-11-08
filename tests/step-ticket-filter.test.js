@@ -4,9 +4,10 @@
 |---|---|
 | T1 | A step lighting a node with tickets A, B, C and filter [B]: the step rollup (coin state), caption and ticket list use only B; the node still shows A, B, C. |
 | T2 | Without a filter the step uses every ticket on its lit carriers (today's behaviour). |
-| T3 | A filter key that is not on a node or edge the step lights fails validation with its field path. |
-| T4 | An imported node's merged tickets (provider + consumer nodeTracking) can be filtered. |
+| T3 | A filter key that is not on a node or edge the step lights is a warning with its field path and is ignored; with no lit key left the step shows every ticket. A malformed filter (not an array, empty, an entry that is not a Jira key) is an error. Orchestrator ruling 2026-11-07: tickets churn, so a removed ticket never stops a spec from validating or resolving. |
+| T4 | An imported node's merged tickets (provider + consumer nodeTracking) can be filtered; a stale key on an imported step does not stop topology resolution. |
 | T5 | (browser) tools/browser-tests/tests/step-ticket-filter.spec.mjs: Workbench Inspect checklist writes the filter. |
+| T6 | Workbench deletion of a node, an edge, or a ticket from a carrier (local or imported overlay) prunes that key from step filters; an emptied filter is removed (ruling 2026-11-07). |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {entrypoint}=require('../tools/source-loader.cjs');
@@ -38,6 +39,7 @@ class Element {
  toJSON(){return this[Symbol.for('nodejs.util.inspect.custom')]();}
 }
 const filterErrors=(C,raw)=>plain(C.validate(C.normalize(raw)).errors).filter(e=>/ticketFilter/.test(e));
+const filterWarnings=(C,raw)=>plain(C.validate(C.normalize(raw)).warnings).filter(e=>/ticketFilter/.test(e));
 function load(){const C={URL,console,AbortController,TextEncoder};vm.runInNewContext(entrypoint('native').source,C);return C;}
 /* Renders one section with a Step-mode stepper on step `index` and paints `map`. */
 function render(raw,map,index=0){
@@ -97,14 +99,22 @@ test('T2 without a filter the step uses every ticket on its lit carriers',()=>{
  assert.deepEqual(r.listed(),['ST-1','ST-2','ST-3']);assert.equal(r.caption(),'BLOCKED · ST-1');assert.equal(r.coin(0),'blocked');assert.equal(r.node('api'),'blocked');
  assert.deepEqual(filterErrors(C,raw),[]);
 });
-test('T3 a filter key not on a lit node or edge fails validation with its field path',()=>{
- const C=load(),errors=raw=>filterErrors(C,raw);
- assert.deepEqual(errors(spec({ticketFilter:['ST-2']})),[]);
- assert.deepEqual(errors(spec({ticketFilter:['ST-2','DB-1','ED-1','ZZ-9']})),[
-  STEP+'.ticketFilter[1]: "DB-1" is not on a node or edge this step lights',
-  STEP+'.ticketFilter[2]: "ED-1" is not on a node or edge this step lights',
-  STEP+'.ticketFilter[3]: "ZZ-9" is not on a node or edge this step lights']);
- assert.deepEqual(errors(spec({nodes:[],edge:'api->db',ticketFilter:['ED-1','ST-1']})),[STEP+'.ticketFilter[1]: "ST-1" is not on a node or edge this step lights'],'edge endpoints are not lit carriers');
+const unlit=(index,key)=>STEP+'.ticketFilter['+index+']: "'+key+'" is not on a node or edge this step lights — ignored';
+const NONE_LIT=STEP+'.ticketFilter: no key is on a node or edge this step lights — the step shows every ticket';
+test('T3 a filter key not on a lit node or edge is a warning with its field path and is ignored; malformed filters are errors',()=>{
+ const C=load(),errors=raw=>filterErrors(C,raw),warnings=raw=>filterWarnings(C,raw);
+ assert.deepEqual(errors(spec({ticketFilter:['ST-2']})),[]);assert.deepEqual(warnings(spec({ticketFilter:['ST-2']})),[]);
+ const stale=spec({ticketFilter:['ST-2','DB-1','ED-1','ZZ-9']});
+ assert.deepEqual(errors(stale),[]);assert.deepEqual(warnings(stale),[unlit(1,'DB-1'),unlit(2,'ED-1'),unlit(3,'ZZ-9')]);
+ const d=C.normalize(stale).sections[0].diagram;
+ assert.deepEqual(plain(C.liveStatusStepTickets(d,d.steps[0],true)),['ST-2'],'the lit keys still filter');assert.equal(C.liveStatusStep(d,d.steps[0],evidence),'done');
+ const endpoint=spec({nodes:[],edge:'api->db',ticketFilter:['ED-1','ST-1']});
+ assert.deepEqual(errors(endpoint),[]);assert.deepEqual(warnings(endpoint),[unlit(1,'ST-1')],'edge endpoints are not lit carriers');
+ const none=spec({ticketFilter:['ZZ-9']}),nd=C.normalize(none).sections[0].diagram;
+ assert.deepEqual(errors(none),[]);assert.deepEqual(warnings(none),[unlit(0,'ZZ-9'),NONE_LIT]);
+ assert.deepEqual(plain(C.liveStatusStepTickets(nd,nd.steps[0],true)),['ST-1','ST-2','ST-3'],'with no lit key the filter is ignored');
+ assert.equal(C.liveStatusStep(nd,nd.steps[0],evidence),'blocked');assert.equal(C.liveStatusCaption(nd,nd.steps[0],evidence),'BLOCKED · ST-1');
+ const r=render(none,evidence);assert.deepEqual(r.listed(),['ST-1','ST-2','ST-3']);assert.equal(r.coin(0),'blocked');
  assert.deepEqual(errors(spec({ticketFilter:['ST-2','not a key']})),[STEP+'.ticketFilter[1]: use a Jira key like HW-123']);
  for(const value of [[],'ST-2'])assert.deepEqual(errors(spec({ticketFilter:value})),[STEP+'.ticketFilter: expected a nonempty array of Jira keys from the nodes and edges this step lights; remove it to show every ticket'],JSON.stringify(value));
 });
@@ -123,8 +133,13 @@ test('T4 an imported node\'s merged provider and nodeTracking tickets can be fil
  assert.equal(C.liveStatusPresentation(d.nodes['imp::api'],map),'blocked');
  assert.deepEqual(filterErrors(C,resolved),[]);
  const r=render(resolved,map);assert.deepEqual(r.listed(),['CAN-2','LOC-1']);assert.equal(r.coin(0),'done');assert.equal(r.node('imp::api'),'blocked');
- // Topology resolution validates the materialized consumer, so a stale key stops it with the field path.
- assert.throws(()=>resolve(consumer(['LOC-1','CAN-9'])),e=>e.message.includes(STEP+'.ticketFilter[1]: "CAN-9" is not on a node or edge this step lights'));
+ // A provider that drops a filtered ticket never stops the consumer from resolving: the key warns and is ignored.
+ const partial=resolve(consumer(['LOC-1','CAN-9'])),pd=C.normalize(partial).sections[0].diagram;
+ assert.deepEqual(filterErrors(C,partial),[]);assert.deepEqual(filterWarnings(C,partial),[unlit(1,'CAN-9')]);
+ assert.deepEqual(plain(C.liveStatusStepTickets(pd,pd.steps[0],true)),['LOC-1']);
+ const gone=resolve(consumer(['CAN-9'])),gd=C.normalize(gone).sections[0].diagram;
+ assert.deepEqual(filterWarnings(C,gone),[unlit(0,'CAN-9'),NONE_LIT]);
+ assert.deepEqual(plain(C.liveStatusStepTickets(gd,gd.steps[0],true)),['CAN-1','CAN-2','LOC-1']);assert.equal(C.liveStatusStep(gd,gd.steps[0],map),'blocked');
 });
 /* Beyond the plan (written with GREEN): removing a hop or node in the Workbench
    takes its tickets out of the filter, so the edit never leaves a stale key. */
@@ -140,4 +155,43 @@ test('Workbench hop and node removal prune the step ticket filter',()=>{
 test('a step ticket filter is a declared capability',()=>{
  const C=load();assert.ok(C.FlowviewCompatibility.detect(spec({ticketFilter:['ST-2']})).includes('flow.step-ticket-filter'));
  assert.ok(!C.FlowviewCompatibility.detect({page:{sections:[{diagram:{nodes:{a:{}},rows:[['a']],steps:[{nodes:['a']}]}}]}}).includes('flow.step-ticket-filter'));
+});
+const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
+const inspectorNames=['canon','validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/topology','workbench/commands/telemetry',
+ 'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/panel-visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
+ 'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/metrics-editor','workbench/inspector'];
+const stepsOf=raw=>raw.page.sections[0].diagram.steps;
+function clickRemove(h,label){const b=h.guide.querySelectorAll('button').find(x=>x.textContent===label);assert.ok(b,'button "'+label+'" exists');b.fire('click');h.flush();}
+const base=()=>{const raw=spec({ticketFilter:['ST-2']});stepsOf(raw).push({id:'store',text:'Store',nodes:['db'],ticketFilter:['DB-1']});return raw;};
+test('T6 Workbench deletion of an edge or a node prunes its tickets from step filters',()=>{
+ const e=inspectorEnvironment(inspectorNames),C=e.C;
+ const apply=(raw,fn)=>{const text=JSON.stringify(raw,null,2),plan=fn(text,raw);assert.equal(plan.error,undefined,plan.error);return JSON.parse(plan.text);};
+ // Deleting the edge drops its ticket; the node tickets the step still lights stay.
+ let raw=apply(base(),(t,r)=>C.planDeleteEdge(t,r,0,0));
+ assert.deepEqual(stepsOf(raw)[1].ticketFilter,['ST-3']);assert.deepEqual(stepsOf(raw)[0].ticketFilter,['ST-2']);assert.deepEqual(stepsOf(raw)[2].ticketFilter,['DB-1']);
+ // Deleting a node drops its tickets and those of the edges it took; an emptied filter is removed.
+ raw=apply(base(),(t,r)=>C.planDeleteNode(t,r,0,'db'));
+ assert.deepEqual(stepsOf(raw)[1].ticketFilter,['ST-3']);assert.equal(Object.hasOwn(stepsOf(raw)[2],'ticketFilter'),false);assert.deepEqual(stepsOf(raw)[0].ticketFilter,['ST-2']);
+ assert.deepEqual(filterWarnings(C,raw),[]);
+});
+test('T6 removing a ticket from a local carrier in Inspect prunes it from step filters in the same undo step',()=>{
+ const e=inspectorEnvironment(inspectorNames);
+ const h=e.mount(base()),before=h.text;h.session.target={kind:'node',section:0,id:'api'};h.inspector.render();
+ clickRemove(h,'Remove ticket 2');const after=JSON.parse(h.text);
+ assert.deepEqual(after.page.sections[0].diagram.nodes.api.tickets,['ST-1','ST-3']);
+ assert.equal(Object.hasOwn(stepsOf(after)[0],'ticketFilter'),false,'the filter emptied by the removal is removed');assert.deepEqual(stepsOf(after)[1].ticketFilter,['ST-3','ED-1']);
+ assert.equal(h.session.undo(),true);assert.equal(h.text,before,'one Undo restores the ticket and the filter');
+});
+test('T6 removing a consumer-owned ticket from an imported node prunes it from step filters instead of being refused',()=>{
+ const e=inspectorEnvironment(inspectorNames);
+ const model=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=model('provider',{nodes:{api:{title:'API',tickets:['CAN-1','CAN-2']},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+ const consumer=model('consumer',{nodes:{local:{title:'Local',tickets:['LOC-2']}},rows:[['local']],panels:[{id:'status',type:'live-status'}],
+  topologyImports:[{spec:'provider',export:'core',as:'imp',nodeTracking:{api:{tickets:['LOC-1']}}}],
+  steps:[{id:'imported',text:'Imported API',nodes:['imp::api','local'],ticketFilter:['CAN-2','LOC-1']}]});
+ const imported=e.mount(consumer);imported.session.replaceProject(JSON.stringify(consumer,null,2),null,{topologyContext:{version:1,id:'consumer',specs:[provider,consumer]}});
+ imported.session.target={kind:'node',section:0,id:'imp::api'};imported.inspector.render();
+ clickRemove(imported,'Remove ticket 1');const next=JSON.parse(imported.text);
+ assert.equal(Object.hasOwn(next.page.sections[0].diagram.topologyImports[0],'nodeTracking'),false,'the overlay ticket is removed');
+ assert.deepEqual(stepsOf(next)[0].ticketFilter,['CAN-2']);
 });

@@ -130,7 +130,10 @@ claim. Alternatives are never synthesized or fetched speculatively.
 The envelope is validated again by `telemetrySample`, survives mixed-provider
 composition, and cannot change numeric signal values or classification. Duplicate
 span IDs, cycles, malformed timing and conflicting candidate duplicates fail.
-Missing parents warn. More than 200 spans yields no timeline and a partial/limited
+Missing parents warn. Honeycomb's synthetic `missing-root` row (start 0, written
+when the root span was not stored) is dropped before the timeline base is chosen;
+the trace is partial with a root-not-stored warning, and spans whose parent is
+absent render as roots. More than 200 spans yields no timeline and a partial/limited
 warning; no silent truncation. Input is capped at 1 MiB, 10,000 table rows,
 20 candidates, 32 events/links per span, and a 24h span-timeline extent. Native
 Honeycomb annotation/log/link rows are excluded from timed spans with a warning.
@@ -290,3 +293,13 @@ The adapter drops legacy `timestamp` entries from outgoing `raw_row_columns`
 without changing the authored query: Honeycomb always returns that column.
 The Status panel’s Trace mode supersedes the former step-owned trace disclosure
 and fallback rail. Selecting or navigating steps never opens or selects a trace.
+
+## Load trace environment
+
+The Load trace **Connection environment** dropdown starts at the connection
+environment that matches the board **Environment**: the exact id first, then the
+id or label ignoring case, then a common alias (`prd`/`prod`/`production`,
+`stg`/`stage`/`staging`, `dev`/`development`, `qa`). With no single match it
+starts empty, or at the only environment when the connection has one. It follows
+later board Environment changes until the reader picks a connection environment;
+that pick is kept. Picking a different connection starts matching again.

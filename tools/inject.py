@@ -307,9 +307,14 @@ def source_commit() -> str | None:
     return sha if re.fullmatch(r"[0-9a-f]{40}", sha) else None
 
 
-def direct_trace_connections(page: dict) -> dict:
-    """Resolve company inheritance/board restrictions with the viewer validator.
-    Source-free kits use the generated backend and reduced company context."""
+def direct_trace_connections(spec: dict, topology: dict | None = None) -> dict:
+    """Resolve company inheritance/board restrictions with the viewer validator,
+    on the page the viewer renders: FlowTopology.resolveSource with the page's
+    topology context, then normalize (src/boot.flowview.js), #1095. `spec` may be
+    a wrapped spec, an unwrapped page or a bare diagram. Source-free kits use the
+    generated backend runtime and reduced company context."""
+    page = spec.get("page") if isinstance(spec, dict) and "page" in spec else spec
+    page = page if isinstance(page, dict) else {}
     tracking = page.get("tracking") if isinstance(page.get("tracking"), dict) else {}
     config = tracking.get("telemetry") or {}
     if not isinstance(config, dict):
@@ -322,13 +327,16 @@ def direct_trace_connections(page: dict) -> dict:
     script = r"""
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const input=JSON.parse(fs.readFileSync(0,'utf8')),root=process.argv[1],loader=path.join(root,'tools/source-loader.cjs');
-let api;if(fs.existsSync(loader) && fs.existsSync(path.join(root,'src/source-bundles.json'))){const scope={URL};vm.runInNewContext(require(loader).entrypoint('backend').body,scope);api=scope.FlowTraceConnections;}
-else api=require(path.join(root,'tools/canon/generated-runtime.cjs')).traceConnections;
-if(!api)throw new Error('Direct trace profile validator unavailable; rebuild this kit.');
-process.stdout.write(JSON.stringify(api.resolve(input.page,input.company)));
+const scope={URL,console:{log(){},info(){},warn(){},error(){}},module:{exports:{}}};
+if(fs.existsSync(loader) && fs.existsSync(path.join(root,'src/source-bundles.json')))vm.runInNewContext(require(loader).entrypoint('backend').body,scope);
+else vm.runInNewContext(fs.readFileSync(path.join(root,'tools/canon/generated-runtime.cjs'),'utf8'),scope);
+const api=scope.FlowTraceConnections;
+if(!api || typeof scope.normalize!=='function')throw new Error('Direct trace profile validator unavailable; rebuild this kit.');
+let raw=input.spec;if(input.topology){try{raw=scope.FlowTopology.resolveSource(raw,input.topology);}catch(e){}}
+process.stdout.write(JSON.stringify(api.resolve(scope.normalize(raw) || {},input.company)));
 """
     result = subprocess.run(["node", "-e", script, str(REPO_ROOT)],
-                            input=json.dumps({"page": page, "company": company}),
+                            input=json.dumps({"spec": spec, "topology": topology, "company": company}),
                             capture_output=True, text=True, timeout=120, check=False)
     if result.returncode:
         raise ValueError("Cannot validate direct trace connections for the capability manifest; rebuild the runtime.")
@@ -374,7 +382,7 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
     servers = ([{"server": "Atlassian", "tools": JIRA_TOOLS}] if tracked else []) + \
         ([{"server": "Grafana", "tools": [tool for source, tool in GRAFANA_TOOLS.items() if source in sources]}] if grafana else []) + \
         ([{"server": "Honeycomb", "tools": HONEYCOMB_TOOLS}] if honeycomb else [])
-    direct = direct_trace_connections(page)
+    direct = direct_trace_connections(spec, topology)
     for profile in direct.values():
         server = next((entry for entry in servers if entry["server"] == profile["server"]), None)
         if server is None:

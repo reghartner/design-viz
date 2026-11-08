@@ -2,8 +2,6 @@
 
 For explicit ID/link retrieval without search or bindings, use [direct trace connection profiles](trace-connections.md). The query-candidate contract below remains unchanged.
 
-Company profile inheritance (#1095): carrier `telemetry` means a node, edge, or topology import `nodeTracking`/`edgeTracking` overlay binding in any section, tab section or nested tab. Telemetry that only a provider supplies for imported carriers does not count; add `tracking.telemetry` (`{}` is enough) or an explicit `traceConnections` map. A Jira-only status board inherits nothing and declares no trace connector.
-
 This runtime contract supplies #947 with trace evidence. It adds no caption, card,
 packet UI, authoring fields, save writes, or numerical Proof classification.
 Document editing remains desktop-only. Local, direct/nested imported, and actual

@@ -96,4 +96,4 @@ Mixed/Engineering access after relevant checks. HTML needs an explicit
 standalone-output request. Commit, publish and Canon enrollment require user
 authorization. Never modify the renderer to make a spec pass.
 
-Direct trace IDs/links: read [connection profiles](../../../docs/trace-connections.md) or the `traces` packet. Company defaults inherit only on boards that use traces (`traceMatch`, or live-status panel + telemetry); `traceConnections: {}` disables. Verify the actual schema; never infer mappings.
+Direct trace IDs/links: read [connection profiles](../../../docs/trace-connections.md) or the `traces` packet. Company defaults inherit only on boards that use traces; `traceConnections: {}` disables. Verify the actual schema; never infer mappings.

@@ -21,4 +21,12 @@ Everything below is discovered automatically. No upstream list needs an edit.
 
 See [docs/company-overlay.md](../docs/company-overlay.md) for details.
 
-Company MCP trace defaults may be declared in `company.json.traceConnections`. They contain no credentials, are inherited only by boards that use traces (`traceMatch` steps, or a live-status panel with telemetry), and fetch only on explicit Load/Verify. Boards may restrict profiles or disable them with `traceConnections: {}`. See [direct trace profiles and the verification handoff](../docs/trace-connections.md).
+Company MCP trace defaults may be declared in `company.json.traceConnections`. They contain no credentials, are inherited only by boards that use traces, and fetch only on explicit Load/Verify. Boards may restrict profiles or disable them with `traceConnections: {}`. See [direct trace profiles and the verification handoff](../docs/trace-connections.md) for the exact rule.
+
+Company profiles compile through source-loader into standalone, workbench, native
+and backend assemblies. Source-free kits retain reduced company agent context and
+the compiled resolver. Injection declares only resolved exact detail tools,
+including a detail-only connection with no search signal, on the page the viewer
+renders after topology resolution. The `traces` authoring packet includes the
+trace connections contract and company context. `--no-config` removes company
+defaults; inline board profiles remain authored configuration.

@@ -707,7 +707,7 @@ class InjectTests(unittest.TestCase):
 
         honey = {"kind": "service", "signals": {"p95": {"honeycomb": {"calculations": [{"op": "P95", "column": "duration_ms"}]}}}}
         provider = spec("provider", {"nodes": {"api": {"title": "API", "telemetry": honey}, "store": {"title": "Store"}}, "rows": [["api", "store"]],
-                                     "topologyExports": {"core": {"nodes": ["api", "store"]}}})
+                                     "edges": [{"from": "api", "to": "store"}], "topologyExports": {"core": {"nodes": ["api", "store"], "edges": ["api->store"]}}})
         consumer = spec("consumer", {"nodes": {"local": {"title": "Local"}}, "rows": [["local"]], "panels": [panel],
                                      "topologyImports": [{"spec": "provider", "export": "core", "as": "shared"}]})
         topology = {"version": 1, "id": "consumer", "specs": [provider, consumer]}

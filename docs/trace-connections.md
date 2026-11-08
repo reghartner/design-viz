@@ -68,10 +68,13 @@ actually declares the chosen `team_slug`/`from` arguments before using it.
 }
 ```
 
-Only boards that use traces inherit company profiles: a `traceMatch` step, or a
-`live-status` panel on a page with page or carrier `telemetry`. Profiles grant
-no permission and never call before Load/Verify. A board may narrow or override
-them:
+Only boards that use traces inherit company profiles. A board uses traces when a
+step in any section or tab has `traceMatch`, or a section has a `live-status`
+panel and the page has `tracking.telemetry` (`{}` is enough), a node, edge or
+import-overlay `telemetry` binding, or a node `detail` reference. Imported
+carriers count after topology resolution, as the viewer renders them. Other
+boards declare no trace connector. Profiles grant no permission and never call
+before Load/Verify. A board may narrow or override them:
 
 ```json
 {"tracking":{"telemetry":{"traceConnections":{
@@ -174,12 +177,7 @@ metadata/schema, and return the original provider response. The viewer uses the
 same validation and decoder as portable artifacts. Without those callbacks the
 UI honestly reports unavailable; it does not fall back to arbitrary networking.
 
-Company profiles compile through source-loader into standalone, workbench, native
-and backend assemblies. Source-free kits retain reduced company agent context and
-the compiled resolver. Injection declares only resolved exact detail tools,
-including a detail-only connection with no search signal. The `traces` authoring
-packet includes this contract and company context. `--no-config` removes company
-defaults; inline board profiles remain authored configuration.
+Company profile packaging is described in `company/README.md`.
 
 ### Focus a span and its authored step
 

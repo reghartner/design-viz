@@ -33,6 +33,32 @@ find only indicators proving that feature path in its deployed environment.
 Use the Metrics chapter's evidence mapping and gap rules; broad service health
 is not the default evidence for new work.
 
+### Find a trace from a log line (Load trace lookups)
+
+When the field that tells traces apart is only on a Loki log line, not a span
+attribute, add `tracking.telemetry.lookups` so readers can find the trace in
+Status → Trace → **Load trace**. The board needs a trace connection and
+`tracking.telemetry.grafana.loki`. For a company whose camera model is structured
+metadata on the line `Handling camera stats message`, next to `trace_id` and
+`span_id`:
+
+```json
+{"tracking": {"telemetry": {"lookups": {"camera-model": {
+  "label": "Camera model",
+  "query": "{env=\"$env\"} |= \"Handling camera stats message\" | cameraModel=\"$value\"",
+  "values": ["arch", "wren"]
+}}}}}
+```
+
+The reader picks or types a value; one `query_loki_logs` call over the Load trace
+lookback lists up to 10 newest lines (time, value, trace ID), and **Load** loads
+that trace and focuses the line's span. Readers can also type a LogQL log query.
+Use only a query and field names verified on a real line; set `fields: {traceId,
+spanId}` when the IDs are not `trace_id` / `span_id`. Suggested `values` need a
+`$value` slot. Declare `query_loki_logs` on the Grafana connector
+(`tools/inject.py` adds it). Contract:
+[Find a trace from a log line](../../../docs/live-status.md#find-a-trace-from-a-log-line).
+
 ## 0. The interaction
 
 The usual request is "give me an Epic Status board for DOOR-100". The agent

@@ -1,0 +1,65 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import path from 'node:path';
+import {test,expect} from '../helpers/test.mjs';
+import {repo} from '../helpers/prepare.mjs';
+/* #1099: Load trace finds a trace from a Loki log line (test plan 1, 2 and 6;
+   tests/telemetry-log-lookup.test.js covers the rest). Desktop only. */
+const PROFILE=JSON.parse(await readFile(path.join(repo,'tests/fixtures/trace-connection-profile.json'),'utf8'));
+const RECORDED=await readFile(path.join(repo,'tests/fixtures/provider-traces/honeycomb-trace.txt'),'utf8');
+const ID='8413cd87a9f15b6bfe8e1acf5b3346d0',SPAN='011114cbd1fd62de',PANEL={id:'status',type:'live-status',title:'Status'};
+const QUERY='{env="$env"} |= "Handling camera stats message" | cameraModel="$value"';
+const schema=()=>({name:'get_trace',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string',enum:['full']}},required:['trace_id','from','environment_slug','team_slug','view_mode'],additionalProperties:false}});
+// grafana/mcp-grafana tools/loki.go QueryLokiLogsResult (format full): one line with the ids, one without.
+const LINES={data:[
+ {timestamp:'1794044533123456789',line:'Handling camera stats message',labels:{env:'stg',severity_text:'DEBUG'},structuredMetadata:{cameraModel:'arch',trace_id:ID,span_id:SPAN}},
+ {timestamp:'1794040000000000000',line:'Handling camera stats message',labels:{env:'stg',severity_text:'DEBUG'},structuredMetadata:{cameraModel:'arch'}}
+],metadata:{linesReturned:2,maxLinesAllowed:10,resultsTruncated:false}};
+async function open(page,server,{grafana=true,lookups=true}={}){
+ await page.setViewportSize({width:1500,height:1100});const calls=[];
+ const servers=[{server:PROFILE.server,tools:[{name:'get_trace',annotations:{readOnlyHint:true,destructiveHint:false}}]}].concat(grafana?[{server:'Grafana',tools:[{name:'query_loki_logs',annotations:{readOnlyHint:true}}]}]:[]);
+ await page.exposeFunction('logTools',()=>servers);await page.exposeFunction('logDescribe',()=>schema());
+ await page.exposeFunction('logPermission',keys=>Object.fromEntries(keys.map(k=>[k,'granted'])));
+ await page.exposeFunction('logCall',(server,tool,args)=>{calls.push({server,tool,args});return tool==='query_loki_logs'?{content:[{type:'text',text:JSON.stringify(LINES)}]}:{payload:RECORDED};});
+ await page.addInitScript(()=>{window.claude={use:async name=>name==='permissions'?{request:keys=>window.logPermission(keys)}:{listTools:()=>window.logTools(),describeTool:()=>window.logDescribe(),callTool:(s,n,a)=>window.logCall(s,n,a)}};window.flowviewBooted=ctl=>{window.ctl=ctl;};});
+ const telemetry={grafana:{loki:'loki-$env'},environment:'stg',environments:{stg:{},prd:{}},traceConnections:{company:PROFILE}};
+ if(lookups)telemetry.lookups={camera:{label:'Camera model',query:QUERY,values:['arch','wren']}};
+ const name='log-lookup-'+(grafana?'grafana':'absent')+(lookups?'':'-plain'),spec={page:{title:'Camera stats',tracking:{telemetry},sections:[{id:'main',diagram:{nodes:{consumer:{title:'Camera stats consumer'}},rows:[['consumer']],panels:[PANEL]}}]}};
+ await writeFile(path.join(server.root,name+'.json'),JSON.stringify(spec));
+ execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,name+'.json'),path.join(repo,'template/flowview.html'),path.join(server.root,name+'.html')],{stdio:'pipe'});
+ await page.goto(server.origin+'/'+name+'.html');await page.waitForFunction(()=>!!window.ctl);
+ const root=page.locator('.pwidget.pt-live-status').filter({visible:true}).first();await root.getByRole('button',{name:'Trace',exact:true}).click();
+ await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
+ return {root,logs:root.locator('.dv-trace-logs'),calls};
+}
+// Accessible names of the Load trace controls outside the log lookup section.
+const formControls=root=>root.locator('.dv-trace-config').evaluate(config=>Array.from(config.querySelectorAll('input,select,textarea,button')).filter(n=>!n.closest('.dv-trace-logs')).map(n=>[n.tagName,n.getAttribute('aria-label') || n.textContent.trim(),n.disabled]));
+
+test('desktop authored log lookup lists the newest matching lines and loads the chosen trace focused on its span',async({page,server},info)=>{
+ const h=await open(page,server);
+ await expect(h.logs.getByRole('combobox',{name:'Log lookup',exact:true})).toHaveValue('camera');await expect(h.logs.getByRole('button',{name:'Find log lines',exact:true})).toBeEnabled();
+ await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');expect(h.calls).toHaveLength(0);
+ await h.logs.getByRole('button',{name:'Find log lines',exact:true}).click();
+ const lines=h.logs.locator('.dv-trace-log-row');await expect(lines).toHaveCount(2);
+ expect(h.calls).toEqual([{server:'Grafana',tool:'query_loki_logs',args:{datasourceUid:'loki-stg',logql:'{env="stg"} |= "Handling camera stats message" | cameraModel="arch"',startRfc3339:'now-2h',endRfc3339:'now',limit:10,direction:'backward',queryType:'range'}}]);
+ await expect(lines.nth(0).locator('.dv-trace-log-time')).toHaveText('2026-11-07 09:42:13Z');await expect(lines.nth(0).locator('.dv-trace-log-value')).toHaveText('arch');await expect(lines.nth(0).locator('.dv-trace-log-id')).toHaveText(ID);
+ await expect(lines.nth(1)).toContainText('This log line has no trace_id');await expect(lines.nth(1).getByRole('button')).toHaveCount(0);
+ await info.attach('log-lookup-results',{body:await h.root.screenshot(),contentType:'image/png'});
+ await lines.nth(0).getByRole('button',{name:'Load trace '+ID,exact:true}).click();
+ await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);await expect(h.root.locator('.dv-trace-span')).toHaveCount(55);
+ expect(h.calls.slice(1)).toEqual([{server:PROFILE.server,tool:'get_trace',args:{view_mode:'full',trace_id:ID,from:'-2h',environment_slug:'production',team_slug:'example-team'}}]);
+ await expect(h.root.locator('.dv-trace-span[data-span-id="'+SPAN+'"]')).toHaveAttribute('aria-pressed','true');await expect(h.root.locator('.dv-trace-span[aria-pressed="true"]')).toHaveCount(1);
+ await expect(h.root.locator('.dv-trace-focus-hint')).toHaveText(/^Trace focus · /);
+ await info.attach('log-lookup-loaded-focused',{body:await h.root.screenshot(),contentType:'image/png'});
+});
+
+test('desktop without a Grafana connector the log lookup is disabled with a message and the rest of Load trace is unchanged',async({page,server},info)=>{
+ const plain=await open(await page.context().newPage(),server,{lookups:false});await expect(plain.logs).toHaveCount(0);const expected=await formControls(plain.root);
+ const h=await open(page,server,{grafana:false});
+ await expect(h.logs.getByRole('status')).toContainText('Log lookups need a Grafana connector with query_loki_logs');
+ await expect(h.logs.getByRole('combobox',{name:'Log lookup',exact:true})).toBeDisabled();await expect(h.logs.getByLabel('Camera model',{exact:true})).toBeDisabled();await expect(h.logs.getByRole('button',{name:'Find log lines',exact:true})).toBeDisabled();
+ expect(await formControls(h.root)).toEqual(expected);
+ await info.attach('log-lookup-no-grafana',{body:await h.root.screenshot(),contentType:'image/png'});
+ await h.root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();
+ await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);expect(h.calls.map(c=>c.tool)).toEqual(['get_trace']);
+});

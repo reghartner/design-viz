@@ -143,8 +143,8 @@ function telemetryEditBinding(binding,edit,options){
       if(edit.value==null)return {error:'A signal needs a query; use Remove signal to delete it.'};
       var value=telemetryQueryValue(source,edit.value);if(value.error)return value;
       next[source]=value.value;
-    }else if(edit.field==='showOnCard'){
-      if(typeof edit.value!=='boolean')return {error:'Show on card must be a boolean.'};
+    }else if(edit.field==='showOnCard' || edit.field==='missingMeansZero'){
+      if(typeof edit.value!=='boolean')return {error:edit.field==='showOnCard'?'Show on card must be a boolean.':'missingMeansZero must be a boolean.'};
       if(source)next[source]=entry[source];
     }else if(edit.field==='unit' || edit.field==='scope' || edit.field==='label' || edit.field==='queryLink'){
       if(source)next[source]=entry[source];
@@ -154,6 +154,9 @@ function telemetryEditBinding(binding,edit,options){
     if(unit)next.unit=unit;
     var scope=edit.field==='scope'?edit.value:entry.scope;if(telemetryText(scope))next.scope=scope.trim();
     var showOnCard=edit.field==='showOnCard'?edit.value:entry.showOnCard;if(typeof showOnCard==='boolean')next.showOnCard=showOnCard;
+    // Checking the box returns to the default by removing the key.
+    var missingMeansZero=edit.field==='missingMeansZero'?(edit.value===false?false:null):entry.missingMeansZero;if(typeof missingMeansZero==='boolean' && (next.loki!==undefined || next.grafana!==undefined))next.missingMeansZero=missingMeansZero;
+    if(telemetryOwn(entry,'window'))next.window=entry.window;
     var label=edit.field==='label'?edit.value:entry.label;
     if(label!=null){if(!telemetryText(label) || label.length>120 || /[\x00-\x1f\x7f]/.test(label))return {error:'A label is 1–120 plain-text characters without control characters.'};next.label=label.trim();}
     var queryLink=edit.field==='queryLink'?edit.value:entry.links && entry.links.query;
@@ -199,8 +202,12 @@ function telemetryEditBinding(binding,edit,options){
       if(edit.value!=null && !(telemetryNumber(edit.value) && Math.abs(edit.value)<=TELEMETRY_CARD_OFFSET_MAX))return {error:'Use a number of pixels between -'+TELEMETRY_CARD_OFFSET_MAX+' and '+TELEMETRY_CARD_OFFSET_MAX+'.'};
     }else if(edit.field==='position'){
       if(edit.value!=null && !(telemetryObject(edit.value) && telemetryNumber(edit.value.x) && telemetryNumber(edit.value.y)))return {error:'Card position needs finite x and y coordinates.'};
+    }else if(edit.field==='title'){
+      if(edit.value!=null && !telemetryCardTitle(edit.value))return {error:'A card title is 1–120 plain-text characters without control characters.'};
+    }else if(edit.field==='width'){
+      if(edit.value!=null && !telemetryCardWidth(edit.value))return {error:'Use a card width in pixels between '+TELEMETRY_CARD_WIDTH_MIN+' and '+TELEMETRY_CARD_WIDTH_MAX+'.'};
     }else return {error:'Unknown card field.'};
-    if(edit.value==null)delete card[edit.field];else card[edit.field]=edit.field==='position'?{x:edit.value.x,y:edit.value.y}:edit.value;
+    if(edit.value==null)delete card[edit.field];else card[edit.field]=edit.field==='position'?{x:edit.value.x,y:edit.value.y}:edit.field==='title'?edit.value.trim():edit.value;
     b.card=card;telemetryDropEmpty(b,'card');
     return {value:b};
   }
@@ -374,7 +381,8 @@ function planCarrierTelemetry(text,raw,target,edit,context){
   // the resolver's expanded binding, never a reference to a provider template.
   var binding=t.binding;
   if(!binding && t.owner && edit && edit.op==='card')binding=telemetryObject(t.resolved.telemetry)?t.resolved.telemetry:null;
-  if(!t.binding && binding && edit.field==='position' && edit.value==null && !(binding.card && binding.card.position))return {text:text};
+  // Clearing a card field the inherited binding does not set creates no override.
+  if(!t.binding && binding && edit.value==null && !(telemetryObject(binding.card) && binding.card[edit.field]!=null))return {text:text};
   var result=telemetryEditBinding(binding,edit,{templates:telemetryPageTemplates(raw)});if(result.error)return result;
   // A non-object authored value is replaced or removed like any other binding.
   if(JSON.stringify(result.value)===JSON.stringify(t.binding) && !(t.hasField && !t.binding))return {text:text};

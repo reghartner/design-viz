@@ -1134,7 +1134,7 @@ function stepForm(val, ctx){
     var evidence=document.createElement('details');
     var evidenceTitle=document.createElement('summary'); evidenceTitle.textContent='Code and trace evidence';evidence.appendChild(evidenceTitle);
     evidence.appendChild(frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr')));
-    evidence.appendChild(frow('Trace match JSON',jsonFieldControl('traceMatch',val.traceMatch,'json')));
+    evidence.appendChild(frow('Trace match JSON',jsonFieldControl('traceMatch',val.traceMatch,'jsonObjArr')));
     evidence.appendChild(frow('Runtime conditions JSON',jsonFieldControl('conditions',val.conditions,'jsonArr')));
     rows.push(evidence);
     ((ctx.diagram && ctx.diagram.panels) || []).forEach(function(p){
@@ -1643,7 +1643,8 @@ function panelPatchControl(pid, patch, decl, target, options){
   }
 
 function jsonFieldControl(key, value, kind, after){
-    /* kind: 'json' (object) | 'jsonArr' (array) | 'jsonAny' (any JSON —
+    /* kind: 'json' (object) | 'jsonArr' (array) | 'jsonObjArr' (object or
+       array — traceMatch alternatives) | 'jsonAny' (any JSON —
        radar rings takes a count OR a radii array). `after` runs on a
        successful commit — the typed editors pass a form refresh so the
        two views of one field can never go stale against each other. */
@@ -1659,6 +1660,9 @@ function jsonFieldControl(key, value, kind, after){
         }
         if (kind === 'json' && (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))){
           formError(key + ' is a JSON object — { ... }'); return false;
+        }
+        if (kind === 'jsonObjArr' && (parsed === null || typeof parsed !== 'object')){
+          formError(key + ' is a JSON object or array — { ... } or [ ... ]'); return false;
         }
         ok = commitSimple(key, JSON.stringify(parsed));
       }

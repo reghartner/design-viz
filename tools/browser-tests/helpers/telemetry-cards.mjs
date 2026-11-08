@@ -17,7 +17,7 @@ const CUE_SAMPLES={ingest:{signals:{lag:{value:10}}},'ingest->app':{signals:{rat
  'app->push':{signals:{rate:{value:0,series:[[T1,0],[T2,0]]},errors:{value:0}}},'shared::api':{signals:{rate:{value:50,series:[[T1,40],[T2,50]]}}},
  'shared::api->shared::store':{signals:{rate:{value:500},errors:{value:1}}}};
 const CUES='.dv-metrics-stream,.dv-metrics-ghost,.dv-metrics-node,[data-metrics-state]';
-function cueSpec(){
+function cueSpec(edit){
  const spec=(id,diagram,extra={})=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},...extra,sections:[{diagram}]}});
  const provider=spec('provider',{nodes:{api:{title:'Imported API'},store:{title:'Imported store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
  const consumer=spec('consumer',{nodes:{ingest:{title:'Ingest',tickets:['LOC-1'],telemetry:QUEUE()},app:{title:'Resident app',tickets:['LOC-2']},push:{title:'Push gateway'}},rows:[['ingest','app','push']],
@@ -25,6 +25,7 @@ function cueSpec(){
   steps:[{id:'notify',edge:'ingest->app',text:'Notify'},{id:'retry',edge:'app->push',failures:{'ingest->push':'dropped'},text:'Retry'}],
   topologyImports:[{spec:'provider',export:'core',as:'shared',position:{x:80,y:300},nodeTracking:{api:{tickets:['IMP-1'],telemetry:SERVICE()}},edgeTracking:{'api->store':{tickets:['IMP-2'],telemetry:CALL()}}}]});
  consumer.page.tracking={jira:{site:'https://jira.test'}};
+ if(edit)edit(consumer.page.sections[0].diagram);
  const context=vm.createContext({});vm.runInContext(sourceLoader.composeSources(['validator.js','canon.js']),context);
  return JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]})));
 }

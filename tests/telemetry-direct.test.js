@@ -6,6 +6,8 @@ const ID='8413cd87a9f15b6bfe8e1acf5b3346d0',NOW=Date.parse('2026-11-06T12:00:00Z
 function context(name='standalone'){const C={URL,AbortController,TextEncoder,TextDecoder,console,setTimeout,clearTimeout,document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint(name).body,C);return C;}
 function profile(){return clone(fixture);}
 function board(p=profile()){return {tracking:{telemetry:{traceConnections:{company:p}}},sections:[{id:'one',diagram:{nodes:{a:{}},rows:[['a']]}}]};}
+// #1095: a traceMatch step makes a board use traces without tracking or bindings.
+function traced(){return {sections:[{id:'one',diagram:{nodes:{a:{}},rows:[['a']],steps:[{id:'s',nodes:['a'],traceMatch:{serviceName:'svc',operation:'op'}}]}}]};}
 function tool(){return {name:'get_trace',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{anyOf:[{type:'string'},{type:'null'}]},environment_slug:{type:['string','null']},team_slug:{type:'string'},view_mode:{enum:['full'],type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode'],additionalProperties:false}};}
 function setup({C=context(),p=board(),metadataOnly=false,permission='granted',result={payload:recorded},describe,call,hooks={}}={}){
  const calls=[],permissions=[],counts={lists:0,describes:0};let tools=[tool()];
@@ -17,7 +19,7 @@ function setup({C=context(),p=board(),metadataOnly=false,permission='granted',re
 }
 test('company config is inherited without calls; board restrictions/overrides are bounded, immutable and exact',()=>{
  const C=context('backend'),F=C.FlowTraceConnections,p=profile(),company={ops:p},page={tracking:{telemetry:{traceConnections:{chosen:{profile:'ops',label:'Chosen',literals:{view_mode:'full'},environments:{prod:{value:'production-2',context:{team:'team-2'}}}}}}}},before=JSON.stringify([page,company]);
- assert.deepEqual(Object.keys(F.resolve({},company)),['ops']);assert.deepEqual(clone(F.resolve({tracking:{telemetry:{traceConnections:{}}}},company)),{});const selected=F.resolve(page,company);assert.deepEqual(Object.keys(selected),['chosen']);assert.deepEqual(Object.keys(selected.chosen.environments),['prod']);assert.equal(selected.chosen.environments.prod.context.team,'team-2');assert.equal(JSON.stringify([page,company]),before);
+ assert.deepEqual(Object.keys(F.resolve({},company)),[]);assert.deepEqual(Object.keys(F.resolve(traced(),company)),['ops']);assert.deepEqual(clone(F.resolve({tracking:{telemetry:{traceConnections:{}}}},company)),{});const selected=F.resolve(page,company);assert.deepEqual(Object.keys(selected),['chosen']);assert.deepEqual(Object.keys(selected.chosen.environments),['prod']);assert.equal(selected.chosen.environments.prod.context.team,'team-2');assert.equal(JSON.stringify([page,company]),before);
  for(const alter of [x=>x.readOnly=false,x=>x.adapter='javascript',x=>x.arguments.traceId=x.arguments.start,x=>x.literals.authorization='secret',x=>x.literals.team='https://signed.example/private',x=>x.environments.prod.context.team={nested:true},x=>x.links[0].path='/{team}/{team}',x=>x.links[0].query.extra='trace_id',x=>x.extra='unknown']){const bad=profile();alter(bad);assert.throws(()=>F.profile(bad),/configuration/);}
  const invalid=clone(page);invalid.tracking.telemetry.traceConnections.chosen.server='Another';let errors=[];assert.deepEqual(clone(F.resolve(invalid,company,(p,m)=>errors.push(m))),{});assert.match(errors.join(),/unsupported/);
  page.tracking.telemetry.enabled=false;assert.deepEqual(clone(F.resolve(page,company)),{});
@@ -101,10 +103,10 @@ test('bounded timeout clears busy state and rejects a transport that resolves af
  for(let i=0;i<10 && !release;i++)await new Promise(setImmediate);assert.ok(release);expire();assert.equal(h.api.snapshot().busy,false);assert.equal(h.api.snapshot().report.code,'timeout');assert.equal(h.calls[0].signal.aborted,true);release();assert.equal(await request,null);assert.equal(h.api.snapshot().exemplar,null);h.api.destroy();
 });
 
-test('inherited company profile needs no tracking or bindings, but explicit empty map and host/page disables win',async()=>{
- const C=context();C.TELEMETRY_COMPANY_TRACE_CONNECTIONS={company:profile()};const p={sections:board().sections},h=setup({C,p});assert.equal(h.counts.lists,0);assert.equal(h.api.snapshot().profiles.length,1);assert.equal(h.calls.length,0);assert.equal((await h.api.load()).traceId,ID);h.api.destroy();
+test('inherited company profile needs no tracking or bindings on a traceMatch board, but explicit empty map and host/page disables win',async()=>{
+ const C=context();C.TELEMETRY_COMPANY_TRACE_CONNECTIONS={company:profile()};const p=traced(),h=setup({C,p});assert.equal(h.counts.lists,0);assert.equal(h.api.snapshot().profiles.length,1);assert.equal(h.calls.length,0);assert.equal((await h.api.load()).traceId,ID);h.api.destroy();
  for(const config of [{traceConnections:{}},{enabled:false}]){const page={tracking:{telemetry:config}},api=C.createTelemetryDirect(page,{describe:async()=>{throw Error('must not discover');},call:async()=>{throw Error('must not call');}});assert.equal(api.snapshot().profiles.length,0);api.set('input',ID);assert.equal(await api.load(),null);api.destroy();}
- const absent=C.createTelemetryDirect({},null);assert.equal(absent.snapshot().profiles.length,1);assert.equal(absent.snapshot().available,false);absent.destroy();
+ const absent=C.createTelemetryDirect(traced(),null);assert.equal(absent.snapshot().profiles.length,1);assert.equal(absent.snapshot().available,false);absent.destroy();
 });
 
 test('registered Tempo profile uses the same direct-only path and preserves provider unknown completeness',async()=>{
@@ -156,4 +158,54 @@ test('connection and environment changes require fresh trace input; section-only
   if(change==='global')global='stage';else h.api.set(change,change==='environment'?'stage':'other');const form=h.api.snapshot().form;assert.equal(form.input,'',change);assert.equal(form.start,'',change);assert.equal(form.end,'',change);assert.equal(await h.api.load(),null);assert.equal(h.counts.lists,0,change);assert.equal(h.calls.length,0,change);h.api.destroy();
  }
  const h=setup({hooks:{sections:()=>[{id:'one',label:'One'},{id:'two',label:'Two'}]}});h.api.set('section','one');h.api.set('start','-2h');h.api.set('section','two');assert.equal(h.api.snapshot().form.input,ID);assert.equal(h.api.snapshot().form.start,'-2h');assert.equal(h.calls.length,0);assert.equal((await h.api.load()).traceId,ID);h.api.destroy();
+});
+
+test('a metadata-only no-spans response names the active lookback; a present but wrong table keeps the header message',async()=>{
+ const notFound='---\nMetadata:\n  environment: ms-demo\n  navigation_hints: no spans found\n  total_spans: 0\n  trace_id: '+ID+'\n  view_mode: full\n  visible_spans: 0\n';
+ for(const [start,label] of [['','2h'],['-7d','7d']]){
+  const h=setup({result:{payload:notFound}});if(start)h.api.set('start',start);assert.deepEqual(clone(h.api.snapshot().bounds),{lookback:label,linkTime:false,linkUsable:false});assert.equal(await h.api.load(),null);const s=h.api.snapshot();
+  assert.equal(s.exemplar,null);assert.equal(s.report.stage,'response');assert.equal(s.report.requestAccepted,true);assert.equal(s.report.idMatched,false);assert.equal(s.report.arguments.from,'-'+label);
+  assert.equal(s.report.code,'trace_not_found');assert.equal(s.report.error,'Trace not found in the last '+label+'. Try a longer lookback under Lookback.');h.api.destroy();
+ }
+ const p=profile();p.time.encoding='iso8601';p.arguments.end='to';const t=tool();t.inputSchema.properties.to={type:'string'};t.inputSchema.required.push('to');
+ const absolute=setup({p:board(p),result:{payload:notFound}});absolute.setTools([t]);absolute.api.set('start','2026-11-06T00:00:00Z');absolute.api.set('end','2026-11-06T06:00:00Z');assert.equal(await absolute.api.load(),null);
+ assert.equal(absolute.api.snapshot().report.code,'trace_not_found');assert.equal(absolute.api.snapshot().report.error,'Trace not found between 2026-11-06T00:00:00Z and 2026-11-06T06:00:00Z. Try a wider range under Lookback.');absolute.api.destroy();
+ const url='https://ui.honeycomb.io/example-team/environments/production/trace?trace_id='+ID+'&trace_start_ts=1791779586.602194688&trace_end_ts=1791779592.123456789',linked=setup({p:board(clone(p)),result:{payload:notFound}});linked.setTools([t]);linked.api.set('input',url);
+ assert.deepEqual(clone(linked.api.snapshot().bounds),{lookback:null,linkTime:true,linkUsable:true});assert.equal(await linked.api.load(),null);const first=linked.api.snapshot().report;assert.equal(first.code,'trace_not_found');assert.equal(first.error,'Trace not found in the time range of the pasted link. Paste the trace ID alone, then set Lookback.');
+ assert.equal(await linked.api.load(),null);assert.notEqual(linked.api.snapshot().report.serial,first.serial,'each not-found report is distinct');const calls=linked.calls.length;linked.api.set('start','-2h');assert.deepEqual(clone(linked.api.snapshot().bounds),{lookback:null,linkTime:true,linkUsable:true},'conflicting time controls do not hide link bounds');
+ assert.equal(await linked.api.load(),null);assert.match(linked.api.snapshot().report.error,/both the link and controls/);assert.equal(linked.calls.length,calls);linked.api.set('input','');assert.equal(linked.api.snapshot().bounds,null);linked.api.destroy();
+ const wrong=recorded.replace('| route |','| path |'),hinted=wrong.replace(/^  navigation_hints: .*$/m,'  navigation_hints: no spans found');assert.notEqual(hinted,wrong);
+ for(const payload of [wrong,hinted]){const h=setup({result:{payload}});assert.equal(await h.api.load(),null);const s=h.api.snapshot();assert.equal(s.report.stage,'response');assert.equal(s.report.error,'Unsupported trace table header.');assert.notEqual(s.report.code,'trace_not_found');h.api.destroy();}
+});
+
+test('a pasted link with time on a relative-only connection is reported as unusable, not as the default lookback',async()=>{
+ const url='https://ui.honeycomb.io/example-team/environments/production/trace?trace_id='+ID+'&trace_start_ts=1791779586.602194688&trace_end_ts=1791779592.123456789',startOnly=url.replace(/&trace_end_ts=[^&]*/,'');
+ for(const [link,error] of [[url,/only relative time/],[startOnly,/both start and end/]]){
+  const h=setup();h.api.set('input',link);assert.deepEqual(clone(h.api.snapshot().bounds),{lookback:null,linkTime:true,linkUsable:false});
+  h.api.set('start','-7d');assert.deepEqual(clone(h.api.snapshot().bounds),{lookback:null,linkTime:true,linkUsable:false},'a Trace start does not make the link time usable');
+  assert.equal(await h.api.load(),null);assert.equal(h.calls.length,0);assert.match(h.api.snapshot().report.error,/both the link and controls/);
+  h.api.set('start','');assert.equal(await h.api.load(),null);assert.equal(h.calls.length,0);assert.match(h.api.snapshot().report.error,error);h.api.destroy();
+ }
+ const p=profile();p.time.encoding='iso8601';p.arguments.end='to';const h=setup({p:board(p)});h.api.set('input',startOnly);assert.deepEqual(clone(h.api.snapshot().bounds),{lookback:null,linkTime:true,linkUsable:false},'a start-only link is unusable on an absolute-capable connection');
+ h.api.set('end','2026-10-12T05:00:00Z');assert.deepEqual(clone(h.api.snapshot().bounds),{lookback:null,linkTime:true,linkUsable:true},'a start-only link plus Trace end is usable');h.api.destroy();
+});
+/* #1081: the Load-trace environment starts at the profile environment that matches the board Environment,
+   and follows board changes until the user picks a trace environment. */
+test('#1081 matchTraceEnvironment: exact id, then case-insensitive id or label, then aliases; ambiguous or unknown is no match',()=>{
+ const M=context().matchTraceEnvironment,envs={prod:{label:'Production'},stage:{label:'Staging'}};
+ assert.equal(M('prd',envs),'prod','1: board prd matches profile prod by alias');assert.equal(M('production',envs),'prod');assert.equal(M('stg',envs),'stage');assert.equal(M('STAGING',envs),'stage','label match ignores case');
+ assert.equal(M('prd',{production:{label:'Prod'},prd:{label:'Other'}}),'prd','2: exact id wins over an alias match');assert.equal(M('PROD',{production:{},prod:{}}),'prod','case-insensitive id wins over an alias match');
+ assert.equal(M('Live',{live:{label:'Live'},prod:{label:'Production'}}),'live');assert.equal(M('development',{dev:{}}),'dev');assert.equal(M('QA',{qa:{}}),'qa');
+ for(const [b,e] of [['perf',envs],['',envs],[null,envs],['prd',{}],['prd',{prod:{},production:{}}]])assert.equal(M(b,e),'',String(b)+' → no match');
+});
+test('#1081 Load-trace environment seeds from the board, keeps today\'s fallback, and follows board changes until the user picks',()=>{
+ const envs={prod:{label:'Production',value:'production',context:{team:'example-team'}},stage:{label:'Staging',value:'staging',context:{team:'example-team'}}};
+ let current='prd';const api=(()=>{const p=profile();p.environments=clone(envs);return context().createTelemetryDirect(board(p),{describe(){},call(){}},{sections:()=>[],environment:()=>current});})();
+ assert.equal(api.snapshot().form.environment,'prod','1: board prd starts the dropdown at prod');
+ current='stg';assert.equal(api.snapshot().form.environment,'stage','4: board change is followed before a user pick');
+ current='perf';assert.equal(api.snapshot().form.environment,'','3: no match shows Choose…');
+ current='prd';assert.equal(api.snapshot().form.environment,'prod');
+ api.set('environment','stage');assert.equal(api.snapshot().form.environment,'stage');current='stg';assert.equal(api.snapshot().form.environment,'stage');current='prd';assert.equal(api.snapshot().form.environment,'stage','4: the user pick stays after board changes');
+ api.destroy();
+ const one=profile();one.environments={stage:clone(envs.stage)};const single=context().createTelemetryDirect(board(one),{describe(){},call(){}},{sections:()=>[],environment:()=>'perf'});assert.equal(single.snapshot().form.environment,'stage','3: no match keeps the single-environment default');single.destroy();
 });

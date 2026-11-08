@@ -8,9 +8,9 @@ acceptance, returned ID match, span count and completeness. Both are explicit
 reader actions. Changing an input never fetches. Clear/cancel, connection,
 environment, mapping diagram, document identity and remount changes retire old
 requests; late responses cannot replace current evidence. Schema/detail requests
-time out after 30 seconds. Changing the connection or environment also clears
-the pasted ID/link and time controls: supply a trace for the selected environment
-before loading again. Changing only the mapping diagram retains that input.
+time out after 30 seconds. Connection or environment changes clear the pasted
+ID/link and times; mapping diagram changes keep them. The environment starts
+at the board's match ([rules](provider-traces.md#load-trace-environment)).
 An authenticated host account change retires the shared telemetry session,
 retracts direct and numeric evidence, and requires reopening the viewer.
 
@@ -68,9 +68,13 @@ actually declares the chosen `team_slug`/`from` arguments before using it.
 }
 ```
 
-Company profiles are inherited by every board built with that company
-configuration. They grant no permission and never make a call before the reader
-clicks Load/Verify. A board may optionally narrow or override those defaults:
+Only boards that use traces inherit company profiles. A board uses traces when a
+step in any section or tab has `traceMatch`, or a section has a `live-status`
+panel and the page has `tracking.telemetry` (`{}` is enough), a node, edge or
+import-overlay `telemetry` binding, or a node `detail` reference. Imported
+carriers count after topology resolution, as the viewer renders them. Other
+boards declare no trace connector. Profiles grant no permission and never call
+before Load/Verify. A board may narrow or override them:
 
 ```json
 {"tracking":{"telemetry":{"traceConnections":{
@@ -78,7 +82,7 @@ clicks Load/Verify. A board may optionally narrow or override those defaults:
 }}}}
 ```
 
-Omitting `traceConnections` inherits all configured company profiles. An explicit
+Omitting `traceConnections` inherits all company profiles there. An explicit
 map selects only its entries; `"traceConnections": {}` disables direct loading for
 that board. Omitting `environments` in an entry enables all environments declared
 in that profile. An
@@ -86,8 +90,10 @@ environment subset can override its declared `label`, `value`, `context` and
 `literals`; board `label` and existing top-level `literals` may also be overridden.
 Overrides cannot introduce literal/context keys or change server, tool, argument
 mapping or adapter. Alternatively a board may contain a full inline v1 profile
-instead of a company reference. Readers can choose only the resolved company/board
-connections. `tracking.telemetry.enabled:false` and host `telemetry:false` win.
+instead of a company reference. Readers choose only resolved connections.
+`tracking.telemetry.enabled:false` and host `telemetry:false` win.
+Optional `allowedAttributes`:
+[provider traces](provider-traces.md#allowed-match-attributes).
 
 ## Absolute bounds and supported links
 
@@ -122,10 +128,8 @@ and a probe establish that the connected detail tool supports absolute `from` an
 }
 ```
 
-This example does not claim that all Honeycomb accounts support absolute strings.
-The runtime validates the discovered schema before every call. Numeric timestamps
-require explicit `unix-seconds` or `unix-milliseconds` and `type:"number"` (or
-`"string"` if the tool accepts decimal strings). Conversion preserves nanosecond
+Numeric timestamps require explicit `unix-seconds` or `unix-milliseconds` and
+`type:"number"` (or `"string"` if the tool accepts decimal strings). Conversion preserves nanosecond
 precision; values that cannot be represented exactly as a declared number fail.
 Raw-ID time controls accept a signed lookback such as `-2h`, or paired UTC ISO
 timestamps. A time-bearing link and explicit time controls cannot be combined.
@@ -173,12 +177,7 @@ metadata/schema, and return the original provider response. The viewer uses the
 same validation and decoder as portable artifacts. Without those callbacks the
 UI honestly reports unavailable; it does not fall back to arbitrary networking.
 
-Company profiles compile through source-loader into standalone, workbench, native
-and backend assemblies. Source-free kits retain reduced company agent context and
-the compiled resolver. Injection declares only resolved exact detail tools,
-including a detail-only connection with no search signal. The `traces` authoring
-packet includes this contract and company context. `--no-config` removes company
-defaults; inline board profiles remain authored configuration.
+Company profile packaging is described in `company/README.md`.
 
 ### Focus a span and its authored step
 

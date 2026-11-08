@@ -233,6 +233,9 @@ an explicit attribute or parent selector. `repeat:"attempts"` groups calls only
 when distinct numeric `retry.attempt` values and a common parent establish an
 attempt group. It cannot be combined with `occurrence`. A span cannot silently
 satisfy two authored steps. Missing or ambiguous matches remain visible.
+`traceMatch` may also be a non-empty array of such selectors, tried in order;
+the first that matches maps the step (see
+[alternatives](provider-traces.md#tracematch-alternatives)).
 
 Budgets are authored expectations, not inferred SLOs. `maxDurationMs` compares
 individual observed durations. `maxQueueDepth` uses `messaging.queue.depth` or

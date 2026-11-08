@@ -571,6 +571,31 @@ class InjectTests(unittest.TestCase):
         resolved["page"]["sections"][0]["diagram"] = {"nodes": {"local": {"title": "Local"}, "shared::api": {"title": "API", "telemetry": signal}}, "rows": [["local", "shared::api"]]}
         self.assertEqual(declaration(resolved)["mcp"]["servers"], [grafana])
 
+    def test_agent_guide_declares_query_loki_logs_for_load_trace_log_lookups(self):
+        # #1099: Load trace log lookups call query_loki_logs on the Grafana connector,
+        # also on a board without loki signals. Without Load trace they are unused.
+        inject = load_inject()
+        profile = json.loads((ROOT / "tests/fixtures/trace-connection-profile.json").read_text())
+        lookups = {"camera": {"label": "Camera model", "query": '{env="$env"} |= "Handling camera stats message" | cameraModel="$value"'}}
+
+        def servers(telemetry, signals=None):
+            node = {"telemetry": {"kind": "service", "signals": signals}} if signals else {}
+            spec = {"page": {"tracking": {"telemetry": telemetry}, "blocks": [{"diagram": {"nodes": {"a": node}, "rows": [["a"]]}}]}}
+            with mock.patch.object(inject, "company_agent_context", return_value={}):
+                guide = GUIDE_BLOCK.search(inject.agent_guide(spec, "a" * 40))[1]
+            return json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S)[1]).get("mcp", {}).get("servers", [])
+
+        detail = {"server": profile["server"], "tools": ["get_trace"]}
+        base = {"grafana": {"loki": "logs"}, "traceConnections": {"company": profile}, "lookups": lookups}
+        self.assertEqual(servers(base), [{"server": "Grafana", "tools": ["query_loki_logs"]}, detail])
+        self.assertEqual(servers({**base, "lookups": {}}), [{"server": "Grafana", "tools": ["query_loki_logs"]}, detail])
+        self.assertEqual(servers(base, {"logs": {"loki": 'count_over_time({app="a"}[5m])'}}), [{"server": "Grafana", "tools": ["query_loki_logs"]}, detail])
+        self.assertEqual(servers(base, {"rate": {"grafana": "up"}}), [{"server": "Grafana", "tools": ["query_prometheus", "query_loki_logs"]}, detail])
+        self.assertEqual(servers({k: v for k, v in base.items() if k != "lookups"}), [detail])
+        self.assertEqual(servers({**base, "lookups": []}), [detail])
+        self.assertEqual(servers({**base, "traceConnections": {}}), [])
+        self.assertEqual(servers({**base, "enabled": False}), [])
+
     def test_combined_jira_honeycomb_guides_fit_real_cap_without_losing_edit_rules(self):
         inject = load_inject()
         self.assertEqual(inject.GUIDE_LIMIT, 8 * 1024, "all-connectors headroom; separate skill caps are unchanged")
@@ -619,15 +644,16 @@ class InjectTests(unittest.TestCase):
         spec = tracked_spec()
         spec["page"]["tracking"]["telemetry"] = {"grafana": {"prometheus": "prom", "loki": "logs", "tempo": "traces", "cloudwatch": "cw"}, "honeycomb": {"environment": "stg", "dataset": "api"}}
         signals = {"requests": {"grafana": "requests"}, "logs": {"loki": 'count_over_time({app="api"}[5m])'}, "tempo": {"tempo": "{}"}, "hc": {"honeycomb": {"calculations": [{"op": "COUNT"}]}}, "trace": {"honeycomb": {"query_spec": {"limit": 1}}}, "cloud": {"cloudwatch": {"namespace": "AWS/IoT", "metric": "Failure", "region": "us-east-1", "accountId": "111111111111", "dimensions": {}, "statistic": "Sum", "missingMeansZero": True}}, "insights": {"cloudwatchLogs": {"logGroups": ["iot"], "region": "us-east-1", "query": "stats count() as n"}}, "sql": {"sql": "select count(*) from events"}}
-        spec["page"]["blocks"] = [{"diagram": {"nodes": {"api": {"telemetry": {"kind": "service", "signals": signals}}}, "rows": [["api"]]}}]
+        spec["page"]["blocks"] = [{"diagram": {"nodes": {"api": {"telemetry": {"kind": "service", "signals": signals}}}, "rows": [["api"]], "panels": [{"id": "status", "type": "live-status"}]}}]
         profile = json.loads((ROOT / "tests/fixtures/trace-connection-profile.json").read_text())
         for two_file in (False, True):
             # Inheritance adds an exact detail tool even though this board has no
-            # traceConnections field. Exercise the real shared profile resolver.
+            # traceConnections field: its live-status panel and telemetry use
+            # traces (#1095). Exercise the real shared profile resolver.
             with mock.patch.object(inject, "company_agent_context", return_value={"traceConnections": {"company": profile}}):
                 guide = GUIDE_BLOCK.search(inject.agent_guide(spec, "a" * 40, two_file))[1]
             self.assertIn("get_trace", guide)
-            self.assertIn("Company profiles inherit", guide)
+            self.assertIn("Company profiles inherit on boards that use traces", guide)
             board_text = "Board evidence: " + "x" * (540 - len("Board evidence: "))
             manifest = re.search(r"```json\n(.*?)\n```", guide, re.S)
             declaration = json.loads(manifest[1])
@@ -650,6 +676,91 @@ class InjectTests(unittest.TestCase):
                 inject.agent_guide(spec, "a" * 40, True)
         finally:
             inject.GUIDE_LIMIT = previous
+
+    def test_company_trace_profile_declares_its_connector_only_on_boards_that_use_traces(self):
+        # #1095: a company profile must not add its detail tool to boards that
+        # never use traces; existing "no connector" boards need no {} workaround.
+        inject = load_inject()
+        profile = json.loads((ROOT / "tests/fixtures/trace-connection-profile.json").read_text())
+
+        def servers(spec, company):
+            context = {"traceConnections": {"operations": profile}} if company else {}
+            with mock.patch.object(inject, "company_agent_context", return_value=context):
+                guide = GUIDE_BLOCK.search(inject.agent_guide(spec, "a" * 40))[1]
+            manifest = re.search(r"```json\n(.*?)\n```", guide, re.S)
+            return json.loads(manifest[1]).get("mcp", {}).get("servers", [])
+
+        telemetry_board = json.loads(json.dumps(SPEC))
+        telemetry_board["page"]["tracking"] = {"telemetry": {"honeycomb": {"environment": "prod", "dataset": "api"}}}
+        telemetry_board["page"]["blocks"] = [{"diagram": {"nodes": {"api": {"telemetry": {"kind": "service", "signals": {"hc": {"honeycomb": {"calculations": [{"op": "COUNT"}]}}}}}}, "rows": [["api"]]}}]
+        jira_board = tracked_spec()
+        jira_board["page"]["blocks"] = [{"diagram": {"nodes": {"a": {"tickets": ["ACME-1"]}}, "rows": [["a"]], "panels": [{"id": "status", "type": "live-status"}]}}]
+        for spec in (SPEC, tracked_spec(), jira_board, telemetry_board):
+            self.assertEqual(servers(spec, True), servers(spec, False))
+            self.assertNotIn(profile["server"], [entry["server"] for entry in servers(spec, True)])
+
+        traced = json.loads(json.dumps(SPEC))
+        traced["page"]["blocks"] = [{"diagram": {"nodes": {"a": {}}, "rows": [["a"]], "steps": [{"id": "checkout", "nodes": ["a"], "traceMatch": {"serviceName": "checkout", "operation": "/cart/checkout"}}]}}]
+        panel_board = json.loads(json.dumps(telemetry_board))
+        panel_board["page"]["blocks"][0]["diagram"]["panels"] = [{"id": "status", "type": "live-status"}]
+        for spec in (traced, panel_board):
+            self.assertIn({"server": profile["server"], "tools": ["get_trace"]}, servers(spec, True))
+
+        explicit = json.loads(json.dumps(SPEC))
+        explicit["page"]["tracking"] = {"telemetry": {"traceConnections": {"reader": {"profile": "operations"}}}}
+        self.assertIn({"server": profile["server"], "tools": ["get_trace"]}, servers(explicit, True))
+        traced["page"]["tracking"] = {"telemetry": {"traceConnections": {}}}
+        self.assertNotIn(profile["server"], [entry["server"] for entry in servers(traced, True)])
+
+    def test_company_trace_profile_follows_the_page_the_runtime_resolves(self):
+        # #1095 review: the declaration must match what the viewer resolves after
+        # FlowTopology.resolveSource + normalize (src/boot.flowview.js), so
+        # provider-only imported telemetry, bare diagrams and unwrapped pages count.
+        inject = load_inject()
+        profile = json.loads((ROOT / "tests/fixtures/trace-connection-profile.json").read_text())
+        panel = {"id": "status", "type": "live-status"}
+        direct = {"server": profile["server"], "tools": ["get_trace"]}
+
+        def servers(spec, topology=None):
+            with mock.patch.object(inject, "company_agent_context", return_value={"traceConnections": {"operations": profile}}):
+                guide = GUIDE_BLOCK.search(inject.agent_guide(spec, "a" * 40, False, topology))[1]
+            return json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S)[1]).get("mcp", {}).get("servers", [])
+
+        def spec(spec_id, diagram):
+            return {"page": {"title": spec_id, "canon": {"version": 1, "id": spec_id, "kind": "canonical", "owner": "group:default/test"},
+                             "sections": [{"id": "main", "diagram": diagram}]}}
+
+        honey = {"kind": "service", "signals": {"p95": {"honeycomb": {"calculations": [{"op": "P95", "column": "duration_ms"}]}}}}
+        provider = spec("provider", {"nodes": {"api": {"title": "API", "telemetry": honey}, "store": {"title": "Store"}}, "rows": [["api", "store"]],
+                                     "edges": [{"from": "api", "to": "store"}], "topologyExports": {"core": {"nodes": ["api", "store"], "edges": ["api->store"]}}})
+        consumer = spec("consumer", {"nodes": {"local": {"title": "Local"}}, "rows": [["local"]], "panels": [panel],
+                                     "topologyImports": [{"spec": "provider", "export": "core", "as": "shared"}]})
+        topology = {"version": 1, "id": "consumer", "specs": [provider, consumer]}
+        with self.subTest('provider-only imported telemetry'):
+            self.assertIn(direct, servers(consumer, topology))
+        quiet = json.loads(json.dumps(provider))
+        del quiet["page"]["sections"][0]["diagram"]["nodes"]["api"]["telemetry"]
+        with self.subTest('imported carriers without telemetry'):
+            self.assertNotIn(direct, servers(consumer, {"version": 1, "id": "consumer", "specs": [quiet, consumer]}))
+
+        step = {"id": "checkout", "nodes": ["a"], "traceMatch": {"serviceName": "checkout", "operation": "/cart/checkout"}}
+        bare = {"nodes": {"a": {}}, "rows": [["a"]], "steps": [step], "panels": [panel]}
+        with self.subTest('bare diagram'):
+            self.assertIn(direct, servers(bare))
+        with self.subTest('unwrapped page'):
+            self.assertIn(direct, servers({"title": "Unwrapped", "sections": [{"id": "main", "diagram": bare}]}))
+        with self.subTest('bare diagram without trace use'):
+            self.assertNotIn(direct, servers({"nodes": {"a": {}}, "rows": [["a"]]}))
+
+        # A node detail reference on a live-status board: the Trace view offers
+        # the loaded detail's sections, whose traceMatch steps inject cannot read.
+        detail = spec("parent", {"nodes": {"parent": {"title": "Service", "detail": {"spec": "approved-detail", "revision": "r1", "section": "main"}}},
+                                 "rows": [["parent"]], "panels": [panel]})
+        with self.subTest('detail reference on a live-status board'):
+            self.assertIn(direct, servers(detail))
+        del detail["page"]["sections"][0]["diagram"]["panels"]
+        with self.subTest('detail reference without a live-status panel'):
+            self.assertNotIn(direct, servers(detail))
 
     def test_agent_guide_replaces_a_stale_guide_when_reinjecting_a_built_page(self):
         built = TEMPLATE.replace("</script>\n" + BACKLINK_OPEN,

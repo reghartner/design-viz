@@ -233,13 +233,15 @@ from Prometheus:
 | `kind` | Required. `call`, `queue`, `service`, `log-event` or `device`. |
 | `signals` | Required. Named signals such as `rate`, `errors`, `p95`, `in`, `lag`, `age`. Names start with a letter and use letters, digits, `-` and `_`. Each signal has exactly one source key and an optional `unit` text. |
 | `signals.<name>.grafana` | A PromQL query string. |
-| `signals.<name>.loki` | A LogQL metric query string. |
+| `signals.<name>.loki` | A LogQL metric query string. A query with `$__range`, such as `sum(count_over_time({app="x"} \|= "y" [$__range]))`, reports one total for the whole window; see [Loki window totals](#loki-window-totals). |
 | `signals.<name>.tempo` | A TraceQL query string, used for exemplar traces. |
 | `signals.<name>.sql` | A SQL query string for a Grafana SQL datasource, such as a data lake. |
 | `signals.<name>.honeycomb` | A Honeycomb query object, kept as authored. |
+| `signals.<name>.missingMeansZero` | Optional boolean on `grafana` and `loki` signals. `false` shows a successful empty result as unobserved instead of 0; see [Empty Loki and Prometheus results](#empty-loki-and-prometheus-results). |
+| `signals.<name>.window` | Optional span of the signal's value, a duration in the page `window` form (`"1h"`, `"7d"`, `"now-7d"`). A display label only; the query is unchanged. See [Signal span](#signal-span). |
 | `proof` | Optional per-signal limits: `min`, `max` (finite numbers) and `maxRatioOf`. With `maxRatioOf: "<other signal>"`, `max` is the highest allowed ratio of this signal to the other one, so `"errors": {"maxRatioOf": "rate", "max": 0.01}` means at most 1 % errors. `maxRatioOf` needs `max` and another signal of the same binding. `min` stays an absolute floor. |
 | `links` | Optional authored link-outs: `dashboard` and `query`, absolute HTTP(S) URLs. |
-| `card` | Optional edge-card placement: `side` (`right`, `left`, `above`, `below`) and `offset` (pixels, -1000 to 1000). |
+| `card` | Optional edge card: `side` (`right`, `left`, `above`, `below`), `offset` (pixels, -1000 to 1000), `title` (1–120 plain-text characters shown instead of the edge label) and `width` (pixels, 140 to 480; default 240). |
 
 Shared settings live on the page beside the Jira settings, in
 `tracking.telemetry`:
@@ -488,9 +490,12 @@ into editable raw signals.
 
 **Dashboard link** and **Query link** take absolute http(s) URLs. On a connection,
 **Card side** (right, left, above or below) and **Card offset** (pixels, -1000 to
-1000) place its metrics card. The validator's warnings for the binding are listed
+1000) place its metrics card. **Card title** replaces the connection label on the card
+and **Card width** (140 to 480; default 240) sets its width; empty restores the default. The validator's warnings for the binding are listed
 under the controls with the same text. An imported node or connection shows the
-provider's binding read only. A binding saved there is stored in the consumer's
+provider's binding read only. An inherited connection still shows the four card
+controls; its first card edit saves the inherited binding with that change in the
+consumer's `edgeTracking` entry, one Undo step. A binding saved there is stored in the consumer's
 `nodeTracking` or `edgeTracking` entry and replaces the inherited binding for this
 consumer only; **Remove metrics** restores the inherited one.
 
@@ -1045,7 +1050,7 @@ including its displayed series, scope, COUNT note and pending status. Inspect
 and proof retain every numeric signal. No visible numeric rows means no card.
 Missing samples say “unobserved”; no fixed unbound placeholders are added. Loading
 and refresh remain per signal. The note names the observation window (default
-`24h`), not an invented duration of silence. Width is capped at 240 SVG units;
+`24h`), not an invented duration of silence. Width is 240 SVG units unless `card.width` sets it;
 measured wrapping determines the height used for obstacle packing. Titles, labels,
 units and scope can shorten; numeric values remain readable without glyph scaling.
 Safe integer counts remain exact; fractional gauges use compact significant digits
@@ -1063,7 +1068,39 @@ Prometheus/Loki Explore links and Honeycomb stable query URLs are automatic when
 available. CloudWatch, Logs and SQL may use authored links. Link generation
 failure never invalidates numeric evidence. Preview invents no provider URLs.
 Workbench Metrics exposes each signal's **label**, **show on card** and **query link** controls;
-source edits and Undo/Redo preserve all three.
+source edits and Undo/Redo preserve all three, and signal edits keep an authored `window`. `loki` and `grafana` signals also show
+**empty result reads 0** (`missingMeansZero`; its tooltip gives the Live and Over time rule); unchecking writes `false`, checking removes the key, and a change to another source drops it.
+
+#### Signal span
+
+The card note names the board window (`tracking.telemetry.window`), but a value
+can cover a different span. The last point of a Prometheus or Loki query covers
+its range selector, so `sum(count_over_time({app="notify"} |= "event consumed" [1h]))`
+on a 24h board is a one-hour count. When a signal's span is not the board window,
+its value carries the span on the card row, in Inspect and in the Proof table:
+`42 events · last 1h`. Nothing is added when the spans are equal (`60m` on a `1h`
+board, `1d` on a `24h` board), when no span is known, or when there is no value.
+Over time uses the same rule: each day's value is evaluated over its own span at
+that day's window end.
+
+A signal's span is, in order:
+
+1. `signals.<name>.window`, a duration in the page `window` form (`"1h"`, `"7d"`,
+   `"now-7d"`). It is a label only and never changes the query. Any source
+   except `cloudwatch`, which always covers the page window, can declare it. A
+   malformed value, or one on a `cloudwatch` signal, is a validation warning at
+   `...telemetry.signals.<name>.window` and is ignored. Like `label`, it takes
+   its own environment substitution, so an unset variable drops only `window`.
+2. For a `grafana` or `loki` query without a declaration: the range of its one
+   range selector when the query counts, that is, it calls `count_over_time`,
+   `sum_over_time`, `bytes_over_time` or `increase`. Brackets inside string
+   literals are not range selectors. The range must be one positive
+   `s`/`m`/`h`/`d`/`w` duration such as `[1h]` or `[7d]`.
+
+Everything else derives no span: `[$__range]` (always the board window; see [Loki window totals](#loki-window-totals)), other variables such as
+`[$__rate_interval]`, subqueries (`[1h:5m]`), compound durations (`[1h30m]`),
+several range selectors, and per-second queries such as `rate(...)`. Declare
+`window` for those when the value covers a different span.
 
 `telemetry.card.side` selects `right`, `left`, `above` or `below`; `offset` moves
 along that side in SVG units. Defaults are right of a vertical route and below a
@@ -1071,6 +1108,12 @@ horizontal route. Optional `position: {"x": -180, "y": 90}` sets the card’s to
 in SVG units relative to the edge path midpoint. Both coordinates must be finite
 numbers. This manual position overrides side/offset and automatic collision packing;
 text width and zoom do not shift it. Removing `position` restores automatic placement.
+Optional `card.title` (1–120 plain-text characters without control characters) is shown
+as the card title instead of the edge label, without the queue topic suffix. Optional
+`card.width` (140 to 480 SVG units; default 240) sets the card width: titles, labels and
+values wrap or shorten within it, and placement and collision packing use it. Both work
+on imported carriers through `edgeTracking` overlays. Like placement, they belong on the
+carrier; templates cannot set them. An invalid title or width warns at its path and is ignored.
 Automatic cards avoid manual cards. Placement shares board control measurements and collision tests;
 card rectangles reserve space in the coin packer even without a live break. Jira
 cues repack around cards and coins, and the frame includes cards and displaced
@@ -1293,7 +1336,10 @@ then adds a thin amber-tinted slider row to the panel. Clicking **Live** returns
 to today; while Live is already selected, clicking it turns colors off as it
 always has, and Over time turns them back on. The slider moves one whole day at a
 time by pointer or arrow keys, Home and End jump to the first and last day, and
-**<** and **>** on the same row step one day. Each day repaints
+**<** and **>** on the same row step one day. The row's heading shows the
+selected day in large type; on a day dated today it reads **TODAY** with the date
+beside it. TODAY shows only when the selected day's date is today; any other day,
+including the shipped demo's past dates, shows its label. Each day repaints
 nodes and edges (local and imported), step coins and captions, lane rollups,
 panel counts, the progress ring, blockers, the Tickets table State column and
 planned-node treatment.
@@ -1511,6 +1557,7 @@ capabilities: {mcp: {servers: [
 ```
 
 Add `"query_cloudwatch"` only for bound CloudWatch metric signals and `"query_cloudwatch_logs"` only for bound Logs signals.
+A board with Load trace log lookups (`tracking.telemetry.lookups`, [Find a trace from a log line](#find-a-trace-from-a-log-line)) also declares `"query_loki_logs"`.
 Add `"query_sql"` to the Grafana tools only when the page has `sql` signals and the
 server enables that tool; it is off by default in
 [grafana/mcp-grafana](https://github.com/grafana/mcp-grafana), the real server,
@@ -1552,7 +1599,7 @@ calls:
 |---|---|---|
 | `get_annotations` | when offered, once per refresh, first and alone | `{type: "annotation", limit: 100}` |
 | `query_prometheus` | once per refresh for each `grafana` signal | `{datasourceUid, expr, startTime, endTime, stepSeconds, queryType: "range"}` (relative in Live; absolute in Over time) |
-| `query_loki_logs` | once per refresh for each `loki` signal | `{datasourceUid, logql, startRfc3339, endRfc3339, queryType: "range", stepSeconds}` (relative in Live; absolute in Over time) |
+| `query_loki_logs` | once per refresh for each `loki` signal | `{datasourceUid, logql, startRfc3339, endRfc3339, queryType: "range", stepSeconds}` (relative in Live; absolute in Over time); a query with `$__range` sends `{datasourceUid, logql, endRfc3339, queryType: "instant"}` instead ([Loki window totals](#loki-window-totals)) |
 | `query_sql` | at most once an hour for each `sql` signal; the value is reused in between | `{datasourceUid, query}` |
 | `query_cloudwatch` | once per signal/window, plus paired SampleCount for Average; [window statistics and series](#cloudwatch-signals) | `{datasourceUid, namespace, metricName, region, accountId, dimensions, statistic, period, start, end}` |
 | `generate_deeplink` | when offered, once per signal per page load, unless the signal authors `links.query` | `{resourceType: "explore", datasourceUid, queries: [{refId, expr}], timeRange: {from: "now-24h", to: "now"}}` |
@@ -1578,13 +1625,30 @@ least 60 seconds. Each metric row links to its exact PromQL or LogQL query. `tem
 PromQL and LogQL query series become ascending `[epoch ms, number]` points. Several series
 are added point by point, so write one aggregated series per signal. `NaN`
 samples are dropped. `value` is the last point. A PromQL or LogQL query that matched nothing is
-`value: 0` with no points. CloudWatch empty results stay unobserved; see
+`value: 0` with no points, unless the signal sets `missingMeansZero: false`. CloudWatch empty results stay unobserved; see
 [CloudWatch signals](#cloudwatch-signals). `unit` is the authored one. A `sql` signal's value is
 the first number of the first returned row. `observedAt` is the newest point of
-the refresh. Every carrier carries the window's annotations as markers `{at, kind,
+the refresh. A Loki query with `$__range` is the exception: see [Loki window
+totals](#loki-window-totals). Every carrier carries the window's annotations as markers `{at, kind,
 label}`: kind `deploy` when tagged deploy, else `incident`, else the first tag.
 Links are the authored `dashboard` and `query`, with the Explore link standing in
 for a missing `query`.
+
+#### Empty Loki and Prometheus results
+
+A `loki` or `grafana` signal may set `missingMeansZero`, a boolean with the same
+name as the CloudWatch query field. Absent or `true` keeps the default: a
+successful empty Loki result of a recognized count/rate query is `value: 0`, and
+an empty Prometheus result is `value: 0` in Live and unobserved in an Over time
+day. `missingMeansZero: false` makes a successful empty result unobserved, with
+"<carrier> <signal>: no numeric observation" in the Metrics text, in Live and in
+Over time, also for a `[$__range]` window total. Use it for logs that exist only in some environments, such as debug
+logs written only in test, so a missing log stream does not read as 0. A
+non-empty result is unchanged, and a failed query never becomes 0: a Prometheus or
+Loki result with a non-success `status` or an `error` is a failed query. Validation
+warns at `signals.<name>.missingMeansZero` and ignores the field when it is not
+a boolean, or when the signal is `tempo`, `sql`, `honeycomb`, `cloudwatch` (whose
+`missingMeansZero` goes inside the `cloudwatch` query) or `cloudwatchLogs`.
 
 A query that fails on its own (`tool_error`, such as a PromQL parse error, or a
 missing datasource UID) leaves the other carriers fresh and keeps that signal's
@@ -1597,6 +1661,29 @@ Tool argument names and result shapes follow grafana/mcp-grafana's source as the
 mock mirrors it; they are unverified against a live Grafana server, and
 `query_sql`'s result shape is the least certain. Confirm with the connector's tool
 list before relying on a parameter name.
+
+#### Loki window totals
+
+A daily count needs the whole window, not the last step of a range query. Write
+the LogQL range as `[$__range]`:
+
+```
+sum(count_over_time({app="notify"} |= "event consumed" [$__range]))
+```
+
+The adapter replaces every `$__range` with the signal window in whole seconds
+(Live: `tracking.telemetry.window`, default `24h`, so `86400s`; Over time: the
+selected day's page window, which ends at the day's end and has the same length,
+so `$__range` is always the page window) and sends ONE instant query, `queryType: "instant"`, at
+the window end (`endRfc3339: "now"` in Live, the window's absolute end in Over
+time), with no `startRfc3339` or `stepSeconds`. The signal's `value` is that one
+result (several series are added), with no series. Loki scans the window once;
+a range query with a 24-hour log range at 240 steps scans it about 240 times. An
+empty result follows the empty rules above: zero for a recognized count/rate
+query, otherwise unobserved, and unobserved with `missingMeansZero: false`
+([Empty Loki and Prometheus results](#empty-loki-and-prometheus-results)). `$__range_s` and `$__range_ms` are not substituted.
+Queries without `$__range` keep the range call and its last point. Use
+`[$__range]` for daily counts so Loki cards match 24-hour Prometheus cards.
 
 ### Two-file publish: `index.html` + `flowspec.json`
 
@@ -2250,7 +2337,11 @@ Average weights, Logs trends and grouped queries; no outer task holds a slot
 while awaiting its own queued child. Traces are excluded from numeric history.
 
 Prometheus/Loki query their authored expressions over the selected window;
-a range step is not an aggregate rewrite. CloudWatch preserves period statistics
+a range step is not an aggregate rewrite. A Loki query with `$__range` is one
+instant query at the selected day's window end with `$__range` set to that
+window ([Loki window totals](#loki-window-totals)), so its Over time value covers
+the selected day's page window (the whole day at the default 24h window), not the
+last hour of the day. CloudWatch preserves period statistics
 and computes a trustworthy headline. Logs retain an independent authoritative
 total. Honeycomb sends hosted absolute string `query_spec.from`/`to` and evaluates
 one calculation directly: daily percentiles, averages and distinct counts are
@@ -2308,7 +2399,8 @@ Partial-error and aborted batches never extend cached coverage.
 
 Direct legacy Grafana history callers without `range.window` retain exact
 endpoint Prometheus/Loki queries with `stepSeconds: 86400`, split only across DST
-discontinuities. Their endpoint samples/cache contract is unchanged. Built-in
+discontinuities. Each endpoint covers the previous 24 hours, so a Loki `$__range`
+there becomes `86400s`. Their endpoint samples/cache contract is unchanged. Built-in
 selected-window behavior above uses useful inner series instead.
 
 ### Honeycomb metrics and mixed connectors (#946, metrics leg)
@@ -2744,9 +2836,12 @@ that successful empty shape into zero; absent/false stays unobserved. Errors,
 timeouts and malformed results never become zero. A real numeric zero remains
 observed. For live Loki, successful empty numeric count/rate queries become zero
 only for recognized `count_over_time`/`rate` log-range expressions and `sum`
-wrappers (including by/without grouping). Raw logs, arbitrary expressions and
+wrappers (including by/without grouping), with a duration or `[$__range]` as the
+range. Raw logs, arbitrary expressions and
 misleading function names inside strings remain unobserved. Daily history keeps
 its existing contract. Honeycomb COUNT caveats belong to Honeycomb evidence only.
+A `loki` or `grafana` signal with `missingMeansZero: false` keeps every successful
+empty result unobserved ([Empty Loki and Prometheus results](#empty-loki-and-prometheus-results)).
 
 Named numeric rows, compact scope and per-signal source links follow the [edge metric card contract](#edge-metric-cards); their display does not change proof eligibility.
 
@@ -2799,3 +2894,87 @@ clearing still address the original carrier; descendant work is edited at its so
 ### Direct trace loading
 
 Status → Trace can load one exact trace ID or a supported provider link using an inherited company or board [trace connection profile](trace-connections.md). Load/Verify are read-only session actions independent of Metrics polling. Imported and local nodes share authored traceMatch mapping behavior; choose the exact mapping diagram when several are available.
+
+### Find a trace from a log line
+
+Sometimes the field that tells requests apart is not on any span. A company's
+camera model, for example, is never a span attribute, and Honeycomb `get_trace`
+returns fixed columns without span attributes. The model is on a Loki debug log
+line as structured metadata, next to the line's trace and span IDs:
+
+```
+line: "Handling camera stats message"
+labels: {env: "stg", k8s_namespace_name: "<ns>", severity_text: "DEBUG"}
+structuredMetadata: {cameraModel: "arch", deviceId: "<id>", trace_id: "1e4cef70fde7bde26ca79f1e74c05bcb", span_id: "b4be3d5412c33b2e"}
+```
+
+**Load trace** ([Direct trace loading](#direct-trace-loading)) can find such a line and load its trace (#1099). The board author
+names lookups in `tracking.telemetry.lookups`:
+
+```json
+"tracking": {"telemetry": {
+  "grafana": {"loki": "loki-uid"},
+  "lookups": {
+    "camera-model": {
+      "label": "Camera model",
+      "query": "{env=\"$env\"} |= \"Handling camera stats message\" | cameraModel=\"$value\"",
+      "values": ["arch", "wren"]
+    }
+  }
+}}
+```
+
+| field | meaning |
+|---|---|
+| `label` | required; the lookup's name in the form and the label of its value box (1–80 characters) |
+| `query` | required; a LogQL log query (at most 2000 characters). `$value` or `${value}` is where the reader's value goes; a query without it runs as written |
+| `values` | optional suggested values (1–50) the reader can pick; the query must then have a `$value` slot |
+| `datasource` | optional Loki datasource UID; default `tracking.telemetry.grafana.loki` of the active environment |
+| `fields` | optional `{traceId, spanId}` field names; default `trace_id` and `span_id` |
+
+The reader opens Status → Trace → **Load trace**, chooses a connection and
+environment, then uses **Find a trace from a log line**: picks a lookup, types or
+picks a value and clicks **Find log lines**. The form also offers **Type a LogQL
+query** for a reader-typed log query. `lookups: {}` offers only that box. Each
+Find makes one `query_loki_logs` call to the Grafana connector that offers that
+tool (the one `loki` signals use, preferring a connector named Grafana):
+
+```json
+{"datasourceUid": "loki-uid", "logql": "{env=\"stg\"} |= \"Handling camera stats message\" | cameraModel=\"arch\"",
+ "startRfc3339": "now-2h", "endRfc3339": "now", "limit": 10, "direction": "backward", "queryType": "range"}
+```
+
+- `$env`, `${variable}` and `$account` expand as in signals, from the board's
+  active Environment. A missing variable stops the Find with its name.
+- The window is the Load trace lookback: the **Trace start** control, else the
+  connection's `defaultLookback`. A relative lookback stays relative (`now-2h` to
+  `now`), so Grafana's clock decides now; absolute start and end pass unchanged.
+- A value cannot contain quotes, backticks, backslashes or control characters,
+  so it cannot leave the LogQL string it is placed in. The typed box is limited
+  to 2000 characters. LogQL cannot write; the call is bounded by the window and
+  10 lines. A Find with no answer after 30 seconds stops with a timeout message.
+- The result lists up to 10 lines, newest first: time (UTC), the value (or the
+  line text for a typed query), and the trace ID. The IDs are read from the
+  line's structured metadata, then parsed labels, then stream labels, because
+  Loki before 3.0 reports every label as a stream label. A line without the
+  trace ID field says "This log line has no trace_id" (with the configured
+  field name) and has no Load button. A metric query returns no lines and says so.
+- **Load** on a line loads that trace ID through the selected connection,
+  exactly as a pasted ID, then focuses the line's span ID in the waterfall and
+  the diagram. A span ID that is not in the trace is reported, and the trace
+  stays loaded.
+- Lookups need the Grafana connector. When no connector offers
+  `query_loki_logs`, or in a host without one (native mounts), the lookup
+  controls are disabled with a message and the rest of Load trace is unchanged.
+  Discovery reads tool metadata only, once, when the Trace view first shows.
+
+The result shape follows grafana/mcp-grafana `tools/loki.go`
+(`QueryLokiLogsResult` with `format` full, read 2026-11-07): `data` is a list of
+`{timestamp: "<unix ns>", line, labels, structuredMetadata?, parsed?}`. The mock
+Grafana server returns the same shape without structured metadata. It is not
+verified against a live Grafana server.
+
+`tools/inject.py` declares `query_loki_logs` on the Grafana connector for a board
+with `lookups` and a trace connection. Spec validation drops a malformed lookup
+and names its field, for example
+`tracking.telemetry.lookups.camera-model.query: has suggested values but no $value slot`.

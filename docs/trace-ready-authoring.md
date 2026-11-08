@@ -4,10 +4,9 @@ Use this workflow to align an accepted diagram with actual spans, preserving its
 story and placement. Run commands from the repository root or the source-free
 kit's **VIZ** directory. Editing and visual verification are desktop-only.
 Create a unique output directory once per author session, then keep using that
-shell's `TRACE_CHECK_DIR` for the commands below. Concurrent authors must create
-their own directories; never reuse another author's temporary spec or reports.
-Keep this directory out of authored deliverables and retain its path with your
-validation evidence. Source specs and trace inputs remain unchanged.
+shell's `TRACE_CHECK_DIR` for the commands below. Never reuse another author's
+temporary spec or reports. Keep this directory out of authored deliverables and
+retain its path with your validation evidence. Source specs and trace inputs remain unchanged.
 
 ```sh
 TRACE_CHECK_DIR="$(mktemp -d "${PWD}/.trace-check.XXXXXX")"
@@ -35,11 +34,12 @@ Keep missing evidence as a gap. Do not invent budgets, protocols or outcomes.
 
 ## 2. Attach exact selectors to existing steps
 
-Steps store mapping metadata; **clicking or navigating steps never selects or
-fetches a trace**. In the existing step that represents the observed operation,
-add `traceMatch`, preserving the step's ID, narrative and delivered `edge` or
+**Clicking or navigating steps never selects or fetches a trace**. In the
+existing step that represents the observed operation, add `traceMatch`,
+preserving the step's ID, narrative and delivered `edge` or
 `edges`. `nodeId` names an existing stable node in this source section, normally
 the receiving node for that operation. It is not a provider service-name guess.
+`traceMatch` on a node or edge is ignored, with a validator warning.
 
 ```json
 {
@@ -66,16 +66,19 @@ the [normalizer](canon.md) can disambiguate: `service.namespace`,
 `http.response.status_code` / `http.status_code`, `db.system` / `db.system.name`,
 `messaging.queue.depth` / `queue.depth`, `messaging.message.age_ms`,
 `flow.backpressure`, `flow.delivery_failed`, `retry.attempt`, and `flow.step.id`.
-Arbitrary tags, payload fields and request IDs are dropped; do not write selectors
-against them. Prefer stable instrumentation meaning over incidental timings.
+Other tags, payload fields and request IDs are dropped (Tempo profiles may keep
+[`allowedAttributes`](provider-traces.md#allowed-match-attributes)); do not write
+selectors against them. Prefer stable instrumentation meaning over incidental
+timings.
 
 For duplicate calls, first use a verified parent/link or retained attribute.
 `occurrence:1` is only valid for fully timed, non-overlapping serial calls;
 concurrent calls remain ambiguous. `repeat:"attempts"` requires distinct numeric
 `retry.attempt` values and a common parent; do not combine it with `occurrence`.
 One span matching two steps is ambiguous. Do not silence ambiguity by renaming
-nodes, taking the first array entry or inventing attributes. Leave the unresolved
-mapping visible and report what instrumentation/context is missing.
+nodes, taking the first span or inventing attributes. Leave the unresolved
+mapping visible and report what instrumentation/context is missing. Per-transport
+root spans of one step: [alternatives](provider-traces.md#tracematch-alternatives).
 
 Only uniquely matched delivered edges receive operation-duration annotations.
 Multiple steps claiming the same edge cannot supply one exact edge duration.
@@ -107,9 +110,9 @@ node tools/canon/trace-cli.mjs preview --spec "$TRACE_CHECK_DIR/trace-resolved.s
 
 ## 4. Validate mapping before enabling a provider
 
-The following fictional example is bundled in the repository **and portable
-kit**. It demonstrates mapping only, with no account, invented budget or claim
-of live evidence. The read-only preview command writes a report, not a spec:
+This fictional example, bundled in the repository **and portable kit**,
+demonstrates mapping only. The read-only preview command writes a report, not a
+spec:
 
 ```sh
 node tools/validate.js examples/trace-ready/existing.spec.json
@@ -192,4 +195,4 @@ the ledger. Do not auto-accept renamed operations or rewrite narrative outcomes
 from missing spans. If the document already uses an approved canonical reference,
 selector/budget changes require that optional workflow's reference reapproval.
 Deliver the candidate spec/ledger and report paths through the existing desktop
-review workflow. Do not save the temporary resolved import copy as authored source.
+review workflow.

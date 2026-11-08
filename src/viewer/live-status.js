@@ -6,7 +6,7 @@ var LIVE_STATUS_APPEARANCES = LIVE_STATUS_STATES.concat(['unchanged']);
 /* Proof presentation consumes one normalized controller snapshot. It neither
    resolves bindings nor judges evidence: proofVerdicts remains the only engine.
    No clock, page walk, queries, or mutations belong in this presentation seam. */
-function liveStatusLogDetails(snapshot){
+function liveStatusLogDetails(snapshot,window){
   var out=[];
   if(!snapshot.enabled || snapshot.historical)return out;
   (snapshot.carriers || []).forEach(function(binding){Object.keys(binding.signals || {}).forEach(function(name){
@@ -14,7 +14,7 @@ function liveStatusLogDetails(snapshot){
     if(!config)return;
     var sample=snapshot.map[binding.id],entry=sample && sample.signals[name],details=signal.breakdownError?telemetryLogDetails({status:'error',error:signal.breakdownError}):entry && entry.breakdown;
     out.push({key:JSON.stringify([snapshot.environment,binding.id,name,signal]),id:binding.id,signal:name,title:binding.title || binding.id,
-      config:config,scope:telemetrySignalScope(signal),total:telemetryCardValue(binding,sample,name),details:details || null});
+      config:config,scope:telemetrySignalScope(signal),total:telemetryCardValue(binding,sample,name,null,window),details:details || null});
   });});
   return out;
 }
@@ -83,10 +83,10 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
     }
     return {id:binding.id,title:binding.title,kind:binding.kind,tickets:binding.tickets.slice(),jira:result.jira || 'No tickets',
       loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,label:loading && !measured?'Loading…':label,predicate:predicate(binding,null,measured)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
-      kpis:telemetryMetricRows(binding,sample,waiting),
+      kpis:telemetryMetricRows(binding,sample,waiting,window),
       since:since.join(' · ') || 'unavailable',url:url,
       linkLabel:primary && binding.signals[primary].source==='grafana'?'Open in Grafana':primary && binding.signals[primary].source==='honeycomb'?'Open in Honeycomb':'Open telemetry',
-      explanation:result.failing.length?'Outside proof threshold: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name)+'; requires '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
+      explanation:result.failing.length?'Outside proof threshold: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name,null,window)+'; requires '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
         result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':result.telemetry==='unmeasured'?'Traffic proof requires an observed signal with an authored minimum.':'Observed signals meet the authored proof thresholds.',
       chart:{pending:!!waiting[primary],observedAt:measuredAt,points:plotted,line:continuous?plotted.map(function(p){return p.x+','+p.y;}).join(' '):null,
         markers:markers.map(function(m){return {x:2+96*(m.at-start)/span,label:m.label,kind:m.kind};})}};
@@ -873,7 +873,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var templates=trackingTelemetry(binding.page).templates;
       telemetryPaintCues(scope,d,templates,metricsView,trackingTelemetry(page).window);
       var cardsView=statusMode!=='trace' && metricsPreview && trackingTelemetry(binding.page).enabled?telemetryCardPreview(d,templates):metricsView;
-      telemetryPaintCards(scope,d,templates,cardsView,trackingTelemetry(page).window,function(card,path,edge,index){
+      telemetryPaintCards(scope,d,templates,cardsView,trackingTelemetry(page).window,function(card,path,edge,index,bound){
         // The bound carrier owns its work presentation, including all resolved
         // imported tickets. Telemetry proof and endpoint states cannot override it.
         // Unticketed metric cards may show no-change without painting ordinary edges.
@@ -885,7 +885,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
           halo.setAttribute('class','dv-live-halo');halo.setAttribute('aria-hidden','true');card.insertBefore(halo,card.firstChild);
         }
         if(authoring){
-          if(binding.ordinal!=null){card.setAttribute('data-metrics-section',binding.ordinal);card.setAttribute('tabindex','0');card.setAttribute('role','button');card.setAttribute('aria-label',(edge.label || edge.from+' to '+edge.to)+'. Drag metrics card to move. Arrow keys move 10 units; Shift moves 50.');}
+          if(binding.ordinal!=null){card.setAttribute('data-metrics-section',binding.ordinal);card.setAttribute('tabindex','0');card.setAttribute('role','button');card.setAttribute('aria-label',(bound.card && bound.card.title || edge.label || edge.from+' to '+edge.to)+'. Drag metrics card to move. Arrow keys move 10 units; Shift moves 50.');}
           return;
         }
         var previous=path._livePointerTarget || path,c=previous._liveCarrier;
@@ -916,7 +916,18 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var directTrace=createTelemetryDirect(page,telemetryOptions && telemetryOptions.directTrace,{
     sections:directTraceSections,
     identity:function(){return [telemetry.environment(),telemetry.snapshot().historical];},
+    environment:function(){return telemetry.environment();},
     disabled:function(){return retired || telemetryOptions===false || !trackingTelemetry(page).enabled || telemetry.snapshot().historical;},
+    accountChanged:function(){telemetry.clear();telemetry.setAvailable(false);},
+    changed:function(){if(!retired){paint();notify();}}
+  });
+  // #1099: find a trace from a Loki log line; the chosen line loads through directTrace.
+  var logLookup=createTelemetryLogLookup(page,telemetryOptions && telemetryOptions.directTrace,{
+    identity:function(){return [telemetry.environment(),telemetry.snapshot().historical];},
+    disabled:function(){return retired || telemetryOptions===false || !trackingTelemetry(page).enabled || telemetry.snapshot().historical;},
+    wanted:function(){return statusMode==='trace';},
+    config:function(){return telemetry.config();},
+    lookback:function(){var form=directTrace.snapshot().form,p=FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS)[form.connection];return {start:form.start,end:form.end,lookback:p?p.time.defaultLookback:''};},
     accountChanged:function(){telemetry.clear();telemetry.setAvailable(false);},
     changed:function(){if(!retired){paint();notify();}}
   });
@@ -967,7 +978,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(!selected && traceInitial && statusMode==='trace' && entries.length){selected=entries[0];traceSelection={key:selected.key,traceId:selected.exemplar.traceId};traceInitial=false;}
     var context=selected?traceContext(selected):null,focus=traceFocusSnapshot(selected,context);
     var model=selected?telemetryTraceModel(selected.binding.section.diagram,selected.binding.stepper && selected.binding.stepper.path(),selected.exemplar):null;
-    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:directTrace.snapshot(),
+    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot()}),
       hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
   function paintTrace(){
@@ -976,7 +987,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function metricsSnapshot(){
     var evidence=telemetry.snapshot(),status=evidence.status;
-    return {environment:evidence.environment,environments:evidence.environments,proof:liveStatusProofPresentation(evidence,telemetryWindow),logDetails:liveStatusLogDetails(evidence),available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
+    return {environment:evidence.environment,environments:evidence.environments,proof:liveStatusProofPresentation(evidence,telemetryWindow),logDetails:liveStatusLogDetails(evidence,telemetryWindow),available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
       refreshedAt:status.refreshedAt,note:status.note,checkedText:status.refreshedAt?'refreshed '+clockTime(status.refreshedAt):'',
       source:telemetrySource(),window:telemetryWindow};
   }
@@ -1034,7 +1045,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(!overSource)return null;
     var base={active:!!over,loading:overLoading,progress:overProgress,error:overError,available:!!(applied && Object.keys(map).length),disabled:editing()};
     if(!over)return base;
-    var days=over.days;base.index=over.index;base.count=days.length;base.first=days[0].short;base.last=days[days.length-1].short;base.label=days[over.index].label;return base;
+    var days=over.days;base.index=over.index;base.count=days.length;base.first=days[0].short;base.last=days[days.length-1].short;base.label=days[over.index].label;
+    // #1082: a day is today only when its key is today's date in the viewer's time zone, whatever the source. An undated day never is.
+    var now=new Date();base.today=days[over.index].key===new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())).toISOString().slice(0,10);return base;
   }
   function overShow(){map=liveStatusDayMap(over.today,over.days[over.index].states);changedKeys=[];telemetry.historyDay(over.index);paint();notify();telemetryHooks.jiraChanged();}
   // Returning to Live restores the live map, then applies any evidence that arrived meanwhile as a normal refresh.
@@ -1750,6 +1763,17 @@ function createLiveStatus(ctl,page,options,renderOptions){
     setDirectTraceField:function(change){if(!retired && change){traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';directTrace.set(change.field,change.value);}},
     loadDirectTrace:async function(verify){if(retired)return;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';var result=await directTrace.load(!!verify);if(result){traceSelection=null;traceInitial=true;}paint();notify();return result;},
     clearDirectTrace:function(){if(retired)return;clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();},
+    setLogLookupField:function(change){if(!retired && change)logLookup.set(change.field,change.value);},
+    findLogLines:function(){return retired?Promise.resolve(null):logLookup.find();},
+    // Load the chosen line's trace exactly as a pasted ID, then focus the line's span.
+    loadLogTrace:async function(index){
+      if(retired)return null;var row=logLookup.row(index);if(!row || !row.traceId)return null;
+      api.setDirectTraceField({field:'input',value:row.traceId});logLookup.chosen(index,'');
+      var result=await api.loadDirectTrace(false);if(retired || !result || !row.spanId)return result;
+      var selected=traceSnapshot().selected;
+      if(!(selected && selected.manual && selected.exemplar.selectionToken===result.selectionToken && api.selectTraceSpan({context:selected.context,spanId:row.spanId})))logLookup.chosen(index,'Span '+row.spanId+' from the log line is not in this trace.');
+      return result;
+    },
     setTraceShow:function(value){if(retired)return;traceShow=!!value;paint();notify();},
     chooseTrace:async function(choice){
       if(retired || statusMode!=='trace')return;
@@ -1849,7 +1873,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     editSave:function(){if(!retired && editor)editor.save();},
     editDiscard:function(){if(!retired && editor)editor.discard();},
     destroy:function(){
-      if(retired)return;clearTraceFocus();on=false;paintLanes();retired=true;directTrace.destroy();bindings.forEach(function(b){telemetryClearStep(b.el);telemetryClearTrace(b.el);b.el.querySelectorAll('.dv-proof-caption').forEach(function(el){el.remove();});});releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);telemetryClearCards(view);if(demoDestroy)demoDestroy();
+      if(retired)return;clearTraceFocus();on=false;paintLanes();retired=true;directTrace.destroy();logLookup.destroy();bindings.forEach(function(b){telemetryClearStep(b.el);telemetryClearTrace(b.el);b.el.querySelectorAll('.dv-proof-caption').forEach(function(el){el.remove();});});releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);telemetryClearCards(view);if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];

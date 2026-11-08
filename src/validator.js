@@ -81,6 +81,14 @@ function deltaWarnings(value, path, warnings){
     });
   }
 }
+// Matching reads traceMatch only from steps (#1096). Imported carriers are
+// skipped: the provider's own build reports them once.
+function carrierTraceMatchWarning(value, d, kind, id, path, warnings){
+  if(!value || typeof value!=='object' || !Object.prototype.hasOwnProperty.call(value,'traceMatch'))return;
+  var imports=(d.topologyProvenance && Array.isArray(d.topologyProvenance.imports))?d.topologyProvenance.imports:[];
+  if(imports.some(function(imp){return imp && Array.isArray(imp[kind+'s']) && imp[kind+'s'].indexOf(id)>=0;}))return;
+  warnings.push(path+'.traceMatch: traceMatch is read only from steps; this value on '+kind+' '+id+' is ignored. Put it on the step that lights this '+kind+'.');
+}
 function trackingWarnings(value, path, warnings){
   if(value && Object.prototype.hasOwnProperty.call(value,'missingWork') && typeof value.missingWork!=='boolean')
     warnings.push(path+'.missingWork: must be true or false — ignored');
@@ -440,6 +448,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     validateTextBox(n, DP+'.nodes.'+id, errors);
     deltaWarnings(n, DP + '.nodes.' + id, warnings);
     trackingWarnings(n, DP + '.nodes.' + id, warnings);
+    carrierTraceMatchWarning(n, d, 'node', id, DP + '.nodes.' + id, warnings);
     validateHandoff(n.handoff,n,DP+'.nodes.'+id+'.handoff',errors);
     if (Object.prototype.hasOwnProperty.call(n, 'delta') && typeof n.delta !== 'boolean')
       warnings.push(DP + '.nodes.' + id + '.delta: must be true or false — ignored');
@@ -464,6 +473,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if(e && e.contract!=null && !validJsonContract(e.contract))warnings.push(EP+'.contract: expected {json: JSON value, title?: string} — skipped');
     deltaWarnings(e, EP, warnings);
     trackingWarnings(e, EP, warnings);
+    if(e)carrierTraceMatchWarning(e, d, 'edge', e.from + '->' + e.to, EP, warnings);
     if(e && e.curveControls!=null && !validCurveControls(e.curveControls))
       errors.push(EP+'.curveControls: expected 3n-1 endpoint-relative cubic controls (2..95), with t: 0..1 and finite dx/dy between -100000 and 100000');
     if(e && e.curveControls!=null && e.curvePoints!=null)
@@ -741,6 +751,7 @@ function validate(page){
   if(!hasTracking && !hasTickets && !hasTelemetry)statusPanels.forEach(function(path){warnings.push(path+': this page has no ticket references — the panel will be empty');});
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
+  if (typeof FlowCanon !== 'undefined' && FlowCanon.traceWarnings) warnings = warnings.concat(FlowCanon.traceWarnings(page));
   validateDocumentLinks(page.documentLinks,page.canon && page.canon.id,'page.documentLinks',errors);
   validateDocumentDescription(page.description,'page.description',errors);
   validateDocumentTags(page.tags,'page.tags',errors);

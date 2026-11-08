@@ -3166,6 +3166,18 @@ test('D13 metric cards draw in the Trace view of a board with tickets without Ji
  const w=harness(raw,{},{authoring:true,metricsPreview:true});shim(w);w.ctl.liveStatus.setStatusMode('trace');w.flush();
  assert.ok(w.view.querySelector('g.dv-metrics-card'),'the Workbench preview draws a card in the Trace view');w.ctl.liveStatus.destroy();
 });
+// The board frame grows for the overlay's cards through svg._refreshStatusFrame (src/engine.js); the Trace view must call it too,
+// or a card placed below the authored frame is cut off (#1148 review: GetCart hidden in Trace).
+test('D13 the Trace view grows the diagram frame for its metric cards, on boards with and without tickets',async()=>{
+ for(const nodes of [{a:{tickets:['AA-1']},b:{}},{a:{},b:{}}]){
+  const {h}=await paintedCard(nodes),api=h.ctl.liveStatus;let grown=0;
+  for(const svg of h.view.querySelectorAll('svg'))svg._refreshStatusFrame=()=>{if(svg.querySelector('g.dv-metrics-card'))grown++;};
+  api.setStatusMode('jira');assert.ok(grown>0,'contrasting precondition: the Jira view refreshes the frame after its cards');
+  grown=0;api.setStatusMode('trace');assert.ok(h.view.querySelector('g.dv-metrics-card'),'the Trace view draws the card');
+  assert.ok(grown>0,(nodes.a.tickets?'ticketed':'Jira-free')+' board: the Trace view refreshes the frame after its cards');
+  api.destroy();
+ }
+});
 test('#1137 an applied status map on a board without tickets gives nodes, step coins and captions no Jira presentation',()=>{
  const seed=harness(),model=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
  const provider=model('provider',{nodes:{api:{title:'Imported API'}},rows:[['api']],topologyExports:{core:{nodes:['api'],edges:[]}}});

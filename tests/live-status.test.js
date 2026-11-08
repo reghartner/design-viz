@@ -1181,7 +1181,8 @@ test('L2 L3 L4 panel paints synchronously, controls act, focus survives refresh 
  mount.remount();api.note('Once');assert.equal(body.querySelectorAll('.dv-live-head').length,1);api.destroy();assert.equal(textOf(body).includes('Once'),true);
 });
 test('L2 empty page and disconnected provider render only the appropriate message',()=>{
- const empty=harness(),mount=mountStatus(empty);assert.match(textOf(mount.body),/This page has no ticket references\./);assert.equal(mount.body.querySelector('table'),null);
+ // #1136: a page without ticket references opens on the Trace view, not on a Jira view that says it has none.
+ const empty=harness(),mount=mountStatus(empty);assert.equal(empty.ctl.liveStatus.snapshot().mode,'trace');assert.match(textOf(mount.body),/No traceMatch steps on this board/);assert.doesNotMatch(textOf(mount.body),/This page has no ticket references/);assert.equal(mount.body.querySelector('table'),null);
  const h=harness(fixture());h.ctl.liveStatus.note('Add the Atlassian connector');const m=mountStatus(h);assert.equal(m.body.querySelector('.dv-live-note').textContent,'Add the Atlassian connector');assert.equal(m.body.querySelector('table'),null);assert.ok(m.body.querySelector('.dv-live-toggle').hidden);
  empty.ctl.liveStatus.destroy();h.ctl.liveStatus.destroy();
 });
@@ -2342,11 +2343,12 @@ test('M10 the action button shows on a metrics-only page so Allow Grafana reache
  const page={page:{tracking:{telemetry:{grafana:{prometheus:'prom-main'}}},sections:[{id:'main',diagram:{nodes:{a:{title:'A',telemetry:TQUEUE()}},rows:[['a']]}}]}};
  const h=harness(page,{},{telemetry:{source:'Grafana',provider:()=>Promise.resolve({})}}),panel=mountStatus(h);
  assert.equal(h.ctl.liveStatus.snapshot().available,false,'M10 no Jira evidence on this page');
- let ran=0;h.ctl.liveStatus.action('Allow Grafana',()=>ran++);
- const action=h.view.querySelector('.dv-live-action');
- assert.ok(action,'M10 the action button');assert.equal(action.hidden,false,'M10 visible beside Metrics');assert.equal(action.textContent,'Allow Grafana');
- action.dispatchEvent({type:'click'});assert.equal(ran,1,'M10 it runs the adapter action');
- h.ctl.liveStatus.action('',null);assert.equal(h.view.querySelector('.dv-live-action').hidden,true,'M10 cleared, it hides');
+ // #1136: a metrics-only page opens on the Trace view, which carries the action button.
+ let ran=0;h.ctl.liveStatus.action('Allow Grafana',()=>ran++);assert.equal(h.ctl.liveStatus.snapshot().mode,'trace');
+ const action=namedControls(h.view,'Allow Grafana');
+ assert.equal(action.length,1,'M10 the action button');
+ action[0].dispatchEvent({type:'click'});assert.equal(ran,1,'M10 it runs the adapter action');
+ h.ctl.liveStatus.action('',null);assert.equal(namedControls(h.view,'Allow Grafana').length,0,'M10 cleared, it hides');
  panel.destroy();h.ctl.liveStatus.destroy();
 });
 
@@ -2813,6 +2815,29 @@ test('#1136 a board without ticket references opens on Trace with no Jira | Trac
  }
 });
 
+test('#1136 a board that opened on Trace for want of references moves to Jira when a loaded detail brings tickets, unless the reader chose a view',async()=>{
+ const raw={page:{tracking:{jira:{site:'https://jira.test'}},sections:[{id:'main',diagram:{nodes:{domain:{title:'Domain',detail:{spec:'remote',section:'child',mode:'link'}}},rows:[['domain']]}}]}},remote={page:{sections:[{id:'child',diagram:{nodes:{child:{tickets:['AA-1']}},rows:[['child']]}}]}};
+ const switchShown=body=>body.querySelectorAll('button.dv-status-mode').filter(el=>shownIn(el,body)).map(accessibleName);
+ for(const chose of [false,true]){
+  const options={loadDetail:async()=>remote},h=harness(raw,{},options),api=h.ctl.liveStatus,m=mountStatus(h);
+  assert.equal(api.snapshot().available,false);assert.equal(api.snapshot().mode,'trace');assert.deepEqual(switchShown(m.body),[]);
+  if(chose)api.setStatusMode('trace');
+  await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.flush();
+  assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().mode,chose?'trace':'jira',chose?'the chosen view stays':'the board now has Jira');
+  assert.deepEqual(switchShown(m.body),['Jira','Trace'],'the switch appears with the references');
+  m.destroy();api.destroy();
+ }
+});
+
+test('#1136 Metrics overlay paints its cues in the Trace view of a Jira-free board; on a board with tickets the Trace view stays clear',async()=>{
+ const raw=cuePage();delete raw.page.tracking.jira;const d=raw.page.sections[0].diagram;Object.values(d.nodes).forEach(n=>delete n.tickets);d.edges.forEach(e=>delete e.tickets);
+ const free=cueHarness(raw);await free.on();
+ assert.equal(free.ctl.liveStatus.snapshot().available,false);assert.equal(free.ctl.liveStatus.snapshot().mode,'trace');
+ assert.equal(free.stream(0).length,1,'the overlay paints in the only view');free.ctl.liveStatus.destroy();
+ const jira=cueHarness();await jira.on();assert.equal(jira.stream(0).length,1,'contrasting precondition: the Jira view paints the overlay');
+ jira.ctl.liveStatus.setStatusMode('trace');assert.equal(jira.cues().length,0,'the Trace view of a board with tickets owns the canvas');jira.ctl.liveStatus.destroy();
+});
+
 test('Proof is cleared from retained panels on telemetry and live-status controller destruction',()=>{
  for(const owner of ['telemetry','liveStatus']){
   const h=harness(fixture()),api=h.ctl.liveStatus;h.ctl.page.sections[0].diagram.nodes.a.telemetry={kind:'service',signals:{rate:{grafana:'explicit',unit:'req/h'}},proof:{rate:{min:1}}};
@@ -2923,7 +2948,8 @@ test('local and nested imported domains preserve authored styles until status pr
  const provider=model('provider',[{id:'main',diagram:{nodes:{domain:{style:'rose'}},rows:[['domain']],topologyExports:{core:{nodes:['domain'],edges:[]}}}}]);
  const middle=model('middle',[{id:'main',diagram:{topologyImports:[{spec:'provider',export:'core',as:'nested'}],topologyExports:{core:{nodes:['nested::domain'],edges:[]}}}}]);
  for(const missing of [false,true]){
-  const consumer=model('consumer',[{id:'main',diagram:{nodes:{local:{style:'rose',detail:{section:'child'}}},rows:[['local']],steps:[{id:'visit',nodes:['local','shared::nested::domain']}],topologyImports:[{spec:'middle',export:'core',as:'shared',nodeDetails:{'nested::domain':{section:'child'}}}]}},{id:'child',detailOnly:true,diagram:{nodes:{leaf:missing?{missingWork:true}:{}},rows:[['leaf']]}}]);
+  // #1137: the ticketed node gives the board ticket references; a board without any gets no status presentation.
+  const consumer=model('consumer',[{id:'main',diagram:{nodes:{local:{style:'rose',detail:{section:'child'}},tracked:{tickets:['AA-1']}},rows:[['local','tracked']],steps:[{id:'visit',nodes:['local','shared::nested::domain']}],topologyImports:[{spec:'middle',export:'core',as:'shared',nodeDetails:{'nested::domain':{section:'child'}}}]}},{id:'child',detailOnly:true,diagram:{nodes:{leaf:missing?{missingWork:true}:{}},rows:[['leaf']]}}]);
   const h=harness(seed.C.FlowTopology.materialize([provider,middle,consumer])[2]),api=h.ctl.liveStatus;
   let beforeAdvance;
   h.ctl.sections[0].stepper={path:()=>h.C.diagramPathList(h.ctl.page.sections[0].diagram)[0].id,sourceIndex:()=>0,mode:()=>'ambient',onBeforeAdvance(fn){beforeAdvance=fn;return ()=>{};}};

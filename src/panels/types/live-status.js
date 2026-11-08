@@ -265,13 +265,9 @@
       if(direct.busy || direct.exemplar || r)button(el(box,'div','actions','dv-live-controls'),'clear','reader-button',direct.busy?'Cancel request':'Clear loaded trace','clearDirectTrace');
     }
     // #1078: board Edit mode is reachable from the Trace view too, so a span can be mapped and saved here.
-    function traceEditControls(body,controls,edit){
+    // Its buttons are in the shared header (#1136); its notice stays in the Trace body.
+    function traceEditNotice(body,edit){
       if(!edit || !(edit.editable || edit.active || edit.notice))return;
-      var editing=!!edit.active,pending=edit.pending;
-      var start=button(controls,'edit','reader-button dv-live-edit','Edit','editStart');start.hidden=!(edit.editable && !editing);start.disabled=!!(edit.blocked || edit.saving);
-      var save=button(controls,'save','reader-button dv-live-save',edit.saving?'Saving…':'Save '+pending+' change'+(pending===1?'':'s'),'editSave');save.hidden=!(editing && pending);save.disabled=!!edit.saving;
-      var discard=button(controls,'discard','reader-button dv-live-discard','Discard','editDiscard');discard.hidden=!(editing && pending);discard.disabled=!!edit.saving;
-      button(controls,'done','reader-button dv-live-edit-done','Done','editDone').hidden=!(editing && !pending);
       var text=edit.notice?edit.notice.text:edit.editable && edit.blocked?edit.blocked:'';
       if(text){var notice=el(body,'p','edit-notice','dv-live-edit-notice',text);notice.setAttribute('role','status');notice.setAttribute('data-kind',edit.notice?edit.notice.kind:'info');}
     }
@@ -280,7 +276,7 @@
       var trace=value.trace,body=el(host,'div','trace-body','dv-live-panel-body dv-live-trace'),controls=el(body,'div','controls','dv-live-controls');
       if(value.actionLabel)button(controls,'action','reader-button',value.actionLabel,'runAction');
       var show=button(controls,'show','reader-button dv-trace-show','Show on diagram','setTraceShow');show._liveArgument=!trace.show;show.setAttribute('aria-pressed',String(trace.show));show.disabled=!trace.selected;
-      traceEditControls(body,controls,value.edit);
+      traceEditNotice(body,value.edit);
       directTraceBody(body,trace.direct);
       var message=trace.direct && trace.direct.profiles.length?(!trace.hasMappings?'Diagram mapping is not configured. Loaded traces still show a waterfall.':''):!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Turn on Metrics overlay to refresh explicit bindings.':'Turn on Metrics overlay to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
       var status=el(body,'p','status','dv-trace-mode-status',[message,trace.hasMappings?trace.status.note:'',trace.hasMappings?trace.notice:''].filter(Boolean).join(' '));status.setAttribute('role','status');
@@ -360,7 +356,8 @@
     // Metrics overlay switch. Then Live | Over time, the Over time error and the day row.
     function sharedHeader(value){
       var header=el(host,'div','header','dv-status-header'),top=el(header,'div','top','dv-status-top'),trace=!!(value && value.mode==='trace');
-      var modes=el(top,'div','modes','dv-status-modes dv-status-segmented');modes.setAttribute('role','group');modes.setAttribute('aria-label','Status view');
+      // #1136: a board without ticket or epic references (snapshot().available false) has no Jira view, so no switch.
+      var modes=el(top,'div','modes','dv-status-modes dv-status-segmented');modes.setAttribute('role','group');modes.setAttribute('aria-label','Status view');modes.hidden=!!(value && !value.available && trace);
       ['jira','trace'].forEach(function(mode){var count=value && value.trace?new Set(value.trace.entries.flatMap(function(e){return e.candidates.map(function(c){return c.traceId;});})).size:0;var control=button(modes,mode,'reader-button dv-status-mode',mode==='jira'?'Jira':'Trace'+(count?' · '+count:''),'setStatusMode');control._liveArgument=mode;control.setAttribute('aria-pressed',String((value && value.mode || 'jira')===mode));});
       var metrics=value && value.metrics || {available:false,enabled:false};
       if(metrics.environments && metrics.environments.length){
@@ -382,6 +379,13 @@
       var toggle=button(time,'toggle','reader-button dv-live-toggle','Live',past?'overTimeClose':'setEnabled');toggle.hidden=!hasData;time.hidden=!hasData;
       toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled) && !past));
       var overTime=button(time,'over-time','reader-button dv-live-over-time',over && over.loading?'Loading history'+(over.progress?' '+over.progress:'')+'…':'Over time','overTime');overTime.hidden=!hasData || !over || !over.available;overTime.disabled=!!(over && (over.loading || over.disabled));overTime.setAttribute('aria-pressed',String(past));
+      // #828 shared-board Edit mode: Edit for editors, then a prominent Save N changes and Discard. In both views, with or without tickets (#1136).
+      var edit=value && value.edit || null,pending=edit?edit.pending:0,editing=!!(edit && edit.active),editRow=el(header,'div','edit','dv-live-edit-controls');
+      var editControl=button(editRow,'edit','reader-button dv-live-edit','Edit','editStart');editControl.hidden=!(edit && edit.editable && !editing);editControl.disabled=!!(edit && (edit.blocked || edit.saving));
+      var saveControl=button(editRow,'save','reader-button dv-live-save',edit && edit.saving?'Saving…':'Save '+pending+' change'+(pending===1?'':'s'),'editSave');saveControl.hidden=!(editing && pending);saveControl.disabled=!!(edit && edit.saving);
+      var discardControl=button(editRow,'discard','reader-button dv-live-discard','Discard','editDiscard');discardControl.hidden=!(editing && pending);discardControl.disabled=!!(edit && edit.saving);
+      var doneControl=button(editRow,'done','reader-button dv-live-edit-done','Done','editDone');doneControl.hidden=!(editing && !pending);
+      editRow.hidden=editControl.hidden && saveControl.hidden && discardControl.hidden && doneControl.hidden;
       var overStatus=el(header,'p','over-time-status','dv-live-over-time-status',hasData && over && over.error?over.error:'');overStatus.setAttribute('role','status');overStatus.hidden=!overStatus.textContent;
       // Day buttons: on the slider row, and on a row of their own for a demo in Live mode, which has no slider. A demo's buttons move its own day.
       // The demo's Live row and the note about other columns belong to the Jira view.
@@ -446,19 +450,14 @@
       var note=el(statusLine,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
       var actionLabel=(available || metrics.available) && value && value.actionLabel || '';
       var action=button(controls,'action','reader-button dv-live-action',actionLabel,'runAction');action.hidden=!actionLabel;
-      // #828 shared-board Edit mode lives in this header: Edit for editors, then a prominent Save N changes and Discard.
-      var edit=available && value.edit || null,pending=edit?edit.pending:0,editing=!!(edit && edit.active);
-      var editControl=button(controls,'edit','reader-button dv-live-edit','Edit','editStart');editControl.hidden=!(edit && edit.editable && !editing);editControl.disabled=!!(edit && (edit.blocked || edit.saving));
-      var saveControl=button(controls,'save','reader-button dv-live-save',edit && edit.saving?'Saving…':'Save '+pending+' change'+(pending===1?'':'s'),'editSave');saveControl.hidden=!(editing && pending);saveControl.disabled=!!(edit && edit.saving);
-      var discardControl=button(controls,'discard','reader-button dv-live-discard','Discard','editDiscard');discardControl.hidden=!(editing && pending);discardControl.disabled=!!(edit && edit.saving);
-      button(controls,'done','reader-button dv-live-edit-done','Done','editDone').hidden=!(editing && !pending);
+      // #828 Edit mode: its buttons are in the shared header (#1136); its reason and notice are in this status row.
+      var edit=available && value.edit || null,editing=!!(edit && edit.active);
       // A fixed slot and size, last in the row so a button appearing to its left cannot move it (#986). "No blockers" only when that is true: blockers off the current path, or with colors off, leave "First blocker" greyed out.
       var first=button(controls,'first','reader-button dv-live-first',value && (value.firstBlocker || (value.blockers || []).length)?'First blocker':'No blockers','firstBlocker');first.hidden=!hasData;first.disabled=!(value && value.firstBlocker);
       var reason=el(statusLine,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
       var editNotice=el(statusLine,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
-      var editShown=!!(edit && (edit.editable || edit.notice));
-      head.hidden=!metrics.note && !metrics.available && (!available || !(hasData || value.note.text || value.actionLabel || editShown));
-      controls.hidden=!actionLabel && (!available || !(hasData || editShown));statusRow.hidden=!metrics.note && !metrics.available && (!available || !(hasData || value.note.text));
+      controls.hidden=!actionLabel && !hasData;statusRow.hidden=!metrics.note && !metrics.available && (!available || !(hasData || value.note.text)) && !reason.textContent && !editNotice.textContent;
+      head.hidden=controls.hidden && statusRow.hidden;
       // Long text is cut off on screen; the tooltip and the status elements keep all of it.
       var statusText=[connection.hidden?'':[connWho,conn.checkedText].filter(Boolean).concat(ghLabel?[ghLabel]:[]).join(', '),metricsConnection.hidden?'':metricsText,note.textContent,reason.textContent,editNotice.textContent].filter(Boolean).join(' · ');
       if(statusText)statusRow.setAttribute('title',statusText);else statusRow.removeAttribute('title');
@@ -560,7 +559,11 @@
   }
   var LIVE_STYLES=String.raw`
 /* #1131: the header shared by the Jira and Trace views. Segments keep the reader's button look (#863); the selected one is filled. */
-.dv-status-header{display:flex;flex-direction:column;gap:8px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--explore-border)}
+.dv-status-header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--explore-border)}
+.dv-status-header>*{flex:0 0 100%;min-width:0}
+/* Live | Over time and the Edit buttons (#1136) share the second row; Edit sits at its right edge. */
+.dv-status-header>.dv-live-time{flex:0 1 auto}
+.dv-status-header>.dv-live-edit-controls{flex:0 1 auto;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-left:auto}
 .dv-status-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .dv-status-segmented{display:flex;flex-wrap:wrap;align-items:center;gap:4px}
 .dv-live-environment{display:inline-flex;align-items:center;gap:6px;font:11px/1.5 'IBM Plex Mono',monospace;color:var(--dtext)}
@@ -615,7 +618,7 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 /* Amber marks "not live": no ticket status uses it. */
 .pt-live-status{--dv-live-past:#f5a524;}
 .pt-live-status .dv-live-time .tbtn.dv-live-toggle[aria-pressed="true"],.pt-live-status .dv-live-time .tbtn.dv-live-toggle[aria-pressed="true"]:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#000;}
-.pt-live-status :is(.dv-live-head,.dv-live-time) .tbtn:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:3px;}
+.pt-live-status :is(.dv-live-head,.dv-live-time,.dv-live-edit-controls) .tbtn:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:3px;}
 .pt-live-status .dv-live-time .tbtn.dv-live-over-time[aria-pressed="true"],.pt-live-status .dv-live-time .tbtn.dv-live-over-time[aria-pressed="true"]:hover{background:var(--dv-live-past);border-color:var(--dv-live-past);color:#2b1a00;}
 .dv-live-day-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:10px;font:11px/1.4 'IBM Plex Mono',monospace;color:var(--dtext);font-variant-numeric:tabular-nums;}
 .dv-live-over-time-row{padding:8px 12px;border-left:3px solid var(--dv-live-past);border-radius:4px;background:color-mix(in srgb,var(--dv-live-past) 14%,transparent);}
@@ -726,13 +729,13 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 .dv-live-none{color:var(--dfaint);}
 .dv-live-suggest{margin:8px 0 0;font:11px/1.5 'IBM Plex Sans',sans-serif;color:var(--dfaint);}
 /* Save keeps its fill over every theme's tbtn rules, hover included. */
-.pt-live-status .dv-live-head .tbtn.dv-live-save,.pt-live-status .dv-live-head .tbtn.dv-live-save:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#fff;font-weight:700;}
-.pt-live-status .dv-live-head .tbtn.dv-live-save:disabled{opacity:.7;}
+.pt-live-status .dv-live-edit-controls .tbtn.dv-live-save,.pt-live-status .dv-live-edit-controls .tbtn.dv-live-save:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#fff;font-weight:700;}
+.pt-live-status .dv-live-edit-controls .tbtn.dv-live-save:disabled{opacity:.7;}
 /* Fixed slot and size: the width of the longer label, plus the button's padding and border (#986). */
 .pt-live-status .dv-live-head .tbtn.dv-live-first{margin-left:auto;width:calc(13ch + 24px);text-align:center;}
-.pt-live-status :is(.dv-live-head,.dv-live-time,.dv-live-day-row) .tbtn:disabled{opacity:.5;cursor:default;}
+.pt-live-status :is(.dv-live-head,.dv-live-time,.dv-live-edit-controls,.dv-live-day-row) .tbtn:disabled{opacity:.5;cursor:default;}
 /* Paper has no controls: print hides these buttons as it hides the reader's other tbtn controls. */
-@media print{.pt-live-status :is(.dv-live-head,.dv-live-time,.dv-live-day-row) .tbtn,.pt-live-status :is(.dv-live-metrics,.dv-live-environment){display:none;}}
+@media print{.pt-live-status :is(.dv-live-head,.dv-live-time,.dv-live-edit-controls,.dv-live-day-row) .tbtn,.pt-live-status :is(.dv-live-metrics,.dv-live-environment){display:none;}}
 .dv-live-edit-reason,.dv-live-edit-notice{flex-basis:100%;font:12px/1.5 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .dv-live-edit-notice[data-kind="warn"],.dv-live-edit-notice[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-draggable{cursor:grab;}

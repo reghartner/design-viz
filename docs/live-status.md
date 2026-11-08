@@ -746,10 +746,14 @@ and Export project preserve the panel. There are no authored state or patch fiel
 
 The Jira and Trace views share one header (#1131). Its top row holds **Jira** | **Trace**,
 an **Env** select when the board names environments, and the **Metrics overlay** switch at
-the right edge. The next row holds **Live** | **Over time**; the day row and any Over time
-error follow it in both views. The Jira view then has two rows. The first holds only
-buttons, which keep their place: any provider action, Edit, and on the far right
-**First blocker**. **First blocker** keeps one size; with no blockers it reads
+the right edge. The next row holds **Live** | **Over time** and, at its right edge, **Edit**
+(then **Save N changes**, **Discard** or **Done**) for anyone who can edit the board; the
+day row and any Over time error follow it in both views. A board with no ticket or epic
+references after imports has no Jira view (#1136): the panel opens on Trace with no
+**Jira** | **Trace** switch, and Metrics overlay paints its cards there. If a loaded detail
+brings ticket references, the switch appears and the panel moves to Jira unless the reader
+chose a view. The Jira view then has two rows. The first holds only buttons, which keep
+their place: any provider action and, on the far right, **First blocker**. **First blocker** keeps one size; with no blockers it reads
 **No blockers** and is greyed out, and with blockers it cannot reach from here it
 stays **First blocker** and is greyed out. The second row holds everything that
 changes. Its height follows the panel's width, one line when the panel is wide and
@@ -792,7 +796,7 @@ source, or a dependency. It is visible before a connector responds too. Edit the
 list in desktop Document settings; the reader contains no exclusion controls. Teams are identified by each Tickets row's lane colour
 stripe and the lane names in Blockers. Status-board step captions omit the team lane chip,
 even with Live disabled; ordinary diagrams retain their authored lane context.
-Without ticket references, epics, or telemetry evidence it says “This page has no ticket references.”
+Without ticket or epic references the panel opens on the Trace view (see the header above).
 Before a provider or applied map is available, it shows the connector note and any
 required authorization action without an empty rollup. Print preserves the last
 paint, and reduced motion disables ring animation.

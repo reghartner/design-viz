@@ -1596,7 +1596,7 @@ successful empty Loki result of a recognized count/rate query is `value: 0`, and
 an empty Prometheus result is `value: 0` in Live and unobserved in an Over time
 day. `missingMeansZero: false` makes a successful empty result unobserved, with
 "<carrier> <signal>: no numeric observation" in the Metrics text, in Live and in
-Over time. Use it for logs that exist only in some environments, such as debug
+Over time, also for a `[$__range]` window total. Use it for logs that exist only in some environments, such as debug
 logs written only in test, so a missing log stream does not read as 0. A
 non-empty result is unchanged, and a failed query never becomes 0: a Prometheus or
 Loki result with a non-success `status` or an `error` is a failed query. Validation
@@ -1634,7 +1634,8 @@ time), with no `startRfc3339` or `stepSeconds`. The signal's `value` is that one
 result (several series are added), with no series. Loki scans the window once;
 a range query with a 24-hour log range at 240 steps scans it about 240 times. An
 empty result follows the empty rules above: zero for a recognized count/rate
-query, otherwise unobserved. `$__range_s` and `$__range_ms` are not substituted.
+query, otherwise unobserved, and unobserved with `missingMeansZero: false`
+([Empty Loki and Prometheus results](#empty-loki-and-prometheus-results)). `$__range_s` and `$__range_ms` are not substituted.
 Queries without `$__range` keep the range call and its last point. Use
 `[$__range]` for daily counts so Loki cards match 24-hour Prometheus cards.
 

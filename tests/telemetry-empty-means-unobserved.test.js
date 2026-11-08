@@ -9,48 +9,54 @@ const {entrypoint}=require('../tools/source-loader.cjs');
 const plain=x=>JSON.parse(JSON.stringify(x)),settle=async()=>{for(let i=0;i<30;i++)await new Promise(setImmediate);};
 const NOW='2026-11-04T22:00:00Z',SECONDS=Date.parse(NOW)/1000-3600,DAY=[{key:'2026-11-04',at:'2026-11-04T22:00:00.000Z'}];
 const LOKI='sum(count_over_time({app="api"} |= "debug" [5m]))',PROM='sum(rate(requests_total[5m]))';
+// #1080 window total: one instant query, an empty answer is a vector.
+const RANGE='sum(count_over_time({app="api"} |= "debug" [$__range]))',EMPTY_VECTOR={status:'success',data:{resultType:'vector',result:[]}};
 const EMPTY={loki:{status:'success',data:{resultType:'matrix',result:[]}},prom:{status:'success',data:{resultType:'matrix',result:[]}}};
 const FULL={loki:{data:[{values:[[SECONDS,'4']]}]},prom:{data:{result:[{values:[[SECONDS,'7']]}]}}};
 const IDS=['local','local->other','shared::api','shared::api->shared::store'];
 function context(){const C={Date:class extends Date{constructor(...a){super(...(a.length?a:[NOW]));}static now(){return Date.parse(NOW);}},URL,AbortController,TextDecoder,TextEncoder,console,document:{hidden:false,addEventListener(){},removeEventListener(){}},setTimeout:()=>1,clearTimeout(){}};vm.runInNewContext(entrypoint('standalone').body,C);return C;}
-function binding(opt){
- const logs={loki:LOKI},rate={grafana:PROM};
+function binding(opt,loki=LOKI){
+ const logs={loki},rate={grafana:PROM};
  if(opt!==undefined){logs.missingMeansZero=opt;rate.missingMeansZero=opt;}
  return {kind:'service',signals:{logs,rate}};
 }
-function importedPage(C,opt){
+function importedPage(C,opt,loki){
  const spec=(id,diagram,extra={})=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},...extra,sections:[{id:'main',diagram}]}});
- const provider=spec('provider',{nodes:{api:{title:'API',telemetry:binding(opt)},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',telemetry:binding(opt)}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
- const consumer=spec('consumer',{nodes:{local:{title:'Local',telemetry:binding(opt)},other:{}},rows:[['local','other']],edges:[{from:'local',to:'other',telemetry:binding(opt)}],topologyImports:[{spec:'provider',export:'core',as:'shared'}]},{tracking:{telemetry:{window:'24h',grafana:{prometheus:'prom',loki:'logs'}}}});
+ const provider=spec('provider',{nodes:{api:{title:'API',telemetry:binding(opt,loki)},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',telemetry:binding(opt,loki)}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+ const consumer=spec('consumer',{nodes:{local:{title:'Local',telemetry:binding(opt,loki)},other:{}},rows:[['local','other']],edges:[{from:'local',to:'other',telemetry:binding(opt,loki)}],topologyImports:[{spec:'provider',export:'core',as:'shared'}]},{tracking:{telemetry:{window:'24h',grafana:{prometheus:'prom',loki:'logs'}}}});
  return C.normalize(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]}));
 }
-async function setup(opt,answer){
- const C=context(),p=importedPage(C,opt),calls=[];
- const adapter=C.createTelemetryProviders(p,{claude:{use:async()=>({listTools:async()=>[{server:'Grafana',tools:['query_prometheus','query_loki_logs']}],callTool:async(server,tool,input)=>{calls.push({tool,input:plain(input)});return {payload:answer(tool)};}})}});
+async function setup(opt,answer,loki){
+ const C=context(),p=importedPage(C,opt,loki),calls=[];
+ const adapter=C.createTelemetryProviders(p,{claude:{use:async()=>({listTools:async()=>[{server:'Grafana',tools:['query_prometheus','query_loki_logs']}],callTool:async(server,tool,input)=>{calls.push({tool,input:plain(input)});return {payload:answer(tool,input)};}})}});
  const carriers=fn=>C.sectionRecords(p).forEach(r=>{const d=r.section.diagram;Object.entries(d.nodes).forEach(([id,node])=>fn(node,id,p));d.edges.forEach(e=>fn(e,e.from+'->'+e.to,p));});
  const api=C.createTelemetry(p,adapter.options,{carriers}),handle=adapter.attach({telemetry:api},p);await settle();
  api.setEnabled(true);await settle();
  return {C,calls,api,close(){handle.destroy();api.destroy();}};
 }
-const answerWith=({loki,prom})=>tool=>plain(tool==='query_loki_logs'?loki:prom);
+const answerWith=({loki,prom})=>(tool,input)=>plain(tool==='query_loki_logs'?(input.queryType==='instant'?EMPTY_VECTOR:loki):prom);
 async function overTime(h){h.api.openHistory(DAY,0);await settle();return {map:plain(h.api.snapshot().map),note:h.api.status().note};}
 
 test('1. Loki empty counting result without missingMeansZero stays observed zero (Live and an Over time day)',async t=>{
- for(const opt of [undefined,true]){
-  const h=await setup(opt,answerWith(EMPTY));t.after(()=>h.close());
+ for(const query of [LOKI,RANGE])for(const opt of [undefined,true]){
+  const h=await setup(opt,answerWith(EMPTY),query);t.after(()=>h.close());
   assert.ok(h.calls.some(c=>c.tool==='query_loki_logs'));
   const live=plain(h.api.snapshot().map);for(const id of IDS)assert.equal(live[id]?.signals.logs?.value,0,'Live '+id+' opt '+opt);
   const past=await overTime(h);for(const id of IDS)assert.equal(past.map[id]?.signals.logs?.value,0,'Over time '+id+' opt '+opt);
  }
 });
 
-test('2. Loki empty with missingMeansZero false is unobserved with a note (Live and an Over time day)',async t=>{
- const h=await setup(false,answerWith(EMPTY));t.after(()=>h.close());
- assert.ok(h.calls.some(c=>c.tool==='query_loki_logs'&&c.input.logql===LOKI),'the query still runs');
- const live=plain(h.api.snapshot().map);for(const id of IDS)assert.equal(live[id]?.signals.logs,undefined,'Live '+id);
- assert.match(h.api.status().note,/logs: no numeric observation/);
- const past=await overTime(h);for(const id of IDS)assert.equal(past.map[id]?.signals.logs,undefined,'Over time '+id);
- assert.match(past.note,/logs: no numeric observation/);
+test('2. Loki empty with missingMeansZero false is unobserved with a note (Live and an Over time day), also for a [$__range] window total',async t=>{
+ for(const query of [LOKI,RANGE]){
+  const h=await setup(false,answerWith(EMPTY),query);t.after(()=>h.close());
+  const sent=h.calls.filter(c=>c.tool==='query_loki_logs');assert.ok(sent.length,'the query still runs');
+  if(query===RANGE)assert.ok(sent.every(c=>c.input.queryType==='instant'&&c.input.logql===query.replace('$__range','86400s')),'the window-total form runs as one instant query');
+  else assert.ok(sent.every(c=>c.input.logql===LOKI));
+  const live=plain(h.api.snapshot().map);for(const id of IDS)assert.equal(live[id]?.signals.logs,undefined,'Live '+id+' '+query);
+  assert.match(h.api.status().note,/logs: no numeric observation/);
+  const past=await overTime(h);for(const id of IDS)assert.equal(past.map[id]?.signals.logs,undefined,'Over time '+id+' '+query);
+  assert.match(past.note,/logs: no numeric observation/);
+ }
 });
 
 test('a failed Loki or Prometheus query is never zero, with or without missingMeansZero (Live and an Over time day)',async t=>{

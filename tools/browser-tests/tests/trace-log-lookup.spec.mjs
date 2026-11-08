@@ -28,7 +28,7 @@ async function open(page,server,{grafana=true,lookups=true}={}){
  await writeFile(path.join(server.root,name+'.json'),JSON.stringify(spec));
  execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,name+'.json'),path.join(repo,'template/flowview.html'),path.join(server.root,name+'.html')],{stdio:'pipe'});
  await page.goto(server.origin+'/'+name+'.html');await page.waitForFunction(()=>!!window.ctl);
- const root=page.locator('.pt-live-status').first();await root.getByRole('button',{name:'Trace',exact:true}).click();
+ const root=page.locator('.pwidget.pt-live-status').filter({visible:true}).first();await root.getByRole('button',{name:'Trace',exact:true}).click();
  await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
  return {root,logs:root.locator('.dv-trace-logs'),calls};
 }

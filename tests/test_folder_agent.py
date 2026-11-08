@@ -5,6 +5,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import select
 import subprocess
@@ -43,6 +44,11 @@ class FolderAgentTests(unittest.TestCase):
 
     def put(self, name, value):
         (self.folder/name).write_text(json.dumps(value))
+
+    def replace(self, name, value):
+        """Atomic put for a file a running helper subprocess polls."""
+        (self.folder/(name + '.tmp')).write_text(json.dumps(value))
+        os.replace(self.folder/(name + '.tmp'), self.folder/name)
 
     def kit(self, files):
         raw = json.dumps({'files': files}).encode()
@@ -631,7 +637,7 @@ class FolderAgentTests(unittest.TestCase):
             with self.subTest(phase=phase):
                 self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
                 self.put('editor.json', {**self.owner, 'connected': True, 'at': (time.time()-editor_age)*1000})
-                code, errors = self.begin_interrupted(announcement, lambda: self.put('session.json', renewed))
+                code, errors = self.begin_interrupted(announcement, lambda: self.replace('session.json', renewed))
                 self.assertEqual(code, 1, errors)
                 self.assertNotIn('Traceback', errors)
                 self.assertEqual([line for line in errors.splitlines() if 'ownership' in line], [self.session_changed_line(
@@ -640,7 +646,7 @@ class FolderAgentTests(unittest.TestCase):
     def test_begin_session_change_omits_new_ids_it_cannot_read(self):
         self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
         self.put('editor.json', {**self.owner, 'connected': True, 'at': (time.time()-60)*1000})
-        code, errors = self.begin_interrupted('heartbeat paused', lambda: self.put('session.json', {
+        code, errors = self.begin_interrupted('heartbeat paused', lambda: self.replace('session.json', {
             'protocol': 'flowview-folder-v1', 'sessionId': 7, 'connectionId': 'two\nlines', 'workflow': 'external'}))
         self.assertEqual(code, 1, errors)
         self.assertNotIn('Traceback', errors)

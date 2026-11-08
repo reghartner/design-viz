@@ -2832,6 +2832,20 @@ test('#1136 a board that opened on Trace for want of references moves to Jira wh
  }
 });
 
+test('#1136 a reader working on a loaded trace keeps the Trace view when a loaded detail brings tickets',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),ID='8413cd87a9f15b6bfe8e1acf5b3346d0';
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{domain:{title:'Domain',detail:{spec:'remote',section:'child',mode:'link'}}},rows:[['domain']]}}]}},remote={page:{sections:[{id:'child',diagram:{nodes:{child:{tickets:['AA-1']}},rows:[['child']]}}]}};
+ const options={loadDetail:async()=>remote,telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async()=>({payload:recorded})}}};
+ const h=harness(raw,{},options),api=h.ctl.liveStatus,m=mountStatus(h);
+ assert.equal(api.snapshot().available,false);assert.equal(api.snapshot().mode,'trace');
+ api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:ID});
+ assert.ok(await api.loadDirectTrace(false),'contrasting precondition: the trace loads');assert.ok(api.snapshot().trace.selected,'and is shown');
+ await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.flush();
+ assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().mode,'trace','the loaded trace keeps the Trace view');assert.ok(api.snapshot().trace.selected,'and stays shown');
+ assert.deepEqual(m.body.querySelectorAll('button.dv-status-mode').filter(el=>shownIn(el,m.body)).map(accessibleName),['Jira','Trace'],'the switch appears with the references');
+ m.destroy();api.destroy();
+});
 test('#1136 D13 Metrics overlay paints its cues in the Trace view on every board, and nothing while it is off',async()=>{
  const raw=cuePage();delete raw.page.tracking.jira;const d=raw.page.sections[0].diagram;Object.values(d.nodes).forEach(n=>delete n.tickets);d.edges.forEach(e=>delete e.tickets);
  const free=cueHarness(raw);await free.on();
@@ -3097,6 +3111,8 @@ function workPresentation(h,card){
 test('#1137 metric cards on a board without tickets get no Jira presentation; ticketed boards keep unchanged',async()=>{
  const free=await paintedCard({a:{},b:{}});
  assert.equal(free.h.ctl.liveStatus.snapshot().available,false,'fixture has no ticket references');
+ // #1136: a Jira-free board opens on Trace; its Jira view (reached through the controller) is where the references guard matters.
+ free.h.ctl.liveStatus.setStatusMode('jira');free.h.flush();free.card=free.h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]');
  assert.ok(free.card,'the degraded carrier has a metric card');
  assert.equal(free.card.getAttribute('data-verdict'),'degraded');
  assert.deepEqual(workPresentation(free.h,free.card),{appearance:null,classes:[],halo:false,label:false,popover:false},'no Jira presentation on a Jira-free board');
@@ -3124,6 +3140,8 @@ test('D13 metric cards draw in the Trace view of a board with tickets without Ji
  assert.ok(card(),'the Trace view draws the card');assert.equal(card().getAttribute('data-verdict'),'degraded');
  const classes=Array.from(ticketed.h.C.LIVE_STATUS_APPEARANCES).filter(s=>card().classList.contains('dv-live-'+s));
  assert.deepEqual({appearance:card().getAttribute('data-live-appearance'),classes,halo:!!card().querySelector('.dv-live-halo')},{appearance:null,classes:[],halo:false},'no Jira work colouring in the Trace view');
+ const presented=workPresentation(ticketed.h,card());assert.deepEqual({label:presented.label,popover:presented.popover},{label:false,popover:false},'in Trace a card opens only its metrics detail, with no Jira work status');
+ assert.doesNotMatch(card().getAttribute('aria-label') || '',/Work status/,'and its name is not a Jira work status');
  api.destroy();
  const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{tickets:['AA-1']},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
  const w=harness(raw,{},{authoring:true,metricsPreview:true});shim(w);w.ctl.liveStatus.setStatusMode('trace');w.flush();

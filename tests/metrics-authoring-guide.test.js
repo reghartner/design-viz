@@ -69,8 +69,7 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
     proof:{rate:{min:1,max:1000},errors:{max:0.1,maxRatioOf:'rate'}},
     links:{dashboard:'https://grafana.example/d/api',query:'https://grafana.example/explore?route=$route'}};
   const authoredRoot={enabled:false,environment:'qa',variables:{service:'api',iotAccount:'111111111111'},environments:{qa:{grafana:{prometheus:'prom-qa'},variables:{iotAccount:'222222222222'}},prd:{}},grafana:{baseUrl:'https://grafana.example',prometheus:'prom-main',loki:'loki-main',tempo:'tempo-main',sql:'sql-main',cloudwatch:'cw-main',accountId:'123456789012'},
-    honeycomb:{environment:'prod',dataset:'api-prod'},window:'7d',refreshMs:300000,templates:{'http-call':template},
-    lookups:{'camera-model':{label:'Camera model',query:'{env="$env"} |= "Handling camera stats message" | cameraModel="$value"',values:['arch','wren'],datasource:'loki-main',fields:{traceId:'trace_id',spanId:'span_id'}}}};
+    honeycomb:{environment:'prod',dataset:'api-prod'},window:'7d',refreshMs:300000,templates:{'http-call':template}};
   const rootWarnings=[],parsed=C.trackingTelemetry({tracking:{telemetry:authoredRoot}},(at,message)=>rootWarnings.push(at+': '+message));
   assert.deepEqual(rootWarnings,[]);
   assert.equal(parsed.environment,'qa');assert.equal(parsed.environments.qa.grafana.prometheus,'prom-qa');assert.deepEqual(plain(parsed.environments.prd),{grafana:{},honeycomb:{}});
@@ -80,7 +79,6 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
   const page={tracking:{telemetry:authoredRoot}},qa=C.telemetryEnvironmentConfig(page,'qa'),prd=C.telemetryEnvironmentConfig(page,'prd');
   assert.deepEqual(plain(qa.variables),{service:'api',iotAccount:'222222222222'},'profile overrides one shared variable and inherits the other');
   assert.deepEqual(plain(prd.variables),authoredRoot.variables,'profiles without overrides inherit shared variables');
-  assert.deepEqual(plain(parsed.lookups),authoredRoot.lookups);
   assert.deepEqual(plain(parsed.honeycomb),authoredRoot.honeycomb);assert.equal(parsed.window,'7d');assert.equal(parsed.refreshMs,300000);
   const parsedTemplate=parsed.templates['http-call'];
   assert.equal(parsedTemplate.kind,'call');assert.deepEqual(plain(parsedTemplate.params),['route']);
@@ -127,7 +125,7 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
   assert.deepEqual(authoredRoot.variables,{service:'api',iotAccount:'111111111111'},'profile resolution preserves authored defaults');
 
   const exercised=new Set(['period','trend','timeField','binSeconds','showOnCard','missingMeansZero','namespace','metric','dimensions','statistic','cloudwatch','cloudwatchLogs','logGroups','region','valueField','breakdown','labelField','title','labelTitle','valueTitle','columns','limit','field','label','scope','variables','accountId','baseUrl','environments','enabled','grafana','honeycomb','window','refreshMs','templates','prometheus','loki','tempo','sql','environment','dataset',
-    'kind','signals','proof','links','card','use','unit','min','max','maxRatioOf','dashboard','query','side','offset','params','lookups','values','datasource','fields','traceId','spanId']);
+    'kind','signals','proof','links','card','use','unit','min','max','maxRatioOf','dashboard','query','side','offset','params']);
   assert.deepEqual([...documentedFields(chapter)].sort(),[...exercised].sort(),'every field named in the chapter table has a parser-backed fixture');
 
   const negative=chapterExample(chapter),config=negative.page.tracking.telemetry;

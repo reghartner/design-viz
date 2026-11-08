@@ -279,7 +279,7 @@ The accepted authored fields are:
 
 | object | fields |
 | --- | --- |
-| `tracking.telemetry` | `enabled`, `grafana`, `honeycomb`, `window`, `refreshMs`, `templates`, `environment`, `environments`, `variables`, `lookups` |
+| `tracking.telemetry` | `enabled`, `grafana`, `honeycomb`, `window`, `refreshMs`, `templates`, `environment`, `environments`, `variables` |
 | `tracking.telemetry.grafana` | `prometheus`, `loki`, `tempo`, `sql`, `cloudwatch` datasource UIDs; optional `accountId` for CloudWatch; optional `baseUrl` for evidenced Grafana UI origin |
 | `tracking.telemetry.honeycomb` | `environment`, optional `dataset` |
 | carrier `telemetry` | `kind`, `signals`, `proof`, `links`, `card`, or `use` plus declared template parameters |
@@ -294,7 +294,6 @@ The accepted authored fields are:
 | signal links | absolute HTTP(S) `query` without credentials |
 | edge card | `side`, `offset` |
 | template | optional `kind`, `params`; required `signals`; optional `proof`, `links` |
-| log lookup (`lookups.<id>`) | `label`, `query` (a LogQL log query, optional `$value` slot); optional `values`, `datasource`, `fields` with `traceId`, `spanId` |
 
 Deployment profiles are optional. Set `tracking.telemetry.environment` to the
 default profile id and `environments` to named profiles such as
@@ -358,33 +357,6 @@ For Grafana links, keep the existing dashboard URL or call `generate_deeplink`
 using its current schema after the query is selected. Store only ordinary
 HTTP(S) dashboard/Explore URLs. For Honeycomb store the stable query UI URL,
 never a signed result/download URL.
-
-### Find a trace from a log line
-
-When the field that tells traces apart is only on a Loki log line (not a span
-attribute), add a log lookup so readers can find the trace in Status → Trace →
-**Load trace**. The board needs a trace connection and the Loki datasource. For
-a company whose camera model is structured metadata on the line
-`Handling camera stats message`, next to `trace_id` and `span_id`:
-
-```json
-{"tracking": {"telemetry": {"lookups": {
-  "camera-model": {
-    "label": "Camera model",
-    "query": "{env=\"$env\"} |= \"Handling camera stats message\" | cameraModel=\"$value\"",
-    "values": ["arch", "wren"]
-  }
-}}}}
-```
-
-The reader picks or types a value; one `query_loki_logs` call over the Load
-trace lookback lists up to 10 newest lines (time, value, trace ID), and **Load**
-loads that trace and focuses the line's span. Readers may also type a LogQL log
-query. Only use a query and field names you verified on a real line; set
-`fields` when the IDs are not `trace_id` / `span_id`. A suggested `values` list
-requires a `$value` slot, and a value cannot contain quotes or backslashes. The
-Grafana declaration must include `query_loki_logs` (`tools/inject.py` adds it).
-Contract: [Find a trace from a log line](../../../docs/trace-connections.md#find-a-trace-from-a-log-line).
 
 ## 4. Preserve runtime honesty
 

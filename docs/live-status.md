@@ -1510,7 +1510,7 @@ capabilities: {mcp: {servers: [
 ```
 
 Add `"query_cloudwatch"` only for bound CloudWatch metric signals and `"query_cloudwatch_logs"` only for bound Logs signals.
-A board with Load trace log lookups (`tracking.telemetry.lookups`, [Find a trace from a log line](trace-connections.md#find-a-trace-from-a-log-line)) also declares `"query_loki_logs"`.
+A board with Load trace log lookups (`tracking.telemetry.lookups`, [Find a trace from a log line](#find-a-trace-from-a-log-line)) also declares `"query_loki_logs"`.
 Add `"query_sql"` to the Grafana tools only when the page has `sql` signals and the
 server enables that tool; it is off by default in
 [grafana/mcp-grafana](https://github.com/grafana/mcp-grafana), the real server,
@@ -2761,3 +2761,87 @@ clearing still address the original carrier; descendant work is edited at its so
 ### Direct trace loading
 
 Status → Trace can load one exact trace ID or a supported provider link using an inherited company or board [trace connection profile](trace-connections.md). Load/Verify are read-only session actions independent of Metrics polling. Imported and local nodes share authored traceMatch mapping behavior; choose the exact mapping diagram when several are available.
+
+### Find a trace from a log line
+
+Sometimes the field that tells requests apart is not on any span. A company's
+camera model, for example, is never a span attribute, and Honeycomb `get_trace`
+returns fixed columns without span attributes. The model is on a Loki debug log
+line as structured metadata, next to the line's trace and span IDs:
+
+```
+line: "Handling camera stats message"
+labels: {env: "stg", k8s_namespace_name: "<ns>", severity_text: "DEBUG"}
+structuredMetadata: {cameraModel: "arch", deviceId: "<id>", trace_id: "1e4cef70fde7bde26ca79f1e74c05bcb", span_id: "b4be3d5412c33b2e"}
+```
+
+**Load trace** ([Direct trace loading](#direct-trace-loading)) can find such a line and load its trace (#1099). The board author
+names lookups in `tracking.telemetry.lookups`:
+
+```json
+"tracking": {"telemetry": {
+  "grafana": {"loki": "loki-uid"},
+  "lookups": {
+    "camera-model": {
+      "label": "Camera model",
+      "query": "{env=\"$env\"} |= \"Handling camera stats message\" | cameraModel=\"$value\"",
+      "values": ["arch", "wren"]
+    }
+  }
+}}
+```
+
+| field | meaning |
+|---|---|
+| `label` | required; the lookup's name in the form and the label of its value box (1–80 characters) |
+| `query` | required; a LogQL log query (at most 2000 characters). `$value` or `${value}` is where the reader's value goes; a query without it runs as written |
+| `values` | optional suggested values (1–50) the reader can pick; the query must then have a `$value` slot |
+| `datasource` | optional Loki datasource UID; default `tracking.telemetry.grafana.loki` of the active environment |
+| `fields` | optional `{traceId, spanId}` field names; default `trace_id` and `span_id` |
+
+The reader opens Status → Trace → **Load trace**, chooses a connection and
+environment, then uses **Find a trace from a log line**: picks a lookup, types or
+picks a value and clicks **Find log lines**. The form also offers **Type a LogQL
+query** for a reader-typed log query. `lookups: {}` offers only that box. Each
+Find makes one `query_loki_logs` call to the Grafana connector that offers that
+tool (the one `loki` signals use, preferring a connector named Grafana):
+
+```json
+{"datasourceUid": "loki-uid", "logql": "{env=\"stg\"} |= \"Handling camera stats message\" | cameraModel=\"arch\"",
+ "startRfc3339": "now-2h", "endRfc3339": "now", "limit": 10, "direction": "backward", "queryType": "range"}
+```
+
+- `$env`, `${variable}` and `$account` expand as in signals, from the board's
+  active Environment. A missing variable stops the Find with its name.
+- The window is the Load trace lookback: the **Trace start** control, else the
+  connection's `defaultLookback`. A relative lookback stays relative (`now-2h` to
+  `now`), so Grafana's clock decides now; absolute start and end pass unchanged.
+- A value cannot contain quotes, backticks, backslashes or control characters,
+  so it cannot leave the LogQL string it is placed in. The typed box is limited
+  to 2000 characters. LogQL cannot write; the call is bounded by the window and
+  10 lines.
+- The result lists up to 10 lines, newest first: time (UTC), the value (or the
+  line text for a typed query), and the trace ID. The IDs are read from the
+  line's structured metadata, then parsed labels, then stream labels, because
+  Loki before 3.0 reports every label as a stream label. A line without the
+  trace ID field says "This log line has no trace_id" (with the configured
+  field name) and has no Load button. A metric query returns no lines and says so.
+- **Load** on a line loads that trace ID through the selected connection,
+  exactly as a pasted ID, then focuses the line's span ID in the waterfall and
+  the diagram. A span ID that is not in the trace is reported, and the trace
+  stays loaded.
+- Lookups need the Grafana connector. When no connector offers
+  `query_loki_logs`, or in a host without one (native mounts), the lookup
+  controls are disabled with a message and the rest of Load trace is unchanged.
+  Discovery reads tool metadata only, once, when the Trace view first shows.
+
+The result shape follows grafana/mcp-grafana `tools/loki.go`
+(`QueryLokiLogsResult` with `format` full, read 2026-11-07): `data` is a list of
+`{timestamp: "<unix ns>", line, labels, structuredMetadata?, parsed?}`. The mock
+Grafana server returns the same shape without structured metadata. It is not
+verified against a live Grafana server.
+
+`tools/inject.py` declares `query_loki_logs` on the Grafana connector for a board
+with `lookups` and a trace connection. Spec validation drops a malformed lookup
+and names its field, for example
+`tracking.telemetry.lookups.camera-model.query: has suggested values but no $value slot`.

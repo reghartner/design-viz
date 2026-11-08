@@ -243,7 +243,8 @@ the built-in attribute list can match today. The one exception is
 
 ## Inspect a request in Status
 
-The existing **Status** panel has **Jira** and **Trace** views. Jira is the default.
+The existing **Status** panel has **Jira** and **Trace** views. Jira is the default on a
+board with ticket references; a board without any opens on Trace with no switch (#1136).
 Choose Trace, then turn on **Metrics overlay** (or the existing connector approval action)
 to retrieve the page's explicit trace bindings. Host and page opt-outs still apply.
 Trace replaces the Jira body and the Jira diagram annotations while selected; the

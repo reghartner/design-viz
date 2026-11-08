@@ -806,7 +806,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         var previous=JSON.stringify(refs()),old=remotePages[remoteKey(ref)],retiredIds=[];
         if(old)sectionRecords(old).forEach(function(record){var d=record.section.diagram;if(d){retiredIds=retiredIds.concat(Object.keys(d.nodes || {}),(d.edges || []).map(function(edge){return edge.from+'->'+edge.to;}));}});
         remotePages[remoteKey(ref)]=normalize(raw);telemetry.bindingsChanged(retiredIds);schedule();
-        // #1136: a board that opened on Trace for want of references opens Jira once a loaded detail brings some, unless the reader chose a view.
+        // #1136: a board that opened on Trace for want of references opens Jira once a loaded detail brings some, unless the reader
+        // chose a view or worked on a trace (Load, a log-line Load, choosing a trace or focusing a span clear statusAuto).
         if(statusAuto && referencesAvailable()){statusAuto=false;clearTraceFocus();statusMode='jira';}
         if(JSON.stringify(refs())!==previous)notify();
       }
@@ -893,7 +894,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
           return;
         }
         var previous=path._livePointerTarget || path,c=previous._liveCarrier;
-        carrierTarget(card,edge.from+'->'+edge.to,edge,appearance,binding.page.tracking,edge.label || edge.from+' → '+edge.to,c && c.waiting,c && c.availability,binding.ordinal!=null?{section:binding.ordinal,kind:'edge',index:index}:null);
+        carrierTarget(card,edge.from+'->'+edge.to,edge,appearance,binding.page.tracking,edge.label || edge.from+' → '+edge.to,c && c.waiting,c && c.availability,binding.ordinal!=null?{section:binding.ordinal,kind:'edge',index:index}:null,null,!workPaint);
         carrierPointer(path,card);carrierPointer(path.closest('svg').querySelector('path.halo[data-dv-edge="'+index+'"]'),card);
       },telemetry.config());
       scope.querySelectorAll('svg').forEach(function(svg){if(svg._layoutStatusCoins)svg._layoutStatusCoins();});
@@ -1219,9 +1220,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(retired)return;
     if(active===trigger){close(true);return;}close(false);
     if(!pop){pop=element('div','nbackpop dv-live-popover',null,view);pop.setAttribute('role','dialog');pop.setAttribute('popover','manual');pop.hidden=true;}
-    pop.replaceChildren();pop.setAttribute('aria-label',(trackingRefs(value).tickets.length?'Live tickets for ':'Work status for ')+label);
-    element('strong','node-link-title','Work status · '+label,pop);
+    var metricsOnly=!!(trigger._liveCarrier && trigger._liveCarrier.metricsOnly);
+    pop.replaceChildren();pop.setAttribute('aria-label',metricsOnly?'Metrics for '+label:(trackingRefs(value).tickets.length?'Live tickets for ':'Work status for ')+label);
+    element('strong','node-link-title',(metricsOnly?'Metrics · ':'Work status · ')+label,pop);
     var dismiss=element('button','node-link-close','×',pop);dismiss.type='button';dismiss.setAttribute('aria-label','Close live tickets');dismiss.addEventListener('click',function(){close(true);});
+    if(metricsOnly){paintProduction(trigger);reveal(trigger,dismiss,false);return;}
     var summary=trigger._liveCarrier && trigger._liveCarrier.summary,found=trackingRefs(summary || value);
     if(summary)element('p','dv-live-domain-summary','Domain summary: this node and '+summary.carriers+' descendant nodes/connections · '+summary.tickets.length+' unique tickets.'+(summary.missing?' Missing work: '+summary.missing+' marked carriers.':'')+(summary.unavailable.length?' Detail evidence unavailable: '+summary.unavailable.join(', ')+'. Completion is unknown.':''),pop);
     if(value && value.missingWork===true)element('p','dv-live-coverage-detail','Missing work: additional work remains without a linked ticket. Clear this Missing work marker when covered.',pop);
@@ -1281,7 +1284,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });
     found.prs.forEach(function(url){link(pop,url,url);});
     paintProduction(trigger);
-    active=trigger;asked=!!(asking && marker && marker.clearable);trigger.setAttribute('aria-expanded','true');pop.hidden=false;if(pop.showPopover)pop.showPopover();
+    reveal(trigger,dismiss,!!(asking && marker && marker.clearable));
+  }
+  function reveal(trigger,dismiss,ask){
+    active=trigger;asked=ask;trigger.setAttribute('aria-expanded','true');pop.hidden=false;if(pop.showPopover)pop.showPopover();
     var rect=trigger.getBoundingClientRect();
     pop.style.left=Math.max(8,Math.min(window.innerWidth-pop.offsetWidth-8,rect.left))+'px';
     pop.style.top=Math.max(8,Math.min(window.innerHeight-pop.offsetHeight-8,rect.bottom+6))+'px';
@@ -1296,12 +1302,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
      the Workbench owns carrier clicks, selection and focus, so the trigger
      stays inert and the Tickets table remains the route to the popover. */
   var CARRIER_ATTRS=['role','tabindex','aria-label','aria-haspopup','aria-expanded'];
-  function carrierTarget(el,id,value,state,tracking,label,waiting,availability,ref,summary){
+  // metricsOnly (#1136 D13): a metric card in the Trace view opens only its metrics detail, never a Jira work status.
+  function carrierTarget(el,id,value,state,tracking,label,waiting,availability,ref,summary,metricsOnly){
     if(!el._liveSaved){el._liveSaved={};CARRIER_ATTRS.forEach(function(name){el._liveSaved[name]=el.getAttribute(name);});}
     el.classList.add('dv-live-target');el.setAttribute('data-live-carrier',id);
-    el._liveCarrier={value:value,state:state,tracking:tracking,label:label,waiting:waiting,availability:availability,ref:ref || null,summary:summary || null};
+    el._liveCarrier={value:value,state:state,tracking:tracking,label:label,waiting:waiting,availability:availability,ref:ref || null,summary:summary || null,metricsOnly:!!metricsOnly};
     if(authoring)return el;
     el.setAttribute('role','button');el.setAttribute('tabindex','0');el.setAttribute('aria-haspopup','dialog');el.setAttribute('aria-expanded','false');
+    if(metricsOnly){el.setAttribute('aria-label','Metrics for '+label);return el;}
     el.setAttribute('aria-label',(trackingRefs(value).tickets.length?'Live tickets for ':'Work status for ')+label+(state?' · '+(state==='unchanged'?'No change needed':state==='missing' && value.missingWork===true?'Missing work':state):'')+(summary?' · Domain summary'+(summary.missing?' · Missing work':'')+(summary.unavailable.length?' · Detail evidence unavailable':''):'')+(availability?' · '+liveStatusAvailabilityLabel(availability):'')+(waiting && waiting.keys?' · waiting on '+waiting.keys.join(', '):''));
     return el;
   }
@@ -1811,7 +1819,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     snapshot:snapshot,
     setStatusMode:function(mode){if(retired || ['jira','trace'].indexOf(mode)<0)return;if(mode!==statusMode)clearTraceFocus();statusMode=mode;statusAuto=false;close(false);paint();notify();},
     setDirectTraceField:function(change){if(!retired && change){traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';directTrace.set(change.field,change.value);}},
-    loadDirectTrace:async function(verify,line){if(retired)return;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';var result=await directTrace.load(!!verify,line);if(result){traceSelection=null;traceInitial=true;}paint();notify();return result;},
+    loadDirectTrace:async function(verify,line){if(retired)return;statusAuto=false;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';var result=await directTrace.load(!!verify,line);if(result){traceSelection=null;traceInitial=true;}paint();notify();return result;},
     clearDirectTrace:function(){if(retired)return;clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();},
     setLogLookupField:function(change){if(!retired && change)logLookup.set(change.field,change.value);},
     findLogLines:function(){return retired?Promise.resolve(null):logLookup.find();},
@@ -1828,7 +1836,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     loadNextLogTrace:function(){if(retired)return Promise.resolve(null);var next=logLookup.next();return next<0?Promise.resolve(null):api.loadLogTrace(next);},
     setTraceShow:function(value){if(retired)return;traceShow=!!value;paint();notify();},
     chooseTrace:async function(choice){
-      if(retired || statusMode!=='trace')return;
+      if(retired || statusMode!=='trace')return;statusAuto=false;
       var entry=traceSources().entries.find(function(e){return e.key===choice.key;});if(!entry)return;
       var request=++traceRequest;clearTraceFocus();tracePending=null;traceInitial=false;traceNotice='';
       if(choice.traceId===entry.exemplar.traceId){traceSelection={key:entry.key,traceId:choice.traceId};paint();notify();return;}
@@ -1849,7 +1857,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(!editor.mapSpan)return false;setTimeout(function(){if(!retired)editor.mapSpan(ref,match);},0);return true;
     },
     selectTraceSpan:function(action){
-      if(retired || statusMode!=='trace' || !action)return false;
+      if(retired || statusMode!=='trace' || !action)return false;statusAuto=false;
       var selected=traceSnapshot().selected;
       if(!selected || action.context!==selected.context)return false;
       var entry=traceSources().entries.find(function(e){return e.key===selected.key;});

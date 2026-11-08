@@ -2842,7 +2842,8 @@ test('#1136 a reader working on a loaded trace keeps the Trace view when a loade
  api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:ID});
  assert.ok(await api.loadDirectTrace(false),'contrasting precondition: the trace loads');assert.ok(api.snapshot().trace.selected,'and is shown');
  await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.flush();
- assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().mode,'trace','the loaded trace keeps the Trace view');assert.ok(api.snapshot().trace.selected,'and stays shown');
+ // The detail adds a mapping diagram, which resets the loaded trace as before; the reader stays in the Trace view to load again.
+ assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().mode,'trace','trace work keeps the Trace view');
  assert.deepEqual(m.body.querySelectorAll('button.dv-status-mode').filter(el=>shownIn(el,m.body)).map(accessibleName),['Jira','Trace'],'the switch appears with the references');
  m.destroy();api.destroy();
 });

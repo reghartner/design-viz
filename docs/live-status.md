@@ -752,7 +752,7 @@ the day row and any Over time error, in both views. A board with no ticket or ep
 references after imports has no Jira view (#1136): the panel opens on Trace with no
 **Jira** | **Trace** switch. If a loaded detail
 brings ticket references, the switch appears and the panel moves to Jira unless the reader
-chose a view. The Jira view then has two rows. The first holds only buttons, which keep
+chose a view or worked on a trace. In the Trace view a metric card opens only its metrics. The Jira view then has two rows. The first holds only buttons, which keep
 their place: any provider action and, on the far right, **First blocker**. **First blocker** keeps one size; with no blockers it reads
 **No blockers** and is greyed out, and with blockers it cannot reach from here it
 stays **First blocker** and is greyed out. The second row holds everything that

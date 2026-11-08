@@ -93,8 +93,12 @@ connections. `tracking.telemetry.enabled:false` and host `telemetry:false` win.
 
 A profile may list `allowedAttributes`: span attribute names it retains from loaded
 traces and permits in `traceMatch.attributes`, in addition to the built-in
-operational list in [trace-ready authoring](trace-ready-authoring.md). Add it
-next to the other fields of a profile, such as `operations` above:
+operational list in [trace-ready authoring](trace-ready-authoring.md). It takes
+effect for Tempo (`tempo-v1`) profiles. The verified Honeycomb `get_trace` table
+has a fixed set of columns and no custom span-attribute columns (see
+[provider traces](provider-traces.md)), so on a Honeycomb profile the field has an
+effect only if a recorded response from that connected tool shows a column with
+that exact name. Add it next to the other fields of a profile:
 
 ```json
 "allowedAttributes": ["device.model"]
@@ -107,13 +111,17 @@ With that profile, a step can tell traces for different device models apart
 - `allowedAttributes` must be an array of at most 32 non-empty attribute names
   (letters, digits, `_ . : / -`, starting with a letter). A malformed entry fails
   with its field path, for example `allowedAttributes[1]`. Credential-shaped names
-  (token, secret, header, cookie, password, authorization, api key) are rejected.
+  are rejected: names containing token, secret, password, passwd, credential,
+  authorization, cookie, header, bearer, private key, access key or api key, and
+  names with an `auth`, `pwd`, `jwt` or `session` part.
 - Values match exactly, with the same rules as built-in attributes. Tempo keeps the
-  span attribute value and its type. Honeycomb `get_trace` tables keep a column with
-  the same name as text, so match it with a string value.
-- Validation accepts an attribute that any resolved connection for the page lists.
-  A trace loaded through a profile that does not list it does not carry it, so the
-  step shows Not observed.
+  span attribute value and its type. A Honeycomb table cell, if present, is text.
+- Validation accepts an attribute that any connection for the page lists, also
+  while `tracking.telemetry.enabled` is `false`. A trace loaded through a profile
+  that does not list it does not carry it, so the step shows Not observed.
+- Validation warns (it does not fail) when only Honeycomb connections list an
+  attribute that a step uses, and when such an attribute has a number or boolean
+  value, which a text cell never matches.
 - A board entry that references a company profile inherits its `allowedAttributes`
   and cannot change them; an inline board profile may declare its own.
 

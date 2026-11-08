@@ -6,8 +6,10 @@ const fixture=require('./fixtures/trace-connection-profile.json'),recorded=fs.re
 const ID='8413cd87a9f15b6bfe8e1acf5b3346d0',clone=x=>JSON.parse(JSON.stringify(x));
 const X_SPAN='b01a8fd7791f709b',Y_SPAN='3b8c2e88761b259e';
 function context(name='standalone'){const C={URL,AbortController,TextEncoder,TextDecoder,console,setTimeout,clearTimeout,document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint(name).body,C);return C;}
-// The recorded Honeycomb table with one extra device.model column. Two
-// productcatalog GetProduct server spans carry X and Y; the rest are blank.
+// SYNTHETIC: the recorded Honeycomb table has a fixed 19 columns and no custom
+// span-attribute columns. This variant adds a device.model column only to
+// exercise the retention path. Two productcatalog GetProduct server spans
+// carry X and Y; the rest are blank.
 function withDeviceModel(text){
   return text.split('\n').map(line=>{
     if(/\|\s*is_collapsed\s*\|\s*$/.test(line))return line+' device.model |';
@@ -18,8 +20,9 @@ function withDeviceModel(text){
   }).join('\n');
 }
 function tool(){return {name:'get_trace',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},additionalProperties:false}};}
-function page(profile){
-  return {tracking:{telemetry:{traceConnections:{company:profile}}},sections:[{id:'one',diagram:{nodes:{catalog:{}},rows:[['catalog']],steps:[
+const TEMPO={version:1,label:'Company Tempo',provider:'tempo',server:'Company Grafana',tool:'get_tempo_trace',readOnly:true,adapter:'tempo-v1',arguments:{traceId:'trace_id',start:'start',end:'end'},time:{encoding:'iso8601',type:'string',defaultLookback:'2h'},literals:{datasourceUid:'tempo-main'},environments:{prod:{}},links:[]};
+function page(profile,connections={company:profile}){
+  return {tracking:{telemetry:{traceConnections:connections}},sections:[{id:'one',diagram:{nodes:{catalog:{}},rows:[['catalog']],steps:[
     {id:'lookup',text:'Look up the product for device model X',traceMatch:{serviceName:'productcatalog',operation:'msdemo.ProductCatalogService/GetProduct',nodeId:'catalog',attributes:{'device.model':'X'}}}
   ]}}]};
 }
@@ -72,8 +75,42 @@ test('3. profile schema: allowedAttributes must be an array of non-empty strings
     const bad=clone(fixture);bad.allowedAttributes=value;
     assert.throws(()=>F.profile(bad),path,JSON.stringify(value));
   }
+  // Credential-shaped names are rejected; ordinary names that contain the letters are not.
+  for(const k of ['session.id','user.jwt','db.pwd','aws.access_key','http.auth','tls.private_key','client.passwd','http.bearer'])
+    {const bad=clone(fixture);bad.allowedAttributes=[k];assert.throws(()=>F.profile(bad),/allowedAttributes\[0\]/,k);}
+  const author=clone(fixture);author.allowedAttributes=['document.author'];assert.deepEqual(clone(F.profile(author).allowedAttributes),['document.author']);
   // The board-level path names the connection and the field.
   const bad=clone(fixture);bad.allowedAttributes=['ok',''];const errors=[];
   assert.deepEqual(clone(F.resolve({tracking:{telemetry:{traceConnections:{company:bad}}}},{},(at,m)=>errors.push(at+' '+m))),{});
   assert.match(errors.join('\n'),/\.traceConnections\.company .*allowedAttributes\[1\]/);
+});
+
+test('validation warns when only Honeycomb connections list the attribute, and when a Honeycomb-only attribute uses a non-string value',()=>{
+  const C=context(),honeycomb=clone(fixture);honeycomb.allowedAttributes=['device.model'];
+  const warn=p=>clone(C.validate(p).warnings.filter(w=>/traceMatch\.attributes/.test(w)));
+  const only=page(honeycomb);
+  assert.deepEqual(attributeErrors(C,only),[]);
+  assert.deepEqual(warn(only),['steps.lookup.traceMatch.attributes.device.model: only Honeycomb connections list this attribute; the verified Honeycomb get_trace table has no custom attribute columns, so this step may show Not observed']);
+  const numeric=page(honeycomb);numeric.sections[0].diagram.steps[0].traceMatch.attributes['device.model']=7;
+  assert.deepEqual(warn(numeric).map(w=>w.replace(/^.*?: /,'')),['only Honeycomb connections list this attribute; the verified Honeycomb get_trace table has no custom attribute columns, so this step may show Not observed','Honeycomb table cells are text; a number value never matches']);
+  const tempo=clone(TEMPO);tempo.allowedAttributes=['device.model'];
+  const mixed=page(null,{company:honeycomb,tempo});
+  assert.deepEqual(attributeErrors(C,mixed),[]);
+  assert.deepEqual(warn(mixed),[]);
+});
+
+test('paused telemetry (enabled:false) still validates profile-allowed attributes',()=>{
+  const C=context(),profile=clone(fixture);profile.allowedAttributes=['device.model'];
+  const p=page(profile);p.tracking.telemetry.enabled=false;
+  assert.deepEqual(attributeErrors(C,p),[]);
+});
+
+test('company-level profile allowedAttributes feed validation, inherited or referenced by the board',()=>{
+  const C=context('backend'),acme=clone(TEMPO);acme.allowedAttributes=['device.model'];
+  C.TELEMETRY_COMPANY_TRACE_CONNECTIONS={acme};
+  const inherited=page(null);delete inherited.tracking;
+  assert.deepEqual(attributeErrors(C,inherited),[]);
+  assert.deepEqual(attributeErrors(C,page(null,{chosen:{profile:'acme'}})),[]);
+  C.TELEMETRY_COMPANY_TRACE_CONNECTIONS={acme:TEMPO};
+  assert.deepEqual(attributeErrors(C,inherited),['traceMatch.attributes: use supported operational attributes only']);
 });

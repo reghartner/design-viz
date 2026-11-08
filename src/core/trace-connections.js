@@ -7,7 +7,7 @@ var FlowTraceConnections=(function(){
   function object(v){return !!v && typeof v==='object' && !Array.isArray(v);}
   function fail(stage,message){var e=new Error(stage+': '+message);e.stage=stage;throw e;}
   function name(v){return typeof v==='string' && /^[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(v) && reserved.indexOf(v)<0;}
-  function attribute(v){return typeof v==='string' && /^[A-Za-z][A-Za-z0-9_.:\/-]{0,199}$/.test(v) && reserved.indexOf(v)<0 && !/(?:secret|password|credential|token|authorization|cookie|header|api.?key)/i.test(v);}
+  function attribute(v){return typeof v==='string' && /^[A-Za-z][A-Za-z0-9_.:\/-]{0,199}$/.test(v) && reserved.indexOf(v)<0 && !/(?:secret|password|passwd|credential|token|authorization|cookie|header|bearer|private.?key|access.?key|api.?key)/i.test(v) && !/(?:^|[._:\/-])(?:auth|pwd|jwt|session)(?:$|[._:\/-])/i.test(v);}
   function text(v){return typeof v==='string' && v.length>0 && v.length<=200 && !/[\x00-\x1f<>]/.test(v);}
   function fields(v,allowed,at){if(!object(v) || Object.keys(v).some(function(k){return allowed.indexOf(k)<0 || reserved.indexOf(k)>=0;}))fail('configuration',at+' has an unsupported shape or field.');}
   function copy(v){return JSON.parse(JSON.stringify(v));}

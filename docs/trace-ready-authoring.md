@@ -72,7 +72,9 @@ against them. Prefer stable instrumentation meaning over incidental timings.
 A [trace connection profile](trace-connections.md#allowed-match-attributes) may
 add attribute names with `allowedAttributes`. Traces loaded with that profile keep
 those attributes, and `traceMatch.attributes` may use them. Values still match
-exactly. For example, when the profile lists `device.model`, this step maps only
+exactly. This works for Tempo profiles; the verified Honeycomb `get_trace` table
+has no custom attribute columns, and validation warns when only Honeycomb
+connections list the attribute. For example, when the profile lists `device.model`, this step maps only
 the message-consumer span for device model X:
 
 ```json

@@ -41,7 +41,7 @@ preserving the step's ID, narrative and delivered `edge` or
 the receiving node for that operation. It is not a provider service-name guess.
 `traceMatch` on a node or edge is ignored, with a validator warning.
 
-The board Trace view shows each span's exact service and operation ([details](live-status.md#direct-trace-loading)).
+The Trace view shows a span's exact service and operation ([details](live-status.md#direct-trace-loading)).
 
 ```json
 {
@@ -135,8 +135,8 @@ them merely to align an existing diagram.
 
 CLI `preview --section N` selects a zero-based diagram section and checks its
 first path (or all steps if no paths). For each additional path, use the same
-production matcher read-only, supplying its exact ID. Give each path report its
-own filename:
+production matcher read-only, supplying its exact ID. Give each path report a
+unique name:
 
 ```sh
 node --input-type=module - "$TRACE_CHECK_DIR/trace-resolved.spec.json" /path/to/request.json 0 PATH_ID > "$TRACE_CHECK_DIR/path-mapping.json" <<'JS'

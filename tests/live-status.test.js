@@ -2703,6 +2703,44 @@ test('OT16 First blocker cannot reach a ticket that has no status on the day, an
  api.overTimeDay(0);h.flush();assert.ok(edge.classList.contains('dv-live-missing'),'the step edge wears the Missing paint');
  assert.equal(api.snapshot().firstBlocker,false);assert.equal(first().textContent,'No blockers');assert.equal(first().disabled,true);assert.equal(api.snapshot().epic.blocked,0);
 });
+/* #1131 (epic #1130, Chuck D1 D6 D8 D12): one header above the Jira and the Trace view. Top row: Jira | Trace, an Env
+   select, a "Metrics overlay" switch. Second row: Live | Over time. The day row and the Over time error below it.
+   Rejects: a header drawn only in the Jira view; Over time that leaves the Trace view; a second environment select or a
+   second Metrics control; "Enable traces". */
+const headerFixture=()=>{const raw=overFixture();raw.page.tracking.telemetry={environment:'prd',environments:{prd:{},stg:{}}};return raw;};
+const accessibleName=el=>el.getAttribute('aria-label') || textOf(el).replace(/\s+/g,' ').trim();
+const shownIn=(el,root)=>{for(let node=el;node && node!==root;node=node.parentElement)if(node.hidden)return false;return true;};
+const namedControls=(root,name,role)=>root.querySelectorAll('button,select,input').filter(el=>shownIn(el,root) && accessibleName(el)===name && (!role || el.getAttribute('role')===role));
+test('OT18 #1131 the shared header shows Live | Over time, the day row, one Env and one Metrics overlay switch in the Jira and the Trace view',async()=>{
+ const h=harness(headerFixture(),{},{telemetry:{provider:()=>Promise.resolve({})}}),api=overReady(h.ctl.liveStatus),m=mountStatus(h);api.apply(overToday());
+ let fail=false;api.setHistory({load:()=>fail?{days:[]}:{days:overDays()}});
+ const header=view=>{
+  assert.equal(namedControls(m.body,'Live').length,1,view+': one Live');assert.equal(namedControls(m.body,'Over time').length,1,view+': one Over time');
+  const env=namedControls(m.body,'Env');assert.equal(env.length,1,view+': one control named Env');assert.equal(env[0].tagName,'select');
+  const metrics=namedControls(m.body,'Metrics overlay','switch');assert.equal(metrics.length,1,view+': one Metrics overlay switch');
+  for(const gone of ['Enable traces','Disconnect traces','Metrics','Environment','Trace environment'])assert.equal(namedControls(m.body,gone).length,0,view+': no control named '+gone);
+  return {env:env[0],metrics:metrics[0],live:namedControls(m.body,'Live')[0],over:namedControls(m.body,'Over time')[0]};
+ };
+ api.setStatusMode('trace');assert.ok(m.body.querySelector('.dv-live-trace'));assert.equal(m.body.querySelector('table.dv-live-tickets'),null);
+ let c=header('Trace');
+ // The switch and Env call the controller actions the old Metrics button and Environment select called.
+ assert.equal(c.metrics.getAttribute('aria-checked'),'false');c.metrics.dispatchEvent({type:'click'});assert.equal(api.snapshot().metrics.enabled,true);
+ c=header('Trace');assert.equal(c.metrics.getAttribute('aria-checked'),'true');c.metrics.dispatchEvent({type:'click'});assert.equal(api.snapshot().metrics.enabled,false);
+ c.env.value='stg';c.env.dispatchEvent({type:'change'});assert.equal(api.snapshot().metrics.environment,'stg');
+ assert.equal(c.live.getAttribute('aria-pressed'),'true');assert.equal(c.over.getAttribute('aria-pressed'),'false');
+ c.over.dispatchEvent({type:'click'});await historySettle();
+ assert.equal(api.snapshot().mode,'trace','Over time from the Trace view keeps the Trace view');assert.equal(api.snapshot().overTime.active,true);assert.ok(m.body.querySelector('.dv-live-trace'));
+ c=header('Trace, Over time');assert.equal(c.over.getAttribute('aria-pressed'),'true');assert.equal(c.live.getAttribute('aria-pressed'),'false');
+ const row=()=>m.body.querySelector('.dv-live-over-time-row');assert.ok(row() && shownIn(row(),m.body),'the day row shows in the Trace view');
+ assert.equal(row().querySelector('.dv-live-over-time-day').textContent,'Oct 22');assert.ok(row().querySelector('input.dv-live-over-time-slider'));
+ const [prev]=row().querySelectorAll('.dv-live-step');prev.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,1);assert.equal(row().querySelector('.dv-live-over-time-day').textContent,'Oct 21');assert.equal(api.snapshot().mode,'trace');
+ c.live.dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,false);assert.equal(api.snapshot().mode,'trace');assert.equal(row(),null);
+ // The Over time error shows in the Trace view too.
+ fail=true;c=header('Trace');c.over.dispatchEvent({type:'click'});await historySettle();
+ const error=m.body.querySelector('.dv-live-over-time-status');assert.ok(error && shownIn(error,m.body),'the Over time error shows in the Trace view');assert.equal(error.textContent,'History could not load. Try Over time again.');
+ api.setStatusMode('jira');header('Jira');assert.ok(m.body.querySelector('table.dv-live-tickets'));assert.ok(shownIn(m.body.querySelector('.dv-live-over-time-status'),m.body),'and in the Jira view');
+ m.destroy();api.destroy();
+});
 
 test('Proof is cleared from retained panels on telemetry and live-status controller destruction',()=>{
  for(const owner of ['telemetry','liveStatus']){

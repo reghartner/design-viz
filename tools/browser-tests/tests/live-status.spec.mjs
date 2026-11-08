@@ -348,6 +348,18 @@ test('O11 buttons and the content below them stay in place when status text grow
  // The row is tall enough for what it holds: three count chips are not clipped.
  expect(await status.evaluate(el=>el.scrollHeight<=el.clientHeight),'status row fits its contents').toBe(true);
 });
+// #1131: the Status panel header (Jira | Trace, Metrics overlay; Live | Over time; the day row) is shared by both views.
+test('Over time from the Trace view keeps the Trace view and shows the day',async({page,server})=>{
+ const root=await openStory(page,server),panel=root.locator('.pt-live-status'),trace=panel.getByRole('button',{name:/^Trace/}),live=panel.getByRole('button',{name:'Live',exact:true}),overTime=panel.getByRole('button',{name:'Over time',exact:true}),slider=panel.getByRole('slider',{name:'Day',exact:true}),row=panel.locator('.dv-live-over-time-row'),day=row.locator('.dv-live-over-time-day'),view=panel.locator('.dv-live-trace');
+ await demoDay(root,4);await trace.click();await expect(trace).toHaveAttribute('aria-pressed','true');await expect(view).toBeVisible();await expect(panel.locator('table.dv-live-tickets')).toHaveCount(0);
+ await expect(live).toBeVisible();await expect(overTime).toBeVisible();await expect(live).toHaveAttribute('aria-pressed','true');await expect(row).toHaveCount(0);
+ await expect(panel.getByRole('switch',{name:'Metrics overlay',exact:true})).toBeVisible();await expect(panel.getByRole('button',{name:'Enable traces',exact:true})).toHaveCount(0);
+ await overTime.click();await expect(overTime).toHaveAttribute('aria-pressed','true');await expect(live).toHaveAttribute('aria-pressed','false');
+ await expect(trace).toHaveAttribute('aria-pressed','true');await expect(view).toBeVisible();await expect(panel.locator('table.dv-live-tickets')).toHaveCount(0);
+ await expect(row).toBeVisible();await expect(slider).toHaveValue('3');await expect(day).toHaveText('Day 4 — signal blocker');
+ await row.getByRole('button',{name:'Previous day',exact:true}).click();await expect(slider).toHaveValue('2');await expect(day).toHaveText(/^Day 3 /);await expect(trace).toHaveAttribute('aria-pressed','true');
+ await live.click();await expect(row).toHaveCount(0);await expect(live).toHaveAttribute('aria-pressed','true');await expect(trace).toHaveAttribute('aria-pressed','true');await expect(view).toBeVisible();
+});
 test('S4 waiting follows ticket dependencies from the provider and the authored pairs, never the edges',async({page,server})=>{
  await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>Object.fromEntries(refs.tickets.map(key=>[key,Object.assign({state:key==='HW-123'?'blocked':key==='FW-45'?'done':'todo'},key==='FW-46'?{dependsOn:[{key:'HW-123',source:'jira',linkType:'is blocked by'}]}:{})]))};});
  const root=await openStory(page,server,''),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');

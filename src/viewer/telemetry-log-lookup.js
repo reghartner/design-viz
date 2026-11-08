@@ -68,7 +68,9 @@ function createTelemetryLogLookup(page,transport,hooks){
     if(form.lookup!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,form.lookup)){form.lookup=ids.length?ids[0]:TELEMETRY_LOG_TYPED;form.value='';}
     return ls;
   }
-  function state(){return retired?'account':disabled()?'disabled':!supported()?'unsupported':connector?connector.state:'checking';}
+  // A closed view and host telemetry off name themselves; without a logs connector the
+  // other causes would send the reader to a fix that cannot work here (#1125).
+  function state(){var cause=disabled();return retired?'account':cause==='closed' || cause==='host'?'disabled':!supported()?'unsupported':cause?'disabled':connector?connector.state:'checking';}
   // Tool metadata only, once per controller; Find checks the connector again.
   function discover(){
     if(connector || dead || retired || !supported() || disabled())return connector && connector.pending;

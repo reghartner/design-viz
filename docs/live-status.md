@@ -3001,8 +3001,10 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   Discovery reads tool metadata only, once, when the Trace view first shows.
 - The disabled note names the cause (#1125): Over time on a past day ("Log
   lookups work in Live, not in Over time. Switch to Live to use them."), board
-  telemetry off (`enabled: false`), host telemetry off, or a closed view.
-  Returning to Live re-enables the lookup.
+  telemetry off (`enabled: false`), host telemetry off, or a closed view. On a
+  host without a logs connector, the connector note wins over Over time and
+  board telemetry off. With the Grafana connector, returning to Live
+  re-enables the lookup.
 
 The result shape follows grafana/mcp-grafana `tools/loki.go`
 (`QueryLokiLogsResult` with `format` full, read 2026-11-07): `data` is a list of

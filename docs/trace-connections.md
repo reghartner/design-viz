@@ -68,9 +68,13 @@ actually declares the chosen `team_slug`/`from` arguments before using it.
 }
 ```
 
-Company profiles are inherited by every board built with that company
-configuration. They grant no permission and never make a call before the reader
-clicks Load/Verify. A board may optionally narrow or override those defaults:
+Only boards that use traces inherit company profiles. A board uses traces when a
+step in any section or tab has `traceMatch`, or a section has a `live-status`
+panel and the page has `tracking.telemetry` (`{}` is enough), a node, edge or
+import-overlay `telemetry` binding, or a node `detail` reference. Imported
+carriers count after topology resolution, as the viewer renders them. Other
+boards declare no trace connector. Profiles grant no permission and never call
+before Load/Verify. A board may narrow or override them:
 
 ```json
 {"tracking":{"telemetry":{"traceConnections":{
@@ -78,7 +82,7 @@ clicks Load/Verify. A board may optionally narrow or override those defaults:
 }}}}
 ```
 
-Omitting `traceConnections` inherits all configured company profiles. An explicit
+Omitting `traceConnections` inherits all company profiles there. An explicit
 map selects only its entries; `"traceConnections": {}` disables direct loading for
 that board. Omitting `environments` in an entry enables all environments declared
 in that profile. An
@@ -86,8 +90,8 @@ environment subset can override its declared `label`, `value`, `context` and
 `literals`; board `label` and existing top-level `literals` may also be overridden.
 Overrides cannot introduce literal/context keys or change server, tool, argument
 mapping or adapter. Alternatively a board may contain a full inline v1 profile
-instead of a company reference. Readers can choose only the resolved company/board
-connections. `tracking.telemetry.enabled:false` and host `telemetry:false` win.
+instead of a company reference. Readers choose only resolved connections.
+`tracking.telemetry.enabled:false` and host `telemetry:false` win.
 Optional `allowedAttributes`:
 [provider traces](provider-traces.md#allowed-match-attributes).
 
@@ -173,12 +177,7 @@ metadata/schema, and return the original provider response. The viewer uses the
 same validation and decoder as portable artifacts. Without those callbacks the
 UI honestly reports unavailable; it does not fall back to arbitrary networking.
 
-Company profiles compile through source-loader into standalone, workbench, native
-and backend assemblies. Source-free kits retain reduced company agent context and
-the compiled resolver. Injection declares only resolved exact detail tools,
-including a detail-only connection with no search signal. The `traces` authoring
-packet includes this contract and company context. `--no-config` removes company
-defaults; inline board profiles remain authored configuration.
+Company profile packaging is described in `company/README.md`.
 
 ### Focus a span and its authored step
 

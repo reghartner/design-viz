@@ -30,6 +30,7 @@ async function portable(page,server,{held=false,absolute=false,inherited=false,d
   window.claude={use:async name=>name==='permissions'?{request:keys=>window.tracePermission(keys)}:{listTools:()=>window.traceTools(),describeTool:()=>window.traceDescribe(),callTool:(s,n,a)=>window.traceCall(s,n,a)}};
   window.directDetail=detail;window.flowviewBooted=ctl=>{window.ctl=ctl;window.sourceBefore=JSON.stringify(window.directDetail);};
  },{detail});
+ // #1095: no tracking at all; the live-status panel plus the node detail reference make this board use traces.
  if(inherited)delete spec.page.tracking;
  const file=path.join(server.root,'direct-trace.spec.json'),output=path.join(server.root,'direct-trace.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),output],{stdio:'pipe'});
  let html=await readFile(output,'utf8');if(inherited)html=html.replace('var ctl = renderPage(view, page, bootSkin, backlinkData, renderOptions);','TELEMETRY_COMPANY_TRACE_CONNECTIONS='+JSON.stringify({company:profile,alternate:{...profile,label:'Alternate connection'}})+';\nvar ctl = renderPage(view, page, bootSkin, backlinkData, renderOptions);');html=html.replace('var ctl = renderPage(view, page, bootSkin, backlinkData, renderOptions);','renderOptions.loadDetail=async function(){await new Promise(function(resolve){setTimeout(resolve,20);});return window.directDetail;};\n  var ctl = renderPage(view, page, bootSkin, backlinkData, renderOptions);');await writeFile(output,html);

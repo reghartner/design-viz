@@ -1759,6 +1759,15 @@ mode:
   if the consumer overlay repeats it) shows "Missing work comes from the source
   diagram "<spec>" and must be cleared there." instead, with no Clear and no
   post-drop question.
+- **Map a span to a step** (#1078): Edit, Save, Discard and Done also show in the
+  Trace view. With a loaded trace, a focused span that no step maps offers **Map
+  this span to a step**: pick one of the diagram's steps that has no `traceMatch`
+  yet, and that step gets `traceMatch: {"serviceName": …, "operation": …}` with the
+  span's exact service and operation. Steps are page-local, so the step itself is
+  written even when it draws on an imported node or edge. The board re-renders
+  with the loaded trace and the focused span kept, and the span then maps to the
+  step. A step that already has a `traceMatch` is not offered; edit it in the
+  Workbench.
 - Imported nodes and edges write the consumer overlay
   (`topologyImports[].nodeTracking` / `edgeTracking`, as the Workbench does); the
   provider spec never changes.
@@ -1788,8 +1797,9 @@ mode:
 Board edits change only the artifact's `flowspec.json`. An agent that keeps its own copy
 of the spec (a repository file or a working copy) brings them in before it changes
 anything, with `tools/board-sync.js`. Board edits can only add a ticket to a node or edge,
-remove one, or clear a Missing work marker, so folding them in is mechanical; the agent
-asks the author only about a real conflict.
+remove one, clear a Missing work marker, or map a trace span to a step that has no
+`traceMatch` (#1078), so folding them in is mechanical; the agent asks the author only
+about a real conflict.
 
 1. Read the artifact's current `flowspec.json` (Artifact tool, read action with `path`)
    and save it, for example as `live.json`.
@@ -1797,16 +1807,19 @@ asks the author only about a real conflict.
    copy does not have, one line each
    (`2026-11-03 14:02 UTC  Bo: DOOR-104 moved from Door API to Cloud sync`), and writes
    them into the local file: the tickets and Missing work markers on the nodes and edges
-   those edits touched, plus their `page.editHistory` entries. Every other line stays as
+   those edits touched, the `traceMatch` of each step a board edit mapped (found by
+   section and step id; a local step that already maps the same service and operation
+   keeps its own), plus their `page.editHistory` entries. Every other line stays as
    written and changes made only in the local copy are kept. Tell the author the listed
    lines.
    - Exit 2, nothing written: a conflict. The same ticket was placed differently on the
      board and in the local copy, or a board edit added a ticket to a node or edge the
      local copy no longer has. (A board edit that removed a ticket from, or cleared the
      marker of, a node or edge the local copy deleted needs no question: both sides agree
-     the ticket is not there.) Ask the author, then rerun with `--resolve KEY=live` (keep the board's
+     the ticket is not there.) A board edit that mapped a span to a step is a conflict
+     when the local step maps a different span or was deleted. Ask the author, then rerun with `--resolve KEY=live` (keep the board's
      placement) or `--resolve KEY=local` (keep the local one, after placing the ticket
-     where the author says).
+     where the author says). For a step, KEY is `step:<step id>`.
    - Exit 3, nothing written: the live board was republished by an agent from another
      copy, so its structure may differ. Start again from `live.json`: copy it over the
      local file and redo the requested change. If the local file has changes of its own
@@ -1818,7 +1831,10 @@ asks the author only about a real conflict.
    with exit 2 when the change alters where a ticket sits (moves it, removes it, adds it
    anywhere, or deletes the node or edge holding it) and a board edit saved after the
    newest agent entry added, moved or removed that ticket; the message names who made the
-   board edit, when, and what it did. Ask the
+   board edit, when, and what it did. It also refuses when the change maps a different
+   span to a step, removes its `traceMatch` or deletes the step, and a board edit saved
+   after the newest agent entry mapped that step (KEY `step:<step id>`); the summary
+   counts added, changed and removed step mappings. Ask the
    author and rerun with `--confirm KEY` once they agree. Board edits older than the
    newest agent entry were already in front of the author and need no question
    (Chuck 2026-11-04). Exit 3: pull first.
@@ -1968,7 +1984,9 @@ hand-written. The panel shows them newest first:
      {"op": "add", "ticket": "EX-1", "node": "payment-api", "label": "Payment API",
       "path": ["sections", 0, "diagram", "nodes", "payment-api"]},
      {"op": "remove", "ticket": "AA-1", "edge": ["door", "cloud"], "label": "Door → Cloud"},
-     {"op": "clear-missing-work", "edge": ["door", "cloud"], "label": "Door → Cloud"}]}
+     {"op": "clear-missing-work", "edge": ["door", "cloud"], "label": "Door → Cloud"},
+     {"op": "trace-match", "step": "charge", "label": "Charge the card",
+      "traceMatch": {"serviceName": "payment", "operation": "grpc.msdemo.PaymentService/Charge"}}]}
 ]
 ```
 
@@ -1979,7 +1997,12 @@ non-empty `changes` array
 whose items carry `op` (`"add"` or `"remove"`), `ticket` (a Jira key) and the
 carrier (`node` id, or `edge: [from, to]`). A `"clear-missing-work"` change
 records a Missing work marker cleared in Edit mode (#855): it carries only the
-carrier (and the optional `path` and `label`), never a `ticket`. Optional: `by` (`id` and `name`
+carrier (and the optional `path` and `label`), never a `ticket`. A `"trace-match"`
+change records a span mapped to a step in Edit mode (#1078): it carries `step` (the
+step id) and `traceMatch` (`serviceName` and `operation` strings), the optional
+`path` and `label` (the step text), and no `ticket`, `node` or `edge`; the panel
+reads it as "payment · grpc.msdemo.PaymentService/Charge mapped to step Charge the
+card". Optional: `by` (`id` and `name`
 strings, either may be empty), each change's `path` (array) and `label` (the
 carrier's display name at save time, so history stays readable after a rename).
 Validation follows the warning-only policy of the other tracking fields: a
@@ -2855,6 +2878,8 @@ clearing still address the original carrier; descendant work is edited at its so
 ### Direct trace loading
 
 Status → Trace can load one exact trace ID or a supported provider link using an inherited company or board [trace connection profile](trace-connections.md). Load/Verify are read-only session actions independent of Metrics polling. Imported and local nodes share authored traceMatch mapping behavior; choose the exact mapping diagram when several are available.
+
+Selecting a span in the loaded trace shows its exact **Service** and **Operation** (#1078), the strings a step's `traceMatch.serviceName` and `traceMatch.operation` must match; copy them from there. A span that no step maps says "No authored step maps this span. Add a traceMatch to a step to map this span." and links to [Make an existing diagram Trace-ready](trace-ready-authoring.md). On a shared board in Edit mode, that span also offers **Map this span to a step**, which writes the two values to a step that has no `traceMatch` yet ([Edit mode](#edit-mode-on-the-shared-board-828)); add `nodeId`, `parentStepId` or `attributes` in the Workbench when one span name is not enough.
 
 ### Find a trace from a log line
 

@@ -11,12 +11,16 @@
   function carrierLabel(change){
     if(typeof change.label==='string' && change.label)return change.label;
     if(typeof change.node==='string')return change.node;
+    if(typeof change.step==='string')return change.step;
     return Array.isArray(change.edge)?change.edge[0]+' → '+change.edge[1]:'';
   }
   // #855: a cleared Missing work marker has no ticket.
   function clears(change){return change.op==='clear-missing-work';}
-  function opText(change){return clears(change)?'Missing work cleared from':change.op==='remove'?'removed from':'added to';}
-  function changeText(change){return (clears(change)?'':change.ticket+' ')+opText(change)+' '+carrierLabel(change);}
+  // #1078: a span mapped to a step names the span (service · operation), never a ticket.
+  function maps(change){return change.op==='trace-match';}
+  function spanText(change){var m=change.traceMatch || {};return m.serviceName+' · '+m.operation;}
+  function opText(change){return clears(change)?'Missing work cleared from':maps(change)?'mapped to step':change.op==='remove'?'removed from':'added to';}
+  function changeText(change){return (clears(change)?'':maps(change)?spanText(change)+' ':change.ticket+' ')+opText(change)+' '+carrierLabel(change);}
   function countText(n){return n+' '+(n===1?'change':'changes');}
   /* #974: an agent entry reads editor · agent · time · its one-line summary; a summary
      replaces the count and the first change. Rows without ticket changes do not expand. */
@@ -42,7 +46,7 @@
       if(!entry.changes.length)return '<li class="dv-edit-entry" data-edit-at="'+esc(entry.at)+'"><div class="dv-edit-summary">'+head+'</div></li>';
       return '<li class="dv-edit-entry" data-edit-at="'+esc(entry.at)+'"><details class="dv-edit-details"><summary class="dv-edit-summary">'+head+'</summary>'+
         '<ul class="dv-edit-changes">'+entry.changes.map(function(change){
-          return '<li class="dv-edit-change" data-edit-op="'+esc(change.op)+'"'+(clears(change)?'>':' data-edit-ticket="'+esc(change.ticket)+'"><span class="dv-edit-ticket">'+esc(change.ticket)+'</span>')+
+          return '<li class="dv-edit-change" data-edit-op="'+esc(change.op)+'"'+(clears(change)?'>':maps(change)?'><span class="dv-edit-span">'+esc(spanText(change))+'</span>':' data-edit-ticket="'+esc(change.ticket)+'"><span class="dv-edit-ticket">'+esc(change.ticket)+'</span>')+
             '<span class="dv-edit-op">'+esc(opText(change))+'</span><span class="dv-edit-carrier">'+esc(carrierLabel(change))+'</span></li>';
         }).join('')+'</ul></details></li>';
     }).join('')+'</ol>';
@@ -73,7 +77,8 @@
         var changes=el(details,'ul','dv-edit-changes');
         entry.changes.forEach(function(change){
           var row=el(changes,'li','dv-edit-change');row.setAttribute('data-edit-op',change.op);
-          if(!clears(change)){
+          if(maps(change))el(row,'span','dv-edit-span',spanText(change));
+          else if(!clears(change)){
             row.setAttribute('data-edit-ticket',change.ticket);el(row,'span','dv-edit-ticket',change.ticket);
             // The ticket title is live evidence from the status map; absent until a connector answers.
             var title=states[change.ticket] && states[change.ticket].title;if(title)el(row,'span','dv-edit-ticket-title',title);
@@ -122,7 +127,7 @@ div.dv-edit-summary{cursor:default}
 .dv-edit-first{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 .dv-edit-changes{list-style:none;margin:0 0 8px;padding:0 4px 0 20px}
 .dv-edit-change{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:3px 0;font-size:12px}
-.dv-edit-ticket{font:600 11px/1.5 'IBM Plex Mono',monospace;color:var(--dink)}
+.dv-edit-ticket,.dv-edit-span{font:600 11px/1.5 'IBM Plex Mono',monospace;color:var(--dink)}.dv-edit-span{overflow-wrap:anywhere}
 .dv-edit-ticket-title{color:var(--dfaint);overflow-wrap:anywhere}
 .dv-edit-op{color:var(--dfaint)}
 .dv-edit-carrier{color:var(--dtext);overflow-wrap:anywhere}

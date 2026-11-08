@@ -41,6 +41,8 @@ preserving the step's ID, narrative and delivered `edge` or
 the receiving node for that operation. It is not a provider service-name guess.
 `traceMatch` on a node or edge is ignored, with a validator warning.
 
+The Trace view shows a span's exact service and operation ([details](live-status.md#direct-trace-loading)).
+
 ```json
 {
   "id": "persist",
@@ -134,7 +136,7 @@ them merely to align an existing diagram.
 CLI `preview --section N` selects a zero-based diagram section and checks its
 first path (or all steps if no paths). For each additional path, use the same
 production matcher read-only, supplying its exact ID. Give each path report a
-distinct filename within your session directory if checking multiple paths:
+unique name:
 
 ```sh
 node --input-type=module - "$TRACE_CHECK_DIR/trace-resolved.spec.json" /path/to/request.json 0 PATH_ID > "$TRACE_CHECK_DIR/path-mapping.json" <<'JS'
@@ -170,8 +172,7 @@ Honeycomb signal for the fictional service could be:
 
 This fragment belongs on an existing carrier; it is not a complete connection.
 Use real verified environment/dataset values and authorized provider capabilities,
-never derive them from node names. Do not invent account access to make a fixture
-live. Exported evidence alone can be validated offline; it does not automatically
+never derive them from node names. Exported evidence alone can be validated offline; it does not automatically
 populate the Status Trace list. Runtime host-preloaded evidence needs the validated
 provider envelope, not an arbitrary exported JSON file. Live timelines have a
 200-span display limit; offline mapper input has a different 10,000-span bound.

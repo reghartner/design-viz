@@ -7,16 +7,20 @@
      node tools/board-sync.js pull <local.json> <live.json> [--resolve KEY=live|local ...]
      node tools/board-sync.js log  <local.json> <live.json> --by <name> [--id <user id>]
                                    [--summary <one line>] [--confirm KEY ...]
+   KEY is a Jira key, or step:<step id> for a step's traceMatch.
 
    <live.json> is the board's current flowspec.json, read from the artifact. <local.json> is
    the agent's copy; both commands rewrite it in place and never touch <live.json>.
 
-   A two-file board's Edit mode (#828, #855) can only add a ticket to a node or edge, remove
-   one, and clear a Missing work marker; each Save appends one page.editHistory entry. `pull`
-   folds the entries the local copy lacks into it: three-way per ticket, by carrier identity
-   (the same identity chain the board uses for its own conflict replay), with the base being
-   the live file with those entries' operations undone, so local changes are kept. Every
-   other line of the local file stays as written.
+   A two-file board's Edit mode (#828, #855, #1078) can add a ticket to a node or edge, remove
+   one, clear a Missing work marker, and map a trace span to a step that has no traceMatch;
+   each Save appends one page.editHistory entry. `pull` folds the entries the local copy
+   lacks into it: three-way per ticket, by carrier identity (the same identity chain the
+   board uses for its own conflict replay), with the base being the live file with those
+   entries' operations undone, so local changes are kept. A step mapping is set on the
+   local step (same chain: section id, step id) when it has none; a different local
+   traceMatch, or a deleted step, is a conflict. Every other line of the local file stays
+   as written.
 
    `log` appends one agent entry ({source: "agent", summary, changes}) describing the change
    from the live file to the local copy, after the local copy holds every live entry.
@@ -90,6 +94,34 @@ function overlayInfo(imp,field,rel){
   const ends=String(rel).split('->').map(part=>prefix+part);
   return {kind:'overlay',field,rel,edge:ends,label:ends.join(' → ')};
 }
+/* #1078: every step with an id, keyed by its identity chain (section id, step id), with its
+   traceMatch: an object, or an alternatives array (#1100). Duplicate keys are ambiguous and
+   never merged. */
+function stepInventory(raw){
+  const map=new Map(),ambiguous=new Set();
+  C.specSectionPaths(raw).forEach(record=>{
+    const diagram=C.specValueAt(raw,record.diagram);if(!isObject(diagram) || !Array.isArray(diagram.steps))return;
+    diagram.steps.forEach((step,index)=>{
+      if(!isObject(step) || typeof step.id!=='string' || !step.id)return;
+      const path=record.diagram.concat(['steps',index]),key=JSON.stringify(C.boardEditChain(raw,path));
+      if(map.has(key)){ambiguous.add(key);map.delete(key);return;}
+      if(ambiguous.has(key))return;
+      const text=typeof step.text==='string'?step.text.replace(/\s+/g,' ').trim():'';
+      map.set(key,{key,path,id:step.id,label:text || step.id,traceMatch:step.traceMatch!=null?step.traceMatch:null});
+    });
+  });
+  return map;
+}
+const spanText=match=>Array.isArray(match)?match.map(spanText).join(' or '):isObject(match)?match.serviceName+' · '+match.operation:JSON.stringify(match);
+// The same single span. An alternatives array is never the board's one mapping.
+const sameSpan=(a,b)=>isObject(a) && isObject(b) && a.serviceName===b.serviceName && a.operation===b.operation;
+// The step a trace-match change names in `raw`: its recorded path when that still holds the same step id, else the step id when unique.
+function stepKey(raw,steps,change){
+  if(Array.isArray(change.path) && change.path.length){const key=JSON.stringify(C.boardEditChain(raw,change.path)),step=steps.get(key);if(step && step.id===change.step)return key;}
+  const found=[...steps.values()].filter(step=>step.id===change.step);
+  return found.length===1?found[0].key:null;
+}
+const isMapping=change=>isObject(change) && change.op==='trace-match' && isObject(change.traceMatch);
 const isOverlayChain=chain=>chain.some((part,i)=>part==='topologyImports' && (chain[i+2]==='nodeTracking' || chain[i+2]==='edgeTracking'));
 function edgeEnds(carrier){return carrier.kind==='edge'?JSON.stringify([JSON.stringify(carrier.chain.slice(0,-1)),carrier.edge]):null;}
 
@@ -134,6 +166,8 @@ function describe(entry){
   (Array.isArray(entry.changes)?entry.changes:[]).forEach(change=>{
     if(!isObject(change))return;
     if(change.op==='clear-missing-work'){lines.push({text:'Missing work cleared from '+changeLabel(change)});return;}
+    // #1078: Edit mode mapped a trace span to a step; it moves no ticket.
+    if(change.op==='trace-match'){const m=isObject(change.traceMatch)?change.traceMatch:{};lines.push({text:m.serviceName+' · '+m.operation+' mapped to step '+(typeof change.label==='string' && change.label?change.label:change.step)});return;}
     if(typeof change.ticket!=='string')return;
     if(!seen.has(change.ticket)){const item={ticket:change.ticket,adds:[],removes:[]};seen.set(change.ticket,item);lines.push(item);}
     seen.get(change.ticket)[change.op==='remove'?'removes':'adds'].push(changeLabel(change));
@@ -199,7 +233,7 @@ function pull(localText,liveText,options){
   const touched=new Map(),unplaced=[];
   sortedByTime(fresh).reverse().forEach(entry=>{
     (Array.isArray(entry.changes)?entry.changes:[]).slice().reverse().forEach(change=>{
-      if(!isObject(change))return;
+      if(!isObject(change) || change.op==='trace-match')return;
       const key=changeKey(liveRaw,live.map,change);
       if(key===null){unplaced.push(who(entry)+' '+when(entry.at)+': '+describe({changes:[change]}).join('; '));return;}
       if(!base.has(key)){const chain=JSON.parse(key);base.set(key,{key,chain,path:change.path,kind:isOverlayChain(chain)?'overlay':'unknown',label:changeLabel(change),tickets:[],missingWork:false});}
@@ -211,6 +245,15 @@ function pull(localText,liveText,options){
       else if(change.op==='remove' && !carrier.tickets.includes(change.ticket))carrier.tickets.push(change.ticket);
     });
   });
+
+  // #1078: the newest board mapping of each step.
+  const liveSteps=stepInventory(liveRaw),localSteps=stepInventory(localRaw),mappings=new Map();
+  sortedByTime(fresh).forEach(entry=>(Array.isArray(entry.changes)?entry.changes:[]).forEach(change=>{
+    if(!isMapping(change))return;
+    const key=stepKey(liveRaw,liveSteps,change);
+    if(key===null){unplaced.push(who(entry)+' '+when(entry.at)+': '+describe({changes:[change]}).join('; '));return;}
+    mappings.set(key,{entry,change,step:liveSteps.get(key)});
+  }));
 
   const inBase=placements(base),inLive=placements(live.map),inMine=placements(mine);
   const tickets=new Set([...inBase.keys(),...inLive.keys(),...inMine.keys()]);
@@ -235,6 +278,21 @@ function pull(localText,liveText,options){
     l.filter(key=>!o.includes(key)).forEach(key=>queue(adds,key,ticket));
     o.filter(key=>!l.includes(key)).forEach(key=>queue(removes,key,ticket));
   });
+  /* The board maps only a step without a traceMatch, so the base has none: set it where the
+     local step has none, keep a local one naming the same span, and ask on anything else. */
+  const stepWrites=[];
+  mappings.forEach(({entry,change,step},key)=>{
+    const id=step.id,choice=resolve['step:'+id],want={serviceName:change.traceMatch.serviceName,operation:change.traceMatch.operation},mineStep=localSteps.get(key);
+    const told='step '+id+': on the board '+who(entry)+' mapped '+spanText(want)+' to step '+step.label+' on '+when(entry.at);
+    if(choice==='local')return;
+    if(!mineStep){conflicts.push({kind:'step-missing',step:id,message:told+', but your local copy no longer has that step. Ask the author, then rerun with --resolve step:'+id+'=local.'});return;}
+    if(sameSpan(mineStep.traceMatch,want))return;
+    if(mineStep.traceMatch && choice!=='live'){
+      conflicts.push({kind:'trace-match-changed',step:id,message:told+'; your local copy maps '+spanText(mineStep.traceMatch)+' to it. Ask the author which to keep, then rerun with --resolve step:'+id+'=live or --resolve step:'+id+'=local.'});
+      return;
+    }
+    stepWrites.push({path:mineStep.path,value:want});
+  });
   if(conflicts.length)return {status:'conflict',text:localText,edits,conflicts,unplaced};
 
   const targets=new Map();
@@ -257,6 +315,7 @@ function pull(localText,liveText,options){
     target(key).missingWork=cleared;
   });
   let text=applyTargets(localText,localRaw,[...targets.values()]);
+  stepWrites.forEach(write=>{text=setField(text,write.path,'traceMatch',JSON.stringify(write.value));});
   text=appendHistory(text,fresh);
   return {status:'merged',text,edits,conflicts:[],unplaced};
 }
@@ -317,6 +376,10 @@ function log(localText,liveText,options){
   const markers={cleared:0,set:0};
   live.map.forEach((carrier,key)=>{const now=mine.get(key);if(carrier.missingWork && now && !now.missingWork){markers.cleared++;changes.push(changeFor('clear-missing-work',null,now));}});
   mine.forEach((carrier,key)=>{const was=live.map.get(key);if(carrier.missingWork && !(was && was.missingWork))markers.set++;});
+  // #1078: step mappings (traceMatch) added, changed or removed, a deleted mapped step included.
+  const liveSteps=stepInventory(liveRaw),localSteps=stepInventory(localRaw),mappings={added:0,changed:0,removed:0};
+  liveSteps.forEach((step,key)=>{const now=localSteps.get(key);if(!step.traceMatch)return;if(!now || !now.traceMatch)mappings.removed++;else if(canonical(now.traceMatch)!==canonical(step.traceMatch))mappings.changed++;});
+  localSteps.forEach((step,key)=>{const was=liveSteps.get(key);if(step.traceMatch && !(was && was.traceMatch))mappings.added++;});
 
   /* Chuck 2026-11-04: board edits saved after the newest agent entry are the author's to
      override. Any change to where a ticket sits that such an edit added, moved or removed
@@ -334,6 +397,17 @@ function log(localText,liveText,options){
     conflicts.push({ticket,message:ticket+': on the board '+who(entry)+' changed it on '+when(entry.at)+', after the newest agent entry ('+done+
       '); this change '+(o.length?'puts it on '+labels(o,mine):'removes it from the board')+'. Ask the author; rerun with --confirm '+ticket+' once they agree.'});
   });
+  // A step mapping a board edit set after the newest agent entry: changing its span, removing it or deleting the step needs confirmation.
+  const recentSteps=new Map();
+  sortedByTime(entries.filter(entry=>!isAgent(entry) && Date.parse(entry.at)>newest)).reverse().forEach(entry=>{
+    (Array.isArray(entry.changes)?entry.changes:[]).forEach(change=>{if(!isMapping(change))return;const key=stepKey(liveRaw,liveSteps,change);if(key!==null && !recentSteps.has(key))recentSteps.set(key,{entry,change});});
+  });
+  recentSteps.forEach(({entry,change},key)=>{
+    const step=liveSteps.get(key),now=localSteps.get(key),id=step.id;
+    if(confirm.has('step:'+id) || (now && sameSpan(now.traceMatch,change.traceMatch)))return;
+    conflicts.push({step:id,message:'step '+id+': on the board '+who(entry)+' mapped '+spanText(change.traceMatch)+' to step '+step.label+' on '+when(entry.at)+', after the newest agent entry; this change '+
+      (!now?'deletes the step':now.traceMatch?'maps '+spanText(now.traceMatch)+' to it':'removes its traceMatch')+'. Ask the author; rerun with --confirm step:'+id+' once they agree.'});
+  });
   if(conflicts.length)return {status:'conflict',text:localText,conflicts};
 
   const shape=structure(liveRaw,localRaw),parts=[];
@@ -346,6 +420,7 @@ function log(localText,liveText,options){
   if(counts.removed)parts.push('removed '+plural(counts.removed,'ticket'));
   if(markers.cleared)parts.push('cleared '+plural(markers.cleared,'Missing work marker'));
   if(markers.set)parts.push('set '+plural(markers.set,'Missing work marker'));
+  ['added','changed','removed'].forEach(kind=>{if(mappings[kind])parts.push(kind+' '+plural(mappings[kind],'step mapping'));});
   const strip=raw=>{const copy=JSON.parse(JSON.stringify(raw)),page=copy.page || copy;delete page.editHistory;return canonical(copy);};
   if(!parts.length && strip(liveRaw)===strip(localRaw))return {status:'unchanged',text:localText,conflicts:[]};
   const counted=parts.length?parts.join(', '):'updated board text and layout';
@@ -359,7 +434,7 @@ function args(argv){
   const out={positional:[],resolve:{},confirm:[]};
   for(let i=0;i<argv.length;i++){
     const arg=argv[i],value=()=>{const next=argv[++i];if(next===undefined || next.startsWith('--'))throw new Error(arg+' needs a value');return next;};
-    if(arg==='--resolve')value().split(',').forEach(item=>{const m=/^([A-Z][A-Z0-9_]+-[0-9]+)=(live|local)$/.exec(item.trim());if(!m)throw new Error('--resolve takes KEY=live or KEY=local, got '+item);out.resolve[m[1]]=m[2];});
+    if(arg==='--resolve')value().split(',').forEach(item=>{const m=/^([A-Z][A-Z0-9_]+-[0-9]+|step:[^=\s]+)=(live|local)$/.exec(item.trim());if(!m)throw new Error('--resolve takes KEY=live or KEY=local, got '+item);out.resolve[m[1]]=m[2];});
     else if(arg==='--confirm')value().split(',').forEach(item=>item.trim() && out.confirm.push(item.trim()));
     else if(arg==='--by')out.by=value();
     else if(arg==='--id')out.id=value();
@@ -370,7 +445,8 @@ function args(argv){
   return out;
 }
 const USAGE='usage: node tools/board-sync.js pull <local.json> <live.json> [--resolve KEY=live|local]\n'+
-  '       node tools/board-sync.js log <local.json> <live.json> --by <name> [--summary <one line>] [--confirm KEY]';
+  '       node tools/board-sync.js log <local.json> <live.json> --by <name> [--summary <one line>] [--confirm KEY]\n'+
+  '       KEY is a Jira key, or step:<step id> for a step\'s traceMatch';
 function main(argv){
   let opts;
   try{opts=args(argv.slice(1));}catch(error){console.error(error.message+'\n'+USAGE);return 1;}

@@ -636,7 +636,18 @@ function editHistoryEntryProblem(entry){
   for(var i=0;i<entry.changes.length;i++){
     var change=entry.changes[i],at='changes['+i+']';
     if(!specObject(change))return at+': must be an object';
-    if(change.op!=='add' && change.op!=='remove' && change.op!=='clear-missing-work')return at+'.op: must be "add", "remove" or "clear-missing-work"';
+    if(change.op!=='add' && change.op!=='remove' && change.op!=='clear-missing-work' && change.op!=='trace-match')return at+'.op: must be "add", "remove", "clear-missing-work" or "trace-match"';
+    // #1078: a span mapped to a step in Edit mode names the step and the traceMatch written there.
+    if(change.op==='trace-match'){
+      if(Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "trace-match" change has no ticket';
+      if(typeof change.step!=='string' || !change.step)return at+'.step: must be a step id';
+      var match=change.traceMatch;
+      if(!specObject(match) || typeof match.serviceName!=='string' || !match.serviceName || typeof match.operation!=='string' || !match.operation)return at+'.traceMatch: needs "serviceName" and "operation" strings';
+      if(Object.prototype.hasOwnProperty.call(change,'node') || Object.prototype.hasOwnProperty.call(change,'edge'))return at+': a "trace-match" change names a step, not a node or edge';
+      if(Object.prototype.hasOwnProperty.call(change,'path') && !Array.isArray(change.path))return at+'.path: must be an array';
+      if(Object.prototype.hasOwnProperty.call(change,'label') && typeof change.label!=='string')return at+'.label: must be a string';
+      continue;
+    }
     // #855: clearing a Missing work marker names only its carrier.
     if(change.op==='clear-missing-work'){if(Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "clear-missing-work" change has no ticket';}
     else if(typeof change.ticket!=='string' || !trackingKeyPattern.test(change.ticket))return at+'.ticket: must be a Jira key';

@@ -73,6 +73,17 @@ function createTelemetryDirect(page,transport,hooks){
       busy=false;report=Object.assign(report || {mode:verify?'verify':'load',requestAccepted:false,idMatched:false},{stage:e.stage || stage,error:e && e.code==='trace_not_found' && resolved?notFoundText(resolved):errorText(e),serial:++telemetryDirectReports});if(e.code && /^[A-Za-z0-9_.-]{1,64}$/.test(e.code))report.code=e.code;changed();return null;
     }finally{if(mine===serial && timeout){clearTimeout(timeout);timeout=null;}}
   }
+  /* #1078: a board Edit-mode change re-renders the page. The loaded trace moves to
+     the next controller; its diagram context is kept by position, since section
+     ids name this render's objects. A picked environment stays picked (#1081). */
+  function carry(){if(dead || !exemplar)return null;var ss=sections();return {form:Object.assign({},form),environmentChosen:environmentChosen,exemplar:exemplar,report:report?JSON.parse(JSON.stringify(report)):null,section:ss.findIndex(function(s){return s.id===form.section;})};}
+  function restore(state){
+    if(dead || accountRetired || !state || !state.exemplar)return false;sync();
+    Object.keys(form).forEach(function(key){if(typeof state.form[key]==='string')form[key]=state.form[key];});
+    environmentChosen=state.environmentChosen===true;
+    var section=sections()[state.section];form.section=section?section.id:'';sync();
+    exemplar=state.exemplar;report=state.report;return true;
+  }
   if(transport && typeof transport.onAccountChanged==='function')offAccount=transport.onAccountChanged(retireAccount);
-  return {snapshot:snapshot,set:set,load:load,clear:function(){cancel();changed();},destroy:function(){cancel();dead=true;if(offAccount)offAccount();}};
+  return {snapshot:snapshot,set:set,load:load,carry:carry,restore:restore,clear:function(){cancel();changed();},destroy:function(){cancel();dead=true;if(offAccount)offAccount();}};
 }

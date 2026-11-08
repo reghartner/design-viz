@@ -424,19 +424,18 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "`page.editHistory`. Report edits after the newest agent entry (`source` set), "
             "one line each. For a local copy, "
             "`node tools/board-sync.js pull <copy> <read file>` folds them in.",
-            "2. Edit JSON; preserve unknown fields; ask the editor, naming who/when, before your "
-            "change moves, removes or re-adds a ticket (or deletes its carrier) or changes/removes "
-            "a step `traceMatch` that a board edit after the newest agent entry touched. Older "
-            "edits need no question.",
+            "2. Edit JSON; preserve unknown fields. If your change moves, removes or re-adds a "
+            "ticket touched by a board edit saved after the newest agent entry, or deletes its "
+            "carrier, ask the editor, naming who/when. Older edits need no question.",
             '3. Append one `page.editHistory` entry: `{"at":"<ISO-8601>","by":{"name":"<editor>"},'
-            '"source": "agent", "summary":"<one line, max 200 chars>",'
-            '"changes":[<ticket changes shaped like board entries>]}`. '
+            '"source": "agent", "summary":"<one line, at most 200 characters>",'
+            '"changes":[<ticket additions/removals shaped like board entries>]}`. '
             'Or use `node tools/board-sync.js log <copy> <read file> --by <editor>`.',
-            "4. " + validate_step + " Validate after logging; publish that file.",
+            "4. " + validate_step + " Validate after logging; publish the checked file.",
             "5. Read `index.html`; republish to the same URL with `url`, "
             f'`file_path` = that unchanged page, `files` = {{"{SPEC_FILE_NAME}": <edited file>}}. '
-            "New URLs lose comments/history. If refused for concurrent changes, redo from step 1; "
-            "append your entry once.",
+            "New URLs lose comments/history. If refused for concurrent changes, restart step 1 "
+            "from the new file; append your entry once.",
             "6. Pass the capability declaration below on every publish; files cannot recover it.",
         ]
     else:

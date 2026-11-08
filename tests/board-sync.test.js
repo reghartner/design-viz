@@ -29,6 +29,12 @@
 | L8 the 200-entry cap | 200 old entries | 200 after log, the oldest gone, the new entry last | an impl growing the list past the cap |
 | T (test review c3) every conflict message names who made the board edit and when | S6 S7 L3 L5 L9 L10 | each message includes the editor and the edit time as `YYYY-MM-DD HH:MM UTC` | an impl that names the editor but not the time |
 | L10 (test review c2; node changes include imported nodes) log covers imported carriers | local adds SH-3 to the overlay of imported node api and clears its Missing work marker; separately Bo (after the newest agent entry) removed SH-2 from imported edge api->store and the local copy puts it back | entry summary "Assigned 1 ticket, cleared 1 Missing work marker" with changes add SH-3 and clear-missing-work on node shared::api at the overlay path; the re-add is a conflict naming SH-2 and Bo | an impl that inventories section nodes and edges only |
+| S12 (#1078) a span the board mapped to a step reaches the local step | steps rates (no traceMatch) and charge; live: Bo mapped currency · GetRates to rates | merged; rates.traceMatch == {serviceName currency, operation GetRates}; charge unchanged; every other line kept; edits line "currency · GetRates mapped to step Resolve rates" | an impl that appends the entry but skips the mapping |
+| S13 (#1078) a local step that already has the same mapping needs nothing | local rates already has that traceMatch (plus a local nodeId) | merged; rates.traceMatch keeps the local nodeId; the entry is appended | an impl that overwrites local refinements |
+| S14 (#1078) a different local mapping stops the pull until resolved | local rates maps checkout · Quote | conflict {kind trace-match-changed, step rates}, message names Bo, the time, Resolve rates and both mappings; CLI exit 2, file unchanged; resolve step:rates=live → the board's value, =local → the local value | last-writer-wins |
+| S15 (#1078) a step the local copy deleted stops the pull | local deleted step rates | conflict {kind step-missing, step rates}; resolve step:rates=local → merged, no step rates, entry recorded | an impl that drops the mapping silently |
+| L11 (#1078) log counts step mappings it changes or removes | local changes charge's traceMatch and removes it from refund | summary "Changed 1 step mapping, removed 1 step mapping"; changes [] | an impl that logs it as text and layout only |
+| L12 (#1078) changing or removing a mapping a recent board edit set needs the author to confirm | agent entry 10:00; Bo mapped rates at 11:00; local changes it, removes it, or deletes the step | each: conflict, step rates, message names Bo and the time; with confirm [step:rates] → logged | an impl with no conflict check for step mappings |
 | L9 (diff review c1) placing a ticket that a recent board edit took off the board is a conflict | agent entry 10:00; Bo removed CC-1 from edge 0 at 11:00; local assigns CC-1 to gamma | status conflict, conflicts[0] ticket CC-1, message names Bo; with confirm [CC-1] → logged | a check limited to the carriers the board edit named |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
@@ -310,4 +316,87 @@ test('L10 log covers imported nodes and edges: their ticket changes, cleared mar
  const back=pulled(s=>{delete overlay(s).edgeTracking;},[agentEntry('2026-11-03T10:00:00Z','Initial board'),bo],spec=>{overlay(spec).edgeTracking={'api->store':{tickets:['SH-2']}};});
  const conflict=S().log(back.local,back.live,{by:'Chuck',now:NOW});
  assert.equal(conflict.status,'conflict');assert.equal(conflict.conflicts[0].ticket,'SH-2');for(const name of ['Bo','2026-11-03 11:00 UTC'])assert.ok(conflict.conflicts[0].message.includes(name),conflict.conflicts[0].message);
+});
+
+/* #1078: Edit mode writes a step's traceMatch (op trace-match). A copy of LOCAL whose main
+   diagram has steps; rates has no mapping, charge and refund have one. */
+const STEPS=LOCAL.replace('"rows": [["alpha", "beta", "gamma"]],','"rows": [["alpha", "beta", "gamma"]],\n        "steps": [\n          {"id": "rates", "text": "Resolve rates", "edge": "alpha->beta"},\n          {"id": "charge", "text": "Charge", "edge": "beta->gamma", "traceMatch": {"serviceName": "payment", "operation": "Charge"}},\n          {"id": "refund", "text": "Refund", "edge": "beta->gamma", "traceMatch": {"serviceName": "payment", "operation": "Refund"}}\n        ],');
+const STEP=(n,i=0)=>['page','sections',i,'diagram','steps',n];
+const RATES={serviceName:'currency',operation:'GetRates'};
+const BO_MAP=at=>entry(at,'Bo',[{op:'trace-match',path:STEP(0),label:'Resolve rates',step:'rates',traceMatch:plain(RATES)}]);
+function stepsLive(mutate,history){const spec=JSON.parse(STEPS);if(mutate)mutate(spec);spec.page.editHistory=history;return JSON.stringify(spec,null,2)+'\n';}
+const mapped=s=>{d(s).steps[0].traceMatch=plain(RATES);};
+const step=(text,id)=>d(JSON.parse(text)).steps.find(item=>item.id===id);
+
+test('S12 a span the board mapped to a step reaches the local step',()=>{
+ assert.ok(STEPS.includes('"id": "rates"'),'precondition: the fixture has steps');
+ const live=stepsLive(mapped,[BO_MAP('2026-11-03T14:02:00Z')]);
+ const out=S().pull(STEPS,live);
+ assert.equal(out.status,'merged');assert.deepEqual(plain(out.conflicts),[]);
+ assert.deepEqual(step(out.text,'rates').traceMatch,RATES);
+ assert.deepEqual(step(out.text,'charge').traceMatch,{serviceName:'payment',operation:'Charge'});
+ assert.deepEqual(JSON.parse(out.text).page.editHistory,[BO_MAP('2026-11-03T14:02:00Z')]);
+ keepsLines(STEPS,out.text,['"id": "rates"','"editHistory"']);
+ assert.deepEqual(plain(out.edits[0].lines),['currency · GetRates mapped to step Resolve rates']);
+});
+
+test('S13 a local step that already has the same mapping needs nothing',()=>{
+ const local=STEPS.replace('{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta"}','{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta", "traceMatch": {"serviceName": "currency", "operation": "GetRates", "nodeId": "beta"}}');
+ const out=S().pull(local,stepsLive(mapped,[BO_MAP('2026-11-03T14:02:00Z')]));
+ assert.equal(out.status,'merged');
+ assert.deepEqual(step(out.text,'rates').traceMatch,{serviceName:'currency',operation:'GetRates',nodeId:'beta'},'the local refinement stays');
+ assert.equal(JSON.parse(out.text).page.editHistory.length,1);
+});
+
+test('S14 a different local mapping of the same step stops the pull until resolved',()=>{
+ const local=STEPS.replace('{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta"}','{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta", "traceMatch": {"serviceName": "checkout", "operation": "Quote"}}');
+ const live=stepsLive(mapped,[BO_MAP('2026-11-03T14:02:00Z')]);
+ const out=S().pull(local,live);
+ assert.equal(out.status,'conflict');assert.equal(out.conflicts.length,1);
+ assert.equal(out.conflicts[0].kind,'trace-match-changed');assert.equal(out.conflicts[0].step,'rates');
+ for(const name of ['Bo','2026-11-03 14:02 UTC','Resolve rates','currency · GetRates','checkout · Quote','step:rates'])assert.ok(out.conflicts[0].message.includes(name),out.conflicts[0].message);
+ const dir=tmp({'local.json':local,'live.json':live}),cli=run(dir,['pull','local.json','live.json']);
+ assert.equal(cli.status,2,cli.stdout+cli.stderr);assert.equal(fs.readFileSync(path.join(dir,'local.json'),'utf8'),local,'nothing written on a conflict');
+ const took=S().pull(local,live,{resolve:{'step:rates':'live'}});assert.equal(took.status,'merged');assert.deepEqual(step(took.text,'rates').traceMatch,RATES);
+ const kept=S().pull(local,live,{resolve:{'step:rates':'local'}});assert.equal(kept.status,'merged');assert.deepEqual(step(kept.text,'rates').traceMatch,{serviceName:'checkout',operation:'Quote'});
+ const cliLive=run(dir,['pull','local.json','live.json','--resolve','step:rates=live']);assert.equal(cliLive.status,0,cliLive.stdout+cliLive.stderr);
+ assert.deepEqual(step(fs.readFileSync(path.join(dir,'local.json'),'utf8'),'rates').traceMatch,RATES);
+});
+
+test('S15 a board mapping of a step the local copy deleted stops the pull',()=>{
+ const local=STEPS.replace('          {"id": "rates", "text": "Resolve rates", "edge": "alpha->beta"},\n','');assert.ok(!local.includes('"rates"'),'precondition: rates deleted');
+ const live=stepsLive(mapped,[BO_MAP('2026-11-03T14:02:00Z')]);
+ const out=S().pull(local,live);
+ assert.equal(out.status,'conflict');assert.equal(out.conflicts[0].kind,'step-missing');assert.equal(out.conflicts[0].step,'rates');
+ for(const name of ['Bo','2026-11-03 14:02 UTC','Resolve rates'])assert.ok(out.conflicts[0].message.includes(name),out.conflicts[0].message);
+ const dropped=S().pull(local,live,{resolve:{'step:rates':'local'}});
+ assert.equal(dropped.status,'merged');assert.equal(step(dropped.text,'rates'),undefined);
+ assert.deepEqual(JSON.parse(dropped.text).page.editHistory,[BO_MAP('2026-11-03T14:02:00Z')],'the board entry is still recorded');
+});
+
+function stepsPulled(mutate,history,change){const live=stepsLive(mutate,history),spec=JSON.parse(live);if(change)change(spec);return {live,local:JSON.stringify(spec,null,2)+'\n'};}
+
+test('L11 log counts the step mappings it changes or removes',()=>{
+ const {live,local}=stepsPulled(null,[agentEntry('2026-11-01T10:00:00Z','Initial board')],spec=>{d(spec).steps[1].traceMatch={serviceName:'payment',operation:'Capture'};delete d(spec).steps[2].traceMatch;});
+ const out=S().log(local,live,{by:'Chuck',now:NOW});
+ assert.equal(out.status,'logged');assert.equal(out.entry.summary,'Changed 1 step mapping, removed 1 step mapping');assert.deepEqual(plain(out.entry.changes),[]);
+ const added=stepsPulled(null,[],spec=>{d(spec).steps[0].traceMatch=plain(RATES);});
+ assert.equal(S().log(added.local,added.live,{by:'Chuck',now:NOW}).entry.summary,'Added 1 step mapping');
+});
+
+test('L12 changing, removing or deleting a mapping a recent board edit set needs the author to confirm',()=>{
+ const history=[agentEntry('2026-11-03T10:00:00Z','Initial board'),BO_MAP('2026-11-03T11:00:00Z')];
+ const changes={changed:spec=>{d(spec).steps[0].traceMatch={serviceName:'currency',operation:'GetAllRates'};},removed:spec=>{delete d(spec).steps[0].traceMatch;},
+  deleted:spec=>{d(spec).steps.splice(0,1);}};
+ for(const [name,change] of Object.entries(changes)){
+  const {live,local}=stepsPulled(mapped,history,change);
+  const out=S().log(local,live,{by:'Chuck',now:NOW});
+  assert.equal(out.status,'conflict',name);assert.equal(out.conflicts.length,1,name);assert.equal(out.conflicts[0].step,'rates',name);
+  for(const text of ['Bo','2026-11-03 11:00 UTC','Resolve rates','step:rates'])assert.ok(out.conflicts[0].message.includes(text),name+': '+out.conflicts[0].message);
+  assert.equal(S().log(local,live,{by:'Chuck',now:NOW,confirm:['step:rates']}).status,'logged',name);
+ }
+ const older=stepsPulled(mapped,[BO_MAP('2026-11-03T09:00:00Z'),agentEntry('2026-11-03T10:00:00Z','Initial board')],changes.removed);
+ assert.equal(S().log(older.local,older.live,{by:'Chuck',now:NOW}).status,'logged','a board mapping older than the newest agent entry is not a conflict');
+ const kept=stepsPulled(mapped,history,spec=>{d(spec).steps[0].traceMatch.nodeId='beta';});
+ assert.equal(S().log(kept.local,kept.live,{by:'Chuck',now:NOW}).status,'logged','refining the same mapping is not a conflict');
 });

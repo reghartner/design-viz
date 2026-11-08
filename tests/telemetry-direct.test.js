@@ -207,3 +207,16 @@ test('#1081 Load-trace environment seeds from the board, keeps today\'s fallback
  api.destroy();
  const one=profile();one.environments={stage:clone(envs.stage)};const single=context().createTelemetryDirect(board(one),{describe(){},call(){}},{sections:()=>[],environment:()=>'perf'});assert.equal(single.snapshot().form.environment,'stage','3: no match keeps the single-environment default');single.destroy();
 });
+
+test('#1078 an edit re-render carries a loaded trace with the environment the reader picked',async()=>{
+ const hooks={environment:()=>'stg'},h=setup({hooks});
+ assert.equal(h.api.snapshot().form.environment,'prod','precondition: the reader picked prod over the board stg');
+ assert.ok(await h.api.load(),'the trace loads');
+ const carried=h.api.carry();assert.ok(carried,'a loaded trace is carried');
+ const after=h.C.createTelemetryDirect(h.p,h.adapter.options.directTrace,{sections:()=>[{id:'next/section/diagram/mount',label:'Diagram'}],...hooks});
+ assert.equal(after.snapshot().form.environment,'stage','precondition: a fresh form seeds from the board');
+ assert.equal(after.restore(JSON.parse(JSON.stringify(carried))),true);
+ const form=after.snapshot().form;
+ assert.equal(form.environment,'prod','the picked environment survives the re-render');assert.equal(form.input,ID);assert.equal(form.section,'next/section/diagram/mount');
+ assert.equal(after.snapshot().exemplar.traceId,ID);
+});

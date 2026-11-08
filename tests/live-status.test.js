@@ -2832,13 +2832,15 @@ test('#1136 a board that opened on Trace for want of references moves to Jira wh
  }
 });
 
-test('#1136 Metrics overlay paints its cues in the Trace view of a Jira-free board; on a board with tickets the Trace view stays clear',async()=>{
+test('#1136 D13 Metrics overlay paints its cues in the Trace view on every board, and nothing while it is off',async()=>{
  const raw=cuePage();delete raw.page.tracking.jira;const d=raw.page.sections[0].diagram;Object.values(d.nodes).forEach(n=>delete n.tickets);d.edges.forEach(e=>delete e.tickets);
  const free=cueHarness(raw);await free.on();
  assert.equal(free.ctl.liveStatus.snapshot().available,false);assert.equal(free.ctl.liveStatus.snapshot().mode,'trace');
  assert.equal(free.stream(0).length,1,'the overlay paints in the only view');free.ctl.liveStatus.destroy();
- const jira=cueHarness();await jira.on();assert.equal(jira.stream(0).length,1,'contrasting precondition: the Jira view paints the overlay');
- jira.ctl.liveStatus.setStatusMode('trace');assert.equal(jira.cues().length,0,'the Trace view of a board with tickets owns the canvas');jira.ctl.liveStatus.destroy();
+ // Chuck 2026-11-08 (D13): the Metrics overlay draws in both views on every board.
+ const jira=cueHarness();await jira.on();assert.equal(jira.stream(0).length,1,'the Jira view paints the overlay');
+ jira.ctl.liveStatus.setStatusMode('trace');assert.equal(jira.stream(0).length,1,'so does the Trace view of a board with tickets');
+ jira.ctl.telemetry.setEnabled(false);assert.equal(jira.cues().length,0,'off, the overlay draws nothing');jira.ctl.liveStatus.destroy();
 });
 
 test('Proof is cleared from retained panels on telemetry and live-status controller destruction',()=>{
@@ -3108,6 +3110,24 @@ test('#1137 metric cards on a board without tickets get no Jira presentation; ti
  assert.equal(ticketed.card.getAttribute('data-verdict'),'degraded');
  assert.deepEqual(workPresentation(ticketed.h,ticketed.card),{appearance:'unchanged',classes:['unchanged'],halo:true,label:true,popover:true},'an unticketed edge on a ticketed board stays unchanged');
  ticketed.h.ctl.liveStatus.destroy();
+});
+// Chuck 2026-11-08 (D13): the Metrics overlay draws in every view. In the Trace view its cards carry no Jira work colouring,
+// and the Workbench card preview still draws there.
+test('D13 metric cards draw in the Trace view of a board with tickets without Jira work colouring, and the Workbench preview draws there too',async()=>{
+ const shim=h=>{const matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+  h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+  const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+  for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;};
+ const ticketed=await paintedCard({a:{tickets:['AA-1']},b:{}}),api=ticketed.h.ctl.liveStatus,card=()=>ticketed.h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]');
+ assert.equal(card().getAttribute('data-live-appearance'),'unchanged','contrasting precondition: the Jira view colours the card');
+ api.setStatusMode('trace');ticketed.h.flush();
+ assert.ok(card(),'the Trace view draws the card');assert.equal(card().getAttribute('data-verdict'),'degraded');
+ const classes=Array.from(ticketed.h.C.LIVE_STATUS_APPEARANCES).filter(s=>card().classList.contains('dv-live-'+s));
+ assert.deepEqual({appearance:card().getAttribute('data-live-appearance'),classes,halo:!!card().querySelector('.dv-live-halo')},{appearance:null,classes:[],halo:false},'no Jira work colouring in the Trace view');
+ api.destroy();
+ const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{tickets:['AA-1']},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
+ const w=harness(raw,{},{authoring:true,metricsPreview:true});shim(w);w.ctl.liveStatus.setStatusMode('trace');w.flush();
+ assert.ok(w.view.querySelector('g.dv-metrics-card'),'the Workbench preview draws a card in the Trace view');w.ctl.liveStatus.destroy();
 });
 test('#1137 an applied status map on a board without tickets gives nodes, step coins and captions no Jira presentation',()=>{
  const seed=harness(),model=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});

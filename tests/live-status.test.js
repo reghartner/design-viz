@@ -2913,3 +2913,34 @@ test('#1124 a log-line trace that is not found says it may not have been kept an
  api.setDirectTraceField({field:'input',value:ids[0]});assert.equal(await api.loadDirectTrace(false),null);assert.equal(report().error,'Trace not found in the last 2h. Try a longer lookback under Lookback.');
  api.destroy();
 });
+
+/* #1137: a board without ticket references (snapshot().available === false) gives metric cards
+   no Jira presentation; a board with tickets keeps "unchanged" on an unticketed carded edge. */
+async function paintedCard(nodes){
+ const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes,rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:{rate:{value:100},errors:{value:50}}}})}}),matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+ // SVG measurement shims so the real card painter places a card in the VM DOM.
+ h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+ const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+ for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
+ h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
+ return {h,card:h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]')};
+}
+test('#1137 metric cards on a board without tickets get no Jira presentation; ticketed boards keep unchanged',async()=>{
+ const free=await paintedCard({a:{},b:{}});
+ assert.equal(free.h.ctl.liveStatus.snapshot().available,false,'fixture has no ticket references');
+ assert.ok(free.card,'the degraded carrier has a metric card');
+ assert.equal(free.card.getAttribute('data-verdict'),'degraded');
+ assert.equal(free.card.getAttribute('data-live-appearance'),null,'no Jira appearance on a Jira-free board');
+ assert.doesNotMatch(free.card.className,/dv-live-/);
+ assert.equal(free.card.querySelector('.dv-live-halo'),null);
+ assert.doesNotMatch(free.card.getAttribute('aria-label')||'',/No change needed/);
+ free.h.ctl.liveStatus.destroy();
+ const ticketed=await paintedCard({a:{tickets:['AA-1']},b:{}});
+ assert.equal(ticketed.h.ctl.liveStatus.snapshot().available,true);
+ assert.ok(ticketed.card);
+ assert.equal(ticketed.card.getAttribute('data-verdict'),'degraded');
+ assert.equal(ticketed.card.getAttribute('data-live-appearance'),'unchanged','an unticketed edge on a ticketed board stays unchanged');
+ assert.match(ticketed.card.getAttribute('aria-label')||'',/No change needed/);
+ ticketed.h.ctl.liveStatus.destroy();
+});

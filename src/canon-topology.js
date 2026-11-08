@@ -393,7 +393,7 @@ var FlowTopology = (function(){
       Object.keys(stepPanelPatch(s) || {}).concat(Object.keys(s.panelVisibility || {})).forEach(function(id){
         if(!(d.panels || []).some(function(p){return p && p.id===id;}))fail(at,where+' references missing panel '+id);
       });
-      if(s.traceMatch && s.traceMatch.nodeId)node(s.traceMatch.nodeId,where+' traceMatch');
+      [].concat(s.traceMatch || []).forEach(function(m){if(m && m.nodeId)node(m.nodeId,where+' traceMatch');});
       (s.conditions || []).forEach(function(c){if(c.nodeId)node(c.nodeId,where+' condition');});
     });
   }

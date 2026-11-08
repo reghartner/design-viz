@@ -130,25 +130,6 @@ precision; values that cannot be represented exactly as a declared number fail.
 Raw-ID time controls accept a signed lookback such as `-2h`, or paired UTC ISO
 timestamps. A time-bearing link and explicit time controls cannot be combined.
 
-### Lookback
-
-The Load trace form shows the active lookback under the trace ID field ("Looks
-back 2h; change under Lookback."): the profile's `time.defaultLookback`, or the
-**Trace start** value in the **Lookback (optional)** section when one is set.
-When Honeycomb `get_trace` answers with only a Metadata block whose
-`navigation_hints` is `no spans found` and no span table, the panel reports
-"Trace not found in the last 2h. Try a longer lookback under Lookback." with the
-lookback that was sent, and opens the Lookback section. A span table that is
-present but lacks a required column still fails as `Unsupported trace table
-header.`
-
-Largest useful Honeycomb lookback: what this repo can verify is that `from` is a
-signed duration of at most four digits and a unit (`s`, `m`, `h`, `d`, `w`), and
-the November 2026 company report observed `from: -7d` returning a trace about 5 h
-old that `-2h` did not return. This repo cannot verify the longest `from`
-Honeycomb accepts or how long an account retains trace data; both depend on the
-Honeycomb account. Use the shortest lookback that covers the trace's age.
-
 ## Verification and evidence record
 
 1. Record the exact connected server/tool, discovery date, tool annotations and
@@ -169,9 +150,7 @@ Honeycomb account. Use the shortest lookback that covers the trace's age.
    Request acceptance alone does not establish ID match or a complete trace.
 5. Exercise raw ID, recognized link, wrong environment, older absolute bounds,
    denied permission, absent ID, malformed response and cancellation. An error is
-   never converted to “not found”, zero spans or a successful empty observation;
-   only the provider's own `no spans found` answer with no table is reported as
-   not found.
+   never converted to “not found”, zero spans or a successful empty observation.
 
 Profile validation rejects unknown configuration fields, excessive profiles/maps,
 reserved keys and credential-shaped literals. Request validation honors required

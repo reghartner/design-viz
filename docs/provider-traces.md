@@ -45,9 +45,6 @@ is preserved; unsupported future offsets, zero and date expressions warn and
 use the default `24h`. `get_trace` uses
 `environment_slug`, returned `trace_id`, `from`, and `view_mode: full` only if
 supported. `run_query` completes results; there is no invented polling contract.
-A `get_trace` response with only a Metadata block (`navigation_hints: no spans
-found`) and no span table is reported as not found for the lookback that was
-sent; see [Lookback](trace-connections.md#lookback).
 
 Tempo uses native `search_tempo_traces(datasourceUid, query, start, end, limit,
 spss)` and `get_tempo_trace(datasourceUid, trace_id, start, end)` with paired RFC3339
@@ -234,3 +231,22 @@ The adapter drops legacy `timestamp` entries from outgoing `raw_row_columns`
 without changing the authored query: Honeycomb always returns that column.
 The Status panel’s Trace mode supersedes the former step-owned trace disclosure
 and fallback rail. Selecting or navigating steps never opens or selects a trace.
+
+## Honeycomb lookback
+
+The Load trace form shows the active lookback under the trace ID field ("Looks
+back 2h; change under Lookback."): the profile's `time.defaultLookback`, or the
+**Trace start** value in the **Lookback (optional)** section when one is set.
+When `get_trace` answers with only a Metadata block whose `navigation_hints`
+starts with `no spans found` and no span table, the panel reports "Trace not
+found in the last 2h. Try a longer lookback under Lookback." with the lookback
+that was sent, and opens the Lookback section. This provider answer is the only
+response reported as not found; errors, unknown shapes and a span table that is
+present but lacks a required column (`Unsupported trace table header.`) are not.
+
+Largest useful lookback: this repo can verify that `from` is a signed duration
+of at most four digits and a unit (`s`, `m`, `h`, `d`, `w`), and the November
+2026 company report observed `from: -7d` returning a trace about 5 h old that
+`-2h` did not return. This repo cannot verify the longest `from` Honeycomb
+accepts or how long an account retains trace data; both depend on the account.
+Use the shortest lookback that covers the trace's age.

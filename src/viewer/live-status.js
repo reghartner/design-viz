@@ -1962,7 +1962,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       index=Math.max(0,Math.min(over.days.length-1,index));if(index===over.index)return;
       over.index=index;if(overSource.day)overSource.day(index);overShow();
     },
-    clear:function(){if(retired)return;overRequest++;overLoading=false;overError='';if(over){over=null;telemetry.closeHistory();if(overSource.close)overSource.close();}availabilityOn=false;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();telemetryHooks.jiraChanged();},
+    clear:function(){if(retired)return;overRequest++;overLoading=false;overError='';if(over){over=null;traceViewChanged();telemetry.closeHistory();if(overSource.close)overSource.close();}availabilityOn=false;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();telemetryHooks.jiraChanged();},
     enabled:function(){return on;},
     setEnabled:function(value){if(retired)return;on=!!value;if(on)availabilityOn=true;paint();notify();},
     // The panel's Metrics button (#939); Jira Live above is independent of it.

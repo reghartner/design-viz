@@ -33,7 +33,7 @@ class Element {
  closest(s){return this.matches(s)?this:this.parentElement?.closest(s)||null;}contains(el){return this===el||this.children.some(c=>c.contains(el));}
  addEventListener(t,f){(this.events[t]??=new Set()).add(f);}removeEventListener(t,f){this.events[t]?.delete(f);}dispatchEvent(ev){ev.target??=this;for(const f of this.events[ev.type]||[])f(ev);}
  getBoundingClientRect(){return {left:0,top:0,right:100,bottom:50,width:100,height:50};}getBBox(){return {x:50,y:30,width:60,height:12};}
- getTotalLength(){return 100;}getPointAtLength(){return {x:50,y:30};}focus(){}get firstChild(){return this.children[0]||null;}
+ getTotalLength(){return 100;}getPointAtLength(){return {x:50,y:30};}focus(){if(this.ownerDocument)this.ownerDocument.activeElement=this;}get firstChild(){return this.children[0]||null;}
  // A failing deepEqual on two elements must print one line, never two circular trees.
  [Symbol.for('nodejs.util.inspect.custom')](){const a=this.attrs;return '<'+this.tagName+(a.class?' class="'+a.class+'"':'')+(a['data-dv-node']?' data-dv-node="'+a['data-dv-node']+'"':'')+' children='+this.children.length+'>';}
  toJSON(){return this[Symbol.for('nodejs.util.inspect.custom')]();}
@@ -41,8 +41,8 @@ class Element {
 const filterErrors=(C,raw)=>plain(C.validate(C.normalize(raw)).errors).filter(e=>/ticketFilter/.test(e));
 const filterWarnings=(C,raw)=>plain(C.validate(C.normalize(raw)).warnings).filter(e=>/ticketFilter/.test(e));
 function load(){const C={URL,console,AbortController,TextEncoder};vm.runInNewContext(entrypoint('native').source,C);return C;}
-/* Renders one section with a Step-mode stepper on step `index` and paints `map`. */
-function render(raw,map,index=0){
+/* Renders every section with a Step-mode stepper on step `index` of the first and paints `map`. */
+function render(raw,map,index=0,renderOptions={}){
  const frames=new Map(),timers=new Map();let serial=0;
  const doc=new Element('document');doc.hidden=false;doc.visibilityState='visible';doc.createElement=tag=>new Element(tag);doc.createElementNS=(_,tag)=>new Element(tag);doc.body=new Element('body');doc.getElementById=id=>doc.querySelector('[id="'+id+'"]');doc.documentElement=new Element('html');
  const schedule=(collection,fn,ms)=>{const id=++serial;collection.set(id,{fn,ms});return id;};
@@ -59,10 +59,10 @@ function render(raw,map,index=0){
  const ctl={view,page,sections},rec=sections[0];
  rec.stepper={sourceIndex:()=>index,mode:()=>'step',path:()=>'default'};
  const host=rec.sectionEl.appendChild(new Element('div',{class:'termbar'})).appendChild(new Element('div',{class:'step-text'}));host.textContent='Step prose';
- ctl.liveStatus=C.createLiveStatus(ctl,page,{},{});
+ ctl.liveStatus=C.createLiveStatus(ctl,page,{},renderOptions);
  const flush=()=>{for(let i=0;i<3;i++){const work=[...frames.values()];frames.clear();work.forEach(x=>x.fn());}};
  rec.sectionEl.dispatchEvent({type:'dv:stepchange'});flush();ctl.liveStatus.apply(map);flush();
- return {C,ctl,view,host,
+ return {C,ctl,view,host,doc,flush,renderOptions,
   listed:()=>host.querySelectorAll('.dv-live-step-tickets .nbacklink').map(el=>el.textContent),
   caption:()=>(host.querySelector('.dv-live-caption')||{}).textContent||'',
   coin:i=>(view.querySelector('g.coin[data-dv-step="'+i+'"]').className.match(/dv-live-(todo|active|testing|done|blocked|missing|unchanged)\b/)||[])[1]||null,
@@ -194,4 +194,72 @@ test('T6 removing a consumer-owned ticket from an imported node prunes it from s
  clickRemove(imported,'Remove ticket 1');const next=JSON.parse(imported.text);
  assert.equal(Object.hasOwn(next.page.sections[0].diagram.topologyImports[0],'nodeTracking'),false,'the overlay ticket is removed');
  assert.deepEqual(stepsOf(next)[0].ticketFilter,['CAN-2']);
+});
+
+/* Cycle 1 review (orchestrator ruling): one static lit set everywhere. A lit node whose detail is a
+   section of the same page adds that section's tickets (recursively); a remote detail never does. */
+const DETAIL_URL='https://example.test/child.spec.json';
+const domainSpec=(detail,filter,child=true)=>({page:{tracking:{jira:{site:'https://jira.test'}},sections:[
+ {id:'main',diagram:{nodes:{dom:{title:'Domain',tickets:['DM-1'],detail},db:{title:'DB',tickets:['DB-1']}},rows:[['dom','db']],edges:[{from:'dom',to:'db'}],panels:[{id:'status',type:'live-status'}],
+  steps:[{id:'domain',text:'Domain work',nodes:['dom'],ticketFilter:filter}]}}].concat(child?[
+ {id:'child',detailOnly:true,diagram:{nodes:{a:{title:'A',tickets:['CH-1','CH-2']},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',tickets:['CE-1']}]}}]:[])}});
+const domainMap={'DM-1':{state:'blocked'},'CH-1':{state:'done'},'CH-2':{state:'blocked'},'CE-1':{state:'blocked'},'DB-1':{state:'todo'}};
+test('T7 a drill-down node with a same-page detail: a child ticket filter validates clean, filters the step, and the Workbench lists and prunes it',()=>{
+ const raw=domainSpec({section:'child'},['CH-1']),C=load();
+ assert.deepEqual(filterErrors(C,raw),[]);assert.deepEqual(filterWarnings(C,raw),[],'a child ticket of a same-page detail is lit');
+ const r=render(raw,domainMap);assert.deepEqual(r.listed(),['CH-1']);assert.equal(r.caption(),'DONE');assert.equal(r.coin(0),'done');
+ assert.equal(r.node('dom'),'blocked','the domain node still rolls up all of its work');
+ const e=inspectorEnvironment(inspectorNames),h=e.mount(raw);h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+ const rows=h.guide.querySelector('fieldset.step-ticket-filter').querySelectorAll('label.frow');
+ assert.deepEqual(rows.map(row=>row.children[0].textContent+'='+row.children[1].children[0].checked),['DM-1=false','CH-1=true','CH-2=false','CE-1=false'],'the checklist lists the detail section tickets');
+ const before=h.text;h.session.target={kind:'node',section:1,id:'a'};h.inspector.render();clickRemove(h,'Remove ticket 1');
+ assert.equal(Object.hasOwn(stepsOf(JSON.parse(h.text))[0],'ticketFilter'),false,'removing the child ticket prunes the parent step filter');
+ assert.equal(h.session.undo(),true);assert.equal(h.text,before);
+ const deleted=JSON.parse(e.C.planDeleteNode(before,JSON.parse(before),1,'a').text);
+ assert.equal(Object.hasOwn(stepsOf(deleted)[0],'ticketFilter'),false,'deleting the child node prunes the parent step filter');
+});
+test('T7 a remote detail ticket is not filterable: it warns and is ignored in the viewer before and after the detail loads',async()=>{
+ const raw=domainSpec({spec:DETAIL_URL,section:'remote-child'},['CH-1'],false),C=load();
+ assert.deepEqual(filterWarnings(C,raw),[unlit(0,'CH-1'),NONE_LIT]);
+ const remote={page:{sections:[{id:'remote-child',diagram:{nodes:{a:{title:'A',tickets:['CH-1','CH-2']},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',tickets:['CE-1']}]}}]}};
+ const r=render(raw,domainMap,0,{loadDetail:()=>Promise.resolve(remote)});
+ assert.deepEqual(r.listed(),['DM-1'],'before the detail loads the filter is ignored');
+ await r.renderOptions.loadDetail({spec:DETAIL_URL},new AbortController().signal);r.flush();
+ assert.deepEqual(r.listed(),['DM-1','CH-1','CH-2','CE-1'],'after it loads the filter is still ignored');assert.equal(r.coin(0),'blocked');
+});
+test('a filtered step waits only on what its shown tickets wait on',()=>{
+ const C=load(),map={'ST-1':{state:'todo'},'ST-2':{state:'todo'},'ST-3':{state:'todo'}},waiting={'ST-1':{tone:'grey',on:[{key:'UP-9'}]},'ST-2':{tone:'grey',on:[{key:'UP-1'}]}};
+ const filtered=C.normalize(spec({ticketFilter:['ST-2']})).sections[0].diagram,all=C.normalize(spec({})).sections[0].diagram;
+ assert.equal(C.liveStatusCaption(filtered,filtered.steps[0],map,waiting),'TODO · 1 tickets · waiting on UP-1');
+ assert.equal(C.liveStatusCaption(all,all.steps[0],map,waiting),'TODO · 3 tickets · waiting on UP-1, UP-9');
+});
+test('First blocker and its focus follow a step filter',()=>{
+ const raw=spec({nodes:['api','db'],ticketFilter:['DB-1']}),blocked={'ST-1':{state:'blocked'},'ST-2':{state:'done'},'ST-3':{state:'done'},'DB-1':{state:'blocked'},'ED-1':{state:'done'}};
+ const run=(raw,map)=>{const r=render(raw,map),d=r.ctl.page.sections[0].diagram,stepper=r.ctl.sections[0].stepper;let jumped=null;
+  Object.assign(stepper,{path:()=>r.C.diagramPathList(d)[0].id,jumpSource:(i,p)=>{jumped=i;return true;}});
+  r.ctl.liveStatus.firstBlocker();r.flush();return {jumped,focused:r.doc.activeElement && r.doc.activeElement.getAttribute('data-live-carrier')};};
+ assert.deepEqual(run(raw,blocked),{jumped:0,focused:'db'},'the blocking filtered ticket is on db, not api');
+ assert.deepEqual(run(spec({nodes:['api','db']}),blocked),{jumped:0,focused:'api'});
+ assert.deepEqual(run(spec({ticketFilter:['ST-2']}),{...blocked,'DB-1':{state:'done'},'ED-1':{state:'blocked'}}),{jumped:1,focused:'api->db'},'a step whose blocked ticket is filtered out is not a blocker');
+});
+test('a blocker\'s downstream step count counts a filtered step only when a shown ticket waits',()=>{
+ const raw=spec({ticketFilter:['ST-2']});raw.page.tracking.dependencies=[{ticket:'ST-1',on:'UP-1'}];stepsOf(raw).push({id:'again',text:'API again',nodes:['api']});
+ const map={...evidence,'ST-1':{state:'todo'},'UP-1':{state:'blocked'}},row=raw=>plain(render(raw,map).ctl.liveStatus.snapshot().blockers).find(b=>b.key==='UP-1');
+ assert.equal(row(raw).downstream,'1 downstream carriers · 1 steps');
+ const unfiltered=JSON.parse(JSON.stringify(raw));stepsOf(unfiltered).forEach(st=>delete st.ticketFilter);
+ assert.equal(row(unfiltered).downstream,'1 downstream carriers · 3 steps');
+});
+test('a step filter narrows the step proof verdict in the caption model and in board-level verdicts',()=>{
+ const C=load(),raw=spec({ticketFilter:['ST-2']}),d=raw.page.sections[0].diagram;
+ d.nodes.api.telemetry={kind:'service',signals:{rate:{grafana:'sum(rate(api_requests_total[5m]))*3600',unit:'req/h'}},proof:{rate:{min:1}}};
+ const page=C.normalize(raw),nd=page.sections[0].diagram,jira={'ST-1':{state:'active'},'ST-2':{state:'done'},'ST-3':{state:'active'}},telemetryMap={api:{signals:{rate:{value:50,unit:'req/h'}},observedAt:'2026-11-07T00:00:00Z'}};
+ const model=C.telemetryStepModel(nd,0,C.diagramPathList(nd)[0].id,page,{map:telemetryMap},jira,true);assert.equal(model.verdict,'proven');
+ const input=C.telemetryProofInput(fn=>Object.keys(nd.nodes).forEach(id=>fn(nd.nodes[id],id,page)),fn=>fn(nd,page),jira,telemetryMap);
+ const verdicts=C.proofVerdicts(input);assert.equal(verdicts.steps.build.verdict,'proven');assert.equal(verdicts.carriers.api.verdict,'live-early','the carrier verdict keeps every ticket');
+});
+test('the Workbench checklist can drop stale keys from a step that lights no tickets',()=>{
+ const raw=spec({nodes:['empty'],ticketFilter:['ZZ-1','ZZ-2']});raw.page.sections[0].diagram.nodes.empty={title:'Empty'};raw.page.sections[0].diagram.rows[0].push('empty');
+ const e=inspectorEnvironment(inspectorNames),h=e.mount(raw),box=key=>{h.session.target={kind:'step',section:0,index:0};h.inspector.render();return h.guide.querySelector('fieldset.step-ticket-filter').querySelectorAll('label.frow').find(row=>row.children[0].textContent.startsWith(key)).children[1].children[0];};
+ let input=box('ZZ-1');input.checked=false;input.fire('change');h.flush();assert.deepEqual(stepsOf(JSON.parse(h.text))[0].ticketFilter,['ZZ-2']);
+ input=box('ZZ-2');input.checked=false;input.fire('change');h.flush();assert.equal(Object.hasOwn(stepsOf(JSON.parse(h.text))[0],'ticketFilter'),false);
 });

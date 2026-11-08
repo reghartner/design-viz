@@ -571,7 +571,8 @@ blocked > missing > active > testing > (all done → done) > (all todo → todo)
 
 Steps, coins and chips derive their state only from the edges and nodes explicitly
 added to that step, including failed communications and imported elements, and
-never carry tickets. An edge does not bring its endpoint nodes into a step's
+never carry tickets. A step can narrow them with a [ticket filter](#step-ticket-filters).
+An edge does not bring its endpoint nodes into a step's
 status unless they are also listed in `nodes`. Unlinked, unmarked nodes derive No change needed; an
 explicit `missingWork: true` contributes Missing. No-change is neutral in mixed
 rollups. Linked tickets without evidence never imply Done or No change needed.
@@ -2145,6 +2146,44 @@ whose `updatedAt` is strictly older than that many days. The carrier gets
 `dv-live-stale` and its popover says “no activity N d”; the rollup color is unchanged.
 Missing/invalid timestamps are never stale; invalid thresholds warn and use 7.
 All story features work with `#live=demo`; pages without tickets or epics show the empty-page message.
+
+### Step ticket filters
+
+A node can carry many stories while a step is about a few of them. The step's
+`ticketFilter` lists the Jira keys it shows, chosen from the tickets the step
+lights: those on the nodes and edges it lights directly (imported carriers
+included, with their merged provider and `nodeTracking` tickets) and, for a lit
+node whose `detail` is a section of the same page, the tickets of that section's
+nodes and edges, recursively. Tickets that exist only in a remote detail
+(`detail.spec`) are not filterable, so the set is the same in the viewer,
+validator and Workbench and does not change when the remote detail loads.
+
+```json
+{"id":"pair","text":"Pair the doorbell","nodes":["firmware"],"ticketFilter":["FW-45"]}
+```
+
+With a filter, the step's coin and chip state, its caption (including the ticket
+count and "waiting on"), its ticket list, playback pauses, First blocker, its place
+in a blocker's downstream step count and the step's proof verdict (in the caption
+and in `verdicts().steps`) use only the listed tickets. A carrier's `missingWork`
+and unavailable detail stay on that carrier. Node and edge colors, carrier
+verdicts, the Tickets table, lane rollups, readiness and coverage still use every
+ticket. Without `ticketFilter` a step shows every ticket on its lit carriers. The
+capability is `flow.step-ticket-filter`.
+
+An empty or non-array filter, or an entry that is not a Jira key, is a validation
+error with its field path. Tickets churn, so a key the step does not light
+(endpoint nodes of its edges count only when they are in `nodes`) is a warning
+with its field path and is ignored; when no listed key is lit, the step shows
+every ticket. A provider dropping a filtered ticket therefore never stops a
+consumer from resolving. In the desktop Workbench, the step's Inspect lists the
+lit tickets as **Tickets on this step** checkboxes, and every box checked removes
+the filter. Removing a hop or node from the step drops every key the step no
+longer lights. Deleting a node or edge, or removing a ticket from a carrier
+(local, or an imported carrier's consumer overlay), drops the removed keys from
+every step filter on the page that no longer lights them, in the same Undo step.
+Board Edit mode on the live board does not change step filters; a ticket it
+removes is ignored by the filter as above.
 
 ## Delivery boards over imported Canon topology
 

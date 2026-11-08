@@ -274,7 +274,7 @@ function createBuilderInteractions(opts){
   }
 
   function deletePlanFor(t, raw){
-    return builderDeletePlan(session.text(), raw, t);
+    return builderDeletePlan(session.text(), raw, t, session.resolve);
   }
 
   function deleteCurrent(){
@@ -387,7 +387,7 @@ function createBuilderInteractions(opts){
   }
   function bulkDeleteSelected(){
     var n = multiSel.length, kind = multiSel[0].kind;
-    var plan = planBulkDelete(session.text(), multiSel);
+    var plan = planBulkDelete(session.text(), multiSel, session.resolve);
     if (applyPlan(plan)){
       clearMultiSelect();
       inspectorMessage(n + ' ' + kind + (n > 1 ? 's' : '') + ' deleted — undo restores them');

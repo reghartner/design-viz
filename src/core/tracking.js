@@ -52,6 +52,74 @@ function trackingRefs(obj, invalid){
   });
   return refs;
 }
+/* Carrier identities are section-local; ticket keys are deduplicated only when
+   counting work. Broad aggregates may include the endpoints of selected hops;
+   visible step state, captions and ticket lists use direct carriers only. */
+function trackingStepCarriers(diagram,step,directOnly){
+  var out=[],nodes=stepNodes(step).slice(),keys=stepKeys(step).concat(Object.keys(stepFailures(step)));
+  (diagram.edges || []).forEach(function(edge){
+    var key=edge.from+'->'+edge.to;if(keys.indexOf(key)<0)return;
+    out.push({id:key,value:edge});if(!directOnly)nodes.push(edge.from,edge.to);
+  });
+  nodes.filter(function(id,i){return nodes.indexOf(id)===i;}).forEach(function(id){
+    var node=(diagram.nodes || {})[id];if(node && !isTextBoxNode(node))out.push({id:id,value:node});
+  });return out;
+}
+/* #1103: `ticketFilter` names the subset of the tickets on a step's directly lit
+   carriers that the step shows. It never adds a ticket, and carriers keep all of
+   theirs. The value is a self-contained array of Jira keys so an imported step's
+   override can carry the same shape. Malformed entries are skipped like carrier
+   tickets; with no valid entry every ticket shows. `invalid` reports them. */
+function trackingStepFilter(step,invalid){
+  if(!step || typeof step!=='object' || !Object.prototype.hasOwnProperty.call(step,'ticketFilter'))return null;
+  var value=step.ticketFilter,out=[];
+  if(!Array.isArray(value) || !value.length){if(invalid)invalid(null);return null;}
+  value.forEach(function(key,index){
+    if(typeof key!=='string' || !trackingKeyPattern.test(key)){if(invalid)invalid(index);}
+    else if(out.indexOf(key)<0)out.push(key);
+  });
+  return out.length?out:null;
+}
+/* The tickets a step filter may name on one carrier: its own, plus, for a node
+   whose detail is a section of the same `page`, that section's carriers'
+   tickets, recursively. A remote detail (detail.spec) never counts, so the set is
+   the same in the viewer, validator and Workbench, before and after it loads. */
+function trackingCarrierStepTickets(page,value){
+  var keys=[],seen=[];
+  function add(carrier){trackingRefs(carrier).tickets.forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});}
+  function descend(node,depth){
+    add(node);
+    var record=page && node && !isTextBoxNode(node)?detailTarget(page,node.detail):null,child=record && record.section.diagram;
+    if(!child || seen.indexOf(child)>=0 || depth>=DETAIL_MAX_DEPTH)return;
+    seen.push(child);
+    Object.keys(child.nodes || {}).forEach(function(id){if(!isTextBoxNode(child.nodes[id]))descend(child.nodes[id],depth+1);});
+    (child.edges || []).forEach(add);
+  }
+  descend(value,0);return keys;
+}
+/* Ticket keys a step lights directly, before any filter: the keys a filter may
+   name. `diagram` is the authored (resolved) section diagram of `page`. */
+function trackingStepLitTickets(diagram,step,page){
+  var keys=[];trackingStepCarriers(diagram || {},step,true).forEach(function(carrier){
+    trackingCarrierStepTickets(page,carrier.value).forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});
+  });return keys;
+}
+/* The filter a step applies: its keys that are lit, in lit order. Tickets
+   churn, so a key on no lit carrier is ignored (the validator warns), and with
+   none left the step shows every ticket. */
+function trackingStepTicketFilter(diagram,step,page){
+  var keys=trackingStepFilter(step);if(!keys)return null;
+  var shown=trackingStepLitTickets(diagram,step,page).filter(function(key){return keys.indexOf(key)>=0;});
+  return shown.length?shown:null;
+}
+/* Per direct carrier id, the filtered tickets a step's proof verdict uses; null
+   without a filter, so verdicts keep each carrier's own tickets. */
+function trackingStepProofTickets(diagram,step,page){
+  var filter=trackingStepTicketFilter(diagram,step,page),out=Object.create(null);if(!filter)return null;
+  trackingStepCarriers(diagram || {},step,true).forEach(function(carrier){
+    out[carrier.id]=trackingCarrierStepTickets(page,carrier.value).filter(function(key){return filter.indexOf(key)>=0;});
+  });return out;
+}
 /* Page-level parent roots (legacy `epic` field) share the ticket key grammar.
    Jira metadata determines whether each root is an Epic or an Initiative. */
 function trackingEpics(page,invalid){

@@ -32,8 +32,10 @@
      Adapters distinguish successful empty counts from unobserved results. A
      signal with neither a finite value nor a finite point is unobserved.
 
-   input.steps  [{id, carriers: [carrier id, ...]}]: each step's directly
-       selected carriers (liveStatusStepCarriers(diagram, step, true)).
+   input.steps  [{id, carriers: [carrier id, ...], tickets?}]: each step's
+       directly selected carriers (liveStatusStepCarriers(diagram, step, true)).
+       tickets, from a step ticketFilter, maps a carrier id to the tickets this
+       step judges it by (trackingStepProofTickets); carrier verdicts keep their own.
 
    options  Reserved for page-level telemetry settings; nothing is read today.
 
@@ -242,17 +244,21 @@ var proofVerdicts = (function(){
     var jiraMap = proofObject(page.jiraMap) ? page.jiraMap : {}, telemetryMap = proofObject(page.telemetryMap) ? page.telemetryMap : {};
     var carriers = Object.create(null), steps = Object.create(null);
     var rollups = {bound: 0, unbound: 0, proven: 0, degraded: 0, unproven: 0, liveEarly: 0};
-    (Array.isArray(page.carriers) ? page.carriers : []).forEach(function(carrier){
-      if (!proofObject(carrier) || typeof carrier.id !== 'string' || !carrier.id || Object.prototype.hasOwnProperty.call(carriers, carrier.id)) return;
-      var tickets = (Array.isArray(carrier.tickets) ? carrier.tickets : []).filter(function(key){ return typeof key === 'string'; });
+    var inputs = Object.create(null);
+    function judge(carrier, list){
+      var tickets = (Array.isArray(list) ? list : []).filter(function(key){ return typeof key === 'string'; });
       var jira = proofJira(tickets, jiraMap), doneAt = jira === 'done' ? proofDoneAt(tickets, jiraMap) : null;
       var judged = proofTelemetry(carrier, proofOwn(telemetryMap, carrier.id));
       var verdict = judged ? proofCell(jira, judged.state) : null;
       if(verdict === 'done' && !judged.minimumObserved)verdict = 'done-traffic-unmeasured';
-      var result = {bound: !!judged, jira: jira, telemetry: judged ? judged.state : null,
+      return {bound: !!judged, jira: jira, telemetry: judged ? judged.state : null,
         verdict: verdict, label: proofLabel(verdict), failing: judged ? judged.failing : [],
         since: {doneAt: proofISO(doneAt), firstTrafficAt: judged ? proofISO(proofFirstTraffic(judged, doneAt)) : null}};
-      carriers[carrier.id] = result;
+    }
+    (Array.isArray(page.carriers) ? page.carriers : []).forEach(function(carrier){
+      if (!proofObject(carrier) || typeof carrier.id !== 'string' || !carrier.id || Object.prototype.hasOwnProperty.call(carriers, carrier.id)) return;
+      var result = judge(carrier, carrier.tickets);
+      carriers[carrier.id] = result;inputs[carrier.id] = carrier;
       rollups[result.bound ? 'bound' : 'unbound']++;
       Object.keys(PROOF_COUNTS).forEach(function(bucket){ if (PROOF_COUNTS[bucket].indexOf(result.verdict) >= 0) rollups[bucket]++; });
     });
@@ -261,7 +267,10 @@ var proofVerdicts = (function(){
       var ids = (Array.isArray(step.carriers) ? step.carriers : []).filter(function(id, index, all){
         return typeof id === 'string' && all.indexOf(id) === index && Object.prototype.hasOwnProperty.call(carriers, id);
       });
-      var verdict = proofStepVerdict(ids.map(function(id){ return carriers[id]; }));
+      var narrowed = proofObject(step.tickets) ? step.tickets : null;
+      var verdict = proofStepVerdict(ids.map(function(id){
+        return narrowed && Object.prototype.hasOwnProperty.call(narrowed, id) ? judge(inputs[id], narrowed[id]) : carriers[id];
+      }));
       steps[step.id] = {verdict: verdict, label: proofLabel(verdict)};
     });
     return {carriers: carriers, rollups: rollups, steps: steps};

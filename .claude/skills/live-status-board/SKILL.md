@@ -121,6 +121,12 @@ Ask the author, in one batch, only what the source does not already state:
   without adding endpoint-node tickets to the list; add those endpoints to the step's `nodes` when their work belongs in that step.
   Keys are deduplicated within each step. Aggregate captions, coin states and
   readiness still include edge endpoints. Unresolved keys say No status.
+- **Step subsets.** When a step is about only some of a lit node's or edge's
+  stories, set the step's `ticketFilter` to those keys (`"ticketFilter":["FW-45"]`).
+  The step's coin, caption and ticket list then use only them; carriers keep all
+  of theirs. Keys may come from a lit node's same-page drill-down section, not from a
+  remote detail. A key the step does not light warns and is ignored.
+  See `docs/live-status.md` § Step ticket filters.
 - **Blocked.** The overlay marks a ticket blocked when Jira has it Flagged
   (JQL `Flagged = Impediment`) or its status name contains "block". Confirm
   the team uses one of those; otherwise blockers will not show.

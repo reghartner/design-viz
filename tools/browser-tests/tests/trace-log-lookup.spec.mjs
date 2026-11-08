@@ -28,7 +28,8 @@ async function open(page,server,{grafana=true,lookups=true,lines=LINES}={}){
  await writeFile(path.join(server.root,name+'.json'),JSON.stringify(spec));
  execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,name+'.json'),path.join(repo,'template/flowview.html'),path.join(server.root,name+'.html')],{stdio:'pipe'});
  await page.goto(server.origin+'/'+name+'.html');await page.waitForFunction(()=>!!window.ctl);
- const root=page.locator('.pwidget.pt-live-status').filter({visible:true}).first();await root.getByRole('button',{name:'Trace',exact:true}).click();
+ // #1136: this board has no ticket references, so the panel opens on Trace with no Jira | Trace switch.
+ const root=page.locator('.pwidget.pt-live-status').filter({visible:true}).first();await expect(root.getByRole('button',{name:/^(Jira|Trace)( · \d+)?$/})).toHaveCount(0);await expect(root.locator('.dv-live-trace')).toBeVisible();
  await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
  return {root,logs:root.locator('.dv-trace-logs'),calls};
 }

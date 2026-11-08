@@ -83,7 +83,8 @@ async function capture(page,name){const dir=path.join(repo,'.local/step-evidence
 
 const traceTab=r=>r.getByRole('button',{name:/^Trace(?: · \d+)?$/});
 const selected=r=>r.locator('.dv-trace-selected');
-async function openTrace(root){await traceTab(root).click();if(await metric(root).getAttribute('aria-checked')==='false')await metric(root).click();await expect(selected(root)).toBeVisible();}
+// #1136: a board without ticket references opens on Trace and shows no Jira | Trace switch.
+async function openTrace(root){if(await root.page().evaluate(()=>window.ctl.liveStatus.snapshot().available))await traceTab(root).click();else{await expect(traceTab(root)).toBeHidden();expect(await root.page().evaluate(()=>window.ctl.liveStatus.snapshot().mode)).toBe('trace');}if(await metric(root).getAttribute('aria-checked')==='false')await metric(root).click();await expect(selected(root)).toBeVisible();}
 
 test('Status modes are exclusive; actual request selection paints SVG independently of stepping',async({page,server})=>{
  const {root,f}=await setup(page,server);await expect(root.getByRole('button',{name:'Jira',exact:true})).toHaveAttribute('aria-pressed','true');await metric(root).click();await expect(root.locator('.dv-proof-caption')).toContainText('PROVEN');await expect(card(root)).toHaveCount(0);

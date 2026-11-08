@@ -21,6 +21,9 @@ async function setup(page,server,{telemetryOnly=false,disabled='',siblings=false
   window.jira=Object.fromEntries(Object.entries({...jira,'NEST-1':{state:'active'},'IMP-3':{state:'done'}}).map(([k,v])=>[k,{...v,updatedAt:new Date(T-H).toISOString()}]));
   if(!telemetryOnly){window.viewer.controller.liveStatus.apply(window.jira);window.viewer.controller.liveStatus.setHistory({load:()=>({days:[0,1,2].map(i=>({at:new Date(T+i*DAY).toISOString(),label:'Day '+i,short:'D'+i,states:Object.fromEntries(Object.keys(window.jira).map(k=>[k,{state:'done'}]))})),index:2})});}
   if(siblings){const h=document.createElement('div');h.id='sibling';document.body.appendChild(h);window.sibling=window.mount(h,raw,opts);}
+  // #1136: a Jira-free board opens on Trace with no Jira | Trace switch. These tests cover the Jira view's
+  // telemetry-only Proof and Activity, which only the controller can still open on such a board.
+  if(telemetryOnly)[window.viewer,window.sibling].forEach(v=>{if(v)v.controller.liveStatus.setStatusMode('jira');});
  },{raw,jira:CUE_JIRA,T,H,DAY,telemetryOnly,disabled,siblings,detail,pending});return page.locator('#host');
 }
 export {setup,spec};

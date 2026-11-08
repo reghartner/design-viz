@@ -151,10 +151,14 @@ function telemetryCloudwatchPoints(payload){
 }
 function telemetryGrafanaCloudwatch(payload,statistic,weights,range,period){
   var points=telemetryCloudwatchPoints(payload);if(!points)return null;
-  if(range && points.some(function(p){return p[0]<Math.floor(Date.parse(range.from)/(period*1000))*period*1000 || p[0]>=Date.parse(range.to);}))return null;
+  // A bucket that starts at or after range.to is outside the window: query_cloudwatch
+  // returns one stamped exactly at end for dense metrics. Points before the rounded start fail.
+  var end=range?Date.parse(range.to):Infinity,inWindow=function(p){return p[0]<end;};
+  if(range && points.some(function(p){return p[0]<Math.floor(Date.parse(range.from)/(period*1000))*period*1000;}))return null;
+  points=points.filter(inWindow);if(!points.length)return null;
   var values=points.map(function(p){return p[1];}),value;
   if(statistic==='Average'){
-    var counts=telemetryCloudwatchPoints(weights);if(!counts || counts.length!==points.length)return null;
+    var counts=telemetryCloudwatchPoints(weights);if(counts)counts=counts.filter(inWindow);if(!counts || counts.length!==points.length)return null;
     var sum=0,count=0;
     for(var i=0;i<points.length;i++){if(counts[i][0]!==points[i][0] || counts[i][1]<=0)return null;sum+=points[i][1]*counts[i][1];count+=counts[i][1];}
     value=sum/count;

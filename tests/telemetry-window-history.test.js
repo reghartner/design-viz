@@ -200,7 +200,7 @@ test('sparse CloudWatch series inside the window is unchanged',()=>{
 test('a CloudWatch point before the rounded window start still fails even with a window-end bucket',()=>{
  const C=context(),payload=dense(PAST_TO-DAY,PAST_TO);payload.timestamps.unshift(PAST_TO-DAY-HOUR);payload.values.unshift(1);
  assert.equal(C.telemetryGrafanaCloudwatch(payload,'Sum',null,PAST,3600),null);
- const from=PAST_TO-DAY+3*60000,range={from:iso(from),to:iso(PAST_TO)};assert.equal(C.telemetryGrafanaCloudwatch(dense(from,PAST_TO),'Sum',null,range,3600).value,5*7,'the rounded start bucket is in the window');
+ const from=PAST_TO-DAY+3*60000,range={from:iso(from),to:iso(PAST_TO)};assert.equal(C.telemetryGrafanaCloudwatch(dense(from,PAST_TO,()=>1),'Sum',null,range,3600).value,24,'the rounded start bucket is in the window');
 });
 test('Over time past day reads a dense end-stamped CloudWatch series while Live and Today are unchanged',async t=>{
  const h=await setup({signals:{total:{cloudwatch:cw()},avg:{cloudwatch:cw('Average')}},answer:c=>{const end=Date.parse(c.input.end),start=Date.parse(c.input.start);

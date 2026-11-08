@@ -2993,9 +2993,11 @@ test('#1142 Over time Load trace and Verify call the transport with the selected
  const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
  const raw=overFixture();raw.page.tracking.telemetry={traceConnections:{company:profile}};
  const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async(request,args)=>{calls.push(plain(args));return {payload:recorded};}}}}),api=overReady(h.ctl.liveStatus),m=mountStatus(h);
- api.apply(overToday());api.setStatusMode('trace');api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:ID});
+ api.apply(overToday());api.setStatusMode('trace');
  const days=historyDays(providerContext(),[historyTicket('AA-1',Date.now()-4*86400000,'In Progress')],{'AA-1':{state:'active'}},Date.now());
  api.setHistory({load:()=>days});api.overTime();await historySettle();api.overTimeDay(days.days.length-3);
+ // Opening Over time clears typed trace input, as it does today; type it on the day.
+ api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:ID});
  const day=api.snapshot().overTime,hours=()=>Math.max(1,Math.ceil((Date.now()-Date.parse(day.window.from))/3600000)),before=hours();
  assert.equal(day.active,true);assert.equal(day.today,false);
  assert.ok(await api.loadDirectTrace(false),'Over time loads a trace');assert.ok(await api.loadDirectTrace(true),'Over time verifies');

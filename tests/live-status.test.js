@@ -2922,7 +2922,8 @@ test('local and nested imported domains preserve authored styles until status pr
  const provider=model('provider',[{id:'main',diagram:{nodes:{domain:{style:'rose'}},rows:[['domain']],topologyExports:{core:{nodes:['domain'],edges:[]}}}}]);
  const middle=model('middle',[{id:'main',diagram:{topologyImports:[{spec:'provider',export:'core',as:'nested'}],topologyExports:{core:{nodes:['nested::domain'],edges:[]}}}}]);
  for(const missing of [false,true]){
-  const consumer=model('consumer',[{id:'main',diagram:{nodes:{local:{style:'rose',detail:{section:'child'}}},rows:[['local']],steps:[{id:'visit',nodes:['local','shared::nested::domain']}],topologyImports:[{spec:'middle',export:'core',as:'shared',nodeDetails:{'nested::domain':{section:'child'}}}]}},{id:'child',detailOnly:true,diagram:{nodes:{leaf:missing?{missingWork:true}:{}},rows:[['leaf']]}}]);
+  // #1137: the ticketed node gives the board ticket references; a board without any gets no status presentation.
+  const consumer=model('consumer',[{id:'main',diagram:{nodes:{local:{style:'rose',detail:{section:'child'}},tracked:{tickets:['AA-1']}},rows:[['local','tracked']],steps:[{id:'visit',nodes:['local','shared::nested::domain']}],topologyImports:[{spec:'middle',export:'core',as:'shared',nodeDetails:{'nested::domain':{section:'child'}}}]}},{id:'child',detailOnly:true,diagram:{nodes:{leaf:missing?{missingWork:true}:{}},rows:[['leaf']]}}]);
   const h=harness(seed.C.FlowTopology.materialize([provider,middle,consumer])[2]),api=h.ctl.liveStatus;
   let beforeAdvance;
   h.ctl.sections[0].stepper={path:()=>h.C.diagramPathList(h.ctl.page.sections[0].diagram)[0].id,sourceIndex:()=>0,mode:()=>'ambient',onBeforeAdvance(fn){beforeAdvance=fn;return ()=>{};}};
@@ -2998,6 +2999,28 @@ test('#1081 Load-trace connection environment follows the board Environment unti
  api.setMetricsEnvironment('prd');api.setDirectTraceField({field:'environment',value:'stage'});api.setMetricsEnvironment('stg');api.setMetricsEnvironment('prd');assert.equal(form().environment,'stage','the user pick stays');
  api.destroy();
 });
+test('#1125 the log lookup note names why it is unavailable, and Live restores it',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
+ const raw=(enabled=true)=>({tracking:{telemetry:{...(enabled?{}:{enabled:false}),grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]});
+ const host=()=>({telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async()=>({data:[]})}}});
+ const logs=h=>{const value=h.ctl.liveStatus.snapshot().trace.direct.logs;return [value.available,value.note];},seen={};
+ const live=harness(raw(),{},host()),api=live.ctl.liveStatus;api.setStatusMode('trace');await settle();
+ assert.deepEqual(logs(live),[true,'']);
+ live.ctl.telemetry.openHistory([{at:'2026-11-01T00:00:00.000Z'}],0);seen.overTime=logs(live);
+ live.ctl.telemetry.closeHistory();await settle();seen.backToLive=logs(live);
+ api.destroy();seen.closed=logs(live);
+ const board=harness(raw(false),{},host());seen.boardOff=logs(board);board.ctl.liveStatus.destroy();
+ const off=harness(raw(),{},{telemetry:false});seen.hostOff=logs(off);off.ctl.liveStatus.destroy();
+ // A host without a logs connector cannot run lookups in Live either, so Over time does not outrank that note.
+ const bare=harness(raw(),{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){}}}});bare.ctl.telemetry.openHistory([{at:'2026-11-01T00:00:00.000Z'}],0);seen.noConnectorOverTime=logs(bare);bare.ctl.liveStatus.destroy();
+ assert.deepEqual(seen,{
+  overTime:[false,'Log lookups work in Live, not in Over time. Switch to Live to use them.'],
+  backToLive:[true,''],
+  closed:[false,'This view was closed. Reopen it to look up log lines.'],
+  boardOff:[false,'Log lookups need telemetry, which this board turns off.'],
+  hostOff:[false,'Log lookups need telemetry, which this host turns off.'],
+  noConnectorOverTime:[false,'Log lookups need a Grafana connector, which this host does not provide.']});
+});
 test('#1124 a log-line trace that is not found says it may not have been kept and offers the next line',async()=>{
  const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
  const ids=['a1'.repeat(16),'b2'.repeat(16),'c3'.repeat(16)],calls=[];
@@ -3019,5 +3042,56 @@ test('#1124 a log-line trace that is not found says it may not have been kept an
  assert.equal(m.body.querySelector('.dv-trace-log-next'),null);
  // A pasted ID keeps today's text.
  api.setDirectTraceField({field:'input',value:ids[0]});assert.equal(await api.loadDirectTrace(false),null);assert.equal(report().error,'Trace not found in the last 2h. Try a longer lookback under Lookback.');
+ api.destroy();
+});
+
+/* #1137: a board without ticket references (snapshot().available === false) gives metric cards
+   no Jira presentation; a board with tickets keeps "unchanged" on an unticketed carded edge. */
+async function paintedCard(nodes){
+ const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes,rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:{rate:{value:100},errors:{value:50}}}})}}),matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+ // SVG measurement shims so the real card painter places a card in the VM DOM.
+ h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+ const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+ for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
+ h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
+ return {h,card:h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]')};
+}
+function workPresentation(h,card){
+ h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});
+ const pop=h.view.querySelector('.dv-live-popover');
+ return {appearance:card.getAttribute('data-live-appearance'),classes:Array.from(h.C.LIVE_STATUS_APPEARANCES).filter(s=>card.classList.contains('dv-live-'+s)),halo:!!card.querySelector('.dv-live-halo'),
+  label:/No change needed/.test(card.getAttribute('aria-label')||''),popover:!!pop && pop.querySelectorAll('.dv-live-coverage-detail').some(p=>/No change needed/.test(p.textContent||''))};
+}
+test('#1137 metric cards on a board without tickets get no Jira presentation; ticketed boards keep unchanged',async()=>{
+ const free=await paintedCard({a:{},b:{}});
+ assert.equal(free.h.ctl.liveStatus.snapshot().available,false,'fixture has no ticket references');
+ assert.ok(free.card,'the degraded carrier has a metric card');
+ assert.equal(free.card.getAttribute('data-verdict'),'degraded');
+ assert.deepEqual(workPresentation(free.h,free.card),{appearance:null,classes:[],halo:false,label:false,popover:false},'no Jira presentation on a Jira-free board');
+ assert.ok(free.card.classList.contains('dv-live-target'),'the card still opens its production evidence');
+ assert.ok(free.h.view.querySelector('.dv-live-popover'),'the click opened the popover');
+ assert.equal(free.card.getAttribute('data-verdict'),'degraded','the card keeps its own verdict');
+ free.h.ctl.liveStatus.destroy();
+ const ticketed=await paintedCard({a:{tickets:['AA-1']},b:{}});
+ assert.equal(ticketed.h.ctl.liveStatus.snapshot().available,true);
+ assert.ok(ticketed.card);
+ assert.equal(ticketed.card.getAttribute('data-verdict'),'degraded');
+ assert.deepEqual(workPresentation(ticketed.h,ticketed.card),{appearance:'unchanged',classes:['unchanged'],halo:true,label:true,popover:true},'an unticketed edge on a ticketed board stays unchanged');
+ ticketed.h.ctl.liveStatus.destroy();
+});
+test('#1137 an applied status map on a board without tickets gives nodes, step coins and captions no Jira presentation',()=>{
+ const seed=harness(),model=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=model('provider',{nodes:{api:{title:'Imported API'}},rows:[['api']],topologyExports:{core:{nodes:['api'],edges:[]}}});
+ const consumer=model('consumer',{nodes:{a:{title:'Sender'},b:{title:'Receiver'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],steps:[{nodes:['a','shared::api']},{edge:'a->b'}],topologyImports:[{spec:'provider',export:'core',as:'shared'}]});
+ const h=harness(seed.C.FlowTopology.materialize([provider,consumer])[1]),api=h.ctl.liveStatus,rec=h.ctl.sections[0],controls=stepTicketControls(h,rec);seed.ctl.liveStatus.destroy();
+ api.apply({});controls.change(0);
+ assert.equal(api.snapshot().available,false,'fixture has no ticket references');
+ const presentation=id=>{const node=h.view.querySelector('g.node[data-dv-node="'+id+'"]');return {node:node.getAttribute('data-live-appearance'),label:/No change needed/.test(node.querySelector('.card').getAttribute('aria-label')||'')};};
+ const caption=controls.host.querySelector('.dv-live-caption');
+ assert.deepEqual({local:presentation('a'),imported:presentation('shared::api'),
+  coin:rec.sectionEl.querySelector('g.coin[data-dv-step="0"]').getAttribute('data-live-appearance'),chip:rec.sectionEl.querySelector('button.schip[data-step-source="0"]').getAttribute('data-live-appearance'),
+  caption:caption?caption.textContent:null,painted:h.view.querySelectorAll('[data-live-appearance]').length},
+  {local:{node:null,label:false},imported:{node:null,label:false},coin:null,chip:null,caption:null,painted:0});
  api.destroy();
 });

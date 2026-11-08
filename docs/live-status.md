@@ -573,7 +573,7 @@ Steps, coins and chips derive their state only from the edges and nodes explicit
 added to that step, including failed communications and imported elements, and
 never carry tickets. A step can narrow them with a [ticket filter](#step-ticket-filters).
 An edge does not bring its endpoint nodes into a step's
-status unless they are also listed in `nodes`. Unlinked, unmarked nodes derive No change needed; an
+status unless they are also listed in `nodes`. Unlinked, unmarked nodes derive No change needed (on boards with ticket references); an
 explicit `missingWork: true` contributes Missing. No-change is neutral in mixed
 rollups. Linked tickets without evidence never imply Done or No change needed.
 Pull requests never carry live state: an authored `prs` URL is an icon, and the
@@ -1036,7 +1036,11 @@ outline, fill and glow follow the bound edge's shared work presentation and stat
 appearance preferences. Every attached ticket participates, including inherited
 provider and import-overlay tickets: blocked/missing/active/testing take precedence,
 unknown evidence cannot claim completion, and an unticketed carrier shows the thin
-1px green no-change outline with no default glow. Endpoint tickets do not supply
+1px green no-change outline with no default glow. On a board with no ticket, epic,
+exclusion or missing-work references (`snapshot().available === false`), carriers and
+cards get no work presentation, even after a status map is applied: no outline state,
+no "No change needed" label, caption or popover line; cards show their own verdict only.
+Endpoint tickets do not supply
 an edge's work state. Telemetry proof never overrides the work outline.
 
 Observed numeric values follow the carrier’s configured tone (green for no-change,
@@ -2265,8 +2269,8 @@ connection and any independently authored communication failure. Local,
 imported, nested and resolved-snapshot connections follow the same behavior;
 a provider-inherited marker stays read-only in authored import overlays.
 
-With Live status data applied, nodes with no linked tickets and no missing-work
-marker automatically show **No change needed** (green, faint fill, solid outline, no
+With Live status data applied on a board with ticket references, nodes with no linked
+tickets and no missing-work marker automatically show **No change needed** (green, faint fill, solid outline, no
 glow). This state is neutral in mixed step rollups: done plus no-change stays
 done. Linked tickets without provider evidence remain unknown. Text boxes stay
 inert. Clear, disable and destroy restore authored paint. Existing ticket-gated
@@ -3015,6 +3019,12 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   `query_loki_logs`, or in a host without one (native mounts), the lookup
   controls are disabled with a message and the rest of Load trace is unchanged.
   Discovery reads tool metadata only, once, when the Trace view first shows.
+- The disabled note names the cause (#1125): Over time on a past day ("Log
+  lookups work in Live, not in Over time. Switch to Live to use them."), board
+  telemetry off (`enabled: false`), host telemetry off, or a closed view. On a
+  host without a logs connector, the connector note wins over Over time and
+  board telemetry off. With the Grafana connector, returning to Live
+  re-enables the lookup.
 
 The result shape follows grafana/mcp-grafana `tools/loki.go`
 (`QueryLokiLogsResult` with `format` full, read 2026-11-07): `data` is a list of

@@ -45,6 +45,9 @@ is preserved; unsupported future offsets, zero and date expressions warn and
 use the default `24h`. `get_trace` uses
 `environment_slug`, returned `trace_id`, `from`, and `view_mode: full` only if
 supported. `run_query` completes results; there is no invented polling contract.
+A `get_trace` response with only a Metadata block (`navigation_hints: no spans
+found`) and no span table is reported as not found for the lookback that was
+sent; see [Lookback](trace-connections.md#lookback).
 
 Tempo uses native `search_tempo_traces(datasourceUid, query, start, end, limit,
 spss)` and `get_tempo_trace(datasourceUid, trace_id, start, end)` with paired RFC3339

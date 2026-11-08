@@ -25,6 +25,9 @@ function telemetryTraceTable(text,required,section){
   if(begin<0)telemetryTraceFail('Missing trace table section.');
   var header=-1,keys;
   for(var i=begin;i<lines.length;i++){var l=lines[i].replace(/^ResultTool response/,'').trim();if(l[0]!=='|')continue;var fields=l.slice(1,-1).split('|').map(function(s){return s.trim();});if(required.every(function(k){return fields.indexOf(k)>=0;})){header=i;keys=fields;break;}}
+  // A provider "no spans found" answer with no table at all is a not-found
+  // result for the requested window; a present but wrong table is not.
+  if(header<0 && !lines.some(function(l){return l.replace(/^ResultTool response/,'').trim()[0]==='|';}) && /^ {2}navigation_hints: no spans found\s*$/m.test(text)){var missing=new Error('No spans found in the requested time range.');missing.code='trace_not_found';throw missing;}
   if(header<0 || new Set(keys).size!==keys.length || !/^\s*\|(?:\s*:?-+:?\s*\|)+\s*$/.test(lines[header+1] || ''))telemetryTraceFail('Unsupported trace table header.');
   var rows=[];for(i=header+2;i<lines.length && /^\s*\|/.test(lines[i]);i++){
     if(rows.length>=10000 || /\\\|/.test(lines[i]))telemetryTraceFail('Trace table exceeds bounds or has ambiguous cells.');

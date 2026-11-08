@@ -109,7 +109,7 @@ var FlowTraceConnections=(function(){
     var env=p.environments[ids[0]],args=Object.assign({},p.literals,env.literals),a=p.arguments;args[a.traceId]=parsed.traceId;
     args[a.start]=p.time.encoding==='relative'?start:encode(from,p.time);if(a.end && p.time.encoding!=='relative')args[a.end]=encode(to,p.time);
     if(a.environment)args[a.environment]=env.value;Object.keys(a.context || {}).forEach(function(k){args[a.context[k]]=env.context[k];});
-    return {traceId:parsed.traceId,environment:ids[0],args:args,range:{from:iso(from),to:iso(to)}};
+    return {traceId:parsed.traceId,environment:ids[0],args:args,range:{from:iso(from),to:iso(to)},lookback:relative?start.slice(1):null};
   }
   /* Fail closed on schema features we cannot honor. anyOf/oneOf nullable unions
      and all required arguments are validated before a tool call. */

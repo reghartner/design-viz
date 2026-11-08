@@ -2776,3 +2776,5 @@ clearing still address the original carrier; descendant work is edited at its so
 ### Direct trace loading
 
 Status → Trace can load one exact trace ID or a supported provider link using an inherited company or board [trace connection profile](trace-connections.md). Load/Verify are read-only session actions independent of Metrics polling. Imported and local nodes share authored traceMatch mapping behavior; choose the exact mapping diagram when several are available.
+
+Selecting a span in the loaded trace shows its exact **Service** and **Operation** (#1078), the strings a step's `traceMatch.serviceName` and `traceMatch.operation` must match; copy them from there. A span that no step maps says "No authored step maps this span. Add a traceMatch to a step to map this span." and links to [Make an existing diagram Trace-ready](trace-ready-authoring.md).

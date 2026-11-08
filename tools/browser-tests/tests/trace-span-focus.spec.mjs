@@ -122,11 +122,12 @@ test('desktop unmapped span links the traceMatch guide; span detail shows exact 
 for(const change of ['environment','connection','clear','history','remount'])test('desktop stale span callbacks cannot navigate after '+change,async({page,server})=>{
  const {root,imported}=await setup(page,server);await row(root,imported).click();
  await page.evaluate(()=>{window.staleAPI=window.api;window.staleAction={context:window.api.snapshot().trace.selected.context,spanId:window.api.snapshot().trace.selected.focus.spanId};window.jumpCalls=0;const jump=window.sp.jumpSource;window.sp.jumpSource=function(...args){window.jumpCalls++;return jump.apply(this,args);};});
- await page.evaluate(change=>{
+ await page.evaluate(async change=>{
   if(change==='environment')window.api.setDirectTraceField({field:'environment',value:'stage'});
   if(change==='connection')window.api.setDirectTraceField({field:'connection',value:''});
   if(change==='clear')window.api.clearTraceFocus({context:window.staleAction.context});
-  if(change==='history')window.viewer.controller.telemetry.openHistory([{at:'2026-10-12T00:00:00Z'}],0);
+  // #1145 (D5): Over time on a day other than the trace's own clears the trace.
+  if(change==='history'){window.api.setHistory({load:()=>({days:[{key:'2026-09-01',label:'Sep 1',short:'Sep 1',states:{}},{key:'2026-09-02',label:'Sep 2',short:'Sep 2',states:{}}]})});window.api.overTime();await new Promise(r=>setTimeout(r,0));}
   if(change==='remount'){window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),window.focusSpec,window.focusOptions);}
   window.staleResult=window.staleAPI.selectTraceSpan(window.staleAction);
  },change);

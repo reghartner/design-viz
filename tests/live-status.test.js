@@ -2843,9 +2843,9 @@ test('#1136 a reader working on a loaded trace keeps the Trace view when a loade
  api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:ID});
  assert.ok(await api.loadDirectTrace(false),'contrasting precondition: the trace loads');assert.ok(api.snapshot().trace.selected,'and is shown');
  await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.flush();
- // The detail adds a mapping diagram, which resets the loaded trace as before; the reader stays in the Trace view to load again.
- assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().mode,'trace','trace work keeps the Trace view');
- assert.deepEqual(m.body.querySelectorAll('button.dv-status-mode').filter(el=>shownIn(el,m.body)).map(accessibleName),['Jira','Trace'],'the switch appears with the references');
+ // The detail adds a mapping diagram; the loaded trace stays (#1145) and the reader stays in the Trace view.
+ assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().mode,'trace','trace work keeps the Trace view');assert.ok(api.snapshot().trace.selected,'#1145: the loaded trace stays');
+ assert.deepEqual(m.body.querySelectorAll('button.dv-status-mode').filter(el=>shownIn(el,m.body)).map(accessibleName),['Jira','Trace · 1'],'the switch appears with the references');
  m.destroy();api.destroy();
 });
 test('#1136 choosing a trace or focusing a span keeps the Trace view when a loaded detail brings tickets',async()=>{
@@ -3293,11 +3293,12 @@ const dayTraceAt=ms=>{const delta=BigInt(ms)*1000000n-1791779586602194688n;retur
 const daysBack=(n,hour=12)=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate()-n,hour).getTime();};
 const dayKeyOf=ms=>{const d=new Date(ms);return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())).toISOString().slice(0,10);};
 const dayLabelOf=ms=>new Date(ms).toLocaleDateString([],{month:'short',day:'numeric'});
-function dayTraceBoard({at,loadDetail}={}){
+function dayTraceBoard({at,loadDetail,lines}={}){
  const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),calls=[];let payload=dayTraceAt(at);
  const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
  const raw=overFixture();raw.page.tracking.telemetry={traceConnections:{company:profile}};
  const renderOptions={telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async(request,args)=>{calls.push(plain(args));return {payload};}}}};
+ if(lines){Object.assign(raw.page.tracking.telemetry,{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}}});Object.assign(renderOptions.telemetry.directTrace,{logsConnector:async()=>'Grafana',queryLogs:async()=>({data:lines})});}
  if(loadDetail)renderOptions.loadDetail=loadDetail;
  const h=harness(raw,{},renderOptions),api=overReady(h.ctl.liveStatus),m=mountStatus(h),now=Date.now();
  api.apply(overToday());api.setStatusMode('trace');
@@ -3344,6 +3345,18 @@ test('#1145 a trace from a day outside the day list keeps the view and says so',
  api.overTime();await historySettle();assert.equal(b.loaded(),false,'the reader\'s own move to Over time clears it');
  const index=api.snapshot().overTime.index;assert.ok(await api.loadDirectTrace(false));await historySettle();
  assert.equal(api.snapshot().overTime.index,index,'the selected day stays');assert.ok(b.loaded());assert.equal(b.note(),note);assert.equal(calls.length,2);
+ api.destroy();
+});
+test('#1145 Load on a log line from two days back moves the view to that day; the list says loading moves the date',async()=>{
+ const at=daysBack(2),line={timestamp:String(BigInt(at+60000)*1000000n),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:{cameraModel:'arch',trace_id:DAY_TRACE_ID,span_id:'011114cbd1fd62de'}};
+ const b=dayTraceBoard({at,lines:[line]}),{api,m,calls}=b,settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
+ await settle();api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();
+ assert.equal(m.body.querySelector('.dv-trace-logs-moves').textContent,'Loading a trace moves the view to its date.');
+ const reach=()=>'-'+Math.ceil((Date.now()-(at+60000-3600000))/3600000)+'h',before=reach();
+ assert.ok(await api.loadLogTrace(0));await historySettle();
+ assert.equal(api.snapshot().overTime.active,true);assert.equal(b.days[api.snapshot().overTime.index].key,dayKeyOf(at),'the view moved to the trace\'s day');
+ assert.ok(b.loaded());assert.equal(calls.length,1);assert.ok([before,reach()].includes(calls[0].from),'D9: back to the line time − 1 h');
+ assert.equal(api.snapshot().trace.selected.focus && api.snapshot().trace.selected.focus.spanId,'011114cbd1fd62de','the line\'s span stays focused');
  api.destroy();
 });
 test('#1145 opening a drill-down keeps the loaded trace and its selection',async()=>{

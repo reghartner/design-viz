@@ -1,0 +1,89 @@
+'use strict';
+/* #1099: find a trace from a Loki log line in Load trace. Test names carry the
+   ticket's test plan number. The browser contract trace-log-lookup.spec.mjs covers
+   the form, loading the found trace and focusing its span (plan 1, 2 and 6). */
+const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
+const {entrypoint}=require('../tools/source-loader.cjs');
+const fixture=require('./fixtures/trace-connection-profile.json');
+const clone=x=>JSON.parse(JSON.stringify(x)),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
+const TRACE='1e4cef70fde7bde26ca79f1e74c05bcb',SPAN='b4be3d5412c33b2e',OTHER='8413cd87a9f15b6bfe8e1acf5b3346d0';
+const QUERY='{env="$env", k8s_namespace_name="${namespace}"} |= "Handling camera stats message" | cameraModel="$value"';
+const EXPANDED='{env="stg", k8s_namespace_name="cameras-stg"} |= "Handling camera stats message" | cameraModel="arch"';
+function context(name='standalone'){const C={URL,AbortController,TextEncoder,TextDecoder,console,setTimeout,clearTimeout,document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint(name).body,C);return C;}
+function board(lookups={camera:{label:'Camera model',query:QUERY,values:['arch','wren']}}){
+ return {tracking:{telemetry:{grafana:{loki:'loki-$env'},environment:'stg',environments:{stg:{variables:{namespace:'cameras-stg'}},prd:{variables:{namespace:'cameras-prd'}}},lookups,traceConnections:{company:clone(fixture)}}},sections:[{id:'one',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+}
+// One log line as grafana/mcp-grafana tools/loki.go returns it (format full).
+function entry({at='1794044533123456789',meta={cameraModel:'arch',deviceId:'cam-1',trace_id:TRACE,span_id:SPAN},labels={env:'stg',k8s_namespace_name:'cameras-stg',severity_text:'DEBUG'},line='Handling camera stats message'}={}){
+ return {timestamp:at,line,labels,...(meta?{structuredMetadata:meta}:{})};
+}
+const GRAFANA={server:'Grafana',tools:[{name:'query_loki_logs',annotations:{readOnlyHint:true}}]},DETAIL={server:fixture.server,tools:[{name:'get_trace',annotations:{readOnlyHint:true}}]};
+function setup({p=board(),data=[entry()],servers=[DETAIL,GRAFANA],lookback={start:'',end:'',lookback:'2h'}}={}){
+ const C=context(),calls=[],counts={lists:0};let changes=0;
+ const mcp={listTools:async()=>{counts.lists++;return clone(servers);},callTool:async(server,tool,args)=>{calls.push({server,tool,args:clone(args)});return {content:[{type:'text',text:JSON.stringify({data,metadata:{linesReturned:data.length,maxLinesAllowed:10,resultsTruncated:false}})}]};}};
+ const transport=C.createTelemetryProviders(p,{claude:{use:async()=>mcp}}).options.directTrace;
+ const api=C.createTelemetryLogLookup(p,transport,{config:()=>C.telemetryEnvironmentConfig(p,'stg'),lookback:()=>lookback,changed:()=>changes++});
+ return {C,p,api,calls,counts,changes:()=>changes};
+}
+const rows=api=>clone(api.snapshot().result.rows).map(r=>[r.time,r.value,r.traceId,r.spanId,r.missing]);
+
+test('plan 1: an authored lookup with a value makes one query_loki_logs call with the expanded query, the lookback range and limit 10',async()=>{
+ const later=entry({at:'1794040000000000000',meta:{cameraModel:'arch',trace_id:OTHER}}),h=setup({data:[entry(),later].concat(Array.from({length:10},()=>later))});
+ assert.equal(h.api.snapshot().available,false,'the connector is checked before lookups are offered');await settle();
+ let s=h.api.snapshot();assert.equal(s.available,true);assert.equal(h.counts.lists,1);assert.equal(h.calls.length,0,'discovery calls no data tool');
+ assert.deepEqual(clone(s.lookups),[{id:'camera',label:'Camera model',slot:true,values:['arch','wren']}]);assert.equal(s.form.lookup,'camera');
+ h.api.set('value','arch');assert.equal(h.calls.length,0,'typing a value calls nothing');
+ await h.api.find();
+ assert.deepEqual(h.calls,[{server:'Grafana',tool:'query_loki_logs',args:{datasourceUid:'loki-stg',logql:EXPANDED,startRfc3339:'now-2h',endRfc3339:'now',limit:10,direction:'backward',queryType:'range'}}]);
+ s=h.api.snapshot();assert.equal(s.busy,false);assert.equal(s.result.error,undefined);assert.equal(s.result.query,EXPANDED);assert.equal(s.result.rows.length,10,'at most 10 lines are listed');
+ assert.deepEqual(rows(h.api).slice(0,2),[['2026-11-07T09:42:13.123Z','arch',TRACE,SPAN,''],['2026-11-07T08:26:40.000Z','arch',OTHER,null,'']]);
+ // Absolute Load trace bounds reach Loki unchanged; a missing environment variable calls nothing.
+ const absolute=setup({lookback:{start:'2026-11-07T06:00:00Z',end:'2026-11-07T10:00:00.5Z',lookback:'2h'}});await settle();absolute.api.set('value','arch');await absolute.api.find();
+ assert.equal(absolute.calls[0].args.startRfc3339,'2026-11-07T06:00:00Z');assert.equal(absolute.calls[0].args.endRfc3339,'2026-11-07T10:00:00.5Z');
+ const unset=board();delete unset.tracking.telemetry.environments.stg.variables;const missing=setup({p:unset});await settle();missing.api.set('value','arch');assert.equal(await missing.api.find(),null);
+ assert.equal(missing.calls.length,0);assert.match(missing.api.snapshot().result.error,/\$\{namespace\}/);
+ // A value that could leave its LogQL string is refused before any call.
+ h.api.set('value','arch" or "x');assert.equal(await h.api.find(),null);assert.equal(h.calls.length,1);assert.match(h.api.snapshot().result.error,/quotes/);
+});
+
+test('plan 3: the trace id is read from structured metadata or a label; a line without it says "This log line has no trace_id"',async()=>{
+ const C=context(),fields={traceId:'trace_id',spanId:'span_id'};
+ const parsed=C.telemetryLogLines({data:[entry(),entry({meta:null,labels:{env:'stg',trace_id:TRACE,span_id:SPAN}}),entry({meta:{cameraModel:'arch'}})]},fields);
+ assert.deepEqual(clone(parsed.rows).map(r=>[r.traceId,r.spanId,r.missing]),[[TRACE,SPAN,''],[TRACE,SPAN,''],[null,null,'This log line has no trace_id']]);
+ const named=C.telemetryLogLines({data:[entry({meta:{tid:TRACE,sid:SPAN}}),entry({meta:{}})]},{traceId:'tid',spanId:'sid'});
+ assert.deepEqual(clone(named.rows).map(r=>[r.traceId,r.spanId,r.missing]),[[TRACE,SPAN,''],[null,null,'This log line has no tid']]);
+ assert.throws(()=>C.telemetryLogLines({streams:[]},fields),/no log lines/);
+ const h=setup({data:[entry({meta:{cameraModel:'arch'}})]});await settle();h.api.set('value','arch');await h.api.find();
+ assert.deepEqual(rows(h.api),[['2026-11-07T09:42:13.123Z','arch',null,null,'This log line has no trace_id']]);
+});
+
+test('plan 4: a reader-typed LogQL log query runs the same way',async()=>{
+ const typed='{env="$env"} |= "Handling camera stats message" | cameraModel="wren"',h=setup({p:board({}),data:[entry({line:'Handling camera stats message model=wren'})]});await settle();
+ let s=h.api.snapshot();assert.deepEqual(clone(s.lookups),[]);assert.equal(s.form.lookup,h.C.TELEMETRY_LOG_TYPED);
+ h.api.set('logql',typed);await h.api.find();
+ assert.deepEqual(h.calls,[{server:'Grafana',tool:'query_loki_logs',args:{datasourceUid:'loki-stg',logql:'{env="stg"} |= "Handling camera stats message" | cameraModel="wren"',startRfc3339:'now-2h',endRfc3339:'now',limit:10,direction:'backward',queryType:'range'}}]);
+ assert.deepEqual(rows(h.api),[['2026-11-07T09:42:13.123Z','Handling camera stats message model=wren',TRACE,SPAN,'']]);
+ const metric=setup({p:board({}),data:[{values:[{timestamp:'1794044533.000',value:3}],labels:{env:'stg'}}]});await settle();metric.api.set('logql','count_over_time({env="stg"}[5m])');await metric.api.find();
+ assert.match(metric.api.snapshot().result.note,/metric query/);
+ h.api.set('logql','');assert.equal(await h.api.find(),null);assert.equal(h.calls.length,1);
+});
+
+test('plan 5: malformed lookups fail with their field path',()=>{
+ const C=context(),warnings=[],lookups={
+  noQuery:{label:'No query'},noSlot:{label:'No slot',query:'{env="$env"} |= "x"',values:['arch']},badTrace:{label:'Bad trace field',query:QUERY,fields:{traceId:'trace-id'}},
+  badSpan:{label:'Bad span field',query:QUERY,fields:{spanId:'1span'}},badValue:{label:'Bad value',query:QUERY,values:['a"b']},unknown:{label:'Unknown',query:QUERY,extra:true},good:{label:'Good',query:QUERY}};
+ const parsed=C.trackingTelemetry({tracking:{telemetry:{lookups}}},(at,message)=>warnings.push(at));
+ assert.deepEqual(Object.keys(parsed.lookups),['good']);assert.deepEqual(clone(parsed.lookups.good),{label:'Good',query:QUERY,fields:{traceId:'trace_id',spanId:'span_id'}});
+ assert.deepEqual(warnings.sort(),['.lookups.badSpan.fields.spanId','.lookups.badTrace.fields.traceId','.lookups.badValue.values[0]','.lookups.noQuery.query','.lookups.noSlot.query','.lookups.unknown.extra']);
+ const result=C.validate({tracking:{telemetry:{lookups}},sections:[{id:'s',diagram:{nodes:{a:{}},rows:[['a']]}}]});
+ for(const at of ['noQuery.query','noSlot.query','badTrace.fields.traceId','badSpan.fields.spanId'])assert.ok(result.warnings.some(w=>w.startsWith('tracking.telemetry.lookups.'+at+':')),at);
+ const shape=[];C.trackingTelemetry({tracking:{telemetry:{lookups:[]}}},at=>shape.push(at));assert.deepEqual(shape,['.lookups']);
+});
+
+test('plan 6: without a Grafana connector lookups are disabled with a message and call nothing',async()=>{
+ const h=setup({servers:[DETAIL]});h.api.snapshot();await settle();
+ const s=h.api.snapshot();assert.equal(s.available,false);assert.match(s.note,/Grafana connector with query_loki_logs/);
+ h.api.set('value','arch');assert.equal(await h.api.find(),null);assert.equal(h.calls.length,0);
+ const C=context(),native=C.createTelemetryLogLookup(board(),{describe(){},call(){}},{});assert.equal(native.snapshot().available,false);assert.match(native.snapshot().note,/Grafana connector/);
+ assert.equal(C.createTelemetryLogLookup({tracking:{telemetry:{}}},null,{}).snapshot(),null,'a board without lookups has no log section');
+});

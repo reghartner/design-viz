@@ -571,6 +571,30 @@ class InjectTests(unittest.TestCase):
         resolved["page"]["sections"][0]["diagram"] = {"nodes": {"local": {"title": "Local"}, "shared::api": {"title": "API", "telemetry": signal}}, "rows": [["local", "shared::api"]]}
         self.assertEqual(declaration(resolved)["mcp"]["servers"], [grafana])
 
+    def test_agent_guide_declares_query_loki_logs_for_load_trace_log_lookups(self):
+        # #1099: Load trace log lookups call query_loki_logs on the Grafana connector,
+        # also on a board without loki signals. Without Load trace they are unused.
+        inject = load_inject()
+        profile = json.loads((ROOT / "tests/fixtures/trace-connection-profile.json").read_text())
+        lookups = {"camera": {"label": "Camera model", "query": '{env="$env"} |= "Handling camera stats message" | cameraModel="$value"'}}
+
+        def servers(telemetry, signals=None):
+            node = {"telemetry": {"kind": "service", "signals": signals}} if signals else {}
+            spec = {"page": {"tracking": {"telemetry": telemetry}, "blocks": [{"diagram": {"nodes": {"a": node}, "rows": [["a"]]}}]}}
+            with mock.patch.object(inject, "company_agent_context", return_value={}):
+                guide = GUIDE_BLOCK.search(inject.agent_guide(spec, "a" * 40))[1]
+            return json.loads(re.search(r"```json\n(.*?)\n```", guide, re.S)[1]).get("mcp", {}).get("servers", [])
+
+        detail = {"server": profile["server"], "tools": ["get_trace"]}
+        base = {"grafana": {"loki": "logs"}, "traceConnections": {"company": profile}, "lookups": lookups}
+        self.assertEqual(servers(base), [{"server": "Grafana", "tools": ["query_loki_logs"]}, detail])
+        self.assertEqual(servers({**base, "lookups": {}}), [{"server": "Grafana", "tools": ["query_loki_logs"]}, detail])
+        self.assertEqual(servers(base, {"logs": {"loki": 'count_over_time({app="a"}[5m])'}}), [{"server": "Grafana", "tools": ["query_loki_logs"]}, detail])
+        self.assertEqual(servers(base, {"rate": {"grafana": "up"}}), [{"server": "Grafana", "tools": ["query_prometheus", "query_loki_logs"]}, detail])
+        self.assertEqual(servers({k: v for k, v in base.items() if k != "lookups"}), [detail])
+        self.assertEqual(servers({**base, "traceConnections": {}}), [])
+        self.assertEqual(servers({**base, "enabled": False}), [])
+
     def test_combined_jira_honeycomb_guides_fit_real_cap_without_losing_edit_rules(self):
         inject = load_inject()
         self.assertEqual(inject.GUIDE_LIMIT, 8 * 1024, "all-connectors headroom; separate skill caps are unchanged")

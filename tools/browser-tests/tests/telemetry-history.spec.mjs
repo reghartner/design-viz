@@ -65,7 +65,7 @@ test('#1082 Over time shows the selected day large, TODAY on a day dated today, 
  const row=root.locator('.dv-live-over-time-row'),day=row.locator('.dv-live-over-time-day'),date=row.locator('.dv-live-over-time-date'),next=root.getByRole('button',{name:'Next day',exact:true});
  await over(root).click();await expect(slider(root)).toHaveValue('2');await expect(day).toHaveText('TODAY');await expect(date).toHaveText('Day 3');
  const size=locator=>locator.evaluate(el=>parseFloat(getComputedStyle(el).fontSize)),note=await size(row.locator('.dv-live-over-time-note'));
- expect(await size(day),'heading-sized').toBeGreaterThanOrEqual(18);expect(await size(day)).toBeGreaterThan(await size(date));expect(await size(date)).toBeGreaterThan(note);
+ expect(await size(day),'larger than the epic key heading (20px)').toBeGreaterThanOrEqual(28);expect(await size(day)).toBeGreaterThan(await size(date));expect(await size(date)).toBeGreaterThanOrEqual(16);expect(await size(date)).toBeGreaterThan(note);
  await select(root,0);await expect(day).toHaveText('Day 1');await expect(date).toBeHidden();
  await next.click();await expect(slider(root)).toHaveValue('1');await expect(day).toHaveText('Day 2');
  await next.click();await expect(day).toHaveText('TODAY');

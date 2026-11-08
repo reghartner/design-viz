@@ -283,6 +283,7 @@ test('O1 O2 O3 O4 O5 O6 O7 demo Over time moves through days without changing an
  await expect(row.locator('.dv-live-over-time-end')).toHaveText(['Day 1','Day 12']);await expect(row.locator('.dv-live-over-time-note')).toHaveText('Status as of Day 4 — signal blocker · other columns show today');await expect(row).toBeVisible();
  // #1082: a demo day is a scripted date, so its heading shows the day's label and never TODAY.
  const heading=row.locator('.dv-live-over-time-day');await expect(heading).toHaveText('Day 4 — signal blocker');await expect(row.locator('.dv-live-over-time-date')).toBeHidden();
+ const fontSize=locator=>locator.evaluate(el=>parseFloat(getComputedStyle(el).fontSize));expect(await fontSize(heading),'the day is the most prominent text, at least the epic key size').toBeGreaterThanOrEqual(await fontSize(panel.locator('.dv-live-epic-key').first()));
  // O2 O3. Keyboard back to Day 1.
  await slider.focus();for(const value of ['2','1','0']){await page.keyboard.press('ArrowLeft');await expect(slider).toHaveValue(value);await expect(slider).toBeFocused();}
  await expect(note).toHaveText('Day 1 — kickoff');await expect(slider).toHaveAttribute('aria-valuetext','Day 1 — kickoff');await expect(heading).toHaveText('Day 1 — kickoff');await expect(edge).toHaveClass(/dv-live-todo/);await expect(edge).not.toHaveClass(/dv-live-blocked/);await expect(coin).toHaveClass(/dv-live-todo/);

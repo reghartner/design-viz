@@ -232,10 +232,17 @@ its own `nodeId`, budgets and `panelId` then apply. If none matches, the step
 shows the first ambiguous result, so a selector that needs refinement stays
 visible; otherwise it shows the last alternative's **not observed** result. A
 child step's `parentStepId` refers to whichever alternative of the parent step
-matched. The array must not be empty; validation reports an invalid entry with
-its index, for example `traceMatch[1].occurrence`. Alternatives do not make two
-spans in one trace acceptable: the matched alternative still needs one unique
-span (or a `repeat:"attempts"` group).
+matched. On a path that does not contain an alternative's `parentStepId` step,
+that alternative is skipped, so a child shared by two paths can name each path's
+parent; if every alternative is skipped the step is **not observed**. (A single
+object whose parent step is not on the path is still an error.) The array must
+not be empty; validation reports an invalid entry with its index, for example
+`traceMatch[1].occurrence`. Alternatives do not make two spans in one trace
+acceptable: the matched alternative still needs one unique span (or a
+`repeat:"attempts"` group). The alternative is chosen per step before the check
+that one span maps to only one step, so if the chosen alternative's span is also
+claimed by another step, the step becomes ambiguous and later alternatives are
+not tried.
 
 The panel has one bounded waterfall and a **Show on diagram** toggle. All canvas
 annotations are runtime-only, with no layout/spec persistence. Pin stores evidence

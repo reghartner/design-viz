@@ -34,7 +34,8 @@
 
    Map: per carrier, each signal's series is the result's points added by time
    ([epoch ms, number], ascending), value its last point, 0 with no points
-   when the query matched nothing; sql signals carry a value only. observedAt
+   when the query matched nothing (unobserved when the signal sets
+   missingMeansZero: false); sql signals carry a value only. observedAt
    is the newest point of the refresh (the server clock); markers are that
    window's annotations; links are the authored ones plus the Explore link.
 
@@ -327,7 +328,7 @@ function telemetryGrafanaJobs(bindings){
     Object.keys(binding.signals).forEach(function(name){
       var signal=binding.signals[name];
       if(signal && TELEMETRY_GRAFANA_RUN.indexOf(signal.source)>=0 && (signal.source==='cloudwatch'?telemetryCloudwatchQuery(signal.query):signal.source==='cloudwatchLogs'?telemetryCloudwatchLogsQuery(signal.query):typeof signal.query==='string'))
-        signals.push({name:name,source:signal.source,query:signal.query,links:signal.links || {},error:signal.error,breakdownError:signal.breakdownError,trendError:signal.trendError,unit:typeof signal.unit==='string' && signal.unit?signal.unit:null});
+        signals.push({name:name,source:signal.source,query:signal.query,links:signal.links || {},error:signal.error,breakdownError:signal.breakdownError,trendError:signal.trendError,unit:typeof signal.unit==='string' && signal.unit?signal.unit:null,missingMeansZero:signal.missingMeansZero});
     });
     if(signals.length)jobs.push({id:binding.id,signals:signals,binding:binding,links:binding.links && typeof binding.links==='object'?binding.links:{}});
   });
@@ -583,9 +584,9 @@ function createTelemetryGrafana(page,win,now,bound){
               var data=payload && payload.data && Array.isArray(payload.data.result)?{data:payload.data.result}:payload;
               var points=payload && payload.data && payload.data.resultType==='streams'?[]:telemetryGrafanaLoki(data);
               if(points.length)entry.points=points;
-              else if(telemetryLokiEmpty(payload) && telemetryLokiCountingQuery(entry.query))entry.value=0;
+              else if(telemetryLokiEmpty(payload) && entry.missingMeansZero!==false && telemetryLokiCountingQuery(entry.query))entry.value=0;
               else notices.push(label+': no numeric observation');
-            }else {var promPoints=telemetryGrafanaPrometheus(payload);if(!windowRange || promPoints.length)entry.points=promPoints;else notices.push(label+': no numeric observation in this window');}
+            }else {var promPoints=telemetryGrafanaPrometheus(payload);if(promPoints.length || !windowRange && entry.missingMeansZero!==false)entry.points=promPoints;else notices.push(label+': no numeric observation'+(windowRange?' in this window':''));}
             var url=telemetryGrafanaUrl(result && result.payload && result.payload.exploreUrl);if(url)entry.exploreUrl=url;
           }).catch(caught(rank,label,{tool:tool,input:query},entry)).finally(function(){settled(job,entry);});});
         });});

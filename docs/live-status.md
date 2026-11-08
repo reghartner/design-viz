@@ -237,6 +237,7 @@ from Prometheus:
 | `signals.<name>.tempo` | A TraceQL query string, used for exemplar traces. |
 | `signals.<name>.sql` | A SQL query string for a Grafana SQL datasource, such as a data lake. |
 | `signals.<name>.honeycomb` | A Honeycomb query object, kept as authored. |
+| `signals.<name>.missingMeansZero` | Optional boolean on `grafana` and `loki` signals. `false` shows a successful empty result as unobserved instead of 0; see [Empty Loki and Prometheus results](#empty-loki-and-prometheus-results). |
 | `proof` | Optional per-signal limits: `min`, `max` (finite numbers) and `maxRatioOf`. With `maxRatioOf: "<other signal>"`, `max` is the highest allowed ratio of this signal to the other one, so `"errors": {"maxRatioOf": "rate", "max": 0.01}` means at most 1 % errors. `maxRatioOf` needs `max` and another signal of the same binding. `min` stays an absolute floor. |
 | `links` | Optional authored link-outs: `dashboard` and `query`, absolute HTTP(S) URLs. |
 | `card` | Optional edge-card placement: `side` (`right`, `left`, `above`, `below`) and `offset` (pixels, -1000 to 1000). |
@@ -1062,7 +1063,8 @@ Prometheus/Loki Explore links and Honeycomb stable query URLs are automatic when
 available. CloudWatch, Logs and SQL may use authored links. Link generation
 failure never invalidates numeric evidence. Preview invents no provider URLs.
 Workbench Metrics exposes each signal's **label**, **show on card** and **query link** controls;
-source edits and Undo/Redo preserve all three.
+source edits and Undo/Redo preserve all three. `loki` and `grafana` signals also show
+**empty means zero** (`missingMeansZero`); unchecked writes `false`, and a change to another source drops it.
 
 `telemetry.card.side` selects `right`, `left`, `above` or `below`; `offset` moves
 along that side in SVG units. Defaults are right of a vertical route and below a
@@ -1577,13 +1579,28 @@ least 60 seconds. Each metric row links to its exact PromQL or LogQL query. `tem
 PromQL and LogQL query series become ascending `[epoch ms, number]` points. Several series
 are added point by point, so write one aggregated series per signal. `NaN`
 samples are dropped. `value` is the last point. A PromQL or LogQL query that matched nothing is
-`value: 0` with no points. CloudWatch empty results stay unobserved; see
+`value: 0` with no points, unless the signal sets `missingMeansZero: false`. CloudWatch empty results stay unobserved; see
 [CloudWatch signals](#cloudwatch-signals). `unit` is the authored one. A `sql` signal's value is
 the first number of the first returned row. `observedAt` is the newest point of
 the refresh. Every carrier carries the window's annotations as markers `{at, kind,
 label}`: kind `deploy` when tagged deploy, else `incident`, else the first tag.
 Links are the authored `dashboard` and `query`, with the Explore link standing in
 for a missing `query`.
+
+#### Empty Loki and Prometheus results
+
+A `loki` or `grafana` signal may set `missingMeansZero`, a boolean with the same
+name as the CloudWatch query field. Absent or `true` keeps the default: a
+successful empty Loki result of a recognized count/rate query is `value: 0`, and
+an empty Prometheus result is `value: 0` in Live and unobserved in an Over time
+day. `missingMeansZero: false` makes a successful empty result unobserved, with
+"<carrier> <signal>: no numeric observation" in the Metrics text, in Live and in
+Over time. Use it for logs that exist only in some environments, such as debug
+logs written only in test, so a missing log stream does not read as 0. A
+non-empty result is unchanged, and a failed query never becomes 0. Validation
+warns at `signals.<name>.missingMeansZero` and ignores the field when it is not
+a boolean, or when the signal is `tempo`, `sql`, `honeycomb`, `cloudwatch` (whose
+`missingMeansZero` goes inside the `cloudwatch` query) or `cloudwatchLogs`.
 
 A query that fails on its own (`tool_error`, such as a PromQL parse error, or a
 missing datasource UID) leaves the other carriers fresh and keeps that signal's
@@ -2708,6 +2725,8 @@ only for recognized `count_over_time`/`rate` log-range expressions and `sum`
 wrappers (including by/without grouping). Raw logs, arbitrary expressions and
 misleading function names inside strings remain unobserved. Daily history keeps
 its existing contract. Honeycomb COUNT caveats belong to Honeycomb evidence only.
+A `loki` or `grafana` signal with `missingMeansZero: false` keeps every successful
+empty result unobserved ([Empty Loki and Prometheus results](#empty-loki-and-prometheus-results)).
 
 Named numeric rows, compact scope and per-signal source links follow the [edge metric card contract](#edge-metric-cards); their display does not change proof eligibility.
 

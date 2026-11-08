@@ -3339,7 +3339,7 @@ test('#1145 a trace from today keeps or returns to Live; Over time on today keep
  api.destroy();
 });
 test('#1145 a trace from a day outside the day list keeps the view and says so',async()=>{
- const at=daysBack(30),b=dayTraceBoard({at}),{api,calls}=b,note='This trace is from '+dayLabelOf(at)+', a day Over time does not list.';
+ const at=daysBack(30),b=dayTraceBoard({at}),{api,calls}=b,note='This trace is from '+dayLabelOf(at)+', which Over time does not list.';
  assert.ok(await api.loadDirectTrace(false));await historySettle();
  assert.equal(api.snapshot().overTime.active,false,'Live stays');assert.ok(b.loaded());assert.equal(b.note(),note);
  api.overTime();await historySettle();assert.equal(b.loaded(),false,'the reader\'s own move to Over time clears it');
@@ -3357,6 +3357,26 @@ test('#1145 Load on a log line from two days back moves the view to that day; th
  assert.equal(api.snapshot().overTime.active,true);assert.equal(b.days[api.snapshot().overTime.index].key,dayKeyOf(at),'the view moved to the trace\'s day');
  assert.ok(b.loaded());assert.equal(calls.length,1);assert.ok([before,reach()].includes(calls[0].from),'D9: back to the line time − 1 h');
  assert.equal(api.snapshot().trace.selected.focus && api.snapshot().trace.selected.focus.spanId,'011114cbd1fd62de','the line\'s span stays focused');
+ api.destroy();
+});
+/* #1145 Q2 (a): a move the loaded trace causes keeps the log results, so the list and the next line
+   survive the Load; a day change the reader makes clears them, as #1141 does. */
+test('#1145 log results survive the move a trace causes and clear on the reader\'s day change',async()=>{
+ const at=daysBack(2),other='c3'.repeat(16),line=(ms,id)=>({timestamp:String(BigInt(ms)*1000000n),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:{cameraModel:'arch',trace_id:id}});
+ const b=dayTraceBoard({at,lines:[line(at+60000,DAY_TRACE_ID),line(at,other)]}),{api,m,calls}=b,settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
+ const logs=()=>api.snapshot().trace.direct.logs;
+ await settle();api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();assert.equal(logs().result.rows.length,2);
+ assert.ok(await api.loadLogTrace(0));await historySettle();
+ assert.equal(api.snapshot().overTime.active,true,'the trace moved the view');
+ assert.equal(logs().result && logs().result.rows.length,2,'the list survives the move the trace caused');assert.equal(logs().result.chosen,0);
+ assert.equal(m.body.querySelectorAll('.dv-trace-log-row').length,2);
+ assert.equal(await api.loadNextLogTrace(),null,'the next line still loads');assert.deepEqual(calls.map(c=>c.trace_id),[DAY_TRACE_ID,other]);
+ // Today, while the list is from Live: a trace that returns the view to Live keeps it too.
+ b.traceAt(Date.now()-60000);assert.ok(await api.loadLogTrace(0));await historySettle();
+ assert.equal(api.snapshot().overTime.active,false,'back to Live for a today trace');assert.equal(logs().result && logs().result.rows.length,2);
+ // The reader's own day change clears the results, as #1141 does.
+ api.overTime();await historySettle();api.overTimeDay(0);assert.equal(logs().result,null,'the reader\'s day change clears them');
+ assert.equal(calls.length,3,'no call without a click');
  api.destroy();
 });
 test('#1145 opening a drill-down keeps the loaded trace and its selection',async()=>{

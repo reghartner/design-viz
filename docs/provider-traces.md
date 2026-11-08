@@ -365,7 +365,8 @@ end are blank and the link has no time of its own (#1142):
   9999 h. The window runs to now.
 
 A link's own time and a typed Trace start / Trace end still win, and Live is
-unchanged. Changing the day retires a pending or loaded trace and keeps the
+unchanged. The loaded trace is the selected request, as in Live; example traces
+from bound carriers stay Live-only. Changing the day retires a pending or loaded trace and keeps the
 typed trace ID. A day without a date has no window; Load trace is unavailable
 on it.
 

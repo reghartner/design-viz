@@ -3031,7 +3031,7 @@ test('#1142 Over time Load trace and Verify call the transport with the selected
  assert.equal(note.textContent,'Searches '+day.label+' · looks back '+calls[1].from.slice(1)+' (this connection cannot stop at a past time)');
  // The loaded trace is the selected request, as in Live; example traces stay Live-only.
  assert.equal(api.snapshot().trace.selected && api.snapshot().trace.selected.manual,true,'the loaded trace is selected in Over time');
- assert.deepEqual(api.snapshot().trace.entries.map(e=>e.label.split(' · ')[0]),['Loaded trace']);
+ assert.deepEqual(plain(api.snapshot().trace.entries.map(e=>e.label.split(' · ')[0])),['Loaded trace']);
  assert.ok(m.body.querySelector('.dv-trace-selected'),'the panel shows the selected request');
  // A day without a date has no window; Load trace stays off there.
  overBackToLive(api);await historySettle();api.setHistory({load:()=>({days:overDays()})});api.overTime();await historySettle();

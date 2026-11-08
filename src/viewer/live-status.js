@@ -937,8 +937,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function traceSources(){
     var evidence=telemetry.snapshot(),entries=[],owners=Object.create(null),mounted=sourceBindings(),ambiguous=new Set();
     eachDiagram(function(d,source){Object.keys(d.nodes || {}).concat((d.edges || []).map(function(e){return e.from+'->'+e.to;})).forEach(function(id){if(!owners[id])owners[id]=[];if(owners[id].indexOf(d)<0)owners[id].push(d);});});
-    if(evidence.historical)return {entries:[],evidence:evidence};
-    mounted.forEach(function(binding){
+    // #1142: example traces stay Live-only; a trace the reader loaded in Over time is still listed.
+    if(!evidence.historical)mounted.forEach(function(binding){
       var d=binding.section.diagram;if(!d || !trackingTelemetry(binding.page).enabled)return;
       if(!traceSections.has(binding.section))traceSections.set(binding.section,++traceSectionSerial);
       if(!traceSections.has(d))traceSections.set(d,++traceSectionSerial);

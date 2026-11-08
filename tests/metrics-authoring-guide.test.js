@@ -100,7 +100,7 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
     const raw={kind:kinds[index],signals:{rate,errors:{grafana:'sum(rate(errors_total[5m]))',unit:'req/h'}},
       proof:{rate:{min:0,max:1000},errors:{max:0.01,maxRatioOf:'rate'}},
       links:{dashboard:'https://grafana.example/d/api',query:'https://grafana.example/explore'},
-      card:{side:sides[index],offset:index-2}};
+      card:{side:sides[index],offset:index-2,title:'Card '+index,width:200+index}};
     const binding=C.carrierTelemetry({telemetry:raw},{},(at,message)=>warnings.push(at+': '+message));
     assert.deepEqual(warnings,[],source);assert.equal(binding.kind,kinds[index]);
     assert.equal(binding.signals.rate.source,source);assert.deepEqual(plain(binding.signals.rate.query),query);assert.equal(binding.signals.rate.unit,'req/h');
@@ -114,18 +114,18 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
   });
 
   const useWarnings=[],used=C.carrierTelemetry({telemetry:{use:'http-call',route:'v1-items',
-    links:{query:'https://grafana.example/explore?route=v1-items'},card:{side:'below',offset:7}}},parsed.templates,
+    links:{query:'https://grafana.example/explore?route=v1-items'},card:{side:'below',offset:7,title:'Route v1-items',width:320}}},parsed.templates,
     (at,message)=>useWarnings.push(at+': '+message));
   assert.deepEqual(useWarnings,[]);assert.equal(used.kind,'call');assert.match(used.signals.rate.query,/v1-items/);
   assert.equal(used.proof.errors.maxRatioOf,'rate');assert.equal(used.links.query,'https://grafana.example/explore?route=v1-items');
-  assert.deepEqual(plain(used.card),{side:'below',offset:7});
+  assert.deepEqual(plain(used.card),{side:'below',offset:7,title:'Route v1-items',width:320});
   assert.equal(used.signals.rate.scope,'route v1-items · ${service} · account ${iotAccount}');
   const resolvedUse=C.carrierTelemetry({telemetry:{use:'http-call',route:'v1-items'}},parsed.templates,undefined,qa);
   assert.equal(resolvedUse.signals.rate.scope,'route v1-items · api · account 222222222222');
   assert.deepEqual(authoredRoot.variables,{service:'api',iotAccount:'111111111111'},'profile resolution preserves authored defaults');
 
   const exercised=new Set(['period','trend','timeField','binSeconds','showOnCard','missingMeansZero','namespace','metric','dimensions','statistic','cloudwatch','cloudwatchLogs','logGroups','region','valueField','breakdown','labelField','title','labelTitle','valueTitle','columns','limit','field','label','scope','variables','accountId','baseUrl','environments','enabled','grafana','honeycomb','window','refreshMs','templates','prometheus','loki','tempo','sql','environment','dataset',
-    'kind','signals','proof','links','card','use','unit','min','max','maxRatioOf','dashboard','query','side','offset','params']);
+    'kind','signals','proof','links','card','use','unit','min','max','maxRatioOf','dashboard','query','side','offset','width','params']);
   assert.deepEqual([...documentedFields(chapter)].sort(),[...exercised].sort(),'every field named in the chapter table has a parser-backed fixture');
 
   const negative=chapterExample(chapter),config=negative.page.tracking.telemetry;

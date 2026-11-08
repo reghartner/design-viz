@@ -81,6 +81,14 @@ function deltaWarnings(value, path, warnings){
     });
   }
 }
+// Matching reads traceMatch only from steps (#1096). Imported carriers are
+// skipped: the provider's own build reports them once.
+function carrierTraceMatchWarning(value, d, kind, id, path, warnings){
+  if(!value || typeof value!=='object' || !Object.prototype.hasOwnProperty.call(value,'traceMatch'))return;
+  var imports=(d.topologyProvenance && Array.isArray(d.topologyProvenance.imports))?d.topologyProvenance.imports:[];
+  if(imports.some(function(imp){return imp && Array.isArray(imp[kind+'s']) && imp[kind+'s'].indexOf(id)>=0;}))return;
+  warnings.push(path+'.traceMatch: traceMatch is read only from steps; this value on '+kind+' '+id+' is ignored. Put it on the step that lights this '+kind+'.');
+}
 function trackingWarnings(value, path, warnings){
   if(value && Object.prototype.hasOwnProperty.call(value,'missingWork') && typeof value.missingWork!=='boolean')
     warnings.push(path+'.missingWork: must be true or false — ignored');
@@ -420,6 +428,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     validateTextBox(n, DP+'.nodes.'+id, errors);
     deltaWarnings(n, DP + '.nodes.' + id, warnings);
     trackingWarnings(n, DP + '.nodes.' + id, warnings);
+    carrierTraceMatchWarning(n, d, 'node', id, DP + '.nodes.' + id, warnings);
     validateHandoff(n.handoff,n,DP+'.nodes.'+id+'.handoff',errors);
     if (Object.prototype.hasOwnProperty.call(n, 'delta') && typeof n.delta !== 'boolean')
       warnings.push(DP + '.nodes.' + id + '.delta: must be true or false — ignored');
@@ -444,6 +453,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if(e && e.contract!=null && !validJsonContract(e.contract))warnings.push(EP+'.contract: expected {json: JSON value, title?: string} — skipped');
     deltaWarnings(e, EP, warnings);
     trackingWarnings(e, EP, warnings);
+    if(e)carrierTraceMatchWarning(e, d, 'edge', e.from + '->' + e.to, EP, warnings);
     if(e && e.curveControls!=null && !validCurveControls(e.curveControls))
       errors.push(EP+'.curveControls: expected 3n-1 endpoint-relative cubic controls (2..95), with t: 0..1 and finite dx/dy between -100000 and 100000');
     if(e && e.curveControls!=null && e.curvePoints!=null)
@@ -626,7 +636,18 @@ function editHistoryEntryProblem(entry){
   for(var i=0;i<entry.changes.length;i++){
     var change=entry.changes[i],at='changes['+i+']';
     if(!specObject(change))return at+': must be an object';
-    if(change.op!=='add' && change.op!=='remove' && change.op!=='clear-missing-work')return at+'.op: must be "add", "remove" or "clear-missing-work"';
+    if(change.op!=='add' && change.op!=='remove' && change.op!=='clear-missing-work' && change.op!=='trace-match')return at+'.op: must be "add", "remove", "clear-missing-work" or "trace-match"';
+    // #1078: a span mapped to a step in Edit mode names the step and the traceMatch written there.
+    if(change.op==='trace-match'){
+      if(Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "trace-match" change has no ticket';
+      if(typeof change.step!=='string' || !change.step)return at+'.step: must be a step id';
+      var match=change.traceMatch;
+      if(!specObject(match) || typeof match.serviceName!=='string' || !match.serviceName || typeof match.operation!=='string' || !match.operation)return at+'.traceMatch: needs "serviceName" and "operation" strings';
+      if(Object.prototype.hasOwnProperty.call(change,'node') || Object.prototype.hasOwnProperty.call(change,'edge'))return at+': a "trace-match" change names a step, not a node or edge';
+      if(Object.prototype.hasOwnProperty.call(change,'path') && !Array.isArray(change.path))return at+'.path: must be an array';
+      if(Object.prototype.hasOwnProperty.call(change,'label') && typeof change.label!=='string')return at+'.label: must be a string';
+      continue;
+    }
     // #855: clearing a Missing work marker names only its carrier.
     if(change.op==='clear-missing-work'){if(Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "clear-missing-work" change has no ticket';}
     else if(typeof change.ticket!=='string' || !trackingKeyPattern.test(change.ticket))return at+'.ticket: must be a Jira key';
@@ -721,6 +742,7 @@ function validate(page){
   if(!hasTracking && !hasTickets && !hasTelemetry)statusPanels.forEach(function(path){warnings.push(path+': this page has no ticket references — the panel will be empty');});
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
+  if (typeof FlowCanon !== 'undefined' && FlowCanon.traceWarnings) warnings = warnings.concat(FlowCanon.traceWarnings(page));
   validateDocumentLinks(page.documentLinks,page.canon && page.canon.id,'page.documentLinks',errors);
   validateDocumentDescription(page.description,'page.description',errors);
   validateDocumentTags(page.tags,'page.tags',errors);

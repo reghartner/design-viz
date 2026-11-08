@@ -54,6 +54,7 @@
     "viewer/telemetry-evidence.js",
     "viewer/telemetry-trace-codecs.js",
     "viewer/telemetry-direct.js",
+    "viewer/telemetry-log-lookup.js",
     "viewer/telemetry.js",
     "viewer/telemetry-cards.js",
     "viewer/telemetry-step.js",

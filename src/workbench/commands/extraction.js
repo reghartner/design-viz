@@ -232,7 +232,8 @@ function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options,validateS
         });if(!step.packets.length)delete step.packets;
       }
       (step.conditions || []).forEach(function(condition){if(selected.has(condition.nodeId)){condition.nodeId=domainId;affected=true;}});
-      if(step.traceMatch && selected.has(step.traceMatch.nodeId)){step.traceMatch.nodeId=domainId;affected=true;report.references.push('Trace match in '+(step.id || 'step '+(index+1))+': node now points to '+title+'; matching criteria stay unchanged.');}
+      var moved=[].concat(step.traceMatch || []).filter(function(m){return m && selected.has(m.nodeId);});
+      if(moved.length){moved.forEach(function(m){m.nodeId=domainId;});affected=true;report.references.push('Trace match in '+(step.id || 'step '+(index+1))+': node now points to '+title+'; matching criteria stay unchanged.');}
       if(affected){
         var nodes=step.nodes || (step.nodes=[]);if(nodes.indexOf(domainId)<0)nodes.push(domainId);
         report.affectedSteps.push(step.id || 'Step '+(index+1));

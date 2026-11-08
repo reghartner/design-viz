@@ -5,7 +5,9 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
+import select
 import subprocess
 import sys
 import tempfile
@@ -42,6 +44,11 @@ class FolderAgentTests(unittest.TestCase):
 
     def put(self, name, value):
         (self.folder/name).write_text(json.dumps(value))
+
+    def replace(self, name, value):
+        """Atomic put for a file a running helper subprocess polls."""
+        (self.folder/(name + '.tmp')).write_text(json.dumps(value))
+        os.replace(self.folder/(name + '.tmp'), self.folder/name)
 
     def kit(self, files):
         raw = json.dumps({'files': files}).encode()
@@ -591,6 +598,82 @@ class FolderAgentTests(unittest.TestCase):
         self.assertIn('heartbeat paused', errors.getvalue())
         self.assertIn('awaiting approval', errors.getvalue())
 
+    # #1109 test plan (coverage = this list):
+    # | 1 ownership change on begin | Re-establish rewrites session.json while begin waits for a paused
+    #   heartbeat, and while it waits for acknowledgement | exit 1; one stderr line with old and new ids
+    #   and the reread hint; no Traceback |
+    # | 2 new id unreadable | session.json names non-id values; an empty placeholder session.json |
+    #   the same line without the new ids |
+    # | 3 another error path unchanged | begin outside the external workflow; cancellation during
+    #   acknowledgement | raw ValueError traceback; acknowledgement failure line and withdrawal kept |
+    def begin_interrupted(self, announcement, change):
+        """Run CLI begin; once stderr shows announcement, call change; return (exit code, stderr)."""
+        command = [sys.executable, str(HELPER), '--folder', str(self.folder), 'begin', '--text', 'Next']
+        with subprocess.Popen(command, cwd=self.folder.resolve().parent, text=True,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+            try:
+                seen = ''
+                while announcement not in seen:
+                    line = process.stderr.readline() if select.select([process.stderr], [], [], 10)[0] else ''
+                    if not line:
+                        self.fail(f'begin never printed {announcement!r}: {seen}')
+                    seen += line
+                change()
+                return process.wait(timeout=10), seen + process.stderr.read()
+            finally:
+                if process.poll() is None:
+                    process.kill()
+
+    def session_changed_line(self, shown, new=''):
+        return (f'Session ownership changed (old session session, connection connection{new}). This happens '
+                f'after Re-establish session in the Workbench. Re-read {shown}/session.json and {shown}/CONNECT.md, '
+                'then run begin again.')
+
+    def test_begin_reports_session_change_on_one_line_without_traceback(self):
+        renewed = {'protocol': 'flowview-folder-v1', 'sessionId': 'renewed', 'connectionId': 'renewed-connection',
+                   'workflow': 'external'}
+        for phase, announcement, editor_age in (('registration', 'heartbeat paused', 60),
+                                                ('acknowledgement', 'Waiting up to 90 seconds for Workbench acknowledgement', 0)):
+            with self.subTest(phase=phase):
+                self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+                self.put('editor.json', {**self.owner, 'connected': True, 'at': (time.time()-editor_age)*1000})
+                code, errors = self.begin_interrupted(announcement, lambda: self.replace('session.json', renewed))
+                self.assertEqual(code, 1, errors)
+                self.assertNotIn('Traceback', errors)
+                self.assertEqual([line for line in errors.splitlines() if 'ownership' in line], [self.session_changed_line(
+                    self.folder.name, '; new session renewed, connection renewed-connection')])
+
+    def test_begin_session_change_omits_new_ids_it_cannot_read(self):
+        self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+        self.put('editor.json', {**self.owner, 'connected': True, 'at': (time.time()-60)*1000})
+        code, errors = self.begin_interrupted('heartbeat paused', lambda: self.replace('session.json', {
+            'protocol': 'flowview-folder-v1', 'sessionId': 7, 'connectionId': 'two\nlines', 'workflow': 'external'}))
+        self.assertEqual(code, 1, errors)
+        self.assertNotIn('Traceback', errors)
+        self.assertEqual([line for line in errors.splitlines() if 'ownership' in line],
+                         [self.session_changed_line(self.folder.name)])
+        # The Workbench writes an empty placeholder before the new session.json content.
+        (self.folder/'session.json').write_text('')
+        with patch.object(helper.Path, 'cwd', return_value=self.folder.resolve().parent):
+            self.assertEqual(helper.session_changed(self.folder.resolve(), self.owner),
+                             self.session_changed_line(self.folder.name))
+
+    def test_begin_keeps_other_errors_unchanged(self):
+        run = self.run_helper('begin', '--text', 'Next')
+        self.assertEqual(run.returncode, 1)
+        self.assertIn('Traceback', run.stderr)
+        self.assertTrue(run.stderr.rstrip().endswith('ValueError: Native requests require the Work in your agent workflow.'), run.stderr)
+        self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+        def cancel():
+            incoming = helper.read(self.folder, 'agent-request.json')
+            self.put('cancel.json', {**self.owner, 'id': 'cancel-1', 'requestId': incoming['id']})
+        code, errors = self.begin_interrupted('Waiting up to 90 seconds for Workbench acknowledgement', cancel)
+        self.assertEqual(code, 1, errors)
+        self.assertIn('Workbench acknowledgement failed: This turn was stopped in the editor. Do not send more '
+                      'changes or replies for it. This attempt was withdrawn.', errors)
+        self.assertIn('Traceback', errors)
+        self.assertTrue(helper.read(self.folder, 'agent-request.json')['withdrawn'])
+
     def test_acceptance_history_is_connection_bound_and_ignores_late_proposal_replacement(self):
         self.active_native_turn('applied')
         result = self.completion()
@@ -869,16 +952,20 @@ class FolderAgentTests(unittest.TestCase):
                     return value
                 errors = io.StringIO()
                 with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Terminal change']), patch.object(helper, 'write', side_effect=write), patch.object(helper, 'read', side_effect=read), patch.object(helper.time, 'sleep', side_effect=AssertionError('Terminal acknowledgement errors must not retry')) as sleeping, patch.object(sys, 'stderr', errors):
-                    with self.assertRaises(ValueError):
+                    with self.assertRaises(SystemExit if change == 'owner' else ValueError) as raised:
                         helper.main()
                     sleeping.assert_not_called()
-                self.assertIn('Workbench acknowledgement failed', errors.getvalue())
                 self.assertNotIn('in time', errors.getvalue())
                 attempt = helper.read(self.folder, 'agent-request.json')
                 if change == 'owner':
+                    # #1109: one line naming both identities replaces the acknowledgement failure.
+                    self.assertEqual(raised.exception.code, 1)
                     self.assertEqual(attempt, {'id': 'replacement-request'})
-                    self.assertIn('Withdrawal could not be confirmed', errors.getvalue())
+                    self.assertIn('Session ownership changed (old session session, connection connection; '
+                                  'new session session, connection replacement).', errors.getvalue())
+                    self.assertNotIn('Workbench acknowledgement failed', errors.getvalue())
                 else:
+                    self.assertIn('Workbench acknowledgement failed', errors.getvalue())
                     self.assertTrue(attempt['withdrawn'])
 
     def test_native_begin_retries_only_missing_or_empty_acknowledgement_files(self):

@@ -1,7 +1,8 @@
 /* Shared-board Edit mode (#828, design #825). A tracked board published as
    index.html + flowspec.json lets people with edit access add a ticket to a node
-   or edge (drag a Tickets row), remove one authored there and clear a Missing
-   work marker set on this board (carrier popover, #855), then Save publishes
+   or edge (drag a Tickets row), remove one authored there, clear a Missing
+   work marker set on this board (carrier popover, #855) and map a trace span
+   to a step without a traceMatch (Trace view, #1078), then Save publishes
    flowspec.json through the artifact runtime.
 
    The editor outlives every render: it keeps the exact authored text the page
@@ -28,6 +29,7 @@ function boardEditIdentity(container,element){
   if(container==='sections' || container==='blocks')return element.id!=null?'id:'+element.id:'heading:'+(element.heading || element.title || '');
   if(container==='tabs')return element.id!=null?'id:'+element.id:'label:'+(element.label || element.title || '');
   if(container==='edges')return JSON.stringify([element.from,element.to,element.label==null?null:element.label]);
+  if(container==='steps' && element.id!=null)return 'id:'+element.id;
   if(container==='topologyImports')return JSON.stringify([element.spec,element.export,element.as]);
   return JSON.stringify(element);
 }
@@ -61,7 +63,7 @@ function boardEditSamePrefix(path,prefix){return prefix.every(function(part,i){r
 
 function createBoardEditor(options){
   var win=options.win || window,text=options.text,base=text,context=options.context || null,fallback=options.fallback || null;
-  var ops=[],active=false,saving=false,readOnly=false,reloading=false,canEdit=false,artifact=null,user=null,notice=null,listeners=[],lastMap=null,question=null;
+  var ops=[],active=false,saving=false,readOnly=false,reloading=false,canEdit=false,artifact=null,user=null,notice=null,listeners=[],lastMap=null,question=null,carriedTrace=null;
   var stashKey='flowview-board-edit:'+String(win.location && win.location.pathname || '')+':'+(options.specFile || 'flowspec.json');
 
   function changed(){listeners.slice().forEach(function(fn){try{fn();}catch(ex){}});}
@@ -76,6 +78,14 @@ function createBoardEditor(options){
     var raw=parsed(source),view=resolved(raw),local=sectionAt(raw,ref.section),shown=sectionAt(view,ref.section);
     if(!local || !shown || !shown.d)return null;
     var out={raw:raw,ref:ref,section:ref.section,kind:ref.kind};
+    /* #1078: steps are page-local, also when they draw on an imported node or
+       edge, so a traceMatch is written on the local step. Only a step without one. */
+    if(ref.kind==='step'){
+      var steps=Array.isArray(local.d && local.d.steps)?local.d.steps:[],at=steps.findIndex(function(step){return step && step.id===ref.id;});
+      if(at<0 || steps[at].traceMatch)return null;
+      out.step=ref.id;out.label=String(steps[at].text || ref.id).replace(/\s+/g,' ').trim();out.path=local.path.concat(['steps',at]);out.local=steps[at];
+      return out;
+    }
     if(ref.kind==='node'){
       if(!shown.d.nodes || !shown.d.nodes[ref.id])return null;
       out.node=ref.id;out.label=title(shown.d,ref.id);
@@ -116,7 +126,8 @@ function createBoardEditor(options){
     return m.local.missingWork?{clearable:true}:null;
   }
   // The new text, or the same text when the operation changes nothing.
-  function splice(source,t,op,ticket){
+  function splice(source,t,op,ticket,match){
+    if(op==='trace-match'){var set=jsonSetField(source,t.path,'traceMatch',JSON.stringify({serviceName:match.serviceName,operation:match.operation}));return set?set.text:null;}
     if(op==='clear-missing-work'){
       if(t.imported){var cleared=planTopologyTracking(source,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,'missingWork',true,true,context,t.index);return cleared.error?null:cleared.text;}
       var removed=jsonSetField(source,t.path,'missingWork',null);
@@ -135,23 +146,26 @@ function createBoardEditor(options){
     var result=jsonSetField(source,t.path,'tickets',list.length?JSON.stringify(list):null);
     return result?result.text:null;
   }
-  function record(t,op,ticket){
+  function record(t,op,ticket,match){
     var entry={op:op};if(ticket!=null)entry.ticket=ticket;entry.path=t.path.slice();entry.label=t.label;
-    if(t.kind==='node')entry.node=t.node;else entry.edge=t.edge.slice();
+    if(t.kind==='step'){entry.step=t.step;entry.traceMatch={serviceName:match.serviceName,operation:match.operation};}
+    else if(t.kind==='node')entry.node=t.node;else entry.edge=t.edge.slice();
     return entry;
   }
   // `ask`: the post-drop question to raise once the change has rendered (#855).
-  function apply(op,ref,ticket,ask){
+  function apply(op,ref,ticket,ask,match){
     if(!active || saving || readOnly)return false;
     var t=target(text,ref);if(!t)return false;
+    if((op==='trace-match')!==(t.kind==='step'))return false;
+    if(op==='trace-match' && !(match && typeof match.serviceName==='string' && match.serviceName && typeof match.operation==='string' && match.operation))return false;
     if(op==='remove' && authoredKeys(t).indexOf(ticket)<0)return false;
     if(op==='clear-missing-work'){var m=marker(t);if(!m || !m.clearable)return false;}
-    var next=splice(text,t,op,ticket);
+    var next=splice(text,t,op,ticket,match);
     if(next==null || next===text)return false;
     if(!render(next))return false;
-    var entry=record(t,op,ticket),chain=boardEditChain(t.raw,t.path);
-    // An operation that undoes a pending one cancels it. A clear has no inverse here.
-    var inverse=op==='clear-missing-work'?-1:ops.findIndex(function(o){return o.ticket===ticket && o.op!==op && JSON.stringify(o.path)===JSON.stringify(entry.path);});
+    var entry=record(t,op,ticket,match),chain=boardEditChain(t.raw,t.path);
+    // An operation that undoes a pending one cancels it. A clear or a span mapping has no inverse here.
+    var inverse=op==='clear-missing-work' || op==='trace-match'?-1:ops.findIndex(function(o){return o.ticket===ticket && o.op!==op && JSON.stringify(o.path)===JSON.stringify(entry.path);});
     if(inverse>=0)ops.splice(inverse,1);
     else ops.push({entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind});
     question=ask || null;
@@ -183,16 +197,18 @@ function createBoardEditor(options){
     var applied=0,dropped=[];
     saved.ops.forEach(function(op){
       var entry=op && op.entry;if(!entry)return;
-      var where=entry.label || entry.node || (entry.edge || []).join(' → ');
-      var describe=entry.op==='clear-missing-work'?'Missing work cleared from '+where:entry.ticket+' '+(entry.op==='add'?'on ':'off ')+where;
+      var where=entry.label || entry.node || entry.step || (entry.edge || []).join(' → ');
+      var describe=entry.op==='clear-missing-work'?'Missing work cleared from '+where:entry.op==='trace-match'?'span mapped to '+where:entry.ticket+' '+(entry.op==='add'?'on ':'off ')+where;
       var raw=parsed(text),paths=op.replayable?boardEditResolveChain(raw,op.chain):[];
       var ref=paths.length===1?refFor(raw,paths[0],op.kind,entry):null;
       if(!ref){dropped.push(describe);return;}
       active=true;
       var before=text;
-      if(!apply(entry.op,ref,entry.ticket) && text===before){
+      if(!apply(entry.op,ref,entry.ticket,null,entry.traceMatch) && text===before){
         // A clear with no marker of this board's left to clear is dropped (#855).
         if(entry.op==='clear-missing-work'){dropped.push(describe);return;}
+        // A step that already has this exact traceMatch needs nothing; any other is dropped (#1078).
+        if(entry.op==='trace-match'){var step=specValueAt(parsed(text),paths[0]),m=step && step.traceMatch,want=entry.traceMatch || {};if(m && m.serviceName===want.serviceName && m.operation===want.operation)applied++;else dropped.push(describe);return;}
         // Already true in the winning version: nothing left to do for it.
         var t=target(text,ref);var has=t && authoredKeys(t).indexOf(entry.ticket)>=0;
         if(t && ((entry.op==='add')===has))applied++;else dropped.push(describe);
@@ -210,6 +226,7 @@ function createBoardEditor(options){
     if(section<0)return null;
     var rest=path.slice(records[section].diagram.length),shown=sectionAt(view,section);if(!shown || !shown.d)return null;
     if(rest[0]==='nodes')return shown.d.nodes && shown.d.nodes[rest[1]]?{section:section,kind:'node',id:rest[1]}:null;
+    if(rest[0]==='steps'){var step=specValueAt(raw,path);return kind==='step' && rest.length===2 && step && typeof step.id==='string'?{section:section,kind:'step',id:step.id}:null;}
     if(rest[0]==='edges')return (shown.d.edges || [])[rest[1]]?{section:section,kind:'edge',index:rest[1]}:null;
     if(rest[0]==='topologyImports' && context){
       var imp=specValueAt(raw,records[section].diagram.concat(['topologyImports',rest[1]]));if(!imp || typeof imp.as!=='string')return null;
@@ -240,6 +257,8 @@ function createBoardEditor(options){
     add:function(ref,ticket){var m=null;try{m=marker(target(text,ref));}catch(ex){m=null;}return apply('add',ref,ticket,m && m.clearable?{ref:ref,ticket:ticket}:null);},
     remove:function(ref,ticket){return apply('remove',ref,ticket);},
     clearMissingWork:function(ref){return apply('clear-missing-work',ref);},
+    // #1078: write traceMatch {serviceName, operation} on a step of ref.section that has none.
+    mapSpan:function(ref,match){return apply('trace-match',ref,null,null,match);},
     // {clearable:true} for a marker set on this board, {clearable:false, source} for a provider-inherited one, else null.
     missingWork:function(ref){if(!active || readOnly)return null;try{return marker(target(text,ref));}catch(ex){return null;}},
     question:function(){return active && !readOnly && question?{ref:question.ref,ticket:question.ticket}:null;},
@@ -285,6 +304,9 @@ function createBoardEditor(options){
     },
     rememberMap:function(map){lastMap=map;},
     lastMap:function(){return lastMap;},
+    // #1078: the Trace view a retiring controller showed, handed once to the next render's.
+    rememberTrace:function(value){carriedTrace=value || null;},
+    takeTrace:function(){var value=carriedTrace;carriedTrace=null;return value;},
     text:function(){return text;}
   };
 

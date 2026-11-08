@@ -5,10 +5,11 @@ function telemetryClearCards(scope){
   scope.querySelectorAll('.dv-metrics-card,.dv-metrics-leader').forEach(function(el){el.remove();});
   scope.querySelectorAll('.dv-metrics-label-hidden').forEach(function(el){el.classList.remove('dv-metrics-label-hidden');el.removeAttribute('data-metrics-preview');});
 }
-function telemetryCardValue(binding,sample,name,pending){
+/* Given the board window, a value whose signal covers another span ends in ' · last <span>'. */
+function telemetryCardValue(binding,sample,name,pending,window){
   if(!name || !binding.signals[name] || proofVerdicts.isTraceSignal(binding.signals[name]))return 'not bound';
-  var reading=telemetryReading(sample,name),unit=binding.signals[name].unit;
-  return reading.value===null?(pending && pending[name]?'Loading…':'unobserved'):(Number.isSafeInteger(reading.value)?reading.value.toLocaleString('en-US'):Math.abs(reading.value)>=1e9 || reading.value!==0 && Math.abs(reading.value)<.0001?reading.value.toExponential(3):Number(reading.value.toPrecision(4)).toLocaleString('en-US'))+(unit?' '+unit:'')+(sample && sample.signals && sample.signals[name] && sample.signals[name].provenance==='formatted-text'?' (formatted text; may be rounded)':'')+(pending && pending[name]?' · Refreshing…':'');
+  var reading=telemetryReading(sample,name),unit=binding.signals[name].unit,span=window?telemetrySpanNote(binding.signals[name],window):'';
+  return reading.value===null?(pending && pending[name]?'Loading…':'unobserved'):(Number.isSafeInteger(reading.value)?reading.value.toLocaleString('en-US'):Math.abs(reading.value)>=1e9 || reading.value!==0 && Math.abs(reading.value)<.0001?reading.value.toExponential(3):Number(reading.value.toPrecision(4)).toLocaleString('en-US'))+(unit?' '+unit:'')+(span?' · '+span:'')+(sample && sample.signals && sample.signals[name] && sample.signals[name].provenance==='formatted-text'?' (formatted text; may be rounded)':'')+(pending && pending[name]?' · Refreshing…':'');
 }
 /* Display metadata never changes the pure proof inputs. Carrier query links are
    a legacy fallback only for a single numeric signal; mixed rows own their URLs. */
@@ -17,8 +18,8 @@ function telemetryMetricUrl(binding,sample,name){
   return telemetryQueryUrl(signal && signal.links && signal.links.query) || telemetryQueryUrl(entry && entry.links && entry.links.query) ||
     (Object.keys(binding.signals).length===1?(telemetryQueryUrl(binding.links && binding.links.query) || telemetryQueryUrl(sample && sample.links && sample.links.query)):null);
 }
-function telemetryMetricRows(binding,sample,pending){
-  return telemetryMetricNames(binding).map(function(name){var signal=binding.signals[name];return {name:name,label:signal.label || name,text:telemetryCardValue(binding,sample,name,pending),url:telemetryMetricUrl(binding,sample,name),scope:telemetrySignalScope(signal)};});
+function telemetryMetricRows(binding,sample,pending,window){
+  return telemetryMetricNames(binding).map(function(name){var signal=binding.signals[name];return {name:name,label:signal.label || name,text:telemetryCardValue(binding,sample,name,pending,window),url:telemetryMetricUrl(binding,sample,name),scope:telemetrySignalScope(signal)};});
 }
 function telemetryCardBinding(binding){
   var signals={};telemetryMetricNames(binding).forEach(function(name){if(binding.signals[name].showOnCard!==false)signals[name]=binding.signals[name];});
@@ -37,22 +38,22 @@ function telemetryCardScope(signal){
 function telemetryCountNote(binding){return telemetryMetricNames(binding).some(function(name){var s=binding.signals[name];return s.source==='honeycomb' && Array.isArray(s.query.calculations) && s.query.calculations.some(function(c){return c && c.op==='COUNT';});})?'Honeycomb COUNT counts source rows/events, not automatically requests.':'';}
 function telemetryCardContent(edge,binding,sample,result,window,pending){
   // Visibility never changes source ownership or legacy-link ambiguity.
-  var rows=telemetryMetricRows(binding,sample,pending).filter(function(row){return binding.signals[row.name].showOnCard!==false;});
+  var rows=telemetryMetricRows(binding,sample,pending,window).filter(function(row){return binding.signals[row.name].showOnCard!==false;});
   rows.forEach(function(row){
     var observed=telemetryReading(sample,row.name).value!==null;
     row.health=observed?(result && (result.failing || []).indexOf(row.name)>=0?'failing':'observed'):pending && pending[row.name]?'loading':'unobserved';
   });
   binding=telemetryCardBinding(binding);
   var primary=telemetryPrimary(binding,true) || telemetryMetricNames(binding)[0] || null,queue=binding.kind==='queue',raw=edge.telemetry || {};
-  var title=edge.label || edge.from+' → '+edge.to;
+  var title=binding.card && binding.card.title || edge.label || edge.from+' → '+edge.to;
   // A template parameter is explicit author input. Never extract a queue name
-  // or a query from the title, id, or query text.
-  if(queue && raw.use && telemetryText(raw.topic) && title.indexOf(raw.topic)<0)title+=' · '+raw.topic;
+  // or a query from the title, id, or query text. An authored card title is used as written.
+  if(queue && raw.use && telemetryText(raw.topic) && !(binding.card && binding.card.title) && title.indexOf(raw.topic)<0)title+=' · '+raw.topic;
   var state=result && result.telemetry || 'unobserved',signal=primary && binding.signals[primary],scope=telemetryCardScope(signal),scalar=signal && (signal.source==='cloudwatch' || signal.source==='cloudwatchLogs');
   var loading=telemetryMetricNames(binding).some(function(name){return pending && pending[name];});
   var measured=telemetryMetricNames(binding).some(function(name){return telemetryReading(sample,name).value!==null;});
   if(loading && !measured)state='loading';
-  return {rows:rows,countNote:telemetryCountNote(binding),title:title,headline:(queue?'in: ':'')+telemetryCardValue(binding,sample,primary,pending)+(scalar && telemetryReading(sample,primary).value!==null?' in '+window:''),scope:[scope,telemetryCountNote(binding)?'COUNT: source rows/events':''].filter(Boolean).join(' · '),
+  return {rows:rows,countNote:telemetryCountNote(binding),title:title,headline:(queue?'in: ':'')+telemetryCardValue(binding,sample,primary,pending,window)+(scalar && !telemetrySpanNote(signal,window) && telemetryReading(sample,primary).value!==null?' in '+window:''),scope:[scope,telemetryCountNote(binding)?'COUNT: source rows/events':''].filter(Boolean).join(' · '),
     details:rows.filter(function(row){return row.name!==primary;}).map(function(row){return row.label+': '+row.text;}),
     note:loading?(measured?'Refreshing…':'Loading…'):state==='silent'?'no traffic · '+window+' window':state==='unobserved'?'unobserved · '+window+' window':window+' window',
     series:primary?telemetryReading(sample,primary).series:[],chartRange:sample && (sample.signals && sample.signals[primary] && sample.signals[primary].window || sample.window),intervalMs:sample && sample.signals && sample.signals[primary] && sample.signals[primary].intervalMs,state:state};
@@ -104,9 +105,9 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       var id=edge.from+'->'+edge.to,result=view.verdicts.carriers[id],content=telemetryCardContent(edge,binding,view.map[id],result,window,view.pending && view.pending[id]);
       if(view.preview){content.note='Preview · synthetic';content.state='preview';}
       var card=telemetrySvg(doc,'g',{'class':'dv-metrics-card','data-dv-edge':index,'data-metrics-card':id,'data-state':content.state,'data-verdict':view.preview?'preview':result && result.verdict || 'unobserved'},svg);
-      // Fixed maximum width with measured wrapping, never stretched glyphs.
+      // Authored card.width or 240, with measured wrapping, never stretched glyphs.
       // Height is the actual rendered content and participates in obstacle packing.
-      var w=240,y=15,rect=telemetrySvg(doc,'rect',{'class':'dv-metrics-card-box',rx:7,width:w},card);
+      var w=binding.card && binding.card.width || 240,y=15,rect=telemetrySvg(doc,'rect',{'class':'dv-metrics-card-box',rx:7,width:w},card);
       var bar=telemetrySvg(doc,'path',{'class':'dv-metrics-card-bar'},card);
       function wrapped(value,cls,width,maxLines,x){
         x=x==null?10:x;
@@ -131,8 +132,8 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
         var display=formatted?row.text.replace(' (formatted text; may be rounded)',''):row.text;
         var value=telemetrySvg(doc,'text',{'class':'t1 dv-metrics-card-value',x:10,y:top,'data-signal':row.name},card);value.textContent=display;
         var valueWidth=value.getComputedTextLength(),label;
-        if(valueWidth<=132){
-          // A small table: numbers align at the right, labels use the remainder.
+        if(valueWidth<=w-108){
+          // A small table: numbers align at the right, labels use the remainder (at least 56 units).
           value.setAttribute('x',w-32-valueWidth);
           label=wrapped(row.label,'t2 dv-metrics-card-label',w-52-valueWidth,2);
         }else{
@@ -165,7 +166,7 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       if(view.preview)leader.setAttribute('data-metrics-preview','true');
       svg.insertBefore(leader,card);boxes.push(box);
       var label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');if(label){label.classList.add('dv-metrics-label-hidden');if(view.preview)label.setAttribute('data-metrics-preview','true');}
-      if(activate)activate(card,path,edge,index);
+      if(activate)activate(card,path,edge,index,binding);
     });
   });
 }

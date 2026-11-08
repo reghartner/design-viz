@@ -31,11 +31,12 @@ test('traceMatch on a local edge warns with the edge id and points to the step',
   assert.match(found[0],/edge api->db is ignored/);
 });
 
-test('traceMatch on an exported provider node warns at the provider build only, not in each consumer',()=>{
+test('traceMatch on an exported provider node warns at the provider build, not again on its imported copies',()=>{
   const spec=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/orders'},sections:[{id:'flow',diagram:d}]}});
   const provider=local();provider.nodes.api.traceMatch=match;provider.edges[0].traceMatch=match;
   provider.topologyExports={core:{nodes:['api','db'],edges:['api->db']}};
-  const consumer=c=>spec(c,{nodes:{web:{title:'Web'}},rows:[['web']],topologyImports:[{spec:'orders',export:'core',as:'orders'}],
+  const consumer=c=>spec(c,{nodes:{web:{title:'Web',traceMatch:match}},rows:[['web']],
+    edges:[{from:'web',to:'orders::api',traceMatch:match}],topologyImports:[{spec:'orders',export:'core',as:'orders'}],
     steps:[{id:'call',edge:'orders::api->orders::db'}]});
   const resolved=C.materializeTopology([spec('orders',provider),consumer('shop'),consumer('admin')]);
   const providerFound=carrierWarnings(C.validateSpec(resolved[0]));
@@ -45,9 +46,13 @@ test('traceMatch on an exported provider node warns at the provider build only, 
   for(const imported of resolved.slice(1)){
     const d=imported.page.sections[0].diagram;
     assert.ok(d.nodes['orders::api'].traceMatch,'the imported node still carries the provider value');
+    assert.ok(d.edges.find(e=>e.from==='orders::api').traceMatch,'the imported edge still carries the provider value');
     const result=C.validateSpec(imported);
     assert.deepEqual(result.errors,[]);
-    assert.deepEqual(carrierWarnings(result),[]);
+    const found=carrierWarnings(result);
+    assert.equal(found.length,2,JSON.stringify(found));
+    assert.ok(found.some(w=>/nodes\.web\.traceMatch/.test(w) && /node web is ignored/.test(w)));
+    assert.ok(found.some(w=>/edges\[0\]\.traceMatch/.test(w) && /edge web->orders::api is ignored/.test(w)));
   }
 });
 

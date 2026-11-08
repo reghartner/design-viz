@@ -237,7 +237,9 @@ test('#1142 an Over time day sets the window: shortest lookback or the day bound
   assert.deepEqual(h.calls.map(c=>c.args.from),['-60h','-60h'],'the shortest lookback that reaches the day start');
   assert.equal(h.api.snapshot().bounds.lookback,'60h');assert.deepEqual(clone(h.api.snapshot().day),{label:'Nov 6',range:'Nov 6 00:00–24:00 local',lookback:'60h'});
   h.api.set('start','-3h');assert.ok(await h.api.load());assert.equal(h.calls.at(-1).args.from,'-3h','a typed Trace start wins');
-  h.api.set('start','');selected=null;assert.ok(await h.api.load());assert.equal(h.calls.at(-1).args.from,'-2h','Live keeps the profile lookback');assert.equal(h.api.snapshot().day,null);
+  // Lookback rounding and the day unit, on the fixed clock.
+  h.api.set('start','');for(const [ms,want] of [[60*3600000+1,'-61h'],[9999*3600000,'-9999h'],[10000*3600000,'-417d']]){selected={...nov6,key:'k'+ms,window:{...nov6.window,from:new Date(now-ms).toISOString()}};assert.ok(await h.api.load());assert.equal(h.calls.at(-1).args.from,want);}
+  selected=null;assert.ok(await h.api.load());assert.equal(h.calls.at(-1).args.from,'-2h','Live keeps the profile lookback');assert.equal(h.api.snapshot().day,null);
   // Today: the window end moves with every read and is not part of the request identity.
   let tick=0;selected=null;h.api.destroy();
   h=setup({C:clocked(),hooks:{day:()=>({key:'2026-11-08',today:true,label:'Nov 8',window:{from:new Date(2026,10,8).toISOString(),to:new Date(now+(++tick)).toISOString(),label:'Nov 8 00:00–12:00 local'}})}});

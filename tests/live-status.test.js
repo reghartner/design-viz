@@ -3029,11 +3029,38 @@ test('#1142 Over time Load trace and Verify call the transport with the selected
  assert.equal(api.snapshot().trace.direct.available,true);
  const note=m.body.querySelector('.dv-trace-lookback-note');assert.ok(note);
  assert.equal(note.textContent,'Searches '+day.label+' · looks back '+calls[1].from.slice(1)+' (this connection cannot stop at a past time)');
+ // The loaded trace is the selected request, as in Live; example traces stay Live-only.
+ assert.equal(api.snapshot().trace.selected && api.snapshot().trace.selected.manual,true,'the loaded trace is selected in Over time');
+ assert.deepEqual(api.snapshot().trace.entries.map(e=>e.label.split(' · ')[0]),['Loaded trace']);
+ assert.ok(m.body.querySelector('.dv-trace-selected'),'the panel shows the selected request');
  // A day without a date has no window; Load trace stays off there.
  overBackToLive(api);await historySettle();api.setHistory({load:()=>({days:overDays()})});api.overTime();await historySettle();
  assert.equal(api.snapshot().overTime.window,null);assert.equal(api.snapshot().trace.direct.available,false);assert.equal(await api.loadDirectTrace(false),null);assert.equal(calls.length,2);
  api.destroy();
 });
+/* #1142 review: on today the window end moves with every read. Repaints must not cancel a pending
+   load, drop the loaded trace, clear the typed ID or fetch again. */
+test('#1142 on today, repaints keep a pending and a loaded trace and the typed ID',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),ID='8413cd87a9f15b6bfe8e1acf5b3346d0',calls=[];let release;
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const raw=overFixture();raw.page.tracking.telemetry={traceConnections:{company:profile}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async(request,args)=>{calls.push(plain(args));await new Promise(r=>release=r);return {payload:recorded};}}}}),api=overReady(h.ctl.liveStatus);mountStatus(h);
+ api.apply(overToday());api.setStatusMode('trace');
+ const days=historyDays(providerContext(),[historyTicket('AA-1',Date.now()-2*86400000,'In Progress')],{'AA-1':{state:'active'}},Date.now());
+ api.setHistory({load:()=>days});api.overTime();await historySettle();api.overTimeDay(days.days.length-1);
+ assert.equal(api.snapshot().overTime.today,true);
+ api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:ID});
+ const repaint=async()=>{for(let i=0;i<5;i++){await new Promise(r=>setTimeout(r,2));api.setTraceShow(true);api.snapshot();}};
+ const pending=api.loadDirectTrace(false);for(let i=0;i<20 && !release;i++)await new Promise(setImmediate);assert.ok(release,'the load reached the transport');
+ await repaint();release();
+ assert.ok(await pending,'pending load survives repaints on today');
+ await repaint();
+ const trace=api.snapshot().trace;
+ assert.ok(trace.direct.exemplar,'the loaded trace survives repaints');assert.equal(trace.direct.form.input,ID,'the typed ID is kept');
+ assert.equal(trace.selected && trace.selected.manual,true);assert.equal(calls.length,1,'no repaint fetches again');
+ api.destroy();
+});
+
 /* #1137: a board without ticket references (snapshot().available === false) gives metric cards
    no Jira presentation; a board with tickets keeps "unchanged" on an unticketed carded edge. */
 async function paintedCard(nodes){

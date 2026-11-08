@@ -108,7 +108,7 @@ export interface TelemetryProgress {
 export interface TelemetryBinding {
   id: string;
   kind: 'call' | 'queue' | 'service' | 'log-event' | 'device';
-  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch' | 'cloudwatchLogs'; query: string | TelemetryCloudWatchQuery | TelemetryCloudWatchLogsQuery | Record<string, unknown>; unit: string | null; scope?: string; label?: string; showOnCard?: boolean; links?: {query?: string}; window?: string; error?: string; /** Derived configuration error: skip only the optional grouped query; never save this into the authored query. */ breakdownError?: string; trendError?: string}>;
+  signals: Record<string, {source: 'grafana' | 'loki' | 'tempo' | 'sql' | 'honeycomb' | 'cloudwatch' | 'cloudwatchLogs'; query: string | TelemetryCloudWatchQuery | TelemetryCloudWatchLogsQuery | Record<string, unknown>; unit: string | null; scope?: string; label?: string; showOnCard?: boolean; /** loki and grafana only: false keeps a successful empty result unobserved. */ missingMeansZero?: boolean; links?: {query?: string}; window?: string; error?: string; /** Derived configuration error: skip only the optional grouped query; never save this into the authored query. */ breakdownError?: string; trendError?: string}>;
   proof: Record<string, {min?: number; max?: number; maxRatioOf?: string}>;
   links: {dashboard?: string; query?: string};
   card: {side?: 'right' | 'left' | 'above' | 'below'; offset?: number; title?: string; width?: number} | null;
@@ -182,6 +182,8 @@ export interface DirectTraceRequest {
     literals: Record<string, string | number | boolean | null>;
     environments: Record<string, {label?: string; value?: string; context?: Record<string, string | number | boolean | null>; literals?: Record<string, string | number | boolean | null>}>;
     links: Array<{origin: string; path: string; query: Record<string, string>; timeEncoding: 'relative' | 'iso8601' | 'unix-seconds' | 'unix-milliseconds'}>;
+    /** Span attribute names retained for traceMatch.attributes. */
+    allowedAttributes?: string[];
   };
 }
 export interface NativeViewerOptions {

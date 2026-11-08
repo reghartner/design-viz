@@ -4,10 +4,9 @@ Use this workflow to align an accepted diagram with actual spans, preserving its
 story and placement. Run commands from the repository root or the source-free
 kit's **VIZ** directory. Editing and visual verification are desktop-only.
 Create a unique output directory once per author session, then keep using that
-shell's `TRACE_CHECK_DIR` for the commands below. Concurrent authors must create
-their own directories; never reuse another author's temporary spec or reports.
-Keep this directory out of authored deliverables and retain its path with your
-validation evidence. Source specs and trace inputs remain unchanged.
+shell's `TRACE_CHECK_DIR` for the commands below. Never reuse another author's
+temporary spec or reports. Keep this directory out of authored deliverables and
+retain its path with your validation evidence. Source specs and trace inputs remain unchanged.
 
 ```sh
 TRACE_CHECK_DIR="$(mktemp -d "${PWD}/.trace-check.XXXXXX")"
@@ -67,8 +66,10 @@ the [normalizer](canon.md) can disambiguate: `service.namespace`,
 `http.response.status_code` / `http.status_code`, `db.system` / `db.system.name`,
 `messaging.queue.depth` / `queue.depth`, `messaging.message.age_ms`,
 `flow.backpressure`, `flow.delivery_failed`, `retry.attempt`, and `flow.step.id`.
-Arbitrary tags, payload fields and request IDs are dropped; do not write selectors
-against them. Prefer stable instrumentation meaning over incidental timings.
+Other tags, payload fields and request IDs are dropped (Tempo profiles may keep
+[`allowedAttributes`](provider-traces.md#allowed-match-attributes)); do not write
+selectors against them. Prefer stable instrumentation meaning over incidental
+timings.
 
 For duplicate calls, first use a verified parent/link or retained attribute.
 `occurrence:1` is only valid for fully timed, non-overlapping serial calls;

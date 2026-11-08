@@ -67,7 +67,14 @@ function telemetryTraceCheckSpans(spans){
   });
   spans.forEach(function(s){var path=[],seen=new Set(),p=s;while(p && !done.has(p.id)){if(seen.has(p.id))telemetryTraceFail('Trace contains a parent cycle.');seen.add(p.id);path.push(p.id);p=ids[p.parentId];}path.forEach(function(id){done.add(id);});});
 }
-function telemetryHoneycombTrace(result,id){
+/* Fixed table columns, plus same-named columns for profile-allowed attributes.
+   Table cells are text, so allowed attribute values are strings. */
+function telemetryHoneycombAttrs(r,allowed){
+  var v={'service.name':r.service,'http.route':r.route,'span.kind':r.kind,'status.code':r.status_code,error:r.error==='true','http.status_code':r.http_status};
+  (Array.isArray(allowed)?allowed:[]).forEach(function(k){if(!telemetryOwn(v,k) && telemetryOwn(r,k))v[k]=r[k];});
+  return telemetryTraceAttrs(v,allowed);
+}
+function telemetryHoneycombTrace(result,id,allowed){
   var text=telemetryTraceText(result),meta=telemetryTraceMeta(text);
   if(meta.trace_id!==id)telemetryTraceFail('Returned trace ID differs from requested candidate.');
   var rows=telemetryTraceTable(text,['span_id','parent_id','start_unix_ns','duration_ns','kind','status_code','error','http_status','service','route','name']);
@@ -86,7 +93,7 @@ function telemetryHoneycombTrace(result,id){
   if(!spans.length)telemetryTraceFail('No timed spans returned.');
   var starts=spans.map(function(r){if(!/^\d{1,22}$/.test(r.start_unix_ns) || !/^\d{1,22}$/.test(r.duration_ns))telemetryTraceFail('Invalid exact nanosecond timing.');return BigInt(r.start_unix_ns);}),base=starts.reduce(function(a,b){return a<b?a:b;});
   var normalized=spans.map(function(r,i){var offset=starts[i]-base,duration=BigInt(r.duration_ns);if(offset>86400000000000n || duration>86400000000000n)telemetryTraceFail('Trace timing exceeds bounds.');
-    return {id:r.span_id,parentId:r.parent_id && !placeholders.has(r.parent_id)?r.parent_id:null,service:r.service,name:r.name,startMs:Number(offset)/1e6,ms:Number(duration)/1e6,time:telemetryTime(Number(starts[i]/1000000n)),error:r.error==='true' || r.status_code==='ERROR' || /^5\d\d$/.test(r.http_status),attributes:telemetryTraceAttrs({'service.name':r.service,'http.route':r.route,'span.kind':r.kind,'status.code':r.status_code,error:r.error==='true','http.status_code':r.http_status}),events:[],links:[]};
+    return {id:r.span_id,parentId:r.parent_id && !placeholders.has(r.parent_id)?r.parent_id:null,service:r.service,name:r.name,startMs:Number(offset)/1e6,ms:Number(duration)/1e6,time:telemetryTime(Number(starts[i]/1000000n)),error:r.error==='true' || r.status_code==='ERROR' || /^5\d\d$/.test(r.http_status),attributes:telemetryHoneycombAttrs(r,allowed),events:[],links:[]};
   });
   telemetryTraceCheckSpans(normalized);
   if(normalized.length>TELEMETRY_TRACE_SPANS){normalized=[];complete='partial';warnings.push('More than 200 spans; trace timeline unavailable.');}
@@ -94,11 +101,11 @@ function telemetryHoneycombTrace(result,id){
 }
 /* Pinned Tempo text exposes service resource; structured spans prefix those keys
    with resource. Map only canonical context keys, with explicit span precedence. */
-function telemetryTempoAttrs(attributes,resource,structured){
-  var attrs=telemetryTraceAttrs(attributes),context=['service.namespace','service.version','deployment.environment.name','deployment.environment'];
+function telemetryTempoAttrs(attributes,resource,structured,allowed){
+  var attrs=telemetryTraceAttrs(attributes,allowed),context=['service.namespace','service.version','deployment.environment.name','deployment.environment'];
   context.forEach(function(k){var v=structured?attributes && attributes['resource.'+k]:resource && resource[k];if(!telemetryOwn(attrs,k) && (typeof v==='boolean' || telemetryNumber(v) || telemetryTraceString(v)))attrs[k]=v;});return attrs;
 }
-function telemetryTempoTrace(result,id){
+function telemetryTempoTrace(result,id,allowed){
   var raw=telemetryTraceJson(result),text=telemetryTraceText(result),secondary=null;try{secondary=JSON.parse(text);}catch(e){}
   if(raw.traceId!==id || secondary && secondary.traceId && secondary.traceId!==id)telemetryTraceFail('Returned trace ID differs from requested candidate.');
   var flat=[];if(Array.isArray(raw.services))raw.services.forEach(function(s){if(!s || !Array.isArray(s.spans))telemetryTraceFail('Invalid Tempo service.');s.spans.forEach(function(p){flat.push({span:p,service:s.serviceName,resource:s.resource,structured:false});});});
@@ -107,7 +114,7 @@ function telemetryTempoTrace(result,id){
   if(!flat.length || flat.length>10000)telemetryTraceFail('Tempo trace span count unavailable.');
   var base=Infinity;flat.forEach(function(x){if(!telemetryNumber(x.span.startTimeMs) || !telemetryNumber(x.span.durationMs))telemetryTraceFail('Invalid Tempo timing.');base=Math.min(base,x.span.startTimeMs);});
   var native=Object.create(null);if(secondary && Array.isArray(secondary.services))secondary.services.forEach(function(s){(s.spans || []).forEach(function(p){native[p.spanId]=p;});});
-  var spans=flat.map(function(x){var p=x.span,extra=native[p.id] || {};return {id:x.structured?p.id:p.spanId,parentId:(x.structured?p.parentId:p.parentSpanId) || null,service:x.service,name:p.name,startMs:p.startTimeMs-base,ms:p.durationMs,time:telemetryTime(p.startTimeMs),error:p.status==='error' || (p.events || []).some(function(e){return e.name==='exception';}),attributes:telemetryTempoAttrs(p.attributes,x.resource,x.structured),events:p.events || [],links:p.links || extra.links || []};});
+  var spans=flat.map(function(x){var p=x.span,extra=native[p.id] || {};return {id:x.structured?p.id:p.spanId,parentId:(x.structured?p.parentId:p.parentSpanId) || null,service:x.service,name:p.name,startMs:p.startTimeMs-base,ms:p.durationMs,time:telemetryTime(p.startTimeMs),error:p.status==='error' || (p.events || []).some(function(e){return e.name==='exception';}),attributes:telemetryTempoAttrs(p.attributes,x.resource,x.structured,allowed),events:p.events || [],links:p.links || extra.links || []};});
   telemetryTraceCheckSpans(spans);
   var partial=raw.partial===true || secondary && secondary.partial===true,warnings=[];
   // No completeness guarantee is inferred from the presence of structuredContent.

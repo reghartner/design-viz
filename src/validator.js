@@ -731,6 +731,7 @@ function validate(page){
   if(!hasTracking && !hasTickets && !hasTelemetry)statusPanels.forEach(function(path){warnings.push(path+': this page has no ticket references — the panel will be empty');});
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
+  if (typeof FlowCanon !== 'undefined' && FlowCanon.traceWarnings) warnings = warnings.concat(FlowCanon.traceWarnings(page));
   validateDocumentLinks(page.documentLinks,page.canon && page.canon.id,'page.documentLinks',errors);
   validateDocumentDescription(page.description,'page.description',errors);
   validateDocumentTags(page.tags,'page.tags',errors);

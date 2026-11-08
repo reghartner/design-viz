@@ -40,6 +40,9 @@ fetches a trace**. In the existing step that represents the observed operation,
 add `traceMatch`, preserving the step's ID, narrative and delivered `edge` or
 `edges`. `nodeId` names an existing stable node in this source section, normally
 the receiving node for that operation. It is not a provider service-name guess.
+`traceMatch` is read only from steps. On a node or an edge it is ignored, and
+the validator warns with that node or edge ID. A provider's exported node or
+edge warns in the provider's own build, not again in each consumer.
 
 ```json
 {

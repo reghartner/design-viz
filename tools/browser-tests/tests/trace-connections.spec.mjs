@@ -19,11 +19,11 @@ async function expectCompactTrace(root){
 function detailSpec(){const detail=nestedSpec(),d=detail.page.sections[0].diagram;detail.page.title='Loaded detail';detail.page.sections[0].heading='Imported detail';delete d.edges[0].telemetry;d.edges[0].curvePoints=[{t:.5,dx:0,dy:70}];
  d.nodes.local={title:'Local frontend'};d.rows.push(['local']);d.steps=[{id:'local',nodes:['local'],text:'Local checkout',traceMatch:{serviceName:'frontend',operation:'/cart/checkout',nodeId:'local'}},{id:'imported',edge:'outer::inner::a->outer::inner::b',text:'Imported currency',traceMatch:{serviceName:'currency',operation:'grpc.msdemo.CurrencyService/GetSupportedCurrencies',nodeId:'outer::inner::b'}}];return detail;}
 async function portable(page,server,{held=false,absolute=false,inherited=false,duplicates=false}={}){
- await page.setViewportSize({width:1500,height:1100});const profile=clone(PROFILE),tools=[schema()],calls=[],permissions=[],releases=[];let hold=held;
+ await page.setViewportSize({width:1500,height:1100});const profile=clone(PROFILE),tools=[schema()],calls=[],permissions=[],releases=[];let hold=held,payload=RECORDED;
  if(absolute){profile.time={encoding:'iso8601',type:'string',defaultLookback:'2h'};profile.arguments.end='to';tools[0].inputSchema.properties.to={type:'string'};tools[0].inputSchema.required.push('to');}
  await page.exposeFunction('traceTools',()=>[{server:profile.server,tools:tools.map(t=>({name:t.name,annotations:t.annotations}))}]);
  await page.exposeFunction('traceDescribe',()=>tools[0]);await page.exposeFunction('tracePermission',keys=>{permissions.push(...keys);return Object.fromEntries(keys.map(k=>[k,'granted']));});
- await page.exposeFunction('traceCall',async(server,tool,args)=>{calls.push({server,tool,args});if(hold)await new Promise(resolve=>releases.push(resolve));return {payload:RECORDED};});
+ await page.exposeFunction('traceCall',async(server,tool,args)=>{calls.push({server,tool,args});if(hold)await new Promise(resolve=>releases.push(resolve));return {payload};});
  const spec={page:{title:'Direct traces',tracking:{telemetry:{traceConnections:{company:profile,alternate:{...profile,label:'Alternate connection'}}}},sections:[{id:'main',diagram:{nodes:{parent:{title:'Imported service',detail:{spec:'approved-detail',revision:'r1',section:'main'}}},rows:[['parent']],panels:[PANEL]}}]}},detail=detailSpec();
  if(duplicates){const root=spec.page.sections[0].diagram;root.nodes.local={title:'Root decoy'};root.nodes['outer::inner::b']={title:'Duplicate imported ID'};root.rows.push(['local','outer::inner::b']);root.steps=clone(detail.page.sections[0].diagram.steps).map(step=>({...step,edge:undefined,nodes:['local']}));}
  await page.addInitScript(({detail})=>{
@@ -37,7 +37,7 @@ async function portable(page,server,{held=false,absolute=false,inherited=false,d
  await root.getByRole('combobox',{name:'Trace connection',exact:true}).selectOption('company');await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
  const choices=await root.getByRole('combobox',{name:'Mapping diagram',exact:true}).locator('option').evaluateAll(nodes=>nodes.map(n=>({value:n.value,text:n.textContent}))),selected=choices.find(o=>o.text.includes('Loaded detail'));
  await root.getByRole('combobox',{name:'Mapping diagram',exact:true}).selectOption(selected.value);
- return {root,calls,permissions,choices,selected,release(){hold=false;releases.splice(0).forEach(fn=>fn());},tools};
+ return {root,calls,permissions,choices,selected,release(){hold=false;releases.splice(0).forEach(fn=>fn());},tools,respond(value){payload=value;}};
 }
 test('desktop inherited-company direct-only read-only load maps local and nested imported nodes in the exact loaded section, with zero search/numeric calls',async({page,server},info)=>{
  const h=await portable(page,server,{inherited:true});await observeTraceReveals(page);expect(h.calls).toHaveLength(0);expect(h.permissions).toHaveLength(0);expect(await page.evaluate(()=>window.ctl.telemetry.enabled())).toBe(false);
@@ -53,6 +53,15 @@ test('desktop inherited-company direct-only read-only load maps local and nested
  await info.attach('direct-loaded-imported',{body:await h.root.screenshot(),contentType:'image/png'});
  await openTraceConfiguration(h.root);await h.root.getByRole('button',{name:'Verify trace connection',exact:true}).click();await expect.poll(()=>h.calls.length).toBe(2);await expect(h.root.locator('.dv-trace-direct-report')).toContainText('Stage: complete');await expect(h.root.locator('.dv-trace-diagnostics')).toHaveJSProperty('open',true);await expect(h.root.locator('.dv-trace-arguments')).toBeVisible();await expect(h.root.locator('.dv-trace-arguments')).toContainText('[configured]');expect(await page.evaluate(()=>window.traceReveals.length)).toBe(1);await info.attach('direct-verified-expanded',{body:await h.root.screenshot(),contentType:'image/png'});
  await h.root.getByRole('button',{name:'Clear loaded trace',exact:true}).click();await expect(h.root.locator('.dv-trace-selected')).toHaveCount(0);await expect(h.root.locator('[data-trace-tone]')).toHaveCount(0);expect(h.calls).toHaveLength(2);
+});
+test('desktop Load trace shows the active lookback, and a no-spans load names it and opens the Lookback section',async({page,server})=>{
+ const h=await portable(page,server),note=h.root.locator('.dv-trace-lookback-note'),time=h.root.locator('.dv-trace-time'),status=h.root.locator('.dv-trace-direct-status'),input=h.root.getByRole('textbox',{name:'Trace ID or link',exact:true});
+ await expect(note).toHaveText('Looks back 2h; change under Lookback.');await expect(time.locator('summary')).toHaveText('Lookback (optional)');await expect(time).toHaveJSProperty('open',false);
+ h.respond('---\nMetadata:\n  environment: ms-demo\n  navigation_hints: no spans found\n  total_spans: 0\n  trace_id: '+ID+'\n  view_mode: full\n  visible_spans: 0\n');
+ await input.fill(ID);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();
+ await expect(status).toHaveText('Trace not found in the last 2h. Try a longer lookback under Lookback.');await expect(time).toHaveJSProperty('open',true);await expect(h.root.locator('.dv-trace-selected')).toHaveCount(0);expect(h.calls).toHaveLength(1);expect(h.calls[0].args.from).toBe('-2h');
+ await h.root.getByRole('textbox',{name:'Trace start',exact:true}).fill('-7d');await expect(note).toHaveText('Looks back 7d; change under Lookback.');await expect(time).toHaveJSProperty('open',true);
+ h.respond(RECORDED);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);expect(h.calls).toHaveLength(2);expect(h.calls[1].args.from).toBe('-7d');
 });
 for(const change of ['environment','connection','section'])test('desktop changing '+change+' cancels pending detail without fetching again',async({page,server})=>{
  const h=await portable(page,server,{held:true});await observeTraceReveals(page);await h.root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();await expect.poll(()=>h.calls.length).toBe(1);await expect(h.root.getByRole('button',{name:'Cancel request',exact:true})).toBeVisible();

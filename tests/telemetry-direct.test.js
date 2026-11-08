@@ -157,3 +157,17 @@ test('connection and environment changes require fresh trace input; section-only
  }
  const h=setup({hooks:{sections:()=>[{id:'one',label:'One'},{id:'two',label:'Two'}]}});h.api.set('section','one');h.api.set('start','-2h');h.api.set('section','two');assert.equal(h.api.snapshot().form.input,ID);assert.equal(h.api.snapshot().form.start,'-2h');assert.equal(h.calls.length,0);assert.equal((await h.api.load()).traceId,ID);h.api.destroy();
 });
+
+test('a metadata-only no-spans response names the active lookback; a present but wrong table keeps the header message',async()=>{
+ const notFound='---\nMetadata:\n  environment: ms-demo\n  navigation_hints: no spans found\n  total_spans: 0\n  trace_id: '+ID+'\n  view_mode: full\n  visible_spans: 0\n';
+ for(const [start,label] of [['','2h'],['-7d','7d']]){
+  const h=setup({result:{payload:notFound}});if(start)h.api.set('start',start);assert.equal(await h.api.load(),null);const s=h.api.snapshot();
+  assert.equal(s.exemplar,null);assert.equal(s.report.stage,'response');assert.equal(s.report.requestAccepted,true);assert.equal(s.report.idMatched,false);assert.equal(s.report.arguments.from,'-'+label);
+  assert.equal(s.report.code,'trace_not_found');assert.equal(s.report.error,'Trace not found in the last '+label+'. Try a longer lookback under Lookback.');h.api.destroy();
+ }
+ const p=profile();p.time.encoding='iso8601';p.arguments.end='to';const t=tool();t.inputSchema.properties.to={type:'string'};t.inputSchema.required.push('to');
+ const absolute=setup({p:board(p),result:{payload:notFound}});absolute.setTools([t]);absolute.api.set('start','2026-11-06T00:00:00Z');absolute.api.set('end','2026-11-06T06:00:00Z');assert.equal(await absolute.api.load(),null);
+ assert.equal(absolute.api.snapshot().report.code,'trace_not_found');assert.equal(absolute.api.snapshot().report.error,'Trace not found between 2026-11-06T00:00:00Z and 2026-11-06T06:00:00Z. Try a wider range under Lookback.');absolute.api.destroy();
+ const wrong=recorded.replace('| route |','| path |'),hinted=wrong.replace(/^  navigation_hints: .*$/m,'  navigation_hints: no spans found');assert.notEqual(hinted,wrong);
+ for(const payload of [wrong,hinted]){const h=setup({result:{payload}});assert.equal(await h.api.load(),null);const s=h.api.snapshot();assert.equal(s.report.stage,'response');assert.equal(s.report.error,'Unsupported trace table header.');assert.notEqual(s.report.code,'trace_not_found');h.api.destroy();}
+});

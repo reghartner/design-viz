@@ -59,7 +59,7 @@ for(const wrapped of [true,false])test('P2 Allow metrics false/true is one Undo 
  await expect.poll(async()=>read(await source.inputValue()).tracking.telemetry.enabled).toBe(false);
  const disabled=await source.inputValue();await expect(cards(page)).toHaveCount(0);await expect(toggle(page)).toBeDisabled();
  expect(read(disabled).tracking.telemetry).toEqual({...raw.page.tracking.telemetry,enabled:false});expect(read(disabled).sections[0].diagram.edges[0].telemetry).toEqual(binding);
- await expect(page.locator('#docview').getByRole('button',{name:'Metrics',exact:true})).toHaveCount(0);
+ await expect(page.locator('#docview').getByRole('switch',{name:'Metrics overlay',exact:true})).toHaveCount(0);
  expect(doc(await exported(page)).tracking.telemetry.enabled).toBe(false);
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await expect(cards(page)).toHaveCount(1);
  await page.locator('#redo-builder').click();await expect(source).toHaveValue(disabled);await expect(cards(page)).toHaveCount(0);

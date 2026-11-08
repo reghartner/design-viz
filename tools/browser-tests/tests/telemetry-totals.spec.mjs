@@ -1,7 +1,7 @@
 import {test,expect} from '../helpers/test.mjs';
 import {setup} from '../helpers/telemetry-proof.mjs';
 const T=Date.UTC(2026,10,4,12),H=3600000,iso=t=>new Date(t).toISOString();
-const metrics=root=>root.getByRole('button',{name:'Metrics',exact:true}),over=root=>root.getByRole('button',{name:'Over time',exact:true}),live=root=>root.getByRole('button',{name:'Live',exact:true});
+const metrics=root=>root.getByRole('switch',{name:'Metrics overlay',exact:true}),over=root=>root.getByRole('button',{name:'Over time',exact:true}),live=root=>root.getByRole('button',{name:'Live',exact:true});
 const since=(root,id)=>root.locator('[data-proof-carrier="'+id+'"] .dv-live-proof-since');
 const production=root=>root.locator('.dv-live-popover:visible .dv-live-production');
 const sample=(value=1200,from=T-H,to=T,observedAt=T)=>({observedAt:iso(observedAt),signals:{rate:{value,unit:'events',aggregate:{kind:'total',from:iso(from),to:iso(to)}}}});
@@ -19,7 +19,7 @@ test('explicit measured totals retain exact value/unit and Done scope on local/d
  await deliver(page,id,sample(1200,T-H,T+1));await expect(since(root,id)).not.toContainText('total:');
  const ordinary=sample();delete ordinary.signals.rate.aggregate;ordinary.signals.rate.series=[[T-H,600],[T,600]];await deliver(page,id,ordinary);await expect(since(root,id)).not.toContainText('total:');
  await deliver(page,id);await expect(since(root,id)).toContainText('total:');await page.evaluate(at=>window.viewer.controller.liveStatus.apply({...window.jira,'LOC-3':{state:'done',updatedAt:at}}),iso(T-H+1));await expect(since(root,id)).not.toContainText('total:');
- await expect(metrics(root)).toHaveAttribute('aria-pressed','false');expect(await page.evaluate(()=>[window.calls.live.length,window.calls.history.length])).toEqual([0,0]);
+ await expect(metrics(root)).toHaveAttribute('aria-checked','false');expect(await page.evaluate(()=>[window.calls.live.length,window.calls.history.length])).toEqual([0,0]);
 });
 test('actual asynchronously selected imports show totals for direct and nested scoped bindings',async({page,server})=>{
  const root=await setup(page,server,{details:true});await done(page);await root.getByRole('button',{name:'Explore Imported service',exact:true}).click();await expect(root.getByText('Loading detail diagram…',{exact:true})).toBeVisible();await page.evaluate(()=>window.loadReleases.shift()());const scope=root.locator('[data-dv-detail-preview]:visible');await expect(scope.locator('.sec-h')).toHaveText('Selected imported detail');

@@ -38,7 +38,7 @@ async function mount(page,server,native){
   await page.goto(server.origin+'/card-inheritance.html');await page.waitForFunction(()=>!!window.cardCtl);
  }
  await apply(page,'done','active');
- const root=page.locator(native?'#host':'#docview');await root.getByRole('button',{name:'Metrics',exact:true}).click();
+ const root=page.locator(native?'#host':'#docview');await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();
  return root;
 }
 async function apply(page,first,second){
@@ -140,7 +140,7 @@ test('loaded imported detail inherits its own work and clears retained card DOM'
 test('nested imported no-change card uses the thin outline without provider evidence',async({page,server})=>{
  const {root}=await mountCues(page,server);
  await page.evaluate(spec=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>({'outer::inner::a->outer::inner::b':{signals:{rate:{value:88},errors:{value:0}}}})}});},nestedSpec());
- await root.getByRole('button',{name:'Metrics',exact:true}).click();const card=root.locator('[data-metrics-card="outer::inner::a->outer::inner::b"]');
+ await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();const card=root.locator('[data-metrics-card="outer::inner::a->outer::inner::b"]');
  await expect(card).toContainText('88 req/h');expect(await paint(card)).toMatchObject({appearance:'unchanged',width:'1px',glow:'0'});
  await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
 });

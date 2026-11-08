@@ -744,8 +744,11 @@ width. It appears immediately, with no menu click.
 The generic desktop Workbench picker lists **Delivery → Live status**; insertion
 and Export project preserve the panel. There are no authored state or patch fields.
 
-The panel header has two rows. The first holds only buttons, which keep their
-place: **Live**, **Over time**, **Metrics** when available, any provider action, Edit, and on the far right
+The Jira and Trace views share one header (#1131). Its top row holds **Jira** | **Trace**,
+an **Env** select when the board names environments, and the **Metrics overlay** switch at
+the right edge. The next row holds **Live** | **Over time**; the day row and any Over time
+error follow it in both views. The Jira view then has two rows. The first holds only
+buttons, which keep their place: any provider action, Edit, and on the far right
 **First blocker**. **First blocker** keeps one size; with no blockers it reads
 **No blockers** and is greyed out, and with blockers it cannot reach from here it
 stays **First blocker** and is greyed out. The second row holds everything that
@@ -756,9 +759,9 @@ blue (`--dv-live-active`) while connecting or awaiting approval, green when conn
 red on error, and it pulses while a fetch is in flight; the time is the last successful
 fetch, not a ticket's change time), and the provider note. Text too long for the row
 is cut off and stays available in the row's tooltip and to screen readers. Demo
-controls supply **<** and **>** on a row below the header. The engine's panel title stays above this header.
+controls supply **<** and **>** on the day row, below **Live** | **Over time**. The engine's panel title stays above this header.
 
-**Metrics** sits beside Live and Over time, when the host supplies a telemetry
+The **Metrics overlay** switch shows when the host supplies a telemetry
 provider or a demo telemetry source (see [Telemetry provider](#telemetry-provider));
 without one it is hidden. It is off on every load and its state is never saved.
 Turning it on calls the telemetry provider at once in Live mode and keeps it refreshing; turning
@@ -2061,7 +2064,7 @@ With Jira Live off, numeric evidence can still show its telemetry-only verdict.
 
 Trace evidence now lives in the existing Status panel's **Trace** view, beside
 **Jira**. It never opens a card over the diagram when stepping. Choose Trace and
-**Enable traces** to retrieve explicit trace bindings, then select an actual
+turn on **Metrics overlay** to retrieve explicit trace bindings, then select an actual
 returned candidate. The selected request stays independent of step navigation;
 path changes remap that same request within its exact source section.
 

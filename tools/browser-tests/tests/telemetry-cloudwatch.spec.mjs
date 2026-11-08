@@ -25,7 +25,7 @@ test('desktop CloudWatch editor round-trip and local/imported zero versus unobse
   window.flowviewBooted=ctl=>window.cloudwatchController=ctl;
  });
  await page.goto(server.origin+'/cloudwatch.html');await page.waitForFunction(()=>!!window.cloudwatchController);
- const panel=page.locator('#docview .pt-live-status').first();await panel.getByRole('button',{name:'Metrics',exact:true}).click();
+ const panel=page.locator('#docview .pt-live-status').first();await panel.getByRole('switch',{name:'Metrics overlay',exact:true}).click();
  for(const id of ['ingest->app','shared::api->shared::store'])await expect(page.locator('[data-metrics-card="'+id+'"]').first()).toContainText('0 events');
  for(const id of ['ingest','shared::api'])expect(await page.evaluate(id=>window.cloudwatchController.telemetry.snapshot().map[id]?.signals.rate?.value,id)).toBe(0);
  const calls=await page.evaluate(()=>window.cloudwatchCalls);expect(calls.every(c=>c.tool==='query_cloudwatch'&&c.input.accountId==='646998985045'&&c.input.period===3600&&Date.parse(c.input.end)-Date.parse(c.input.start)===86400000)).toBe(true);expect(calls.some(c=>c.input.dimensions.ActionType==='SQS')).toBe(true);
@@ -33,6 +33,6 @@ test('desktop CloudWatch editor round-trip and local/imported zero versus unobse
  await page.evaluate(()=>{window.cloudwatchEmpty=true;window.cloudwatchController.telemetry.retry();});
  await expect.poll(()=>page.evaluate(()=>Object.keys(window.cloudwatchController.telemetry.snapshot().map))).toEqual([]);
  for(const id of ['ingest->app','shared::api->shared::store']){const card=page.locator('[data-metrics-card="'+id+'"]').first();await expect(card).toContainText(/unobserved/i);await expect(card).not.toContainText('0 events');}
- await panel.getByRole('combobox',{name:'Environment',exact:true}).selectOption('prd');await expect.poll(()=>page.evaluate(()=>window.cloudwatchCalls.at(-1).input.accountId)).toBe('333333333333');
+ await panel.getByRole('combobox',{name:'Env',exact:true}).selectOption('prd');await expect.poll(()=>page.evaluate(()=>window.cloudwatchCalls.at(-1).input.accountId)).toBe('333333333333');
  await page.locator('#docview .board').first().screenshot({path:testInfo.outputPath('cloudwatch-unobserved.png')});
 });

@@ -244,7 +244,7 @@ the built-in attribute list can match today. The one exception is
 ## Inspect a request in Status
 
 The existing **Status** panel has **Jira** and **Trace** views. Jira is the default.
-Choose Trace, then **Enable traces** (or the existing connector approval action)
+Choose Trace, then turn on **Metrics overlay** (or the existing connector approval action)
 to retrieve the page's explicit trace bindings. Host and page opt-outs still apply.
 Trace replaces the Jira body and owns the diagram annotations while selected;
 returning to Jira restores its existing status and scalar telemetry presentation.

@@ -167,7 +167,7 @@ test('V8 V9 V11 external detail refs create a deferred control and retired mount
  api.apply({'DD-1':{state:'done',updatedAt:'2026-10-26T12:00:00Z'}});api.note('Detail loaded','info');assert.equal(h.view.querySelectorAll('.dv-live-toggle').filter(el=>!el.hidden).length,0);
  const pending=renderOptions.loadDetail({spec:'approved-detail'},new AbortController().signal);resolve({nodes:{child:{tickets:['DD-1']}},rows:[['child']]});await pending;h.flush();
  assert.deepEqual(plain(api.refs().tickets),['DD-1']);assert.equal(removed.children.length,0);assert.equal(host.querySelectorAll('.dv-live-toggle').length,1);
- const root=host.querySelector('.dv-live-head'),toggle=root.querySelector('.dv-live-toggle');assert.equal(root.hidden,false);assert.equal(root.querySelector('[data-live-count="done"]').textContent,'done 1');assert.equal(root.querySelector('.dv-live-note').textContent,'Detail loaded');assert.equal(root.querySelector('time'),null,'V8 no ticket-change time in the header (#769)');assert.equal(h.ctl.liveStatus.snapshot().updatedAt,'2026-10-26T12:00:00Z');
+ const root=host.querySelector('.dv-live-head'),toggle=host.querySelector('.dv-live-toggle');assert.equal(root.hidden,false);assert.equal(root.querySelector('[data-live-count="done"]').textContent,'done 1');assert.equal(root.querySelector('.dv-live-note').textContent,'Detail loaded');assert.equal(root.querySelector('time'),null,'V8 no ticket-change time in the header (#769)');assert.equal(h.ctl.liveStatus.snapshot().updatedAt,'2026-10-26T12:00:00Z');
  toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),false);assert.equal(toggle.getAttribute('aria-pressed'),'false');
  h.view.dispatchEvent({type:'detail-navigation'});h.flush();assert.equal(host.querySelectorAll('.dv-live-toggle').length,1);
  mount.destroy();api.apply({});h.view.dispatchEvent({type:'navigation-mounted'});h.flush();assert.equal(host.children.length,0);
@@ -1170,7 +1170,7 @@ test('L2 L3 snapshot exposes rollup and all mutations notify; navigation control
 });
 test('L2 L3 L4 panel paints synchronously, controls act, focus survives refresh and cleanup preserves print',()=>{
  const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const mount=mountStatus(h),body=mount.body;
- assert.equal(body.firstChild.className,'dv-status-modes');assert.ok(body.querySelector('.dv-live-head'));assert.ok(body.querySelector('table.dv-live-tickets'));assert.ok(body.querySelector('.dv-live-epic'));assert.ok(body.querySelector('.dv-live-verdict')===null,'no verdict line');
+ assert.equal(body.firstChild.className,'dv-status-header');assert.ok(body.firstChild.querySelector('.dv-status-modes'));assert.ok(body.querySelector('.dv-live-head'));assert.ok(body.querySelector('table.dv-live-tickets'));assert.ok(body.querySelector('.dv-live-epic'));assert.ok(body.querySelector('.dv-live-verdict')===null,'no verdict line');
  assert.deepEqual(body.querySelectorAll('h3').map(el=>el.textContent),['Tickets','Blockers and dependency chains','Activity']);
  const toggle=body.querySelector('.dv-live-toggle');assert.equal(toggle.textContent,'Live');toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),false);toggle.dispatchEvent({type:'click'});assert.equal(api.enabled(),true);
  let action=0,next=0,prev=0;api.action('Retry',()=>action++);body.querySelector('.dv-live-action').dispatchEvent({type:'click'});assert.equal(action,1);
@@ -2039,16 +2039,16 @@ test('M5 apply keeps the provider result contract, snapshots are copies, clear e
  h.ctl.liveStatus.destroy();
 });
 
-test('M6 Metrics sits beside Live, off by default; on calls the provider and updates its connector text; off clears; Live is untouched',async()=>{
+test('M6 the Metrics overlay switch is in the shared header, off by default; on calls the provider and updates its connector text; off clears; Live is untouched',async()=>{
  let calls=0,seen=null,fail=false;const sample={a:{signals:{lag:{value:3}}}};
  const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)},{telemetry:{provider:b=>{calls++;seen=b;return fail?Promise.reject(Error('Grafana timeout')):Promise.resolve(sample);}}});
  const panel=mountStatus(h);h.flush();h.flush();await settle();
- const head=h.view.querySelector('.dv-live-head'),live=head.querySelector('.dv-live-toggle'),metrics=head.querySelector('button.dv-live-metrics'),conn=head.querySelector('.dv-live-metrics-connection'),jira=head.querySelector('.dv-live-connection');
- assert.ok(metrics,'M6 Metrics button in the panel header');assert.equal(metrics.hidden,false);assert.equal(metrics.textContent,'Metrics');assert.equal(metrics.type,'button');
- assert.ok(metrics.classList.contains('tbtn') && metrics.classList.contains('reader-button'),'M6 Metrics wears the header button look');
- assert.equal(metrics.getAttribute('aria-pressed'),'false','M6 off by default');assert.equal(calls,0,'M6 no provider call while off');
- const controls=head.querySelector('.dv-live-controls'),order=controls.children;
- assert.ok(order.indexOf(live)<order.indexOf(metrics),'M6 Metrics follows the Jira mode controls');
+ const head=h.view.querySelector('.dv-live-head'),header=h.view.querySelector('.dv-status-header'),live=header.querySelector('.dv-live-toggle'),metrics=header.querySelector('button.dv-live-metrics'),conn=head.querySelector('.dv-live-metrics-connection'),jira=head.querySelector('.dv-live-connection');
+ assert.ok(metrics,'M6 Metrics switch in the panel header');assert.equal(metrics.hidden,false);assert.equal(textOf(metrics).trim(),'Metrics overlay');assert.equal(metrics.type,'button');assert.equal(metrics.getAttribute('role'),'switch');
+ assert.ok(!metrics.classList.contains('tbtn'),'#1131 a switch, not a button that looks like a third view');
+ assert.equal(metrics.getAttribute('aria-checked'),'false','M6 off by default');assert.equal(calls,0,'M6 no provider call while off');
+ const top=header.querySelector('.dv-status-top'),controls=head.querySelector('.dv-live-controls');
+ assert.equal(top.children.at(-1),metrics,'#1131 the switch ends the top row');assert.ok(header.children.indexOf(top)<header.children.indexOf(live.parentElement),'#1131 Live | Over time is the row below');
  assert.ok(head.children.indexOf(controls)<head.children.indexOf(head.querySelector('.dv-live-status')),'M6 controls precede status text');
  assert.ok(conn,'M6 metrics connector text');assert.ok(!conn.classList.contains('dv-live-connection'),'M6 distinct connector');
  assert.equal(head.querySelectorAll('.dv-live-connection').length,1);
@@ -2059,7 +2059,7 @@ test('M6 Metrics sits beside Live, off by default; on calls the provider and upd
  assert.equal(conn.getAttribute('data-state'),'disconnected');assert.equal(conn.getAttribute('data-busy'),'false');assert.equal(text(),'Metrics: not connected');
  const livePressed=live.getAttribute('aria-pressed');assert.equal(livePressed,'true');
  metrics.dispatchEvent({type:'click'});
- assert.equal(metrics.getAttribute('aria-pressed'),'true');assert.equal(conn.getAttribute('data-state'),'connecting');assert.equal(conn.getAttribute('data-busy'),'true');assert.equal(text(),'Metrics: connecting');
+ assert.equal(metrics.getAttribute('aria-checked'),'true');assert.equal(conn.getAttribute('data-state'),'connecting');assert.equal(conn.getAttribute('data-busy'),'true');assert.equal(text(),'Metrics: connecting');
  await settle();assert.equal(calls,1);assert.deepEqual(plain(seen),LOCAL_BINDINGS,'M6 the click hands the provider the bound carriers');
  const at=h.ctl.telemetry.status().refreshedAt;
  assert.equal(conn.getAttribute('data-state'),'connected');assert.equal(conn.getAttribute('data-busy'),'false');assert.equal(text(),'Metrics: connected, refreshed '+metricsClock(at));
@@ -2068,17 +2068,17 @@ test('M6 Metrics sits beside Live, off by default; on calls the provider and upd
  assert.equal(conn.getAttribute('data-state'),'error');assert.equal(text(),'Metrics: did not answer · Grafana timeout');
  assert.equal(live.getAttribute('aria-pressed'),livePressed,'M6 Jira Live is untouched');assert.equal(h.ctl.liveStatus.enabled(),true);
  metrics.dispatchEvent({type:'click'});
- assert.equal(metrics.getAttribute('aria-pressed'),'false');assert.deepEqual(plain(h.ctl.telemetry.snapshot().map),{},'M6 off clears the map');
+ assert.equal(metrics.getAttribute('aria-checked'),'false');assert.deepEqual(plain(h.ctl.telemetry.snapshot().map),{},'M6 off clears the map');
  assert.equal(conn.getAttribute('data-state'),'disconnected');assert.equal(text(),'Metrics: not connected');
- live.dispatchEvent({type:'click'});assert.equal(h.ctl.liveStatus.enabled(),false);assert.equal(h.ctl.telemetry.snapshot().enabled,false,'M6 Live does not drive Metrics');assert.equal(metrics.getAttribute('aria-pressed'),'false');
+ live.dispatchEvent({type:'click'});assert.equal(h.ctl.liveStatus.enabled(),false);assert.equal(h.ctl.telemetry.snapshot().enabled,false,'M6 Live does not drive Metrics');assert.equal(metrics.getAttribute('aria-checked'),'false');
  panel.destroy();h.ctl.liveStatus.destroy();
 });
 
 test('M7 a page with a telemetry provider and no Jira evidence still shows Metrics in the header',()=>{
  const h=harness(telemetryPage(),{},{telemetry:{provider:()=>Promise.resolve({})}});
- const panel=mountStatus(h),head=h.view.querySelector('.dv-live-head'),metrics=head && head.querySelector('button.dv-live-metrics');
- assert.equal(head.hidden,false,'M7 the header shows for Metrics alone');assert.ok(metrics && !metrics.hidden,'M7 Metrics button');
- assert.equal(head.querySelector('.dv-live-toggle').hidden,true,'M7 Live stays hidden without Jira evidence');
+ const panel=mountStatus(h),head=h.view.querySelector('.dv-live-head'),metrics=h.view.querySelector('.dv-status-header button.dv-live-metrics');
+ assert.equal(head.hidden,false,'M7 the header shows for Metrics alone');assert.ok(metrics && !metrics.hidden,'M7 Metrics overlay switch');
+ assert.equal(h.view.querySelector('.dv-live-toggle').hidden,true,'M7 Live stays hidden without Jira evidence');
  panel.destroy();h.ctl.liveStatus.destroy();
 });
 
@@ -2369,7 +2369,7 @@ test('M10 the action button shows on a metrics-only page so Allow Grafana reache
 | OT12 | demo timeline with a late ticket, a ticket that later disappears, and one never named | not created yet: no status entry; absent after existing: missing; epic state per day; last day matches the live demo | treating every absent ticket the same |
 | OT13 | provider entry without a state | apply() still drops it | widening the provider contract |
 | OT15 | status row and day buttons (#986) | counts, connection and notes are in `.dv-live-status` with their full text in its title; buttons are in `.dv-live-controls`; a board's `<` and `>` step the slider, are disabled at the ends, and are absent on Live | changing text beside static buttons; step buttons on a board with no slider |
-| OT14 | the two mode buttons (Chuck, 2026-11-04) | Live and Over time are the first two header controls, exactly one is pressed, the selected Over time click does nothing, Live returns to today without turning colors off, the selected Live click still turns colors off, and Over time turns colors back on | a Back to today button; a past day with colors off |
+| OT14 | the two mode buttons (Chuck, 2026-11-04) | Live and Over time are the only two buttons of their header row (#1131), exactly one is pressed, the selected Over time click does nothing, Live returns to today without turning colors off, the selected Live click still turns colors off, and Over time turns colors back on | a Back to today button; a past day with colors off |
 | OT17 | days dated two days ago to today, then a history ending before today and one with no dates (#1082) | the Over time row's heading shows the selected day's label large; on a day dated today it reads TODAY with the label beside it; the slider and `<` `>` update it; Live has no heading | a date only in the small note; TODAY on a last day that is not today |
 */
 const overFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:'EP-1'}},lanes:{APP:{label:'App',color:'#34d399'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',tickets:['AA-1']},b:{title:'Beta',tickets:['BB-1']},planned:{title:'Planned',tickets:['AA-1'],existsWhen:'tickets-done'}},rows:[['a','b','planned']],edges:[{from:'a',to:'b',tickets:['EE-1']}],steps:[{id:'hop',edge:'a->b',lane:'APP'},{id:'beta',nodes:['b'],lane:'APP'}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
@@ -2649,9 +2649,9 @@ test('C13 a plain top-level REST issue loads like the connector shape',async()=>
 test('OT14 Live and Over time are two mode buttons: Live returns to today and the selected Over time stays',async()=>{
  const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);api.apply(overToday());let loads=0;api.setHistory({load(){loads++;return {days:overDays()};}});
  const pressed=()=>[overLiveButton(h).getAttribute('aria-pressed'),overButton(h).getAttribute('aria-pressed')];
- assert.ok(h.view.querySelector('.dv-live-controls'),'#986 a row of static buttons');assert.deepEqual(h.view.querySelector('.dv-live-controls').children.slice(0,2).map(el=>el.className.split(' ').find(name=>/^dv-live-(toggle|over-time)$/.test(name))),['dv-live-toggle','dv-live-over-time']);assert.deepEqual(pressed(),['true','false']);
+ assert.ok(h.view.querySelector('.dv-live-time'),'#1131 a row of their own');assert.deepEqual(h.view.querySelector('.dv-live-time').children.map(el=>el.className.split(' ').find(name=>/^dv-live-(toggle|over-time)$/.test(name))),['dv-live-toggle','dv-live-over-time']);assert.deepEqual(pressed(),['true','false']);
  overButton(h).dispatchEvent({type:'click'});await historySettle();assert.deepEqual(pressed(),['false','true']);assert.equal(overButton(h).textContent,'Over time');assert.equal(api.enabled(),true);
- assert.ok(!textOf(h.view.querySelector('.dv-live-head')).includes('Back to today'),'no separate return button');
+ assert.ok(!textOf(h.view).includes('Back to today'),'no separate return button');
  overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,true,'the selected mode stays');assert.equal(loads,1);
  overLiveButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,false);assert.equal(api.enabled(),true,'returning to Live keeps colors on');assert.deepEqual(pressed(),['true','false']);
  overLiveButton(h).dispatchEvent({type:'click'});assert.equal(api.enabled(),false,'the selected Live still turns colors off');assert.deepEqual(pressed(),['false','false']);

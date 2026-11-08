@@ -88,7 +88,7 @@ async function mountImportedDetail(page,server,enabled=true){
  return {root,scope,metrics,node:scope.locator('g.node[data-dv-node="shared::api"]')};
 }
 
-const metricsButton=panel=>panel.getByRole('button',{name:'Metrics',exact:true});
+const metricsButton=panel=>panel.getByRole('switch',{name:'Metrics overlay',exact:true});
 export {cueSpec,mountCues,mountImportedDetail,importedDetailSpec,CUE_JIRA,CUE_SAMPLES,CUES,PANEL};
 export function nestedSpec(){
  const spec=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});

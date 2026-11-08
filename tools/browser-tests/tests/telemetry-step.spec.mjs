@@ -7,7 +7,7 @@ import {repo} from '../helpers/prepare.mjs';
 import {canonTraceFixture} from '../../../tests/helpers/canon-trace-evidence.mjs';
 import {stepFixture,recordedUrlEvidence,AT} from '../../../tests/helpers/step-evidence.mjs';
 import {importedDetailSpec,nestedSpec,PANEL} from '../helpers/telemetry-cards.mjs';
-const metric=r=>r.getByRole('button',{name:'Metrics',exact:true});
+const metric=r=>r.getByRole('switch',{name:'Metrics overlay',exact:true});
 const card=r=>r.locator('.dv-trace-evidence');
 const step=r=>r.getByRole('button',{name:'Step',exact:true});
 const ambient=r=>r.getByRole('button',{name:'Ambient',exact:true});
@@ -83,7 +83,7 @@ async function capture(page,name){const dir=path.join(repo,'.local/step-evidence
 
 const traceTab=r=>r.getByRole('button',{name:/^Trace(?: · \d+)?$/});
 const selected=r=>r.locator('.dv-trace-selected');
-async function openTrace(root){await traceTab(root).click();const enable=root.getByRole('button',{name:'Enable traces',exact:true});if(await enable.isVisible())await enable.click();await expect(selected(root)).toBeVisible();}
+async function openTrace(root){await traceTab(root).click();if(await metric(root).getAttribute('aria-checked')==='false')await metric(root).click();await expect(selected(root)).toBeVisible();}
 
 test('Status modes are exclusive; actual request selection paints SVG independently of stepping',async({page,server})=>{
  const {root,f}=await setup(page,server);await expect(root.getByRole('button',{name:'Jira',exact:true})).toHaveAttribute('aria-pressed','true');await metric(root).click();await expect(root.locator('.dv-proof-caption')).toContainText('PROVEN');await expect(card(root)).toHaveCount(0);
@@ -102,16 +102,16 @@ for(const origin of ['local','direct','nested'])for(const loaded of [false,true]
  await unchanged(page);
 });
 
-for(const disabled of ['page','host'])test(`${disabled} opt-out never enables trace calls through nested imports`,async({page,server})=>{const {root}=await setup(page,server,{origin:'nested',loaded:true,disabled});await traceTab(root).click();await expect(root.getByRole('button',{name:'Enable traces',exact:true})).toBeHidden();await expect(root.locator('.dv-trace-mode-status')).toContainText('unavailable');await expect(selected(root)).toHaveCount(0);expect(await page.evaluate(()=>window.calls.provider)).toBe(0);});
+for(const disabled of ['page','host'])test(`${disabled} opt-out never enables trace calls through nested imports`,async({page,server})=>{const {root}=await setup(page,server,{origin:'nested',loaded:true,disabled});await traceTab(root).click();await expect(metric(root)).toBeHidden();await expect(root.locator('.dv-trace-mode-status')).toContainText('unavailable');await expect(selected(root)).toHaveCount(0);expect(await page.evaluate(()=>window.calls.provider)).toBe(0);});
 
 test('history, off, capability removal and destroy retire selected evidence; native sibling is isolated',async({page,server})=>{
  const {root}=await setup(page,server,{sibling:true});await openTrace(root);await root.getByRole('button',{name:'Pin as evidence',exact:true}).click();await root.getByRole('button',{name:'Jira',exact:true}).click();await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(1);await over(root).click();await traceTab(root).click();await expect(selected(root)).toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);await expect(root.locator('.dv-trace-mode-status')).toContainText('Over time');
- await root.getByRole('button',{name:'Jira',exact:true}).click();await root.getByRole('button',{name:'Live',exact:true}).click();await traceTab(root).click();await root.locator('.dv-trace-candidate').first().click();await expect(selected(root)).toBeVisible();await root.getByRole('button',{name:'Disconnect traces',exact:true}).click();await expect(selected(root)).toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);
- await root.getByRole('button',{name:'Enable traces',exact:true}).click();await root.locator('.dv-trace-candidate').first().click();await page.evaluate(()=>window.ctl.telemetry.retractExemplars());await expect(selected(root)).toHaveCount(0);await expect(page.locator('#sibling [data-trace-tone]')).toHaveCount(0);await page.evaluate(()=>{window.retained=document.querySelector('#host').shadowRoot;window.viewer.destroy();});expect(await page.evaluate(()=>window.retained.querySelectorAll('[data-trace-tone],.dv-trace-overlay').length)).toBe(0);await unchanged(page);
+ await root.getByRole('button',{name:'Jira',exact:true}).click();await root.getByRole('button',{name:'Live',exact:true}).click();await traceTab(root).click();await root.locator('.dv-trace-candidate').first().click();await expect(selected(root)).toBeVisible();await expect(metric(root)).toHaveAttribute('aria-checked','true');await metric(root).click();await expect(selected(root)).toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);
+ await expect(metric(root)).toHaveAttribute('aria-checked','false');await metric(root).click();await root.locator('.dv-trace-candidate').first().click();await page.evaluate(()=>window.ctl.telemetry.retractExemplars());await expect(selected(root)).toHaveCount(0);await expect(page.locator('#sibling [data-trace-tone]')).toHaveCount(0);await page.evaluate(()=>{window.retained=document.querySelector('#host').shadowRoot;window.viewer.destroy();});expect(await page.evaluate(()=>window.retained.querySelectorAll('[data-trace-tone],.dv-trace-overlay').length)).toBe(0);await unchanged(page);
 });
 
 for(const options of [{noTrace:true},{noTimeline:true},{unknown:true},{noHandler:true},{preload:true}])test('honest trace limits and unavailable alternatives '+JSON.stringify(options),async({page,server})=>{
- const {root}=await setup(page,server,options);await traceTab(root).click();if(!options.preload)await root.getByRole('button',{name:'Enable traces',exact:true}).click();
+ const {root}=await setup(page,server,options);await traceTab(root).click();if(!options.preload){await expect(metric(root)).toHaveAttribute('aria-checked','false');await metric(root).click();}
  if(options.noTrace){await expect(selected(root)).toHaveCount(0);await expect(root.locator('.dv-trace-mode-status')).toContainText('No trace evidence');return;}
  await expect(selected(root)).toBeVisible();if(options.noTimeline){await expect(root.locator('[data-trace-tone]')).toHaveCount(0);await expect(root.locator('.dv-trace-limit')).toContainText('timeline unavailable');}
  if(options.noHandler)await expect(root.locator('.dv-trace-candidate[aria-pressed="false"]').first()).toBeDisabled();
@@ -135,10 +135,10 @@ test('canonical doorbell normal, slow database, service error, partial and backp
 
 
 test('late explicit alternative after off cannot restore trace selection or SVG',async({page,server})=>{
- const {root,f}=await setup(page,server,{holdChoose:true});await openTrace(root);await root.locator('.dv-trace-candidate[data-trace-id="'+f.alternative.traceId+'"]').first().click();await expect(root.locator('.dv-trace-mode-status')).toContainText('Loading selected trace');await root.getByRole('button',{name:'Disconnect traces',exact:true}).click();await page.evaluate(()=>window.releaseChoice());await expect(selected(root)).toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.liveStatus.snapshot().trace.selected)).toBeNull();
+ const {root,f}=await setup(page,server,{holdChoose:true});await openTrace(root);await root.locator('.dv-trace-candidate[data-trace-id="'+f.alternative.traceId+'"]').first().click();await expect(root.locator('.dv-trace-mode-status')).toContainText('Loading selected trace');await expect(metric(root)).toHaveAttribute('aria-checked','true');await metric(root).click();await page.evaluate(()=>window.releaseChoice());await expect(selected(root)).toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.liveStatus.snapshot().trace.selected)).toBeNull();
 });
 test('duplicate carrier IDs in distinct sections never borrow another section’s trace',async({page,server})=>{
- const {root}=await setup(page,server,{sameIds:true});const first=root.locator('#section-main');await traceTab(first).click();await first.getByRole('button',{name:'Enable traces',exact:true}).click();await expect(first.locator('.dv-trace-mode-status')).toContainText('duplicate carrier IDs');await expect(root.locator('[data-trace-tone]')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.liveStatus.snapshot().trace.entries.length)).toBe(0);
+ const {root}=await setup(page,server,{sameIds:true});const first=root.locator('#section-main');await traceTab(first).click();await expect(metric(first)).toHaveAttribute('aria-checked','false');await metric(first).click();await expect(first.locator('.dv-trace-mode-status')).toContainText('duplicate carrier IDs');await expect(root.locator('[data-trace-tone]')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.liveStatus.snapshot().trace.entries.length)).toBe(0);
 });
 
 test('reused host token cannot silently replace an explicitly selected trace',async({page,server})=>{

@@ -5,7 +5,7 @@ import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 import {mountCues,cueSpec,nestedSpec,importedDetailSpec,CUE_JIRA,PANEL} from '../helpers/telemetry-cards.mjs';
 const T=Date.UTC(2026,9,21),DAY=86400000;
-const metrics=root=>root.getByRole('button',{name:'Metrics',exact:true}),over=root=>root.getByRole('button',{name:'Over time',exact:true}),live=root=>root.getByRole('button',{name:'Live',exact:true}),slider=root=>root.getByRole('slider',{name:'Day',exact:true});
+const metrics=root=>root.getByRole('switch',{name:'Metrics overlay',exact:true}),over=root=>root.getByRole('button',{name:'Over time',exact:true}),live=root=>root.getByRole('button',{name:'Live',exact:true}),slider=root=>root.getByRole('slider',{name:'Day',exact:true});
 async function select(root,index){const input=slider(root);await input.focus();await input.press('Home');for(let i=0;i<index;i++)await input.press('ArrowRight');await expect(input).toHaveValue(String(index));}
 async function layout(root,count){
  await expect(root.locator('.dv-metrics-card')).toHaveCount(count);
@@ -41,7 +41,7 @@ async function setup(page,server,{nested=false,detail=false,disabled=false,pendi
 }
 
 test('tandem native: Metrics off incurs Jira only; on within history, keyboard days, gaps, held refresh and cache',async({page,server})=>{
- const root=await setup(page,server);await expect(metrics(root)).toHaveAttribute('aria-pressed','false');expect(await page.evaluate(()=>window.calls.history.length)).toBe(0);
+ const root=await setup(page,server);await expect(metrics(root)).toHaveAttribute('aria-checked','false');expect(await page.evaluate(()=>window.calls.history.length)).toBe(0);
  await over(root).click();await expect(slider(root)).toBeVisible();expect(await page.evaluate(()=>window.calls.history.length)).toBe(0);
  await metrics(root).click();await expect(root.locator('.dv-metrics-card')).toHaveCount(3);await expect(root.locator('[data-metrics-card="ingest->app"]')).toContainText('50');
  const records=await page.evaluate(()=>window.calls.history);expect(records).toHaveLength(1);expect(records[0].bindings.map(b=>b.id)).toEqual(['ingest','shared::api','ingest->app','app->push','shared::api->shared::store']);expect(records[0].range).toEqual({from:new Date(T).toISOString(),to:new Date(T+2*DAY).toISOString(),endpoints:[0,1,2].map(i=>({key:new Date(T+(i-1)*DAY).toISOString().slice(0,10),at:new Date(T+i*DAY).toISOString()}))});
@@ -109,7 +109,7 @@ for(const mode of ['jira','grafana','both','neither','disabled'])test('MCP capab
  },{mode,T,DAY});
  const file=path.join(server.root,'matrix.json'),out=path.join(server.root,'matrix.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/matrix.html');await page.waitForFunction(()=>!!window.ctl);const root=page.locator('#docview');
  const jira=['jira','both','disabled'].includes(mode),grafana=['grafana','both'].includes(mode);
- if(grafana){await expect(metrics(root)).toBeVisible();await expect(metrics(root)).toHaveAttribute('aria-pressed','false');}else await expect(metrics(root)).toBeHidden();
+ if(grafana){await expect(metrics(root)).toBeVisible();await expect(metrics(root)).toHaveAttribute('aria-checked','false');}else await expect(metrics(root)).toBeHidden();
  if(jira){await expect(over(root)).toBeVisible();await expect(live(root)).toBeVisible();}else await expect(over(root)).toBeHidden();
  expect(await page.evaluate(()=>window.calls.filter(c=>c.tool==='query_prometheus'||c.tool==='getJiraIssue'))).toEqual([]);
  if(grafana){await metrics(root).click();await expect(root.locator('g.node[data-dv-node="a"]')).toHaveAttribute('data-metrics-state','flowing');}
@@ -200,7 +200,7 @@ test.describe('actual Jira/Grafana selected local days across DST',()=>{
    window.claude={use:async name=>name==='mcp'?mcp:null};
   },fixture);
   const file=path.join(server.root,'dst.json'),out=path.join(server.root,'dst.html');await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out]);await page.goto(server.origin+'/dst.html');const root=page.locator('#docview');
-  await expect(metrics(root)).toHaveAttribute('aria-pressed','false');await over(root).click();await expect(slider(root)).toHaveAttribute('max','3');await select(root,1);expect(await page.evaluate(()=>window.dstCalls.filter(c=>c.tool==='query_prometheus'))).toEqual([]);
+  await expect(metrics(root)).toHaveAttribute('aria-checked','false');await over(root).click();await expect(slider(root)).toHaveAttribute('max','3');await select(root,1);expect(await page.evaluate(()=>window.dstCalls.filter(c=>c.tool==='query_prometheus'))).toEqual([]);
   const node=root.locator('g.node[data-dv-node="a"]');await expect(node).toHaveClass(/dv-live-done/);await metrics(root).click();await expect(node).toHaveAttribute('data-metrics-verdict','done-unproven');
   const calls=await page.evaluate(()=>window.dstCalls.filter(c=>c.tool==='query_prometheus'));expect(calls.map(c=>c.input)).toEqual([{datasourceUid:'prom-main',expr:'UNCHANGED[24h]',startTime:new Date(Date.parse(fixture.endpoints[1])-DAY).toISOString(),endTime:fixture.endpoints[1],queryType:'range',stepSeconds:360}]);
   await select(root,0);await expect(node).toHaveClass(/dv-live-todo/);await expect(node).toHaveAttribute('data-metrics-state','flowing');await select(root,1);await expect(node).toHaveClass(/dv-live-done/);await expect(node).toHaveAttribute('data-metrics-state','silent');expect(await page.evaluate(()=>window.dstCalls.filter(c=>c.tool==='query_prometheus').length)).toBe(2);

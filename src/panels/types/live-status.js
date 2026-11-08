@@ -276,19 +276,13 @@
       if(text){var notice=el(body,'p','edit-notice','dv-live-edit-notice',text);notice.setAttribute('role','status');notice.setAttribute('data-kind',edit.notice?edit.notice.kind:'info');}
     }
     function traceBody(value){
+      // #1131: Env and the Metrics overlay switch are in the shared header, not here.
       var trace=value.trace,body=el(host,'div','trace-body','dv-live-panel-body dv-live-trace'),controls=el(body,'div','controls','dv-live-controls');
-      var enable=button(controls,'enable','reader-button dv-trace-enable',trace.enabled?'Disconnect traces':'Enable traces','setMetricsEnabled');enable._liveArgument=!trace.enabled;enable.hidden=!trace.available;
       if(value.actionLabel)button(controls,'action','reader-button',value.actionLabel,'runAction');
       var show=button(controls,'show','reader-button dv-trace-show','Show on diagram','setTraceShow');show._liveArgument=!trace.show;show.setAttribute('aria-pressed',String(trace.show));show.disabled=!trace.selected;
       traceEditControls(body,controls,value.edit);
-      var metrics=value.metrics;
-      if(metrics.environments && metrics.environments.length){
-        var select=el(controls,'select','environment','reader-button tbtn');select.setAttribute('aria-label','Trace environment');
-        metrics.environments.forEach(function(id){var option=el(select,'option',id,'',id);option.value=id;});select.value=metrics.environment;
-        if(!select._liveChange){select._liveChange=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnvironment(select.value);};select.addEventListener('change',select._liveChange);}
-      }
       directTraceBody(body,trace.direct);
-      var message=trace.direct && trace.direct.profiles.length?(!trace.hasMappings?'Diagram mapping is not configured. Loaded traces still show a waterfall.':''):!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live in Jira to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Enable traces to refresh explicit bindings.':'Enable traces to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
+      var message=trace.direct && trace.direct.profiles.length?(!trace.hasMappings?'Diagram mapping is not configured. Loaded traces still show a waterfall.':''):!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live in Jira to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Turn on Metrics overlay to refresh explicit bindings.':'Turn on Metrics overlay to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
       var status=el(body,'p','status','dv-trace-mode-status',[message,trace.hasMappings?trace.status.note:'',trace.hasMappings?trace.notice:''].filter(Boolean).join(' '));status.setAttribute('role','status');
       if(trace.entries.length){
         el(body,'h3','candidates-title','','Returned traces');
@@ -362,20 +356,59 @@
       var all=el(detail,'details','all','dv-trace-all');el(all,'summary','summary','','All operation mappings');var mappings=el(all,'div','mappings','dv-trace-mappings');
       model.rows.forEach(function(item){var row=el(mappings,'div',item.id,'dv-trace-mapping');row.setAttribute('data-tone',item.tone);el(row,'strong','operation','',item.operation);el(row,'span','duration','',item.label+(item.budget!=null?' / '+item.budget+' ms budget':''));el(row,'small','conditions','',[item.detail].concat(item.conditions.map(function(c){return c.label;})).filter(Boolean).join(' · '));});
     }
+    // #1131 (Chuck D1 D6 D8 D12): one header above the Jira and the Trace view. Top row: Jira | Trace, Env and the
+    // Metrics overlay switch. Then Live | Over time, the Over time error and the day row.
+    function sharedHeader(value){
+      var header=el(host,'div','header','dv-status-header'),top=el(header,'div','top','dv-status-top'),trace=!!(value && value.mode==='trace');
+      var modes=el(top,'div','modes','dv-status-modes dv-status-segmented');modes.setAttribute('role','group');modes.setAttribute('aria-label','Status view');
+      ['jira','trace'].forEach(function(mode){var count=value && value.trace?new Set(value.trace.entries.flatMap(function(e){return e.candidates.map(function(c){return c.traceId;});})).size:0;var control=button(modes,mode,'reader-button dv-status-mode',mode==='jira'?'Jira':'Trace'+(count?' · '+count:''),'setStatusMode');control._liveArgument=mode;control.setAttribute('aria-pressed',String((value && value.mode || 'jira')===mode));});
+      var metrics=value && value.metrics || {available:false,enabled:false};
+      if(metrics.environments && metrics.environments.length){
+        var environmentLabel=el(top,'label','environment-label','dv-live-environment');
+        el(environmentLabel,'span','caption','','Env');
+        var environmentSelect=el(environmentLabel,'select','select','reader-button tbtn');environmentSelect.setAttribute('aria-label','Env');
+        metrics.environments.forEach(function(id){var option=el(environmentSelect,'option',id,'',id);option.value=id;});
+        environmentSelect.value=metrics.environment;
+        if(!environmentSelect._liveChange){environmentSelect._liveChange=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnvironment(environmentSelect.value);};environmentSelect.addEventListener('change',environmentSelect._liveChange);}
+      }
+      // Metrics (#939): an on/off switch, not a third view (D12). Shown only with a telemetry provider or demo, off by default, never persisted.
+      var metricsSwitch=el(top,'button','metrics','dv-live-metrics');metricsSwitch.type='button';metricsSwitch.setAttribute('role','switch');metricsSwitch.setAttribute('aria-checked',String(!!metrics.enabled));metricsSwitch.hidden=!metrics.available;metricsSwitch._liveArgument=!metrics.enabled;
+      el(el(metricsSwitch,'span','track','dv-live-switch-track'),'i','thumb','dv-live-switch-thumb').parentNode.setAttribute('aria-hidden','true');el(metricsSwitch,'span','label','','Metrics overlay');
+      if(!metricsSwitch._liveClick){metricsSwitch._liveClick=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnabled(metricsSwitch._liveArgument);};metricsSwitch.addEventListener('click',metricsSwitch._liveClick);}
+      var available=value && value.available,hasData=available && value.hasData;
+      // Live and Over time are the two modes (#929, Chuck 2026-11-04), in a row of their own. The selected one is filled. Live returns from a past day; while selected it still turns colors off (D6).
+      var over=value && value.overTime,past=!!(over && over.active);
+      var time=el(header,'div','time','dv-live-time dv-status-segmented');time.setAttribute('role','group');time.setAttribute('aria-label','Status time');
+      var toggle=button(time,'toggle','reader-button dv-live-toggle','Live',past?'overTimeClose':'setEnabled');toggle.hidden=!hasData;time.hidden=!hasData;
+      toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled) && !past));
+      var overTime=button(time,'over-time','reader-button dv-live-over-time',over && over.loading?'Loading history'+(over.progress?' '+over.progress:'')+'…':'Over time','overTime');overTime.hidden=!hasData || !over || !over.available;overTime.disabled=!!(over && (over.loading || over.disabled));overTime.setAttribute('aria-pressed',String(past));
+      var overStatus=el(header,'p','over-time-status','dv-live-over-time-status',hasData && over && over.error?over.error:'');overStatus.setAttribute('role','status');overStatus.hidden=!overStatus.textContent;
+      // Day buttons: on the slider row, and on a row of their own for a demo in Live mode, which has no slider. A demo's buttons move its own day.
+      // The demo's Live row and the note about other columns belong to the Jira view.
+      if(hasData && (past || value.demo && !trace)){
+        var demoDays=value.demo,row=el(header,'div','day-row','dv-live-day-row'+(past?' dv-live-over-time-row':'')+(demoDays?' dv-live-demo':''));
+        // #1082: the selected day, larger than the epic key; a day dated today reads TODAY with its date beside it.
+        if(past){var heading=el(row,'div','heading','dv-live-over-time-heading');el(heading,'strong','day','dv-live-over-time-day',over.today?'TODAY':over.label);el(heading,'span','date','dv-live-over-time-date',over.today?over.label:'').hidden=!over.today;}
+        var previousDay=button(row,'previous','reader-button dv-live-step','<',demoDays?'prevDemo':'overTimeStep');previousDay._liveArgument=-1;previousDay.setAttribute('aria-label','Previous day');previousDay.disabled=demoDays?demoDays.first:over.index<=0;
+        if(past){
+          el(row,'span','first','dv-live-over-time-end',over.first);
+          var slider=el(row,'input','slider','dv-live-over-time-slider');slider.type='range';slider.min='0';slider.max=String(over.count-1);slider.step='1';slider.setAttribute('aria-label','Day');
+          if(slider.value!==String(over.index))slider.value=String(over.index);slider.setAttribute('aria-valuetext',over.label);
+          if(!slider._liveInput){slider._liveInput=function(){var owner=host._livePanelApi;if(owner)owner.overTimeDay(Number(slider.value));};slider.addEventListener('input',slider._liveInput);}
+          el(row,'span','last','dv-live-over-time-end',over.last);
+        }
+        var nextDay=button(row,'next','reader-button dv-live-step','>',demoDays?'nextDemo':'overTimeStep');nextDay._liveArgument=1;nextDay.setAttribute('aria-label','Next day');nextDay.disabled=demoDays?demoDays.ended:over.index>=over.count-1;
+        if(past && !trace)el(row,'p','note','dv-live-over-time-note','Status as of '+over.label+' · other columns show today').setAttribute('role','status');
+      }
+    }
     function paint(value){
       if(!live)return;epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=doc.activeElement;
-      var modes=el(host,'div','modes','dv-status-modes');modes.setAttribute('role','group');modes.setAttribute('aria-label','Status view');
-      ['jira','trace'].forEach(function(mode){var count=value && value.trace?new Set(value.trace.entries.flatMap(function(e){return e.candidates.map(function(c){return c.traceId;});})).size:0;var control=button(modes,mode,'reader-button dv-status-mode',mode==='jira'?'Jira':'Trace'+(count?' · '+count:''),'setStatusMode');control._liveArgument=mode;control.setAttribute('aria-pressed',String((value && value.mode || 'jira')===mode));});
+      sharedHeader(value);
       if(value && value.mode==='trace'){traceBody(value);sweep(host);return;}
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
       // #986: the first row holds buttons that never move. Everything that changes has a row of its own, whose height depends on the panel's width and never on its text, so it cannot move the buttons or what is below.
       var controls=el(head,'div','controls','dv-live-controls'),statusRow=el(head,'div','status','dv-live-status'),countRow=el(statusRow,'div','counts','dv-live-counts'),statusLine=el(statusRow,'div','text','dv-live-status-text');
       var available=value && value.available,hasData=available && value.hasData;
-      // Live and Over time are the two modes (#929, Chuck 2026-11-04): first in the header, so changing Jira text cannot wrap them apart. The selected one is filled. Live returns from a past day; while selected it still turns colors off.
-      var over=value && value.overTime,past=!!(over && over.active);
-      var toggle=button(controls,'toggle','reader-button dv-live-toggle','Live',past?'overTimeClose':'setEnabled');toggle.hidden=!hasData;
-      toggle._liveArgument=value?!value.enabled:false;toggle.setAttribute('aria-pressed',String(!!(value && value.enabled) && !past));
-      var overTime=button(controls,'over-time','reader-button dv-live-over-time',over && over.loading?'Loading history'+(over.progress?' '+over.progress:'')+'…':'Over time','overTime');overTime.hidden=!hasData || !over || !over.available;overTime.disabled=!!(over && (over.loading || over.disabled));overTime.setAttribute('aria-pressed',String(past));
       countRow.setAttribute('role','region');countRow.setAttribute('aria-label','Status counts');countRow.setAttribute('tabindex','0');countRow.setAttribute('title','Scroll horizontally to see all counts.');
       // Preserve native count scrolling when the page presenter also owns arrow keys.
       if(!countRow._liveKeys){countRow._liveKeys=function(event){if(event.target===countRow && ['ArrowLeft','ArrowRight','Home','End'].indexOf(event.key)>=0)event.stopPropagation();};countRow.addEventListener('keydown',countRow._liveKeys);}
@@ -383,18 +416,7 @@
       var missingCount=el(countRow,'span','count-missing-work','dv-live-count'+(hasData && missingWork.count && missingWork.painted?' dv-live-missing':''),'Missing work '+missingWork.count);
       missingCount.setAttribute('data-live-count','missing-work');missingCount.setAttribute('title','Authored nodes and connections marked as missing work; each occurrence counts.');missingCount.hidden=!hasData || !missingWork.count;
       states.forEach(function(state){var count=el(countRow,'span','count-'+state,'dv-live-count'+(hasData && value && value.enabled && value.counts[state]?' dv-live-'+state:''),state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
-      // Metrics (#939): the telemetry switch beside Live, shown only with a telemetry provider or demo, off by default, never persisted.
       var metrics=value && value.metrics || {available:false,enabled:false},proof=metrics.proof;
-      var metricsToggle=button(controls,'metrics','reader-button dv-live-metrics','Metrics','setMetricsEnabled');metricsToggle.hidden=!metrics.available;
-      if(metrics.environments && metrics.environments.length){
-        var environmentLabel=el(controls,'label','environment-label','dv-live-environment');
-        el(environmentLabel,'span','caption','','Environment ');
-        var environmentSelect=el(environmentLabel,'select','select','reader-button tbtn');environmentSelect.setAttribute('aria-label','Environment');
-        metrics.environments.forEach(function(id){var option=el(environmentSelect,'option',id,'',id);option.value=id;});
-        environmentSelect.value=metrics.environment;
-        if(!environmentSelect._liveChange){environmentSelect._liveChange=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnvironment(environmentSelect.value);};environmentSelect.addEventListener('change',environmentSelect._liveChange);}
-      }
-      metricsToggle._liveArgument=!metrics.enabled;metricsToggle.setAttribute('aria-pressed',String(!!metrics.enabled));
       var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo'}[conn.state];
       var connection=el(statusLine,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
       var connWho=(conn.source || '')+(connLabel && connLabel!==String(conn.source || '').toLowerCase()?' '+connLabel:'');
@@ -424,7 +446,6 @@
       var note=el(statusLine,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
       var actionLabel=(available || metrics.available) && value && value.actionLabel || '';
       var action=button(controls,'action','reader-button dv-live-action',actionLabel,'runAction');action.hidden=!actionLabel;
-      var overStatus=el(statusLine,'span','over-time-status','dv-live-over-time-status',hasData && over && over.error?over.error:'');overStatus.setAttribute('role','status');overStatus.hidden=!overStatus.textContent;
       // #828 shared-board Edit mode lives in this header: Edit for editors, then a prominent Save N changes and Discard.
       var edit=available && value.edit || null,pending=edit?edit.pending:0,editing=!!(edit && edit.active);
       var editControl=button(controls,'edit','reader-button dv-live-edit','Edit','editStart');editControl.hidden=!(edit && edit.editable && !editing);editControl.disabled=!!(edit && (edit.blocked || edit.saving));
@@ -437,27 +458,11 @@
       var editNotice=el(statusLine,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
       var editShown=!!(edit && (edit.editable || edit.notice));
       head.hidden=!metrics.note && !metrics.available && (!available || !(hasData || value.note.text || value.actionLabel || editShown));
-      controls.hidden=!metrics.available && (!available || !(hasData || value.actionLabel || editShown));statusRow.hidden=!metrics.note && !metrics.available && (!available || !(hasData || value.note.text));
+      controls.hidden=!actionLabel && (!available || !(hasData || editShown));statusRow.hidden=!metrics.note && !metrics.available && (!available || !(hasData || value.note.text));
       // Long text is cut off on screen; the tooltip and the status elements keep all of it.
-      var statusText=[connection.hidden?'':[connWho,conn.checkedText].filter(Boolean).concat(ghLabel?[ghLabel]:[]).join(', '),metricsConnection.hidden?'':metricsText,note.textContent,overStatus.textContent,reason.textContent,editNotice.textContent].filter(Boolean).join(' · ');
+      var statusText=[connection.hidden?'':[connWho,conn.checkedText].filter(Boolean).concat(ghLabel?[ghLabel]:[]).join(', '),metricsConnection.hidden?'':metricsText,note.textContent,reason.textContent,editNotice.textContent].filter(Boolean).join(' · ');
       if(statusText)statusRow.setAttribute('title',statusText);else statusRow.removeAttribute('title');
       if(!available && !proof)el(host,'p','empty','dv-live-empty','This page has no ticket references.');
-      // Day buttons: on the slider row, and on a row of their own for a demo in Live mode, which has no slider. A demo's buttons move its own day.
-      if(hasData && (past || value.demo)){
-        var demoDays=value.demo,row=el(host,'div','day-row','dv-live-day-row'+(past?' dv-live-over-time-row':'')+(demoDays?' dv-live-demo':''));
-        // #1082: the selected day, larger than the epic key; a day dated today reads TODAY with its date beside it.
-        if(past){var heading=el(row,'div','heading','dv-live-over-time-heading');el(heading,'strong','day','dv-live-over-time-day',over.today?'TODAY':over.label);el(heading,'span','date','dv-live-over-time-date',over.today?over.label:'').hidden=!over.today;}
-        var previousDay=button(row,'previous','reader-button dv-live-step','<',demoDays?'prevDemo':'overTimeStep');previousDay._liveArgument=-1;previousDay.setAttribute('aria-label','Previous day');previousDay.disabled=demoDays?demoDays.first:over.index<=0;
-        if(past){
-          el(row,'span','first','dv-live-over-time-end',over.first);
-          var slider=el(row,'input','slider','dv-live-over-time-slider');slider.type='range';slider.min='0';slider.max=String(over.count-1);slider.step='1';slider.setAttribute('aria-label','Day');
-          if(slider.value!==String(over.index))slider.value=String(over.index);slider.setAttribute('aria-valuetext',over.label);
-          if(!slider._liveInput){slider._liveInput=function(){var owner=host._livePanelApi;if(owner)owner.overTimeDay(Number(slider.value));};slider.addEventListener('input',slider._liveInput);}
-          el(row,'span','last','dv-live-over-time-end',over.last);
-        }
-        var nextDay=button(row,'next','reader-button dv-live-step','>',demoDays?'nextDemo':'overTimeStep');nextDay._liveArgument=1;nextDay.setAttribute('aria-label','Next day');nextDay.disabled=demoDays?demoDays.ended:over.index>=over.count-1;
-        if(past)el(row,'p','note','dv-live-over-time-note','Status as of '+over.label+' · other columns show today').setAttribute('role','status');
-      }
       if(hasData || proof || (metrics.logDetails || []).length || value && value.activity.length){
         var body=el(host,'div','body','dv-live-panel-body'),epic=value.epic || {keys:[]};
         if(hasData){
@@ -554,7 +559,20 @@
     if(controller)connect(controller);else {paint(null);if(typeof liveStatusWhenReady==='function')offReady=liveStatusWhenReady(host,connect);}
   }
   var LIVE_STYLES=String.raw`
-.dv-status-modes{display:flex;gap:6px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--explore-border)}
+/* #1131: the header shared by the Jira and Trace views. Segments keep the reader's button look (#863); the selected one is filled. */
+.dv-status-header{display:flex;flex-direction:column;gap:8px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--explore-border)}
+.dv-status-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.dv-status-segmented{display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+.dv-live-environment{display:inline-flex;align-items:center;gap:6px;font:11px/1.5 'IBM Plex Mono',monospace;color:var(--dtext)}
+.dv-live-metrics{display:inline-flex;align-items:center;gap:8px;margin-left:auto;padding:2px 0;border:0;background:none;color:var(--dink);font:12px/1.4 'IBM Plex Sans',sans-serif;cursor:pointer}
+.dv-live-switch-track{position:relative;flex:none;width:30px;height:16px;border-radius:999px;background:var(--dfaint,#9aa3ad);transition:background-color .15s}
+.dv-live-switch-thumb{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s}
+.dv-live-metrics[aria-checked="true"] .dv-live-switch-track{background:var(--dv-live-active)}
+.dv-live-metrics[aria-checked="true"] .dv-live-switch-thumb{transform:translateX(14px)}
+.dv-live-metrics:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:3px;border-radius:4px}
+@media(prefers-reduced-motion:reduce){.dv-live-switch-track,.dv-live-switch-thumb{transition:none}}
+.dv-status-header>.dv-live-over-time-status{margin:0;font:11px/1.5 'IBM Plex Mono',monospace}
+.dv-status-header>.dv-live-day-row{margin-top:0}
 .pt-live-status .dv-status-modes .tbtn.dv-status-mode[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-candidate[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-show[aria-pressed="true"]{background:var(--dv-live-active);color:#fff;border-color:var(--dv-live-active)}
 .dv-live-trace{font-size:12px}.dv-live-trace p{margin:6px 0;overflow-wrap:anywhere}.dv-trace-mode-status:empty{display:none}
 .dv-trace-direct{border:1px solid var(--explore-border);border-radius:6px;padding:10px;margin:10px 0}.dv-trace-input-label{display:grid;gap:4px;margin:8px 0}.dv-trace-input{box-sizing:border-box;width:100%;min-width:0;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);border-radius:4px;padding:6px}.dv-trace-arguments{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:10px}.dv-trace-direct-report{padding:8px;border:1px solid var(--explore-border);margin-top:8px}
@@ -596,9 +614,9 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 .dv-live-over-time-status{color:var(--dv-live-blocked);}
 /* Amber marks "not live": no ticket status uses it. */
 .pt-live-status{--dv-live-past:#f5a524;}
-.pt-live-status .dv-live-head .tbtn:is(.dv-live-toggle,.dv-live-metrics)[aria-pressed="true"],.pt-live-status .dv-live-head .tbtn:is(.dv-live-toggle,.dv-live-metrics)[aria-pressed="true"]:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#000;}
-.pt-live-status .dv-live-head .tbtn:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:3px;}
-.pt-live-status .dv-live-head .tbtn.dv-live-over-time[aria-pressed="true"],.pt-live-status .dv-live-head .tbtn.dv-live-over-time[aria-pressed="true"]:hover{background:var(--dv-live-past);border-color:var(--dv-live-past);color:#2b1a00;}
+.pt-live-status .dv-live-time .tbtn.dv-live-toggle[aria-pressed="true"],.pt-live-status .dv-live-time .tbtn.dv-live-toggle[aria-pressed="true"]:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#000;}
+.pt-live-status :is(.dv-live-head,.dv-live-time) .tbtn:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:3px;}
+.pt-live-status .dv-live-time .tbtn.dv-live-over-time[aria-pressed="true"],.pt-live-status .dv-live-time .tbtn.dv-live-over-time[aria-pressed="true"]:hover{background:var(--dv-live-past);border-color:var(--dv-live-past);color:#2b1a00;}
 .dv-live-day-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:10px;font:11px/1.4 'IBM Plex Mono',monospace;color:var(--dtext);font-variant-numeric:tabular-nums;}
 .dv-live-over-time-row{padding:8px 12px;border-left:3px solid var(--dv-live-past);border-radius:4px;background:color-mix(in srgb,var(--dv-live-past) 14%,transparent);}
 .dv-live-step{min-width:34px;text-align:center;}
@@ -712,9 +730,9 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 .pt-live-status .dv-live-head .tbtn.dv-live-save:disabled{opacity:.7;}
 /* Fixed slot and size: the width of the longer label, plus the button's padding and border (#986). */
 .pt-live-status .dv-live-head .tbtn.dv-live-first{margin-left:auto;width:calc(13ch + 24px);text-align:center;}
-.pt-live-status .dv-live-head .tbtn:disabled,.pt-live-status .dv-live-day-row .tbtn:disabled{opacity:.5;cursor:default;}
+.pt-live-status :is(.dv-live-head,.dv-live-time,.dv-live-day-row) .tbtn:disabled{opacity:.5;cursor:default;}
 /* Paper has no controls: print hides these buttons as it hides the reader's other tbtn controls. */
-@media print{.pt-live-status .dv-live-head .tbtn,.pt-live-status .dv-live-day-row .tbtn{display:none;}}
+@media print{.pt-live-status :is(.dv-live-head,.dv-live-time,.dv-live-day-row) .tbtn,.pt-live-status :is(.dv-live-metrics,.dv-live-environment){display:none;}}
 .dv-live-edit-reason,.dv-live-edit-notice{flex-basis:100%;font:12px/1.5 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .dv-live-edit-notice[data-kind="warn"],.dv-live-edit-notice[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-draggable{cursor:grab;}

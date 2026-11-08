@@ -476,7 +476,11 @@ spec and ledger bytes are unchanged. The panel shows and copies a hand-off namin
 the folder and the new IDs; pasting it tells the agent to reread `CONNECT.md`,
 verify `session.json`, and continue with `begin` (copy & paste) or a renewed
 Monitor `watch` (Beta). Helper commands for the released request fail because its
-identity no longer matches. Interrupt computation in the agent app itself.
+identity no longer matches. When an old `begin` reads the new `session.json`, it exits
+with one line naming the old IDs and, when readable, the new ones, and asking to reread
+`session.json` and `CONNECT.md`, then run `begin` again. During the Re-establish gap it
+can instead stop with the disconnect error.
+Interrupt computation in the agent app itself.
 
 In the Beta conversation, use `progress --request ID --text TEXT` to report meaningful work phases, errors,
 and observable activity during longer work (roughly every 20 seconds at tool

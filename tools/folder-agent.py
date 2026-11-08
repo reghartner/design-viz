@@ -32,6 +32,10 @@ class HeartbeatPausedError(ValueError):
     """The same connected editor has not refreshed its lease yet."""
 
 
+class OwnershipChangedError(ValueError):
+    """session.json names a different session or connection than this command started with."""
+
+
 def heartbeat_fresh(editor):
     at = editor.get('at')
     return (isinstance(at, (int, float)) and not isinstance(at, bool) and math.isfinite(at) and
@@ -282,7 +286,27 @@ def preflight(folder, monitor='unverified'):
 
 def assert_owner(folder, owner):
     if identity(folder) != owner:
-        raise ValueError('Session ownership changed. Reread the session.')
+        raise OwnershipChangedError('Session ownership changed. Reread the session.')
+
+
+def session_changed(folder, owner):
+    """One line for begin after Re-establish session replaced the ids it started with."""
+    def ids(value):
+        if all(isinstance(value.get(key), str) and re.fullmatch(r'[\w-]{1,120}', value[key], re.ASCII)
+               for key in ('sessionId', 'connectionId')):
+            return f"session {value['sessionId']}, connection {value['connectionId']}"
+    try:
+        current = identity(folder)
+    except Exception:
+        current = {}
+    known = [f'{age} {text}' for age, text in (('old', ids(owner)), ('new', ids(current))) if text]
+    try:
+        shown = folder.relative_to(Path.cwd())
+    except (OSError, ValueError):
+        shown = folder
+    return ('Session ownership changed' + (f" ({'; '.join(known)})" if known else '') +
+            '. This happens after Re-establish session in the Workbench. '
+            f'Re-read {shown / "session.json"} and {shown / "CONNECT.md"}, then run begin again.')
 
 
 def progress_history(folder, value):
@@ -679,6 +703,98 @@ def refresh_sources(folder, source_repo=None):
         raise
 
 
+def begin(folder, owner, text):
+    """Register a native agent request and wait for the Workbench to acknowledge it."""
+    if read(folder, 'session.json').get('workflow') != 'external':
+        raise ValueError('Native requests require the Work in your agent workflow.')
+    if not text.strip() or len(text) > 16000:
+        raise ValueError('Enter a request of at most 16000 characters.')
+    recovery_deadline = time.monotonic() + RECOVERY_SECONDS
+    previous_result = None
+    def ready_to_begin():
+        nonlocal previous_result
+        connected_editor(folder, owner)
+        previous_result = require_available_request(folder, owner)
+        connected_editor(folder, owner)
+
+    announced = False
+    while True:
+        wait_for_editor(folder, owner, deadline=recovery_deadline)
+        try:
+            ready_to_begin()
+            break
+        except ProposalPendingError as error:
+            if not announced:
+                print(f'{error} Waiting up to {RECOVERY_SECONDS} seconds in total before registration.', file=sys.stderr, flush=True)
+                announced = True
+            remaining = recovery_deadline - time.monotonic()
+            if remaining <= 0:
+                raise
+            time.sleep(min(.25, remaining))
+    request_id = uuid.uuid4().hex
+    write(folder, 'agent-request.json', {**owner, 'id': request_id, 'text': text, 'expiresAt': int(time.time() * 1000) + ACKNOWLEDGEMENT_SECONDS * 1000}, guard=ready_to_begin)
+    def still_ours():
+        assert_owner(folder, owner)
+        if read(folder, 'agent-request.json').get('id') != request_id:
+            raise ValueError('Another native request replaced this attempt.')
+
+    def withdraw():
+        try:
+            write(folder, 'agent-request.json', {**owner, 'id': request_id, 'text': text,
+                                               'expiresAt': 0, 'withdrawn': True}, guard=still_ours)
+            return True
+        except (OSError, ValueError):
+            return False
+
+    deadline = time.monotonic() + ACKNOWLEDGEMENT_SECONDS
+    announced = False
+    request_seen = False
+    try:
+        while time.monotonic() < deadline:
+            connected_editor(folder, owner, allow_stale=True)
+            if cancelled(folder, owner, request_id):
+                raise ValueError('This turn was stopped in the editor. Do not send more changes or replies for it.')
+            still_ours()
+            if not announced and deadline - time.monotonic() <= ACKNOWLEDGEMENT_SECONDS - 1:
+                print(f'Waiting up to {ACKNOWLEDGEMENT_SECONDS} seconds for Workbench acknowledgement. Bring its existing tab to the front if it is suspended.', file=sys.stderr, flush=True)
+                announced = True
+            request = pending_object(folder, 'request.json')
+            if request and request.get('id') == request_id:
+                request_seen = True
+                try:
+                    request = active_request(folder, owner, request_id)
+                except HeartbeatPausedError:
+                    time.sleep(0.1)
+                    continue
+                # request.json precedes browser acceptance. Only its accepted
+                # transcript entry acknowledges the turn; old history may
+                # remain while that entry is being published.
+                transcript = pending_object(folder, 'transcript.json')
+                if transcript is not None:
+                    messages = transcript.get('messages', [])
+                    if not isinstance(messages, list) or any(not isinstance(item, dict) for item in messages):
+                        raise ValueError('Invalid Workbench acknowledgement file: transcript.json')
+                    acknowledged = (transcript.get('sessionId') == owner['sessionId'] and
+                                    any(item.get('role') == 'user' and item.get('requestId') == request_id and
+                                        not item.get('cancelled') for item in messages))
+                    if acknowledged and time.monotonic() < deadline and request.get('expiresAt', float('inf')) > time.time() * 1000:
+                        print(json.dumps({'id': request_id, 'revision': request['revision'], **({'previousResult': previous_result} if previous_result else {})}))
+                        return
+            elif request_seen:
+                raise ValueError('Request is no longer current. Reread the session.')
+            time.sleep(0.1)
+    except (OSError, ValueError) as error:
+        withdrawn = withdraw()
+        if isinstance(error, OwnershipChangedError):
+            raise  # main() reports the replaced session on one line.
+        outcome = 'This attempt was withdrawn.' if withdrawn else 'Withdrawal could not be confirmed.'
+        print(f'Workbench acknowledgement failed: {error} {outcome} Do not submit unacknowledged work.', file=sys.stderr, flush=True)
+        raise
+    withdrawn = withdraw()
+    outcome = 'This attempt was withdrawn.' if withdrawn else 'Withdrawal could not be confirmed; use Re-establish session in Agent and continue with its hand-off.'
+    raise ValueError('The workbench did not acknowledge this request in time. ' + outcome + ' Keep the workbench visible and retry; if another turn is stuck, ask the user to use Re-establish session in Agent and paste its hand-off. Do not submit unacknowledged work.')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--folder', type=Path, default=Path(__file__).resolve().parent)
@@ -729,92 +845,12 @@ def main():
         return
     owner = identity(folder)
     if args.command == 'begin':
-        if read(folder, 'session.json').get('workflow') != 'external':
-            raise ValueError('Native requests require the Work in your agent workflow.')
-        if not args.text.strip() or len(args.text) > 16000:
-            raise ValueError('Enter a request of at most 16000 characters.')
-        recovery_deadline = time.monotonic() + RECOVERY_SECONDS
-        previous_result = None
-        def ready_to_begin():
-            nonlocal previous_result
-            connected_editor(folder, owner)
-            previous_result = require_available_request(folder, owner)
-            connected_editor(folder, owner)
-
-        announced = False
-        while True:
-            wait_for_editor(folder, owner, deadline=recovery_deadline)
-            try:
-                ready_to_begin()
-                break
-            except ProposalPendingError as error:
-                if not announced:
-                    print(f'{error} Waiting up to {RECOVERY_SECONDS} seconds in total before registration.', file=sys.stderr, flush=True)
-                    announced = True
-                remaining = recovery_deadline - time.monotonic()
-                if remaining <= 0:
-                    raise
-                time.sleep(min(.25, remaining))
-        request_id = uuid.uuid4().hex
-        write(folder, 'agent-request.json', {**owner, 'id': request_id, 'text': args.text, 'expiresAt': int(time.time() * 1000) + ACKNOWLEDGEMENT_SECONDS * 1000}, guard=ready_to_begin)
-        def still_ours():
-            assert_owner(folder, owner)
-            if read(folder, 'agent-request.json').get('id') != request_id:
-                raise ValueError('Another native request replaced this attempt.')
-
-        def withdraw():
-            try:
-                write(folder, 'agent-request.json', {**owner, 'id': request_id, 'text': args.text,
-                                                   'expiresAt': 0, 'withdrawn': True}, guard=still_ours)
-                return True
-            except (OSError, ValueError):
-                return False
-
-        deadline = time.monotonic() + ACKNOWLEDGEMENT_SECONDS
-        announced = False
-        request_seen = False
         try:
-            while time.monotonic() < deadline:
-                connected_editor(folder, owner, allow_stale=True)
-                if cancelled(folder, owner, request_id):
-                    raise ValueError('This turn was stopped in the editor. Do not send more changes or replies for it.')
-                still_ours()
-                if not announced and deadline - time.monotonic() <= ACKNOWLEDGEMENT_SECONDS - 1:
-                    print(f'Waiting up to {ACKNOWLEDGEMENT_SECONDS} seconds for Workbench acknowledgement. Bring its existing tab to the front if it is suspended.', file=sys.stderr, flush=True)
-                    announced = True
-                request = pending_object(folder, 'request.json')
-                if request and request.get('id') == request_id:
-                    request_seen = True
-                    try:
-                        request = active_request(folder, owner, request_id)
-                    except HeartbeatPausedError:
-                        time.sleep(0.1)
-                        continue
-                    # request.json precedes browser acceptance. Only its accepted
-                    # transcript entry acknowledges the turn; old history may
-                    # remain while that entry is being published.
-                    transcript = pending_object(folder, 'transcript.json')
-                    if transcript is not None:
-                        messages = transcript.get('messages', [])
-                        if not isinstance(messages, list) or any(not isinstance(item, dict) for item in messages):
-                            raise ValueError('Invalid Workbench acknowledgement file: transcript.json')
-                        acknowledged = (transcript.get('sessionId') == owner['sessionId'] and
-                                        any(item.get('role') == 'user' and item.get('requestId') == request_id and
-                                            not item.get('cancelled') for item in messages))
-                        if acknowledged and time.monotonic() < deadline and request.get('expiresAt', float('inf')) > time.time() * 1000:
-                            print(json.dumps({'id': request_id, 'revision': request['revision'], **({'previousResult': previous_result} if previous_result else {})}))
-                            return
-                elif request_seen:
-                    raise ValueError('Request is no longer current. Reread the session.')
-                time.sleep(0.1)
-        except (OSError, ValueError) as error:
-            withdrawn = withdraw()
-            outcome = 'This attempt was withdrawn.' if withdrawn else 'Withdrawal could not be confirmed.'
-            print(f'Workbench acknowledgement failed: {error} {outcome} Do not submit unacknowledged work.', file=sys.stderr, flush=True)
-            raise
-        withdrawn = withdraw()
-        outcome = 'This attempt was withdrawn.' if withdrawn else 'Withdrawal could not be confirmed; use Re-establish session in Agent and continue with its hand-off.'
-        raise ValueError('The workbench did not acknowledge this request in time. ' + outcome + ' Keep the workbench visible and retry; if another turn is stuck, ask the user to use Re-establish session in Agent and paste its hand-off. Do not submit unacknowledged work.')
+            begin(folder, owner, args.text)
+        except OwnershipChangedError:
+            print(session_changed(folder, owner), file=sys.stderr)
+            raise SystemExit(1)
+        return
     if args.command == 'reply':
         wait_for_editor(folder, owner)
         completed = completed_reply(folder, owner, args.request)

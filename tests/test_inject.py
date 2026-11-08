@@ -651,6 +651,41 @@ class InjectTests(unittest.TestCase):
         finally:
             inject.GUIDE_LIMIT = previous
 
+    def test_company_trace_profile_declares_its_connector_only_on_boards_that_use_traces(self):
+        # #1095: a company profile must not add its detail tool to boards that
+        # never use traces; existing "no connector" boards need no {} workaround.
+        inject = load_inject()
+        profile = json.loads((ROOT / "tests/fixtures/trace-connection-profile.json").read_text())
+
+        def servers(spec, company):
+            context = {"traceConnections": {"operations": profile}} if company else {}
+            with mock.patch.object(inject, "company_agent_context", return_value=context):
+                guide = GUIDE_BLOCK.search(inject.agent_guide(spec, "a" * 40))[1]
+            manifest = re.search(r"```json\n(.*?)\n```", guide, re.S)
+            return json.loads(manifest[1]).get("mcp", {}).get("servers", [])
+
+        telemetry_board = json.loads(json.dumps(SPEC))
+        telemetry_board["page"]["tracking"] = {"telemetry": {"honeycomb": {"environment": "prod", "dataset": "api"}}}
+        telemetry_board["page"]["blocks"] = [{"diagram": {"nodes": {"api": {"telemetry": {"kind": "service", "signals": {"hc": {"honeycomb": {"calculations": [{"op": "COUNT"}]}}}}}}, "rows": [["api"]]}}]
+        jira_board = tracked_spec()
+        jira_board["page"]["blocks"] = [{"diagram": {"nodes": {"a": {"tickets": ["ACME-1"]}}, "rows": [["a"]], "panels": [{"id": "status", "type": "live-status"}]}}]
+        for spec in (SPEC, tracked_spec(), jira_board, telemetry_board):
+            self.assertEqual(servers(spec, True), servers(spec, False))
+            self.assertNotIn(profile["server"], [entry["server"] for entry in servers(spec, True)])
+
+        traced = json.loads(json.dumps(SPEC))
+        traced["page"]["blocks"] = [{"diagram": {"nodes": {"a": {}}, "rows": [["a"]], "steps": [{"id": "checkout", "nodes": ["a"], "traceMatch": {"serviceName": "checkout", "operation": "/cart/checkout"}}]}}]
+        panel_board = json.loads(json.dumps(telemetry_board))
+        panel_board["page"]["blocks"][0]["diagram"]["panels"] = [{"id": "status", "type": "live-status"}]
+        for spec in (traced, panel_board):
+            self.assertIn({"server": profile["server"], "tools": ["get_trace"]}, servers(spec, True))
+
+        explicit = json.loads(json.dumps(SPEC))
+        explicit["page"]["tracking"] = {"telemetry": {"traceConnections": {"reader": {"profile": "operations"}}}}
+        self.assertIn({"server": profile["server"], "tools": ["get_trace"]}, servers(explicit, True))
+        traced["page"]["tracking"] = {"telemetry": {"traceConnections": {}}}
+        self.assertNotIn(profile["server"], [entry["server"] for entry in servers(traced, True)])
+
     def test_agent_guide_replaces_a_stale_guide_when_reinjecting_a_built_page(self):
         built = TEMPLATE.replace("</script>\n" + BACKLINK_OPEN,
                                  '</script>\n<script type="text/markdown" id="dv-agent-guide">\nold guide\n</script>\n' + BACKLINK_OPEN, 1)

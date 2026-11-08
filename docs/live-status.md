@@ -2953,6 +2953,10 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   `query_loki_logs`, or in a host without one (native mounts), the lookup
   controls are disabled with a message and the rest of Load trace is unchanged.
   Discovery reads tool metadata only, once, when the Trace view first shows.
+- The disabled note names the cause (#1125): Over time on a past day ("Log
+  lookups work in Live, not in Over time. Switch to Live to use them."), board
+  telemetry off (`enabled: false`), host telemetry off, or a closed view.
+  Returning to Live re-enables the lookup.
 
 The result shape follows grafana/mcp-grafana `tools/loki.go`
 (`QueryLokiLogsResult` with `format` full, read 2026-11-07): `data` is a list of

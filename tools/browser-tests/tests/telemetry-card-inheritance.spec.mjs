@@ -139,7 +139,9 @@ test('loaded imported detail inherits its own work and clears retained card DOM'
 
 test('nested imported no-change card uses the thin outline without provider evidence',async({page,server})=>{
  const {root}=await mountCues(page,server);
- await page.evaluate(spec=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>({'outer::inner::a->outer::inner::b':{signals:{rate:{value:88},errors:{value:0}}}})}});},nestedSpec());
+ // #1137: the no-change look needs ticket references on the board; this local ticketed node supplies them.
+ const spec=nestedSpec(),d=spec.page.sections[0].diagram;d.nodes.tracked={title:'Tracked work',tickets:['AA-1']};d.rows[0].push('tracked');
+ await page.evaluate(spec=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>({'outer::inner::a->outer::inner::b':{signals:{rate:{value:88},errors:{value:0}}}})}});},spec);
  await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();const card=root.locator('[data-metrics-card="outer::inner::a->outer::inner::b"]');
  await expect(card).toContainText('88 req/h');expect(await paint(card)).toMatchObject({appearance:'unchanged',width:'1px',glow:'0'});
  await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();

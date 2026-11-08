@@ -488,10 +488,12 @@ test('signal show on card is one reversible edit and survives label, source and 
  oneStep(ui,()=>{const toggle=ui.control('received show on card').querySelector('input');toggle.checked=true;toggle.fire('change');ui.h.flush();});assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,true);
 });
 
-test('#1111 loki and grafana signals get an empty count reads 0 toggle that survives other edits; checking it removes the key; other sources drop it',()=>{
- const ui=harness(board({kind:'queue',signals:{received:{loki:LOKI_IN},trace:{tempo:'{}'}}}),EDGE);ui.metrics();
- assert.equal(ui.row('trace empty count reads 0 (Live)'),null,'no toggle where the field means nothing');
- const toggle=()=>ui.control('received empty count reads 0 (Live)').querySelector('input');
+test('#1111 loki and grafana signals get an empty result reads 0 toggle that survives other edits; checking it removes the key; other sources drop it',()=>{
+ const ui=harness(board({kind:'queue',signals:{received:{loki:LOKI_IN},sent:{grafana:'sent',missingMeansZero:true},trace:{tempo:'{}'}}}),EDGE);ui.metrics();
+ assert.equal(ui.row('trace empty result reads 0'),null,'no toggle where the field means nothing');
+ const toggle=()=>ui.control('received empty result reads 0').querySelector('input');
+ assert.equal(ui.control('sent empty result reads 0').querySelector('input').checked,true);
+ oneStep(ui,()=>ui.set('sent unit','req'));assert.equal(edgeOf(ui).telemetry.signals.sent.missingMeansZero,true,'an authored true survives other edits');
  assert.equal(toggle().checked,true,'absent reads as the default');
  oneStep(ui,()=>{const t=toggle();t.checked=false;t.fire('change');ui.h.flush();});
  assert.equal(edgeOf(ui).telemetry.signals.received.missingMeansZero,false);assert.equal(toggle().checked,false);

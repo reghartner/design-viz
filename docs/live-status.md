@@ -1064,7 +1064,7 @@ available. CloudWatch, Logs and SQL may use authored links. Link generation
 failure never invalidates numeric evidence. Preview invents no provider URLs.
 Workbench Metrics exposes each signal's **label**, **show on card** and **query link** controls;
 source edits and Undo/Redo preserve all three. `loki` and `grafana` signals also show
-**empty count reads 0 (Live)** (`missingMeansZero`); unchecking writes `false`, checking removes the key, and a change to another source drops it.
+**empty result reads 0** (`missingMeansZero`; its tooltip gives the Live and Over time rule); unchecking writes `false`, checking removes the key, and a change to another source drops it.
 
 `telemetry.card.side` selects `right`, `left`, `above` or `below`; `offset` moves
 along that side in SVG units. Defaults are right of a vertical route and below a

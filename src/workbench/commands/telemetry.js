@@ -144,7 +144,7 @@ function telemetryEditBinding(binding,edit,options){
       var value=telemetryQueryValue(source,edit.value);if(value.error)return value;
       next[source]=value.value;
     }else if(edit.field==='showOnCard' || edit.field==='missingMeansZero'){
-      if(typeof edit.value!=='boolean')return {error:edit.field==='showOnCard'?'Show on card must be a boolean.':'Empty means zero must be a boolean.'};
+      if(typeof edit.value!=='boolean')return {error:edit.field==='showOnCard'?'Show on card must be a boolean.':'missingMeansZero must be a boolean.'};
       if(source)next[source]=entry[source];
     }else if(edit.field==='unit' || edit.field==='scope' || edit.field==='label' || edit.field==='queryLink'){
       if(source)next[source]=entry[source];

@@ -62,7 +62,7 @@ test('a failed Loki or Prometheus query is never zero, with or without missingMe
   assert.match(h.api.status().note,/8 Grafana queries failed/,'both signals fail on all four carriers');
   const past=await overTime(h);
   for(const id of IDS){assert.equal(past.map[id]?.signals.logs,undefined,'Over time Loki '+id);assert.equal(past.map[id]?.signals.rate,undefined,'Over time Prometheus '+id);}
-  assert.match(past.note,/failed/);
+  assert.match(past.note,/8 Grafana queries failed/,'Over time: both signals fail on all four carriers');
  }
 });
 

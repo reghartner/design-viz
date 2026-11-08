@@ -2890,3 +2890,26 @@ test('#1081 Load-trace connection environment follows the board Environment unti
  api.setMetricsEnvironment('prd');api.setDirectTraceField({field:'environment',value:'stage'});api.setMetricsEnvironment('stg');api.setMetricsEnvironment('prd');assert.equal(form().environment,'stage','the user pick stays');
  api.destroy();
 });
+test('#1124 a log-line trace that is not found says it may not have been kept and offers the next line',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
+ const ids=['a1'.repeat(16),'b2'.repeat(16),'c3'.repeat(16)],calls=[];
+ const notFound=id=>'---\nMetadata:\n  environment: production\n  navigation_hints: no spans found\n  total_spans: 0\n  trace_id: '+id+'\n  view_mode: full\n  visible_spans: 0\n';
+ const ns=ago=>(BigInt(Date.now()-ago)*1000000n).toString(),line=(ago,meta)=>({timestamp:ns(ago),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:meta});
+ const data=[line(600000,{trace_id:ids[0]}),line(900000,{cameraModel:'arch'}),line(1200000,{trace_id:ids[1]}),line(3*3600000,{trace_id:ids[2]})];
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const raw={tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async(request,args)=>{calls.push(args.trace_id);return {payload:notFound(args.trace_id)};},logsConnector:async()=>'Grafana',queryLogs:async()=>({data})}}}),api=h.ctl.liveStatus;
+ const report=()=>api.snapshot().trace.direct.report,m=mountStatus(h);
+ api.setStatusMode('trace');await settle();api.setDirectTraceField({field:'environment',value:'prod'});api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();
+ assert.equal(await api.loadLogTrace(0),null);assert.deepEqual(calls,[ids[0]]);assert.equal(report().code,'trace_not_found');
+ assert.equal(report().error,'Trace not found. The provider may not have kept this trace (sampling). Try the next log line.');
+ const next=m.body.querySelector('.dv-trace-log-next');assert.ok(next,'the not-found report offers the next log line');assert.equal(next.textContent,'Try the next log line');
+ next.dispatchEvent({type:'click'});await settle();assert.deepEqual(calls,[ids[0],ids[1]],'the next line with a trace id loads; the line without one is skipped');
+ assert.equal(report().error,'Trace not found. The provider may not have kept this trace (sampling). Try the next log line.');
+ // A line older than the lookback window also gets the lookback hint; with no later line there is no next-line offer.
+ assert.equal(await api.loadLogTrace(3),null);assert.equal(report().error,'Trace not found. The provider may not have kept this trace (sampling). The log line is older than the last 2h; try a longer lookback under Lookback.');
+ assert.equal(m.body.querySelector('.dv-trace-log-next'),null);
+ // A pasted ID keeps today's text.
+ api.setDirectTraceField({field:'input',value:ids[0]});assert.equal(await api.loadDirectTrace(false),null);assert.equal(report().error,'Trace not found in the last 2h. Try a longer lookback under Lookback.');
+ api.destroy();
+});

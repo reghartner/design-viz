@@ -2938,6 +2938,8 @@ test('#1137 metric cards on a board without tickets get no Jira presentation; ti
  assert.ok(free.card,'the degraded carrier has a metric card');
  assert.equal(free.card.getAttribute('data-verdict'),'degraded');
  assert.deepEqual(workPresentation(free.h,free.card),{appearance:null,classes:[],halo:false,label:false,popover:false},'no Jira presentation on a Jira-free board');
+ assert.ok(free.card.classList.contains('dv-live-target'),'the card still opens its production evidence');
+ assert.ok(free.h.view.querySelector('.dv-live-popover'),'the click opened the popover');
  assert.equal(free.card.getAttribute('data-verdict'),'degraded','the card keeps its own verdict');
  free.h.ctl.liveStatus.destroy();
  const ticketed=await paintedCard({a:{tickets:['AA-1']},b:{}});
@@ -2946,4 +2948,15 @@ test('#1137 metric cards on a board without tickets get no Jira presentation; ti
  assert.equal(ticketed.card.getAttribute('data-verdict'),'degraded');
  assert.deepEqual(workPresentation(ticketed.h,ticketed.card),{appearance:'unchanged',classes:['unchanged'],halo:true,label:true,popover:true},'an unticketed edge on a ticketed board stays unchanged');
  ticketed.h.ctl.liveStatus.destroy();
+});
+test('#1137 an applied status map on a board without tickets gives nodes, step coins and captions no Jira presentation',()=>{
+ const h=harness({nodes:{a:{title:'Sender'},b:{title:'Receiver'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],steps:[{nodes:['a']},{edge:'a->b'}]}),api=h.ctl.liveStatus,rec=h.ctl.sections[0],controls=stepTicketControls(h,rec);
+ api.apply({});controls.change(0);
+ assert.equal(api.snapshot().available,false,'fixture has no ticket references');
+ const node=h.view.querySelector('g.node[data-dv-node="a"]'),card=node.querySelector('.card'),caption=controls.host.querySelector('.dv-live-caption');
+ assert.deepEqual({node:node.getAttribute('data-live-appearance'),label:/No change needed/.test(card.getAttribute('aria-label')||''),
+  coin:rec.sectionEl.querySelector('g.coin[data-dv-step="0"]').getAttribute('data-live-appearance'),chip:rec.sectionEl.querySelector('button.schip[data-step-source="0"]').getAttribute('data-live-appearance'),
+  caption:caption?caption.textContent:null,painted:h.view.querySelectorAll('[data-live-appearance]').length},
+  {node:null,label:false,coin:null,chip:null,caption:null,painted:0});
+ api.destroy();
 });

@@ -293,7 +293,7 @@ The accepted authored fields are:
 | proof entry | `min`, `max`, optional `maxRatioOf` another signal |
 | carrier links | absolute HTTP(S) `dashboard`, `query` |
 | signal links | absolute HTTP(S) `query` without credentials |
-| edge card | `side`, `offset` |
+| edge card | `side`, `offset`, `title`, `width` |
 | template | optional `kind`, `params`; required `signals`; optional `proof`, `links` |
 
 Deployment profiles are optional. Set `tracking.telemetry.environment` to the
@@ -424,9 +424,9 @@ its existing contract. Honeycomb COUNT caveats belong to Honeycomb evidence only
 
 Cards and node Inspect display every numeric signal in authored order, excluding
 trace bindings. Optional boolean `showOnCard: false` hides only that canvas row;
-Inspect and proof still use the signal. With no visible numeric rows, no card is
-shown. Optional `label` is plain text (1–120 characters, no control
-characters); otherwise the signal name labels the row. For example:
+Inspect and proof still use the signal. No visible numeric rows means no
+card. Optional `label` is plain text (1–120 characters, no control
+characters), else the signal name. For example:
 
 ```json
 {"telemetry":{"kind":"service","signals":{"matched":{"cloudwatch":{"namespace":"AWS/IoT","metric":"TopicMatch","dimensions":{"RuleName":"camera_message_camera_stats"},"statistic":"Sum","region":"us-east-1","accountId":"123456789012"},"unit":"events","label":"Matched events","showOnCard":true,"links":{"query":"https://grafana.example/explore?query=matched"}}}}}

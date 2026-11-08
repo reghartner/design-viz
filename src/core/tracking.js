@@ -148,7 +148,8 @@ function trackingExistsWhen(value){
                          unit: <string>|null, scope?: string, label?: string, showOnCard?: boolean, links?: {query?: string}}},
       proof: {<signal name>: {min?: number, max?: number, maxRatioOf?: <other signal name>}},
       links: {dashboard?: <absolute http(s) URL>, query?: <absolute http(s) URL>},
-      card: null | {side?: 'right'|'left'|'above'|'below', offset?: number, position?: {x:number,y:number}}}
+      card: null | {side?: 'right'|'left'|'above'|'below', offset?: number, position?: {x:number,y:number},
+             title?: string (replaces the edge label), width?: number (140–480; default 240)}}
    With maxRatioOf, max is the highest allowed ratio of this signal to the named one.
 
    trackingTelemetry(page, invalid) always returns:
@@ -167,7 +168,7 @@ var TELEMETRY_CARD_SIDES=['right','left','above','below'];
 var TELEMETRY_LINKS=['dashboard','query'];
 var TELEMETRY_BINDING_FIELDS=['kind','signals','proof','links','card'];
 var TELEMETRY_RESERVED=TELEMETRY_BINDING_FIELDS.concat(['use','params']);
-var TELEMETRY_DEFAULT_WINDOW='24h',TELEMETRY_MIN_REFRESH_MS=60000,TELEMETRY_CARD_OFFSET_MAX=1000;
+var TELEMETRY_DEFAULT_WINDOW='24h',TELEMETRY_MIN_REFRESH_MS=60000,TELEMETRY_CARD_OFFSET_MAX=1000,TELEMETRY_CARD_WIDTH_MIN=140,TELEMETRY_CARD_WIDTH_MAX=480;
 var telemetryNamePattern=/^[A-Za-z][A-Za-z0-9_-]*$/;
 var telemetryParamPattern=/^[A-Za-z][A-Za-z0-9_]*$/;
 var telemetryWindowPattern=/^(?:now-|-)?([1-9][0-9]*[smhdw])$/;
@@ -181,6 +182,8 @@ function telemetryOwn(v,key){return Object.prototype.hasOwnProperty.call(v,key);
 function telemetryText(v){return typeof v==='string' && v.trim()!=='';}
 function telemetryClone(v){return JSON.parse(JSON.stringify(v));}
 function telemetryNumber(v){return typeof v==='number' && isFinite(v);}
+function telemetryCardTitle(v){return telemetryText(v) && v.length<=120 && !/[\x00-\x1f\x7f]/.test(v);}
+function telemetryCardWidth(v){return telemetryNumber(v) && v>=TELEMETRY_CARD_WIDTH_MIN && v<=TELEMETRY_CARD_WIDTH_MAX;}
 function telemetryTextBox(v){return !!(v && v.type==='text' && (telemetryOwn(v,'text') || telemetryOwn(v,'textStyle')));}
 function telemetryWarn(invalid){return function(path,message){if(invalid)invalid(path,message);};}
 function telemetryUnknown(value,allowed,warn,prefix){
@@ -267,7 +270,7 @@ function telemetryProofEntry(name,value,signals,warn){
    their $param placeholders are not substituted yet. */
 function telemetryClean(raw,warn,template){
   var allowed=template?['kind','params','signals','proof','links']:TELEMETRY_BINDING_FIELDS,ok=true,out={};
-  if(template && telemetryOwn(raw,'card'))warn('.card','card placement belongs on the carrier — ignored');
+  if(template && telemetryOwn(raw,'card'))warn('.card','card fields belong on the carrier — ignored');
   telemetryUnknown(raw,allowed.concat(template?['card']:[]),warn);
   if(telemetryOwn(raw,'kind') || !template){
     if(TELEMETRY_KINDS.indexOf(raw.kind)<0){warn('.kind','use one of '+TELEMETRY_KINDS.join(', ')+' — '+(template?'template':'binding')+' ignored');ok=false;}
@@ -300,7 +303,7 @@ function telemetryClean(raw,warn,template){
   }
   if(!template && telemetryOwn(raw,'card')){
     var card=raw.card,placed={};
-    if(!telemetryObject(card))warn('.card','must be an object {side?, offset?, position?} — ignored');
+    if(!telemetryObject(card))warn('.card','must be an object {side?, offset?, position?, title?, width?} — ignored');
     else{
       if(telemetryOwn(card,'side')){if(TELEMETRY_CARD_SIDES.indexOf(card.side)>=0)placed.side=card.side;else warn('.card.side','use one of '+TELEMETRY_CARD_SIDES.join(', ')+' — ignored');}
       if(telemetryOwn(card,'offset')){
@@ -312,7 +315,9 @@ function telemetryClean(raw,warn,template){
         else warn('.card.position','must contain finite x and y coordinates — ignored');
         if(telemetryObject(card.position))telemetryUnknown(card.position,['x','y'],warn,'.card.position');
       }
-      telemetryUnknown(card,['side','offset','position'],warn,'.card');
+      if(telemetryOwn(card,'title')){if(telemetryCardTitle(card.title))placed.title=card.title.trim();else warn('.card.title','must be plain text of 1–120 characters without control characters — ignored');}
+      if(telemetryOwn(card,'width')){if(telemetryCardWidth(card.width))placed.width=card.width;else warn('.card.width','must be a number of pixels between '+TELEMETRY_CARD_WIDTH_MIN+' and '+TELEMETRY_CARD_WIDTH_MAX+' — ignored');}
+      telemetryUnknown(card,['side','offset','position','title','width'],warn,'.card');
     }
     if(Object.keys(placed).length)out.card=placed;
   }

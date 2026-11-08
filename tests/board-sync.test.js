@@ -35,6 +35,8 @@
 | S15 (#1078) a step the local copy deleted stops the pull | local deleted step rates | conflict {kind step-missing, step rates}; resolve step:rates=local → merged, no step rates, entry recorded | an impl that drops the mapping silently |
 | L11 (#1078) log counts step mappings it changes or removes | local changes charge's traceMatch and removes it from refund | summary "Changed 1 step mapping, removed 1 step mapping"; changes [] | an impl that logs it as text and layout only |
 | L12 (#1078) changing or removing a mapping a recent board edit set needs the author to confirm | agent entry 10:00; Bo mapped rates at 11:00; local changes it, removes it, or deletes the step | each: conflict, step rates, message names Bo and the time; with confirm [step:rates] → logged | an impl with no conflict check for step mappings |
+| S16 (#1078 review c2) a local traceMatch alternatives array (#1100) on the mapped step stops the pull | local rates = [currency · GetRates, currency · GetAllRates] | conflict {kind trace-match-changed, step rates}, message names both alternatives joined with " or "; CLI exit 2, file unchanged; resolve step:rates=live → the board's object, =local → the array | an impl that reads an array as "no traceMatch" and overwrites it |
+| L13 (#1078 review c2) log counts and guards alternatives arrays | (a) Bo mapped rates after the newest agent entry, local turns it into alternatives; (b) an array added to an unmapped step | (a) conflict whose message says "maps … or … to it", not "removes"; with confirm → "Changed 1 step mapping"; (b) "Added 1 step mapping" | an impl that counts an array as no mapping |
 | L9 (diff review c1) placing a ticket that a recent board edit took off the board is a conflict | agent entry 10:00; Bo removed CC-1 from edge 0 at 11:00; local assigns CC-1 to gamma | status conflict, conflicts[0] ticket CC-1, message names Bo; with confirm [CC-1] → logged | a check limited to the carriers the board edit named |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
@@ -399,4 +401,32 @@ test('L12 changing, removing or deleting a mapping a recent board edit set needs
  assert.equal(S().log(older.local,older.live,{by:'Chuck',now:NOW}).status,'logged','a board mapping older than the newest agent entry is not a conflict');
  const kept=stepsPulled(mapped,history,spec=>{d(spec).steps[0].traceMatch.nodeId='beta';});
  assert.equal(S().log(kept.local,kept.live,{by:'Chuck',now:NOW}).status,'logged','refining the same mapping is not a conflict');
+});
+
+const ALTERNATIVES=[{serviceName:'currency',operation:'GetRates'},{serviceName:'currency',operation:'GetAllRates'}];
+
+test('S16 a local traceMatch alternatives array on the step the board mapped stops the pull until resolved',()=>{
+ const local=STEPS.replace('{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta"}','{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta", "traceMatch": '+JSON.stringify(ALTERNATIVES)+'}');
+ const live=stepsLive(mapped,[BO_MAP('2026-11-03T14:02:00Z')]);
+ const out=S().pull(local,live);
+ assert.equal(out.status,'conflict');assert.equal(out.conflicts.length,1);
+ assert.equal(out.conflicts[0].kind,'trace-match-changed');assert.equal(out.conflicts[0].step,'rates');
+ for(const name of ['Bo','2026-11-03 14:02 UTC','currency · GetRates or currency · GetAllRates','step:rates'])assert.ok(out.conflicts[0].message.includes(name),out.conflicts[0].message);
+ const dir=tmp({'local.json':local,'live.json':live}),cli=run(dir,['pull','local.json','live.json']);
+ assert.equal(cli.status,2,cli.stdout+cli.stderr);assert.equal(fs.readFileSync(path.join(dir,'local.json'),'utf8'),local,'nothing written on a conflict');
+ assert.deepEqual(step(S().pull(local,live,{resolve:{'step:rates':'live'}}).text,'rates').traceMatch,RATES);
+ assert.deepEqual(step(S().pull(local,live,{resolve:{'step:rates':'local'}}).text,'rates').traceMatch,ALTERNATIVES);
+});
+
+test('L13 log counts and guards traceMatch alternatives arrays',()=>{
+ const history=[agentEntry('2026-11-03T10:00:00Z','Initial board'),BO_MAP('2026-11-03T11:00:00Z')];
+ const {live,local}=stepsPulled(mapped,history,spec=>{d(spec).steps[0].traceMatch=plain(ALTERNATIVES);});
+ const out=S().log(local,live,{by:'Chuck',now:NOW});
+ assert.equal(out.status,'conflict');assert.equal(out.conflicts.length,1);assert.equal(out.conflicts[0].step,'rates');
+ assert.ok(out.conflicts[0].message.includes('maps currency · GetRates or currency · GetAllRates to it'),out.conflicts[0].message);
+ assert.ok(!out.conflicts[0].message.includes('removes'),out.conflicts[0].message);
+ const confirmed=S().log(local,live,{by:'Chuck',now:NOW,confirm:['step:rates']});
+ assert.equal(confirmed.status,'logged');assert.equal(confirmed.entry.summary,'Changed 1 step mapping');
+ const added=stepsPulled(null,[],spec=>{d(spec).steps[0].traceMatch=plain(ALTERNATIVES);});
+ assert.equal(S().log(added.local,added.live,{by:'Chuck',now:NOW}).entry.summary,'Added 1 step mapping');
 });

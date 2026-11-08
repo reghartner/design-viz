@@ -932,7 +932,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     sections:directTraceSections,
     identity:function(){return [telemetry.environment(),telemetry.snapshot().historical];},
     environment:function(){return telemetry.environment();},
-    disabled:function(){return retired || telemetryOptions===false || !trackingTelemetry(page).enabled || telemetry.snapshot().historical;},
+    // #1142: Over time searches the selected day. A day without a date has no window, so Load stays off there.
+    day:function(){var state=over && overTimeState();return state && state.window?{key:over.days[over.index].key,today:state.today,label:state.label,window:state.window}:null;},
+    disabled:function(){return retired || telemetryOptions===false || !trackingTelemetry(page).enabled || telemetry.snapshot().historical && !overTimeWindow();},
     accountChanged:function(){telemetry.clear();telemetry.setAvailable(false);},
     changed:function(){if(!retired){paint();notify();}}
   });
@@ -953,8 +955,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function traceSources(){
     var evidence=telemetry.snapshot(),entries=[],owners=Object.create(null),mounted=sourceBindings(),ambiguous=new Set();
     eachDiagram(function(d,source){Object.keys(d.nodes || {}).concat((d.edges || []).map(function(e){return e.from+'->'+e.to;})).forEach(function(id){if(!owners[id])owners[id]=[];if(owners[id].indexOf(d)<0)owners[id].push(d);});});
-    if(evidence.historical)return {entries:[],evidence:evidence};
-    mounted.forEach(function(binding){
+    // #1142: example traces stay Live-only; a trace the reader loaded in Over time is still listed.
+    if(!evidence.historical)mounted.forEach(function(binding){
       var d=binding.section.diagram;if(!d || !trackingTelemetry(binding.page).enabled)return;
       if(!traceSections.has(binding.section))traceSections.set(binding.section,++traceSectionSerial);
       if(!traceSections.has(d))traceSections.set(d,++traceSectionSerial);

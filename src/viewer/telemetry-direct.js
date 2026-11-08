@@ -22,7 +22,17 @@ function createTelemetryDirect(page,transport,hooks){
   function sections(){return typeof hooks.sections==='function'?hooks.sections():[];}
   function boardEnvironment(){return typeof hooks.environment==='function'?hooks.environment():null;}
   function contextIdentity(){return JSON.stringify(typeof hooks.identity==='function'?hooks.identity():null);}
-  function identity(){return JSON.stringify([profiles(),contextIdentity(),sections().map(function(s){return s.id;})]);}
+  // #1142: the selected Over time day, or null in Live. A day change retires a request but keeps the
+  // typed input. On today the window end moves, so the day key and today flag identify it.
+  function day(){var d=typeof hooks.day==='function'?hooks.day():null;return d && d.window && typeof d.window.from==='string'?d:null;}
+  function identity(){var d=day();return JSON.stringify([profiles(),contextIdentity(),sections().map(function(s){return s.id;}),d?[d.key,!!d.today]:null]);}
+  /* With no Trace start or end typed, a day is searched whole: an absolute connection sends its bounds,
+     a relative-only one the shortest lookback that reaches its start. A link's own time wins (load, bounds). */
+  function dayTime(p,request,now){
+    var d=day();if(!p || !d || request.start || request.end)return null;
+    if(p.time.encoding!=='relative')return {start:d.window.from,end:d.window.to};
+    var hours=Math.max(1,Math.ceil((now-Date.parse(d.window.from))/3600000));return {start:'-'+(hours>9999?Math.ceil(hours/24)+'d':hours+'h'),end:''};
+  }
   function changed(){if(!dead && hooks.changed)hooks.changed();}
   function cancel(){serial++;if(timeout)clearTimeout(timeout);timeout=null;if(abort)abort.abort();abort=null;busy=false;exemplar=null;report=null;}
   function clearInput(){form.input='';form.start='';form.end='';}
@@ -40,9 +50,11 @@ function createTelemetryDirect(page,transport,hooks){
     function at(request){try{return FlowTraceConnections.timeWindow(p,parsed,request,Date.now());}catch(e){return null;}}
     var start=Object.prototype.hasOwnProperty.call(parsed,'start'),end=Object.prototype.hasOwnProperty.call(parsed,'end');
     if(start || end)return {lookback:null,linkTime:true,linkUsable:!!at({start:start?'':form.start,end:end?'':form.end})};
-    var w=at(form);return w?{lookback:w.relative?w.start.slice(1):null,linkTime:false,linkUsable:false}:null;
+    var w=at(Object.assign({},form,dayTime(p,form,Date.now())));return w?{lookback:w.relative?w.start.slice(1):null,linkTime:false,linkUsable:false}:null;
   }
-  function snapshot(){var ps=sync();return {available:available(),busy:busy,form:Object.assign({},form),bounds:bounds(ps),profiles:Object.keys(ps).map(function(id){return {id:id,label:ps[id].label,lookback:ps[id].time.defaultLookback,environments:Object.keys(ps[id].environments).map(function(e){return {id:e,label:ps[id].environments[e].label || e};})};}),sections:sections().map(function(s){return {id:s.id,label:s.label};}),report:report?JSON.parse(JSON.stringify(report)):null,exemplar:exemplar,section:form.section};}
+  // What a blank Trace start / end searches on the selected day, for the form note.
+  function dayNote(ps){var d=day(),p=ps[form.connection];if(!d)return null;return {label:d.label || d.key || '',range:d.window.label || '',lookback:p && p.time.encoding==='relative'?dayTime(p,{},Date.now()).start.slice(1):null};}
+  function snapshot(){var ps=sync();return {available:available(),busy:busy,form:Object.assign({},form),bounds:bounds(ps),profiles:Object.keys(ps).map(function(id){return {id:id,label:ps[id].label,lookback:ps[id].time.defaultLookback,environments:Object.keys(ps[id].environments).map(function(e){return {id:e,label:ps[id].environments[e].label || e};})};}),sections:sections().map(function(s){return {id:s.id,label:s.label};}),report:report?JSON.parse(JSON.stringify(report)):null,exemplar:exemplar,section:form.section,day:dayNote(ps)};}
   function set(field,value){if(dead || !Object.prototype.hasOwnProperty.call(form,field) || typeof value!=='string' || value.length>4096)return;sync();if(value===form[field])return;cancel();form[field]=value;if(field==='connection' || field==='environment')clearInput();if(field==='connection'){form.environment='';environmentChosen=false;}if(field==='environment')environmentChosen=true;sync();changed();}
   function errorText(e){var known={not_granted:'Connector permission was not granted.',needs_reauth:'Reconnect this connector in the host.',user_changed:'Host account changed; start a new trace request.',server_not_connected:'The configured connector is not connected.',server_not_found:'The configured connector was not found.',capability_removed:'The configured tool capability was removed.',capability_disabled:'The configured tool capability is disabled.'};return known[e && e.code] || telemetryTraceErrorText(e) || 'The host could not complete the read-only detail request.';}
   function lookbackText(r){return r.linkTime?'Trace not found in the time range of the pasted link. Paste the trace ID alone, then set Lookback.':r.lookback?'Trace not found in the last '+r.lookback+'. Try a longer lookback under Lookback.':'Trace not found between '+r.range.from.replace(/\.0+Z$/,'Z')+' and '+r.range.to.replace(/\.0+Z$/,'Z')+'. Try a wider range under Lookback.';}
@@ -66,7 +78,9 @@ function createTelemetryDirect(page,transport,hooks){
       if(!available())FlowTraceConnections.fail('host','Direct trace retrieval is unavailable in this host.');
       if(!p)FlowTraceConnections.fail('configuration','Choose a configured trace connection.');
       if(sections().length>1 && !request.section)FlowTraceConnections.fail('input','Choose a diagram context for authored mappings.');
-      stage='input';resolved=FlowTraceConnections.input(p,request,Date.now());
+      stage='input';var now=Date.now(),time=dayTime(p,request,now),parsed=null;
+      if(time){try{parsed=FlowTraceConnections.parseInput(p,request.input);}catch(e){}}
+      resolved=FlowTraceConnections.input(p,parsed && !Object.prototype.hasOwnProperty.call(parsed,'start') && !Object.prototype.hasOwnProperty.call(parsed,'end')?Object.assign({},request,time):request,now);
       var safeArgs={};Object.keys(resolved.args).forEach(function(k){safeArgs[k]=[p.arguments.traceId,p.arguments.start,p.arguments.end,p.arguments.environment].indexOf(k)>=0?resolved.args[k]:'[configured]';});
       busy=true;update({mode:verify?'verify':'load',stage:'schema',connection:p.label,server:p.server,tool:p.tool,environment:resolved.environment,arguments:safeArgs,requestAccepted:false,idMatched:false});
       timeout=setTimeout(function(){if(mine!==serial || dead)return;serial++;abort.abort();timeout=null;busy=false;report=Object.assign(report || {},{stage:stage,error:'Trace '+stage+' request timed out. Retry with a bounded window.',code:'timeout'});changed();},30000);

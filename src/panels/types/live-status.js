@@ -228,12 +228,14 @@
       if(direct.sections.length)field(config,'section','Mapping diagram',direct.sections);
       field(config,'input','Trace ID or link',null,'Paste a trace ID or supported Honeycomb link');
       var start=direct.form.start,relative=/^-([1-9][0-9]{0,3}[smhdw])$/.exec(start),bounds=direct.bounds,back=bounds?bounds.lookback:direct.form.end?null:start?relative && relative[1]:profile && profile.lookback;
-      if(start || profile)el(config,'p','lookback','dv-trace-lookback-note',bounds && bounds.linkTime?(bounds.linkUsable?'Uses the time range in the pasted link.':'This link\'s time range cannot be used with this connection; paste the trace ID alone.'):back?'Looks back '+back+'; change under Lookback.':'Uses the time set under Lookback.');
+      // #1142: with no Trace start or end, Over time searches the selected day.
+      var day=!start && !direct.form.end && direct.day,dayText=day && 'Searches '+(day.lookback?day.label+' · looks back '+day.lookback+' (this connection cannot stop at a past time)':day.range);
+      if(start || profile)el(config,'p','lookback','dv-trace-lookback-note',bounds && bounds.linkTime?(bounds.linkUsable?'Uses the time range in the pasted link.':'This link\'s time range cannot be used with this connection; paste the trace ID alone.'):dayText || (back?'Looks back '+back+'; change under Lookback.':'Uses the time set under Lookback.'));
       var time=el(config,'details','time','dv-trace-time');el(time,'summary','summary','','Lookback (optional)');
       // Open once per not-found report; the section may be rebuilt when Trace mode is re-entered.
       // A log-line trace that was not kept opens Lookback only when the line is outside it (#1124).
       if(r && r.code==='trace_not_found' && (!r.logLine || r.lookbackHint) && host._directNotFoundReport!==r.serial){time.open=true;host._directNotFoundReport=r.serial;}
-      el(time,'p','help','','Leave blank to use link bounds or the connection lookback.');
+      el(time,'p','help','','Leave blank to use link bounds or '+(direct.day?'the selected day.':'the connection lookback.'));
       field(time,'start','Trace start',null,'-2h or UTC ISO timestamp');field(time,'end','Trace end',null,'UTC ISO timestamp (absolute start only)');
       var controls=el(config,'div','actions','dv-live-controls');
       var load=el(controls,'button','load','reader-button dv-trace-load tbtn','Load trace');load.type='button';load.disabled=!direct.available || !direct.form.input.trim();

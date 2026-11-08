@@ -160,6 +160,19 @@ test('published entries list several topology exports sorted by name, not in aut
   f.write('provider.json',provider);
   assert.deepEqual((await buildLibraryFromDirectory(f.directory)).diagrams[0].exports,['alpha','zeta']);
 });
+test('published entries list step-set names sorted by name; the browser index keeps only names',async t=>{
+  const {buildLibraryFromDirectory}=await import('../tools/canon/library.mjs');
+  const f=discoveryFixture(t),provider=namedSpec('provider'),plain=namedSpec('plain'),d=provider.page.sections[0].diagram;
+  const node=d.rows.flat(2)[0];d.steps.push({id:'listed',nodes:[node],text:'Listed step'});
+  d.topologyExports={core:{nodes:[node],edges:[]}};
+  d.stepExports={zeta:{export:'core',steps:['listed']},alpha:{export:['core'],steps:['listed']}};
+  f.write('provider.json',provider);f.write('plain.json',plain);
+  const library=await buildLibraryFromDirectory(f.directory),entry=id=>library.diagrams.find(item=>item.id===id);
+  assert.deepEqual(entry('provider').stepExports,['alpha','zeta']);assert.deepEqual(entry('plain').stepExports,[]);
+  const parsed=context.parseCanonLibrary({...library,diagrams:[{...entry('provider'),stepExports:['alpha',7,'zeta']}]})[0];
+  assert.deepEqual(Array.from(parsed.stepExports),['alpha','zeta']);
+  assert.equal(context.parseCanonLibrary({...library,diagrams:[{...entry('provider'),stepExports:undefined}]})[0].stepExports,undefined);
+});
 test('version 2 and 3 indexes validate metadata and URLs without embedding or mutating source content',async()=>{
   const {buildLibrary}=await import('../tools/canon/library.mjs');
   const raw=await buildLibrary(path.join(__dirname,'../examples/canon/registry.json'));

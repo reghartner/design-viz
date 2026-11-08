@@ -281,7 +281,7 @@ test('O1 O2 O3 O4 O5 O6 O7 demo Over time moves through days without changing an
  const before=await activity();expect(before.length).toBeGreaterThan(0);
  await overTime.click();await expect(overTime).toHaveAttribute('aria-pressed','true');await expect(live).toHaveAttribute('aria-pressed','false');await expect(slider).toHaveValue('3');await expect(slider).toHaveAttribute('min','0');await expect(slider).toHaveAttribute('max','11');await expect(slider).toHaveAttribute('step','1');
  await expect(row.locator('.dv-live-over-time-end')).toHaveText(['Day 1','Day 12']);await expect(row.locator('.dv-live-over-time-note')).toHaveText('Status as of Day 4 — signal blocker · other columns show today');await expect(row).toBeVisible();
- // #1082: a demo day is a scripted date, so its heading shows the day's label and never TODAY.
+ // #1082: TODAY only when the day's date is today; the shipped demo's dates (2026-10-20 to 2026-10-31) are past, so its heading shows the day's label.
  const heading=row.locator('.dv-live-over-time-day');await expect(heading).toHaveText('Day 4 — signal blocker');await expect(row.locator('.dv-live-over-time-date')).toBeHidden();
  const fontSize=locator=>locator.evaluate(el=>parseFloat(getComputedStyle(el).fontSize));expect(await fontSize(heading),'the day is the most prominent text, at least the epic key size').toBeGreaterThanOrEqual(await fontSize(panel.locator('.dv-live-epic-key').first()));
  // O2 O3. Keyboard back to Day 1.

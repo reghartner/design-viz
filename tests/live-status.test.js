@@ -2690,8 +2690,12 @@ test('OT17 the selected day is shown large, today reads TODAY, and changing the 
   assert.equal(api.snapshot().overTime.index,2);assert.equal(api.snapshot().overTime.today,false);assert.equal(big().textContent,'Oct 22');assert.ok(beside().hidden);
   overBackToLive(api);await historySettle();
  }
+ // The product's own day builder, run now: its last day reads TODAY.
+ const built=historyDays(providerContext(),[historyTicket('AA-1',Date.now()-2*86400000,'In Progress')],{'AA-1':{state:'active'}},Date.now());
+ api.setHistory({load:()=>built});api.overTime();await historySettle();
+ assert.equal(api.snapshot().overTime.index,built.days.length-1);assert.equal(api.snapshot().overTime.today,true);assert.equal(big().textContent,'TODAY');assert.equal(beside().textContent,built.days.at(-1).label);
 });
-test('OT16First blocker cannot reach a ticket that has no status on the day, and a real blocker on another day still counts',async()=>{
+test('OT16 First blocker cannot reach a ticket that has no status on the day, and a real blocker on another day still counts',async()=>{
  const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);h.ctl.sections[0].stepper={path:()=>'happy',sourceIndex:()=>0,mode:()=>'ambient',jumpSource(){}};api.apply(overToday());
  const rest={'EP-1':{state:'active'},'AA-1':{state:'todo'},'BB-1':{state:'todo'},'ZZ-2':{state:'todo'}},first=()=>h.view.querySelector('.dv-live-first'),edge=h.view.querySelector('path.edge');
  api.setHistory({load:()=>({days:[{label:'One',short:'One',states:{...rest}},{label:'Two',short:'Two',states:{...rest,'EE-1':{state:'blocked'}}}]})});api.overTime();await historySettle();h.flush();

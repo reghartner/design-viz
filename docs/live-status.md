@@ -1080,9 +1080,11 @@ that day's window end.
 A signal's span is, in order:
 
 1. `signals.<name>.window`, a duration in the page `window` form (`"1h"`, `"7d"`,
-   `"now-7d"`). It is a label only and never changes the query. Any source can
-   declare it. A malformed value is a validation warning at
-   `...telemetry.signals.<name>.window` and is ignored.
+   `"now-7d"`). It is a label only and never changes the query. Any source
+   except `cloudwatch`, which always covers the page window, can declare it. A
+   malformed value, or one on a `cloudwatch` signal, is a validation warning at
+   `...telemetry.signals.<name>.window` and is ignored. Like `label`, it takes
+   its own environment substitution, so an unset variable drops only `window`.
 2. For a `grafana` or `loki` query without a declaration: the range of its one
    range selector when the query counts, that is, it calls `count_over_time`,
    `sum_over_time`, `bytes_over_time` or `increase`. Brackets inside string

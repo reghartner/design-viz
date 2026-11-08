@@ -6,7 +6,7 @@ var LIVE_STATUS_APPEARANCES = LIVE_STATUS_STATES.concat(['unchanged']);
 /* Proof presentation consumes one normalized controller snapshot. It neither
    resolves bindings nor judges evidence: proofVerdicts remains the only engine.
    No clock, page walk, queries, or mutations belong in this presentation seam. */
-function liveStatusLogDetails(snapshot){
+function liveStatusLogDetails(snapshot,window){
   var out=[];
   if(!snapshot.enabled || snapshot.historical)return out;
   (snapshot.carriers || []).forEach(function(binding){Object.keys(binding.signals || {}).forEach(function(name){
@@ -14,7 +14,7 @@ function liveStatusLogDetails(snapshot){
     if(!config)return;
     var sample=snapshot.map[binding.id],entry=sample && sample.signals[name],details=signal.breakdownError?telemetryLogDetails({status:'error',error:signal.breakdownError}):entry && entry.breakdown;
     out.push({key:JSON.stringify([snapshot.environment,binding.id,name,signal]),id:binding.id,signal:name,title:binding.title || binding.id,
-      config:config,scope:telemetrySignalScope(signal),total:telemetryCardValue(binding,sample,name),details:details || null});
+      config:config,scope:telemetrySignalScope(signal),total:telemetryCardValue(binding,sample,name,null,window),details:details || null});
   });});
   return out;
 }
@@ -968,7 +968,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function metricsSnapshot(){
     var evidence=telemetry.snapshot(),status=evidence.status;
-    return {environment:evidence.environment,environments:evidence.environments,proof:liveStatusProofPresentation(evidence,telemetryWindow),logDetails:liveStatusLogDetails(evidence),available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
+    return {environment:evidence.environment,environments:evidence.environments,proof:liveStatusProofPresentation(evidence,telemetryWindow),logDetails:liveStatusLogDetails(evidence,telemetryWindow),available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
       refreshedAt:status.refreshedAt,note:status.note,checkedText:status.refreshedAt?'refreshed '+clockTime(status.refreshedAt):'',
       source:telemetrySource(),window:telemetryWindow};
   }

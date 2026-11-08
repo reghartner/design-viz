@@ -33,6 +33,14 @@ test('2: a declared window wins over the query range and uses the page window gr
  assert.equal(texts({sql:'select count(*) from pushes where at > now() - interval 1 hour',window:'1h',unit:'pushes'}).card,'42 pushes · last 1h');
  const binding=C.carrierTelemetry({telemetry:{kind:'service',signals:{count:{loki:LOKI_1H,window:'-7d'}}}},{});
  assert.equal(binding.signals.count.window,'7d');
+ // Log details carry the same span as the card row.
+ const logs={cloudwatchLogs:{logGroups:['g'],query:'stats count() as n',region:'us-east-1',valueField:'n',breakdown:{query:'stats count() as n by clientId',labelField:'clientId',valueField:'n'}},window:'1h'};
+ const logBinding={...C.carrierTelemetry({telemetry:{kind:'service',signals:{count:logs}}},{}),id:'a->b',title:'A to B'};
+ assert.equal(C.liveStatusLogDetails({enabled:true,carriers:[logBinding],map:{'a->b':{signals:{count:{value:42}}}}},'24h')[0].total,'42 · last 1h');
+ // An unset variable in window drops only window; the query still runs.
+ const warnings=[],unset=C.carrierTelemetry({telemetry:{kind:'service',signals:{count:{loki:LOKI_1H,window:'${span}'}}}},{},(at,message)=>warnings.push(at+': '+message),{environment:'stg'});
+ assert.equal(unset.signals.count.error,undefined);assert.equal(unset.signals.count.window,undefined);assert.match(warnings.join('\n'),/^\.signals\.count\.window: unresolved telemetry variable span/);
+ assert.equal(C.carrierTelemetry({telemetry:{kind:'service',signals:{count:{loki:LOKI_1H,window:'${span}'}}}},{},null,{environment:'stg',variables:{span:'7d'}}).signals.count.window,'7d');
 });
 
 test('3: [$__range] or a span equal to the board window adds no label',()=>{
@@ -73,6 +81,9 @@ test('5: a malformed window is a validation warning at its field path; the signa
   const binding=V.carrierTelemetry(spec(window).page.sections[0].diagram.edges[0],{});
   assert.equal(binding.signals.count.window,undefined);assert.equal(binding.signals.count.query,LOKI_1H);
  }
+ // CloudWatch always queries the page window, so a declared span would be false.
+ const warnings=[],cw=V.carrierTelemetry({telemetry:{kind:'service',signals:{sum:{cloudwatch:{namespace:'AWS/IoT',metric:'TopicMatch',region:'us-east-1',accountId:'111111111111',dimensions:{RuleName:'r'},statistic:'Sum'},window:'7d'}}}},{},(at,message)=>warnings.push(at+': '+message));
+ assert.deepEqual(warnings,['.signals.sum.window: cloudwatch signals always cover the page window — ignored']);assert.equal(cw.signals.sum.window,undefined);
 });
 
 test('Workbench edits of other signal fields keep an authored window',()=>{

@@ -2988,6 +2988,12 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
 - The window is the Load trace lookback: the **Trace start** control, else the
   connection's `defaultLookback`. A relative lookback stays relative (`now-2h` to
   `now`), so Grafana's clock decides now; absolute start and end pass unchanged.
+- In Over time Find searches the selected day (#1141): the whole local calendar
+  day, to now for today (`snapshot().overTime.window`). The section names it,
+  for example "Loki · Nov 6 00:00–24:00 local", and an empty result says "No
+  matching log lines on Nov 6." A Trace start or end typed under Lookback still
+  wins. Changing the day clears the results without a call; the typed value
+  stays. Live is unchanged.
 - A value cannot contain quotes, backticks, backslashes or control characters,
   so it cannot leave the LogQL string it is placed in. The typed box is limited
   to 2000 characters. LogQL cannot write; the call is bounded by the window and
@@ -3013,12 +3019,11 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   `query_loki_logs`, or in a host without one (native mounts), the lookup
   controls are disabled with a message and the rest of Load trace is unchanged.
   Discovery reads tool metadata only, once, when the Trace view first shows.
-- The disabled note names the cause (#1125): Over time on a past day ("Log
-  lookups work in Live, not in Over time. Switch to Live to use them."), board
-  telemetry off (`enabled: false`), host telemetry off, or a closed view. On a
-  host without a logs connector, the connector note wins over Over time and
-  board telemetry off. With the Grafana connector, returning to Live
-  re-enables the lookup.
+- The disabled note names the cause (#1125): board telemetry off (`enabled:
+  false`), host telemetry off, a closed view, or an Over time day without a
+  date ("Log lookups need a dated Over time day; this day has none."). On a host
+  without a logs connector, the connector note wins over board telemetry off and
+  an undated day.
 
 The result shape follows grafana/mcp-grafana `tools/loki.go`
 (`QueryLokiLogsResult` with `format` full, read 2026-11-07): `data` is a list of

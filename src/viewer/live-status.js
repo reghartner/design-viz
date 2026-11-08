@@ -924,14 +924,18 @@ function createLiveStatus(ctl,page,options,renderOptions){
   });
   // #1099: find a trace from a Loki log line; the chosen line loads through directTrace.
   var logLookup=createTelemetryLogLookup(page,telemetryOptions && telemetryOptions.directTrace,{
-    identity:function(){return [telemetry.environment(),telemetry.snapshot().historical];},
-    disabled:function(){return retired?'closed':telemetryOptions===false?'host':!trackingTelemetry(page).enabled?'board':telemetry.snapshot().historical?'history':'';},
+    // #1141: a day change clears results. Key on the day and the today flag, never the window (today's end moves).
+    identity:function(){var day=logSearchDay();return [telemetry.environment(),day?[day.key,day.today]:telemetry.snapshot().historical];},
+    disabled:function(){return retired?'closed':telemetryOptions===false?'host':!trackingTelemetry(page).enabled?'board':telemetry.snapshot().historical && !logSearchDay()?'history':'';},
+    day:function(){return logSearchDay();},
     wanted:function(){return statusMode==='trace';},
     config:function(){return telemetry.config();},
     lookback:function(){var form=directTrace.snapshot().form,p=FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS)[form.connection];return {start:form.start,end:form.end,lookback:p?p.time.defaultLookback:''};},
     accountChanged:function(){telemetry.clear();telemetry.setAvailable(false);},
     changed:function(){if(!retired){paint();notify();}}
   });
+  // The selected Over time day for the log search, or null in Live or on a day without a date.
+  function logSearchDay(){var state=over && overTimeState(),day=over && over.days[over.index];return state && state.window?{key:day.key,today:!!state.today,from:state.window.from,to:state.window.to,label:state.window.label,short:day.short || day.label || day.key}:null;}
   function traceSources(){
     var evidence=telemetry.snapshot(),entries=[],owners=Object.create(null),mounted=sourceBindings(),ambiguous=new Set();
     eachDiagram(function(d,source){Object.keys(d.nodes || {}).concat((d.edges || []).map(function(e){return e.from+'->'+e.to;})).forEach(function(id){if(!owners[id])owners[id]=[];if(owners[id].indexOf(d)<0)owners[id].push(d);});});

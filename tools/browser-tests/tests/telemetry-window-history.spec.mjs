@@ -52,7 +52,7 @@ for(const native of [false,true])test((native?'native shadow DOM':'standalone')+
 test('Jira-free board: Over time offers the last 7 local days and shows the selected day\'s metric cards (#1138)',async({page,server})=>{
  const root=await fixture(page,server,false,true),panel=root.locator('.pt-live-status').first(),metrics=panel.getByRole('switch',{name:'Metrics overlay',exact:true}),over=panel.getByRole('button',{name:'Over time',exact:true}),slider=panel.getByRole('slider',{name:'Day',exact:true}),local=root.locator('[data-metrics-card="ingest->app"]').first();
  expect(await page.evaluate(()=>window.historyCtl.liveStatus.snapshot().available)).toBe(false);
- await over.click();await expect(root.locator('.dv-live-over-time-row')).toBeVisible();await expect(slider).toHaveAttribute('max','6');await expect(slider).toHaveValue('6');await expect(root.locator('.dv-live-over-time-day')).toHaveText('TODAY');
+ await expect(over).toBeVisible();await over.click();await expect(root.locator('.dv-live-over-time-row')).toBeVisible();await expect(slider).toHaveAttribute('max','6');await expect(slider).toHaveValue('6');await expect(root.locator('.dv-live-over-time-day')).toHaveText('TODAY');
  expect(await page.evaluate(()=>window.historyCalls.length)).toBe(0);
  await page.evaluate(()=>{window.holdHoney=false;});await metrics.click();await expect(local).toContainText('20 events');await expect(local).toContainText('95 ms');
  await slider.focus();await slider.press('Home');await expect(local).toContainText('9 events');await expect(local).toContainText('75 ms');

@@ -115,10 +115,9 @@ for the complete wrapper example, tool schemas, bounds and selection behavior.
 - `tempo`: explicit TraceQL trace search; one observed request, not an aggregate metric.
 
 All sources apply to local, imported/nested, overlay and detail nodes/edges. Missing tools give an actionable source/tool diagnostic; other supported sources keep working.
+A source the page cannot call must remain unobserved with a one-line source/tool diagnostic.
 
 ### CloudWatch window totals
-
-A source the page cannot call must remain unobserved with a one-line source/tool diagnostic.
 
 CloudWatch accepts `Sum`, `Maximum`, `Minimum`, `Average` and `SampleCount`. Use the Grafana datasource
 UID at `tracking.telemetry.grafana.cloudwatch`; shared

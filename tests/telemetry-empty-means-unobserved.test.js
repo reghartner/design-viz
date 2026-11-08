@@ -51,9 +51,19 @@ test('2. Loki empty with missingMeansZero false is unobserved with a note (Live 
  assert.match(h.api.status().note,/logs: no numeric observation/);
  const past=await overTime(h);for(const id of IDS)assert.equal(past.map[id]?.signals.logs,undefined,'Over time '+id);
  assert.match(past.note,/logs: no numeric observation/);
- // A failed Loki query is never zero, with or without the field.
- const failed=await setup(false,answerWith({loki:{status:'error',error:'boom'},prom:FULL.prom}));t.after(()=>failed.close());
- for(const id of IDS)assert.equal(plain(failed.api.snapshot().map)[id]?.signals.logs,undefined);assert.match(failed.api.status().note,/failed/);
+});
+
+test('a failed Loki or Prometheus query is never zero, with or without missingMeansZero (Live and an Over time day)',async t=>{
+ const ERROR={status:'error',errorType:'bad_data',error:'boom',data:{resultType:'matrix',result:[]}};
+ for(const opt of [undefined,false]){
+  const h=await setup(opt,answerWith({loki:ERROR,prom:ERROR}));t.after(()=>h.close());
+  const live=plain(h.api.snapshot().map);
+  for(const id of IDS){assert.equal(live[id]?.signals.logs,undefined,'Live Loki '+id+' opt '+opt);assert.equal(live[id]?.signals.rate,undefined,'Live Prometheus '+id+' opt '+opt);}
+  assert.match(h.api.status().note,/8 Grafana queries failed/,'both signals fail on all four carriers');
+  const past=await overTime(h);
+  for(const id of IDS){assert.equal(past.map[id]?.signals.logs,undefined,'Over time Loki '+id);assert.equal(past.map[id]?.signals.rate,undefined,'Over time Prometheus '+id);}
+  assert.match(past.note,/failed/);
+ }
 });
 
 test('3. Prometheus empty with missingMeansZero false is unobserved; without it Live reads 0 and an Over time day stays unobserved',async t=>{

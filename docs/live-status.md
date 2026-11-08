@@ -1064,7 +1064,7 @@ available. CloudWatch, Logs and SQL may use authored links. Link generation
 failure never invalidates numeric evidence. Preview invents no provider URLs.
 Workbench Metrics exposes each signal's **label**, **show on card** and **query link** controls;
 source edits and Undo/Redo preserve all three. `loki` and `grafana` signals also show
-**empty means zero** (`missingMeansZero`); unchecked writes `false`, and a change to another source drops it.
+**empty count reads 0 (Live)** (`missingMeansZero`); unchecking writes `false`, checking removes the key, and a change to another source drops it.
 
 `telemetry.card.side` selects `right`, `left`, `above` or `below`; `offset` moves
 along that side in SVG units. Defaults are right of a vertical route and below a
@@ -1597,7 +1597,8 @@ day. `missingMeansZero: false` makes a successful empty result unobserved, with
 "<carrier> <signal>: no numeric observation" in the Metrics text, in Live and in
 Over time. Use it for logs that exist only in some environments, such as debug
 logs written only in test, so a missing log stream does not read as 0. A
-non-empty result is unchanged, and a failed query never becomes 0. Validation
+non-empty result is unchanged, and a failed query never becomes 0: a Prometheus or
+Loki result with a non-success `status` or an `error` is a failed query. Validation
 warns at `signals.<name>.missingMeansZero` and ignores the field when it is not
 a boolean, or when the signal is `tempo`, `sql`, `honeycomb`, `cloudwatch` (whose
 `missingMeansZero` goes inside the `cloudwatch` query) or `cloudwatchLogs`.

@@ -586,7 +586,7 @@ function createTelemetryGrafana(page,win,now,bound){
               if(points.length)entry.points=points;
               else if(telemetryLokiEmpty(payload) && entry.missingMeansZero!==false && telemetryLokiCountingQuery(entry.query))entry.value=0;
               else notices.push(label+': no numeric observation');
-            }else {var promPoints=telemetryGrafanaPrometheus(payload);if(promPoints.length || !windowRange && entry.missingMeansZero!==false)entry.points=promPoints;else notices.push(label+': no numeric observation'+(windowRange?' in this window':''));}
+            }else {if(payload && payload.status && payload.status!=='success' || payload && payload.error)throw {code:'tool_error',message:'Prometheus query failed'};var promPoints=telemetryGrafanaPrometheus(payload);if(promPoints.length || !windowRange && entry.missingMeansZero!==false)entry.points=promPoints;else notices.push(label+': no numeric observation'+(windowRange?' in this window':''));}
             var url=telemetryGrafanaUrl(result && result.payload && result.payload.exploreUrl);if(url)entry.exploreUrl=url;
           }).catch(caught(rank,label,{tool:tool,input:query},entry)).finally(function(){settled(job,entry);});});
         });});

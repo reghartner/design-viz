@@ -2119,6 +2119,19 @@ count: `16.1 ms across 2 spans`. A board that keeps one step per transport reads
 `2 operations · 1 unknown · 16.1 ms` (the other transport's step is missing); make them one
 step with alternatives.
 
+A step that may be absent from a trace (for example, its operation runs in a different
+trace) can carry `traceMatch.optional: true`; with alternatives, set it on every
+alternative ([canon rules](canon.md#reference-traces-and-incident-alternates)). When an optional step has no
+match in the loaded trace, the label is built from the other rows as if that row were not
+there: a node named by one matched step and one missing optional step reads
+`Matched: … · 16.1 ms`, or only the time for a single selector. The title lists it as
+*optional, not in this trace: service operation*, it never makes the node unknown, and a
+node whose only row is a missing optional step gets no label. The coverage line leaves it
+out and adds the count: `1/3 steps matched · 1 optional not in this trace · 0 spans
+unmatched`. Edge labels carry matched rows only, so a missing step never adds to them. A
+matched optional step reads like any matched step; an ambiguous one still counts as
+ambiguous. Local, imported and drill-down steps follow the same rules.
+
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
 deduplicated in-memory Jira Activity entry, without posting externally. Trace
 selection uses the existing cached provider API; rendering and stepping never

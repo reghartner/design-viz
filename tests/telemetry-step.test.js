@@ -174,7 +174,7 @@ test('a node named by a matched step and an optional step missing from the trace
   assert.equal(labels.edge(0).text,'Matched: stats-consumer persistent://stats/camer… · 16.1 ms','the edge follows the same rules');
   assert.equal(labels.tone(node),'observed','the optional step does not make the node unknown');
   // The company case with a single traceMatch object: the time alone.
-  d=board();d.steps[0].traceMatch=d.steps[0].traceMatch[1];
+  d=board();d.steps[0].traceMatch=d.steps[0].traceMatch[0];
   assert.equal(paintTraceLabels(d,pulsar()).node(node).text,'16.1 ms');
   // Without optional the missing step still counts.
   d=board();delete d.steps[1].traceMatch.optional;

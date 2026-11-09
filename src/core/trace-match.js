@@ -27,6 +27,9 @@ function mapTrace(d,trace,pathId){
     const rank=r=>r.status==='ambiguous'?2:offPath.has(r)?0:1;
     if(Array.isArray(m))m.some((alternative,i)=>{const r=attempt(step,alternative || {},true);r.alternative=i;if(r.status==='matched' || !result || rank(r)>rank(result) || rank(r)===rank(result) && rank(r)<2)result=r;return r.status==='matched';});
     else result=attempt(step,m);
+    // #1175: an optional step (optional:true on its selector, or on every alternative) may be
+    // absent from a trace. Missing, it is not unknown; matched or ambiguous, it is unchanged.
+    if(result.status==='missing' && [].concat(m).every(a=>a && a.optional===true))Object.assign(result,{detail:'Optional, not in this trace.'+(result.detail?' '+result.detail:''),conditions:[],optional:true});
     visiting.delete(step.id);results.set(step.id,result);return result;
   }
   function attempt(step,m,alternative){

@@ -85,7 +85,7 @@ export function compareTrace(spec,raw,{section=0,label='Incident trace'}={}){
     if(existing.has(id))throw new Error('Incident step ID collision.');
     // No copied success patches beyond the fork: a server span cannot prove a
     // notification appeared, a door opened, or a physical device started recording.
-    const step={id,text:(evidence.status==='unmapped'?'Uninstrumented step · outcome unknown':evidence.conditions.length?evidence.conditions.map(c=>c.label).join('; '):'Observed '+selector.serviceName+' · '+selector.operation),
+    const step={id,text:(evidence.status==='unmapped'?'Uninstrumented step · outcome unknown':evidence.optional?'Optional, not in this trace: '+selector.serviceName+' · '+selector.operation:evidence.conditions.length?evidence.conditions.map(c=>c.label).join('; '):'Observed '+selector.serviceName+' · '+selector.operation),
       conditions:C.clone(evidence.conditions),nodes:evidence.nodeId?[evidence.nodeId]:[],
       codeRefs:C.clone(originalStep.codeRefs || []),evidence:{traceId:trace.traceId,spanIds:evidence.spans.map(s=>s.id),canonicalStepId:originalStep.id,status:evidence.status}};
     if(trace.sourceUrl)step.link=trace.sourceUrl;

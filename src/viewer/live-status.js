@@ -968,8 +968,16 @@ function createLiveStatus(ctl,page,options,renderOptions){
     openOver(true);
   }
   // Every view change ends the last note; one that leaves the trace's day clears the trace and says so.
+  // Never "Trace selection expired" for a day change (round 3): example traces are Live-only (D7), so
+  // Over time retires one the reader chose with the plain note, and one shown automatically quietly.
   function traceViewChanged(){
-    traceDayNote='';var e=directTrace.snapshot().exemplar,d=traceDayOf(e),view=viewDay();if(!d || d.key===view.key)return;
+    traceDayNote='';traceNotice='';var view=viewDay();
+    if(over && traceSelection && traceSelection.key.indexOf('direct/')!==0){
+      var shown=traceSources().entries.find(function(entry){return entry.key===traceSelection.key;}),day=shown && traceDayOf(shown.exemplar);
+      if(traceSelection.chosen && day)traceNotice='Cleared trace '+traceSelection.traceId.slice(0,12)+' ('+day.label+'): the view moved to '+view.label+'.';
+      clearTraceFocus();traceSelection=null;tracePending=null;traceInitial=true;
+    }
+    var e=directTrace.snapshot().exemplar,d=traceDayOf(e);if(!d || d.key===view.key)return;
     traceDayNote='Cleared trace '+e.traceId.slice(0,12)+' ('+d.label+'): the view moved to '+view.label+'.';
     clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();
   }
@@ -1144,7 +1152,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     Promise.resolve().then(function(){return overSource.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result);},function(){overLoad(request,null);});
     return true;
   }
-  function overShow(){traceViewChanged();map=liveStatusDayMap(over.today,over.days[over.index].states);changedKeys=[];telemetry.historyDay(over.index);paint();notify();telemetryHooks.jiraChanged();}
+  function overShow(){map=liveStatusDayMap(over.today,over.days[over.index].states);changedKeys=[];telemetry.historyDay(over.index);paint();notify();telemetryHooks.jiraChanged();}
   // Returning to Live restores the live map, then applies any evidence that arrived meanwhile as a normal refresh.
   function overClose(){
     var left=over;over=null;traceViewChanged();map=left.live;changedKeys=[];telemetry.closeHistory();
@@ -1182,7 +1190,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var byTrace=!!(overTarget && overTarget.request===request),target=byTrace?traceDayOf(directTrace.snapshot().exemplar):null;overTarget=null;
     if(byTrace && (!target || target.key===localDayKey(Date.now()))){notify();return;}
     if(target){index=days.findIndex(function(day){return day.key===target.key;});if(index<0){traceDayNote=outsideNote(target);notify();return;}}
-    var show=function(){over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null};on=true;availabilityOn=true;telemetry.openHistory(days,index);overShow();};
+    var show=function(){over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null};on=true;availabilityOn=true;traceViewChanged();telemetry.openHistory(days,index);overShow();};
     if(target)traceMoved(show);else show();
   }
   // Authored carrier occurrences, independent of distinct Jira ticket totals.
@@ -1874,7 +1882,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     setStatusMode:function(mode){if(retired || ['jira','trace'].indexOf(mode)<0)return;if(mode!==statusMode)clearTraceFocus();statusMode=mode;statusAuto=false;close(false);paint();notify();},
     setDirectTraceField:function(change){if(!retired && change){traceDayNote='';traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';directTrace.set(change.field,change.value);}},
     loadDirectTrace:async function(verify,line){if(retired)return;statusAuto=false;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';traceDayNote='';var result=await directTrace.load(!!verify,line);if(result){traceSelection=null;traceInitial=true;if(!retired)traceFollow(result);}paint();notify();return result;},
-    clearDirectTrace:function(){if(retired)return;traceDayNote='';clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();},
+    clearDirectTrace:function(){if(retired)return;traceDayNote='';traceNotice='';clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();},
     setLogLookupField:function(change){if(!retired && change)logLookup.set(change.field,change.value);},
     findLogLines:function(){return retired?Promise.resolve(null):logLookup.find();},
     // Load the chosen line's trace exactly as a pasted ID, then focus the line's span.
@@ -1893,10 +1901,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(retired || statusMode!=='trace')return;statusAuto=false;
       var entry=traceSources().entries.find(function(e){return e.key===choice.key;});if(!entry)return;
       var request=++traceRequest;clearTraceFocus();tracePending=null;traceInitial=false;traceNotice='';
-      if(choice.traceId===entry.exemplar.traceId){traceSelection={key:entry.key,traceId:choice.traceId};paint();notify();return;}
+      if(choice.traceId===entry.exemplar.traceId){traceSelection={key:entry.key,traceId:choice.traceId,chosen:true};paint();notify();return;}
       if(!telemetry.canChooseExemplar(entry.carrier,entry.exemplar.selectionToken,choice.traceId))return;
       tracePending={request:request,key:entry.key,traceId:choice.traceId};traceNotice='Loading selected trace…';notify();
-      try{await telemetry.chooseExemplar(entry.carrier,entry.exemplar.selectionToken,choice.traceId);if(retired || request!==traceRequest)return;traceSelection={key:entry.key,traceId:choice.traceId};traceNotice='';}
+      try{await telemetry.chooseExemplar(entry.carrier,entry.exemplar.selectionToken,choice.traceId);if(retired || request!==traceRequest)return;traceSelection={key:entry.key,traceId:choice.traceId,chosen:true};traceNotice='';}
       catch(ex){if(retired || request!==traceRequest)return;traceNotice=ex.message;}
       tracePending=null;paint();notify();
     },
@@ -1971,7 +1979,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     overTimeDay:function(index){
       if(retired || !over || typeof index!=='number' || !isFinite(index) || Math.floor(index)!==index)return;
       index=Math.max(0,Math.min(over.days.length-1,index));if(index===over.index)return;
-      over.index=index;if(overSource.day)overSource.day(index);overShow();
+      over.index=index;traceViewChanged();if(overSource.day)overSource.day(index);overShow();
     },
     clear:function(){if(retired)return;overRequest++;overLoading=false;overError='';if(over){over=null;traceViewChanged();telemetry.closeHistory();if(overSource.close)overSource.close();}availabilityOn=false;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();telemetryHooks.jiraChanged();},
     enabled:function(){return on;},

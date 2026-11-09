@@ -385,6 +385,7 @@ function showMsgs(v){
   }
   v.errors.forEach(function(m){ add('e', 'ERROR ', m); });
   v.warnings.forEach(function(m){ add('w', 'warn ', m); });
+  (v.notes || []).forEach(function(m){ add('n', 'note ', m); });
 }
 
 function go(fromText,request){

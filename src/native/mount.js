@@ -50,7 +50,7 @@ function mountNativeSpec(environment, spec, options){
   });
   protectLinks();
   return {
-    root:environment.root, controller:controller, warnings:findings.warnings,
+    root:environment.root, controller:controller, warnings:findings.warnings, notes:findings.notes || [],
     resources:environment.resources,
     snapshot:snapshot,
     setCanvas:function(on){

@@ -965,6 +965,7 @@ section.doc-sec>.dv-inserttarget-tag{position:absolute; top:-10px; left:10px;
 .msgs li:hover{text-decoration:underline;}
 .msgs li.e{color:#C0392B;}
 .msgs li.w{color:#B0771A;}
+.msgs li.n{color:var(--sub);}
 /* contract & schema */
 .schema{margin-top:46px; border:1px solid var(--line); border-radius:14px; background:var(--card); padding:20px 24px;}
 .schema table{border-collapse:collapse; width:100%; margin-top:12px;}

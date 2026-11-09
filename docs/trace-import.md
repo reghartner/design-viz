@@ -130,11 +130,8 @@ is no longer offered, #1216).
 Row position represents dependency order. Slots within each row render left to
 right. Position does not represent timestamp order or duration.
 
-Optional lane routing spreads attachment ports, reserves horizontal tracks between
-rows, and chooses vertical channels that clear every card. Tracks expand the
-row gaps when needed. Routes prefer shorter paths with fewer crossings and
-coincident segments; a background break separates remaining crossings.
-Dense or non-planar graphs can still cross. Numbered coins and authored edge
+An older trace board with `routing: "lanes"` still draws its lane routes.
+Dense or non-planar graphs can cross. Numbered coins and authored edge
 labels can still crowd a dense view. Step selection highlights the relevant
 relationship; the complete graph remains available for context.
 

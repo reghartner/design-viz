@@ -940,8 +940,8 @@ Directed arrows between placed nodes:
   edges and row positions retain their normal behavior. Ports fix endpoints,
   not a collision-free route: use `bend` and label offsets for crowded paths.
 - `kind` — the **protocol** of the hop (see "Edge kinds"). Default `int`.
-- `ret` — `true` marks an evidenced response/ack, drawn as a fine dash in the
-  protocol's color; or name the reply in the step text.
+- `ret` — `true` marks an evidenced response/ack back along the request, drawn
+  as a fine dash in the protocol's color (or put that reply in the step text).
 - `label` — optional short text on the edge. Protocol verbs and topics read
   best: `POST /commands`, `PUBLISH cmd/site-4/pump-7`, `verify JWT`. Keep
   under ~28 characters.
@@ -2662,7 +2662,7 @@ contract stays the authority; a recipe shows the working subset for one task.
                      "panels": {"ord": {"state": "PERSISTED"}}},
                     {"edge": "db->bus", "text": "Created event published",
                      "panels": {"lag": {"value": 1}}},
-                    {"edges": ["bus->pick", "bus->invoice"], "text": "Fan-out to fulfillment workers; Picking acks the message",
+                    {"edges": ["bus->pick", "bus->invoice"], "text": "Fan-out to fulfillment workers",
                      "panels": {"ord": {"state": "FANNED_OUT"}, "lag": {"value": 0}}}
                   ]
                 }

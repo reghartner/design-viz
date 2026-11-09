@@ -64,7 +64,7 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
    route (a home router, bridge or gateway), every fan-out branch, an
    app read's request and its reply. Put all of them in that step's `edges`,
    even if lit before. Add a response edge ("200", "202", ack) only when the
-   source or code shows that response; else name it in the caption. Put `blocked`/`dropped` on the link
+   source or code shows that response (or name that reply in the caption). Put `blocked`/`dropped` on the link
    that actually failed (with a router drawn, a Wi-Fi failure is the
    device→router hop). If a hop should not be lit, remove it from the caption.
 7. **Icons follow state.** Values never switch icons automatically. When a

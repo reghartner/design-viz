@@ -52,7 +52,7 @@ show: its nodes and the edges between them. Syntax: `docs/shared-topology.md`.
 
 ## Presentation defaults
 
-- A landing tab (the first tab a reader sees inside a diagram) is a diagram of
+- A landing tab (the first tab a reader sees inside one diagram) is a diagram of
   the systems and teams in the story, not a block of text. Gap lists and meeting notes belong in the ledger
   or the team's document system.
 - Target desktop and the intended Backstage/Confluence content widths. Test

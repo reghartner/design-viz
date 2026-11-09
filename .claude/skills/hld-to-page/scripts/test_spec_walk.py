@@ -133,8 +133,9 @@ class WalkTest(unittest.TestCase):
         w = self.walk(spec)
         hits = [c for c in w.checks if "svc->cam" in c]
         self.assertEqual(len(hits), 1, w.out)
-        self.assertIn("keep it only if the source or code shows this response", hits[0])
-        self.assertIn("otherwise name the reply in the step text (or a calls panel)", hits[0])
+        self.assertIn("keep it only if the source or code shows this response (a shown reply can go in "
+                      "the step text or a calls panel instead of a second arrow)", hits[0])
+        self.assertNotIn("otherwise", hits[0])
         # A plain request edge with an ack-like label is not a response edge.
         spec["page"]["blocks"][0]["diagram"]["edges"][1].pop("ret")
         w = self.walk(spec)

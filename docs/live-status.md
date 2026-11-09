@@ -1606,10 +1606,10 @@ qualifying connector named **Grafana**. Missing required query tools appear as a
 visible diagnostic. `generate_deeplink` and `get_annotations` are optional;
 declare these extras only when offered and needed. The generated declaration is
 a minimum; preserve previously verified offered optional tools when
-republishing. The trace adapter requires its search/detail pair, so a page with
-a `tempo` signal also declares `search_tempo_traces` and `get_tempo_trace` on
-Grafana, and a Honeycomb example-trace wrapper (`query_spec`) adds `get_trace`
-after `run_query` (#1139).
+republishing. The trace adapter searches only each carrier's first trace signal,
+with its search/detail pair. When that signal is `tempo`, the page also declares
+`search_tempo_traces` and `get_tempo_trace` on Grafana; when it is a Honeycomb
+example-trace wrapper (`query_spec`), `get_trace` follows `run_query` (#1139).
 Discovery uses `claude.use('mcp')` and `listTools()` metadata, without data calls
 or permission prompts. Page/host disable suppresses discovery. Late results after
 retirement are dropped; each refresh rechecks required tools.

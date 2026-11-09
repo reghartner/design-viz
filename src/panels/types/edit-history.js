@@ -20,7 +20,9 @@
   function maps(change){return change.op==='trace-match';}
   function spanText(change){var m=change.traceMatch || {};return m.serviceName+' · '+m.operation;}
   function opText(change){return clears(change)?'Missing work cleared from':maps(change)?'mapped to step':change.op==='remove'?'removed from':'added to';}
-  function changeText(change){return (clears(change)?'':maps(change)?spanText(change)+' ':change.ticket+' ')+opText(change)+' '+carrierLabel(change);}
+  // #1180: a mapping that replaced a traceMatch names it.
+  function replacedText(change){var r=maps(change) && change.replaces;return r && typeof r==='object'?' (replaced '+r.serviceName+' · '+r.operation+')':'';}
+  function changeText(change){return (clears(change)?'':maps(change)?spanText(change)+' ':change.ticket+' ')+opText(change)+' '+carrierLabel(change)+replacedText(change);}
   function countText(n){return n+' '+(n===1?'change':'changes');}
   /* #974: an agent entry reads editor · agent · time · its one-line summary; a summary
      replaces the count and the first change. Rows without ticket changes do not expand. */
@@ -47,7 +49,7 @@
       return '<li class="dv-edit-entry" data-edit-at="'+esc(entry.at)+'"><details class="dv-edit-details"><summary class="dv-edit-summary">'+head+'</summary>'+
         '<ul class="dv-edit-changes">'+entry.changes.map(function(change){
           return '<li class="dv-edit-change" data-edit-op="'+esc(change.op)+'"'+(clears(change)?'>':maps(change)?'><span class="dv-edit-span">'+esc(spanText(change))+'</span>':' data-edit-ticket="'+esc(change.ticket)+'"><span class="dv-edit-ticket">'+esc(change.ticket)+'</span>')+
-            '<span class="dv-edit-op">'+esc(opText(change))+'</span><span class="dv-edit-carrier">'+esc(carrierLabel(change))+'</span></li>';
+            '<span class="dv-edit-op">'+esc(opText(change))+'</span><span class="dv-edit-carrier">'+esc(carrierLabel(change))+'</span>'+(replacedText(change)?'<span class="dv-edit-replaced">'+esc(replacedText(change))+'</span>':'')+'</li>';
         }).join('')+'</ul></details></li>';
     }).join('')+'</ol>';
   }
@@ -85,6 +87,7 @@
           }
           el(row,'span','dv-edit-op',opText(change));
           el(row,'span','dv-edit-carrier',carrierLabel(change));
+          if(replacedText(change))el(row,'span','dv-edit-replaced',replacedText(change));
         });
       });
       resolveNames(entries);

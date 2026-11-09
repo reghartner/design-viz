@@ -324,6 +324,23 @@
       directTraceBody(body,trace.direct,shownTrace);
       var message=trace.direct && trace.direct.profiles.length?(!trace.hasMappings?'Diagram mapping is not configured. Loaded traces still show a waterfall.':''):!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Turn on Metrics overlay to refresh explicit bindings.':'Turn on Metrics overlay to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
       var status=el(body,'p','status','dv-trace-mode-status',[message,trace.hasMappings?trace.status.note:'',trace.hasMappings?trace.notice:''].filter(Boolean).join(' '));status.setAttribute('role','status');
+      // #1177: the latest span mapping with its Undo, and the step chooser of a drop on a carrier with several steps.
+      if(trace.mapped){var note=el(body,'div','map-note','dv-trace-map-note');note.setAttribute('role','status');
+        el(note,'span','text','dv-trace-map-note-text','Mapped '+trace.mapped.traceMatch.serviceName+' · '+trace.mapped.traceMatch.operation+' to step '+trace.mapped.label+(trace.mapped.unmatched?'; this step\'s parent, attributes, namespace or occurrence do not match this span, so nothing lights.':'.'));
+        button(note,'undo','reader-button dv-trace-map-undo','Undo','undoTraceMap');}
+      if(trace.mapChooser){
+        var mc=trace.mapChooser,chooser=el(body,'div','map-chooser','dv-trace-map-chooser');chooser.setAttribute('role','group');chooser.setAttribute('aria-label','Choose the step for '+mc.label);
+        el(chooser,'p','prompt','dv-trace-map-prompt',mc.steps.length?'Map '+mc.span+' to which step of '+mc.label+'?':'No step names '+mc.label+'. Drop '+mc.span+' on a step instead.');
+        // Focus goes back to the dragged span row (else the panel) after a pick, Cancel or Esc (#1180).
+        var back=function(){var row=host.querySelector('.dv-trace-span[data-span-id="'+mc.spanId+'"]');if(row && row.focus)row.focus({preventScroll:true});else if(host.focus)host.focus({preventScroll:true});};
+        mc.steps.forEach(function(step){var choice=button(chooser,'step-'+step.id,'reader-button dv-trace-map-choice',step.label,'chooseTraceMapStep');choice._liveArgument={stepId:step.id};choice.disabled=!!step.disabled;choice._mapBack=back;});
+        var cancel=button(chooser,'cancel','reader-button dv-trace-map-cancel','Cancel','cancelTraceMapChooser');cancel._mapBack=back;
+        chooser._mapBack=back;
+        if(!chooser._mapKey){chooser._mapKey=function(ev){if(ev.key!=='Escape')return;ev.preventDefault();ev.stopPropagation();var owner=host._livePanelApi;if(owner)owner.cancelTraceMapChooser();if(chooser._mapBack)chooser._mapBack();};chooser.addEventListener('keydown',chooser._mapKey);}
+        chooser.querySelectorAll('button').forEach(function(item){if(!item._mapReturn){item._mapReturn=function(){if(item._mapBack)setTimeout(item._mapBack,0);};item.addEventListener('click',item._mapReturn);}});
+        // Each drop moves focus to the chooser, also when it is already open.
+        if(chooser._mapDrop!==mc.drop){chooser._mapDrop=mc.drop;var first=chooser.querySelector('button.dv-trace-map-choice:not([disabled])') || chooser.querySelector('button');if(first && first.focus)first.focus({preventScroll:true});}
+      }
       function returnedTraces(parent){
         el(parent,'h3','candidates-title','','Returned traces');
         var list;
@@ -376,15 +393,18 @@
         if(!focus.choice && !focus.choices.length)link(operation,'map-guide','How to map a span','https://github.com/reghartner/design-viz/blob/main/docs/trace-ready-authoring.md').classList.add('dv-trace-map-guide');
         // #1078: Edit mode only. The chosen step gets traceMatch {serviceName, operation} with this span's exact values.
         // A span without a service or operation name has nothing exact to write.
-        var mapSteps=focusedSpan.service && focusedSpan.name?model.mapSteps:null;
+        // #1177: the dropdown lists steps without a traceMatch, preselects none, and the button names the chosen step.
+        var mapSteps=focusedSpan.service && focusedSpan.name && model.mapSteps?model.mapSteps.filter(function(step){return !step.mapped;}):null;
         if(!focus.choice && !focus.choices.length && mapSteps){
           var mapper=el(operation,'div','map','dv-trace-map-step');mapper.setAttribute('role','group');mapper.setAttribute('aria-label','Map this span to a step');
           if(mapSteps.length){
             var pick=el(mapper,'select','step','reader-button tbtn dv-trace-map-select');pick.setAttribute('aria-label','Step to map');
-            mapSteps.forEach(function(step){el(pick,'option',step.id,'',step.label).value=step.id;});
-            if(!mapSteps.some(function(step){return step.id===pick.value;}))pick.value=mapSteps[0].id;
-            var apply=button(mapper,'apply','reader-button dv-trace-map-apply','Map this span to a step','mapTraceSpan');apply._liveArgument={context:selected.context,spanId:focusedSpan.id,stepId:pick.value};pick._mapApply=apply;
-            if(!pick._mapChange){pick._mapChange=function(){if(pick._mapApply && pick._mapApply._liveArgument)pick._mapApply._liveArgument.stepId=pick.value;};pick.addEventListener('change',pick._mapChange);}
+            el(pick,'option','','','Choose a step…').value='';mapSteps.forEach(function(step){el(pick,'option',step.id,'',step.label).value=step.id;});
+            if(!mapSteps.some(function(step){return step.id===pick.value;}))pick.value='';
+            var apply=button(mapper,'apply','reader-button dv-trace-map-apply','Map to step','mapTraceSpan');pick._mapApply=apply;pick._mapSteps=mapSteps;
+            pick._mapShow=function(){var chosen=pick._mapSteps.find(function(step){return step.id===pick.value;});pick._mapApply.textContent=chosen?'Map to step: '+chosen.caption:'Map to step';pick._mapApply.disabled=!chosen;if(pick._mapApply._liveArgument)pick._mapApply._liveArgument.stepId=pick.value;};
+            apply._liveArgument={context:selected.context,spanId:focusedSpan.id,stepId:pick.value};pick._mapShow();
+            if(!pick._mapChange){pick._mapChange=function(){if(pick._mapShow)pick._mapShow();};pick.addEventListener('change',pick._mapChange);}
           }else el(mapper,'p','none','dv-trace-map-none','Every step of this diagram already has a traceMatch.');
         }
         if(!focus.choice && focus.choices.length){
@@ -394,8 +414,12 @@
       }
       var waterfall=el(detail,'div','waterfall','dv-trace-waterfall');waterfall.setAttribute('aria-label','Selected trace waterfall');
       var extent=Math.max.apply(null,e.spans.map(function(s){return s.startMs+s.ms;}).concat([1]));
+      // #1177: in Edit mode a span row drags onto a step, a node or an edge to map it.
+      var dragSpans=!!(value.edit && value.edit.active && model.mapSteps);
       e.spans.forEach(function(span){
-        var row=el(waterfall,'button',span.id,'dv-trace-span');row.type='button';row.setAttribute('data-error',String(span.error));row.setAttribute('aria-pressed',String(!!focusedSpan && span.id===focusedSpan.id));row._traceSpan={context:selected.context,spanId:span.id};row.setAttribute('data-span-id',span.id);
+        var row=el(waterfall,'button',span.id,'dv-trace-span'+(dragSpans && span.service && span.name?' dv-live-draggable':''));row.type='button';
+        if(dragSpans && span.service && span.name)row.setAttribute('draggable','true');else row.removeAttribute('draggable');
+        if(!row._spanDrag){row._spanDrag=function(ev){if(row.getAttribute('draggable')!=='true' || !ev.dataTransfer || !row._traceSpan)return;ev.dataTransfer.setData('application/x-flowview-span',JSON.stringify(row._traceSpan));ev.dataTransfer.setData('text/plain',row._traceSpan.spanId);ev.dataTransfer.effectAllowed='copy';};row.addEventListener('dragstart',row._spanDrag);}row.setAttribute('data-error',String(span.error));row.setAttribute('aria-pressed',String(!!focusedSpan && span.id===focusedSpan.id));row._traceSpan={context:selected.context,spanId:span.id};row.setAttribute('data-span-id',span.id);
         if(!row._traceClick){row._traceClick=function(){var owner=host._livePanelApi;if(owner && row.isConnected)owner.selectTraceSpan(row._traceSpan);};row.addEventListener('click',row._traceClick);}
         el(row,'span','name','dv-trace-span-name',span.service+' · '+span.name).title=span.id;
         var track=el(row,'span','track','dv-trace-track'),bar=el(track,'i','bar','dv-trace-bar');bar.style.marginLeft=100*span.startMs/extent+'%';bar.style.width=Math.max(.4,100*span.ms/extent)+'%';

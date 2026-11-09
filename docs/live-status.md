@@ -1795,7 +1795,7 @@ mode:
 - **Map a span to a step** (#1078): Edit, Save, Discard and Done also show in the
   Trace view. With a loaded trace, a focused span that no step maps offers **Map
   this span to a step**: pick one of the diagram's steps that has no `traceMatch`
-  yet, and that step gets `traceMatch: {"serviceName": …, "operation": …}` with the
+  yet (a drag or the chooser can also replace one, #1177), and that step gets `traceMatch: {"serviceName": …, "operation": …}` with the
   span's exact service and operation. Steps are page-local, so the step itself is
   written even when it draws on an imported node or edge. The board re-renders
   with the loaded trace and the focused span kept, and the span then maps to the
@@ -2033,9 +2033,13 @@ records a Missing work marker cleared in Edit mode (#855): it carries only the
 carrier (and the optional `path` and `label`), never a `ticket`. A `"trace-match"`
 change records a span mapped to a step in Edit mode (#1078): it carries `step` (the
 step id) and `traceMatch` (`serviceName` and `operation` strings), the optional
-`path` and `label` (the step text), and no `ticket`, `node` or `edge`; the panel
+`path` and `label` (the step text), `replaces` (the `serviceName` and `operation` it
+replaced, #1180) when it replaced a mapping, and no `ticket`, `node` or `edge`; the panel
 reads it as "payment · grpc.msdemo.PaymentService/Charge mapped to step Charge the
-card". Optional: `by` (`id` and `name`
+card", with "(replaced <service> · <operation>)" after a replacement. `board-sync pull`
+sets a step's newest board mapping where the local step still equals the `replaces` of
+its oldest fresh mapping (no `traceMatch` when that one was a first mapping), keeps a
+local step that already names the newest span, and asks on anything else. Optional: `by` (`id` and `name`
 strings, either may be empty), each change's `path` (array) and `label` (the
 carrier's display name at save time, so history stays readable after a rename).
 Validation follows the warning-only policy of the other tracking fields: a
@@ -3010,6 +3014,8 @@ clearing still address the original carrier; descendant work is edited at its so
 Status → Trace can load one exact trace ID or a supported provider link using an inherited company or board [trace connection profile](trace-connections.md). Load/Verify are read-only session actions independent of Metrics polling. Imported and local nodes share authored traceMatch mapping behavior; choose the exact mapping diagram when several are available.
 
 Selecting a span in the loaded trace shows its exact **Service** and **Operation** (#1078), the strings a step's `traceMatch.serviceName` and `traceMatch.operation` must match; copy them from there. A span that no step maps says "No authored step maps this span. Add a traceMatch to a step to map this span." and links to [Make an existing diagram Trace-ready](trace-ready-authoring.md). On a shared board in Edit mode, that span also offers **Map this span to a step**, which writes the two values to a step that has no `traceMatch` yet ([Edit mode](#edit-mode-on-the-shared-board-828)); add `nodeId`, `parentStepId` or `attributes` in the Workbench when one span name is not enough.
+
+**Map a span by drag, chooser or dropdown (#1177).** In Edit mode (desktop) a span row in the waterfall drags onto a step (its step button or coin), which maps that step, or onto a node or edge. A carrier named by exactly one step that has no `traceMatch` maps that step; otherwise a chooser lists the carrier's steps, marking those already mapped ("mapped, replaces"), and the reader picks one or presses Esc. Drop targets highlight during the drag. The **Step to map** dropdown preselects nothing, lists only steps without a `traceMatch`, and its button reads "Map to step: <step>". Mapping a step that already has a single `traceMatch` replaces its `serviceName` and `operation` and keeps its other fields (`nodeId`, `parentStepId`, `attributes`, `maxDurationMs`, `optional`), without a confirm; Undo covers it, and the change records the replaced pair as `replaces` (#1180). A step whose `traceMatch` is an alternatives array is shown disabled ("has alternatives; edit in Inspect"). Only the trace's own section takes a drop. The chooser names the dragged span; Esc or Cancel returns focus to the span row. After every mapping the panel says "Mapped <service> · <operation> to step <step>." with **Undo**, which takes back the latest pending mapping (one click each, newest first) until the next Save. Each mapping is one `trace-match` change on Save; an undone one leaves none. The re-render after a mapping, or any other Edit-mode change, keeps the loaded trace and the picked example trace (the pick stays selected), the selected span and its focus, and returns focus to the dragged span row. When live evidence for the picked carrier arrives with the same trace it takes over the pick; with another trace (a fresh default) it is listed beside the pick, marked "(your pick)", until the reader selects something else. A step button whose `traceMatch` is an alternatives array takes no drop and says "Has alternatives; edit in Inspect". When the mapped step keeps a `parentStepId`, `attributes`, `namespace` or `occurrence` that leaves the span missing, the note says nothing lights (`nodeId` only picks the node to annotate).
 
 ### A loaded trace sets the day
 

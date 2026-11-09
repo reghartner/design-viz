@@ -33,12 +33,28 @@ test('#1201 an error signal over its limit turns the card red, outranking every 
 test('#1201 the popup verdict says the error signal is over its limit, and Proof gains a red error chip',()=>{
  const {carrier,verdicts}=judge('error',{signals:{rate:{value:100},dlq:{value:4}}},'done'),sample={signals:{rate:{value:100},dlq:{value:4}}};
  const proof=C.liveStatusProofPresentation({carriers:[carrier],map:{'a->b':sample},verdicts},'24h',true);
- assert.match(proof.rows[0].explanation,/error signal dlq is over its limit/i);assert.equal(proof.rows[0].error,true,'the Proof table row pill wears the error state');
- assert.match(proof.rows[0].metrics.explanation,/error signal dlq is over its limit/i);
+ assert.match(proof.rows[0].explanation,/error signal dlq is outside its limit/i);assert.equal(proof.rows[0].error,true,'the Proof table row pill wears the error state');
+ assert.match(proof.rows[0].metrics.explanation,/error signal dlq is outside its limit/i);
  assert.deepEqual({error:proof.counts.error,degraded:proof.counts.degraded,state:proof.states.error},{error:1,degraded:0,state:'error'});
  assert.ok(Array.from(proof.arcs,a=>a.key).includes('error'),'the ring has an error arc');
  const plainCarrier=judge(undefined,{signals:{rate:{value:100},dlq:{value:4}}},'done');
  const today=C.liveStatusProofPresentation({carriers:[plainCarrier.carrier],map:{'a->b':sample},verdicts:plainCarrier.verdicts},'24h',true);
  assert.deepEqual({error:today.counts.error||0,degraded:today.counts.degraded},{error:0,degraded:1},'without the field the carrier stays degraded');
  assert.doesNotMatch(today.rows[0].explanation,/error signal/i);
+});
+test('#1201 review: a quiet dead-letter queue (rate 0 or missing, dlq 4) counts as error, not unproven or neutral',()=>{
+ const T1=Date.UTC(2026,10,3,9),T2=Date.UTC(2026,10,3,10);
+ for(const [label,sample,from] of [['rate 0',{signals:{rate:{value:0,series:[[T1,0],[T2,0]]},dlq:{value:4}}},'unproven'],['rate missing',{signals:{dlq:{value:4}}},'neutral']]){
+  const {carrier,verdicts,state}=judge('error',sample,'done');
+  assert.equal(state,'error',label+': the card is red');
+  const proof=C.liveStatusProofPresentation({carriers:[carrier],map:{'a->b':sample},verdicts},'24h',true),c=proof.counts;
+  assert.deepEqual({error:c.error,[from]:c[from],bound:c.bound,sum:c.proven+c.degraded+c.unproven+c.liveEarly+c.neutral+(c.error||0)},{error:1,[from]:0,bound:1,sum:1},label+': taken out of '+from+', bound unchanged');
+  assert.ok(Array.from(proof.arcs,a=>a.key).includes('error'),label+': error arc');
+  assert.equal(proof.rows[0].error,true);assert.doesNotMatch(proof.rows[0].metrics.label,/SILENT/,label+': the metrics label is not SILENT');
+ }
+});
+test('#1201 review: a hidden error signal is named as an error signal on the card',()=>{
+ const edge={from:'a',to:'b',telemetry:{...telemetry('error'),signals:{...signals('error'),dlq:{...signals('error').dlq,showOnCard:false}}}},binding=C.carrierTelemetry(edge,{});
+ const sample={signals:{rate:{value:100},dlq:{value:4}}},result=C.proofVerdicts({carriers:[{...binding,id:'a->b',tickets:[]}],telemetryMap:{'a->b':sample}}).carriers['a->b'];
+ assert.equal(C.telemetryCardContent(edge,binding,sample,result,'24h').hidden,'Hidden error signal dlq: outside limit');
 });

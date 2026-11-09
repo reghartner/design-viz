@@ -1068,7 +1068,8 @@ and refresh remain per signal. The note names the observation window (default
 measured wrapping determines the height used for obstacle packing. Titles, labels,
 units and scope can shorten; numeric values remain readable without glyph scaling.
 Safe integer counts remain exact; fractional gauges use compact significant digits
-and extreme non-safe values use scientific notation. Inspect shows full labels and scope.
+and extreme non-safe values use scientific notation. Inspect shows full labels and scope,
+except an authored `scope: ""`, which hides the scope there too (#1194).
 CloudWatch cards say “This rule”, “This queue” or “All topics · whole account”,
 with full rule names and account IDs available in Inspect.
 
@@ -1081,8 +1082,9 @@ only when it has one signal; mixed rows never inherit one another's queries.
 Prometheus/Loki Explore links and Honeycomb stable query URLs are automatic when
 available. CloudWatch, Logs and SQL may use authored links. Link generation
 failure never invalidates numeric evidence. Preview invents no provider URLs.
-Workbench Metrics exposes each signal's **label**, **show on card** and **query link** controls;
-source edits and Undo/Redo preserve all three, and signal edits keep an authored `window`. `loki` and `grafana` signals also show
+Workbench Metrics exposes each signal's **label**, **show on card**, **query link**, **scope** and
+**hide scope** controls (**hide scope** writes `scope: ""`; unchecking it removes the key);
+source edits and Undo/Redo preserve them, including `scope: ""`, and signal edits keep an authored `window`. `loki` and `grafana` signals also show
 **empty result reads 0** (`missingMeansZero`; its tooltip gives the Live and Over time rule); unchecking writes `false`, checking removes the key, and a change to another source drops it.
 
 #### Signal span

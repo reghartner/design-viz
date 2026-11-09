@@ -4290,8 +4290,8 @@ test('#1193 steps without a traceMatch leave the step count; the coverage line n
    scope names the queue without the account id; a scope the previous tile showed is not repeated. An authored empty
    scope hides it; an absent scope keeps the generated text. Jira and Trace view popups alike. */
 const tileMetric=(name,queue='orders-queue')=>({namespace:'AWS/SQS',metric:name,dimensions:{QueueName:queue},accountId:'123456789012',region:'us-east-1',statistic:'Sum'});
-async function openTiles(signals,values){
- const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'Orders',tickets:['EE-1'],telemetry:{kind:'call',signals,proof:{}}}]}}]}};
+async function openTiles(signals,values,proof={}){
+ const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'Orders',tickets:['EE-1'],telemetry:{kind:'call',signals,proof}}]}}]}};
  const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:values}})}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
  h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
  const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
@@ -4318,6 +4318,22 @@ test('#1194 metric tiles: one scope line per queue, no account id, an empty scop
   assert.equal(tiles[0].querySelectorAll('svg.dv-live-metric-sparkline').length,0,view+': the primary series is drawn once');
   assert.equal(tiles[1].querySelectorAll('svg.dv-live-metric-sparkline').length,1,view+': another metric with a series has its own small graph');
   assert.equal(tiles[2].querySelectorAll('svg').length,0,view+': no graph without a series');
+ }
+ api.destroy();
+});
+test('#1194 the main chart goes to the primary signal\'s tile found by name, not by index',async()=>{
+ // telemetryPrimary skips a maxRatioOf numerator: errors comes first, but rate is the primary.
+ const at=Date.now(),series=base=>[3,2,1].map((n,i)=>[new Date(at-n*3600000).toISOString(),base+i*10]);
+ const raw={kind:'call',signals:{errors:{grafana:'errors',unit:'req/h'},rate:{grafana:'rate',unit:'req/h'}},proof:{rate:{min:1},errors:{maxRatioOf:'rate',max:0.5}}};
+ const {api,pop,open}=await openTiles(raw.signals,{errors:{value:2,series:series(1)},rate:{value:100,series:series(90)}},raw.proof);
+ for(const view of ['jira','trace']){
+  const tiles=open(view);
+  assert.deepEqual(tiles.map(t=>t.querySelector('.dv-live-metric-label').textContent),['errors','rate'],view);
+  assert.equal(pop().querySelectorAll('svg.dv-live-proof-sparkline').length,1,view+': the primary series is drawn once');
+  assert.equal(tiles[1].querySelectorAll('.dv-live-production-chart svg.dv-live-proof-sparkline').length,1,view+': the rate tile holds the main chart');
+  assert.equal(tiles[1].querySelectorAll('svg').length,1,view+': and no second graph');
+  assert.equal(tiles[0].querySelectorAll('svg.dv-live-metric-sparkline').length,1,view+': errors keeps its own small graph');
+  assert.equal(tiles[0].querySelectorAll('.dv-live-production-chart').length,0,view);
  }
  api.destroy();
 });

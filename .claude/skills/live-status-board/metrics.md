@@ -155,7 +155,7 @@ with exactly the same range/period. Missing, invalid or mismatched weights leave
 Average unobserved, never the last bucket or an unweighted mean. Tool summaries
 such as `statistics.avg` and `statistics.count` are not underlying sample weights.
 Actual series remain timestamp-spaced, including isolated points and gaps.
-Empty arrays normally mean no data points yet; `missingMeansZero: true` opts only
+Empty arrays mean no data points yet; `missingMeansZero: true` opts only
 successful empty results into zero. Malformed/error results never become zero.
 
 ### Named environment variables and counting scope
@@ -280,7 +280,7 @@ The accepted authored fields are:
 | `tracking.telemetry.grafana` | `prometheus`, `loki`, `tempo`, `sql`, `cloudwatch` datasource UIDs; optional `accountId` for CloudWatch; optional `baseUrl` for evidenced Grafana UI origin |
 | `tracking.telemetry.honeycomb` | `environment`, optional `dataset` |
 | carrier `telemetry` | `kind`, `signals`, `proof`, `links`, `card`, or `use` plus declared template parameters |
-| signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope`, `label`, `showOnCard`, `links`, `window`; `loki`/`grafana` also `missingMeansZero` |
+| signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope`, `label`, `showOnCard`, `role`, `links`, `window`; `loki`/`grafana` also `missingMeansZero` |
 | `cloudwatch` query | `namespace`, `metric`, `region`, `accountId`, `dimensions`, `statistic`; optional `missingMeansZero`, `period` |
 | Logs `trend` | `query`, `timeField`, `valueField`; optional `binSeconds` (or false instead of an object) |
 | `cloudwatchLogs` query | `logGroups`, `query`, `region`, optional `valueField`, `breakdown`, `trend` |

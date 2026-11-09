@@ -40,10 +40,16 @@ function telemetryCountNote(binding){return telemetryMetricNames(binding).some(f
    waiting (a signal not arriving, or silent for the whole window) < failing (a limit not met)
    < flowing (values arriving, no limits authored) < held (every authored limit holds).
    Proof chips (#1199) wear the state of the verdict bucket they count. */
-var TELEMETRY_PROOF_BUCKET_STATES={proven:'held',liveEarly:'held',degraded:'failing',unproven:'waiting'};
+var TELEMETRY_PROOF_BUCKET_STATES={proven:'held',liveEarly:'held',degraded:'failing',error:'error',unproven:'waiting'};
+/* #1201: failing signals the author marked `role: "error"`. Over its limit, an error signal
+   outranks every other state: the card is `error` (red). */
+function telemetryErrorFailing(binding,result){
+  return (result && result.failing || []).filter(function(name){return !!(binding.signals[name] && binding.signals[name].role==='error');});
+}
 function telemetryCardMetricState(binding,sample,result){
   var names=telemetryMetricNames(binding);
   if(!names.length)return null;
+  if(telemetryErrorFailing(binding,result).length)return 'error';
   if(result && result.telemetry==='silent' || names.some(function(name){return telemetryReading(sample,name).value===null;}))return 'waiting';
   if(result && (result.failing || []).length)return 'failing';
   return telemetryMetricProofNames(binding).length?'held':'flowing';

@@ -75,7 +75,7 @@
     }
     function link(parent,key,label,url){var node=el(parent,url?'a':'span',key,'nbacklink',label);
       if(url){node.setAttribute('href',url);node.setAttribute('target','_blank');node.setAttribute('rel','noopener noreferrer');}else node.removeAttribute('href');return node;}
-    var proofLabels={proven:'proven',degraded:'degraded',unproven:'unproven',liveEarly:'live early',neutral:'unclassified',unbound:'unbound'};
+    var proofLabels={proven:'proven',degraded:'degraded',error:'error',unproven:'unproven',liveEarly:'live early',neutral:'unclassified',unbound:'unbound'};
     function proofBox(body,proof){
       var box=el(body,'div','proof','dv-live-proof'),ring=el(box,'div','ring','dv-live-completion');
       box.setAttribute('data-proof-bound',proof.counts.bound);box.setAttribute('data-proof-unbound',proof.counts.unbound);
@@ -88,6 +88,8 @@
       el(ring,'strong','count','dv-live-proof-ratio',proof.counts.proven+'/'+proof.counts.bound+' bound proven');
       var main=el(box,'div','main','dv-live-epic-main');el(main,'h3','heading','','Proof');
       var pills=el(main,'div','pills','dv-live-proof-pills');Object.keys(proofLabels).forEach(function(key){
+        // #1201: the error chip shows only when an error signal is over its limit.
+        if(key==='error' && !proof.counts.error)return;
         var pill=el(pills,'span',key,'dv-live-state-pill dv-live-proof-pill',proof.counts[key]+' '+proofLabels[key]);pill.setAttribute('data-proof-bucket',key);
         // #1199: a chip wears the metric-card state of the verdicts it counts (shared CSS in style.core.css).
         if(proof.states && proof.states[key])pill.setAttribute('data-metric-state',proof.states[key]);else pill.removeAttribute('data-metric-state');
@@ -762,6 +764,8 @@ body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-l
 .dv-live-proof-arc[data-proof-bucket="proven"]{stroke:var(--dv-live-done);}
 .dv-live-proof-arc[data-proof-bucket="degraded"]{stroke:var(--dv-metrics-degraded,var(--dv-live-past));}
 .dv-live-proof-arc[data-proof-bucket="unproven"]{stroke:var(--dfaint);}
+.dv-live-proof-arc[data-proof-bucket="error"]{stroke:var(--dv-live-blocked);}
+.dv-live-proof-pill[data-proof-bucket="error"]{color:var(--dv-live-blocked);}
 .dv-live-proof-arc[data-proof-bucket="liveEarly"]{stroke:var(--dv-live-active);}
 .dv-live-proof-sentence{font:11px/1.5 'IBM Plex Mono',monospace;}
 .dv-live-proof-predicate,.dv-live-proof-detail{font:10px/1.5 'IBM Plex Sans',sans-serif;color:var(--dfaint);overflow-wrap:anywhere;}

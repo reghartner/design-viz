@@ -96,7 +96,7 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
     ['cloudwatchLogs',{logGroups:['arn:aws:logs:us-east-1:${iotAccount}:log-group:AWSIotLogsV2'],query:'filter topicName = "$aws/rules/camera_message_power_state" | stats count() as n',region:'us-east-1',valueField:'n',trend:{query:'stats count() as n by bin(5m) as t',timeField:'t',valueField:'n',binSeconds:300},breakdown:{query:'stats count() as n, latest(reason) as sampleReason by clientId',labelField:'clientId',valueField:'n',title:'Devices',labelTitle:'Client ID',valueTitle:'Failures',columns:[{field:'sampleReason',label:'Latest reason'}],limit:20}}],
   ],kinds=['call','queue','service','log-event','device','service','log-event'],sides=['right','left','above','below','right','left','above'];
   variants.forEach(([source,query],index)=>{
-    const rate={[source]:query,unit:'req/h',scope:'authored counting scope',label:'Observed requests',showOnCard:index%2===0,links:{query:'https://metrics.example/query?source='+source}},warnings=[];
+    const rate={[source]:query,unit:'req/h',scope:'authored counting scope',label:'Observed requests',showOnCard:index%2===0,role:'error',links:{query:'https://metrics.example/query?source='+source}},warnings=[];
     const raw={kind:kinds[index],signals:{rate,errors:{grafana:'sum(rate(errors_total[5m]))',unit:'req/h'}},
       proof:{rate:{min:0,max:1000},errors:{max:0.01,maxRatioOf:'rate'}},
       links:{dashboard:'https://grafana.example/d/api',query:'https://grafana.example/explore'},
@@ -104,7 +104,7 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
     const binding=C.carrierTelemetry({telemetry:raw},{},(at,message)=>warnings.push(at+': '+message));
     assert.deepEqual(warnings,[],source);assert.equal(binding.kind,kinds[index]);
     assert.equal(binding.signals.rate.source,source);assert.deepEqual(plain(binding.signals.rate.query),query);assert.equal(binding.signals.rate.unit,'req/h');
-    assert.equal(binding.signals.rate.scope,rate.scope);assert.equal(binding.signals.rate.label,rate.label);assert.equal(binding.signals.rate.showOnCard,rate.showOnCard);assert.deepEqual(plain(binding.signals.rate.links),rate.links);
+    assert.equal(binding.signals.rate.scope,rate.scope);assert.equal(binding.signals.rate.label,rate.label);assert.equal(binding.signals.rate.showOnCard,rate.showOnCard);assert.equal(binding.signals.rate.role,'error');assert.deepEqual(plain(binding.signals.rate.links),rate.links);
     if(source==='cloudwatchLogs'){
       const effective=C.carrierTelemetry({telemetry:raw},{},undefined,qa);
       assert.deepEqual(plain(effective.signals.rate.query),{...query,logGroups:['arn:aws:logs:us-east-1:222222222222:log-group:AWSIotLogsV2']});
@@ -124,7 +124,7 @@ test('G3 every documented telemetry field is accepted by root, template, raw and
   assert.equal(resolvedUse.signals.rate.scope,'route v1-items · api · account 222222222222');
   assert.deepEqual(authoredRoot.variables,{service:'api',iotAccount:'111111111111'},'profile resolution preserves authored defaults');
 
-  const exercised=new Set(['period','trend','timeField','binSeconds','showOnCard','missingMeansZero','namespace','metric','dimensions','statistic','cloudwatch','cloudwatchLogs','logGroups','region','valueField','breakdown','labelField','title','labelTitle','valueTitle','columns','limit','field','label','scope','variables','accountId','baseUrl','environments','enabled','grafana','honeycomb','window','refreshMs','templates','prometheus','loki','tempo','sql','environment','dataset',
+  const exercised=new Set(['period','trend','timeField','binSeconds','showOnCard','role','missingMeansZero','namespace','metric','dimensions','statistic','cloudwatch','cloudwatchLogs','logGroups','region','valueField','breakdown','labelField','title','labelTitle','valueTitle','columns','limit','field','label','scope','variables','accountId','baseUrl','environments','enabled','grafana','honeycomb','window','refreshMs','templates','prometheus','loki','tempo','sql','environment','dataset',
     'kind','signals','proof','links','card','use','unit','min','max','maxRatioOf','dashboard','query','side','offset','width','params']);
   assert.deepEqual([...documentedFields(chapter)].sort(),[...exercised].sort(),'every field named in the chapter table has a parser-backed fixture');
 

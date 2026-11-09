@@ -39,6 +39,6 @@ test('#1201 the popup verdict says the error signal is over its limit, and Proof
  assert.ok(Array.from(proof.arcs,a=>a.key).includes('error'),'the ring has an error arc');
  const plainCarrier=judge(undefined,{signals:{rate:{value:100},dlq:{value:4}}},'done');
  const today=C.liveStatusProofPresentation({carriers:[plainCarrier.carrier],map:{'a->b':sample},verdicts:plainCarrier.verdicts},'24h',true);
- assert.deepEqual({error:today.counts.error,degraded:today.counts.degraded},{error:0,degraded:1},'without the field the carrier stays degraded');
+ assert.deepEqual({error:today.counts.error||0,degraded:today.counts.degraded},{error:0,degraded:1},'without the field the carrier stays degraded');
  assert.doesNotMatch(today.rows[0].explanation,/error signal/i);
 });

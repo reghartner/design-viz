@@ -238,6 +238,7 @@ from Prometheus:
 | `signals.<name>.sql` | A SQL query string for a Grafana SQL datasource, such as a data lake. |
 | `signals.<name>.honeycomb` | A Honeycomb query object, kept as authored. |
 | `signals.<name>.missingMeansZero` | Optional boolean on `grafana` and `loki` signals. `false` shows a successful empty result as unobserved instead of 0; see [Empty Loki and Prometheus results](#empty-loki-and-prometheus-results). |
+| `signals.<name>.role` | Optional `"error"`: an error signal, such as a dead-letter queue depth. When its `proof` limit is exceeded the metric card border is red (state `error`, #1201), outranking every other card state, the popup verdict names the error signal as over its limit, and the Proof box shows a red `error` chip (those carriers leave the degraded count). Any other value is a validation warning and is ignored. Without the field the signal behaves as before. |
 | `signals.<name>.window` | Optional span of the signal's value, a duration in the page `window` form (`"1h"`, `"7d"`, `"now-7d"`). A display label only; the query is unchanged. See [Signal span](#signal-span). |
 | `proof` | Optional per-signal limits: `min`, `max` (finite numbers) and `maxRatioOf`. With `maxRatioOf: "<other signal>"`, `max` is the highest allowed ratio of this signal to the other one, so `"errors": {"maxRatioOf": "rate", "max": 0.01}` means at most 1 % errors. `maxRatioOf` needs `max` and another signal of the same binding. `min` stays an absolute floor. |
 | `links` | Optional authored link-outs: `dashboard` and `query`, absolute HTTP(S) URLs. |
@@ -1045,13 +1046,14 @@ own work paint. The worst signal on the card decides:
 
 | state | when | border |
 |---|---|---|
+| `error` | an error signal (`role: "error"`) over its limit (#1201); outranks every other state | red, thick |
 | `waiting` | a signal has no value yet, or the card is silent (every rate-like value zero for the whole window) | to-do style: blue, dotted |
 | `failing` | values arriving, an authored limit not met | in-progress style: blue, medium |
 | `flowing` | values arriving, no limits authored | green, normal |
 | `held` | values arriving, every authored limit holds | green, thick |
 
 The card carries the state as `data-metric-state`. The Proof count chips (#1199) use
-the same CSS variables: proven and live early wear `held`, degraded `failing`,
+the same CSS variables: proven and live early wear `held`, degraded `failing`, error `error` (shown only when non-zero),
 unproven `waiting`; unclassified and unbound stay neutral. Colours follow the personal
 status colours for Done, In progress and To do. In the Jira view a card still names
 its edge's work status and lists its tickets in the popover; on a board with no

@@ -161,7 +161,7 @@
       var section=el(config,'section','logs','dv-trace-logs');section.setAttribute('aria-label','Find a trace from a log line');
       el(section,'h4','title','dv-trace-logs-title','Find a trace from a log line');
       if(!logs.available)el(section,'p','unavailable','dv-trace-logs-status',logs.note).setAttribute('role','status');
-      // tag 'checkbox': an input type=checkbox after its label text; it sends node.checked.
+      // tag 'checkbox': a checkbox followed by its label text; it sends node.checked.
       function control(key,label,tag){
         var check=tag==='checkbox',wrap=el(section,'label',key+'-label',check?'dv-trace-check-label':'dv-trace-input-label');if(!check)el(wrap,'span','label','',label);
         var node=el(wrap,check?'input':tag,key,check?'dv-trace-log-'+key:'dv-trace-input');if(check){node.type='checkbox';el(wrap,'span','label','',label);}

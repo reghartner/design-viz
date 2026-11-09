@@ -4285,3 +4285,39 @@ test('#1193 steps without a traceMatch leave the step count; the coverage line n
  assert.match(summary,/ · 1\/2 steps matched/,summary);assert.doesNotMatch(summary,/without a trace mapping|optional/,'the one-line summary keeps only the ratio');
  api.destroy();
 });
+/* #1194: each metric tile in the card popup is one row: the bold label, the metric's own small graph, and one small
+   line "<scope>: <value>". The generated CloudWatch scope names the queue without the account id, and a scope shared
+   by several tiles shows once. An authored empty scope hides it; an absent scope keeps the generated text. Jira and
+   Trace view popups alike. */
+test('#1194 metric tiles: one scope line per queue, no account id, and an authored empty scope hides it',async()=>{
+ const metric=name=>({namespace:'AWS/SQS',metric:name,dimensions:{QueueName:'orders-queue'},accountId:'123456789012',region:'us-east-1',statistic:'Sum'});
+ const telemetry={kind:'call',signals:{sent:{cloudwatch:metric('NumberOfMessagesSent'),unit:'msgs/day'},received:{cloudwatch:metric('NumberOfMessagesReceived'),unit:'msgs/day'},
+  visible:{cloudwatch:metric('ApproximateNumberOfMessagesVisible'),unit:'msgs',scope:''}},proof:{}};
+ const at=Date.now(),series=[[new Date(at-3*3600000).toISOString(),400],[new Date(at-2*3600000).toISOString(),420],[new Date(at-3600000).toISOString(),420]];
+ const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'Orders',tickets:['EE-1'],telemetry}]}}]}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:{sent:{value:1240,series},received:{value:1200},visible:{value:3}}}})}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+ h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+ const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+ for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
+ api.apply({'EE-1':{state:'done',updatedAt:new Date(at-86400000).toISOString()}});h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
+ const card=()=>h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]'),pop=()=>h.view.querySelector('.dv-live-popover'),escape=()=>h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
+ for(const view of ['jira','trace']){
+  if(view==='trace'){escape();api.setStatusMode('trace');h.flush();}
+  workPresentation(h,card());
+  const tiles=pop().querySelectorAll('.dv-live-production-kpi');
+  assert.equal(tiles.length,3,view);
+  assert.deepEqual(tiles.map(t=>(t.querySelector('.dv-live-metric-label') || {}).textContent),['sent','received','visible'],view+': each tile leads with its label');
+  assert.deepEqual(tiles.map(t=>t.querySelectorAll('.dv-live-metric-line').map(l=>l.textContent)),[['orders-queue: 1,240 msgs/day'],['1,200 msgs/day'],['3 msgs']],view+': one line per tile; the shared queue scope once; the empty scope hides it');
+  assert.ok(tiles.every(t=>!/123456789012/.test(textOf(t))),view+': no account id on a tile');
+  assert.equal(tiles[0].querySelectorAll('svg.dv-live-metric-sparkline').length,1,view+': the metric with a series has its own small graph');
+  assert.equal(tiles[1].querySelectorAll('svg.dv-live-metric-sparkline').length,0,view+': no graph without a series');
+ }
+ api.destroy();
+});
+test('#1194 an authored empty scope is kept, not dropped; an absent scope keeps the generated text',()=>{
+ const h=harness(),C=h.C,signal={cloudwatch:{namespace:'AWS/SQS',metric:'NumberOfMessagesSent',dimensions:{QueueName:'orders-queue'},accountId:'123456789012',region:'us-east-1',statistic:'Sum'},unit:'msgs/day'};
+ const warnings=[],clean=scope=>C.telemetryClean({kind:'call',signals:{sent:scope===undefined?signal:{...signal,scope}}},(at,message)=>warnings.push(at+': '+message),false).signals.sent;
+ assert.equal(clean('').scope,'','an empty scope is authored text');assert.deepEqual(warnings,[]);
+ assert.equal(Object.prototype.hasOwnProperty.call(clean(undefined),'scope'),false);
+ h.ctl.liveStatus.destroy();
+});

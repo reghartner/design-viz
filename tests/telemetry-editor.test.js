@@ -488,6 +488,22 @@ test('signal show on card is one reversible edit and survives label, source and 
  oneStep(ui,()=>{const toggle=ui.control('received show on card').querySelector('input');toggle.checked=true;toggle.fire('change');ui.h.flush();});assert.equal(edgeOf(ui).telemetry.signals.received.showOnCard,true);
 });
 
+// #1194: scope "" hides the scope line. The Workbench keeps it through other edits and can set it on purpose.
+test('#1194 scope "" survives other signal edits, "hide scope" sets and clears it, and whitespace alone is refused',()=>{
+ const ui=harness(board({kind:'queue',signals:{received:{grafana:'received',unit:'msgs',scope:''}}}),EDGE);ui.metrics();
+ assert.equal(ui.control('received hide scope').querySelector('input').checked,true);
+ oneStep(ui,()=>ui.set('received unit','msgs/h'));oneStep(ui,()=>ui.set('received label','Received'));oneStep(ui,()=>ui.set('received query','new_received'));
+ oneStep(ui,()=>{const toggle=ui.control('received show on card').querySelector('input');toggle.checked=false;toggle.fire('change');ui.h.flush();});
+ assert.equal(edgeOf(ui).telemetry.signals.received.scope,'','unit, label, query and show-on-card edits keep scope ""');
+ oneStep(ui,()=>{const toggle=ui.control('received hide scope').querySelector('input');toggle.checked=false;toggle.fire('change');ui.h.flush();});
+ assert.equal(Object.prototype.hasOwnProperty.call(edgeOf(ui).telemetry.signals.received,'scope'),false,'unchecking removes the key');
+ oneStep(ui,()=>{const toggle=ui.control('received hide scope').querySelector('input');toggle.checked=true;toggle.fire('change');ui.h.flush();});
+ assert.equal(edgeOf(ui).telemetry.signals.received.scope,'','checking sets scope ""');
+ const C=api(ui.e.C),binding=edgeOf(ui).telemetry;
+ assert.equal(C.telemetryEditBinding(binding,{op:'signal',name:'received',field:'scope',value:''},{}).value.signals.received.scope,'','the pure edit accepts ""');
+ assert.match(C.telemetryEditBinding(binding,{op:'signal',name:'received',field:'scope',value:'   '},{}).error || '',/non-empty text/,'whitespace alone is refused');
+});
+
 test('#1111 loki and grafana signals get an empty result reads 0 toggle that survives other edits; checking it removes the key; other sources drop it',()=>{
  const ui=harness(board({kind:'queue',signals:{received:{loki:LOKI_IN},sent:{grafana:'sent',missingMeansZero:true},trace:{tempo:'{}'}}}),EDGE);ui.metrics();
  assert.equal(ui.row('trace empty result reads 0'),null,'no toggle where the field means nothing');

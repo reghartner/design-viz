@@ -3867,7 +3867,7 @@ test('#1177 dragging a span onto a step or a carrier maps it; two candidate step
  assert.equal(b.m.body.querySelector('.dv-trace-map-chooser'),null,'Esc cancels');assert.equal(b.editor.calls.length,0);
  spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
  b.m.body.querySelectorAll('button.dv-trace-map-choice')[1].dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);
- assert.deepEqual(b.editor.calls.at(-1),{ref:{section:0,kind:'step',id:'beta-again'},match:MAP_MATCH,previous:{serviceName:'x',operation:'y'}},'picking a mapped step replaces the traceMatch it shows');
+ assert.deepEqual(b.editor.calls.at(-1),{ref:{section:0,kind:'step',id:'beta-again'},match:{...MAP_MATCH,nodeId:'b'},previous:{serviceName:'x',operation:'y'}},'picking a mapped step replaces the traceMatch it shows (with nodeId b: dropped on node b, which the step names alone)');
  b.api.destroy();
  // Outside Edit mode a span row does not drag.
  const editor=mapEditor();editor.state=()=>({editable:true,blocked:'',active:false,pending:0,saving:false,readOnly:false,notice:null,mapped:null});
@@ -4267,6 +4267,33 @@ test('#1173 another trace resets the open sections; a re-poll with the same entr
  assert.equal(api.snapshot().trace.selected.manual,false);assert.equal(request().open,false,'returning to A starts collapsed');assert.equal(config().open,false);
  api.destroy();
 });
+/* #1177 follow-up (Chuck 2026-11-09): a span dropped on a node writes traceMatch.nodeId for that node when
+   the step names exactly that node, so the node lights up at once; a step chip or an edge drop does not. */
+test('#1177 a drop on a node writes nodeId when the step names exactly that node',async()=>{
+ let b=mapBoard();let s=await b.focus();
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ assert.deepEqual(b.editor.calls.at(-1),{ref:{section:0,kind:'step',id:'beta'},match:{...MAP_MATCH,nodeId:'b'},previous:null},'node drop: nodeId b');
+ spanDrop(b.h,b.h.view.querySelector('button.schip[data-step-source="1"]'),s.context);runTimers(b.h);
+ assert.deepEqual(b.editor.calls.at(-1).match,MAP_MATCH,'a step-button drop writes no nodeId');
+ b.api.destroy();
+ // Through the chooser after a node drop: nodeId only for a step that names exactly that node.
+ b=mapBoard({twoOnB:true});s=await b.focus();b.h.ctl.page.sections[0].diagram.steps.push({id:'both',text:'Both nodes',nodes:['a','b']});
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ const pick=label=>{const button=b.m.body.querySelectorAll('button.dv-trace-map-choice').find(x=>x.textContent===label);button.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);};
+ pick('Beta third');assert.deepEqual(b.editor.calls.at(-1).match,{...MAP_MATCH,nodeId:'b'});
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);pick('Both nodes');
+ assert.deepEqual(b.editor.calls.at(-1).match,MAP_MATCH,'a step naming more than that node gets no nodeId');
+ b.api.destroy();
+});
+test('#1192 a step that names the node and an edge, or edges, gets no nodeId from a node drop',async()=>{
+ for(const extra of [{edge:'a->b'},{edges:['a->b']}]){
+  const b=mapBoard();const d=b.h.ctl.page.sections[0].diagram;Object.assign(d.steps[1],extra);const s=await b.focus();
+  spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+  const pick=b.m.body.querySelector('button.dv-trace-map-choice');if(pick){pick.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);}
+  assert.ok(b.editor.calls.length,JSON.stringify(extra)+': mapped');assert.equal('nodeId' in b.editor.calls.at(-1).match,false,JSON.stringify(extra)+': no nodeId');
+  b.api.destroy();
+ }
+});
 
 /* #1193: "N/M steps matched" counts only steps with a traceMatch, less optional steps this trace lacks. The request
    card's coverage line adds "· K steps without a trace mapping"; the one-line summary does not. Both agree on N/M. */
@@ -4322,4 +4349,81 @@ test('#1202 the Jira-view popup evidence reads exactly like the Trace view: no D
  escape();api.setStatusMode('trace');h.flush();workPresentation(h,card());const trace=textOf(pop().querySelector('.dv-live-production'));
  assert.equal(jiraText,trace,'the evidence block is the same in both views');
  api.destroy();
+});
+
+/* #1194: each metric tile in the card popup is one row: the bold label, the metric's graph, and one small line
+   "<scope>: <value>". The primary signal's row holds the main chart, so its series is drawn once. The generated CloudWatch
+   scope names the queue without the account id; a scope the previous tile showed is not repeated. An authored empty
+   scope hides it; an absent scope keeps the generated text. Jira and Trace view popups alike. */
+const tileMetric=(name,queue='orders-queue')=>({namespace:'AWS/SQS',metric:name,dimensions:{QueueName:queue},accountId:'123456789012',region:'us-east-1',statistic:'Sum'});
+async function openTiles(signals,values,proof={}){
+ const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'Orders',tickets:['EE-1'],telemetry:{kind:'call',signals,proof}}]}}]}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:values}})}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+ h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+ const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+ for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
+ api.apply({'EE-1':{state:'done',updatedAt:new Date(Date.now()-86400000).toISOString()}});h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
+ const card=()=>h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]'),pop=()=>h.view.querySelector('.dv-live-popover');
+ return {h,api,pop,open(view){if(view==='trace'){h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});api.setStatusMode('trace');h.flush();}workPresentation(h,card());return pop().querySelectorAll('.dv-live-production-kpi');}};
+}
+const tileLines=tiles=>tiles.map(t=>t.querySelectorAll('.dv-live-metric-line').map(l=>l.textContent));
+test('#1194 metric tiles: one scope line per queue, no account id, an empty scope hides it, and the primary series is drawn once',async()=>{
+ const at=Date.now(),series=base=>[3,2,1].map((n,i)=>[new Date(at-n*3600000).toISOString(),base+i*10]);
+ const {api,pop,open}=await openTiles({sent:{cloudwatch:tileMetric('NumberOfMessagesSent'),unit:'msgs/day'},received:{cloudwatch:tileMetric('NumberOfMessagesReceived'),unit:'msgs/day'},
+  visible:{cloudwatch:tileMetric('ApproximateNumberOfMessagesVisible'),unit:'msgs',scope:''}},{sent:{value:1240,series:series(400)},received:{value:1200,series:series(300)},visible:{value:3}});
+ for(const view of ['jira','trace']){
+  const tiles=open(view);
+  assert.equal(tiles.length,3,view);
+  assert.deepEqual(tiles.map(t=>(t.querySelector('.dv-live-metric-label') || {}).textContent),['sent','received','visible'],view+': each tile leads with its label');
+  assert.deepEqual(tileLines(tiles),[['orders-queue: 1,240 msgs/day'],['1,200 msgs/day'],['3 msgs']],view+': one line per tile; the shared queue scope once; the empty scope hides it');
+  assert.ok(tiles.every(t=>!/123456789012/.test(textOf(t))),view+': no account id on a tile');
+  // The primary (sent) row holds the main chart between its label and its line; no second copy of its series.
+  assert.equal(pop().querySelectorAll('svg.dv-live-proof-sparkline').length,1,view+': one main chart');
+  assert.equal(tiles[0].querySelectorAll('.dv-live-production-chart svg.dv-live-proof-sparkline').length,1,view+': in the primary row');
+  assert.deepEqual(tiles[0].children.map(c=>c.className.split(' ')[0]),['dv-live-metric-label','dv-live-production-chart','dv-live-metric-line'],view);
+  assert.equal(tiles[0].querySelectorAll('svg.dv-live-metric-sparkline').length,0,view+': the primary series is drawn once');
+  assert.equal(tiles[1].querySelectorAll('svg.dv-live-metric-sparkline').length,1,view+': another metric with a series has its own small graph');
+  assert.equal(tiles[2].querySelectorAll('svg').length,0,view+': no graph without a series');
+ }
+ api.destroy();
+});
+test('#1194 the main chart goes to the primary signal\'s tile found by name, not by index',async()=>{
+ // telemetryPrimary skips a maxRatioOf numerator: errors comes first, but rate is the primary.
+ const at=Date.now(),series=base=>[3,2,1].map((n,i)=>[new Date(at-n*3600000).toISOString(),base+i*10]);
+ const raw={kind:'call',signals:{errors:{grafana:'errors',unit:'req/h'},rate:{grafana:'rate',unit:'req/h'}},proof:{rate:{min:1},errors:{maxRatioOf:'rate',max:0.5}}};
+ const {api,pop,open}=await openTiles(raw.signals,{errors:{value:2,series:series(1)},rate:{value:100,series:series(90)}},raw.proof);
+ for(const view of ['jira','trace']){
+  const tiles=open(view);
+  assert.deepEqual(tiles.map(t=>t.querySelector('.dv-live-metric-label').textContent),['errors','rate'],view);
+  assert.equal(pop().querySelectorAll('svg.dv-live-proof-sparkline').length,1,view+': the primary series is drawn once');
+  assert.equal(tiles[1].querySelectorAll('.dv-live-production-chart svg.dv-live-proof-sparkline').length,1,view+': the rate tile holds the main chart');
+  assert.equal(tiles[1].querySelectorAll('svg').length,1,view+': and no second graph');
+  assert.equal(tiles[0].querySelectorAll('svg.dv-live-metric-sparkline').length,1,view+': errors keeps its own small graph');
+  assert.equal(tiles[0].querySelectorAll('.dv-live-production-chart').length,0,view);
+ }
+ api.destroy();
+});
+test('#1194 a scope repeats when the previous tile showed another one; account-wide CloudWatch wording on tiles',async()=>{
+ const {api,open}=await openTiles({a1:{cloudwatch:tileMetric('NumberOfMessagesSent','q1')},b:{cloudwatch:tileMetric('NumberOfMessagesSent','q2')},a2:{cloudwatch:tileMetric('NumberOfMessagesReceived','q1')}},{a1:{value:1},b:{value:2},a2:{value:3}});
+ assert.deepEqual(tileLines(open('jira')),[['q1: 1'],['q2: 2'],['q1: 3']],'q1, q2, q1: the third tile names its queue again');
+ api.destroy();
+ const C=harness().C,iot=(metric,dimensions)=>({source:'cloudwatch',query:{namespace:'AWS/IoT',metric,dimensions,accountId:'111111111111',region:'us-east-1',statistic:'Sum'}});
+ assert.equal(C.telemetryTileScope(iot('PublishIn.AuthError',{Protocol:'MQTT'})),'All topics · whole account');
+ assert.equal(C.telemetryTileScope(iot('Connect.AuthError',{})),'All connections · whole account');
+ assert.equal(C.telemetryTileScope(iot('TopicMatch',{RuleName:'camera_rule'})),'camera_rule');
+ for(const s of [iot('PublishIn.AuthError',{Protocol:'MQTT'}),iot('TopicMatch',{RuleName:'camera_rule'})])assert.doesNotMatch(C.telemetryTileScope(s),/111111111111/);
+});
+test('#1194 an authored empty scope is kept and hides the scope on the card; whitespace alone warns; an absent scope keeps the generated text',()=>{
+ const h=harness(),C=h.C,signal={cloudwatch:{namespace:'AWS/SQS',metric:'NumberOfMessagesSent',dimensions:{QueueName:'orders-queue'},accountId:'123456789012',region:'us-east-1',statistic:'Sum'},unit:'msgs/day'};
+ const clean=scope=>{const warnings=[],out=C.telemetryClean({kind:'call',signals:{sent:scope===undefined?signal:{...signal,scope}}},(at,message)=>warnings.push(at+': '+message),false).signals.sent;return {out,warnings};};
+ assert.equal(clean('').out.scope,'','an empty scope is authored text');assert.deepEqual(clean('').warnings,[]);
+ assert.equal(Object.prototype.hasOwnProperty.call(clean(undefined).out,'scope'),false);
+ const blank=clean('   ');assert.equal(Object.prototype.hasOwnProperty.call(blank.out,'scope'),false,'whitespace alone is ignored');
+ assert.ok(blank.warnings.some(w=>/scope: must be non-empty text, or "" to hide the scope/.test(w)),JSON.stringify(blank.warnings));
+ const bound={source:'cloudwatch',query:signal.cloudwatch,unit:'msgs/day'};
+ assert.equal(C.telemetryCardScope({...bound,scope:''}),'','the card hides it');assert.equal(C.telemetrySignalScope({...bound,scope:''}),'','Proof and Inspect hide it');
+ assert.equal(C.telemetryCardScope(bound),'This queue','an absent scope keeps the generated card text');
+ const content=C.telemetryCardContent({from:'a',to:'b',telemetry:{}},{kind:'call',signals:{sent:{...bound,scope:''}},proof:{}},{signals:{sent:{value:5}}},null,'24h');
+ assert.equal(content.scope,'','the card content carries no scope');
+ h.ctl.liveStatus.destroy();
 });

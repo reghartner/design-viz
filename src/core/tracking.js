@@ -304,7 +304,8 @@ function telemetrySignal(name,value,warn){
     if(telemetryText(value.unit))out.unit=value.unit;
     else warn(at+'.unit','must be non-empty text — unit ignored');
   }
-  if(telemetryOwn(value,'scope')){if(telemetryText(value.scope))out.scope=value.scope;else warn(at+'.scope','must be non-empty text — ignored');}
+  // #1194: an authored empty scope ("") hides the scope; whitespace alone is a mistake and is ignored with a warning.
+  if(telemetryOwn(value,'scope')){if(value.scope==='' || telemetryText(value.scope))out.scope=value.scope;else warn(at+'.scope','must be non-empty text, or "" to hide the scope — ignored');}
   if(telemetryOwn(value,'label')){if(telemetryText(value.label) && value.label.length<=120 && !/[\x00-\x1f\x7f]/.test(value.label))out.label=value.label.trim();else warn(at+'.label','must be plain text of 1–120 characters without control characters — ignored');}
   if(telemetryOwn(value,'showOnCard')){if(typeof value.showOnCard==='boolean')out.showOnCard=value.showOnCard;else warn(at+'.showOnCard','must be a boolean — ignored');}
   if(telemetryOwn(value,'missingMeansZero')){
@@ -488,7 +489,7 @@ function carrierTelemetry(obj,templates,invalid,environment){
   Object.keys(clean.signals).forEach(function(name){
     var entry=clean.signals[name],source=TELEMETRY_SOURCES.filter(function(key){return telemetryOwn(entry,key);})[0];
     signals[name]={source:source,query:entry[source],unit:telemetryOwn(entry,'unit')?entry.unit:null};
-    if(entry.scope)signals[name].scope=entry.scope;
+    if(typeof entry.scope==='string')signals[name].scope=entry.scope;
     if(entry.label)signals[name].label=entry.label;
     if(telemetryOwn(entry,'showOnCard'))signals[name].showOnCard=entry.showOnCard;
     if(telemetryOwn(entry,'missingMeansZero'))signals[name].missingMeansZero=entry.missingMeansZero;
@@ -647,7 +648,7 @@ function telemetryProviderConfig(page,ctl){
 /* Scope is evidence metadata, never inferred from an edge title or arbitrary query text. */
 function telemetrySignalScope(signal){
   if(!signal)return '';
-  if(signal.scope)return signal.scope;
+  if(typeof signal.scope==='string')return signal.scope;
   if(signal.source!=='cloudwatch')return '';
   var q=signal.query,d=q.dimensions || {},scope='';
   if(d.QueueName)scope='queue only: '+d.QueueName;

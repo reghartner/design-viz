@@ -7,7 +7,7 @@ import {recordedUrlEvidence} from '../../../tests/helpers/step-evidence.mjs';
 const PROFILE=JSON.parse(await readFile(path.join(repo,'tests/fixtures/trace-connection-profile.json'),'utf8'));
 const RECORDED=await readFile(path.join(repo,'tests/fixtures/provider-traces/honeycomb-trace.txt'),'utf8'),ID='8413cd87a9f15b6bfe8e1acf5b3346d0';
 const schema={name:'get_trace',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
-async function setup(page,server,{ambiguous=false,baseline=false,textTarget=false,edgeScene=false,extremeCurve=false,edgeOnly=false,multiEdge=false,brokenEdge=false,alternatives=false,reducedMotion='reduce'}={}){
+async function setup(page,server,{ambiguous=false,baseline=false,textTarget=false,edgeScene=false,extremeCurve=false,edgeOnly=false,multiEdge=false,brokenEdge=false,alternatives=false,beforeLoad=null,reducedMotion='reduce'}={}){
  await page.setViewportSize({width:1600,height:1100});await page.emulateMedia({reducedMotion});
  const spec=nestedSpec(),d=spec.page.sections[0].diagram,e=await recordedUrlEvidence();
  spec.page.title='Trace focus · checkout request';spec.page.subtitle='Recorded request · explicit authored steps';
@@ -42,6 +42,7 @@ async function setup(page,server,{ambiguous=false,baseline=false,textTarget=fals
   window.api=window.viewer.controller.liveStatus;window.sp=window.viewer.controller.sections[0].stepper;window.api.apply({'EDGE-1':{state:'active'},'EDGE-2':{state:'done'}});
  },{spec,schema,text:RECORDED});
  const root=page.locator('#host');await root.getByRole('button',{name:'Trace',exact:true}).click();
+ if(beforeLoad)await beforeLoad(root);
  await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
  await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await root.getByRole('button',{name:'Load trace',exact:true}).click();
  await expect(root.locator('.dv-trace-span')).toHaveCount(e.spans.length);
@@ -231,15 +232,24 @@ for(const mode of ['multiple delivered edges','broken status edge'])test('deskto
 });
 
 
-for(const extremeCurve of [false,true])test('desktop timing ink fits the SVG clip at '+(extremeCurve?'an extreme curve':'a bottom float')+' without reframing',async({page,server},info)=>{
- const {root,local,imported}=await setup(page,server,{edgeScene:true,extremeCurve});const span=extremeCurve?imported:local;
- // The bottom float has the layout's 24-unit gutter. A route can have a
- // larger measured/status gutter; prove its preferred timing would clip below.
+// Card bottom to frame bottom, in SVG units, for the local node.
+const gutter=root=>node(root,'local').locator('.card').evaluate(el=>{
+ const svg=el.closest('svg'),frame=svg.viewBox.baseVal,m=svg.getCTM().inverse().multiply(el.getCTM()),b=el.getBBox();
+ const bottom=Math.max(...[[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>m.b*x+m.d*y+m.f));return frame.y+frame.height-bottom;
+});
+for(const extremeCurve of [false,true])test('desktop timing ink fits the SVG clip at '+(extremeCurve?'an extreme curve':'a bottom float')+'; the frame holds from the settled selection onward',async({page,server},info)=>{
+ // The bottom float has the layout's 24-unit gutter before a trace is loaded.
+ let before=null;
+ const {root,local,imported}=await setup(page,server,{edgeScene:true,extremeCurve,beforeLoad:async root=>{if(!extremeCurve)before=await gutter(root);}});const span=extremeCurve?imported:local;
  if(!extremeCurve){
-  const gutter=await node(root,'local').locator('.card').evaluate(el=>{
-   const svg=el.closest('svg'),frame=svg.viewBox.baseVal,m=svg.getCTM().inverse().multiply(el.getCTM()),b=el.getBBox();
-   const bottom=Math.max(...[[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>m.b*x+m.d*y+m.f));return frame.y+frame.height-bottom;
-  });expect(gutter).toBeGreaterThanOrEqual(22);expect(gutter).toBeLessThanOrEqual(26);
+  expect(before).toBeGreaterThanOrEqual(22);expect(before).toBeLessThanOrEqual(26);
+  // #1185: a loaded trace grows the frame so the node's time label stays below its card (as cards do, #1171).
+  const held=await node(root,'local').evaluate(g=>{
+   const svg=g.closest('svg'),frame=svg.viewBox.baseVal,label=g.querySelector('.dv-trace-overlay text'),card=g.querySelector('.card');
+   const box=el=>{const m=svg.getCTM().inverse().multiply(el.getCTM()),b=el.getBBox(),ys=[[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>m.b*x+m.d*y+m.f);return {top:Math.min(...ys),bottom:Math.max(...ys)};};
+   const l=box(label),c=box(card);return {inside:l.bottom+4<=frame.y+frame.height+.5,below:l.top>c.bottom};
+  });
+  expect(held,'the frame holds the loaded label below its card').toEqual({inside:true,below:true});
  }
  const svg=root.locator('.board svg:has(path.edge)').first();
  await row(root,span).click();await root.getByRole('button',{name:'Fit diagram',exact:true}).click();

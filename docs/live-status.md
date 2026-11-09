@@ -2177,6 +2177,7 @@ reader clicked it; a focus the reader cleared stays cleared, also after an edit.
 several possible steps is not focused and the request summary reads `error in <service>
 <operation>: pick a step to focus it`; when no step maps an error span it reads `error in <service>
 <operation> (not on this diagram)`.
+A loaded trace can grow the diagram frame so node time labels stay below their cards.
 
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
 deduplicated in-memory Jira Activity entry, without posting externally. Trace

@@ -360,6 +360,23 @@ test('Over time from the Trace view keeps the Trace view and shows the day',asyn
  await row.getByRole('button',{name:'Previous day',exact:true}).click();await expect(slider).toHaveValue('2');await expect(day).toHaveText(/^Day 3 /);await expect(trace).toHaveAttribute('aria-pressed','true');
  await live.click();await expect(row).toHaveCount(0);await expect(live).toHaveAttribute('aria-pressed','true');await expect(trace).toHaveAttribute('aria-pressed','true');await expect(view).toBeVisible();
 });
+// #1162: status notes wrap in full instead of ending in an ellipsis, and First blocker sits at the right end of the counts row.
+test('long status notes wrap in full in both status lines, and First blocker sits on the counts row',async({page,server})=>{
+ await page.addInitScript(()=>{window.flowviewBooted=ctl=>{window.ctl=ctl;};});
+ const root=await openStory(page,server),panel=root.locator('.pt-live-status'),first=panel.locator('.dv-live-first'),counts=panel.getByRole('region',{name:'Status counts',exact:true});
+ await demoDay(root,4);await expect(first).toHaveText('First blocker');await expect(counts).toBeVisible();
+ const middle=async locator=>{const box=await locator.boundingBox();return box.y+box.height/2;};
+ expect(Math.abs(await middle(first)-await middle(counts)),'First blocker shares the counts row').toBeLessThanOrEqual(4);
+ const head=await panel.locator('.dv-live-head').boundingBox(),slot=await first.boundingBox();expect(head.x+head.width-(slot.x+slot.width),'at its right end').toBeLessThanOrEqual(2);
+ const long='Grafana query rate failed: upstream timeout after 30 s on the shared Prometheus data source; retry later or check the connector settings.';
+ await page.waitForFunction(()=>!!window.ctl);
+ await page.evaluate(note=>{window.ctl.telemetry.setAvailable(false,note+' '+note);window.ctl.liveStatus.note(note+' '+note,'warn');},long);
+ for(const [name,text] of [['metrics line',panel.locator('.dv-status-header .dv-live-metrics-connection > span')],['Jira status note',panel.locator('.dv-live-status .dv-live-note')]]){
+  await expect(text,name).toContainText('connector settings.');
+  const m=await text.evaluate(el=>({scroll:el.scrollWidth,client:el.clientWidth,height:el.getBoundingClientRect().height}));
+  expect(m.scroll,name+' shows its full text').toBeLessThanOrEqual(m.client);expect(m.height,name+' wraps onto more than one line').toBeGreaterThan(24);
+ }
+});
 test('S4 waiting follows ticket dependencies from the provider and the authored pairs, never the edges',async({page,server})=>{
  await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>Object.fromEntries(refs.tickets.map(key=>[key,Object.assign({state:key==='HW-123'?'blocked':key==='FW-45'?'done':'todo'},key==='FW-46'?{dependsOn:[{key:'HW-123',source:'jira',linkType:'is blocked by'}]}:{})]))};});
  const root=await openStory(page,server,''),node=id=>root.locator('g.node[data-dv-node="'+id+'"]');

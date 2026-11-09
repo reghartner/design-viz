@@ -2673,6 +2673,16 @@ test('OT15 changing text has its own row, and a board steps days with < and > on
  prev.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,1);prev.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,0);assert.equal(prev.disabled,true);assert.equal(next.disabled,false);
  next.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,1);
 });
+// #1162: the counts and First blocker share the first row (First blocker last, in its fixed slot); the status row below
+// holds only text, which wraps. Rejects First blocker alone on a row above the counts.
+test('#1162 the counts and First blocker share the first row; the status row holds only text',()=>{
+ const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());api.note('A long note about the connector','warn');
+ const controls=h.view.querySelector('.dv-live-controls'),status=h.view.querySelector('.dv-live-status');
+ assert.ok(controls.querySelector('.dv-live-counts[role="region"]'),'the counts are on the first row');
+ assert.ok(controls.children.at(-1).classList.contains('dv-live-first'),'First blocker ends that row, so a button appearing to its left cannot move it');
+ assert.equal(status.querySelector('.dv-live-counts'),null,'the status row holds text only');assert.ok(status.querySelector('.dv-live-note'));assert.match(status.getAttribute('title'),/A long note about the connector/);
+ api.destroy();
+});
 // #1082: a day's key is its calendar date in the viewer's time zone, as liveStatusHistoryDays writes it.
 const overDayKey=offset=>{const now=new Date();return new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()+offset)).toISOString().slice(0,10);};
 test('OT17 the selected day is shown large, today reads TODAY, and changing the day updates it (#1082)',async()=>{

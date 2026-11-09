@@ -52,9 +52,11 @@ function cards(page){return page.evaluate(()=>Object.fromEntries([...document.qu
  return [card.getAttribute('data-metrics-card'),{state:card.getAttribute('data-metric-state'),appearance:card.getAttribute('data-live-appearance'),halo:!!card.querySelector('.dv-live-halo'),
   stroke:box.stroke,width:box.strokeWidth,dotted:box.strokeDasharray!=='none'}];
 })));}
-function chips(page){return page.evaluate(()=>Object.fromEntries([...document.querySelector('#host').shadowRoot.querySelectorAll('.dv-live-proof-pill')].map(chip=>{
- const s=getComputedStyle(chip);return [chip.getAttribute('data-proof-bucket'),{text:chip.textContent,stroke:s.borderTopColor,width:s.borderTopWidth,dotted:s.borderTopStyle==='dotted',solid:s.borderTopStyle==='solid'}];
-})));}
+function pills(page,selector){return page.evaluate(selector=>[...document.querySelector('#host').shadowRoot.querySelectorAll(selector)].map(chip=>{
+ const s=getComputedStyle(chip);return {bucket:chip.getAttribute('data-proof-bucket'),text:chip.textContent,stroke:s.borderTopColor,width:s.borderTopWidth,dotted:s.borderTopStyle==='dotted',solid:s.borderTopStyle==='solid',ink:s.color};
+}),selector);}
+const chips=async page=>Object.fromEntries((await pills(page,'.dv-live-proof-pills .dv-live-proof-pill')).map(p=>[p.bucket,p]));
+
 
 for(const skin of ['daylight','blueprint'])test('#1200 #1199 metric cards show the metric state only, the same in Jira and Trace, and Proof chips match ('+skin+')',async({page,server},testInfo)=>{
  const root=await mount(page,server,skin);
@@ -66,10 +68,24 @@ for(const skin of ['daylight','blueprint'])test('#1200 #1199 metric cards show t
  expect(Object.keys(CHIPS).map(bucket=>got[bucket].text)).toEqual(['1 proven','1 live early','1 degraded','1 unproven']);
  for(const [bucket,state] of Object.entries(CHIPS)){
   const {stroke,width,dotted}=WANT[state];expect({bucket,stroke:got[bucket].stroke,width:got[bucket].width,dotted:got[bucket].dotted,solid:got[bucket].solid}).toEqual({bucket,stroke,width,dotted,solid:!dotted});
+  expect(Object.values(WANT).map(w=>w.stroke),bucket+' chip text is neutral ink, not a state colour').not.toContain(got[bucket].ink);
  }
+ expect(new Set(Object.keys(CHIPS).map(bucket=>got[bucket].ink)).size,'every state chip uses the same neutral ink').toBe(1);
+ // The Proof ring's arcs use the same state colour as their chip border.
+ const arcs=await page.evaluate(()=>[...document.querySelector('#host').shadowRoot.querySelectorAll('.dv-live-proof-arc')].map(a=>[a.getAttribute('data-proof-bucket'),getComputedStyle(a).stroke]));
+ expect(arcs.map(a=>a[0])).toEqual(['proven','degraded','unproven','liveEarly']);
+ for(const [bucket,stroke] of arcs)expect({bucket,stroke},'arc matches chip').toEqual({bucket,stroke:got[bucket].stroke});
+ // The Proof table's per-carrier verdict pills wear the same state as their count chip.
+ const rows=(await pills(page,'.dv-live-proof-table .dv-live-proof-pill')).filter(p=>CHIPS[p.bucket]);
+ expect(rows.map(p=>p.bucket).sort()).toEqual(['degraded','liveEarly','proven','unproven']);
+ for(const p of rows){const {stroke,width,dotted}=WANT[CHIPS[p.bucket]];expect({bucket:p.bucket,stroke:p.stroke,width:p.width,dotted:p.dotted}).toEqual({bucket:p.bucket,stroke,width,dotted});}
  await page.evaluate(()=>window.viewer.controller.liveStatus.setStatusMode('trace'));
  await expect.poll(()=>cards(page),'the Trace view shows the same metric state').toEqual(expected);
  await expect(root.locator('g.node[data-dv-node="a"]')).toHaveAttribute('data-live-appearance','done');
  await root.screenshot({path:testInfo.outputPath('metric-state-trace-'+skin+'.png')});
+ // A personal Done border width of 1px still leaves held visibly stronger than flowing (1px): max(Done width, 2px).
+ await page.evaluate(()=>{localStorage.setItem('flowview.status-colors.v1',JSON.stringify({version:2,colors:{},appearance:{'live-done':{borderWidth:1}}}));window.dispatchEvent(new CustomEvent('flowview-status-colors-change'));});
+ await expect.poll(async()=>{const c=await cards(page);return [c['a->b'].width,c['b->c'].width];}).toEqual(['2px','1px']);
+ await page.evaluate(()=>{localStorage.removeItem('flowview.status-colors.v1');window.dispatchEvent(new CustomEvent('flowview-status-colors-change'));});
  await page.evaluate(()=>window.viewer.destroy());
 });

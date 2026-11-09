@@ -3365,7 +3365,6 @@ test('#1137 metric cards on a board without tickets get no Jira presentation; ti
    with no Jira state or proof words and no Since Done line. Dates in either popup read in local time, never as ISO. */
 test('#1153 the Trace-view metrics popup shows metric evidence only, and the Jira-view proof line reads its date in local time',async()=>{
  const DONE='2026-11-05T12:00:00.000Z',ISO=/\d{4}-\d\d-\d\dT\d\d:\d\d/;
- const readable=at=>{const d=new Date(at),day=d.getFullYear()===new Date().getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'};return d.toLocaleDateString([],day)+', '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});};
  const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',tickets:['EE-1'],telemetry:TCALL()}]}}]}};
  const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:{rate:{value:5500},errors:{value:12}}}})}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
  h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
@@ -3374,8 +3373,8 @@ test('#1153 the Trace-view metrics popup shows metric evidence only, and the Jir
  api.apply({'EE-1':{state:'done',updatedAt:DONE}});h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
  const card=()=>h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]'),pop=()=>h.view.querySelector('.dv-live-popover'),escape=()=>h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
  workPresentation(h,card());const jira=textOf(pop());
- assert.match(jira,/Since Done: Done /,'contrasting precondition: the Jira-view popup keeps its proof line');
- assert.ok(jira.includes('Done '+readable(DONE)),'its Done date reads in local time: '+jira);assert.doesNotMatch(jira,ISO,'no ISO timestamp in the Jira-view popup');
+ // #1202: the Jira-view popup's evidence reads like the Trace view's too, so it has no Since Done line.
+ assert.doesNotMatch(jira,/Since Done/,'no Since Done line in the Jira-view popup (#1202)');assert.doesNotMatch(jira,ISO,'no ISO timestamp in the Jira-view popup');
  escape();api.setStatusMode('trace');h.flush();workPresentation(h,card());const trace=textOf(pop());
  assert.match(pop().getAttribute('aria-label'),/^Metrics for /,'the Trace view opens the metrics popup');
  assert.match(trace,/rate/,'it still shows the signal values');assert.match(trace,/5,500/);

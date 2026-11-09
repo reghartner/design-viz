@@ -2663,11 +2663,16 @@ their exact-result contract; explicit native raw wrappers are trace intent.
 ### Production and telemetry Activity
 
 A carrier's existing Work status popover includes Production when the permitted
-telemetry map has measured evidence. It uses the same Proof values, configured
-window, actual points/markers and safe authored-first link as the panel. Failed
-thresholds name their signal, measured value and requirement. Missing values stay
-unobserved; measured zero stays zero. Since Done shows known Done and first
-observed traffic times in local time (for example "Nov 5, 7:00 AM"), plus explicitly measured totals when their interval
+telemetry map has measured evidence. It uses the same configured window, actual points,
+deploy markers and safe authored-first link as the panel. Since #1202 it reads exactly like
+the Trace view's metrics popup: one verdict line with the metric state and its explanation
+(no Jira state, proof words, Done marker or Since Done line); failed limits name their
+signal, measured value and limit. Missing values stay unobserved; measured zero stays zero.
+Jira state belongs to the popover's Tickets: one row per ticket (#1198) with the key, the
+title on one line (the full title in its tooltip), any PRs or staleness, and the status chip
+at the right; a ticket detail takes a second line and the owner is not shown. The Proof
+table's Since Done column keeps known Done and first observed traffic times in local time
+(for example "Nov 5, 7:00 AM"), plus explicitly measured totals when their interval
 matches Done as described below; window rates are not lifetime totals. Local,
 imported and asynchronously loaded detail carriers use their carrier identity and
 own binding scope. Refreshes and day selection update an open Production block

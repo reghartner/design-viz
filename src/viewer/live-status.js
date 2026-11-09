@@ -1405,23 +1405,24 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return proof && proof.rows.find(function(row){return row.id===id;}) || null;
   }
   function paintProduction(trigger){
-    // #1153: the Trace view's metrics popup shows metric evidence only: no proof label, Done marker or Since Done line.
-    var row=productionRow(trigger),block=pop.querySelector('.dv-live-production'),metricsOnly=!!(trigger && trigger._liveCarrier && trigger._liveCarrier.metricsOnly);
+    // #1153: the metrics popup shows metric evidence only: no proof label, Done marker or Since Done line. #1202: the Jira view's
+    // popup reads the same; its Tickets section is where Jira state belongs.
+    var row=productionRow(trigger),block=pop.querySelector('.dv-live-production');
     if(!row){if(block)block.remove();return false;}
     if(!block)block=element('section','dv-live-production',null,pop);
     block.setAttribute('data-loading',row.initialLoading?'true':'false');block.setAttribute('data-production-carrier',row.id);
-    if(metricsOnly){block.removeAttribute('data-verdict');block.setAttribute('data-telemetry',row.telemetry || 'unobserved');}else{block.removeAttribute('data-telemetry');block.setAttribute('data-verdict',row.verdict || 'unobserved');}
+    block.setAttribute('data-telemetry',row.telemetry || 'unobserved');
     function text(tag,cls,value){var node=block.querySelector('.'+cls);if(!node)node=element(tag,cls,null,block);if(node.textContent!==value)node.textContent=value;return node;}
     var environment=telemetry.environment();
     text('h3','dv-live-production-heading',(environment?environment.toUpperCase()+' ':'')+'Evidence');
-    text('p','dv-live-production-verdict',metricsOnly?row.metrics.label+' · '+row.metrics.explanation:row.label+' · '+row.explanation);
+    text('p','dv-live-production-verdict',row.metrics.label+' · '+row.metrics.explanation);
     text('p','dv-live-proof-predicate',row.predicate);
     var chart=block.querySelector('.dv-live-production-chart') || element('div','dv-live-production-chart',null,block);chart.replaceChildren();
     if(row.chart.points.length || row.chart.markers.length){
       var svg=telemetrySvg(document,'svg',{class:'dv-live-proof-sparkline',viewBox:'0 0 100 32',role:'img','aria-label':telemetryWindow+' window: '+row.chart.points.length+' observed points'},chart);
       if(row.chart.line)telemetrySvg(document,'polyline',{class:'dv-live-proof-series',points:row.chart.line},svg);
       row.chart.points.forEach(function(point){telemetrySvg(document,'circle',{class:'dv-live-proof-point',cx:point.x,cy:point.y,r:1.8},svg);});
-      row.chart.markers.filter(function(marker){return !metricsOnly || marker.kind!=='done';}).forEach(function(marker){var tick=telemetrySvg(document,'line',{class:'dv-live-proof-marker',x1:marker.x,x2:marker.x,y1:2,y2:30,'data-kind':marker.kind},svg);telemetrySvg(document,'title',{},tick).textContent=marker.label;});
+      row.chart.markers.filter(function(marker){return marker.kind!=='done';}).forEach(function(marker){var tick=telemetrySvg(document,'line',{class:'dv-live-proof-marker',x1:marker.x,x2:marker.x,y1:2,y2:30,'data-kind':marker.kind},svg);telemetrySvg(document,'title',{},tick).textContent=marker.label;});
     }else element('span','',row.chart.pending?'Loading…':'No observed series in this window',chart);
     var kpis=block.querySelector('.dv-live-production-kpis') || element('div','dv-live-production-kpis',null,block);
     while(kpis.children.length>row.kpis.length)kpis.lastElementChild.remove();
@@ -1431,7 +1432,6 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(kpi.url){var queryLink=link(tile,'',kpi.url);queryLink.className='dv-live-metric-link';queryLink.setAttribute('aria-label','Open '+kpi.label+' source query in a new tab');queryLink.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});}
       if(kpi.scope)element('small','dv-live-metric-scope',kpi.scope,tile);
     });
-    if(!metricsOnly)text('p','dv-live-production-since','Since Done: '+row.since);else{var since=block.querySelector('.dv-live-production-since');if(since)since.remove();}
     var anchor=block.querySelector('.dv-live-production-link');
     if(row.url){if(!anchor){anchor=link(block,'',row.url);anchor.classList.add('dv-live-production-link');anchor.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});element('span','',null,anchor);}anchor.setAttribute('href',row.url);anchor.querySelector('span').textContent=row.linkLabel;}
     else if(anchor){var root=pop.getRootNode();if(root.activeElement===anchor)pop.querySelector('.node-link-close').focus({preventScroll:true});anchor.remove();}
@@ -1502,16 +1502,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
         remove.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();close(false);setTimeout(function(){editor.remove(ref,key);},0);});
       }
       var ticketSource=summary && summary.ticketSources[key];
+      // #1198: one line per ticket: the key, the title cut to one line (full title in its tooltip), PRs and staleness, then the
+      // status chip at the right. A detail (a blocked reason) takes a second line. The owner is not shown.
       link(row,key,liveStatusTicketURL(ticketSource?ticketSource.tracking:tracking,key,entry,(ticketSource && ticketSource.authoredURL) || trackingTicketURL(value,key) || (availability || []).map(function(cause){return trackingTicketURL(cause.value,key);}).filter(Boolean)[0]));
+      if(entry && entry.title)element('span','dv-live-ticket-title',entry.title,row).setAttribute('title',entry.title);
+      if(entry && entry.prs)element('span','dv-live-ticket-prs','PRs: '+entry.prs.count+' '+entry.prs.state,row);
+      if(entry && entry.prs && entry.prs.links){var icons=element('span','dv-live-ticket-links',null,row);entry.prs.links.forEach(function(pr){liveStatusPRDecorate(element('a',null,null,icons),pr);});}
+      if(entry && liveStatusStale(entry,Date.now(),tracking && tracking.staleDays))element('span','dv-live-stale-detail','no activity '+Math.floor((Date.now()-Date.parse(entry.updatedAt))/86400000)+' d',row);
       var pill=element('span','dv-live-ticket-state dv-live-state-pill',entry?entry.state:'No status',row);liveStatusClass(pill,entry?entry.state:null);
-      if(entry){
-        if(entry.title)element('span','dv-live-ticket-title',entry.title,row);
-        if(entry.assignee)element('span','dv-live-ticket-assignee',entry.assignee,row);
-        if(entry.prs)element('span','dv-live-ticket-prs','PRs: '+entry.prs.count+' '+entry.prs.state,row);
-        if(entry.prs && entry.prs.links){var icons=element('span','dv-live-ticket-links',null,row);entry.prs.links.forEach(function(pr){liveStatusPRDecorate(element('a',null,null,icons),pr);});}
-        if(entry.detail)element('span','dv-live-ticket-detail',entry.detail,row);
-        if(liveStatusStale(entry,Date.now(),tracking && tracking.staleDays))element('span','dv-live-stale-detail','no activity '+Math.floor((Date.now()-Date.parse(entry.updatedAt))/86400000)+' d',row);
-      }
+      if(entry && entry.detail)element('span','dv-live-ticket-detail',entry.detail,row);
     });
     found.prs.forEach(function(url){link(pop,url,url);});
     paintProduction(trigger);

@@ -483,3 +483,18 @@ test('#1192 a node-drop mapping then a replacement keeps nodeId on pull; nodeId 
  // A different non-empty local nodeId asks.
  out=S().pull(same.replace('"operation": "GetRates"}','"operation": "GetRates", "nodeId": "gamma"}'),nodeLive);assert.equal(out.status,'conflict');assert.equal(out.conflicts[0].kind,'trace-match-changed');
 });
+/* #1192 c2 (ruling): nodeId merges three ways. Base = the replaced nodeId of the oldest fresh change
+   (replaces.nodeId), board = the newest change's nodeId, local = the local step's nodeId. */
+test('#1192 c2 a replacement keeps the author\'s local nodeId; a board nodeId change reaches an unchanged step',()=>{
+ const PRICE={serviceName:'checkout',operation:'Price'},withMatch=m=>STEPS.replace('{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta"}','{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta", "traceMatch": '+JSON.stringify(m)+'}');
+ // (a) base {A, alpha}; the author set gamma locally; Bo replaced the span on the step button (nodeId alpha kept).
+ let live=stepsLive(s=>{d(s).steps[0].traceMatch={...PRICE,nodeId:'alpha'};},[entry('2026-11-09T12:00:00Z','Bo',[{op:'trace-match',path:STEP(0),label:'Resolve rates',step:'rates',traceMatch:{...PRICE,nodeId:'alpha'},replaces:{...plain(RATES),nodeId:'alpha'}}])]);
+ let out=S().pull(withMatch({...RATES,nodeId:'gamma'}),live);assert.equal(out.status,'merged',JSON.stringify(out.conflicts));
+ assert.deepEqual(step(out.text,'rates').traceMatch,{...PRICE,nodeId:'gamma'},'(a) the local gamma stays');
+ // (b) base {A, alpha}; Bo dropped the same span on node beta; local unchanged.
+ live=stepsLive(s=>{d(s).steps[0].traceMatch={...plain(RATES),nodeId:'beta'};},[entry('2026-11-09T12:00:00Z','Bo',[{op:'trace-match',path:STEP(0),label:'Resolve rates',step:'rates',traceMatch:{...plain(RATES),nodeId:'beta'},replaces:{...plain(RATES),nodeId:'alpha'}}])]);
+ out=S().pull(withMatch({...RATES,nodeId:'alpha'}),live);assert.equal(out.status,'merged',JSON.stringify(out.conflicts));
+ assert.deepEqual(step(out.text,'rates').traceMatch,{...RATES,nodeId:'beta'},'(b) the board nodeId reaches the unchanged step');
+ // Both differ from the base and each other: ask.
+ out=S().pull(withMatch({...RATES,nodeId:'gamma'}),live);assert.equal(out.status,'conflict');
+});

@@ -265,7 +265,7 @@ union of `allowedAttributes` over the page's trace connection profiles for that
 provider; a Honeycomb profile without `dataset` adds none. Tempo keeps those
 attributes from the trace itself. Honeycomb makes the same one extra `run_query`
 for the chosen trace, with the page's Honeycomb environment and the Metrics
-window. Like the trace search, it uses the page's `honeycomb.dataset`, and without
+window, and its own 30-second deadline; a timeout drops only the attributes. Like the trace search, it uses the page's `honeycomb.dataset`, and without
 one it queries the whole environment. Publishing declares `run_query` only for a
 profile that has both `allowedAttributes` and `dataset`.
 

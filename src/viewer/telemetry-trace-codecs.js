@@ -151,6 +151,16 @@ function telemetryTraceAttributeJoin(spans,result,columns){
   if(rows.length && !matched)return ['Span attributes not loaded ('+columns.join(', ')+'): no run_query trace.span_id matches a get_trace span_id.'];
   return rows.length>=TELEMETRY_TRACE_SPANS?['Span attributes ('+columns.join(', ')+') may be missing on some spans: run_query returned its '+TELEMETRY_TRACE_SPANS+'-row limit.']:[];
 }
+/* The attribute query's own deadline: aborting `parent` or reaching `ms` cancels only
+   the query. bounded() also settles when a transport ignores the signal. */
+function telemetryTraceDeadline(parent,ms){
+  var limit=new AbortController(),timedOut=false,stop=function(){limit.abort();};
+  if(parent.aborted)limit.abort();else parent.addEventListener('abort',stop);
+  var timer=setTimeout(function(){timedOut=true;limit.abort();},Math.max(0,ms));
+  return {signal:limit.signal,
+    bounded:function(promise){return Promise.race([promise,new Promise(function(resolve,reject){function fail(){reject(timedOut?new Error('run_query timed out'):{code:'cancelled'});}if(limit.signal.aborted)fail();else limit.signal.addEventListener('abort',fail);})]);},
+    done:function(){clearTimeout(timer);parent.removeEventListener('abort',stop);}};
+}
 /* Adds the attributes to spans in place and returns warnings; a failure is a warning,
    never a lost trace. base: {traceId, environment, dataset, from, describe(), call(input), stop(error)}. */
 async function telemetryTraceAttributes(spans,allowed,base){

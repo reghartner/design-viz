@@ -107,16 +107,14 @@ function createTelemetryDirect(page,transport,hooks){
         // this request's 30 seconds) and a timeout drops only the attributes.
         if(timeout){clearTimeout(timeout);timeout=null;}
         stage='attributes';update({stage:stage});var query={connection:request.connection,profile:Object.assign({},p,{tool:'run_query'}),environment:resolved.environment},env=p.environments[resolved.environment];
-        var limit=new AbortController(),timedOut=false,stopLimit=function(){limit.abort();};signal.addEventListener('abort',stopLimit);
-        var limitTimer=setTimeout(function(){timedOut=true;limit.abort();},Math.max(0,deadline-Date.now()));
-        var bounded=function(promise){return Promise.race([promise,new Promise(function(resolve,reject){limit.signal.addEventListener('abort',function(){reject(timedOut?new Error('run_query timed out'):{code:'cancelled'});});})]);};
+        var limit=telemetryTraceDeadline(signal,deadline-Date.now());
         var passed=Object.assign({},resolved.args);[p.arguments.traceId,p.arguments.start,p.arguments.end].forEach(function(k){if(k)delete passed[k];});
         try{
           trace.warnings=trace.warnings.concat(await telemetryTraceAttributes(trace.spans,p.allowedAttributes,{traceId:resolved.traceId,environment:env && env.value,dataset:p.dataset,args:passed,
             from:'-'+(resolved.lookback || Math.max(1,Math.ceil((Date.now()-Date.parse(resolved.range.from))/3600000))+'h'),
-            describe:function(){return bounded(transport.describe(query,limit.signal));},call:function(input){return bounded(transport.call(query,input,limit.signal));},
+            describe:function(){return limit.bounded(transport.describe(query,limit.signal));},call:function(input){return limit.bounded(transport.call(query,input,limit.signal));},
             stop:function(error){return !active() || !!(error && error.code==='user_changed');}}));
-        }finally{clearTimeout(limitTimer);signal.removeEventListener('abort',stopLimit);}
+        }finally{limit.done();}
         check();
       }
       var e=telemetryTraceEnvelope({version:1,provider:p.provider,traceId:resolved.traceId,signal:'direct',selectionToken:'direct-'+mine,selectionReason:'Explicit trace ID loaded with '+p.label,observedAt:new Date().toISOString(),range:resolved.range,candidates:[{traceId:resolved.traceId,status:'unknown'}],spans:trace.spans,completeness:trace.completeness,warnings:trace.warnings.map(telemetryTraceErrorText).filter(Boolean),url:trace.url},p.allowedAttributes);

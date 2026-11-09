@@ -30,7 +30,7 @@ function bridge(server,answers,runQuery=RUN_QUERY){
   const mcp={calls,
     listTools:async()=>[{server,tools:[{name:GET_TRACE.name,annotations:GET_TRACE.annotations},{name:RUN_QUERY.name,annotations:RUN_QUERY.annotations}]}],
     describeTool:async(s,name)=>clone(name==='run_query'?runQuery:GET_TRACE),
-    callTool:async(s,name,args)=>{calls.push({server:s,name,args:clone(args)});return answers(name,args);}};
+    callTool:async(s,name,args,options)=>{calls.push({server:s,name,args:clone(args)});return answers(name,args,options);}};
   return {mcp,win:{claude:{use:async n=>n==='permissions'?{request:async keys=>Object.fromEntries(keys.map(k=>[k,'granted']))}:mcp}}};
 }
 async function load(C,p,answers=(name)=>({payload:name==='get_trace'?recorded:ATTRIBUTE_ROWS}),verify=false,runQuery){
@@ -186,11 +186,13 @@ test('8. a Honeycomb profile with allowedAttributes but no dataset still resolve
   assert.equal(status(C,p,e).status,'missing');
 });
 
-test('9. a slow run_query times out on its own: the loaded trace stays, only the attributes are missing',async()=>{
+// Never answers; rejects on abort like the real host, so a regression fails instead of hanging.
+const hung=options=>new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject({code:'aborted'})));
+test('9. a slow run_query times out on its own: the loaded trace stays, only the attributes are missing',{timeout:20000},async()=>{
   const pending=new Map();let serial=0;
   const timers={set:(fn,ms)=>{pending.set(++serial,{fn,ms});return serial;},clear:id=>pending.delete(id)};
   const C=context(undefined,timers),p=page(profile());
-  const {mcp,win}=bridge(fixture.server,name=>name==='get_trace'?{payload:recorded}:new Promise(()=>{}));
+  const {mcp,win}=bridge(fixture.server,(name,args,options)=>name==='get_trace'?{payload:recorded}:hung(options));
   const adapter=C.createTelemetryProviders(p,win),api=C.createTelemetryDirect(p,adapter.options.directTrace,{sections:()=>[{id:'one',label:'Diagram'}]});
   api.set('environment','prod');api.set('input',ID);
   const loading=api.load(false);await settle();
@@ -229,4 +231,26 @@ test('11. profile literals and context reach run_query where its schema names th
   for(const id of Object.keys(literal.environments)){delete literal.environments[id].value;}
   const q=await load(C,page(literal),undefined,false,schema);
   assert.equal(q.calls[1].args.environment_slug,'production');
+});
+
+test('12. example traces: a hung attribute run_query has its own 30-second deadline and drops only the attributes',{timeout:20000},async()=>{
+  const pending=new Map();let serial=0;
+  const timers={set:(fn,ms)=>{pending.set(++serial,{fn,ms});return serial;},clear:id=>pending.delete(id)};
+  const C=context('2026-10-30T00:00:00Z',timers),p=C.normalize(examplePage(wrapper,{company:profile()}));
+  const mcp=honeycombExampleBridge(),call=mcp.callTool;
+  mcp.callTool=async(server,name,args,options)=>name==='run_query' && args.raw_row_columns[0]==='trace.span_id'?(mcp.calls.push({server,name,args:clone(args)}),hung(options)):call(server,name,args,options);
+  const win={claude:{use:async n=>n==='permissions'?{request:async keys=>Object.fromEntries(keys.map(k=>[k,'granted']))}:mcp}};
+  const adapter=C.createTelemetryProviders(p,win);
+  const api=C.createTelemetry(p,adapter.options,{carriers:fn=>C.sectionRecords(p).forEach(r=>{const d=r.section.diagram||{};Object.keys(d.nodes||{}).forEach(id=>fn(d.nodes[id],id,p));})});
+  const handle=adapter.attach({telemetry:api,liveStatus:{onDestroy:()=>()=>{}}},p);await settle();
+  api.setEnabled(true);await settle();
+  assert.deepEqual(mcp.calls.map(c=>c.name),['run_query','get_trace','run_query']);
+  const deadline=[...pending.entries()].find(([,t])=>t.ms===30000);
+  assert.ok(deadline,'the attribute query has a 30-second deadline: '+JSON.stringify([...pending.values()].map(t=>t.ms)));
+  pending.delete(deadline[0]);deadline[1].fn();await settle();
+  const e=api.snapshot().map.a && api.snapshot().map.a.exemplars && api.snapshot().map.a.exemplars[0];
+  handle.destroy();api.destroy();
+  assert.ok(e,'the chosen trace still loads');
+  assert.equal(e.spans.find(x=>x.id===X_SPAN).attributes['device.model'],undefined);
+  assert.ok(e.warnings.some(w=>/device\.model/.test(w) && /timed out/.test(w)),JSON.stringify(e.warnings));
 });

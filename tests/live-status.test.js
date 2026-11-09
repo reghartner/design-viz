@@ -3883,8 +3883,40 @@ test('#1173 with one authored lookup, the text button switches to a typed LogQL 
  assert.equal(api.snapshot().trace.direct.logs.form.lookup,'camera');assert.equal(typedField(),undefined);
  api.destroy();
 });
-// #1182 c2: one open-state slot. Another trace resets it (pick A, open, pick B, back to A: collapsed); a Live re-poll of
-// the same example (new selection token, same trace) keeps it; focus inside a collapsing card moves to its line.
+// #1182 c2: one open-state slot. Another trace resets it (pick A, open, pick B, back to A: collapsed); a re-poll with the
+// same entry key keeps it; focus inside a card removed by a Load moves to the new card's line once.
+test('#1173 a repaint never takes focus from outside the panel after a pick in the card',async()=>{
+ const {f,h,api,m,request}=await compactExamples(),example=api.snapshot().trace.entries.find(e=>!e.manual);
+ let focused=[];const focus=Element.prototype.focus;Element.prototype.focus=function(){focused.push(this);};
+ try{
+  await api.chooseTrace({key:example.key,traceId:example.exemplar.traceId});h.flush();assert.equal(request().open,false);
+  // Focus on the card line, then a repaint: the card keeps it without a focus() call.
+  h.doc.activeElement=request().querySelector('summary');h.ctl.telemetry.apply(JSON.parse(JSON.stringify(f.samples)));h.flush();
+  // The reader moves on to an input elsewhere, then to the page body; Live repaints leave focus there.
+  const input=new Element('input');h.doc.body.appendChild(input);h.doc.activeElement=input;
+  h.ctl.telemetry.apply(JSON.parse(JSON.stringify(f.samples)));h.flush();api.setTraceShow(true);h.flush();
+  h.doc.activeElement=h.doc.body;api.setTraceShow(false);h.flush();h.ctl.telemetry.apply(JSON.parse(JSON.stringify(f.samples)));h.flush();
+  assert.equal(focused.length,0,'no repaint moves focus');
+  // A Load from inside the card, with the reader typing elsewhere before it lands: the carried focus is not used.
+  h.doc.activeElement=request().querySelector('summary');h.flush();
+  api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:COMPACT_ID});const loading=api.loadDirectTrace(false);h.flush();
+  assert.equal(request(),null,'the card is gone while loading');h.doc.activeElement=input;await loading;h.flush();
+  assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(focused.length,0,'focus stays on the input');
+  h.ctl.telemetry.apply(JSON.parse(JSON.stringify(f.samples)));h.flush();h.doc.activeElement=h.doc.body;h.flush();api.setTraceShow(true);h.flush();
+  assert.equal(focused.length,0,'the carried focus was used up, not kept for a later repaint');
+ }finally{Element.prototype.focus=focus;api.destroy();}
+});
+
+test('#1173 after Clear the same trace loaded again starts collapsed',async()=>{
+ const {h,api,request,config}=await compactExamples();
+ const load=async()=>{api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();};
+ await load();assert.equal(api.snapshot().trace.selected.manual,true);
+ request().open=true;request().dispatchEvent({type:'toggle'});config().open=true;config().dispatchEvent({type:'toggle'});
+ api.clearDirectTrace();h.flush();assert.equal(request(),null);
+ await load();assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(request().open,false,'the card starts collapsed');assert.equal(config().open,false,'the search starts collapsed');
+ api.destroy();
+});
+
 async function compactExamples(){
  const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json')));
  f.spec.page.tracking.telemetry.traceConnections={company:profile};
@@ -3894,17 +3926,19 @@ async function compactExamples(){
  h.ctl.telemetry.apply(f.samples);api.setStatusMode('trace');h.flush();
  return {f,h,api,m,request:()=>m.body.querySelector('details.dv-trace-request'),config:()=>m.body.querySelector('details.dv-trace-config')};
 }
-test('#1173 another trace resets the open sections; a re-poll of the same trace keeps them; focus moves to the card line',async()=>{
+test('#1173 another trace resets the open sections; a re-poll with the same entry keeps them; focus moves to the card line after a Load',async()=>{
  const {f,h,api,m,request,config}=await compactExamples(),example=api.snapshot().trace.entries.find(e=>!e.manual);
  await api.chooseTrace({key:example.key,traceId:example.exemplar.traceId});h.flush();
  request().open=true;request().dispatchEvent({type:'toggle'});config().open=true;config().dispatchEvent({type:'toggle'});
- // Re-poll: same trace, new selection token.
- const before=api.snapshot().trace.selected.exemplar.selectionToken;h.ctl.telemetry.apply(JSON.parse(JSON.stringify(f.samples)));h.flush();
- assert.equal(api.snapshot().trace.selected.exemplar.traceId,example.exemplar.traceId);
- assert.equal(request().open,true,'a re-poll keeps the open card (token '+before+' -> '+api.snapshot().trace.selected.exemplar.selectionToken+')');assert.equal(config().open,true);
+ // Re-poll with the same entry key and trace: the open sections stay (a new selection token would expire the selection instead).
+ const key=api.snapshot().trace.selected.key;h.ctl.telemetry.apply(JSON.parse(JSON.stringify(f.samples)));h.flush();
+ assert.equal(api.snapshot().trace.selected.key,key);assert.equal(api.snapshot().trace.selected.exemplar.traceId,example.exemplar.traceId);
+ assert.equal(request().open,true,'a re-poll keeps the open card');assert.equal(config().open,true);
  // B: a loaded trace. Focus sits inside the open card; the card collapses and focus moves to its line.
  let focused=null;h.doc.activeElement=request().querySelector('.dv-trace-identity');const focus=Element.prototype.focus;Element.prototype.focus=function(){focused=this;};api.setTraceShow(true);h.flush();
- api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();
+ api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:COMPACT_ID});const loading=api.loadDirectTrace(false);h.flush();
+ // The card is gone during the Load; a browser leaves focus on the body.
+ assert.equal(request(),null,'the card is gone while loading');h.doc.activeElement=h.doc.body;await loading;h.flush();
  assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(request().open,false,'another trace collapses the card');assert.equal(config().open,false);Element.prototype.focus=focus;assert.ok(focused && focused===request().querySelector('summary'),'focus moves to the card line');
  // Back to A: its earlier open state is not restored.
  const again=api.snapshot().trace.entries.find(e=>e.key===example.key) || api.snapshot().trace.entries.find(e=>!e.manual);

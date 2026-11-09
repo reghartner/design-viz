@@ -315,10 +315,11 @@
       // #1173: Show on diagram waits for a shown trace.
       var show=button(controls,'show','reader-button dv-trace-show','Show on diagram','setTraceShow');show._liveArgument=!trace.show;show.setAttribute('aria-pressed',String(trace.show));show.hidden=show.disabled=!trace.selected;
       controls.hidden=!value.actionLabel && !trace.selected;
-      // Keyed by the trace, not its selection token: a Verify or a Live re-poll of the same trace keeps open sections.
-      var shownKey=function(selected){if(selected.manual)return 'direct';try{var parts=JSON.parse(selected.key);return Array.isArray(parts)?JSON.stringify(parts.slice(0,2)):selected.key;}catch(e){return selected.key;}};
-      // Example keys are [sectionId, carrier, selectionToken]; the token changes on every Live re-poll, so it is left out.
-      var shownTrace=trace.selected?JSON.stringify([shownKey(trace.selected),trace.selected.exemplar.traceId]):null;
+      // Open sections are keyed by the entry key and trace ID. A loaded trace's key carries its load token, so it is 'direct' and a Verify of it keeps them.
+      // An example keeps them while its entry key is unchanged; a new selection token expires the selection instead.
+      var shownTrace=trace.selected?JSON.stringify([trace.selected.manual?'direct':trace.selected.key,trace.selected.exemplar.traceId]):null;
+      // Nothing shown and nothing loading (Clear, a day move, an expired selection): the next trace starts collapsed. A Load or Verify gap keeps them.
+      if(!shownTrace && !(trace.direct && trace.direct.busy) && !trace.status.busy)host._traceOpen=null;
       traceEditNotice(body,value.edit);
       directTraceBody(body,trace.direct,shownTrace);
       var message=trace.direct && trace.direct.profiles.length?(!trace.hasMappings?'Diagram mapping is not configured. Loaded traces still show a waterfall.':''):!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Turn on Metrics overlay to refresh explicit bindings.':'Turn on Metrics overlay to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
@@ -339,19 +340,21 @@
           });
         });
       }
-      if(!trace.selected){if(trace.entries.length)returnedTraces(body);return;}
+      // Focus that was inside the card when it went away (a Load's gap) returns to the next card's line once.
+      if(!trace.selected){if(host._traceCardHadFocus)host._traceCardFocus=true;host._traceCardHadFocus=false;if(trace.entries.length)returnedTraces(body);return;}
       var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
       // #1173: the request card (Returned traces and the selected request's details) is one collapsed line while it is shown.
       var card=el(detail,'details','request','dv-trace-request'),matchedSteps=model.mapping?model.rows.filter(function(r){return r.status==='matched';}).length:0;
       // #1175: an optional step missing from this trace does not count against coverage; the summary and the coverage line share these counts.
       var optionalAbsent=model.rows.filter(function(r){return r.optional;}).length,stepTotal=model.rows.length-optionalAbsent;
-      // Focus inside the card is remembered across a Load's gap, when the card is rebuilt and its old element is gone.
-      var focusCard=card.contains(doc.activeElement) || !!host._traceCardFocus && !host.contains(doc.activeElement);traceSection(card,'request',shownTrace);
+      // The carried focus is used once, and only while nothing else holds focus (the removed card left it on the body).
+      var active=doc.activeElement,carried=!!host._traceCardFocus && (!active || active===doc.body || active.isConnected===false);host._traceCardFocus=false;
+      var focusCard=card.contains(active) || carried;traceSection(card,'request',shownTrace);
       var limited=e.warnings.some(function(w){return /200 spans|timeline unavailable/i.test(w);}) || !!model.warning;
       var cardSummary=el(card,'summary','summary','dv-trace-request-summary',[e.traceId.slice(0,12),selected.day?'Started '+selected.day.label+' '+selected.day.time+' local':'',e.spans.length+' spans',model.mapping?matchedSteps+'/'+stepTotal+' steps matched':'',e.completeness==='partial'?'partial':e.completeness!=='complete'?e.completeness+' completeness':'',limited?'limit reached':''].filter(Boolean).join(' · '));
       // Picking a trace from inside the open card collapses it; keep keyboard focus on its line.
-      if(focusCard && !card.open)cardSummary.focus({preventScroll:true});
-      host._traceCardFocus=card.contains(doc.activeElement);
+      if(focusCard && !card.open && doc.activeElement!==cardSummary)cardSummary.focus({preventScroll:true});
+      host._traceCardHadFocus=card.contains(doc.activeElement);
       el(card,'h3','heading','','Selected request');el(card,'code','identity','dv-trace-identity',e.traceId);if(selected.day)el(card,'p','date','dv-trace-date','Started '+selected.day.label+' '+selected.day.time+' local');if(selected.manual && !selected.hasMappings)el(card,'p','mapping-unavailable','','Diagram mapping is not configured for this section.');
       var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
       el(card,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');

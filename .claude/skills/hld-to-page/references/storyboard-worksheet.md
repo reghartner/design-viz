@@ -195,7 +195,7 @@ Edge rules:
   earlier step; if an edge is lit, the caption or evidence must support it.
 - Common misses: the device's own first hop of a heartbeat or report
   (device -> ingest) when the caption starts at a backend write; the clip or
-  data fetch when a person "opens" something (app -> store and its reply); a
+  data fetch when a person "opens" something (app -> store; the caption names the reply); a
   state write the caption implies (ingest -> shadow when the app value
   changes).
 - Relays: each message follows the route the source gives. When the source
@@ -204,13 +204,14 @@ Edge rules:
   path (cellular, a second radio, an intentional fan-out) is fine when the
   source supports it. Never add a relay hop, or delete a sourced direct path,
   just to make the topology look uniform.
-- Responses: add a `ret: true` edge ("200", "202", "ack", "clip") only when
-  the source or code evidence shows that response. A read (app opens a clip)
-  has a sourced reply; a fire-and-forget report usually does not.
+- Responses: one arrow per call, caller to callee. Name what comes back
+  ("200", "202", "ack", the clip) in the step text or a calls panel, and only
+  when the source or code shows it. Do not add a `ret: true` edge. A read (app
+  opens a clip) has a sourced reply; a fire-and-forget report usually does not.
 - A failure goes on the link that failed: Wi-Fi down means `cam->router` is
   `blocked`, not `cam->ingest`.
-- One edge per ordered node pair. A response is a separate `ret: true` edge in
-  the opposite direction. A second different message on the same pair goes in
+- One edge per ordered node pair. A reply rides in the caption of the step
+  that lights the call. A second different message on the same pair goes in
   the caption or a log panel.
 - Several steps may start with the same edge (a heartbeat every 30 minutes,
   a retry): each step gets its own numbered circle on that edge. Never drop or

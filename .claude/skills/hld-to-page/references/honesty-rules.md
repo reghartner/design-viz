@@ -55,8 +55,8 @@ every worksheet cell and every spec field. For longer discussion and examples
   HTTP 500 is a delivered error response, not a broken edge. Failure marks last
   one step only; repeat them if the break must stay visible. Mark the link
   that actually failed, not a downstream one.
-- A response or acknowledgement edge ("200", "202", "ack") is a claim. Draw it
-  only when the source or code evidence shows that response.
+- One arrow per call, caller to callee. A reply ("200", "202", "ack") is a
+  claim: name it in the step text only when the source or code shows it.
 - Node tones (`alert`, `warn`, `ok`, `dim`, `base`) carry forward. Use `alert`
   or `warn` only when the source says something fails or degrades at that beat,
   and clear or set `ok` only when the source says it recovers.

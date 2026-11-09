@@ -876,10 +876,11 @@ def bypassed(d, a, b):
 
 
 def check_topology(d, check):
-    """Acknowledgement-style response edges: the spec cannot show whether the source supports them."""
+    """Acknowledgement-style response edges (#1214): one arrow per call; the reply
+    belongs in the step text or a calls panel, not in a second, opposite edge."""
     for e in d.get("edges") or []:
         if isinstance(e, dict) and e.get("ret") and ACK_LABEL.search(str(e.get("label") or "")):
-            check("response edge %s->%s %r: keep it only if the source or code shows this response" % (
+            check("response edge %s->%s %r: one arrow per call; drop this edge and name the reply in the step text (or a calls panel)" % (
                 e.get("from"), e.get("to"), e.get("label")))
 
 

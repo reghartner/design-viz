@@ -27,6 +27,7 @@ topology, notification or outcome without evidence.
 | Domain overview with focused internals | `cookbook/domain-drilldowns.md`, `docs/drilldowns.md` (`mode: "focus"` only) |
 | Extracting selected nodes from a branched or custom-layout flow | `docs/drilldowns.md#extract-an-independent-diagram`; preserve the overview story, create an independent destination with no inherited timeline; preview reference changes and download external destinations before applying |
 | Endpoints continuing in another diagram | `cookbook/diagram-handoffs.md` (`node.handoff`) |
+| Creating a shared import or export (import instead of redrawing) | [below](#creating-imports-and-exports), then `docs/shared-topology.md` |
 | Queue, buffer, retry, replicas, rollout, software state | matching recipe in `cookbook/README.md` |
 | Honeycomb trace import or measured timing | `docs/trace-import.md` |
 | Backstage bindings, code refs, canon, incidents | [bindings and code](bindings-and-code.md), [integrations](integrations.md), `docs/canon.md` |
@@ -37,8 +38,21 @@ topology, notification or outcome without evidence.
 | Auto arrange, stable raw node insertion, explicit manual graph geometry, or Home layout editing | [authoring details](authoring-details.md) |
 | Source changed; paired source/spec fix | [evidence and updates](evidence-and-updates.md) |
 
+## Creating imports and exports
+
+Import a provider's slice when it already draws the systems your story uses;
+redraw only what no provider exports. Export a slice that other diagrams will
+show: its nodes and the edges between them. Syntax: `docs/shared-topology.md`.
+- When two exports from one provider share a node, import one of them as a
+  subset (`nodes`/`edges`) without that node, so it is drawn once.
+- An imported block placed by hand can overlap the story's own floats and raise
+  edge-label warnings: check the render after placing one.
+
 ## Presentation defaults
 
+- A landing tab (the first tab) is a diagram of the systems and teams in the
+  story, not a block of text. Gap lists and meeting notes belong in the ledger
+  or the team's document system.
 - Target desktop and the intended Backstage/Confluence content widths. Test
   phone widths only when asked.
 - Author explicit Views and named arrangements to give a panel the main space.

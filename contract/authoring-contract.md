@@ -940,9 +940,8 @@ Directed arrows between placed nodes:
   edges and row positions retain their normal behavior. Ports fix endpoints,
   not a collision-free route: use `bend` and label offsets for crowded paths.
 - `kind` — the **protocol** of the hop (see "Edge kinds"). Default `int`.
-- `ret` — `true` marks a response/acknowledgment: drawn as a fine dash in the
-  protocol's color (a request/response pair is a normal edge one way and a
-  `ret` edge back).
+- `ret` — `true` marks a response edge, drawn as a fine dash. Kept for existing
+  specs; new stories draw one arrow per call and name the reply in step text.
 - `label` — optional short text on the edge. Protocol verbs and topics read
   best: `POST /commands`, `PUBLISH cmd/site-4/pump-7`, `verify JWT`. Keep
   under ~28 characters.
@@ -2550,8 +2549,9 @@ contract stays the authority; a recipe shows the working subset for one task.
 1. Components/services → `nodes` (id, short title, sub = role/topic/port,
    closest icon, tint by role). Attach the doc's permalink for each component
    as `link`.
-2. Calls/messages between them → `edges` with the right protocol `kind`;
-   responses/acks get `ret: true`.
+2. Calls/messages between them → `edges` with the right protocol `kind`, one
+   arrow from caller to callee; name what comes back (202, ack, a record) in the
+   step text or a calls panel, not as a `ret: true` edge.
 3. The main scenario → `steps` in narrative order, captions in plain language,
    permalinks as `link` where the doc has them.
 4. Group into `sections` (one flow per section, accent per topic, `source` =

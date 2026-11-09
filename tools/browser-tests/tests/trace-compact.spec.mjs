@@ -43,3 +43,21 @@ test('#1173 at 1440x900 a loaded trace\'s span list starts beside the diagram, a
  // search report, request details and Clear rows took over 300).
  expect(row.y-body.y,'the span list follows the collapsed lines directly').toBeLessThan(260);
 });
+/* #1186 stage 2 (Chuck approved the mockup 2026-11-09): the span list fills the rest of the panel and scrolls inside it,
+   and a focused span's detail opens directly under its row. */
+test('#1186 at 1440x900 the span list fills the panel and scrolls itself; a focused span\'s detail opens under its row',async({page,server},info)=>{
+ const {panel}=await open(page,server);
+ await panel.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await panel.getByRole('button',{name:'Load trace',exact:true}).click();
+ const list=panel.locator('.dv-trace-waterfall');await expect(list.locator('.dv-trace-span').first()).toBeVisible();
+ const geometry=async()=>{const card=await panel.boundingBox(),box=await list.boundingBox();const m=await list.evaluate(el=>({scroll:el.scrollHeight,client:el.clientHeight,overflow:getComputedStyle(el).overflowY}));return {card,box,...m};};
+ const g=await geometry();
+ expect(g.box.y+g.box.height,'the list ends inside the panel').toBeLessThanOrEqual(g.card.y+g.card.height+1);
+ expect(g.card.y+g.card.height-(g.box.y+g.box.height),'the list fills the rest of the panel').toBeLessThan(48);
+ expect(['auto','scroll'],'the list scrolls itself').toContain(g.overflow);expect(g.scroll,'55 spans overflow the list').toBeGreaterThan(g.client+40);
+ // A span from the middle of the list: its detail opens directly under its row, inside the list.
+ const row=list.locator('.dv-trace-span').nth(5);await row.scrollIntoViewIfNeeded();await row.click();
+ const detail=list.locator('.dv-trace-span-detail');await expect(detail).toHaveCount(1);await expect(detail).toBeVisible();
+ const r=await row.boundingBox(),d=await detail.boundingBox();
+ expect(Math.abs(d.y-(r.y+r.height)),'the detail sits directly under its row').toBeLessThan(10);
+ await page.screenshot({path:info.outputPath('trace-stage2-1440x900.png')});
+});

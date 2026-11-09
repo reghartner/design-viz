@@ -3983,3 +3983,66 @@ test('#1173 another trace resets the open sections; a re-poll with the same entr
  assert.equal(api.snapshot().trace.selected.manual,false);assert.equal(request().open,false,'returning to A starts collapsed');assert.equal(config().open,false);
  api.destroy();
 });
+
+// #1186 (Chuck 2026-11-09, stage-2 mockup): the request line carries Show on diagram and Open trace as icons, a header row
+// replaces the focus hint box, the focused span's detail opens under its row, and the card holds Source and limitations,
+// All operation mappings and Pin as evidence. Desktop only.
+async function stage2Loaded(){
+ const {h,api,m}=compactHarness(['prod']);api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();
+ return {h,api,m,request:()=>m.body.querySelector('details.dv-trace-request')};
+}
+test('#1186 the request line holds Show on diagram and Open trace as icons, outside the summary',async()=>{
+ const {h,api,m,request}=await stage2Loaded(),line=m.body.querySelector('.dv-trace-request-line');
+ assert.ok(line,'one request line');assert.ok(line.contains(request()),'the card is on the line');
+ const icons=line.querySelector('.dv-trace-request-icons');assert.ok(icons,'an icon group on the line');
+ assert.equal(m.body.querySelectorAll('button.dv-trace-show').length,1,'one Show on diagram control');
+ const show=icons.querySelector('button.dv-trace-show');assert.ok(show,'Show on diagram is an icon on the request line');
+ assert.equal(show.getAttribute('aria-label'),'Show on diagram');assert.equal(show.getAttribute('aria-pressed'),String(api.snapshot().trace.show));assert.equal(show.textContent.trim(),'','an icon, no text');
+ const open=icons.querySelector('a.dv-trace-open');assert.ok(open,'Open trace is a link icon next to it');
+ assert.equal(open.getAttribute('aria-label'),'Open trace in Honeycomb');assert.match(open.getAttribute('href'),/^https:\/\/ui\.honeycomb\.io\//);assert.equal(open.textContent.trim(),'');
+ assert.ok(!request().querySelector('summary').contains(show) && !request().querySelector('summary').contains(open),'the icons are not inside the summary, so clicking them does not toggle the card');
+ const before=api.snapshot().trace.show;show.dispatchEvent({type:'click'});h.flush();assert.equal(api.snapshot().trace.show,!before);
+ assert.equal(m.body.querySelector('button.dv-trace-show').getAttribute('aria-pressed'),String(!before));
+ api.destroy();
+});
+test('#1186 no focus hint box: the span list has a header row with the count',async()=>{
+ const {api,m}=await stage2Loaded(),count=api.snapshot().trace.selected.exemplar.spans.length;
+ assert.ok(m.body.querySelector('.dv-trace-focus-summary')===null,'no hint box');assert.ok(m.body.querySelector('.dv-trace-focus-hint')===null);
+ const head=m.body.querySelector('.dv-trace-spans-head'),list=m.body.querySelector('.dv-trace-waterfall');assert.ok(head,'a list header');
+ assert.equal(textOf(head).replace(/\s+/g,' ').trim(),'Spans · '+count+' · click a span to focus it on the diagram');
+ assert.ok(head.parentElement===list.parentElement && head.parentElement.children.indexOf(head)+1===head.parentElement.children.indexOf(list),'the header sits directly above the list');
+ api.destroy();
+});
+test('#1186 the focused span\'s detail opens inline, directly under its row',async()=>{
+ const {h,api,m}=await stage2Loaded(),rows=()=>m.body.querySelectorAll('.dv-trace-span'),span=api.snapshot().trace.selected.exemplar.spans[2];
+ assert.ok(m.body.querySelector('.dv-trace-span-detail')===null,'no detail before a span is focused');
+ rows().find(r=>r.getAttribute('data-span-id')===span.id).dispatchEvent({type:'click'});h.flush();
+ const row=m.body.querySelector('.dv-trace-span[aria-pressed="true"]');assert.ok(row && row.getAttribute('data-span-id')===span.id);
+ const item=row.parentElement,list=m.body.querySelector('.dv-trace-waterfall');assert.ok(item.parentElement===list,'each row sits in a list item');
+ const detail=item.children[item.children.indexOf(row)+1];assert.ok(detail && detail.classList.contains('dv-trace-span-detail'),'the detail follows its row inside the item');
+ assert.equal(m.body.querySelectorAll('.dv-trace-span-detail').length,1);
+ assert.equal(detail.querySelector('.dv-trace-span-service').textContent,span.service);assert.equal(detail.querySelector('.dv-trace-span-operation').textContent,span.name);assert.ok(detail.querySelector('.dv-trace-duration'));
+ const clear=detail.querySelectorAll('button').find(b=>b.textContent==='Clear trace focus');assert.ok(clear,'Clear trace focus is in the detail');
+ clear.dispatchEvent({type:'click'});h.flush();assert.ok(m.body.querySelector('.dv-trace-span-detail')===null,'clearing focus closes the detail');
+ api.destroy();
+});
+test('#1186 Source and limitations, All operation mappings and Pin as evidence sit inside the request card',async()=>{
+ const {h,api,request}=await compactExamples(),example=api.snapshot().trace.entries.find(e=>!e.manual);
+ await api.chooseTrace({key:example.key,traceId:example.exemplar.traceId});h.flush();
+ assert.ok(request().querySelector('details.dv-trace-metadata'),'Source and limitations is in the card');
+ assert.ok(request().querySelector('details.dv-trace-all'),'All operation mappings is in the card');
+ assert.ok(request().querySelectorAll('button').some(b=>b.textContent==='Pin as evidence'),'Pin as evidence is in the card');
+ api.destroy();
+});
+test('#1186 focus that left the card before a Load is not carried to the new card',async()=>{
+ const {h,api,request}=await compactExamples(),example=api.snapshot().trace.entries.find(e=>!e.manual);
+ let focused=[];const focus=Element.prototype.focus;Element.prototype.focus=function(){focused.push(this);};
+ try{
+  await api.chooseTrace({key:example.key,traceId:example.exemplar.traceId});h.flush();
+  // A repaint while focus is on the card line, then the reader clicks the canvas (focus to the body) before starting a Load.
+  h.doc.activeElement=request().querySelector('summary');api.setTraceShow(true);h.flush();h.doc.activeElement=h.doc.body;
+  api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:COMPACT_ID});const loading=api.loadDirectTrace(false);h.flush();
+  assert.ok(request()===null,'the card is gone while loading');await loading;h.flush();
+  assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(focused.length,0,'focus stays where the reader left it');
+ }finally{Element.prototype.focus=focus;api.destroy();}
+});

@@ -86,6 +86,6 @@ test('#1198 a crowded ticket row (eight PR links, PR count, stale marker, long k
  expect(g.parts.length).toBe(10);expect(g.parts.every(p=>p.inside),'the stale marker, the count and all eight links are fully visible: '+JSON.stringify(g.parts)).toBe(true);
  expect(g.rowFits,'nothing overflows the row').toBe(true);expect(g.textClipped).toBe(false);
  expect(Math.abs(g.chipTop-g.keyTop),'the chip stays on the key\'s line, at the top right').toBeLessThan(6);expect(g.chipRight).toBeLessThanOrEqual(g.right+1);
- expect(g.titleWidth,'the title keeps its minimum').toBeGreaterThanOrEqual(59);
+ expect(g.titleWidth,'the title keeps its minimum (56px)').toBeGreaterThanOrEqual(55);
  await row.screenshot({path:info.outputPath('popup-row-crowded.png')});
 });

@@ -123,8 +123,19 @@ test('M2 desktop a reader without edit access is not offered "Map this span to a
 /* #1177 (b, e): drag a span row from the waterfall. The page function measures inside the light DOM of the
    two-file board (no shadow root); both ends of each drag are on screen at once. */
 async function point(locator){await locator.scrollIntoViewIfNeeded();await expect(locator).toBeVisible();const box=await locator.boundingBox();return {x:box.x+box.width/2,y:box.y+box.height/2};}
+/* Selecting a mapped span moves the step view's camera to that step, so another node can sit outside the
+   canvas while its card still has a box. Fit the diagram, then wait until the point really hits the node. */
+async function nodePoint(page,root,id){
+ await root.getByRole('button',{name:'Fit diagram',exact:true}).first().click();
+ let p=null;
+ await expect.poll(async()=>{p=await cardPoint(nodeCard(root,id));return page.evaluate(([x,y,node])=>!!document.elementFromPoint(x,y)?.closest('g.node[data-dv-node="'+node+'"]'),[p.x,p.y,id]);},{message:'node '+id+' is under the drop point'}).toBe(true);
+ return p;
+}
 async function dragSpan(page,panel,item,to){
- const from=await point(span(panel,item).locator('.dv-trace-span-name'));const target=typeof to==='function'?await to():to;
+ const name=span(panel,item).locator('.dv-trace-span-name');await point(name);const target=typeof to==='function'?await to():to;
+ // Read the row again after the target is settled, so both ends are measured in the same scroll position.
+ const box=await name.boundingBox(),from={x:box.x+box.width/2,y:box.y+box.height/2},view=page.viewportSize();
+ for(const p of [from,target])expect(p.x>0 && p.y>0 && p.x<view.width && p.y<view.height,'drag point on screen '+JSON.stringify(p)).toBe(true);
  await page.mouse.move(from.x,from.y);await page.mouse.down();await page.mouse.move(from.x+12,from.y+6,{steps:3});
  await page.mouse.move(target.x,target.y,{steps:12});await page.mouse.up();
 }
@@ -138,21 +149,21 @@ test('M3 desktop Edit mode drags spans onto a step and onto nodes; two candidate
  await expect(panel.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);
  await span(panel,CURRENCY).click();await expectMapped(page,panel,CURRENCY,'Step 2: Resolve supported currencies','rates');
  // Onto a node with exactly one unmapped step: that step; the node lights up.
- await dragSpan(page,panel,PAYMENT,()=>cardPoint(nodeCard(root,'pay')));
+ await dragSpan(page,panel,PAYMENT,()=>nodePoint(page,root,'pay'));
  await expect(panel.locator('.dv-trace-map-note-text')).toHaveText('Mapped payment · grpc.msdemo.PaymentService/Charge to step Settle payment.');
  await expect(root.locator('g.node[data-dv-node="pay"][data-trace-tone]')).toHaveCount(1);
  // Onto a node with several steps: a chooser lists them, the mapped one marked; Esc cancels, a pick maps.
- await dragSpan(page,panel,CART,()=>cardPoint(nodeCard(root,'web')));
+ await dragSpan(page,panel,CART,()=>nodePoint(page,root,'web'));
  const chooser=panel.locator('.dv-trace-map-chooser');await expect(chooser).toBeVisible();
  await expect(chooser.locator('button.dv-trace-map-choice')).toHaveText(['Accept checkout · mapped, replaces','Review the cart','Audit the cart']);
  await page.keyboard.press('Escape');await expect(chooser).toHaveCount(0);
- await dragSpan(page,panel,CART,()=>cardPoint(nodeCard(root,'web')));
+ await dragSpan(page,panel,CART,()=>nodePoint(page,root,'web'));
  await chooser.getByRole('button',{name:'Review the cart',exact:true}).click();
  await expect(panel.locator('.dv-trace-map-note-text')).toHaveText('Mapped cart · msdemo.CartService/EmptyCart to step Review the cart.');
  // Undo takes back the latest mapping.
  await panel.getByRole('button',{name:'Undo',exact:true}).click();await expect(panel.getByRole('button',{name:'Save 2 changes',exact:true})).toBeVisible();
  // #1180 m3: through the real board-edit, the chooser replaces a mapped step; its other fields stay.
- await dragSpan(page,panel,CART,()=>cardPoint(nodeCard(root,'web')));
+ await dragSpan(page,panel,CART,()=>nodePoint(page,root,'web'));
  await chooser.getByRole('button',{name:'Accept checkout · mapped, replaces',exact:true}).click();
  await expect(panel.locator('.dv-trace-map-note-text')).toHaveText('Mapped cart · msdemo.CartService/EmptyCart to step Accept checkout.');
  // Save records each mapping as one trace-match change; the replacement names what it replaced.

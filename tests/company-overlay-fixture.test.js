@@ -111,6 +111,9 @@ test('widget_doc and authoring packets document the company panel from its fragm
   assert.match(doc,/Patches are SPARSE/);
   const packet=execFileSync('python3',['tools/authoring-packet.py','--panel','ticket-board','--mode','edit'],{cwd:checkout,encoding:'utf8',stdio:['ignore','pipe','pipe']});
   assert.match(packet,/<!-- Source: contract\/authoring-contract\.md # panel: ticket-board -->\n- `ticket-board`/);
+  // #1221: the fragment's general rule reaches the packet under Company rules; its panel section does not repeat.
+  assert.match(packet,/\n## Company rules\n[\s\S]*<!-- Source: company\/contract\/ticket-board\.md -->\n### Ticket board naming\n\nTitle a ticket board after the epic it counts/);
+  assert.equal(packet.split('closed tickets out of a fixed total').length-1,1);
 });
 
 test('company tests and example validation run in the normal Node and Python suites',()=>{

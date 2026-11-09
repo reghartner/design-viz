@@ -15,8 +15,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from widget_doc import load_sections, CLIP_CUE, CLIP_CUE_TYPES
-from company_overlay import company_agent_context, contract_text
+from widget_doc import load_sections, CLIP_CUE, CLIP_CUE_TYPES, PANELS_HEAD
+from company_overlay import company_agent_context, contract_text, CONTRACT_ADDITIONS
 
 ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = 'contract/authoring-contract.md'
@@ -97,6 +97,33 @@ def normalize_links(text, source):
 def read_document(path):
     """Maintained text; the contract includes company/contract fragments."""
     return contract_text(ROOT) if path == CONTRACT else (ROOT / path).read_text()
+
+
+def company_rules(contract):
+    """[(fragment path, text)] for a fork's company/contract fragments, read from the contract
+    they are appended to (so a portable kit, which has no company/ folder, gets them too), in
+    file-name order. A fragment's panel sections are left out: they reach a packet with their
+    selected panel. Fragments left with nothing are skipped."""
+    lines, fence, start = contract.splitlines(), False, None
+    for index, line in enumerate(lines):
+        if line.startswith('```'): fence = not fence
+        if not fence and line == CONTRACT_ADDITIONS: start = index + 1; break
+    if start is None: return []
+    fragments, path, body = [], None, []
+    for line in lines[start:] + ['<!-- end -->']:
+        match = re.match(r'^<!-- (company/contract/(?:(?!-->).)+\.md|end) -->$', line)
+        if not match:
+            if path: body.append(line)
+            continue
+        if path:
+            kept, fence, dropping = [], False, False
+            for text in body:
+                if text.startswith('```'): fence = not fence
+                if not fence and re.match(r'^#{1,3} ', text): dropping = text.startswith(PANELS_HEAD)
+                if not dropping: kept.append(text)
+            if '\n'.join(kept).strip(): fragments.append((path, '\n'.join(kept).strip()))
+        path, body = (None if match[1] == 'end' else match[1]), []
+    return fragments
 
 
 def section(text, title):
@@ -242,6 +269,17 @@ def generate(panel_names, feature_names, mode='new', raw=None):
         add(CONTRACT, 'panels — declaration mechanics', intro)
         for panel in sorted(panels): add(CONTRACT, 'panel: ' + panel, blocks[panel])
         add(CONTRACT, 'panels — sparse patch mechanics', tail)
+    rules = company_rules(contract)
+    if rules:
+        parts.append('## Company rules\n\nThis fork\'s `company/contract/` fragments, in file-name order. They extend the '
+                     'authoring contract and follow its rules. Their panel sections come with the selected panel.')
+        for path, text in rules:
+            # Like every source, hashed as a whole file. A portable kit has no fragment file, so there the
+            # hash is of the excerpt the contract carries, without its panel sections.
+            source = (ROOT / path).read_text() if (ROOT / path).is_file() else text
+            text = normalize_links(text, CONTRACT)
+            parts.append('<!-- Source: ' + path + ' -->\n' + text)
+            provenance.append({'path': path, 'section': None, 'sha256': hashlib.sha256(source.encode()).hexdigest(), 'characters': len(text), 'bytes': len(text.encode())})
     routes = {'docs/visibility-evidence.md', 'docs/auto-arrange.md',
               REFS + 'bindings-and-code.md', REFS + 'recipe-routing.md'}
     if mode == 'new': routes.update({REFS + 'storyboard-worksheet.md', REFS + 'worked-example.md'})

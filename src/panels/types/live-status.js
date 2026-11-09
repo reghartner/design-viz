@@ -362,13 +362,14 @@
       var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
       // #1173: the request card (Returned traces and the selected request's details) is one collapsed line while it is shown.
       var card=el(detail,'details','request','dv-trace-request'),matchedSteps=model.mapping?model.rows.filter(function(r){return r.status==='matched';}).length:0;
-      // #1175: an optional step missing from this trace does not count against coverage; the summary and the coverage line share these counts.
-      var optionalAbsent=model.rows.filter(function(r){return r.optional;}).length,stepTotal=model.rows.length-optionalAbsent;
+      // #1175: an optional step missing from this trace does not count against coverage. #1193: nor does a step
+      // without a traceMatch ("unmapped"). The summary and the coverage line share these counts.
+      var optionalAbsent=model.rows.filter(function(r){return r.optional;}).length,unmappedSteps=model.rows.filter(function(r){return r.status==='unmapped';}).length,stepTotal=model.rows.length-optionalAbsent-unmappedSteps;
       // The carried focus is used once, and only while nothing else holds focus (the removed card left it on the body).
       var active=doc.activeElement,carried=!!host._traceCardFocus && (!active || active===doc.body || active.isConnected===false);host._traceCardFocus=false;
       var focusCard=card.contains(active) || carried;traceSection(card,'request',shownTrace);
       var limited=e.warnings.some(function(w){return /200 spans|timeline unavailable/i.test(w);}) || !!model.warning;
-      var cardSummary=el(card,'summary','summary','dv-trace-request-summary',[e.traceId.slice(0,12),selected.day?'Started '+selected.day.label+' '+selected.day.time+' local':'',e.spans.length+' spans',model.mapping?matchedSteps+'/'+stepTotal+' steps matched':'',e.completeness==='partial'?'partial':e.completeness!=='complete'?e.completeness+' completeness':'',limited?'limit reached':''].filter(Boolean).join(' · '));
+      var cardSummary=el(card,'summary','summary','dv-trace-request-summary',[e.traceId.slice(0,12),selected.day?'Started '+selected.day.label+' '+selected.day.time+' local':'',e.spans.length+' spans',model.mapping?matchedSteps+'/'+stepTotal+' steps matched':'',e.completeness==='partial'?'partial':e.completeness!=='complete'?e.completeness+' completeness':'',limited?'limit reached':'',selected.errorNote].filter(Boolean).join(' · '));
       // Picking a trace from inside the open card collapses it; keep keyboard focus on its line.
       if(focusCard && !card.open && doc.activeElement!==cardSummary)cardSummary.focus({preventScroll:true});
       host._traceCardHadFocus=card.contains(doc.activeElement);
@@ -376,7 +377,7 @@
       var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
       el(card,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');
       var limit=e.warnings.filter(function(w){return /200 spans|timeline unavailable/i.test(w);});if(model.warning)limit.push(model.warning);if(limit.length)el(card,'p','limit','dv-trace-limit',Array.from(new Set(limit)).join(' '));
-      if(model.mapping)el(card,'p','coverage','dv-trace-coverage',matchedSteps+'/'+stepTotal+' steps matched · '+(optionalAbsent?optionalAbsent+' optional not in this trace · ':'')+model.mapping.unmatched.length+' spans unmatched');
+      if(model.mapping)el(card,'p','coverage','dv-trace-coverage',matchedSteps+'/'+stepTotal+' steps matched · '+(optionalAbsent?optionalAbsent+' optional not in this trace · ':'')+(unmappedSteps?unmappedSteps+(unmappedSteps===1?' step':' steps')+' without a trace mapping · ':'')+model.mapping.unmatched.length+' spans unmatched');
       if(trace.entries.length)returnedTraces(card);
       var focus=selected.focus,focusedSpan=focus && e.spans.find(function(s){return s.id===focus.spanId;});
       var focusBox=el(detail,'div','focus','dv-trace-focus-summary');
@@ -687,8 +688,15 @@
 /* Evidence never replaces status or missing-work borders. Only the selected
    operation escapes step/ambient dimming; whole-trace annotations stay quiet. */
 g.node[data-trace-focus="true"]{opacity:1!important}
-.dv-trace-focus-overlay .dv-trace-focus-brackets{fill:none;stroke:#009fc7;stroke-width:3;stroke-linecap:square;stroke-linejoin:round;stroke-dasharray:none;filter:drop-shadow(0 0 2px var(--dbg,#fff))}
-.dv-trace-focus-overlay rect{fill:#007d9c;stroke:var(--dbg,#fff);stroke-width:2}
+.dv-trace-focus-overlay .dv-trace-focus-brackets{fill:none;stroke:var(--dv-trace-color,#009fc7);stroke-width:3;stroke-linecap:square;stroke-linejoin:round;stroke-dasharray:none;filter:drop-shadow(0 0 2px var(--dbg,#fff))}
+.dv-trace-focus-overlay[data-trace-level="above"][data-trace-tone],.dv-trace-edge-focus[data-trace-level="above"][data-trace-tone]{--dv-trace-color:#8a94a0}
+.dv-trace-focus-overlay[data-trace-level="below"] .dv-trace-focus-brackets,.dv-trace-focus-overlay[data-trace-level="above"] .dv-trace-focus-brackets{stroke-width:2.5;stroke-dasharray:0 5;stroke-linecap:round}
+.dv-trace-edge-outline{stroke:var(--dv-trace-color,#009fc7)}.dv-trace-edge-focus[data-trace-level="below"] .dv-trace-edge-outline,.dv-trace-edge-focus[data-trace-level="above"] .dv-trace-edge-outline{stroke-dasharray:2.5 5;stroke-linecap:butt}
+.dv-trace-overlay[data-trace-level="current"] text{font-size:16px}.dv-trace-overlay[data-trace-level="current"][data-tone="observed"]{fill:#1d5f8c}.dv-trace-overlay[data-trace-level="current"][data-tone="error"]{fill:#a3243f}.dv-trace-overlay[data-trace-level="current"][data-tone="warning"]{fill:#8a5f00}.dv-trace-overlay[data-trace-level="current"][data-tone="unknown"]{fill:#5b6570}
+/* Dark skins: the current label ink is lighter than its tone (at least 8.8:1 on Blueprint #031B3A and Terminal #050908). */
+body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-level="current"][data-tone="observed"],body.sk-terminal .dv-trace-overlay[data-trace-level="current"][data-tone="observed"],body.sk-blueprint .dv-trace-overlay[data-trace-level="current"][data-tone="observed"]{fill:#8fd0f5}body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-level="current"][data-tone="error"],body.sk-terminal .dv-trace-overlay[data-trace-level="current"][data-tone="error"],body.sk-blueprint .dv-trace-overlay[data-trace-level="current"][data-tone="error"]{fill:#ff9db0}body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-level="current"][data-tone="warning"],body.sk-terminal .dv-trace-overlay[data-trace-level="current"][data-tone="warning"],body.sk-blueprint .dv-trace-overlay[data-trace-level="current"][data-tone="warning"]{fill:#f5c96a}body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-level="current"][data-tone="unknown"],body.sk-terminal .dv-trace-overlay[data-trace-level="current"][data-tone="unknown"],body.sk-blueprint .dv-trace-overlay[data-trace-level="current"][data-tone="unknown"]{fill:#c3cbd3}.dv-trace-overlay[data-trace-level="other"]{opacity:.55}.dv-trace-overlay[data-trace-level="other"] text{font-size:12px}
+.dv-trace-focus-overlay[data-trace-tone="observed"],.dv-trace-edge-focus[data-trace-tone="observed"]{--dv-trace-color:#009fc7}
+.dv-trace-focus-overlay rect{fill:color-mix(in srgb,var(--dv-trace-color,#009fc7) 78%,#000);stroke:var(--dbg,#fff);stroke-width:2}
 .dv-trace-focus-overlay text{fill:#fff;font:700 10px 'IBM Plex Mono',monospace;letter-spacing:.3px}
 .dv-trace-focus-summary{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:10px 12px;border:1px solid color-mix(in srgb,#009fc7 40%,var(--dfaint));border-radius:7px;background:color-mix(in srgb,#009fc7 7%,var(--dbg));font-size:12px}
 .dv-trace-focus-hint{min-width:0;overflow-wrap:anywhere}.dv-trace-focus-summary .reader-button{align-self:flex-start;max-width:100%;white-space:normal;overflow-wrap:anywhere}

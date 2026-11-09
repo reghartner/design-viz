@@ -66,7 +66,39 @@ function telemetryTraceModel(diagram,pathId,exemplar){
   });
   // Multiple authored steps claiming one edge cannot supply one exact duration.
   Object.keys(edges).forEach(function(key){if(edges[key].length!==1)delete edges[key];});
-  return {mapping:mapping,warning:warning,rows:rows,nodes:nodes,edges:edges};
+  var parents=Object.create(null);(exemplar.spans || []).forEach(function(s){parents[s.id]=s.parentId || null;});
+  return {mapping:mapping,warning:warning,rows:rows,nodes:nodes,edges:edges,parents:parents};
+}
+/* #1185: each trace carrier's highlight level against the focused span: "current" (the focused
+   span's step), "above" (an ancestor span's), "below" (a descendant span's) or "other". With no
+   span focused every carrier is "below". A carrier takes its highest level (current, above,
+   below, other) and the worst tone of its matched rows at that level. */
+function telemetryTraceLevels(model,focus){
+  var parents=model.parents || {},children=Object.create(null),above=Object.create(null),below=Object.create(null),focused=focus && focus.spanId,current=focus && focus.choice && focus.choice.row;
+  Object.keys(parents).forEach(function(id){var p=parents[id];if(p)(children[p]=children[p] || []).push(id);});
+  if(focused){
+    for(var p=parents[focused];p && !above[p];p=parents[p])above[p]=true;
+    var queue=(children[focused] || []).slice();
+    while(queue.length){var id=queue.shift();if(below[id])continue;below[id]=true;queue=queue.concat(children[id] || []);}
+  }
+  var ranks={other:0,below:1,above:2,current:3},tones={unknown:0,observed:1,warning:2,error:3};
+  function rowLevel(row){
+    if(!focused)return 'below';
+    if(current?row.id===current.id:row.spanIds.indexOf(focused)>=0)return 'current';
+    if(row.spanIds.some(function(id){return above[id];}))return 'above';
+    return row.spanIds.some(function(id){return below[id];})?'below':'other';
+  }
+  function carrier(rows){
+    var best=null;
+    rows.forEach(function(row){if(row.status!=='matched')return;var level=rowLevel(row);
+      if(!best || ranks[level]>ranks[best.level])best={level:level,tone:row.tone};
+      else if(level===best.level && tones[row.tone]>tones[best.tone])best.tone=row.tone;});
+    return best;
+  }
+  var out={nodes:Object.create(null),edges:Object.create(null)};
+  Object.keys(model.nodes).forEach(function(id){var c=carrier(model.nodes[id]);if(c)out.nodes[id]=c;});
+  Object.keys(model.edges).forEach(function(key){var rows=model.edges[key],c=carrier(rows);if(c && rows[0].edgeIndex!=null)out.edges[rows[0].edgeIndex]=c;});
+  return out;
 }
 /* Span navigation considers every authored path in this exact diagram. A shared
    step keeps its current path; without that context the reader chooses a path.
@@ -91,11 +123,14 @@ function telemetryClearTrace(scope){
   scope.querySelectorAll('.dv-trace-overlay,.dv-trace-focus-overlay,.dv-trace-edge-focus').forEach(function(el){el.remove();});
   scope.querySelectorAll('[data-trace-focus]').forEach(function(el){el.removeAttribute('data-trace-focus');});
   scope.querySelectorAll('[data-trace-tone]').forEach(function(el){el.removeAttribute('data-trace-tone');el.removeAttribute('data-trace-status');});
+  scope.querySelectorAll('[data-trace-level]').forEach(function(el){el.removeAttribute('data-trace-level');});
 }
 /* Keep larger evidence text inside the existing SVG clip. This is transient
    label placement, never a viewBox/camera mutation. Prefer the authored route's
    other side before clamping an edge label into its bounded canvas. */
-function telemetryTraceConstrainLabel(text,alternatives){
+/* keepBelow (node labels, #1185): never lift the label up into its own card. A label that then
+   runs past the frame's bottom is fitted by the status frame refresh, which grows the frame. */
+function telemetryTraceConstrainLabel(text,alternatives,keepBelow){
   var svg=text.closest('svg');if(!svg || !svg.viewBox || !svg.getCTM || !text.getCTM)return;
   var frame=svg.viewBox.baseVal,pad=4,box=boardControlBox(text,svg);if(!box)return;
   function fits(b){return b.x>=frame.x+pad && b.y>=frame.y+pad && b.x+b.w<=frame.x+frame.width-pad && b.y+b.h<=frame.y+frame.height-pad;}
@@ -107,7 +142,7 @@ function telemetryTraceConstrainLabel(text,alternatives){
   }
   text.setAttribute('x',original.x);text.setAttribute('y',original.y);box=boardControlBox(text,svg);if(!box)return;
   var dx=Math.max(frame.x+pad-box.x,Math.min(0,frame.x+frame.width-pad-box.x-box.w));
-  var dy=Math.max(frame.y+pad-box.y,Math.min(0,frame.y+frame.height-pad-box.y-box.h));
+  var dy=Math.max(frame.y+pad-box.y,Math.min(0,frame.y+frame.height-pad-box.y-box.h));if(keepBelow)dy=Math.max(dy,0);
   var root=svg.getCTM(),local=text.getCTM();if(!root || !local)return;
   var inverse=root.inverse().multiply(local).inverse();
   text.setAttribute('x',Number(original.x)+inverse.a*dx+inverse.c*dy);text.setAttribute('y',Number(original.y)+inverse.b*dx+inverse.d*dy);
@@ -136,32 +171,38 @@ function telemetryTraceLabel(listed){
     var others=r.otherAlternatives || [],absent=others.filter(function(a){return !a.seen;}),unused=others.filter(function(a){return a.seen;});
     return [r.optional?'optional, not in this trace: '+r.service+' '+r.operation:named(r)+': '+(r.duration!=null?r.duration+' ms':r.label)+(r.budget!=null?' / '+r.budget+' ms budget':'')].concat(r.conditions.map(function(c){return c.label;}),
       absent.length?['not in this trace: '+absent.map(function(a){return a.name;}).join(', ')]:[],unused.length?['in this trace, not matched: '+unused.map(function(a){return a.name;}).join(', ')]:[]).join('; ');
-  }).join(' · ')+(time?' · Time '+time+': each matched span counts start to end, including its child spans; overlapping spans count once.':'');
+  }).join(' · ')+(time?' · Time '+time+': time covers each matched span from start to end (overlaps counted once).':'');
   return {text:text,title:title};
 }
 function telemetryPaintTrace(binding,model,focus){
   var scope=binding.el,d=binding.section.diagram;telemetryClearTrace(scope);if(!model)return;
+  var levels=telemetryTraceLevels(model,focus);
   function counted(rows){return rows.filter(function(r){return !r.optional;});}
-  function mark(target,rows,x,y){
+  function mark(target,rows,x,y,level){
     var ranks={unknown:0,observed:1,warning:2,error:3},tone=counted(rows).reduce(function(a,r){return ranks[r.tone]>ranks[a]?r.tone:a;},'unknown');
     target.setAttribute('data-trace-tone',tone);target.setAttribute('data-trace-status',counted(rows).map(function(r){return r.status;}).join(' '));
     var doc=target.ownerDocument,g=doc.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','dv-trace-overlay');g.setAttribute('data-tone',tone);g.setAttribute('pointer-events','none');
     var label=telemetryTraceLabel(rows),text=doc.createElementNS('http://www.w3.org/2000/svg','text');text.setAttribute('x',x);text.setAttribute('y',y);text.setAttribute('text-anchor','middle');text.textContent=label.text+(tone==='error'?' · error':tone==='warning'?' · warning':'');g.appendChild(text);
     var title=doc.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=label.title;g.appendChild(title);
+    if(level){g.setAttribute('data-trace-level',level.level);target.setAttribute('data-trace-level',level.level);}
     if(target.matches('path.edge'))g.setAttribute('data-trace-edge',target.getAttribute('data-dv-edge'));
     var parent=target.matches('g.node')?target:target.parentNode;if(!target.matches('g.node') && target.getAttribute('transform')!=null)g.setAttribute('transform',target.getAttribute('transform'));g.setAttribute('role','img');g.setAttribute('aria-label',title.textContent);parent.appendChild(g);return text;
   }
-  scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !counted(rows).length || !card)return;var box=card.getBBox();var text=mark(node,rows,box.x+box.width/2,box.y+box.height+24);telemetryTraceConstrainLabel(text);});
-  scope.querySelectorAll('g.node.node-text[data-dv-node]').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')];if(rows && counted(rows).length)node.setAttribute('data-trace-tone','observed');});
+  scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !counted(rows).length || !card)return;var box=card.getBBox();var level=levels.nodes[node.getAttribute('data-dv-node')],text=mark(node,rows,box.x+box.width/2,box.y+box.height+24,level);telemetryTraceConstrainLabel(text,null,true);
+    if(level && (level.level==='below' || level.level==='above'))telemetryPaintTraceBrackets(node,level.level,level.tone);});
+  scope.querySelectorAll('g.node.node-text[data-dv-node]').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')];if(!rows || !counted(rows).length)return;node.setAttribute('data-trace-tone','observed');
+    var level=levels.nodes[node.getAttribute('data-dv-node')];if(!level)return;node.setAttribute('data-trace-level',level.level);
+    if(level.level==='below' || level.level==='above')telemetryPaintTraceBrackets(node,level.level,level.tone);});
   scope.querySelectorAll('path.edge[data-dv-edge]').forEach(function(path){
     var edge=d.edges[Number(path.getAttribute('data-dv-edge'))],rows=edge && model.edges[edge.from+'->'+edge.to];if(!rows)return;
     var length=path.getTotalLength(),mid=length/2,point=path.getPointAtLength(mid),a=path.getPointAtLength(Math.max(0,mid-1)),b=path.getPointAtLength(Math.min(length,mid+1));
     var dx=b.x-a.x,dy=b.y-a.y,norm=Math.sqrt(dx*dx+dy*dy) || 1,nx=-dy/norm,ny=dx/norm;if(ny<0){nx=-nx;ny=-ny;}if(!dx && !dy)ny=1;
-    var text=mark(path,rows,point.x,point.y),box=text.getBBox(),offset=Math.abs(nx)*box.width/2+Math.abs(ny)*box.height/2+18;
+    var level=levels.edges[Number(path.getAttribute('data-dv-edge'))],text=mark(path,rows,point.x,point.y,level),box=text.getBBox(),offset=Math.abs(nx)*box.width/2+Math.abs(ny)*box.height/2+18;
     // Opposite the usual protocol label and clear of the step coin. Account for
     // the text's width on vertical/bent edges, retaining the path's transform.
     var baseline=point.y-box.y-box.height/2;text.setAttribute('x',point.x+nx*offset);text.setAttribute('y',point.y+ny*offset+baseline);
     telemetryTraceConstrainLabel(text,[{x:point.x-nx*(offset+24),y:point.y-ny*(offset+24)+baseline}]);
+    if(level && (level.level==='below' || level.level==='above'))telemetryPaintTraceEdgeFocus(path,level.level,level.tone);
   });
   telemetryPaintTraceFocus(scope,focus);
 }
@@ -170,28 +211,35 @@ function telemetryPaintTrace(binding,model,focus){
    Never replace a card/edge stroke or use a service name as a node identity. */
 function telemetryPaintTraceFocus(scope,focus){
   if(!focus || !focus.choice)return;
-  var row=focus.choice.row;
+  var row=focus.choice.row,tone=row.tone || 'observed';
   if(row.edgeIndex!=null)scope.querySelectorAll('path.edge[data-dv-edge]').forEach(function(path){
-    if(Number(path.getAttribute('data-dv-edge'))===row.edgeIndex)telemetryPaintTraceEdgeFocus(path);
+    if(Number(path.getAttribute('data-dv-edge'))===row.edgeIndex)telemetryPaintTraceEdgeFocus(path,'current',tone);
   });
   if(!row.nodeId)return;
   scope.querySelectorAll('g.node[data-dv-node]').forEach(function(node){
     if(node.getAttribute('data-dv-node')!==row.nodeId)return;
     node.setAttribute('data-trace-focus','true');
-    var card=node.querySelector('.card,.text-box-hit');if(!card)return;
-    var box=card.getBBox(),x=box.x-7,y=box.y-7,w=box.width+14,h=box.height+14,k=12,doc=node.ownerDocument;
-    var g=doc.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','dv-trace-focus-overlay');g.setAttribute('pointer-events','none');g.setAttribute('aria-hidden','true');
-    var brackets=doc.createElementNS('http://www.w3.org/2000/svg','path');brackets.setAttribute('class','dv-trace-focus-brackets');
-    brackets.setAttribute('d','M'+x+','+(y+k)+'v-'+k+'h'+k+' M'+(x+w-k)+','+y+'h'+k+'v'+k+' M'+(x+w)+','+(y+h-k)+'v'+k+'h-'+k+' M'+(x+k)+','+(y+h)+'h-'+k+'v-'+k);g.appendChild(brackets);
+    var g=telemetryPaintTraceBrackets(node,'current',tone);if(!g)return;
+    var x=Number(g.getAttribute('data-x')),y=Number(g.getAttribute('data-y')),doc=node.ownerDocument;
     var tag=doc.createElementNS('http://www.w3.org/2000/svg','rect');tag.setAttribute('x',x+13);tag.setAttribute('y',y-9);tag.setAttribute('width','45');tag.setAttribute('height','18');tag.setAttribute('rx','5');g.appendChild(tag);
-    var text=doc.createElementNS('http://www.w3.org/2000/svg','text');text.setAttribute('x',x+35.5);text.setAttribute('y',y+3);text.setAttribute('text-anchor','middle');text.textContent='Trace';g.appendChild(text);node.appendChild(g);
+    var text=doc.createElementNS('http://www.w3.org/2000/svg','text');text.setAttribute('x',x+35.5);text.setAttribute('y',y+3);text.setAttribute('text-anchor','middle');text.textContent='Trace';g.appendChild(text);
   });
+}
+/* #1074 corner brackets outside a node card, at one highlight level, coloured by the span tone. */
+function telemetryPaintTraceBrackets(node,level,tone){
+  var card=node.querySelector('.card,.text-box-hit');if(!card)return null;
+  var box=card.getBBox(),x=box.x-7,y=box.y-7,w=box.width+14,h=box.height+14,k=12,doc=node.ownerDocument;
+  var g=doc.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','dv-trace-focus-overlay');g.setAttribute('pointer-events','none');g.setAttribute('aria-hidden','true');
+  g.setAttribute('data-trace-level',level);g.setAttribute('data-trace-tone',tone);g.setAttribute('data-x',x);g.setAttribute('data-y',y);
+  var brackets=doc.createElementNS('http://www.w3.org/2000/svg','path');brackets.setAttribute('class','dv-trace-focus-brackets');
+  brackets.setAttribute('d','M'+x+','+(y+k)+'v-'+k+'h'+k+' M'+(x+w-k)+','+y+'h'+k+'v'+k+' M'+(x+w)+','+(y+h-k)+'v'+k+'h-'+k+' M'+(x+k)+','+(y+h)+'h-'+k+'v-'+k);g.appendChild(brackets);
+  node.appendChild(g);return g;
 }
 
 /* A true transparent-center ring: no background-colored stroke covers semantic
    ink or nearby wires. Geometry stays in the original path's coordinate system;
    the overlay has no edge classes, identity attributes, arrows or interactions. */
-function telemetryPaintTraceEdgeFocus(path){
+function telemetryPaintTraceEdgeFocus(path,level,tone){
   // Failure/availability replaces the delivered path with its own broken glyph.
   // Do not draw a continuous delivery halo across that intentional break.
   if(path.classList.contains('comm-hidden') || path.classList.contains('dv-live-comm-hidden') || path.closest('.dv-fragment-hidden,.view-step-hidden'))return;
@@ -202,10 +250,13 @@ function telemetryPaintTraceEdgeFocus(path){
   if(!shape || !path.getAttribute('id'))return;
   function make(tag,attrs,parent){var el=doc.createElementNS(ns,tag);Object.keys(attrs).forEach(function(key){el.setAttribute(key,attrs[key]);});parent.appendChild(el);return el;}
   var g=doc.createElementNS(ns,'g');g.setAttribute('class','dv-trace-edge-focus');g.setAttribute('pointer-events','none');g.setAttribute('aria-hidden','true');
+  g.setAttribute('data-trace-level',level || 'current');g.setAttribute('data-trace-tone',tone || 'observed');
+  // The ring between the two mask strokes: 4 units each side for current, 2 for the dotted below/above.
+  var outer=width+(level==='below' || level==='above'?12:16);
   if(path.getAttribute('transform')!=null)g.setAttribute('transform',path.getAttribute('transform'));
   var defs=make('defs',{},g),mask=make('mask',{id:id,maskUnits:'userSpaceOnUse',x:box.x-pad,y:box.y-pad,width:box.width+2*pad,height:box.height+2*pad,'mask-type':'luminance'},defs);
-  make('path',{d:shape,fill:'none',stroke:'white','stroke-width':width+12,'stroke-linecap':'round','stroke-linejoin':'round'},mask);
+  make('path',{d:shape,fill:'none',stroke:'white','stroke-width':outer,'stroke-linecap':'round','stroke-linejoin':'round'},mask);
   make('path',{d:shape,fill:'none',stroke:'black','stroke-width':width+8,'stroke-linecap':'round','stroke-linejoin':'round'},mask);
-  make('path',{'class':'dv-trace-edge-outline',d:shape,fill:'none',stroke:'#009fc7','stroke-width':width+12,'stroke-linecap':'round','stroke-linejoin':'round',mask:'url(#'+id+')'},g);
+  make('path',{'class':'dv-trace-edge-outline',d:shape,fill:'none',stroke:'#009fc7','stroke-width':outer,'stroke-linecap':'round','stroke-linejoin':'round',mask:'url(#'+id+')'},g);
   path.parentNode.insertBefore(g,path);
 }

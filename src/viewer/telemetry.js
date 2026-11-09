@@ -94,7 +94,7 @@ function telemetryLogDetails(raw){
   return {status:'complete',rows:rows,limit:raw.limit,returnedRows:raw.returnedRows,textTruncated:truncated,range:{from:from,to:to}};
 }
 /* One carrier's sample, kept to the provider result contract; null when unusable. */
-function telemetrySample(raw){
+function telemetrySample(raw,allowedFor){
   if(!telemetryObject(raw))return null;
   var out={signals:{},observedAt:telemetryTime(raw.observedAt),markers:[],links:{}};
   if(raw.window && telemetryTime(raw.window.from) && telemetryTime(raw.window.to) && Date.parse(raw.window.from)<Date.parse(raw.window.to))out.window={from:telemetryTime(raw.window.from),to:telemetryTime(raw.window.to)};
@@ -121,7 +121,7 @@ function telemetrySample(raw){
     out.markers.push(kept);
   });
   if(telemetryObject(raw.links))TELEMETRY_LINKS.forEach(function(key){var url=deltaLinkUrl(raw.links[key]);if(url)out.links[key]=url;});
-  if(Array.isArray(raw.exemplars) && raw.exemplars.length<=1 && typeof telemetryTraceEnvelope==='function'){out.exemplars=[];raw.exemplars.forEach(function(v){try{out.exemplars.push(telemetryTraceEnvelope(v));}catch(e){}});}
+  if(Array.isArray(raw.exemplars) && raw.exemplars.length<=1 && typeof telemetryTraceEnvelope==='function'){out.exemplars=[];raw.exemplars.forEach(function(v){try{out.exemplars.push(telemetryTraceEnvelope(v,typeof allowedFor==='function'?allowedFor(v && v.provider):undefined));}catch(e){}});}
   return out;
 }
 /* Each page's telemetry templates, parsed once per walk. */
@@ -410,6 +410,8 @@ function createTelemetry(page,options,hooks){
   var environment=trackingTelemetry(page || {}).environment || null,environmentGeneration=0;
   var permitted=options!==false && trackingTelemetry(page || {}).enabled;
   options=options || {};hooks=hooks || {};
+  // #1197: trace samples keep the attributes the page's trace connection profiles allow.
+  function traceAllowed(provider){return typeof telemetryTraceAllowed==='function'?telemetryTraceAllowed(page,provider):undefined;}
   var available=permitted && options.available!==false,availabilityNote='';
   var provider=typeof options.provider==='function'?options.provider:null;
   var history=typeof options.history==='function'?options.history:provider && typeof provider.history==='function'?provider.history:null;
@@ -444,7 +446,7 @@ function createTelemetry(page,options,hooks){
   function store(value,expected){
     var next=Object.create(null);
     var keys=bindingKeys();
-    if(telemetryObject(value))Object.keys(value).forEach(function(id){var sample=telemetrySample(value[id]);if(id && sample && (!expected || expected[id]===keys[id]))next[id]=sample;});
+    if(telemetryObject(value))Object.keys(value).forEach(function(id){var sample=telemetrySample(value[id],traceAllowed);if(id && sample && (!expected || expected[id]===keys[id]))next[id]=sample;});
     liveMap=next;if(!past)map=next;
     liveKeys=keys;if(!Object.keys(next).length)resetObservations();
     else if(past)heldObservation=true;else observed();
@@ -634,7 +636,7 @@ function createTelemetry(page,options,hooks){
       if(!sample || !sample.exemplars || !sample.exemplars.some(function(e){return e.selectionToken===token;}))throw new Error('Trace selection expired.');
       var result=await options.chooseExemplar(id,token,traceId);
       if(retired || !enabled || past || before!==JSON.stringify(bindings()) || liveMap[id]!==sample)throw new Error('Trace selection expired.');
-      sample.exemplars=[telemetryTraceEnvelope(result)];notify();return copy(sample.exemplars[0]);
+      sample.exemplars=[telemetryTraceEnvelope(result,traceAllowed(result && result.provider))];notify();return copy(sample.exemplars[0]);
     },
     retractExemplars:function(){[liveMap,map].forEach(function(m){Object.keys(m).forEach(function(id){delete m[id].exemplars;if(!Object.keys(m[id].signals).length)delete m[id];});});notify();},
     openHistory:function(days,index){

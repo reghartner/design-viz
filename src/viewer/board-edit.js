@@ -131,7 +131,7 @@ function createBoardEditor(options){
   // The new text, or the same text when the operation changes nothing.
   function splice(source,t,op,ticket,match){
     // #1180: a replacement swaps serviceName and operation and keeps the step's other traceMatch fields.
-    if(op==='trace-match'){var written=Object.assign({},t.previous || {},{serviceName:match.serviceName,operation:match.operation}),set=jsonSetField(source,t.path,'traceMatch',JSON.stringify(written));return set?set.text:null;}
+    if(op==='trace-match'){var written=Object.assign({},t.previous || {},{serviceName:match.serviceName,operation:match.operation},typeof match.nodeId==='string' && match.nodeId?{nodeId:match.nodeId}:{}),set=jsonSetField(source,t.path,'traceMatch',JSON.stringify(written));return set?set.text:null;}
     if(op==='clear-missing-work'){
       if(t.imported){var cleared=planTopologyTracking(source,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,'missingWork',true,true,context,t.index);return cleared.error?null:cleared.text;}
       var removed=jsonSetField(source,t.path,'missingWork',null);
@@ -152,7 +152,9 @@ function createBoardEditor(options){
   }
   function record(t,op,ticket,match){
     var entry={op:op};if(ticket!=null)entry.ticket=ticket;entry.path=t.path.slice();entry.label=t.label;
-    if(t.kind==='step'){entry.step=t.step;entry.traceMatch={serviceName:match.serviceName,operation:match.operation};if(t.previous)entry.replaces={serviceName:t.previous.serviceName,operation:t.previous.operation};}
+    if(t.kind==='step'){entry.step=t.step;entry.traceMatch={serviceName:match.serviceName,operation:match.operation};
+      // The change describes the full span mapping that results: a nodeId written now or kept from the step (#1192).
+      var nodeId=typeof match.nodeId==='string' && match.nodeId?match.nodeId:t.previous && !Array.isArray(t.previous) && typeof t.previous.nodeId==='string' && t.previous.nodeId?t.previous.nodeId:null;if(nodeId)entry.traceMatch.nodeId=nodeId;if(t.previous){entry.replaces={serviceName:t.previous.serviceName,operation:t.previous.operation};if(typeof t.previous.nodeId==='string' && t.previous.nodeId)entry.replaces.nodeId=t.previous.nodeId;}}
     else if(t.kind==='node')entry.node=t.node;else entry.edge=t.edge.slice();
     return entry;
   }

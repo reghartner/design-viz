@@ -188,36 +188,50 @@ JIRA_TOOLS = ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql", "ge
 GRAFANA_TOOLS = {"grafana": "query_prometheus", "loki": "query_loki_logs", "sql": "query_sql", "cloudwatch": "query_cloudwatch", "cloudwatchLogs": "query_cloudwatch_logs"}
 GRAFANA_SOURCES = ("grafana", "loki", "sql", "cloudwatch", "cloudwatchLogs")
 HONEYCOMB_TOOLS = ["run_query"]
+# #1139: example traces (src/viewer/telemetry-traces.js) need the search/detail
+# pair of each trace source; Honeycomb's search tool is run_query.
+TRACE_TOOLS = {"tempo": ["search_tempo_traces", "get_tempo_trace"], "honeycomb": ["get_trace"]}
 
 
-def _telemetry_sources(telemetry: dict) -> set[str]:
+def _signal_sources(signal: dict) -> set[str]:
+    return {source for source in ("grafana", "loki", "tempo", "sql", "honeycomb", "cloudwatch", "cloudwatchLogs") if source in signal}
+
+
+def _trace_sources(signal: dict) -> set[str]:
+    """Sources of a signal that offers example traces (proofVerdicts.isTraceSignal)."""
+    honeycomb = signal.get("honeycomb")
+    return ({"tempo"} if "tempo" in signal else set()) | \
+        ({"honeycomb"} if isinstance(honeycomb, dict) and "query_spec" in honeycomb else set())
+
+
+def _telemetry_sources(telemetry: dict, pick=_signal_sources) -> set[str]:
     """Authored source keys in one binding or page telemetry block."""
     found = set()
     signals = telemetry.get("signals")
     if isinstance(signals, dict):
         for signal in signals.values():
             if isinstance(signal, dict):
-                found.update(source for source in ("grafana", "loki", "tempo", "sql", "honeycomb", "cloudwatch", "cloudwatchLogs") if source in signal)
+                found.update(pick(signal))
     templates = telemetry.get("templates")
     if isinstance(templates, dict):
         for template in templates.values():
             if isinstance(template, dict):
-                found.update(_telemetry_sources(template))
+                found.update(_telemetry_sources(template, pick))
     return found
 
 
-def telemetry_sources(value) -> set[str]:
-    """All authored telemetry sources in a spec fragment."""
+def telemetry_sources(value, pick=_signal_sources) -> set[str]:
+    """All authored telemetry sources in a spec fragment (`pick` selects per signal)."""
     found = set()
     if isinstance(value, dict):
         telemetry = value.get("telemetry")
         if isinstance(telemetry, dict):
-            found.update(_telemetry_sources(telemetry))
+            found.update(_telemetry_sources(telemetry, pick))
         for item in value.values():
-            found.update(telemetry_sources(item))
+            found.update(telemetry_sources(item, pick))
     elif isinstance(value, list):
         for item in value:
-            found.update(telemetry_sources(item))
+            found.update(telemetry_sources(item, pick))
     return found
 
 
@@ -237,20 +251,21 @@ def telemetry_authored(value) -> bool:
 TOPOLOGY_BLOCK = re.compile(r'<script type="application/json" id="flowview-topology">(.*?)</script>', re.S)
 # Resolves the page's imports as src/boot.flowview.js does at view time
 # (FlowTopology.resolveSource over that context, then normalize) and prints the
-# signal sources of every binding the runtime hands its telemetry provider.
+# signal sources of every binding the runtime hands its telemetry provider, and
+# the sources of its example-trace signals.
 RESOLVED_SOURCES_JS = r"""
 const {entrypoint}=require(__LOADER__),vm=require('node:vm'),fs=require('node:fs');
 const input=JSON.parse(fs.readFileSync(0,'utf8')),quiet={log(){},info(){},warn(){},error(){}};
 const doc={hidden:false,addEventListener(){},removeEventListener(){},createElement:()=>({style:{},setAttribute(){},appendChild(){}})};
 const C={URL,console:quiet,AbortController,setTimeout,clearTimeout,document:doc};
 vm.runInNewContext(entrypoint('native').source,C);
-const page=C.normalize(C.FlowTopology.resolveSource(input.spec,input.context)),sources=[];
+const page=C.normalize(C.FlowTopology.resolveSource(input.spec,input.context)),sources=[],traces=[];
 C.telemetryBindings(fn=>C.sectionRecords(page).forEach(record=>{
   const d=record.section.diagram||{};
   Object.keys(d.nodes||{}).forEach(id=>fn(d.nodes[id],id,page));
   (Array.isArray(d.edges)?d.edges:[]).forEach(e=>fn(e,e&&typeof e==='object'?e.from+'->'+e.to:null,page));
-})).forEach(b=>Object.keys(b.signals).forEach(name=>{if(!sources.includes(b.signals[name].source))sources.push(b.signals[name].source);}));
-process.stdout.write(JSON.stringify({bound:sources.length>0,sources}));
+})).forEach(b=>Object.keys(b.signals).forEach(name=>{const s=b.signals[name];if(!sources.includes(s.source))sources.push(s.source);if(C.proofVerdicts.isTraceSignal(s) && !traces.includes(s.source))traces.push(s.source);}));
+process.stdout.write(JSON.stringify({bound:sources.length>0,sources,traces}));
 """
 
 
@@ -266,21 +281,22 @@ def topology_context(html: str):
     return context if isinstance(context, dict) else None
 
 
-def imported_telemetry(spec: dict, context: dict) -> tuple[bool, set[str]]:
+def imported_telemetry(spec: dict, context: dict) -> tuple[bool, set[str], set[str]]:
     """Telemetry the runtime resolves from imported carriers: exported and selected
     carriers only, nested imports included, consumer overlays replacing provider
-    bindings and provider templates expanded. On resolver failure, fail open to
-    authored context so the guide never under-declares its data dependencies."""
+    bindings and provider templates expanded. Returns (bound, sources, trace
+    sources). On resolver failure, fail open to authored context so the guide
+    never under-declares its data dependencies."""
     script = RESOLVED_SOURCES_JS.replace("__LOADER__", json.dumps(str(REPO_ROOT / "tools" / "source-loader.cjs")))
     try:
         result = subprocess.run(["node", "-e", script], input=json.dumps({"spec": spec, "context": context}),
                                 capture_output=True, text=True, timeout=120, check=False)
         resolved = json.loads(result.stdout) if result.returncode == 0 else None
-        if isinstance(resolved, dict) and isinstance(resolved.get("sources"), list):
-            return bool(resolved.get("bound")), set(resolved["sources"])
+        if isinstance(resolved, dict) and isinstance(resolved.get("sources"), list) and isinstance(resolved.get("traces"), list):
+            return bool(resolved.get("bound")), set(resolved["sources"]), set(resolved["traces"])
     except (OSError, subprocess.SubprocessError, ValueError):
         pass
-    return telemetry_authored(context), telemetry_sources(context)
+    return telemetry_authored(context), telemetry_sources(context), telemetry_sources(context, _trace_sources)
 
 
 # #826: the spec file published beside a two-file page, and the line that tells
@@ -350,7 +366,8 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
     capability declaration names only what this page needs (the Jira connector only
     when the page has Jira/non-telemetry tracking; the Grafana connector only when the enabled root has
     a carrier or page template binding a grafana, loki or sql signal, imported
-    carriers of the embedded `topology` context included, #943; the artifact and user
+    carriers of the embedded `topology` context included, #943; the example-trace
+    search/detail tools when a signal offers example traces, #1139; the artifact and user
     capabilities for Jira- or telemetry-editable pages published in two-file mode,
     independent of Jira permission, #826). `commit` pins the doc links to the
     source this page was built from (#758: docs at the page's version). Any authored
@@ -369,25 +386,31 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
     # reads/writes the artifact and attributes saves through the viewer profile.
     tracked = bool(tracking and any(key != "telemetry" for key in tracking))
     sources = telemetry_sources(page)
+    traces = telemetry_sources(page, _trace_sources)
     metrics = telemetry_authored(page)
     if topology is not None:
-        imported_bound, imported_sources = imported_telemetry(spec, topology)
+        imported_bound, imported_sources, imported_traces = imported_telemetry(spec, topology)
         metrics = metrics or imported_bound
         sources.update(imported_sources)
+        traces.update(imported_traces)
     telemetry_config = tracking.get("telemetry") if tracking and isinstance(tracking.get("telemetry"), dict) else {}
     root_disabled = telemetry_config.get("enabled") is False
     grafana = not root_disabled and any(source in GRAFANA_SOURCES for source in sources)
     honeycomb = not root_disabled and "honeycomb" in sources
+    traces = set() if root_disabled else traces
     direct = direct_trace_connections(spec, topology)
     # #1099: Load trace log lookups call query_loki_logs, so they need Load trace.
     log_lookups = not root_disabled and bool(direct) and isinstance(telemetry_config.get("lookups"), dict)
     grafana_tools = [tool for source, tool in GRAFANA_TOOLS.items() if source in sources]
     if log_lookups and "query_loki_logs" not in grafana_tools:
         grafana_tools.append("query_loki_logs")
+    if "tempo" in traces:
+        grafana_tools += TRACE_TOOLS["tempo"]
+    honeycomb_tools = HONEYCOMB_TOOLS + (TRACE_TOOLS["honeycomb"] if "honeycomb" in traces else [])
 
     servers = ([{"server": "Atlassian", "tools": JIRA_TOOLS}] if tracked else []) + \
-        ([{"server": "Grafana", "tools": grafana_tools}] if grafana or log_lookups else []) + \
-        ([{"server": "Honeycomb", "tools": HONEYCOMB_TOOLS}] if honeycomb else [])
+        ([{"server": "Grafana", "tools": grafana_tools}] if grafana or log_lookups or "tempo" in traces else []) + \
+        ([{"server": "Honeycomb", "tools": honeycomb_tools}] if honeycomb else [])
     for profile in direct.values():
         server = next((entry for entry in servers if entry["server"] == profile["server"]), None)
         if server is None:
@@ -496,7 +519,7 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
         lines += [
             "",
             "Grafana queries at most once/minute; SQL at most once/hour. "
-            "Annotations, traces and deeplinks are optional tools; declare only offered extras. Keep verified extras on republish.",
+            "Annotations and deeplinks are optional tools; declare only offered extras. Keep verified extras on republish.",
         ]
     if metrics:
         lines += [
@@ -523,8 +546,8 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
             "cloudwatchLogs/query_cloudwatch_logs: first row valueField/column; Complete+empty+totalFound=0 means zero. "
             "Logs: independent scalar + safe count trend + optional bounded breakdown. Numeric Over time includes Today/Honeycomb; SQL needs time macros.",
             "- Honeycomb uses run_query: one scalar, exact JSON, no breakdowns/formulas; COUNT "
-            "counts spans/events. Use stable query links, never signed URLs. For traces declare "
-            "get_trace and read the trace contract; one request only, retain partial warnings. "
+            "counts spans/events. Use stable query links, never signed URLs. Trace wrappers add "
+            "get_trace; read the trace contract; one request only, retain partial warnings. "
             "No trace history/raw trace JSON or unverified live-account claim.",
         ]
     if direct:

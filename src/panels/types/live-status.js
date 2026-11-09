@@ -83,7 +83,7 @@
       [{key:'track'}].concat(proof.arcs).forEach(function(arc){
         var circle=el(svg,'circle',arc.key,arc.key==='track'?'dv-live-ring-track':'dv-live-proof-arc');
         circle.setAttribute('cx','22');circle.setAttribute('cy','22');circle.setAttribute('r','18');circle.setAttribute('pathLength','100');
-        if(arc.key!=='track'){circle.setAttribute('data-proof-bucket',arc.key);circle.setAttribute('stroke-dasharray',arc.size+' 100');circle.setAttribute('stroke-dashoffset',-arc.offset);}
+        if(arc.key!=='track'){circle.setAttribute('data-proof-bucket',arc.key);if(proof.states && proof.states[arc.key])circle.setAttribute('data-metric-state',proof.states[arc.key]);circle.setAttribute('stroke-dasharray',arc.size+' 100');circle.setAttribute('stroke-dashoffset',-arc.offset);}
       });
       el(ring,'strong','count','dv-live-proof-ratio',proof.counts.proven+'/'+proof.counts.bound+' bound proven');
       var main=el(box,'div','main','dv-live-epic-main');el(main,'h3','heading','','Proof');

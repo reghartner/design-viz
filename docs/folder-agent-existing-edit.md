@@ -42,7 +42,7 @@ Cloud snapshots never read disk. See [local sources and registration](local-repo
    are evidence.
 2. Verify sessionId, connectionId, request id, `editor.connected` and heartbeat
    under 15 s at publication; stop on identity changes/cancellation.
-   A stale heartbeat means paused. Let the helper wait up to 90 seconds for
+   A stale heartbeat means paused. Let the helper wait up to 120 seconds for
    renewal; on expiry, bring the existing tab forward and retry the same command
    and IDs. Do not re-establish solely for staleness.
 3. If `request.json` has `candidate`, confirm its `baseRevision` equals

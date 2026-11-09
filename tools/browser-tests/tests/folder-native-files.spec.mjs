@@ -151,3 +151,49 @@ test('desktop heartbeat and resume events stay live during a held native artifac
   await page.evaluate(()=>{window.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'));});
   expect(await sessionFile(page,'editor.json')).toEqual(closed);
 });
+
+// #1223: the agent chat's request poll (250 ms) and the folder heartbeat (1 s) run on the
+// background timer's dedicated worker, so Chrome's intensive throttling of a hidden tab's page
+// timers does not slow them. The worker starts with the first connected tick, and a retired
+// connection releases it: retire → reconnect leaves exactly one worker per timer.
+test('#1223 desktop polling and heartbeat run on background workers; retire and reconnect leave one pair',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await page.addInitScript(()=>{
+    window.showDirectoryPicker=async()=>navigator.storage.getDirectory();
+    const Real=window.Worker;window.backgroundWorkers=[];
+    window.Worker=class extends Real{
+      constructor(...args){super(...args);this.record={delays:[],terminated:false};window.backgroundWorkers.push(this.record);}
+      postMessage(message,...rest){if(message && typeof message.ms==='number')this.record.delays.push(message.ms);return super.postMessage(message,...rest);}
+      terminate(){this.record.terminated=true;return super.terminate();}
+    };
+  });
+  const workers=()=>page.evaluate(()=>window.backgroundWorkers.map(w=>({delays:[...new Set(w.delays)].sort((a,b)=>a-b),live:!w.terminated})));
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);
+  expect(await workers()).toEqual([]);
+  await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
+  await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();
+  // One worker carries the poll tick, another the heartbeat.
+  await expect.poll(async()=>(await workers()).filter(w=>w.live).map(w=>w.delays.join(',')).sort()).toEqual(['1000','250']);
+  // A request written by the agent is acknowledged through that polling.
+  const manifest=await sessionFile(page,'session.json');
+  await page.evaluate(async owner=>{
+    const root=await navigator.storage.getDirectory(),meta=await root.getDirectoryHandle('.flowview-agent'),handle=await meta.getFileHandle('agent-request.json',{create:true}),writer=await handle.createWritable();
+    await writer.write(JSON.stringify({...owner,id:'worker-request',text:'Acknowledge through the worker tick',expiresAt:Date.now()+120000}));await writer.close();
+  },manifest);
+  await expect.poll(async()=>(await sessionFile(page,'transcript.json'))?.messages.at(-1)?.requestId).toBe('worker-request');
+  // Retire (the folder lease closed elsewhere): both workers are released.
+  await page.evaluate(async()=>{
+    const root=await navigator.storage.getDirectory(),meta=await root.getDirectoryHandle('.flowview-agent'),handle=await meta.getFileHandle('editor.json');
+    const value=JSON.parse(await(await handle.getFile()).text()),writer=await handle.createWritable();
+    await writer.write(JSON.stringify({...value,connected:false}));await writer.close();
+  });
+  await expect(page.locator('#editor-agent')).toHaveAttribute('data-connected','false');
+  await expect.poll(async()=>(await workers()).filter(w=>w.live).length).toBe(0);
+  // Reconnect: exactly one live worker per timer again, none leaked from the retired client.
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-start-resume').click();await page.locator('#folder-agent-connect').click();
+  await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();
+  await expect.poll(async()=>(await workers()).filter(w=>w.live).map(w=>w.delays.join(',')).sort()).toEqual(['1000','250']);
+  await page.locator('#folder-agent-pairing>summary').click();await page.locator('#folder-agent-disconnect').click();
+  await expect(page.locator('#editor-agent')).toHaveAttribute('data-connected','false');
+  await expect.poll(async()=>(await workers()).filter(w=>w.live).length).toBe(0);
+});

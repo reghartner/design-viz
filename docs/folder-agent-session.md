@@ -106,6 +106,10 @@ your-diagram/
 ```
 
 The support directory contains its own `.gitignore` excluding its contents.
+A request's candidate copies are deleted once it is accepted, released, withdrawn
+or expired, or when a newer request is published (a reply may be a question, so its
+copies stay until then); the current request keeps its own, and a name this session
+never published is left alone (#1223).
 Commit the reviewed spec and ledger; connection metadata, copied messages and
 candidate files are not project deliverables. Existing unrelated files, including
 a root README or `.gitignore`, are preserved. Previously created exchange folders
@@ -445,27 +449,39 @@ python3 /path/to/diagram/.flowview-agent/folder-agent.py begin --text "The reque
 ```
 
 Wait for browser acknowledgement before working. `begin` waits for both the request
-file and its accepted transcript entry; it withdraws after 90 seconds without
-acknowledgement. Before registering, it also waits up to 90 seconds for a paused
+file and its accepted transcript entry; it withdraws after 120 seconds without
+acknowledgement. Before registering, it also waits up to 120 seconds for a paused
 heartbeat to refresh or an existing proposal to be approved and saved. These
-share one 90-second pre-registration budget (at most three minutes across both phases).
+share one 120-second pre-registration budget (at most four minutes across both phases).
 Unapproved proposals are never automatically applied or replaced; rejected and
 other unfinished requests remain active for correction. These waits
-allow for delayed background browser timers, and report progress on stderr while
-keeping JSON stdout unchanged. Keep the helper running; bringing the existing
-Workbench tab to the front can shorten the wait. One
+allow for delayed background browser timers (two one-minute wakes of a throttled hidden
+tab), and report progress on stderr ("a hidden tab can be slowed by the browser") while
+keeping JSON stdout unchanged. Keep the helper running. One
 request is active at a time. Successful explicit Accept with an `applied` or
 `unchanged` result finishes an external request automatically. No agent reply,
 reset or changed connection is needed, even if the agent is idle.
 
 A stale heartbeat alone does not require a new session. Commands for an existing
-request wait up to 90 seconds for the same connected editor to refresh, preserving
+request wait up to 120 seconds for the same connected editor to refresh, preserving
 its IDs and pending work. Identity changes, explicit disconnect and cancellation
 are refused immediately. Publication still requires a heartbeat at most 15 seconds
 old and the current request. If the bounded wait expires, bring the existing
-Workbench tab to the front and retry the same command with the same IDs. A frozen
-or discarded browser tab cannot be resumed by the helper. File permission errors
-need their reported access repair; they are not heartbeat pauses.
+Workbench tab to the front and retry the same command with the same IDs. File
+permission errors need their reported access repair; they are not heartbeat pauses.
+
+**Hidden tabs (#1223).** The Workbench runs its heartbeat and request polling on a
+dedicated Web Worker timer, so a hidden tab keeps renewing its lease and answering
+requests while Chrome's intensive throttling limits the page's own timers to about
+one wake a minute. Where workers are unavailable the page timer is used. A worker does
+not help against tab freezing: with Energy Saver on, Chrome (133 and later) may freeze
+a CPU-intensive background tab, and Memory Saver may discard one; a frozen or
+discarded tab runs nothing until it is brought to the front, so the helper's waits
+run out. Chrome exempts a tab only for a Web Lock or IndexedDB connection that
+blocks another context, audio or video conferencing, or device APIs, none of which
+a Workbench connection holds, so no lock is taken to avoid freezing. If requests
+time out with the tab hidden, keep the Workbench visible (or in its own window) or
+turn off Energy Saver for it.
 
 **Re-establish session** in the Agent window recovers a stuck or lost turn in either
 mode. It writes `cancel.json` for any active request under the old identity,

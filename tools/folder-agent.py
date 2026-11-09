@@ -24,8 +24,13 @@ import uuid
 LIMIT = 8 * 1024 * 1024
 PROGRESS_LIMIT = 100
 HEARTBEAT_MAX_AGE_MS = 15000
-RECOVERY_SECONDS = 90
-ACKNOWLEDGEMENT_SECONDS = 90
+# A hidden Workbench tab can be throttled by the browser to about one wake a minute (#1223).
+# With the same identity and a connected lease, wait two such cycles before giving up.
+RECOVERY_SECONDS = 120
+ACKNOWLEDGEMENT_SECONDS = 120
+# The Workbench refuses a refresh envelope that expires more than 120 s ahead; keep a margin.
+REFRESH_SECONDS = 110
+HIDDEN_TAB = 'a hidden tab can be slowed by the browser'
 
 
 class HeartbeatPausedError(ValueError):
@@ -63,7 +68,7 @@ def wait_for_editor(folder, owner, request_id=None, deadline=None):
                 deadline = time.monotonic() + RECOVERY_SECONDS
             if not announced:
                 announced = True
-                print(f'Workbench heartbeat paused; waiting up to {RECOVERY_SECONDS} seconds for this same connection to resume. Bringing its tab to the front can help.', file=sys.stderr, flush=True)
+                print(f'Workbench heartbeat paused; waiting up to {RECOVERY_SECONDS} seconds for the Workbench tab ({HIDDEN_TAB}).', file=sys.stderr, flush=True)
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise
@@ -273,7 +278,7 @@ def preflight(folder, monitor='unverified'):
         {'id': 'monitor', 'status': {'available': 'ready', 'unavailable': 'missing', 'unverified': 'unverified'}[monitor],
          'message': 'Monitor availability is reported by the visible Claude session; this helper cannot inspect Claude tools.'},
         {'id': 'editor', 'status': 'ready' if live else 'missing',
-         'message': 'Editor connection is live.' if live else ('Workbench heartbeat is paused. Bring the existing tab to the front; helper commands wait for this same connection to resume.' if editor.get('connected') is True and all(editor.get(k) == v for k, v in owner.items()) else 'Editor is disconnected or ownership changed. Return to the workbench and check this session.')},
+         'message': 'Editor connection is live.' if live else (f'Workbench heartbeat is paused ({HIDDEN_TAB}). Helper commands wait up to {RECOVERY_SECONDS} seconds for this same connection to resume.' if editor.get('connected') is True and all(editor.get(k) == v for k, v in owner.items()) else 'Editor is disconnected or ownership changed. Return to the workbench and check this session.')},
     ]
     value = {**owner, 'at': int(time.time() * 1000), 'checks': checks,
              'ready': all(check['status'] == 'ready' for check in checks)}
@@ -664,11 +669,11 @@ def refresh_sources(folder, source_repo=None):
         return {**owner, 'status': 'rejected', 'code': 'invalid_sources', 'message': str(error), 'currentRevision': revision, 'localSources': capability}
     available()
     request = {**owner, 'version': 1, 'id': uuid.uuid4().hex, 'baseRevision': revision,
-               'expiresAt': int(time.time()*1000) + ACKNOWLEDGEMENT_SECONDS*1000}
+               'expiresAt': int(time.time()*1000) + REFRESH_SECONDS*1000}
     if snapshot is not None:
         request['sources'] = snapshot
     write(folder, 'refresh-sources.json', request, guard=available)
-    deadline = time.monotonic() + ACKNOWLEDGEMENT_SECONDS
+    deadline = time.monotonic() + REFRESH_SECONDS
     try:
         while True:
             connected_editor(folder, owner, allow_stale=True)
@@ -756,7 +761,7 @@ def begin(folder, owner, text):
                 raise ValueError('This turn was stopped in the editor. Do not send more changes or replies for it.')
             still_ours()
             if not announced and deadline - time.monotonic() <= ACKNOWLEDGEMENT_SECONDS - 1:
-                print(f'Waiting up to {ACKNOWLEDGEMENT_SECONDS} seconds for Workbench acknowledgement. Bring its existing tab to the front if it is suspended.', file=sys.stderr, flush=True)
+                print(f'Waiting up to {ACKNOWLEDGEMENT_SECONDS} seconds for Workbench acknowledgement ({HIDDEN_TAB}).', file=sys.stderr, flush=True)
                 announced = True
             request = pending_object(folder, 'request.json')
             if request and request.get('id') == request_id:

@@ -81,6 +81,8 @@ class FolderAgentTests(unittest.TestCase):
         request = json.loads((self.folder/'refresh-sources.json').read_text())
         self.assertEqual(set(request), {'version','sessionId','connectionId','id','baseRevision','expiresAt'})
         self.assertEqual(request['baseRevision'], 'connection-1')
+        # #1223: the Workbench refuses an envelope more than 120 s ahead; the helper keeps a margin.
+        self.assertLessEqual(request['expiresAt'], time.time()*1000 + 110000)
         self.assertFalse((self.folder/'request.json').exists())
         self.refresh_receipt()
         output, error = process.communicate(timeout=5)
@@ -509,8 +511,8 @@ class FolderAgentTests(unittest.TestCase):
 
     def test_native_begin_timeout_withdraws_its_request(self):
         self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
-        # Deterministically cross the deadline without waiting 90 real seconds.
-        with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Late']), patch.object(helper.time, 'monotonic', side_effect=[0, 0, 91]):
+        # Deterministically cross the deadline without waiting 120 real seconds.
+        with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Late']), patch.object(helper.time, 'monotonic', side_effect=[0, 0, 121]):
             with self.assertRaisesRegex(ValueError, 'withdrawn'):
                 helper.main()
         self.assertTrue(helper.read(self.folder, 'agent-request.json')['withdrawn'])
@@ -577,7 +579,7 @@ class FolderAgentTests(unittest.TestCase):
         with patch.object(sys, 'argv', ['helper', '--folder', str(self.folder), 'begin', '--text', 'Next']), patch.object(helper.time, 'monotonic', side_effect=lambda: clock[0]), patch.object(helper.time, 'sleep', side_effect=advance), patch.object(sys, 'stderr', io.StringIO()):
             with self.assertRaisesRegex(helper.ProposalPendingError, 'awaiting approval'):
                 helper.main()
-        self.assertEqual(clock[0], 90)
+        self.assertEqual(clock[0], 120)
         self.assertEqual(before['agent-request.json'], (self.folder/'agent-request.json').read_bytes())
         self.assertFalse((self.folder/'result.json').exists())
 
@@ -593,7 +595,7 @@ class FolderAgentTests(unittest.TestCase):
         with patch.object(sys, 'argv', ['helper', '--folder', str(self.folder), 'begin', '--text', 'Next']), patch.object(helper.time, 'time', side_effect=lambda: epoch+clock[0]), patch.object(helper.time, 'monotonic', side_effect=lambda: clock[0]), patch.object(helper.time, 'sleep', side_effect=advance), patch.object(sys, 'stderr', errors):
             with self.assertRaises(helper.ProposalPendingError):
                 helper.main()
-        self.assertEqual(clock[0], 90)
+        self.assertEqual(clock[0], 120)
         self.assertEqual(helper.read(self.folder, 'agent-request.json')['id'], 'request')
         self.assertIn('heartbeat paused', errors.getvalue())
         self.assertIn('awaiting approval', errors.getvalue())
@@ -633,7 +635,7 @@ class FolderAgentTests(unittest.TestCase):
         renewed = {'protocol': 'flowview-folder-v1', 'sessionId': 'renewed', 'connectionId': 'renewed-connection',
                    'workflow': 'external'}
         for phase, announcement, editor_age in (('registration', 'heartbeat paused', 60),
-                                                ('acknowledgement', 'Waiting up to 90 seconds for Workbench acknowledgement', 0)):
+                                                ('acknowledgement', 'Waiting up to 120 seconds for Workbench acknowledgement', 0)):
             with self.subTest(phase=phase):
                 self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
                 self.put('editor.json', {**self.owner, 'connected': True, 'at': (time.time()-editor_age)*1000})
@@ -667,7 +669,7 @@ class FolderAgentTests(unittest.TestCase):
         def cancel():
             incoming = helper.read(self.folder, 'agent-request.json')
             self.put('cancel.json', {**self.owner, 'id': 'cancel-1', 'requestId': incoming['id']})
-        code, errors = self.begin_interrupted('Waiting up to 90 seconds for Workbench acknowledgement', cancel)
+        code, errors = self.begin_interrupted('Waiting up to 120 seconds for Workbench acknowledgement', cancel)
         self.assertEqual(code, 1, errors)
         self.assertIn('Workbench acknowledgement failed: This turn was stopped in the editor. Do not send more '
                       'changes or replies for it. This attempt was withdrawn.', errors)
@@ -1007,7 +1009,7 @@ class FolderAgentTests(unittest.TestCase):
                     helper.main()
                 filename = 'proposal.json' if command == 'propose' else command + '.json'
                 self.assertEqual(json.loads(output.getvalue())['written'], filename)
-                self.assertIn('waiting up to 90 seconds', errors.getvalue())
+                self.assertIn('waiting up to 120 seconds', errors.getvalue())
                 self.assertEqual(now[0], 1060)
                 self.assertEqual(helper.identity(self.folder), self.owner)
                 self.assertEqual(helper.read(self.folder, filename)['requestId'], 'request')
@@ -1020,7 +1022,7 @@ class FolderAgentTests(unittest.TestCase):
         with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'reply', '--request', 'request', '--text', 'Do not publish']), patch.object(helper.time, 'time', side_effect=lambda: now[0]), patch.object(helper.time, 'monotonic', side_effect=lambda: now[0]), patch.object(helper.time, 'sleep', side_effect=sleep), patch.object(sys, 'stderr', io.StringIO()):
             with self.assertRaisesRegex(helper.HeartbeatPausedError, 'existing Workbench tab.*same session and request IDs'):
                 helper.main()
-        self.assertEqual(now[0], 1090)
+        self.assertEqual(now[0], 1120)
         self.assertFalse((self.folder/'reply.json').exists())
 
     def test_recovery_stops_immediately_for_terminal_changes_and_permission_errors(self):
@@ -1076,11 +1078,42 @@ class FolderAgentTests(unittest.TestCase):
             helper.main()
         request = helper.read(self.folder, 'request.json')
         self.assertEqual(json.loads(output.getvalue())['id'], request['id'])
-        self.assertEqual(request['expiresAt'], 1150000)
+        self.assertEqual(request['expiresAt'], 1180000)
         self.assertGreaterEqual(now[0], 1120)
         self.assertLess(now[0], 1121)
         self.assertEqual(helper.identity(self.folder), self.owner)
         self.assertIn('acknowledgement', errors.getvalue())
+
+    def test_begin_waits_for_a_hidden_tab_across_throttled_minutes_without_asking_for_the_front(self):
+        """#1223: a hidden Workbench tab can be throttled to one wake a minute. With the same identity and a
+        connected lease, begin starts with a stale heartbeat that refreshes 30 s or 100 s later (100 s is past
+        the old 90 s recovery wait), and the acknowledgement arrives 110 s after registration (past the old
+        90 s acknowledgement wait). Both are waited for. Foregrounding is mentioned only when a wait runs out."""
+        for stale in (30, 100):
+            with self.subTest(stale=stale):
+                self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+                for name in ('request.json', 'transcript.json', 'agent-request.json'):
+                    (self.folder/name).unlink(missing_ok=True)
+                self.put('editor.json', {**self.owner, 'connected': True, 'at': (1000-16)*1000})
+                now, written = [1000.0], [None]
+                def sleep(seconds):
+                    now[0] += seconds
+                    if now[0] >= 1000 + stale:
+                        self.put('editor.json', {**self.owner, 'connected': True, 'at': now[0]*1000})
+                    if (self.folder/'agent-request.json').exists() and written[0] is None:
+                        written[0] = now[0]
+                    if written[0] is not None and now[0] >= written[0] + 110:
+                        request = helper.read(self.folder, 'agent-request.json')
+                        self.put('request.json', {**request, 'revision': 'connection-1'})
+                        self.put('transcript.json', {'sessionId': self.owner['sessionId'], 'messages': [{'role': 'user', 'requestId': request['id'], 'text': request['text']}]})
+                # begin starts at 1000 with a heartbeat 16 s old (paused); it refreshes at 1000 + stale.
+                output, errors = io.StringIO(), io.StringIO()
+                with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Hidden tab']), patch.object(helper.time, 'time', side_effect=lambda: now[0]), patch.object(helper.time, 'monotonic', side_effect=lambda: now[0]), patch.object(helper.time, 'sleep', side_effect=sleep), patch.object(sys, 'stdout', output), patch.object(sys, 'stderr', errors):
+                    helper.main()
+                self.assertEqual(json.loads(output.getvalue())['id'], helper.read(self.folder, 'request.json')['id'])
+                self.assertIn('a hidden tab can be slowed by the browser', errors.getvalue())
+                self.assertNotIn('to the front', errors.getvalue())
+                self.assertEqual(helper.identity(self.folder), self.owner)
 
     def test_watcher_ignores_stale_heartbeat_and_old_connection(self):
         self.put('editor.json', {**self.owner, 'connected': True, 'at': 0})

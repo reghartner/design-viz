@@ -639,6 +639,18 @@ function liveStatusCaption(diagram,step,map,waiting){
   }
   return text;
 }
+/* #1138 (D2): Over time on a board with no Jira references: the last 7 local days ending at `now`, built
+   with no calls. Days have the shape liveStatusHistoryDays writes: `key` is the local date, `at` the next
+   local midnight, and the label carries the year when the list spans two years. There are no ticket states. */
+function liveStatusLocalDays(now,locale){
+  var today=new Date(now),year=today.getFullYear(),month=today.getMonth(),date=today.getDate(),days=[];
+  var format=new Date(year,month,date-6).getFullYear()===year?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'};
+  for(var back=6;back>=0;back--){
+    var text=new Date(year,month,date-back).toLocaleDateString(locale || [],format);
+    days.push({key:new Date(Date.UTC(year,month,date-back)).toISOString().slice(0,10),at:new Date(year,month,date-back+1).toISOString(),label:text,short:text,states:{}});
+  }
+  return {days:days,index:days.length-1};
+}
 /* Over time (#929, #1012): one past day over today's map. Status comes from the day and everything
    else stays as of today, so a ticket keeps its row, title and place in the total. A ticket the day
    does not name is Missing, because an uncolored carrier would hide that it did not exist.
@@ -809,6 +821,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         // #1136: a board that opened on Trace for want of references opens Jira once a loaded detail brings some, unless the reader
         // chose a view or worked on a trace (Load, a log-line Load, choosing a trace or focusing a span clear statusAuto).
         if(statusAuto && referencesAvailable()){statusAuto=false;clearTraceFocus();statusMode='jira';}
+        // #1138: a local Over time ends when a loaded detail gives the board Jira references.
+        if(over && over.source===localHistory && referencesAvailable())overClose();
         if(JSON.stringify(refs())!==previous)notify();
       }
       return raw;
@@ -1082,9 +1096,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
       metrics:metricsSnapshot(),mode:statusMode,trace:traceSnapshot()};
   }
   function editState(){var state=editor?editor.state():null;return state && over && !state.blocked?Object.assign({},state,{blocked:'Editing is off while a past day is shown.'}):state;}
+  // #1138 (D2, V2): a board with no ticket, epic, exclusion or missing-work reference after imports has no Jira
+  // history, so when it has Metrics, Over time uses the local day list. The reader's click still opens it.
+  var localHistory={load:function(){return liveStatusLocalDays(Date.now());}};
+  function historySource(){return overSource || (!authoring && telemetry.status().state!=='absent' && !referencesAvailable()?localHistory:null);}
   function overTimeState(){
-    if(!overSource)return null;
-    var base={active:!!over,loading:overLoading,progress:overProgress,error:overError,available:!!(applied && Object.keys(map).length),disabled:editing()};
+    var source=over?over.source:historySource();if(!source)return null;
+    var base={active:!!over,loading:overLoading,progress:overProgress,error:overError,available:source===localHistory || !!(applied && Object.keys(map).length),disabled:editing()};
     base.window=overTimeWindow();
     if(!over)return base;
     var days=over.days;base.index=over.index;base.count=days.length;base.first=days[0].short;base.last=days[days.length-1].short;base.label=days[over.index].label;
@@ -1108,7 +1126,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // Returning to Live restores the live map, then applies any evidence that arrived meanwhile as a normal refresh.
   function overClose(){
     var left=over;over=null;map=left.live;changedKeys=[];telemetry.closeHistory();
-    if(overSource.close)overSource.close();
+    if(left.source.close)left.source.close();
     if(left.held)api.apply(left.value);else{paint();notify();telemetryHooks.jiraChanged();}
   }
   /* Every provider map, and a history source's today map, passes this one check. */
@@ -1132,12 +1150,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });
     return next;
   }
-  function overLoad(request,result){
+  function overLoad(request,result,source){
     if(retired || request!==overRequest)return;overLoading=false;
     var days=result && Array.isArray(result.days)?result.days:[];
     if(!days.length){overError='History could not load. Try Over time again.';notify();return;}
     var index=result.index;if(typeof index!=='number' || index<0 || index>=days.length)index=days.length-1;
-    over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null};on=true;availabilityOn=true;telemetry.openHistory(days,index);overShow();
+    over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null,source:source};on=true;availabilityOn=true;telemetry.openHistory(days,index);overShow();
   }
   // Authored carrier occurrences, independent of distinct Jira ticket totals.
   // The shared walk includes resolved imports, nested sections and loaded details.
@@ -1921,18 +1939,18 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // The reader's click is the only thing that loads history.
     overTime:function(){
       if(retired || overLoading || over)return;
-      if(!overSource || !applied || !Object.keys(map).length || editing())return;
+      var source=historySource();if(!source || source!==localHistory && (!applied || !Object.keys(map).length) || editing())return;
       var request=++overRequest;overLoading=true;overError='';overProgress='';notify();
-      Promise.resolve().then(function(){return overSource.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result);},function(){overLoad(request,null);});
+      Promise.resolve().then(function(){return source.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result,source);},function(){overLoad(request,null,source);});
     },
     overTimeClose:function(){if(!retired && over)overClose();},
     overTimeStep:function(delta){if(!retired && over)api.overTimeDay(over.index+delta);},
     overTimeDay:function(index){
       if(retired || !over || typeof index!=='number' || !isFinite(index) || Math.floor(index)!==index)return;
       index=Math.max(0,Math.min(over.days.length-1,index));if(index===over.index)return;
-      over.index=index;if(overSource.day)overSource.day(index);overShow();
+      over.index=index;if(over.source.day)over.source.day(index);overShow();
     },
-    clear:function(){if(retired)return;overRequest++;overLoading=false;overError='';if(over){over=null;telemetry.closeHistory();if(overSource.close)overSource.close();}availabilityOn=false;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();telemetryHooks.jiraChanged();},
+    clear:function(){if(retired)return;overRequest++;overLoading=false;overError='';if(over){var left=over;over=null;telemetry.closeHistory();if(left.source.close)left.source.close();}availabilityOn=false;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();telemetryHooks.jiraChanged();},
     enabled:function(){return on;},
     setEnabled:function(value){if(retired)return;on=!!value;if(on)availabilityOn=true;paint();notify();},
     // The panel's Metrics button (#939); Jira Live above is independent of it.

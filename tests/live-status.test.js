@@ -3290,6 +3290,61 @@ test('#1137 metric cards on a board without tickets get no Jira presentation; ti
 });
 // Chuck 2026-11-08 (D13): the Metrics overlay draws in every view. In the Trace view its cards carry no Jira work colouring,
 // and the Workbench card preview still draws there.
+/* #1153: the Trace view's metrics popup states metric evidence only: signal values, window, verdict and query links,
+   with no Jira state or proof words and no Since Done line. Dates in either popup read in local time, never as ISO. */
+test('#1153 the Trace-view metrics popup shows metric evidence only, and the Jira-view proof line reads its date in local time',async()=>{
+ const DONE='2026-11-05T12:00:00.000Z',ISO=/\d{4}-\d\d-\d\dT\d\d:\d\d/;
+ const readable=at=>{const d=new Date(at),day=d.getFullYear()===new Date().getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'};return d.toLocaleDateString([],day)+', '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});};
+ const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',tickets:['EE-1'],telemetry:TCALL()}]}}]}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:{rate:{value:5500},errors:{value:12}}}})}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+ h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+ const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+ for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
+ api.apply({'EE-1':{state:'done',updatedAt:DONE}});h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
+ const card=()=>h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]'),pop=()=>h.view.querySelector('.dv-live-popover'),escape=()=>h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
+ workPresentation(h,card());const jira=textOf(pop());
+ assert.match(jira,/Since Done: Done /,'contrasting precondition: the Jira-view popup keeps its proof line');
+ assert.ok(jira.includes('Done '+readable(DONE)),'its Done date reads in local time: '+jira);assert.doesNotMatch(jira,ISO,'no ISO timestamp in the Jira-view popup');
+ escape();api.setStatusMode('trace');h.flush();workPresentation(h,card());const trace=textOf(pop());
+ assert.match(pop().getAttribute('aria-label'),/^Metrics for /,'the Trace view opens the metrics popup');
+ assert.match(trace,/rate/,'it still shows the signal values');assert.match(trace,/5,500/);
+ for(const word of [/\bDONE\b/,/Since Done/,/\bDone\b/,/proven/i,/IN PROGRESS/i])assert.doesNotMatch(trace,word,'no Jira or proof words in the Trace-view popup: '+word);
+ assert.doesNotMatch(trace,ISO,'no ISO timestamp in the Trace-view popup');
+ assert.equal(pop().querySelector('.dv-live-production').getAttribute('data-verdict'),null,'no Jira-derived verdict token on the metrics popup');
+ api.destroy();
+});
+test('#1153 readable times: this year without the year, another year with it, an invalid value as given',()=>{
+ const h=harness(),C=h.C,now=new Date(),thisYear=new Date(now.getFullYear(),1,3,9,5).toISOString(),otherYear=new Date(now.getFullYear()-3,1,3,9,5).toISOString();
+ const time=d=>new Date(d).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+ assert.equal(C.liveStatusReadableTime(thisYear),new Date(thisYear).toLocaleDateString([],{month:'short',day:'numeric'})+', '+time(thisYear));
+ assert.equal(C.liveStatusReadableTime(otherYear),new Date(otherYear).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'})+', '+time(otherYear));
+ assert.match(C.liveStatusReadableTime(otherYear),new RegExp(String(now.getFullYear()-3)));assert.doesNotMatch(C.liveStatusReadableTime(thisYear),new RegExp(String(now.getFullYear())));
+ assert.equal(C.liveStatusReadableTime('not a date'),'not a date');
+ h.ctl.liveStatus.destroy();
+});
+test('#1153 the Trace-view metrics popup states each metric state in its own words, for Done and In Progress carriers alike',async()=>{
+ const shim=h=>{const matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+  h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+  const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+  for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;};
+ const P95={kind:'call',signals:{p95:{grafana:'histogram_quantile(0.95, x)',unit:'ms'}},proof:{}};
+ const cases=[
+  ['degraded',TCALL(),{rate:{value:5000},errors:{value:900}},/^DEGRADED · Outside limit: errors is /],
+  ['silent',TCALL(),{rate:{value:0},errors:{value:0}},/^SILENT · Outside limit: rate is 0 req\/h; limit rate at least 1 req\/h$/],
+  ['unmeasured, no limits',P95,{p95:{value:41}},/^OBSERVED · Observed signals; no authored limits\.$/],
+  ['unmeasured, max only',{...P95,proof:{p95:{max:300}}},{p95:{value:41}},/^OBSERVED · Observed signals are within their authored limits; no traffic minimum is authored\.$/],
+  ['flowing',TCALL(),{rate:{value:5500},errors:{value:12}},/^OBSERVED · Observed signals are within their authored limits\.$/]];
+ for(const state of ['done','active'])for(const [name,telemetry,signals,expected] of cases){
+  const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',tickets:['EE-1'],telemetry}]}}]}};
+  const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals}})}}),api=h.ctl.liveStatus;shim(h);
+  api.apply({'EE-1':{state,updatedAt:'2026-11-05T12:00:00.000Z'}});h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();api.setStatusMode('trace');h.flush();
+  workPresentation(h,h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]'));
+  const pop=h.view.querySelector('.dv-live-popover'),verdict=pop.querySelector('.dv-live-production-verdict').textContent,text=textOf(pop);
+  assert.match(verdict,expected,state+' '+name+': '+verdict);
+  for(const word of [/\bDONE\b/i,/IN PROGRESS/i,/live early/i,/proven/i,/proof/i,/Since Done/])assert.doesNotMatch(text,word,state+' '+name+': '+word);
+  api.destroy();
+ }
+});
 test('D13 metric cards draw in the Trace view of a board with tickets without Jira work colouring, and the Workbench preview draws there too',async()=>{
  const shim=h=>{const matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
   h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};

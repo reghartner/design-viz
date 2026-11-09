@@ -752,7 +752,7 @@ the day row and any Over time error, in both views. A board with no ticket or ep
 references after imports has no Jira view (#1136): the panel opens on Trace with no
 **Jira** | **Trace** switch. If a loaded detail
 brings ticket references, the switch appears and the panel moves to Jira unless the reader
-chose a view or worked on a trace. In the Trace view a metric card opens only its metrics. The Jira view then has two rows. The first holds only buttons, which keep
+chose a view or worked on a trace. In the Trace view a metric card opens only its metrics: signal values, window, a metric verdict and query links, with no Jira or proof words and no Since Done line (#1153). The Jira view then has two rows. The first holds only buttons, which keep
 their place: any provider action and, on the far right, **First blocker**. **First blocker** keeps one size; with no blockers it reads
 **No blockers** and is greyed out, and with blockers it cannot reach from here it
 stays **First blocker** and is greyed out. The second row holds everything that
@@ -2579,7 +2579,7 @@ telemetry map has measured evidence. It uses the same Proof values, configured
 window, actual points/markers and safe authored-first link as the panel. Failed
 thresholds name their signal, measured value and requirement. Missing values stay
 unobserved; measured zero stays zero. Since Done shows known Done and first
-observed traffic timestamps, plus explicitly measured totals when their interval
+observed traffic times in local time (for example "Nov 5, 7:00 AM"), plus explicitly measured totals when their interval
 matches Done as described below; window rates are not lifetime totals. Local,
 imported and asynchronously loaded detail carriers use their carrier identity and
 own binding scope. Refreshes and day selection update an open Production block

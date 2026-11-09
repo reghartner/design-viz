@@ -249,8 +249,8 @@ function telemetryPaintTraceEdgeFocus(path,level,tone){
   function make(tag,attrs,parent){var el=doc.createElementNS(ns,tag);Object.keys(attrs).forEach(function(key){el.setAttribute(key,attrs[key]);});parent.appendChild(el);return el;}
   var g=doc.createElementNS(ns,'g');g.setAttribute('class','dv-trace-edge-focus');g.setAttribute('pointer-events','none');g.setAttribute('aria-hidden','true');
   g.setAttribute('data-trace-level',level || 'current');g.setAttribute('data-trace-tone',tone || 'observed');
-  // The ring between the two mask strokes: 4 units each side for current, 2 for above, 1 for below.
-  var outer=width+(level==='below'?10:level==='above'?12:16);
+  // The ring between the two mask strokes: 4 units each side for current, 2 for the dotted below/above.
+  var outer=width+(level==='below' || level==='above'?12:16);
   if(path.getAttribute('transform')!=null)g.setAttribute('transform',path.getAttribute('transform'));
   var defs=make('defs',{},g),mask=make('mask',{id:id,maskUnits:'userSpaceOnUse',x:box.x-pad,y:box.y-pad,width:box.width+2*pad,height:box.height+2*pad,'mask-type':'luminance'},defs);
   make('path',{d:shape,fill:'none',stroke:'white','stroke-width':outer,'stroke-linecap':'round','stroke-linejoin':'round'},mask);

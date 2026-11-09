@@ -2156,9 +2156,9 @@ Trace highlight levels (#1185) add marks without changing any node or edge colou
 brackets outside a node card or text node, and an outline that follows the edge's own path. With
 a span focused, its step's carriers are *current* (solid brackets with the Trace tag, a wide
 outline, time label 2px larger in a darker ink); carriers of its descendant spans are *below*
-(thin brackets, a thin lighter outline); carriers of its ancestor spans are *above* (dashed
-brackets and outline); other carriers in the trace get no marks and a smaller, fainter time label.
-With no span focused every carrier in the trace has the *below* marks. An edge whose delivery is
+(dotted brackets and outline in the span's colour); carriers of its ancestor spans are *above*
+(dotted brackets and outline in grey); other carriers in the trace get no marks and a smaller,
+fainter time label. With no span focused every carrier in the trace has the dotted *below* marks. An edge whose delivery is
 drawn broken, or a step that delivers on several edges, gets no outline. Mark colours follow each
 span's result: error red, warning amber, observed cyan, unknown grey. When a trace is first shown
 and it has an error span whose step mapping is unique, the earliest such span is focused, as if the

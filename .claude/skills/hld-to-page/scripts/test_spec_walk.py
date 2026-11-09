@@ -122,9 +122,9 @@ class WalkTest(unittest.TestCase):
     # ---- #1214: replies without a second arrow ----------------------------
 
     def test_ack_style_response_edge_offers_the_step_text_alternative(self):
-        # #1214 (company round 6, corrected): a ret edge stays only with evidence;
-        # otherwise the reply is named in the step text or a calls panel. Existing
-        # ret edges still validate cleanly.
+        # #1214 (company round 6, corrected): a ret edge stays only with evidence,
+        # and a reply the source shows may go in the step text or a calls panel
+        # instead of a second arrow. Existing ret edges still validate cleanly.
         spec = page({"edges": [
             {"from": "cam", "to": "svc", "kind": "https", "label": "report"},
             {"from": "svc", "to": "cam", "kind": "https", "ret": True, "label": "202 accepted"},

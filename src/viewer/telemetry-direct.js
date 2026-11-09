@@ -100,6 +100,14 @@ function createTelemetryDirect(page,transport,hooks){
       if(result && result.isError)FlowTraceConnections.fail('detail',telemetryTraceErrorText(result) || 'The detail tool returned an error; no trace was accepted.');
       update({requestAccepted:true,stage:'response'});stage='response';
       var trace=p.adapter==='honeycomb-table-v1'?telemetryHoneycombTrace(result,resolved.traceId,p.allowedAttributes):telemetryTempoTrace(result,resolved.traceId,p.allowedAttributes);check();
+      // #1197: one run_query on the same server reads the allowed attributes Honeycomb get_trace omits.
+      if(p.provider==='honeycomb' && (p.allowedAttributes || []).length && trace.spans.length){
+        stage='attributes';update({stage:stage});var query={connection:request.connection,profile:Object.assign({},p,{tool:'run_query'}),environment:resolved.environment},env=p.environments[resolved.environment];
+        trace.warnings=trace.warnings.concat(await telemetryTraceAttributes(trace.spans,p.allowedAttributes,{traceId:resolved.traceId,environment:env && env.value,dataset:p.dataset,
+          from:'-'+(resolved.lookback || Math.max(1,Math.ceil((Date.now()-Date.parse(resolved.range.from))/3600000))+'h'),
+          describe:function(){return transport.describe(query,signal);},call:function(input){return transport.call(query,input,signal);},
+          stop:function(error){return !active() || !!(error && error.code==='user_changed');}}));check();
+      }
       var e=telemetryTraceEnvelope({version:1,provider:p.provider,traceId:resolved.traceId,signal:'direct',selectionToken:'direct-'+mine,selectionReason:'Explicit trace ID loaded with '+p.label,observedAt:new Date().toISOString(),range:resolved.range,candidates:[{traceId:resolved.traceId,status:'unknown'}],spans:trace.spans,completeness:trace.completeness,warnings:trace.warnings.map(telemetryTraceErrorText).filter(Boolean),url:trace.url},p.allowedAttributes);
       exemplar=e;busy=false;update({stage:'complete',idMatched:true,spanCount:e.spans.length,completeness:e.completeness,warnings:e.warnings});return e;
     }catch(e){

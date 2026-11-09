@@ -67,8 +67,14 @@ function createTelemetryTraces(page,win,now,bound){
     var request=(async function(){
       var result=await entry.mcp.callTool(entry.contract.server,entry.contract.detail.name,telemetryTraceInputs(entry.job,entry.config,entry.contract,entry.range,candidate.traceId),{signal:abort.signal});
       if(!active(entry.epoch))telemetryTraceFail('Trace session cancelled.');
-      var trace=entry.job.signal.source==='tempo'?telemetryTempoTrace(result,candidate.traceId):telemetryHoneycombTrace(result,candidate.traceId);
-      return telemetryTraceEnvelope({version:1,provider:entry.job.signal.source,traceId:candidate.traceId,signal:entry.job.name,selectionReason:reason+'; first explicit trace signal in authored order',selectionToken:entry.token,observedAt:new Date(clock()).toISOString(),range:entry.range,candidates:entry.candidates,spans:trace.spans,completeness:trace.completeness,warnings:entry.warnings.concat(trace.warnings),url:trace.url || candidate.url || null});
+      // #1197: the page's trace connection profiles' allowedAttributes apply here too;
+      // Honeycomb reads them with one more run_query for the chosen trace.
+      var source=entry.job.signal.source,allowed=telemetryTraceAllowed(current,source),trace=source==='tempo'?telemetryTempoTrace(result,candidate.traceId,allowed):telemetryHoneycombTrace(result,candidate.traceId,allowed);
+      if(source!=='tempo' && allowed.length && trace.spans.length)trace.warnings=trace.warnings.concat(await telemetryTraceAttributes(trace.spans,allowed,{traceId:candidate.traceId,environment:entry.config.honeycomb.environment,dataset:entry.config.honeycomb.dataset,from:'-'+telemetryWindowDuration(entry.config.window),
+        describe:function(){return entry.contract.search;},call:function(input){return entry.mcp.callTool(entry.contract.server,entry.contract.search.name,input,{signal:abort.signal});},
+        stop:function(error){return !active(entry.epoch) || !!(error && error.code==='user_changed');}}));
+      if(!active(entry.epoch))telemetryTraceFail('Trace session cancelled.');
+      return telemetryTraceEnvelope({version:1,provider:source,traceId:candidate.traceId,signal:entry.job.name,selectionReason:reason+'; first explicit trace signal in authored order',selectionToken:entry.token,observedAt:new Date(clock()).toISOString(),range:entry.range,candidates:entry.candidates,spans:trace.spans,completeness:trace.completeness,warnings:entry.warnings.concat(trace.warnings),url:trace.url || candidate.url || null},allowed);
     })().catch(function(error){throw telemetryProviderStepError(error,entry.contract.detail.name+' trace detail');});entry.details.set(candidate.traceId,request);return request;
   }
   async function load(job,mcp,config){

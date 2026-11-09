@@ -54,7 +54,8 @@ function telemetryLogRange(start,end,lookback){
 function createTelemetryLogLookup(page,transport,hooks){
   hooks=hooks || {};
   var holding=false,dead=false,retired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),off=null,serial=0,abort=null,timer=null,busy=false,connector=null,lastIdentity=null,result=null;
-  var form={lookup:'',value:'',logql:''};
+  // traced: "Only lines with a trace ID" (#1158), reader state like the rest of the form.
+  var form={lookup:'',value:'',logql:'',traced:true};
   function lookups(){return trackingTelemetry(page).lookups || null;}
   function supported(){return !!transport && typeof transport.logsConnector==='function' && typeof transport.queryLogs==='function';}
   // '' when enabled, else the cause: a TELEMETRY_LOG_DISABLED key, or true for an unnamed one.
@@ -93,7 +94,7 @@ function createTelemetryLogLookup(page,transport,hooks){
       result:result?Object.assign(JSON.parse(JSON.stringify(result)),{next:next()}):null};
   }
   function set(field,value){
-    if(dead || !telemetryOwn(form,field) || typeof value!=='string' || value.length>2000)return;
+    if(dead || !telemetryOwn(form,field) || typeof value!==typeof form[field] || typeof value==='string' && value.length>2000)return;
     sync();if(form[field]===value)return;cancel();form[field]=value;if(field==='lookup')form.value='';result=null;sync();changed();
   }
   function errorText(e){
@@ -125,6 +126,11 @@ function createTelemetryLogLookup(page,transport,hooks){
       var logql=expand(query,slot),uid=lookup && lookup.datasource?expand(lookup.datasource,false):config.grafana && config.grafana.loki;
       if(missing)fail('Set telemetry variable ${'+missing+'} in the active environment.');
       if(slot)logql=logql.replace(/\$\{value\}|\$value(?![A-Za-z0-9_])/g,function(){return value;});
+      // #1158: ask Loki only for lines whose trace ID field passes telemetryLogLines' hex rule, on a new
+      // line so a trailing # comment cannot swallow it. A metric query (no leading stream selector) or a
+      // field that is not a label name keeps the query as typed.
+      var fields=lookup?lookup.fields:{traceId:'trace_id',spanId:'span_id'};
+      if(request.traced && /^\s*\{/.test(logql) && telemetryLogFieldPattern.test(fields.traceId))logql+='\n| '+fields.traceId+' =~ "[0-9a-fA-F]{16,32}"';
       if(!uid)fail('Set tracking.telemetry.grafana.loki to the Loki datasource UID.');
       var back=typeof hooks.lookback==='function'?hooks.lookback() || {}:{},searched=daySearch(back),range=searched?{startRfc3339:searched.from,endRfc3339:searched.to,lookback:null}:telemetryLogRange(back.start,back.end,back.lookback);
       var args={datasourceUid:uid,logql:logql,startRfc3339:range.startRfc3339,endRfc3339:range.endRfc3339,limit:TELEMETRY_LOG_LIMIT,direction:'backward',queryType:'range'};
@@ -133,10 +139,11 @@ function createTelemetryLogLookup(page,transport,hooks){
       timer=setTimeout(function(){if(dead || mine!==serial)return;timer=null;serial++;controller.abort();abort=null;busy=false;result.error='The log query timed out after 30 seconds. Retry, or use a shorter lookback.';changed();},30000);
       var payload=await transport.queryLogs(args,signal);
       if(dead || mine!==serial || signal.aborted)return null;
-      var parsed=telemetryLogLines(payload,lookup?lookup.fields:{traceId:'trace_id',spanId:'span_id'});
+      var parsed=telemetryLogLines(payload,fields);if(request.traced)parsed.rows=parsed.rows.filter(function(row){return !!row.traceId;});
       parsed.rows.forEach(function(row){row.value=slot?value:row.line;});
       busy=false;abort=null;result.rows=parsed.rows;
-      if(!parsed.rows.length)result.note=parsed.metric?'That is a metric query; type a log query that returns lines.':'No matching log lines '+(searched?'on '+(searched.short || searched.key):range.lookback?'in the last '+range.lookback:'in the selected range')+'.';
+      var where=searched?'on '+(searched.short || searched.key):range.lookback?'in the last '+range.lookback:'in the selected range';
+      if(!parsed.rows.length)result.note=parsed.metric?'That is a metric query; type a log query that returns lines.':request.traced?'No log lines with a trace ID '+where+'. Clear "Only lines with a trace ID" to see every line.':'No matching log lines '+where+'.';
       changed();return JSON.parse(JSON.stringify(result));
     }catch(e){
       if(dead || mine!==serial || signal.aborted)return null;

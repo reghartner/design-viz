@@ -3714,3 +3714,86 @@ test('#1164 example traces are not selected or painted until the reader picks on
   api.destroy();
  }
 });
+/* #1177 Map span to step (Edit mode, desktop). An editor stand-in records mapSpan calls and carries the
+   Trace view across a re-render the way board-edit.js does. */
+function mapEditor(){
+ let carried=null,mapped=null;const calls=[];
+ return {calls,undone:0,setMapped(v){mapped=v;},
+  state(){return {editable:true,blocked:'',active:true,pending:calls.length,saving:false,readOnly:false,notice:null,mapped};},
+  onChange:()=>()=>{},rememberMap(){},lastMap:()=>null,question:()=>null,endQuestion(){},removable:()=>[],missingWork:()=>null,start(){},
+  rememberTrace(v){carried=v;},takeTrace(){const v=carried;carried=null;return v;},
+  mapSpan(ref,match,previous){calls.push(plain({ref,match,previous:previous===undefined?null:previous}));return true;},undoMap(){this.undone++;return true;}};
+}
+const runTimers=h=>{for(let i=0;i<5 && h.timers.size;i++){const due=[...h.timers];h.timers.clear();due.forEach(([,t])=>t.fn());}};
+const MAP_ID='8413cd87a9f15b6bfe8e1acf5b3346d0',MAP_SPAN='dcce084f04baa9e1',MAP_MATCH={serviceName:'currency',operation:'grpc.msdemo.CurrencyService/GetSupportedCurrencies'};
+function mapBoard({editor=mapEditor(),twoOnB=false}={}){
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8');
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const raw=overFixture();raw.page.tracking.telemetry={traceConnections:{company:profile}};const d=raw.page.sections[0].diagram;
+ d.steps[0].text='Hop to beta';d.steps[1].text='Show beta';if(twoOnB)d.steps.push({id:'beta-again',text:'Show beta again',nodes:['b'],traceMatch:{serviceName:'x',operation:'y'}},{id:'beta-third',text:'Beta third',nodes:['b']});
+ const h=harness(raw,{},{boardEditor:editor,telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async()=>({payload:recorded})}}}),api=h.ctl.liveStatus,m=mountStatus(h);
+ h.ctl.sections[0].stepper={path:()=>h.C.diagramPathList(h.ctl.page.sections[0].diagram)[0].id,sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+ api.apply(overToday());api.setStatusMode('trace');api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:MAP_ID});
+ return {h,api,m,editor,raw,focus:async()=>{assert.ok(await api.loadDirectTrace(false));const s=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:s.context,spanId:MAP_SPAN}),true);return api.snapshot().trace.selected;}};
+}
+const spanDrop=(h,target,context)=>{const data={'application/x-flowview-span':JSON.stringify({context,spanId:MAP_SPAN})};
+ for(const type of ['dragover','drop'])h.view.dispatchEvent({type,target,dataTransfer:{types:Object.keys(data),getData:t=>data[t]||'',dropEffect:''},preventDefault(){}});};
+test('#1177 the dropdown preselects nothing and the button names the chosen step',async()=>{
+ const b=mapBoard();await b.focus();
+ const pick=b.m.body.querySelector('select.dv-trace-map-select'),apply=b.m.body.querySelector('button.dv-trace-map-apply');assert.ok(pick && apply);
+ assert.equal(pick.getAttribute('aria-label'),'Step to map');assert.equal(pick.value,'','nothing is preselected');
+ assert.equal(apply.disabled,true,'the button waits for a choice');assert.equal(apply.textContent,'Map to step');
+ pick.value='beta';pick.dispatchEvent({type:'change'});
+ assert.equal(apply.disabled,false);assert.equal(apply.textContent,'Map to step: Show beta','the button names the step');
+ apply.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);
+ assert.deepEqual(b.editor.calls,[{ref:{section:0,kind:'step',id:'beta'},match:MAP_MATCH,previous:null}]);
+ b.api.destroy();
+});
+test('#1177 dragging a span onto a step or a carrier maps it; two candidate steps ask; Esc cancels',async()=>{
+ let b=mapBoard();let s=await b.focus();
+ const row=b.m.body.querySelector('.dv-trace-span[data-span-id="'+MAP_SPAN+'"]');assert.equal(row.getAttribute('draggable'),'true','Edit mode makes span rows draggable');
+ spanDrop(b.h,b.h.view.querySelector('button.schip[data-step-source="0"]'),s.context);runTimers(b.h);
+ assert.deepEqual(b.editor.calls.at(-1),{ref:{section:0,kind:'step',id:'hop'},match:MAP_MATCH,previous:null},'a step chip maps that step');
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ assert.deepEqual(b.editor.calls.at(-1).ref,{section:0,kind:'step',id:'beta'},'a node with one unmapped step maps it');
+ b.api.destroy();
+ b=mapBoard({twoOnB:true});s=await b.focus();
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ assert.equal(b.editor.calls.length,0,'two candidate steps: nothing yet');
+ const chooser=b.m.body.querySelector('.dv-trace-map-chooser');assert.ok(chooser,'a chooser appears');
+ assert.deepEqual(chooser.querySelectorAll('button.dv-trace-map-choice').map(x=>x.textContent),['Show beta','Show beta again · mapped, replaces','Beta third']);
+ chooser.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
+ assert.equal(b.m.body.querySelector('.dv-trace-map-chooser'),null,'Esc cancels');assert.equal(b.editor.calls.length,0);
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ b.m.body.querySelectorAll('button.dv-trace-map-choice')[1].dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);
+ assert.deepEqual(b.editor.calls.at(-1),{ref:{section:0,kind:'step',id:'beta-again'},match:MAP_MATCH,previous:{serviceName:'x',operation:'y'}},'picking a mapped step replaces the traceMatch it shows');
+ b.api.destroy();
+ // Outside Edit mode a span row does not drag.
+ const editor=mapEditor();editor.state=()=>({editable:true,blocked:'',active:false,pending:0,saving:false,readOnly:false,notice:null,mapped:null});
+ b=mapBoard({editor});await b.focus();assert.notEqual(b.m.body.querySelector('.dv-trace-span[data-span-id="'+MAP_SPAN+'"]').getAttribute('draggable'),'true');b.api.destroy();
+});
+test('#1177 the latest mapping shows a note with Undo',async()=>{
+ const b=mapBoard();await b.focus();b.editor.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});b.api.setTraceShow(true);
+ const note=b.m.body.querySelector('.dv-trace-map-note');assert.ok(note,'the result note');
+ assert.equal(note.querySelector('.dv-trace-map-note-text').textContent,'Mapped currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies to step Show beta.');
+ const undo=note.querySelector('button.dv-trace-map-undo');assert.equal(undo.textContent,'Undo');undo.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);
+ assert.equal(b.editor.undone,1);b.api.destroy();
+});
+test('#1177 an Edit-mode re-render keeps the loaded trace, the picked example, the selected span and the focus',async()=>{
+ // Loaded trace: the next controller shows it focused on the same span.
+ const editor=mapEditor();let b=mapBoard({editor});await b.focus();b.api.destroy();
+ b=mapBoard({editor});b.h.flush();let s=b.api.snapshot().trace.selected;
+ assert.ok(s && s.manual,'the loaded trace stays');assert.equal(s.focus && s.focus.spanId,MAP_SPAN,'and its focused span');
+ b.api.destroy();editor.takeTrace();
+ // Picked example trace: the next controller has no Metrics data yet and still shows the reader's pick.
+ const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),open=()=>{const h=harness(f.spec,{},{telemetry:{},boardEditor:editor}),m=mountStatus(h);
+  h.ctl.sections[0].stepper={path:()=>'short',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};return {h,m,api:h.ctl.liveStatus};};
+ let x=open();x.h.ctl.telemetry.apply(f.samples);x.api.setStatusMode('trace');
+ const entry=x.api.snapshot().trace.entries[0];await x.api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});
+ s=x.api.snapshot().trace.selected;const spanId=s.exemplar.spans[0].id;assert.equal(x.api.selectTraceSpan({context:s.context,spanId}),true);x.api.destroy();
+ x=open();x.h.flush();s=x.api.snapshot().trace.selected;
+ assert.ok(s,'the picked example stays selected');assert.equal(s.manual,false);assert.equal(s.carrier,entry.carrier);assert.equal(s.exemplar.traceId,entry.exemplar.traceId);
+ assert.equal(s.focus && s.focus.spanId,spanId,'its focused span stays');assert.ok(x.m.body.querySelector('.dv-trace-selected'));
+ assert.ok(x.h.view.querySelectorAll('.dv-trace-overlay,[data-trace-tone]').length>0,'the mapped carriers light up again');
+ x.api.destroy();
+});

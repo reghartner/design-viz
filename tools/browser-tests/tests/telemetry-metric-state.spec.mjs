@@ -71,6 +71,10 @@ for(const skin of ['daylight','blueprint'])test('#1200 #1199 metric cards show t
   expect(Object.values(WANT).map(w=>w.stroke),bucket+' chip text is neutral ink, not a state colour').not.toContain(got[bucket].ink);
  }
  expect(new Set(Object.keys(CHIPS).map(bucket=>got[bucket].ink)).size,'every state chip uses the same neutral ink').toBe(1);
+ // The Proof ring's arcs use the same state colour as their chip border.
+ const arcs=await page.evaluate(()=>[...document.querySelector('#host').shadowRoot.querySelectorAll('.dv-live-proof-arc')].map(a=>[a.getAttribute('data-proof-bucket'),getComputedStyle(a).stroke]));
+ expect(arcs.map(a=>a[0])).toEqual(['proven','degraded','unproven','liveEarly']);
+ for(const [bucket,stroke] of arcs)expect({bucket,stroke},'arc matches chip').toEqual({bucket,stroke:got[bucket].stroke});
  // The Proof table's per-carrier verdict pills wear the same state as their count chip.
  const rows=(await pills(page,'.dv-live-proof-table .dv-live-proof-pill')).filter(p=>CHIPS[p.bucket]);
  expect(rows.map(p=>p.bucket).sort()).toEqual(['degraded','liveEarly','proven','unproven']);

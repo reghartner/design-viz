@@ -1055,7 +1055,7 @@ signal still loading is left out):
 
 The card carries the state as `data-metric-state`. The Proof count chips (#1199) use
 the same CSS variables: proven and live early wear `held`, degraded `failing`,
-unproven `waiting`; unclassified and unbound stay neutral. The Proof table's verdict
+unproven `waiting`; unclassified and unbound stay neutral. The Proof ring's arcs and the Proof table's verdict
 pills use the same states, and chip text uses the card's neutral ink. Colours follow the personal
 status colours (and border widths) for Done, In progress and To do; held stays at
 least 2px so it reads stronger than flowing. In the Jira view a card still names

@@ -2044,7 +2044,7 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
  let calls=0,seen=null,fail=false;const sample={a:{signals:{lag:{value:3}}}};
  const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)},{telemetry:{provider:b=>{calls++;seen=b;return fail?Promise.reject(Error('Grafana timeout')):Promise.resolve(sample);}}});
  const panel=mountStatus(h);h.flush();h.flush();await settle();
- const head=h.view.querySelector('.dv-live-head'),header=h.view.querySelector('.dv-status-header'),live=header.querySelector('.dv-live-toggle'),metrics=header.querySelector('button.dv-live-metrics'),conn=header.querySelector('.dv-live-metrics-connection'),jira=head.querySelector('.dv-live-connection');
+ const head=h.view.querySelector('.dv-live-head'),header=h.view.querySelector('.dv-status-header'),live=header.querySelector('.dv-live-toggle'),metrics=header.querySelector('button.dv-live-metrics'),conn=head.querySelector('.dv-live-metrics-connection'),jira=head.querySelector('.dv-live-connection');
  assert.ok(metrics,'M6 Metrics switch in the panel header');assert.equal(metrics.hidden,false);assert.equal(textOf(metrics).trim(),'Metrics overlay');assert.equal(metrics.type,'button');assert.equal(metrics.getAttribute('role'),'switch');
  assert.ok(!metrics.classList.contains('tbtn'),'#1131 a switch, not a button that looks like a third view');
  assert.equal(metrics.getAttribute('aria-checked'),'false','M6 off by default');assert.equal(calls,0,'M6 no provider call while off');
@@ -2053,7 +2053,7 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
  assert.ok(head.children.indexOf(controls)<head.children.indexOf(head.querySelector('.dv-live-status')),'M6 controls precede status text');
  assert.ok(conn,'M6 metrics connector text');assert.ok(!conn.classList.contains('dv-live-connection'),'M6 distinct connector');
  assert.equal(head.querySelectorAll('.dv-live-connection').length,1);
- assert.equal(h.view.querySelectorAll('.dv-live-metrics-connection').length,1,'#1136 one metrics connector line, in the shared header for both views');assert.equal(conn.parentElement,header);
+ assert.equal(h.view.querySelectorAll('.dv-live-metrics-connection').length,1,'#1136 one metrics connector line per view');assert.ok(conn.closest('.dv-live-status'),'#1162 in the Jira status row, below the counts and First blocker');
  const text=()=>conn.querySelectorAll('span')[0].textContent;
  assert.equal(conn.hidden,false);assert.equal(conn.tagName,jira.tagName,'M6 same markup as the Jira connector');assert.equal(conn.getAttribute('role'),'status');assert.ok(conn.querySelector('i.dv-live-metrics-dot'),'M6 its own status dot');
  assert.equal(conn.getAttribute('data-state'),'disconnected');assert.equal(conn.getAttribute('data-busy'),'false');assert.equal(text(),'Metrics: not connected');
@@ -2076,8 +2076,9 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
 
 test('M7 a page with a telemetry provider and no Jira evidence still shows Metrics in the header',()=>{
  const h=harness(telemetryPage(),{},{telemetry:{provider:()=>Promise.resolve({})}});
- const panel=mountStatus(h),header=h.view.querySelector('.dv-status-header'),metrics=header.querySelector('button.dv-live-metrics'),line=header.querySelector('.dv-live-metrics-connection');
- assert.ok(metrics && !metrics.hidden,'M7 Metrics overlay switch');assert.ok(line && !line.hidden,'M7 and its connector line (#1136: in the shared header)');
+ const panel=mountStatus(h),header=h.view.querySelector('.dv-status-header'),metrics=header.querySelector('button.dv-live-metrics'),line=h.view.querySelector('.dv-live-status .dv-live-metrics-connection');
+ assert.ok(metrics && !metrics.hidden,'M7 Metrics overlay switch');assert.ok(line && !line.hidden,'M7 and its connector line (#1162: in the Jira status row)');
+ assert.equal(h.view.querySelector('.dv-live-head').hidden,false);assert.equal(h.view.querySelector('.dv-live-status').hidden,false,'M7 the status row shows for the Metrics line alone');
  assert.equal(h.view.querySelector('.dv-live-toggle').hidden,true,'M7 Live stays hidden without Jira evidence');
  panel.destroy();h.ctl.liveStatus.destroy();
 });
@@ -2685,7 +2686,11 @@ test('#1162 the counts and First blocker share the first row; the status row hol
  api.destroy();
  // Before the first answer an action (Allow Jira) shows alone: no empty, focusable counts region beside it.
  const w=harness(overFixture());mountStatus(w);w.ctl.liveStatus.action('Allow Jira',()=>{});
- const row=w.view.querySelector('.dv-live-controls');assert.equal(row.hidden,false);assert.equal(row.querySelector('.dv-live-action').hidden,false);assert.equal(row.querySelector('.dv-live-counts').hidden,true,'no counts region without data');
+ // The counts strip stays as an unnamed spacer and First blocker's slot is reserved, unseen and inert, so the action keeps its place when data arrives.
+ const row=w.view.querySelector('.dv-live-controls'),strip=row.querySelector('.dv-live-counts'),slot=row.querySelector('.dv-live-first');assert.equal(row.hidden,false);assert.equal(row.querySelector('.dv-live-action').hidden,false);
+ assert.equal(strip.hidden,false);assert.equal(strip.getAttribute('role'),null,'an unnamed spacer, not a focusable region');assert.equal(strip.getAttribute('tabindex'),null);
+ assert.equal(slot.getAttribute('data-reserved'),'true');assert.equal(slot.getAttribute('aria-hidden'),'true');assert.equal(slot.getAttribute('tabindex'),'-1');assert.equal(slot.disabled,true);
+ w.ctl.liveStatus.apply(overToday());assert.equal(strip.getAttribute('role'),'region');assert.equal(slot.getAttribute('data-reserved'),null);assert.equal(slot.getAttribute('aria-hidden'),null);
  w.ctl.liveStatus.destroy();
 });
 // #1082: a day's key is its calendar date in the viewer's time zone, as liveStatusHistoryDays writes it.
@@ -2871,7 +2876,7 @@ test('#1136 a board without ticket references opens on Trace with no Jira | Trac
  edit[0].dispatchEvent({type:'click'});assert.equal(free.editor.starts,1,'Edit starts board editing');
  // The Metrics overlay's connector line is in the shared header, so the only view shows it.
  const metricsLines=b=>b.m.body.querySelectorAll('.dv-live-metrics-connection').filter(el=>shownIn(el,b.m.body));
- assert.equal(metricsLines(free).length,1,'the metrics status line shows on a Jira-free board');assert.ok(metricsLines(free)[0].closest('.dv-status-header'));assert.match(textOf(metricsLines(free)[0]),/Metrics: not connected/);
+ assert.equal(metricsLines(free).length,1,'the metrics status line shows on a Jira-free board');assert.ok(metricsLines(free)[0].closest('.dv-live-trace'),'#1162 under the Trace view controls');assert.match(textOf(metricsLines(free)[0]),/Metrics: not connected/);
  free.m.destroy();free.api.destroy();
  // Boards with tickets, local or only through an import, keep the switch and open on Jira; Edit is in the header in both views.
  const seed=harness(),C=seed.C;seed.ctl.liveStatus.destroy();

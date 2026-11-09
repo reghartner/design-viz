@@ -747,9 +747,10 @@ and Export project preserve the panel. There are no authored state or patch fiel
 The Jira and Trace views share one header (#1131). Its top row holds **Jira** | **Trace**,
 an **Env** select when the board names environments, **Edit** (then **Save N changes**,
 **Discard** or **Done**) for anyone who can edit the board, and the **Metrics overlay** switch
-at the right edge. **Live** | **Over time** follows, then the day row, any Over time error and
-the Metrics connector line, in both views. The connector line comes last because it wraps, so a
-changing note cannot move a button or the slider (#1162). A board with no ticket or epic
+at the right edge. **Live** | **Over time** follows, then the day row and any Over time error,
+in both views. Each view draws the Metrics connector line below its own button rows: the Jira
+view in its status row, under the counts and **First blocker**; the Trace view directly under
+its controls row. The line wraps, so a changing note moves no button or slider (#1162). A board with no ticket or epic
 references after imports has no Jira view (#1136): the panel opens on Trace with no
 **Jira** | **Trace** switch. If a loaded detail
 brings ticket references, the switch appears and the panel moves to Jira unless the reader
@@ -762,7 +763,7 @@ which wraps so every note shows in full: a connector indicator (a dot plus “Ji
 blue (`--dv-live-active`) while connecting or awaiting approval, green when connected or in demo mode,
 red on error, and it pulses while a fetch is in flight; the time is the last successful
 fetch, not a ticket's change time), and the provider note. The row's tooltip repeats the
-whole text, and the Metrics connector line in the shared header wraps the same way. Demo
+whole text, and the Metrics connector line in this row wraps the same way. Demo
 controls supply **<** and **>** on the day row, below **Live** | **Over time**. The engine's panel title stays above this header.
 
 While it is on, the Metrics overlay draws its cards and cues in both views on every board
@@ -772,7 +773,7 @@ provider or a demo telemetry source (see [Telemetry provider](#telemetry-provide
 without one it is hidden. It is off on every load and its state is never saved.
 Turning it on calls the telemetry provider at once in Live mode and keeps it refreshing; turning
 it off stops the provider and clears the telemetry map. It never changes Live or the
-Jira paint, and Live never changes it. Its connector line in the shared header uses the
+Jira paint, and Live never changes it. Its connector line (in each view, below the buttons) uses the
 Jira connector's dot colors: “Metrics: not connected” while off, “Metrics:
 connecting” until the first answer, “Metrics: connected, refreshed 3:42:15 PM” (“Metrics:
 demo, …” for a demo source) and “Metrics: did not answer · <message>” after a failed

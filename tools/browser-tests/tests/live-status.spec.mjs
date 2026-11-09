@@ -398,24 +398,37 @@ for(const width of [null,480]){
  test('#1162 long status notes wrap in full in both status lines'+(width?' in a '+width+' px panel':''),async({page,server})=>{
   const {root,panel}=await storyWithCtl(page,server,width);await demoDay(root,4);
   await page.evaluate(note=>{window.ctl.telemetry.setAvailable(false,note+' '+note);window.ctl.liveStatus.note(note+' '+note,'warn');},LONG_NOTE);
-  for(const [name,text] of [['metrics line',panel.locator('.dv-status-header .dv-live-metrics-connection > span')],['Jira status note',panel.locator('.dv-live-status .dv-live-note')]]){
+  for(const [name,text] of [['metrics line',panel.locator('.dv-live-status .dv-live-metrics-connection > span')],['Jira status note',panel.locator('.dv-live-status .dv-live-note')]]){
    await expect(text,name).toContainText('connector settings.');
    const m=await text.evaluate(el=>({scroll:el.scrollWidth,client:el.clientWidth,height:el.getBoundingClientRect().height}));
    expect(m.scroll,name+' shows its full text').toBeLessThanOrEqual(m.client);expect(m.height,name+' wraps onto more than one line').toBeGreaterThan(24);
   }
  });
 }
-// #1162 / #986: the Metrics line wraps, so it comes after every static control; a changing note moves none of them.
-test('#1162 a changing Metrics note moves no Live | Over time button, day-row button or slider',async({page,server})=>{
- const {root,panel}=await storyWithCtl(page,server);await demoDay(root,4);
- const live=panel.getByRole('button',{name:'Live',exact:true}),overTime=panel.getByRole('button',{name:'Over time',exact:true}),line=panel.locator('.dv-status-header .dv-live-metrics-connection');
- await overTime.click();const slider=panel.getByRole('slider',{name:'Day',exact:true});await expect(slider).toBeVisible();
- const items={live,overTime,previous:panel.getByRole('button',{name:'Previous day',exact:true}),slider,next:panel.getByRole('button',{name:'Next day',exact:true})};
- const places=async()=>{const out={};for(const [name,item] of Object.entries(items)){const box=await item.boundingBox();out[name]=[box.x,box.y,box.width,box.height];}return out;};
- const before=await places();
- for(const note of [LONG_NOTE+' '+LONG_NOTE,'Short note.',LONG_NOTE]){
-  await page.evaluate(value=>window.ctl.telemetry.setAvailable(false,value),note);await expect(line).toContainText(note.slice(0,12));
-  expect(await places(),'note: '+note.slice(0,24)).toEqual(before);
+// #1162 / #986: the Metrics line wraps, so each view draws it below its button rows; a changing note moves no button or slider
+// in the header, the Jira counts row (provider action, First blocker) or the Trace controls row (action, Show on diagram).
+for(const width of [null,480])test('#1162 a changing Metrics note moves no button or slider in either view, Live or Over time'+(width?' in a '+width+' px panel':''),async({page,server})=>{
+ const {root,panel}=await storyWithCtl(page,server,width);await demoDay(root,4);
+ await page.evaluate(()=>window.ctl.liveStatus.action('Allow Jira',()=>{}));
+ const button=name=>panel.getByRole('button',{name,exact:true}),jira=button('Jira'),trace=panel.getByRole('button',{name:/^Trace/}),line=panel.locator('.dv-live-metrics-connection');
+ const notes=['Short note.',LONG_NOTE+' '+LONG_NOTE,'',LONG_NOTE];
+ for(const view of ['jira','trace'])for(const mode of ['live','over']){
+  await (view==='jira'?jira:trace).click();
+  // Live from a past day returns to today; Over time opens the day row. A click on the selected Live would turn colors off.
+  if((await button('Over time').getAttribute('aria-pressed')==='true')!==(mode==='over'))await (mode==='live'?button('Live'):button('Over time')).click();
+  await expect(button('Over time')).toHaveAttribute('aria-pressed',String(mode==='over'));
+  const items={live:button('Live'),overTime:button('Over time'),action:button('Allow Jira')};
+  // The demo's Live day buttons belong to the Jira view; Over time's day row shows in both views.
+  if(view==='jira' || mode==='over'){items.previous=button('Previous day');items.next=button('Next day');}
+  if(mode==='over')items.slider=panel.getByRole('slider',{name:'Day',exact:true});
+  if(view==='jira')items.first=panel.locator('.dv-live-first');else items.show=button('Show on diagram');
+  const places=async()=>{const out={};for(const [name,item] of Object.entries(items)){await expect(item,view+' '+mode+' '+name).toBeVisible();const box=await item.boundingBox();out[name]=[box.x,box.y,box.width,box.height];}return out;};
+  await page.evaluate(value=>window.ctl.telemetry.setAvailable(false,value),notes[0]);await expect(line).toContainText(notes[0]);const before=await places();
+  for(const note of notes.slice(1)){
+   await page.evaluate(value=>window.ctl.telemetry.setAvailable(false,value),note);
+   if(note)await expect(line).toContainText(note.slice(0,12));else await expect(line).toBeHidden();
+   expect.soft(await places(),view+' '+mode+', note: '+(note.slice(0,24) || '(none)')).toEqual(before);
+  }
  }
 });
 test('S4 waiting follows ticket dependencies from the provider and the authored pairs, never the edges',async({page,server})=>{

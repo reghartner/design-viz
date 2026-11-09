@@ -1889,7 +1889,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         view.querySelectorAll('.dv-live-halo').forEach(function(el){el.remove();});
         bindings.forEach(paintBinding);
       }
-      bindings.forEach(paintStory);paintLanes();paintMetrics();paintTrace();
+      // Trace labels first: metric cards are then placed clear of them (#1163).
+      bindings.forEach(paintStory);paintLanes();paintTrace();paintMetrics();
       // Paint Jira cues once, after cards and coins reserve their final boxes.
       // Handoffs transfer their ticket target from the card to the cue; a second
       // cue paint would discard that target after its source has been cleared.

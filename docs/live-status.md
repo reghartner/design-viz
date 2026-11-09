@@ -2119,6 +2119,11 @@ count: `16.1 ms across 2 spans`. A board that keeps one step per transport reads
 `2 operations · 1 unknown · 16.1 ms` (the other transport's step is missing); make them one
 step with alternatives.
 
+With the Metrics overlay on, the trace labels are drawn first and the metric cards are then
+placed clear of them, the same way cards avoid node cards (#1163). The labels never move for
+cards; a card moves farther from its edge instead, and the diagram frame grows to fit it.
+A card with an authored `card.position` keeps that position.
+
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
 deduplicated in-memory Jira Activity entry, without posting externally. Trace
 selection uses the existing cached provider API; rendering and stepping never

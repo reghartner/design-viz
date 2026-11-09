@@ -56,9 +56,9 @@ function telemetryCardMetricState(binding,sample,result){
 }
 /* Hidden (showOnCard:false) signals count toward the card state, as they do in the verdict;
    name each one on the card when it has no value or fails, so the border has a visible cause.
-   A hidden signal whose query is still in flight is left out. */
+   A hidden signal still loading with no value yet is left out; a refresh keeps its last line. */
 function telemetryCardHiddenNote(binding,sample,result,pending){
-  return telemetryMetricNames(binding).filter(function(name){return binding.signals[name].showOnCard===false && !(pending && pending[name]);}).map(function(name){
+  return telemetryMetricNames(binding).filter(function(name){return binding.signals[name].showOnCard===false && !(pending && pending[name] && telemetryReading(sample,name).value===null);}).map(function(name){
     var why=telemetryReading(sample,name).value===null?'no value':result && (result.failing || []).indexOf(name)>=0?'outside limit':'';
     return why?'Hidden '+(binding.signals[name].label || name)+': '+why:'';
   }).filter(Boolean).join(' · ');

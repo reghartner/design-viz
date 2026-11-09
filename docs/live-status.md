@@ -2143,8 +2143,8 @@ service and operation are cut to 40 characters on the canvas; the title has the 
 The label's title lists the other alternatives as *not in this trace*, or as *in this trace,
 not matched* when a span with that service and operation is present; they never count as
 unknown. Several rows read `N operations`, then `K unknown` for mapped operations missing
-from the trace, `K ambiguous` for ambiguous mappings, then the time. Time: each matched
-span counts its own start-to-end duration, which includes its child spans. When more than
+from the trace, `K ambiguous` for ambiguous mappings, then the time. Time: the time covers
+each matched span from start to end (overlaps counted once); the title says so. When more than
 one matched span maps to the node or edge, the label shows the wall-clock time they cover
 together (the union of their intervals, so nested or overlapping spans count once) and the
 count: `16.1 ms across 2 spans`. A board that keeps one step per transport reads
@@ -2163,13 +2163,19 @@ there: a node named by one matched step and one missing optional step reads
 `Matched: … · 16.1 ms`, or only the time for a single selector. The title lists it as
 *optional, not in this trace: service operation*, it never makes the node unknown, and a
 node whose only row is a missing optional step gets no label. The coverage line leaves it
-out and adds the count: `1/3 steps matched · 1 optional not in this trace · 0 spans
-unmatched`. Edge labels and titles carry matched rows only, so a missing step, optional or
+out and adds the count: `1/2 steps matched · 1 optional not in this trace · 0 spans
+unmatched` (with any steps without a `traceMatch` also named, below). Edge labels and titles carry matched rows only, so a missing step, optional or
 not, never adds to an edge and an edge title does not list a missing optional step. A
 matched optional step reads like any matched step; an ambiguous one still counts as
 ambiguous. Local, imported and drill-down steps follow the same rules. A trace that lacks
 an optional step can still be approved as the reference trace; a missing step without
 `optional` still blocks approval.
+
+The `N/M steps matched` count, in the request card's one-line summary and in its coverage
+line, counts only steps on the current path that have a `traceMatch`, less optional steps
+missing from the trace (#1193). Steps without a `traceMatch` are not still to match: the
+coverage line names them, `· 4 steps without a trace mapping`, and the summary keeps only
+the ratio.
 
 With the Metrics overlay on, the trace labels are drawn first and the metric cards are then
 placed clear of them, the same way cards avoid node cards (#1163). The labels never move for

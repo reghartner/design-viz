@@ -781,6 +781,8 @@ class InjectTests(unittest.TestCase):
         self.assertEqual(servers(profile), [{"server": profile["server"], "tools": ["get_trace"]}])
         listed = {**profile, "allowedAttributes": ["event.type"], "dataset": "events"}
         self.assertEqual(servers(listed), [{"server": profile["server"], "tools": ["get_trace", "run_query"]}])
+        # #1205: without a dataset Load makes no run_query, so none is declared.
+        self.assertEqual(servers({**profile, "allowedAttributes": ["event.type"]}), [{"server": profile["server"], "tools": ["get_trace"]}])
 
     def test_company_trace_profile_declares_its_connector_only_on_boards_that_use_traces(self):
         # #1095: a company profile must not add its detail tool to boards that

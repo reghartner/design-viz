@@ -232,14 +232,18 @@ A Honeycomb profile that lists `allowedAttributes` also names its dataset:
 ```
 
 Load and Verify with that profile then make a second call, after `get_trace`
-answers: one `run_query` on the same server, inside the same reader action and
-timeout. No other action calls it, and a profile without `allowedAttributes`
+answers: one `run_query` on the same server, inside the same reader action. It
+gets the time left of the request's 30 seconds; when that runs out only the
+query is cancelled, and the trace loads without those attributes ("run_query
+timed out"). No other action calls it, and a profile without `allowedAttributes`
 makes no second call. Without `dataset` the profile still resolves: validation
 warns, Load makes no second call, and **Source and limitations** names the
 attributes that are missing. The arguments are:
 
-- `environment_slug`: the selected environment's value; `dataset_slug`: the
-  profile `dataset`;
+- the profile's literals and context arguments, as `get_trace` receives them,
+  where the `run_query` schema names them (for example `team_slug`, or an
+  `environment_slug` literal); otherwise `environment_slug` is the selected
+  environment's value; `dataset_slug`: the profile `dataset`;
 - `query_spec`: `{"filters":[{"column":"trace.trace_id","op":"=","value":"<loaded
   ID>"}],"from":"-<lookback>"}`, the same lookback as the trace request (an absolute
   window becomes the shortest whole-hour lookback that reaches its start). It is a
@@ -247,8 +251,9 @@ attributes that are missing. The arguments are:
 - `raw_row_columns`: `trace.span_id` and up to 29 allowed attributes (run_query
   takes at most 30 columns); `results_limit`: 200.
 
-The raw rows join onto spans by `trace.span_id`. A blank cell adds nothing; a
-`get_trace` column of the same name wins. If the call fails, returns an
+The raw rows join onto spans where `trace.span_id` equals the `get_trace`
+`span_id` exactly; rows that match no span are named as missing. A blank cell
+adds nothing; a `get_trace` column of the same name wins. If the call fails, returns an
 unsupported answer, or returns 200 rows (it may be cut off), the trace still loads
 and **Source and limitations** names the attributes that are missing; a step that
 needs them shows Not observed. A native host receives this call as a second
@@ -257,9 +262,12 @@ declares `run_query` beside the detail tool on that server (`tools/inject.py`).
 
 The example traces of an authored trace signal use the same allowed list: the
 union of `allowedAttributes` over the page's trace connection profiles for that
-provider. Tempo keeps those attributes from the trace itself. Honeycomb makes the
-same one extra `run_query` for the chosen trace, with the page's Honeycomb
-environment and dataset and the Metrics window.
+provider; a Honeycomb profile without `dataset` adds none. Tempo keeps those
+attributes from the trace itself. Honeycomb makes the same one extra `run_query`
+for the chosen trace, with the page's Honeycomb environment and the Metrics
+window. Like the trace search, it uses the page's `honeycomb.dataset`, and without
+one it queries the whole environment. Publishing declares `run_query` only for a
+profile that has both `allowedAttributes` and `dataset`.
 
 - `allowedAttributes` must be an array of at most 32 non-empty attribute names
   (letters, digits, `_ . : / -`, starting with a letter). A malformed entry fails

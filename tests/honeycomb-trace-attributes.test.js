@@ -14,9 +14,9 @@ const clone=x=>JSON.parse(JSON.stringify(x)),settle=async()=>{for(let i=0;i<30;i
 const ATTRIBUTE_ROWS=['# Raw Rows','','| trace.span_id | device.model |','| --- | --- |',`| ${X_SPAN} | X |`,`| ${Y_SPAN} | Y |`,'| dbd662d250034c44 |  |'].join('\n');
 const RUN_QUERY={name:'run_query',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{environment_slug:{type:'string'},dataset_slug:{type:'string'},query_spec:{type:'object'},raw_row_columns:{type:'array',items:{type:'string'}},results_limit:{type:'integer'}},required:['environment_slug','query_spec']}};
 const GET_TRACE={name:'get_trace',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},additionalProperties:false}};
-function context(now){
+function context(now,timers){
   class Clock extends Date{static now(){return now===undefined?super.now():Date.parse(now);}}
-  const C={URL,AbortController,TextEncoder,TextDecoder,console,setTimeout,clearTimeout,Date:now===undefined?Date:Clock,document:{hidden:false,addEventListener(){},removeEventListener(){}}};
+  const C={URL,AbortController,TextEncoder,TextDecoder,console,setTimeout:timers?timers.set:setTimeout,clearTimeout:timers?timers.clear:clearTimeout,Date:now===undefined?Date:Clock,document:{hidden:false,addEventListener(){},removeEventListener(){}}};
   vm.runInNewContext(entrypoint('standalone').body,C);return C;
 }
 function profile(allowed=['device.model']){const p=clone(fixture);if(allowed){p.allowedAttributes=allowed;p.dataset='events';}return p;}
@@ -25,16 +25,16 @@ function page(p){
     {id:'lookup',text:'Look up the product for device model X',traceMatch:{serviceName:'productcatalog',operation:'msdemo.ProductCatalogService/GetProduct',nodeId:'catalog',attributes:{'device.model':'X'}}}
   ]}}]};
 }
-function bridge(server,answers){
+function bridge(server,answers,runQuery=RUN_QUERY){
   const calls=[];
   const mcp={calls,
     listTools:async()=>[{server,tools:[{name:GET_TRACE.name,annotations:GET_TRACE.annotations},{name:RUN_QUERY.name,annotations:RUN_QUERY.annotations}]}],
-    describeTool:async(s,name)=>clone(name==='run_query'?RUN_QUERY:GET_TRACE),
+    describeTool:async(s,name)=>clone(name==='run_query'?runQuery:GET_TRACE),
     callTool:async(s,name,args)=>{calls.push({server:s,name,args:clone(args)});return answers(name,args);}};
   return {mcp,win:{claude:{use:async n=>n==='permissions'?{request:async keys=>Object.fromEntries(keys.map(k=>[k,'granted']))}:mcp}}};
 }
-async function load(C,p,answers=(name)=>({payload:name==='get_trace'?recorded:ATTRIBUTE_ROWS}),verify=false){
-  const {mcp,win}=bridge(fixture.server,answers);
+async function load(C,p,answers=(name)=>({payload:name==='get_trace'?recorded:ATTRIBUTE_ROWS}),verify=false,runQuery){
+  const {mcp,win}=bridge(fixture.server,answers,runQuery);
   const adapter=C.createTelemetryProviders(p,win),api=C.createTelemetryDirect(p,adapter.options.directTrace,{sections:()=>[{id:'one',label:'Diagram'}]});
   api.set('environment','prod');api.set('input',ID);
   const e=await api.load(verify),report=api.snapshot().report;api.destroy();
@@ -143,6 +143,10 @@ test('6. example traces (Honeycomb): a page profile listing the attribute adds o
   const bare=honeycombExampleBridge(),plain=await example(examplePage(wrapper,{company:clone(fixture)}),bare);
   assert.deepEqual(bare.calls.map(c=>c.name),['run_query','get_trace']);
   assert.equal(plain.map.a.exemplars[0].spans.find(x=>x.id===X_SPAN).attributes['device.model'],undefined);
+  // #1205: a listing profile without a dataset cannot fetch attributes, so it adds no call.
+  const noDataset=profile();delete noDataset.dataset;
+  const skipped=honeycombExampleBridge();await example(examplePage(wrapper,{company:noDataset}),skipped);
+  assert.deepEqual(skipped.calls.map(c=>c.name),['run_query','get_trace']);
 });
 
 test('7. example traces (Tempo): the page Tempo profile allowed list keeps the span attribute',async()=>{
@@ -180,4 +184,49 @@ test('8. a Honeycomb profile with allowedAttributes but no dataset still resolve
   assert.equal(e.spans.length,55);
   assert.ok(e.warnings.some(w=>/device\.model/.test(w) && /dataset/.test(w)),JSON.stringify(e.warnings));
   assert.equal(status(C,p,e).status,'missing');
+});
+
+test('9. a slow run_query times out on its own: the loaded trace stays, only the attributes are missing',async()=>{
+  const pending=new Map();let serial=0;
+  const timers={set:(fn,ms)=>{pending.set(++serial,{fn,ms});return serial;},clear:id=>pending.delete(id)};
+  const C=context(undefined,timers),p=page(profile());
+  const {mcp,win}=bridge(fixture.server,name=>name==='get_trace'?{payload:recorded}:new Promise(()=>{}));
+  const adapter=C.createTelemetryProviders(p,win),api=C.createTelemetryDirect(p,adapter.options.directTrace,{sections:()=>[{id:'one',label:'Diagram'}]});
+  api.set('environment','prod');api.set('input',ID);
+  const loading=api.load(false);await settle();
+  assert.deepEqual(mcp.calls.map(c=>c.name),['get_trace','run_query']);
+  assert.equal(pending.size,1,'only the attribute deadline is pending');
+  const [[,timer]]=[...pending];assert.ok(timer.ms>0 && timer.ms<=30000,String(timer.ms));
+  pending.clear();timer.fn();
+  const e=await loading,report=api.snapshot().report;api.destroy();
+  assert.ok(e,'trace kept: '+JSON.stringify(report));
+  assert.equal(report.stage,'complete');assert.equal(e.spans.length,55);
+  assert.ok(e.warnings.some(w=>/device\.model/.test(w) && /run_query timed out/.test(w)),JSON.stringify(e.warnings));
+  assert.equal(status(C,p,e).status,'missing');
+});
+
+test('10. span ids join on the exact get_trace string; ids that match no span warn',async()=>{
+  const C=context(),p=page(profile());
+  const other=['# Raw Rows','','| trace.span_id | device.model |','| --- | --- |','| not-a-span | X |'].join('\n');
+  const {e}=await load(C,p,name=>({payload:name==='get_trace'?recorded:other}));
+  assert.ok(e.warnings.some(w=>/device\.model/.test(w) && /span_id/.test(w)),JSON.stringify(e.warnings));
+  assert.equal(status(C,p,e).status,'missing');
+  // A non-hex provider span id still joins when the strings are equal.
+  const rows=['# Raw Rows','','| trace.span_id | device.model |','| --- | --- |','| span-x | X |'].join('\n');
+  const joined=C.telemetryHoneycombTrace({payload:recorded},ID,['device.model']).spans.map(sp=>({...sp,id:sp.id===X_SPAN?'span-x':sp.id}));
+  assert.deepEqual(clone(C.telemetryTraceAttributeJoin(joined,{payload:rows},['device.model'])),[]);
+  assert.equal(joined.find(sp=>sp.id==='span-x').attributes['device.model'],'X');
+});
+
+test('11. profile literals and context reach run_query where its schema names them',async()=>{
+  const schema=clone(RUN_QUERY);schema.inputSchema.properties.team_slug={type:'string'};
+  const C=context(),p=page(profile());
+  const {calls}=await load(C,p,undefined,false,schema);
+  assert.equal(calls[1].args.team_slug,'example-team');
+  assert.equal(calls[1].args.view_mode,undefined,'a get_trace literal the run_query schema does not name is not sent');
+  // An environment supplied as a literal (no environment argument mapping).
+  const literal=profile();delete literal.arguments.environment;literal.literals={...literal.literals,environment_slug:'production'};
+  for(const id of Object.keys(literal.environments)){delete literal.environments[id].value;}
+  const q=await load(C,page(literal),undefined,false,schema);
+  assert.equal(q.calls[1].args.environment_slug,'production');
 });

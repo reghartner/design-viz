@@ -126,14 +126,18 @@ function telemetryTempoTrace(result,id,allowed){
 /* #1197: Honeycomb get_trace returns no span attributes. One run_query raw-row query
    for the loaded trace returns the allowed columns per span id. run_query takes at
    most 30 raw columns, so at most 29 attributes are asked for besides trace.span_id. */
+// A Honeycomb profile without a dataset cannot fetch attributes, so it adds none (#1205).
 function telemetryTraceAllowed(page,provider){
-  try{var ps=FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS),out=[];Object.keys(ps).forEach(function(id){if(ps[id].provider===provider)(ps[id].allowedAttributes || []).forEach(function(k){if(out.indexOf(k)<0)out.push(k);});});return out;}catch(e){return [];}
+  try{var ps=FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS),out=[];Object.keys(ps).forEach(function(id){if(ps[id].provider===provider && (provider!=='honeycomb' || ps[id].dataset))(ps[id].allowedAttributes || []).forEach(function(k){if(out.indexOf(k)<0)out.push(k);});});return out;}catch(e){return [];}
 }
 function telemetryTraceAttributeQuery(tool,base,allowed){
   var schema=tool && tool.inputSchema,prop=schema && schema.properties && schema.properties.query_spec,a=tool && tool.annotations || {},types=prop && (Array.isArray(prop.type)?prop.type:[prop.type]);
   if(a.readOnlyHint===false || a.destructiveHint===true)telemetryTraceFail('run_query is marked write/destructive.');
   if(!types || !types.some(function(t){return t==='object' || t==='string';}))telemetryTraceFail('Unsupported run_query query_spec type.');
-  var columns=allowed.slice(0,29),spec={filters:[{column:'trace.trace_id',op:'=',value:base.traceId}],from:base.from},input={environment_slug:base.environment};
+  // Profile literals and context reach run_query as they reach get_trace, where its schema names them.
+  var columns=allowed.slice(0,29),spec={filters:[{column:'trace.trace_id',op:'=',value:base.traceId}],from:base.from},input={},props=schema && schema.properties || {};
+  Object.keys(base.args || {}).forEach(function(k){if(telemetryOwn(props,k) && ['dataset_slug','query_spec','raw_row_columns','results_limit'].indexOf(k)<0)input[k]=base.args[k];});
+  if(!telemetryOwn(input,'environment_slug') && base.environment!==undefined)input.environment_slug=base.environment;
   if(telemetryTraceString(base.dataset))input.dataset_slug=base.dataset;
   input.query_spec=types.indexOf('object')<0?JSON.stringify(spec):spec;input.raw_row_columns=['trace.span_id'].concat(columns);input.results_limit=TELEMETRY_TRACE_SPANS;
   FlowTraceConnections.validate(input,schema);
@@ -142,8 +146,9 @@ function telemetryTraceAttributeQuery(tool,base,allowed){
 function telemetryTraceAttributeJoin(spans,result,columns){
   if(result && result.isError)telemetryTraceFail(telemetryTraceErrorText(result) || 'run_query returned an error.');
   var rows=telemetryTraceTable(telemetryTraceText(result),['trace.span_id'],'# Raw Rows'),by=Object.create(null);
-  rows.forEach(function(r){var id=r['trace.span_id'];if(!telemetryTraceId(id))return;var v=by[id]=by[id] || Object.create(null);columns.forEach(function(k){if(telemetryOwn(r,k) && telemetryTraceString(r[k]) && !telemetryOwn(v,k))v[k]=r[k];});});
-  spans.forEach(function(s){var v=by[s.id];if(v)columns.forEach(function(k){if(telemetryOwn(v,k) && !telemetryOwn(s.attributes,k))s.attributes[k]=v[k];});});
+  rows.forEach(function(r){var id=r['trace.span_id'];if(!telemetryTraceString(id))return;var v=by[id]=by[id] || Object.create(null);columns.forEach(function(k){if(telemetryOwn(r,k) && telemetryTraceString(r[k]) && !telemetryOwn(v,k))v[k]=r[k];});});
+  var matched=0;spans.forEach(function(s){var v=by[s.id];if(v){matched++;columns.forEach(function(k){if(telemetryOwn(v,k) && !telemetryOwn(s.attributes,k))s.attributes[k]=v[k];});}});
+  if(rows.length && !matched)return ['Span attributes not loaded ('+columns.join(', ')+'): no run_query trace.span_id matches a get_trace span_id.'];
   return rows.length>=TELEMETRY_TRACE_SPANS?['Span attributes ('+columns.join(', ')+') may be missing on some spans: run_query returned its '+TELEMETRY_TRACE_SPANS+'-row limit.']:[];
 }
 /* Adds the attributes to spans in place and returns warnings; a failure is a warning,

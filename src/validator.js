@@ -81,6 +81,41 @@ function deltaWarnings(value, path, warnings){
     });
   }
 }
+// #1215: each tab gets its own panel. A panel declared on two or more tabs with the same
+// type and content is repeated, usually a shared reference table that belongs in the ledger.
+// Content is the declaration (key order ignored; the id is identity, not content) plus the
+// patches the tab's steps make to that panel: a panel each tab's steps fill differently
+// shows different content and is not repeated. Warning only.
+function tabPanelRepeatWarnings(page, warnings){
+  function stable(value){
+    if(Array.isArray(value))return '['+value.map(stable).join(',')+']';
+    if(value && typeof value==='object')return '{'+Object.keys(value).sort().map(function(k){return JSON.stringify(k)+':'+stable(value[k]);}).join(',')+'}';
+    return JSON.stringify(value);
+  }
+  var groups=new Map();
+  sectionRecords(page).forEach(function(record){
+    var d=record.section && record.section.diagram;
+    if(record.tabBlock==null || !specObject(d) || !Array.isArray(d.panels))return;
+    d.panels.forEach(function(panel,index){
+      if(!specObject(panel) || typeof panel.type!=='string')return;
+      var content={};Object.keys(panel).forEach(function(k){if(k!=='id')content[k]=panel[k];});
+      // The engine's own reader (panels, or the legacy patch alias). The patches are compared as a list,
+      // independent of which step applies them.
+      var patches=typeof panel.id!=='string'?[]:(Array.isArray(d.steps)?d.steps:[]).map(function(st){var patch=stepPanelPatch(st);return patch && Object.prototype.hasOwnProperty.call(patch,panel.id)?patch[panel.id]:null;}).filter(function(v){return v!==null;});
+      var key=stable({declaration:content,patches:patches}),group=groups.get(key);
+      if(!group)groups.set(key,group={panel:panel,path:record.path+'.diagram.panels['+index+']',tabs:[],labels:[],paths:[]});
+      var tab=record.tabBlock+'/'+record.tab;
+      if(group.tabs.indexOf(tab)<0){group.tabs.push(tab);group.labels.push(typeof record.tabLabel==='string' && record.tabLabel?record.tabLabel:'Tab '+(record.tab+1));group.paths.push(record.path.replace(/\.sections\[\d+\]$/,''));}
+    });
+  });
+  groups.forEach(function(group){
+    if(group.tabs.length<2)return;
+    var name=typeof group.panel.title==='string' && group.panel.title?group.panel.title:typeof group.panel.id==='string'?group.panel.id:'';
+    // Tabs in different tab blocks can share a label; then each names its tab path too.
+    var tabs=group.labels.map(function(l,i){return JSON.stringify(l)+(group.labels.indexOf(l)!==group.labels.lastIndexOf(l)?' ('+group.paths[i]+')':'');});
+    warnings.push(group.path+': the same '+group.panel.type+' panel'+(name?' "'+name+'"':'')+' is declared on more than one tab ('+tabs.join(', ')+'); give each tab its own panel and keep a shared reference table in the ledger, folding the row a tab needs into that tab\'s panel');
+  });
+}
 // Matching reads traceMatch only from steps (#1096). Imported carriers are
 // skipped: the provider's own build reports them once.
 function carrierTraceMatchWarning(value, d, kind, id, path, warnings){
@@ -527,6 +562,14 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(DP + '.steps[' + ti + '].delta: must be true or false — ignored');
     var keys = stepKeys(st);
     var failures = stepFailures(st);
+    // #1196: a connection gets a trace time only when traceMatch.nodeId is the node it ends at.
+    var ends = keys.filter(function(k){return typeof k === 'string' && k.indexOf('->') > 0;}).map(function(k){var i = k.indexOf('->');return {key:k, from:k.slice(0, i), to:k.slice(i + 2)};});
+    if (st && ends.length) (Array.isArray(st.traceMatch) ? st.traceMatch : [st.traceMatch]).forEach(function(m, mi){
+      if (!m || typeof m !== 'object' || typeof m.nodeId !== 'string' || !m.nodeId || ends.some(function(e){return e.to === m.nodeId;})) return;
+      var at = DP + '.steps[' + ti + '].traceMatch' + (Array.isArray(st.traceMatch) ? '[' + mi + ']' : '') + ".nodeId: '" + m.nodeId + "' is ";
+      var sent = ends.find(function(e){return e.from === m.nodeId;}), to = (sent || ends[0]).to;
+      warnings.push(at + (sent ? 'the sending end of edge ' + sent.key : "not the receiving end of this step's edges (" + ends.map(function(e){return e.key;}).join(', ') + ')') + "; connection times use the receiving node '" + to + "'");
+    });
     if(st && st.coinOffsets!=null){
       var OP=DP+'.steps['+ti+'].coinOffsets';
       if(!specObject(st.coinOffsets))warnings.push(OP+': expected an object mapping edge keys to {dx, dy} — using automatic positions');
@@ -666,9 +709,11 @@ function editHistoryEntryProblem(entry){
       if(Object.prototype.hasOwnProperty.call(change,'node') || Object.prototype.hasOwnProperty.call(change,'edge'))return at+': a "trace-match" change names a step, not a node or edge';
       if(Object.prototype.hasOwnProperty.call(change,'path') && !Array.isArray(change.path))return at+'.path: must be an array';
       if(Object.prototype.hasOwnProperty.call(change,'label') && typeof change.label!=='string')return at+'.label: must be a string';
+      if(Object.prototype.hasOwnProperty.call(match,'nodeId') && (typeof match.nodeId!=='string' || !match.nodeId))return at+'.traceMatch.nodeId: must be a node id';
       // #1180: a mapping that replaced a traceMatch names it.
       var was=change.replaces;
       if(Object.prototype.hasOwnProperty.call(change,'replaces') && (!specObject(was) || typeof was.serviceName!=='string' || !was.serviceName || typeof was.operation!=='string' || !was.operation))return at+'.replaces: needs "serviceName" and "operation" strings';
+      if(specObject(was) && Object.prototype.hasOwnProperty.call(was,'nodeId') && (typeof was.nodeId!=='string' || !was.nodeId))return at+'.replaces.nodeId: must be a node id';
       continue;
     }
     // #855: clearing a Missing work marker names only its carrier.
@@ -761,6 +806,7 @@ function validate(page){
     });
     (d.panels || []).forEach(function(panel,index){if(panel && panel.type==='live-status')statusPanels.push(record.reference+'.diagram.panels['+index+']');});
   });
+  tabPanelRepeatWarnings(page,warnings);
   if((hasTracking || hasTickets || hasTelemetry) && !statusPanels.length)warnings.push('page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup');
   if(!hasTracking && !hasTickets && !hasTelemetry)statusPanels.forEach(function(path){warnings.push(path+': this page has no ticket references — the panel will be empty');});
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));

@@ -297,3 +297,13 @@ test('#1180 the edit-history line names the traceMatch a mapping replaced',()=>{
  const bad=plain(C.validate(C.normalize(historyFixture([{at,changes:[change({replaces:'Quote'})]}])))).warnings;
  assert.equal(bad.length,1);assert.match(bad[0],/changes\[0\]\.replaces: /);
 });
+test('#1192 a trace-match change nodeId must be a node id; an entry without one stays valid',()=>{
+ const at='2026-11-09T10:00:00Z',change=extra=>({op:'trace-match',step:'rates',label:'Resolve rates',traceMatch:{serviceName:'currency',operation:'GetRates',...extra}});
+ assert.deepEqual(plain(C.validate(C.normalize(historyFixture([{at,changes:[change({})]},{at,changes:[change({nodeId:'beta'})]}])))).warnings,[]);
+ for(const nodeId of ['',7]){const w=plain(C.validate(C.normalize(historyFixture([{at,changes:[change({nodeId})]}])))).warnings;assert.equal(w.length,1,String(nodeId));assert.match(w[0],/traceMatch\.nodeId: /);}
+});
+test('#1192 c2 replaces.nodeId must be a node id when present',()=>{
+ const at='2026-11-09T10:00:00Z',change=replaces=>({op:'trace-match',step:'rates',traceMatch:{serviceName:'currency',operation:'GetRates'},replaces});
+ assert.deepEqual(plain(C.validate(C.normalize(historyFixture([{at,changes:[change({serviceName:'a',operation:'b',nodeId:'beta'})]}])))).warnings,[]);
+ const w=plain(C.validate(C.normalize(historyFixture([{at,changes:[change({serviceName:'a',operation:'b',nodeId:''})]}])))).warnings;assert.equal(w.length,1);assert.match(w[0],/replaces\.nodeId: /);
+});

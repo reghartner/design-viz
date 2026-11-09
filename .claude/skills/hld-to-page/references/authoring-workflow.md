@@ -179,15 +179,15 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     `[REPLAY-120](https://…)`; nodes and steps: the `link` field. If neither
     works, keep the reference as text, list it under **Missing links** in the
     ledger with what you searched, and ask for all missing links in one question.
-20. **Group tabs the way the reader experiences the product.** If the page
-    will have tabs and neither the request nor the source settles the
-    grouping, ask how to group them (Phase 2), proposing user-experience
-    grouping (for example recording, customer playback, internal playback) as
-    the default, not the order or teams in which things were decided. On a
-    page with tabs, every section goes inside the tabs container: a direct
-    section in `blocks` shows on every tab (above the tab bar if before the
-    container, below if after). Put intro and
-    "Considered/rejected" content in their own tab, not the first.
+20. **Group tabs the way the reader experiences the product.** If neither
+    the request nor the source settles the grouping, ask (Phase 2),
+    proposing user-experience grouping (e.g. recording, customer playback,
+    internal playback), not decision order or teams. On a tabbed page, every
+    section goes inside the tabs container: a direct section in `blocks`
+    shows on every tab (above the tab bar if before it, below if after). Put
+    intro and "Considered/rejected" content in their own tab, not the first.
+    Each tab gets its own panels; shared reference tables go in the ledger
+    ([why](../../../../docs/tab-views.md#one-panel-per-tab)).
 
 And always: honesty. No invented facts. Unknown is not failed. End each path
 at its last source-backed outcome; do not add a user action (opening the

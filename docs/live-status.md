@@ -1068,7 +1068,8 @@ and refresh remain per signal. The note names the observation window (default
 measured wrapping determines the height used for obstacle packing. Titles, labels,
 units and scope can shorten; numeric values remain readable without glyph scaling.
 Safe integer counts remain exact; fractional gauges use compact significant digits
-and extreme non-safe values use scientific notation. Inspect shows full labels and scope.
+and extreme non-safe values use scientific notation. Inspect shows full labels and scope,
+except an authored `scope: ""`, which hides the scope there too (#1194).
 CloudWatch cards say “This rule”, “This queue” or “All topics · whole account”,
 with full rule names and account IDs available in Inspect.
 
@@ -1081,8 +1082,9 @@ only when it has one signal; mixed rows never inherit one another's queries.
 Prometheus/Loki Explore links and Honeycomb stable query URLs are automatic when
 available. CloudWatch, Logs and SQL may use authored links. Link generation
 failure never invalidates numeric evidence. Preview invents no provider URLs.
-Workbench Metrics exposes each signal's **label**, **show on card** and **query link** controls;
-source edits and Undo/Redo preserve all three, and signal edits keep an authored `window`. `loki` and `grafana` signals also show
+Workbench Metrics exposes each signal's **label**, **show on card**, **query link**, **scope** and
+**hide scope** controls (**hide scope** writes `scope: ""`; unchecking it removes the key);
+source edits and Undo/Redo preserve them, including `scope: ""`, and signal edits keep an authored `window`. `loki` and `grafana` signals also show
 **empty result reads 0** (`missingMeansZero`; its tooltip gives the Live and Over time rule); unchecking writes `false`, checking removes the key, and a change to another source drops it.
 
 #### Signal span
@@ -2032,14 +2034,21 @@ carrier (`node` id, or `edge: [from, to]`). A `"clear-missing-work"` change
 records a Missing work marker cleared in Edit mode (#855): it carries only the
 carrier (and the optional `path` and `label`), never a `ticket`. A `"trace-match"`
 change records a span mapped to a step in Edit mode (#1078): it carries `step` (the
-step id) and `traceMatch` (`serviceName` and `operation` strings), the optional
-`path` and `label` (the step text), `replaces` (the `serviceName` and `operation` it
+step id) and `traceMatch` (`serviceName` and `operation` strings, plus the resulting `nodeId` when the step has one after the mapping), the optional
+`path` and `label` (the step text), `replaces` (the `serviceName`, `operation` and any `nodeId` it
 replaced, #1180) when it replaced a mapping, and no `ticket`, `node` or `edge`; the panel
 reads it as "payment · grpc.msdemo.PaymentService/Charge mapped to step Charge the
 card", with "(replaced <service> · <operation>)" after a replacement. `board-sync pull`
 sets a step's newest board mapping where the local step still equals the `replaces` of
 its oldest fresh mapping (no `traceMatch` when that one was a first mapping), keeps a
-local step that already names the newest span, and asks on anything else. Optional: `by` (`id` and `name`
+local step that already names the newest span, and asks on anything else. `nodeId` merges the same way, separately from the span: its base
+is the first `replaces.nodeId` among the step's fresh changes (none after a first mapping,
+or once a change sets a `nodeId` its `replaces` lacks; an older engine's change without
+any `nodeId` is skipped). Local equals the base: pull takes the board's `nodeId`. The
+board equals the base, or local equals the board: pull keeps the local one, also when the
+span changes. Both differ: it asks. It never writes a `nodeId` whose node is missing from
+the local copy; it asks instead. `--resolve step:<id>=live` takes the board's span and
+`nodeId` and keeps the step's other `traceMatch` fields. Optional: `by` (`id` and `name`
 strings, either may be empty), each change's `path` (array) and `label` (the
 carrier's display name at save time, so history stays readable after a rename).
 Validation follows the warning-only policy of the other tracking fields: a
@@ -2113,15 +2122,30 @@ With a trace shown (loaded or picked), the Trace view is compact (#1173), so the
 waterfall sits beside the diagram. The search (Load trace, log search, the load
 report and **Clear loaded trace**) is one line naming the connection and
 environment ("Fixture Honeycomb · Production · Change trace"). The request card
-is one line too: "8413cd87a9f1 · Started Nov 9 07:19 local · 55 spans · 6/7 steps
-matched". It holds Returned traces and the request details. Each line opens with
+is one line too: "8413cd87a9f1 · partial · Nov 9 07:19 · 55 spans · 6/7 steps
+matched". Warning flags (partial, unknown completeness, limit reached) come right after the
+trace ID, and the line wraps rather than clipping (#1186). It holds Returned traces and the request details. Each line opens with
 one click, and an opened section stays open until the shown trace changes. A
 select with one choice (connection, environment, mapping diagram, a single log
 lookup) is not drawn; its value still applies. The help sentence is the Load
 trace summary's tooltip, and **Show on diagram** appears once a trace is shown.
 
+Stage 2 (#1186) finishes the layout. **Show on diagram** (a toggle) and **Open
+trace** are icons at the right end of the request line, outside its summary, with
+those accessible names. The request card also holds **Pin as evidence**, **Source
+and limitations** and **All operation mappings**. A header row, "Spans · 55 · click
+a span to focus it on the diagram", sits above the span list. In a section layout
+tile the list fills the rest of the panel and scrolls inside it, so its length
+never grows the tile. A focused span's detail (duration, service, operation, the
+matched step or the step choices, **Clear trace focus**) opens directly under its
+row, and a span focused from the diagram is scrolled into the list's view.
+
 Each annotated node or uniquely matched edge gets one label from its rows: one row per
-step on the current path whose `traceMatch` names it (#1154). One row shows its time,
+step on the current path whose `traceMatch` names it (#1154). Connection timing (#1196):
+for a step with `edge` or `edges`, `traceMatch.nodeId` names the receiving node, and the
+connection timed is the step's one delivered connection into that node. A `nodeId` at the
+sending end times the node but no connection; `node tools/validate.js` warns and names the
+receiving node to use. One row shows its time,
 for example `16.1 ms`. When the step's
 [traceMatch alternatives](provider-traces.md#tracematch-alternatives) matched, the label
 names the alternative: `Matched: stats-consumer persistent://stats/camer… · 16.1 ms` (the
@@ -2186,7 +2210,7 @@ and it has an error span whose step mapping is unique, the earliest such span is
 reader clicked it; a focus the reader cleared stays cleared, also after an edit. An error span with
 several possible steps is not focused and the request summary reads `error in <service>
 <operation>: pick a step to focus it`; when no step maps an error span it reads `error in <service>
-<operation> (not on this diagram)`.
+<operation> (not on this diagram)`. The note follows the warning flags, before the date (#1186).
 A loaded trace can grow the diagram frame so node time labels stay below their cards.
 
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
@@ -2831,6 +2855,17 @@ whole account”. Other dimensions, edge titles and arbitrary Logs query text ne
 establish topic scope. Use `unit: "refused publishes"` to read “15 refused publishes”
 with the card’s “24h window” context.
 
+Metric tiles in the card popup (Jira and Trace views, #1194) are one row per metric:
+the bold label, the metric's graph, and one small line `<scope>: <value>`, for example
+`orders-queue: 1,240 msgs/day`. The primary signal's row holds the popup's main chart
+(with its Done and deploy markers); every other metric with a series gets its own small
+graph. The tile scope is the authored `scope` as written, else the CloudWatch queue or
+rule name, or “All topics · whole account” / “All connections · whole account”; it never
+carries the account ID. A tile does not repeat the scope of the tile just before it. An
+authored empty scope (`"scope": ""`, or **hide scope** in the Workbench Metrics editor)
+hides the scope everywhere: tile, card, Proof predicate and Inspect. A scope of only
+spaces is ignored with a validator warning. An absent scope keeps the generated text.
+
 ### CloudWatch Logs Insights
 
 A `cloudwatchLogs` signal is a structured object with `logGroups` (nonempty
@@ -3037,7 +3072,7 @@ Status → Trace can load one exact trace ID or a supported provider link using 
 
 Selecting a span in the loaded trace shows its exact **Service** and **Operation** (#1078), the strings a step's `traceMatch.serviceName` and `traceMatch.operation` must match; copy them from there. A span that no step maps says "No authored step maps this span. Add a traceMatch to a step to map this span." and links to [Make an existing diagram Trace-ready](trace-ready-authoring.md). On a shared board in Edit mode, that span also offers **Map this span to a step**, which writes the two values to a step that has no `traceMatch` yet ([Edit mode](#edit-mode-on-the-shared-board-828)); add `nodeId`, `parentStepId` or `attributes` in the Workbench when one span name is not enough.
 
-**Map a span by drag, chooser or dropdown (#1177).** In Edit mode (desktop) a span row in the waterfall drags onto a step (its step button or coin), which maps that step, or onto a node or edge. A carrier named by exactly one step that has no `traceMatch` maps that step; otherwise a chooser lists the carrier's steps, marking those already mapped ("mapped, replaces"), and the reader picks one or presses Esc. Drop targets highlight during the drag. The **Step to map** dropdown preselects nothing, lists only steps without a `traceMatch`, and its button reads "Map to step: <step>". Mapping a step that already has a single `traceMatch` replaces its `serviceName` and `operation` and keeps its other fields (`nodeId`, `parentStepId`, `attributes`, `maxDurationMs`, `optional`), without a confirm; Undo covers it, and the change records the replaced pair as `replaces` (#1180). A step whose `traceMatch` is an alternatives array is shown disabled ("has alternatives; edit in Inspect"). Only the trace's own section takes a drop. The chooser names the dragged span; Esc or Cancel returns focus to the span row. After every mapping the panel says "Mapped <service> · <operation> to step <step>." with **Undo**, which takes back the latest pending mapping (one click each, newest first) until the next Save. Each mapping is one `trace-match` change on Save; an undone one leaves none. The re-render after a mapping, or any other Edit-mode change, keeps the loaded trace and the picked example trace (the pick stays selected), the selected span and its focus, and returns focus to the dragged span row. When live evidence for the picked carrier arrives with the same trace it takes over the pick; with another trace (a fresh default) it is listed beside the pick, marked "(your pick)", until the reader selects something else. A step button whose `traceMatch` is an alternatives array takes no drop and says "Has alternatives; edit in Inspect". When the mapped step keeps a `parentStepId`, `attributes`, `namespace` or `occurrence` that leaves the span missing, the note says nothing lights (`nodeId` only picks the node to annotate).
+**Map a span by drag, chooser or dropdown (#1177).** In Edit mode (desktop) a span row in the waterfall drags onto a step (its step button or coin), which maps that step, or onto a node or edge. A carrier named by exactly one step that has no `traceMatch` maps that step; otherwise a chooser lists the carrier's steps, marking those already mapped ("mapped, replaces"), and the reader picks one or presses Esc. Drop targets highlight during the drag. The **Step to map** dropdown preselects nothing, lists only steps without a `traceMatch`, and its button reads "Map to step: <step>". A mapping from a drop on a node, directly or by a chooser pick after it, also writes `nodeId` for that node when the step names only that node (no `edge` or `edges`), so the node lights up at once. Mapping a step that already has a single `traceMatch` replaces its `serviceName` and `operation`, sets `nodeId` to the dropped node under that same rule and otherwise keeps the existing one, and keeps its other fields (`parentStepId`, `attributes`, `maxDurationMs`, `optional`), without a confirm; Undo covers it, and the change records the replaced pair as `replaces` (#1180). A step whose `traceMatch` is an alternatives array is shown disabled ("has alternatives; edit in Inspect"). Only the trace's own section takes a drop. The chooser names the dragged span; Esc or Cancel returns focus to the span row. After every mapping the panel says "Mapped <service> · <operation> to step <step>." with **Undo**, which takes back the latest pending mapping (one click each, newest first) until the next Save. Each mapping is one `trace-match` change on Save; an undone one leaves none. The re-render after a mapping, or any other Edit-mode change, keeps the loaded trace and the picked example trace (the pick stays selected), the selected span and its focus, and returns focus to the dragged span row. When live evidence for the picked carrier arrives with the same trace it takes over the pick; with another trace (a fresh default) it is listed beside the pick, marked "(your pick)", until the reader selects something else. A step button whose `traceMatch` is an alternatives array takes no drop and says "Has alternatives; edit in Inspect". When the mapped step keeps a `parentStepId`, `attributes`, `namespace` or `occurrence` that leaves the span missing, the note says nothing lights (`nodeId` only picks the node to annotate).
 
 ### A loaded trace sets the day
 

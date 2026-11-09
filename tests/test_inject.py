@@ -764,6 +764,36 @@ class InjectTests(unittest.TestCase):
         finally:
             inject.GUIDE_LIMIT = previous
 
+    def test_honeycomb_profile_with_allowed_attributes_declares_run_query(self):
+        # #1197: Load reads a Honeycomb profile's allowedAttributes with one run_query
+        # on the profile's server, so publishing declares it beside the detail tool.
+        inject = load_inject()
+        profile = json.loads((ROOT / "tests/fixtures/trace-connection-profile.json").read_text())
+
+        def guide_for(connection):
+            spec = json.loads(json.dumps(SPEC))
+            spec["page"]["tracking"] = {"telemetry": {"traceConnections": {"reader": connection}}}
+            spec["page"]["blocks"] = [{"diagram": {"nodes": {"a": {}}, "rows": [["a"]], "steps": [{"id": "s", "nodes": ["a"], "traceMatch": {"serviceName": "api", "operation": "op"}}]}}]
+            with mock.patch.object(inject, "company_agent_context", return_value={}):
+                return GUIDE_BLOCK.search(inject.agent_guide(spec, "a" * 40))[1]
+
+        def servers(connection):
+            return json.loads(re.search(r"```json\n(.*?)\n```", guide_for(connection), re.S)[1]).get("mcp", {}).get("servers", [])
+
+        self.assertEqual(servers(profile), [{"server": profile["server"], "tools": ["get_trace"]}])
+        listed = {**profile, "allowedAttributes": ["event.type"], "dataset": "events"}
+        self.assertEqual(servers(listed), [{"server": profile["server"], "tools": ["get_trace", "run_query"]}])
+        # #1205: without a dataset Load makes no run_query, so none is declared.
+        self.assertEqual(servers({**profile, "allowedAttributes": ["event.type"]}), [{"server": profile["server"], "tools": ["get_trace"]}])
+        # The guide line about the extra call appears only with allowedAttributes and
+        # dataset; otherwise the guide is byte-identical to a profile without them.
+        line = "Honeycomb allowedAttributes with `dataset`: each Load/Verify also calls run_query once; keep it declared."
+        plain = guide_for(profile)
+        self.assertNotIn(line, plain)
+        self.assertEqual(guide_for({**profile, "allowedAttributes": ["event.type"]}), plain)
+        self.assertEqual(guide_for({**profile, "dataset": "events"}), plain)
+        self.assertIn(line, guide_for(listed))
+
     def test_company_trace_profile_declares_its_connector_only_on_boards_that_use_traces(self):
         # #1095: a company profile must not add its detail tool to boards that
         # never use traces; existing "no connector" boards need no {} workaround.

@@ -68,7 +68,7 @@ the [normalizer](canon.md) can disambiguate: `service.namespace`,
 `http.response.status_code` / `http.status_code`, `db.system` / `db.system.name`,
 `messaging.queue.depth` / `queue.depth`, `messaging.message.age_ms`,
 `flow.backpressure`, `flow.delivery_failed`, `retry.attempt`, and `flow.step.id`.
-Other tags, payload fields and request IDs are dropped (Tempo profiles may keep
+Other tags, payload fields and request IDs are dropped (profiles may keep
 [`allowedAttributes`](provider-traces.md#allowed-match-attributes)); do not write
 selectors against them. Prefer stable instrumentation meaning over incidental
 timings.

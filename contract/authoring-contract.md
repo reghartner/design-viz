@@ -716,8 +716,8 @@ shown by the `edit-history` panel. `at`, a non-empty `changes` array and each ch
 and carrier are required, and add/remove changes also require `ticket`; `by`, `by.id`,
 `by.name`, `path` and `label` are optional. A change `{"op": "clear-missing-work", "node" | "edge", "path"?, "label"?}`
 records a Missing work marker cleared in Edit mode (#855); it names only its carrier
-and must not carry a `ticket`. A change `{"op": "trace-match", "step", "traceMatch": {"serviceName", "operation"}, "replaces"?, "path"?, "label"?}`
-records a span mapped to a step in Edit mode (#1078), `replaces` the `{serviceName, operation}` it
+and must not carry a `ticket`. A change `{"op": "trace-match", "step", "traceMatch": {"serviceName", "operation", "nodeId"?}, "replaces"?, "path"?, "label"?}`
+records a span mapped to a step in Edit mode (#1078), `replaces` the `{serviceName, operation, nodeId?}` it
 replaced (#1180); it names the step, no `ticket`, `node` or `edge`. Any other `op` is malformed. `at` is an ISO-8601 date-time with seconds, an optional fraction
 of any length and `Z` or a `±hh:mm` offset (`2026-10-30T16:23:15.987Z`).
 An agent's change to the board is logged as one agent entry (#974):
@@ -940,8 +940,8 @@ Directed arrows between placed nodes:
   edges and row positions retain their normal behavior. Ports fix endpoints,
   not a collision-free route: use `bend` and label offsets for crowded paths.
 - `kind` — the **protocol** of the hop (see "Edge kinds"). Default `int`.
-- `ret` — `true` marks an evidenced response/ack back along the request, drawn
-  as a fine dash in the protocol's color (or put that reply in the step text).
+- `ret` — `true` marks an evidenced response/ack back along the request: a
+  fine dash in the protocol's color (or put that reply in step text).
 - `label` — optional short text on the edge. Protocol verbs and topics read
   best: `POST /commands`, `PUBLISH cmd/site-4/pump-7`, `verify JWT`. Keep
   under ~28 characters.

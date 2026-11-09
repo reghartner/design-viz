@@ -495,7 +495,7 @@ function createTelemetryGrafana(page,win,now,bound){
       if(sample){if(['cloudwatch','cloudwatchLogs'].indexOf(entry.source)>=0 || windowRange)sample.window=anchoredRange;var queryUrl=telemetryQueryUrl(entry.links.query) || telemetryGrafanaUrl(entry.exploreUrl);if(queryUrl)sample.links={query:queryUrl};if(entry.unit)sample.unit=entry.unit;if(entry.breakdown)sample.breakdown=entry.breakdown;if(entry.intervalMs)sample.intervalMs=entry.intervalMs;}
       report.settled(job.id,entry.name,sample);
     }
-    function progressNote(){failures.sort(function(a,b){return a.rank-b.rank;});var note=!failures.length?'':failures.length===1?'1 Grafana query failed: '+failures[0].text:failures.length+' Grafana queries failed; first '+failures[0].text;var text=[note].concat(notices).filter(Boolean).join('; ');if(report && report.note && text!==reportedNote){reportedNote=text;report.note(text);}}
+    function progressNote(){failures.sort(function(a,b){return a.rank-b.rank;});var note=!failures.length?'':failures.length===1?'1 Grafana query failed: '+failures[0].text:failures.length+' Grafana queries failed; first '+failures[0].text;var text=telemetryNotes([note].concat(notices));if(report && report.note && text!==reportedNote){reportedNote=text;report.note(text);}}
     function failed(rank,label,message){failures.push({rank:rank,text:label+': '+message});if(report && report.pending)progressNote();}
     // A query's failure: its own (tool_error, bad input) or the refresh's (everything else).
     function caught(rank,label,repeat,entry){return function(error){

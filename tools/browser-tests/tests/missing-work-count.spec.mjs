@@ -101,12 +101,14 @@ test('480px desktop status panel shows Missing work and every Jira count in full
  const fullyShown=badge=>badge.evaluate(el=>{const b=el.getBoundingClientRect(),r=el.parentElement.getBoundingClientRect();return b.left>=r.left-1 && b.right<=r.right+1 && b.top>=r.top-1 && b.bottom<=r.bottom+1;});
  for(const badge of await counts.locator('[data-live-count]:visible').all())expect(await fullyShown(badge),await badge.textContent()).toBe(true);
  expect(await counts.evaluate(el=>el.scrollWidth<=el.clientWidth),'no count is cut off').toBe(true);
- const slot=await first.boundingBox();
+ // Measured against the panel: the screenshot and the Live click scroll the page, which moves every viewport box.
+ const place=()=>first.evaluate(el=>{const b=el.getBoundingClientRect(),p=el.closest('.pt-live-status').getBoundingClientRect();return [b.x-p.x,b.y-p.y,b.width,b.height];});
+ const slot=await place();
  await panel.screenshot({path:info.outputPath('missing-work-count-desktop-480.png')});
  await page.evaluate(()=>window.viewer.controller.liveStatus.apply({'COUNT-1':{state:'done'}}));
  await expect(counts.locator('[data-live-count]:visible')).toHaveCount(2);
- expect(await first.boundingBox(),'changing counts do not move First blocker').toEqual(slot);
+ expect(await place(),'changing counts do not move First blocker').toEqual(slot);
  await panel.getByRole('button',{name:'Live',exact:true}).click();
- expect(await first.boundingBox(),'Live does not move First blocker').toEqual(slot);
+ expect(await place(),'Live does not move First blocker').toEqual(slot);
  await page.evaluate(()=>window.viewer.destroy());
 });

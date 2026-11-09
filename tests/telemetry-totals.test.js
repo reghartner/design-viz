@@ -3,6 +3,8 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const {entrypoint}=require('../tools/source-loader.cjs');
 const C={URL,AbortController,document:{hidden:false,addEventListener(){},removeEventListener(){}},setTimeout,clearTimeout};vm.runInNewContext(entrypoint('native').source,C);
 const T=Date.UTC(2026,10,4,12),H=3600000,iso=t=>new Date(t).toISOString(),plain=v=>JSON.parse(JSON.stringify(v));
+// #1153: Since Done dates read in local time ("Nov 4, 12:00 PM"), with the year when it is not this year; never ISO.
+const readable=t=>{const d=new Date(t),day=d.getFullYear()===new Date().getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'};return d.toLocaleDateString([],day)+', '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});},ISO=/\d{4}-\d\d-\d\dT\d\d:\d\d/;
 const sample=(value=1200,aggregate={kind:'total',from:iso(T-H),to:iso(T)})=>({observedAt:iso(T),signals:{rate:{value,unit:'events',aggregate,series:[[T-H,5],[T,10]]}}});
 function present(raw=sample(),done=T-H,extra={}){
  const carriers=['local','direct::api','outer::inner::api','loaded::inner::api'].map(id=>({id,title:id,tickets:['AA-1'],kind:'service',signals:{rate:{source:'grafana',query:'explicit',unit:'req/h'}},proof:{rate:{min:1}},links:{}}));
@@ -25,7 +27,7 @@ test('malformed, unsafe, unobserved or future aggregate ranges never turn ordina
  for(const observedAt of [undefined,null,'bad',T-1,1e100])assert.equal(C.telemetrySample({...sample(),observedAt}).signals.rate.aggregate,undefined);
 });
 test('since-Done totals require the exact Done boundary for every bound local and imported carrier, preserving zero and precision',()=>{
- for(const value of [0,1200,1200.123456789])for(const row of present(sample(value)).rows){assert.match(row.since,new RegExp('rate total: '+String(value).replaceAll('.','\\.')+' events through '+iso(T)));assert.match(row.since,/Done /);}
+ for(const value of [0,1200,1200.123456789])for(const row of present(sample(value)).rows){assert.ok(row.since.includes('rate total: '+String(value)+' events through '+readable(T)),row.since);assert.match(row.since,/Done /);assert.doesNotMatch(row.since,ISO);}
  for(const delta of [-1,1,H])for(const row of present(sample(),T-H+delta).rows)assert.doesNotMatch(row.since,/total:/,'wrong Done must not display a since-Done total');
  const raw=sample();raw.signals.unbound={value:777,aggregate:raw.signals.rate.aggregate};delete raw.signals.rate.aggregate;for(const row of present(raw).rows)assert.doesNotMatch(row.since,/total:/,'only bound signals qualify');
 });

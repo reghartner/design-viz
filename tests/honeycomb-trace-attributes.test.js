@@ -93,11 +93,10 @@ test('4. a failed or truncated attribute query still loads the trace and names w
   assert.ok(e.warnings.some(w=>/200/.test(w) && /device\.model/.test(w)),JSON.stringify(e.warnings));
 });
 
-test('5. profile schema: a Honeycomb profile with allowedAttributes names its dataset; the validator no longer warns that Honeycomb returns no attributes',()=>{
+test('5. profile schema: dataset is a Honeycomb dataset name; the validator no longer warns that Honeycomb returns no attributes',()=>{
   const C=context(),F=C.FlowTraceConnections;
-  const missing=profile();delete missing.dataset;
-  assert.throws(()=>F.profile(missing),/dataset/);
   assert.equal(F.profile(profile()).dataset,'events');
+  const tempo={...clone(fixture),provider:'tempo',adapter:'tempo-v1',tool:'get_tempo_trace',dataset:'events'};assert.throws(()=>F.profile(tempo),/dataset/);
   for(const bad of ['',7,'x'.repeat(201)]){const p=profile();p.dataset=bad;assert.throws(()=>F.profile(p),/dataset/);}
   const plain=clone(fixture);assert.equal(F.profile(plain).dataset,undefined);
   const warn=p=>clone(C.validate(p).warnings.filter(w=>/traceMatch\.attributes/.test(w)));
@@ -166,4 +165,19 @@ test('7. example traces (Tempo): the page Tempo profile allowed list keeps the s
   assert.deepEqual(kept.calls.map(c=>c.name),['search_tempo_traces','get_tempo_trace']);
   const dropped=await run({tempo:clone(TEMPO)});
   assert.equal(dropped.span.attributes['device.model'],undefined);
+});
+
+test('8. a Honeycomb profile with allowedAttributes but no dataset still resolves: the validator warns, Load skips the extra query and names the missing attributes',async()=>{
+  const C=context(),missing=profile();delete missing.dataset;
+  assert.equal(C.FlowTraceConnections.profile(missing).dataset,undefined);
+  const p=page(missing);
+  assert.deepEqual(clone(C.FlowCanon.validate(p).filter(m=>/traceMatch|dataset/.test(m))),[]);
+  assert.deepEqual(clone(C.validate(p).warnings.filter(w=>/dataset/.test(w))),['tracking.telemetry.traceConnections.company: allowedAttributes on a Honeycomb profile need `dataset` to fetch span attributes; without it they stay Not observed']);
+  assert.deepEqual(clone(C.validate(page(profile())).warnings.filter(w=>/dataset/.test(w))),[]);
+  const {e,report,calls}=await load(C,p);
+  assert.ok(e,'trace loads: '+JSON.stringify(report));
+  assert.deepEqual(calls.map(c=>c.name),['get_trace']);
+  assert.equal(e.spans.length,55);
+  assert.ok(e.warnings.some(w=>/device\.model/.test(w) && /dataset/.test(w)),JSON.stringify(e.warnings));
+  assert.equal(status(C,p,e).status,'missing');
 });

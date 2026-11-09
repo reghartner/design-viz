@@ -224,7 +224,7 @@ column as text.
 
 ### Honeycomb attribute query (#1197)
 
-A Honeycomb profile that lists `allowedAttributes` must also name its dataset:
+A Honeycomb profile that lists `allowedAttributes` also names its dataset:
 
 ```json
 "allowedAttributes": ["event.type"],
@@ -234,7 +234,9 @@ A Honeycomb profile that lists `allowedAttributes` must also name its dataset:
 Load and Verify with that profile then make a second call, after `get_trace`
 answers: one `run_query` on the same server, inside the same reader action and
 timeout. No other action calls it, and a profile without `allowedAttributes`
-makes no second call. The arguments are:
+makes no second call. Without `dataset` the profile still resolves: validation
+warns, Load makes no second call, and **Source and limitations** names the
+attributes that are missing. The arguments are:
 
 - `environment_slug`: the selected environment's value; `dataset_slug`: the
   profile `dataset`;

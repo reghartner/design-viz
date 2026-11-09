@@ -101,7 +101,8 @@ function createTelemetryDirect(page,transport,hooks){
       update({requestAccepted:true,stage:'response'});stage='response';
       var trace=p.adapter==='honeycomb-table-v1'?telemetryHoneycombTrace(result,resolved.traceId,p.allowedAttributes):telemetryTempoTrace(result,resolved.traceId,p.allowedAttributes);check();
       // #1197: one run_query on the same server reads the allowed attributes Honeycomb get_trace omits.
-      if(p.provider==='honeycomb' && (p.allowedAttributes || []).length && trace.spans.length){
+      if(p.provider==='honeycomb' && (p.allowedAttributes || []).length && trace.spans.length && !p.dataset)trace.warnings.push('Span attributes not loaded ('+p.allowedAttributes.join(', ')+'): the Honeycomb profile names no dataset.');
+      else if(p.provider==='honeycomb' && (p.allowedAttributes || []).length && trace.spans.length){
         stage='attributes';update({stage:stage});var query={connection:request.connection,profile:Object.assign({},p,{tool:'run_query'}),environment:resolved.environment},env=p.environments[resolved.environment];
         trace.warnings=trace.warnings.concat(await telemetryTraceAttributes(trace.spans,p.allowedAttributes,{traceId:resolved.traceId,environment:env && env.value,dataset:p.dataset,
           from:'-'+(resolved.lookback || Math.max(1,Math.ceil((Date.now()-Date.parse(resolved.range.from))/3600000))+'h'),

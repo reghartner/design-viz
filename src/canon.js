@@ -201,19 +201,24 @@ var FlowCanon = (function(){
   /* Attribute name -> providers of the page's trace connections that list it in
      allowedAttributes. Read with telemetry paused too: enabled:false stops loading,
      not authoring. */
-  function profileAttributes(raw){
-    var out=Object.create(null),page=pageOf(raw);
-    if(typeof FlowTraceConnections==='undefined' || !object(page))return out;
+  function pageConnections(raw){
+    var page=pageOf(raw);
+    if(typeof FlowTraceConnections==='undefined' || !object(page))return {};
     var telemetry=page.tracking && page.tracking.telemetry;
     if(object(telemetry) && telemetry.enabled===false)page=Object.assign({},page,{tracking:Object.assign({},page.tracking,{telemetry:Object.assign({},telemetry,{enabled:true})})});
-    var connections=FlowTraceConnections.resolve(page,typeof TELEMETRY_COMPANY_TRACE_CONNECTIONS!=='undefined'?TELEMETRY_COMPANY_TRACE_CONNECTIONS:{});
+    return FlowTraceConnections.resolve(page,typeof TELEMETRY_COMPANY_TRACE_CONNECTIONS!=='undefined'?TELEMETRY_COMPANY_TRACE_CONNECTIONS:{});
+  }
+  function profileAttributes(raw){
+    var out=Object.create(null),connections=pageConnections(raw);
     Object.keys(connections).forEach(function(id){(connections[id].allowedAttributes || []).forEach(function(k){(out[k]=out[k] || []).push(connections[id].provider);});});
     return out;
   }
   /* Honeycomb trace attributes are text: get_trace table cells, and the run_query
      raw rows a Honeycomb profile reads its allowedAttributes from (#1197). */
   function traceWarnings(raw){
-    var listed=profileAttributes(raw),warnings=[];
+    var listed=profileAttributes(raw),warnings=[],connections=pageConnections(raw);
+    // #1197: a Honeycomb profile reads allowedAttributes with run_query over its dataset.
+    Object.keys(connections).forEach(function(id){var c=connections[id];if(c.provider==='honeycomb' && (c.allowedAttributes || []).length && !c.dataset)warnings.push('tracking.telemetry.traceConnections.'+id+': allowedAttributes on a Honeycomb profile need `dataset` to fetch span attributes; without it they stay Not observed');});
     sections(raw).forEach(function(sec){(Array.isArray(sec.diagram.steps)?sec.diagram.steps:[]).forEach(function(st){
       // An array lists alternatives; report each under traceMatch[index].
       var many=Array.isArray(st && st.traceMatch);

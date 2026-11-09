@@ -23,7 +23,8 @@ function createFolderAgentFiles(directory){
   return {
     readText:readText,
     remove:async function(name){
-      if(!/^state-[\w-]{1,120}\.json$/.test(name))throw Error('Only staged session snapshots may be removed.');
+      // Staged session snapshots and finished requests' candidate copies (#1223) only.
+      if(!/^state-[\w-]{1,120}\.json$/.test(name) && !/^candidate-[\w-]{1,120}\.(spec\.json|ledger\.md)$/.test(name))throw Error('Only staged session snapshots and candidate files may be removed.');
       try{await directory.removeEntry(name);}catch(ex){if(ex.name!=='NotFoundError')throw ex;}
     },
     read:async function(name){var text=await readText(name);return text===null || text==='' && /^(project|session|state|editor|transcript|changes|artifact-write)\.json$/.test(name)?null:JSON.parse(text);},
@@ -134,7 +135,7 @@ function folderAgentPilotHealth(value,identity,now){
 function createFolderAgentClient(opts){
   var files=opts.files,now=opts.now || Date.now,uuid=opts.uuid || function(){return crypto.randomUUID();};
   var connected=false,disposed=false,epoch=0,manifest=null,exchange=null,project=null,pilotStatus=null;
-  var heartbeatReady=false,life=createWorkbenchLifetime(),heartbeatTimer=null,heartbeatJob=null,heartbeatListeners=[],editorChain=Promise.resolve();
+  var heartbeatReady=false,life=createWorkbenchLifetime(),background=createWorkbenchBackgroundTimer(),heartbeatTimer=null,heartbeatJob=null,heartbeatListeners=[],editorChain=Promise.resolve();
   var lastArtifactState='saved',lastState='',lastHeartbeat=-Infinity,pending=null,transcript=[],seen=new Set(),nativeSeen=new Set(),chain=Promise.resolve();
   var refreshSeen=new Set(),pendingRefreshResult=null;
   // #878: the provider copy is rebuilt only when topologyRevision changes and
@@ -164,7 +165,7 @@ function createFolderAgentClient(opts){
   // Heartbeats must not wait behind artifact saves or proposal preparation.
   // All writes to editor.json share this small queue, including retirement.
   function editorSerial(action){var job=editorChain.then(action);editorChain=job.catch(function(){});return job;}
-  function stopHeartbeat(){life.cancelDelay(heartbeatTimer);heartbeatTimer=null;}
+  function stopHeartbeat(){background.cancelDelay(heartbeatTimer);heartbeatTimer=null;}
   function stopHeartbeatListeners(){heartbeatListeners.forEach(function(remove){remove();});heartbeatListeners=[];}
   function folderError(ex){pilotStatus=null;if(opts.artifactStatus)opts.artifactStatus('failed',ex.message);publish({status:'Folder unavailable: '+ex.message,listening:false,accessError:ex.name==='NotAllowedError'?'permission':'unavailable'});}
   function identityMatches(value,owner){return value && owner && value.sessionId===owner.sessionId && value.connectionId===owner.connectionId;}
@@ -181,7 +182,8 @@ function createFolderAgentClient(opts){
     return write && owner?writeDisconnected(owner):Promise.resolve();
   }
   function scheduleHeartbeat(){
-    stopHeartbeat();if(connected && heartbeatReady && !disposed)heartbeatTimer=life.delay(function(){heartbeatTimer=null;heartbeat().catch(function(){});},1000);
+    // #1223: a worker-driven timer, so a hidden tab still renews its lease every second.
+    stopHeartbeat();if(connected && heartbeatReady && !disposed)heartbeatTimer=background.delay(function(){heartbeatTimer=null;heartbeat().catch(function(){});},1000);
   }
   function heartbeat(force){
     if(heartbeatJob)return heartbeatJob;
@@ -342,6 +344,21 @@ function createFolderAgentClient(opts){
       // Each request.json phase rechecks identity and both candidate files.
       publication:function(check){return async function(){await check();await exact(check);};}};
   }
+  // #1223: a finished request's candidate copies are deleted: every request this session
+  // published (its transcript) except the current one. Names this client never published
+  // (a taken or raced name) are not ours. Best effort; it never blocks the request flow.
+  var cleanedCandidates=new Set();
+  async function cleanupCandidates(token){
+    if(typeof files.remove!=='function' || !alive(token))return;
+    try{
+      var owner=await files.read('session.json');if(!alive(token) || !belongs(owner))return;
+      var ids=transcript.filter(function(item){return item.role==='user' && validId(item.requestId) && item.requestId!==pending && !cleanedCandidates.has(item.requestId);}).map(function(item){return item.requestId;});
+      for(var id of Array.from(new Set(ids))){
+        if(!alive(token))return;
+        await files.remove('candidate-'+id+'.spec.json');await files.remove('candidate-'+id+'.ledger.md');cleanedCandidates.add(id);
+      }
+    }catch(ignored){}
+  }
   async function readOptional(name){
     try{return await files.read(name);}catch(ex){
       if(ex instanceof SyntaxError || ex.name==='NotReadableError')return null;
@@ -382,6 +399,7 @@ function createFolderAgentClient(opts){
     seen.add(accepted.result.id);exchange.receive({acknowledged:accepted.result.id},exchange.request());
     pendingAcceptance=null;pendingReviewResult=null;pending=null;turnEpoch++;clearReview();
     publish({status:'Update accepted and saved. Continue in your agent.',progress:''});
+    await cleanupCandidates(token);
   }
   // A refresh is independent of a story request. Optional provider bytes are
   // revalidated against the current consumer; no consumer replacement is accepted.
@@ -459,7 +477,7 @@ function createFolderAgentClient(opts){
         var expiredId=pending;pending=null;turnEpoch++;clearReceipt();clearReview();activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;
         transcript.forEach(function(item){if(item.requestId===expiredId && item.role==='user')item.cancelled=true;});
         await files.write('cancel.json',envelope({id:uuid(),requestId:expiredId,at:now(),reason:'The agent timed out before receiving acknowledgement. Retry this request.'}));
-        if(!alive(token))return;await saveTranscript();publish({status:'The agent request expired before acknowledgement. Ask your agent to retry.'});return;
+        if(!alive(token))return;await saveTranscript();publish({status:'The agent request expired before acknowledgement. Ask your agent to retry.'});await cleanupCandidates(token);return;
       }
       if(!pending && belongs(incoming) && validId(incoming.id) && typeof incoming.text==='string' && incoming.text.trim() && incoming.text.length<=16000 && Number.isFinite(incoming.expiresAt) && incoming.expiresAt>now() && !nativeSeen.has(incoming.id)){
         var request=envelope({id:incoming.id,text:incoming.text,at:now(),revision:sent.snapshot.revision,selection:[],views:[],
@@ -491,6 +509,7 @@ function createFolderAgentClient(opts){
         activity=[];activitySeen.clear();clearReceipt();clearReview();
         transcript.push({role:'user',text:incoming.text,requestId:incoming.id});await saveTranscript();
         publish({status:'Your agent is preparing an update. It will wait for your review.'});
+        await cleanupCandidates(token);if(!alive(token) || turn!==turnEpoch)return;
       }
     }
     if(changesDirty){await saveChanges();if(!alive(token) || turn!==turnEpoch)return;}
@@ -555,6 +574,7 @@ function createFolderAgentClient(opts){
       seen.add(reply.id);transcript.push({role:'assistant',text:reply.text,requestId:pending});
       pending=null;publish({status:opts.workflow==='external'?'Request finished. Continue in your agent.':'Reply received. You can continue the conversation.',progress:''});
       await saveTranscript();if(!alive(token))return;
+      await cleanupCandidates(token);if(!alive(token))return;
     }
     var listener=await readOptional('listener.json');if(!alive(token) || turn!==turnEpoch)return;
     var listening=belongs(listener) && listener.listening===true && now()-listener.at>=0 && now()-listener.at<5000;
@@ -712,7 +732,7 @@ function createFolderAgentClient(opts){
         exchange.pin(sent.snapshot);
         transcript.push({role:'user',text:text,requestId:id,context:{selection:request.selection,views:request.views,technicalLevel:request.technicalLevel,previewCurrent:request.previewCurrent}});
         publish({status:request.delivery==='clipboard'?'Request ready to copy. Continue in your agent.':'Message saved — waiting for Claude.',progress:''});
-        await saveTranscript();return request;
+        await saveTranscript();await cleanupCandidates(token);return request;
       }catch(ex){
         // A committed request remains pending when only its transcript failed to save.
         if(!transcript.some(function(item){return item.requestId===id;})){if(pending===id)pending=null;publish({});}
@@ -745,7 +765,7 @@ function createFolderAgentClient(opts){
         await files.write('cancel.json',envelope({id:uuid(),requestId:requestId,at:now(),reason:reason || 'Released in the editor.'}));
         if(!alive(token))return false;
         if(changesDirty){await saveChanges();if(!alive(token))return false;}
-        await saveTranscript();return true;
+        await saveTranscript();await cleanupCandidates(token);return true;
       });
     },
     readLedger:function(){return serial(async function(){
@@ -766,7 +786,7 @@ function createFolderAgentClient(opts){
       // Callers can release their folder lock only after outstanding saves drain.
       return Promise.allSettled([closing,chain]).then(function(results){if(results[0].status==='rejected')throw results[0].reason;});
     },
-    destroy:function(){connected=false;heartbeatReady=false;disposed=true;pendingAcceptance=null;pendingRefreshResult=null;epoch++;stopHeartbeat();stopHeartbeatListeners();life.destroy();clearReview();},
+    destroy:function(){connected=false;heartbeatReady=false;disposed=true;pendingAcceptance=null;pendingRefreshResult=null;epoch++;stopHeartbeat();stopHeartbeatListeners();life.destroy();background.destroy();clearReview();},
     manifest:function(){return manifest;}
   };
 }

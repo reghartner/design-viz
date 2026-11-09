@@ -1310,8 +1310,8 @@ test('#1223 finished requests leave no candidate files behind; the current reque
   assert.deepEqual(has(e,stopped),[false,false],'released: removed');
   // A newer request clears an older one still on disk, but never another attempt's taken name.
   await e.client.send('Older turn');const older=e.disk.get('request.json').id,n=Number(older.slice(3));e.reply({id:'reply-older'});
-  e.files.remove=async()=>{};await e.client.poll();e.files.remove=async name=>e.disk.delete(name);
-  assert.deepEqual(has(e,older),[true,true],'precondition: a removal that did not happen');
+  e.files.remove=async()=>{throw Error('Folder busy');};await e.client.poll();e.files.remove=async name=>e.disk.delete(name);
+  assert.deepEqual(has(e,older),[true,true],'precondition: a removal that failed is not fatal and is retried later');
   e.disk.set(`candidate-id-${n+1}.ledger.md`,'someone else’s notes');await assert.rejects(e.client.send('Taken'),/already exists/);
   await e.client.send('Newest turn');const newest=e.disk.get('request.json').id;
   assert.deepEqual(has(e,older),[false,false],'a newer publication removes the finished request');

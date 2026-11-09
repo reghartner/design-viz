@@ -43,3 +43,43 @@ function createWorkbenchLifetime(){
   }
   return {alive:function(){return !disposed;},guard:guard,listen:listen,delay:delay,cancelDelay:cancelDelay,own:own,destroy:destroy};
 }
+
+/* #1223: delays for work that must keep running while the Workbench tab is hidden (the
+   folder heartbeat and request polling). After about five minutes hidden, Chrome's intensive
+   throttling wakes a page's chained timers about once a minute; a dedicated worker's timers
+   are not intensively throttled, so the worker keeps each delay and posts back when it is due.
+   Without Worker, or when the worker cannot start, the page timer is used. A frozen tab runs
+   neither (see docs/folder-agent-session.md). The page still owns every check the callback makes. */
+var WORKBENCH_BACKGROUND_TIMER_SOURCE='var t={};onmessage=function(e){var m=e.data;if(m && m.cancel!==undefined){clearTimeout(t[m.cancel]);delete t[m.cancel];return;}'+
+  't[m.id]=setTimeout(function(){delete t[m.id];postMessage(m.id);},m.ms);};';
+function createWorkbenchBackgroundTimer(){
+  var life=createWorkbenchLifetime(),worker=null,url=null,serial=0,pending=new Map();
+  function page(rec){rec.page=life.delay(function(){if(pending.get(rec.id)===rec){pending.delete(rec.id);rec.fn();}},rec.ms);}
+  function fallback(){
+    if(!worker)return;
+    try{worker.terminate();}catch(ignored){}if(url)try{URL.revokeObjectURL(url);}catch(ignored){}
+    worker=null;url=null;pending.forEach(function(rec){if(rec.page==null)page(rec);});
+  }
+  try{
+    if(typeof Worker==='function' && typeof Blob==='function' && typeof URL!=='undefined' && URL.createObjectURL){
+      url=URL.createObjectURL(new Blob([WORKBENCH_BACKGROUND_TIMER_SOURCE],{type:'text/javascript'}));
+      worker=new Worker(url);
+      worker.onmessage=function(event){var rec=pending.get(event.data);if(rec && life.alive()){pending.delete(rec.id);rec.fn();}};
+      worker.onerror=function(event){if(event && event.preventDefault)event.preventDefault();fallback();};
+    }
+  }catch(ignored){worker=null;if(url)try{URL.revokeObjectURL(url);}catch(alsoIgnored){}url=null;}
+  return {
+    delay:function(fn,ms){
+      if(!life.alive())return null;
+      var rec={id:++serial,fn:fn,ms:ms,page:null};pending.set(rec.id,rec);
+      if(worker)worker.postMessage({id:rec.id,ms:ms});else page(rec);
+      return rec.id;
+    },
+    cancelDelay:function(id){
+      var rec=pending.get(id);if(!rec)return;pending.delete(id);
+      if(rec.page!=null)life.cancelDelay(rec.page);else if(worker)worker.postMessage({cancel:id});
+    },
+    kind:function(){return worker?'worker':'page';},
+    destroy:function(){pending.clear();if(worker){try{worker.terminate();}catch(ignored){}worker=null;}if(url)try{URL.revokeObjectURL(url);}catch(ignored){}url=null;life.destroy();}
+  };
+}

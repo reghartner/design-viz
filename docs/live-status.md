@@ -2125,6 +2125,8 @@ With the Metrics overlay on, the trace labels are drawn first and the metric car
 placed clear of them, the same way cards avoid node cards (#1163). The labels never move for
 cards; a card moves farther from its edge instead, and the diagram frame grows to fit it.
 The exception is a label clamped at the frame edge, which moves out once the frame grows.
+When the board's scale changes and a label's text is laid out at a different size, the cards
+are placed again.
 A card's leader line has a gap where it would cross a trace label, also while a card is
 dragged in the Workbench.
 A card with an authored `card.position` keeps that position.

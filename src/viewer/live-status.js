@@ -957,14 +957,19 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // A move the trace itself causes keeps the log results it may have come from (Q2).
   function traceMoved(fn){logLookup.hold(true);try{fn();}finally{logLookup.hold(false);}}
   function traceFollow(e){
-    var d=traceDayOf(e);if(!d || d.key===viewDay().key)return;
-    if(d.key===localDayKey(Date.now())){traceMoved(overClose);return;}
+    var d=traceDayOf(e);if(!d)return;
+    // A history load still running moves the view for whichever trace is loaded when it arrives (overLoad).
+    if(overLoading){overTarget={request:overRequest};return;}
+    // D5: Live when the trace is from today, also from Over time on today.
+    if(d.key===localDayKey(Date.now())){if(over)traceMoved(overClose);return;}
+    if(d.key===viewDay().key)return;
     if(over){var index=over.days.findIndex(function(day){return day.key===d.key;});if(index>=0)traceMoved(function(){api.overTimeDay(index);});else traceDayNote=outsideNote(d);return;}
     // Without an Over time that can open here there is no day list to move to; the card still shows the date.
-    openOver(d);
+    openOver(true);
   }
+  // Every view change ends the last note; one that leaves the trace's day clears the trace and says so.
   function traceViewChanged(){
-    var e=directTrace.snapshot().exemplar,d=traceDayOf(e),view=viewDay();if(!d || d.key===view.key)return;
+    traceDayNote='';var e=directTrace.snapshot().exemplar,d=traceDayOf(e),view=viewDay();if(!d || d.key===view.key)return;
     traceDayNote='Cleared trace '+e.traceId.slice(0,12)+' ('+d.label+'): the view moved to '+view.label+'.';
     clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();
   }
@@ -1045,7 +1050,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var context=selected?traceContext(selected):null,focus=traceFocusSnapshot(selected,context);
     var model=selected?telemetryTraceModel(selected.binding.section.diagram,selected.binding.stepper && selected.binding.stepper.path(),selected.exemplar):null;
     if(selected)model.mapSteps=traceMapSteps(selected.binding);
-    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,day:traceDayOf(selected.exemplar),context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot(),dayNote:traceDayNote,movesDay:!!overTimeState()}),
+    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,day:traceDayOf(selected.exemplar),context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot(),dayNote:traceDayNote,movesDay:canOpenOver()}),
       hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
   function paintTrace(){
@@ -1131,10 +1136,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return {from:new Date(from).toISOString(),to:end.toISOString(),label:(day.label || day.key)+' 00:00–'+(to===midnight?'24:00':pad(end.getHours())+':'+pad(end.getMinutes()))+' local'};
   }
   // The reader's click (Over time, or a Load that moves the view to a trace's day) is the only thing that loads history.
-  function openOver(day){
-    if(retired || overLoading || over)return false;
-    if(!overSource || !applied || !Object.keys(map).length || editing())return false;
-    var request=++overRequest;overLoading=true;overError='';overProgress='';overTarget=day?{request:request,day:day}:null;notify();
+  // Whether Over time can open now; the log list promises a move only then.
+  function canOpenOver(){return !retired && !!overSource && applied && Object.keys(map).length>0 && !editing();}
+  function openOver(trace){
+    if(retired || overLoading || over || !canOpenOver())return false;
+    var request=++overRequest;overLoading=true;overError='';overProgress='';overTarget=trace?{request:request}:null;notify();
     Promise.resolve().then(function(){return overSource.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result);},function(){overLoad(request,null);});
     return true;
   }
@@ -1171,8 +1177,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var days=result && Array.isArray(result.days)?result.days:[];
     if(!days.length){overError='History could not load. Try Over time again.';notify();return;}
     var index=result.index;if(typeof index!=='number' || index<0 || index>=days.length)index=days.length-1;
-    // #1145: opened by a loaded trace: its own day, or stay in Live when the list does not have it.
-    var target=overTarget && overTarget.request===request?overTarget.day:null;overTarget=null;
+    // #1145: a load a trace started opens on the day of the trace loaded now. With no trace, or one from
+    // today, the view stays in Live; a day the list does not have keeps it there with a note.
+    var byTrace=!!(overTarget && overTarget.request===request),target=byTrace?traceDayOf(directTrace.snapshot().exemplar):null;overTarget=null;
+    if(byTrace && (!target || target.key===localDayKey(Date.now()))){notify();return;}
     if(target){index=days.findIndex(function(day){return day.key===target.key;});if(index<0){traceDayNote=outsideNote(target);notify();return;}}
     var show=function(){over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null};on=true;availabilityOn=true;telemetry.openHistory(days,index);overShow();};
     if(target)traceMoved(show);else show();

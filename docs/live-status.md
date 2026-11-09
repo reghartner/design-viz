@@ -2945,13 +2945,15 @@ Selecting a span in the loaded trace shows its exact **Service** and **Operation
 
 A loaded trace is one request with its own start time, the earliest span's (#1145, D5). The request card
 says "Started Nov 6 12:00 local". Loading it moves the view to that local day: Over time on that day, or
-Live when it is today. Opening Over time for it is part of the Load click. When Over time is open and its
-day list has no such day, or the history it loads has none, the view stays and the Load trace section says
-"This trace is from Nov 3, which Over time does not list." A board without Over time stays in Live.
-Over time on today is the same day as Live. Moving the view to any other day, or back to Live from a past
-day, clears the trace without a call, and the section says "Cleared trace 8413cd87a9f1 (Nov 6): the view
-moved to Nov 7." The typed trace ID stays, and log results stay across a move the loaded trace itself causes. Ticket colours on nodes follow the day shown (D14). Opening a
-drill-down keeps the loaded trace; it is cleared when its mapping diagram goes away.
+Live when it is today, also from Over time on today. Opening Over time for it is part of the Load click;
+when the history arrives, the view goes to the day of the trace loaded then, and stays in Live if there is
+none or it is from today. When the day list has no such day, the view stays and the Load trace section says
+"This trace is from Nov 3, which Over time does not list." A board where Over time cannot open stays in Live.
+The reader moving the view to another day, or back to Live from a past day, clears the trace without a
+call, and the section says "Cleared trace 8413cd87a9f1 (Nov 6): the view moved to Nov 7." until the next
+view change. The reader's own Over time on today keeps a trace from today. The typed trace ID stays, and
+log results stay across a move the loaded trace itself causes. Ticket colours on nodes follow the day
+shown (D14). Opening a drill-down keeps the loaded trace; it is cleared when its mapping diagram goes away.
 
 ### Find a trace from a log line
 
@@ -3027,7 +3029,7 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   searches the line's time ± 1 h (#1145; see [Honeycomb lookback](provider-traces.md#honeycomb-lookback)),
   then focuses the line's span ID in the waterfall and the diagram. A span ID
   that is not in the trace is reported, and the trace stays loaded. The list
-  says "Loading a trace moves the view to its date." when the board has Over time.
+  says "Loading a trace moves the view to its date." when Over time can open.
 - A log line's trace may never have been kept by the provider (sampling)
   (#1124). When it is not found, the report says "Trace not found. The provider
   may not have kept this trace (sampling). Try the next log line." and offers

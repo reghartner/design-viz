@@ -314,6 +314,7 @@
       el(detail,'h3','heading','','Selected request');el(detail,'code','identity','dv-trace-identity',e.traceId);if(selected.day)el(detail,'p','date','dv-trace-date','Started '+selected.day.label+' '+selected.day.time+' local');if(selected.manual && !selected.hasMappings)el(detail,'p','mapping-unavailable','','Diagram mapping is not configured for this section.');
       var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
       el(detail,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');
+      if(selected.errorNote)el(detail,'p','error-note','dv-trace-error-note',selected.errorNote);
       var limit=e.warnings.filter(function(w){return /200 spans|timeline unavailable/i.test(w);});if(model.warning)limit.push(model.warning);if(limit.length)el(detail,'p','limit','dv-trace-limit',Array.from(new Set(limit)).join(' '));
       // #1175: an optional step missing from this trace does not count against coverage.
       var optional=model.rows.filter(function(r){return r.optional;}).length;
@@ -620,7 +621,10 @@
 /* Evidence never replaces status or missing-work borders. Only the selected
    operation escapes step/ambient dimming; whole-trace annotations stay quiet. */
 g.node[data-trace-focus="true"]{opacity:1!important}
-.dv-trace-focus-overlay .dv-trace-focus-brackets{fill:none;stroke:#009fc7;stroke-width:3;stroke-linecap:square;stroke-linejoin:round;stroke-dasharray:none;filter:drop-shadow(0 0 2px var(--dbg,#fff))}
+.dv-trace-focus-overlay .dv-trace-focus-brackets{fill:none;stroke:var(--dv-trace-color,#009fc7);stroke-width:3;stroke-linecap:square;stroke-linejoin:round;stroke-dasharray:none;filter:drop-shadow(0 0 2px var(--dbg,#fff))}
+.dv-trace-focus-overlay[data-trace-level="below"] .dv-trace-focus-brackets{stroke-width:1.5;opacity:.8}.dv-trace-focus-overlay[data-trace-level="above"] .dv-trace-focus-brackets{stroke-width:2;stroke-dasharray:5 4;stroke-linecap:butt}
+.dv-trace-edge-outline{stroke:var(--dv-trace-color,#009fc7)}.dv-trace-edge-focus[data-trace-level="below"]{opacity:.7}.dv-trace-edge-focus[data-trace-level="above"] .dv-trace-edge-outline{stroke-dasharray:8 6;stroke-linecap:butt}
+.dv-trace-overlay[data-trace-level="current"] text{font-size:16px}.dv-trace-overlay[data-trace-level="other"]{opacity:.55}.dv-trace-overlay[data-trace-level="other"] text{font-size:12px}
 .dv-trace-focus-overlay rect{fill:#007d9c;stroke:var(--dbg,#fff);stroke-width:2}
 .dv-trace-focus-overlay text{fill:#fff;font:700 10px 'IBM Plex Mono',monospace;letter-spacing:.3px}
 .dv-trace-focus-summary{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:10px 12px;border:1px solid color-mix(in srgb,#009fc7 40%,var(--dfaint));border-radius:7px;background:color-mix(in srgb,#009fc7 7%,var(--dbg));font-size:12px}

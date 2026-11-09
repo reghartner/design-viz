@@ -2150,6 +2150,18 @@ A card's leader line has a gap where it would cross a trace label, also while a 
 dragged in the Workbench.
 A card with an authored `card.position` keeps that position.
 
+Trace highlight levels (#1185) add marks without changing any node or edge colour: corner
+brackets outside a node card, and an outline that follows the edge's own path. With a span
+focused, its step's carriers are *current* (solid brackets with the Trace tag, solid outline,
+time label bold and 2px larger); carriers of its descendant spans are *below* (thin brackets,
+thin lighter outline); carriers of its ancestor spans are *above* (dashed brackets and outline);
+other carriers in the trace get no marks and a smaller, fainter time label. With no span focused
+every carrier in the trace has the *below* marks. Mark colours follow each span's result: error
+red, warning amber, observed blue, unknown grey. When a trace is first shown and it has an error
+span whose step mapping is unique, the earliest such span is focused, as if the reader clicked
+it; the reader can clear or change it. If no error span maps to a step, nothing is focused and
+the request summary reads `error in <service> <operation> (not on this diagram)`.
+
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
 deduplicated in-memory Jira Activity entry, without posting externally. Trace
 selection uses the existing cached provider API; rendering and stepping never

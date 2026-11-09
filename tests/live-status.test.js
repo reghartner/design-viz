@@ -3041,7 +3041,9 @@ test('span focus controller pauses, jumps exact source steps, shares state, and 
  selected=api.snapshot().trace.selected;assert.equal(selected.focus.spanId,span.id);assert.equal(selected.focus.choice.stepId,'submit');
  assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,1);assert.equal(h.view.querySelectorAll('.dv-trace-edge-focus').length,1);assert.equal(h.view.querySelector('.dv-trace-edge-focus').getAttribute('transform'),'translate(5 7)');assert.equal(h.view.querySelector('.dv-trace-edge-outline').getAttribute('d'),edge.getAttribute('d'));
  api.setTraceShow(true);api.setTraceShow(true);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,1);assert.equal(h.view.querySelectorAll('.dv-trace-edge-focus').length,1);assert.equal(h.view.querySelectorAll('mask').length,1);assert.equal(edge.getAttribute('d'),'M0 0 C30 40 70 40 100 0');
- api.clearTraceFocus({context:selected.context});assert.equal(api.snapshot().trace.selected.focus,null);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay,.dv-trace-edge-focus').length,0);assert.equal(h.view.querySelectorAll('mask').length,0);assert.equal(pauses,1);assert.equal(api.selectTraceSpan(action),false);
+ api.clearTraceFocus({context:selected.context});assert.equal(api.snapshot().trace.selected.focus,null);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay[data-trace-level="current"],.dv-trace-edge-focus[data-trace-level="current"]').length,0);
+ // #1185: with no span focused the trace's carriers keep their "below" marks, one mask per outline.
+ assert.equal(h.view.querySelectorAll('.dv-trace-edge-focus[data-trace-level="below"]').length,1);assert.equal(h.view.querySelectorAll('mask').length,1);assert.equal(pauses,1);assert.equal(api.selectTraceSpan(action),false);
  const next={context:api.snapshot().trace.selected.context,spanId:span.id};api.destroy();assert.equal(api.selectTraceSpan(next),false);assert.equal(jumps.length,1);
 });
 
@@ -3764,7 +3766,8 @@ test('#1185 a failed trace focuses its earliest mapped error span; an unmapped e
    assert.equal(api.snapshot().trace.selected.focus,null,'the reader can clear it, and it does not come back');
   }else{
    assert.equal(selected.focus,null,'an unmapped error span is not focused');
-   assert.match(m.body.textContent,/error in billing charge card \(not on this diagram\)/,'the request summary names it');
+   const text=n=>[n.textContent || ''].concat(n.children.map(text)).join(' ');
+   assert.match(text(m.body),/error in billing charge card \(not on this diagram\)/,'the request summary names it');
   }
   api.destroy();
  }

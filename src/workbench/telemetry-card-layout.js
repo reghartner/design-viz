@@ -14,14 +14,15 @@ function createTelemetryCardLayoutEditor(opts){
     return {card:card,svg:svg,snapshot:snapshot,target:target,topology:topology,contextKey:JSON.stringify(topology),
       anchor:{x:Number(card.getAttribute('data-metrics-anchor-x')),y:Number(card.getAttribute('data-metrics-anchor-y'))},
       origin:{x:matrix.matrix.e,y:matrix.matrix.f},
-      leader:svg.querySelector('.dv-metrics-leader[data-dv-edge="'+target.index+'"]')};
+      leader:svg.querySelector('.dv-metrics-leader[data-dv-edge="'+target.index+'"]'),labels:telemetryTraceLabelBoxes(svg)};
   }
   function fresh(c){var now=opts.session.snapshot();return c.card.isConnected && !opts.disabled() && now.text===c.snapshot.text && now.project===c.snapshot.project && (now.renderedText==null || now.renderedText===now.text) && JSON.stringify(opts.session.topologyContext?opts.session.topologyContext():null)===c.contextKey;}
   function point(c,ev){try{var matrix=c.svg.getScreenCTM();if(!matrix)return null;var p=c.svg.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;return p.matrixTransform(matrix.inverse());}catch(ex){return null;}}
   function preview(c,p){
     c.card.setAttribute('transform','translate('+p.x+' '+p.y+')');
     var rect=c.card.querySelector('rect'),w=Number(rect.getAttribute('width')),h=Number(rect.getAttribute('height')),a=c.anchor;
-    if(c.leader)c.leader.setAttribute('d','M'+a.x+' '+a.y+'L'+Math.max(p.x,Math.min(p.x+w,a.x))+' '+Math.max(p.y,Math.min(p.y+h,a.y)));
+    // Same leader as the live paint, with its gap at trace labels (#1163).
+    if(c.leader)c.leader.setAttribute('d',telemetryCardLeaderTo(a,{x:p.x,y:p.y,w:w,h:h},c.labels));
   }
   function consume(){suppress=true;life.delay(function(){suppress=false;},0);}
   function cancelNudge(){if(!nudge)return;var g=nudge;nudge=null;preview(g.c,g.c.origin);}

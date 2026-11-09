@@ -102,6 +102,13 @@ function telemetryCardLeader(a,b,labels){
   gaps.sort(function(g,h){return g[0]-h[0];}).forEach(function(g){if(g[0]>t)d+='M'+at(t)+'L'+at(g[0]);t=Math.max(t,g[1]);});
   return t<1?d+'M'+at(t)+'L'+at(1):d;
 }
+/* Leader to the nearest point of a card box; shared with the Workbench card drag preview. */
+function telemetryCardLeaderTo(mid,box,labels){
+  return telemetryCardLeader(mid,{x:Math.max(box.x,Math.min(box.x+box.w,mid.x)),y:Math.max(box.y,Math.min(box.y+box.h,mid.y))},labels);
+}
+function telemetryTraceLabelBoxes(svg){
+  return Array.from(svg.querySelectorAll('.dv-trace-overlay text')).map(function(el){return boardControlBox(el,svg);}).filter(Boolean);
+}
 function telemetryPaintCards(scope,diagram,templates,view,window,activate,config){
   telemetryClearCards(scope);
   if(!view || !diagram)return;
@@ -174,8 +181,7 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       var placed=telemetryCardPlace(path,w,height,binding.card || {},boxes),box=placed.box;
       card.setAttribute('data-metrics-anchor-x',placed.mid.x);card.setAttribute('data-metrics-anchor-y',placed.mid.y);
       card.setAttribute('transform','translate('+box.x+' '+box.y+')');card.setAttribute('data-side',placed.side);
-      var end={x:Math.max(box.x,Math.min(box.x+box.w,placed.mid.x)),y:Math.max(box.y,Math.min(box.y+box.h,placed.mid.y))};
-      var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-dv-edge':index,d:telemetryCardLeader(placed.mid,end,labels),'pointer-events':'none','aria-hidden':'true'});
+      var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-dv-edge':index,d:telemetryCardLeaderTo(placed.mid,box,labels),'pointer-events':'none','aria-hidden':'true'});
       if(view.preview)leader.setAttribute('data-metrics-preview','true');
       svg.insertBefore(leader,card);boxes.push(box);
       var label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');if(label){label.classList.add('dv-metrics-label-hidden');if(view.preview)label.setAttribute('data-metrics-preview','true');}

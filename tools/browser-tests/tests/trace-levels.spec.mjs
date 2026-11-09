@@ -1,6 +1,7 @@
 // #1185: trace highlight levels. Every carrier of a shown trace gets #1074's marks: node corner
 // brackets and an outline that follows the edge's own (curved) path. With no span focused they are
-// "below"; focusing the Charge span makes its edge "current" and its ancestors' carriers "above".
+// "below" (dotted, in each span's colour); the failed Charge span is focused automatically: its edge is "current" (solid) and
+// its ancestors' carriers are "above" (dotted grey).
 // Local nodes and edges on the reported checkout board.
 import {readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -48,7 +49,7 @@ function marks(root){
    const index=path.getAttribute('data-dv-edge'),ring=path.previousElementSibling,outline=ring && ring.classList.contains('dv-trace-edge-focus') && ring.querySelector('.dv-trace-edge-outline');
    if(!outline)return;
    const n=24,length=path.getTotalLength(),drift=Math.max(...Array.from({length:n+1},(_,k)=>{const a=path.getPointAtLength(length*k/n),b=outline.getPointAtLength(outline.getTotalLength()*k/n);return Math.hypot(a.x-b.x,a.y-b.y);}));
-   out.edges[index]={level:ring.getAttribute('data-trace-level'),tone:ring.getAttribute('data-trace-tone'),stroke:getComputedStyle(outline).stroke,curved:/[CQ]/.test(path.getAttribute('d')),drift,transform:ring.getAttribute('transform')===path.getAttribute('transform')};
+   out.edges[index]={level:ring.getAttribute('data-trace-level'),tone:ring.getAttribute('data-trace-tone'),stroke:getComputedStyle(outline).stroke,dash:getComputedStyle(outline).strokeDasharray,curved:/[CQ]/.test(path.getAttribute('d')),drift,transform:ring.getAttribute('transform')===path.getAttribute('transform')};
   });
   scope.querySelectorAll('g.node[data-dv-node]').forEach(node=>{const b=node.querySelector('.dv-trace-focus-overlay');if(b)out.nodes[node.getAttribute('data-dv-node')]=b.getAttribute('data-trace-level');});
   return out;
@@ -62,8 +63,8 @@ test('desktop trace levels: the failed span is focused; above, below and other m
  // PlaceOrder and the root span are its ancestors (above); GetCart, ShipOrder and shipping are other.
  await expect.poll(async()=>(await marks(root)).edges['2']?.level,{message:'the failed Charge edge is current'}).toBe('current');
  let m=await marks(root);
- expect(m.edges['2'].tone).toBe('error');expect(m.edges['2'].stroke,'error marks are red').toBe('rgb(214, 75, 104)');
- expect(m.edges['0'].level,'PlaceOrder (an ancestor) is above').toBe('above');expect(m.edges['0'].stroke,'observed marks are #1074 cyan').toBe('rgb(0, 159, 199)');
+ expect(m.edges['2'].tone).toBe('error');expect(m.edges['2'].stroke,'error marks are red').toBe('rgb(214, 75, 104)');expect(m.edges['2'].dash,'the current outline is solid').toBe('none');
+ expect(m.edges['0'].level,'PlaceOrder (an ancestor) is above').toBe('above');expect(m.edges['0'].stroke,'above marks are grey').toBe('rgb(138, 148, 160)');expect(m.edges['0'].dash,'non-selected outlines are dotted').toBe('2.5px, 5px');
  for(const i of ['0','2']){expect(m.edges[i].drift,'edge '+i+' outline follows its curved path').toBeLessThan(1);expect(m.edges[i].curved).toBe(true);}
  expect(m.nodes.web,'the root span node is above').toBe('above');
  expect(m.edges['1'],'GetCart is another branch: no outline').toBeUndefined();expect(m.nodes.shipping,'the shipping node is another branch: no brackets').toBeUndefined();
@@ -76,6 +77,7 @@ test('desktop trace levels: the failed span is focused; above, below and other m
  m=await marks(root);
  for(const i of ['0','1','2','3']){expect(m.edges[i].level,'edge '+i).toBe('below');expect(m.edges[i].drift,'edge '+i+' outline follows its path').toBeLessThan(1);expect(m.edges[i].transform).toBe(true);}
  for(const i of ['0','1','2'])expect(m.edges[i].curved,'edge '+i+' is curved').toBe(true);
- expect(m.edges['2'].stroke,'the failed span keeps its colour below').toBe('rgb(214, 75, 104)');
+ expect(m.edges['2'].stroke,'the failed span keeps its colour below').toBe('rgb(214, 75, 104)');expect(m.edges['0'].stroke,'observed marks are #1074 cyan').toBe('rgb(0, 159, 199)');
+ for(const i of ['0','1','2','3'])expect(m.edges[i].dash,'edge '+i+' below outline is dotted').toBe('2.5px, 5px');
  expect(m.nodes).toEqual({web:'below',shipping:'below'});
 });

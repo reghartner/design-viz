@@ -18,10 +18,10 @@
    page.editHistory entry. `pull` folds the entries the local copy
    lacks into it: three-way per ticket, by carrier identity (the same identity chain the
    board uses for its own conflict replay), with the base being the live file with those
-   entries' operations undone, so local changes are kept. A step mapping is set on the
-   local step (same chain: section id, step id) when it has none, or when it still equals the
-   change's `replaces` (its other traceMatch fields stay); a different local traceMatch, or a
-   deleted step, is a conflict. Every other line of the local file stays
+   entries' operations undone, so local changes are kept. A step's base is the `replaces` of
+   its oldest fresh mapping (none for a first mapping): the newest mapping is set on the local
+   step (same chain: section id, step id) when it still equals that base, keeping its other
+   traceMatch fields; anything else, or a deleted step, is a conflict. Every other line of the local file stays
    as written.
 
    `log` appends one agent entry ({source: "agent", summary, changes}) describing the change
@@ -248,13 +248,14 @@ function pull(localText,liveText,options){
     });
   });
 
-  // #1078: the newest board mapping of each step.
+  // #1078: the newest board mapping of each step, and (#1180) the base its oldest fresh one replaced.
   const liveSteps=stepInventory(liveRaw),localSteps=stepInventory(localRaw),mappings=new Map();
   sortedByTime(fresh).forEach(entry=>(Array.isArray(entry.changes)?entry.changes:[]).forEach(change=>{
     if(!isMapping(change))return;
     const key=stepKey(liveRaw,liveSteps,change);
     if(key===null){unplaced.push(who(entry)+' '+when(entry.at)+': '+describe({changes:[change]}).join('; '));return;}
-    mappings.set(key,{entry,change,step:liveSteps.get(key)});
+    const first=mappings.get(key);
+    mappings.set(key,{entry,change,step:liveSteps.get(key),base:first?first.base:isObject(change.replaces)?change.replaces:null});
   }));
 
   const inBase=placements(base),inLive=placements(live.map),inMine=placements(mine);
@@ -280,19 +281,18 @@ function pull(localText,liveText,options){
     l.filter(key=>!o.includes(key)).forEach(key=>queue(adds,key,ticket));
     o.filter(key=>!l.includes(key)).forEach(key=>queue(removes,key,ticket));
   });
-  /* The base is the change's `replaces` (#1180), else none: set the mapping where the local step
-     still equals the base (keeping its other traceMatch fields), keep a local one naming the same
-     span, and ask on anything else. */
+  /* Set the newest mapping where the local step still equals the base (keeping its other
+     traceMatch fields), keep a local one naming the same span, and ask on anything else. */
   const stepWrites=[];
-  mappings.forEach(({entry,change,step},key)=>{
+  mappings.forEach(({entry,change,step,base},key)=>{
     const id=step.id,choice=resolve['step:'+id],want={serviceName:change.traceMatch.serviceName,operation:change.traceMatch.operation},mineStep=localSteps.get(key);
     const told='step '+id+': on the board '+who(entry)+' mapped '+spanText(want)+' to step '+step.label+' on '+when(entry.at);
     if(choice==='local')return;
     if(!mineStep){conflicts.push({kind:'step-missing',step:id,message:told+', but your local copy no longer has that step. Ask the author, then rerun with --resolve step:'+id+'=local.'});return;}
     if(sameSpan(mineStep.traceMatch,want))return;
-    if(isObject(change.replaces) && sameSpan(mineStep.traceMatch,change.replaces)){stepWrites.push({path:mineStep.path,value:{...mineStep.traceMatch,...want}});return;}
-    if(mineStep.traceMatch && choice!=='live'){
-      conflicts.push({kind:'trace-match-changed',step:id,message:told+'; your local copy maps '+spanText(mineStep.traceMatch)+' to it. Ask the author which to keep, then rerun with --resolve step:'+id+'=live or --resolve step:'+id+'=local.'});
+    if(base?sameSpan(mineStep.traceMatch,base):!mineStep.traceMatch){stepWrites.push({path:mineStep.path,value:base?{...mineStep.traceMatch,...want}:want});return;}
+    if(choice!=='live'){
+      conflicts.push({kind:'trace-match-changed',step:id,message:told+'; your local copy '+(mineStep.traceMatch?'maps '+spanText(mineStep.traceMatch)+' to it':'has no traceMatch on it')+'. Ask the author which to keep, then rerun with --resolve step:'+id+'=live or --resolve step:'+id+'=local.'});
       return;
     }
     stepWrites.push({path:mineStep.path,value:want});

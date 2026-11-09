@@ -294,7 +294,7 @@
       var status=el(body,'p','status','dv-trace-mode-status',[message,trace.hasMappings?trace.status.note:'',trace.hasMappings?trace.notice:''].filter(Boolean).join(' '));status.setAttribute('role','status');
       // #1177: the latest span mapping with its Undo, and the step chooser of a drop on a carrier with several steps.
       if(trace.mapped){var note=el(body,'div','map-note','dv-trace-map-note');note.setAttribute('role','status');
-        el(note,'span','text','dv-trace-map-note-text','Mapped '+trace.mapped.traceMatch.serviceName+' · '+trace.mapped.traceMatch.operation+' to step '+trace.mapped.label+'.');
+        el(note,'span','text','dv-trace-map-note-text','Mapped '+trace.mapped.traceMatch.serviceName+' · '+trace.mapped.traceMatch.operation+' to step '+trace.mapped.label+(trace.mapped.unmatched?'; this step\'s node, parent or attributes do not match this span, so nothing lights.':'.'));
         button(note,'undo','reader-button dv-trace-map-undo','Undo','undoTraceMap');}
       if(trace.mapChooser){
         var mc=trace.mapChooser,chooser=el(body,'div','map-chooser','dv-trace-map-chooser');chooser.setAttribute('role','group');chooser.setAttribute('aria-label','Choose the step for '+mc.label);

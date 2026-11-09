@@ -974,7 +974,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
      moves the view there (Live for today); a view change to another day clears the trace with one note. */
   var traceDayNote='',overTarget=null,overParked=null,traceLoads=0;
   // #1177: a picked example trace carried across an Edit-mode re-render, and the step chooser a span drop opened.
-  var carriedExample=null,traceChooser=null;
+  var carriedExample=null,traceChooser=null,traceReturnSpan=null;
   function localDayKey(ms){var d=new Date(ms);return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())).toISOString().slice(0,10);}
   function traceDayOf(e){
     var at=Math.min.apply(null,(e && e.spans || []).map(function(s){return Date.parse(s.time);}).filter(function(t){return isFinite(t);}));if(!isFinite(at))return null;
@@ -1044,16 +1044,18 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var carried=carriedExample;
     if(carried && (!traceSelection || traceSelection.key!==carried.key)){carriedExample=carried=null;}
     if(carried && !evidence.historical){
-      // Live evidence for the same carrier replaces the carried entry (tokens differ per session); the pick
-      // and its focus move to it only when it shows the same trace (#1180).
-      var live=entries.find(function(e){return e.carrier===carried.carrier && e.binding.ordinal===carried.ordinal;});
+      /* Live evidence for the same carrier that shows the same trace takes over the pick, its focus and an
+         open chooser (tokens differ per session). Live evidence showing another trace (a re-attached
+         adapter picks its default again) is listed beside the carried pick, which stays (#1180 c2). */
+      var live=entries.find(function(e){return e.carrier===carried.carrier && e.binding.ordinal===carried.ordinal && e.exemplar.traceId===traceSelection.traceId;});
       var home=mounted.find(function(b){return b.ordinal===carried.ordinal;});
       if(live){
-        carriedExample=null;
-        if(live.exemplar.traceId===traceSelection.traceId){var was=home && traceContext({key:carried.key,exemplar:carried.exemplar,binding:home});traceSelection={key:live.key,traceId:traceSelection.traceId,chosen:traceSelection.chosen};if(traceFocus && was && traceFocus.context===was)traceFocus.context=traceContext(live);}
-        else{traceSelection=null;traceInitial=false;traceFocus=null;}
+        carriedExample=null;var was=home && traceContext({key:carried.key,exemplar:carried.exemplar,binding:home});
+        traceSelection={key:live.key,traceId:traceSelection.traceId,chosen:traceSelection.chosen};
+        if(was && traceFocus && traceFocus.context===was)traceFocus.context=traceContext(live);
+        if(was && traceChooser && traceChooser.context===was)traceChooser.context=traceContext(live);
       }
-      else if(home)entries.push({key:carried.key,carrier:carried.carrier,binding:home,exemplar:carried.exemplar,carried:true,label:(home.section.heading || home.section.id || 'Diagram')+' · '+carried.carrier});
+      else if(home)entries.push({key:carried.key,carrier:carried.carrier,binding:home,exemplar:carried.exemplar,carried:true,label:(home.section.heading || home.section.id || 'Diagram')+' · '+carried.carrier+' (your pick)'});
     }
     var manual=directTrace.snapshot();
     if(manual.exemplar){var context=directTraceSections().find(function(s){return s.id===manual.section;}),binding=context?context.binding:{section:{diagram:{steps:[]}},page:page,stepper:null,el:null};
@@ -1089,19 +1091,21 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(statusMode!=='trace')return null;
     var selected=traceSelection && traceSources().entries.find(function(e){return e.key===traceSelection.key;}),example=null;
     if(selected && !selected.manual && selected.binding.ordinal!=null)example={key:'carried/'+selected.binding.ordinal+'/'+selected.carrier+'/'+selected.exemplar.selectionToken,ordinal:selected.binding.ordinal,carrier:selected.carrier,exemplar:selected.exemplar,traceId:traceSelection.traceId,chosen:!!traceSelection.chosen};
-    return {direct:directTrace.carry(),example:example,spanId:selected && traceFocus?traceFocus.spanId:null,show:traceShow};
+    return {direct:directTrace.carry(),example:example,spanId:selected && traceFocus?traceFocus.spanId:null,show:traceShow,returnSpan:traceReturnSpan};
   }
   function traceRestore(carried){
     statusMode='trace';statusAuto=false;traceShow=carried.show!==false;
     var direct=!!(carried.direct && directTrace.restore(carried.direct));
     // The reader's pick wins: a picked example stays selected beside a loaded trace (#1180).
     if(carried.example){carriedExample=carried.example;traceSelection={key:carried.example.key,traceId:carried.example.traceId,chosen:carried.example.chosen};traceInitial=false;}
-    if(!(direct || carried.example) || !carried.spanId)return;
+    if(!(direct || carried.example) || !carried.spanId && !carried.returnSpan)return;
     // After the render settles its opening step, so the mapped step it jumps to stays shown.
     requestAnimationFrame(function(){
       if(retired || statusMode!=='trace')return;
       var selected=traceSnapshot().selected;
-      if(selected && selected.exemplar.spans.some(function(s){return s.id===carried.spanId;}))api.selectTraceSpan({context:selected.context,spanId:carried.spanId});
+      if(carried.spanId && selected && selected.exemplar.spans.some(function(s){return s.id===carried.spanId;}))api.selectTraceSpan({context:selected.context,spanId:carried.spanId});
+      // A drop or chooser pick re-rendered the board: focus goes back to the dragged span row (#1180).
+      var row=carried.returnSpan && view.querySelector('.dv-trace-span[data-span-id="'+carried.returnSpan+'"]');if(row && row.focus)row.focus({preventScroll:true});
     });
   }
   /* #1177: drag a span onto a step (its chip or coin) or onto a node or edge. A carrier named by one step
@@ -1113,7 +1117,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var inside=bindings.filter(function(binding){return binding.ordinal!=null && binding.el.contains(hit);});
     var binding=inside.filter(function(candidate){return !inside.some(function(other){return other!==candidate && candidate.el.contains(other.el);});})[0];
     var index=Number(hit.getAttribute('data-step-source')!=null?hit.getAttribute('data-step-source'):hit.getAttribute('data-dv-step')),step=binding && (binding.section.diagram.steps || [])[index];
-    return step && typeof step.id==='string'?{el:hit,ordinal:binding.ordinal,step:step.id}:null;
+    if(!step || typeof step.id!=='string')return null;
+    // An alternatives traceMatch (#1100) is edited in Inspect: no highlight and no drop, and the button says why (#1180).
+    if(Array.isArray(step.traceMatch)){hit.setAttribute('title','Has alternatives; edit in Inspect');return {blocked:true};}
+    return {el:hit,ordinal:binding.ordinal,step:step.id};
   }
   function carrierSteps(binding,ref,steps){
     var d=binding.section.diagram,edge=ref.kind==='edge' && (d.edges || [])[ref.index],key=edge && edge.from+'->'+edge.to;
@@ -1125,6 +1132,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function spanDropped(payload,hit){
     var selected=traceSnapshot().selected;if(!payload || !selected || payload.context!==selected.context)return;
     var entry=traceSources().entries.find(function(e){return e.key===selected.key;}),steps=entry && traceMapSteps(entry.binding);if(!steps)return;
+    traceReturnSpan=payload.spanId;
     if(hit.step){if(hit.ordinal!==entry.binding.ordinal)return;var target=steps.find(function(step){return step.id===hit.step;});if(target)api.mapTraceSpan({context:payload.context,spanId:payload.spanId,stepId:target.id,replace:target.mapped});return;}
     if(hit.ref.section!==entry.binding.ordinal)return;
     var named=carrierSteps(entry.binding,hit.ref,steps);
@@ -1138,6 +1146,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var choices=telemetryTraceChoices(entry.binding.section.diagram,entry.binding.stepper && entry.binding.stepper.path(),entry.exemplar,traceFocus.spanId);
     var choice=traceFocus.choiceKey && choices.find(function(c){return c.key===traceFocus.choiceKey;});
     return {spanId:traceFocus.spanId,choices:choices,choice:choice || null,navigable:!!entry.binding.stepper};
+  }
+  /* #1180: the latest pending mapping for its note. When the step keeps a nodeId, parentStepId or attributes
+     that exclude the mapped span, the selected trace shows nothing for it; the note says so. */
+  function mappedNote(selected,model){
+    var m=editing() && editor.state().mapped;if(!m)return null;var out={step:m.step,label:m.label,traceMatch:m.traceMatch,unmatched:false};
+    var row=selected && model && model.mapping && model.mapping.steps.find(function(r){return r.stepId===m.step;}),step=selected && (selected.binding.section.diagram.steps || []).find(function(x){return x.id===m.step;}),kept=step && step.traceMatch;
+    if(row && row.status!=='matched' && kept && !Array.isArray(kept) && (kept.nodeId || kept.parentStepId || kept.attributes))out.unmatched=true;
+    return out;
   }
   function traceSnapshot(){
     var source=traceSources(),entries=source.entries,evidence=source.evidence,hasMappings=false;
@@ -1156,7 +1172,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,
       // #1177: the step chooser of a span drop, and the latest pending mapping with its Undo.
       mapChooser:traceChooser && selected && traceChooser.context===context?{label:traceChooser.label,span:traceChooser.span,spanId:traceChooser.spanId,drop:traceChooser.drop,steps:traceChooser.steps.map(function(step){return {id:step.id,mapped:step.mapped,disabled:step.alternatives,label:step.caption+(step.alternatives?' · has alternatives; edit in Inspect':step.mapped?' · mapped, replaces':'')};})}:null,
-      mapped:editing() && editor.state().mapped || null,enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
+      mapped:mappedNote(selected,model),enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
   function paintTrace(){
     var trace=traceSnapshot(),selected=trace.selected,sources=traceSources().entries;
@@ -1550,9 +1566,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function carriesTicket(ev){return !!(ev.dataTransfer && Array.prototype.indexOf.call(ev.dataTransfer.types || [],EDIT_TICKET_TYPE)>=0);}
   function carriesSpan(ev){return !!(ev.dataTransfer && Array.prototype.indexOf.call(ev.dataTransfer.types || [],EDIT_SPAN_TYPE)>=0) && statusMode==='trace';}
   // Only the trace's own section takes a span drop (#1180): its steps are the ones Map span writes.
-  function traceOrdinal(){var selected=traceSelection && traceSources().entries.find(function(e){return e.key===traceSelection.key;});return selected?selected.binding.ordinal:null;}
+  var ordinalCache=null;
+  function traceOrdinal(){
+    var key=traceSelection && traceSelection.key;if(!key)return null;if(ordinalCache && ordinalCache.key===key)return ordinalCache.ordinal;
+    var selected=traceSources().entries.find(function(e){return e.key===key;});ordinalCache={key:key,ordinal:selected?selected.binding.ordinal:null};return ordinalCache.ordinal;
+  }
   function spanHit(target){
-    var step=stepDropRef(target),carrier=!step && dropRef(target),hit=step || carrier && {el:carrier.el,ref:carrier.ref};if(!hit)return null;
+    var step=stepDropRef(target);if(step && step.blocked)return null;
+    var carrier=!step && dropRef(target),hit=step || carrier && {el:carrier.el,ref:carrier.ref};if(!hit)return null;
     var ordinal=traceOrdinal();return ordinal!=null && (step?step.ordinal:carrier.ref.section)===ordinal?hit:null;
   }
   function dragOver(ev){

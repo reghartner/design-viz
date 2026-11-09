@@ -22,7 +22,8 @@
    its oldest fresh mapping (none for a first mapping): the newest mapping is set on the local
    step (same chain: section id, step id) when it still equals that base, keeping its other
    traceMatch fields; a local step that already names the newest span is kept; anything
-   else, or a deleted step, is a conflict. Every other line of the local file stays
+   else, or a deleted step, is a conflict. nodeId merges the same way on its own (#1192),
+   and a nodeId whose node the local copy lacks is a conflict. Every other line of the local file stays
    as written.
 
    `log` appends one agent entry ({source: "agent", summary, changes}) describing the change
@@ -256,7 +257,7 @@ function pull(localText,liveText,options){
     const key=stepKey(liveRaw,liveSteps,change);
     if(key===null){unplaced.push(who(entry)+' '+when(entry.at)+': '+describe({changes:[change]}).join('; '));return;}
     const first=mappings.get(key);
-    mappings.set(key,{entry,change,step:liveSteps.get(key),base:first?first.base:isObject(change.replaces)?change.replaces:null});
+    mappings.set(key,{entry,change,step:liveSteps.get(key),base:first?first.base:isObject(change.replaces)?change.replaces:null,changes:(first?first.changes:[]).concat([change])});
   }));
 
   const inBase=placements(base),inLive=placements(live.map),inMine=placements(mine);
@@ -285,28 +286,36 @@ function pull(localText,liveText,options){
   /* Set the newest mapping where the local step still equals the base (keeping its other
      traceMatch fields), keep a local one naming the same span, and ask on anything else; nodeId merges the same way. */
   const stepWrites=[];
-  mappings.forEach(({entry,change,step,base},key)=>{
-    const id=step.id,choice=resolve['step:'+id],want={serviceName:change.traceMatch.serviceName,operation:change.traceMatch.operation,...(typeof change.traceMatch.nodeId==='string'?{nodeId:change.traceMatch.nodeId}:{})},mineStep=localSteps.get(key);
-    const told='step '+id+': on the board '+who(entry)+' mapped '+spanText(want)+' to step '+step.label+' on '+when(entry.at);
+  /* The nodeId base (#1192): walking a step's fresh changes oldest first, a replaces.nodeId is the base; a first
+     mapping, or a change that names a nodeId its replaces lacks (it set one), means none. A change with neither
+     (an older engine, which never changed nodeId) says nothing, so the walk goes on. */
+  const nodeBase=changes=>{for(const c of changes){if(!isObject(c.replaces))return undefined;if(typeof c.replaces.nodeId==='string')return c.replaces.nodeId;if(isObject(c.traceMatch) && typeof c.traceMatch.nodeId==='string')return undefined;}return undefined;};
+  // A nodeId the local copy can hold: a node of the step's own diagram, or an imported one by its alias.
+  const nodeExists=(path,id)=>{const d=C.specValueAt(localRaw,path.slice(0,-2));if(!isObject(d))return false;if(isObject(d.nodes) && Object.prototype.hasOwnProperty.call(d.nodes,id))return true;
+    const at=id.indexOf('::');return at>0 && Array.isArray(d.topologyImports) && d.topologyImports.some(imp=>isObject(imp) && imp.as===id.slice(0,at));};
+  mappings.forEach(({entry,change,step,base,changes},key)=>{
+    const id=step.id,choice=resolve['step:'+id],want={serviceName:change.traceMatch.serviceName,operation:change.traceMatch.operation},wantNode=typeof change.traceMatch.nodeId==='string'?change.traceMatch.nodeId:undefined,mineStep=localSteps.get(key);
+    const told='step '+id+': on the board '+who(entry)+' mapped '+spanText(want)+(wantNode?' on node '+wantNode:'')+' to step '+step.label+' on '+when(entry.at);
     if(choice==='local')return;
     if(!mineStep){conflicts.push({kind:'step-missing',step:id,message:told+', but your local copy no longer has that step. Ask the author, then rerun with --resolve step:'+id+'=local.'});return;}
-    /* Three-way per part (#1192): the span (serviceName, operation) against the base span, and nodeId against
-       the base nodeId (replaces.nodeId of the oldest fresh change; none for a first mapping or an older engine's
-       replaces). Local equals base: take the board's; board equals base or local: keep local; else ask. */
-    const mine=mineStep.traceMatch,mineNode=isObject(mine)?mine.nodeId:undefined,baseNode=base && typeof base.nodeId==='string'?base.nodeId:undefined;
+    /* Three ways per part: the span (serviceName, operation) against the oldest fresh change's replaces, and nodeId
+       against nodeBase. Local equals base: take the board's. Board equals base (or local): keep local. Else ask;
+       --resolve step:<id>=live then takes the board's parts and keeps the other traceMatch fields. */
+    const mine=mineStep.traceMatch,mineNode=isObject(mine) && typeof mine.nodeId==='string'?mine.nodeId:undefined,baseNode=nodeBase(changes);
     const span=sameSpan(mine,want)?'keep':(base?sameSpan(mine,base):!mine)?'take':'ask';
-    const node=mineNode===want.nodeId || want.nodeId===baseNode?'keep':mineNode===baseNode?'take':'ask';
-    if(span!=='ask' && node!=='ask'){
-      if(span==='keep' && node==='keep')return;
-      const value={...(isObject(mine)?mine:{}),...(span==='take'?{serviceName:want.serviceName,operation:want.operation}:{})};
-      if(node==='take'){if(want.nodeId===undefined)delete value.nodeId;else value.nodeId=want.nodeId;}
-      stepWrites.push({path:mineStep.path,value});return;
+    const node=mineNode===wantNode || wantNode===baseNode?'keep':mineNode===baseNode?'take':'ask';
+    const live=choice==='live',takeSpan=span==='take' || span==='ask' && live,takeNode=node==='take' || node==='ask' && live;
+    if(takeNode && wantNode!==undefined && !nodeExists(mineStep.path,wantNode)){
+      conflicts.push({kind:'node-missing',step:id,message:told+', but node '+wantNode+' no longer exists locally. Ask the author, add the node or keep yours with --resolve step:'+id+'=local.'});return;
     }
-    if(choice!=='live'){
-      conflicts.push({kind:'trace-match-changed',step:id,message:told+(span!=='ask'?' on node '+(want.nodeId || '(none)')+'; your local copy maps it on node '+(mineNode || '(none)'):'; your local copy '+(mineStep.traceMatch?'maps '+spanText(mineStep.traceMatch)+' to it':'has no traceMatch on it'))+'. Ask the author which to keep, then rerun with --resolve step:'+id+'=live or --resolve step:'+id+'=local.'});
+    if((span==='ask' || node==='ask') && !live){
+      conflicts.push({kind:'trace-match-changed',step:id,message:told+'; your local copy '+(mine?'maps '+spanText(mine)+(mineNode?' on node '+mineNode:'')+' to it':'has no traceMatch on it')+'. Ask the author which to keep, then rerun with --resolve step:'+id+'=live or --resolve step:'+id+'=local.'});
       return;
     }
-    stepWrites.push({path:mineStep.path,value:want});
+    if(!takeSpan && !takeNode)return;
+    const value={...(isObject(mine) && !Array.isArray(mine)?mine:{}),...(takeSpan?want:{})};
+    if(takeNode){if(wantNode===undefined)delete value.nodeId;else value.nodeId=wantNode;}
+    stepWrites.push({path:mineStep.path,value});
   });
   if(conflicts.length)return {status:'conflict',text:localText,edits,conflicts,unplaced};
 

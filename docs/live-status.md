@@ -2039,10 +2039,14 @@ reads it as "payment · grpc.msdemo.PaymentService/Charge mapped to step Charge 
 card", with "(replaced <service> · <operation>)" after a replacement. `board-sync pull`
 sets a step's newest board mapping where the local step still equals the `replaces` of
 its oldest fresh mapping (no `traceMatch` when that one was a first mapping), keeps a
-local step that already names the newest span, and asks on anything else. `nodeId`
-merges the same way against `replaces.nodeId`: on the same span pull writes the board's
-`nodeId` where the local copy still has the base one (or none), and asks when the local
-copy has a different one. Optional: `by` (`id` and `name`
+local step that already names the newest span, and asks on anything else. `nodeId` merges the same way, separately from the span: its base
+is the first `replaces.nodeId` among the step's fresh changes (none after a first mapping,
+or once a change sets a `nodeId` its `replaces` lacks; an older engine's change without
+any `nodeId` is skipped). Local equals the base: pull takes the board's `nodeId`. The
+board equals the base, or local equals the board: pull keeps the local one, also when the
+span changes. Both differ: it asks. It never writes a `nodeId` whose node is missing from
+the local copy; it asks instead. `--resolve step:<id>=live` takes the board's span and
+`nodeId` and keeps the step's other `traceMatch` fields. Optional: `by` (`id` and `name`
 strings, either may be empty), each change's `path` (array) and `label` (the
 carrier's display name at save time, so history stays readable after a rename).
 Validation follows the warning-only policy of the other tracking fields: a

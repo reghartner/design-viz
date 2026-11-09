@@ -1,5 +1,4 @@
 'use strict';
-const {withoutLanesNote}=require('./helpers/lanes-note.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource}=require('../tools/source-loader.cjs');
 const B=require('./workbench-command-context.cjs')(['graph','document','narrative','layout']);
@@ -13,8 +12,7 @@ const flatRows=d=>(d.rows || []).flat(2);
 function valid(raw){
   const result=plain(B.validate(B.normalize(raw)));
   assert.deepEqual(result.errors,[],result.errors.join('\n'));
-  const warnings=withoutLanesNote(result.warnings);
-  assert.deepEqual(warnings,[],warnings.join('\n'));
+  assert.deepEqual(result.warnings,[],result.warnings.join('\n'));
 }
 function fixture(){
   return {page:{title:'Orders overview',protocols:{orders:{label:'Order event',color:'#38bdf8'}},lanes:{request:{label:'Request',color:'#38bdf8'}},blocks:[

@@ -835,7 +835,7 @@ bounding-box rule applies at every level.
 ### rows — left-to-right slots (no coordinates)
 
 Connectors are curves: omit `diagram.routing`. Lane routing is no longer offered;
-an older spec with `routing: "lanes"` still draws lanes, with a validator warning.
+an older spec with `routing: "lanes"` still draws lanes, with a validator note.
 Honeycomb imports generate dependency rows
 (at most four cards per row), retaining service cycles and all relationships.
 Their row order describes dependencies, not elapsed time.

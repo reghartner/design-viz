@@ -3,11 +3,10 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),vm=requir
 const {readSource}=require('../tools/source-loader.cjs');
 const source=require('../src/starters/audio-story.json'),C={};vm.runInNewContext(readSource('validator.js'),C);
 const plain=x=>JSON.parse(JSON.stringify(x));
-const {withoutLanesNote}=require('./helpers/lanes-note.cjs');
 function story(section,path){const d=source.page.sections[section].diagram;return C.foldPanelStates(C.diagramForPath(d,path));}
 test('the audio teaching story validates cleanly and every path folds without mutating the spec',()=>{
  const before=JSON.stringify(source),result=C.validate(C.normalize(source));
- assert.deepEqual(plain(result.errors),[]);assert.deepEqual(withoutLanesNote(result.warnings),[]);
+ assert.deepEqual(plain(result.errors),[]);assert.deepEqual(plain(result.warnings),[]);
  source.page.sections.forEach((s,i)=>s.diagram.paths.forEach(p=>story(i,p.id)));
  assert.equal(JSON.stringify(source),before);
 });

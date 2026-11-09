@@ -154,6 +154,19 @@ class ValidateCliTest(unittest.TestCase):
         self.assertNotIn("warn  ", r.stdout)
         self.assertIn("errors,", r.stdout)  # summary line stays
 
+    def test_lane_routing_prints_a_note_not_a_warning(self):
+        # #1216: routing "lanes" is a note line plus a ", 1 note" count; it is
+        # never a warning, and --quiet hides the note like the warnings.
+        spec = "src/starters/security-response.json"
+        r = run_cli(spec)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn(f'{spec}: note  sections[0].diagram.routing: "lanes" is no longer recommended', r.stdout)
+        self.assertNotIn("warn  ", r.stdout)
+        self.assertEqual(r.stdout.strip().splitlines()[-1], f"{spec}: 0 errors, 0 warnings, 1 note")
+        quiet = run_cli("--quiet", spec)
+        self.assertNotIn("note  ", quiet.stdout)
+        self.assertEqual(quiet.stdout.strip().splitlines()[-1], f"{spec}: 0 errors, 0 warnings, 1 note")
+
     def test_unparseable_file_exits_1(self):
         r = run_cli("README.md")
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)

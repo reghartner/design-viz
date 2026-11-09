@@ -315,6 +315,15 @@ class PageBuildTest(unittest.TestCase):
         self.assertFalse((self.root / "doorbell" / "chime.html").exists(),
                          "nothing is written when validation stops the build")
 
+    def test_lane_routing_note_never_stops_the_build(self):
+        # #1216: an older spec with routing "lanes" gets a note, not a warning,
+        # so it still builds without --allow-warnings.
+        r = run_tool(str(ROOT / "src" / "starters" / "security-response.json"),
+                     "older/lanes", "--root", str(self.root))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("PAGE_BUILD OK", r.stdout)
+        self.assertTrue((self.root / "older" / "lanes.html").is_file())
+
     def test_warning_gate_cannot_be_spoofed_by_the_path(self):
         # a spec path containing the literal text "0 warnings" must not slip
         # a warning-bearing spec past the gate (the gate parses the summary

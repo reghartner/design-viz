@@ -1,5 +1,4 @@
 'use strict';
-const {withoutLanesNote}=require('./helpers/lanes-note.cjs');
 /* These command families load core/data leaves without the builder inspector. */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -218,7 +217,7 @@ test('adding a node keeps lane rows and existing lane routes', () => {
   for(const id of Object.keys(raw.nodes))assert.deepStrictEqual(plain(placed.pos[id]),prior[id]);
   assert.equal(B.laneRoutes(next,placed)[0].path,route);
   assert.ok(next.floats[0].noSpread && B.positionedFloat(next.floats[0]));
-  assert.deepStrictEqual(withoutLanesNote(B.validate(B.normalize(next)).warnings),[]);
+  assert.deepStrictEqual(plain(B.validate(B.normalize(next)).warnings),[]);
 });
 
 function automaticPaths(d){
@@ -263,7 +262,7 @@ test('raw insertion markers preserve lane routes and legacy floats retain fallba
   assert.deepStrictEqual(plain(after.pos.a),plain(placed.pos.a));
   assert.deepStrictEqual(plain(after.pos.b),plain(placed.pos.b));
   assert.ok(after.vb.x+after.vb.w>=after.pos.z.cx+after.pos.z.w/2);
-  assert.deepStrictEqual(withoutLanesNote(B.validate(B.normalize(next)).warnings),[]);
+  assert.deepStrictEqual(plain(B.validate(B.normalize(next)).warnings),[]);
   assert.equal(JSON.stringify(raw),before);
 
   const legacy=plain(next);delete legacy.floats[0].noSpread;

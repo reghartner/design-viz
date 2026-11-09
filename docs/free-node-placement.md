@@ -86,7 +86,7 @@ uses a curve even in a lane diagram; other lane edges and the row grid are
 preserved. Ports stay anchored during avoidance/bend adjustments, and labels,
 packets and step highlights follow the resulting path. Pinning does not guarantee
 that a path avoids every other card; drag the arrow to add smooth through-points (`curvePoints`) and use label nudges for crowded routes. Manual curves override avoidance and can be reset in Inspect.
-Float layouts use curve routing, as reported by validation when lanes are requested.
+Float layouts use curve routing; an older lanes diagram with floats also draws curves, and validation says so.
 
 Use **Clear Custom Edges** in an edge Inspector or its right-click menu to restore
 automatic entry, exit and curve routing without changing the connection type,

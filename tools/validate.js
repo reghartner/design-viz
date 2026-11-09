@@ -5,9 +5,9 @@ const core = require('./canon/core.cjs');
 
    Usage: node tools/validate.js [--quiet] [--resolve-imports <folder-or-registry>] <spec.json> [<spec.json> ...]
 
-   Prints errors, warnings, and lint findings with field paths, one per line,
-   prefixed by the file name. Exit 1 when any file has errors (or fails to
-   parse), 0 otherwise. --quiet prints only errors and the per-file summary.
+   Prints errors, warnings, lint findings and notes with field paths, one per
+   line, prefixed by the file name. Notes are informational and never count as
+   warnings. Exit 1 when any file has errors (or fails to parse), 0 otherwise. --quiet prints only errors and the per-file summary.
 
    This closes the authoring loop for spec-emitting agents: emit JSON, run
    this, fix what it names — no browser involved. It loads the same
@@ -237,9 +237,13 @@ async function main(argv){
     if (!quiet){
       for (const w of v.warnings) console.log(file + ': warn  ' + w);
       for (const w of lint) console.log(file + ': lint  ' + w);
+      for (const note of v.notes || []) console.log(file + ': note  ' + note);
     }
+    // Notes (#1216) never count as warnings; the count appears only when there is one.
+    const notes = (v.notes || []).length;
     console.log(file + ': ' + v.errors.length + ' errors, ' +
-                (v.warnings.length + lint.length) + ' warnings');
+                (v.warnings.length + lint.length) + ' warnings' +
+                (notes ? ', ' + notes + (notes === 1 ? ' note' : ' notes') : ''));
     if (v.errors.length) anyErrors = true;
   });
   return anyErrors ? 1 : 0;

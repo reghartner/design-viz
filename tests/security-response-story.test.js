@@ -1,5 +1,4 @@
 'use strict';
-const {withoutLanesNote}=require('./helpers/lanes-note.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
@@ -16,7 +15,7 @@ test('security response teaching seed validates without warnings and preserves i
   const before = JSON.stringify(source);
   const result = core.validate(core.normalize(source));
   assert.deepEqual(plain(result.errors), []);
-  assert.deepEqual(withoutLanesNote(result.warnings), []);
+  assert.deepEqual(plain(result.warnings), []);
   for (const path of ['confirmed', 'false-alarm', 'dispatch-unavailable']) folded(path);
   assert.equal(JSON.stringify(source), before);
 });

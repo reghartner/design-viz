@@ -1002,7 +1002,7 @@ function edgeForm(val, ctx){
       return rows;
     }
     var portHint=document.createElement('p');portHint.className='fnote';
-    portHint.textContent='Entry/exit positions run from 0% at the left or top to 100% at the right or bottom. Pinned ports use a curve, including in lane routing; Auto restores automatic routing.';
+    portHint.textContent='Entry/exit positions run from 0% at the left or top to 100% at the right or bottom. Pinned ports use a curve; Auto restores automatic routing.';
     var curveControls=document.createElement('div'),curveHint=document.createElement('p');curveHint.className='fnote';
     curveHint.textContent='Drag the arrow or its round handles to shape a smooth curve. Drag another part to add a point. Double-click a point to remove it. Focus a point to use arrow keys or Delete.';
     curveControls.appendChild(curveHint);

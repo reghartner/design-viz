@@ -173,10 +173,11 @@ test('#1216 Edge routing is shown only on a lanes diagram, and only to switch it
     h.session.target={kind:'section',section:0};h.inspector.render();
     assert.equal(control().value,'lanes','a lanes diagram shows its value');
     assert.deepEqual(Array.from(control().options).map(o=>[o.value,o.textContent]),[['lanes','Lanes (no longer offered)'],['curves','Curves']]);
-    const before=h.text;control().value='curves';control().fire('change');h.flush();
+    const before=h.text,retired=control();control().value='curves';control().fire('change');h.flush();
     assert.equal('routing' in get(),false,'switching off removes routing');assert.deepEqual(get().edges,diagram.edges);assert.deepEqual(get().rows,diagram.rows);
     if(!bare)assert.deepEqual(JSON.parse(h.text).page.blocks[1],raw.page.blocks[1]);
-    h.session.target={kind:'section',section:0};h.inspector.render();assert.equal(control(),null,'once off, there is no way back to Lanes');
+    const off=h.text;h.session.target={kind:'section',section:0};h.inspector.render();assert.equal(control(),null,'once off, there is no way back to Lanes');
+    retired.value='lanes';retired.fire('change');h.flush();assert.equal(h.text,off,'a control left over from before the re-render cannot write lanes back');
     h.session.undo();assert.equal(h.text,before);
     h.inspector.destroy();
   }

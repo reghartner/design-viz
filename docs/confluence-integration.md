@@ -88,8 +88,8 @@ alone is not proof that non-contributor colleagues can access it.
 2. **Interaction:** play/pause, select Internet down step 3, check the failed hop,
    step to the earlier alternate ending, then switch Home/Data flow. Confirm
    state and step stay aligned. Test reduced motion and a narrow page column.
-3. **Complex trace:** import `src/starters/complex-trace.json`; test lane routing,
-   Auto/Fit width/Readable, service-internal timing and concurrent spans.
+3. **Complex trace:** import `src/starters/complex-trace.json`; test the older lane
+   routing it still draws, Auto/Fit width/Readable, service-internal timing and concurrent spans.
 4. **Multiple instances:** put two different macros on one page. Updating one
    must not alter the other. Check full-width pages and columns for resize loops
    and excess whitespace, particularly after toggling Home/Data flow.

@@ -1215,7 +1215,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function traceLabelSize(text){var box=text.getBBox();return Math.round(box.width*10)+'x'+Math.round(box.height*10);}
   function recordTraceLabels(){view.querySelectorAll('.dv-trace-overlay text').forEach(function(text){text._dvTraceLabelSize=traceLabelSize(text);});}
   function traceLabelsResized(){
-    if(retired || !telemetry.enabled() && !metricsPreview)return;
+    // Cards (Metrics on) and connection labels (#1195, any time trace labels show) are rechecked.
+    if(retired || !view.querySelector('.dv-trace-overlay'))return;
     if(painting){traceRecheck=true;return;}
     var changed=Array.prototype.filter.call(view.querySelectorAll('.dv-trace-overlay text'),function(text){var size=traceLabelSize(text),moved=text._dvTraceLabelSize!==size;text._dvTraceLabelSize=size;return moved;});
     if(changed.length && telemetryTraceLabelsBlocked(changed)){paint();notify();}

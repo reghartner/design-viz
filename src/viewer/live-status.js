@@ -18,6 +18,12 @@ function liveStatusLogDetails(snapshot,window){
   });});
   return out;
 }
+// A date as other panel dates read, in local time ("Nov 5, 7:00 AM"); the year only when it is not this year (#1153).
+function liveStatusReadableTime(at){
+  var d=new Date(at);if(!isFinite(d.getTime()))return String(at);
+  var day=d.getFullYear()===new Date().getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'};
+  return d.toLocaleDateString([],day)+', '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+}
 function liveStatusProofPresentation(snapshot,window,includeUnobserved){
   if(!snapshot)return null;
   // Map keys, links and markers are not measurements. Use only already-resolved
@@ -69,11 +75,11 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
     var continuous=points.length>=3 && points.every(function(p,i){return !i || p.at-points[i-1].at<=(interval?interval*1.1:span/4);});
     var url=null,authored=binding.links || {},provider=sample && sample.links || {};
     [authored.dashboard,authored.query,provider.dashboard,telemetryMetricUrl(binding,sample,primary),provider.query].some(function(value){url=deltaLinkUrl(value);return !!url;});
-    var since=[];if(result.since.doneAt){since.push('Done '+result.since.doneAt);if(result.since.firstTrafficAt)since.push('First observed traffic '+result.since.firstTrafficAt);}
+    var since=[];if(result.since.doneAt){since.push('Done '+liveStatusReadableTime(result.since.doneAt));if(result.since.firstTrafficAt)since.push('First observed traffic '+liveStatusReadableTime(result.since.firstTrafficAt));}
     if(!snapshot.historical && result.since.doneAt)telemetryMetricNames(binding).forEach(function(name){
       var entry=sample && sample.signals && sample.signals[name],aggregate=telemetryAggregate(entry,sample && sample.observedAt);
       if(!aggregate || aggregate.from!==result.since.doneAt)return;
-      since.push(name+' total: '+String(entry.value)+(entry.unit?' '+entry.unit:'')+' through '+aggregate.to);
+      since.push(name+' total: '+String(entry.value)+(entry.unit?' '+entry.unit:'')+' through '+liveStatusReadableTime(aggregate.to));
     });
     // No combined verdict while Jira is unknown does not erase measured evidence.
     var label=result.label;
@@ -88,6 +94,10 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
       linkLabel:primary && binding.signals[primary].source==='grafana'?'Open in Grafana':primary && binding.signals[primary].source==='honeycomb'?'Open in Honeycomb':'Open telemetry',
       explanation:result.failing.length?'Outside proof threshold: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name,null,window)+'; requires '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
         result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':result.telemetry==='unmeasured'?'Traffic proof requires an observed signal with an authored minimum.':'Observed signals meet the authored proof thresholds.',
+      // #1153: the Trace view's metrics popup states the metric evidence alone, with no Jira state or proof words.
+      metrics:{label:loading && !measured?'Loading…':result.telemetry==='silent'?'SILENT':result.telemetry==='degraded'?'DEGRADED':measured?(result.telemetry==='unobserved'?'OBSERVED · evidence incomplete':'OBSERVED'):'UNOBSERVED',
+        explanation:result.failing.length?'Outside limit: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name,null,window)+'; limit '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
+          result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':'Observed signals are within their authored limits.'},
       chart:{pending:!!waiting[primary],observedAt:measuredAt,points:plotted,line:continuous?plotted.map(function(p){return p.x+','+p.y;}).join(' '):null,
         markers:markers.map(function(m){return {x:2+96*(m.at-start)/span,label:m.label,kind:m.kind};})}};
   });
@@ -1182,21 +1192,22 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return proof && proof.rows.find(function(row){return row.id===id;}) || null;
   }
   function paintProduction(trigger){
-    var row=productionRow(trigger),block=pop.querySelector('.dv-live-production');
+    // #1153: the Trace view's metrics popup shows metric evidence only: no proof label, Done marker or Since Done line.
+    var row=productionRow(trigger),block=pop.querySelector('.dv-live-production'),metricsOnly=!!(trigger && trigger._liveCarrier && trigger._liveCarrier.metricsOnly);
     if(!row){if(block)block.remove();return false;}
     if(!block)block=element('section','dv-live-production',null,pop);
     block.setAttribute('data-loading',row.initialLoading?'true':'false');block.setAttribute('data-production-carrier',row.id);block.setAttribute('data-verdict',row.verdict || 'unobserved');
     function text(tag,cls,value){var node=block.querySelector('.'+cls);if(!node)node=element(tag,cls,null,block);if(node.textContent!==value)node.textContent=value;return node;}
     var environment=telemetry.environment();
     text('h3','dv-live-production-heading',(environment?environment.toUpperCase()+' ':'')+'Evidence');
-    text('p','dv-live-production-verdict',row.label+' · '+row.explanation);
+    text('p','dv-live-production-verdict',metricsOnly?row.metrics.label+' · '+row.metrics.explanation:row.label+' · '+row.explanation);
     text('p','dv-live-proof-predicate',row.predicate);
     var chart=block.querySelector('.dv-live-production-chart') || element('div','dv-live-production-chart',null,block);chart.replaceChildren();
     if(row.chart.points.length || row.chart.markers.length){
       var svg=telemetrySvg(document,'svg',{class:'dv-live-proof-sparkline',viewBox:'0 0 100 32',role:'img','aria-label':telemetryWindow+' window: '+row.chart.points.length+' observed points'},chart);
       if(row.chart.line)telemetrySvg(document,'polyline',{class:'dv-live-proof-series',points:row.chart.line},svg);
       row.chart.points.forEach(function(point){telemetrySvg(document,'circle',{class:'dv-live-proof-point',cx:point.x,cy:point.y,r:1.8},svg);});
-      row.chart.markers.forEach(function(marker){var tick=telemetrySvg(document,'line',{class:'dv-live-proof-marker',x1:marker.x,x2:marker.x,y1:2,y2:30,'data-kind':marker.kind},svg);telemetrySvg(document,'title',{},tick).textContent=marker.label;});
+      row.chart.markers.filter(function(marker){return !metricsOnly || marker.kind!=='done';}).forEach(function(marker){var tick=telemetrySvg(document,'line',{class:'dv-live-proof-marker',x1:marker.x,x2:marker.x,y1:2,y2:30,'data-kind':marker.kind},svg);telemetrySvg(document,'title',{},tick).textContent=marker.label;});
     }else element('span','',row.chart.pending?'Loading…':'No observed series in this window',chart);
     var kpis=block.querySelector('.dv-live-production-kpis') || element('div','dv-live-production-kpis',null,block);
     while(kpis.children.length>row.kpis.length)kpis.lastElementChild.remove();
@@ -1206,7 +1217,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(kpi.url){var queryLink=link(tile,'',kpi.url);queryLink.className='dv-live-metric-link';queryLink.setAttribute('aria-label','Open '+kpi.label+' source query in a new tab');queryLink.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});}
       if(kpi.scope)element('small','dv-live-metric-scope',kpi.scope,tile);
     });
-    text('p','dv-live-production-since','Since Done: '+row.since);
+    if(!metricsOnly)text('p','dv-live-production-since','Since Done: '+row.since);
     var anchor=block.querySelector('.dv-live-production-link');
     if(row.url){if(!anchor){anchor=link(block,'',row.url);anchor.classList.add('dv-live-production-link');anchor.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});element('span','',null,anchor);}anchor.setAttribute('href',row.url);anchor.querySelector('span').textContent=row.linkLabel;}
     else if(anchor){var root=pop.getRootNode();if(root.activeElement===anchor)pop.querySelector('.node-link-close').focus({preventScroll:true});anchor.remove();}

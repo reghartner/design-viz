@@ -3744,6 +3744,31 @@ test('#1145 opening a drill-down keeps the loaded trace and its selection',async
 /* #1164: example traces (from the metrics fetch) are listed, but none is the selected request and nothing
    paints on the diagram until the reader picks one; a loaded trace still selects itself. Boards with and
    without Jira. */
+/* #1185: a shown trace with an error span whose step mapping is unique focuses the earliest such span,
+   as if the reader clicked it (the stepper pauses and jumps to its step). An error span that no step maps
+   is not focused, and the request summary names it. The reader can clear the focus; it does not return. */
+test('#1185 a failed trace focuses its earliest mapped error span; an unmapped error is named in the summary',async()=>{
+ for(const mapped of [true,false]){
+  const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),e=f.samples['mcu->ingest'].exemplars[0],failed=e.spans.find(s=>s.error);
+  assert.ok(failed,'the fixture trace has an error span');
+  if(!mapped){failed.service='billing';failed.name='charge card';}
+  const h=harness(f.spec,{},{telemetry:{}}),api=h.ctl.liveStatus,m=mountStatus(h),jumps=[];
+  h.ctl.sections[0].stepper={path:()=>'event',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(i,path){jumps.push([i,path]);return true;}};
+  h.ctl.telemetry.apply(f.samples);api.setStatusMode('trace');h.flush();
+  const t=api.snapshot().trace;await api.chooseTrace({key:t.entries[0].key,traceId:t.entries[0].exemplar.traceId});h.flush();h.flush();
+  const selected=api.snapshot().trace.selected;
+  if(mapped){
+   assert.equal(selected.focus && selected.focus.spanId,failed.id,'the error span is focused without a click');
+   assert.deepEqual(jumps,[[0,'event']],'the stepper jumps to its step, as for a click');
+   api.clearTraceFocus({context:selected.context});h.flush();h.flush();
+   assert.equal(api.snapshot().trace.selected.focus,null,'the reader can clear it, and it does not come back');
+  }else{
+   assert.equal(selected.focus,null,'an unmapped error span is not focused');
+   assert.match(m.body.textContent,/error in billing charge card \(not on this diagram\)/,'the request summary names it');
+  }
+  api.destroy();
+ }
+});
 test('#1164 example traces are not selected or painted until the reader picks one',async()=>{
  for(const jira of [true,false]){
   const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),d=f.spec.page.sections[0].diagram;

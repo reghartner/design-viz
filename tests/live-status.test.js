@@ -3492,6 +3492,22 @@ test('#1145 Over time retires example traces without "Trace selection expired"',
   api.destroy();
  }
 });
+/* #1145 with #1138: on a Jira-free board with Metrics, Load opens the local 7-day Over time on the trace's day. */
+test('#1145 Load on a Jira-free board opens the local Over time on the trace\'s day',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),calls=[],at=daysBack(2);
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const raw=freeFixture();raw.page.tracking.telemetry.traceConnections={company:profile};
+ const h=harness(raw,{},{telemetry:{historyMode:'window',provider:async()=>({}),history:async()=>({}),directTrace:{describe:async()=>tool,call:async(request,args)=>{calls.push(plain(args));return {payload:dayTraceAt(at)};}}}}),api=h.ctl.liveStatus,m=mountStatus(h);
+ assert.equal(api.snapshot().available,false,'the board has no Jira references');assert.equal(api.snapshot().mode,'trace');
+ assert.equal(api.snapshot().trace.direct.movesDay,true,'the local Over time can open');
+ api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:DAY_TRACE_ID});
+ assert.ok(await api.loadDirectTrace(false));await historySettle();
+ const over=api.snapshot().overTime;assert.equal(over.active,true,'Load opens the local Over time');assert.equal(over.count,7);
+ assert.equal(over.window.from,localMidnight(2),'on the trace\'s day');
+ assert.ok(api.snapshot().trace.selected && api.snapshot().trace.selected.manual,'the trace stays loaded');assert.equal(calls.length,1);
+ assert.equal(m.body.querySelector('.dv-trace-date').textContent,'Started '+dayLabelOf(at)+' 12:00 local');
+ api.destroy();
+});
 test('#1145 opening a drill-down keeps the loaded trace and its selection',async()=>{
  const detail={sections:[{id:'child',diagram:{nodes:{child:{title:'Child'}},rows:[['child']]}}]};
  const b=dayTraceBoard({at:Date.now()-60000,loadDetail:async()=>detail}),{api,h}=b;

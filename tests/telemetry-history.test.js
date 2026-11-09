@@ -48,6 +48,15 @@ test('H5 historical proof never borrows live; newest pending live answer is held
  api.historyDay(1);assert.equal(api.verdicts().carriers.a.telemetry,'unobserved');api.historyDay(2);assert.equal(api.verdicts().carriers.a.verdict,'proven');assert.equal(history,1);
  api.closeHistory();assert.equal(api.snapshot().map.a.signals.rate.value,200);await settle();assert.equal(live,2);api.destroy();
 });
+test('#1200 an Over time day gives the card the metric state of that day',async()=>{
+ const {api,C,carrier}=runtime({provider:async()=>sample(100),history:async()=>series([[T,0],[T+2*DAY,5]])});
+ const binding=C.carrierTelemetry(carrier,{}),state=()=>C.telemetryCardMetricState(binding,api.snapshot().map.a,api.verdicts().carriers.a);
+ api.setEnabled(true);await settle();assert.equal(state(),'held','live');
+ api.openHistory(days,0);await settle();assert.equal(state(),'waiting','day 0: zero all day is silent');
+ api.historyDay(1);assert.equal(state(),'waiting','day 1: no value');
+ api.historyDay(2);assert.equal(state(),'held','day 2: the limit holds');
+ api.closeHistory();await settle();assert.equal(state(),'held');api.destroy();
+});
 test('H6 unsupported history stays unobserved; disabled root/host suppress history and stale apply; re-rendered controllers do not share cache',async()=>{
  const {api}=runtime({provider:async()=>sample(50)});api.setEnabled(true);await settle();api.openHistory(days,0);assert.deepEqual(plain(api.snapshot().map),{});assert.match(api.status().note,/unavailable/);api.closeHistory();assert.equal(api.snapshot().map.a.signals.rate.value,50);api.destroy();
  for(const [options,page] of [[false,{}],[{provider:async()=>sample(5),history:()=>{throw Error('must not call');}},{tracking:{telemetry:{enabled:false}}}]]){

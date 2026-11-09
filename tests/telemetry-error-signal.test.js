@@ -33,7 +33,7 @@ test('#1201 an error signal over its limit turns the card red, outranking every 
 test('#1201 the popup verdict says the error signal is over its limit, and Proof gains a red error chip',()=>{
  const {carrier,verdicts}=judge('error',{signals:{rate:{value:100},dlq:{value:4}}},'done'),sample={signals:{rate:{value:100},dlq:{value:4}}};
  const proof=C.liveStatusProofPresentation({carriers:[carrier],map:{'a->b':sample},verdicts},'24h',true);
- assert.match(proof.rows[0].explanation,/error signal dlq is over its limit/i);
+ assert.match(proof.rows[0].explanation,/error signal dlq is over its limit/i);assert.equal(proof.rows[0].error,true,'the Proof table row pill wears the error state');
  assert.match(proof.rows[0].metrics.explanation,/error signal dlq is over its limit/i);
  assert.deepEqual({error:proof.counts.error,degraded:proof.counts.degraded,state:proof.states.error},{error:1,degraded:0,state:'error'});
  assert.ok(Array.from(proof.arcs,a=>a.key).includes('error'),'the ring has an error arc');

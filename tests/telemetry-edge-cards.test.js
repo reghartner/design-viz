@@ -95,4 +95,10 @@ test('#1200 card metric state: worst signal decides and Jira state never enters'
  assert.equal(state(open,{signals:{rate:{value:100}}}),'waiting','worst decides: one signal not arriving');
  assert.equal(state(mixed,{signals:{rate:{value:100},errors:{value:1},p95:{value:400}}}),'failing','worst decides: one limit not met');
  assert.equal(state(mixed,{signals:{rate:{value:100},errors:{value:1},p95:{value:200}}}),'held','every authored limit holds; an unlimited signal arrives');
+ // Hidden (showOnCard:false) signals count, as in the verdict, and the card names them.
+ const hidden={...mixed,signals:{...mixed.signals,p95:{unit:'ms',showOnCard:false}}};
+ const note=(sample)=>{const result=C.proofVerdicts({carriers:[{id:'a->b',...hidden}],telemetryMap:{'a->b':sample}}).carriers['a->b'];return [C.telemetryCardMetricState(hidden,sample,result),C.telemetryCardContent({from:'a',to:'b'},hidden,sample,result,'24h').hidden];};
+ assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1}}}),['waiting','1 hidden signal: no value'],'a hidden signal with no value');
+ assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1},p95:{value:400}}}),['failing','1 hidden signal: outside limit'],'a hidden signal that fails');
+ assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1},p95:{value:200}}}),['held',''],'a hidden signal that holds adds no line');
 });

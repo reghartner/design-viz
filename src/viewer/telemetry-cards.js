@@ -54,6 +54,14 @@ function telemetryCardMetricState(binding,sample,result){
   if(result && (result.failing || []).length)return 'failing';
   return telemetryMetricProofNames(binding).length?'held':'flowing';
 }
+/* Hidden (showOnCard:false) signals count toward the card state, as they do in the verdict;
+   name them on the card when they have no value or fail, so the border has a visible cause. */
+function telemetryCardHiddenNote(binding,sample,result){
+  var hidden=telemetryMetricNames(binding).filter(function(name){return binding.signals[name].showOnCard===false;});
+  var missing=hidden.filter(function(name){return telemetryReading(sample,name).value===null;}).length,failing=hidden.filter(function(name){return result && (result.failing || []).indexOf(name)>=0;}).length;
+  function count(n){return n+' hidden signal'+(n===1?'':'s');}
+  return [missing?count(missing)+': no value':'',failing?count(failing)+': outside limit':''].filter(Boolean).join(' · ');
+}
 function telemetryCardContent(edge,binding,sample,result,window,pending){
   // Visibility never changes source ownership or legacy-link ambiguity.
   var rows=telemetryMetricRows(binding,sample,pending,window).filter(function(row){return binding.signals[row.name].showOnCard!==false;});
@@ -61,7 +69,7 @@ function telemetryCardContent(edge,binding,sample,result,window,pending){
     var observed=telemetryReading(sample,row.name).value!==null;
     row.health=observed?(result && (result.failing || []).indexOf(row.name)>=0?'failing':'observed'):pending && pending[row.name]?'loading':'unobserved';
   });
-  binding=telemetryCardBinding(binding);
+  var hidden=telemetryCardHiddenNote(binding,sample,result);binding=telemetryCardBinding(binding);
   var primary=telemetryPrimary(binding,true) || telemetryMetricNames(binding)[0] || null,queue=binding.kind==='queue',raw=edge.telemetry || {};
   var title=binding.card && binding.card.title || edge.label || edge.from+' → '+edge.to;
   // A template parameter is explicit author input. Never extract a queue name
@@ -71,7 +79,7 @@ function telemetryCardContent(edge,binding,sample,result,window,pending){
   var loading=telemetryMetricNames(binding).some(function(name){return pending && pending[name];});
   var measured=telemetryMetricNames(binding).some(function(name){return telemetryReading(sample,name).value!==null;});
   if(loading && !measured)state='loading';
-  return {rows:rows,countNote:telemetryCountNote(binding),title:title,headline:(queue?'in: ':'')+telemetryCardValue(binding,sample,primary,pending,window)+(scalar && !telemetrySpanNote(signal,window) && telemetryReading(sample,primary).value!==null?' in '+window:''),scope:[scope,telemetryCountNote(binding)?'COUNT: source rows/events':''].filter(Boolean).join(' · '),
+  return {rows:rows,hidden:hidden,countNote:telemetryCountNote(binding),title:title,headline:(queue?'in: ':'')+telemetryCardValue(binding,sample,primary,pending,window)+(scalar && !telemetrySpanNote(signal,window) && telemetryReading(sample,primary).value!==null?' in '+window:''),scope:[scope,telemetryCountNote(binding)?'COUNT: source rows/events':''].filter(Boolean).join(' · '),
     details:rows.filter(function(row){return row.name!==primary;}).map(function(row){return row.label+': '+row.text;}),
     note:loading?(measured?'Refreshing…':'Loading…'):state==='silent'?'no traffic · '+window+' window':state==='unobserved'?'unobserved · '+window+' window':window+' window',
     series:primary?telemetryReading(sample,primary).series:[],chartRange:sample && (sample.signals && sample.signals[primary] && sample.signals[primary].window || sample.window),intervalMs:sample && sample.signals && sample.signals[primary] && sample.signals[primary].intervalMs,state:state};
@@ -207,6 +215,7 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       });
       if(content.series.length){telemetryPaintSparkline(doc,card,content.series,10,y,Math.min(100,w-20),12,telemetryWindowMs(window),content.chartRange,content.intervalMs);y+=20;}
       if(sharedScope)wrapped(sharedScope,'t2 dv-metrics-card-scope',w-20,2);
+      if(content.hidden && !view.preview)wrapped(content.hidden,'t2 dv-metrics-card-hidden',w-20,2);
       wrapped(content.note,'t2 dv-metrics-card-note',w-20,2);
       if(content.countNote)wrapped('COUNT: source rows/events','t2 dv-metrics-card-scope',w-20,2);
       var height=y+3;rect.setAttribute('height',height);bar.setAttribute('d','M3 7V'+(height-7));

@@ -93,7 +93,7 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
       if(result.jira==='unknown')label+=' · Jira status unavailable';
     }
     return {id:binding.id,title:binding.title,kind:binding.kind,tickets:binding.tickets.slice(),jira:result.jira || 'No tickets',
-      loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,label:loading && !measured?'Loading…':label,predicate:predicate(binding,null,measured)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
+      loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,error:telemetryErrorFailing(binding,result).length>0,label:loading && !measured?'Loading…':label,predicate:predicate(binding,null,measured)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
       kpis:telemetryMetricRows(binding,sample,waiting,window),
       since:since.join(' · ') || 'unavailable',url:url,
       linkLabel:primary && binding.signals[primary].source==='grafana'?'Open in Grafana':primary && binding.signals[primary].source==='honeycomb'?'Open in Honeycomb':'Open telemetry',

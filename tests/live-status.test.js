@@ -2689,7 +2689,7 @@ test('#1162 the counts and First blocker share the first row; the status row hol
  // The counts strip stays as an unnamed spacer and First blocker's slot is reserved, unseen and inert, so the action keeps its place when data arrives.
  const row=w.view.querySelector('.dv-live-controls'),strip=row.querySelector('.dv-live-counts'),slot=row.querySelector('.dv-live-first');assert.equal(row.hidden,false);assert.equal(row.querySelector('.dv-live-action').hidden,false);
  assert.equal(strip.hidden,false);assert.equal(strip.getAttribute('role'),null,'an unnamed spacer, not a focusable region');assert.equal(strip.getAttribute('tabindex'),null);
- assert.equal(slot.getAttribute('data-reserved'),'true');assert.equal(slot.getAttribute('aria-hidden'),'true');assert.equal(slot.getAttribute('tabindex'),'-1');assert.equal(slot.disabled,true);
+ assert.equal(slot.hidden,false,'the slot is kept, not removed');assert.equal(slot.getAttribute('data-reserved'),'true');assert.equal(slot.getAttribute('aria-hidden'),'true');assert.equal(slot.getAttribute('tabindex'),'-1');assert.equal(slot.disabled,true);
  w.ctl.liveStatus.apply(overToday());assert.equal(strip.getAttribute('role'),'region');assert.equal(slot.getAttribute('data-reserved'),null);assert.equal(slot.getAttribute('aria-hidden'),null);
  w.ctl.liveStatus.destroy();
 });
@@ -2874,7 +2874,7 @@ test('#1136 a board without ticket references opens on Trace with no Jira | Trac
  assert.equal(namedControls(free.m.body,'Env').length,1,'Env stays');assert.equal(namedControls(free.m.body,'Metrics overlay','switch').length,1,'the Metrics overlay switch stays');
  const edit=namedControls(free.m.body,'Edit');assert.equal(edit.length,1,'an editor sees one Edit');assert.ok(edit[0].closest('.dv-status-header'),'Edit is in the shared header');
  edit[0].dispatchEvent({type:'click'});assert.equal(free.editor.starts,1,'Edit starts board editing');
- // The Metrics overlay's connector line is in the shared header, so the only view shows it.
+ // The Metrics overlay's connector line is drawn by each view below its button rows (#1162), so the Trace view shows it here.
  const metricsLines=b=>b.m.body.querySelectorAll('.dv-live-metrics-connection').filter(el=>shownIn(el,b.m.body));
  assert.equal(metricsLines(free).length,1,'the metrics status line shows on a Jira-free board');assert.ok(metricsLines(free)[0].closest('.dv-live-trace'),'#1162 under the Trace view controls');assert.match(textOf(metricsLines(free)[0]),/Metrics: not connected/);
  free.m.destroy();free.api.destroy();
@@ -3734,6 +3734,65 @@ test('#1164 example traces are not selected or painted until the reader picks on
   api.destroy();
  }
 });
+/* #1173 (epic #1130, Chuck 2026-11-09): the compact Trace view. One-choice selects are not rendered as selects (their value
+   still applies), the help line moves to the Load trace summary's title, Show on diagram waits for a shown trace, and with a
+   trace shown the search section and the request card are each one collapsed line, so the span list comes right after them.
+   Rejects: a select with a single option; a help paragraph in the form; Show on diagram before any trace; a shown trace
+   whose search form or request details push the waterfall down. */
+const compactTool=()=>({name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}});
+const COMPACT_ID='8413cd87a9f15b6bfe8e1acf5b3346d0';
+function compactBoard(envs=['prod']){
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json')));
+ profile.environments=Object.fromEntries(Object.entries(profile.environments).filter(([id])=>envs.includes(id)));
+ return {page:{tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{
+  nodes:{web:{title:'Checkout frontend'},checkout:{title:'Checkout service'},cart:{title:'Cart service'},payment:{title:'Payment service'}},rows:[['web','checkout','payment'],['cart']],
+  edges:[{from:'web',to:'checkout',label:'PlaceOrder'},{from:'checkout',to:'cart',label:'GetCart'},{from:'checkout',to:'payment',label:'Charge'}],
+  steps:[{id:'accept',nodes:['web'],traceMatch:{serviceName:'frontend',operation:'/cart/checkout',nodeId:'web'}},{id:'place',edge:'web->checkout',traceMatch:{serviceName:'checkout',operation:'msdemo.CheckoutService/PlaceOrder'}},{id:'charge',edge:'checkout->payment',traceMatch:{serviceName:'payment',operation:'grpc.msdemo.PaymentService/Charge'}}],
+  panels:[{id:'status',type:'live-status',title:'Status'}]}}]}};
+}
+function compactHarness(envs){
+ const recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),calls=[];
+ const h=harness(compactBoard(envs),{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>compactTool(),call:async(request,args)=>{calls.push(args);return {payload:recorded};},logsConnector:async()=>'Grafana',queryLogs:async()=>({data:[]})}}});
+ return {h,api:h.ctl.liveStatus,m:mountStatus(h),calls};
+}
+test('#1173 one-choice selects are not rendered, the help line moves to the summary title, Show on diagram waits for a trace',async()=>{
+ const {h,api,m,calls}=compactHarness(['prod']);
+ assert.equal(api.snapshot().mode,'trace');
+ const selects=()=>m.body.querySelectorAll('select').map(el=>el.getAttribute('aria-label'));
+ for(const name of ['Trace connection','Connection environment','Mapping diagram','Log lookup'])assert.ok(!selects().includes(name),'no one-choice select named '+name+': '+selects());
+ const config=m.body.querySelector('details.dv-trace-config'),summary=config.querySelector('summary');
+ assert.ok(!textOf(config).includes('Load one exact request.'),'the help line is not in the form');
+ assert.match(summary.getAttribute('title') || '',/^Load one exact request\. This session only; diagram mappings use authored traceMatch steps\.$/,'its text is the summary title');
+ assert.match(textOf(summary),/Fixture Honeycomb · Production/,'the one-choice connection and environment are named in the summary');
+ const show=()=>m.body.querySelector('button.dv-trace-show');assert.ok(!show() || show().hidden,'no Show on diagram before a trace is shown');
+ // The sole choices still apply: Load sends the same request as with the selects.
+ api.setDirectTraceField({field:'input',value:COMPACT_ID});assert.ok(await api.loadDirectTrace(false),'the trace loads');
+ assert.deepEqual(plain(calls.at(-1)),{trace_id:COMPACT_ID,from:'-2h',environment_slug:'production',team_slug:'example-team',view_mode:'full'});
+ h.flush();assert.equal(show().hidden,false,'Show on diagram after a Load');assert.equal(show().disabled,false);
+ api.destroy();
+ // Two options still render a select.
+ const two=compactHarness(['prod','stage']);assert.ok(two.m.body.querySelectorAll('select').some(el=>el.getAttribute('aria-label')==='Connection environment'),'two environments keep the select');two.api.destroy();
+});
+test('#1173 with a trace shown the search section and the request card are one collapsed line each, and the span list follows',async()=>{
+ const {h,api,m}=compactHarness(['prod']),config=()=>m.body.querySelector('details.dv-trace-config'),request=()=>m.body.querySelector('details.dv-trace-request');
+ assert.equal(config().open,true,'with no trace shown the search section is open');assert.equal(request(),null,'no request card yet');
+ api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();
+ assert.equal(config().open,false,'the search section collapses');
+ assert.match(textOf(config().querySelector('summary')).replace(/\s+/g,' ').trim(),/^Fixture Honeycomb · Production · Change trace$/);
+ assert.ok(request(),'one request card');assert.equal(request().open,false,'collapsed');
+ assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · Started .+ local · \d+ spans · \d+\/\d+ steps matched$/);
+ assert.ok(request().querySelector('.dv-trace-identity'),'expanding shows today\'s details');assert.equal(request().querySelector('.dv-trace-identity').textContent,COMPACT_ID);
+ const closed=el=>{for(let n=el.parentElement;n;n=n.parentElement)if(n.tagName==='details' && !n.open && !el.closest('summary'))return true;return false;};
+ const span=m.body.querySelector('.dv-trace-span');assert.ok(span && !closed(span),'the span list is not inside a collapsed section');
+ const order=m.body.querySelectorAll('details.dv-trace-config,details.dv-trace-request,.dv-trace-focus-summary,.dv-trace-waterfall').map(el=>el.className.split(' ')[0]);
+ assert.deepEqual(order,['dv-trace-config','dv-trace-request','dv-trace-focus-summary','dv-trace-waterfall'],'the waterfall comes right after the collapsed lines and the focus box');
+ for(const el of [config(),request()])assert.equal(el.children[0].tagName,'summary','each collapsed section shows only its summary line');
+ // A section the reader expanded stays expanded across repaints until the shown trace changes.
+ request().open=true;config().open=true;api.setTraceShow(false);api.setTraceShow(true);h.flush();
+ assert.equal(request().open,true);assert.equal(config().open,true);
+ api.clearDirectTrace();h.flush();assert.equal(config().open,true);assert.equal(request(),null);
+ api.destroy();
+});
 /* #1175: a step whose traceMatch is optional and that this trace lacks does not count against
    the coverage line; the line adds "· K optional not in this trace". A local board and a drill-down. */
 test('#1175 the coverage line leaves out a missing optional step and counts it as optional not in this trace',async()=>{
@@ -3770,4 +3829,20 @@ test('#1175 a drill-down step that is optional and missing reads like a local on
  assert.equal(label.text,h.C.telemetryTraceDuration(selected.model.rows[0].duration),'the drill-down node reads its matched step\'s time');
  assert.match(label.title,/optional, not in this trace: refund POST \/refund/);
  api.destroy();
+});
+// #1173 with #1175: the request card's one-line summary and its coverage line count steps the same way, leaving out an
+// optional step this trace lacks.
+test('#1173 the request summary and the coverage line agree when an optional step is missing',async()=>{
+ for(const optional of [false,true]){
+  const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),d=f.spec.page.sections[0].diagram;
+  if(optional)d.steps.find(s=>s.id==='push').traceMatch.optional=true;
+  const h=harness(f.spec,{},{telemetry:{}}),api=h.ctl.liveStatus,m=mountStatus(h);
+  h.ctl.sections[0].stepper={path:()=>'event',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+  h.ctl.telemetry.apply(f.samples);api.setStatusMode('trace');h.flush();
+  const entry=api.snapshot().trace.entries[0];await api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});h.flush();
+  const summary=m.body.querySelector('details.dv-trace-request > summary').textContent,coverage=m.body.querySelector('.dv-trace-coverage').textContent;
+  const counts=text=>/(\d+\/\d+) steps matched/.exec(text)[1];
+  assert.equal(counts(summary),optional?'1/3':'1/4',summary);assert.equal(counts(summary),counts(coverage),'the summary and the coverage line agree');
+  api.destroy();
+ }
 });

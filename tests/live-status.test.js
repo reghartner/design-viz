@@ -3416,6 +3416,27 @@ test('#1145 the log list promises a move only when Over time can open',async()=>
  api.apply(overToday());assert.equal(api.snapshot().trace.direct.movesDay,true);assert.ok(m.body.querySelector('.dv-trace-logs-moves'));
  api.destroy();
 });
+/* #1145 round 3: a day change never says "Trace selection expired". An example trace the reader chose gets
+   the plain note; one shown automatically leaves without a note. Leaving Over time or loading clears it. */
+test('#1145 Over time retires example traces without "Trace selection expired"',async()=>{
+ for(const work of ['auto','choose']){
+  const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),h=harness(f.spec,{},{telemetry:{}}),api=overReady(h.ctl.liveStatus),m=mountStatus(h);
+  h.ctl.sections[0].stepper={path:()=>'short',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+  h.ctl.telemetry.apply(f.samples);api.apply({'TRACE-1':{state:'active'}});api.setStatusMode('trace');
+  const selected=api.snapshot().trace.selected;assert.ok(selected && !selected.manual,work+': an example trace is shown');
+  if(work==='choose')await api.chooseTrace({key:selected.key,traceId:selected.exemplar.traceId});
+  const now=new Date(),key=back=>new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()-back)).toISOString().slice(0,10);
+  api.setHistory({load:()=>({days:[2,1,0].map(back=>({key:key(back),label:key(back),short:key(back),states:{'TRACE-1':{state:'active'}}}))})});
+  api.overTime();await historySettle();assert.equal(api.snapshot().overTime.active,true);
+  const status=()=>m.body.querySelector('.dv-trace-mode-status').textContent;
+  assert.doesNotMatch(api.snapshot().trace.notice,/expired/,work);assert.doesNotMatch(status(),/expired/,work);
+  const plainNote='Cleared trace '+selected.exemplar.traceId.slice(0,12)+' ('+new Date(Math.min(...selected.exemplar.spans.map(s=>Date.parse(s.time)))).toLocaleDateString([],{month:'short',day:'numeric'})+'): the view moved to '+key(0)+'.';
+  assert.equal(api.snapshot().trace.notice,work==='choose'?plainNote:'',work+': the plain note only for a trace the reader chose');
+  api.overTimeDay(0);assert.equal(api.snapshot().trace.notice,'',work+': the next day change ends it');assert.doesNotMatch(status(),/expired/,work);
+  overBackToLive(api);await historySettle();assert.equal(api.snapshot().trace.notice,'',work+': leaving Over time clears it');assert.doesNotMatch(status(),/expired|Cleared/);
+  api.destroy();
+ }
+});
 test('#1145 opening a drill-down keeps the loaded trace and its selection',async()=>{
  const detail={sections:[{id:'child',diagram:{nodes:{child:{title:'Child'}},rows:[['child']]}}]};
  const b=dayTraceBoard({at:Date.now()-60000,loadDetail:async()=>detail}),{api,h}=b;

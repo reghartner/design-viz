@@ -440,9 +440,11 @@ class InjectTests(unittest.TestCase):
         # a template signal on the page counts too, even before a carrier uses it
         templated = {"tracking": {"jira": {"site": "https://jira.test"}, "telemetry": {"templates": {"t": {"kind": "service", "signals": {"r": {"grafana": "up"}}}}}}}
         self.assertEqual(guide_for(page_extra=templated)[0]["mcp"]["servers"], [jira, grafana])
-        for other in ({"tempo": "{ }"}, {"honeycomb": {"dataset": "d"}}):
+        # #1139: a tempo signal declares only the example-trace pair on Grafana.
+        for other, extra in (({"tempo": "{ }"}, {"server": "Grafana", "tools": ["search_tempo_traces", "get_tempo_trace"]}),
+                             ({"honeycomb": {"dataset": "d"}}, {"server": "Honeycomb", "tools": ["run_query"]})):
             declaration, guide = guide_for(node_telemetry={"kind": "service", "signals": {"x": other}})
-            self.assertEqual(declaration["mcp"]["servers"], [jira] + ([{"server": "Honeycomb", "tools": ["run_query"]}] if "honeycomb" in other else []), other)
+            self.assertEqual(declaration["mcp"]["servers"], [jira, extra], other)
             self.assertNotIn("get_annotations", guide)
             for needle in ("## Metrics rules", "never derive a query", "imported/nested", "Honeycomb uses run_query"):
                 self.assertIn(needle, guide)
@@ -532,6 +534,11 @@ class InjectTests(unittest.TestCase):
         honey_signal = {"kind": "service", "signals": {"p95": {"honeycomb": {"calculations": [{"op": "P95", "column": "duration_ms"}]}}}}
         self.assertEqual(declaration(consumer(), provider(api=honey_signal))["mcp"]["servers"], [honeycomb])
         self.assertEqual(declaration(consumer(), provider(hidden=honey_signal)), {"comments": comments})
+        # #1139: an imported Honeycomb example-trace wrapper adds get_trace; an
+        # unexported one adds nothing.
+        honey_traces = {"kind": "service", "signals": {"samples": {"honeycomb": {"query_spec": {}, "raw_row_columns": ["trace.trace_id"], "results_limit": 5}}}}
+        self.assertEqual(declaration(consumer(), provider(api=honey_traces))["mcp"]["servers"], [{"server": "Honeycomb", "tools": ["run_query", "get_trace"]}])
+        self.assertEqual(declaration(consumer(), provider(hidden=honey_traces)), {"comments": comments})
         disabled_honey = consumer()
         disabled_honey["page"]["tracking"] = {"telemetry": {"enabled": False}}
         self.assertEqual(declaration(disabled_honey, provider(api=honey_signal)), {"comments": comments})
@@ -540,9 +547,11 @@ class InjectTests(unittest.TestCase):
         self.assertEqual(declaration(consumer(), templated)["mcp"]["servers"], [{"server": "Grafana", "tools": ["query_loki_logs"]}])
         # a provider carrier the import does not export never reaches the page
         self.assertEqual(declaration(consumer(), provider(hidden=signal)), {"comments": comments})
-        # a consumer overlay replaces the provider binding as a whole (here with a tempo-only one)
+        # a consumer overlay replaces the provider binding as a whole (here with a
+        # tempo-only one, which declares only the example-trace pair, #1139)
         tempo = {"kind": "service", "signals": {"t": {"tempo": "{ }"}}}
-        self.assertEqual(declaration(consumer({"api": {"telemetry": tempo}}), provider(api=signal)), {"comments": comments})
+        self.assertEqual(declaration(consumer({"api": {"telemetry": tempo}}), provider(api=signal)),
+                         {"mcp": {"servers": [{"server": "Grafana", "tools": ["search_tempo_traces", "get_tempo_trace"]}]}, "comments": comments})
         # Nested imports use the loader-selected export and retain the provider
         # binding. This is the same resolution path used for selected details.
         middle = consumer()
@@ -595,6 +604,56 @@ class InjectTests(unittest.TestCase):
         self.assertEqual(servers({**base, "lookups": []}), [detail])
         self.assertEqual(servers({**base, "traceConnections": {}}), [])
         self.assertEqual(servers({**base, "enabled": False}), [])
+
+    def test_agent_guide_declares_example_trace_tools_for_authored_trace_bindings(self):
+        # #1139 (Chuck's V3 ruling, 2026-11-08): example traces need the trace
+        # adapter's search/detail pair (src/viewer/telemetry-traces.js), so a page
+        # with an authored trace binding declares it. A page without one keeps its
+        # declaration byte for byte. None of these boards has Jira.
+        inject = load_inject()
+        tempo_pair = ["search_tempo_traces", "get_tempo_trace"]
+        wrapper = {"honeycomb": {"query_spec": {"filters": [{"column": "service.name", "op": "=", "value": "api"}]},
+                                 "raw_row_columns": ["trace.trace_id"], "results_limit": 5}}
+        scalar = {"honeycomb": {"calculations": [{"op": "COUNT"}]}}
+
+        def manifest(signals=None, telemetry=None):
+            spec = json.loads(json.dumps(SPEC))
+            if telemetry is not None:
+                spec["page"]["tracking"] = {"telemetry": telemetry}
+            if signals is not None:
+                spec["page"]["blocks"] = [{"diagram": {"nodes": {"api": {"telemetry": {"kind": "service", "signals": signals}}}, "rows": [["api"]]}}]
+            with mock.patch.object(inject, "company_agent_context", return_value={}):
+                guide = GUIDE_BLOCK.search(inject.agent_guide(spec, "a" * 40))[1]
+            self.assertLess(len(guide.encode("utf-8")), inject.GUIDE_LIMIT)
+            return re.search(r"```json\n(.*?)\n```", guide, re.S)[1]
+
+        def servers(signals=None, telemetry=None):
+            return json.loads(manifest(signals, telemetry)).get("mcp", {}).get("servers", [])
+
+        # Tempo: the pair on the Grafana server, after any metric tools.
+        self.assertEqual(servers({"traces": {"tempo": '{ resource.service.name = "api" }'}}), [{"server": "Grafana", "tools": tempo_pair}])
+        self.assertEqual(servers({"rate": {"grafana": "up"}, "traces": {"tempo": "{ }"}}), [{"server": "Grafana", "tools": ["query_prometheus"] + tempo_pair}])
+        templated = {"templates": {"svc": {"kind": "service", "signals": {"traces": {"tempo": "{ }"}}}}}
+        self.assertEqual(servers(telemetry=templated), [{"server": "Grafana", "tools": tempo_pair}])
+        # Honeycomb: get_trace after run_query, only for the example-trace wrapper.
+        self.assertEqual(servers({"samples": wrapper}), [{"server": "Honeycomb", "tools": ["run_query", "get_trace"]}])
+        self.assertEqual(servers({"count": scalar, "samples": wrapper}), [{"server": "Honeycomb", "tools": ["run_query", "get_trace"]}])
+        self.assertEqual(servers({"traces": {"tempo": "{ }"}, "samples": wrapper}),
+                         [{"server": "Grafana", "tools": tempo_pair}, {"server": "Honeycomb", "tools": ["run_query", "get_trace"]}])
+        # A root disable grants no trace permission either.
+        self.assertEqual(servers({"traces": {"tempo": "{ }"}, "samples": wrapper}, {"enabled": False}), [])
+        # Pages without a trace binding declare neither, unchanged byte for byte.
+        comments = '"comments":{"composer_only":true,"customAnchors":true}'
+        unchanged = [
+            (manifest(), "{" + comments + "}"),
+            (manifest(telemetry={"grafana": {"tempo": "traces"}, "honeycomb": {"environment": "prod"}}), "{" + comments + "}"),
+            (manifest({"rate": {"grafana": "up"}}), '{"mcp":{"servers":[{"server":"Grafana","tools":["query_prometheus"]}]},' + comments + "}"),
+            (manifest({"count": scalar}), '{"mcp":{"servers":[{"server":"Honeycomb","tools":["run_query"]}]},' + comments + "}"),
+        ]
+        for text, expected in unchanged:
+            self.assertEqual(text, expected)
+            for tool in tempo_pair + ["get_trace"]:
+                self.assertNotIn(tool, text)
 
     def test_combined_jira_honeycomb_guides_fit_real_cap_without_losing_edit_rules(self):
         inject = load_inject()
@@ -659,11 +718,11 @@ class InjectTests(unittest.TestCase):
             declaration = json.loads(manifest[1])
             direct = [entry for entry in declaration["mcp"]["servers"] if entry["server"] == profile["server"]]
             self.assertEqual(direct, [{"server": profile["server"], "tools": ["get_trace"]}])
-            # Publishing authors explicitly add offered trace tools to the real
-            # capability declaration; the injector must not infer these extras.
-            for server in declaration["mcp"]["servers"]:
-                extras = ["get_trace"] if "run_query" in server["tools"] else ["search_tempo_traces", "get_tempo_trace"] if "query_prometheus" in server["tools"] else []
-                server["tools"].extend(extras)
+            # #1139: the bound tempo signal and Honeycomb wrapper declare their
+            # example-trace tools; authors no longer add them by hand.
+            declared = {entry["server"]: entry["tools"] for entry in declaration["mcp"]["servers"]}
+            self.assertEqual(declared["Grafana"], ["query_prometheus", "query_loki_logs", "query_sql", "query_cloudwatch", "query_cloudwatch_logs", "search_tempo_traces", "get_tempo_trace"])
+            self.assertEqual(declared["Honeycomb"], ["run_query", "get_trace"])
             authored_guide = guide.replace(manifest[1], json.dumps(declaration, indent=2)) + "\n## Board context\n" + board_text
             self.assertGreaterEqual(inject.GUIDE_LIMIT - len(authored_guide.encode("utf-8")), 512)
             tools = [tool for server in declaration["mcp"]["servers"] for tool in server["tools"]]

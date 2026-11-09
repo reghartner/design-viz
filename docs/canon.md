@@ -242,8 +242,8 @@ are validation errors. A missing optional step maps as `status:"missing"` with
 `optional:true`, detail `Optional, not in this trace.` and no unknown condition,
 so it is not a comparison divergence and an incident step after the fork is dim;
 `trace-cli preview` shows it that way. A span is present when it matches the
-selector's service, operation, namespace and attributes. A present span under
-another, matched parent, or a call past the `occurrence` count, is not this
+selector's service, operation, namespace and attributes. A present span not
+under the matched parent step's span, or a call past the `occurrence` count, is not this
 step's span. If a present span cannot be attributed because the parent step's
 mapping is missing or ambiguous, the step stays unknown. A step whose
 `parentStepId` names an optional step is not optional itself: mark it optional

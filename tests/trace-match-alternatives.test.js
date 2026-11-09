@@ -144,9 +144,9 @@ test('an optional step whose own span is in the trace but rejected by its parent
   // Own span and parent both absent: optional, not in this trace.
   const absent=both(d,trace(span('x','other'))).steps[1];
   assert.equal(absent.optional,true);assert.equal(absent.detail,'Optional, not in this trace. Parent mapping is unavailable.');
-  // Alternatives with different operations: alternative 0's operation is absent, alternative 1's span is
-  // present but its parent mapping is unavailable. One unattributable span is enough to stay unknown.
-  const mixed=diagram();mixed.steps[1].traceMatch=[{serviceName:'stats-store',operation:'INSERT legacy',nodeId:'store',parentStepId:'consume',optional:true},{...mixed.steps[1].traceMatch,optional:true}];
+  // Alternatives with different operations: alternative 0's span is present but its parent mapping is
+  // unavailable, alternative 1's operation is absent. One unattributable span is enough to stay unknown.
+  const mixed=diagram();mixed.steps[1].traceMatch=[{...mixed.steps[1].traceMatch,optional:true},{serviceName:'stats-store',operation:'INSERT legacy',nodeId:'store',parentStepId:'consume',optional:true}];
   const unclear=both(mixed,trace(span('r-db','INSERT stats','r1','stats-store'))).steps[1];
   assert.equal(unclear.status,'missing');assert.equal(unclear.optional,undefined);assert.deepEqual(unclear.conditions.map(c=>c.kind),['unknown']);
 });

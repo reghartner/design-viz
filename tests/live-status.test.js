@@ -3898,7 +3898,8 @@ test('#1173 a repaint never takes focus from outside the panel after a pick in t
   h.doc.activeElement=h.doc.body;api.setTraceShow(false);h.flush();h.ctl.telemetry.apply(JSON.parse(JSON.stringify(f.samples)));h.flush();
   assert.equal(focused.length,0,'no repaint moves focus');
   // A Load from inside the card, with the reader typing elsewhere before it lands: the carried focus is not used.
-  h.doc.activeElement=request().querySelector('summary');h.flush();
+  // A repaint with focus on the card line records it, so the Load's gap carries it.
+  h.doc.activeElement=request().querySelector('summary');api.setTraceShow(true);h.flush();assert.equal(focused.length,0);
   api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:COMPACT_ID});const loading=api.loadDirectTrace(false);h.flush();
   assert.equal(request(),null,'the card is gone while loading');h.doc.activeElement=input;await loading;h.flush();
   assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(focused.length,0,'focus stays on the input');

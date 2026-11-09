@@ -111,7 +111,7 @@ def company_rules(contract):
     if start is None: return []
     fragments, path, body = [], None, []
     for line in lines[start:] + ['<!-- end -->']:
-        match = re.match(r'^<!-- (company/contract/.+\.md|end) -->$', line)
+        match = re.match(r'^<!-- (company/contract/(?:(?!-->).)+\.md|end) -->$', line)
         if not match:
             if path: body.append(line)
             continue
@@ -274,7 +274,8 @@ def generate(panel_names, feature_names, mode='new', raw=None):
         parts.append('## Company rules\n\nThis fork\'s `company/contract/` fragments, in file-name order. They extend the '
                      'authoring contract and follow its rules. Their panel sections come with the selected panel.')
         for path, text in rules:
-            # Like every source, hashed as a whole file; a portable kit has only the contract's copy.
+            # Like every source, hashed as a whole file. A portable kit has no fragment file, so there the
+            # hash is of the excerpt the contract carries, without its panel sections.
             source = (ROOT / path).read_text() if (ROOT / path).is_file() else text
             text = normalize_links(text, CONTRACT)
             parts.append('<!-- Source: ' + path + ' -->\n' + text)

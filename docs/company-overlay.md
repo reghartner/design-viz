@@ -117,7 +117,9 @@ Every focused packet from `tools/authoring-packet.py` also carries the
 fragments, in file-name order, under one `## Company rules` heading, each after
 a `<!-- Source: company/contract/<file> -->` line. `packet.md.json` lists each
 one in `provenance` (path, no section, the SHA-256 of the fragment file, and the
-characters and bytes of the text the packet carries). A fragment's `### panels`
+characters and bytes of the text the packet carries; in a portable kit, which
+has no fragment file, the SHA-256 is of the excerpt its contract carries,
+without the fragment's panel sections). A fragment's `### panels`
 sections are left out there: their bullets reach a packet when that panel is
 selected, so they never appear twice, and a fragment with nothing else is not
 listed. A portable kit reads the fragments from its contract, so its packets

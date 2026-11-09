@@ -2,7 +2,8 @@
 // #1079: traceMatch.attributes may use attributes the trace connection profile allows.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const {entrypoint}=require('../tools/source-loader.cjs');
-const fixture=require('./fixtures/trace-connection-profile.json'),recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8');
+// #1197: a Honeycomb profile that lists allowedAttributes names its dataset.
+const fixture={...require('./fixtures/trace-connection-profile.json'),dataset:'events'},recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8');
 const ID='8413cd87a9f15b6bfe8e1acf5b3346d0',clone=x=>JSON.parse(JSON.stringify(x));
 const X_SPAN='b01a8fd7791f709b',Y_SPAN='3b8c2e88761b259e';
 function context(name='standalone'){const C={URL,AbortController,TextEncoder,TextDecoder,console,setTimeout,clearTimeout,document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint(name).body,C);return C;}
@@ -85,14 +86,14 @@ test('3. profile schema: allowedAttributes must be an array of non-empty strings
   assert.match(errors.join('\n'),/\.traceConnections\.company .*allowedAttributes\[1\]/);
 });
 
-test('validation warns when only Honeycomb connections list the attribute, and when a Honeycomb-only attribute uses a non-string value',()=>{
+test('validation warns when a Honeycomb-only attribute uses a non-string value (#1197: Honeycomb attributes load, so no Not observed warning)',()=>{
   const C=context(),honeycomb=clone(fixture);honeycomb.allowedAttributes=['device.model'];
   const warn=p=>clone(C.validate(p).warnings.filter(w=>/traceMatch\.attributes/.test(w)));
   const only=page(honeycomb);
   assert.deepEqual(attributeErrors(C,only),[]);
-  assert.deepEqual(warn(only),['steps.lookup.traceMatch.attributes.device.model: only Honeycomb connections list this attribute; Honeycomb get_trace does not return span attributes, so this step shows Not observed']);
+  assert.deepEqual(warn(only),[]);
   const numeric=page(honeycomb);numeric.sections[0].diagram.steps[0].traceMatch.attributes['device.model']=7;
-  assert.deepEqual(warn(numeric).map(w=>w.replace(/^.*?: /,'')),['only Honeycomb connections list this attribute; Honeycomb get_trace does not return span attributes, so this step shows Not observed','Honeycomb table cells are text; a number value never matches']);
+  assert.deepEqual(warn(numeric).map(w=>w.replace(/^.*?: /,'')),['Honeycomb table cells are text; a number value never matches']);
   const tempo=clone(TEMPO);tempo.allowedAttributes=['device.model'];
   const mixed=page(null,{company:honeycomb,tempo});
   assert.deepEqual(attributeErrors(C,mixed),[]);
@@ -121,7 +122,6 @@ test('array traceMatch: an alternative using a Honeycomb-only attribute warns un
   step.traceMatch=[{serviceName:'productcatalog',operation:'msdemo.ProductCatalogService/GetProduct',nodeId:'catalog'},{...step.traceMatch,attributes:{'device.model':7}}];
   assert.deepEqual(attributeErrors(C,p),[]);
   assert.deepEqual(clone(C.validate(p).warnings.filter(w=>/traceMatch/.test(w))),[
-    'steps.lookup.traceMatch[1].attributes.device.model: only Honeycomb connections list this attribute; Honeycomb get_trace does not return span attributes, so this step shows Not observed',
     'steps.lookup.traceMatch[1].attributes.device.model: Honeycomb table cells are text; a number value never matches'
   ]);
 });

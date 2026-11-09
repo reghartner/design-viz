@@ -19,7 +19,19 @@ function telemetryMetricUrl(binding,sample,name){
     (Object.keys(binding.signals).length===1?(telemetryQueryUrl(binding.links && binding.links.query) || telemetryQueryUrl(sample && sample.links && sample.links.query)):null);
 }
 function telemetryMetricRows(binding,sample,pending,window){
-  return telemetryMetricNames(binding).map(function(name){var signal=binding.signals[name];return {name:name,label:signal.label || name,text:telemetryCardValue(binding,sample,name,pending,window),url:telemetryMetricUrl(binding,sample,name),scope:telemetrySignalScope(signal)};});
+  return telemetryMetricNames(binding).map(function(name){var signal=binding.signals[name];return {name:name,label:signal.label || name,text:telemetryCardValue(binding,sample,name,pending,window),url:telemetryMetricUrl(binding,sample,name),scope:telemetryTileScope(signal)};});
+}
+/* #1194: the short scope on a metric tile: the authored scope as written ("" hides it), else the
+   CloudWatch queue or rule name, or the account-wide wording, never the account id. */
+function telemetryTileScope(signal){
+  if(!signal)return '';
+  if(typeof signal.scope==='string')return signal.scope;
+  if(signal.source!=='cloudwatch')return '';
+  var q=signal.query,d=q.dimensions || {};
+  if(d.QueueName)return d.QueueName;
+  if(q.namespace==='AWS/IoT' && d.RuleName)return d.RuleName;
+  var full=telemetrySignalScope(signal);
+  return full.indexOf('all topics')===0?'All topics · whole account':full.indexOf('all connections')===0?'All connections · whole account':'';
 }
 function telemetryCardBinding(binding){
   var signals={};telemetryMetricNames(binding).forEach(function(name){if(binding.signals[name].showOnCard!==false)signals[name]=binding.signals[name];});
@@ -27,7 +39,7 @@ function telemetryCardBinding(binding){
 }
 function telemetryCardScope(signal){
   if(!signal)return '';
-  if(signal.scope)return signal.scope;
+  if(typeof signal.scope==='string')return signal.scope;
   if(signal.source!=='cloudwatch')return '';
   var q=signal.query,d=q.dimensions || {};
   if(d.QueueName)return 'This queue';

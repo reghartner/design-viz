@@ -455,8 +455,11 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
         if server is None:
             server = {"server": profile["server"], "tools": []}
             servers.append(server)
-        if profile["tool"] not in server["tools"]:
-            server["tools"].append(profile["tool"])
+        # #1197: a Honeycomb profile with allowedAttributes reads them with one run_query.
+        extra = ["run_query"] if profile.get("provider") == "honeycomb" and profile.get("allowedAttributes") and profile.get("dataset") else []
+        for tool in [profile["tool"]] + extra:
+            if tool not in server["tools"]:
+                server["tools"].append(tool)
     capabilities = {"mcp": {"servers": servers}} if servers else {}
     capabilities["comments"] = COMMENTS_CAPABILITY
     if two_file and (tracked or metrics):
@@ -593,6 +596,8 @@ def agent_guide(spec: dict, commit: str | None, two_file: bool = False, topology
         lines += ["", "## Direct trace connections",
                   "Company profiles inherit on boards that use traces; traceConnections:{} disables. Load/Verify calls only the configured detail tool after schema/host permission checks. No search, numeric fetch or board write.",
                   *(["Log lookups (`lookups`): each Find calls Grafana query_loki_logs once; keep that tool declared."] if log_lookups else []),
+                  *(["Honeycomb allowedAttributes with `dataset`: each Load/Verify also calls run_query once; keep it declared."]
+                    if any(p.get("provider") == "honeycomb" and p.get("allowedAttributes") and p.get("dataset") for p in direct.values()) else []),
                   f"Connection handoff: {PUBLIC_REPO}/blob/{ref}/docs/trace-connections.md ."]
     if tracked:
         lines += [

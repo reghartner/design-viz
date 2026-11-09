@@ -12,7 +12,7 @@ function createTelemetryDirectMcp(win){
       var servers=telemetryGrafanaListed(list).filter(function(s){return (s.server || s.name)===p.server;});
       if(servers.length!==1)FlowTraceConnections.fail('schema','The exact configured connector is absent or ambiguous.');
       var tools=(servers[0].tools || []).filter(function(t){return t.name===p.tool;});
-      if(tools.length!==1)FlowTraceConnections.fail('schema','The exact configured detail tool is absent or ambiguous.');
+      if(tools.length!==1)FlowTraceConnections.fail('schema',p.tool==='run_query'?'The configured connector offers no single run_query tool.':'The exact configured detail tool is absent or ambiguous.');
       var annotations=tools[0].annotations || {};if(annotations.readOnlyHint===false || annotations.destructiveHint===true)FlowTraceConnections.fail('schema','Discovered detail tool is marked write/destructive.');
       var described=await telemetryDescribeTools(claude,mcp,p.server,tools,active);if(!active())throw {code:'capability_removed'};
       contracts.set(request,mcp);return described[0];

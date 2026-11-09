@@ -93,13 +93,30 @@ function createTelemetryDirect(page,transport,hooks){
       resolved=FlowTraceConnections.input(p,parsed && !Object.prototype.hasOwnProperty.call(parsed,'start') && !Object.prototype.hasOwnProperty.call(parsed,'end')?Object.assign({},request,time):request,now);
       var safeArgs={};Object.keys(resolved.args).forEach(function(k){safeArgs[k]=[p.arguments.traceId,p.arguments.start,p.arguments.end,p.arguments.environment].indexOf(k)>=0?resolved.args[k]:'[configured]';});
       busy=true;update({mode:verify?'verify':'load',stage:'schema',connection:p.label,server:p.server,tool:p.tool,environment:resolved.environment,arguments:safeArgs,requestAccepted:false,idMatched:false});
-      timeout=setTimeout(function(){if(mine!==serial || dead)return;serial++;abort.abort();timeout=null;busy=false;report=Object.assign(report || {},{stage:stage,error:'Trace '+stage+' request timed out. Retry with a bounded window.',code:'timeout'});changed();},30000);
+      var deadline=Date.now()+30000;timeout=setTimeout(function(){if(mine!==serial || dead)return;serial++;abort.abort();timeout=null;busy=false;report=Object.assign(report || {},{stage:stage,error:'Trace '+stage+' request timed out. Retry with a bounded window.',code:'timeout'});changed();},30000);
       stage='schema';var descriptor={connection:request.connection,profile:p,environment:resolved.environment};
       var tool=await transport.describe(descriptor,signal);check();FlowTraceConnections.tool(p,tool,resolved.args);
       stage='detail';update({stage:stage});var result=await transport.call(descriptor,resolved.args,signal);check();
       if(result && result.isError)FlowTraceConnections.fail('detail',telemetryTraceErrorText(result) || 'The detail tool returned an error; no trace was accepted.');
       update({requestAccepted:true,stage:'response'});stage='response';
       var trace=p.adapter==='honeycomb-table-v1'?telemetryHoneycombTrace(result,resolved.traceId,p.allowedAttributes):telemetryTempoTrace(result,resolved.traceId,p.allowedAttributes);check();
+      // #1197: one run_query on the same server reads the allowed attributes Honeycomb get_trace omits.
+      if(p.provider==='honeycomb' && (p.allowedAttributes || []).length && trace.spans.length && !p.dataset)trace.warnings.push('Span attributes not loaded ('+p.allowedAttributes.join(', ')+'): the Honeycomb profile names no dataset.');
+      else if(p.provider==='honeycomb' && (p.allowedAttributes || []).length && trace.spans.length){
+        // The trace is already accepted: the query has its own deadline (the time left of
+        // this request's 30 seconds) and a timeout drops only the attributes.
+        if(timeout){clearTimeout(timeout);timeout=null;}
+        stage='attributes';update({stage:stage});var query={connection:request.connection,profile:Object.assign({},p,{tool:'run_query'}),environment:resolved.environment},env=p.environments[resolved.environment];
+        var limit=telemetryTraceDeadline(signal,deadline-Date.now());
+        var passed=Object.assign({},resolved.args);[p.arguments.traceId,p.arguments.start,p.arguments.end].forEach(function(k){if(k)delete passed[k];});
+        try{
+          trace.warnings=trace.warnings.concat(await telemetryTraceAttributes(trace.spans,p.allowedAttributes,{traceId:resolved.traceId,environment:env && env.value,dataset:p.dataset,args:passed,
+            from:'-'+(resolved.lookback || Math.max(1,Math.ceil((Date.now()-Date.parse(resolved.range.from))/3600000))+'h'),
+            describe:function(){return limit.bounded(transport.describe(query,limit.signal));},call:function(input){return limit.bounded(transport.call(query,input,limit.signal));},
+            stop:function(error){return !active() || !!(error && error.code==='user_changed');}}));
+        }finally{limit.done();}
+        check();
+      }
       var e=telemetryTraceEnvelope({version:1,provider:p.provider,traceId:resolved.traceId,signal:'direct',selectionToken:'direct-'+mine,selectionReason:'Explicit trace ID loaded with '+p.label,observedAt:new Date().toISOString(),range:resolved.range,candidates:[{traceId:resolved.traceId,status:'unknown'}],spans:trace.spans,completeness:trace.completeness,warnings:trace.warnings.map(telemetryTraceErrorText).filter(Boolean),url:trace.url},p.allowedAttributes);
       exemplar=e;busy=false;update({stage:'complete',idMatched:true,spanCount:e.spans.length,completeness:e.completeness,warnings:e.warnings});return e;
     }catch(e){

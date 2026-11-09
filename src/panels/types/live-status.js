@@ -186,6 +186,8 @@
       if(text)el(section,'p','status','dv-trace-logs-status',text).setAttribute('role','status');
       if(r.chosenNote)el(box,'p','log-note','dv-trace-direct-status',r.chosenNote).setAttribute('role','status');
       if(!r.rows.length)return;
+      // #1145 (D5): loading a line's trace moves the view to the trace's day.
+      if(direct.movesDay)el(section,'p','moves','dv-trace-logs-moves','Loading a trace moves the view to its date.');
       var rows=el(section,'ol','results','dv-trace-log-results');rows.setAttribute('aria-label','Matching log lines');
       r.rows.forEach(function(row,i){
         var item=el(rows,'li',String(i),'dv-trace-log-row');item.setAttribute('data-chosen',String(r.chosen===i));
@@ -254,6 +256,8 @@
       if(!load._directLoadClick){load._directLoadClick=function(){load._directLoadAction();};load.addEventListener('click',load._directLoadClick);}
       var verify=button(controls,'verify','reader-button dv-trace-verify','Verify trace connection','loadDirectTrace');verify._liveArgument=true;verify.disabled=load.disabled;
       if(direct.logs)logLookupBody(config,box,direct.logs,direct);
+      // #1145: why a loaded trace left, or why the view did not move to its day.
+      if(direct.dayNote)el(box,'p','day-note','dv-trace-day-note',direct.dayNote).setAttribute('role','status');
       if(!direct.available)el(box,'p','unavailable','dv-trace-direct-status','Direct trace retrieval is unavailable in this host or view.').setAttribute('role','status');
       if(r){var report=el(box,'section','report','dv-trace-direct-report'+(loaded?' dv-trace-report-compact':''));report.setAttribute('aria-label','Trace connection report');
         el(report,'p','stage','dv-trace-direct-status',r.error || (r.stage==='complete'?'Loaded · ID matched · '+r.spanCount+' spans · '+r.completeness+' completeness':r.stage==='schema'?'Checking runtime tool schema…':'Loading exact trace…')).setAttribute('role','status');
@@ -302,7 +306,7 @@
       }
       if(!trace.selected)return;
       var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
-      el(detail,'h3','heading','','Selected request');el(detail,'code','identity','dv-trace-identity',e.traceId);if(selected.manual && !selected.hasMappings)el(detail,'p','mapping-unavailable','','Diagram mapping is not configured for this section.');
+      el(detail,'h3','heading','','Selected request');el(detail,'code','identity','dv-trace-identity',e.traceId);if(selected.day)el(detail,'p','date','dv-trace-date','Started '+selected.day.label+' '+selected.day.time+' local');if(selected.manual && !selected.hasMappings)el(detail,'p','mapping-unavailable','','Diagram mapping is not configured for this section.');
       var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
       el(detail,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');
       var limit=e.warnings.filter(function(w){return /200 spans|timeline unavailable/i.test(w);});if(model.warning)limit.push(model.warning);if(limit.length)el(detail,'p','limit','dv-trace-limit',Array.from(new Set(limit)).join(' '));

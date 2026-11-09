@@ -2898,9 +2898,9 @@ test('#1136 a reader working on a loaded trace keeps the Trace view when a loade
  api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:ID});
  assert.ok(await api.loadDirectTrace(false),'contrasting precondition: the trace loads');assert.ok(api.snapshot().trace.selected,'and is shown');
  await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.flush();
- // The detail adds a mapping diagram, which resets the loaded trace as before; the reader stays in the Trace view to load again.
- assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().mode,'trace','trace work keeps the Trace view');
- assert.deepEqual(m.body.querySelectorAll('button.dv-status-mode').filter(el=>shownIn(el,m.body)).map(accessibleName),['Jira','Trace'],'the switch appears with the references');
+ // The detail adds a mapping diagram; the loaded trace stays (#1145) and the reader stays in the Trace view.
+ assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().mode,'trace','trace work keeps the Trace view');assert.ok(api.snapshot().trace.selected,'#1145: the loaded trace stays');
+ assert.deepEqual(m.body.querySelectorAll('button.dv-status-mode').filter(el=>shownIn(el,m.body)).map(accessibleName),['Jira','Trace · 1'],'the switch appears with the references');
  m.destroy();api.destroy();
 });
 test('#1136 choosing a trace or focusing a span keeps the Trace view when a loaded detail brings tickets',async()=>{
@@ -3148,7 +3148,7 @@ test('#1124 a log-line trace that is not found says it may not have been kept an
  const data=[line(600000,{trace_id:ids[0]}),line(900000,{cameraModel:'arch'}),line(1200000,{trace_id:ids[1]}),line(3*3600000,{trace_id:ids[2]})];
  const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
  const raw={tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]};
- const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async(request,args)=>{calls.push(args.trace_id);return {payload:notFound(args.trace_id)};},logsConnector:async()=>'Grafana',queryLogs:async()=>({data})}}}),api=h.ctl.liveStatus;
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async(request,args)=>{calls.push(args.trace_id);froms.push(args.from);return {payload:notFound(args.trace_id)};},logsConnector:async()=>'Grafana',queryLogs:async()=>({data})}}}),api=h.ctl.liveStatus,froms=[];
  const report=()=>api.snapshot().trace.direct.report,m=mountStatus(h);
  api.setStatusMode('trace');await settle();api.setDirectTraceField({field:'environment',value:'prod'});api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();
  assert.equal(await api.loadLogTrace(0),null);assert.deepEqual(calls,[ids[0]]);assert.equal(report().code,'trace_not_found');
@@ -3156,9 +3156,14 @@ test('#1124 a log-line trace that is not found says it may not have been kept an
  const next=m.body.querySelector('.dv-trace-log-next');assert.ok(next,'the not-found report offers the next log line');assert.equal(next.textContent,'Try the next log line');
  next.dispatchEvent({type:'click'});await settle();assert.deepEqual(calls,[ids[0],ids[1]],'the next line with a trace id loads; the line without one is skipped');
  assert.equal(report().error,'Trace not found. The provider may not have kept this trace (sampling). Try the next log line.');
- // A line older than the lookback window also gets the lookback hint; with no later line there is no next-line offer.
- assert.equal(await api.loadLogTrace(3),null);assert.equal(report().error,'Trace not found. The provider may not have kept this trace (sampling). The log line is older than the last 2h; try a longer lookback under Lookback.');
+ // #1145 (D9): a log-line load searches back to the line's time − 1 h, so a 3 h old line is inside its
+ // window and gets no lookback hint; with no later line there is no next-line offer.
+ assert.equal(await api.loadLogTrace(3),null);assert.ok(['-4h','-5h'].includes(froms.at(-1)),froms.at(-1));assert.equal(report().error,'Trace not found. The provider may not have kept this trace (sampling).');
  assert.equal(m.body.querySelector('.dv-trace-log-next'),null);
+ // A typed Trace start wins, so a line outside it still gets the lookback hint.
+ api.setDirectTraceField({field:'start',value:'-2h'});assert.equal(await api.loadLogTrace(3),null);assert.equal(froms.at(-1),'-2h');
+ assert.equal(report().error,'Trace not found. The provider may not have kept this trace (sampling). The log line is older than the last 2h; try a longer lookback under Lookback.');
+ api.setDirectTraceField({field:'start',value:''});
  // A pasted ID keeps today's text.
  api.setDirectTraceField({field:'input',value:ids[0]});assert.equal(await api.loadDirectTrace(false),null);assert.equal(report().error,'Trace not found in the last 2h. Try a longer lookback under Lookback.');
  api.destroy();
@@ -3389,5 +3394,247 @@ test('#1137 an applied status map on a board without tickets gives nodes, step c
   coin:rec.sectionEl.querySelector('g.coin[data-dv-step="0"]').getAttribute('data-live-appearance'),chip:rec.sectionEl.querySelector('button.schip[data-step-source="0"]').getAttribute('data-live-appearance'),
   caption:caption?caption.textContent:null,painted:h.view.querySelectorAll('[data-live-appearance]').length},
   {local:{node:null,label:false},imported:{node:null,label:false},coin:null,chip:null,caption:null,painted:0});
+ api.destroy();
+});
+/* #1145 (D5, D14): a loaded trace sets the view's day. The recorded Honeycomb trace is moved so its first
+   span starts at a chosen time. The board has Jira history: AA-1 is To Do until yesterday, Done today. */
+const DAY_TRACE_ID='8413cd87a9f15b6bfe8e1acf5b3346d0',DAY_TRACE=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8');
+const dayTraceAt=ms=>{const delta=BigInt(ms)*1000000n-1791779586602194688n;return DAY_TRACE.replace(/\b\d{19}\b/g,n=>String(BigInt(n)+delta));};
+const daysBack=(n,hour=12)=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate()-n,hour).getTime();};
+const dayKeyOf=ms=>{const d=new Date(ms);return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())).toISOString().slice(0,10);};
+const dayLabelOf=ms=>new Date(ms).toLocaleDateString([],{month:'short',day:'numeric'});
+function dayTraceBoard({at,loadDetail,lines,deferHistory=false,apply=true}={}){
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),calls=[];let payload=dayTraceAt(at);
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const raw=overFixture();raw.page.tracking.telemetry={traceConnections:{company:profile}};
+ let hold=null;const renderOptions={telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async(request,args)=>{calls.push(plain(args));const reply={payload};if(hold)await hold.promise;return reply;}}}};
+ if(lines){Object.assign(raw.page.tracking.telemetry,{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}}});Object.assign(renderOptions.telemetry.directTrace,{logsConnector:async()=>'Grafana',queryLogs:async()=>({data:lines})});}
+ if(loadDetail)renderOptions.loadDetail=loadDetail;
+ const h=harness(raw,{},renderOptions),api=overReady(h.ctl.liveStatus),m=mountStatus(h),now=Date.now();
+ if(apply)api.apply(overToday());api.setStatusMode('trace');
+ const history=historyDays(providerContext(),[historyTicket('AA-1',now-4*86400000,'In Progress',[historyChange(now-86400000,'To Do','In Progress')])],{'AA-1':{state:'done'}},now);
+ let release=null,loads=0;api.setHistory({load:()=>{loads++;return deferHistory?new Promise(r=>{release=()=>r(history);}):history;}});
+ api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:DAY_TRACE_ID});
+ return {h,api,m,calls,renderOptions,days:history.days,traceAt:ms=>{payload=dayTraceAt(ms);},release:()=>{const r=release;release=null;if(r)r();},loads:()=>loads,
+  holdCalls:()=>{let open;hold={promise:new Promise(r=>open=r)};return ()=>{hold=null;open();};},note:()=>api.snapshot().trace.direct.dayNote,
+  loaded:()=>{const t=api.snapshot().trace;return !!(t.direct.exemplar && t.selected && t.selected.manual);}};
+}
+test('#1145 a trace from two days back opens Over time on its day with that day\'s Jira colours; another day clears it',async()=>{
+ const at=daysBack(2),b=dayTraceBoard({at}),{api,h,m,calls}=b,a=()=>h.view.querySelector('[data-dv-node="a"]');
+ h.flush();assert.ok(a().classList.contains('dv-live-done'),'Live paints today');
+ assert.ok(await api.loadDirectTrace(false));await historySettle();h.flush();
+ const over=api.snapshot().overTime;assert.equal(over.active,true,'loading the trace opens Over time');
+ assert.equal(b.days[over.index].key,dayKeyOf(at),'on the trace\'s own day');
+ assert.ok(b.loaded(),'the trace stays loaded and selected');assert.equal(calls.length,1,'one call');
+ assert.ok(a().classList.contains('dv-live-todo') && !a().classList.contains('dv-live-done'),'D14: the node shows that day\'s status');
+ assert.equal(m.body.querySelector('.dv-trace-date').textContent,'Started '+dayLabelOf(at)+' 12:00 local','the request card names the trace\'s date');
+ assert.equal(b.note() || '','','no note when the view reached the trace\'s day');
+ api.overTimeDay(over.index+1);h.flush();
+ assert.equal(b.loaded(),false,'another day clears the trace');assert.equal(api.snapshot().trace.direct.exemplar,null);
+ assert.equal(b.note(),'Cleared trace '+DAY_TRACE_ID.slice(0,12)+' ('+dayLabelOf(at)+'): the view moved to '+b.days[over.index+1].short+'.');
+ assert.equal(m.body.querySelector('.dv-trace-day-note').textContent,b.note());assert.equal(api.snapshot().trace.direct.form.input,DAY_TRACE_ID,'the typed ID stays');
+ api.overTimeDay(over.index);h.flush();assert.equal(b.note(),'','the note goes with the next view change');assert.equal(m.body.querySelector('.dv-trace-day-note'),null);
+ // Back to Live clears a past-day trace too, with no call.
+ assert.ok(await api.loadDirectTrace(false));await historySettle();assert.equal(api.snapshot().overTime.index,over.index);assert.ok(b.loaded());
+ overBackToLive(api);await historySettle();assert.equal(b.loaded(),false);assert.equal(b.note(),'Cleared trace '+DAY_TRACE_ID.slice(0,12)+' ('+dayLabelOf(at)+'): the view moved to Live.');
+ // Jira clear also returns a past day to Live and clears the trace.
+ assert.ok(await api.loadDirectTrace(false));await historySettle();assert.ok(b.loaded());assert.equal(api.snapshot().overTime.active,true);
+ api.clear();assert.equal(b.loaded(),false,'Jira clear clears the past-day trace');assert.equal(b.note(),'Cleared trace '+DAY_TRACE_ID.slice(0,12)+' ('+dayLabelOf(at)+'): the view moved to Live.');
+ assert.equal(calls.length,3,'moving the day never loads');
+ api.destroy();
+});
+test('#1145 a trace from today keeps or returns to Live; Over time on today keeps it',async()=>{
+ const b=dayTraceBoard({at:Date.now()-60000}),{api,calls}=b;
+ assert.ok(await api.loadDirectTrace(false));await historySettle();
+ assert.equal(api.snapshot().overTime.active,false,'a today trace keeps Live');assert.ok(b.loaded());
+ api.overTime();await historySettle();assert.equal(api.snapshot().overTime.today,true);assert.ok(b.loaded(),'the reader\'s Over time on today is the trace\'s day');
+ assert.ok(await api.loadDirectTrace(false));await historySettle();assert.equal(api.snapshot().overTime.active,false,'D5: a today trace moves the view to Live');assert.ok(b.loaded());
+ api.overTime();await historySettle();api.overTimeDay(0);assert.equal(b.loaded(),false);
+ assert.ok(await api.loadDirectTrace(true),'Verify loads it too');await historySettle();
+ assert.equal(api.snapshot().overTime.active,false,'a today trace returns a past day to Live');assert.ok(b.loaded());assert.equal(calls.length,3);
+ api.destroy();
+});
+test('#1145 a trace from a day outside the day list keeps the view and says so',async()=>{
+ const at=daysBack(30),b=dayTraceBoard({at}),{api,calls}=b,note='This trace is from '+dayLabelOf(at)+', which Over time does not list.';
+ assert.ok(await api.loadDirectTrace(false));await historySettle();
+ assert.equal(api.snapshot().overTime.active,false,'Live stays');assert.ok(b.loaded());assert.equal(b.note(),note);
+ api.overTime();await historySettle();assert.equal(b.loaded(),false,'the reader\'s own move to Over time clears it');
+ const index=api.snapshot().overTime.index;assert.ok(await api.loadDirectTrace(false));await historySettle();
+ assert.equal(api.snapshot().overTime.index,index,'the selected day stays');assert.ok(b.loaded());assert.equal(b.note(),note);assert.equal(calls.length,2);
+ api.destroy();
+});
+test('#1145 Load on a log line from two days back moves the view to that day; the list says loading moves the date',async()=>{
+ const at=daysBack(2),line={timestamp:String(BigInt(at+60000)*1000000n),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:{cameraModel:'arch',trace_id:DAY_TRACE_ID,span_id:'011114cbd1fd62de'}};
+ const b=dayTraceBoard({at,lines:[line]}),{api,m,calls}=b,settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
+ await settle();api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();
+ assert.equal(m.body.querySelector('.dv-trace-logs-moves').textContent,'Loading a trace moves the view to its date.');
+ const reach=()=>'-'+Math.ceil((Date.now()-(at+60000-3600000))/3600000)+'h',before=reach();
+ assert.ok(await api.loadLogTrace(0));await historySettle();
+ assert.equal(api.snapshot().overTime.active,true);assert.equal(b.days[api.snapshot().overTime.index].key,dayKeyOf(at),'the view moved to the trace\'s day');
+ assert.ok(b.loaded());assert.equal(calls.length,1);assert.ok([before,reach()].includes(calls[0].from),'D9: back to the line time − 1 h');
+ assert.equal(api.snapshot().trace.selected.focus && api.snapshot().trace.selected.focus.spanId,'011114cbd1fd62de','the line\'s span stays focused');
+ api.destroy();
+});
+/* #1145 Q2 (a): a move the loaded trace causes keeps the log results, so the list and the next line
+   survive the Load; a day change the reader makes clears them, as #1141 does. */
+test('#1145 log results survive the move a trace causes and clear on the reader\'s day change',async()=>{
+ const at=daysBack(2),other='c3'.repeat(16),line=(ms,id)=>({timestamp:String(BigInt(ms)*1000000n),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:{cameraModel:'arch',trace_id:id}});
+ const b=dayTraceBoard({at,lines:[line(at+60000,DAY_TRACE_ID),line(at,other)]}),{api,m,calls}=b,settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
+ const logs=()=>api.snapshot().trace.direct.logs;
+ await settle();api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();assert.equal(logs().result.rows.length,2);
+ assert.ok(await api.loadLogTrace(0));await historySettle();
+ assert.equal(api.snapshot().overTime.active,true,'the trace moved the view');
+ assert.equal(logs().result && logs().result.rows.length,2,'the list survives the move the trace caused');assert.equal(logs().result.chosen,0);
+ assert.equal(m.body.querySelectorAll('.dv-trace-log-row').length,2);
+ assert.equal(await api.loadNextLogTrace(),null,'the next line still loads');assert.deepEqual(calls.map(c=>c.trace_id),[DAY_TRACE_ID,other]);
+ // A trace from another listed day moves Over time day to day; the list stays.
+ b.traceAt(daysBack(1));assert.ok(await api.loadLogTrace(0));assert.equal(b.days[api.snapshot().overTime.index].key,dayKeyOf(daysBack(1)));assert.equal(logs().result && logs().result.rows.length,2,'a day-to-day move keeps the list');
+ // Today, while the list is from Live: a trace that returns the view to Live keeps it too.
+ b.traceAt(Date.now()-60000);assert.ok(await api.loadLogTrace(0));await historySettle();
+ assert.equal(api.snapshot().overTime.active,false,'back to Live for a today trace');assert.equal(logs().result && logs().result.rows.length,2);
+ // The reader's own day change clears the results, as #1141 does.
+ api.overTime();await historySettle();api.overTimeDay(0);assert.equal(logs().result,null,'the reader\'s day change clears them');
+ assert.equal(calls.length,4,'no call without a click');
+ api.destroy();
+});
+test('#1145 a history load the trace started follows the trace loaded when it arrives',async()=>{
+ // A, then B from another past day: the view opens on B's day and B stays.
+ let b=dayTraceBoard({at:daysBack(2),deferHistory:true});
+ assert.ok(await b.api.loadDirectTrace(false));assert.equal(b.api.snapshot().overTime.loading,true);
+ b.traceAt(daysBack(1));assert.ok(await b.api.loadDirectTrace(false));b.release();await historySettle();
+ assert.equal(b.api.snapshot().overTime.active,true);assert.equal(b.days[b.api.snapshot().overTime.index].key,dayKeyOf(daysBack(1)),'B\'s day');assert.ok(b.loaded(),'B stays');assert.equal(b.note(),'');b.api.destroy();
+ // A, then a today trace B: the view stays in Live with B.
+ b=dayTraceBoard({at:daysBack(2),deferHistory:true});
+ assert.ok(await b.api.loadDirectTrace(false));b.traceAt(Date.now()-60000);assert.ok(await b.api.loadDirectTrace(false));b.release();await historySettle();
+ assert.equal(b.api.snapshot().overTime.active,false,'Live for today');assert.ok(b.loaded());assert.equal(b.note(),'');b.api.destroy();
+ // A, then Clear trace: the history arrives and the view stays in Live.
+ b=dayTraceBoard({at:daysBack(2),deferHistory:true});
+ assert.ok(await b.api.loadDirectTrace(false));b.api.clearDirectTrace();b.release();await historySettle();
+ assert.equal(b.api.snapshot().overTime.active,false,'no trace, no move');assert.equal(b.loaded(),false);b.api.destroy();
+});
+test('#1145 a trace that runs past midnight takes the day of its first span',async()=>{
+ const at=daysBack(2,23)+59*60000+57000,b=dayTraceBoard({at}),{api,m}=b;
+ assert.ok(await api.loadDirectTrace(false));await historySettle();
+ assert.equal(b.days[api.snapshot().overTime.index].key,dayKeyOf(at),'the first span\'s day, not a later span\'s');
+ assert.ok(api.snapshot().trace.selected.exemplar.spans.some(s=>dayKeyOf(Date.parse(s.time))!==dayKeyOf(at)),'the fixture crosses midnight');
+ assert.equal(m.body.querySelector('.dv-trace-date').textContent,'Started '+dayLabelOf(at)+' 23:59 local');api.destroy();
+});
+test('#1145 the log list promises a move only when Over time can open',async()=>{
+ const line={timestamp:String(BigInt(daysBack(2))*1000000n),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:{cameraModel:'arch',trace_id:DAY_TRACE_ID}};
+ const b=dayTraceBoard({at:daysBack(2),lines:[line],apply:false}),{api,m}=b,settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
+ await settle();api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();
+ assert.equal(api.snapshot().trace.direct.movesDay,false,'no ticket status yet: Over time cannot open');assert.equal(m.body.querySelector('.dv-trace-logs-moves'),null);
+ api.apply(overToday());assert.equal(api.snapshot().trace.direct.movesDay,true);assert.ok(m.body.querySelector('.dv-trace-logs-moves'));
+ api.destroy();
+});
+/* #1145 round 3: a day change never says "Trace selection expired". An example trace the reader chose gets
+   the plain note; one shown automatically leaves without a note. Leaving Over time or loading clears it. */
+test('#1145 Over time retires example traces without "Trace selection expired"',async()=>{
+ for(const work of ['auto','choose']){
+  const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),h=harness(f.spec,{},{telemetry:{}}),api=overReady(h.ctl.liveStatus),m=mountStatus(h);
+  h.ctl.sections[0].stepper={path:()=>'short',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+  h.ctl.telemetry.apply(f.samples);api.apply({'TRACE-1':{state:'active'}});api.setStatusMode('trace');
+  const selected=api.snapshot().trace.selected;assert.ok(selected && !selected.manual,work+': an example trace is shown');
+  if(work==='choose')await api.chooseTrace({key:selected.key,traceId:selected.exemplar.traceId});
+  const now=new Date(),key=back=>new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()-back)).toISOString().slice(0,10);
+  api.setHistory({load:()=>({days:[2,1,0].map(back=>({key:key(back),label:key(back),short:key(back),states:{'TRACE-1':{state:'active'}}}))})});
+  api.overTime();await historySettle();assert.equal(api.snapshot().overTime.active,true);
+  const status=()=>m.body.querySelector('.dv-trace-mode-status').textContent;
+  assert.doesNotMatch(api.snapshot().trace.notice,/expired/,work);assert.doesNotMatch(status(),/expired/,work);
+  const plainNote='Cleared trace '+selected.exemplar.traceId.slice(0,12)+' ('+new Date(Math.min(...selected.exemplar.spans.map(s=>Date.parse(s.time)))).toLocaleDateString([],{month:'short',day:'numeric'})+'): the view moved to '+key(0)+'.';
+  assert.equal(api.snapshot().trace.notice,work==='choose'?plainNote:'',work+': the plain note only for a trace the reader chose');
+  api.overTimeDay(0);assert.equal(api.snapshot().trace.notice,'',work+': the next day change ends it');assert.doesNotMatch(status(),/expired/,work);
+  overBackToLive(api);await historySettle();assert.equal(api.snapshot().trace.notice,'',work+': leaving Over time clears it');assert.doesNotMatch(status(),/expired|Cleared/);
+  api.destroy();
+ }
+});
+/* #1145 with #1138: on a Jira-free board with Metrics, Load opens the local 7-day Over time on the trace's day. */
+test('#1145 Load on a Jira-free board opens the local Over time on the trace\'s day',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),calls=[],at=daysBack(2);
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const raw=freeFixture();raw.page.tracking.telemetry.traceConnections={company:profile};
+ const h=harness(raw,{},{telemetry:{historyMode:'window',provider:async()=>({}),history:async()=>({}),directTrace:{describe:async()=>tool,call:async(request,args)=>{calls.push(plain(args));return {payload:dayTraceAt(at)};}}}}),api=h.ctl.liveStatus,m=mountStatus(h);
+ assert.equal(api.snapshot().available,false,'the board has no Jira references');assert.equal(api.snapshot().mode,'trace');
+ assert.equal(api.snapshot().trace.direct.movesDay,true,'the local Over time can open');
+ api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:DAY_TRACE_ID});
+ assert.ok(await api.loadDirectTrace(false));await historySettle();
+ const over=api.snapshot().overTime;assert.equal(over.active,true,'Load opens the local Over time');assert.equal(over.count,7);
+ assert.equal(over.window.from,localMidnight(2),'on the trace\'s day');
+ assert.ok(api.snapshot().trace.selected && api.snapshot().trace.selected.manual,'the trace stays loaded');assert.equal(calls.length,1);
+ assert.equal(m.body.querySelector('.dv-trace-date').textContent,'Started '+dayLabelOf(at)+' 12:00 local');
+ api.destroy();
+});
+/* #1145 cycle 2: an example-trace choice still loading when the view enters Over time never ends in
+   "Trace selection expired"; the plain note clears on Load, Clear trace and a field edit. */
+async function exampleBoard(){
+ const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),h=harness(f.spec,{},{telemetry:{}}),api=overReady(h.ctl.liveStatus),m=mountStatus(h);
+ h.ctl.sections[0].stepper={path:()=>'short',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+ h.ctl.telemetry.apply(f.samples);api.apply({'TRACE-1':{state:'active'}});api.setStatusMode('trace');
+ const now=new Date(),key=back=>new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()-back)).toISOString().slice(0,10);
+ api.setHistory({load:()=>({days:[2,1,0].map(back=>({key:key(back),label:key(back),short:key(back),states:{'TRACE-1':{state:'active'}}}))})});
+ return {h,api,m,status:()=>m.body.querySelector('.dv-trace-mode-status').textContent};
+}
+test('#1145 a choice still loading when Over time opens never ends in "Trace selection expired"',async()=>{
+ const {h,api,status}=await exampleBoard(),t=h.ctl.telemetry,real=t.chooseExemplar;let release;
+ t.canChooseExemplar=()=>true;
+ t.chooseExemplar=function(...args){return new Promise(r=>release=r).then(()=>{if(t.snapshot().historical)throw new Error('Trace selection expired.');return real.apply(t,args);});};
+ const selected=api.snapshot().trace.selected,other=selected.exemplar.candidates.find(c=>c.traceId!==selected.exemplar.traceId);
+ const choosing=api.chooseTrace({key:selected.key,traceId:other.traceId});assert.equal(api.snapshot().trace.notice,'Loading selected trace…');
+ api.overTime();await historySettle();assert.equal(api.snapshot().overTime.active,true);
+ release();await choosing;await historySettle();
+ assert.doesNotMatch(api.snapshot().trace.notice,/expired/);assert.doesNotMatch(status(),/expired/);
+ api.destroy();
+});
+test('#1145 the day notes clear on Load, Clear trace and a field edit',async()=>{
+ // traceNotice: an example trace the reader chose, retired by Over time.
+ const e=await exampleBoard(),chosen=e.api.snapshot().trace.selected;await e.api.chooseTrace({key:chosen.key,traceId:chosen.exemplar.traceId});
+ e.api.overTime();await historySettle();assert.match(e.api.snapshot().trace.notice,/^Cleared trace /);
+ e.api.clearDirectTrace();assert.equal(e.api.snapshot().trace.notice,'','Clear trace ends it');e.api.destroy();
+ // The Load trace day note: from a day outside the list.
+ const b=dayTraceBoard({at:daysBack(30)}),{api}=b,outside=async()=>{b.traceAt(daysBack(30));assert.ok(await api.loadDirectTrace(false));await historySettle();assert.match(b.note(),/which Over time does not list/);};
+ await outside();api.clearDirectTrace();assert.equal(b.note(),'','Clear trace ends it');
+ await outside();api.setDirectTraceField({field:'start',value:'-3h'});assert.equal(b.note(),'','a field edit ends it');api.setDirectTraceField({field:'start',value:''});
+ await outside();b.traceAt(Date.now()-60000);assert.ok(await api.loadDirectTrace(false));assert.equal(b.note(),'','a Load ends it');
+ api.destroy();
+});
+test('#1145 a trace loaded while the reader\'s Over time is loading takes the view to its day',async()=>{
+ let b=dayTraceBoard({at:daysBack(2),deferHistory:true});
+ b.api.overTime();assert.equal(b.api.snapshot().overTime.loading,true);
+ assert.ok(await b.api.loadDirectTrace(false));b.release();await historySettle();
+ assert.equal(b.days[b.api.snapshot().overTime.index].key,dayKeyOf(daysBack(2)),'the trace\'s day, not today');assert.ok(b.loaded());assert.equal(b.note(),'');b.api.destroy();
+ // A trace cleared again before the history arrives: the reader's own click still opens Over time.
+ b=dayTraceBoard({at:daysBack(2),deferHistory:true});
+ b.api.overTime();assert.ok(await b.api.loadDirectTrace(false));b.api.clearDirectTrace();b.release();await historySettle();
+ assert.equal(b.api.snapshot().overTime.active,true,'the reader asked for Over time');assert.equal(b.api.snapshot().overTime.today,true);b.api.destroy();
+});
+test('#1145 a history that arrives while a replacement Load is running is used once that Load ends',async()=>{
+ const b=dayTraceBoard({at:daysBack(2),deferHistory:true});
+ assert.ok(await b.api.loadDirectTrace(false));assert.equal(b.loads(),1);
+ b.traceAt(daysBack(1));const open=b.holdCalls(),pending=b.api.loadDirectTrace(false);for(let i=0;i<20 && b.calls.length<2;i++)await new Promise(setImmediate);assert.equal(b.calls.length,2);
+ b.release();await historySettle();open();assert.ok(await pending);await historySettle();
+ assert.equal(b.api.snapshot().overTime.active,true);assert.equal(b.days[b.api.snapshot().overTime.index].key,dayKeyOf(daysBack(1)));assert.ok(b.loaded());
+ assert.equal(b.loads(),1,'one history load, not a second sweep');b.api.destroy();
+});
+test('#1145 a drill-down that brings tickets ends the local Over time and clears a past-day trace',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),at=daysBack(2),detail={page:{sections:[{id:'child',diagram:{nodes:{child:{tickets:['AA-1']}},rows:[['child']]}}]}};
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const raw=freeFixture();raw.page.tracking.telemetry.traceConnections={company:profile};raw.page.sections[0].diagram.nodes.b.detail={spec:'remote',section:'child',mode:'link'};
+ const options={loadDetail:async()=>detail,telemetry:{historyMode:'window',provider:async()=>({}),history:async()=>({}),directTrace:{describe:async()=>tool,call:async()=>({payload:dayTraceAt(at)})}}};
+ const h=harness(raw,{},options),api=h.ctl.liveStatus;mountStatus(h);
+ api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:DAY_TRACE_ID});
+ assert.ok(await api.loadDirectTrace(false));await historySettle();assert.equal(api.snapshot().overTime.active,true,'the local Over time on the trace\'s day');
+ await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.flush();
+ assert.equal(!!(api.snapshot().overTime && api.snapshot().overTime.active),false,'#1149: the local Over time ends');
+ assert.equal(api.snapshot().trace.direct.exemplar,null,'the past-day trace leaves with it');
+ assert.equal(api.snapshot().trace.direct.dayNote,'Cleared trace '+DAY_TRACE_ID.slice(0,12)+' ('+dayLabelOf(at)+'): the view moved to Live.');
+ api.destroy();
+});
+test('#1145 opening a drill-down keeps the loaded trace and its selection',async()=>{
+ const detail={sections:[{id:'child',diagram:{nodes:{child:{title:'Child'}},rows:[['child']]}}]};
+ const b=dayTraceBoard({at:Date.now()-60000,loadDetail:async()=>detail}),{api,h}=b;
+ assert.ok(await api.loadDirectTrace(false));const key=api.snapshot().trace.selected.key;
+ await b.renderOptions.loadDetail({spec:'detail'},new AbortController().signal);h.flush();
+ assert.ok(b.loaded(),'the trace is still loaded');assert.equal(api.snapshot().trace.selected.key,key,'and still selected');
+ assert.equal(api.snapshot().trace.direct.sections.length,2,'the drill-down added a mapping diagram');
  api.destroy();
 });

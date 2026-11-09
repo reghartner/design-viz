@@ -53,7 +53,7 @@ function telemetryLogRange(start,end,lookback){
 }
 function createTelemetryLogLookup(page,transport,hooks){
   hooks=hooks || {};
-  var dead=false,retired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),off=null,serial=0,abort=null,timer=null,busy=false,connector=null,lastIdentity=null,result=null;
+  var holding=false,dead=false,retired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),off=null,serial=0,abort=null,timer=null,busy=false,connector=null,lastIdentity=null,result=null;
   var form={lookup:'',value:'',logql:''};
   function lookups(){return trackingTelemetry(page).lookups || null;}
   function supported(){return !!transport && typeof transport.logsConnector==='function' && typeof transport.queryLogs==='function';}
@@ -64,7 +64,7 @@ function createTelemetryLogLookup(page,transport,hooks){
   function cancel(){serial++;if(timer)clearTimeout(timer);timer=null;if(abort)abort.abort();abort=null;busy=false;}
   function sync(){
     var key=JSON.stringify(typeof hooks.identity==='function'?hooks.identity():null),ls=lookups() || {},ids=Object.keys(ls);
-    if(key!==lastIdentity){if(lastIdentity!==null){cancel();result=null;}lastIdentity=key;}
+    if(key!==lastIdentity){if(lastIdentity!==null && !holding){cancel();result=null;}lastIdentity=key;}
     if(form.lookup!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,form.lookup)){form.lookup=ids.length?ids[0]:TELEMETRY_LOG_TYPED;form.value='';}
     return ls;
   }
@@ -151,5 +151,7 @@ function createTelemetryLogLookup(page,transport,hooks){
   // The next row with a trace id after `from` (default: the chosen row), or -1 (#1124).
   function next(from){if(!result)return -1;if(from===undefined)from=result.chosen;if(typeof from!=='number')return -1;for(var i=from+1;i<result.rows.length;i++)if(result.rows[i].traceId)return i;return -1;}
   if(transport && typeof transport.onAccountChanged==='function')off=transport.onAccountChanged(retire);
-  return {snapshot:snapshot,set:set,find:find,row:row,chosen:chosen,next:next,clear:function(){cancel();result=null;changed();},destroy:function(){cancel();dead=true;if(off)off();}};
+  // #1145: while a loaded trace moves the view to its own day, the results stay; the reader's own day change still clears them.
+  function hold(on){holding=!!on;if(!holding && !dead)sync();}
+  return {snapshot:snapshot,set:set,find:find,row:row,chosen:chosen,next:next,hold:hold,clear:function(){cancel();result=null;changed();},destroy:function(){cancel();dead=true;if(off)off();}};
 }

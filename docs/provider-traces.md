@@ -368,9 +368,15 @@ end are blank and the link has no time of its own (#1142):
 
 A link's own time and a typed Trace start / Trace end still win, and Live is
 unchanged. The loaded trace is the selected request, as in Live; example traces
-from bound carriers stay Live-only. Changing the day retires a pending or loaded trace and keeps the
-typed trace ID. A day without a date has no window; Load trace is unavailable
-on it.
+from bound carriers stay Live-only. Changing the day ends a pending request and
+keeps the typed trace ID. A day without a date has no window; Load trace is
+unavailable on it. A loaded trace then moves the view to its own day
+([A loaded trace sets the day](live-status.md#a-loaded-trace-sets-the-day)).
+
+**Load** on a found log line searches the line's time ± 1 h instead (#1145, D9):
+absolute connections send line − 1 h to line + 1 h, ending no later than now;
+relative-only connections send the shortest lookback that reaches line − 1 h.
+A typed Trace start / Trace end still wins.
 
 When `get_trace` answers with only a Metadata block whose `navigation_hints`
 starts with `no spans found` and no span table, the panel opens the Lookback

@@ -17,21 +17,31 @@ function matchTraceEnvironment(board,environments){
   return '';
 }
 function createTelemetryDirect(page,transport,hooks){
-  hooks=hooks || {};var dead=false,accountRetired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),offAccount=null,serial=0,abort=null,timeout=null,busy=false,exemplar=null,report=null,form={connection:'',environment:'',section:'',input:'',start:'',end:''},environmentChosen=false,lastIdentity=null,lastContext=null;
+  hooks=hooks || {};var dead=false,accountRetired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),offAccount=null,serial=0,abort=null,timeout=null,busy=false,exemplar=null,report=null,form={connection:'',environment:'',section:'',input:'',start:'',end:''},environmentChosen=false,lastIdentity=null,lastContext=null,lastDay='';
   function profiles(){return FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS);}
   function sections(){return typeof hooks.sections==='function'?hooks.sections():[];}
   function boardEnvironment(){return typeof hooks.environment==='function'?hooks.environment():null;}
   function contextIdentity(){return JSON.stringify(typeof hooks.identity==='function'?hooks.identity():null);}
-  // #1142: the selected Over time day, or null in Live. A day change retires a request but keeps the
-  // typed input. On today the window end moves, so the day key and today flag identify it.
+  // #1142: the selected Over time day, or null in Live. On today the window end moves, so the day key
+  // and today flag identify it. A day change ends a pending request only (#1145): the controller moves
+  // the view to a loaded trace's day and clears the trace when the reader moves elsewhere.
   function day(){var d=typeof hooks.day==='function'?hooks.day():null;return d && d.window && typeof d.window.from==='string'?d:null;}
-  function identity(){var d=day();return JSON.stringify([profiles(),contextIdentity(),sections().map(function(s){return s.id;}),d?[d.key,!!d.today]:null]);}
+  function dayKey(){var d=day();return d?JSON.stringify([d.key,!!d.today]):'';}
+  // A new mapping diagram (a drill-down) keeps a loaded trace; losing its own diagram clears it (sync).
+  function identity(){return JSON.stringify([profiles(),contextIdentity()]);}
+  function requestKey(){return JSON.stringify([identity(),dayKey()]);}
+  // The shortest relative lookback that reaches `from`.
+  function reach(from,now){var hours=Math.max(1,Math.ceil((now-from)/3600000));return {start:'-'+(hours>9999?Math.ceil(hours/24)+'d':hours+'h'),end:''};}
   /* With no Trace start or end typed, a day is searched whole: an absolute connection sends its bounds,
      a relative-only one the shortest lookback that reaches its start. A link's own time wins (load, bounds). */
   function dayTime(p,request,now){
     var d=day();if(!p || !d || request.start || request.end)return null;
-    if(p.time.encoding!=='relative')return {start:d.window.from,end:d.window.to};
-    var hours=Math.max(1,Math.ceil((now-Date.parse(d.window.from))/3600000));return {start:'-'+(hours>9999?Math.ceil(hours/24)+'d':hours+'h'),end:''};
+    return p.time.encoding!=='relative'?{start:d.window.from,end:d.window.to}:reach(Date.parse(d.window.from),now);
+  }
+  // #1145 (D9): a log line's trace is searched at the line's time ± 1 h, ending no later than now.
+  function lineTime(p,request,line,now){
+    var at=line && line.at?Date.parse(line.at):NaN;if(!p || !isFinite(at) || request.start || request.end)return null;
+    var from=at-3600000;return p.time.encoding!=='relative'?{start:new Date(from).toISOString(),end:new Date(Math.max(from,Math.min(at+3600000,now))).toISOString()}:reach(from,now);
   }
   function changed(){if(!dead && hooks.changed)hooks.changed();}
   function cancel(){serial++;if(timeout)clearTimeout(timeout);timeout=null;if(abort)abort.abort();abort=null;busy=false;exemplar=null;report=null;}
@@ -39,7 +49,7 @@ function createTelemetryDirect(page,transport,hooks){
   // An account boundary retires this session permanently. Form edits/cancel
   // only retire a request and must never signal a shared account change.
   function retireAccount(){if(dead || accountRetired)return;accountRetired=true;cancel();report={stage:'account',code:'user_changed',error:'Host account changed. Reopen this view to start a new telemetry session.',requestAccepted:false,idMatched:false};changed();}
-  function sync(){var key=identity(),context=contextIdentity();if(lastIdentity!==key){if(lastIdentity!==null && lastContext!==context)clearInput();cancel();lastIdentity=key;lastContext=context;}var ps=profiles(),ids=Object.keys(ps);if(!ps[form.connection]){form.connection=ids.length===1?ids[0]:'';form.environment='';}var p=ps[form.connection],envs=p?Object.keys(p.environments):[];if(envs.indexOf(form.environment)<0)environmentChosen=false;if(!environmentChosen)form.environment=(p && matchTraceEnvironment(boardEnvironment(),p.environments)) || (envs.length===1?envs[0]:'');var ss=sections();if(!ss.some(function(s){return s.id===form.section;}))form.section=ss.length===1?ss[0].id:'';return ps;}
+  function sync(){var key=identity(),context=contextIdentity(),today=dayKey();if(lastIdentity!==key){if(lastIdentity!==null && lastContext!==context)clearInput();cancel();lastIdentity=key;lastContext=context;}if(lastDay!==today){if(busy)cancel();lastDay=today;}var ps=profiles(),ids=Object.keys(ps);if(!ps[form.connection]){form.connection=ids.length===1?ids[0]:'';form.environment='';}var p=ps[form.connection],envs=p?Object.keys(p.environments):[];if(envs.indexOf(form.environment)<0)environmentChosen=false;if(!environmentChosen)form.environment=(p && matchTraceEnvironment(boardEnvironment(),p.environments)) || (envs.length===1?envs[0]:'');var ss=sections();if(!ss.some(function(s){return s.id===form.section;})){if(form.section)cancel();form.section=ss.length===1?ss[0].id:'';}return ps;}
   function available(){return !dead && !accountRetired && !!transport && typeof transport.describe==='function' && typeof transport.call==='function' && !(hooks.disabled && hooks.disabled());}
   // The time window a load would send now, so the form can say which one applies.
   // Link time is detected from the parsed link alone; linkUsable says whether
@@ -70,15 +80,15 @@ function createTelemetryDirect(page,transport,hooks){
   // line: {at, next} when the trace ID came from a log line (#1124).
   async function load(verify,line){
     line=line && typeof line==='object'?{at:typeof line.at==='string'?line.at:null,next:!!line.next}:null;
-    sync();cancel();var mine=serial,key=lastIdentity,ps=profiles(),p=ps[form.connection],request=Object.assign({},form),stage='configuration',resolved=null;abort=new AbortController();var signal=abort.signal;
-    function active(){return !dead && mine===serial && !signal.aborted && key===identity() && available();}
+    sync();cancel();var mine=serial,key=requestKey(),ps=profiles(),p=ps[form.connection],request=Object.assign({},form),stage='configuration',resolved=null;abort=new AbortController();var signal=abort.signal;
+    function active(){return !dead && mine===serial && !signal.aborted && key===requestKey() && available();}
     function check(){if(!active())FlowTraceConnections.fail('cancelled','Trace request expired.');}
     function update(next){if(!active())return;report=Object.assign(report || {},next);changed();}
     try{
       if(!available())FlowTraceConnections.fail('host','Direct trace retrieval is unavailable in this host.');
       if(!p)FlowTraceConnections.fail('configuration','Choose a configured trace connection.');
       if(sections().length>1 && !request.section)FlowTraceConnections.fail('input','Choose a diagram context for authored mappings.');
-      stage='input';var now=Date.now(),time=dayTime(p,request,now),parsed=null;
+      stage='input';var now=Date.now(),time=lineTime(p,request,line,now) || dayTime(p,request,now),parsed=null;
       if(time){try{parsed=FlowTraceConnections.parseInput(p,request.input);}catch(e){}}
       resolved=FlowTraceConnections.input(p,parsed && !Object.prototype.hasOwnProperty.call(parsed,'start') && !Object.prototype.hasOwnProperty.call(parsed,'end')?Object.assign({},request,time):request,now);
       var safeArgs={};Object.keys(resolved.args).forEach(function(k){safeArgs[k]=[p.arguments.traceId,p.arguments.start,p.arguments.end,p.arguments.environment].indexOf(k)>=0?resolved.args[k]:'[configured]';});
@@ -94,7 +104,7 @@ function createTelemetryDirect(page,transport,hooks){
       exemplar=e;busy=false;update({stage:'complete',idMatched:true,spanCount:e.spans.length,completeness:e.completeness,warnings:e.warnings});return e;
     }catch(e){
       if(!dead && e && e.code==='user_changed'){if(transport && typeof transport.accountChanged==='function')transport.accountChanged();if(typeof hooks.accountChanged==='function')hooks.accountChanged();retireAccount();return null;}
-      if(dead || mine!==serial || signal.aborted || key!==identity())return null;
+      if(!dead)sync();if(dead || mine!==serial || signal.aborted || key!==requestKey())return null;
       busy=false;report=Object.assign(report || {mode:verify?'verify':'load',requestAccepted:false,idMatched:false},{stage:e.stage || stage,error:e && e.code==='trace_not_found' && resolved?notFoundText(resolved,line):errorText(e),serial:++telemetryDirectReports,logLine:!!line});if(line && e && e.code==='trace_not_found' && resolved)report.lookbackHint=lineOutside(resolved,line);if(e.code && /^[A-Za-z0-9_.-]{1,64}$/.test(e.code))report.code=e.code;changed();return null;
     }finally{if(mine===serial && timeout){clearTimeout(timeout);timeout=null;}}
   }

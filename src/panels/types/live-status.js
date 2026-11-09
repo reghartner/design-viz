@@ -362,8 +362,9 @@
       // #1186: the card shares its line with Show on diagram and Open trace, which sit outside the summary so they never toggle it.
       // The icons come first in DOM and tab order (positioned at the line's right end), so Tab never passes the card's body first.
       var line=el(detail,'div','request-line','dv-trace-request-line'),icons=el(line,'div','icons','dv-trace-request-icons'),card=el(line,'details','request','dv-trace-request'),matchedSteps=model.mapping?model.rows.filter(function(r){return r.status==='matched';}).length:0;
-      // #1175: an optional step missing from this trace does not count against coverage; the summary and the coverage line share these counts.
-      var optionalAbsent=model.rows.filter(function(r){return r.optional;}).length,stepTotal=model.rows.length-optionalAbsent;
+      // #1175: an optional step missing from this trace does not count against coverage. #1193: nor does a step
+      // without a traceMatch ("unmapped"). The summary and the coverage line share these counts.
+      var optionalAbsent=model.rows.filter(function(r){return r.optional;}).length,unmappedSteps=model.rows.filter(function(r){return r.status==='unmapped';}).length,stepTotal=model.rows.length-optionalAbsent-unmappedSteps;
       // The carried focus is used once, and only while nothing else holds focus (the removed card left it on the body).
       var active=doc.activeElement,carried=!!host._traceCardFocus && (!active || active===doc.body || active.isConnected===false);host._traceCardFocus=false;
       var focusCard=card.contains(active) || carried;traceSection(card,'request',shownTrace);
@@ -376,7 +377,7 @@
       var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
       el(card,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');
       var limit=e.warnings.filter(function(w){return /200 spans|timeline unavailable/i.test(w);});if(model.warning)limit.push(model.warning);if(limit.length)el(card,'p','limit','dv-trace-limit',Array.from(new Set(limit)).join(' '));
-      if(model.mapping)el(card,'p','coverage','dv-trace-coverage',matchedSteps+'/'+stepTotal+' steps matched · '+(optionalAbsent?optionalAbsent+' optional not in this trace · ':'')+model.mapping.unmatched.length+' spans unmatched');
+      if(model.mapping)el(card,'p','coverage','dv-trace-coverage',matchedSteps+'/'+stepTotal+' steps matched · '+(optionalAbsent?optionalAbsent+' optional not in this trace · ':'')+(unmappedSteps?unmappedSteps+(unmappedSteps===1?' step':' steps')+' without a trace mapping · ':'')+model.mapping.unmatched.length+' spans unmatched');
       if(trace.entries.length)returnedTraces(card);
       if(!selected.manual)button(el(card,'div','actions','dv-live-controls'),'pin','reader-button','Pin as evidence','pinSelectedTrace');
       var metadata=el(card,'details','metadata','dv-trace-metadata');el(metadata,'summary','summary','','Source and limitations');

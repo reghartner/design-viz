@@ -4078,7 +4078,7 @@ test('#1175 the coverage line leaves out a missing optional step and counts it a
   h.ctl.telemetry.apply(f.samples);api.setStatusMode('trace');h.flush();
   const entry=api.snapshot().trace.entries[0];await api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});h.flush();
   // The event path: submit matched, publish and push missing, unbound has no traceMatch.
-  assert.equal(m.body.querySelector('.dv-trace-coverage').textContent,optional?'1/3 steps matched · 1 optional not in this trace · 0 spans unmatched':'1/4 steps matched · 0 spans unmatched');
+  assert.equal(m.body.querySelector('.dv-trace-coverage').textContent,optional?'1/2 steps matched · 1 optional not in this trace · 1 step without a trace mapping · 0 spans unmatched':'1/3 steps matched · 1 step without a trace mapping · 0 spans unmatched');
   const text=el=>el.children.map(c=>c.textContent || '').join(' | '),row=m.body.querySelectorAll('.dv-trace-mapping').map(text).find(t=>t.startsWith('push notification'));
   assert.equal(row,optional?'push notification | Not observed | Optional, not in this trace.':'push notification | Not observed | Not observed · outcome unknown','the push step is listed among the mappings');
   api.destroy();
@@ -4155,7 +4155,7 @@ test('#1173 the request summary and the coverage line agree when an optional ste
   const entry=api.snapshot().trace.entries[0];await api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});h.flush();
   const summary=m.body.querySelector('details.dv-trace-request > summary').textContent,coverage=m.body.querySelector('.dv-trace-coverage').textContent;
   const counts=text=>/(\d+\/\d+) steps matched/.exec(text)[1];
-  assert.equal(counts(summary),optional?'1/3':'1/4',summary);assert.equal(counts(summary),counts(coverage),'the summary and the coverage line agree');
+  assert.equal(counts(summary),optional?'1/2':'1/3',summary);assert.equal(counts(summary),counts(coverage),'the summary and the coverage line agree');
   api.destroy();
  }
 });
@@ -4347,4 +4347,21 @@ test('#1186 a span focused while the panel is hidden is scrolled into the list\'
   assert.equal(list.scrollTop,892,'shown again: the focused span is scrolled into the list\'s view');assert.equal(watchers[0].off,true,'the watch stops');
   api.setTraceShow(true);h.flush();assert.equal(list.scrollTop,892,'a repaint of the same focus does not scroll again');
  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;api.destroy();}
+});
+
+/* #1193: "N/M steps matched" counts only steps with a traceMatch, less optional steps this trace lacks. The request
+   card's coverage line adds "· K steps without a trace mapping"; the one-line summary does not. Both agree on N/M. */
+test('#1193 steps without a traceMatch leave the step count; the coverage line names them and agrees with the summary',async()=>{
+ const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),d=f.spec.page.sections[0].diagram;
+ // The event path: submit matched, publish missing, push optional and missing, and four steps with no traceMatch.
+ d.steps.find(s=>s.id==='push').traceMatch.optional=true;
+ for(const id of ['note-1','note-2','note-3']){d.steps.push({id,text:'Narrative '+id,nodes:['app']});d.paths[0].steps.push(id);}
+ const h=harness(f.spec,{},{telemetry:{}}),api=h.ctl.liveStatus,m=mountStatus(h);
+ h.ctl.sections[0].stepper={path:()=>'event',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+ h.ctl.telemetry.apply(f.samples);api.setStatusMode('trace');h.flush();
+ const entry=api.snapshot().trace.entries[0];await api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});h.flush();
+ const summary=m.body.querySelector('details.dv-trace-request > summary').textContent,coverage=m.body.querySelector('.dv-trace-coverage').textContent;
+ assert.equal(coverage,'1/2 steps matched · 1 optional not in this trace · 4 steps without a trace mapping · 0 spans unmatched');
+ assert.match(summary,/ · 1\/2 steps matched/,summary);assert.doesNotMatch(summary,/without a trace mapping|optional/,'the one-line summary keeps only the ratio');
+ api.destroy();
 });

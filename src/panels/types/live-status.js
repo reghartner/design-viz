@@ -83,12 +83,14 @@
       [{key:'track'}].concat(proof.arcs).forEach(function(arc){
         var circle=el(svg,'circle',arc.key,arc.key==='track'?'dv-live-ring-track':'dv-live-proof-arc');
         circle.setAttribute('cx','22');circle.setAttribute('cy','22');circle.setAttribute('r','18');circle.setAttribute('pathLength','100');
-        if(arc.key!=='track'){circle.setAttribute('data-proof-bucket',arc.key);circle.setAttribute('stroke-dasharray',arc.size+' 100');circle.setAttribute('stroke-dashoffset',-arc.offset);}
+        if(arc.key!=='track'){circle.setAttribute('data-proof-bucket',arc.key);if(proof.states && proof.states[arc.key])circle.setAttribute('data-metric-state',proof.states[arc.key]);circle.setAttribute('stroke-dasharray',arc.size+' 100');circle.setAttribute('stroke-dashoffset',-arc.offset);}
       });
       el(ring,'strong','count','dv-live-proof-ratio',proof.counts.proven+'/'+proof.counts.bound+' bound proven');
       var main=el(box,'div','main','dv-live-epic-main');el(main,'h3','heading','','Proof');
       var pills=el(main,'div','pills','dv-live-proof-pills');Object.keys(proofLabels).forEach(function(key){
         var pill=el(pills,'span',key,'dv-live-state-pill dv-live-proof-pill',proof.counts[key]+' '+proofLabels[key]);pill.setAttribute('data-proof-bucket',key);
+        // #1199: a chip wears the metric-card state of the verdicts it counts (shared CSS in style.core.css).
+        if(proof.states && proof.states[key])pill.setAttribute('data-metric-state',proof.states[key]);else pill.removeAttribute('data-metric-state');
       });
       el(main,'p','sentence','dv-live-proof-sentence',proof.sentence);el(main,'p','predicate','dv-live-proof-predicate',proof.predicate);
     }
@@ -111,7 +113,9 @@
         var metrics=el(row,'td','signals','dv-live-proof-kpi');
         item.kpis.forEach(function(kpi){var metric=el(metrics,'div',kpi.name,'dv-live-proof-detail');el(metric,'span','value','',kpi.label+': '+kpi.text);if(kpi.url){var source=link(metric,'query',null,kpi.url);source.className='dv-live-metric-link';source.setAttribute('aria-label','Open '+kpi.label+' source query in a new tab');source.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});}});
         el(row,'td','since','dv-live-proof-since',item.since);
-        var verdict=el(row,'td','verdict','');var pill=el(verdict,'span','pill','dv-live-state-pill dv-live-proof-pill',item.label);pill.setAttribute('data-proof-bucket',TELEMETRY_SEALS[item.verdict]==='live-early'?'liveEarly':TELEMETRY_SEALS[item.verdict] || 'neutral');
+        var verdict=el(row,'td','verdict','');var pill=el(verdict,'span','pill','dv-live-state-pill dv-live-proof-pill',item.label);var bucket=TELEMETRY_SEALS[item.verdict]==='live-early'?'liveEarly':TELEMETRY_SEALS[item.verdict] || 'neutral';pill.setAttribute('data-proof-bucket',bucket);
+        // #1199 review: the row pill wears the same metric state as its count chip and card.
+        if(proof.states && proof.states[bucket])pill.setAttribute('data-metric-state',proof.states[bucket]);else pill.removeAttribute('data-metric-state');
         el(verdict,'div','evidence','dv-live-proof-detail',(item.initialLoading?'Loading…':item.telemetry)+(item.failing.length?' · failing: '+item.failing.join(', '):''));el(verdict,'div','predicate','dv-live-proof-predicate',item.predicate);
         var action=el(row,'td','link','');if(item.url){var anchor=link(action,'link',null,item.url);anchor.className='nbacklink dv-live-proof-link';anchor.setAttribute('aria-label','Open telemetry for '+item.title);anchor.setAttribute('title','Open telemetry for '+item.title);if(!anchor._proofIcon){anchor.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});anchor._proofIcon=true;}}
       });

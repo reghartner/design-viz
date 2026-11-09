@@ -187,7 +187,7 @@ for(const mode of ['blocked','blocked-zero','blocked-missing'])test('published-p
  if(mode==='blocked'){
   await root.getByRole('button',{name:/^Trace(?: · \d+)?$/}).click();
   // Chuck 2026-11-08 (D13): with the overlay on, the cards stay in Trace, carry no Jira appearance and open only their metrics.
-  const card=root.locator('.dv-metrics-card').filter({hasText:'formatted text; may be rounded'}).first();await expect(card).toBeVisible();await expect(root.locator('.dv-metrics-card[data-live-appearance]')).toHaveCount(0);
+  const card=root.locator('.dv-metrics-card').filter({hasText:'formatted text; may be rounded'}).first();await expect(card).toBeVisible();await expect(root.locator('.dv-metrics-card:not([data-metric-state])')).toHaveCount(0);
   await expect(card).toHaveAttribute('aria-label',/^Metrics for /);await card.click();const pop=root.locator('.dv-live-popover');await expect(pop).toHaveAttribute('aria-label',/^Metrics for /);await expect(pop).not.toContainText('Work status');await page.keyboard.press('Escape');await expect(pop).toBeHidden();
   await expect(root.locator('.dv-trace-selected')).toHaveCount(0);await expect(root.locator('.dv-trace-mode-status')).toHaveText('No traceMatch steps on this board');
   await root.getByRole('button',{name:'Jira',exact:true}).click();await expect(root.locator('.dv-metrics-card').filter({hasText:'formatted text; may be rounded'}).first()).toBeVisible();

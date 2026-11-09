@@ -767,7 +767,7 @@ whole text, and the Metrics connector line in this row wraps the same way. Demo
 controls supply **<** and **>** on the day row, below **Live** | **Over time**. The engine's panel title stays above this header.
 
 While it is on, the Metrics overlay draws its cards and cues in both views on every board
-(Chuck 2026-11-08, D13); in the Trace view its cards carry no Jira work colouring.
+(Chuck 2026-11-08, D13); its cards carry no Jira work colouring in either view (#1200).
 The **Metrics overlay** switch shows when the host supplies a telemetry
 provider or a demo telemetry source (see [Telemetry provider](#telemetry-provider));
 without one it is hidden. It is off on every load and its state is never saved.
@@ -1038,24 +1038,36 @@ sections are included from the start.
 ### Edge metric cards
 
 While Metrics is available and on, each visible explicitly bound edge gets one
-rounded card connected to the measured route midpoint. While Live is on, its
-outline, fill and glow follow the bound edge's shared work presentation and status
-appearance preferences. Every attached ticket participates, including inherited
-provider and import-overlay tickets: blocked/missing/active/testing take precedence,
-unknown evidence cannot claim completion, and an unticketed carrier shows the thin
-1px green no-change outline with no default glow. On a board with no ticket, epic,
-exclusion or missing-work references (`snapshot().available === false`), carriers and
-cards get no work presentation, even after a status map is applied: no outline state,
-no "No change needed" label, caption or popover line; cards show their own verdict only.
-Endpoint tickets do not supply
-an edge's work state. Telemetry proof never overrides the work outline.
+rounded card connected to the measured route midpoint. Its border shows the
+METRIC state only (#1200), identically in the Jira and Trace views, on boards with
+and without Jira; ticket state never paints a card, and nodes and edges keep their
+own work paint. The worst signal decides, counting every numeric signal of the carrier
+as its verdict does, including `showOnCard: false` ones; when a hidden signal has no
+value or fails, the card names it on a line such as "Hidden p95: no value" (a hidden
+signal still loading is left out):
 
-Observed numeric values follow the carrier’s configured tone (green for no-change,
-blue for active by default), adjusted for readable contrast against its fill;
-without work presentation they use neutral ink. A failing bound limit is amber and labeled
-“Outside limit”, even when the work outline is green. Unobserved values stay distinct
-from observed zero. Loading keeps the inherited outline and says “Loading…”. Live
-off or Clear removes inherited work styling; Metrics off removes the cards.
+| state | when | border |
+|---|---|---|
+| `waiting` | a signal has no value yet, or the card is silent (every rate-like value zero for the whole window) | to-do style: blue, dotted |
+| `failing` | values arriving, an authored limit not met | in-progress style: blue, medium |
+| `flowing` | values arriving, no limits authored | green, normal |
+| `held` | values arriving, every authored limit holds | green, thick |
+
+The card carries the state as `data-metric-state`. The Proof count chips (#1199) use
+the same CSS variables: proven and live early wear `held`, degraded `failing`,
+unproven `waiting`; unclassified and unbound stay neutral. The Proof ring's arcs and the Proof table's verdict
+pills use the same states, and chip text uses the card's neutral ink. Colours follow the personal
+status colours (and border widths) for Done, In progress and To do; held stays at
+least 2px so it reads stronger than flowing. In the Jira view a card still names
+its edge's work status and lists its tickets in the popover; on a board with no
+ticket, epic, exclusion or missing-work references (`snapshot().available === false`),
+carriers get no work presentation, even after a status map is applied: no outline
+state, no "No change needed" label, caption or popover line.
+
+Observed numeric values use the green observed ink, adjusted for readable contrast
+against the card. A failing bound limit is amber and labeled “Outside limit”.
+Unobserved values stay distinct from observed zero. Loading says “Loading…”.
+Metrics off removes the cards.
 Every numeric signal appears in
 authored order; trace bindings are excluded. Each row uses its optional `label`
 (1–120 plain-text characters without control characters) or signal-name fallback.

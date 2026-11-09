@@ -3340,6 +3340,7 @@ test('#1163 a board scale change repaints only when a changed trace label meets 
  scale();assert.equal(paints(),true,'a label grew under a drawn leader: paint');
  api.destroy();
 });
+// #1200: a card never wears Jira work paint; on a ticketed board the Jira view still names an unticketed card "No change needed".
 test('#1137 metric cards on a board without tickets get no Jira presentation; ticketed boards keep unchanged',async()=>{
  const free=await paintedCard({a:{},b:{}});
  assert.equal(free.h.ctl.liveStatus.snapshot().available,false,'fixture has no ticket references');
@@ -3356,7 +3357,7 @@ test('#1137 metric cards on a board without tickets get no Jira presentation; ti
  assert.equal(ticketed.h.ctl.liveStatus.snapshot().available,true);
  assert.ok(ticketed.card);
  assert.equal(ticketed.card.getAttribute('data-verdict'),'degraded');
- assert.deepEqual(workPresentation(ticketed.h,ticketed.card),{appearance:'unchanged',classes:['unchanged'],halo:true,label:true,popover:true},'an unticketed edge on a ticketed board stays unchanged');
+ assert.deepEqual(workPresentation(ticketed.h,ticketed.card),{appearance:null,classes:[],halo:false,label:true,popover:true},'an unticketed edge on a ticketed board stays unchanged in its name and popover, not its paint');
  ticketed.h.ctl.liveStatus.destroy();
 });
 // Chuck 2026-11-08 (D13): the Metrics overlay draws in every view. In the Trace view its cards carry no Jira work colouring,
@@ -3422,7 +3423,7 @@ test('D13 metric cards draw in the Trace view of a board with tickets without Ji
   const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
   for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;};
  const ticketed=await paintedCard({a:{tickets:['AA-1']},b:{}}),api=ticketed.h.ctl.liveStatus,card=()=>ticketed.h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]');
- assert.equal(card().getAttribute('data-live-appearance'),'unchanged','contrasting precondition: the Jira view colours the card');
+ assert.match(card().getAttribute('aria-label') || '',/No change needed/,'contrasting precondition: the Jira view names the card\'s work status');
  api.setStatusMode('trace');ticketed.h.flush();
  assert.ok(card(),'the Trace view draws the card');assert.equal(card().getAttribute('data-verdict'),'degraded');
  const classes=Array.from(ticketed.h.C.LIVE_STATUS_APPEARANCES).filter(s=>card().classList.contains('dv-live-'+s));
@@ -4267,6 +4268,28 @@ test('#1173 another trace resets the open sections; a re-poll with the same entr
  const again=api.snapshot().trace.entries.find(e=>e.key===example.key) || api.snapshot().trace.entries.find(e=>!e.manual);
  await api.chooseTrace({key:again.key,traceId:again.exemplar.traceId});h.flush();
  assert.equal(api.snapshot().trace.selected.manual,false);assert.equal(request().open,false,'returning to A starts collapsed');assert.equal(config().open,false);
+ api.destroy();
+});
+/* #1200: the painted card carries its metric state, identically in the Jira and Trace views, and never Jira work paint;
+   nodes keep theirs. */
+test('#1200 a painted metric card shows its metric state in both views and no Jira paint, while nodes keep theirs',async()=>{
+ const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{tickets:['AA-1']},b:{},c:{}},rows:[['a','b','c']],
+  edges:[{from:'a',to:'b',label:'PlaceOrder',tickets:['EE-1'],telemetry:TCALL()},{from:'b',to:'c',label:'Ship',tickets:['EE-2'],telemetry:TCALL()}]}}]}};
+ const samples={'a->b':{signals:{rate:{value:100},errors:{value:0}}},'b->c':{signals:{rate:{value:100},errors:{value:50}}}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve(samples)}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+ h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+ const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+ for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
+ api.apply({'AA-1':{state:'done'},'EE-1':{state:'done'},'EE-2':{state:'done'}});
+ h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
+ const read=()=>Object.fromEntries(h.view.querySelectorAll('g.dv-metrics-card').map(card=>[card.getAttribute('data-metrics-card'),{state:card.getAttribute('data-metric-state'),
+  appearance:card.getAttribute('data-live-appearance'),classes:Array.from(h.C.LIVE_STATUS_APPEARANCES).filter(s=>card.classList.contains('dv-live-'+s)),halo:!!card.querySelector('.dv-live-halo')}]));
+ const want={'a->b':{state:'held',appearance:null,classes:[],halo:false},'b->c':{state:'failing',appearance:null,classes:[],halo:false}};
+ assert.deepEqual(read(),want,'Jira view: metric state only, done tickets do not paint the cards');
+ assert.equal(h.view.querySelector('g.node[data-dv-node="a"]').getAttribute('data-live-appearance'),'done','nodes keep their Jira paint');
+ assert.equal(h.view.querySelector('path.edge[data-dv-edge="0"]').getAttribute('data-live-appearance'),'done','edges keep their Jira paint');
+ api.setStatusMode('trace');h.flush();
+ assert.deepEqual(read(),want,'Trace view: the same metric state');
  api.destroy();
 });
 /* #1177 follow-up (Chuck 2026-11-09): a span dropped on a node writes traceMatch.nodeId for that node when

@@ -72,3 +72,37 @@ test('a card leader leaves a gap where it would cross a trace label',()=>{
  assert.equal(C.telemetryCardLeader({x:0,y:0},{x:0,y:100},[]),'M0 0L0 100','no label, one unbroken line');
  assert.equal(C.telemetryCardLeader({x:0,y:0},{x:0,y:30},[{x:-20,y:-10,w:40,h:60}]),'','a leader wholly inside a label is not drawn');
 });
+/* #1200: a card's border shows the metric state only. The worst signal decides:
+   waiting (none arriving, or silent) < failing (a limit not met) < flowing (no limits) < held (every limit holds). */
+test('#1200 card metric state: worst signal decides and Jira state never enters',()=>{
+ const T1=Date.UTC(2026,10,3,9),T2=Date.UTC(2026,10,3,10),zero=v=>({value:v,series:[[T1,v],[T2,v]]});
+ const limited={kind:'call',signals:{rate:{unit:'req/h'},errors:{unit:'req/h'}},proof:{rate:{min:1},errors:{maxRatioOf:'rate',max:.01}}};
+ const open={kind:'call',signals:{rate:{unit:'req/h'},errors:{unit:'req/h'}}};
+ const mixed={kind:'call',signals:{rate:{unit:'req/h'},errors:{unit:'req/h'},p95:{unit:'ms'}},proof:{rate:{min:1},p95:{max:300}}};
+ const state=(binding,sample,jira)=>{
+  const result=C.proofVerdicts({carriers:[{id:'a->b',...binding,tickets:jira?['W-1']:[]}],jiraMap:{'W-1':{state:jira}},telemetryMap:sample?{'a->b':sample}:{}}).carriers['a->b'];
+  return C.telemetryCardMetricState(binding,sample,result);
+ };
+ assert.equal(state(limited,{signals:{rate:{value:100},errors:{value:0}}}),'held');
+ for(const jira of ['done','active','todo','blocked'])assert.equal(state(limited,{signals:{rate:{value:100},errors:{value:0}}},jira),'held','Jira '+jira+' does not change it');
+ assert.equal(state(open,{signals:{rate:{value:100},errors:{value:3}}}),'flowing');
+ assert.equal(state(limited,{signals:{rate:{value:100},errors:{value:50}}}),'failing');
+ assert.equal(state(limited,{signals:{rate:{value:100},errors:{value:50}}},'done'),'failing');
+ assert.equal(state(limited,null),'waiting','nothing arriving yet');
+ assert.equal(state(limited,{signals:{rate:zero(0),errors:zero(0)}},'done'),'waiting','silent for the whole window');
+ assert.equal(state(open,{signals:{rate:zero(0),errors:zero(0)}}),'waiting','silent without limits');
+ assert.equal(state(limited,{signals:{rate:{value:100}}}),'waiting','worst decides: one limited signal not arriving');
+ assert.equal(state(open,{signals:{rate:{value:100}}}),'waiting','worst decides: one signal not arriving');
+ assert.equal(state(mixed,{signals:{rate:{value:100},errors:{value:1},p95:{value:400}}}),'failing','worst decides: one limit not met');
+ assert.equal(state(mixed,{signals:{rate:{value:100},errors:{value:1},p95:{value:200}}}),'held','every authored limit holds; an unlimited signal arrives');
+ // Hidden (showOnCard:false) signals count, as in the verdict, and the card names them.
+ const hidden={...mixed,signals:{...mixed.signals,p95:{unit:'ms',showOnCard:false},queue:{unit:'msgs',label:'Queue depth',showOnCard:false}},proof:{...mixed.proof,queue:{max:10}}};
+ const note=(sample,pending)=>{const result=C.proofVerdicts({carriers:[{id:'a->b',...hidden}],telemetryMap:sample?{'a->b':sample}:{}}).carriers['a->b'];return [C.telemetryCardMetricState(hidden,sample,result),C.telemetryCardContent({from:'a',to:'b'},hidden,sample,result,'24h',pending).hidden];};
+ assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1},queue:{value:0}}}),['waiting','Hidden p95: no value'],'a hidden signal with no value, named');
+ assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1},p95:{value:400},queue:{value:0}}}),['failing','Hidden p95: outside limit'],'a hidden signal that fails, named');
+ assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1},queue:{value:40}}}),['waiting','Hidden p95: no value · Hidden Queue depth: outside limit'],'several, by label, joined');
+ assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1},p95:{value:200},queue:{value:0}}}),['held',''],'hidden signals that hold add no line');
+ assert.equal(note({signals:{rate:{value:100},errors:{value:1},queue:{value:0}}},{p95:true})[1],'','a pending hidden signal is not "no value"');
+ assert.equal(note(null,{rate:true,errors:true,p95:true,queue:true})[1],'','first load: everything pending, no hidden line');
+ assert.equal(note({signals:{rate:{value:100},errors:{value:1},p95:{value:400},queue:{value:0}}},{p95:true})[1],'Hidden p95: outside limit','a refresh in flight keeps the line of a hidden signal that still shows a value');
+});

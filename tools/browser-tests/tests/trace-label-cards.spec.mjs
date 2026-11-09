@@ -143,8 +143,8 @@ async function expectSettled(root,when){
  expectClear(now.problems,when);
 }
 
-for(const origin of ['local','imported']){
- test(`desktop ${origin} metric cards never cover a node or edge trace label`,async({page,server})=>{
+for(const round of [1,2,3,4,5])for(const origin of ['local','imported']){
+ test(`round ${round} desktop ${origin} metric cards never cover a node or edge trace label`,async({page,server})=>{
   const root=await setup(page,server,{origin,exemplar:true});
   await startSampling(root);
   await metric(root).click();await expect(metric(root)).toHaveAttribute('aria-checked','true');
@@ -152,7 +152,7 @@ for(const origin of ['local','imported']){
   await expect(root.locator(LABELS).filter({hasText:'Matched: database INSERT shipping.quotes'})).toHaveCount(1);
   expectClear(await stopSampling(root),'at any paint from the Metrics click on');await expectSettled(root,'once settled');
  });
- test(`desktop ${origin} trace labels keep their places when the Metrics overlay turns on and off`,async({page,server})=>{
+ test(`round ${round} desktop ${origin} trace labels keep their places when the Metrics overlay turns on and off`,async({page,server})=>{
   const root=await setup(page,server,{origin,exemplar:false});
   await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
   await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await root.getByRole('button',{name:'Load trace',exact:true}).click();
@@ -174,7 +174,7 @@ for(const origin of ['local','imported']){
  // A label's box can change after the cards were placed: text is laid out again at each board
  // scale (in CI a label widened by about 3% when the Auto view zoomed out). Grow the labels so they
  // meet a settled card or leader, change the scale, and the cards and leaders must clear them again.
- test(`desktop ${origin} cards are placed again when a trace label grows after they were placed`,async({page,server})=>{
+ test(`round ${round} desktop ${origin} cards are placed again when a trace label grows after they were placed`,async({page,server})=>{
   const root=await setup(page,server,{origin,exemplar:false});
   await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
   await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await root.getByRole('button',{name:'Load trace',exact:true}).click();

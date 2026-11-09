@@ -89,12 +89,25 @@ function telemetryCardPlace(path,w,h,placement,boxes){
   }
   return {box:box,mid:mid,side:side};
 }
+/* The leader from the edge midpoint to its card, with a gap wherever it would
+   cross a trace label (#1163), so the line never strikes through the label. */
+function telemetryCardLeader(a,b,labels){
+  var dx=b.x-a.x,dy=b.y-a.y,gaps=[],d='',t=0;
+  (labels || []).forEach(function(r){
+    var lo=0,hi=1,p=[-dx,dx,-dy,dy],q=[a.x-r.x+3,r.x+r.w+3-a.x,a.y-r.y+3,r.y+r.h+3-a.y];
+    for(var i=0;i<4;i++){if(!p[i]){if(q[i]<0)return;continue;}var u=q[i]/p[i];if(p[i]<0)lo=Math.max(lo,u);else hi=Math.min(hi,u);}
+    if(lo<hi)gaps.push([lo,hi]);
+  });
+  function at(u){return (a.x+dx*u)+' '+(a.y+dy*u);}
+  gaps.sort(function(g,h){return g[0]-h[0];}).forEach(function(g){if(g[0]>t)d+='M'+at(t)+'L'+at(g[0]);t=Math.max(t,g[1]);});
+  return t<1?d+'M'+at(t)+'L'+at(1):d;
+}
 function telemetryPaintCards(scope,diagram,templates,view,window,activate,config){
   telemetryClearCards(scope);
   if(!view || !diagram)return;
   scope.querySelectorAll('svg').forEach(function(svg){
-    var boxes=[],doc=svg.ownerDocument;
-    svg.querySelectorAll('.node .card,.node .icbg,.node use,.node image,.node text,.handoff-stripe,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff],.dvdelta,.node-review-badge,.comm-break,text.lbl,.dv-trace-overlay text').forEach(function(el){if(el.closest('.coin'))return;var box=boardControlBox(el,svg);if(box)boxes.push(box);});
+    var boxes=[],labels=[],doc=svg.ownerDocument;
+    svg.querySelectorAll('.node .card,.node .icbg,.node use,.node image,.node text,.handoff-stripe,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff],.dvdelta,.node-review-badge,.comm-break,text.lbl,.dv-trace-overlay text').forEach(function(el){if(el.closest('.coin'))return;var box=boardControlBox(el,svg);if(box)boxes.push(box);if(box && el.closest('.dv-trace-overlay'))labels.push(box);});
     Array.from(svg.querySelectorAll('path.edge[data-dv-edge]')).sort(function(a,b){
       function manual(path){var edge=(diagram.edges || [])[Number(path.getAttribute('data-dv-edge'))],binding=edge && carrierTelemetry(edge,templates,null,config);return !!(binding && binding.card && binding.card.position);}
       return Number(manual(b))-Number(manual(a));
@@ -162,7 +175,7 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       card.setAttribute('data-metrics-anchor-x',placed.mid.x);card.setAttribute('data-metrics-anchor-y',placed.mid.y);
       card.setAttribute('transform','translate('+box.x+' '+box.y+')');card.setAttribute('data-side',placed.side);
       var end={x:Math.max(box.x,Math.min(box.x+box.w,placed.mid.x)),y:Math.max(box.y,Math.min(box.y+box.h,placed.mid.y))};
-      var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-dv-edge':index,d:'M'+placed.mid.x+' '+placed.mid.y+'L'+end.x+' '+end.y,'pointer-events':'none','aria-hidden':'true'});
+      var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-dv-edge':index,d:telemetryCardLeader(placed.mid,end,labels),'pointer-events':'none','aria-hidden':'true'});
       if(view.preview)leader.setAttribute('data-metrics-preview','true');
       svg.insertBefore(leader,card);boxes.push(box);
       var label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');if(label){label.classList.add('dv-metrics-label-hidden');if(view.preview)label.setAttribute('data-metrics-preview','true');}

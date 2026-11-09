@@ -2122,6 +2122,7 @@ step with alternatives.
 With the Metrics overlay on, the trace labels are drawn first and the metric cards are then
 placed clear of them, the same way cards avoid node cards (#1163). The labels never move for
 cards; a card moves farther from its edge instead, and the diagram frame grows to fit it.
+A card's leader line has a gap where it would cross a trace label.
 A card with an authored `card.position` keeps that position.
 
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a

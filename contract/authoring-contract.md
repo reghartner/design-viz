@@ -716,8 +716,8 @@ shown by the `edit-history` panel. `at`, a non-empty `changes` array and each ch
 and carrier are required, and add/remove changes also require `ticket`; `by`, `by.id`,
 `by.name`, `path` and `label` are optional. A change `{"op": "clear-missing-work", "node" | "edge", "path"?, "label"?}`
 records a Missing work marker cleared in Edit mode (#855); it names only its carrier
-and must not carry a `ticket`. A change `{"op": "trace-match", "step", "traceMatch": {"serviceName", "operation"}, "replaces"?, "path"?, "label"?}`
-records a span mapped to a step in Edit mode (#1078), `replaces` the `{serviceName, operation}` it
+and must not carry a `ticket`. A change `{"op": "trace-match", "step", "traceMatch": {"serviceName", "operation", "nodeId"?}, "replaces"?, "path"?, "label"?}`
+records a span mapped to a step in Edit mode (#1078), `replaces` the `{serviceName, operation, nodeId?}` it
 replaced (#1180); it names the step, no `ticket`, `node` or `edge`. Any other `op` is malformed. `at` is an ISO-8601 date-time with seconds, an optional fraction
 of any length and `Z` or a `±hh:mm` offset (`2026-10-30T16:23:15.987Z`).
 An agent's change to the board is logged as one agent entry (#974):

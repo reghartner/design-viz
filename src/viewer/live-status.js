@@ -1139,9 +1139,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(hit.step){if(hit.ordinal!==entry.binding.ordinal)return;var target=steps.find(function(step){return step.id===hit.step;});if(target)api.mapTraceSpan({context:payload.context,spanId:payload.spanId,stepId:target.id,replace:target.mapped});return;}
     if(hit.ref.section!==entry.binding.ordinal)return;
     var named=carrierSteps(entry.binding,hit.ref,steps);
-    if(named.length===1 && !named[0].mapped){api.mapTraceSpan({context:payload.context,spanId:payload.spanId,stepId:named[0].id});return;}
+    // Chuck 2026-11-09: a drop on a node also writes its id as traceMatch.nodeId when the step names exactly
+    // that node, so the node lights up at once (a node lights only through nodeId, #1078).
+    var nodeId=hit.ref.kind==='node'?hit.ref.id:null;
+    if(named.length===1 && !named[0].mapped){api.mapTraceSpan({context:payload.context,spanId:payload.spanId,stepId:named[0].id,nodeId:nodeId});return;}
     var dragged=entry.exemplar.spans.find(function(item){return item.id===payload.spanId;});
-    traceChooser={context:payload.context,spanId:payload.spanId,span:dragged?dragged.service+' · '+dragged.name:'this span',label:carrierLabel(entry.binding,hit.ref),steps:named,drop:(traceChooser && traceChooser.drop || 0)+1};paint();notify();
+    traceChooser={context:payload.context,spanId:payload.spanId,nodeId:nodeId,span:dragged?dragged.service+' · '+dragged.name:'this span',label:carrierLabel(entry.binding,hit.ref),steps:named,drop:(traceChooser && traceChooser.drop || 0)+1};paint();notify();
   }
   function traceFocusSnapshot(entry,context){
     if(!traceFocus)return null;
@@ -2110,13 +2113,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
       // #1177: a step that has a traceMatch is replaced only when the reader picked it as such (drop or chooser).
       if(!span || !span.service || !span.name || !step || step.alternatives || step.mapped && action.replace!==true)return false;
       var ref={section:entry.binding.ordinal,kind:'step',id:action.stepId},match={serviceName:span.service,operation:span.name},previous=step.mapped?step.traceMatch:null;
+      var authored=(entry.binding.section.diagram.steps || [])[step.index];
+      if(typeof action.nodeId==='string' && authored && !authored.edge && !authored.edges && Array.isArray(authored.nodes) && authored.nodes.length===1 && authored.nodes[0]===action.nodeId)match.nodeId=action.nodeId;
       // Focus goes back to the span row after the re-render this mapping causes, and only then (#1180 c3).
       if(!editor.mapSpan)return false;traceChooser=null;traceReturnSpan=action.spanId;setTimeout(function(){if(!retired && !editor.mapSpan(ref,match,previous))traceReturnSpan=null;},0);return true;
     },
     // #1177: the chooser a span drop opened on a carrier with several steps; Esc or Cancel closes it.
     chooseTraceMapStep:function(action){
       if(retired || !traceChooser || !action)return false;var c=traceChooser,step=c.steps.find(function(item){return item.id===action.stepId;});if(!step)return false;
-      return api.mapTraceSpan({context:c.context,spanId:c.spanId,stepId:step.id,replace:step.mapped});
+      return api.mapTraceSpan({context:c.context,spanId:c.spanId,stepId:step.id,replace:step.mapped,nodeId:c.nodeId});
     },
     cancelTraceMapChooser:function(){if(retired || !traceChooser)return;traceChooser=null;traceReturnSpan=null;paint();notify();},
     // #1177: take back the latest pending span mapping (board-edit.js undoMap); it re-renders the board.

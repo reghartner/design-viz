@@ -3868,7 +3868,7 @@ test('#1177 dragging a span onto a step or a carrier maps it; two candidate step
  assert.equal(b.m.body.querySelector('.dv-trace-map-chooser'),null,'Esc cancels');assert.equal(b.editor.calls.length,0);
  spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
  b.m.body.querySelectorAll('button.dv-trace-map-choice')[1].dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);
- assert.deepEqual(b.editor.calls.at(-1),{ref:{section:0,kind:'step',id:'beta-again'},match:MAP_MATCH,previous:{serviceName:'x',operation:'y'}},'picking a mapped step replaces the traceMatch it shows');
+ assert.deepEqual(b.editor.calls.at(-1),{ref:{section:0,kind:'step',id:'beta-again'},match:{...MAP_MATCH,nodeId:'b'},previous:{serviceName:'x',operation:'y'}},'picking a mapped step replaces the traceMatch it shows (with nodeId b: dropped on node b, which the step names alone)');
  b.api.destroy();
  // Outside Edit mode a span row does not drag.
  const editor=mapEditor();editor.state=()=>({editable:true,blocked:'',active:false,pending:0,saving:false,readOnly:false,notice:null,mapped:null});
@@ -4267,6 +4267,33 @@ test('#1173 another trace resets the open sections; a re-poll with the same entr
  await api.chooseTrace({key:again.key,traceId:again.exemplar.traceId});h.flush();
  assert.equal(api.snapshot().trace.selected.manual,false);assert.equal(request().open,false,'returning to A starts collapsed');assert.equal(config().open,false);
  api.destroy();
+});
+/* #1177 follow-up (Chuck 2026-11-09): a span dropped on a node writes traceMatch.nodeId for that node when
+   the step names exactly that node, so the node lights up at once; a step chip or an edge drop does not. */
+test('#1177 a drop on a node writes nodeId when the step names exactly that node',async()=>{
+ let b=mapBoard();let s=await b.focus();
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ assert.deepEqual(b.editor.calls.at(-1),{ref:{section:0,kind:'step',id:'beta'},match:{...MAP_MATCH,nodeId:'b'},previous:null},'node drop: nodeId b');
+ spanDrop(b.h,b.h.view.querySelector('button.schip[data-step-source="1"]'),s.context);runTimers(b.h);
+ assert.deepEqual(b.editor.calls.at(-1).match,MAP_MATCH,'a step-button drop writes no nodeId');
+ b.api.destroy();
+ // Through the chooser after a node drop: nodeId only for a step that names exactly that node.
+ b=mapBoard({twoOnB:true});s=await b.focus();b.h.ctl.page.sections[0].diagram.steps.push({id:'both',text:'Both nodes',nodes:['a','b']});
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ const pick=label=>{const button=b.m.body.querySelectorAll('button.dv-trace-map-choice').find(x=>x.textContent===label);button.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);};
+ pick('Beta third');assert.deepEqual(b.editor.calls.at(-1).match,{...MAP_MATCH,nodeId:'b'});
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);pick('Both nodes');
+ assert.deepEqual(b.editor.calls.at(-1).match,MAP_MATCH,'a step naming more than that node gets no nodeId');
+ b.api.destroy();
+});
+test('#1192 a step that names the node and an edge, or edges, gets no nodeId from a node drop',async()=>{
+ for(const extra of [{edge:'a->b'},{edges:['a->b']}]){
+  const b=mapBoard();const d=b.h.ctl.page.sections[0].diagram;Object.assign(d.steps[1],extra);const s=await b.focus();
+  spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+  const pick=b.m.body.querySelector('button.dv-trace-map-choice');if(pick){pick.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);}
+  assert.ok(b.editor.calls.length,JSON.stringify(extra)+': mapped');assert.equal('nodeId' in b.editor.calls.at(-1).match,false,JSON.stringify(extra)+': no nodeId');
+  b.api.destroy();
+ }
 });
 
 /* #1193: "N/M steps matched" counts only steps with a traceMatch, less optional steps this trace lacks. The request

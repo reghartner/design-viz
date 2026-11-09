@@ -2374,6 +2374,7 @@ test('M10 the action button shows on a metrics-only page so Allow Grafana reache
 | OT17 | days dated two days ago to today, then a history ending before today and one with no dates (#1082) | the Over time row's heading shows the selected day's label large; on a day dated today it reads TODAY with the label beside it; the slider and `<` `>` update it; Live has no heading | a date only in the small note; TODAY on a last day that is not today |
 | OT18 | Metrics off; days from the product builders in America/New_York: a normal day, the 23 h and 25 h DST days, a demo day, today; days with no date key (#1132) | `snapshot().overTime.window` is `{from, to, label}`: from the day key's local midnight to the next local midnight in UTC, today ending now; null in Live and on a day with no key | a UTC-midnight day; a fixed 24 h day; a demo day cut at its UTC `at`; a window that needs Metrics; a today window ending in the future |
 | OT19 | log lookup with a Grafana transport; a dated past day, today (the default day) with the clock moved 2 min, Previous day, Live, an undated day (#1141) | Find sends exactly the day's window (today: local midnight to now) once; results survive repaints while today's end moves; a day change clears results with no call and keeps the typed value; Live sends now-2h..now; an undated day names itself | an identity keyed on the window (today's rows vanish on the next paint); a day search that refetches on repaint |
+| OT20 | a board with no ticket or epic references and two telemetry carriers, a window-mode history spy; the local day builder at fixed times in America/New_York; a detail with a ticket or a Jira history source arriving while it is open; a click on the selected Live (#1138) | Over time shows and opens on 7 days keyed by local date, ending today, each ending at the next local midnight; no provider or history call with Metrics off; with Metrics on one history window per new day and none for a past day already loaded; the local Over time ends when the board gains a ticket or a Jira source arrives; Live stays selected | Over time only with a Jira history source; a UTC or fixed 24 h day list; a day list that calls a connector; a refetch of a loaded past day; a reader left on a past day with no Live; a Live click that un-presses Live with nothing to turn off |
 */
 const overFixture=()=>({page:{tracking:{jira:{site:'https://jira.test',epic:'EP-1'}},lanes:{APP:{label:'App',color:'#34d399'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',tickets:['AA-1']},b:{title:'Beta',tickets:['BB-1']},planned:{title:'Planned',tickets:['AA-1'],existsWhen:'tickets-done'}},rows:[['a','b','planned']],edges:[{from:'a',to:'b',tickets:['EE-1']}],steps:[{id:'hop',edge:'a->b',lane:'APP'},{id:'beta',nodes:['b'],lane:'APP'}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
 const overStale='2000-01-01T00:00:00Z';
@@ -2732,6 +2733,60 @@ test('OT18 the selected Over time day gives its local-day search window, with Me
    overBackToLive(api);await historySettle();
   }
  }finally{if(zone===undefined)delete process.env.TZ;else process.env.TZ=zone;}
+});
+// #1138 (D2): a board with no Jira references gets Over time from the last 7 local days, built with no calls.
+const freeFixture=()=>({page:{tracking:{telemetry:{window:'24h'}},sections:[{id:'main',diagram:{nodes:{a:{title:'Alpha',telemetry:TQUEUE()},b:{title:'Beta'}},rows:[['a','b']],edges:[{from:'a',to:'b',telemetry:TCALL()}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}});
+const localMidnight=back=>{const now=new Date();return new Date(now.getFullYear(),now.getMonth(),now.getDate()-back).toISOString();};
+test('OT20 the local day list is the last 7 local days ending today, keyed, each ending at the next local midnight (#1138)',()=>{
+ const zone=process.env.TZ;process.env.TZ='America/New_York';
+ try{
+  const C={URL};vm.runInNewContext(entrypoint('native').source,C);assert.equal(typeof C.liveStatusLocalDays,'function','#1138: a local day list builder');
+  const spring=plain(C.liveStatusLocalDays(new Date(2025,2,10,12).getTime(),'en-US'));assert.equal(spring.index,6);
+  assert.deepEqual(spring.days.map(d=>[d.key,d.at,d.label,d.short]),[['2025-03-04','2025-03-05T05:00:00.000Z','Mar 4','Mar 4'],['2025-03-05','2025-03-06T05:00:00.000Z','Mar 5','Mar 5'],['2025-03-06','2025-03-07T05:00:00.000Z','Mar 6','Mar 6'],
+   ['2025-03-07','2025-03-08T05:00:00.000Z','Mar 7','Mar 7'],['2025-03-08','2025-03-09T05:00:00.000Z','Mar 8','Mar 8'],['2025-03-09','2025-03-10T04:00:00.000Z','Mar 9','Mar 9'],['2025-03-10','2025-03-11T04:00:00.000Z','Mar 10','Mar 10']],'Mar 9 is 23 h');
+  assert.ok(spring.days.every(d=>Object.keys(d.states).length===0),'no ticket states');
+  const turn=plain(C.liveStatusLocalDays(new Date(2026,0,2,9).getTime(),'en-US'));
+  assert.deepEqual(turn.days.map(d=>d.key),['2025-12-27','2025-12-28','2025-12-29','2025-12-30','2025-12-31','2026-01-01','2026-01-02']);assert.equal(turn.days[0].label,'Dec 27, 2025','a list over a new year carries the year');assert.equal(turn.days[6].label,'Jan 2, 2026');
+ }finally{if(zone===undefined)delete process.env.TZ;else process.env.TZ=zone;}
+});
+test('OT20 a Jira-free board offers Over time on the local days, with no calls until Metrics is on, then one window per new day (#1138)',async()=>{
+ let live=0;const windows=[];
+ const h=harness(freeFixture(),{},{telemetry:{historyMode:'window',provider:async()=>{live++;return {};},history:async(bindings,range)=>{windows.push(plain(range.window));return {};}}});
+ const api=h.ctl.liveStatus,over=()=>api.snapshot().overTime;mountStatus(h);
+ assert.equal(api.snapshot().available,false,'the board has no Jira references');
+ assert.ok(over(),'#1138: a Jira-free board offers Over time');assert.equal(overButton(h).hidden,false,'the Over time button shows');
+ overButton(h).dispatchEvent({type:'click'});await historySettle();
+ assert.equal(over().active,true);assert.equal(over().count,7);assert.equal(over().index,6,'it opens on today');assert.equal(over().today,true);assert.ok(h.view.querySelector('input.dv-live-over-time-slider'),'the day row shows');
+ for(let index=0;index<7;index++){api.overTimeDay(index);assert.equal(over().window.from,localMidnight(6-index),'day '+index+' starts at its local midnight');}
+ await historySettle();assert.equal(live,0,'Metrics off: no live call');assert.equal(windows.length,0,'Metrics off: no history call');
+ api.overTimeDay(5);api.setMetricsEnabled(true);await historySettle();
+ for(const index of [4,5,4]){api.overTimeDay(index);await historySettle();}
+ assert.deepEqual(windows.map(w=>w.to),[localMidnight(0),localMidnight(1)],'one window per new day; a loaded past day comes from the cache');
+ assert.ok(windows.every(w=>Date.parse(w.to)-Date.parse(w.from)===86400000),'each is the Metrics window ending at the day end');
+ api.overTimeDay(6);await historySettle();assert.equal(windows.length,3);assert.ok(Date.parse(windows[2].to)<=Date.now() && windows[2].to>=localMidnight(0),'today ends now');
+ overBackToLive(api);await historySettle();assert.equal(over().active,false);
+ api.destroy();
+});
+const freeTelemetry=()=>({historyMode:'window',provider:async()=>({}),history:async()=>({})});
+test('OT20 a local Over time ends when a detail with tickets loads or a Jira history source arrives (#1138)',async()=>{
+ let resolve;const renderOptions={telemetry:freeTelemetry(),loadDetail:()=>new Promise(r=>resolve=r)},h=harness(freeFixture(),{},renderOptions),api=h.ctl.liveStatus;mountStatus(h);
+ api.overTime();await historySettle();api.overTimeDay(2);assert.equal(api.snapshot().overTime.active,true);
+ const pending=renderOptions.loadDetail({spec:'approved-detail'},new AbortController().signal);resolve({nodes:{child:{tickets:['DD-1']}},rows:[['child']]});await pending;h.flush();
+ assert.equal(api.snapshot().available,true,'the board now has a ticket');
+ assert.ok(!api.snapshot().overTime?.active,'the local Over time ends, so the reader is not left on a past day');
+ assert.equal(h.ctl.telemetry.snapshot().historical,false,'Metrics is back on Live');assert.equal(h.view.querySelector('.dv-live-over-time-row'),null);
+ api.destroy();
+ const j=harness(freeFixture(),{},{telemetry:freeTelemetry()}),jira=j.ctl.liveStatus;mountStatus(j);
+ jira.overTime();await historySettle();jira.overTimeDay(1);assert.equal(jira.snapshot().overTime.active,true);
+ let loads=0;jira.setHistory({load(){loads++;return {days:overDays()};}});
+ assert.equal(jira.snapshot().overTime.active,false,'a Jira history source closes the local Over time');assert.equal(j.ctl.telemetry.snapshot().historical,false);assert.equal(loads,0,'and loads nothing until the reader asks');
+ jira.destroy();
+});
+test('OT20 on a Jira-free board a click on the selected Live changes nothing (#1138)',()=>{
+ const h=harness(freeFixture(),{},{telemetry:freeTelemetry()}),api=h.ctl.liveStatus,live=()=>h.view.querySelector('button.dv-live-toggle');mountStatus(h);
+ assert.equal(live().hidden,false);assert.equal(live().getAttribute('aria-pressed'),'true');
+ live().dispatchEvent({type:'click'});assert.equal(api.enabled(),true,'there are no ticket colors to turn off');assert.equal(live().getAttribute('aria-pressed'),'true','Live stays selected');
+ api.destroy();
 });
 test('OT16 First blocker cannot reach a ticket that has no status on the day, and a real blocker on another day still counts',async()=>{
  const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);h.ctl.sections[0].stepper={path:()=>'happy',sourceIndex:()=>0,mode:()=>'ambient',jumpSource(){}};api.apply(overToday());
@@ -3235,6 +3290,61 @@ test('#1137 metric cards on a board without tickets get no Jira presentation; ti
 });
 // Chuck 2026-11-08 (D13): the Metrics overlay draws in every view. In the Trace view its cards carry no Jira work colouring,
 // and the Workbench card preview still draws there.
+/* #1153: the Trace view's metrics popup states metric evidence only: signal values, window, verdict and query links,
+   with no Jira state or proof words and no Since Done line. Dates in either popup read in local time, never as ISO. */
+test('#1153 the Trace-view metrics popup shows metric evidence only, and the Jira-view proof line reads its date in local time',async()=>{
+ const DONE='2026-11-05T12:00:00.000Z',ISO=/\d{4}-\d\d-\d\dT\d\d:\d\d/;
+ const readable=at=>{const d=new Date(at),day=d.getFullYear()===new Date().getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'};return d.toLocaleDateString([],day)+', '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});};
+ const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',tickets:['EE-1'],telemetry:TCALL()}]}}]}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:{rate:{value:5500},errors:{value:12}}}})}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+ h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+ const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+ for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
+ api.apply({'EE-1':{state:'done',updatedAt:DONE}});h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
+ const card=()=>h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]'),pop=()=>h.view.querySelector('.dv-live-popover'),escape=()=>h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
+ workPresentation(h,card());const jira=textOf(pop());
+ assert.match(jira,/Since Done: Done /,'contrasting precondition: the Jira-view popup keeps its proof line');
+ assert.ok(jira.includes('Done '+readable(DONE)),'its Done date reads in local time: '+jira);assert.doesNotMatch(jira,ISO,'no ISO timestamp in the Jira-view popup');
+ escape();api.setStatusMode('trace');h.flush();workPresentation(h,card());const trace=textOf(pop());
+ assert.match(pop().getAttribute('aria-label'),/^Metrics for /,'the Trace view opens the metrics popup');
+ assert.match(trace,/rate/,'it still shows the signal values');assert.match(trace,/5,500/);
+ for(const word of [/\bDONE\b/,/Since Done/,/\bDone\b/,/proven/i,/IN PROGRESS/i])assert.doesNotMatch(trace,word,'no Jira or proof words in the Trace-view popup: '+word);
+ assert.doesNotMatch(trace,ISO,'no ISO timestamp in the Trace-view popup');
+ assert.equal(pop().querySelector('.dv-live-production').getAttribute('data-verdict'),null,'no Jira-derived verdict token on the metrics popup');
+ api.destroy();
+});
+test('#1153 readable times: this year without the year, another year with it, an invalid value as given',()=>{
+ const h=harness(),C=h.C,now=new Date(),thisYear=new Date(now.getFullYear(),1,3,9,5).toISOString(),otherYear=new Date(now.getFullYear()-3,1,3,9,5).toISOString();
+ const time=d=>new Date(d).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+ assert.equal(C.liveStatusReadableTime(thisYear),new Date(thisYear).toLocaleDateString([],{month:'short',day:'numeric'})+', '+time(thisYear));
+ assert.equal(C.liveStatusReadableTime(otherYear),new Date(otherYear).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'})+', '+time(otherYear));
+ assert.match(C.liveStatusReadableTime(otherYear),new RegExp(String(now.getFullYear()-3)));assert.doesNotMatch(C.liveStatusReadableTime(thisYear),new RegExp(String(now.getFullYear())));
+ assert.equal(C.liveStatusReadableTime('not a date'),'not a date');
+ h.ctl.liveStatus.destroy();
+});
+test('#1153 the Trace-view metrics popup states each metric state in its own words, for Done and In Progress carriers alike',async()=>{
+ const shim=h=>{const matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+  h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+  const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+  for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;};
+ const P95={kind:'call',signals:{p95:{grafana:'histogram_quantile(0.95, x)',unit:'ms'}},proof:{}};
+ const cases=[
+  ['degraded',TCALL(),{rate:{value:5000},errors:{value:900}},/^DEGRADED · Outside limit: errors is /],
+  ['silent',TCALL(),{rate:{value:0},errors:{value:0}},/^SILENT · Outside limit: rate is 0 req\/h; limit rate at least 1 req\/h$/],
+  ['unmeasured, no limits',P95,{p95:{value:41}},/^OBSERVED · Observed signals; no authored limits\.$/],
+  ['unmeasured, max only',{...P95,proof:{p95:{max:300}}},{p95:{value:41}},/^OBSERVED · Observed signals are within their authored limits; no traffic minimum is authored\.$/],
+  ['flowing',TCALL(),{rate:{value:5500},errors:{value:12}},/^OBSERVED · Observed signals are within their authored limits\.$/]];
+ for(const state of ['done','active'])for(const [name,telemetry,signals,expected] of cases){
+  const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',tickets:['EE-1'],telemetry}]}}]}};
+  const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals}})}}),api=h.ctl.liveStatus;shim(h);
+  api.apply({'EE-1':{state,updatedAt:'2026-11-05T12:00:00.000Z'}});h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();api.setStatusMode('trace');h.flush();
+  workPresentation(h,h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]'));
+  const pop=h.view.querySelector('.dv-live-popover'),verdict=pop.querySelector('.dv-live-production-verdict').textContent,text=textOf(pop);
+  assert.match(verdict,expected,state+' '+name+': '+verdict);
+  for(const word of [/\bDONE\b/i,/IN PROGRESS/i,/live early/i,/proven/i,/proof/i,/Since Done/])assert.doesNotMatch(text,word,state+' '+name+': '+word);
+  api.destroy();
+ }
+});
 test('D13 metric cards draw in the Trace view of a board with tickets without Jira work colouring, and the Workbench preview draws there too',async()=>{
  const shim=h=>{const matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
   h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};

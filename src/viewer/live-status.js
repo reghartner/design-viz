@@ -18,6 +18,12 @@ function liveStatusLogDetails(snapshot,window){
   });});
   return out;
 }
+// A date as other panel dates read, in local time ("Nov 5, 7:00 AM"); the year only when it is not this year (#1153).
+function liveStatusReadableTime(at){
+  var d=new Date(at);if(!isFinite(d.getTime()))return String(at);
+  var day=d.getFullYear()===new Date().getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'};
+  return d.toLocaleDateString([],day)+', '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+}
 function liveStatusProofPresentation(snapshot,window,includeUnobserved){
   if(!snapshot)return null;
   // Map keys, links and markers are not measurements. Use only already-resolved
@@ -69,12 +75,13 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
     var continuous=points.length>=3 && points.every(function(p,i){return !i || p.at-points[i-1].at<=(interval?interval*1.1:span/4);});
     var url=null,authored=binding.links || {},provider=sample && sample.links || {};
     [authored.dashboard,authored.query,provider.dashboard,telemetryMetricUrl(binding,sample,primary),provider.query].some(function(value){url=deltaLinkUrl(value);return !!url;});
-    var since=[];if(result.since.doneAt){since.push('Done '+result.since.doneAt);if(result.since.firstTrafficAt)since.push('First observed traffic '+result.since.firstTrafficAt);}
+    var since=[];if(result.since.doneAt){since.push('Done '+liveStatusReadableTime(result.since.doneAt));if(result.since.firstTrafficAt)since.push('First observed traffic '+liveStatusReadableTime(result.since.firstTrafficAt));}
     if(!snapshot.historical && result.since.doneAt)telemetryMetricNames(binding).forEach(function(name){
       var entry=sample && sample.signals && sample.signals[name],aggregate=telemetryAggregate(entry,sample && sample.observedAt);
       if(!aggregate || aggregate.from!==result.since.doneAt)return;
-      since.push(name+' total: '+String(entry.value)+(entry.unit?' '+entry.unit:'')+' through '+aggregate.to);
+      since.push(name+' total: '+String(entry.value)+(entry.unit?' '+entry.unit:'')+' through '+liveStatusReadableTime(aggregate.to));
     });
+    var limited=telemetryMetricProofNames(binding).some(function(name){var limit=binding.proof[name];return !proofVerdicts.isTraceSignal(binding.signals[name]) && limit && (telemetryNumber(limit.min) || telemetryNumber(limit.max));});
     // No combined verdict while Jira is unknown does not erase measured evidence.
     var label=result.label;
     if(!label){
@@ -88,6 +95,12 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
       linkLabel:primary && binding.signals[primary].source==='grafana'?'Open in Grafana':primary && binding.signals[primary].source==='honeycomb'?'Open in Honeycomb':'Open telemetry',
       explanation:result.failing.length?'Outside proof threshold: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name,null,window)+'; requires '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
         result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':result.telemetry==='unmeasured'?'Traffic proof requires an observed signal with an authored minimum.':'Observed signals meet the authored proof thresholds.',
+      // #1153: the Trace view's metrics popup states the metric evidence alone, with no Jira state or proof words.
+      metrics:{label:loading && !measured?'Loading…':result.telemetry==='silent'?'SILENT':result.telemetry==='degraded'?'DEGRADED':measured?(result.telemetry==='unobserved'?'OBSERVED · evidence incomplete':'OBSERVED'):'UNOBSERVED',
+        explanation:result.failing.length?'Outside limit: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name,null,window)+'; limit '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
+          result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':
+          // unmeasured: no observed signal has an authored minimum, so traffic is not judged.
+          result.telemetry==='unmeasured'?(limited?'Observed signals are within their authored limits; no traffic minimum is authored.':'Observed signals; no authored limits.'):'Observed signals are within their authored limits.'},
       chart:{pending:!!waiting[primary],observedAt:measuredAt,points:plotted,line:continuous?plotted.map(function(p){return p.x+','+p.y;}).join(' '):null,
         markers:markers.map(function(m){return {x:2+96*(m.at-start)/span,label:m.label,kind:m.kind};})}};
   });
@@ -639,6 +652,18 @@ function liveStatusCaption(diagram,step,map,waiting){
   }
   return text;
 }
+/* #1138 (D2): Over time on a board with no Jira references: the last 7 local days ending at `now`, built
+   with no calls. Days have the shape liveStatusHistoryDays writes: `key` is the local date, `at` the next
+   local midnight, and the label carries the year when the list spans two years. There are no ticket states. */
+function liveStatusLocalDays(now,locale){
+  var today=new Date(now),year=today.getFullYear(),month=today.getMonth(),date=today.getDate(),days=[];
+  var format=new Date(year,month,date-6).getFullYear()===year?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'};
+  for(var back=6;back>=0;back--){
+    var text=new Date(year,month,date-back).toLocaleDateString(locale || [],format);
+    days.push({key:new Date(Date.UTC(year,month,date-back)).toISOString().slice(0,10),at:new Date(year,month,date-back+1).toISOString(),label:text,short:text,states:{}});
+  }
+  return {days:days,index:days.length-1};
+}
 /* Over time (#929, #1012): one past day over today's map. Status comes from the day and everything
    else stays as of today, so a ticket keeps its row, title and place in the total. A ticket the day
    does not name is Missing, because an uncolored carrier would hide that it did not exist.
@@ -809,6 +834,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         // #1136: a board that opened on Trace for want of references opens Jira once a loaded detail brings some, unless the reader
         // chose a view or worked on a trace (Load, a log-line Load, choosing a trace or focusing a span clear statusAuto).
         if(statusAuto && referencesAvailable()){statusAuto=false;clearTraceFocus();statusMode='jira';}
+        // #1138: a local Over time ends when a loaded detail gives the board Jira references.
+        if(over && over.source===localHistory && referencesAvailable())overClose();
         if(JSON.stringify(refs())!==previous)notify();
       }
       return raw;
@@ -1082,9 +1109,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
       metrics:metricsSnapshot(),mode:statusMode,trace:traceSnapshot()};
   }
   function editState(){var state=editor?editor.state():null;return state && over && !state.blocked?Object.assign({},state,{blocked:'Editing is off while a past day is shown.'}):state;}
+  // #1138 (D2, V2): a board with no ticket, epic, exclusion or missing-work reference after imports has no Jira
+  // history, so when it has Metrics, Over time uses the local day list. The reader's click still opens it.
+  var localHistory={load:function(){return liveStatusLocalDays(Date.now());}};
+  function historySource(){return overSource || (!authoring && telemetry.status().state!=='absent' && !referencesAvailable()?localHistory:null);}
   function overTimeState(){
-    if(!overSource)return null;
-    var base={active:!!over,loading:overLoading,progress:overProgress,error:overError,available:!!(applied && Object.keys(map).length),disabled:editing()};
+    var source=over?over.source:historySource();if(!source)return null;
+    var base={active:!!over,loading:overLoading,progress:overProgress,error:overError,available:source===localHistory || !!(applied && Object.keys(map).length),disabled:editing()};
     base.window=overTimeWindow();
     if(!over)return base;
     var days=over.days;base.index=over.index;base.count=days.length;base.first=days[0].short;base.last=days[days.length-1].short;base.label=days[over.index].label;
@@ -1108,7 +1139,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // Returning to Live restores the live map, then applies any evidence that arrived meanwhile as a normal refresh.
   function overClose(){
     var left=over;over=null;map=left.live;changedKeys=[];telemetry.closeHistory();
-    if(overSource.close)overSource.close();
+    if(left.source.close)left.source.close();
     if(left.held)api.apply(left.value);else{paint();notify();telemetryHooks.jiraChanged();}
   }
   /* Every provider map, and a history source's today map, passes this one check. */
@@ -1132,12 +1163,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });
     return next;
   }
-  function overLoad(request,result){
+  function overLoad(request,result,source){
     if(retired || request!==overRequest)return;overLoading=false;
     var days=result && Array.isArray(result.days)?result.days:[];
     if(!days.length){overError='History could not load. Try Over time again.';notify();return;}
     var index=result.index;if(typeof index!=='number' || index<0 || index>=days.length)index=days.length-1;
-    over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null};on=true;availabilityOn=true;telemetry.openHistory(days,index);overShow();
+    over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null,source:source};on=true;availabilityOn=true;telemetry.openHistory(days,index);overShow();
   }
   // Authored carrier occurrences, independent of distinct Jira ticket totals.
   // The shared walk includes resolved imports, nested sections and loaded details.
@@ -1182,21 +1213,23 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return proof && proof.rows.find(function(row){return row.id===id;}) || null;
   }
   function paintProduction(trigger){
-    var row=productionRow(trigger),block=pop.querySelector('.dv-live-production');
+    // #1153: the Trace view's metrics popup shows metric evidence only: no proof label, Done marker or Since Done line.
+    var row=productionRow(trigger),block=pop.querySelector('.dv-live-production'),metricsOnly=!!(trigger && trigger._liveCarrier && trigger._liveCarrier.metricsOnly);
     if(!row){if(block)block.remove();return false;}
     if(!block)block=element('section','dv-live-production',null,pop);
-    block.setAttribute('data-loading',row.initialLoading?'true':'false');block.setAttribute('data-production-carrier',row.id);block.setAttribute('data-verdict',row.verdict || 'unobserved');
+    block.setAttribute('data-loading',row.initialLoading?'true':'false');block.setAttribute('data-production-carrier',row.id);
+    if(metricsOnly){block.removeAttribute('data-verdict');block.setAttribute('data-telemetry',row.telemetry || 'unobserved');}else{block.removeAttribute('data-telemetry');block.setAttribute('data-verdict',row.verdict || 'unobserved');}
     function text(tag,cls,value){var node=block.querySelector('.'+cls);if(!node)node=element(tag,cls,null,block);if(node.textContent!==value)node.textContent=value;return node;}
     var environment=telemetry.environment();
     text('h3','dv-live-production-heading',(environment?environment.toUpperCase()+' ':'')+'Evidence');
-    text('p','dv-live-production-verdict',row.label+' · '+row.explanation);
+    text('p','dv-live-production-verdict',metricsOnly?row.metrics.label+' · '+row.metrics.explanation:row.label+' · '+row.explanation);
     text('p','dv-live-proof-predicate',row.predicate);
     var chart=block.querySelector('.dv-live-production-chart') || element('div','dv-live-production-chart',null,block);chart.replaceChildren();
     if(row.chart.points.length || row.chart.markers.length){
       var svg=telemetrySvg(document,'svg',{class:'dv-live-proof-sparkline',viewBox:'0 0 100 32',role:'img','aria-label':telemetryWindow+' window: '+row.chart.points.length+' observed points'},chart);
       if(row.chart.line)telemetrySvg(document,'polyline',{class:'dv-live-proof-series',points:row.chart.line},svg);
       row.chart.points.forEach(function(point){telemetrySvg(document,'circle',{class:'dv-live-proof-point',cx:point.x,cy:point.y,r:1.8},svg);});
-      row.chart.markers.forEach(function(marker){var tick=telemetrySvg(document,'line',{class:'dv-live-proof-marker',x1:marker.x,x2:marker.x,y1:2,y2:30,'data-kind':marker.kind},svg);telemetrySvg(document,'title',{},tick).textContent=marker.label;});
+      row.chart.markers.filter(function(marker){return !metricsOnly || marker.kind!=='done';}).forEach(function(marker){var tick=telemetrySvg(document,'line',{class:'dv-live-proof-marker',x1:marker.x,x2:marker.x,y1:2,y2:30,'data-kind':marker.kind},svg);telemetrySvg(document,'title',{},tick).textContent=marker.label;});
     }else element('span','',row.chart.pending?'Loading…':'No observed series in this window',chart);
     var kpis=block.querySelector('.dv-live-production-kpis') || element('div','dv-live-production-kpis',null,block);
     while(kpis.children.length>row.kpis.length)kpis.lastElementChild.remove();
@@ -1206,7 +1239,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(kpi.url){var queryLink=link(tile,'',kpi.url);queryLink.className='dv-live-metric-link';queryLink.setAttribute('aria-label','Open '+kpi.label+' source query in a new tab');queryLink.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});}
       if(kpi.scope)element('small','dv-live-metric-scope',kpi.scope,tile);
     });
-    text('p','dv-live-production-since','Since Done: '+row.since);
+    if(!metricsOnly)text('p','dv-live-production-since','Since Done: '+row.since);else{var since=block.querySelector('.dv-live-production-since');if(since)since.remove();}
     var anchor=block.querySelector('.dv-live-production-link');
     if(row.url){if(!anchor){anchor=link(block,'',row.url);anchor.classList.add('dv-live-production-link');anchor.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});element('span','',null,anchor);}anchor.setAttribute('href',row.url);anchor.querySelector('span').textContent=row.linkLabel;}
     else if(anchor){var root=pop.getRootNode();if(root.activeElement===anchor)pop.querySelector('.node-link-close').focus({preventScroll:true});anchor.remove();}
@@ -1921,18 +1954,18 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // The reader's click is the only thing that loads history.
     overTime:function(){
       if(retired || overLoading || over)return;
-      if(!overSource || !applied || !Object.keys(map).length || editing())return;
+      var source=historySource();if(!source || source!==localHistory && (!applied || !Object.keys(map).length) || editing())return;
       var request=++overRequest;overLoading=true;overError='';overProgress='';notify();
-      Promise.resolve().then(function(){return overSource.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result);},function(){overLoad(request,null);});
+      Promise.resolve().then(function(){return source.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result,source);},function(){overLoad(request,null,source);});
     },
     overTimeClose:function(){if(!retired && over)overClose();},
     overTimeStep:function(delta){if(!retired && over)api.overTimeDay(over.index+delta);},
     overTimeDay:function(index){
       if(retired || !over || typeof index!=='number' || !isFinite(index) || Math.floor(index)!==index)return;
       index=Math.max(0,Math.min(over.days.length-1,index));if(index===over.index)return;
-      over.index=index;if(overSource.day)overSource.day(index);overShow();
+      over.index=index;if(over.source.day)over.source.day(index);overShow();
     },
-    clear:function(){if(retired)return;overRequest++;overLoading=false;overError='';if(over){over=null;telemetry.closeHistory();if(overSource.close)overSource.close();}availabilityOn=false;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();telemetryHooks.jiraChanged();},
+    clear:function(){if(retired)return;overRequest++;overLoading=false;overError='';if(over){var left=over;over=null;telemetry.closeHistory();if(left.source.close)left.source.close();}availabilityOn=false;map=Object.create(null);cacheUpdatedAt=null;activity=[];seenKeys=Object.create(null);changedKeys=[];applied=true;paint();notify();telemetryHooks.jiraChanged();},
     enabled:function(){return on;},
     setEnabled:function(value){if(retired)return;on=!!value;if(on)availabilityOn=true;paint();notify();},
     // The panel's Metrics button (#939); Jira Live above is independent of it.

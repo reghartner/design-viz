@@ -752,7 +752,7 @@ the day row and any Over time error, in both views. A board with no ticket or ep
 references after imports has no Jira view (#1136): the panel opens on Trace with no
 **Jira** | **Trace** switch. If a loaded detail
 brings ticket references, the switch appears and the panel moves to Jira unless the reader
-chose a view or worked on a trace. In the Trace view a metric card opens only its metrics. The Jira view then has two rows. The first holds only buttons, which keep
+chose a view or worked on a trace. In the Trace view a metric card opens only its metrics: signal values, window, a metric verdict and query links, with no Jira or proof words and no Since Done line (#1153). The Jira view then has two rows. The first holds only buttons, which keep
 their place: any provider action and, on the far right, **First blocker**. **First blocker** keeps one size; with no blockers it reads
 **No blockers** and is greyed out, and with blockers it cannot reach from here it
 stays **First blocker** and is greyed out. The second row holds everything that
@@ -1407,6 +1407,14 @@ The slider and **<** and **>** share one current day: the buttons carry on from
 the slider's day, and Live returns to the day the buttons reached. There the timeline's
 last day supplies titles and the story list, so the total stays the same. There
 is no button on host-provider pages or in Workbench preview.
+
+**Boards without Jira.** A board with Metrics and no ticket, epic, exclusion or
+missing-work reference, after imports, still shows **Live** and **Over time**. There Over time
+lists the last 7 local days ending today, built with no calls. With the Metrics
+overlay off nothing is fetched; with it on, each day's metrics window is fetched
+when the day is first shown, and a past day already loaded is not fetched again.
+A click on the selected **Live** changes nothing there. If a loaded detail gives the
+board a ticket, Over time ends and the board returns to Live.
 
 The `getJiraIssue` reply shape was checked with one real call on a live Atlassian
 connector: the issue sits in `issues.nodes[0]`, and a plain top-level REST issue is
@@ -2094,6 +2102,23 @@ explicit `traceMatch`, including imported nodes. No display-name joins are used.
 **Show on diagram** controls runtime annotations; Jira/scalar cues return when
 switching back to Jira. No document layout or authored timing is changed.
 
+Each annotated node or uniquely matched edge gets one label from its rows: one row per
+step on the current path whose `traceMatch` names it (#1154). One row shows its time,
+for example `16.1 ms`. When the step's
+[traceMatch alternatives](provider-traces.md#tracematch-alternatives) matched, the label
+names the alternative: `Matched: stats-consumer persistent://stats/camer… · 16.1 ms` (the
+service and operation are cut to 40 characters on the canvas; the title has the full name).
+The label's title lists the other alternatives as *not in this trace*, or as *in this trace,
+not matched* when a span with that service and operation is present; they never count as
+unknown. Several rows read `N operations`, then `K unknown` for mapped operations missing
+from the trace, `K ambiguous` for ambiguous mappings, then the time. Time: each matched
+span counts its own start-to-end duration, which includes its child spans. When more than
+one matched span maps to the node or edge, the label shows the wall-clock time they cover
+together (the union of their intervals, so nested or overlapping spans count once) and the
+count: `16.1 ms across 2 spans`. A board that keeps one step per transport reads
+`2 operations · 1 unknown · 16.1 ms` (the other transport's step is missing); make them one
+step with alternatives.
+
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
 deduplicated in-memory Jira Activity entry, without posting externally. Trace
 selection uses the existing cached provider API; rendering and stepping never
@@ -2571,7 +2596,7 @@ telemetry map has measured evidence. It uses the same Proof values, configured
 window, actual points/markers and safe authored-first link as the panel. Failed
 thresholds name their signal, measured value and requirement. Missing values stay
 unobserved; measured zero stays zero. Since Done shows known Done and first
-observed traffic timestamps, plus explicitly measured totals when their interval
+observed traffic times in local time (for example "Nov 5, 7:00 AM"), plus explicitly measured totals when their interval
 matches Done as described below; window rates are not lifetime totals. Local,
 imported and asynchronously loaded detail carriers use their carrier identity and
 own binding scope. Refreshes and day selection update an open Production block

@@ -747,8 +747,9 @@ and Export project preserve the panel. There are no authored state or patch fiel
 The Jira and Trace views share one header (#1131). Its top row holds **Jira** | **Trace**,
 an **Env** select when the board names environments, **Edit** (then **Save N changes**,
 **Discard** or **Done**) for anyone who can edit the board, and the **Metrics overlay** switch
-at the right edge. The Metrics connector line follows (#1136), then **Live** | **Over time**,
-the day row and any Over time error, in both views. A board with no ticket or epic
+at the right edge. **Live** | **Over time** follows, then the day row, any Over time error and
+the Metrics connector line, in both views. The connector line comes last because it wraps, so a
+changing note cannot move a button or the slider (#1162). A board with no ticket or epic
 references after imports has no Jira view (#1136): the panel opens on Trace with no
 **Jira** | **Trace** switch. If a loaded detail
 brings ticket references, the switch appears and the panel moves to Jira unless the reader

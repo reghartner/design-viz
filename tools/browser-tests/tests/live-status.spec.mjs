@@ -348,8 +348,8 @@ test('O11 buttons and the content below them stay in place when status text grow
  const grown=await places(),{epicTop,...buttons}=grown,{epicTop:epicBefore,...buttonsBefore}=before;expect(buttons,'long status text').toEqual(buttonsBefore);expect(epicTop).toBeGreaterThan(epicBefore);
  expect(await status.locator('.dv-live-note').evaluate(el=>el.scrollWidth<=el.clientWidth),'the long note is shown in full').toBe(true);
  await next.click();await next.click();await expect(slot).toHaveText('First blocker');await expect(slot).toBeEnabled();expect(await places(),'a blocker appears').toEqual(before);
- // The row is tall enough for what it holds: three count chips are not clipped.
- expect(await status.evaluate(el=>el.scrollHeight<=el.clientHeight),'status row fits its contents').toBe(true);
+ // The counts strip is tall enough for what it holds: three count chips are not clipped.
+ expect(await panel.locator('.dv-live-counts').evaluate(el=>el.scrollHeight<=el.clientHeight),'the counts strip fits its contents').toBe(true);
 });
 // #1131: the Status panel header (Jira | Trace, Metrics overlay; Live | Over time; the day row) is shared by both views.
 test('Over time from the Trace view keeps the Trace view and shows the day',async({page,server})=>{
@@ -364,20 +364,48 @@ test('Over time from the Trace view keeps the Trace view and shows the day',asyn
  await live.click();await expect(row).toHaveCount(0);await expect(live).toHaveAttribute('aria-pressed','true');await expect(trace).toHaveAttribute('aria-pressed','true');await expect(view).toBeVisible();
 });
 // #1162: status notes wrap in full instead of ending in an ellipsis, and First blocker sits at the right end of the counts row.
-test('long status notes wrap in full in both status lines, and First blocker sits on the counts row',async({page,server})=>{
+// Each runs at the default panel and at the 480 px minimum desktop panel.
+async function storyWithCtl(page,server,width){
  await page.addInitScript(()=>{window.flowviewBooted=ctl=>{window.ctl=ctl;};});
- const root=await openStory(page,server),panel=root.locator('.pt-live-status'),first=panel.locator('.dv-live-first'),counts=panel.getByRole('region',{name:'Status counts',exact:true});
- await demoDay(root,4);await expect(first).toHaveText('First blocker');await expect(counts).toBeVisible();
- const middle=async locator=>{const box=await locator.boundingBox();return box.y+box.height/2;};
- expect(Math.abs(await middle(first)-await middle(counts)),'First blocker shares the counts row').toBeLessThanOrEqual(4);
- const head=await panel.locator('.dv-live-head').boundingBox(),slot=await first.boundingBox();expect(head.x+head.width-(slot.x+slot.width),'at its right end').toBeLessThanOrEqual(2);
- const long='Grafana query rate failed: upstream timeout after 30 s on the shared Prometheus data source; retry later or check the connector settings.';
- await page.waitForFunction(()=>!!window.ctl);
- await page.evaluate(note=>{window.ctl.telemetry.setAvailable(false,note+' '+note);window.ctl.liveStatus.note(note+' '+note,'warn');},long);
- for(const [name,text] of [['metrics line',panel.locator('.dv-status-header .dv-live-metrics-connection > span')],['Jira status note',panel.locator('.dv-live-status .dv-live-note')]]){
-  await expect(text,name).toContainText('connector settings.');
-  const m=await text.evaluate(el=>({scroll:el.scrollWidth,client:el.clientWidth,height:el.getBoundingClientRect().height}));
-  expect(m.scroll,name+' shows its full text').toBeLessThanOrEqual(m.client);expect(m.height,name+' wraps onto more than one line').toBeGreaterThan(24);
+ const root=await openStory(page,server),panel=root.locator('.pt-live-status');await page.waitForFunction(()=>!!window.ctl);
+ if(width)await panel.evaluate((el,w)=>{el.style.setProperty('width',w+'px','important');el.style.setProperty('max-width',w+'px','important');el.style.boxSizing='border-box';},width);
+ return {root,panel};
+}
+const LONG_NOTE='Grafana query rate failed: upstream timeout after 30 s on the shared Prometheus data source; retry later or check the connector settings.';
+for(const width of [null,480]){
+ test('#1162 First blocker sits at the right end of the counts row'+(width?' in a '+width+' px panel':''),async({page,server})=>{
+  const {root,panel}=await storyWithCtl(page,server,width),first=panel.locator('.dv-live-first'),counts=panel.getByRole('region',{name:'Status counts',exact:true});
+  if(width)expect((await panel.boundingBox()).width).toBeCloseTo(width,0);
+  await demoDay(root,4);await expect(first).toHaveText('First blocker');await expect(counts).toBeVisible();
+  const middle=async locator=>{const box=await locator.boundingBox();return box.y+box.height/2;};
+  const check=async label=>{
+   expect(Math.abs(await middle(first)-await middle(counts)),label+': First blocker shares the counts row').toBeLessThanOrEqual(4);
+   const head=await panel.locator('.dv-live-head').boundingBox(),slot=await first.boundingBox();expect(Math.abs(head.x+head.width-(slot.x+slot.width)),label+': at its right end').toBeLessThanOrEqual(2);
+  };
+  await check('counts only');
+  await page.evaluate(()=>window.ctl.liveStatus.action('Allow Jira',()=>{}));await expect(panel.getByRole('button',{name:'Allow Jira',exact:true})).toBeVisible();await check('with an action beside it');
+ });
+ test('#1162 long status notes wrap in full in both status lines'+(width?' in a '+width+' px panel':''),async({page,server})=>{
+  const {root,panel}=await storyWithCtl(page,server,width);await demoDay(root,4);
+  await page.evaluate(note=>{window.ctl.telemetry.setAvailable(false,note+' '+note);window.ctl.liveStatus.note(note+' '+note,'warn');},LONG_NOTE);
+  for(const [name,text] of [['metrics line',panel.locator('.dv-status-header .dv-live-metrics-connection > span')],['Jira status note',panel.locator('.dv-live-status .dv-live-note')]]){
+   await expect(text,name).toContainText('connector settings.');
+   const m=await text.evaluate(el=>({scroll:el.scrollWidth,client:el.clientWidth,height:el.getBoundingClientRect().height}));
+   expect(m.scroll,name+' shows its full text').toBeLessThanOrEqual(m.client);expect(m.height,name+' wraps onto more than one line').toBeGreaterThan(24);
+  }
+ });
+}
+// #1162 / #986: the Metrics line wraps, so it comes after every static control; a changing note moves none of them.
+test('#1162 a changing Metrics note moves no Live | Over time button, day-row button or slider',async({page,server})=>{
+ const {root,panel}=await storyWithCtl(page,server);await demoDay(root,4);
+ const live=panel.getByRole('button',{name:'Live',exact:true}),overTime=panel.getByRole('button',{name:'Over time',exact:true}),line=panel.locator('.dv-status-header .dv-live-metrics-connection');
+ await overTime.click();const slider=panel.getByRole('slider',{name:'Day',exact:true});await expect(slider).toBeVisible();
+ const items={live,overTime,previous:panel.getByRole('button',{name:'Previous day',exact:true}),slider,next:panel.getByRole('button',{name:'Next day',exact:true})};
+ const places=async()=>{const out={};for(const [name,item] of Object.entries(items)){const box=await item.boundingBox();out[name]=[box.x,box.y,box.width,box.height];}return out;};
+ const before=await places();
+ for(const note of [LONG_NOTE+' '+LONG_NOTE,'Short note.',LONG_NOTE]){
+  await page.evaluate(value=>window.ctl.telemetry.setAvailable(false,value),note);await expect(line).toContainText(note.slice(0,12));
+  expect(await places(),'note: '+note.slice(0,24)).toEqual(before);
  }
 });
 test('S4 waiting follows ticket dependencies from the provider and the authored pairs, never the edges',async({page,server})=>{

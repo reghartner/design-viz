@@ -2683,6 +2683,10 @@ test('#1162 the counts and First blocker share the first row; the status row hol
  assert.ok(controls.children.at(-1).classList.contains('dv-live-first'),'First blocker ends that row, so a button appearing to its left cannot move it');
  assert.equal(status.querySelector('.dv-live-counts'),null,'the status row holds text only');assert.ok(status.querySelector('.dv-live-note'));assert.match(status.getAttribute('title'),/A long note about the connector/);
  api.destroy();
+ // Before the first answer an action (Allow Jira) shows alone: no empty, focusable counts region beside it.
+ const w=harness(overFixture());mountStatus(w);w.ctl.liveStatus.action('Allow Jira',()=>{});
+ const row=w.view.querySelector('.dv-live-controls');assert.equal(row.hidden,false);assert.equal(row.querySelector('.dv-live-action').hidden,false);assert.equal(row.querySelector('.dv-live-counts').hidden,true,'no counts region without data');
+ w.ctl.liveStatus.destroy();
 });
 // #1082: a day's key is its calendar date in the viewer's time zone, as liveStatusHistoryDays writes it.
 const overDayKey=offset=>{const now=new Date();return new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()+offset)).toISOString().slice(0,10);};

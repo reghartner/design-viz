@@ -391,25 +391,6 @@
       var metricsSwitch=el(top,'button','metrics','dv-live-metrics');metricsSwitch.type='button';metricsSwitch.setAttribute('role','switch');metricsSwitch.setAttribute('aria-checked',String(!!metrics.enabled));metricsSwitch.hidden=!metrics.available;metricsSwitch._liveArgument=!metrics.enabled;
       el(el(metricsSwitch,'span','track','dv-live-switch-track'),'i','thumb','dv-live-switch-thumb').parentNode.setAttribute('aria-hidden','true');el(metricsSwitch,'span','label','','Metrics overlay');
       if(!metricsSwitch._liveClick){metricsSwitch._liveClick=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnabled(metricsSwitch._liveArgument);};metricsSwitch.addEventListener('click',metricsSwitch._liveClick);}
-      // The Metrics overlay's connector line, in the shared header so both views show it once (#1136). Same markup and dot
-      // tokens as the Jira connector, its own class names so `.dv-live-connection` keeps naming the Jira connector alone.
-      var metricsState=metrics.state==='ok'?(metrics.demo?'demo':'connected'):{loading:'connecting',error:'error',approval:'approval'}[metrics.state] || 'disconnected';
-      var metricsLabel={connected:'connected',demo:'demo',connecting:'connecting',error:'did not answer',approval:'needs approval'}[metricsState] || 'not connected';
-      var metricsConnection=el(header,'span','metrics-connection','dv-live-metrics-connection');metricsConnection.setAttribute('data-state',metricsState);metricsConnection.setAttribute('data-busy',String(!!metrics.busy));metricsConnection.setAttribute('role','status');
-      el(metricsConnection,'i','dot','dv-live-metrics-dot');
-      // A note on a good answer (a failed query beside answered ones) follows the refreshed time.
-      var answered=metricsState==='connected' || metricsState==='demo',metricsText;
-      if(metrics.source){
-        // #943: "Grafana connected · 24h window · refreshed 10:42:13"; an error shows its note, which names the fix.
-        var named=metrics.source+' '+metricsLabel;
-        metricsText=metricsState==='error'?metrics.note || named:metricsState==='disconnected'?named:
-          [named,metrics.window?metrics.window+' window':'',answered?metrics.checkedText:'',answered?metrics.note:''].filter(Boolean).join(' · ');
-      }else metricsText=metricsState==='error'?'Metrics: '+metricsLabel+(metrics.note?' · '+metrics.note:''):
-        ['Metrics: '+metricsLabel,metrics.checkedText].filter(Boolean).join(', ')+(answered && metrics.note?' · '+metrics.note:'');
-      if(!metrics.available && metrics.note)metricsText=metrics.note;
-      if(metrics.environment)metricsText+=' · '+metrics.environment;
-      el(metricsConnection,'span','text','',metricsText);metricsConnection.title=metricsText;
-      metricsConnection.hidden=!metrics.available && !metrics.note;
       var available=value && value.available,hasData=available && value.hasData;
       // Live and Over time are the two modes (#929, Chuck 2026-11-04), in a row of their own. The selected one is filled. Live returns from a past day; while selected it still turns colors off (D6).
       var over=value && value.overTime,past=!!(over && over.active);
@@ -439,6 +420,27 @@
         var nextDay=button(row,'next','reader-button dv-live-step','>',demoDays?'nextDemo':'overTimeStep');nextDay._liveArgument=1;nextDay.setAttribute('aria-label','Next day');nextDay.disabled=demoDays?demoDays.ended:over.index>=over.count-1;
         if(past && !trace && hasData)el(row,'p','note','dv-live-over-time-note','Status as of '+over.label+' · other columns show today').setAttribute('role','status');
       }
+      // The Metrics overlay's connector line, in the shared header so both views show it once (#1136). It comes last (#1162):
+      // it wraps, so its height follows its text and must not move Live | Over time or the day row's buttons and slider (#986).
+      // Same markup and dot
+      // tokens as the Jira connector, its own class names so `.dv-live-connection` keeps naming the Jira connector alone.
+      var metricsState=metrics.state==='ok'?(metrics.demo?'demo':'connected'):{loading:'connecting',error:'error',approval:'approval'}[metrics.state] || 'disconnected';
+      var metricsLabel={connected:'connected',demo:'demo',connecting:'connecting',error:'did not answer',approval:'needs approval'}[metricsState] || 'not connected';
+      var metricsConnection=el(header,'span','metrics-connection','dv-live-metrics-connection');metricsConnection.setAttribute('data-state',metricsState);metricsConnection.setAttribute('data-busy',String(!!metrics.busy));metricsConnection.setAttribute('role','status');
+      el(metricsConnection,'i','dot','dv-live-metrics-dot');
+      // A note on a good answer (a failed query beside answered ones) follows the refreshed time.
+      var answered=metricsState==='connected' || metricsState==='demo',metricsText;
+      if(metrics.source){
+        // #943: "Grafana connected · 24h window · refreshed 10:42:13"; an error shows its note, which names the fix.
+        var named=metrics.source+' '+metricsLabel;
+        metricsText=metricsState==='error'?metrics.note || named:metricsState==='disconnected'?named:
+          [named,metrics.window?metrics.window+' window':'',answered?metrics.checkedText:'',answered?metrics.note:''].filter(Boolean).join(' · ');
+      }else metricsText=metricsState==='error'?'Metrics: '+metricsLabel+(metrics.note?' · '+metrics.note:''):
+        ['Metrics: '+metricsLabel,metrics.checkedText].filter(Boolean).join(', ')+(answered && metrics.note?' · '+metrics.note:'');
+      if(!metrics.available && metrics.note)metricsText=metrics.note;
+      if(metrics.environment)metricsText+=' · '+metrics.environment;
+      el(metricsConnection,'span','text','',metricsText);metricsConnection.title=metricsText;
+      metricsConnection.hidden=!metrics.available && !metrics.note;
     }
     function paint(value){
       if(!live)return;epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=doc.activeElement;
@@ -450,7 +452,7 @@
       // below and wraps in full.
       var controls=el(head,'div','controls','dv-live-controls'),countRow=el(controls,'div','counts','dv-live-counts'),statusRow=el(head,'div','status','dv-live-status'),statusLine=el(statusRow,'div','text','dv-live-status-text');
       var available=value && value.available,hasData=available && value.hasData;
-      countRow.setAttribute('role','region');countRow.setAttribute('aria-label','Status counts');countRow.setAttribute('tabindex','0');countRow.setAttribute('title','Scroll horizontally to see all counts.');
+      countRow.hidden=!hasData;countRow.setAttribute('role','region');countRow.setAttribute('aria-label','Status counts');countRow.setAttribute('tabindex','0');countRow.setAttribute('title','Scroll horizontally to see all counts.');
       // Preserve native count scrolling when the page presenter also owns arrow keys.
       if(!countRow._liveKeys){countRow._liveKeys=function(event){if(event.target===countRow && ['ArrowLeft','ArrowRight','Home','End'].indexOf(event.key)>=0)event.stopPropagation();};countRow.addEventListener('keydown',countRow._liveKeys);}
       var missingWork=value && value.missingWork || {count:0,painted:false};
@@ -767,7 +769,7 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 .pwidget.pt-live-status{display:flex;flex-direction:column}
 .pt-live-status>.ptitle{flex:none}
 .pt-live-status .pbody{flex:1;min-width:0;min-height:0;overflow:auto;color:var(--dtext);font:13px/1.5 'IBM Plex Sans',sans-serif}
-.dv-live-head{container-type:inline-size;display:flex;flex-direction:column;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--explore-border);font:11px/1.5 'IBM Plex Mono',monospace}
+.dv-live-head{display:flex;flex-direction:column;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--explore-border);font:11px/1.5 'IBM Plex Mono',monospace}
 .dv-live-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
 .dv-live-head>.dv-live-controls{flex-wrap:nowrap;}
 .dv-live-head>.dv-live-controls>.dv-live-counts{flex:1 1 auto;}

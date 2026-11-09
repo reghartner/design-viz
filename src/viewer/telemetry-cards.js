@@ -111,6 +111,8 @@ function telemetryCardLeaderTo(mid,box,labels){
 function telemetryTraceLabelsBlocked(texts){
   return texts.some(function(text){
     var svg=text.closest('svg'),box=svg && boardControlBox(text,svg);if(!box)return false;
+    // #1195: a re-laid-out label that now meets a connection label (and has no plate) repaints too.
+    if(!text.parentNode.querySelector('.dv-trace-label-plate') && Array.from(svg.querySelectorAll('text.lbl')).some(function(el){var l=boardControlBox(el,svg);return !!l && boardBoxesOverlap(box,l,0);}))return true;
     return Array.from(svg.querySelectorAll('.dv-metrics-card-box')).some(function(el){var card=boardControlBox(el,svg);return !!card && boardBoxesOverlap(box,card,0);}) ||
       Array.from(svg.querySelectorAll('.dv-metrics-leader')).some(function(leader){
         var n=(leader.getAttribute('d') || '').match(/-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi) || [];

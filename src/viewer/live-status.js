@@ -2033,6 +2033,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         bindings.forEach(paintBinding);
       }
       // Trace labels first: metric cards are then placed clear of them (#1163).
+      // #1195: show the connection labels metric cards hid, so trace labels avoid them too; paintMetrics hides them again.
+      bindings.forEach(function(binding){telemetryClearCards(binding.el);});
       bindings.forEach(paintStory);paintLanes();paintTrace();paintMetrics();recordTraceLabels();
       // Paint Jira cues once, after cards and coins reserve their final boxes.
       // Handoffs transfer their ticket target from the card to the cue; a second

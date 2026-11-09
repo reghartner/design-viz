@@ -290,7 +290,12 @@ function pull(localText,liveText,options){
     const told='step '+id+': on the board '+who(entry)+' mapped '+spanText(want)+' to step '+step.label+' on '+when(entry.at);
     if(choice==='local')return;
     if(!mineStep){conflicts.push({kind:'step-missing',step:id,message:told+', but your local copy no longer has that step. Ask the author, then rerun with --resolve step:'+id+'=local.'});return;}
-    if(sameSpan(mineStep.traceMatch,want))return;
+    // The same span: the board's nodeId reaches a local step without one; a different local nodeId asks (#1192).
+    if(sameSpan(mineStep.traceMatch,want)){
+      const mineNode=mineStep.traceMatch.nodeId;if(!want.nodeId || mineNode===want.nodeId)return;
+      if(!mineNode || choice==='live'){stepWrites.push({path:mineStep.path,value:{...mineStep.traceMatch,nodeId:want.nodeId}});return;}
+      conflicts.push({kind:'trace-match-changed',step:id,message:told+' on node '+want.nodeId+'; your local copy maps that span on node '+mineNode+'. Ask the author which to keep, then rerun with --resolve step:'+id+'=live or --resolve step:'+id+'=local.'});return;
+    }
     if(base?sameSpan(mineStep.traceMatch,base):!mineStep.traceMatch){stepWrites.push({path:mineStep.path,value:base?{...mineStep.traceMatch,...want}:want});return;}
     if(choice!=='live'){
       conflicts.push({kind:'trace-match-changed',step:id,message:told+'; your local copy '+(mineStep.traceMatch?'maps '+spanText(mineStep.traceMatch)+' to it':'has no traceMatch on it')+'. Ask the author which to keep, then rerun with --resolve step:'+id+'=live or --resolve step:'+id+'=local.'});

@@ -158,6 +158,7 @@ function telemetryEditBinding(binding,edit,options){
     // Checking the box returns to the default by removing the key.
     var missingMeansZero=edit.field==='missingMeansZero'?(edit.value===false?false:null):entry.missingMeansZero;if(typeof missingMeansZero==='boolean' && (next.loki!==undefined || next.grafana!==undefined))next.missingMeansZero=missingMeansZero;
     if(telemetryOwn(entry,'window'))next.window=entry.window;
+    if(telemetryOwn(entry,'role'))next.role=entry.role;
     var label=edit.field==='label'?edit.value:entry.label;
     if(label!=null){if(!telemetryText(label) || label.length>120 || /[\x00-\x1f\x7f]/.test(label))return {error:'A label is 1–120 plain-text characters without control characters.'};next.label=label.trim();}
     var queryLink=edit.field==='queryLink'?edit.value:entry.links && entry.links.query;

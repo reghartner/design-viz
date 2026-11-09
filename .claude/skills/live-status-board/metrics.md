@@ -152,10 +152,8 @@ the headline and graph use the same returned buckets, without prorating.
 `Sum` and `SampleCount` sum bucket values; `Maximum`/`Minimum` take their extrema.
 `Average` weights each bucket by its underlying SampleCount from a paired query
 with exactly the same range/period. Missing, invalid or mismatched weights leave
-Average unobserved, never the last bucket or an unweighted mean. Tool summaries
-such as `statistics.avg` and `statistics.count` are not underlying sample weights.
-Actual series remain timestamp-spaced, including isolated points and gaps.
-Empty arrays normally mean no data points yet; `missingMeansZero: true` opts only
+Average unobserved, never the last bucket or an unweighted mean.
+Empty arrays mean no data points yet; `missingMeansZero: true` opts only
 successful empty results into zero. Malformed/error results never become zero.
 
 ### Named environment variables and counting scope
@@ -280,7 +278,7 @@ The accepted authored fields are:
 | `tracking.telemetry.grafana` | `prometheus`, `loki`, `tempo`, `sql`, `cloudwatch` datasource UIDs; optional `accountId` for CloudWatch; optional `baseUrl` for evidenced Grafana UI origin |
 | `tracking.telemetry.honeycomb` | `environment`, optional `dataset` |
 | carrier `telemetry` | `kind`, `signals`, `proof`, `links`, `card`, or `use` plus declared template parameters |
-| signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope`, `label`, `showOnCard`, `links`, `window`; `loki`/`grafana` also `missingMeansZero` |
+| signal | exactly one of `grafana`, `loki`, `tempo`, `sql`, `honeycomb`, `cloudwatch`, `cloudwatchLogs`; optional `unit`, `scope`, `label`, `showOnCard`, `role`, `links`, `window`; `loki`/`grafana` also `missingMeansZero` |
 | `cloudwatch` query | `namespace`, `metric`, `region`, `accountId`, `dimensions`, `statistic`; optional `missingMeansZero`, `period` |
 | Logs `trend` | `query`, `timeField`, `valueField`; optional `binSeconds` (or false instead of an object) |
 | `cloudwatchLogs` query | `logGroups`, `query`, `region`, optional `valueField`, `breakdown`, `trend` |
@@ -421,7 +419,8 @@ its existing contract. Honeycomb COUNT caveats belong to Honeycomb evidence only
 Cards and node Inspect display every numeric signal in authored order, excluding
 trace bindings. Optional boolean `showOnCard: false` hides only that canvas row;
 Inspect and proof still use the signal. No visible numeric rows means no
-card. Optional `label` is plain text (1–120 characters, no control
+card. `role: "error"` marks a dead-letter/error signal: red card outside its limit
+([details](../../../docs/live-status.md#telemetry-bindings)). Optional `label` is plain text (1–120 characters, no control
 characters), else the signal name. For example:
 
 ```json

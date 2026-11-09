@@ -238,6 +238,7 @@ from Prometheus:
 | `signals.<name>.sql` | A SQL query string for a Grafana SQL datasource, such as a data lake. |
 | `signals.<name>.honeycomb` | A Honeycomb query object, kept as authored. |
 | `signals.<name>.missingMeansZero` | Optional boolean on `grafana` and `loki` signals. `false` shows a successful empty result as unobserved instead of 0; see [Empty Loki and Prometheus results](#empty-loki-and-prometheus-results). |
+| `signals.<name>.role` | Optional `"error"`: an error signal, such as a dead-letter queue depth. When it is outside its `proof` limit (any `min`, `max` or `maxRatioOf`) the metric card border is red (state `error`, #1201), outranking every other card state, the popup verdict names the error signal as outside its limit, and the Proof box shows a red `error` chip and arc. Those carriers leave whichever Proof bucket their verdict put them in (degraded, unproven or unclassified), so a quiet dead-letter queue with messages counts as error. Any other value is a validation warning and is ignored. Without the field the signal behaves as before. |
 | `signals.<name>.window` | Optional span of the signal's value, a duration in the page `window` form (`"1h"`, `"7d"`, `"now-7d"`). A display label only; the query is unchanged. See [Signal span](#signal-span). |
 | `proof` | Optional per-signal limits: `min`, `max` (finite numbers) and `maxRatioOf`. With `maxRatioOf: "<other signal>"`, `max` is the highest allowed ratio of this signal to the other one, so `"errors": {"maxRatioOf": "rate", "max": 0.01}` means at most 1 % errors. `maxRatioOf` needs `max` and another signal of the same binding. `min` stays an absolute floor. |
 | `links` | Optional authored link-outs: `dashboard` and `query`, absolute HTTP(S) URLs. |
@@ -1049,16 +1050,17 @@ signal still loading is left out):
 
 | state | when | border |
 |---|---|---|
+| `error` | an error signal (`role: "error"`) outside its limit (#1201); outranks every other state | Blocked colour, 3px (a lighter red on Blueprint for contrast) |
 | `waiting` | a signal has no value yet, or the card is silent (every rate-like value zero for the whole window) | to-do style: blue, dotted |
 | `failing` | values arriving, an authored limit not met | in-progress style: blue, medium |
 | `flowing` | values arriving, no limits authored | green, normal |
 | `held` | values arriving, every authored limit holds | green, thick |
 
 The card carries the state as `data-metric-state`. The Proof count chips (#1199) use
-the same CSS variables: proven and live early wear `held`, degraded `failing`,
+the same CSS variables: proven and live early wear `held`, degraded `failing`, error `error` (shown only when non-zero),
 unproven `waiting`; unclassified and unbound stay neutral. The Proof ring's arcs and the Proof table's verdict
 pills use the same states, and chip text uses the card's neutral ink. Colours follow the personal
-status colours (and border widths) for Done, In progress and To do; held stays at
+status colours (and border widths) for Done, In progress and To do, and `error` the Blocked colour at a fixed 3px; held stays at
 least 2px so it reads stronger than flowing. In the Jira view a card still names
 its edge's work status and lists its tickets in the popover; on a board with no
 ticket, epic, exclusion or missing-work references (`snapshot().available === false`),

@@ -308,6 +308,8 @@ function telemetrySignal(name,value,warn){
   if(telemetryOwn(value,'scope')){if(value.scope==='' || telemetryText(value.scope))out.scope=value.scope;else warn(at+'.scope','must be non-empty text, or "" to hide the scope — ignored');}
   if(telemetryOwn(value,'label')){if(telemetryText(value.label) && value.label.length<=120 && !/[\x00-\x1f\x7f]/.test(value.label))out.label=value.label.trim();else warn(at+'.label','must be plain text of 1–120 characters without control characters — ignored');}
   if(telemetryOwn(value,'showOnCard')){if(typeof value.showOnCard==='boolean')out.showOnCard=value.showOnCard;else warn(at+'.showOnCard','must be a boolean — ignored');}
+  // #1201: an error signal turns its card red when over its limit.
+  if(telemetryOwn(value,'role')){if(value.role==='error')out.role='error';else warn(at+'.role','must be "error" — ignored');}
   if(telemetryOwn(value,'missingMeansZero')){
     if(source!=='loki' && source!=='grafana')warn(at+'.missingMeansZero','only loki and grafana signals take this field'+(source==='cloudwatch'?'; CloudWatch reads it inside the cloudwatch query':'')+' — ignored');
     else if(typeof value.missingMeansZero==='boolean')out.missingMeansZero=value.missingMeansZero;
@@ -318,7 +320,7 @@ function telemetrySignal(name,value,warn){
     if(!telemetryObject(value.links))warn(at+'.links','must be an object {query?} — ignored');
     else {out.links={};telemetryUnknown(value.links,['query'],warn,at+'.links');if(telemetryOwn(value.links,'query')){if(telemetryQueryUrl(value.links.query))out.links.query=value.links.query;else warn(at+'.links.query','must be an absolute HTTP(S) URL without credentials — ignored');}}
   }
-  telemetryUnknown(value,[source,'unit','scope','label','showOnCard','missingMeansZero','links','window'],warn,at);
+  telemetryUnknown(value,[source,'unit','scope','label','showOnCard','role','missingMeansZero','links','window'],warn,at);
   return out;
 }
 /* One proof entry for a known signal. Returns the cleaned entry or null. */
@@ -492,6 +494,7 @@ function carrierTelemetry(obj,templates,invalid,environment){
     if(typeof entry.scope==='string')signals[name].scope=entry.scope;
     if(entry.label)signals[name].label=entry.label;
     if(telemetryOwn(entry,'showOnCard'))signals[name].showOnCard=entry.showOnCard;
+    if(entry.role)signals[name].role=entry.role;
     if(telemetryOwn(entry,'missingMeansZero'))signals[name].missingMeansZero=entry.missingMeansZero;
     if(entry.window)signals[name].window=entry.window;
     if(entry.links)signals[name].links=entry.links;

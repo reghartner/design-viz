@@ -276,5 +276,6 @@ var proofVerdicts = (function(){
     return {carriers: carriers, rollups: rollups, steps: steps};
   }
   proofVerdicts.isTraceSignal = isTraceSignal;
+  proofVerdicts.counts = JSON.parse(JSON.stringify(PROOF_COUNTS));
   return proofVerdicts;
 })();

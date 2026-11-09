@@ -39,8 +39,15 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
   var pending=snapshot.pending || {},querying=snapshot.carriers.some(function(binding){return telemetryMetricNames(binding).some(function(name){return pending[binding.id] && pending[binding.id][name];});});
   if(!observed && !querying && !includeUnobserved)return null;
   var counts=Object.assign({},snapshot.verdicts.rollups),offset=0;
-  counts.neutral=counts.bound-counts.proven-counts.degraded-counts.unproven-counts.liveEarly;
-  var arcs=['proven','degraded','unproven','liveEarly'].map(function(key){
+  // #1201: a carrier whose error signal is outside its limit counts as `error`, leaving whichever
+  // bucket its verdict put it in (neutral included), so the bound total is unchanged.
+  snapshot.carriers.forEach(function(binding){
+    var result=snapshot.verdicts.carriers[binding.id];if(!result.bound || !telemetryErrorFailing(binding,result).length)return;
+    var bucket=Object.keys(proofVerdicts.counts).filter(function(key){return proofVerdicts.counts[key].indexOf(result.verdict)>=0;})[0];
+    if(bucket)counts[bucket]--;counts.error=(counts.error || 0)+1;
+  });
+  counts.neutral=counts.bound-counts.proven-counts.degraded-counts.unproven-counts.liveEarly-(counts.error || 0);
+  var arcs=['proven','degraded','error','unproven','liveEarly'].filter(function(key){return key!=='error' || counts.error;}).map(function(key){
     var size=counts.bound?100*counts[key]/counts.bound:0,arc={key:key,count:counts[key],size:size,offset:offset};offset+=size;return arc;
   });
   var duration=/^(\d+)([smhdw])$/.exec(window),windowMs=duration?Number(duration[1])*({s:1000,m:60000,h:3600000,d:86400000,w:604800000})[duration[2]]:86400000;
@@ -57,6 +64,7 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
   var rows=snapshot.carriers.filter(function(binding){return snapshot.verdicts.carriers[binding.id].bound;}).map(function(binding){
     var waiting=pending[binding.id] || {},loading=telemetryMetricNames(binding).some(function(name){return waiting[name];}),measured=telemetryMetricNames(binding).some(function(name){return telemetryReading(snapshot.map[binding.id],name).value!==null;});
     var result=snapshot.verdicts.carriers[binding.id],sample=snapshot.map[binding.id],primary=telemetryPrimary(binding,true),queue=binding.kind==='queue';
+    function errorSignal(name){return telemetryErrorFailing(binding,result).indexOf(name)>=0;}
     // #1194: one plot per signal; the popup's main chart is the primary's, each metric tile has its own small one.
     function plot(name){
       var reading=name?telemetryReading(sample,name):{series:[]},times=reading.series.map(function(p){return Date.parse(telemetryTime(p[0]));}).filter(isFinite);
@@ -93,16 +101,18 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
       label=result.telemetry==='silent'?'SILENT':result.telemetry==='degraded'?'DEGRADED':measured?(result.telemetry==='unobserved'?'OBSERVED · evidence incomplete':'OBSERVED'):'UNOBSERVED';
       if(result.jira==='unknown')label+=' · Jira status unavailable';
     }
+    // #1201: an error signal outside its limit names the row ERROR, after the Jira state when there is one.
+    if(telemetryErrorFailing(binding,result).length)label=label.indexOf(' · ')>0?label.split(' · ')[0]+' · ERROR':['done','active','testing','todo','blocked','missing'].indexOf(result.verdict)>=0?label+' · ERROR':'ERROR';
     return {id:binding.id,title:binding.title,kind:binding.kind,tickets:binding.tickets.slice(),jira:result.jira || 'No tickets',
-      loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,label:loading && !measured?'Loading…':label,predicate:predicate(binding,null,measured)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
+      loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,error:telemetryErrorFailing(binding,result).length>0,label:loading && !measured?'Loading…':label,predicate:predicate(binding,null,measured)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
       primary:primary,kpis:telemetryMetricRows(binding,sample,waiting,window).map(function(kpi){var own=plot(kpi.name);return Object.assign(kpi,{chart:{points:own.points,line:own.line}});}),
       since:since.join(' · ') || 'unavailable',url:url,
       linkLabel:primary && binding.signals[primary].source==='grafana'?'Open in Grafana':primary && binding.signals[primary].source==='honeycomb'?'Open in Honeycomb':'Open telemetry',
-      explanation:result.failing.length?'Outside proof threshold: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name,null,window)+'; requires '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
+      explanation:result.failing.length?'Outside proof threshold: '+result.failing.map(function(name){return (errorSignal(name)?'error signal '+name+' is outside its limit: ':name+' is ')+telemetryCardValue(binding,sample,name,null,window)+'; requires '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
         result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':result.telemetry==='unmeasured'?'Traffic proof requires an observed signal with an authored minimum.':'Observed signals meet the authored proof thresholds.',
       // #1153: the Trace view's metrics popup states the metric evidence alone, with no Jira state or proof words.
-      metrics:{label:loading && !measured?'Loading…':result.telemetry==='silent'?'SILENT':result.telemetry==='degraded'?'DEGRADED':measured?(result.telemetry==='unobserved'?'OBSERVED · evidence incomplete':'OBSERVED'):'UNOBSERVED',
-        explanation:result.failing.length?'Outside limit: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name,null,window)+'; limit '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
+      metrics:{label:loading && !measured?'Loading…':telemetryErrorFailing(binding,result).length?'ERROR':result.telemetry==='silent'?'SILENT':result.telemetry==='degraded'?'DEGRADED':measured?(result.telemetry==='unobserved'?'OBSERVED · evidence incomplete':'OBSERVED'):'UNOBSERVED',
+        explanation:result.failing.length?'Outside limit: '+result.failing.map(function(name){return (errorSignal(name)?'error signal '+name+' is outside its limit: ':name+' is ')+telemetryCardValue(binding,sample,name,null,window)+'; limit '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
           result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':
           // unmeasured: no observed signal has an authored minimum, so traffic is not judged.
           result.telemetry==='unmeasured'?(limited?'Observed signals are within their authored limits; no traffic minimum is authored.':'Observed signals; no authored limits.'):'Observed signals are within their authored limits.'},
@@ -111,7 +121,7 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
   });
   var predicates=rows.map(function(row){return row.predicate;}).filter(function(value,i,all){return all.indexOf(value)===i;});
   return {counts:counts,arcs:arcs,rows:rows,window:window,historical:!!snapshot.historical,states:TELEMETRY_PROOF_BUCKET_STATES,
-    sentence:counts.proven+' of '+counts.bound+' bound carriers proven · '+counts.unproven+' Done carriers unproven · '+counts.unbound+' carriers unbound.',
+    sentence:counts.proven+' of '+counts.bound+' bound carriers proven · '+counts.unproven+' Done carriers unproven · '+(counts.error?counts.error+' error · ':'')+counts.unbound+' carriers unbound.',
     predicate:predicates.length===1?predicates[0]:'Proof thresholds are shown for each carrier below.'};
 }
 /* Runtime Activity consumes only accepted live observations. Reconciliation

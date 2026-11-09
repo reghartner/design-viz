@@ -554,3 +554,14 @@ test('#1112 an inherited imported connection without an overlay shows the card r
   assert.equal(ui.h.session.redo(),true);assert.equal(ui.text,after,'Redo restores the created overlay');
   assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking['api->store'].telemetry.card,{width:400});
 });
+
+// #1201 review: a Workbench signal edit keeps the authored error role.
+test('#1201 editing a signal unit, query or Show on card keeps role "error"',()=>{
+  const vm=require('node:vm'),{composeSources}=require('../tools/source-loader.cjs'),V={URL,TextEncoder};vm.createContext(V);
+  vm.runInContext(composeSources(['canon.js','validator.js','workbench/commands/telemetry.js']),V);
+  const binding={kind:'queue',signals:{dlq:{grafana:'max(dlq_depth)',unit:'msgs',role:'error'}},proof:{dlq:{max:0}}};
+  for(const [field,value] of [['unit','messages'],['query','max(dlq_depth_total)'],['showOnCard',false]]){
+    const out=V.telemetryEditBinding(JSON.parse(JSON.stringify(binding)),{op:'signal',name:'dlq',field,value},{});
+    assert.equal(out.error,undefined,field);assert.equal(out.value.signals.dlq.role,'error',field+' keeps role');
+  }
+});

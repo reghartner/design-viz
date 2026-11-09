@@ -32,7 +32,7 @@ function spec(skin){
   edges:[edge('a','b','EDGE-1',LIMITED()),edge('b','c','EDGE-2',OPEN()),edge('c','d','EDGE-3',LIMITED()),edge('d','e','EDGE-4',LIMITED()),edge('e','f','EDGE-5',LIMITED()),edge('f','g','EDGE-6',LIMITED())],
   panels:[{id:'status',type:'live-status',title:'Status'}]}}]}};
 }
-async function mount(page,server,skin){
+async function mount(page,server,skin,raw=spec(skin),jira=JIRA,samples=SAMPLES){
  await page.setViewportSize({width:1440,height:1000});
  await writeFile(path.join(server.root,'metric-state.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
  await writeFile(path.join(server.root,'metric-state.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./metric-state.js";window.mount=mountNativeViewer;</script>');
@@ -40,7 +40,7 @@ async function mount(page,server,skin){
  await page.evaluate(({raw,jira,samples})=>{
   window.viewer=window.mount(document.querySelector('#host'),raw,{telemetry:{provider:()=>Promise.resolve(structuredClone(samples))}});
   window.viewer.controller.liveStatus.apply(jira);
- },{raw:spec(skin),jira:JIRA,samples:SAMPLES});
+ },{raw,jira,samples});
  const root=page.locator('#host');
  await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();
  await expect(root.locator('[data-metrics-card="a->b"]')).toContainText('100 req/h');
@@ -87,5 +87,39 @@ for(const skin of ['daylight','blueprint'])test('#1200 #1199 metric cards show t
  await page.evaluate(()=>{localStorage.setItem('flowview.status-colors.v1',JSON.stringify({version:2,colors:{},appearance:{'live-done':{borderWidth:1}}}));window.dispatchEvent(new CustomEvent('flowview-status-colors-change'));});
  await expect.poll(async()=>{const c=await cards(page);return [c['a->b'].width,c['b->c'].width];}).toEqual(['2px','1px']);
  await page.evaluate(()=>{localStorage.removeItem('flowview.status-colors.v1');window.dispatchEvent(new CustomEvent('flowview-status-colors-change'));});
+ await page.evaluate(()=>window.viewer.destroy());
+});
+
+/* #1201: an error signal (`role: "error"`, e.g. a dead-letter queue depth) over its limit turns the card border red,
+   and the Proof error chip border and error arc stroke wear the same red. Under its limit the card shows its normal state. */
+// Blocked red; Blueprint uses a lighter red (#ff6b6b) for 3:1 contrast on its dark card fill.
+const RED_BY_SKIN={daylight:{stroke:'rgb(232, 23, 23)',width:'3px',dotted:false},blueprint:{stroke:'rgb(255, 107, 107)',width:'3px',dotted:false}};
+function errorSpec(skin){
+ const raw=spec(skin),d=raw.page.sections[0].diagram;
+ d.edges[0].telemetry={kind:'queue',signals:{rate:{grafana:'sum(rate(sent_total[5m]))*3600',unit:'req/h'},dlq:{grafana:'max(dlq_depth)',unit:'msgs',role:'error'}},proof:{rate:{min:1},dlq:{max:0}}};
+ return raw;
+}
+for(const skin of ['daylight','blueprint'])test('#1201 an error signal outside its limit turns the card, its Proof chip and arc red; under its limit the normal state ('+skin+')',async({page,server},testInfo)=>{
+ const RED=RED_BY_SKIN[skin],samples={...SAMPLES,'a->b':{signals:{rate:{value:100},dlq:{value:4}}}};
+ const root=await mount(page,server,skin,errorSpec(skin),JIRA,samples);
+ const border=async()=>{const c=(await cards(page))['a->b'];return {stroke:c.stroke,width:c.width,dotted:c.dotted};};
+ await expect.poll(border,'the error card border is red').toEqual(RED);
+ expect((await cards(page))['a->b'].state).toBe('error');
+ const got=await chips(page);
+ expect(got.error && {text:got.error.text,stroke:got.error.stroke,width:got.error.width,dotted:got.error.dotted},'the error chip').toEqual({text:'1 error',...RED});
+ const arc=await page.evaluate(()=>{const a=document.querySelector('#host').shadowRoot.querySelector('.dv-live-proof-arc[data-proof-bucket="error"]');return a && getComputedStyle(a).stroke;});
+ expect(arc,'the error arc').toBe(RED.stroke);
+ await root.screenshot({path:testInfo.outputPath('metric-state-error-'+skin+'.png')});
+ await page.evaluate(()=>window.viewer.controller.telemetry.apply({'a->b':{signals:{rate:{value:100},dlq:{value:0}}}}));
+ await expect.poll(async()=>{const c=(await cards(page))['a->b'];return {state:c.state,stroke:c.stroke,width:c.width,dotted:c.dotted};},'under its limit').toEqual({state:'held',...WANT.held});
+ expect((await chips(page)).error,'no error chip under the limit').toBeUndefined();
+ // A quiet dead-letter queue: no traffic for the whole window, messages in the DLQ. The card is red and
+ // the Proof table row pill for that carrier is the error pill.
+ await page.evaluate(([T1,T2])=>window.viewer.controller.telemetry.apply({'a->b':{signals:{rate:{value:0,series:[[T1,0],[T2,0]]},dlq:{value:4}}}}),[T1,T2]);
+ await expect.poll(border,'silent traffic with messages in the DLQ: the card is red').toEqual(RED);
+ const row=await page.evaluate(()=>{const p=document.querySelector('#host').shadowRoot.querySelector('[data-proof-carrier="a->b"] .dv-live-proof-pill');if(!p)return null;const s=getComputedStyle(p);return {bucket:p.getAttribute('data-proof-bucket'),state:p.getAttribute('data-metric-state'),stroke:s.borderTopColor,width:s.borderTopWidth,dotted:s.borderTopStyle==='dotted'};});
+ expect(row,'the Proof table row pill is the error pill').toEqual({bucket:'error',state:'error',...RED});
+ const quiet=(await chips(page)).error;
+ expect(quiet && {text:quiet.text,stroke:quiet.stroke,width:quiet.width,dotted:quiet.dotted},'silent traffic: the Proof error chip is shown').toEqual({text:'1 error',...RED});
  await page.evaluate(()=>window.viewer.destroy());
 });

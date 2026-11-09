@@ -3690,3 +3690,23 @@ test('#1145 opening a drill-down keeps the loaded trace and its selection',async
  assert.equal(api.snapshot().trace.direct.sections.length,2,'the drill-down added a mapping diagram');
  api.destroy();
 });
+/* #1164: example traces (from the metrics fetch) are listed, but none is the selected request and nothing
+   paints on the diagram until the reader picks one; a loaded trace still selects itself. Boards with and
+   without Jira. */
+test('#1164 example traces are not selected or painted until the reader picks one',async()=>{
+ for(const jira of [true,false]){
+  const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),d=f.spec.page.sections[0].diagram;
+  if(!jira){delete f.spec.page.tracking.jira;d.edges.forEach(e=>delete e.tickets);Object.values(d.nodes).forEach(n=>delete n.tickets);}
+  const h=harness(f.spec,{},{telemetry:{}}),api=h.ctl.liveStatus,m=mountStatus(h),painted=()=>h.view.querySelectorAll('.dv-trace-overlay,[data-trace-tone]').length;
+  h.ctl.sections[0].stepper={path:()=>'short',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+  h.ctl.telemetry.apply(f.samples);api.setStatusMode('trace');h.flush();
+  let t=api.snapshot().trace;assert.ok(t.entries.length,(jira?'Jira':'Jira-free')+': example traces are listed');
+  assert.equal(t.selected,null,'none is selected without a reader click');assert.equal(m.body.querySelector('.dv-trace-selected'),null);
+  assert.equal(painted(),0,'nothing is painted on the diagram');
+  assert.ok(m.body.querySelector('.dv-trace-candidates'),'the list is shown');
+  await api.chooseTrace({key:t.entries[0].key,traceId:t.entries[0].exemplar.traceId});h.flush();
+  t=api.snapshot().trace;assert.equal(t.selected && t.selected.key,t.entries[0].key,'picking one selects it');assert.ok(m.body.querySelector('.dv-trace-selected'));
+  assert.ok(painted()>0,'and paints it');
+  api.destroy();
+ }
+});

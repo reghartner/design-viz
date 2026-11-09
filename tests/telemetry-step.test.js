@@ -119,7 +119,8 @@ test('a node whose traceMatch alternatives matched names the matched alternative
  assert.equal(labels.node('consumer').text,'Matched: stats-consumer persistent://stats/camer… · 16.1 ms');assert.doesNotMatch(labels.node('consumer').text,/unknown/);
  assert.ok(labels.node('consumer').title.startsWith('Matched: stats-consumer '+PULSAR+': 16.1 ms'));
  assert.match(labels.node('consumer').title,new RegExp('not in this trace: stats-consumer '+RABBIT));assert.doesNotMatch(labels.node('consumer').title,/unknown/);
- assert.match(labels.node('consumer').title,/start to end, including its child spans/,'the title states what the time counts');
+ assert.match(labels.node('consumer').title,/ · Time 16\.1 ms: time covers each matched span from start to end \(overlaps counted once\)\.$/,'the title states what the time counts');
+ assert.doesNotMatch(labels.node('consumer').title,/child spans/,'#1193: sibling spans are not nested');
  assert.equal(labels.edge(0).text,'Matched: stats-consumer persistent://stats/camer… · 16.1 ms','the uniquely delivered edge follows the same rules');
  labels=paintTraceLabels(transportBoard(),transportTrace(traceSpan('r1',RABBIT,0,4.97)));
  assert.equal(labels.node('consumer').text,'Matched: stats-consumer camera_stats_message pro… · 4.97 ms');assert.match(labels.node('consumer').title,new RegExp('not in this trace: stats-consumer '+PULSAR.replace(/[/.]/g,'\\$&')));

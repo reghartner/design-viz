@@ -214,7 +214,7 @@ function initWorkbenchAgentChat(opts){
   }
   function restoreRecoveryForProject(current){
     if(adoptingProject || !current.open || seenProject===current.project)return;
-    generation++;background.cancelDelay(timer);background.release();
+    generation++;life.cancelDelay(timer);background.release();
     var retired=client,unlock=releaseLock;client=null;releaseLock=null;connecting=false;cacheReady=false;
     if(retired)retired.disconnect().catch(function(){}).finally(function(){retired.destroy();if(unlock)unlock();});else if(unlock)unlock();
     resetConversationForProject(current);
@@ -442,11 +442,11 @@ function initWorkbenchAgentChat(opts){
       accessLost=true;paint({});status('Folder access needs attention: '+ex.message+' Disconnect in Connection details, then Reopen diagram folder to restore access.');
     }
     if(!state.connected && releaseLock){releaseLock();releaseLock=null;}
-    if(life.alive() && token===generation && state.connected)timer=background.delay(function(){tick(token);},250);
+    if(life.alive() && token===generation && state.connected)timer=life.delay(function(){tick(token);},250);
     else if(token===generation)background.release();
   }
   async function disconnect(){
-    var token=++generation;background.cancelDelay(timer);background.release();get('pilot-capture').checked=false;
+    var token=++generation;life.cancelDelay(timer);background.release();get('pilot-capture').checked=false;
     var workingDrain=opts.releaseWorking?opts.releaseWorking():Promise.resolve();
     var unlock=releaseLock;releaseLock=null;
     var old=client,message='Disconnected. Reopen your diagram folder or choose New Connection.';client=null;accessLost=false;connecting=true;handoff.hidden=true;
@@ -664,7 +664,7 @@ function initWorkbenchAgentChat(opts){
   async function reestablish(){
     if(!client || !state.connected || connecting || renewing || !activeFiles || !activeFolder || opts.practice)return;
     var old=client,previous=old.manifest(),directory=activeFolder,files=activeFiles,pilot=pilotRequested,token=++generation;
-    background.cancelDelay(timer);background.release();renewing=true;connecting=true;handoff.hidden=true;paint({});status('Re-establishing the session…');
+    life.cancelDelay(timer);background.release();renewing=true;connecting=true;handoff.hidden=true;paint({});status('Re-establishing the session…');
     try{
       // Release the old turn under its own identity, then close it before claiming new ids.
       await old.flush();

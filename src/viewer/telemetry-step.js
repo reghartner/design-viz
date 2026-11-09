@@ -188,7 +188,9 @@ function telemetryPaintTrace(binding,model,focus){
   }
   scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !counted(rows).length || !card)return;var box=card.getBBox();var level=levels.nodes[node.getAttribute('data-dv-node')],text=mark(node,rows,box.x+box.width/2,box.y+box.height+24,level);telemetryTraceConstrainLabel(text);
     if(level && (level.level==='below' || level.level==='above'))telemetryPaintTraceBrackets(node,level.level,level.tone);});
-  scope.querySelectorAll('g.node.node-text[data-dv-node]').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')];if(rows && counted(rows).length)node.setAttribute('data-trace-tone','observed');});
+  scope.querySelectorAll('g.node.node-text[data-dv-node]').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')];if(!rows || !counted(rows).length)return;node.setAttribute('data-trace-tone','observed');
+    var level=levels.nodes[node.getAttribute('data-dv-node')];if(!level)return;node.setAttribute('data-trace-level',level.level);
+    if(level.level==='below' || level.level==='above')telemetryPaintTraceBrackets(node,level.level,level.tone);});
   scope.querySelectorAll('path.edge[data-dv-edge]').forEach(function(path){
     var edge=d.edges[Number(path.getAttribute('data-dv-edge'))],rows=edge && model.edges[edge.from+'->'+edge.to];if(!rows)return;
     var length=path.getTotalLength(),mid=length/2,point=path.getPointAtLength(mid),a=path.getPointAtLength(Math.max(0,mid-1)),b=path.getPointAtLength(Math.min(length,mid+1));
@@ -247,8 +249,8 @@ function telemetryPaintTraceEdgeFocus(path,level,tone){
   function make(tag,attrs,parent){var el=doc.createElementNS(ns,tag);Object.keys(attrs).forEach(function(key){el.setAttribute(key,attrs[key]);});parent.appendChild(el);return el;}
   var g=doc.createElementNS(ns,'g');g.setAttribute('class','dv-trace-edge-focus');g.setAttribute('pointer-events','none');g.setAttribute('aria-hidden','true');
   g.setAttribute('data-trace-level',level || 'current');g.setAttribute('data-trace-tone',tone || 'observed');
-  // The ring between the two mask strokes: 2 units each side for current and above, 1 for below.
-  var outer=width+(level==='below'?10:12);
+  // The ring between the two mask strokes: 4 units each side for current, 2 for above, 1 for below.
+  var outer=width+(level==='below'?10:level==='above'?12:16);
   if(path.getAttribute('transform')!=null)g.setAttribute('transform',path.getAttribute('transform'));
   var defs=make('defs',{},g),mask=make('mask',{id:id,maskUnits:'userSpaceOnUse',x:box.x-pad,y:box.y-pad,width:box.width+2*pad,height:box.height+2*pad,'mask-type':'luminance'},defs);
   make('path',{d:shape,fill:'none',stroke:'white','stroke-width':outer,'stroke-linecap':'round','stroke-linejoin':'round'},mask);

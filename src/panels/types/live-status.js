@@ -623,9 +623,10 @@
 g.node[data-trace-focus="true"]{opacity:1!important}
 .dv-trace-focus-overlay .dv-trace-focus-brackets{fill:none;stroke:var(--dv-trace-color,#009fc7);stroke-width:3;stroke-linecap:square;stroke-linejoin:round;stroke-dasharray:none;filter:drop-shadow(0 0 2px var(--dbg,#fff))}
 .dv-trace-focus-overlay[data-trace-level="below"] .dv-trace-focus-brackets{stroke-width:1.5;opacity:.8}.dv-trace-focus-overlay[data-trace-level="above"] .dv-trace-focus-brackets{stroke-width:2;stroke-dasharray:5 4;stroke-linecap:butt}
-.dv-trace-edge-outline{stroke:var(--dv-trace-color,#009fc7)}.dv-trace-edge-focus[data-trace-level="below"]{opacity:.7}.dv-trace-edge-focus[data-trace-level="above"] .dv-trace-edge-outline{stroke-dasharray:8 6;stroke-linecap:butt}
-.dv-trace-overlay[data-trace-level="current"] text{font-size:16px}.dv-trace-overlay[data-trace-level="other"]{opacity:.55}.dv-trace-overlay[data-trace-level="other"] text{font-size:12px}
-.dv-trace-focus-overlay rect{fill:#007d9c;stroke:var(--dbg,#fff);stroke-width:2}
+.dv-trace-edge-outline{stroke:var(--dv-trace-color,#009fc7)}.dv-trace-edge-focus[data-trace-level="below"]{opacity:.6}.dv-trace-edge-focus[data-trace-level="above"] .dv-trace-edge-outline{stroke-dasharray:8 6;stroke-linecap:butt}
+.dv-trace-overlay[data-trace-level="current"] text{font-size:16px}.dv-trace-overlay[data-trace-level="current"][data-tone="observed"]{fill:#1d5f8c}.dv-trace-overlay[data-trace-level="current"][data-tone="error"]{fill:#a3243f}.dv-trace-overlay[data-trace-level="current"][data-tone="warning"]{fill:#8a5f00}.dv-trace-overlay[data-trace-level="current"][data-tone="unknown"]{fill:#5b6570}.dv-trace-overlay[data-trace-level="other"]{opacity:.55}.dv-trace-overlay[data-trace-level="other"] text{font-size:12px}
+.dv-trace-focus-overlay[data-trace-tone="observed"],.dv-trace-edge-focus[data-trace-tone="observed"]{--dv-trace-color:#009fc7}
+.dv-trace-focus-overlay rect{fill:color-mix(in srgb,var(--dv-trace-color,#009fc7) 78%,#000);stroke:var(--dbg,#fff);stroke-width:2}
 .dv-trace-focus-overlay text{fill:#fff;font:700 10px 'IBM Plex Mono',monospace;letter-spacing:.3px}
 .dv-trace-focus-summary{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:10px 12px;border:1px solid color-mix(in srgb,#009fc7 40%,var(--dfaint));border-radius:7px;background:color-mix(in srgb,#009fc7 7%,var(--dbg));font-size:12px}
 .dv-trace-focus-hint{min-width:0;overflow-wrap:anywhere}.dv-trace-focus-summary .reader-button{align-self:flex-start;max-width:100%;white-space:normal;overflow-wrap:anywhere}

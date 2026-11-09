@@ -1294,29 +1294,50 @@ test('#1223 a request written while the tab is hidden is acknowledged within the
    request (a taken or raced name) are never ours to delete. */
 test('#1223 finished requests leave no candidate files behind; the current request keeps its own',async()=>{
   const names=id=>[`candidate-${id}.spec.json`,`candidate-${id}.ledger.md`],has=(h,id)=>names(id).map(n=>h.disk.has(n));
+  // Removals are queued after the job that finished the request; the next poll runs after them.
+  const drain=h=>h.client.poll();
   // External: accepted completion.
   const a=harness({workflow:'external',reviewMode:true});a.files.remove=async name=>a.disk.delete(name);await a.client.start();
   await externalTurn(a,'accepted');assert.deepEqual(has(a,'accepted'),[true,true],'the current request keeps its files');
-  a.proposal();await a.client.poll();await a.client.acceptReview();assert.equal(a.last.pending,null);
+  a.proposal();await a.client.poll();await a.client.acceptReview();assert.equal(a.last.pending,null);await drain(a);
   assert.deepEqual(has(a,'accepted'),[false,false],'accepted: removed');
   // External: withdrawn before acknowledgement reached the agent (expired).
-  await externalTurn(a,'withdrawn');a.disk.set('agent-request.json',a.envelope({id:'withdrawn',text:'Update the story',expiresAt:0,withdrawn:true}));await a.client.poll();
+  await externalTurn(a,'withdrawn');a.disk.set('agent-request.json',a.envelope({id:'withdrawn',text:'Update the story',expiresAt:0,withdrawn:true}));await a.client.poll();await drain(a);
   assert.equal(a.last.pending,null);assert.deepEqual(has(a,'withdrawn'),[false,false],'withdrawn: removed');
-  // Embedded: final reply, and Stop.
+  // External: a native request that expires while it is being published never runs; its seeded copies go too.
+  const late=harness({workflow:'external',reviewMode:true});late.files.remove=async name=>late.disk.delete(name);await late.client.start();
+  late.disk.set('agent-request.json',late.envelope({id:'late',text:'Update the story',expiresAt:100500}));
+  const write=late.files.write;late.files.write=async(...args)=>{await write.apply(late.files,args);if(args[0]==='request.json')late.advance(1000);};
+  await late.client.poll();late.files.write=write;await drain(late);
+  assert.equal(late.last.pending,null);assert.equal(late.disk.get('cancel.json').requestId,'late');assert.deepEqual(has(late,'late'),[false,false],'expired during publication: removed');
+  // Embedded: Stop removes; a final reply may be a blocking question, so its copies stay until a newer request.
   const e=harness();e.files.remove=async name=>e.disk.delete(name);await e.client.start();
-  await e.client.send('Reply turn');const replied=e.disk.get('request.json').id;e.reply();await e.client.poll();
-  assert.deepEqual(has(e,replied),[false,false],'replied: removed');
-  await e.client.send('Stopped turn');const stopped=e.disk.get('request.json').id;await e.client.cancel();
+  await e.client.send('Stopped turn');const stopped=e.disk.get('request.json').id;await e.client.cancel();await drain(e);
   assert.deepEqual(has(e,stopped),[false,false],'released: removed');
-  // A newer request clears an older one still on disk, but never another attempt's taken name.
-  await e.client.send('Older turn');const older=e.disk.get('request.json').id,n=Number(older.slice(3));e.reply({id:'reply-older'});
-  e.files.remove=async()=>{throw Error('Folder busy');};await e.client.poll();e.files.remove=async name=>e.disk.delete(name);
-  assert.deepEqual(has(e,older),[true,true],'precondition: a removal that failed is not fatal and is retried later');
+  await e.client.send('Question turn');const asked=e.disk.get('request.json').id,n=Number(asked.slice(3));e.reply({id:'reply-question',text:'Which customer?'});await e.client.poll();await drain(e);
+  assert.equal(e.last.pending,null);assert.deepEqual(has(e,asked),[true,true],'replied: kept for a follow-up');
+  // A failed removal never blocks a request and is retried; a name this client never published is left alone.
   e.disk.set(`candidate-id-${n+1}.ledger.md`,'someone else’s notes');await assert.rejects(e.client.send('Taken'),/already exists/);
-  await e.client.send('Newest turn');const newest=e.disk.get('request.json').id;
-  assert.deepEqual(has(e,older),[false,false],'a newer publication removes the finished request');
-  assert.deepEqual(has(e,newest),[true,true],'and keeps its own');
+  e.files.remove=async()=>{throw Error('Folder busy');};
+  await e.client.send('Newest turn');const newest=e.disk.get('request.json').id;await drain(e);
+  assert.deepEqual(has(e,asked),[true,true],'precondition: a removal that failed is not fatal');
+  e.files.remove=async name=>e.disk.delete(name);e.reply({id:'reply-newest'});await e.client.poll();await e.client.send('After');await drain(e);
+  assert.deepEqual(has(e,asked),[false,false],'a newer publication removes the finished request, retrying the failed removal');
+  assert.deepEqual(has(e,newest),[false,false]);assert.deepEqual(has(e,e.disk.get('request.json').id),[true,true],'and keeps its own');
   assert.equal(e.disk.get(`candidate-id-${n+1}.ledger.md`),'someone else’s notes','a name this client never published is left alone');
+});
+test('#1223 the background worker starts with the first delay, and a retired connection releases it',async()=>{
+  const h=hiddenHarness();
+  assert.equal(h.workers.length,0,'no worker before a connection asks for a delay');
+  await h.client.start();await h.settle();assert.equal(h.workers.length,1);
+  // Lost ownership retires the connection without destroy(); its worker and Blob URL are released.
+  h.disk.set('session.json',{...h.client.manifest(),connectionId:'another'});
+  for(let n=0;n<3;n++)await h.second();
+  assert.deepEqual(h.workers.map(w=>!!w.terminated),[true],'retirement ends the idle worker');
+  const live=()=>h.workers.filter(w=>!w.terminated).length;
+  h.client.destroy();assert.equal(live(),0);
+  // The tour's practice frame (page-only) never constructs one.
+  const timer=h.context.createWorkbenchBackgroundTimer({pageOnly:true});let fired=0;timer.delay(()=>fired++,250);assert.equal(h.workers.length,1);timer.destroy();
 });
 test('#1223 the directory adapter removes only candidate and staged snapshot files',async()=>{
   const h=harness(),removed=[];const directory={async removeEntry(name){removed.push(name);}};

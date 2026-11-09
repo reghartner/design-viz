@@ -54,7 +54,8 @@ function initWorkbenchAgentChat(opts){
   function writeClipboard(text){return opts.practice?opts.practice.copy(text):navigator.clipboard.writeText(text);}
   if(!root)return {destroy:function(){}};
   // #1223: request polling runs on a worker-driven timer so a hidden tab still answers its agent.
-  var life=createWorkbenchLifetime(),background=createWorkbenchBackgroundTimer(),client=null,timer=null,connecting=false,generation=0,releaseLock=null,adoptingProject=false;
+  // Its worker starts with the first connected tick; the tour's practice frame uses the page timer.
+  var life=createWorkbenchLifetime(),background=createWorkbenchBackgroundTimer({pageOnly:!!opts.practice}),client=null,timer=null,connecting=false,generation=0,releaseLock=null,adoptingProject=false;
   var workflow='external',composeMode='external',setupIntent='adopt',setupUseRemembered=false,freshProject=null,pendingFileChoice=null,copying=false,composeEpoch=0,activeFiles=null,renewing=false;
   var selectionFeedback=null,selectionFeedbackTimer=null;
   var state={connected:false,pending:null,transcript:[],changes:[],listening:false,pilotStatus:null},pilotRequested=false;
@@ -213,7 +214,7 @@ function initWorkbenchAgentChat(opts){
   }
   function restoreRecoveryForProject(current){
     if(adoptingProject || !current.open || seenProject===current.project)return;
-    generation++;background.cancelDelay(timer);
+    generation++;background.cancelDelay(timer);background.release();
     var retired=client,unlock=releaseLock;client=null;releaseLock=null;connecting=false;cacheReady=false;
     if(retired)retired.disconnect().catch(function(){}).finally(function(){retired.destroy();if(unlock)unlock();});else if(unlock)unlock();
     resetConversationForProject(current);
@@ -442,9 +443,10 @@ function initWorkbenchAgentChat(opts){
     }
     if(!state.connected && releaseLock){releaseLock();releaseLock=null;}
     if(life.alive() && token===generation && state.connected)timer=background.delay(function(){tick(token);},250);
+    else if(token===generation)background.release();
   }
   async function disconnect(){
-    var token=++generation;background.cancelDelay(timer);get('pilot-capture').checked=false;
+    var token=++generation;background.cancelDelay(timer);background.release();get('pilot-capture').checked=false;
     var workingDrain=opts.releaseWorking?opts.releaseWorking():Promise.resolve();
     var unlock=releaseLock;releaseLock=null;
     var old=client,message='Disconnected. Reopen your diagram folder or choose New Connection.';client=null;accessLost=false;connecting=true;handoff.hidden=true;
@@ -499,6 +501,8 @@ function initWorkbenchAgentChat(opts){
     if(!renewal)activeLocalRepository=projectFolder && projectFolder.localRepository || null;
     var workingBinding=files.artifacts?{name:directory.name+'/'+files.artifacts.spec,paired:true,external:true,localRepository:activeLocalRepository,handle:directory,artifacts:files.artifacts,flush:function(){return client?client.flush():Promise.reject(Error('Reconnect the diagram folder.'));},retry:function(){return client?client.flush():Promise.reject(Error('Reconnect the diagram folder.'));}}:null;
     if(workingBinding && opts.workingDestination)opts.workingDestination(workingBinding);
+    // A retired client is not destroyed by its retirement; release it (and its timer) before replacing it.
+    if(client){var replaced=client;client=null;try{replaced.destroy();}catch(ignored){}}
     client=createFolderAgentClient({files:files,artifactStatus:function(state,detail){if(workingBinding && opts.workingStatus)opts.workingStatus(workingBinding,state,detail);},snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,prepare:opts.prepare,normalize:opts.normalize,refreshSources:opts.refreshSources,topologyContext:opts.topologyContext,workflow:workflow,requireLedger:!!files.artifacts,
       level:function(){return get('level').value;},changed:function(update){if(life.alive() && token===generation && opts.snapshot().project===connectionProject){paint(update);if(update.connected===false && workingBinding && opts.workingStatus)opts.workingStatus(workingBinding,'disconnected');}}});
 
@@ -660,7 +664,7 @@ function initWorkbenchAgentChat(opts){
   async function reestablish(){
     if(!client || !state.connected || connecting || renewing || !activeFiles || !activeFolder || opts.practice)return;
     var old=client,previous=old.manifest(),directory=activeFolder,files=activeFiles,pilot=pilotRequested,token=++generation;
-    background.cancelDelay(timer);renewing=true;connecting=true;handoff.hidden=true;paint({});status('Re-establishing the session…');
+    background.cancelDelay(timer);background.release();renewing=true;connecting=true;handoff.hidden=true;paint({});status('Re-establishing the session…');
     try{
       // Release the old turn under its own identity, then close it before claiming new ids.
       await old.flush();

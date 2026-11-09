@@ -28,6 +28,8 @@ HEARTBEAT_MAX_AGE_MS = 15000
 # With the same identity and a connected lease, wait two such cycles before giving up.
 RECOVERY_SECONDS = 120
 ACKNOWLEDGEMENT_SECONDS = 120
+# The Workbench refuses a refresh envelope that expires more than 120 s ahead; keep a margin.
+REFRESH_SECONDS = 110
 HIDDEN_TAB = 'a hidden tab can be slowed by the browser'
 
 
@@ -667,11 +669,11 @@ def refresh_sources(folder, source_repo=None):
         return {**owner, 'status': 'rejected', 'code': 'invalid_sources', 'message': str(error), 'currentRevision': revision, 'localSources': capability}
     available()
     request = {**owner, 'version': 1, 'id': uuid.uuid4().hex, 'baseRevision': revision,
-               'expiresAt': int(time.time()*1000) + ACKNOWLEDGEMENT_SECONDS*1000}
+               'expiresAt': int(time.time()*1000) + REFRESH_SECONDS*1000}
     if snapshot is not None:
         request['sources'] = snapshot
     write(folder, 'refresh-sources.json', request, guard=available)
-    deadline = time.monotonic() + ACKNOWLEDGEMENT_SECONDS
+    deadline = time.monotonic() + REFRESH_SECONDS
     try:
         while True:
             connected_editor(folder, owner, allow_stale=True)

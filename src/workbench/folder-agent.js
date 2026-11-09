@@ -178,7 +178,7 @@ function createFolderAgentClient(opts){
   }
   function retire(status,write){
     var owner=manifest && {sessionId:manifest.sessionId,connectionId:manifest.connectionId};
-    connected=false;heartbeatReady=false;pending=null;pendingAcceptance=null;pendingRefreshResult=null;epoch++;stopHeartbeat();stopHeartbeatListeners();clearReview();publish({status:status,listening:false});
+    connected=false;heartbeatReady=false;pending=null;pendingAcceptance=null;pendingRefreshResult=null;epoch++;stopHeartbeat();background.release();stopHeartbeatListeners();clearReview();publish({status:status,listening:false});
     return write && owner?writeDisconnected(owner):Promise.resolve();
   }
   function scheduleHeartbeat(){
@@ -347,18 +347,21 @@ function createFolderAgentClient(opts){
   // #1223: a finished request's candidate copies are deleted: every request this session
   // published (its transcript) except the current one. Names this client never published
   // (a taken or raced name) are not ours. Best effort; it never blocks the request flow.
+  // Queued after the current job, never awaited by it: removals cannot delay a request.
   var cleanedCandidates=new Set();
-  async function cleanupCandidates(token){
+  async function cleanupCandidates(token,extra){
     if(typeof files.remove!=='function' || !alive(token))return;
     try{
       var owner=await files.read('session.json');if(!alive(token) || !belongs(owner))return;
       var ids=transcript.filter(function(item){return item.role==='user' && validId(item.requestId) && item.requestId!==pending && !cleanedCandidates.has(item.requestId);}).map(function(item){return item.requestId;});
+      if(extra && validId(extra) && extra!==pending)ids.push(extra);
       for(var id of Array.from(new Set(ids))){
         if(!alive(token))return;
         await files.remove('candidate-'+id+'.spec.json');await files.remove('candidate-'+id+'.ledger.md');cleanedCandidates.add(id);
       }
     }catch(ignored){}
   }
+  function queueCleanup(token,extra){serial(function(){return cleanupCandidates(token,extra);});}
   async function readOptional(name){
     try{return await files.read(name);}catch(ex){
       if(ex instanceof SyntaxError || ex.name==='NotReadableError')return null;
@@ -399,7 +402,7 @@ function createFolderAgentClient(opts){
     seen.add(accepted.result.id);exchange.receive({acknowledged:accepted.result.id},exchange.request());
     pendingAcceptance=null;pendingReviewResult=null;pending=null;turnEpoch++;clearReview();
     publish({status:'Update accepted and saved. Continue in your agent.',progress:''});
-    await cleanupCandidates(token);
+    queueCleanup(token);
   }
   // A refresh is independent of a story request. Optional provider bytes are
   // revalidated against the current consumer; no consumer replacement is accepted.
@@ -477,7 +480,7 @@ function createFolderAgentClient(opts){
         var expiredId=pending;pending=null;turnEpoch++;clearReceipt();clearReview();activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;
         transcript.forEach(function(item){if(item.requestId===expiredId && item.role==='user')item.cancelled=true;});
         await files.write('cancel.json',envelope({id:uuid(),requestId:expiredId,at:now(),reason:'The agent timed out before receiving acknowledgement. Retry this request.'}));
-        if(!alive(token))return;await saveTranscript();publish({status:'The agent request expired before acknowledgement. Ask your agent to retry.'});await cleanupCandidates(token);return;
+        if(!alive(token))return;await saveTranscript();publish({status:'The agent request expired before acknowledgement. Ask your agent to retry.'});queueCleanup(token);return;
       }
       if(!pending && belongs(incoming) && validId(incoming.id) && typeof incoming.text==='string' && incoming.text.trim() && incoming.text.length<=16000 && Number.isFinite(incoming.expiresAt) && incoming.expiresAt>now() && !nativeSeen.has(incoming.id)){
         var request=envelope({id:incoming.id,text:incoming.text,at:now(),revision:sent.snapshot.revision,selection:[],views:[],
@@ -501,7 +504,8 @@ function createFolderAgentClient(opts){
         if(now()>=incoming.expiresAt){
           nativeSeen.add(incoming.id);
           await files.write('cancel.json',envelope({id:uuid(),requestId:incoming.id,at:now(),reason:'Native request expired during publication. Retry this request.'}));
-          if(alive(token))publish({status:'The agent request expired before acknowledgement. Ask your agent to retry.'});return;
+          // Its copies were seeded in full for this request, which will never run.
+          if(alive(token)){publish({status:'The agent request expired before acknowledgement. Ask your agent to retry.'});queueCleanup(token,incoming.id);}return;
         }
         // Pin only an accepted publication; the base is still sent.snapshot.
         exchange.pin(sent.snapshot);
@@ -509,7 +513,7 @@ function createFolderAgentClient(opts){
         activity=[];activitySeen.clear();clearReceipt();clearReview();
         transcript.push({role:'user',text:incoming.text,requestId:incoming.id});await saveTranscript();
         publish({status:'Your agent is preparing an update. It will wait for your review.'});
-        await cleanupCandidates(token);if(!alive(token) || turn!==turnEpoch)return;
+        queueCleanup(token);
       }
     }
     if(changesDirty){await saveChanges();if(!alive(token) || turn!==turnEpoch)return;}
@@ -573,8 +577,8 @@ function createFolderAgentClient(opts){
     if((!belongs(proposal) || proposal.requestId!==pending || seen.has(proposal.id)) && belongs(reply) && validText(reply) && pending && reply.requestId===pending && !seen.has(reply.id)){
       seen.add(reply.id);transcript.push({role:'assistant',text:reply.text,requestId:pending});
       pending=null;publish({status:opts.workflow==='external'?'Request finished. Continue in your agent.':'Reply received. You can continue the conversation.',progress:''});
+      // A reply can be a blocking question; the request's copies stay until a newer request.
       await saveTranscript();if(!alive(token))return;
-      await cleanupCandidates(token);if(!alive(token))return;
     }
     var listener=await readOptional('listener.json');if(!alive(token) || turn!==turnEpoch)return;
     var listening=belongs(listener) && listener.listening===true && now()-listener.at>=0 && now()-listener.at<5000;
@@ -732,7 +736,7 @@ function createFolderAgentClient(opts){
         exchange.pin(sent.snapshot);
         transcript.push({role:'user',text:text,requestId:id,context:{selection:request.selection,views:request.views,technicalLevel:request.technicalLevel,previewCurrent:request.previewCurrent}});
         publish({status:request.delivery==='clipboard'?'Request ready to copy. Continue in your agent.':'Message saved — waiting for Claude.',progress:''});
-        await saveTranscript();await cleanupCandidates(token);return request;
+        await saveTranscript();queueCleanup(token);return request;
       }catch(ex){
         // A committed request remains pending when only its transcript failed to save.
         if(!transcript.some(function(item){return item.requestId===id;})){if(pending===id)pending=null;publish({});}
@@ -765,7 +769,7 @@ function createFolderAgentClient(opts){
         await files.write('cancel.json',envelope({id:uuid(),requestId:requestId,at:now(),reason:reason || 'Released in the editor.'}));
         if(!alive(token))return false;
         if(changesDirty){await saveChanges();if(!alive(token))return false;}
-        await saveTranscript();await cleanupCandidates(token);return true;
+        await saveTranscript();queueCleanup(token);return true;
       });
     },
     readLedger:function(){return serial(async function(){

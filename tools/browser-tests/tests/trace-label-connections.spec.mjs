@@ -126,11 +126,15 @@ function addBlocker(root,box){
  },box);
 }
 // Places blockers against a loaded trace's measured labels, then loads the trace again and waits until every
-// trace label has been painted anew (the old label elements are marked first).
+// trace label has been painted anew (the old label elements are marked first). A loaded trace collapses the
+// load options into one line, which is opened first.
 async function reblock(root,boxes){
  for(const box of boxes){const got=await addBlocker(root,box);for(const k of ['x0','x1','y0','y1'])expect(Math.abs(got[k]-box[k]),'blocker '+k).toBeLessThan(1);}
  await root.evaluate(host=>(host.shadowRoot || host).querySelectorAll('.dv-trace-overlay text').forEach(t=>t.setAttribute('data-test-old','')));
- await root.getByRole('button',{name:'Load trace',exact:true}).click();
+ const options=root.locator('summary[aria-label="Change or load another trace"]');await expect(options).toBeVisible();
+ if(!await options.evaluate(summary=>summary.parentNode.open))await options.click();
+ const again=root.getByRole('button',{name:'Load trace',exact:true});await expect(again).toBeVisible();
+ await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await again.click();
  await expect(root.locator('.dv-trace-overlay text[data-test-old]'),'painted anew').toHaveCount(0);
  await expect(root.locator('.dv-trace-overlay text')).toHaveCount(7);
 }

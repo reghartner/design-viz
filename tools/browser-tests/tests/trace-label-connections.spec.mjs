@@ -42,15 +42,21 @@ function imported(){
  d.steps=local.steps.map(step=>({...step,...step.nodes?{nodes:step.nodes.map(q)}:{},...step.edge?{edge:step.edge.split('->').map(q).join('->')}:{},...step.traceMatch?{traceMatch:Array.isArray(step.traceMatch)?step.traceMatch.map(match):match(step.traceMatch)}:{}}));
  return Object.assign(d,{view:local.view,autoplay:false,panels:local.panels,sectionLayout:local.sectionLayout});
 }
-async function setup(page,server,origin,{skin,metrics}={}){
- const spec={page:{title:'Checkout request path',...skin?{skin}:{},tracking:{telemetry:{traceConnections:{company:PROFILE}}},sections:[{id:'main',heading:'Checkout',diagram:origin==='imported'?imported():checkout()}]}};
+// focusUnlit: the PlaceOrder span errors, so it is auto-focused, and its step lights only the frontend, so
+// the focused Checkout service node is not lit by the step.
+async function setup(page,server,origin,{skin,metrics,focusUnlit}={}){
+ const diagram=origin==='imported'?imported():checkout();
+ if(focusUnlit)diagram.steps=diagram.steps.map(step=>step.id==='place'?(({edge,...rest})=>({...rest,nodes:['web']}))(step):step);
+ const text=focusUnlit?RECORDED.replace(/^(\| 2275c50ef5f955a5 \|(?:[^|]*\|){4}) UNSET \| false \|/m,'$1 ERROR | true |'):RECORDED;
+ if(focusUnlit && text===RECORDED)throw new Error('PlaceOrder span not found in the recorded trace');
+ const spec={page:{title:'Checkout request path',...skin?{skin}:{},tracking:{telemetry:{traceConnections:{company:PROFILE}}},sections:[{id:'main',heading:'Checkout',diagram}]}};
  const prefix=origin==='imported'?'shop::':'',key=(a,b)=>prefix+a+'->'+prefix+b,n=v=>({value:v,unit:'req/h'});
  const samples={[key('web','checkout')]:{signals:{rate:n(5500),errors:n(12),p95:{value:4447,unit:'ms'}}},[key('checkout','cart')]:{signals:{rate:n(5400),errors:n(3),p95:{value:41,unit:'ms'}}},[key('checkout','payment')]:{signals:{rate:n(5200),errors:n(140),p95:{value:262,unit:'ms'}}}};
  await page.setViewportSize({width:1440,height:1100});
  await writeFile(path.join(server.root,'trace-label-connections-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
  await writeFile(path.join(server.root,'trace-label-connections.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./trace-label-connections-native.js";window.mount=mountNativeViewer;</script>');
  await page.goto(server.origin+'/trace-label-connections.html');await page.waitForFunction(()=>!!window.mount);
- await page.evaluate(({spec,schema,text,samples,metrics})=>{window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{...metrics?{provider:async()=>structuredClone(samples)}:{},directTrace:{describe:async()=>schema,call:async()=>({payload:text})}}});},{spec,schema,text:RECORDED,samples,metrics});
+ await page.evaluate(({spec,schema,text,samples,metrics})=>{window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{...metrics?{provider:async()=>structuredClone(samples)}:{},directTrace:{describe:async()=>schema,call:async()=>({payload:text})}}});},{spec,schema,text,samples,metrics});
  return page.locator('#host');
 }
 // Runs in the page against the viewer's shadow root: shown connection labels (position and box), trace
@@ -65,7 +71,9 @@ function labels(root){
   const onTop=(t,c)=>{const g=t.el.parentNode,x=(Math.max(t.box.left,c.box.left)+Math.min(t.box.right,c.box.right))/2,y=(Math.max(t.box.top,c.box.top)+Math.min(t.box.bottom,c.box.bottom))/2;
    g.style.pointerEvents='visiblePainted';const top=scope.elementFromPoint(x,y);g.style.pointerEvents='';return !!top && (top===t.el || top===t.plate || t.el.contains(top));};
   const overlaps=[],plates=[];traces.forEach(t=>connections.forEach(c=>{if(hit(t.box,c.box) && !(t.plate && onTop(t,c)))overlaps.push('"'+t.text+'" on "'+c.text+'"');}));
-  traces.forEach(t=>{if(t.plate){const st=getComputedStyle(t.plate),gs=getComputedStyle(t.el.parentNode);plates.push({text:t.text,opacity:st.opacity,group:gs.opacity,fill:st.fill,ink:getComputedStyle(t.el).fill,ground:getComputedStyle(t.el.closest('.board')).backgroundColor});}});
+  // effective: the plate's opacity times every ancestor's, up to the svg.
+  const effective=el=>{let e=1;for(;el && el.tagName!=='svg';el=el.parentNode)e*=Number(getComputedStyle(el).opacity);return e;};
+  traces.forEach(t=>{if(t.plate){const st=getComputedStyle(t.plate);plates.push({text:t.text,opacity:st.opacity,effective:effective(t.plate),textOpacity:getComputedStyle(t.el).fillOpacity,focus:t.el.parentNode.getAttribute('data-trace-focus'),fill:st.fill,ink:getComputedStyle(t.el).fill,ground:getComputedStyle(t.el.closest('.board')).backgroundColor});}});
   return {connections:connections.map(c=>[c.text,c.x,c.y,c.transform]),traces:traces.length,overlaps,plates};
  });
 }
@@ -88,38 +96,59 @@ function block(root,origin,mode){
   const m=svg.getCTM().inverse().multiply(card.getCTM()),b=card.getBBox(),cx=m.a*(b.x+b.width/2)+m.e,cb=m.d*(b.y+b.height)+m.f;
   const add=(x,y,w,size)=>{const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('class','lbl');t.setAttribute('data-test-blocker','');
    t.setAttribute('x',x);t.setAttribute('y',y);t.setAttribute('textLength',w);t.setAttribute('lengthAdjust','spacingAndGlyphs');t.style.fontSize=size+'px';t.textContent='blocker';svg.appendChild(t);};
-  if(mode==='all')add(cx-200,cb+175,400,200);else add(cx-30,cb+60,60,24);
+  // 'side': the real ShipOrder label is hidden so only the blocker decides; the blocker covers the left of
+  // the label's home spot and every spot straight down, leaving room to the right within the card.
+  if(mode==='all')add(cx-200,cb+175,400,200);
+  else{Array.from(scope.querySelectorAll('text.lbl')).find(l=>l.textContent==='ShipOrder').style.display='none';add(cx-40,cb+58,35,56);}
  },{id:(origin==='imported'?'shop::':'')+'checkout',mode});
 }
-async function load(root){
+// count: labels painted (6 with focusUnlit, whose PlaceOrder step has no edge).
+async function load(root,count=7){
  await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
  await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await root.getByRole('button',{name:'Load trace',exact:true}).click();
- await expect(root.locator('.dv-trace-overlay text')).toHaveCount(7);
+ await expect(root.locator('.dv-trace-overlay text')).toHaveCount(count);
 }
-// The Checkout service's time label: its text x/y, the spot it is first placed at (centred, 24 under its card),
-// and whether it has a plate. A plated label is raised to the top of the svg with data-trace-node.
+// The Checkout service's time label: its text x/y and width, the spot it is first placed at (centred, 24 under
+// its card), its card's width, and whether it has a plate. A plated label is raised to the top of the svg with data-trace-node.
 const checkoutLabel=(root,origin)=>root.evaluate((host,id)=>{
  const scope=host.shadowRoot || host,node=scope.querySelector('g.node[data-dv-node="'+id+'"]'),card=node.querySelector('.card').getBBox();
  const g=node.querySelector('.dv-trace-overlay') || scope.querySelector('.dv-trace-overlay[data-trace-node="'+id+'"]'),text=g && g.querySelector('text');
- return text?{x:Number(text.getAttribute('x')),y:Number(text.getAttribute('y')),home:{x:card.x+card.width/2,y:card.y+card.height+24},plate:!!g.querySelector('.dv-trace-label-plate')}:null;
+ return text?{x:Number(text.getAttribute('x')),y:Number(text.getAttribute('y')),width:text.getBBox().width,card:card.width,home:{x:card.x+card.width/2,y:card.y+card.height+24},plate:!!g.querySelector('.dv-trace-label-plate')}:null;
 },(origin==='imported'?'shop::':'')+'checkout');
-test('desktop a trace label blocked straight down moves sideways',async({page,server})=>{
- const root=await setup(page,server,'local');await block(root,'local','down');await load(root);
+test('desktop a trace label blocked straight down moves sideways, staying within its card',async({page,server})=>{
+ const root=await setup(page,server,'local');await block(root,'local','side');await load(root);
  const moved=await checkoutLabel(root,'local'),after=await labels(root);
  expect(moved.plate,'a clear spot exists sideways').toBe(false);
  expect(moved.y,'not moved down').toBeCloseTo(moved.home.y,3);expect(Math.abs(moved.x-moved.home.x),'moved sideways').toBeGreaterThan(10);
+ expect(Math.abs(moved.x-moved.home.x)+moved.width/2,'the whole label stays within its card width').toBeLessThanOrEqual(moved.card/2);
  expect(after.overlaps).toEqual([]);
 });
 test('desktop with no clear spot the label is plated above the connection labels in the board ground colour, on a dark skin',async({page,server},info)=>{
  const root=await setup(page,server,'local',{skin:'blueprint'});await block(root,'local','all');await load(root);
  const label=await checkoutLabel(root,'local');expect(label.plate,'no clear spot: a plate').toBe(true);
+ expect(label.x,'not moved off its card').toBeCloseTo(label.home.x,3);
  const after=await labels(root);expect(after.overlaps,'the plated label is drawn on top of the connection labels').toEqual([]);
- const plate=after.plates.find(p=>/ms/.test(p.text));expect(plate.opacity).toBe('1');
- // Raised out of g.node, the label keeps its node's step dimming.
- expect(plate.group,'the plated label keeps its node dimming').toBe(await root.evaluate(host=>getComputedStyle((host.shadowRoot || host).querySelector('g.node[data-dv-node="checkout"]')).opacity));
+ const plate=after.plates.find(p=>/^4,446 ms/.test(p.text));expect(plate.opacity).toBe('1');
+ expect(plate.effective,'the plate is fully opaque').toBe(1);
+ // Raised out of g.node, the label's text keeps its node's step dimming (the node is not lit here).
+ const node=await nodeOpacity(root);expect(Number(node),'the Checkout node is dimmed').toBeLessThan(1);
+ expect(plate.textOpacity,'the plated text keeps its node dimming').toBe(node);
  expect(plate.fill,'the plate takes the board ground').toBe(plate.ground);expect(plate.fill).not.toBe(plate.ink);
  await info.attach('trace-label-plate-blueprint',{body:await root.screenshot(),contentType:'image/png'});
 });
+test('desktop a plated label of the trace-focused node is not dimmed',async({page,server})=>{
+ const root=await setup(page,server,'local',{skin:'blueprint',focusUnlit:true});await block(root,'local','all');await load(root,6);
+ await expect(root.locator('g.node[data-dv-node="checkout"]'),'the errored span is focused on the Checkout node').toHaveAttribute('data-trace-focus','true');
+ await expect(root.locator('g.node[data-dv-node="checkout"]'),'not lit by the step').not.toHaveClass(/\blit\b/);
+ await expect.poll(()=>nodeOpacity(root),'a trace-focused node is not dimmed').toBe('1');
+ const plate=(await labels(root)).plates.find(p=>/^4,446 ms/.test(p.text));
+ expect(plate.focus).toBe('true');expect(plate.effective).toBe(1);expect(plate.textOpacity,'its plated label is not dimmed either').toBe('1');
+});
+// The Checkout node's settled opacity (step dimming fades over 0.4s).
+async function nodeOpacity(root){
+ let last=null;for(let i=0;i<20;i++){const v=await root.evaluate(host=>getComputedStyle((host.shadowRoot || host).querySelector('g.node[data-dv-node="checkout"]')).opacity);if(v===last)return v;last=v;await new Promise(r=>setTimeout(r,250));}
+ return last;
+}
 // Moves a connection label (one a metric card hides) onto the Shipping service time label's home spot:
 // centred, 22 under the card. Test-only, before the trace loads.
 function moveOntoShippingHome(root,text){

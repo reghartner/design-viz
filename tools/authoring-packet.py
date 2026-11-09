@@ -111,7 +111,7 @@ def company_rules(contract):
     if start is None: return []
     fragments, path, body = [], None, []
     for line in lines[start:] + ['<!-- end -->']:
-        match = re.match(r'^<!-- (company/contract/[^\s]+\.md|end) -->$', line)
+        match = re.match(r'^<!-- (company/contract/.+\.md|end) -->$', line)
         if not match:
             if path: body.append(line)
             continue
@@ -274,9 +274,11 @@ def generate(panel_names, feature_names, mode='new', raw=None):
         parts.append('## Company rules\n\nThis fork\'s `company/contract/` fragments, in file-name order. They extend the '
                      'authoring contract and follow its rules. Their panel sections come with the selected panel.')
         for path, text in rules:
+            # Like every source, hashed as a whole file; a portable kit has only the contract's copy.
+            source = (ROOT / path).read_text() if (ROOT / path).is_file() else text
             text = normalize_links(text, CONTRACT)
             parts.append('<!-- Source: ' + path + ' -->\n' + text)
-            provenance.append({'path': path, 'section': None, 'sha256': hashlib.sha256(text.encode()).hexdigest(), 'characters': len(text), 'bytes': len(text.encode())})
+            provenance.append({'path': path, 'section': None, 'sha256': hashlib.sha256(source.encode()).hexdigest(), 'characters': len(text), 'bytes': len(text.encode())})
     routes = {'docs/visibility-evidence.md', 'docs/auto-arrange.md',
               REFS + 'bindings-and-code.md', REFS + 'recipe-routing.md'}
     if mode == 'new': routes.update({REFS + 'storyboard-worksheet.md', REFS + 'worked-example.md'})

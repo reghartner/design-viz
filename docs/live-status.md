@@ -2128,9 +2128,12 @@ there: a node named by one matched step and one missing optional step reads
 *optional, not in this trace: service operation*, it never makes the node unknown, and a
 node whose only row is a missing optional step gets no label. The coverage line leaves it
 out and adds the count: `1/3 steps matched · 1 optional not in this trace · 0 spans
-unmatched`. Edge labels carry matched rows only, so a missing step never adds to them. A
+unmatched`. Edge labels and titles carry matched rows only, so a missing step, optional or
+not, never adds to an edge and an edge title does not list a missing optional step. A
 matched optional step reads like any matched step; an ambiguous one still counts as
-ambiguous. Local, imported and drill-down steps follow the same rules.
+ambiguous. Local, imported and drill-down steps follow the same rules. A trace that lacks
+an optional step can still be approved as the reference trace; a missing step without
+`optional` still blocks approval.
 
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
 deduplicated in-memory Jira Activity entry, without posting externally. Trace

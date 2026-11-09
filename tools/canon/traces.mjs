@@ -50,7 +50,8 @@ export function mapTrace(d,trace,pathId){return C.traceMatch.mapTrace(d,trace,pa
 export function referencePreview(spec,raw,section=0){
   const d=C.sections(spec)[section]?.diagram;if(!d)throw new Error('Diagram section not found.');
   const steps=baseSteps(d);if(!steps.length || steps.some(s=>!s || typeof s.id!=='string' || !s.id) || new Set(steps.map(s=>s.id)).size!==steps.length)throw new Error('Give every baseline step a stable unique ID before attaching trace evidence.');
-  const trace=normalizeTrace(raw),mapping=mapTrace(d,trace),measured=mapping.steps.filter(s=>s.status!=='unmapped');
+  // #1175: a missing optional step is absent by design; it neither blocks approval nor enters the reference mapping.
+  const trace=normalizeTrace(raw),mapping=mapTrace(d,trace),measured=mapping.steps.filter(s=>s.status!=='unmapped' && !s.optional);
   const errors=C.validateSpec(spec).errors || [];if(errors.length)throw new Error(errors.join('\n'));
   const eligible=measured.length>0 && measured.every(s=>s.status==='matched' && !s.conditions.length);
   return {trace,mapping,eligible,reason:eligible?'Review the mapping, then approve this reference.':'Every instrumented step must map uniquely and satisfy authored budgets before reference approval.'};
@@ -59,7 +60,7 @@ export function approveReference(spec,raw,{section=0,reason,actor='local reviewe
   if(!reason?.trim())throw new Error('Reference approval requires a reason.');
   const preview=referencePreview(spec,raw,section);if(!preview.eligible)throw new Error(preview.reason);
   const out=C.clone(spec),d=C.sections(out)[section].diagram;
-  d.referenceTrace={version:1,trace:preview.trace,mapping:preview.mapping.steps.filter(s=>s.status!=='unmapped').map(s=>({stepId:s.stepId,spanIds:s.spans.map(p=>p.id)})),
+  d.referenceTrace={version:1,trace:preview.trace,mapping:preview.mapping.steps.filter(s=>s.status!=='unmapped' && !s.optional).map(s=>({stepId:s.stepId,spanIds:s.spans.map(p=>p.id)})),
     contract:digest(baseSteps(d).map(s=>({id:s.id,traceMatch:s.traceMatch || null}))),approval:{actor,reason:reason.trim(),at}};
   return out;
 }

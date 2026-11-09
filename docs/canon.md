@@ -240,9 +240,11 @@ the first that matches maps the step (see
 every entry sets it or none does; mixed or non-boolean values are validation
 errors. A missing optional step maps as `status:"missing"` with `optional:true`,
 detail `Optional, not in this trace.` and no unknown condition, so it is not a
-comparison divergence; `trace-cli preview` shows it that way. Reference approval
-still requires every instrumented step to match. A matched or ambiguous optional
-step is unchanged. Viewer labels: [live status](live-status.md#story-mode).
+comparison divergence; `trace-cli preview` shows it that way. It does not block
+reference approval and is left out of the reference mapping; a missing step
+without `optional`, or an ambiguous optional step, still blocks approval. A
+matched or ambiguous optional step is unchanged. Viewer labels:
+[live status](live-status.md#story-mode).
 
 Budgets are authored expectations, not inferred SLOs. `maxDurationMs` compares
 individual observed durations. `maxQueueDepth` uses `messaging.queue.depth` or

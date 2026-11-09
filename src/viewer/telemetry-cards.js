@@ -91,13 +91,14 @@ function telemetryCardPlace(path,w,h,placement,boxes){
 }
 /* The leader from the edge midpoint to its card, with a gap wherever it would
    cross a trace label (#1163), so the line never strikes through the label. */
+function telemetrySegmentInBox(a,b,r,pad){
+  var dx=b.x-a.x,dy=b.y-a.y,lo=0,hi=1,p=[-dx,dx,-dy,dy],q=[a.x-r.x+pad,r.x+r.w+pad-a.x,a.y-r.y+pad,r.y+r.h+pad-a.y];
+  for(var i=0;i<4;i++){if(!p[i]){if(q[i]<0)return null;continue;}var u=q[i]/p[i];if(p[i]<0)lo=Math.max(lo,u);else hi=Math.min(hi,u);}
+  return lo<hi?[lo,hi]:null;
+}
 function telemetryCardLeader(a,b,labels){
   var dx=b.x-a.x,dy=b.y-a.y,gaps=[],d='',t=0;
-  (labels || []).forEach(function(r){
-    var lo=0,hi=1,p=[-dx,dx,-dy,dy],q=[a.x-r.x+3,r.x+r.w+3-a.x,a.y-r.y+3,r.y+r.h+3-a.y];
-    for(var i=0;i<4;i++){if(!p[i]){if(q[i]<0)return;continue;}var u=q[i]/p[i];if(p[i]<0)lo=Math.max(lo,u);else hi=Math.min(hi,u);}
-    if(lo<hi)gaps.push([lo,hi]);
-  });
+  (labels || []).forEach(function(r){var gap=telemetrySegmentInBox(a,b,r,3);if(gap)gaps.push(gap);});
   function at(u){return (a.x+dx*u)+' '+(a.y+dy*u);}
   gaps.sort(function(g,h){return g[0]-h[0];}).forEach(function(g){if(g[0]>t)d+='M'+at(t)+'L'+at(g[0]);t=Math.max(t,g[1]);});
   return t<1?d+'M'+at(t)+'L'+at(1):d;
@@ -105,6 +106,18 @@ function telemetryCardLeader(a,b,labels){
 /* Leader to the nearest point of a card box; shared with the Workbench card drag preview. */
 function telemetryCardLeaderTo(mid,box,labels){
   return telemetryCardLeader(mid,{x:Math.max(box.x,Math.min(box.x+box.w,mid.x)),y:Math.max(box.y,Math.min(box.y+box.h,mid.y))},labels);
+}
+/* Whether any of these trace labels now meets a metric card or a drawn card leader (#1163). */
+function telemetryTraceLabelsBlocked(texts){
+  return texts.some(function(text){
+    var svg=text.closest('svg'),box=svg && boardControlBox(text,svg);if(!box)return false;
+    return Array.from(svg.querySelectorAll('.dv-metrics-card-box')).some(function(el){var card=boardControlBox(el,svg);return !!card && boardBoxesOverlap(box,card,0);}) ||
+      Array.from(svg.querySelectorAll('.dv-metrics-leader')).some(function(leader){
+        var n=(leader.getAttribute('d') || '').match(/-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi) || [];
+        for(var i=0;i+3<n.length;i+=4)if(telemetrySegmentInBox({x:+n[i],y:+n[i+1]},{x:+n[i+2],y:+n[i+3]},box,0))return true;
+        return false;
+      });
+  });
 }
 function telemetryTraceLabelBoxes(svg){
   return Array.from(svg.querySelectorAll('.dv-trace-overlay text')).map(function(el){return boardControlBox(el,svg);}).filter(Boolean);

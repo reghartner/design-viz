@@ -1103,13 +1103,16 @@ function createLiveStatus(ctl,page,options,renderOptions){
   /* #1163: metric cards are placed against the trace labels' boxes at paint time. Text is laid
      out again at each board scale, so a label's box can change without a paint: the Auto view
      rescales the board after the cards grow its frame (in CI a label widened by about 3%).
-     On a scale change, paint again at once if any label box changed, so the cards are placed
-     again in the same frame and no frame shows a card over a label. */
+     On a scale change, if a label's box changed and now meets a card or a drawn leader, paint
+     again at once, in the same frame. A scale change during a paint is checked after it. */
+  var traceRecheck=false;
   function traceLabelSize(text){var box=text.getBBox();return Math.round(box.width*10)+'x'+Math.round(box.height*10);}
   function recordTraceLabels(){view.querySelectorAll('.dv-trace-overlay text').forEach(function(text){text._dvTraceLabelSize=traceLabelSize(text);});}
   function traceLabelsResized(){
-    if(retired || painting || !telemetry.enabled() && !metricsPreview)return;
-    if(Array.prototype.some.call(view.querySelectorAll('.dv-trace-overlay text'),function(text){return text._dvTraceLabelSize!==undefined && text._dvTraceLabelSize!==traceLabelSize(text);})){paint();notify();}
+    if(retired || !telemetry.enabled() && !metricsPreview)return;
+    if(painting){traceRecheck=true;return;}
+    var changed=Array.prototype.filter.call(view.querySelectorAll('.dv-trace-overlay text'),function(text){var size=traceLabelSize(text),moved=text._dvTraceLabelSize!==size;text._dvTraceLabelSize=size;return moved;});
+    if(changed.length && telemetryTraceLabelsBlocked(changed)){paint();notify();}
   }
   view.addEventListener('board-scale-change',traceLabelsResized,true);
   destroyListeners.push(function(){view.removeEventListener('board-scale-change',traceLabelsResized,true);});
@@ -1922,6 +1925,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }finally{
       painting=false;if(!retired)observeBindings();
     }
+    if(traceRecheck){traceRecheck=false;traceLabelsResized();}
     if(!retired && editor)askPending();
   }
   function schedule(){if(retired || painting || frame)return;frame=requestAnimationFrame(function(){frame=0;paint();notify();});}

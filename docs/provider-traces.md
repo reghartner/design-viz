@@ -416,6 +416,6 @@ The Load trace **Connection environment** dropdown starts at the connection
 environment that matches the board **Environment**: the exact id first, then the
 id or label ignoring case, then a common alias (`prd`/`prod`/`production`,
 `stg`/`stage`/`staging`, `dev`/`development`, `qa`). With no single match it
-starts empty, or at the only environment when the connection has one. It follows
+starts empty. A connection with one environment shows no dropdown; that one applies (#1173). It follows
 later board Environment changes until the reader picks a connection environment;
 that pick is kept. Picking a different connection starts matching again.

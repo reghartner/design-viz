@@ -115,13 +115,32 @@ function paintTraceLabels(d,e){
 }
 test('a node whose traceMatch alternatives matched names the matched alternative and shows its time',()=>{
  let labels=paintTraceLabels(transportBoard(),transportTrace(traceSpan('p1',PULSAR,0,16.1),traceSpan('p-db','INSERT stats',2,9,'p1','stats-store')));
- assert.equal(labels.node('consumer').text,'Matched: stats-consumer '+PULSAR+' · 16.1 ms');assert.doesNotMatch(labels.node('consumer').text,/unknown/);
+ // Service and operation are cut to 40 characters on the canvas; the title keeps the full name.
+ assert.equal(labels.node('consumer').text,'Matched: stats-consumer persistent://stats/camer… · 16.1 ms');assert.doesNotMatch(labels.node('consumer').text,/unknown/);
+ assert.ok(labels.node('consumer').title.startsWith('Matched: stats-consumer '+PULSAR+': 16.1 ms'));
  assert.match(labels.node('consumer').title,new RegExp('not in this trace: stats-consumer '+RABBIT));assert.doesNotMatch(labels.node('consumer').title,/unknown/);
  assert.match(labels.node('consumer').title,/start to end, including its child spans/,'the title states what the time counts');
- assert.equal(labels.edge(0).text,'Matched: stats-consumer '+PULSAR+' · 16.1 ms','the uniquely delivered edge follows the same rules');
+ assert.equal(labels.edge(0).text,'Matched: stats-consumer persistent://stats/camer… · 16.1 ms','the uniquely delivered edge follows the same rules');
  labels=paintTraceLabels(transportBoard(),transportTrace(traceSpan('r1',RABBIT,0,4.97)));
- assert.equal(labels.node('consumer').text,'Matched: stats-consumer '+RABBIT+' · 4.97 ms');assert.match(labels.node('consumer').title,new RegExp('not in this trace: stats-consumer '+PULSAR.replace(/[/.]/g,'\\$&')));
- assert.equal(labels.edge(0).text,'Matched: stats-consumer '+RABBIT+' · 4.97 ms');
+ assert.equal(labels.node('consumer').text,'Matched: stats-consumer camera_stats_message pro… · 4.97 ms');assert.match(labels.node('consumer').title,new RegExp('not in this trace: stats-consumer '+PULSAR.replace(/[/.]/g,'\\$&')));
+ assert.ok(labels.node('consumer').title.startsWith('Matched: stats-consumer '+RABBIT+': 4.97 ms'));
+ assert.equal(labels.edge(0).text,'Matched: stats-consumer camera_stats_message pro… · 4.97 ms');
+});
+test('the canvas name of a matched alternative is capped at 40 characters; a short one is not cut',()=>{
+ const d=transportBoard(),long='two.leia.camera_stats_message process';d.steps[0].traceMatch[1].operation=long;
+ let label=paintTraceLabels(d,transportTrace(traceSpan('r1',long,0,4.97))).node('consumer');
+ assert.equal(label.text,'Matched: stats-consumer two.leia.camera_stats_me… · 4.97 ms');
+ assert.ok(label.text.replace(/^Matched: /,'').replace(/ · 4\.97 ms$/,'').length<=40);assert.ok(label.title.startsWith('Matched: stats-consumer '+long+': 4.97 ms'),'the title keeps the full name');
+ d.steps[0].traceMatch[1]={serviceName:'consumer',operation:'pulsar process',nodeId:'consumer'};
+ label=paintTraceLabels(d,transportTrace(traceSpan('r1','pulsar process',0,16.1,null,'consumer'))).node('consumer');
+ assert.equal(label.text,'Matched: consumer pulsar process · 16.1 ms');
+});
+test('an unmatched alternatives row never lists its own alternative among the others',()=>{
+ let label=paintTraceLabels(transportBoard(),transportTrace(traceSpan('p1',PULSAR,0,16.1),traceSpan('p2',PULSAR,1,4))).node('consumer');
+ assert.equal(label.text,'Ambiguous');assert.match(label.title,new RegExp('not in this trace: stats-consumer '+RABBIT));
+ assert.doesNotMatch(label.title,/in this trace, not matched/,'the ambiguous alternative is the row itself, not another alternative');
+ label=paintTraceLabels(transportBoard(),transportTrace(traceSpan('x1','unrelated',0,1))).node('consumer');
+ assert.equal(label.text,'Not observed');assert.match(label.title,/not in this trace: stats-consumer persistent:\/\/stats\/camera process$/,'only the other alternative is listed');
 });
 test('several matched spans on one node show the union of their intervals and the span count, never the sum',()=>{
  const d=transportBoard();d.steps.push({id:'persist',text:'Persist stats',traceMatch:{serviceName:'stats-consumer',operation:'INSERT stats',nodeId:'consumer',parentStepId:'consume'}});

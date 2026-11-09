@@ -84,11 +84,15 @@ async function capture(page,name){const dir=path.join(repo,'.local/step-evidence
 const traceTab=r=>r.getByRole('button',{name:/^Trace(?: · \d+)?$/});
 const selected=r=>r.locator('.dv-trace-selected');
 // #1136: a board without ticket references opens on Trace and shows no Jira | Trace switch.
-async function openTrace(root){if(await root.page().evaluate(()=>window.ctl.liveStatus.snapshot().available))await traceTab(root).click();else{await expect(traceTab(root)).toBeHidden();expect(await root.page().evaluate(()=>window.ctl.liveStatus.snapshot().mode)).toBe('trace');}if(await metric(root).getAttribute('aria-checked')==='false')await metric(root).click();await expect(selected(root)).toBeVisible();}
+// #1164: example traces are listed, but the reader picks one; the first entry's own trace makes no call.
+async function pickExample(root){await expect(root.locator('.dv-trace-candidate').first()).toBeVisible();const id=await root.page().evaluate(()=>window.ctl.liveStatus.snapshot().trace.entries[0].exemplar.traceId);await root.locator('.dv-trace-candidate[data-trace-id="'+id+'"]').first().click();await expect(selected(root)).toBeVisible();}
+async function openTrace(root,{pick=true}={}){if(await root.page().evaluate(()=>window.ctl.liveStatus.snapshot().available))await traceTab(root).click();else{await expect(traceTab(root)).toBeHidden();expect(await root.page().evaluate(()=>window.ctl.liveStatus.snapshot().mode)).toBe('trace');}if(await metric(root).getAttribute('aria-checked')==='false')await metric(root).click();if(pick)await pickExample(root);}
 
 test('Status modes are exclusive; actual request selection paints SVG independently of stepping',async({page,server})=>{
  const {root,f}=await setup(page,server);await expect(root.getByRole('button',{name:'Jira',exact:true})).toHaveAttribute('aria-pressed','true');await metric(root).click();await expect(root.locator('.dv-proof-caption')).toContainText('PROVEN');await expect(card(root)).toHaveCount(0);await expect(root.locator('.dv-metrics-card').first()).toBeVisible();
- await openTrace(root);await expect(root.locator('.dv-live-tickets,.dv-live-proof,.dv-live-epic,.dv-live-activity')).toHaveCount(0);await expect(root.locator('.dv-trace-waterfall')).toHaveCount(1);await expect(root.locator('g.node[data-dv-node="ingest"]')).toHaveAttribute('data-trace-tone','error');await expect(root.locator('path.edge[data-dv-edge="0"]')).toHaveAttribute('data-trace-status','matched');await expect(root.locator('.dv-jira-cue,.dv-live-target:not(.dv-metrics-card),.dv-live-stale,.dv-live-changed')).toHaveCount(0);
+ // #1164 (N3): Trace view, overlay on, nothing picked or loaded: examples are listed, none is selected, no durations paint.
+ await openTrace(root,{pick:false});await expect(root.locator('.dv-trace-candidate').first()).toBeVisible();await expect(selected(root)).toHaveCount(0);await expect(root.locator('.dv-trace-overlay,[data-trace-tone]')).toHaveCount(0);await capture(page,'status-trace-mode-unpicked');
+ await pickExample(root);await expect(root.locator('.dv-live-tickets,.dv-live-proof,.dv-live-epic,.dv-live-activity')).toHaveCount(0);await expect(root.locator('.dv-trace-waterfall')).toHaveCount(1);await expect(root.locator('g.node[data-dv-node="ingest"]')).toHaveAttribute('data-trace-tone','error');await expect(root.locator('path.edge[data-dv-edge="0"]')).toHaveAttribute('data-trace-status','matched');await expect(root.locator('.dv-jira-cue,.dv-live-target:not(.dv-metrics-card),.dv-live-stale,.dv-live-changed')).toHaveCount(0);
  // Chuck 2026-11-08 (D13): the Metrics overlay draws in every view, beside the trace highlighting, without Jira work paint.
  await expect(root.locator('.dv-metrics-card').first()).toBeVisible();await expect(root.locator('.dv-metrics-card[data-live-appearance]')).toHaveCount(0);
  const id=f.samples['mcu->ingest'].exemplars[0].traceId,calls=await page.evaluate(()=>({...window.calls}));await capture(page,'status-trace-mode');
@@ -117,7 +121,7 @@ test('history, off, capability removal and destroy retire selected evidence; nat
 for(const options of [{noTrace:true},{noTimeline:true},{unknown:true},{noHandler:true},{preload:true}])test('honest trace limits and unavailable alternatives '+JSON.stringify(options),async({page,server})=>{
  const {root}=await setup(page,server,options);await traceTab(root).click();if(!options.preload){await expect(metric(root)).toHaveAttribute('aria-checked','false');await metric(root).click();}
  if(options.noTrace){await expect(selected(root)).toHaveCount(0);await expect(root.locator('.dv-trace-mode-status')).toContainText('No trace evidence');return;}
- await expect(selected(root)).toBeVisible();if(options.noTimeline){await expect(root.locator('[data-trace-tone]')).toHaveCount(0);await expect(root.locator('.dv-trace-limit')).toContainText('timeline unavailable');}
+ await pickExample(root);if(options.noTimeline){await expect(root.locator('[data-trace-tone]')).toHaveCount(0);await expect(root.locator('.dv-trace-limit')).toContainText('timeline unavailable');}
  if(options.noHandler)await expect(root.locator('.dv-trace-candidate[aria-pressed="false"]').first()).toBeDisabled();
  if(options.unknown)await expect(selected(root).getByRole('link')).toHaveCount(0);
  await unchanged(page);

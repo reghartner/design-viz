@@ -3291,6 +3291,33 @@ function workPresentation(h,card){
  return {appearance:card.getAttribute('data-live-appearance'),classes:Array.from(h.C.LIVE_STATUS_APPEARANCES).filter(s=>card.classList.contains('dv-live-'+s)),halo:!!card.querySelector('.dv-live-halo'),
   label:/No change needed/.test(card.getAttribute('aria-label')||''),popover:!!pop && pop.querySelectorAll('.dv-live-coverage-detail').some(p=>/No change needed/.test(p.textContent||''))};
 }
+/* #1163 review c4: a board scale change re-lays out trace label text. It repaints (cards placed again)
+   only when a label's box changed and now meets a metric card or a drawn card leader; any other scale
+   change (Follow active moves, Ctrl+wheel) paints nothing. */
+test('#1163 a board scale change repaints only when a changed trace label meets a card or a leader',async()=>{
+ const f=await (await import('./helpers/step-evidence.mjs')).stepFixture();
+ const h=harness(f.spec,{},{telemetry:{provider:()=>Promise.resolve(structuredClone(f.samples))}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+ // SVG measurement shims so the real card painter places cards and the trace painter draws labels.
+ h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+ const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;},getCTM:()=>matrix,ownerDocument:h.doc});
+ for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
+ h.ctl.sections[0].stepper={path:()=>'event',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+ h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();api.setStatusMode('trace');h.flush();
+ const entry=api.snapshot().trace.entries[0];await api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});h.flush();
+ let cards=h.view.querySelectorAll('g.dv-metrics-card');const labels=()=>h.view.querySelectorAll('.dv-trace-overlay text');
+ assert.ok(cards.length && labels().length,'cards and trace labels are painted');
+ const paints=()=>{const now=h.view.querySelectorAll('g.dv-metrics-card'),moved=now[0]!==cards[0];cards=now;return moved;};
+ const scale=()=>h.view.dispatchEvent({type:'board-scale-change'});
+ const place=()=>cards.forEach(card=>card.querySelector('.dv-metrics-card-box').getBBox=()=>({x:0,y:400,width:240,height:100}));
+ place();const label=labels()[0],box=label.getBBox();
+ label.getBBox=()=>({...box,x:900,y:100});scale();assert.equal(paints(),false,'same size as at paint: no paint');
+ label.getBBox=()=>({x:900,y:100,width:box.width+40,height:box.height});scale();assert.equal(paints(),false,'a label grew but meets nothing: no paint');
+ label.getBBox=()=>({x:0,y:420,width:box.width+60,height:box.height});scale();assert.equal(paints(),true,'a label grew onto a card: paint, the cards are placed again');
+ place();const leader=h.view.querySelector('path.dv-metrics-leader').getAttribute('d').match(/-?[\d.]+/g).map(Number),mid={x:(leader[0]+leader[2])/2,y:(leader[1]+leader[3])/2};
+ const next=labels()[0],size=next.getBBox();next.getBBox=()=>({x:mid.x-(size.width+20)/2,y:mid.y-size.height/2,width:size.width+20,height:size.height});
+ scale();assert.equal(paints(),true,'a label grew under a drawn leader: paint');
+ api.destroy();
+});
 test('#1137 metric cards on a board without tickets get no Jira presentation; ticketed boards keep unchanged',async()=>{
  const free=await paintedCard({a:{},b:{}});
  assert.equal(free.h.ctl.liveStatus.snapshot().available,false,'fixture has no ticket references');

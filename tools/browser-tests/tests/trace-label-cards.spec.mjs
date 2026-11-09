@@ -109,21 +109,37 @@ async function stopSampling(root){
  const page=root.page();await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,500)));
  return page.evaluate(()=>{window.__traceLabelStop=true;return Array.from(window.__traceLabelProblems);});
 }
-// Label anchors in SVG user units (text x/y attributes), keyed by text, and whether the
-// label sits within 6 units of the board frame (where telemetryTraceConstrainLabel clamps it).
+// Label anchors in SVG user units (text x/y attributes), keyed by text, whether the label sits
+// within 6 units of the board frame (where telemetryTraceConstrainLabel clamps it), and its size.
 function anchors(root){return root.evaluate(host=>Array.from((host.shadowRoot || host).querySelectorAll('.dv-trace-overlay text')).map(t=>{
  const svg=t.closest('svg'),vb=svg.viewBox.baseVal,b=t.getBBox(),m=svg.getCTM().inverse().multiply(t.getCTM());
  const xs=[],ys=[];[[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].forEach(([x,y])=>{xs.push(m.a*x+m.c*y+m.e);ys.push(m.b*x+m.d*y+m.f);});
  const edge=Math.min(...xs)<vb.x+6 || Math.max(...xs)>vb.x+vb.width-6 || Math.min(...ys)<vb.y+6 || Math.max(...ys)>vb.y+vb.height-6;
- return [t.textContent,Number(t.getAttribute('x')),Number(t.getAttribute('y')),edge];
+ return [t.textContent,Number(t.getAttribute('x')),Number(t.getAttribute('y')),edge,b.width,b.height];
 }));}
+// Cards move; labels do not. An edge label is offset from its edge by its own size, and text is
+// laid out again at each board scale (CI: a few units at 56% against 72%), so a label may move by
+// its own size change, plus 2 units; never further, which a card pushing it would need.
+function expectSamePlace([text,x,y,,w,h],[,x0,y0,,w0,h0]){
+ const slack=2+Math.abs(w-w0)+Math.abs(h-h0);
+ expect(Math.abs(x-x0),text+' x').toBeLessThanOrEqual(slack);expect(Math.abs(y-y0),text+' y').toBeLessThanOrEqual(slack);
+}
 // Covered labels are the ticket (#1163); leader, node and frame findings are checked after them.
 function expectClear(seen,when){
  expect(seen.filter(p=>p.startsWith('label ')),'no metric card covers a trace label '+when).toEqual([]);
  expect(seen,'no leader through a label, no card over a node card, every card inside the frame '+when).toEqual([]);
 }
+// The board has settled once the zoom, the frame and every card transform hold for two frames
+// (the Auto fit after the cards grow the frame, and its repaint, are done).
+async function cameraSettled(root){
+ await expect.poll(()=>root.evaluate(host=>new Promise(resolve=>{
+  const scope=host.shadowRoot || host,zoom=scope.querySelector('.board-zoom-value'),svg=scope.querySelector('.board svg');
+  const read=()=>JSON.stringify([zoom && zoom.textContent,svg && svg.getAttribute('viewBox'),Array.from(scope.querySelectorAll('.dv-metrics-card')).map(card=>card.getAttribute('transform'))]);
+  const first=read();requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(first===read())));
+ })),{message:'the board camera and cards have settled'}).toBe(true);
+}
 async function expectSettled(root,when){
- const now=await measure(root);expect(now.labels,'trace labels seen in the viewer').toBe(6);expect(now.cards,'metric cards seen in the viewer').toBe(3);
+ await cameraSettled(root);const now=await measure(root);expect(now.labels,'trace labels seen in the viewer').toBe(6);expect(now.cards,'metric cards seen in the viewer').toBe(3);
  expectClear(now.problems,when);
 }
 
@@ -147,30 +163,29 @@ for(const origin of ['local','imported']){
   await startSampling(root);await metric(root).click();await expect(root.locator(CARDS)).toHaveCount(3);await expect(root.locator(LABELS)).toHaveCount(6);
   expectClear(await stopSampling(root),'at any paint after the first overlay-on');await expectSettled(root,'after the first overlay-on');
   const grown=await anchors(root);expect(grown).toHaveLength(6);expect(grown.map(a=>a[0])).toEqual(first.map(a=>a[0]));
-  grown.forEach(([text,x,y],i)=>{if(first[i][3])return;expect(Math.abs(x-first[i][1]),text+' x').toBeLessThanOrEqual(2);expect(Math.abs(y-first[i][2]),text+' y').toBeLessThanOrEqual(2);});
+  grown.forEach((label,i)=>{if(!first[i][3])expectSamePlace(label,first[i]);});
   await metric(root).click();await expect(root.locator(CARDS)).toHaveCount(0);
   await expect(root.locator(LABELS)).toHaveCount(6);const off=await anchors(root);expect(off).toHaveLength(6);
   await metric(root).click();await expect(root.locator(CARDS)).toHaveCount(3);await expect(root.locator(LABELS)).toHaveCount(6);
   await expectSettled(root,'after the overlay turns on again');
   const on=await anchors(root);expect(on.map(a=>a[0])).toEqual(off.map(a=>a[0]));
-  // Cards move; labels do not. Edge labels follow font metrics by about a unit between overlay states, as before #1163.
-  on.forEach(([text,x,y],i)=>{expect(Math.abs(x-off[i][1]),text+' x').toBeLessThanOrEqual(2);expect(Math.abs(y-off[i][2]),text+' y').toBeLessThanOrEqual(2);});
+  on.forEach((label,i)=>expectSamePlace(label,off[i]));
  });
  // A label's box can change after the cards were placed: text is laid out again at each board
- // scale (in CI a label widened by about 3% when the Auto view zoomed out). Grow the labels,
- // change the scale, and the cards must be placed again clear of them.
+ // scale (in CI a label widened by about 3% when the Auto view zoomed out). Grow the labels so they
+ // meet a settled card or leader, change the scale, and the cards and leaders must clear them again.
  test(`desktop ${origin} cards are placed again when a trace label grows after they were placed`,async({page,server})=>{
   const root=await setup(page,server,{origin,exemplar:false});
   await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
   await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await root.getByRole('button',{name:'Load trace',exact:true}).click();
   await expect(root.locator(LABELS)).toHaveCount(6);await metric(root).click();await expect(root.locator(CARDS)).toHaveCount(3);
   await expectSettled(root,'before the labels grow');
-  const before=await root.evaluate(host=>Array.from((host.shadowRoot || host).querySelectorAll('.dv-metrics-card')).map(card=>card.getAttribute('transform')));
   await root.evaluate(host=>{const style=document.createElement('style');style.textContent='.dv-trace-overlay text{font-size:18px!important}';(host.shadowRoot || host).appendChild(style);});
+  const grown=await measure(root);
+  expect(grown.problems.length,'the grown labels now meet a card or a leader: '+JSON.stringify(grown.problems)).toBeGreaterThan(0);
   await root.getByRole('button',{name:'Diagram zoom out',exact:true}).click();
-  await expect.poll(async()=>(await measure(root)).problems.filter(p=>p.startsWith('label ')),{message:'the cards are placed again clear of the grown labels'}).toEqual([]);
+  await expect.poll(async()=>(await measure(root)).problems,{message:'the cards and leaders clear the grown labels'}).toEqual([]);
   await expectSettled(root,'after the labels grew');
-  expect(await root.evaluate(host=>Array.from((host.shadowRoot || host).querySelectorAll('.dv-metrics-card')).map(card=>card.getAttribute('transform')))).not.toEqual(before);
  });
 
 }

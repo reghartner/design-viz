@@ -4285,39 +4285,63 @@ test('#1193 steps without a traceMatch leave the step count; the coverage line n
  assert.match(summary,/ · 1\/2 steps matched/,summary);assert.doesNotMatch(summary,/without a trace mapping|optional/,'the one-line summary keeps only the ratio');
  api.destroy();
 });
-/* #1194: each metric tile in the card popup is one row: the bold label, the metric's own small graph, and one small
-   line "<scope>: <value>". The generated CloudWatch scope names the queue without the account id, and a scope shared
-   by several tiles shows once. An authored empty scope hides it; an absent scope keeps the generated text. Jira and
-   Trace view popups alike. */
-test('#1194 metric tiles: one scope line per queue, no account id, and an authored empty scope hides it',async()=>{
- const metric=name=>({namespace:'AWS/SQS',metric:name,dimensions:{QueueName:'orders-queue'},accountId:'123456789012',region:'us-east-1',statistic:'Sum'});
- const telemetry={kind:'call',signals:{sent:{cloudwatch:metric('NumberOfMessagesSent'),unit:'msgs/day'},received:{cloudwatch:metric('NumberOfMessagesReceived'),unit:'msgs/day'},
-  visible:{cloudwatch:metric('ApproximateNumberOfMessagesVisible'),unit:'msgs',scope:''}},proof:{}};
- const at=Date.now(),series=[[new Date(at-3*3600000).toISOString(),400],[new Date(at-2*3600000).toISOString(),420],[new Date(at-3600000).toISOString(),420]];
- const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'Orders',tickets:['EE-1'],telemetry}]}}]}};
- const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:{sent:{value:1240,series},received:{value:1200},visible:{value:3}}}})}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+/* #1194: each metric tile in the card popup is one row: the bold label, the metric's graph, and one small line
+   "<scope>: <value>". The primary signal's row holds the main chart, so its series is drawn once. The generated CloudWatch
+   scope names the queue without the account id; a scope the previous tile showed is not repeated. An authored empty
+   scope hides it; an absent scope keeps the generated text. Jira and Trace view popups alike. */
+const tileMetric=(name,queue='orders-queue')=>({namespace:'AWS/SQS',metric:name,dimensions:{QueueName:queue},accountId:'123456789012',region:'us-east-1',statistic:'Sum'});
+async function openTiles(signals,values){
+ const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'Orders',tickets:['EE-1'],telemetry:{kind:'call',signals,proof:{}}}]}}]}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:values}})}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
  h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
  const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
  for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
- api.apply({'EE-1':{state:'done',updatedAt:new Date(at-86400000).toISOString()}});h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
- const card=()=>h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]'),pop=()=>h.view.querySelector('.dv-live-popover'),escape=()=>h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
+ api.apply({'EE-1':{state:'done',updatedAt:new Date(Date.now()-86400000).toISOString()}});h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
+ const card=()=>h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]'),pop=()=>h.view.querySelector('.dv-live-popover');
+ return {h,api,pop,open(view){if(view==='trace'){h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});api.setStatusMode('trace');h.flush();}workPresentation(h,card());return pop().querySelectorAll('.dv-live-production-kpi');}};
+}
+const tileLines=tiles=>tiles.map(t=>t.querySelectorAll('.dv-live-metric-line').map(l=>l.textContent));
+test('#1194 metric tiles: one scope line per queue, no account id, an empty scope hides it, and the primary series is drawn once',async()=>{
+ const at=Date.now(),series=base=>[3,2,1].map((n,i)=>[new Date(at-n*3600000).toISOString(),base+i*10]);
+ const {api,pop,open}=await openTiles({sent:{cloudwatch:tileMetric('NumberOfMessagesSent'),unit:'msgs/day'},received:{cloudwatch:tileMetric('NumberOfMessagesReceived'),unit:'msgs/day'},
+  visible:{cloudwatch:tileMetric('ApproximateNumberOfMessagesVisible'),unit:'msgs',scope:''}},{sent:{value:1240,series:series(400)},received:{value:1200,series:series(300)},visible:{value:3}});
  for(const view of ['jira','trace']){
-  if(view==='trace'){escape();api.setStatusMode('trace');h.flush();}
-  workPresentation(h,card());
-  const tiles=pop().querySelectorAll('.dv-live-production-kpi');
+  const tiles=open(view);
   assert.equal(tiles.length,3,view);
   assert.deepEqual(tiles.map(t=>(t.querySelector('.dv-live-metric-label') || {}).textContent),['sent','received','visible'],view+': each tile leads with its label');
-  assert.deepEqual(tiles.map(t=>t.querySelectorAll('.dv-live-metric-line').map(l=>l.textContent)),[['orders-queue: 1,240 msgs/day'],['1,200 msgs/day'],['3 msgs']],view+': one line per tile; the shared queue scope once; the empty scope hides it');
+  assert.deepEqual(tileLines(tiles),[['orders-queue: 1,240 msgs/day'],['1,200 msgs/day'],['3 msgs']],view+': one line per tile; the shared queue scope once; the empty scope hides it');
   assert.ok(tiles.every(t=>!/123456789012/.test(textOf(t))),view+': no account id on a tile');
-  assert.equal(tiles[0].querySelectorAll('svg.dv-live-metric-sparkline').length,1,view+': the metric with a series has its own small graph');
-  assert.equal(tiles[1].querySelectorAll('svg.dv-live-metric-sparkline').length,0,view+': no graph without a series');
+  // The primary (sent) row holds the main chart between its label and its line; no second copy of its series.
+  assert.equal(pop().querySelectorAll('svg.dv-live-proof-sparkline').length,1,view+': one main chart');
+  assert.equal(tiles[0].querySelectorAll('.dv-live-production-chart svg.dv-live-proof-sparkline').length,1,view+': in the primary row');
+  assert.deepEqual(tiles[0].children.map(c=>c.className.split(' ')[0]),['dv-live-metric-label','dv-live-production-chart','dv-live-metric-line'],view);
+  assert.equal(tiles[0].querySelectorAll('svg.dv-live-metric-sparkline').length,0,view+': the primary series is drawn once');
+  assert.equal(tiles[1].querySelectorAll('svg.dv-live-metric-sparkline').length,1,view+': another metric with a series has its own small graph');
+  assert.equal(tiles[2].querySelectorAll('svg').length,0,view+': no graph without a series');
  }
  api.destroy();
 });
-test('#1194 an authored empty scope is kept, not dropped; an absent scope keeps the generated text',()=>{
+test('#1194 a scope repeats when the previous tile showed another one; account-wide CloudWatch wording on tiles',async()=>{
+ const {api,open}=await openTiles({a1:{cloudwatch:tileMetric('NumberOfMessagesSent','q1')},b:{cloudwatch:tileMetric('NumberOfMessagesSent','q2')},a2:{cloudwatch:tileMetric('NumberOfMessagesReceived','q1')}},{a1:{value:1},b:{value:2},a2:{value:3}});
+ assert.deepEqual(tileLines(open('jira')),[['q1: 1'],['q2: 2'],['q1: 3']],'q1, q2, q1: the third tile names its queue again');
+ api.destroy();
+ const C=harness().C,iot=(metric,dimensions)=>({source:'cloudwatch',query:{namespace:'AWS/IoT',metric,dimensions,accountId:'111111111111',region:'us-east-1',statistic:'Sum'}});
+ assert.equal(C.telemetryTileScope(iot('PublishIn.AuthError',{Protocol:'MQTT'})),'All topics · whole account');
+ assert.equal(C.telemetryTileScope(iot('Connect.AuthError',{})),'All connections · whole account');
+ assert.equal(C.telemetryTileScope(iot('TopicMatch',{RuleName:'camera_rule'})),'camera_rule');
+ for(const s of [iot('PublishIn.AuthError',{Protocol:'MQTT'}),iot('TopicMatch',{RuleName:'camera_rule'})])assert.doesNotMatch(C.telemetryTileScope(s),/111111111111/);
+});
+test('#1194 an authored empty scope is kept and hides the scope on the card; whitespace alone warns; an absent scope keeps the generated text',()=>{
  const h=harness(),C=h.C,signal={cloudwatch:{namespace:'AWS/SQS',metric:'NumberOfMessagesSent',dimensions:{QueueName:'orders-queue'},accountId:'123456789012',region:'us-east-1',statistic:'Sum'},unit:'msgs/day'};
- const warnings=[],clean=scope=>C.telemetryClean({kind:'call',signals:{sent:scope===undefined?signal:{...signal,scope}}},(at,message)=>warnings.push(at+': '+message),false).signals.sent;
- assert.equal(clean('').scope,'','an empty scope is authored text');assert.deepEqual(warnings,[]);
- assert.equal(Object.prototype.hasOwnProperty.call(clean(undefined),'scope'),false);
+ const clean=scope=>{const warnings=[],out=C.telemetryClean({kind:'call',signals:{sent:scope===undefined?signal:{...signal,scope}}},(at,message)=>warnings.push(at+': '+message),false).signals.sent;return {out,warnings};};
+ assert.equal(clean('').out.scope,'','an empty scope is authored text');assert.deepEqual(clean('').warnings,[]);
+ assert.equal(Object.prototype.hasOwnProperty.call(clean(undefined).out,'scope'),false);
+ const blank=clean('   ');assert.equal(Object.prototype.hasOwnProperty.call(blank.out,'scope'),false,'whitespace alone is ignored');
+ assert.ok(blank.warnings.some(w=>/scope: must be non-empty text, or "" to hide the scope/.test(w)),JSON.stringify(blank.warnings));
+ const bound={source:'cloudwatch',query:signal.cloudwatch,unit:'msgs/day'};
+ assert.equal(C.telemetryCardScope({...bound,scope:''}),'','the card hides it');assert.equal(C.telemetrySignalScope({...bound,scope:''}),'','Proof and Inspect hide it');
+ assert.equal(C.telemetryCardScope(bound),'This queue','an absent scope keeps the generated card text');
+ const content=C.telemetryCardContent({from:'a',to:'b',telemetry:{}},{kind:'call',signals:{sent:{...bound,scope:''}},proof:{}},{signals:{sent:{value:5}}},null,'24h');
+ assert.equal(content.scope,'','the card content carries no scope');
  h.ctl.liveStatus.destroy();
 });

@@ -148,11 +148,12 @@ function telemetryEditBinding(binding,edit,options){
       if(source)next[source]=entry[source];
     }else if(edit.field==='unit' || edit.field==='scope' || edit.field==='label' || edit.field==='queryLink'){
       if(source)next[source]=entry[source];
-      if(edit.value!=null && !telemetryText(edit.value))return {error:'Signal metadata must be non-empty text, or removed.'};
+      // #1194: scope "" is authored on purpose: it hides the scope line.
+      if(edit.value!=null && !telemetryText(edit.value) && !(edit.field==='scope' && edit.value===''))return {error:'Signal metadata must be non-empty text, or removed.'};
     }else return {error:'Unknown signal field.'};
     var unit=edit.field==='unit'?(edit.value==null?null:edit.value.trim()):(telemetryText(entry.unit)?entry.unit:null);
     if(unit)next.unit=unit;
-    var scope=edit.field==='scope'?edit.value:entry.scope;if(telemetryText(scope))next.scope=scope.trim();
+    var scope=edit.field==='scope'?edit.value:entry.scope;if(scope==='')next.scope='';else if(telemetryText(scope))next.scope=scope.trim();
     var showOnCard=edit.field==='showOnCard'?edit.value:entry.showOnCard;if(typeof showOnCard==='boolean')next.showOnCard=showOnCard;
     // Checking the box returns to the default by removing the key.
     var missingMeansZero=edit.field==='missingMeansZero'?(edit.value===false?false:null):entry.missingMeansZero;if(typeof missingMeansZero==='boolean' && (next.loki!==undefined || next.grafana!==undefined))next.missingMeansZero=missingMeansZero;

@@ -95,7 +95,7 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
     }
     return {id:binding.id,title:binding.title,kind:binding.kind,tickets:binding.tickets.slice(),jira:result.jira || 'No tickets',
       loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,label:loading && !measured?'Loading…':label,predicate:predicate(binding,null,measured)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
-      kpis:telemetryMetricRows(binding,sample,waiting,window).map(function(kpi){var own=plot(kpi.name);return Object.assign(kpi,{chart:{points:own.points,line:own.line}});}),
+      primary:primary,kpis:telemetryMetricRows(binding,sample,waiting,window).map(function(kpi){var own=plot(kpi.name);return Object.assign(kpi,{chart:{points:own.points,line:own.line}});}),
       since:since.join(' · ') || 'unavailable',url:url,
       linkLabel:primary && binding.signals[primary].source==='grafana'?'Open in Grafana':primary && binding.signals[primary].source==='honeycomb'?'Open in Honeycomb':'Open telemetry',
       explanation:result.failing.length?'Outside proof threshold: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name,null,window)+'; requires '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
@@ -1430,21 +1430,23 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }else element('span','',row.chart.pending?'Loading…':'No observed series in this window',chart);
     var kpis=block.querySelector('.dv-live-production-kpis') || element('div','dv-live-production-kpis',null,block);
     while(kpis.children.length>row.kpis.length)kpis.lastElementChild.remove();
-    // #1194: one row per metric: bold label, its own small graph, one line "<scope>: <value>". A scope shared by several
-    // tiles shows on the first of them only.
-    var scoped=Object.create(null);
+    // #1194: one row per metric: bold label, its graph, one line "<scope>: <value>". The primary signal's row holds the
+    // main chart (with its markers) instead of a second copy. A scope the previous tile already showed is not repeated.
+    var previous=null,placed=false;
     row.kpis.forEach(function(kpi,i){
       var tile=kpis.children[i] || element('div','dv-live-production-kpi',null,kpis);tile.replaceChildren();
       element('strong','dv-live-metric-label',kpi.label,tile);
       if(kpi.url){var queryLink=link(tile,'',kpi.url);queryLink.className='dv-live-metric-link';queryLink.setAttribute('aria-label','Open '+kpi.label+' source query in a new tab');queryLink.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});}
-      if(kpi.chart && kpi.chart.points.length){
+      if(kpi.name===row.primary){tile.appendChild(chart);placed=true;}
+      else if(kpi.chart && kpi.chart.points.length){
         var spark=telemetrySvg(document,'svg',{class:'dv-live-metric-sparkline',viewBox:'0 0 100 32',role:'img','aria-label':kpi.label+': '+kpi.chart.points.length+' observed points'},tile);
         if(kpi.chart.line)telemetrySvg(document,'polyline',{class:'dv-live-metric-series',points:kpi.chart.line},spark);
         kpi.chart.points.forEach(function(point){telemetrySvg(document,'circle',{class:'dv-live-metric-point',cx:point.x,cy:point.y,r:1.8},spark);});
       }
-      var scope=kpi.scope && !scoped[kpi.scope]?kpi.scope:'';if(kpi.scope)scoped[kpi.scope]=true;
+      var scope=kpi.scope && kpi.scope!==previous?kpi.scope:'';previous=kpi.scope;
       element('small','dv-live-metric-line',(scope?scope+': ':'')+kpi.text,tile);
     });
+    if(!placed && chart.parentNode!==block)block.insertBefore(chart,kpis);
     if(!metricsOnly)text('p','dv-live-production-since','Since Done: '+row.since);else{var since=block.querySelector('.dv-live-production-since');if(since)since.remove();}
     var anchor=block.querySelector('.dv-live-production-link');
     if(row.url){if(!anchor){anchor=link(block,'',row.url);anchor.classList.add('dv-live-production-link');anchor.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});element('span','',null,anchor);}anchor.setAttribute('href',row.url);anchor.querySelector('span').textContent=row.linkLabel;}

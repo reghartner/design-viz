@@ -304,8 +304,8 @@ function telemetrySignal(name,value,warn){
     if(telemetryText(value.unit))out.unit=value.unit;
     else warn(at+'.unit','must be non-empty text — unit ignored');
   }
-  // #1194: an authored empty scope hides the scope line; it is kept as "".
-  if(telemetryOwn(value,'scope')){if(typeof value.scope==='string')out.scope=telemetryText(value.scope)?value.scope:'';else warn(at+'.scope','must be text — ignored');}
+  // #1194: an authored empty scope ("") hides the scope; whitespace alone is a mistake and is ignored with a warning.
+  if(telemetryOwn(value,'scope')){if(value.scope==='' || telemetryText(value.scope))out.scope=value.scope;else warn(at+'.scope','must be non-empty text, or "" to hide the scope — ignored');}
   if(telemetryOwn(value,'label')){if(telemetryText(value.label) && value.label.length<=120 && !/[\x00-\x1f\x7f]/.test(value.label))out.label=value.label.trim();else warn(at+'.label','must be plain text of 1–120 characters without control characters — ignored');}
   if(telemetryOwn(value,'showOnCard')){if(typeof value.showOnCard==='boolean')out.showOnCard=value.showOnCard;else warn(at+'.showOnCard','must be a boolean — ignored');}
   if(telemetryOwn(value,'missingMeansZero')){

@@ -2832,13 +2832,15 @@ establish topic scope. Use `unit: "refused publishes"` to read “15 refused pub
 with the card’s “24h window” context.
 
 Metric tiles in the card popup (Jira and Trace views, #1194) are one row per metric:
-the bold label, the metric's own small graph when it has a series, and one small line
-`<scope>: <value>`, for example `orders-queue: 1,240 msgs/day`. The tile scope is the
-authored `scope` as written, else the CloudWatch queue or rule name, or “All topics ·
-whole account” / “All connections · whole account”; it never carries the account ID.
-Several tiles with the same scope show it on the first only. An authored empty scope
-(`"scope": ""`) hides the scope on the tile and on the card; an absent scope keeps the
-generated text.
+the bold label, the metric's graph, and one small line `<scope>: <value>`, for example
+`orders-queue: 1,240 msgs/day`. The primary signal's row holds the popup's main chart
+(with its Done and deploy markers); every other metric with a series gets its own small
+graph. The tile scope is the authored `scope` as written, else the CloudWatch queue or
+rule name, or “All topics · whole account” / “All connections · whole account”; it never
+carries the account ID. A tile does not repeat the scope of the tile just before it. An
+authored empty scope (`"scope": ""`, or **hide scope** in the Workbench Metrics editor)
+hides the scope everywhere: tile, card, Proof predicate and Inspect. A scope of only
+spaces is ignored with a validator warning. An absent scope keeps the generated text.
 
 ### CloudWatch Logs Insights
 

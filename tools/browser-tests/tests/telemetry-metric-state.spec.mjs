@@ -119,5 +119,7 @@ for(const skin of ['daylight','blueprint'])test('#1201 an error signal outside i
  await expect.poll(border,'silent traffic with messages in the DLQ: the card is red').toEqual(RED);
  const row=await page.evaluate(()=>{const p=document.querySelector('#host').shadowRoot.querySelector('[data-proof-carrier="a->b"] .dv-live-proof-pill');if(!p)return null;const s=getComputedStyle(p);return {bucket:p.getAttribute('data-proof-bucket'),state:p.getAttribute('data-metric-state'),stroke:s.borderTopColor,width:s.borderTopWidth,dotted:s.borderTopStyle==='dotted'};});
  expect(row,'the Proof table row pill is the error pill').toEqual({bucket:'error',state:'error',...RED});
+ const quiet=(await chips(page)).error;
+ expect(quiet && {text:quiet.text,stroke:quiet.stroke,width:quiet.width,dotted:quiet.dotted},'silent traffic: the Proof error chip is shown').toEqual({text:'1 error',...RED});
  await page.evaluate(()=>window.viewer.destroy());
 });

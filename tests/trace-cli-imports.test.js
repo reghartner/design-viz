@@ -95,3 +95,29 @@ test('preview --resolve-imports shows a missing optional step as optional, not i
   assert.equal(incident.text,'Optional, not in this trace: platform-store · INSERT order');assert.equal(incident.evidence.canonicalStepId,'persist');
   h.unchanged();
 });
+
+// #1175 ruling (FV REQUESTS, 2026-11-09): a missing optional step does not block reference
+// approval. The company's case: trace A holds step 1 and lacks optional step 2. A missing
+// step without optional, and an ambiguous optional step, still block.
+test('reference --resolve-imports approves a trace that lacks an optional step; missing or ambiguous steps still block',t=>{
+  const h=setup(t),submitOnly=h.write('submit-only.json',{spans:[span('submit','platform-api','POST /checkout')]}),out=path.join(h.dir,'a-reference.json');
+  const optional=structuredClone(h.raw);optional.page.sections[0].diagram.steps.find(s=>s.id==='persist').traceMatch.optional=true;
+  const spec=h.write('optional.spec.json',optional),before=fs.readFileSync(spec);
+  const preview=cli('preview','--spec',spec,'--trace',submitOnly,'--resolve-imports',REGISTRY);
+  assert.equal(preview.status,0,preview.stderr);assert.equal(JSON.parse(preview.stdout).eligible,true,'preview: trace A is eligible');
+  const approved=cli('reference','--spec',spec,'--trace',submitOnly,'--resolve-imports',REGISTRY,'--reason','Trace A','--out',out);
+  assert.equal(approved.status,0,approved.stderr);
+  assert.deepEqual(JSON.parse(fs.readFileSync(out,'utf8')).page.sections[0].diagram.referenceTrace.mapping,[{stepId:'request',spanIds:['submit']}],'the reference records only the steps this trace holds');
+  const compare=cli('compare','--spec',out,'--trace',submitOnly,'--resolve-imports',REGISTRY);
+  assert.equal(compare.status,0,compare.stderr);assert.equal(JSON.parse(compare.stderr).firstDivergence,null);
+  const blocked=/Every instrumented step must map uniquely/;
+  const plain=cli('reference','--spec',h.spec,'--trace',submitOnly,'--resolve-imports',REGISTRY,'--reason','Trace A');
+  assert.equal(plain.status,1,'a missing step without optional still blocks');assert.match(plain.stderr,blocked);
+  const twice=h.write('twice.json',{spans:[span('submit','platform-api','POST /checkout'),span('insert','platform-store','INSERT order',{parentId:'submit'}),span('insert-2','platform-store','INSERT order',{parentId:'submit',startMs:20})]});
+  const ambiguous=cli('reference','--spec',spec,'--trace',twice,'--resolve-imports',REGISTRY,'--reason','Twice');
+  assert.equal(ambiguous.status,1,'an ambiguous optional step still blocks');assert.match(ambiguous.stderr,blocked);
+  const none=structuredClone(optional);none.page.sections[0].diagram.steps.find(s=>s.id==='request').traceMatch.optional=true;
+  const empty=cli('reference','--spec',h.write('all-optional.spec.json',none),'--trace',h.write('unrelated.json',{spans:[span('submit','other','GET /')]}),'--resolve-imports',REGISTRY,'--reason','Nothing');
+  assert.equal(empty.status,1,'a trace with no instrumented step present is not a reference');assert.match(empty.stderr,blocked);
+  assert.deepEqual(fs.readFileSync(spec),before);h.unchanged();
+});

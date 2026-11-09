@@ -7,7 +7,7 @@ import {recordedUrlEvidence} from '../../../tests/helpers/step-evidence.mjs';
 const PROFILE=JSON.parse(await readFile(path.join(repo,'tests/fixtures/trace-connection-profile.json'),'utf8'));
 const RECORDED=await readFile(path.join(repo,'tests/fixtures/provider-traces/honeycomb-trace.txt'),'utf8'),ID='8413cd87a9f15b6bfe8e1acf5b3346d0';
 const schema={name:'get_trace',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
-async function setup(page,server,{ambiguous=false,baseline=false,textTarget=false,edgeScene=false,extremeCurve=false,edgeOnly=false,multiEdge=false,brokenEdge=false,reducedMotion='reduce'}={}){
+async function setup(page,server,{ambiguous=false,baseline=false,textTarget=false,edgeScene=false,extremeCurve=false,edgeOnly=false,multiEdge=false,brokenEdge=false,alternatives=false,reducedMotion='reduce'}={}){
  await page.setViewportSize({width:1600,height:1100});await page.emulateMedia({reducedMotion});
  const spec=nestedSpec(),d=spec.page.sections[0].diagram,e=await recordedUrlEvidence();
  spec.page.title='Trace focus · checkout request';spec.page.subtitle='Recorded request · explicit authored steps';
@@ -30,6 +30,8 @@ async function setup(page,server,{ambiguous=false,baseline=false,textTarget=fals
  if(multiEdge){d.edges.push({from:'outer::inner::a',to:'local',label:'Another authored delivery'});delete d.steps[1].edge;d.steps[1].edges=['outer::inner::a->outer::inner::b','outer::inner::a->local'];}
  if(brokenEdge)d.edges[0].missingWork=true;
  if(ambiguous){d.steps.push({...structuredClone(d.steps[1]),id:'retry',text:'Retry currency lookup'});d.paths.push({id:'retry',label:'Recovery',steps:['retry','finish']});}
+ // #1154: each step matches through its second traceMatch alternative; the first names a span this trace lacks.
+ if(alternatives)d.steps.forEach(step=>{if(step.traceMatch)step.traceMatch=[{...step.traceMatch,operation:step.traceMatch.operation+'/legacy'},step.traceMatch];});
  await writeFile(path.join(server.root,'trace-focus-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
  await writeFile(path.join(server.root,'trace-focus.html'),'<div id="host"></div><div id="peer"></div><script type="module">import {mountNativeViewer} from "./trace-focus-native.js";window.mount=mountNativeViewer;</script>');
  await page.goto(server.origin+'/trace-focus.html');await page.waitForFunction(()=>!!window.mount);
@@ -261,4 +263,12 @@ for(const extremeCurve of [false,true])test('desktop timing ink fits the SVG cli
  await page.evaluate(()=>{for(let i=0;i<3;i++)window.api.setTraceShow(true);});await expectTimingUnclipped(text);await expect(svg).toHaveAttribute('viewBox',frame);
  await root.getByRole('button',{name:'Clear trace focus',exact:true}).click();await expect(svg).toHaveAttribute('viewBox',frame);
  await page.evaluate(()=>window.api.setTraceShow(false));await expect(svg).toHaveAttribute('viewBox',frame);await expect(root.locator('.dv-trace-overlay,.dv-trace-edge-focus')).toHaveCount(0);
+});
+test('desktop matched-alternative node labels fit the SVG clip below their cards, with the long name capped',async({page,server})=>{
+ const {root,local,imported}=await setup(page,server,{edgeScene:true,alternatives:true});
+ for(const [span,id,name] of [[local,'local',/^Matched: frontend \/cart\/checkout · /],[imported,'outer::inner::b',/^Matched: currency grpc\.msdemo\.CurrencyService\/Ge… · /]]){
+  await row(root,span).click();await root.getByRole('button',{name:'Fit diagram',exact:true}).click();
+  const text=node(root,id).locator('.dv-trace-overlay text');await expect(text).toHaveText(name);await expectTimingUnclipped(text);
+  expect(await text.evaluate(el=>{const a=el.getBoundingClientRect(),b=el.closest('g.node').querySelector('.card').getBoundingClientRect();return a.top>b.bottom;}),'the label sits below its card').toBe(true);
+ }
 });

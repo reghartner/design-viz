@@ -264,7 +264,7 @@ function createTelemetryHoneycomb(page,win,now,bound){
         if(e.code!=='query_unobserved')throw error;
       }
     }
-    if(report && report.note)report.note(notes.filter(function(n,i){return notes.indexOf(n)===i;}).join('; '));return map;
+    if(report && report.note)report.note(telemetryNotes(notes));return map;
   }
   return {options:{environmentChanged:function(){allowEpoch++;approval=null;blocked=null;syncAction();},provider:provider,history:function(bindings,range,signal,report){if(!range || !range.window){if(report && report.note)report.note('Honeycomb history requires a selected observation window.');return Promise.resolve({});}return provider(bindings,signal,report,range.window);},source:'Honeycomb',available:false},attach:function(next,nextPage){
     ctl=next;current=nextPage || current;var epoch=++generation,mine=ctl,offs=[];available(false);

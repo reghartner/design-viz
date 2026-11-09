@@ -54,6 +54,12 @@ function telemetryTime(value){
   var ms=typeof value==='number'?value:typeof value==='string'?Date.parse(value):NaN;
   var date=new Date(ms);return isFinite(date.getTime())?date.toISOString():null;
 }
+/* Status notes: one note stays as written; several each end with one full stop
+   and are separated by a space. Duplicates are compared in that ended form. */
+function telemetryNotes(notes){
+  var list=[],ended=[];(notes || []).forEach(function(n){n=typeof n==='string'?n.trim():'';var e=n.replace(/[\s;,:]+$/,'');if(e && !/[.!?…]$/.test(e))e+='.';if(e && ended.indexOf(e)<0){list.push(n);ended.push(e);}});
+  return list.length<2?list.join(''):ended.join(' ');
+}
 function telemetryPoint(point){
   return Array.isArray(point) && point.length===2 && (telemetryNumber(point[0]) || typeof point[0]==='string' && isFinite(Date.parse(point[0]))) && telemetryNumber(point[1]);
 }
@@ -386,7 +392,7 @@ function telemetryHistoryCache(now){
       group.plans.forEach(function(plan,i){var id=group.bindings[i].id,part={};if(answer.map && answer.map[id])part[id]=answer.map[id];
         var saved=finish(plan,{map:part,note:answer.note},signal);if(saved.map[id])map[id]=saved.map[id];
       });
-    });})).then(function(){if(signal.aborted)throw new Error('History cancelled');return {map:map,note:notes.join('; ')};});
+    });})).then(function(){if(signal.aborted)throw new Error('History cancelled');return {map:map,note:telemetryNotes(notes)};});
   }};
 }
 
@@ -488,7 +494,7 @@ function createTelemetry(page,options,hooks){
       if(outcome.state==='approval' || outcome.state==='error' && state!=='approval')state=outcome.state;
       if(outcome.note && notes.indexOf(outcome.note)<0)notes.push(outcome.note);
     });
-    setStatus({state:state,busy:!!historyRequests.length,note:notes.join('; ')});
+    setStatus({state:state,busy:!!historyRequests.length,note:telemetryNotes(notes)});
   }
   /* Built-ins request one selected observation window. Legacy custom adapters
      retain their endpoint series, batching and slider-without-fetch contract. */

@@ -675,7 +675,8 @@ failures retain their intentional coin hiding. Placement reruns after path,
 filter and Live changes, and the board frame grows to include displaced cues.
 
 Click a Jira cue, a tracked node's card or an edge's line, label or live break glyph for
-ticket status, title, assignee and the informational PR summary. The
+ticket status, title and the informational PR summary, one line per ticket with no
+assignee (#1198). The
 node's own links, detail and handoff controls keep their clicks. In the reader
 that card or edge label is one keyboard button named for its tickets and state;
 the Jira cue shares that button without adding another Tab stop. On a whole-card
@@ -2704,11 +2705,16 @@ their exact-result contract; explicit native raw wrappers are trace intent.
 ### Production and telemetry Activity
 
 A carrier's existing Work status popover includes Production when the permitted
-telemetry map has measured evidence. It uses the same Proof values, configured
-window, actual points/markers and safe authored-first link as the panel. Failed
-thresholds name their signal, measured value and requirement. Missing values stay
-unobserved; measured zero stays zero. Since Done shows known Done and first
-observed traffic times in local time (for example "Nov 5, 7:00 AM"), plus explicitly measured totals when their interval
+telemetry map has measured evidence. It uses the same configured window, actual points,
+deploy markers and safe authored-first link as the panel. Since #1202 it reads exactly like
+the Trace view's metrics popup: one verdict line with the metric state and its explanation
+(no Jira state, proof words, Done marker or Since Done line); failed limits name their
+signal, measured value and limit. Missing values stay unobserved; measured zero stays zero.
+Jira state belongs to the popover's Tickets: one row per ticket (#1198) with the key, the
+title on one line (the full title in its tooltip), any PRs or staleness, and the status chip
+at the right; a ticket detail takes a second line and the owner is not shown. The Proof
+table's Since Done column keeps known Done and first observed traffic times in local time
+(for example "Nov 5, 7:00 AM"), plus explicitly measured totals when their interval
 matches Done as described below; window rates are not lifetime totals. Local,
 imported and asynchronously loaded detail carriers use their carrier identity and
 own binding scope. Refreshes and day selection update an open Production block
@@ -2749,9 +2755,10 @@ that exact interval. Normalization requires a finite nonnegative value no larger
 than `Number.MAX_SAFE_INTEGER`, valid `from < to`, and an explicit valid
 signal `observedAt >= to` (carrier `observedAt` for legacy samples without a signal
 as-of). An explicit unknown signal as-of cannot borrow a peer's time. Invalid metadata is dropped without discarding a valid
-ordinary headline. Proof's Since Done column and Production show the named bound
-signal's total only when `from` exactly equals the actual Done timestamp. They
-retain the original measurement value and unit, including zero, and display the
+ordinary headline. Proof's Since Done column shows the named bound
+signal's total only when `from` exactly equals the actual Done timestamp (the popover's
+Production block has no Since Done line, #1202). It
+retains the original measurement value and unit, including zero, and displays the
 through timestamp alongside the existing Done/first-traffic facts. Changing Done
 removes a mismatched total. History endpoint projection drops aggregate metadata;
 this version does not display totals in historical views, including embedded days.

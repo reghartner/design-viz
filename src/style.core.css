@@ -4096,8 +4096,20 @@ g.node.dv-edit-target,path.edge.dv-edit-target{cursor:copy;}
 .docview g.coin.dv-edit-over[data-dv-step] circle{stroke:var(--dink,currentColor)!important;stroke-width:3px!important;}
 .dv-live-popover{inset:auto;margin:0;flex-direction:column;align-items:stretch;padding:12px;font-size:11px;font-weight:400;max-width:min(420px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;}
 .dv-live-popover .node-link-title{padding-right:28px;}
-.dv-live-ticket{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:8px 0;border-bottom:1px solid currentColor;}
+/* #1198 one line per ticket: key, title, staleness, PR count and PR links, with the status chip pinned at the top right
+   (its width is reserved through --dv-live-chip-ch, the chip text length). Only the title shrinks (ellipsis, at least 56px);
+   staleness, the count and the links are never clipped: when they do not fit, they wrap onto a second line in the row,
+   PR icons wrapping among themselves. A detail spans its own line. */
+.dv-live-ticket{position:relative;display:flex;flex-wrap:wrap;align-items:flex-start;gap:2px 8px;box-sizing:border-box;width:100%;min-width:0;padding:5px calc(var(--dv-live-chip-ch,9) * 1ch + 16px) 5px 0;border-bottom:1px solid color-mix(in srgb,currentColor 25%,transparent);}
 .dv-live-ticket-title,.dv-live-ticket-assignee,.dv-live-ticket-prs,.dv-live-ticket-detail,.dv-live-ticket-links{grid-column:1 / -1;white-space:pre-wrap;overflow-wrap:anywhere;}
+.dv-live-ticket>.nbacklink{flex:none;margin-top:3px;padding:2px 4px;font-size:11px;white-space:nowrap;}
+.dv-live-ticket>.dv-live-ticket-title{flex:1 1 0;min-width:56px;line-height:28px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dv-live-ticket>.dv-live-stale-detail,.dv-live-ticket>.dv-live-ticket-prs{flex:none;font-size:11px;line-height:28px;white-space:nowrap;}
+.dv-live-ticket>.dv-live-ticket-links{flex:0 1 auto;min-width:0;gap:1px;}
+.dv-live-popover .dv-live-ticket .nbacklink.dv-live-pr-link{box-sizing:border-box;padding:0;border:0;}
+.dv-live-popover .dv-live-ticket .nbacklink.dv-live-pr-link:focus-visible{outline:2px solid currentColor;outline-offset:1px;}
+.dv-live-ticket>.dv-live-ticket-state{position:absolute;top:8px;right:0;}
+.dv-live-ticket>.dv-live-ticket-detail{flex:1 0 100%;font-size:11px;}
 .dv-live-ticket-links{display:flex;flex-wrap:wrap;gap:2px;}
 /* Pull request icons (#733, #756): one monochrome icon per link. GitHub evidence
    colours the icon by state and adds a checks dot; details live in the tooltip. */

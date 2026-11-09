@@ -670,6 +670,7 @@ function editHistoryEntryProblem(entry){
       // #1180: a mapping that replaced a traceMatch names it.
       var was=change.replaces;
       if(Object.prototype.hasOwnProperty.call(change,'replaces') && (!specObject(was) || typeof was.serviceName!=='string' || !was.serviceName || typeof was.operation!=='string' || !was.operation))return at+'.replaces: needs "serviceName" and "operation" strings';
+      if(specObject(was) && Object.prototype.hasOwnProperty.call(was,'nodeId') && (typeof was.nodeId!=='string' || !was.nodeId))return at+'.replaces.nodeId: must be a node id';
       continue;
     }
     // #855: clearing a Missing work marker names only its carrier.

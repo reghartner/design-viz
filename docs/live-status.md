@@ -2033,13 +2033,16 @@ records a Missing work marker cleared in Edit mode (#855): it carries only the
 carrier (and the optional `path` and `label`), never a `ticket`. A `"trace-match"`
 change records a span mapped to a step in Edit mode (#1078): it carries `step` (the
 step id) and `traceMatch` (`serviceName` and `operation` strings, plus the resulting `nodeId` when the step has one after the mapping), the optional
-`path` and `label` (the step text), `replaces` (the `serviceName` and `operation` it
+`path` and `label` (the step text), `replaces` (the `serviceName`, `operation` and any `nodeId` it
 replaced, #1180) when it replaced a mapping, and no `ticket`, `node` or `edge`; the panel
 reads it as "payment · grpc.msdemo.PaymentService/Charge mapped to step Charge the
 card", with "(replaced <service> · <operation>)" after a replacement. `board-sync pull`
 sets a step's newest board mapping where the local step still equals the `replaces` of
 its oldest fresh mapping (no `traceMatch` when that one was a first mapping), keeps a
-local step that already names the newest span, and asks on anything else. Optional: `by` (`id` and `name`
+local step that already names the newest span, and asks on anything else. `nodeId`
+merges the same way against `replaces.nodeId`: on the same span pull writes the board's
+`nodeId` where the local copy still has the base one (or none), and asks when the local
+copy has a different one. Optional: `by` (`id` and `name`
 strings, either may be empty), each change's `path` (array) and `label` (the
 carrier's display name at save time, so history stays readable after a rename).
 Validation follows the warning-only policy of the other tracking fields: a

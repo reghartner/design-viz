@@ -51,6 +51,8 @@ test('#1201 review: a quiet dead-letter queue (rate 0 or missing, dlq 4) counts 
   assert.deepEqual({error:c.error,[from]:c[from],bound:c.bound,sum:c.proven+c.degraded+c.unproven+c.liveEarly+c.neutral+(c.error||0)},{error:1,[from]:0,bound:1,sum:1},label+': taken out of '+from+', bound unchanged');
   assert.ok(Array.from(proof.arcs,a=>a.key).includes('error'),label+': error arc');
   assert.equal(proof.rows[0].error,true);assert.doesNotMatch(proof.rows[0].metrics.label,/SILENT/,label+': the metrics label is not SILENT');
+  assert.equal(proof.rows[0].label,'DONE · ERROR',label+': the row text names the error, not UNPROVEN');
+  assert.match(proof.sentence,/ · 1 error · /,label+': the Proof sentence counts the error');
  }
 });
 test('#1201 review: a hidden error signal is named as an error signal on the card',()=>{

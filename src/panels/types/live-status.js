@@ -88,7 +88,7 @@
       el(ring,'strong','count','dv-live-proof-ratio',proof.counts.proven+'/'+proof.counts.bound+' bound proven');
       var main=el(box,'div','main','dv-live-epic-main');el(main,'h3','heading','','Proof');
       var pills=el(main,'div','pills','dv-live-proof-pills');Object.keys(proofLabels).forEach(function(key){
-        // #1201: the error chip shows only when an error signal is over its limit.
+        // #1201: the error chip shows only when an error signal is outside its limit.
         if(key==='error' && !proof.counts.error)return;
         var pill=el(pills,'span',key,'dv-live-state-pill dv-live-proof-pill',proof.counts[key]+' '+proofLabels[key]);pill.setAttribute('data-proof-bucket',key);
         // #1199: a chip wears the metric-card state of the verdicts it counts (shared CSS in style.core.css).

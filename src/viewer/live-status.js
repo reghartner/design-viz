@@ -101,6 +101,8 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
       label=result.telemetry==='silent'?'SILENT':result.telemetry==='degraded'?'DEGRADED':measured?(result.telemetry==='unobserved'?'OBSERVED · evidence incomplete':'OBSERVED'):'UNOBSERVED';
       if(result.jira==='unknown')label+=' · Jira status unavailable';
     }
+    // #1201: an error signal outside its limit names the row ERROR, after the Jira state when there is one.
+    if(telemetryErrorFailing(binding,result).length)label=label.indexOf(' · ')>0?label.split(' · ')[0]+' · ERROR':['done','active','testing','todo','blocked','missing'].indexOf(result.verdict)>=0?label+' · ERROR':'ERROR';
     return {id:binding.id,title:binding.title,kind:binding.kind,tickets:binding.tickets.slice(),jira:result.jira || 'No tickets',
       loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,error:telemetryErrorFailing(binding,result).length>0,label:loading && !measured?'Loading…':label,predicate:predicate(binding,null,measured)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
       primary:primary,kpis:telemetryMetricRows(binding,sample,waiting,window).map(function(kpi){var own=plot(kpi.name);return Object.assign(kpi,{chart:{points:own.points,line:own.line}});}),
@@ -119,7 +121,7 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
   });
   var predicates=rows.map(function(row){return row.predicate;}).filter(function(value,i,all){return all.indexOf(value)===i;});
   return {counts:counts,arcs:arcs,rows:rows,window:window,historical:!!snapshot.historical,states:TELEMETRY_PROOF_BUCKET_STATES,
-    sentence:counts.proven+' of '+counts.bound+' bound carriers proven · '+counts.unproven+' Done carriers unproven · '+counts.unbound+' carriers unbound.',
+    sentence:counts.proven+' of '+counts.bound+' bound carriers proven · '+counts.unproven+' Done carriers unproven · '+(counts.error?counts.error+' error · ':'')+counts.unbound+' carriers unbound.',
     predicate:predicates.length===1?predicates[0]:'Proof thresholds are shown for each carrier below.'};
 }
 /* Runtime Activity consumes only accepted live observations. Reconciliation

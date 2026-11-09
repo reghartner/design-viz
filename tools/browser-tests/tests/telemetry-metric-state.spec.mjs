@@ -79,5 +79,9 @@ for(const skin of ['daylight','blueprint'])test('#1200 #1199 metric cards show t
  await expect.poll(()=>cards(page),'the Trace view shows the same metric state').toEqual(expected);
  await expect(root.locator('g.node[data-dv-node="a"]')).toHaveAttribute('data-live-appearance','done');
  await root.screenshot({path:testInfo.outputPath('metric-state-trace-'+skin+'.png')});
+ // A personal Done border width of 1px still leaves held visibly stronger than flowing (1px): max(Done width, 2px).
+ await page.evaluate(()=>{localStorage.setItem('flowview.status-colors.v1',JSON.stringify({version:2,colors:{},appearance:{'live-done':{borderWidth:1}}}));window.dispatchEvent(new CustomEvent('flowview-status-colors-change'));});
+ await expect.poll(async()=>{const c=await cards(page);return [c['a->b'].width,c['b->c'].width];}).toEqual(['2px','1px']);
+ await page.evaluate(()=>{localStorage.removeItem('flowview.status-colors.v1');window.dispatchEvent(new CustomEvent('flowview-status-colors-change'));});
  await page.evaluate(()=>window.viewer.destroy());
 });

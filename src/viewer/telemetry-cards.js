@@ -49,12 +49,13 @@ function telemetryCardMetricState(binding,sample,result){
   return telemetryMetricProofNames(binding).length?'held':'flowing';
 }
 /* Hidden (showOnCard:false) signals count toward the card state, as they do in the verdict;
-   name them on the card when they have no value or fail, so the border has a visible cause. */
-function telemetryCardHiddenNote(binding,sample,result){
-  var hidden=telemetryMetricNames(binding).filter(function(name){return binding.signals[name].showOnCard===false;});
-  var missing=hidden.filter(function(name){return telemetryReading(sample,name).value===null;}).length,failing=hidden.filter(function(name){return result && (result.failing || []).indexOf(name)>=0;}).length;
-  function count(n){return n+' hidden signal'+(n===1?'':'s');}
-  return [missing?count(missing)+': no value':'',failing?count(failing)+': outside limit':''].filter(Boolean).join(' · ');
+   name each one on the card when it has no value or fails, so the border has a visible cause.
+   A hidden signal whose query is still in flight is left out. */
+function telemetryCardHiddenNote(binding,sample,result,pending){
+  return telemetryMetricNames(binding).filter(function(name){return binding.signals[name].showOnCard===false && !(pending && pending[name]);}).map(function(name){
+    var why=telemetryReading(sample,name).value===null?'no value':result && (result.failing || []).indexOf(name)>=0?'outside limit':'';
+    return why?'Hidden '+(binding.signals[name].label || name)+': '+why:'';
+  }).filter(Boolean).join(' · ');
 }
 function telemetryCardContent(edge,binding,sample,result,window,pending){
   // Visibility never changes source ownership or legacy-link ambiguity.
@@ -63,7 +64,7 @@ function telemetryCardContent(edge,binding,sample,result,window,pending){
     var observed=telemetryReading(sample,row.name).value!==null;
     row.health=observed?(result && (result.failing || []).indexOf(row.name)>=0?'failing':'observed'):pending && pending[row.name]?'loading':'unobserved';
   });
-  var hidden=telemetryCardHiddenNote(binding,sample,result);binding=telemetryCardBinding(binding);
+  var hidden=telemetryCardHiddenNote(binding,sample,result,pending);binding=telemetryCardBinding(binding);
   var primary=telemetryPrimary(binding,true) || telemetryMetricNames(binding)[0] || null,queue=binding.kind==='queue',raw=edge.telemetry || {};
   var title=binding.card && binding.card.title || edge.label || edge.from+' → '+edge.to;
   // A template parameter is explicit author input. Never extract a queue name

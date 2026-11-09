@@ -64,7 +64,7 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
    route (a home router, bridge or gateway), every fan-out branch, an
    app read's request and its reply. Put all of them in that step's `edges`,
    even if lit before. Add a response edge ("200", "202", ack) only when the
-   source or code shows that response (or name that reply in the caption). Put `blocked`/`dropped` on the link
+   source or code shows that response (or name it in the caption). Put `blocked`/`dropped` on the link
    that actually failed (with a router drawn, a Wi-Fi failure is the
    device→router hop). If a hop should not be lit, remove it from the caption.
 7. **Icons follow state.** Values never switch icons automatically. When a
@@ -185,9 +185,9 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     grouping (for example recording, customer playback, internal playback) as
     the default, not the order or teams in which things were decided. On a
     page with tabs, every section goes inside the tabs container: a direct
-    section in `blocks` shows on every tab (above the tab bar if it comes
-    before the container, below if after). Put intro and
-    "Considered/rejected" content in their own tab.
+    section in `blocks` shows on every tab (above the tab bar if before the
+    container, below if after). Put intro and
+    "Considered/rejected" content in their own tab, not the first.
 
 And always: honesty. No invented facts. Unknown is not failed. End each path
 at its last source-backed outcome; do not add a user action (opening the

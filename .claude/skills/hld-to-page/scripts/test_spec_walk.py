@@ -119,6 +119,28 @@ class WalkTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         return Walk(r.stdout)
 
+    # ---- #1214: replies without a second arrow ----------------------------
+
+    def test_ack_style_response_edge_offers_the_step_text_alternative(self):
+        # #1214 (company round 6, corrected): a ret edge stays only with evidence,
+        # and a reply the source shows may go in the step text or a calls panel
+        # instead of a second arrow. Existing ret edges still validate cleanly.
+        spec = page({"edges": [
+            {"from": "cam", "to": "svc", "kind": "https", "label": "report"},
+            {"from": "svc", "to": "cam", "kind": "https", "ret": True, "label": "202 accepted"},
+            {"from": "svc", "to": "app", "kind": "https", "label": "push"},
+        ], "steps": [step("1", edges=["cam->svc", "svc->cam"]), step("2", edges=["svc->app"])]})
+        w = self.walk(spec)
+        hits = [c for c in w.checks if "svc->cam" in c]
+        self.assertEqual(len(hits), 1, w.out)
+        self.assertIn("keep it only if the source or code shows this response (a shown reply can go in "
+                      "the step text or a calls panel instead of a second arrow)", hits[0])
+        self.assertNotIn("otherwise", hits[0])
+        # A plain request edge with an ack-like label is not a response edge.
+        spec["page"]["blocks"][0]["diagram"]["edges"][1].pop("ret")
+        w = self.walk(spec)
+        self.assertFalse([c for c in w.checks if "svc->cam" in c], w.out)
+
     # ---- finding 1: dates -------------------------------------------------
 
     def test_multi_day_date_delta_sets_elapsed_time(self):

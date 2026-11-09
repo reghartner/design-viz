@@ -78,7 +78,7 @@ Table `showChange:false`; contract `fieldLabel`: [columns](../../../cookbook/sof
 - **Source checkout:** run `python3 tools/build.py` before validators. Commit
   authored inputs only; HTML/runtime outputs are ignored. An extracted kit
   includes its backend and needs no source checkout or build.
-- **Canon/topology:** `--feature topology`; keep imports/exports/providers.
+- **Canon/topology:** `--feature topology`; keep or create ([when](references/recipe-routing.md#creating-imports-and-exports)) imports/exports/providers.
   Merge `export:["a","b"]`; nest via re-exported IDs. [Overlays](../../../docs/shared-topology.md).
   Repo preview: consumer `folder-agent.py refresh-sources --source-repo /repo`. No cloud disk refresh.
 - **Details:** [workflow](references/authoring-workflow.md),

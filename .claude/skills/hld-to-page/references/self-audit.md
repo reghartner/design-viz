@@ -63,7 +63,8 @@ Output lines have three levels:
   "just now" detail that changes on a step that delivers no edge (correct for
   an unshown scheduled report the source says succeeds: label it illustrative
   and name its time); a response edge labeled like an acknowledgement ("200",
-  "202", "ack"): keep it only if the source or code shows that response.
+  "202", "ack"): keep it only if the source or code shows that response (a
+  shown reply can go in the step text or a calls panel instead of a second arrow).
 - `NOTE` (information): codeRefs on a node but on no step (correct when that
   code never runs in the story); catalog services not bound; more than one
   diagram on the page.

@@ -205,7 +205,8 @@ Edge rules:
   source supports it. Never add a relay hop, or delete a sourced direct path,
   just to make the topology look uniform.
 - Responses: add a `ret: true` edge ("200", "202", "ack", "clip") only when
-  the source or code evidence shows that response. A read (app opens a clip)
+  the source or code evidence shows that response, or write the answer in the
+  step text or a calls panel instead of a second arrow. A read (app opens a clip)
   has a sourced reply; a fire-and-forget report usually does not.
 - A failure goes on the link that failed: Wi-Fi down means `cam->router` is
   `blocked`, not `cam->ingest`.

@@ -927,9 +927,8 @@ Directed arrows between placed nodes:
   choice. Ports fix endpoints,
   not a collision-free route: use `bend` and label offsets for crowded paths.
 - `kind` — the **protocol** of the hop (see "Edge kinds"). Default `int`.
-- `ret` — `true` marks a response/acknowledgment: drawn as a fine dash in the
-  protocol's color (a request/response pair is a normal edge one way and a
-  `ret` edge back).
+- `ret` — `true` marks an evidenced response/ack back along the request: a
+  fine dash in the protocol's color (or put that reply in step text).
 - `label` — optional short text on the edge. Protocol verbs and topics read
   best: `POST /commands`, `PUBLISH cmd/site-4/pump-7`, `verify JWT`. Keep
   under ~28 characters.
@@ -2537,8 +2536,10 @@ contract stays the authority; a recipe shows the working subset for one task.
 1. Components/services → `nodes` (id, short title, sub = role/topic/port,
    closest icon, tint by role). Attach the doc's permalink for each component
    as `link`.
-2. Calls/messages between them → `edges` with the right protocol `kind`;
-   responses/acks get `ret: true`.
+2. Calls/messages between them → `edges` with the right protocol `kind`. Add a
+   response/ack `ret: true` edge only when the source or code shows the
+   response, or write the answer in the step text or a calls panel instead of a
+   second arrow.
 3. The main scenario → `steps` in narrative order, captions in plain language,
    permalinks as `link` where the doc has them.
 4. Group into `sections` (one flow per section, accent per topic, `source` =
@@ -2624,13 +2625,11 @@ contract stays the authority; a recipe shows the working subset for one task.
                   "edges": [
                     {"from": "web", "to": "api", "kind": "https", "label": "POST /orders"},
                     {"from": "api", "to": "auth", "kind": "int", "label": "verify"},
-                    {"from": "auth", "to": "svc", "kind": "int", "ret": true, "label": "ok"},
                     {"from": "api", "to": "svc", "kind": "int", "label": "create"},
                     {"from": "svc", "to": "db", "kind": "int", "label": "insert"},
                     {"from": "db", "to": "bus", "kind": "mqtt", "label": "PUBLISH orders.created"},
                     {"from": "bus", "to": "pick", "kind": "mqtt", "label": "SUBSCRIBE orders.*"},
-                    {"from": "bus", "to": "invoice", "kind": "mqtt"},
-                    {"from": "pick", "to": "bus", "kind": "mqtt", "ret": true, "label": "ack"}
+                    {"from": "bus", "to": "invoice", "kind": "mqtt"}
                   ],
                   "panels": [
                     {"id": "ord", "type": "state", "title": "Order Svc — order state",
@@ -2642,7 +2641,7 @@ contract stays the authority; a recipe shows the working subset for one task.
                   ],
                   "steps": [
                     {"edge": "web->api", "text": "Customer submits the order"},
-                    {"edges": ["api->auth", "auth->svc"], "text": "Session verified, order accepted",
+                    {"edge": "api->auth", "text": "Session verified: Auth replies ok, order accepted",
                      "panels": {"ord": {"state": "AUTHORIZED"}}},
                     {"edge": "api->svc", "text": "Order handed to the service"},
                     {"edge": "svc->db", "text": "Order persisted",
@@ -2651,9 +2650,7 @@ contract stays the authority; a recipe shows the working subset for one task.
                     {"edge": "db->bus", "text": "Created event published",
                      "panels": {"lag": {"value": 1}}},
                     {"edges": ["bus->pick", "bus->invoice"], "text": "Fan-out to fulfillment workers",
-                     "panels": {"ord": {"state": "FANNED_OUT"}}},
-                    {"edge": "pick->bus", "text": "Picking acknowledges",
-                     "panels": {"lag": {"value": 0}}}
+                     "panels": {"ord": {"state": "FANNED_OUT"}, "lag": {"value": 0}}}
                   ]
                 }
               }

@@ -879,7 +879,7 @@ def check_topology(d, check):
     """Acknowledgement-style response edges: the spec cannot show whether the source supports them."""
     for e in d.get("edges") or []:
         if isinstance(e, dict) and e.get("ret") and ACK_LABEL.search(str(e.get("label") or "")):
-            check("response edge %s->%s %r: keep it only if the source or code shows this response" % (
+            check("response edge %s->%s %r: keep it only if the source or code shows this response (a shown reply can go in the step text or a calls panel instead of a second arrow)" % (
                 e.get("from"), e.get("to"), e.get("label")))
 
 

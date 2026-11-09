@@ -2183,7 +2183,9 @@ several possible steps is not focused and the request summary reads `error in <s
 <operation> (not on this diagram)`.
 A loaded trace can grow the diagram frame so node time labels stay below their cards.
 A trace label never sits on a connection label (#1195): it moves down, then sideways, to a clear spot,
-or, if there is none, gets an opaque plate behind it. Connection labels never move.
+or, if there is none, gets an opaque plate behind it. Connection labels never move. When the board scale
+changes, unplated labels are checked again; a plated label is not, and its plate is padded to cover the
+slightly wider text.
 
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
 deduplicated in-memory Jira Activity entry, without posting externally. Trace

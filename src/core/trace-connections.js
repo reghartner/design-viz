@@ -17,7 +17,7 @@ var FlowTraceConnections=(function(){
     return copy(v);
   }
   function profile(raw){
-    fields(raw,['version','label','provider','server','tool','readOnly','adapter','arguments','time','literals','environments','links','allowedAttributes'],'profile');
+    fields(raw,['version','label','provider','server','tool','readOnly','adapter','arguments','time','literals','environments','links','allowedAttributes','dataset'],'profile');
     if(raw.version!==1 || !text(raw.label) || !text(raw.server) || !name(raw.tool) || raw.readOnly!==true || !({honeycomb:'honeycomb-table-v1',tempo:'tempo-v1'}[raw.provider]===raw.adapter))fail('configuration','Use version 1, an exact server/tool, readOnly:true and a registered provider adapter.');
     var p=copy(raw),a=p.arguments;
     fields(a,['traceId','start','end','environment','context'],'arguments');
@@ -43,6 +43,9 @@ var FlowTraceConnections=(function(){
       p.allowedAttributes.forEach(function(k,i){if(!attribute(k))fail('configuration','allowedAttributes['+i+'] must be a non-empty, non-secret span attribute name.');});
       p.allowedAttributes=p.allowedAttributes.filter(function(k,i,all){return all.indexOf(k)===i;});
     }
+    // #1197: Honeycomb get_trace returns no span attributes; Load reads them with one
+    // run_query over this dataset. Without it they stay unobserved (FlowCanon warns).
+    if(own(p,'dataset') && (p.provider!=='honeycomb' || !text(p.dataset)))fail('configuration','dataset must be a Honeycomb dataset name of 1–200 characters.');
     p.links=p.links || [];
     if(!Array.isArray(p.links) || p.links.length>8)fail('configuration','links must contain at most eight descriptors.');
     p.links.forEach(function(link){fields(link,['origin','path','query','timeEncoding'],'link');

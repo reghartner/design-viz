@@ -7,12 +7,12 @@ environment, bounded arguments (configured literals/context are redacted), reque
 acceptance, returned ID match, span count and completeness. Both are explicit
 reader actions. Changing an input never fetches. Clear/cancel, connection,
 environment, mapping diagram, document identity and remount changes retire old
-requests; late responses cannot replace current evidence. Schema/detail requests
-time out after 30 seconds. Connection or environment changes clear the pasted
+requests; late responses cannot replace current evidence. Requests time out
+after 30 seconds. Connection or environment changes clear the pasted
 ID/link and times; mapping diagram changes keep them. The environment starts
 at the board's match ([rules](provider-traces.md#load-trace-environment)).
 An authenticated host account change retires the shared telemetry session,
-retracts direct and numeric evidence, and requires reopening the viewer.
+retracts direct and numeric evidence; reopen the viewer.
 
 The result stays in this viewing session. No board edits, metrics, numeric proof,
 trace history or new traceMatch rules are created. Choose a mapping diagram when
@@ -92,7 +92,7 @@ Overrides cannot introduce literal/context keys or change server, tool, argument
 mapping or adapter. Alternatively a board may contain a full inline v1 profile
 instead of a company reference. Readers choose only resolved connections.
 `tracking.telemetry.enabled:false` and host `telemetry:false` win.
-Optional `allowedAttributes`:
+Optional `allowedAttributes` (Honeycomb: with `dataset`):
 [provider traces](provider-traces.md#allowed-match-attributes).
 
 ## Absolute bounds and supported links

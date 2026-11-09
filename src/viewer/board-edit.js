@@ -2,7 +2,8 @@
    index.html + flowspec.json lets people with edit access add a ticket to a node
    or edge (drag a Tickets row), remove one authored there, clear a Missing
    work marker set on this board (carrier popover, #855) and map a trace span
-   to a step without a traceMatch (Trace view, #1078), then Save publishes
+   to a step (Trace view, #1078), replacing a single traceMatch the reader saw
+   (#1177; the change records it as `replaces`), then Save publishes
    flowspec.json through the artifact runtime.
 
    The editor outlives every render: it keeps the exact authored text the page
@@ -79,11 +80,13 @@ function createBoardEditor(options){
     if(!local || !shown || !shown.d)return null;
     var out={raw:raw,ref:ref,section:ref.section,kind:ref.kind};
     /* #1078: steps are page-local, also when they draw on an imported node or
-       edge, so a traceMatch is written on the local step. Only a step without one. */
+       edge, so a traceMatch is written on the local step. `previous` is the
+       traceMatch it has now; apply() replaces one only when asked to (#1177). */
     if(ref.kind==='step'){
       var steps=Array.isArray(local.d && local.d.steps)?local.d.steps:[],at=steps.findIndex(function(step){return step && step.id===ref.id;});
-      if(at<0 || steps[at].traceMatch)return null;
+      if(at<0)return null;
       out.step=ref.id;out.label=String(steps[at].text || ref.id).replace(/\s+/g,' ').trim();out.path=local.path.concat(['steps',at]);out.local=steps[at];
+      out.previous=steps[at].traceMatch && typeof steps[at].traceMatch==='object'?steps[at].traceMatch:null;out.alternatives=Array.isArray(out.previous);
       return out;
     }
     if(ref.kind==='node'){
@@ -127,7 +130,8 @@ function createBoardEditor(options){
   }
   // The new text, or the same text when the operation changes nothing.
   function splice(source,t,op,ticket,match){
-    if(op==='trace-match'){var set=jsonSetField(source,t.path,'traceMatch',JSON.stringify({serviceName:match.serviceName,operation:match.operation}));return set?set.text:null;}
+    // #1180: a replacement swaps serviceName and operation and keeps the step's other traceMatch fields.
+    if(op==='trace-match'){var written=Object.assign({},t.previous || {},{serviceName:match.serviceName,operation:match.operation}),set=jsonSetField(source,t.path,'traceMatch',JSON.stringify(written));return set?set.text:null;}
     if(op==='clear-missing-work'){
       if(t.imported){var cleared=planTopologyTracking(source,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,'missingWork',true,true,context,t.index);return cleared.error?null:cleared.text;}
       var removed=jsonSetField(source,t.path,'missingWork',null);
@@ -148,26 +152,35 @@ function createBoardEditor(options){
   }
   function record(t,op,ticket,match){
     var entry={op:op};if(ticket!=null)entry.ticket=ticket;entry.path=t.path.slice();entry.label=t.label;
-    if(t.kind==='step'){entry.step=t.step;entry.traceMatch={serviceName:match.serviceName,operation:match.operation};}
+    if(t.kind==='step'){entry.step=t.step;entry.traceMatch={serviceName:match.serviceName,operation:match.operation};if(t.previous)entry.replaces={serviceName:t.previous.serviceName,operation:t.previous.operation};}
     else if(t.kind==='node')entry.node=t.node;else entry.edge=t.edge.slice();
     return entry;
   }
+  // #1177: the traceMatch a mapping replaces must be the one the caller saw (serviceName and operation), or
+  // none. Alternatives arrays compare structurally (#1180); a mapping never replaces one (apply).
+  function sameMatch(a,b){
+    if(Array.isArray(a) || Array.isArray(b))return Array.isArray(a) && Array.isArray(b) && JSON.stringify(a)===JSON.stringify(b);
+    return !a && !b || !!(a && b && a.serviceName===b.serviceName && a.operation===b.operation);
+  }
   // `ask`: the post-drop question to raise once the change has rendered (#855).
-  function apply(op,ref,ticket,ask,match){
+  function apply(op,ref,ticket,ask,match,previous){
     if(!active || saving || readOnly)return false;
     var t=target(text,ref);if(!t)return false;
     if((op==='trace-match')!==(t.kind==='step'))return false;
     if(op==='trace-match' && !(match && typeof match.serviceName==='string' && match.serviceName && typeof match.operation==='string' && match.operation))return false;
+    if(op==='trace-match' && (t.alternatives || !sameMatch(t.previous,previous)))return false;
     if(op==='remove' && authoredKeys(t).indexOf(ticket)<0)return false;
     if(op==='clear-missing-work'){var m=marker(t);if(!m || !m.clearable)return false;}
-    var next=splice(text,t,op,ticket,match);
+    var next=splice(text,t,op,ticket,match),before=text;
     if(next==null || next===text)return false;
     if(!render(next))return false;
     var entry=record(t,op,ticket,match),chain=boardEditChain(t.raw,t.path);
     // An operation that undoes a pending one cancels it. A clear or a span mapping has no inverse here.
+    // Coupling (#1180 m8): undoMap restores a mapping's exact `before` text only while this check never
+    // cancels an op after it. It reads o.ticket and o.path on the op wrapper, so today it never matches.
     var inverse=op==='clear-missing-work' || op==='trace-match'?-1:ops.findIndex(function(o){return o.ticket===ticket && o.op!==op && JSON.stringify(o.path)===JSON.stringify(entry.path);});
     if(inverse>=0)ops.splice(inverse,1);
-    else ops.push({entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind});
+    else ops.push({entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind,previous:op==='trace-match'?t.previous:undefined,before:op==='trace-match'?before:undefined});
     question=ask || null;
     changed();return true;
   }
@@ -176,7 +189,8 @@ function createBoardEditor(options){
     if(error){if(win.console)console.warn('flowspec: board edit refused: '+error);return false;}
     text=next;return true;
   }
-  function stash(){try{win.sessionStorage.setItem(stashKey,JSON.stringify({ops:ops}));}catch(ex){}}
+  // The text from before a mapping (for its Undo) stays out of the stash.
+  function stash(){try{win.sessionStorage.setItem(stashKey,JSON.stringify({ops:ops.map(function(o){return {entry:o.entry,chain:o.chain,replayable:o.replayable,kind:o.kind,previous:o.previous};})}));}catch(ex){}}
   function unstash(){try{win.sessionStorage.removeItem(stashKey);}catch(ex){}}
   function history(source,entry){
     var raw=parsed(source),owner=raw && raw.page?['page']:[],page=specValueAt(raw,owner),list=page && page.editHistory,itemText=JSON.stringify(entry,null,2);
@@ -204,7 +218,7 @@ function createBoardEditor(options){
       if(!ref){dropped.push(describe);return;}
       active=true;
       var before=text;
-      if(!apply(entry.op,ref,entry.ticket,null,entry.traceMatch) && text===before){
+      if(!apply(entry.op,ref,entry.ticket,null,entry.traceMatch,op.previous) && text===before){
         // A clear with no marker of this board's left to clear is dropped (#855).
         if(entry.op==='clear-missing-work'){dropped.push(describe);return;}
         // A step that already has this exact traceMatch needs nothing; any other is dropped (#1078).
@@ -241,13 +255,25 @@ function createBoardEditor(options){
     return null;
   }
 
+  /* #1177: undo the latest pending span mapping. The text from before it comes back exactly when it is the
+     last change; otherwise the step's traceMatch is set back to what it replaced. */
+  function lastMapping(){for(var i=ops.length-1;i>=0;i--)if(ops[i].entry.op==='trace-match')return i;return -1;}
+  function undoMap(){
+    if(!active || saving || readOnly)return false;var at=lastMapping();if(at<0)return false;
+    var op=ops[at],next=at===ops.length-1 && op.before!=null?op.before:null;
+    if(next==null){var set=jsonSetField(text,op.entry.path,'traceMatch',op.previous?JSON.stringify(op.previous):null);next=set && set.text;}
+    if(next==null || !render(next))return false;
+    ops.splice(at,1);question=null;changed();return true;
+  }
   function beforeUnload(ev){if(!ops.length || reloading)return;ev.preventDefault();ev.returnValue='';return '';}
   win.addEventListener('beforeunload',beforeUnload);
 
+  // The latest pending span mapping, for the result note and its Undo (#1177).
+  function mapped(){var at=lastMapping();if(at<0 || readOnly)return null;var e=ops[at].entry;return {step:e.step,label:e.label,traceMatch:{serviceName:e.traceMatch.serviceName,operation:e.traceMatch.operation}};}
   var api={
     state:function(){
       return {editable:canEdit && !!artifact && !readOnly,blocked:fallback?"Editing is off: this board couldn't load its latest version, so saving would overwrite newer changes.":'',
-        active:active && !readOnly,pending:ops.length,saving:saving,readOnly:readOnly,notice:notice?{kind:notice.kind,text:notice.text}:null};
+        active:active && !readOnly,pending:ops.length,saving:saving,readOnly:readOnly,notice:notice?{kind:notice.kind,text:notice.text}:null,mapped:mapped()};
     },
     onChange:function(fn){listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
     start:function(){if(!canEdit || !artifact || fallback || readOnly || active)return;active=true;notice=null;changed();},
@@ -257,8 +283,10 @@ function createBoardEditor(options){
     add:function(ref,ticket){var m=null;try{m=marker(target(text,ref));}catch(ex){m=null;}return apply('add',ref,ticket,m && m.clearable?{ref:ref,ticket:ticket}:null);},
     remove:function(ref,ticket){return apply('remove',ref,ticket);},
     clearMissingWork:function(ref){return apply('clear-missing-work',ref);},
-    // #1078: write traceMatch {serviceName, operation} on a step of ref.section that has none.
-    mapSpan:function(ref,match){return apply('trace-match',ref,null,null,match);},
+    // #1078: write traceMatch {serviceName, operation} on a step of ref.section. A step that has one is
+    // replaced only when `previous` names it (#1177).
+    mapSpan:function(ref,match,previous){return apply('trace-match',ref,null,null,match,previous || null);},
+    undoMap:undoMap,
     // {clearable:true} for a marker set on this board, {clearable:false, source} for a provider-inherited one, else null.
     missingWork:function(ref){if(!active || readOnly)return null;try{return marker(target(text,ref));}catch(ex){return null;}},
     question:function(){return active && !readOnly && question?{ref:question.ref,ticket:question.ticket}:null;},

@@ -57,22 +57,27 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
   var rows=snapshot.carriers.filter(function(binding){return snapshot.verdicts.carriers[binding.id].bound;}).map(function(binding){
     var waiting=pending[binding.id] || {},loading=telemetryMetricNames(binding).some(function(name){return waiting[name];}),measured=telemetryMetricNames(binding).some(function(name){return telemetryReading(snapshot.map[binding.id],name).value!==null;});
     var result=snapshot.verdicts.carriers[binding.id],sample=snapshot.map[binding.id],primary=telemetryPrimary(binding,true),queue=binding.kind==='queue';
-    var reading=primary?telemetryReading(sample,primary):{series:[]},times=reading.series.map(function(p){return Date.parse(telemetryTime(p[0]));}).filter(isFinite);
-    // Each primary signal owns its measurement window. A carrier timestamp may
-    // summarize a newer peer and must not clip this signal's older points.
-    var entry=sample && sample.signals && sample.signals[primary],explicit=entry && telemetryOwn(entry,'observedAt');
-    var measuredAt=!entry?null:explicit?telemetryTime(entry.observedAt):telemetryTime(sample && sample.observedAt) || (times.length?telemetryTime(Math.max.apply(null,times)):null);
-    var bounds=snapshot.historical?snapshot.window:entry && entry.window;
-    var end=Date.parse(bounds?bounds.to:snapshot.historical?snapshot.at:measuredAt);
-    var start=bounds?Date.parse(bounds.from):end-windowMs,span=end-start,interval=entry && entry.intervalMs;
-    var points=reading.series.map(function(p){return {at:Date.parse(telemetryTime(p[0])),value:p[1]};}).filter(function(p){return isFinite(end) && p.at>=start-(interval || 0) && p.at<=end;}).sort(function(a,b){return a.at-b.at;});
+    // #1194: one plot per signal; the popup's main chart is the primary's, each metric tile has its own small one.
+    function plot(name){
+      var reading=name?telemetryReading(sample,name):{series:[]},times=reading.series.map(function(p){return Date.parse(telemetryTime(p[0]));}).filter(isFinite);
+      // Each primary signal owns its measurement window. A carrier timestamp may
+      // summarize a newer peer and must not clip this signal's older points.
+      var entry=sample && sample.signals && sample.signals[name],explicit=entry && telemetryOwn(entry,'observedAt');
+      var measuredAt=!entry?null:explicit?telemetryTime(entry.observedAt):telemetryTime(sample && sample.observedAt) || (times.length?telemetryTime(Math.max.apply(null,times)):null);
+      var bounds=snapshot.historical?snapshot.window:entry && entry.window;
+      var end=Date.parse(bounds?bounds.to:snapshot.historical?snapshot.at:measuredAt);
+      var start=bounds?Date.parse(bounds.from):end-windowMs,span=end-start,interval=entry && entry.intervalMs;
+      var points=reading.series.map(function(p){return {at:Date.parse(telemetryTime(p[0])),value:p[1]};}).filter(function(p){return isFinite(end) && p.at>=start-(interval || 0) && p.at<=end;}).sort(function(a,b){return a.at-b.at;});
+      var low=points.length?Math.min.apply(null,points.map(function(p){return p.value;})):0,high=points.length?Math.max.apply(null,points.map(function(p){return p.value;})):0;
+      var plotted=points.map(function(p){return {x:2+96*Math.max(0,p.at-start)/span,y:high===low?16:28-24*(p.value-low)/(high-low)};});
+      // Sparse daily endpoints are dots, never a fictitious continuous sparkline.
+      var continuous=points.length>=3 && points.every(function(p,i){return !i || p.at-points[i-1].at<=(interval?interval*1.1:span/4);});
+      return {measuredAt:measuredAt,start:start,end:end,span:span,points:plotted,line:continuous?plotted.map(function(p){return p.x+','+p.y;}).join(' '):null};
+    }
+    var main=plot(primary),measuredAt=main.measuredAt,start=main.start,end=main.end,span=main.span;
     var markers=(sample && sample.markers || []).filter(function(m){return m.kind==='done' || m.kind==='deploy';}).map(function(m){return {at:Date.parse(m.at),label:m.label || m.kind,kind:m.kind};});
     if(result.since.doneAt)markers.push({at:Date.parse(result.since.doneAt),label:'Done',kind:'done'});
     markers=markers.filter(function(m,i,all){return isFinite(end) && m.at>=start && m.at<=end && !all.slice(0,i).some(function(other){return other.at===m.at && other.kind===m.kind;});});
-    var low=points.length?Math.min.apply(null,points.map(function(p){return p.value;})):0,high=points.length?Math.max.apply(null,points.map(function(p){return p.value;})):0;
-    var plotted=points.map(function(p){return {x:2+96*Math.max(0,p.at-start)/span,y:high===low?16:28-24*(p.value-low)/(high-low)};});
-    // Sparse daily endpoints are dots, never a fictitious continuous sparkline.
-    var continuous=points.length>=3 && points.every(function(p,i){return !i || p.at-points[i-1].at<=(interval?interval*1.1:span/4);});
     var url=null,authored=binding.links || {},provider=sample && sample.links || {};
     [authored.dashboard,authored.query,provider.dashboard,telemetryMetricUrl(binding,sample,primary),provider.query].some(function(value){url=deltaLinkUrl(value);return !!url;});
     var since=[];if(result.since.doneAt){since.push('Done '+liveStatusReadableTime(result.since.doneAt));if(result.since.firstTrafficAt)since.push('First observed traffic '+liveStatusReadableTime(result.since.firstTrafficAt));}
@@ -90,7 +95,7 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
     }
     return {id:binding.id,title:binding.title,kind:binding.kind,tickets:binding.tickets.slice(),jira:result.jira || 'No tickets',
       loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,label:loading && !measured?'Loading…':label,predicate:predicate(binding,null,measured)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
-      kpis:telemetryMetricRows(binding,sample,waiting,window),
+      primary:primary,kpis:telemetryMetricRows(binding,sample,waiting,window).map(function(kpi){var own=plot(kpi.name);return Object.assign(kpi,{chart:{points:own.points,line:own.line}});}),
       since:since.join(' · ') || 'unavailable',url:url,
       linkLabel:primary && binding.signals[primary].source==='grafana'?'Open in Grafana':primary && binding.signals[primary].source==='honeycomb'?'Open in Honeycomb':'Open telemetry',
       explanation:result.failing.length?'Outside proof threshold: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name,null,window)+'; requires '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
@@ -101,7 +106,7 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
           result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':
           // unmeasured: no observed signal has an authored minimum, so traffic is not judged.
           result.telemetry==='unmeasured'?(limited?'Observed signals are within their authored limits; no traffic minimum is authored.':'Observed signals; no authored limits.'):'Observed signals are within their authored limits.'},
-      chart:{pending:!!waiting[primary],observedAt:measuredAt,points:plotted,line:continuous?plotted.map(function(p){return p.x+','+p.y;}).join(' '):null,
+      chart:{pending:!!waiting[primary],observedAt:measuredAt,points:main.points,line:main.line,
         markers:markers.map(function(m){return {x:2+96*(m.at-start)/span,label:m.label,kind:m.kind};})}};
   });
   var predicates=rows.map(function(row){return row.predicate;}).filter(function(value,i,all){return all.indexOf(value)===i;});
@@ -1428,12 +1433,23 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }else element('span','',row.chart.pending?'Loading…':'No observed series in this window',chart);
     var kpis=block.querySelector('.dv-live-production-kpis') || element('div','dv-live-production-kpis',null,block);
     while(kpis.children.length>row.kpis.length)kpis.lastElementChild.remove();
+    // #1194: one row per metric: bold label, its graph, one line "<scope>: <value>". The primary signal's row holds the
+    // main chart (with its markers) instead of a second copy. A scope the previous tile already showed is not repeated.
+    var previous=null,placed=false;
     row.kpis.forEach(function(kpi,i){
       var tile=kpis.children[i] || element('div','dv-live-production-kpi',null,kpis);tile.replaceChildren();
-      element('span','',kpi.label+': '+kpi.text,tile);
+      element('strong','dv-live-metric-label',kpi.label,tile);
       if(kpi.url){var queryLink=link(tile,'',kpi.url);queryLink.className='dv-live-metric-link';queryLink.setAttribute('aria-label','Open '+kpi.label+' source query in a new tab');queryLink.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});}
-      if(kpi.scope)element('small','dv-live-metric-scope',kpi.scope,tile);
+      if(kpi.name===row.primary){tile.appendChild(chart);placed=true;}
+      else if(kpi.chart && kpi.chart.points.length){
+        var spark=telemetrySvg(document,'svg',{class:'dv-live-metric-sparkline',viewBox:'0 0 100 32',role:'img','aria-label':kpi.label+': '+kpi.chart.points.length+' observed points'},tile);
+        if(kpi.chart.line)telemetrySvg(document,'polyline',{class:'dv-live-metric-series',points:kpi.chart.line},spark);
+        kpi.chart.points.forEach(function(point){telemetrySvg(document,'circle',{class:'dv-live-metric-point',cx:point.x,cy:point.y,r:1.8},spark);});
+      }
+      var scope=kpi.scope && kpi.scope!==previous?kpi.scope:'';previous=kpi.scope;
+      element('small','dv-live-metric-line',(scope?scope+': ':'')+kpi.text,tile);
     });
+    if(!placed && chart.parentNode!==block)block.insertBefore(chart,kpis);
     if(!metricsOnly)text('p','dv-live-production-since','Since Done: '+row.since);else{var since=block.querySelector('.dv-live-production-since');if(since)since.remove();}
     var anchor=block.querySelector('.dv-live-production-link');
     if(row.url){if(!anchor){anchor=link(block,'',row.url);anchor.classList.add('dv-live-production-link');anchor.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});element('span','',null,anchor);}anchor.setAttribute('href',row.url);anchor.querySelector('span').textContent=row.linkLabel;}

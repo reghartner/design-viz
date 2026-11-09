@@ -40,6 +40,8 @@ function flowMetricsDom(o){
       if(source==='loki' || source==='grafana')row(box,prefix+name+' empty result reads 0',c.checkbox(entry.missingMeansZero!==false,function(v){return commit({op:'signal',name:name,field:'missingMeansZero',value:v});})).setAttribute('title','On: an empty Prometheus result reads 0 in Live; an empty Loki count/rate reads 0 in Live and Over time. Off: empty stays unobserved (missingMeansZero: false).');
       row(box,prefix+name+' query link',c.text(entry && entry.links?entry.links.query:null,function(v){return commit({op:'signal',name:name,field:'queryLink',value:v});},{placeholder:'https://… (stable source query)'}));
       row(box,prefix+name+' scope',c.text(telemetryObject(entry)?entry.scope:null,function(v){return commit({op:'signal',name:name,field:'scope',value:v});},{placeholder:'Exact counting scope (optional)'}));
+      // #1194: scope "" hides the scope line; unchecking removes the key, so the generated scope returns.
+      row(box,prefix+name+' hide scope',c.checkbox(telemetryObject(entry) && entry.scope==='',function(v){return commit({op:'signal',name:name,field:'scope',value:v?'':null});}));
       proofEditors(box,binding.proof,names,name,prefix,commit);
       box.appendChild(c.action(prefix?'Remove '+prefix+'signal '+name:'Remove signal '+name,function(){return commit({op:'removeSignal',name:name});}));
     });

@@ -286,6 +286,7 @@
     function traceBody(value){
       // #1131: Env and the Metrics overlay switch are in the shared header, not here.
       var trace=value.trace,body=el(host,'div','trace-body','dv-live-panel-body dv-live-trace'),controls=el(body,'div','controls','dv-live-controls');
+      metricsLine(body,value.metrics || {available:false,enabled:false});
       if(value.actionLabel)button(controls,'action','reader-button',value.actionLabel,'runAction');
       var show=button(controls,'show','reader-button dv-trace-show','Show on diagram','setTraceShow');show._liveArgument=!trace.show;show.setAttribute('aria-pressed',String(trace.show));show.disabled=!trace.selected;
       traceEditNotice(body,value.edit);
@@ -366,8 +367,32 @@
       var all=el(detail,'details','all','dv-trace-all');el(all,'summary','summary','','All operation mappings');var mappings=el(all,'div','mappings','dv-trace-mappings');
       model.rows.forEach(function(item){var row=el(mappings,'div',item.id,'dv-trace-mapping');row.setAttribute('data-tone',item.tone);el(row,'strong','operation','',item.operation);el(row,'span','duration','',item.label+(item.budget!=null?' / '+item.budget+' ms budget':''));el(row,'small','conditions','',[item.detail].concat(item.conditions.map(function(c){return c.label;})).filter(Boolean).join(' · '));});
     }
-    // #1131 (Chuck D1 D6 D8 D12): one header above the Jira and the Trace view. Top row: Jira | Trace, Env and the
-    // Metrics overlay switch. Then Live | Over time, the Over time error and the day row.
+    // The Metrics overlay's connector line, once per view (#1136), below that view's button rows (#1162): it wraps, so its
+    // height follows its text and must not move a button (#986). Same markup and dot tokens as the Jira connector, its own
+    // class names so `.dv-live-connection` keeps naming the Jira connector alone.
+    function metricsLine(parent,metrics){
+      var metricsState=metrics.state==='ok'?(metrics.demo?'demo':'connected'):{loading:'connecting',error:'error',approval:'approval'}[metrics.state] || 'disconnected';
+      var metricsLabel={connected:'connected',demo:'demo',connecting:'connecting',error:'did not answer',approval:'needs approval'}[metricsState] || 'not connected';
+      var metricsConnection=el(parent,'span','metrics-connection','dv-live-metrics-connection');metricsConnection.setAttribute('data-state',metricsState);metricsConnection.setAttribute('data-busy',String(!!metrics.busy));metricsConnection.setAttribute('role','status');
+      el(metricsConnection,'i','dot','dv-live-metrics-dot');
+      // A note on a good answer (a failed query beside answered ones) follows the refreshed time.
+      var answered=metricsState==='connected' || metricsState==='demo',metricsText;
+      if(metrics.source){
+        // #943: "Grafana connected · 24h window · refreshed 10:42:13"; an error shows its note, which names the fix.
+        var named=metrics.source+' '+metricsLabel;
+        metricsText=metricsState==='error'?metrics.note || named:metricsState==='disconnected'?named:
+          [named,metrics.window?metrics.window+' window':'',answered?metrics.checkedText:'',answered?metrics.note:''].filter(Boolean).join(' · ');
+      }else metricsText=metricsState==='error'?'Metrics: '+metricsLabel+(metrics.note?' · '+metrics.note:''):
+        ['Metrics: '+metricsLabel,metrics.checkedText].filter(Boolean).join(', ')+(answered && metrics.note?' · '+metrics.note:'');
+      if(!metrics.available && metrics.note)metricsText=metrics.note;
+      if(metrics.environment)metricsText+=' · '+metrics.environment;
+      el(metricsConnection,'span','text','',metricsText);metricsConnection.title=metricsText;
+      metricsConnection.hidden=!metrics.available && !metrics.note;
+      return {el:metricsConnection,text:metricsText};
+    }
+    // #1131 (Chuck D1 D6 D8 D12): one header above the Jira and the Trace view. Top row: Jira | Trace, Env, Edit and the
+    // Metrics overlay switch. Then Live | Over time, the Over time error and the day row. The Metrics connector line is not
+    // here: each view draws it below its own button rows (metricsLine, #1162).
     function sharedHeader(value){
       var header=el(host,'div','header','dv-status-header'),top=el(header,'div','top','dv-status-top'),trace=!!(value && value.mode==='trace');
       // #1136: a board without ticket or epic references (snapshot().available false) has no Jira view, so no switch.
@@ -393,25 +418,6 @@
       var metricsSwitch=el(top,'button','metrics','dv-live-metrics');metricsSwitch.type='button';metricsSwitch.setAttribute('role','switch');metricsSwitch.setAttribute('aria-checked',String(!!metrics.enabled));metricsSwitch.hidden=!metrics.available;metricsSwitch._liveArgument=!metrics.enabled;
       el(el(metricsSwitch,'span','track','dv-live-switch-track'),'i','thumb','dv-live-switch-thumb').parentNode.setAttribute('aria-hidden','true');el(metricsSwitch,'span','label','','Metrics overlay');
       if(!metricsSwitch._liveClick){metricsSwitch._liveClick=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnabled(metricsSwitch._liveArgument);};metricsSwitch.addEventListener('click',metricsSwitch._liveClick);}
-      // The Metrics overlay's connector line, in the shared header so both views show it once (#1136). Same markup and dot
-      // tokens as the Jira connector, its own class names so `.dv-live-connection` keeps naming the Jira connector alone.
-      var metricsState=metrics.state==='ok'?(metrics.demo?'demo':'connected'):{loading:'connecting',error:'error',approval:'approval'}[metrics.state] || 'disconnected';
-      var metricsLabel={connected:'connected',demo:'demo',connecting:'connecting',error:'did not answer',approval:'needs approval'}[metricsState] || 'not connected';
-      var metricsConnection=el(header,'span','metrics-connection','dv-live-metrics-connection');metricsConnection.setAttribute('data-state',metricsState);metricsConnection.setAttribute('data-busy',String(!!metrics.busy));metricsConnection.setAttribute('role','status');
-      el(metricsConnection,'i','dot','dv-live-metrics-dot');
-      // A note on a good answer (a failed query beside answered ones) follows the refreshed time.
-      var answered=metricsState==='connected' || metricsState==='demo',metricsText;
-      if(metrics.source){
-        // #943: "Grafana connected · 24h window · refreshed 10:42:13"; an error shows its note, which names the fix.
-        var named=metrics.source+' '+metricsLabel;
-        metricsText=metricsState==='error'?metrics.note || named:metricsState==='disconnected'?named:
-          [named,metrics.window?metrics.window+' window':'',answered?metrics.checkedText:'',answered?metrics.note:''].filter(Boolean).join(' · ');
-      }else metricsText=metricsState==='error'?'Metrics: '+metricsLabel+(metrics.note?' · '+metrics.note:''):
-        ['Metrics: '+metricsLabel,metrics.checkedText].filter(Boolean).join(', ')+(answered && metrics.note?' · '+metrics.note:'');
-      if(!metrics.available && metrics.note)metricsText=metrics.note;
-      if(metrics.environment)metricsText+=' · '+metrics.environment;
-      el(metricsConnection,'span','text','',metricsText);metricsConnection.title=metricsText;
-      metricsConnection.hidden=!metrics.available && !metrics.note;
       var available=value && value.available,hasData=available && value.hasData;
       // Live and Over time are the two modes (#929, Chuck 2026-11-04), in a row of their own. The selected one is filled. Live returns from a past day; while selected it still turns colors off (D6).
       var over=value && value.overTime,past=!!(over && over.active);
@@ -447,12 +453,13 @@
       sharedHeader(value);
       if(value && value.mode==='trace'){traceBody(value);sweep(host);return;}
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
-      // #986: the first row holds buttons that never move. Everything that changes has a row of its own, whose height depends on the panel's width and never on its text, so it cannot move the buttons or what is below.
-      var controls=el(head,'div','controls','dv-live-controls'),statusRow=el(head,'div','status','dv-live-status'),countRow=el(statusRow,'div','counts','dv-live-counts'),statusLine=el(statusRow,'div','text','dv-live-status-text');
+      // #986/#1162: the first row is the counts, then the provider action, then First blocker in a fixed slot at its top right, so
+      // neither changing counts nor a button appearing can move it. The counts wrap onto more lines so every one shows in full;
+      // that moves only what is below. Status text has the row below and wraps in full.
+      var controls=el(head,'div','controls','dv-live-controls'),countRow=el(controls,'div','counts','dv-live-counts'),statusRow=el(head,'div','status','dv-live-status'),statusLine=el(statusRow,'div','text','dv-live-status-text');
       var available=value && value.available,hasData=available && value.hasData;
-      countRow.setAttribute('role','region');countRow.setAttribute('aria-label','Status counts');countRow.setAttribute('tabindex','0');countRow.setAttribute('title','Scroll horizontally to see all counts.');
-      // Preserve native count scrolling when the page presenter also owns arrow keys.
-      if(!countRow._liveKeys){countRow._liveKeys=function(event){if(event.target===countRow && ['ArrowLeft','ArrowRight','Home','End'].indexOf(event.key)>=0)event.stopPropagation();};countRow.addEventListener('keydown',countRow._liveKeys);}
+      // Without data the strip stays as an empty spacer (no name), so the action keeps its place when data arrives.
+      if(hasData){countRow.setAttribute('role','region');countRow.setAttribute('aria-label','Status counts');}else{countRow.removeAttribute('role');countRow.removeAttribute('aria-label');}
       var missingWork=value && value.missingWork || {count:0,painted:false};
       var missingCount=el(countRow,'span','count-missing-work','dv-live-count'+(hasData && missingWork.count && missingWork.painted?' dv-live-missing':''),'Missing work '+missingWork.count);
       missingCount.setAttribute('data-live-count','missing-work');missingCount.setAttribute('title','Authored nodes and connections marked as missing work; each occurrence counts.');missingCount.hidden=!hasData || !missingWork.count;
@@ -465,19 +472,23 @@
       var gh=conn.github || {state:'none'},ghLabel={connecting:'GitHub connecting',connected:'GitHub connected',error:'GitHub did not answer'}[gh.state];
       var github=el(connection,'span','github','dv-live-connection-github',ghLabel || '');github.setAttribute('data-state',gh.state);github.setAttribute('data-busy',String(!!gh.busy));github.hidden=!ghLabel;
       connection.hidden=!available || conn.state==='none';
+      var metricsConnection=metricsLine(statusLine,metrics);
       var note=el(statusLine,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
       var actionLabel=(available || metrics.available) && value && value.actionLabel || '';
       var action=button(controls,'action','reader-button dv-live-action',actionLabel,'runAction');action.hidden=!actionLabel;
       // #828 Edit mode: its buttons are in the shared header (#1136); its reason and notice are in this status row.
       var edit=available && value.edit || null,editing=!!(edit && edit.active);
       // A fixed slot and size, last in the row so a button appearing to its left cannot move it (#986). "No blockers" only when that is true: blockers off the current path, or with colors off, leave "First blocker" greyed out.
-      var first=button(controls,'first','reader-button dv-live-first',value && (value.firstBlocker || (value.blockers || []).length)?'First blocker':'No blockers','firstBlocker');first.hidden=!hasData;first.disabled=!(value && value.firstBlocker);
+      var first=button(controls,'first','reader-button dv-live-first',value && (value.firstBlocker || (value.blockers || []).length)?'First blocker':'No blockers','firstBlocker');first.disabled=!(value && value.firstBlocker) || !hasData;
+      // Without data its slot stays reserved but unseen and inert, so nothing moves when data arrives (#1162).
+      if(hasData){first.removeAttribute('data-reserved');first.removeAttribute('tabindex');first.removeAttribute('aria-hidden');}
+      else{first.setAttribute('data-reserved','true');first.setAttribute('tabindex','-1');first.setAttribute('aria-hidden','true');}
       var reason=el(statusLine,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
       var editNotice=el(statusLine,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
-      controls.hidden=!actionLabel && !hasData;statusRow.hidden=(!available || !(hasData || value.note.text)) && !reason.textContent && !editNotice.textContent;
+      controls.hidden=!actionLabel && !hasData;statusRow.hidden=(!available || !(hasData || value.note.text)) && !reason.textContent && !editNotice.textContent && metricsConnection.el.hidden || connection.hidden && metricsConnection.el.hidden && note.hidden && reason.hidden && editNotice.hidden;
       head.hidden=controls.hidden && statusRow.hidden;
-      // Long text is cut off on screen; the tooltip and the status elements keep all of it.
-      var statusText=[connection.hidden?'':[connWho,conn.checkedText].filter(Boolean).concat(ghLabel?[ghLabel]:[]).join(', '),note.textContent,reason.textContent,editNotice.textContent].filter(Boolean).join(' · ');
+      // The tooltip repeats the whole status text.
+      var statusText=[connection.hidden?'':[connWho,conn.checkedText].filter(Boolean).concat(ghLabel?[ghLabel]:[]).join(', '),metricsConnection.el.hidden?'':metricsConnection.text,note.textContent,reason.textContent,editNotice.textContent].filter(Boolean).join(' · ');
       if(statusText)statusRow.setAttribute('title',statusText);else statusRow.removeAttribute('title');
       if(!available && !proof)el(host,'p','empty','dv-live-empty','This page has no ticket references.');
       if(hasData || proof || (metrics.logDetails || []).length || value && value.activity.length){
@@ -579,8 +590,10 @@
 /* #1131: the header shared by the Jira and Trace views. Segments keep the reader's button look (#863); the selected one is filled. */
 .dv-status-header{display:flex;flex-direction:column;gap:8px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--explore-border)}
 .dv-live-edit-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.dv-status-header>.dv-live-metrics-connection{min-width:0;font:11px/1.5 'IBM Plex Mono',monospace}
-.dv-status-header>.dv-live-metrics-connection>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.dv-live-metrics-connection>span{min-width:0;overflow-wrap:anywhere}
+/* #1162: in the Trace view the Metrics line sits directly under the controls row. */
+.dv-live-trace>.dv-live-metrics-connection{display:flex;margin:6px 0;font:11px/1.5 'IBM Plex Mono',monospace}
+.pt-live-status .dv-live-head .tbtn.dv-live-first[data-reserved]{visibility:hidden;}
 .dv-status-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .dv-status-segmented{display:flex;flex-wrap:wrap;align-items:center;gap:4px}
 .dv-live-environment{display:inline-flex;align-items:center;gap:6px;font:11px/1.5 'IBM Plex Mono',monospace;color:var(--dtext)}
@@ -619,9 +632,10 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 .dv-live-toggle{display:flex;gap:4px;align-items:center;}
 .dv-live-count{border-radius:4px;padding:2px 4px;color:var(--dv-live-on);}
 .dv-live-note{color:var(--dtext);}
-.dv-live-connection,.dv-live-metrics-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
+/* #1162: status lines wrap in full; the dot stays beside the first line. */
+.dv-live-connection,.dv-live-metrics-connection{display:inline-flex;align-items:flex-start;gap:6px;color:var(--dtext);}
 .dv-live-connection[hidden],.dv-live-metrics-connection[hidden]{display:none!important;}
-.dv-live-connection-dot,.dv-live-metrics-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
+.dv-live-connection-dot,.dv-live-metrics-dot{width:8px;height:8px;margin-top:.45em;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
 .dv-live-connection[data-state="connected"] .dv-live-connection-dot,.dv-live-connection[data-state="demo"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="connected"] .dv-live-metrics-dot,.dv-live-metrics-connection[data-state="demo"] .dv-live-metrics-dot{background:var(--dv-live-done);}
 .dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="connecting"] .dv-live-metrics-dot,.dv-live-metrics-connection[data-state="approval"] .dv-live-metrics-dot{background:var(--dv-live-active);}
 .dv-live-connection[data-state="error"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="error"] .dv-live-metrics-dot{background:var(--dv-live-blocked);}
@@ -766,19 +780,19 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 .pwidget.pt-live-status{display:flex;flex-direction:column}
 .pt-live-status>.ptitle{flex:none}
 .pt-live-status .pbody{flex:1;min-width:0;min-height:0;overflow:auto;color:var(--dtext);font:13px/1.5 'IBM Plex Sans',sans-serif}
-.dv-live-head{container-type:inline-size;display:flex;flex-direction:column;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--explore-border);font:11px/1.5 'IBM Plex Mono',monospace}
+.dv-live-head{display:flex;flex-direction:column;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--explore-border);font:11px/1.5 'IBM Plex Mono',monospace}
 .dv-live-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
-.dv-live-status{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);align-items:center;gap:0 8px;height:36px;overflow:hidden;white-space:nowrap;}
-/* A fixed count row reserves room for the scrollbar; changing counts never moves the header below it. */
-.dv-live-counts{display:flex;align-items:center;gap:8px;min-width:0;height:36px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;}
+.dv-live-head>.dv-live-controls{flex-wrap:nowrap;align-items:flex-start;}
+.dv-live-head>.dv-live-controls>.dv-live-counts{flex:1 1 auto;}
+.dv-live-head>.dv-live-controls>.tbtn{flex:none;}
+.dv-live-status{min-width:0;}
+/* #1162: the counts wrap onto more lines so each shows in full; a single line sits level with First blocker. */
+.dv-live-counts{display:flex;flex-wrap:wrap;align-items:center;align-content:center;gap:4px 8px;min-width:0;min-height:30px;}
 .dv-live-counts>.dv-live-count{flex:none;}
-.dv-live-counts:focus-visible{outline:2px solid var(--dv-live-active);outline-offset:-2px;}
-.dv-live-status-text{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden;}
-.dv-live-status-text>*{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;}
-.dv-live-connection>span{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.dv-live-status-text{display:flex;flex-wrap:wrap;align-items:flex-start;gap:2px 8px;min-width:0;}
+.dv-live-status-text>*{flex:0 1 auto;min-width:0;overflow-wrap:anywhere;}
+.dv-live-connection>span{min-width:0;overflow-wrap:anywhere;}
 .dv-live-controls[hidden],.dv-live-status[hidden]{display:none!important;}
-/* A narrow panel gives counts and text a line each: the height follows the panel's width, never its text. */
-@container (max-width:560px){.dv-live-status{grid-template-columns:minmax(0,1fr);grid-template-rows:36px 28px;height:64px;}}
 .pt-live-status [hidden]{display:none!important}
 .dv-live-panel-body{min-width:0;color:var(--dtext)}
 .dv-live-panel-body h3{margin:18px 0 8px;font:600 14px/1.4 'IBM Plex Sans',sans-serif;color:var(--dink)}

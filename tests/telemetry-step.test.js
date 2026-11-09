@@ -87,3 +87,54 @@ test('compact trace milliseconds retain raw evidence and exact delivered-edge id
  d.edges.pop();d.steps.push({...structuredClone(d.steps[0]),id:'duplicate'});d.paths[0].steps.push('duplicate');
  const choices=plain(C.telemetryTraceChoices(d,'event',e,raw.id));assert.equal(choices.length,2);assert.ok(choices.every(choice=>choice.row.status==='ambiguous' && choice.row.edgeIndex===0),'an explicit step choice may select its unique delivered edge');
 });
+
+// #1154: canvas trace labels. A step with two traceMatch alternatives (one root
+// span per transport) names the alternative that matched and shows its time.
+// Time per matched span = its own start-to-end duration (children included);
+// several matched spans on one node show the union of their intervals and the count.
+const PULSAR='persistent://stats/camera process',RABBIT='camera_stats_message process';
+function transportBoard(){
+ return {nodes:{broker:{title:'Broker'},consumer:{title:'Stats consumer'}},rows:[['broker','consumer']],edges:[{from:'broker',to:'consumer'}],
+  steps:[{id:'consume',text:'Consume stats',edge:'broker->consumer',traceMatch:[{serviceName:'stats-consumer',operation:PULSAR,nodeId:'consumer'},{serviceName:'stats-consumer',operation:RABBIT,nodeId:'consumer'}]}]};
+}
+const traceSpan=(id,name,startMs,ms,parentId=null,service='stats-consumer')=>({id,parentId,name,service,startMs,ms,error:false,attributes:{},links:[]});
+const transportTrace=(...spans)=>({traceId:'1154'.padEnd(32,'0'),warnings:[],spans});
+// Only the SVG surface telemetryPaintTrace touches: node cards, edge paths, overlay text/title.
+function paintTraceLabels(d,e){
+ const doc={},el=(tag,attrs={})=>({tagName:tag,attrs:{...attrs},children:[],textContent:'',parentNode:null,ownerDocument:doc,
+  setAttribute(k,v){this.attrs[k]=String(v);},getAttribute(k){return k in this.attrs?this.attrs[k]:null;},removeAttribute(k){delete this.attrs[k];},
+  appendChild(c){c.parentNode=this;this.children.push(c);return c;},matches(sel){return sel==='g.node'?this.tagName==='g' && this.attrs.class==='node':sel==='path.edge'?this.tagName==='path':false;},
+  closest(){return null;},getBBox(){return {x:0,y:0,width:120,height:40};},querySelector(sel){return sel==='.card'?this.children.find(c=>c.attrs.class==='card') || null:null;}});
+ doc.createElementNS=(ns,tag)=>el(tag);
+ const nodes=Object.keys(d.nodes).map(id=>{const g=el('g',{class:'node','data-dv-node':id});g.appendChild(el('rect',{class:'card'}));return g;});
+ const layer=el('g'),paths=d.edges.map((edge,i)=>layer.appendChild(Object.assign(el('path',{class:'edge','data-dv-edge':i}),{getTotalLength:()=>100,getPointAtLength:l=>({x:l,y:0})})));
+ const scope={querySelectorAll:sel=>sel==='g.node[data-dv-node]:not(.node-text)'?nodes:sel==='path.edge[data-dv-edge]'?paths:[]};
+ C.telemetryPaintTrace({el:scope,section:{diagram:d}},C.telemetryTraceModel(d,undefined,e));
+ const read=(parent,pick)=>{const g=parent.children.find(c=>c.attrs.class==='dv-trace-overlay' && pick(c));return g?{text:g.children.find(c=>c.tagName==='text').textContent,title:g.children.find(c=>c.tagName==='title').textContent}:null;};
+ return {node:id=>read(nodes.find(n=>n.attrs['data-dv-node']===id),()=>true),edge:i=>read(layer,g=>g.attrs['data-trace-edge']===String(i))};
+}
+test('a node whose traceMatch alternatives matched names the matched alternative and shows its time',()=>{
+ let labels=paintTraceLabels(transportBoard(),transportTrace(traceSpan('p1',PULSAR,0,16.1),traceSpan('p-db','INSERT stats',2,9,'p1','stats-store')));
+ assert.equal(labels.node('consumer').text,'Matched: stats-consumer '+PULSAR+' · 16.1 ms');assert.doesNotMatch(labels.node('consumer').text,/unknown/);
+ assert.match(labels.node('consumer').title,new RegExp('not in this trace: stats-consumer '+RABBIT));assert.doesNotMatch(labels.node('consumer').title,/unknown/);
+ assert.match(labels.node('consumer').title,/start to end, including its child spans/,'the title states what the time counts');
+ assert.equal(labels.edge(0).text,'Matched: stats-consumer '+PULSAR+' · 16.1 ms','the uniquely delivered edge follows the same rules');
+ labels=paintTraceLabels(transportBoard(),transportTrace(traceSpan('r1',RABBIT,0,4.97)));
+ assert.equal(labels.node('consumer').text,'Matched: stats-consumer '+RABBIT+' · 4.97 ms');assert.match(labels.node('consumer').title,new RegExp('not in this trace: stats-consumer '+PULSAR.replace(/[/.]/g,'\\$&')));
+ assert.equal(labels.edge(0).text,'Matched: stats-consumer '+RABBIT+' · 4.97 ms');
+});
+test('several matched spans on one node show the union of their intervals and the span count, never the sum',()=>{
+ const d=transportBoard();d.steps.push({id:'persist',text:'Persist stats',traceMatch:{serviceName:'stats-consumer',operation:'INSERT stats',nodeId:'consumer',parentStepId:'consume'}});
+ let labels=paintTraceLabels(d,transportTrace(traceSpan('p1',PULSAR,0,16.1),traceSpan('p-db','INSERT stats',2,9,'p1')));
+ assert.equal(labels.node('consumer').text,'2 operations · 16.1 ms across 2 spans','a nested child span adds no time');assert.doesNotMatch(labels.node('consumer').text,/25\.1/);
+ labels=paintTraceLabels(d,transportTrace(traceSpan('p1',PULSAR,0,16.1),traceSpan('p-db','INSERT stats',10,20,'p1')));
+ assert.equal(labels.node('consumer').text,'2 operations · 30 ms across 2 spans','an overlapping span counts its overlap once');
+});
+test('a mapped operation missing from the trace still reads unknown; an ambiguous one reads ambiguous',()=>{
+ const d=transportBoard();d.steps.push({id:'persist',text:'Persist stats',traceMatch:{serviceName:'stats-consumer',operation:'INSERT stats',nodeId:'consumer',parentStepId:'consume'}});
+ let labels=paintTraceLabels(d,transportTrace(traceSpan('p1',PULSAR,0,16.1)));
+ assert.equal(labels.node('consumer').text,'2 operations · 1 unknown · 16.1 ms');
+ d.steps.push({id:'ack',text:'Acknowledge',traceMatch:{serviceName:'stats-consumer',operation:'ack',nodeId:'consumer'}});
+ labels=paintTraceLabels(d,transportTrace(traceSpan('p1',PULSAR,0,16.1),traceSpan('a1','ack',1,1,'p1'),traceSpan('a2','ack',3,1,'p1')));
+ assert.equal(labels.node('consumer').text,'3 operations · 1 unknown · 1 ambiguous · 16.1 ms');
+});

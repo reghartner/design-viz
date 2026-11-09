@@ -128,7 +128,9 @@ function telemetryClearTrace(scope){
 /* Keep larger evidence text inside the existing SVG clip. This is transient
    label placement, never a viewBox/camera mutation. Prefer the authored route's
    other side before clamping an edge label into its bounded canvas. */
-function telemetryTraceConstrainLabel(text,alternatives){
+/* keepBelow (node labels, #1185): never lift the label up into its own card. A label that then
+   runs past the frame's bottom is fitted by the status frame refresh, which grows the frame. */
+function telemetryTraceConstrainLabel(text,alternatives,keepBelow){
   var svg=text.closest('svg');if(!svg || !svg.viewBox || !svg.getCTM || !text.getCTM)return;
   var frame=svg.viewBox.baseVal,pad=4,box=boardControlBox(text,svg);if(!box)return;
   function fits(b){return b.x>=frame.x+pad && b.y>=frame.y+pad && b.x+b.w<=frame.x+frame.width-pad && b.y+b.h<=frame.y+frame.height-pad;}
@@ -140,7 +142,7 @@ function telemetryTraceConstrainLabel(text,alternatives){
   }
   text.setAttribute('x',original.x);text.setAttribute('y',original.y);box=boardControlBox(text,svg);if(!box)return;
   var dx=Math.max(frame.x+pad-box.x,Math.min(0,frame.x+frame.width-pad-box.x-box.w));
-  var dy=Math.max(frame.y+pad-box.y,Math.min(0,frame.y+frame.height-pad-box.y-box.h));
+  var dy=Math.max(frame.y+pad-box.y,Math.min(0,frame.y+frame.height-pad-box.y-box.h));if(keepBelow)dy=Math.max(dy,0);
   var root=svg.getCTM(),local=text.getCTM();if(!root || !local)return;
   var inverse=root.inverse().multiply(local).inverse();
   text.setAttribute('x',Number(original.x)+inverse.a*dx+inverse.c*dy);text.setAttribute('y',Number(original.y)+inverse.b*dx+inverse.d*dy);
@@ -186,7 +188,7 @@ function telemetryPaintTrace(binding,model,focus){
     if(target.matches('path.edge'))g.setAttribute('data-trace-edge',target.getAttribute('data-dv-edge'));
     var parent=target.matches('g.node')?target:target.parentNode;if(!target.matches('g.node') && target.getAttribute('transform')!=null)g.setAttribute('transform',target.getAttribute('transform'));g.setAttribute('role','img');g.setAttribute('aria-label',title.textContent);parent.appendChild(g);return text;
   }
-  scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !counted(rows).length || !card)return;var box=card.getBBox();var level=levels.nodes[node.getAttribute('data-dv-node')],text=mark(node,rows,box.x+box.width/2,box.y+box.height+24,level);telemetryTraceConstrainLabel(text);
+  scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !counted(rows).length || !card)return;var box=card.getBBox();var level=levels.nodes[node.getAttribute('data-dv-node')],text=mark(node,rows,box.x+box.width/2,box.y+box.height+24,level);telemetryTraceConstrainLabel(text,null,true);
     if(level && (level.level==='below' || level.level==='above'))telemetryPaintTraceBrackets(node,level.level,level.tone);});
   scope.querySelectorAll('g.node.node-text[data-dv-node]').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')];if(!rows || !counted(rows).length)return;node.setAttribute('data-trace-tone','observed');
     var level=levels.nodes[node.getAttribute('data-dv-node')];if(!level)return;node.setAttribute('data-trace-level',level.level);

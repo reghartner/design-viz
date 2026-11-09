@@ -26,6 +26,30 @@ def simple_spec():
         'steps': [{'id': 'open', 'text': 'Open', 'panels': {'app': {'phoneScreen': 'app'}}}]}}]}}
 
 
+def temporary_checkout(case, fragments, kit=False):
+    """A temporary checkout: upstream files linked in (never this checkout's company/ folder, so
+    the tests hold in a fork too), plus company/contract fragments; None: no company/ folder.
+    kit: a portable folder-agent kit instead, whose contract already carries the fragments and
+    which has no company/ folder."""
+    directory = tempfile.TemporaryDirectory(prefix='flowview-company-rules-'); case.addCleanup(directory.cleanup)
+    root = Path(directory.name)
+    for entry in ROOT.iterdir():
+        if entry.name not in ('company', 'contract', '.git', '.worktrees', '.local', 'node_modules'):
+            (root / entry.name).symlink_to(entry)
+    (root / 'contract').mkdir()
+    for entry in (ROOT / 'contract').iterdir():
+        if entry.name != 'authoring-contract.md': (root / 'contract' / entry.name).symlink_to(entry)
+    if fragments is not None: (root / 'company/contract').mkdir(parents=True)
+    for name, text in (fragments or {}).items(): (root / 'company/contract' / name).write_text(text)
+    (root / packet.CONTRACT).write_text((ROOT / packet.CONTRACT).read_text())
+    if kit:
+        (root / packet.CONTRACT).write_text(packet.contract_text(root))
+        for name in fragments: (root / 'company/contract' / name).unlink()
+        (root / 'company/contract').rmdir(); (root / 'company').rmdir()
+    original = packet.ROOT; packet.ROOT = root; case.addCleanup(setattr, packet, 'ROOT', original)
+    return root
+
+
 class AuthoringPacketTests(unittest.TestCase):
     def assert_local_links_resolve(self, text, root):
         count = 0
@@ -220,6 +244,9 @@ class AuthoringPacketTests(unittest.TestCase):
         # Reader-facing rules from human reviewers (#831) add at most 4,608 bytes.
         budgets = {'new': 78_744 + 1_024 + 512 + 384 + 512 + 4_608,
                    'edit': 67_458 + 1_024 + 512 + 384 + 512 + 4_608}
+        # Upstream budget: measured without this checkout's company/ folder, since a fork's
+        # Company rules and company context are outside it.
+        temporary_checkout(self, None)
         for mode, maximum in budgets.items():
             text, _ = packet.generate([], [], mode=mode)
             self.assertLessEqual(len(text.encode()), maximum)
@@ -343,27 +370,7 @@ class CompanyRulesPacketTests(unittest.TestCase):
              'a-first.md': '### Fork-wide icons\n\nPrefer the fork icon set over generic shapes.\n'}
 
     def fork(self, fragments, kit=False):
-        """A temporary checkout: upstream files linked in (never this checkout's company/ folder, so
-        the tests hold in a fork too), plus company/contract fragments; None: no company/ folder.
-        kit: a portable folder-agent kit instead, whose contract already carries the fragments and
-        which has no company/ folder."""
-        directory = tempfile.TemporaryDirectory(prefix='flowview-company-rules-'); self.addCleanup(directory.cleanup)
-        root = Path(directory.name)
-        for entry in ROOT.iterdir():
-            if entry.name not in ('company', 'contract', '.git', '.worktrees', '.local', 'node_modules'):
-                (root / entry.name).symlink_to(entry)
-        (root / 'contract').mkdir()
-        for entry in (ROOT / 'contract').iterdir():
-            if entry.name != 'authoring-contract.md': (root / 'contract' / entry.name).symlink_to(entry)
-        if fragments is not None: (root / 'company/contract').mkdir(parents=True)
-        for name, text in (fragments or {}).items(): (root / 'company/contract' / name).write_text(text)
-        (root / packet.CONTRACT).write_text((ROOT / packet.CONTRACT).read_text())
-        if kit:
-            (root / packet.CONTRACT).write_text(packet.contract_text(root))
-            for name in fragments: (root / 'company/contract' / name).unlink()
-            (root / 'company/contract').rmdir(); (root / 'company').rmdir()
-        original = packet.ROOT; packet.ROOT = root; self.addCleanup(setattr, packet, 'ROOT', original)
-        return root
+        return temporary_checkout(self, fragments, kit)
 
     def selections(self):
         yield [], []
@@ -392,6 +399,15 @@ class CompanyRulesPacketTests(unittest.TestCase):
             for panels, features in self.selections():
                 text, meta = packet.generate(panels, features, mode=mode)
                 self.assert_rules(text, meta, mode + ' ' + ','.join(panels + features))
+                for entry in meta['provenance']:
+                    if entry['path'].startswith('company/contract/'):
+                        self.assertEqual(entry['sha256'], hashlib.sha256(self.RULES[entry['path'].rsplit('/', 1)[1]].encode()).hexdigest(), 'whole-file hash')
+
+    def test_a_fragment_file_name_with_spaces_is_carried(self):
+        self.fork({'team rules.md': '### Team rule\n\nOne rule from a file name with a space.\n'})
+        text, meta = packet.generate([], [], mode='edit')
+        self.assertIn('<!-- Source: company/contract/team rules.md -->\n### Team rule\n', text)
+        self.assertIn('company/contract/team rules.md', [entry['path'] for entry in meta['provenance']])
 
     def test_a_portable_kit_packet_carries_the_same_rules_from_its_contract(self):
         self.fork(self.RULES)

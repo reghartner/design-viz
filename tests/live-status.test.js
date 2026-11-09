@@ -3759,7 +3759,9 @@ async function failedTrace(edit,renderOptions={}){
  const pick=async()=>{const t=api.snapshot().trace;await api.chooseTrace({key:t.entries[0].key,traceId:t.entries[0].exemplar.traceId});h.flush();h.flush();};
  await pick();
  const text=n=>[n.textContent || ''].concat(n.children.map(text)).join(' ');
- return {h,api,m,jumps,failed,pick,summary:()=>text(m.body)};
+ // The collapsed request line (#1182): the error note must stay visible without opening the card.
+ const line=()=>{const el=m.body.querySelector('.dv-trace-request-summary');return el?text(el):'';};
+ return {h,api,m,jumps,failed,pick,summary:()=>text(m.body),line};
 }
 test('#1185 a failed trace focuses its earliest uniquely mapped error span, as a click would',async()=>{
  const t=await failedTrace();
@@ -3773,6 +3775,7 @@ test('#1185 an error span that no step maps is not focused and is named as not o
  const t=await failedTrace((f,failed)=>{failed.service='billing';failed.name='charge card';});
  assert.equal(t.api.snapshot().trace.selected.focus,null,'an unmapped error span is not focused');
  assert.match(t.summary(),/error in billing charge card \(not on this diagram\)/,'the request summary names it');
+ assert.match(t.line(),/error in billing charge card \(not on this diagram\)/,'on the collapsed request line');
  t.api.destroy();
 });
 test('#1185 an error span with several possible steps is not focused; the summary asks for a pick',async()=>{
@@ -3780,6 +3783,7 @@ test('#1185 an error span with several possible steps is not focused; the summar
  assert.equal(t.api.snapshot().trace.selected.focus,null,'an ambiguous error span is not focused');
  assert.doesNotMatch(t.summary(),/not on this diagram/,'it is on this diagram');
  assert.match(t.summary(),/error in event-ingest POST \/v1\/events: pick a step to focus it/);
+ assert.match(t.line(),/error in event-ingest POST \/v1\/events: pick a step to focus it/,'on the collapsed request line');
  t.api.destroy();
 });
 test('#1185 a cleared automatic focus stays cleared after an edit re-render',async()=>{

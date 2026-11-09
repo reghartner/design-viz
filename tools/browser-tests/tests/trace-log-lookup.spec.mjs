@@ -61,7 +61,7 @@ test('desktop authored log lookup lists the newest matching lines and loads the 
  expect(sent).toEqual([{server:PROFILE.server,tool:'get_trace',args:{view_mode:'full',trace_id:ID,from:sent[0].args.from,environment_slug:'production',team_slug:'example-team'}}]);
  await expect(h.root.locator('.dv-trace-span[data-span-id="'+SPAN+'"]')).toHaveAttribute('aria-pressed','true');await expect(h.root.locator('.dv-trace-span[aria-pressed="true"]')).toHaveCount(1);
  // #1186: the focused span's detail opens under its row (the focus hint box is gone).
- await expect(h.root.locator('.dv-trace-span-item').filter({has:h.root.locator('.dv-trace-span[data-span-id="'+SPAN+'"]')}).locator('.dv-trace-span-detail')).toBeVisible();
+ await expect(h.root.locator('.dv-trace-span-item:has(> .dv-trace-span[data-span-id="'+SPAN+'"]) > .dv-trace-span-detail')).toBeVisible();
  await info.attach('log-lookup-loaded-focused',{body:await h.root.screenshot(),contentType:'image/png'});
 });
 

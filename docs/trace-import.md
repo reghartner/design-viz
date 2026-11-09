@@ -125,16 +125,13 @@ saved focused diagram. Source completeness warnings still apply to every focus.
 Imports place upstream services before their downstream dependencies. Service
 cycles are grouped at the same dependency level; large levels wrap into rows
 of at most four cards. Neighbour ordering reduces avoidable crossings. The
-result is ordinary `rows` data you can edit, with no lanes by default. To opt in,
-select the section heading and choose **Inspect → Edge routing → Lanes**.
+result is ordinary `rows` data you can edit, with curved connectors (lane routing
+is no longer offered, #1216).
 Row position represents dependency order. Slots within each row render left to
 right. Position does not represent timestamp order or duration.
 
-Optional lane routing spreads attachment ports, reserves horizontal tracks between
-rows, and chooses vertical channels that clear every card. Tracks expand the
-row gaps when needed. Routes prefer shorter paths with fewer crossings and
-coincident segments; a background break separates remaining crossings.
-Dense or non-planar graphs can still cross. Numbered coins and authored edge
+An older trace board with `routing: "lanes"` still draws its lane routes.
+Dense or non-planar graphs can cross. Numbered coins and authored edge
 labels can still crowd a dense view. Step selection highlights the relevant
 relationship; the complete graph remains available for context.
 

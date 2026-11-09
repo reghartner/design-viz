@@ -33,7 +33,10 @@ test('all software panel presets and domain starters validate without warnings',
   for (const file of ['software-systems.json','honeycomb-trace.json']){
     const spec = JSON.parse(fs.readFileSync(path.join(root, 'src/starters', file), 'utf8'));
     const v = C.validate(C.normalize(spec));
-    assert.deepEqual(plain(v), {errors:[],warnings:[]}, file);
+    // #1216: honeycomb-trace keeps its lane routing, which is a note, never a warning.
+    const expected = file === 'honeycomb-trace.json'
+      ? {errors:[], warnings:[], notes:['blocks[0].diagram.routing: "lanes" is no longer recommended; omit routing to draw curves']} : {errors:[], warnings:[]};
+    assert.deepEqual(plain(v), expected, file);
   }
 });
 

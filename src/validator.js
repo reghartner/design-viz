@@ -354,7 +354,7 @@ function specStructureErrors(page){
   return errors;
 }
 
-function validateSection(sec, P, protos, lanes, errors, warnings){
+function validateSection(sec, P, protos, lanes, errors, warnings, notes){
   if (!sec || typeof sec !== 'object'){ errors.push(P + ': must be an object'); return; }
   validateSectionTextStyle(sec.textStyle,P,errors);
   var sectionStepCount = sec.diagram && Array.isArray(sec.diagram.steps)
@@ -435,8 +435,11 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!d.nodes || typeof d.nodes !== 'object'){ errors.push(DP + '.nodes: required — map of node id to {title, sub, icon, tint}'); return; }
   if (!Array.isArray(d.rows) || d.rows.length === 0){ errors.push(DP + '.rows: required — array of rows, each an array of node ids (nested array = stack)'); return; }
   if (d.routing != null && d.routing !== 'lanes' && d.routing !== 'curves')
-    warnings.push(DP + '.routing: expected "lanes" or "curves" — using curves');
+    warnings.push(DP + '.routing: expected "curves" or no routing — using curves');
   if (d.routing === 'lanes'){
+    // #1216: lane routing is no longer offered. An existing spec still draws lanes; this is a
+    // note, never a warning, so nothing that gates on warnings rejects an older lanes spec.
+    notes.push(DP + '.routing: "lanes" is no longer recommended; omit routing to draw curves');
     if ((d.floats || []).some(function(f){return !f || f.noSpread!==true;}) || d.rows.some(function(row){ return !Array.isArray(row) || !row.length || row.length>5 || row.some(Array.isArray); }) ||
         (d.edges || []).some(function(e){ return e.from === e.to; }))
       warnings.push(DP + '.routing: lanes requires 1–5 unstacked cards per row, no automatically spaced floats or self-loops — using curves');
@@ -745,7 +748,7 @@ function editHistoryEntries(page, warn){
 }
 
 function validate(page){
-  var errors = [], warnings = [];
+  var errors = [], warnings = [], notes = [];
   if (!specObject(page)){ errors.push('top level: expected {page:{blocks:[...]}} (or sections), or a bare diagram with nodes+rows'); return {errors:errors, warnings:warnings}; }
   errors = specStructureErrors(page);
   if (errors.length) return {errors:errors, warnings:warnings};
@@ -855,18 +858,21 @@ function validate(page){
   var lanes = resolveLanes(page);
   blocks.forEach(function(b){
     if (b.type === 'section'){
-      validateSection(b.sec, b.path, protos, lanes, errors, warnings);
+      validateSection(b.sec, b.path, protos, lanes, errors, warnings, notes);
     } else {
       if (!b.tabs.length) warnings.push(b.path + '.tabs: empty tabs block');
       b.tabs.forEach(function(t){
         if (!t.sections.length) warnings.push(t.path + '.sections: tab has no sections');
         t.sections.forEach(function(sec, k){
-          validateSection(sec, t.path + '.sections[' + k + ']', protos, lanes, errors, warnings);
+          validateSection(sec, t.path + '.sections[' + k + ']', protos, lanes, errors, warnings, notes);
         });
       });
     }
   });
-  return {errors:errors, warnings:warnings};
+  var result = {errors:errors, warnings:warnings};
+  // Notes are informational (#1216): present only when there is one, and never counted as warnings.
+  if (notes.length) result.notes = notes;
+  return result;
 }
 
 /* ---------------- lint (advisory warnings, never errors) ----------------

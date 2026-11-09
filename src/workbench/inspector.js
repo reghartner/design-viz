@@ -1002,7 +1002,7 @@ function edgeForm(val, ctx){
       return rows;
     }
     var portHint=document.createElement('p');portHint.className='fnote';
-    portHint.textContent='Entry/exit positions run from 0% at the left or top to 100% at the right or bottom. Pinned ports use a curve, including in lane routing; Auto restores automatic routing.';
+    portHint.textContent='Entry/exit positions run from 0% at the left or top to 100% at the right or bottom. Pinned ports use a curve; Auto restores automatic routing.';
     var curveControls=document.createElement('div'),curveHint=document.createElement('p');curveHint.className='fnote';
     curveHint.textContent='Drag the arrow or its round handles to shape a smooth curve. Drag another part to add a point. Double-click a point to remove it. Focus a point to use arrow keys or Delete.';
     curveControls.appendChild(curveHint);
@@ -2293,21 +2293,24 @@ function sectionForm(val, ctx){
     function identity(key,value){return commitCascade(function(raw){return planSetSectionIdentity(session.text(),raw,target.section,key,value);});}
     var routingRows=[];
     if(ctx.diagram){
-      var routing=selectControl(['curves','lanes'],ctx.diagram.routing == null?'curves':ctx.diagram.routing,function(value){
-        return commitCascade(function(raw){
-          var got=builderDiagram(session.text(),raw,target.section);
-          return got.error?got:planSetField(session.text(),raw,got.path,'routing',JSON.stringify(value));
-        },{after:refreshFormSoon});
-      });
-      routing.setAttribute('aria-label','Edge routing');
-      Array.prototype.forEach.call(routing.options,function(option){
-        if(option.value==='curves')option.textContent='No lanes (default)';
-        if(option.value==='lanes')option.textContent='Lanes';
-      });
-      var help=document.createElement('p');help.className='fnote';
-      help.textContent='Lanes reserve tracks for connections between rows. Requires 1–5 unstacked nodes per row, no floats or self-loops. Applies to every view of this diagram; story lane labels are separate.';
-      help.textContent+=' Unsupported layouts use curves.';
-      routingRows.push(frow('Edge routing',routing),help);
+      /* #1216 (Chuck, option B): lane routing is no longer offered. A diagram that has it shows it, only to
+         switch it off (routing is removed); there is no control otherwise. */
+      if(ctx.diagram.routing==='lanes'){
+        var routing=selectControl(['lanes','curves'],'lanes',function(value){
+          return commitCascade(function(raw){
+            var got=builderDiagram(session.text(),raw,target.section);
+            return got.error?got:planSetField(session.text(),raw,got.path,'routing',value==='lanes'?JSON.stringify('lanes'):null);
+          },{after:refreshFormSoon});
+        });
+        routing.setAttribute('aria-label','Edge routing');
+        Array.prototype.forEach.call(routing.options,function(option){
+          if(option.value==='curves')option.textContent='Curves';
+          if(option.value==='lanes')option.textContent='Lanes (no longer offered)';
+        });
+        var help=document.createElement('p');help.className='fnote';
+        help.textContent='This diagram still draws lane routes. Lanes are no longer offered: switch to Curves; it cannot be turned back on here.';
+        routingRows.push(frow('Edge routing',routing),help);
+      }
       routingRows.push(storyTimeGroup(ctx.diagram,target));
     }
     if(builderTargetPath(parseEditor().raw,target).length===0)return routingRows;

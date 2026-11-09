@@ -160,24 +160,25 @@ test('registered collection composers reuse shared assignment and sparse history
   assert.equal(seen.effective.origin.label,'Initial state');
 });
 
-test('diagram routing edits the selected section or bare diagram with exact undo and retired controls',()=>{
+/* #1216 (Chuck's spoken ruling, option B): Inspect no longer offers lane routing. A diagram without it has no
+   Edge routing control; one that has routing "lanes" shows it and can switch it off (routing is removed), with
+   exact undo. There is no way back to Lanes. */
+test('#1216 Edge routing is shown only on a lanes diagram, and only to switch it off',()=>{
   for(const bare of [false,true]){
     const e=environment(),diagram={nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a'],['b']],edges:[{from:'a',to:'b',bend:20}]};
-    const raw=bare?diagram:{page:{blocks:[{heading:'Unchanged',diagram:{...diagram,routing:'lanes'}},{tabs:[{label:'Details',sections:[{heading:'Target',diagram}]}]}]}};
-    const h=e.mount(raw);h.session.target={kind:'section',section:bare?0:1};h.inspector.render();
-    const control=()=>h.guide.querySelector('select[aria-label="Edge routing"]');
-    const get=()=>bare?JSON.parse(h.text):JSON.parse(h.text).page.blocks[1].tabs[0].sections[0].diagram;
-    const before=h.text;assert.equal(control().value,'curves');
-    control().value='lanes';control().fire('change');h.flush();assert.equal(get().routing,'lanes');
-    assert.deepEqual(get().edges,diagram.edges);assert.deepEqual(get().rows,diagram.rows);
-    if(!bare)assert.deepEqual(JSON.parse(h.text).page.blocks[0],raw.page.blocks[0]);
-    const on=h.text,retired=control();
-    h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
-    h.session.redo();assert.equal(h.text,on);
-    h.session.target={kind:'section',section:bare?0:1};
-    h.inspector.render();retired.value='curves';retired.fire('change');assert.equal(h.text,on);
-    control().value='curves';control().fire('change');h.flush();assert.equal(get().routing,'curves');
-    h.session.undo();assert.equal(h.text,on);
+    const raw=bare?{...diagram,routing:'lanes'}:{page:{blocks:[{heading:'Unchanged',diagram:{...diagram,routing:'lanes'}},{tabs:[{label:'Details',sections:[{heading:'Target',diagram}]}]}]}};
+    const h=e.mount(raw),control=()=>h.guide.querySelector('select[aria-label="Edge routing"]');
+    const get=()=>bare?JSON.parse(h.text):JSON.parse(h.text).page.blocks[0].diagram;
+    if(!bare){h.session.target={kind:'section',section:1};h.inspector.render();assert.equal(control(),null,'a diagram without lanes is not offered lane routing');}
+    h.session.target={kind:'section',section:0};h.inspector.render();
+    assert.equal(control().value,'lanes','a lanes diagram shows its value');
+    assert.deepEqual(Array.from(control().options).map(o=>[o.value,o.textContent]),[['lanes','Lanes (no longer offered)'],['curves','Curves']]);
+    const before=h.text,retired=control();control().value='curves';control().fire('change');h.flush();
+    assert.equal('routing' in get(),false,'switching off removes routing');assert.deepEqual(get().edges,diagram.edges);assert.deepEqual(get().rows,diagram.rows);
+    if(!bare)assert.deepEqual(JSON.parse(h.text).page.blocks[1],raw.page.blocks[1]);
+    const off=h.text;h.session.target={kind:'section',section:0};h.inspector.render();assert.equal(control(),null,'once off, there is no way back to Lanes');
+    retired.value='lanes';retired.fire('change');h.flush();assert.equal(h.text,off,'a control left over from before the re-render cannot write lanes back');
+    h.session.undo();assert.equal(h.text,before);
     h.inspector.destroy();
   }
 });

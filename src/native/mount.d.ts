@@ -278,6 +278,8 @@ export interface NativeViewerOptions {
 export interface NativeViewer {
   readonly root: ShadowRoot;
   readonly warnings: string[];
+  /** Informational validator notes (never warnings), e.g. an older spec that still uses lane routing. */
+  readonly notes?: string[];
   navigate(target: NativeViewerTarget): void;
   /** Current section/view/path/step. Does not change host routing. */
   snapshot(): NativeViewerTarget | null;

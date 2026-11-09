@@ -166,8 +166,7 @@ for supported inputs and estimation limits, and `docs/section-layouts.md` for th
 (`columns:24`; an absent marker means legacy 12). Host/width preview is temporary;
 missing profiles fall back to default, then the existing layout.
 Every row diagram has **Auto / Fit width / Readable** viewing controls, including
-curved edges. Do not enable lane routing just to expose sizing; these choices
-do not modify the spec or routing. Auto scales smoothly with column width;
+curved edges. These choices do not modify the spec or routing. Auto scales smoothly with column width;
 Readable keeps labels larger. Regular views also support background drag-to-pan,
 −/+ and Ctrl/⌘-wheel zoom, and Fit diagram. These are temporary viewing controls.
 Overflowing diagrams show mouse-friendly

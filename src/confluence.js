@@ -15,7 +15,7 @@ function buildConfluenceExport(text){
       return {error:'This spec is ' + Math.ceil(bytes / 1024) + ' KiB. Confluence snapshots currently support up to 128 KiB; split the story into smaller specs.'};
     var title = typeof page.title === 'string' ? page.title : '';
     var slug = title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,100);
-    return {text:compact, bytes:bytes, name:(slug || 'flowspec') + '.confluence.json', page:page, warnings:result.warnings};
+    return {text:compact, bytes:bytes, name:(slug || 'flowspec') + '.confluence.json', page:page, warnings:result.warnings, notes:result.notes || []};
   } catch (ex){ return {error:'Could not read the spec: ' + ex.message}; }
 }
 function confluenceSections(page){

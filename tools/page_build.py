@@ -288,9 +288,10 @@ def main() -> int:
     out = (r.stdout + r.stderr).strip()
     if r.returncode != 0:
         fail(f"validator errors — fix every one, then re-run:\n{out}")
-    # Parse the summary line ("N errors, M warnings"); a substring test could
-    # be spoofed by a file PATH containing "0 warnings".
-    summary = re.search(r"(\d+) errors, (\d+) warnings\s*$", out)
+    # Parse the summary line ("N errors, M warnings", then ", K notes" when there
+    # are notes, which never block); a substring test could be spoofed by a file
+    # PATH containing "0 warnings".
+    summary = re.search(r"(\d+) errors, (\d+) warnings(?:, \d+ notes?)?\s*$", out)
     if not summary:
         fail(f"could not parse the validator summary line:\n{out}")
     if int(summary.group(2)) != 0 and not a.allow_warnings:

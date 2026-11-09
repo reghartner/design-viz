@@ -104,7 +104,11 @@ test('valid starters retain input values and only the known legacy expansion war
     const warnings = file === 'domain-drilldown.json'
       ? ['sections[0].diagram.nodes.recording.detail.mode: inline expansion was removed; opens as a focused drilldown. Use focus for new diagrams.']
       : [];
-    assert.deepEqual(validateBoth(raw), {errors: [], warnings}, file);
+    // #1216: starters that keep lane routing get one note per lanes diagram, never a warning.
+    const {notes = [], ...findings} = validateBoth(raw);
+    assert.deepEqual(findings, {errors: [], warnings}, file);
+    assert.ok(notes.every(note => /\.diagram\.routing: "lanes" is no longer recommended; omit routing to draw curves$/.test(note)), file);
+    assert.equal(notes.length, (JSON.stringify(raw).match(/"routing":"lanes"/g) || []).length, file);
   }
   const d = diagram(), section = {diagram: d}, page = {sections: [section]};
   assert.equal(source.normalize({page}), page);

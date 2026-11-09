@@ -48,7 +48,8 @@ async function setup(page,server,{origin,exemplar}){
  const series=base=>Array.from({length:24},(_,k)=>[new Date(Date.now()-(23-k)*3600000).toISOString(),Math.round(base*(1+.15*Math.sin(k/3)))]);
  const signals=(rate,errors,p95)=>({rate:{value:rate,unit:'req/h',series:series(rate)},errors:{value:errors,unit:'req/h',series:series(errors)},p95:{value:p95,unit:'ms',series:series(p95)}});
  const samples={[key('web','checkout')]:{signals:signals(5500,12,4447)},[key('checkout','cart')]:{signals:signals(5400,3,41)},[key('checkout','payment')]:{signals:signals(5200,140,262)}};
- // The trace arrives with the metrics, as on the reported board: cards and labels appear in the same paint.
+ // The trace is the PlaceOrder example, as on the reported board. It is selected after the cards first appear
+ // (automatically, or by the reader's pick when examples wait for one, #1168); on main the cards were then placed before its labels existed.
  if(exemplar)samples[key('web','checkout')].exemplars=[{...await recordedUrlEvidence(),observedAt:now,range:{from:new Date(Date.now()-86400000).toISOString(),to:now}}];
  await page.setViewportSize({width:1440,height:1100});
  await writeFile(path.join(server.root,'trace-label-cards-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
@@ -61,6 +62,13 @@ async function setup(page,server,{origin,exemplar}){
  return root;
 }
 const metric=root=>root.getByRole('switch',{name:'Metrics overlay',exact:true});
+// Select the example trace: keep an automatic selection, otherwise pick entries[0] as a reader does (#1168).
+async function pickExample(root){
+ const page=root.page(),trace=()=>page.evaluate(()=>{const t=window.viewer.controller.liveStatus.snapshot().trace;return {entries:t.entries.length,selected:!!t.selected,id:t.entries[0] && t.entries[0].exemplar.traceId};});
+ await expect.poll(async()=>(await trace()).entries).toBeGreaterThan(0);
+ const state=await trace();if(!state.selected)await root.locator('.dv-trace-candidate[data-trace-id="'+state.id+'"]').first().click();
+ await expect(root.locator('.dv-trace-selected')).toBeVisible();
+}
 const LABELS='.dv-trace-overlay text',CARDS='.dv-metrics-card';
 // Screen boxes of every trace label, metric card and node card. Lists each label a card
 // covers, each node card a metric card covers, and each card outside the board frame.
@@ -82,7 +90,7 @@ for(const origin of ['local','imported']){
  test(`desktop ${origin} metric cards never cover a node or edge trace label`,async({page,server})=>{
   const root=await setup(page,server,{origin,exemplar:true});
   await metric(root).click();await expect(metric(root)).toHaveAttribute('aria-checked','true');
-  await expect(root.locator('.dv-trace-selected')).toBeVisible();await expect(root.locator(CARDS)).toHaveCount(3);await expect(root.locator(LABELS)).toHaveCount(6);
+  await pickExample(root);await expect(root.locator(CARDS)).toHaveCount(3);await expect(root.locator(LABELS)).toHaveCount(6);
   await expect(root.locator(LABELS).filter({hasText:'Matched: database INSERT shipping.quotes'})).toHaveCount(1);
   await expect.poll(()=>problems(root),{message:'No metric card covers a trace label or a node card, and every card is inside the board frame'}).toEqual([]);
  });

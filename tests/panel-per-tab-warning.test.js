@@ -27,14 +27,31 @@ test('the same panel type with different content, one tab, or two sections of on
   assert.deepEqual(repeated(C.validateSpec(page([table()]))),[],'one tab');
   const oneTab={page:{title:'Tabs',blocks:[{tabs:[{label:'Only',sections:[{id:'x',diagram:diagram([table()])},{id:'y',diagram:diagram([table()])}]}]}]}};
   assert.deepEqual(repeated(C.validateSpec(oneTab)),[],'two sections of one tab are not two tabs');
-  // A log panel each tab's steps fill differently shows different content on each tab.
-  const log=()=>({id:'log',type:'log',title:'Event log'}),stepped=entry=>({nodes:{a:{title:'A'}},rows:[['a']],panels:[log()],steps:[{id:'s1',nodes:['a'],panels:{log:{entries:[entry]}}}]});
-  const filled={page:{title:'Tabs',blocks:[{tabs:[{label:'A',sections:[{id:'x',diagram:stepped('armed')}]},{label:'B',sections:[{id:'y',diagram:stepped('fired')}]}]}]}};
-  assert.deepEqual(repeated(C.validateSpec(filled)),[],'the same declaration filled differently by each tab\'s steps');
-  const same={page:{title:'Tabs',blocks:[{tabs:[{label:'A',sections:[{id:'x',diagram:stepped('armed')}]},{label:'B',sections:[{id:'y',diagram:stepped('armed')}]}]}]}};
-  assert.equal(repeated(C.validateSpec(same)).length,1,'the same declaration and the same step patches on two tabs');
+  // A log panel each tab's steps fill differently shows different content on each tab. Patches are read the
+  // way the engine reads them: steps[].panels, or the legacy steps[].patch alias.
+  const log=()=>({id:'log',type:'log',title:'Event log'});
+  const stepped=(entry,{alias=false,at=0}={})=>({nodes:{a:{title:'A'}},rows:[['a']],panels:[log()],
+    steps:[{id:'s0',nodes:['a']},{id:'s1',nodes:['a']}].map((st,i)=>i===at?{...st,[alias?'patch':'panels']:{log:{log:[entry]}}}:st)});
+  const two=(a,b)=>({page:{title:'Tabs',blocks:[{tabs:[{label:'A',sections:[{id:'x',diagram:a}]},{label:'B',sections:[{id:'y',diagram:b}]}]}]}});
+  for(const alias of [false,true]){
+    const how=alias?'patch alias':'panels';
+    assert.deepEqual(repeated(C.validateSpec(two(stepped('armed',{alias}),stepped('fired',{alias})))),[],how+': the same declaration filled differently by each tab\'s steps');
+    assert.equal(repeated(C.validateSpec(two(stepped('armed',{alias}),stepped('armed',{alias})))).length,1,how+': the same declaration and the same step patches on two tabs');
+  }
+  assert.deepEqual(repeated(C.validateSpec(two(stepped('armed'),stepped('fired',{alias:true})))),[],'one tab through panels, the other through the alias, filled differently');
+  // Coordinator ruling: patches are compared as a list, independent of the step that applies them.
+  assert.equal(repeated(C.validateSpec(two(stepped('armed',{at:0}),stepped('armed',{at:1})))).length,1,'the same patch list at different steps is repeated');
   const plain={page:{title:'No tabs',sections:[{id:'x',diagram:diagram([table()])},{id:'y',diagram:diagram([table()])}]}};
   assert.deepEqual(repeated(C.validateSpec(plain)),[],'a page without tabs');
+});
+test('tabs with the same label in two tab blocks name their tab paths; a non-string title falls back to the id',()=>{
+  const block=panels=>({tabs:[{label:'Overview',sections:[{id:'o'+Math.random().toString(36).slice(2,7),diagram:diagram(panels)}]}]});
+  const found=repeated(C.validateSpec({page:{title:'Two blocks',blocks:[block([table()]),block([table()])]}}));
+  assert.equal(found.length,1);
+  assert.match(found[0],/\("Overview" \(blocks\[0\]\.tabs\[0\]\), "Overview" \(blocks\[1\]\.tabs\[0\]\)\)/,found[0]);
+  const titled={...table(),title:{text:'Retention'}};
+  const named=repeated(C.validateSpec(page([titled],[{...titled}])));
+  assert.equal(named.length,1);assert.match(named[0],/table panel "ref"/);assert.doesNotMatch(named[0],/object Object/);
 });
 test('node tools/validate.js prints the warning and exits 0',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'panel-per-tab-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));

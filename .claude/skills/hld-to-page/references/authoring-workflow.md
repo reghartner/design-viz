@@ -180,13 +180,13 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     works, keep the reference as text, list it under **Missing links** in the
     ledger with what you searched, and ask for all missing links in one question.
 20. **Group tabs the way the reader experiences the product.** If neither
-    the request nor the source settles a tabbed page's grouping, ask (Phase
-    2), proposing user-experience grouping (e.g. recording, customer
-    playback, internal playback), not decision order or teams. Every section
-    goes inside the tabs container: a direct section in `blocks` shows on
-    every tab (above the tab bar if before it, below if after). Put intro
-    and "Considered/rejected" content in their own tab or the first tab's
-    text. Each tab gets its own panels; shared reference tables go in the
+    the request nor the source settles the grouping, ask (Phase 2),
+    proposing user-experience grouping (e.g. recording, customer playback,
+    internal playback), not decision order or teams. On a tabbed page, every
+    section goes inside the tabs container: a direct section in `blocks`
+    shows on every tab (above the tab bar if before it, below if after). Put
+    intro and "Considered/rejected" content in its own tab or the first
+    tab. Each tab gets its own panels; shared reference tables go in the
     ledger ([why](../../../../docs/tab-views.md#one-panel-per-tab)).
 
 And always: honesty. No invented facts. Unknown is not failed. End each path

@@ -99,17 +99,21 @@ function tabPanelRepeatWarnings(page, warnings){
     d.panels.forEach(function(panel,index){
       if(!specObject(panel) || typeof panel.type!=='string')return;
       var content={};Object.keys(panel).forEach(function(k){if(k!=='id')content[k]=panel[k];});
-      var patches=typeof panel.id!=='string'?[]:(Array.isArray(d.steps)?d.steps:[]).map(function(st){return specObject(st) && specObject(st.panels) && Object.prototype.hasOwnProperty.call(st.panels,panel.id)?st.panels[panel.id]:null;}).filter(function(v){return v!==null;});
+      // The engine's own reader (panels, or the legacy patch alias). The patches are compared as a list,
+      // independent of which step applies them.
+      var patches=typeof panel.id!=='string'?[]:(Array.isArray(d.steps)?d.steps:[]).map(function(st){var patch=stepPanelPatch(st);return patch && Object.prototype.hasOwnProperty.call(patch,panel.id)?patch[panel.id]:null;}).filter(function(v){return v!==null;});
       var key=stable({declaration:content,patches:patches}),group=groups.get(key);
-      if(!group)groups.set(key,group={panel:panel,path:record.path+'.diagram.panels['+index+']',tabs:[],labels:[]});
+      if(!group)groups.set(key,group={panel:panel,path:record.path+'.diagram.panels['+index+']',tabs:[],labels:[],paths:[]});
       var tab=record.tabBlock+'/'+record.tab;
-      if(group.tabs.indexOf(tab)<0){group.tabs.push(tab);group.labels.push(record.tabLabel || 'Tab '+(record.tab+1));}
+      if(group.tabs.indexOf(tab)<0){group.tabs.push(tab);group.labels.push(typeof record.tabLabel==='string' && record.tabLabel?record.tabLabel:'Tab '+(record.tab+1));group.paths.push(record.path.replace(/\.sections\[\d+\]$/,''));}
     });
   });
   groups.forEach(function(group){
     if(group.tabs.length<2)return;
-    var name=group.panel.title || group.panel.id || '';
-    warnings.push(group.path+': the same '+group.panel.type+' panel'+(name?' "'+name+'"':'')+' is declared on more than one tab ('+group.labels.map(function(l){return JSON.stringify(l);}).join(', ')+'); give each tab its own panel and keep a shared reference table in the ledger, folding the row a tab needs into that tab\'s panel');
+    var name=typeof group.panel.title==='string' && group.panel.title?group.panel.title:typeof group.panel.id==='string'?group.panel.id:'';
+    // Tabs in different tab blocks can share a label; then each names its tab path too.
+    var tabs=group.labels.map(function(l,i){return JSON.stringify(l)+(group.labels.indexOf(l)!==group.labels.lastIndexOf(l)?' ('+group.paths[i]+')':'');});
+    warnings.push(group.path+': the same '+group.panel.type+' panel'+(name?' "'+name+'"':'')+' is declared on more than one tab ('+tabs.join(', ')+'); give each tab its own panel and keep a shared reference table in the ledger, folding the row a tab needs into that tab\'s panel');
   });
 }
 // Matching reads traceMatch only from steps (#1096). Imported carriers are

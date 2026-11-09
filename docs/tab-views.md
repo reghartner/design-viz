@@ -44,8 +44,11 @@ limits, regions) belongs in the coverage ledger; fold the one row a tab needs
 into that tab's own panel. `node tools/validate.js` warns, never errors, when
 two or more tabs declare an identical panel: the same type and the same content
 after key order is normalised, where content is the declaration without its
-`id` plus the patches the tab's steps make to that panel (#1215). Panels that
-only share a type, or that each tab's steps fill differently, are not repeated.
+`id` plus the list of patches the tab's steps make to that panel (`panels`, or
+the legacy `patch` alias), compared in order but regardless of which step
+applies each one (#1215). Panels that only share a type, or that each tab's
+steps fill differently, are not repeated. Tabs with the same label in two tab
+blocks are named with their tab path.
 
 ## Identity, order and opening
 

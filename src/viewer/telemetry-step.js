@@ -57,7 +57,7 @@ function telemetryTraceModel(diagram,pathId,exemplar){
     var others=Array.isArray(step.traceMatch)?step.traceMatch.filter(function(a,i){return a && i!==match.alternative;}).map(function(a){
       return {name:a.serviceName+' '+a.operation,seen:normalized.spans.some(function(s){return s.serviceName===a.serviceName && s.operation===a.operation && (!a.namespace || s.attributes['service.namespace']===a.namespace) && Object.keys(a.attributes || {}).every(function(k){return s.attributes[k]===a.attributes[k];});})};
     }):[];
-    var row={id:match.stepId,nodeId:match.nodeId,edgeIndex:exact.length===1?diagram.edges.indexOf(exact[0]):null,status:match.status,tone:tone,duration:duration,budget:selector.maxDurationMs,label:label,operation:selector.operation || step.text || step.id,service:selector.serviceName,alternative:match.alternative,otherAlternatives:others,detail:match.detail,conditions:match.conditions,spanIds:match.spans.map(function(s){return s.id;}),
+    var row={id:match.stepId,nodeId:match.nodeId,edgeIndex:exact.length===1?diagram.edges.indexOf(exact[0]):null,status:match.status,tone:tone,duration:duration,budget:selector.maxDurationMs,label:label,operation:selector.operation || step.text || step.id,service:selector.serviceName,alternative:match.alternative,optional:!!match.optional,otherAlternatives:others,detail:match.detail,conditions:match.conditions,spanIds:match.spans.map(function(s){return s.id;}),
       intervals:match.spans.map(function(s){return {id:s.id,startMs:s.startMs,durationMs:s.durationMs};})};rows.push(row);
     // Only explicit stable node IDs and a uniquely delivered edge may annotate
     // the canvas. A service name or display title is never a join key.
@@ -124,33 +124,35 @@ function telemetryTraceSpanTime(rows){
   spans.slice(1).forEach(function(s){if(s.startMs>end){total+=end-start;start=s.startMs;}end=Math.max(end,s.startMs+s.durationMs);});
   return telemetryTraceDuration(total+end-start)+(spans.length>1?' across '+spans.length+' spans':'');
 }
-function telemetryTraceLabel(rows){
-  var time=telemetryTraceSpanTime(rows),one=rows.length===1 && rows[0];
+function telemetryTraceLabel(listed){
+  // #1175: an optional step missing from this trace is left out of the label; the title lists it.
+  var rows=listed.filter(function(r){return !r.optional;}),time=telemetryTraceSpanTime(rows),one=rows.length===1 && rows[0];
   function count(status,word){var n=rows.filter(function(r){return r.status===status;}).length;return n?n+' '+word:'';}
   function named(r){return r.alternative!=null && r.status==='matched'?'Matched: '+r.service+' '+r.operation:r.operation;}
   // On the canvas the service and operation are cut to 40 characters; the title keeps them whole.
   var name=one && one.service+' '+one.operation,text=one && one.status!=='matched'?one.label:one?[one.alternative!=null?'Matched: '+(name.length>40?name.slice(0,39)+'…':name):'',time || one.label].filter(Boolean).join(' · '):
     [rows.length+' operations',count('missing','unknown'),count('ambiguous','ambiguous'),time].filter(Boolean).join(' · ');
-  var title=rows.map(function(r){
+  var title=listed.map(function(r){
     var others=r.otherAlternatives || [],absent=others.filter(function(a){return !a.seen;}),unused=others.filter(function(a){return a.seen;});
-    return [named(r)+': '+(r.duration!=null?r.duration+' ms':r.label)+(r.budget!=null?' / '+r.budget+' ms budget':'')].concat(r.conditions.map(function(c){return c.label;}),
+    return [r.optional?'optional, not in this trace: '+r.service+' '+r.operation:named(r)+': '+(r.duration!=null?r.duration+' ms':r.label)+(r.budget!=null?' / '+r.budget+' ms budget':'')].concat(r.conditions.map(function(c){return c.label;}),
       absent.length?['not in this trace: '+absent.map(function(a){return a.name;}).join(', ')]:[],unused.length?['in this trace, not matched: '+unused.map(function(a){return a.name;}).join(', ')]:[]).join('; ');
   }).join(' · ')+(time?' · Time '+time+': each matched span counts start to end, including its child spans; overlapping spans count once.':'');
   return {text:text,title:title};
 }
 function telemetryPaintTrace(binding,model,focus){
   var scope=binding.el,d=binding.section.diagram;telemetryClearTrace(scope);if(!model)return;
+  function counted(rows){return rows.filter(function(r){return !r.optional;});}
   function mark(target,rows,x,y){
-    var ranks={unknown:0,observed:1,warning:2,error:3},tone=rows.reduce(function(a,r){return ranks[r.tone]>ranks[a]?r.tone:a;},'unknown');
-    target.setAttribute('data-trace-tone',tone);target.setAttribute('data-trace-status',rows.map(function(r){return r.status;}).join(' '));
+    var ranks={unknown:0,observed:1,warning:2,error:3},tone=counted(rows).reduce(function(a,r){return ranks[r.tone]>ranks[a]?r.tone:a;},'unknown');
+    target.setAttribute('data-trace-tone',tone);target.setAttribute('data-trace-status',counted(rows).map(function(r){return r.status;}).join(' '));
     var doc=target.ownerDocument,g=doc.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','dv-trace-overlay');g.setAttribute('data-tone',tone);g.setAttribute('pointer-events','none');
     var label=telemetryTraceLabel(rows),text=doc.createElementNS('http://www.w3.org/2000/svg','text');text.setAttribute('x',x);text.setAttribute('y',y);text.setAttribute('text-anchor','middle');text.textContent=label.text+(tone==='error'?' · error':tone==='warning'?' · warning':'');g.appendChild(text);
     var title=doc.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=label.title;g.appendChild(title);
     if(target.matches('path.edge'))g.setAttribute('data-trace-edge',target.getAttribute('data-dv-edge'));
     var parent=target.matches('g.node')?target:target.parentNode;if(!target.matches('g.node') && target.getAttribute('transform')!=null)g.setAttribute('transform',target.getAttribute('transform'));g.setAttribute('role','img');g.setAttribute('aria-label',title.textContent);parent.appendChild(g);return text;
   }
-  scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !card)return;var box=card.getBBox();var text=mark(node,rows,box.x+box.width/2,box.y+box.height+24);telemetryTraceConstrainLabel(text);});
-  scope.querySelectorAll('g.node.node-text[data-dv-node]').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')];if(rows)node.setAttribute('data-trace-tone','observed');});
+  scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !counted(rows).length || !card)return;var box=card.getBBox();var text=mark(node,rows,box.x+box.width/2,box.y+box.height+24);telemetryTraceConstrainLabel(text);});
+  scope.querySelectorAll('g.node.node-text[data-dv-node]').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')];if(rows && counted(rows).length)node.setAttribute('data-trace-tone','observed');});
   scope.querySelectorAll('path.edge[data-dv-edge]').forEach(function(path){
     var edge=d.edges[Number(path.getAttribute('data-dv-edge'))],rows=edge && model.edges[edge.from+'->'+edge.to];if(!rows)return;
     var length=path.getTotalLength(),mid=length/2,point=path.getPointAtLength(mid),a=path.getPointAtLength(Math.max(0,mid-1)),b=path.getPointAtLength(Math.min(length,mid+1));

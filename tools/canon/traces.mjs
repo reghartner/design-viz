@@ -50,7 +50,8 @@ export function mapTrace(d,trace,pathId){return C.traceMatch.mapTrace(d,trace,pa
 export function referencePreview(spec,raw,section=0){
   const d=C.sections(spec)[section]?.diagram;if(!d)throw new Error('Diagram section not found.');
   const steps=baseSteps(d);if(!steps.length || steps.some(s=>!s || typeof s.id!=='string' || !s.id) || new Set(steps.map(s=>s.id)).size!==steps.length)throw new Error('Give every baseline step a stable unique ID before attaching trace evidence.');
-  const trace=normalizeTrace(raw),mapping=mapTrace(d,trace),measured=mapping.steps.filter(s=>s.status!=='unmapped');
+  // #1175: a missing optional step is absent by design; it neither blocks approval nor enters the reference mapping.
+  const trace=normalizeTrace(raw),mapping=mapTrace(d,trace),measured=mapping.steps.filter(s=>s.status!=='unmapped' && !s.optional);
   const errors=C.validateSpec(spec).errors || [];if(errors.length)throw new Error(errors.join('\n'));
   const eligible=measured.length>0 && measured.every(s=>s.status==='matched' && !s.conditions.length);
   return {trace,mapping,eligible,reason:eligible?'Review the mapping, then approve this reference.':'Every instrumented step must map uniquely and satisfy authored budgets before reference approval.'};
@@ -59,7 +60,7 @@ export function approveReference(spec,raw,{section=0,reason,actor='local reviewe
   if(!reason?.trim())throw new Error('Reference approval requires a reason.');
   const preview=referencePreview(spec,raw,section);if(!preview.eligible)throw new Error(preview.reason);
   const out=C.clone(spec),d=C.sections(out)[section].diagram;
-  d.referenceTrace={version:1,trace:preview.trace,mapping:preview.mapping.steps.filter(s=>s.status!=='unmapped').map(s=>({stepId:s.stepId,spanIds:s.spans.map(p=>p.id)})),
+  d.referenceTrace={version:1,trace:preview.trace,mapping:preview.mapping.steps.filter(s=>s.status!=='unmapped' && !s.optional).map(s=>({stepId:s.stepId,spanIds:s.spans.map(p=>p.id)})),
     contract:digest(baseSteps(d).map(s=>({id:s.id,traceMatch:s.traceMatch || null}))),approval:{actor,reason:reason.trim(),at}};
   return out;
 }
@@ -85,7 +86,7 @@ export function compareTrace(spec,raw,{section=0,label='Incident trace'}={}){
     if(existing.has(id))throw new Error('Incident step ID collision.');
     // No copied success patches beyond the fork: a server span cannot prove a
     // notification appeared, a door opened, or a physical device started recording.
-    const step={id,text:(evidence.status==='unmapped'?'Uninstrumented step · outcome unknown':evidence.conditions.length?evidence.conditions.map(c=>c.label).join('; '):'Observed '+selector.serviceName+' · '+selector.operation),
+    const step={id,text:(evidence.status==='unmapped'?'Uninstrumented step · outcome unknown':evidence.optional?'Optional, not in this trace: '+selector.serviceName+' · '+selector.operation:evidence.conditions.length?evidence.conditions.map(c=>c.label).join('; '):'Observed '+selector.serviceName+' · '+selector.operation),
       conditions:C.clone(evidence.conditions),nodes:evidence.nodeId?[evidence.nodeId]:[],
       codeRefs:C.clone(originalStep.codeRefs || []),evidence:{traceId:trace.traceId,spanIds:evidence.spans.map(s=>s.id),canonicalStepId:originalStep.id,status:evidence.status}};
     if(trace.sourceUrl)step.link=trace.sourceUrl;
@@ -97,7 +98,8 @@ export function compareTrace(spec,raw,{section=0,label='Incident trace'}={}){
     }
     const queue=evidence.conditions.find(c=>c.kind==='queue-buildup'),panelId=selector?.panelId;
     if(queue && panelId && d.panels?.some(p=>p.id===panelId && p.type==='queue'))step.panels={[panelId]:{state:'held',reason:'Last measured · '+queue.label+(evidence.conditions.some(c=>c.kind==='backpressure')?' · backpressure':'')}};
-    if(evidence.nodeId)step.tone={[evidence.nodeId]:evidence.conditions.some(c=>['service-error','delivery-failed'].includes(c.kind))?'alert':evidence.conditions.length?'warn':'ok'};
+    // A missing optional step is not observed: dim, never ok.
+    if(evidence.nodeId)step.tone={[evidence.nodeId]:evidence.optional?'dim':evidence.conditions.some(c=>['service-error','delivery-failed'].includes(c.kind))?'alert':evidence.conditions.length?'warn':'ok'};
     d.steps.push(step);ids.push(id);
   }
   d.paths.push({id:pathId,label:String(label).slice(0,100),color:'#f97316',steps:ids});d.autoplay=false;

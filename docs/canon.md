@@ -236,6 +236,20 @@ satisfy two authored steps. Missing or ambiguous matches remain visible.
 `traceMatch` may also be a non-empty array of such selectors, tried in order;
 the first that matches maps the step (see
 [alternatives](provider-traces.md#tracematch-alternatives)).
+`optional:true` marks a step that may be absent from a trace. With alternatives,
+every alternative sets `optional:true`, or none does; mixed or non-boolean values
+are validation errors. An optional step with no span of its service and operation
+in the trace maps as `status:"missing"` with `optional:true`, detail
+`Optional, not in this trace.` and no unknown condition, so it is not a comparison
+divergence and an incident step after the fork is dim; `trace-cli preview` shows
+it that way. If such a span is present but its parent or occurrence rule rejects
+it, the step stays unknown. A step whose `parentStepId` names an optional step is
+not optional itself: mark it optional too, or it reads unknown when the parent is
+absent. It does not block
+reference approval and is left out of the reference mapping; a missing step
+without `optional`, or an ambiguous optional step, still blocks approval. A
+matched or ambiguous optional step is unchanged. Viewer labels:
+[live status](live-status.md#story-mode).
 
 Budgets are authored expectations, not inferred SLOs. `maxDurationMs` compares
 individual observed durations. `maxQueueDepth` uses `messaging.queue.depth` or

@@ -4,7 +4,7 @@ import path from 'node:path';
 import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 /* #1099: Load trace finds a trace from a Loki log line (test plan 1, 2 and 6;
-   tests/telemetry-log-lookup.test.js covers the rest). Desktop only. */
+   tests/telemetry-log-lookup.test.js covers the rest). #1158: the "Only lines with a trace ID" checkbox. Desktop only. */
 const PROFILE=JSON.parse(await readFile(path.join(repo,'tests/fixtures/trace-connection-profile.json'),'utf8'));
 const RECORDED=await readFile(path.join(repo,'tests/fixtures/provider-traces/honeycomb-trace.txt'),'utf8');
 const ID='8413cd87a9f15b6bfe8e1acf5b3346d0',SPAN='011114cbd1fd62de',PANEL={id:'status',type:'live-status',title:'Status'};
@@ -42,6 +42,8 @@ test('desktop authored log lookup lists the newest matching lines and loads the 
  const h=await open(page,server);
  await expect(h.logs.getByRole('combobox',{name:'Log lookup',exact:true})).toHaveValue('camera');await expect(h.logs.getByRole('button',{name:'Find log lines',exact:true})).toBeEnabled();
  await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');expect(h.calls).toHaveLength(0);
+ // #1158: unchecked, Find sends the query as before and lists every line.
+ await h.logs.getByRole('checkbox',{name:'Only lines with a trace ID',exact:true}).uncheck();
  await h.logs.getByRole('button',{name:'Find log lines',exact:true}).click();
  const lines=h.logs.locator('.dv-trace-log-row');await expect(lines).toHaveCount(2);
  expect(h.calls).toEqual([{server:'Grafana',tool:'query_loki_logs',args:{datasourceUid:'loki-stg',logql:'{env="stg"} |= "Handling camera stats message" | cameraModel="arch"',startRfc3339:'now-2h',endRfc3339:'now',limit:10,direction:'backward',queryType:'range'}}]);
@@ -70,7 +72,8 @@ test('desktop without a Grafana connector the log lookup is disabled with a mess
 test('desktop a log-line trace the provider did not keep says so and loads the next log line',async({page,server},info)=>{
  const MISSING='5ab0'.repeat(8),ns=ago=>(BigInt(Date.now()-ago)*1000000n).toString(),line=(ago,meta)=>({timestamp:ns(ago),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:meta});
  const h=await open(page,server,{lines:{data:[line(600000,{cameraModel:'arch',trace_id:MISSING}),line(900000,{cameraModel:'arch'}),line(1200000,{cameraModel:'arch',trace_id:ID,span_id:SPAN})]}});
- await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');await h.logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(h.logs.locator('.dv-trace-log-row')).toHaveCount(3);
+ await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');await h.logs.getByRole('checkbox',{name:'Only lines with a trace ID',exact:true}).uncheck();
+ await h.logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(h.logs.locator('.dv-trace-log-row')).toHaveCount(3);
  await h.logs.getByRole('button',{name:'Load trace '+MISSING,exact:true}).click();
  const report=h.root.locator('.dv-trace-direct-report');await expect(report).toContainText('Trace not found. The provider may not have kept this trace (sampling). Try the next log line.');
  await expect(report).not.toContainText('longer lookback');await expect(h.root.locator('.dv-trace-time')).toHaveJSProperty('open',false);
@@ -78,6 +81,19 @@ test('desktop a log-line trace the provider did not keep says so and loads the n
  await report.getByRole('button',{name:'Try the next log line',exact:true}).click();
  await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);await expect(h.root.locator('.dv-trace-span[data-span-id="'+SPAN+'"]')).toHaveAttribute('aria-pressed','true');
  expect(h.calls.filter(c=>c.tool==='get_trace').map(c=>c.args.trace_id)).toEqual([MISSING,ID]);
+});
+
+/* #1158: "Only lines with a trace ID" is checked by default; Find then appends the trace ID label filter. */
+test('desktop "Only lines with a trace ID": checked by default; unchecked Find sends the query unchanged, checked Find appends the trace ID filter',async({page,server},info)=>{
+ const h=await open(page,server),traced=h.logs.getByRole('checkbox',{name:'Only lines with a trace ID',exact:true}),find=h.logs.getByRole('button',{name:'Find log lines',exact:true}),rows=h.logs.locator('.dv-trace-log-row');
+ const query='{env="stg"} |= "Handling camera stats message" | cameraModel="arch"';
+ await expect(traced).toBeChecked();await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');
+ await traced.uncheck();await find.click();await expect(rows).toHaveCount(2);
+ expect(h.calls.map(c=>c.args.logql)).toEqual([query]);await expect(rows.nth(1)).toContainText('This log line has no trace_id');
+ await traced.check();await expect(rows,'changing the checkbox clears the results').toHaveCount(0);expect(h.calls).toHaveLength(1);
+ await find.click();await expect(rows).toHaveCount(1);await expect(rows.nth(0).locator('.dv-trace-log-id')).toHaveText(ID);
+ expect(h.calls.map(c=>c.args.logql)).toEqual([query,query+' | trace_id =~ "[0-9a-fA-F]{16,32}"']);
+ await info.attach('log-lookup-traced-only',{body:await h.root.screenshot(),contentType:'image/png'});
 });
 
 test('desktop Over time Find searches the selected day: today to now, then the whole previous day',async({page,server},info)=>{
@@ -101,15 +117,17 @@ test('desktop Over time Find searches the selected day: today to now, then the w
  // Over time opens on today: the search runs from local midnight to now.
  await expect(logs.locator('.dv-trace-logs-window')).toHaveText(/^Loki · \d{4}-\d\d-\d\d 00:00–\d\d:\d\d local$/);
  await logs.getByLabel('Camera model',{exact:true}).fill('arch');const before=await page.evaluate(()=>Date.now());
- await logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(rows).toHaveCount(2);
+ // #1158: "Only lines with a trace ID" is checked by default, so the line without one is not listed.
+ await logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(rows).toHaveCount(1);
  let sent=await calls();expect(sent).toHaveLength(1);expect([sent[0].startRfc3339,sent[0].limit,sent[0].direction]).toEqual([await midnight(0),10,'backward']);
+ expect(sent[0].logql).toBe('{env="stg"} |= "Handling camera stats message" | cameraModel="arch" | trace_id =~ "[0-9a-fA-F]{16,32}"');
  const end=Date.parse(sent[0].endRfc3339);expect(end).toBeGreaterThanOrEqual(before);expect(end).toBeLessThanOrEqual(await page.evaluate(()=>Date.now()));
  await info.attach('log-search-over-time-today',{body:await root.screenshot(),contentType:'image/png'});
  // Previous day clears the results without a call; the typed value stays. Find then searches that whole day.
  await root.getByRole('button',{name:'Previous day',exact:true}).click();await expect(rows).toHaveCount(0);
  await expect(logs.getByLabel('Camera model',{exact:true})).toHaveValue('arch');expect(await calls()).toHaveLength(1);
  await expect(logs.locator('.dv-trace-logs-window')).toHaveText(/^Loki · \d{4}-\d\d-\d\d 00:00–24:00 local$/);
- await logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(rows).toHaveCount(2);
+ await logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(rows).toHaveCount(1);
  sent=await calls();expect(sent).toHaveLength(2);expect([sent[1].startRfc3339,sent[1].endRfc3339]).toEqual([await midnight(1),await midnight(0)]);
  await info.attach('log-search-over-time-previous-day',{body:await root.screenshot(),contentType:'image/png'});
 });

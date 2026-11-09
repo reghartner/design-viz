@@ -3150,7 +3150,7 @@ test('#1124 a log-line trace that is not found says it may not have been kept an
  const raw={tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]};
  const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async(request,args)=>{calls.push(args.trace_id);return {payload:notFound(args.trace_id)};},logsConnector:async()=>'Grafana',queryLogs:async()=>({data})}}}),api=h.ctl.liveStatus;
  const report=()=>api.snapshot().trace.direct.report,m=mountStatus(h);
- api.setStatusMode('trace');await settle();api.setDirectTraceField({field:'environment',value:'prod'});api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();
+ api.setStatusMode('trace');await settle();api.setDirectTraceField({field:'environment',value:'prod'});api.setLogLookupField({field:'value',value:'arch'});api.setLogLookupField({field:'traced',value:false});await api.findLogLines();
  assert.equal(await api.loadLogTrace(0),null);assert.deepEqual(calls,[ids[0]]);assert.equal(report().code,'trace_not_found');
  assert.equal(report().error,'Trace not found. The provider may not have kept this trace (sampling). Try the next log line.');
  const next=m.body.querySelector('.dv-trace-log-next');assert.ok(next,'the not-found report offers the next log line');assert.equal(next.textContent,'Try the next log line');
@@ -3161,6 +3161,20 @@ test('#1124 a log-line trace that is not found says it may not have been kept an
  assert.equal(m.body.querySelector('.dv-trace-log-next'),null);
  // A pasted ID keeps today's text.
  api.setDirectTraceField({field:'input',value:ids[0]});assert.equal(await api.loadDirectTrace(false),null);assert.equal(report().error,'Trace not found in the last 2h. Try a longer lookback under Lookback.');
+ api.destroy();
+});
+test('#1158 the log form renders "Only lines with a trace ID" checked, and unchecking it reaches the controller',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);},calls=[];
+ const raw={tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async args=>{calls.push(plain(args));return {data:[]};}}}}),api=h.ctl.liveStatus;
+ api.setStatusMode('trace');await settle();const m=mountStatus(h),logs=()=>api.snapshot().trace.direct.logs;
+ const box=m.body.querySelector('.dv-trace-logs .dv-trace-log-traced');assert.ok(box,'the checkbox renders in the log form');
+ assert.equal(box.type,'checkbox');assert.equal(box.checked,true,'checked by default');assert.equal(box.disabled,false);
+ assert.equal(box.closest('label').querySelector('span').textContent,'Only lines with a trace ID');
+ api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();assert.equal(calls.length,1);assert.ok(logs().result);
+ box.checked=false;box.dispatchEvent({type:'change'});
+ assert.equal(logs().form.traced,false,'unchecking reaches the controller');assert.equal(logs().result,null,'and clears the results');assert.equal(calls.length,1,'without a call');
+ h.flush();assert.equal(m.body.querySelector('.dv-trace-log-traced').checked,false,'the repaint keeps it unchecked');
  api.destroy();
 });
 /* #1142: in Over time, Load trace and Verify call the transport and search the selected day. */

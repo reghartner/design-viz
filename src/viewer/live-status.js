@@ -1163,10 +1163,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   // The reader's click (Over time, or a Load that moves the view to a trace's day) is the only thing that loads history.
   // Whether Over time can open now; the log list promises a move only then.
-  function canOpenOver(){return !retired && !!overSource && applied && Object.keys(map).length>0 && !editing();}
+  // The local 7-day list (#1138) needs no ticket status; a Jira history source needs the applied map.
+  function canOpenOver(){var source=historySource();return !retired && !!source && (source===localHistory || applied && Object.keys(map).length>0) && !editing();}
   function openOver(trace){
     if(retired || overLoading || over || !canOpenOver())return false;
-    var source=overSource,request=++overRequest;overLoading=true;overError='';overProgress='';overTarget=trace?{request:request}:null;notify();
+    var source=historySource(),request=++overRequest;overLoading=true;overError='';overProgress='';overTarget=trace?{request:request}:null;notify();
     Promise.resolve().then(function(){return source.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result,source);},function(){overLoad(request,null,source);});
     return true;
   }
@@ -1991,12 +1992,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     },
     setHistory:function(source){if(retired)return;if(over)overClose();overRequest++;overLoading=false;overError='';overSource=source && typeof source.load==='function'?source:null;notify();},
     // The reader's click is the only thing that loads history.
-    overTime:function(){
-      if(retired || overLoading || over)return;
-      var source=historySource();if(!source || source!==localHistory && (!applied || !Object.keys(map).length) || editing())return;
-      var request=++overRequest;overLoading=true;overError='';overProgress='';notify();
-      Promise.resolve().then(function(){return source.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result,source);},function(){overLoad(request,null,source);});
-    },
+    overTime:function(){openOver(null);},
     overTimeClose:function(){if(!retired && over)overClose();},
     overTimeStep:function(delta){if(!retired && over)api.overTimeDay(over.index+delta);},
     overTimeDay:function(index){

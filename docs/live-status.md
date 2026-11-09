@@ -2953,7 +2953,8 @@ Selecting a span in the loaded trace shows its exact **Service** and **Operation
 
 A loaded trace is one request with its own start time, the earliest span's (#1145, D5). The request card
 says "Started Nov 6 12:00 local". Loading it moves the view to that local day: Over time on that day, or
-Live when it is today, also from Over time on today. Opening Over time for it is part of the Load click;
+Live when it is today, also from Over time on today. Opening Over time for it (on a Jira-free board, the
+local 7-day list) is part of the Load click;
 when the history arrives, the view goes to the day of the trace loaded then, and stays in Live if there is
 none or it is from today. When the day list has no such day, the view stays and the Load trace section says
 "This trace is from Nov 3, which Over time does not list." A board where Over time cannot open stays in Live.

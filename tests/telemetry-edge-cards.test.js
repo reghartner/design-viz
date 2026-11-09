@@ -72,3 +72,27 @@ test('a card leader leaves a gap where it would cross a trace label',()=>{
  assert.equal(C.telemetryCardLeader({x:0,y:0},{x:0,y:100},[]),'M0 0L0 100','no label, one unbroken line');
  assert.equal(C.telemetryCardLeader({x:0,y:0},{x:0,y:30},[{x:-20,y:-10,w:40,h:60}]),'','a leader wholly inside a label is not drawn');
 });
+/* #1200: a card's border shows the metric state only. The worst signal decides:
+   waiting (none arriving, or silent) < failing (a limit not met) < flowing (no limits) < held (every limit holds). */
+test('#1200 card metric state: worst signal decides and Jira state never enters',()=>{
+ const T1=Date.UTC(2026,10,3,9),T2=Date.UTC(2026,10,3,10),zero=v=>({value:v,series:[[T1,v],[T2,v]]});
+ const limited={kind:'call',signals:{rate:{unit:'req/h'},errors:{unit:'req/h'}},proof:{rate:{min:1},errors:{maxRatioOf:'rate',max:.01}}};
+ const open={kind:'call',signals:{rate:{unit:'req/h'},errors:{unit:'req/h'}}};
+ const mixed={kind:'call',signals:{rate:{unit:'req/h'},errors:{unit:'req/h'},p95:{unit:'ms'}},proof:{rate:{min:1},p95:{max:300}}};
+ const state=(binding,sample,jira)=>{
+  const result=C.proofVerdicts({carriers:[{id:'a->b',...binding,tickets:jira?['W-1']:[]}],jiraMap:{'W-1':{state:jira}},telemetryMap:sample?{'a->b':sample}:{}}).carriers['a->b'];
+  return C.telemetryCardMetricState(binding,sample,result);
+ };
+ assert.equal(state(limited,{signals:{rate:{value:100},errors:{value:0}}}),'held');
+ for(const jira of ['done','active','todo','blocked'])assert.equal(state(limited,{signals:{rate:{value:100},errors:{value:0}}},jira),'held','Jira '+jira+' does not change it');
+ assert.equal(state(open,{signals:{rate:{value:100},errors:{value:3}}}),'flowing');
+ assert.equal(state(limited,{signals:{rate:{value:100},errors:{value:50}}}),'failing');
+ assert.equal(state(limited,{signals:{rate:{value:100},errors:{value:50}}},'done'),'failing');
+ assert.equal(state(limited,null),'waiting','nothing arriving yet');
+ assert.equal(state(limited,{signals:{rate:zero(0),errors:zero(0)}},'done'),'waiting','silent for the whole window');
+ assert.equal(state(open,{signals:{rate:zero(0),errors:zero(0)}}),'waiting','silent without limits');
+ assert.equal(state(limited,{signals:{rate:{value:100}}}),'waiting','worst decides: one limited signal not arriving');
+ assert.equal(state(open,{signals:{rate:{value:100}}}),'waiting','worst decides: one signal not arriving');
+ assert.equal(state(mixed,{signals:{rate:{value:100},errors:{value:1},p95:{value:400}}}),'failing','worst decides: one limit not met');
+ assert.equal(state(mixed,{signals:{rate:{value:100},errors:{value:1},p95:{value:200}}}),'held','every authored limit holds; an unlimited signal arrives');
+});

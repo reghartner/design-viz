@@ -3293,7 +3293,7 @@ const dayTraceAt=ms=>{const delta=BigInt(ms)*1000000n-1791779586602194688n;retur
 const daysBack=(n,hour=12)=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate()-n,hour).getTime();};
 const dayKeyOf=ms=>{const d=new Date(ms);return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())).toISOString().slice(0,10);};
 const dayLabelOf=ms=>new Date(ms).toLocaleDateString([],{month:'short',day:'numeric'});
-function dayTraceBoard({at,loadDetail,lines}={}){
+function dayTraceBoard({at,loadDetail,lines,deferHistory=false,apply=true}={}){
  const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),calls=[];let payload=dayTraceAt(at);
  const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
  const raw=overFixture();raw.page.tracking.telemetry={traceConnections:{company:profile}};
@@ -3301,11 +3301,11 @@ function dayTraceBoard({at,loadDetail,lines}={}){
  if(lines){Object.assign(raw.page.tracking.telemetry,{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}}});Object.assign(renderOptions.telemetry.directTrace,{logsConnector:async()=>'Grafana',queryLogs:async()=>({data:lines})});}
  if(loadDetail)renderOptions.loadDetail=loadDetail;
  const h=harness(raw,{},renderOptions),api=overReady(h.ctl.liveStatus),m=mountStatus(h),now=Date.now();
- api.apply(overToday());api.setStatusMode('trace');
+ if(apply)api.apply(overToday());api.setStatusMode('trace');
  const history=historyDays(providerContext(),[historyTicket('AA-1',now-4*86400000,'In Progress',[historyChange(now-86400000,'To Do','In Progress')])],{'AA-1':{state:'done'}},now);
- api.setHistory({load:()=>history});
+ let release=null;api.setHistory({load:()=>deferHistory?new Promise(r=>{release=()=>r(history);}):history});
  api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:DAY_TRACE_ID});
- return {h,api,m,calls,renderOptions,days:history.days,traceAt:ms=>{payload=dayTraceAt(ms);},note:()=>api.snapshot().trace.direct.dayNote,
+ return {h,api,m,calls,renderOptions,days:history.days,traceAt:ms=>{payload=dayTraceAt(ms);},release:()=>{const r=release;release=null;if(r)r();},note:()=>api.snapshot().trace.direct.dayNote,
   loaded:()=>{const t=api.snapshot().trace;return !!(t.direct.exemplar && t.selected && t.selected.manual);}};
 }
 test('#1145 a trace from two days back opens Over time on its day with that day\'s Jira colours; another day clears it',async()=>{
@@ -3322,20 +3322,25 @@ test('#1145 a trace from two days back opens Over time on its day with that day\
  assert.equal(b.loaded(),false,'another day clears the trace');assert.equal(api.snapshot().trace.direct.exemplar,null);
  assert.equal(b.note(),'Cleared trace '+DAY_TRACE_ID.slice(0,12)+' ('+dayLabelOf(at)+'): the view moved to '+b.days[over.index+1].short+'.');
  assert.equal(m.body.querySelector('.dv-trace-day-note').textContent,b.note());assert.equal(api.snapshot().trace.direct.form.input,DAY_TRACE_ID,'the typed ID stays');
+ api.overTimeDay(over.index);h.flush();assert.equal(b.note(),'','the note goes with the next view change');assert.equal(m.body.querySelector('.dv-trace-day-note'),null);
  // Back to Live clears a past-day trace too, with no call.
  assert.ok(await api.loadDirectTrace(false));await historySettle();assert.equal(api.snapshot().overTime.index,over.index);assert.ok(b.loaded());
  overBackToLive(api);await historySettle();assert.equal(b.loaded(),false);assert.equal(b.note(),'Cleared trace '+DAY_TRACE_ID.slice(0,12)+' ('+dayLabelOf(at)+'): the view moved to Live.');
- assert.equal(calls.length,2,'moving the day never loads');
+ // Jira clear also returns a past day to Live and clears the trace.
+ assert.ok(await api.loadDirectTrace(false));await historySettle();assert.ok(b.loaded());assert.equal(api.snapshot().overTime.active,true);
+ api.clear();assert.equal(b.loaded(),false,'Jira clear clears the past-day trace');assert.equal(b.note(),'Cleared trace '+DAY_TRACE_ID.slice(0,12)+' ('+dayLabelOf(at)+'): the view moved to Live.');
+ assert.equal(calls.length,3,'moving the day never loads');
  api.destroy();
 });
 test('#1145 a trace from today keeps or returns to Live; Over time on today keeps it',async()=>{
  const b=dayTraceBoard({at:Date.now()-60000}),{api,calls}=b;
  assert.ok(await api.loadDirectTrace(false));await historySettle();
  assert.equal(api.snapshot().overTime.active,false,'a today trace keeps Live');assert.ok(b.loaded());
- api.overTime();await historySettle();assert.equal(api.snapshot().overTime.today,true);assert.ok(b.loaded(),'Over time on today is the trace\'s day');
- api.overTimeDay(0);assert.equal(b.loaded(),false);
+ api.overTime();await historySettle();assert.equal(api.snapshot().overTime.today,true);assert.ok(b.loaded(),'the reader\'s Over time on today is the trace\'s day');
+ assert.ok(await api.loadDirectTrace(false));await historySettle();assert.equal(api.snapshot().overTime.active,false,'D5: a today trace moves the view to Live');assert.ok(b.loaded());
+ api.overTime();await historySettle();api.overTimeDay(0);assert.equal(b.loaded(),false);
  assert.ok(await api.loadDirectTrace(true),'Verify loads it too');await historySettle();
- assert.equal(api.snapshot().overTime.active,false,'a today trace returns a past day to Live');assert.ok(b.loaded());assert.equal(calls.length,2);
+ assert.equal(api.snapshot().overTime.active,false,'a today trace returns a past day to Live');assert.ok(b.loaded());assert.equal(calls.length,3);
  api.destroy();
 });
 test('#1145 a trace from a day outside the day list keeps the view and says so',async()=>{
@@ -3371,12 +3376,44 @@ test('#1145 log results survive the move a trace causes and clear on the reader\
  assert.equal(logs().result && logs().result.rows.length,2,'the list survives the move the trace caused');assert.equal(logs().result.chosen,0);
  assert.equal(m.body.querySelectorAll('.dv-trace-log-row').length,2);
  assert.equal(await api.loadNextLogTrace(),null,'the next line still loads');assert.deepEqual(calls.map(c=>c.trace_id),[DAY_TRACE_ID,other]);
+ // A trace from another listed day moves Over time day to day; the list stays.
+ b.traceAt(daysBack(1));assert.ok(await api.loadLogTrace(0));assert.equal(b.days[api.snapshot().overTime.index].key,dayKeyOf(daysBack(1)));assert.equal(logs().result && logs().result.rows.length,2,'a day-to-day move keeps the list');
  // Today, while the list is from Live: a trace that returns the view to Live keeps it too.
  b.traceAt(Date.now()-60000);assert.ok(await api.loadLogTrace(0));await historySettle();
  assert.equal(api.snapshot().overTime.active,false,'back to Live for a today trace');assert.equal(logs().result && logs().result.rows.length,2);
  // The reader's own day change clears the results, as #1141 does.
  api.overTime();await historySettle();api.overTimeDay(0);assert.equal(logs().result,null,'the reader\'s day change clears them');
- assert.equal(calls.length,3,'no call without a click');
+ assert.equal(calls.length,4,'no call without a click');
+ api.destroy();
+});
+test('#1145 a history load the trace started follows the trace loaded when it arrives',async()=>{
+ // A, then B from another past day: the view opens on B's day and B stays.
+ let b=dayTraceBoard({at:daysBack(2),deferHistory:true});
+ assert.ok(await b.api.loadDirectTrace(false));assert.equal(b.api.snapshot().overTime.loading,true);
+ b.traceAt(daysBack(1));assert.ok(await b.api.loadDirectTrace(false));b.release();await historySettle();
+ assert.equal(b.api.snapshot().overTime.active,true);assert.equal(b.days[b.api.snapshot().overTime.index].key,dayKeyOf(daysBack(1)),'B\'s day');assert.ok(b.loaded(),'B stays');assert.equal(b.note(),'');b.api.destroy();
+ // A, then a today trace B: the view stays in Live with B.
+ b=dayTraceBoard({at:daysBack(2),deferHistory:true});
+ assert.ok(await b.api.loadDirectTrace(false));b.traceAt(Date.now()-60000);assert.ok(await b.api.loadDirectTrace(false));b.release();await historySettle();
+ assert.equal(b.api.snapshot().overTime.active,false,'Live for today');assert.ok(b.loaded());assert.equal(b.note(),'');b.api.destroy();
+ // A, then Clear trace: the history arrives and the view stays in Live.
+ b=dayTraceBoard({at:daysBack(2),deferHistory:true});
+ assert.ok(await b.api.loadDirectTrace(false));b.api.clearDirectTrace();b.release();await historySettle();
+ assert.equal(b.api.snapshot().overTime.active,false,'no trace, no move');assert.equal(b.loaded(),false);b.api.destroy();
+});
+test('#1145 a trace that runs past midnight takes the day of its first span',async()=>{
+ const at=daysBack(2,23)+59*60000+57000,b=dayTraceBoard({at}),{api,m}=b;
+ assert.ok(await api.loadDirectTrace(false));await historySettle();
+ assert.equal(b.days[api.snapshot().overTime.index].key,dayKeyOf(at),'the first span\'s day, not a later span\'s');
+ assert.ok(api.snapshot().trace.selected.exemplar.spans.some(s=>dayKeyOf(Date.parse(s.time))!==dayKeyOf(at)),'the fixture crosses midnight');
+ assert.equal(m.body.querySelector('.dv-trace-date').textContent,'Started '+dayLabelOf(at)+' 23:59 local');api.destroy();
+});
+test('#1145 the log list promises a move only when Over time can open',async()=>{
+ const line={timestamp:String(BigInt(daysBack(2))*1000000n),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:{cameraModel:'arch',trace_id:DAY_TRACE_ID}};
+ const b=dayTraceBoard({at:daysBack(2),lines:[line],apply:false}),{api,m}=b,settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
+ await settle();api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();
+ assert.equal(api.snapshot().trace.direct.movesDay,false,'no ticket status yet: Over time cannot open');assert.equal(m.body.querySelector('.dv-trace-logs-moves'),null);
+ api.apply(overToday());assert.equal(api.snapshot().trace.direct.movesDay,true);assert.ok(m.body.querySelector('.dv-trace-logs-moves'));
  api.destroy();
 });
 test('#1145 opening a drill-down keeps the loaded trace and its selection',async()=>{

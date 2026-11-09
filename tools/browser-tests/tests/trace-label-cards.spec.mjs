@@ -70,62 +70,88 @@ async function pickExample(root){
  await expect(root.locator('.dv-trace-selected')).toBeVisible();
 }
 const LABELS='.dv-trace-overlay text',CARDS='.dv-metrics-card';
-// Screen boxes of every trace label, metric card and node card. Lists each label a card
-// covers, each label a card leader line runs through, each node card a metric card
-// covers, and each card outside the board frame.
-function problems(root){
- return root.evaluate(host=>{
-  const box=el=>el.getBoundingClientRect(),hit=(a,b)=>Math.min(a.right,b.right)-Math.max(a.left,b.left)>.5 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>.5;
-  const cards=Array.from(host.querySelectorAll('.dv-metrics-card')).map(card=>({id:card.getAttribute('data-metrics-card'),box:box(card.querySelector('.dv-metrics-card-box')),svg:box(card.closest('svg'))}));
-  const out=[];
-  host.querySelectorAll('.dv-trace-overlay text').forEach(text=>cards.forEach(card=>{if(hit(box(text),card.box))out.push('label "'+text.textContent+'" under card '+card.id);}));
-  const labels=Array.from(host.querySelectorAll('.dv-trace-overlay text')).map(text=>({text:text.textContent,box:box(text)}));
-  host.querySelectorAll('.dv-metrics-leader').forEach(path=>{
-   const length=path.getTotalLength(),m=path.getScreenCTM();if(!length || !m)return;
-   for(let k=0;k<=60;k++){
-    const p=path.getPointAtLength(length*k/60),x=m.a*p.x+m.c*p.y+m.e,y=m.b*p.x+m.d*p.y+m.f;
-    const under=labels.find(l=>x>l.box.left+1 && x<l.box.right-1 && y>l.box.top+1 && y<l.box.bottom-1);
-    if(under){out.push('leader '+path.getAttribute('data-dv-edge')+' through label "'+under.text+'"');break;}
-   }
-  });
-  host.querySelectorAll('g.node .card').forEach(node=>cards.forEach(card=>{if(hit(box(node),card.box))out.push('node '+node.closest('g.node').getAttribute('data-dv-node')+' under card '+card.id);}));
-  cards.forEach(card=>{const b=card.box,f=card.svg;if(b.left<f.left-.5 || b.right>f.right+.5 || b.top<f.top-.5 || b.bottom>f.bottom+.5)out.push('card '+card.id+' outside the board frame');});
-  return out;
+// Runs in the page against the viewer's shadow root. Lists each trace label a metric card covers,
+// each label a card leader line runs through, each node card a metric card covers, and each card
+// outside the board frame, with the label and card counts it saw.
+function boardProblems(scope){
+ const box=el=>el.getBoundingClientRect(),hit=(a,b)=>Math.min(a.right,b.right)-Math.max(a.left,b.left)>.5 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>.5;
+ const cards=Array.from(scope.querySelectorAll('.dv-metrics-card')).map(card=>({id:card.getAttribute('data-metrics-card'),box:box(card.querySelector('.dv-metrics-card-box')),svg:box(card.closest('svg'))}));
+ const labels=Array.from(scope.querySelectorAll('.dv-trace-overlay text')).map(text=>({text:text.textContent,box:box(text)}));
+ const out=[];
+ labels.forEach(label=>cards.forEach(card=>{if(hit(label.box,card.box))out.push('label "'+label.text+'" under card '+card.id);}));
+ scope.querySelectorAll('.dv-metrics-leader').forEach(path=>{
+  const length=path.getTotalLength(),m=path.getScreenCTM();if(!length || !m)return;
+  for(let k=0;k<=60;k++){
+   const p=path.getPointAtLength(length*k/60),x=m.a*p.x+m.c*p.y+m.e,y=m.b*p.x+m.d*p.y+m.f;
+   const under=labels.find(l=>x>l.box.left+1 && x<l.box.right-1 && y>l.box.top+1 && y<l.box.bottom-1);
+   if(under){out.push('leader '+path.getAttribute('data-dv-edge')+' through label "'+under.text+'"');break;}
+  }
  });
+ scope.querySelectorAll('g.node .card').forEach(node=>cards.forEach(card=>{if(hit(box(node),card.box))out.push('node '+node.closest('g.node').getAttribute('data-dv-node')+' under card '+card.id);}));
+ cards.forEach(card=>{const b=card.box,f=card.svg;if(b.left<f.left-.5 || b.right>f.right+.5 || b.top<f.top-.5 || b.bottom>f.bottom+.5)out.push('card '+card.id+' outside the board frame');});
+ return {labels:labels.length,cards:cards.length,problems:out};
+}
+const SOURCE=boardProblems.toString();
+// The native viewer renders inside #host's shadow root; page queries must start there.
+function measure(root){return root.evaluate((host,source)=>(0,eval)('('+source+')')(host.shadowRoot || host),SOURCE);}
+// Records every problem seen after each DOM change and on every frame until stopSampling, so a
+// state that a later repaint corrects is still caught (main corrects it on the next paint).
+function startSampling(root){
+ return root.evaluate((host,source)=>{
+  const scope=host.shadowRoot || host,check=(0,eval)('('+source+')'),seen=window.__traceLabelProblems=new Set();window.__traceLabelStop=false;
+  const sample=()=>check(scope).problems.forEach(p=>seen.add(p)),observer=new MutationObserver(sample);
+  observer.observe(scope,{subtree:true,childList:true,attributes:true,attributeFilter:['transform','x','y','d','viewBox']});
+  const frame=()=>{if(window.__traceLabelStop){observer.disconnect();return;}sample();requestAnimationFrame(frame);};requestAnimationFrame(frame);
+ },SOURCE);
+}
+async function stopSampling(root){
+ // Let at least half a second of frames pass after the last checked state.
+ const page=root.page();await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,500)));
+ return page.evaluate(()=>{window.__traceLabelStop=true;return Array.from(window.__traceLabelProblems);});
 }
 // Label anchors in SVG user units (text x/y attributes), keyed by text, and whether the
 // label sits within 6 units of the board frame (where telemetryTraceConstrainLabel clamps it).
-function anchors(root){return root.evaluate(host=>Array.from(host.querySelectorAll('.dv-trace-overlay text')).map(t=>{
+function anchors(root){return root.evaluate(host=>Array.from((host.shadowRoot || host).querySelectorAll('.dv-trace-overlay text')).map(t=>{
  const svg=t.closest('svg'),vb=svg.viewBox.baseVal,b=t.getBBox(),m=svg.getCTM().inverse().multiply(t.getCTM());
  const xs=[],ys=[];[[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].forEach(([x,y])=>{xs.push(m.a*x+m.c*y+m.e);ys.push(m.b*x+m.d*y+m.f);});
  const edge=Math.min(...xs)<vb.x+6 || Math.max(...xs)>vb.x+vb.width-6 || Math.min(...ys)<vb.y+6 || Math.max(...ys)>vb.y+vb.height-6;
  return [t.textContent,Number(t.getAttribute('x')),Number(t.getAttribute('y')),edge];
 }));}
+// Covered labels are the ticket (#1163); leader, node and frame findings are checked after them.
+function expectClear(seen,when){
+ expect(seen.filter(p=>p.startsWith('label ')),'no metric card covers a trace label '+when).toEqual([]);
+ expect(seen,'no leader through a label, no card over a node card, every card inside the frame '+when).toEqual([]);
+}
+async function expectSettled(root,when){
+ const now=await measure(root);expect(now.labels,'trace labels seen in the viewer').toBe(6);expect(now.cards,'metric cards seen in the viewer').toBe(3);
+ expectClear(now.problems,when);
+}
 
 for(const origin of ['local','imported']){
  test(`desktop ${origin} metric cards never cover a node or edge trace label`,async({page,server})=>{
   const root=await setup(page,server,{origin,exemplar:true});
+  await startSampling(root);
   await metric(root).click();await expect(metric(root)).toHaveAttribute('aria-checked','true');
   await pickExample(root);await expect(root.locator(CARDS)).toHaveCount(3);await expect(root.locator(LABELS)).toHaveCount(6);
   await expect(root.locator(LABELS).filter({hasText:'Matched: database INSERT shipping.quotes'})).toHaveCount(1);
-  await expect.poll(()=>problems(root),{message:'No metric card covers a trace label or a node card, and every card is inside the board frame'}).toEqual([]);
+  expectClear(await stopSampling(root),'at any paint after the trace is picked');await expectSettled(root,'once settled');
  });
  test(`desktop ${origin} trace labels keep their places when the Metrics overlay turns on and off`,async({page,server})=>{
   const root=await setup(page,server,{origin,exemplar:false});
   await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
   await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await root.getByRole('button',{name:'Load trace',exact:true}).click();
-  await expect(root.locator(LABELS)).toHaveCount(6);await expect(root.locator(CARDS)).toHaveCount(0);const first=await anchors(root);
+  await expect(root.locator(LABELS)).toHaveCount(6);await expect(root.locator(CARDS)).toHaveCount(0);const first=await anchors(root);expect(first).toHaveLength(6);
   // First overlay-on: no card covers a label, and labels do not move for the cards. The cards grow the
   // frame, and the frame keeps that size. Only a label the smaller overlay-off frame had clamped at its
   // edge may move (on the imported board the Shipping label went from y 65.8 to 74, as on main).
-  await metric(root).click();await expect(root.locator(CARDS)).toHaveCount(3);await expect(root.locator(LABELS)).toHaveCount(6);
-  await expect.poll(()=>problems(root)).toEqual([]);
-  const grown=await anchors(root);expect(grown.map(a=>a[0])).toEqual(first.map(a=>a[0]));
+  await startSampling(root);await metric(root).click();await expect(root.locator(CARDS)).toHaveCount(3);await expect(root.locator(LABELS)).toHaveCount(6);
+  expectClear(await stopSampling(root),'at any paint after the first overlay-on');await expectSettled(root,'after the first overlay-on');
+  const grown=await anchors(root);expect(grown).toHaveLength(6);expect(grown.map(a=>a[0])).toEqual(first.map(a=>a[0]));
   grown.forEach(([text,x,y],i)=>{if(first[i][3])return;expect(Math.abs(x-first[i][1]),text+' x').toBeLessThanOrEqual(2);expect(Math.abs(y-first[i][2]),text+' y').toBeLessThanOrEqual(2);});
   await metric(root).click();await expect(root.locator(CARDS)).toHaveCount(0);
-  await expect(root.locator(LABELS)).toHaveCount(6);const off=await anchors(root);
+  await expect(root.locator(LABELS)).toHaveCount(6);const off=await anchors(root);expect(off).toHaveLength(6);
   await metric(root).click();await expect(root.locator(CARDS)).toHaveCount(3);await expect(root.locator(LABELS)).toHaveCount(6);
-  await expect.poll(()=>problems(root)).toEqual([]);
+  await expectSettled(root,'after the overlay turns on again');
   const on=await anchors(root);expect(on.map(a=>a[0])).toEqual(off.map(a=>a[0]));
   // Cards move; labels do not. Edge labels follow font metrics by about a unit between overlay states, as before #1163.
   on.forEach(([text,x,y],i)=>{expect(Math.abs(x-off[i][1]),text+' x').toBeLessThanOrEqual(2);expect(Math.abs(y-off[i][2]),text+' y').toBeLessThanOrEqual(2);});

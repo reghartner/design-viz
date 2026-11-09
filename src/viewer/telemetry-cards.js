@@ -36,6 +36,18 @@ function telemetryCardScope(signal){
   return full.indexOf('all topics')===0?'All topics · whole account':full.indexOf('all connections')===0?'All connections · whole account':full;
 }
 function telemetryCountNote(binding){return telemetryMetricNames(binding).some(function(name){var s=binding.signals[name];return s.source==='honeycomb' && Array.isArray(s.query.calculations) && s.query.calculations.some(function(c){return c && c.op==='COUNT';});})?'Honeycomb COUNT counts source rows/events, not automatically requests.':'';}
+/* #1200: the card border shows the metric state only, never Jira work. The worst signal decides:
+   waiting (a signal not arriving, or silent for the whole window) < failing (a limit not met)
+   < flowing (values arriving, no limits authored) < held (every authored limit holds).
+   Proof chips (#1199) wear the state of the verdict bucket they count. */
+var TELEMETRY_PROOF_BUCKET_STATES={proven:'held',liveEarly:'held',degraded:'failing',unproven:'waiting'};
+function telemetryCardMetricState(binding,sample,result){
+  var names=telemetryMetricNames(binding);
+  if(!names.length)return null;
+  if(result && result.telemetry==='silent' || names.some(function(name){return telemetryReading(sample,name).value===null;}))return 'waiting';
+  if(result && (result.failing || []).length)return 'failing';
+  return telemetryMetricProofNames(binding).length?'held':'flowing';
+}
 function telemetryCardContent(edge,binding,sample,result,window,pending){
   // Visibility never changes source ownership or legacy-link ambiguity.
   var rows=telemetryMetricRows(binding,sample,pending,window).filter(function(row){return binding.signals[row.name].showOnCard!==false;});
@@ -137,7 +149,8 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       if(!binding || !telemetryMetricNames(telemetryCardBinding(binding)).length || edge.hidden===true || !boardControlBox(path,svg) && !boardControlBox(liveBreak,svg))return;
       var id=edge.from+'->'+edge.to,result=view.verdicts.carriers[id],content=telemetryCardContent(edge,binding,view.map[id],result,window,view.pending && view.pending[id]);
       if(view.preview){content.note='Preview · synthetic';content.state='preview';}
-      var card=telemetrySvg(doc,'g',{'class':'dv-metrics-card','data-dv-edge':index,'data-metrics-card':id,'data-state':content.state,'data-verdict':view.preview?'preview':result && result.verdict || 'unobserved'},svg);
+      var card=telemetrySvg(doc,'g',{'class':'dv-metrics-card','data-dv-edge':index,'data-metrics-card':id,'data-state':content.state,'data-verdict':view.preview?'preview':result && result.verdict || 'unobserved'},svg),metricState=view.preview?null:telemetryCardMetricState(binding,view.map[id],result);
+      if(metricState)card.setAttribute('data-metric-state',metricState);
       // Authored card.width or 240, with measured wrapping, never stretched glyphs.
       // Height is the actual rendered content and participates in obstacle packing.
       var w=binding.card && binding.card.width || 240,y=15,rect=telemetrySvg(doc,'rect',{'class':'dv-metrics-card-box',rx:7,width:w},card);

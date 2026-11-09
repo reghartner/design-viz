@@ -89,6 +89,8 @@
       var main=el(box,'div','main','dv-live-epic-main');el(main,'h3','heading','','Proof');
       var pills=el(main,'div','pills','dv-live-proof-pills');Object.keys(proofLabels).forEach(function(key){
         var pill=el(pills,'span',key,'dv-live-state-pill dv-live-proof-pill',proof.counts[key]+' '+proofLabels[key]);pill.setAttribute('data-proof-bucket',key);
+        // #1199: a chip wears the metric-card state of the verdicts it counts (shared CSS in style.core.css).
+        if(proof.states && proof.states[key])pill.setAttribute('data-metric-state',proof.states[key]);else pill.removeAttribute('data-metric-state');
       });
       el(main,'p','sentence','dv-live-proof-sentence',proof.sentence);el(main,'p','predicate','dv-live-proof-predicate',proof.predicate);
     }

@@ -3338,6 +3338,7 @@ test('#1163 a board scale change repaints only when a changed trace label meets 
  scale();assert.equal(paints(),true,'a label grew under a drawn leader: paint');
  api.destroy();
 });
+// #1200: a card never wears Jira work paint; on a ticketed board the Jira view still names an unticketed card "No change needed".
 test('#1137 metric cards on a board without tickets get no Jira presentation; ticketed boards keep unchanged',async()=>{
  const free=await paintedCard({a:{},b:{}});
  assert.equal(free.h.ctl.liveStatus.snapshot().available,false,'fixture has no ticket references');
@@ -3354,7 +3355,7 @@ test('#1137 metric cards on a board without tickets get no Jira presentation; ti
  assert.equal(ticketed.h.ctl.liveStatus.snapshot().available,true);
  assert.ok(ticketed.card);
  assert.equal(ticketed.card.getAttribute('data-verdict'),'degraded');
- assert.deepEqual(workPresentation(ticketed.h,ticketed.card),{appearance:'unchanged',classes:['unchanged'],halo:true,label:true,popover:true},'an unticketed edge on a ticketed board stays unchanged');
+ assert.deepEqual(workPresentation(ticketed.h,ticketed.card),{appearance:null,classes:[],halo:false,label:true,popover:true},'an unticketed edge on a ticketed board stays unchanged in its name and popover, not its paint');
  ticketed.h.ctl.liveStatus.destroy();
 });
 // Chuck 2026-11-08 (D13): the Metrics overlay draws in every view. In the Trace view its cards carry no Jira work colouring,
@@ -3420,7 +3421,7 @@ test('D13 metric cards draw in the Trace view of a board with tickets without Ji
   const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
   for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;};
  const ticketed=await paintedCard({a:{tickets:['AA-1']},b:{}}),api=ticketed.h.ctl.liveStatus,card=()=>ticketed.h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]');
- assert.equal(card().getAttribute('data-live-appearance'),'unchanged','contrasting precondition: the Jira view colours the card');
+ assert.match(card().getAttribute('aria-label') || '',/No change needed/,'contrasting precondition: the Jira view names the card\'s work status');
  api.setStatusMode('trace');ticketed.h.flush();
  assert.ok(card(),'the Trace view draws the card');assert.equal(card().getAttribute('data-verdict'),'degraded');
  const classes=Array.from(ticketed.h.C.LIVE_STATUS_APPEARANCES).filter(s=>card().classList.contains('dv-live-'+s));

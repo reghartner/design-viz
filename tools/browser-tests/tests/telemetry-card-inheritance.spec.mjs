@@ -44,7 +44,11 @@ async function mount(page,server,native){
 async function apply(page,first,second){
  await page.evaluate(({first,second})=>window.cardCtl.liveStatus.apply(Object.fromEntries([['END-1','blocked'],['LOC-1',first],['LOC-2',second],['BASE-1',first],['OVER-1',second]].filter(([,state])=>state).map(([key,state])=>[key,{state}]))),{first,second});
 }
-async function paint(card){return card.evaluate(el=>{const box=getComputedStyle(el.querySelector('.dv-metrics-card-box')),halo=el.querySelector('.dv-live-halo');return {appearance:el.getAttribute('data-live-appearance'),stroke:box.stroke,width:box.strokeWidth,fill:box.fill,dash:box.strokeDasharray,glow:halo?getComputedStyle(halo).opacity:null};});}
+async function paint(card){return card.evaluate(el=>{const box=getComputedStyle(el.querySelector('.dv-metrics-card-box')),halo=el.querySelector('.dv-live-halo');return {appearance:el.getAttribute('data-live-appearance'),state:el.getAttribute('data-metric-state'),stroke:box.stroke,width:box.strokeWidth,fill:box.fill,dash:box.strokeDasharray,glow:halo?getComputedStyle(halo).opacity:null};});}
+// #1200: card borders show the metric state only (default status colours), never inherited Jira work.
+const HELD={appearance:null,state:'held',stroke:'rgb(46, 214, 0)',width:'3px',dash:'none',glow:null};
+const FAILING={appearance:null,state:'failing',stroke:'rgb(0, 157, 255)',width:'2px',dash:'none',glow:null};
+const WAITING={appearance:null,state:'waiting',stroke:'rgb(143, 180, 255)',width:'3px',glow:null};
 async function textContrast(card,selector){return card.evaluate((el,selector)=>{
  // A media/font repaint can replace the card after the locator resolves it.
  // Empty computed fills are not black ink: Canvas retains its previous color.
@@ -60,31 +64,29 @@ async function textContrast(card,selector){return card.evaluate((el,selector)=>{
  },selector);}
 async function capture(root,testInfo,name){const file=testInfo.outputPath(name+'.png');await root.screenshot({path:file});await testInfo.attach(name,{path:file,contentType:'image/png'});}
 
-for(const native of [false,true])test((native?'native':'standalone')+' metric cards inherit work rollups independently of health and loading',async({page,server},testInfo)=>{
+for(const native of [false,true])test((native?'native':'standalone')+' metric cards show the metric state, not inherited work, through loading, health and Jira changes',async({page,server},testInfo)=>{
  const root=await mount(page,server,native),card=id=>root.locator('[data-metrics-card="'+id+'"]'),unchanged=card(ids[0]);
  await expect(unchanged).toContainText('Loading…');
+ // The Jira view still names the unticketed card's work status; its border shows only that no values arrived yet.
  await expect(unchanged).toHaveAttribute('aria-label',/No change needed/);
- expect(await paint(unchanged)).toMatchObject({appearance:'unchanged',stroke:'rgb(46, 214, 0)',width:'1px',glow:'0'});
- for(const id of ids.slice(1))await expect(card(id)).toHaveAttribute('data-live-appearance','active');
+ for(const id of ids){const got=await paint(card(id));expect(got).toMatchObject(WAITING);expect(got.dash).not.toBe('none');}
  // Endpoint work is blocked; neither this unticketed bound edge nor an ordinary edge borrows it.
  await expect(root.locator('path.edge[data-dv-edge="0"]')).not.toHaveAttribute('data-live-appearance');
  await expect(root.locator('path.edge[data-dv-edge="2"]')).not.toHaveAttribute('data-live-appearance');
  await capture(root,testInfo,'inherited-loading');
  await page.evaluate(()=>window.requests[0].resolve(Object.fromEntries(window.requests[0].bindings.map(b=>[b.id,{signals:{rate:{value:100},errors:{value:0}}}]))));
  await expect(unchanged).toContainText('100 req/s');
+ for(const id of ids)expect(await paint(card(id))).toMatchObject(HELD);
  const observed=await textContrast(unchanged,'.dv-metrics-card-value[data-signal="rate"]');expect(observed.contrast).toBeGreaterThanOrEqual(4.5);expect(observed.ink[1]).toBeGreaterThan(observed.ink[0]);
  await capture(root,testInfo,'inherited-default');
  for(const [first,second,want] of [['done','blocked','blocked'],['done','missing','missing'],['done','testing','testing'],['done','todo','active'],['done','done','done'],['done',null,null]]){
   await apply(page,first,second);
-  for(const id of ids.slice(1)){
-   if(want)await expect(card(id)).toHaveAttribute('data-live-appearance',want);else await expect(card(id)).not.toHaveAttribute('data-live-appearance');
-  }
+  for(const id of ids)await expect.poll(()=>paint(card(id)),'Jira '+want+' does not change card '+id).toMatchObject(HELD);
   if(want==='blocked')await capture(root,testInfo,'inherited-blocked');
  }
- expect((await paint(card(ids[2]))).stroke).toBe('rgb(138, 147, 163)');
  await page.evaluate(()=>window.cardCtl.telemetry.apply({'a->b':{signals:{rate:{value:100},errors:{value:5}}}}));
  await expect(unchanged.locator('.dv-metrics-card-failure')).toHaveText('Outside limit');
- expect(await paint(unchanged)).toMatchObject({appearance:'unchanged',width:'1px',stroke:'rgb(46, 214, 0)'});
+ expect(await paint(unchanged)).toMatchObject(FAILING);
  for(const selector of ['.dv-metrics-card-value[data-signal="errors"]','.dv-metrics-card-failure']){const health=await textContrast(unchanged,selector);expect(health.contrast).toBeGreaterThanOrEqual(4.5);expect(health.ink[0]).toBeGreaterThan(health.ink[1]);expect(health.ink[1]).toBeGreaterThan(health.ink[2]);}
  await capture(root,testInfo,'inherited-failing');
  // Media changes repaint metric cards; the board owns this test tint and stays mounted.
@@ -98,25 +100,22 @@ for(const native of [false,true])test((native?'native':'standalone')+' metric ca
  await capture(root,testInfo,'inherited-print');
  await page.emulateMedia({media:'screen'});await board.evaluate(el=>el.style.removeProperty('--dv-board-ground'));
 
- // Scope the same user appearance tokens consumed by nodes and metric cards.
- await page.evaluate(()=>{localStorage.setItem('flowview.status-colors.v1',JSON.stringify({version:2,colors:{'live-unchanged':'#765432'},appearance:{'live-unchanged':{borderColor:'#123456',borderWidth:2.25,fillStrength:40,glowStrength:100}}}));window.dispatchEvent(new CustomEvent('flowview-status-colors-change'));});
- await expect.poll(()=>paint(unchanged)).toMatchObject({appearance:'unchanged',stroke:'rgb(18, 52, 86)',width:'2.25px',glow:'0.35'});
- await expect.poll(async()=>{const {ink}=await textContrast(unchanged,'.dv-metrics-card-value[data-signal="rate"]');return ink[0]>ink[1] && ink[1]>ink[2];}).toBe(true);
- expect(await unchanged.evaluate(el=>getComputedStyle(el).getPropertyValue('--dv-live-fill').trim())).toBe('40%');
+ // The in-progress status preference drives the failing border (#1200); the no-change preference no longer reaches cards.
+ await page.evaluate(()=>{localStorage.setItem('flowview.status-colors.v1',JSON.stringify({version:2,colors:{'live-unchanged':'#765432'},appearance:{'live-active':{borderColor:'#123456',borderWidth:2.25},'live-unchanged':{borderColor:'#654321',borderWidth:5,fillStrength:100}}}));window.dispatchEvent(new CustomEvent('flowview-status-colors-change'));});
+ await expect.poll(()=>paint(unchanged)).toMatchObject({...FAILING,stroke:'rgb(18, 52, 86)',width:'2.25px'});
+ for(const selector of ['.dv-metrics-card-value[data-signal="rate"]','.dv-metrics-card-value[data-signal="errors"]','.dv-metrics-card-failure'])await expect.poll(async()=>(await textContrast(unchanged,selector)).contrast).toBeGreaterThanOrEqual(4.5);
  await capture(root,testInfo,'inherited-preferences');
- for(const tint of ['#2ed600','#000000','#ffffff']){
-  await page.evaluate(tint=>{const palette=JSON.parse(localStorage.getItem('flowview.status-colors.v1'));palette.colors['live-unchanged']=tint;palette.appearance['live-unchanged'].fillStrength=100;localStorage.setItem('flowview.status-colors.v1',JSON.stringify(palette));window.dispatchEvent(new CustomEvent('flowview-status-colors-change'));},tint);
-  for(const selector of ['.dv-metrics-card-value[data-signal="rate"]','.dv-metrics-card-value[data-signal="errors"]','.dv-metrics-card-failure'])await expect.poll(async()=>(await textContrast(unchanged,selector)).contrast).toBeGreaterThanOrEqual(4.5);
-  await capture(root,testInfo,'inherited-opaque-'+tint.slice(1));
- }
+ await page.evaluate(()=>{localStorage.removeItem('flowview.status-colors.v1');window.dispatchEvent(new CustomEvent('flowview-status-colors-change'));});
 
  await page.evaluate(()=>window.cardCtl.telemetry.apply({'a->b':{signals:{rate:{value:0},errors:{value:0}}}}));
  await expect(unchanged.locator('.dv-metrics-card-value[data-signal="errors"]')).toHaveText('0 req/s');
  await expect(unchanged.locator('.dv-metrics-card-value[data-signal="errors"]')).toHaveAttribute('data-metric-health','observed');
  await expect(unchanged.locator('.dv-metrics-card-value[data-signal="rate"]')).toHaveAttribute('data-metric-health','failing');
- await page.evaluate(()=>window.cardCtl.liveStatus.clear());await expect(unchanged).not.toHaveAttribute('data-live-appearance');
- await page.evaluate(()=>window.cardCtl.liveStatus.setEnabled(false));await expect(root.locator('.dv-metrics-card[data-live-appearance]')).toHaveCount(0);
- await page.evaluate(()=>window.cardCtl.liveStatus.setEnabled(true));await expect(unchanged).toHaveAttribute('data-live-appearance','unchanged');
+ // Zero for the whole window is silent: the to-do style, whatever Live does.
+ expect(await paint(unchanged)).toMatchObject(WAITING);
+ await page.evaluate(()=>window.cardCtl.liveStatus.clear());expect(await paint(unchanged)).toMatchObject(WAITING);
+ await page.evaluate(()=>window.cardCtl.liveStatus.setEnabled(false));await expect(root.locator('.dv-metrics-card[data-live-appearance]')).toHaveCount(0);expect(await paint(unchanged)).toMatchObject(WAITING);
+ await page.evaluate(()=>window.cardCtl.liveStatus.setEnabled(true));expect(await paint(unchanged)).toMatchObject(WAITING);
  await page.evaluate(()=>window.cardCtl.telemetry.setEnvironment('prd'));await expect(unchanged).toContainText('Loading…');await expect(unchanged).not.toContainText('100 req/s');
  expect((await textContrast(unchanged,'.dv-metrics-card-value[data-signal="rate"]')).contrast).toBeGreaterThanOrEqual(4.5);
  await page.evaluate(()=>window.requests.at(-1).resolve({}));await expect(unchanged).toContainText('unobserved');await expect(unchanged).not.toContainText('0 req/s');
@@ -127,22 +126,22 @@ for(const native of [false,true])test((native?'native':'standalone')+' metric ca
  if(native){await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();}
 });
 
-test('loaded imported detail inherits its own work and clears retained card DOM',async({page,server},testInfo)=>{
+test('loaded imported detail card shows its metric state, not its work, and clears retained card DOM',async({page,server},testInfo)=>{
  const {root,scope}=await mountImportedDetail(page,server),card=scope.locator('[data-metrics-card="shared::api->shared::store"]');
- await expect(card).toHaveAttribute('data-live-appearance','done');
+ await expect.poll(()=>paint(card)).toMatchObject(HELD);
  await page.evaluate(()=>window.viewer.controller.liveStatus.apply({'ROOT-1':{state:'blocked'},'IMP-2':{state:'active'},'IMP-3':{state:'done'}}));
- await expect(card).toHaveAttribute('data-live-appearance','active');
+ await expect.poll(()=>paint(card)).toMatchObject(HELD);
  await capture(scope,testInfo,'loaded-import-inheritance');
  const retained=await scope.elementHandle();await page.evaluate(()=>window.viewer.destroy());
  expect(await retained.evaluate(el=>el.querySelectorAll('.dv-metrics-card,.dv-metrics-leader').length)).toBe(0);await expect(root).toBeEmpty();
 });
 
-test('nested imported no-change card uses the thin outline without provider evidence',async({page,server})=>{
+test('nested imported card shows its metric state on a board with ticket references',async({page,server})=>{
  const {root}=await mountCues(page,server);
  // #1137: the no-change look needs ticket references on the board; this local ticketed node supplies them.
  const spec=nestedSpec(),d=spec.page.sections[0].diagram;d.nodes.tracked={title:'Tracked work',tickets:['AA-1']};d.rows[0].push('tracked');
  await page.evaluate(spec=>{window.viewer.destroy();window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>({'outer::inner::a->outer::inner::b':{signals:{rate:{value:88},errors:{value:0}}}})}});},spec);
  await root.getByRole('switch',{name:'Metrics overlay',exact:true}).click();const card=root.locator('[data-metrics-card="outer::inner::a->outer::inner::b"]');
- await expect(card).toContainText('88 req/h');expect(await paint(card)).toMatchObject({appearance:'unchanged',width:'1px',glow:'0'});
+ await expect(card).toContainText('88 req/h');expect(await paint(card)).toMatchObject(HELD);
  await page.evaluate(()=>window.viewer.destroy());await expect(root).toBeEmpty();
 });

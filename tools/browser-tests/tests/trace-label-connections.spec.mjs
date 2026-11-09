@@ -73,7 +73,7 @@ function labels(root){
   const overlaps=[],plates=[];traces.forEach(t=>connections.forEach(c=>{if(hit(t.box,c.box) && !(t.plate && onTop(t,c)))overlaps.push('"'+t.text+'" on "'+c.text+'"');}));
   // effective: the plate's opacity times every ancestor's, up to the svg.
   const effective=el=>{let e=1;for(;el && el.tagName!=='svg';el=el.parentNode)e*=Number(getComputedStyle(el).opacity);return e;};
-  traces.forEach(t=>{if(t.plate){const st=getComputedStyle(t.plate);plates.push({text:t.text,opacity:st.opacity,effective:effective(t.plate),textOpacity:getComputedStyle(t.el).fillOpacity,focus:t.el.parentNode.getAttribute('data-trace-focus'),fill:st.fill,ink:getComputedStyle(t.el).fill,ground:getComputedStyle(t.el.closest('.board')).backgroundColor});}});
+  traces.forEach(t=>{if(t.plate){const st=getComputedStyle(t.plate);plates.push({text:t.text,opacity:st.opacity,effective:effective(t.plate),textOpacity:getComputedStyle(t.el).opacity,level:t.el.parentNode.getAttribute('data-trace-level'),focus:t.el.parentNode.getAttribute('data-trace-focus'),fill:st.fill,ink:getComputedStyle(t.el).fill,ground:getComputedStyle(t.el.closest('.board')).backgroundColor});}});
   return {connections:connections.map(c=>[c.text,c.x,c.y,c.transform]),traces:traces.length,overlaps,plates};
  });
 }
@@ -88,20 +88,52 @@ for(const origin of ['local','imported'])test(`desktop ${origin} trace labels ne
  expect(after.connections,'connection labels never move').toEqual(before.connections);
  await info.attach('trace-labels-clear-of-connections-'+origin,{body:await root.screenshot(),contentType:'image/png'});
 });
-// Test-only connection labels (text.lbl, fixed width through textLength) placed against the Checkout service
-// card, in SVG units: they block every spot the avoidance would try, or only the spots straight down.
+// A test-only connection label (text.lbl, fixed width through textLength) placed against the Checkout service
+// card, in SVG units, that blocks every spot the avoidance would try.
 function block(root,origin,mode){
  return root.evaluate((host,{id,mode})=>{
   const scope=host.shadowRoot || host,node=scope.querySelector('g.node[data-dv-node="'+id+'"]'),svg=node.closest('svg'),card=node.querySelector('.card');
   const m=svg.getCTM().inverse().multiply(card.getCTM()),b=card.getBBox(),cx=m.a*(b.x+b.width/2)+m.e,cb=m.d*(b.y+b.height)+m.f;
   const add=(x,y,w,size)=>{const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('class','lbl');t.setAttribute('data-test-blocker','');
    t.setAttribute('x',x);t.setAttribute('y',y);t.setAttribute('textLength',w);t.setAttribute('lengthAdjust','spacingAndGlyphs');t.style.fontSize=size+'px';t.textContent='blocker';svg.appendChild(t);};
-  // 'side': the real ShipOrder label is hidden so only the blocker decides; the blocker covers the left of
-  // the label's home spot and every spot straight down, leaving room to the right within the card.
   if(mode==='all')add(cx-200,cb+175,400,200);
-  else{Array.from(scope.querySelectorAll('text.lbl')).find(l=>l.textContent==='ShipOrder').style.display='none';add(cx-40,cb+58,35,56);}
  },{id:(origin==='imported'?'shop::':'')+'checkout',mode});
 }
+// Font-independent geometry, in svg units, for a node's trace label (local board): its home box (centred under
+// the card, baseline 24 below it) from the label's measured size, its box now, its card's centre and width,
+// and whether it is plated. hide: connection labels hidden first, so only test blockers decide.
+function measure(root,id,hide=[]){
+ return root.evaluate((host,{id,hide})=>{
+  const scope=host.shadowRoot || host,node=scope.querySelector('g.node[data-dv-node="'+id+'"]'),svg=node.closest('svg'),card=node.querySelector('.card');
+  Array.from(scope.querySelectorAll('text.lbl')).filter(l=>hide.includes(l.textContent)).forEach(l=>{l.style.display='none';});
+  const g=node.querySelector('.dv-trace-overlay') || scope.querySelector('.dv-trace-overlay[data-trace-node="'+id+'"]'),text=g.querySelector('text');
+  const inv=svg.getCTM().inverse(),m=inv.multiply(card.getCTM()),mt=inv.multiply(text.getCTM()),c=card.getBBox(),t=text.getBBox(),ty=Number(text.getAttribute('y'));
+  const cx=m.a*(c.x+c.width/2)+m.e,base=m.d*(c.y+c.height+24)+m.f,half=t.width*mt.a/2;
+  return {cx,card:c.width*m.a,width:2*half,home:{x0:cx-half,x1:cx+half,y0:base+(t.y-ty)*mt.d,y1:base+(t.y+t.height-ty)*mt.d},
+   now:{x0:mt.a*t.x+mt.e,x1:mt.a*(t.x+t.width)+mt.e,y0:mt.d*t.y+mt.f,y1:mt.d*(t.y+t.height)+mt.f},plate:!!g.querySelector('.dv-trace-label-plate')};
+ },{id,hide});
+}
+// Adds a test-only connection label (text.lbl) that fills the svg box given, whatever the font: its size and
+// position are corrected from its measured box. Returns the box it fills.
+function addBlocker(root,box){
+ return root.evaluate((host,{x0,x1,y0,y1})=>{
+  const scope=host.shadowRoot || host,svg=scope.querySelector('g.node').closest('svg'),t=document.createElementNS('http://www.w3.org/2000/svg','text');
+  t.setAttribute('class','lbl');t.setAttribute('data-test-blocker','');t.textContent='blocker';t.setAttribute('lengthAdjust','spacingAndGlyphs');t.setAttribute('textLength',x1-x0);
+  t.setAttribute('x',x0);t.setAttribute('y',y1);t.style.fontSize='20px';svg.appendChild(t);
+  for(let i=0;i<4;i++){const b=t.getBBox();t.style.fontSize=(parseFloat(t.style.fontSize)*(y1-y0)/b.height)+'px';const c=t.getBBox();t.setAttribute('x',Number(t.getAttribute('x'))+x0-c.x);t.setAttribute('y',Number(t.getAttribute('y'))+y0-c.y);}
+  const b=t.getBBox();return {x0:b.x,x1:b.x+b.width,y0:b.y,y1:b.y+b.height};
+ },box);
+}
+// Places blockers against a loaded trace's measured labels, then loads the trace again and waits until every
+// trace label has been painted anew (the old label elements are marked first).
+async function reblock(root,boxes){
+ for(const box of boxes){const got=await addBlocker(root,box);for(const k of ['x0','x1','y0','y1'])expect(Math.abs(got[k]-box[k]),'blocker '+k).toBeLessThan(1);}
+ await root.evaluate(host=>(host.shadowRoot || host).querySelectorAll('.dv-trace-overlay text').forEach(t=>t.setAttribute('data-test-old','')));
+ await root.getByRole('button',{name:'Load trace',exact:true}).click();
+ await expect(root.locator('.dv-trace-overlay text[data-test-old]'),'painted anew').toHaveCount(0);
+ await expect(root.locator('.dv-trace-overlay text')).toHaveCount(7);
+}
+const centre=b=>(b.x0+b.x1)/2;
 // count: labels painted (6 with focusUnlit, whose PlaceOrder step has no edge).
 async function load(root,count=7){
  await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
@@ -115,13 +147,46 @@ const checkoutLabel=(root,origin)=>root.evaluate((host,id)=>{
  const g=node.querySelector('.dv-trace-overlay') || scope.querySelector('.dv-trace-overlay[data-trace-node="'+id+'"]'),text=g && g.querySelector('text');
  return text?{x:Number(text.getAttribute('x')),y:Number(text.getAttribute('y')),width:text.getBBox().width,card:card.width,home:{x:card.x+card.width/2,y:card.y+card.height+24},plate:!!g.querySelector('.dv-trace-label-plate')}:null;
 },(origin==='imported'?'shop::':'')+'checkout');
+// The blockers below are sized from the label measured in the viewer, so CI fonts do not change the case.
+// Each one covers the label's home spot and every spot straight down (down moves go to 32).
 test('desktop a trace label blocked straight down moves sideways, staying within its card',async({page,server})=>{
- const root=await setup(page,server,'local');await block(root,'local','side');await load(root);
- const moved=await checkoutLabel(root,'local'),after=await labels(root);
+ const root=await setup(page,server,'local');await load(root);
+ const a=await measure(root,'checkout',['ShipOrder']),half=a.width/2;
+ expect(12+half,'room for a 12-unit move within the card').toBeLessThanOrEqual(a.card/2);
+ // Covers the left of the home spot only: the first sideways move (right, 12) is clear.
+ await reblock(root,[{x0:a.cx-half-120,x1:a.cx-half+5,y0:a.home.y0-2,y1:a.home.y1+40}]);
+ const moved=await measure(root,'checkout'),dx=centre(moved.now)-a.cx;expect(dx,'moved sideways').toBeGreaterThan(10);
  expect(moved.plate,'a clear spot exists sideways').toBe(false);
- expect(moved.y,'not moved down').toBeCloseTo(moved.home.y,3);expect(Math.abs(moved.x-moved.home.x),'moved sideways').toBeGreaterThan(10);
- expect(Math.abs(moved.x-moved.home.x)+moved.width/2,'the whole label stays within its card width').toBeLessThanOrEqual(moved.card/2);
- expect(after.overlaps).toEqual([]);
+ expect(moved.now.y0,'not moved down').toBeCloseTo(a.home.y0,3);
+ expect(Math.abs(dx)+half,'the whole label stays within its card width').toBeLessThanOrEqual(a.card/2+.01);
+ expect((await labels(root)).overlaps).toEqual([]);
+});
+test('desktop a sideways spot that leaves the card is not used; the label is plated instead',async({page,server})=>{
+ const root=await setup(page,server,'local');await load(root);
+ const a=await measure(root,'checkout',['ShipOrder']),half=a.width/2;
+ // legal: the largest sideways move (12 to 72 in steps of 12) that keeps the whole label within its card;
+ // the next one leaves the card. The blocker covers every spot left of that next spot, and that spot only is clear,
+ // so an avoidance that allowed any move keeping the label's centre over its card would use it.
+ const legal=12*Math.min(6,Math.floor((a.card/2-half)/12)),next=legal+12;
+ expect(next,'a next move exists').toBeLessThanOrEqual(72);expect(next+half,'the next move leaves the card').toBeGreaterThan(a.card/2);
+ expect(next,'the next move keeps the centre over the card').toBeLessThanOrEqual(a.card/2);
+ await reblock(root,[{x0:a.cx-half-120,x1:a.cx+legal-half+4,y0:a.home.y0-2,y1:a.home.y1+40}]);
+ const clear=await root.evaluate((host,{x0,x1,y0,y1})=>{const scope=host.shadowRoot || host,svg=scope.querySelector('g.node').closest('svg'),inv=svg.getCTM().inverse();
+  return Array.from(scope.querySelectorAll('text.lbl,.node .card')).filter(el=>getComputedStyle(el).display!=='none').every(el=>{const m=inv.multiply(el.getCTM()),b=el.getBBox(),l=m.a*b.x+m.e,r=m.a*(b.x+b.width)+m.e,t=m.d*b.y+m.f,u=m.d*(b.y+b.height)+m.f;
+   return r<=x0-2 || l>=x1+2 || u<=y0-2 || t>=y1+2;});},{x0:a.home.x0+next,x1:a.home.x1+next,y0:a.home.y0,y1:a.home.y1});
+ expect(clear,'the spot that leaves the card is clear').toBe(true);
+ const label=await measure(root,'checkout');expect(label.plate,'plated').toBe(true);expect(centre(label.now),'kept at home').toBeCloseTo(a.cx,3);expect(label.now.y0).toBeCloseTo(a.home.y0,3);
+ expect((await labels(root)).overlaps).toEqual([]);
+});
+test('desktop a label wider than its card still moves straight down to a clear spot, with no plate',async({page,server})=>{
+ const root=await setup(page,server,'local');await load(root);
+ const a=await measure(root,'shipping');expect(a.width,'the Shipping label is wider than its card').toBeGreaterThan(a.card);
+ // Covers the top half of the home spot only: a short move down is clear.
+ await reblock(root,[{x0:a.home.x0,x1:a.home.x1,y0:a.home.y0,y1:(a.home.y0+a.home.y1)/2}]);
+ const moved=await measure(root,'shipping');expect(moved.now.y0-a.home.y0,'moved down').toBeGreaterThan(1);
+ expect(moved.plate,'a clear spot exists straight down').toBe(false);expect(centre(moved.now),'not moved sideways').toBeCloseTo(a.cx,3);
+ expect(moved.now.y0-a.home.y0,'within the down moves').toBeLessThanOrEqual(32);
+ expect((await labels(root)).overlaps).toEqual([]);
 });
 test('desktop with no clear spot the label is plated above the connection labels in the board ground colour, on a dark skin',async({page,server},info)=>{
  const root=await setup(page,server,'local',{skin:'blueprint'});await block(root,'local','all');await load(root);
@@ -132,7 +197,7 @@ test('desktop with no clear spot the label is plated above the connection labels
  expect(plate.effective,'the plate is fully opaque').toBe(1);
  // Raised out of g.node, the label's text keeps its node's step dimming (the node is not lit here).
  const node=await nodeOpacity(root);expect(Number(node),'the Checkout node is dimmed').toBeLessThan(1);
- expect(plate.textOpacity,'the plated text keeps its node dimming').toBe(node);
+ expect(Number(plate.textOpacity),'the plated text (fill and halo) keeps its node dimming').toBeCloseTo(Number(node)*(plate.level==='other'?.55:1),3);
  expect(plate.fill,'the plate takes the board ground').toBe(plate.ground);expect(plate.fill).not.toBe(plate.ink);
  await info.attach('trace-label-plate-blueprint',{body:await root.screenshot(),contentType:'image/png'});
 });

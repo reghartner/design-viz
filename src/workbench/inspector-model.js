@@ -273,7 +273,7 @@ var BUILDER_GUIDES = {
       ['bullets', 'bullet list; entries may reveal/hide per step'],
       ['contract / contracts', 'legacy single card or an ordered array of sized contract blocks'],
       ['diagram', 'the board: nodes, rows, edges, panels, steps'],
-      ['diagram.routing', 'Edge routing: No lanes (default) or Lanes; applies to every view of this diagram'],
+      ['diagram.routing', 'Edge routing: shown only on a diagram that still has Lanes (no longer offered), to switch it to Curves'],
       ['diagram.storyTime', 'Story time: start (and optional end), 12/24-hour clock and date format; steps move it, clocks follow it, and device-app fields with reportedAt show computed freshness'],
       ['diagram.deviceDefaults', 'battery drain/charge percent per hour for every battery panel without its own rates']
     ]

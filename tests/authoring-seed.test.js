@@ -25,7 +25,9 @@ const phoneCount = state => c.phoneModel(state['resident-phone']).notifications.
 test('the two-perspective teaching seed builds a clean shared story', () => {
   const result = c.validate(c.normalize(spec));
   assert.equal(result.errors.length, 0, result.errors.join('\n'));
-  assert.equal(result.warnings.length, 0, result.warnings.join('\n'));
+  // #1216: this seed keeps routing: "lanes"; only that retirement note is allowed.
+  const warnings = result.warnings.filter(w => !/\.routing: "lanes" is no longer recommended/.test(w));
+  assert.equal(warnings.length, 0, warnings.join('\n'));
   assert.equal(spec.page.sections.length, 1);
   assert.ok(diagram.layouts.find(v=>v.id===diagram.defaultLayout).sectionLayout.default.some(tile => !tile.panel && !tile.controls));
   assert.ok(diagram.layouts.find(v=>v.id===diagram.defaultLayout).sectionLayout.default.some(tile => tile.panel === 'home'));

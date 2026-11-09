@@ -3,10 +3,12 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),vm=requir
 const {readSource}=require('../tools/source-loader.cjs');
 const source=require('../src/starters/audio-story.json'),C={};vm.runInNewContext(readSource('validator.js'),C);
 const plain=x=>JSON.parse(JSON.stringify(x));
+// #1216: this starter keeps routing: "lanes"; only that retirement note is allowed.
+const LANES_NOTE=/\.routing: "lanes" is no longer recommended/;
 function story(section,path){const d=source.page.sections[section].diagram;return C.foldPanelStates(C.diagramForPath(d,path));}
 test('the audio teaching story validates cleanly and every path folds without mutating the spec',()=>{
  const before=JSON.stringify(source),result=C.validate(C.normalize(source));
- assert.deepEqual(plain(result.errors),[]);assert.deepEqual(plain(result.warnings),[]);
+ assert.deepEqual(plain(result.errors),[]);assert.deepEqual(plain(result.warnings).filter(w=>!LANES_NOTE.test(w)),[]);
  source.page.sections.forEach((s,i)=>s.diagram.paths.forEach(p=>story(i,p.id)));
  assert.equal(JSON.stringify(source),before);
 });

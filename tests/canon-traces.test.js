@@ -4,6 +4,9 @@ const C=require('../tools/canon/core.cjs');
 const spec=()=>JSON.parse(fs.readFileSync('examples/canon/specs/doorbell.json'));
 const trace=name=>JSON.parse(fs.readFileSync('examples/canon/traces/'+name+'.json'));
 const plain=v=>JSON.parse(JSON.stringify(v));
+// #1216: the doorbell canon spec keeps routing: "lanes"; only that retirement note is allowed.
+const LANES_NOTE=/\.routing: "lanes" is no longer recommended/;
+const withoutLanesNote=r=>({errors:r.errors,warnings:r.warnings.filter(w=>!LANES_NOTE.test(w))});
 const load=()=>import('../tools/canon/traces.mjs');
 test('reference requires explicit review and maps async span links without assuming time order',async()=>{
   const T=await load(),s=spec(),before=JSON.stringify(s),preview=T.referencePreview(s,trace('happy'));
@@ -22,7 +25,7 @@ test('incident branches at first difference with independent IDs and never copie
   const error=d.steps.find(s=>s.id===incident.steps[2]);assert.equal(error.edge,'hub->cloud');assert.equal(error.failures,undefined);assert.equal(error.conditions[0].kind,'service-error');
   for(const id of incident.steps.slice(2))assert.equal(d.steps.find(s=>s.id===id).panels,undefined);
   assert.equal(d.steps.find(s=>s.id===incident.steps.at(-1)).conditions[0].kind,'unknown');
-  assert.deepEqual(plain(C.validateSpec(r.spec)),{errors:[],warnings:[]});
+  assert.deepEqual(withoutLanesNote(plain(C.validateSpec(r.spec))),{errors:[],warnings:[]});
 });
 test('latency uses authored budgets, queue depth uses metrics, partial traces never infer delivery failure',async()=>{
   const T=await load(),s=T.approveReference(spec(),trace('happy'),{reason:'Reviewed'});

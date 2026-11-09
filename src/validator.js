@@ -402,6 +402,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   if (d.routing != null && d.routing !== 'lanes' && d.routing !== 'curves')
     warnings.push(DP + '.routing: expected "lanes" or "curves" — using curves');
   if (d.routing === 'lanes'){
+    // #1216: lane routing is no longer offered; an existing spec still draws lanes.
+    warnings.push(DP + '.routing: "lanes" is no longer recommended; omit routing to draw curves');
     if ((d.floats || []).some(function(f){return !f || f.noSpread!==true;}) || d.rows.some(function(row){ return !Array.isArray(row) || !row.length || row.length>5 || row.some(Array.isArray); }) ||
         (d.edges || []).some(function(e){ return e.from === e.to; }))
       warnings.push(DP + '.routing: lanes requires 1–5 unstacked cards per row, no automatically spaced floats or self-loops — using curves');

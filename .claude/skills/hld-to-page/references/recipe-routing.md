@@ -49,7 +49,7 @@ topology, notification or outcome without evidence.
   topology, panels and step controls after writing semantic content. Preserve an existing
   spec's rows, floats, positions, ports, route fields and panel rectangles unless
   the user requests a rearrangement.
-  Omit `diagram.routing` unless lanes are requested.
+  Omit `diagram.routing`; lane routing is no longer offered.
 - `diagram.brand` shares a company name/mark across phone, device app, camera
   and security panels. Use only an approved mark or a library icon; never
   invent a company's identity.

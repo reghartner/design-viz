@@ -27,6 +27,12 @@ test('the same panel type with different content, one tab, or two sections of on
   assert.deepEqual(repeated(C.validateSpec(page([table()]))),[],'one tab');
   const oneTab={page:{title:'Tabs',blocks:[{tabs:[{label:'Only',sections:[{id:'x',diagram:diagram([table()])},{id:'y',diagram:diagram([table()])}]}]}]}};
   assert.deepEqual(repeated(C.validateSpec(oneTab)),[],'two sections of one tab are not two tabs');
+  // A log panel each tab's steps fill differently shows different content on each tab.
+  const log=()=>({id:'log',type:'log',title:'Event log'}),stepped=entry=>({nodes:{a:{title:'A'}},rows:[['a']],panels:[log()],steps:[{id:'s1',nodes:['a'],panels:{log:{entries:[entry]}}}]});
+  const filled={page:{title:'Tabs',blocks:[{tabs:[{label:'A',sections:[{id:'x',diagram:stepped('armed')}]},{label:'B',sections:[{id:'y',diagram:stepped('fired')}]}]}]}};
+  assert.deepEqual(repeated(C.validateSpec(filled)),[],'the same declaration filled differently by each tab\'s steps');
+  const same={page:{title:'Tabs',blocks:[{tabs:[{label:'A',sections:[{id:'x',diagram:stepped('armed')}]},{label:'B',sections:[{id:'y',diagram:stepped('armed')}]}]}]}};
+  assert.equal(repeated(C.validateSpec(same)).length,1,'the same declaration and the same step patches on two tabs');
   const plain={page:{title:'No tabs',sections:[{id:'x',diagram:diagram([table()])},{id:'y',diagram:diagram([table()])}]}};
   assert.deepEqual(repeated(C.validateSpec(plain)),[],'a page without tabs');
 });

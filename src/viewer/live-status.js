@@ -973,6 +973,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   /* #1145 (D5): a loaded trace sets the view's day. Its day is the local date of its first span. Loading
      moves the view there (Live for today); a view change to another day clears the trace with one note. */
   var traceDayNote='',overTarget=null,overParked=null,traceLoads=0;
+  // #1177: a picked example trace carried across an Edit-mode re-render, and the step chooser a span drop opened.
+  var carriedExample=null,traceChooser=null;
   function localDayKey(ms){var d=new Date(ms);return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())).toISOString().slice(0,10);}
   function traceDayOf(e){
     var at=Math.min.apply(null,(e && e.spans || []).map(function(s){return Date.parse(s.time);}).filter(function(t){return isFinite(t);}));if(!isFinite(at))return null;
@@ -1036,6 +1038,17 @@ function createLiveStatus(ctl,page,options,renderOptions){
         });
       });
     });
+    /* #1177: the example trace the reader had picked before an Edit-mode re-render. The next render has no
+       Metrics data yet, so it stays listed and selected until live evidence for the same carrier and
+       token arrives, or the reader selects something else. */
+    var carried=carriedExample;
+    if(carried && (!traceSelection || traceSelection.key!==carried.key)){carriedExample=carried=null;}
+    if(carried && !evidence.historical){
+      var live=entries.find(function(e){return e.carrier===carried.carrier && e.binding.ordinal===carried.ordinal && e.exemplar.selectionToken===carried.exemplar.selectionToken;});
+      var home=mounted.find(function(b){return b.ordinal===carried.ordinal;});
+      if(live){traceSelection={key:live.key,traceId:traceSelection.traceId,chosen:traceSelection.chosen};carriedExample=null;}
+      else if(home)entries.push({key:carried.key,carrier:carried.carrier,binding:home,exemplar:carried.exemplar,label:(home.section.heading || home.section.id || 'Diagram')+' · '+carried.carrier});
+    }
     var manual=directTrace.snapshot();
     if(manual.exemplar){var context=directTraceSections().find(function(s){return s.id===manual.section;}),binding=context?context.binding:{section:{diagram:{steps:[]}},page:page,stepper:null,el:null};
       entries.unshift({key:'direct/'+manual.section+'/'+manual.exemplar.selectionToken,carrier:null,binding:binding,exemplar:manual.exemplar,manual:true,label:'Loaded trace'+(context?' · '+context.label:'')});
@@ -1047,35 +1060,68 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return JSON.stringify([traceRequest,traceFocusEpoch,entry.key,entry.exemplar.traceId,entry.exemplar.selectionToken,telemetry.environment(),
       traceObjectId(b.page),traceObjectId(b.section),traceObjectId(b.section.diagram),b.el?traceObjectId(b.el):0,b.stepper?traceObjectId(b.stepper):0]);
   }
-  function clearTraceFocus(){traceFocus=null;traceFocusEpoch++;}
+  function clearTraceFocus(){traceFocus=null;traceFocusEpoch++;traceChooser=null;}
   /* #1078: in board Edit mode, the steps of the trace's own diagram a span can be
-     mapped to (those without a traceMatch); null outside Edit mode. */
+     mapped to; null outside Edit mode. A step that has a traceMatch is marked
+     `mapped` (#1177): the dropdown leaves it out, a drop or the chooser replaces it. */
   function traceMapSteps(binding){
     var state=editor && editor.state();if(!state || !state.active || state.saving || binding.ordinal==null)return null;
     // Numbered as the trace status line numbers a choice: position on the shown path, else on the first path holding the step.
     var d=binding.section.diagram,paths=diagramPathList(d),shown=binding.stepper && binding.stepper.path();
     return (d.steps || []).map(function(step,i){
-      if(!step || step.traceMatch || typeof step.id!=='string')return null;
+      if(!step || typeof step.id!=='string')return null;
       var caption=String(step.text || step.id).replace(/\s+/g,' ').trim();if(caption.length>96)caption=caption.slice(0,95)+'…';
       var holds=function(p){return p.indices.indexOf(i)>=0;},path=paths.find(function(p){return p.id===shown && holds(p);}) || paths.find(holds);
-      return {id:step.id,label:path?'Step '+(path.indices.indexOf(i)+1)+': '+caption+' · '+path.label:caption};
+      var m=step.traceMatch && typeof step.traceMatch==='object'?step.traceMatch:null;
+      return {id:step.id,index:i,caption:caption,label:path?'Step '+(path.indices.indexOf(i)+1)+': '+caption+' · '+path.label:caption,mapped:!!m,traceMatch:m?{serviceName:m.serviceName,operation:m.operation}:null};
     }).filter(Boolean);
   }
-  // An edit re-renders the page (#828): the next controller reopens this Trace view, loaded trace and focused span.
+  /* An edit re-renders the page (#828): the next controller reopens this Trace view with the loaded trace
+     or the picked example trace (#1177), and the focused span. */
   function traceCarry(){
     if(statusMode!=='trace')return null;
-    var selected=traceSelection && traceSources().entries.find(function(e){return e.key===traceSelection.key;});
-    return {direct:directTrace.carry(),spanId:selected && selected.manual && traceFocus?traceFocus.spanId:null,show:traceShow};
+    var selected=traceSelection && traceSources().entries.find(function(e){return e.key===traceSelection.key;}),example=null;
+    if(selected && !selected.manual && selected.binding.ordinal!=null)example={key:'carried/'+selected.binding.ordinal+'/'+selected.carrier+'/'+selected.exemplar.selectionToken,ordinal:selected.binding.ordinal,carrier:selected.carrier,exemplar:selected.exemplar,traceId:traceSelection.traceId,chosen:!!traceSelection.chosen};
+    return {direct:directTrace.carry(),example:example,spanId:selected && traceFocus?traceFocus.spanId:null,show:traceShow};
   }
   function traceRestore(carried){
     statusMode='trace';statusAuto=false;traceShow=carried.show!==false;
-    if(!carried.direct || !directTrace.restore(carried.direct) || !carried.spanId)return;
+    var direct=!!(carried.direct && directTrace.restore(carried.direct));
+    if(!direct && carried.example){carriedExample=carried.example;traceSelection={key:carried.example.key,traceId:carried.example.traceId,chosen:carried.example.chosen};traceInitial=false;}
+    if(!(direct || carried.example) || !carried.spanId)return;
     // After the render settles its opening step, so the mapped step it jumps to stays shown.
     requestAnimationFrame(function(){
       if(retired || statusMode!=='trace')return;
       var selected=traceSnapshot().selected;
-      if(selected && selected.manual && selected.exemplar.spans.some(function(s){return s.id===carried.spanId;}))api.selectTraceSpan({context:selected.context,spanId:carried.spanId});
+      if(selected && selected.exemplar.spans.some(function(s){return s.id===carried.spanId;}))api.selectTraceSpan({context:selected.context,spanId:carried.spanId});
     });
+  }
+  /* #1177: drag a span onto a step (its chip or coin) or onto a node or edge. A carrier named by one step
+     without a traceMatch maps it; otherwise the reader chooses among the carrier's steps. */
+  var EDIT_SPAN_TYPE='application/x-flowview-span';
+  function stepDropRef(target){
+    if(!editing() || !target || !target.closest)return null;
+    var hit=target.closest('[data-step-source]') || target.closest('g.coin[data-dv-step]');if(!hit)return null;
+    var inside=bindings.filter(function(binding){return binding.ordinal!=null && binding.el.contains(hit);});
+    var binding=inside.filter(function(candidate){return !inside.some(function(other){return other!==candidate && candidate.el.contains(other.el);});})[0];
+    var index=Number(hit.getAttribute('data-step-source')!=null?hit.getAttribute('data-step-source'):hit.getAttribute('data-dv-step')),step=binding && (binding.section.diagram.steps || [])[index];
+    return step && typeof step.id==='string'?{el:hit,ordinal:binding.ordinal,step:step.id}:null;
+  }
+  function carrierSteps(binding,ref,steps){
+    var d=binding.section.diagram,edge=ref.kind==='edge' && (d.edges || [])[ref.index],key=edge && edge.from+'->'+edge.to;
+    return steps.filter(function(step){var s=d.steps[step.index];if(!s)return false;
+      if(ref.kind==='node')return Array.isArray(s.nodes) && s.nodes.indexOf(ref.id)>=0;
+      return !!key && (s.edge===key || Array.isArray(s.edges) && s.edges.indexOf(key)>=0);});
+  }
+  function carrierLabel(binding,ref){var d=binding.section.diagram,title=function(id){var n=(d.nodes || {})[id];return n && n.title || id;};if(ref.kind==='node')return title(ref.id);var e=(d.edges || [])[ref.index];return e?title(e.from)+' → '+title(e.to):'this edge';}
+  function spanDropped(payload,hit){
+    var selected=traceSnapshot().selected;if(!payload || !selected || payload.context!==selected.context)return;
+    var entry=traceSources().entries.find(function(e){return e.key===selected.key;}),steps=entry && traceMapSteps(entry.binding);if(!steps)return;
+    if(hit.step){if(hit.ordinal!==entry.binding.ordinal)return;var target=steps.find(function(step){return step.id===hit.step;});if(target)api.mapTraceSpan({context:payload.context,spanId:payload.spanId,stepId:target.id,replace:target.mapped});return;}
+    if(hit.ref.section!==entry.binding.ordinal)return;
+    var named=carrierSteps(entry.binding,hit.ref,steps);
+    if(named.length===1 && !named[0].mapped){api.mapTraceSpan({context:payload.context,spanId:payload.spanId,stepId:named[0].id});return;}
+    traceChooser={context:payload.context,spanId:payload.spanId,label:carrierLabel(entry.binding,hit.ref),steps:named};paint();notify();
   }
   function traceFocusSnapshot(entry,context){
     if(!traceFocus)return null;
@@ -1098,7 +1144,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var model=selected?telemetryTraceModel(selected.binding.section.diagram,selected.binding.stepper && selected.binding.stepper.path(),selected.exemplar):null;
     if(selected)model.mapSteps=traceMapSteps(selected.binding);
     return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,day:traceDayOf(selected.exemplar),context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot(),dayNote:traceDayNote,movesDay:canOpenOver()}),
-      hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
+      hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,
+      // #1177: the step chooser of a span drop, and the latest pending mapping with its Undo.
+      mapChooser:traceChooser && selected && traceChooser.context===context?{label:traceChooser.label,steps:traceChooser.steps.map(function(step){return {id:step.id,mapped:step.mapped,label:step.caption+(step.mapped?' · mapped, replaces':'')};})}:null,
+      mapped:editing() && editor.state().mapped || null,enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
   function paintTrace(){
     var trace=traceSnapshot(),selected=trace.selected,sources=traceSources().entries;
@@ -1490,13 +1539,22 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function setDropOver(el){if(dropOver===el)return;if(dropOver)dropOver.classList.remove('dv-edit-over');dropOver=el;if(el)el.classList.add('dv-edit-over');}
   function carriesTicket(ev){return !!(ev.dataTransfer && Array.prototype.indexOf.call(ev.dataTransfer.types || [],EDIT_TICKET_TYPE)>=0);}
+  function carriesSpan(ev){return !!(ev.dataTransfer && Array.prototype.indexOf.call(ev.dataTransfer.types || [],EDIT_SPAN_TYPE)>=0) && statusMode==='trace';}
+  function spanHit(target){var step=stepDropRef(target);if(step)return step;var carrier=dropRef(target);return carrier?{el:carrier.el,ref:carrier.ref}:null;}
   function dragOver(ev){
+    if(carriesSpan(ev)){var over=spanHit(ev.target);setDropOver(over && over.el);if(over){ev.preventDefault();ev.dataTransfer.dropEffect='copy';}return;}
     if(!carriesTicket(ev))return;
     var hit=dropRef(ev.target);setDropOver(hit && hit.el);if(!hit)return;
     ev.preventDefault();ev.dataTransfer.dropEffect='copy';
   }
   function dragLeave(ev){var hit=dropRef(ev.relatedTarget);if(!hit || hit.el!==dropOver)setDropOver(null);}
   function drop(ev){
+    if(carriesSpan(ev)){
+      var landed=spanHit(ev.target);setDropOver(null);if(!landed)return;ev.preventDefault();
+      var payload=null;try{payload=JSON.parse(ev.dataTransfer.getData(EDIT_SPAN_TYPE));}catch(ex){payload=null;}
+      if(payload && typeof payload.context==='string' && typeof payload.spanId==='string')spanDropped(payload,landed);
+      return;
+    }
     if(!carriesTicket(ev))return;
     var hit=dropRef(ev.target);setDropOver(null);if(!hit)return;
     ev.preventDefault();
@@ -1962,11 +2020,20 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(retired || !editing() || statusMode!=='trace' || !action || typeof action.stepId!=='string')return false;
       var selected=traceSnapshot().selected;if(!selected || action.context!==selected.context)return false;
       var entry=traceSources().entries.find(function(e){return e.key===selected.key;}),span=entry && entry.exemplar.spans.find(function(s){return s.id===action.spanId;});
-      var steps=entry && traceMapSteps(entry.binding);
-      if(!span || !span.service || !span.name || !steps || !steps.some(function(step){return step.id===action.stepId;}))return false;
-      var ref={section:entry.binding.ordinal,kind:'step',id:action.stepId},match={serviceName:span.service,operation:span.name};
-      if(!editor.mapSpan)return false;setTimeout(function(){if(!retired)editor.mapSpan(ref,match);},0);return true;
+      var steps=entry && traceMapSteps(entry.binding),step=steps && steps.find(function(item){return item.id===action.stepId;});
+      // #1177: a step that has a traceMatch is replaced only when the reader picked it as such (drop or chooser).
+      if(!span || !span.service || !span.name || !step || step.mapped && action.replace!==true)return false;
+      var ref={section:entry.binding.ordinal,kind:'step',id:action.stepId},match={serviceName:span.service,operation:span.name},previous=step.mapped?step.traceMatch:null;
+      if(!editor.mapSpan)return false;traceChooser=null;setTimeout(function(){if(!retired)editor.mapSpan(ref,match,previous);},0);return true;
     },
+    // #1177: the chooser a span drop opened on a carrier with several steps; Esc or Cancel closes it.
+    chooseTraceMapStep:function(action){
+      if(retired || !traceChooser || !action)return false;var c=traceChooser,step=c.steps.find(function(item){return item.id===action.stepId;});if(!step)return false;
+      return api.mapTraceSpan({context:c.context,spanId:c.spanId,stepId:step.id,replace:step.mapped});
+    },
+    cancelTraceMapChooser:function(){if(retired || !traceChooser)return;traceChooser=null;paint();notify();},
+    // #1177: take back the latest pending span mapping (board-edit.js undoMap); it re-renders the board.
+    undoTraceMap:function(){if(retired || !editor || !editor.undoMap)return false;setTimeout(function(){if(!retired)editor.undoMap();},0);return true;},
     selectTraceSpan:function(action){
       if(retired || statusMode!=='trace' || !action)return false;statusAuto=false;
       var selected=traceSnapshot().selected;

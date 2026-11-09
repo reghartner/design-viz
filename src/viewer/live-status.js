@@ -890,7 +890,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       (d.edges || []).forEach(function(edge){fn(edge,edge.from+'->'+edge.to,item.page);});});
   }
   var telemetryHooks={carriers:eachCarrier,historyCarriers:historyCarriers,diagrams:eachDiagram,jira:function(){return map;},
-    observed:telemetryActivity.observe,reset:telemetryActivity.clear,retire:telemetryActivity.retire,
+    observed:telemetryActivity.observe,reset:function(){telemetryActivity.clear();carriedExample=null;},retire:telemetryActivity.retire,
     changed:function(){if(!retired){telemetryActivity.reconcile(telemetry.snapshot().carriers);telemetryActivity.reconcileTraces(telemetry.snapshot());paint();notify();}}};
   var telemetry=createTelemetry(page,telemetryOptions,telemetryHooks);
   ctl.telemetry=telemetry;
@@ -1042,7 +1042,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
        Metrics data yet, so it stays listed and selected until live evidence for the same carrier and
        token arrives, or the reader selects something else. */
     var carried=carriedExample;
-    if(carried && (!traceSelection || traceSelection.key!==carried.key)){carriedExample=carried=null;}
+    // It ends as a live pick does: when the reader selects something else, the Metrics environment changes,
+    // or the account changes (telemetry clear, the reset hook above) (#1180 c3).
+    if(carried && (!traceSelection || traceSelection.key!==carried.key || carried.environment!==telemetry.environment())){carriedExample=carried=null;}
     if(carried && !evidence.historical){
       /* Live evidence for the same carrier that shows the same trace takes over the pick, its focus and an
          open chooser (tokens differ per session). Live evidence showing another trace (a re-attached
@@ -1090,7 +1092,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function traceCarry(){
     if(statusMode!=='trace')return null;
     var selected=traceSelection && traceSources().entries.find(function(e){return e.key===traceSelection.key;}),example=null;
-    if(selected && !selected.manual && selected.binding.ordinal!=null)example={key:'carried/'+selected.binding.ordinal+'/'+selected.carrier+'/'+selected.exemplar.selectionToken,ordinal:selected.binding.ordinal,carrier:selected.carrier,exemplar:selected.exemplar,traceId:traceSelection.traceId,chosen:!!traceSelection.chosen};
+    if(selected && !selected.manual && selected.binding.ordinal!=null)example={key:'carried/'+selected.binding.ordinal+'/'+selected.carrier+'/'+selected.exemplar.selectionToken,environment:telemetry.environment(),ordinal:selected.binding.ordinal,carrier:selected.carrier,exemplar:selected.exemplar,traceId:traceSelection.traceId,chosen:!!traceSelection.chosen};
     return {direct:directTrace.carry(),example:example,spanId:selected && traceFocus?traceFocus.spanId:null,show:traceShow,returnSpan:traceReturnSpan};
   }
   function traceRestore(carried){
@@ -1110,7 +1112,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   /* #1177: drag a span onto a step (its chip or coin) or onto a node or edge. A carrier named by one step
      without a traceMatch maps it; otherwise the reader chooses among the carrier's steps. */
-  var EDIT_SPAN_TYPE='application/x-flowview-span';
+  var EDIT_SPAN_TYPE='application/x-flowview-span',titled=[];
+  // The alternatives title is for the drag only; each button gets its own back after it (#1180 c3).
+  function restoreTitles(){titled.splice(0).forEach(function(el){if(el._mapTitle==null)el.removeAttribute('title');else el.setAttribute('title',el._mapTitle);el._mapTitle=undefined;});}
   function stepDropRef(target){
     if(!editing() || !target || !target.closest)return null;
     var hit=target.closest('[data-step-source]') || target.closest('g.coin[data-dv-step]');if(!hit)return null;
@@ -1119,7 +1123,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var index=Number(hit.getAttribute('data-step-source')!=null?hit.getAttribute('data-step-source'):hit.getAttribute('data-dv-step')),step=binding && (binding.section.diagram.steps || [])[index];
     if(!step || typeof step.id!=='string')return null;
     // An alternatives traceMatch (#1100) is edited in Inspect: no highlight and no drop, and the button says why (#1180).
-    if(Array.isArray(step.traceMatch)){hit.setAttribute('title','Has alternatives; edit in Inspect');return {blocked:true};}
+    if(Array.isArray(step.traceMatch)){if(titled.indexOf(hit)<0){titled.push(hit);hit._mapTitle=hit.getAttribute('title');}hit.setAttribute('title','Has alternatives; edit in Inspect');return {blocked:true};}
     return {el:hit,ordinal:binding.ordinal,step:step.id};
   }
   function carrierSteps(binding,ref,steps){
@@ -1132,7 +1136,6 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function spanDropped(payload,hit){
     var selected=traceSnapshot().selected;if(!payload || !selected || payload.context!==selected.context)return;
     var entry=traceSources().entries.find(function(e){return e.key===selected.key;}),steps=entry && traceMapSteps(entry.binding);if(!steps)return;
-    traceReturnSpan=payload.spanId;
     if(hit.step){if(hit.ordinal!==entry.binding.ordinal)return;var target=steps.find(function(step){return step.id===hit.step;});if(target)api.mapTraceSpan({context:payload.context,spanId:payload.spanId,stepId:target.id,replace:target.mapped});return;}
     if(hit.ref.section!==entry.binding.ordinal)return;
     var named=carrierSteps(entry.binding,hit.ref,steps);
@@ -1147,12 +1150,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var choice=traceFocus.choiceKey && choices.find(function(c){return c.key===traceFocus.choiceKey;});
     return {spanId:traceFocus.spanId,choices:choices,choice:choice || null,navigable:!!entry.binding.stepper};
   }
-  /* #1180: the latest pending mapping for its note. When the step keeps a nodeId, parentStepId or attributes
-     that exclude the mapped span, the selected trace shows nothing for it; the note says so. */
+  /* #1180: the latest pending mapping for its note. When the step keeps a parentStepId, attributes, namespace
+     or occurrence that exclude the mapped span, the selected trace shows nothing for it; the note says so. */
   function mappedNote(selected,model){
     var m=editing() && editor.state().mapped;if(!m)return null;var out={step:m.step,label:m.label,traceMatch:m.traceMatch,unmatched:false};
     var row=selected && model && model.mapping && model.mapping.steps.find(function(r){return r.stepId===m.step;}),step=selected && (selected.binding.section.diagram.steps || []).find(function(x){return x.id===m.step;}),kept=step && step.traceMatch;
-    if(row && row.status!=='matched' && kept && !Array.isArray(kept) && (kept.nodeId || kept.parentStepId || kept.attributes))out.unmatched=true;
+    // Only fields that filter spans can exclude one; nodeId only picks the node to annotate (#1180 c3).
+    if(row && row.status==='missing' && kept && !Array.isArray(kept) && (kept.parentStepId || kept.attributes || kept.namespace || kept.occurrence!=null))out.unmatched=true;
     return out;
   }
   function traceSnapshot(){
@@ -1583,9 +1587,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
     ev.preventDefault();ev.dataTransfer.dropEffect='copy';
   }
   function dragLeave(ev){var hit=carriesSpan(ev)?spanHit(ev.relatedTarget):dropRef(ev.relatedTarget);if(!hit || hit.el!==dropOver)setDropOver(null);}
+  function dragEnd(){restoreTitles();setDropOver(null);}
   function drop(ev){
     if(carriesSpan(ev)){
-      var landed=spanHit(ev.target);setDropOver(null);if(!landed)return;ev.preventDefault();
+      var landed=spanHit(ev.target);setDropOver(null);restoreTitles();if(!landed)return;ev.preventDefault();
       var payload=null;try{payload=JSON.parse(ev.dataTransfer.getData(EDIT_SPAN_TYPE));}catch(ex){payload=null;}
       if(payload && typeof payload.context==='string' && typeof payload.spanId==='string')spanDropped(payload,landed);
       return;
@@ -1598,9 +1603,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     setTimeout(function(){if(editor)editor.add(hit.ref,key);},0);
   }
   if(editor){
-    view.addEventListener('dragover',dragOver);view.addEventListener('dragleave',dragLeave);view.addEventListener('drop',drop);
+    view.addEventListener('dragover',dragOver);view.addEventListener('dragleave',dragLeave);view.addEventListener('drop',drop);view.addEventListener('dragend',dragEnd);
     var offEditor=editor.onChange(function(){if(!retired){paint();notify();}});
-    destroyListeners.push(function(){offEditor();setDropOver(null);view.removeEventListener('dragover',dragOver);view.removeEventListener('dragleave',dragLeave);view.removeEventListener('drop',drop);});
+    destroyListeners.push(function(){offEditor();setDropOver(null);view.removeEventListener('dragover',dragOver);view.removeEventListener('dragleave',dragLeave);view.removeEventListener('drop',drop);view.removeEventListener('dragend',dragEnd);restoreTitles();});
   }
   function sourceBindings(){
     var found=[];
@@ -2059,14 +2064,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
       // #1177: a step that has a traceMatch is replaced only when the reader picked it as such (drop or chooser).
       if(!span || !span.service || !span.name || !step || step.alternatives || step.mapped && action.replace!==true)return false;
       var ref={section:entry.binding.ordinal,kind:'step',id:action.stepId},match={serviceName:span.service,operation:span.name},previous=step.mapped?step.traceMatch:null;
-      if(!editor.mapSpan)return false;traceChooser=null;setTimeout(function(){if(!retired)editor.mapSpan(ref,match,previous);},0);return true;
+      // Focus goes back to the span row after the re-render this mapping causes, and only then (#1180 c3).
+      if(!editor.mapSpan)return false;traceChooser=null;traceReturnSpan=action.spanId;setTimeout(function(){if(!retired && !editor.mapSpan(ref,match,previous))traceReturnSpan=null;},0);return true;
     },
     // #1177: the chooser a span drop opened on a carrier with several steps; Esc or Cancel closes it.
     chooseTraceMapStep:function(action){
       if(retired || !traceChooser || !action)return false;var c=traceChooser,step=c.steps.find(function(item){return item.id===action.stepId;});if(!step)return false;
       return api.mapTraceSpan({context:c.context,spanId:c.spanId,stepId:step.id,replace:step.mapped});
     },
-    cancelTraceMapChooser:function(){if(retired || !traceChooser)return;traceChooser=null;paint();notify();},
+    cancelTraceMapChooser:function(){if(retired || !traceChooser)return;traceChooser=null;traceReturnSpan=null;paint();notify();},
     // #1177: take back the latest pending span mapping (board-edit.js undoMap); it re-renders the board.
     undoTraceMap:function(){if(retired || !editor || !editor.undoMap)return false;setTimeout(function(){if(!retired)editor.undoMap();},0);return true;},
     selectTraceSpan:function(action){

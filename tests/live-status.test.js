@@ -3924,7 +3924,7 @@ test('#1180 c2 after a pick the dragged span row gets focus back; a mapping its 
  assert.equal(focused,1,'the dragged row has focus after the re-render');b.api.destroy();editor.takeTrace();
  // The step keeps attributes that exclude the span: the note says so.
  const e2=mapEditor(),d=mapBoard({editor:e2});d.h.ctl.page.sections[0].diagram.steps[1].traceMatch={...MAP_MATCH,attributes:{'http.route':'/not-this-span'}};await d.focus();e2.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});d.api.setTraceShow(true);
- assert.equal(d.m.body.querySelector('.dv-trace-map-note-text').textContent,'Mapped currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies to step Show beta; this step\'s node, parent or attributes do not match this span, so nothing lights.');
+ assert.equal(d.m.body.querySelector('.dv-trace-map-note-text').textContent,'Mapped currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies to step Show beta; this step\'s parent, attributes, namespace or occurrence do not match this span, so nothing lights.');
  d.api.destroy();
 });
 /* #1175: a step whose traceMatch is optional and that this trace lacks does not count against

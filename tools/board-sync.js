@@ -21,7 +21,8 @@
    entries' operations undone, so local changes are kept. A step's base is the `replaces` of
    its oldest fresh mapping (none for a first mapping): the newest mapping is set on the local
    step (same chain: section id, step id) when it still equals that base, keeping its other
-   traceMatch fields; anything else, or a deleted step, is a conflict. Every other line of the local file stays
+   traceMatch fields; a local step that already names the newest span is kept; anything
+   else, or a deleted step, is a conflict. Every other line of the local file stays
    as written.
 
    `log` appends one agent entry ({source: "agent", summary, changes}) describing the change

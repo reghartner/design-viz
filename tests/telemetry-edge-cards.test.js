@@ -65,3 +65,10 @@ test('an authored card title replaces the label and drops the queue topic suffix
  assert.equal(C.telemetryCardContent(edge,binding,{signals:{in:{value:25}}},{telemetry:'flowing'},'6h').title,'Camera stats consumer · RabbitMQ');
  assert.equal(C.telemetryCardContent(edge,{...binding,card:{width:300}},{signals:{in:{value:25}}},{telemetry:'flowing'},'6h').title,'Publish · device-events','width alone keeps the label and suffix');
 });
+// #1163 review: a card leader never strikes through a trace label; it has a gap there.
+test('a card leader leaves a gap where it would cross a trace label',()=>{
+ const label={x:-20,y:20,w:40,h:15},clear={x:50,y:20,w:40,h:15};
+ assert.equal(C.telemetryCardLeader({x:0,y:0},{x:0,y:100},[label,clear]),'M0 0L0 17M0 38L0 100','vertical leader through a label below the edge');
+ assert.equal(C.telemetryCardLeader({x:0,y:0},{x:0,y:100},[]),'M0 0L0 100','no label, one unbroken line');
+ assert.equal(C.telemetryCardLeader({x:0,y:0},{x:0,y:30},[{x:-20,y:-10,w:40,h:60}]),'','a leader wholly inside a label is not drawn');
+});

@@ -2140,6 +2140,16 @@ ambiguous. Local, imported and drill-down steps follow the same rules. A trace t
 an optional step can still be approved as the reference trace; a missing step without
 `optional` still blocks approval.
 
+With the Metrics overlay on, the trace labels are drawn first and the metric cards are then
+placed clear of them, the same way cards avoid node cards (#1163). The labels never move for
+cards; a card moves farther from its edge instead, and the diagram frame grows to fit it.
+The exception is a label clamped at the frame edge, which moves out once the frame grows.
+Text is laid out again at each board scale. When a scale change leaves a label meeting a card or
+a leader line, the board paints again and the cards are placed clear of it.
+A card's leader line has a gap where it would cross a trace label, also while a card is
+dragged in the Workbench.
+A card with an authored `card.position` keeps that position.
+
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
 deduplicated in-memory Jira Activity entry, without posting externally. Trace
 selection uses the existing cached provider API; rendering and stepping never

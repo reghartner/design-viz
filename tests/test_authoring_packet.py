@@ -343,9 +343,10 @@ class CompanyRulesPacketTests(unittest.TestCase):
              'a-first.md': '### Fork-wide icons\n\nPrefer the fork icon set over generic shapes.\n'}
 
     def fork(self, fragments, kit=False):
-        """A temporary checkout: upstream files linked in, plus company/contract fragments. kit: a
-        portable folder-agent kit instead, whose contract already carries the fragments and which
-        has no company/ folder."""
+        """A temporary checkout: upstream files linked in (never this checkout's company/ folder, so
+        the tests hold in a fork too), plus company/contract fragments; None: no company/ folder.
+        kit: a portable folder-agent kit instead, whose contract already carries the fragments and
+        which has no company/ folder."""
         directory = tempfile.TemporaryDirectory(prefix='flowview-company-rules-'); self.addCleanup(directory.cleanup)
         root = Path(directory.name)
         for entry in ROOT.iterdir():
@@ -354,8 +355,8 @@ class CompanyRulesPacketTests(unittest.TestCase):
         (root / 'contract').mkdir()
         for entry in (ROOT / 'contract').iterdir():
             if entry.name != 'authoring-contract.md': (root / 'contract' / entry.name).symlink_to(entry)
-        (root / 'company/contract').mkdir(parents=True)
-        for name, text in fragments.items(): (root / 'company/contract' / name).write_text(text)
+        if fragments is not None: (root / 'company/contract').mkdir(parents=True)
+        for name, text in (fragments or {}).items(): (root / 'company/contract' / name).write_text(text)
         (root / packet.CONTRACT).write_text((ROOT / packet.CONTRACT).read_text())
         if kit:
             (root / packet.CONTRACT).write_text(packet.contract_text(root))
@@ -417,6 +418,7 @@ class CompanyRulesPacketTests(unittest.TestCase):
             self.assertNotIn('company/contract/zz-panel-only.md', [entry['path'] for entry in meta['provenance']])
 
     def test_without_fragments_every_packet_is_unchanged(self):
+        self.fork(None)
         upstream = {(mode, tuple(panels), tuple(features)): packet.generate(panels, features, mode=mode)
                     for mode in ('new', 'edit') for panels, features in self.selections()}
         for key, (text, meta) in upstream.items():

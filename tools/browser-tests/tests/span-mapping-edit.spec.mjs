@@ -173,7 +173,7 @@ test('M3 desktop Edit mode drags spans onto a step and onto nodes; two candidate
  // Save records each mapping as one trace-match change; the replacement names what it replaced.
  const saved=JSON.parse(await save(page,panel,3)),changes=saved.page.editHistory.at(-1).changes,accept=saved.page.sections[0].diagram.steps.find(s=>s.id==='accept');
  expect(changes.map(c=>[c.op,c.step,c.traceMatch,c.replaces])).toEqual([['trace-match','rates',CURRENCY.match,undefined],['trace-match','settle',{...PAYMENT.match,nodeId:'pay'},undefined],
-  ['trace-match','accept',{...CART.match,nodeId:'web'},{serviceName:ACCEPT.serviceName,operation:ACCEPT.operation}]]);
+  ['trace-match','accept',{...CART.match,nodeId:'web'},{serviceName:ACCEPT.serviceName,operation:ACCEPT.operation,nodeId:'web'}]]);
  expect(accept.traceMatch).toEqual({...CART.match,nodeId:'web'});
  await expect(root.locator('.dv-edit-first').first()).toHaveText('currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies mapped to step Resolve supported currencies');
  await expect(root.locator('.dv-edit-change').filter({hasText:'(replaced frontend · /cart/checkout)'})).toHaveCount(1);

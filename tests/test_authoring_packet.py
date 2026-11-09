@@ -334,5 +334,98 @@ class AuthoringPacketTests(unittest.TestCase):
                 self.assertTrue((registry_path.parent / diagram['path']).is_file())
 
 
+
+class CompanyRulesPacketTests(unittest.TestCase):
+    """#1221: a fork's company/contract/*.md fragments reach every focused packet under one
+    "Company rules" heading, are recorded in packet.md.json, and never appear twice. Upstream,
+    with no company/contract, is unchanged."""
+    RULES = {'rules.md': '### Queue naming\n\nName every queue node after the team in its [runbook](../runbooks/queues.md).\n',
+             'a-first.md': '### Fork-wide icons\n\nPrefer the fork icon set over generic shapes.\n'}
+
+    def fork(self, fragments, kit=False):
+        """A temporary checkout: upstream files linked in, plus company/contract fragments. kit: a
+        portable folder-agent kit instead, whose contract already carries the fragments and which
+        has no company/ folder."""
+        directory = tempfile.TemporaryDirectory(prefix='flowview-company-rules-'); self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        for entry in ROOT.iterdir():
+            if entry.name not in ('company', 'contract', '.git', '.worktrees', '.local', 'node_modules'):
+                (root / entry.name).symlink_to(entry)
+        (root / 'contract').mkdir()
+        for entry in (ROOT / 'contract').iterdir():
+            if entry.name != 'authoring-contract.md': (root / 'contract' / entry.name).symlink_to(entry)
+        (root / 'company/contract').mkdir(parents=True)
+        for name, text in fragments.items(): (root / 'company/contract' / name).write_text(text)
+        (root / packet.CONTRACT).write_text((ROOT / packet.CONTRACT).read_text())
+        if kit:
+            (root / packet.CONTRACT).write_text(packet.contract_text(root))
+            for name in fragments: (root / 'company/contract' / name).unlink()
+            (root / 'company/contract').rmdir(); (root / 'company').rmdir()
+        original = packet.ROOT; packet.ROOT = root; self.addCleanup(setattr, packet, 'ROOT', original)
+        return root
+
+    def selections(self):
+        yield [], []
+        for feature in sorted(packet.FEATURES): yield [], [feature]
+        yield ['gauge'], []
+        yield [], sorted(packet.FEATURES)
+
+    def assert_rules(self, text, meta, label):
+        self.assertEqual(text.count('\n## Company rules\n'), 1, label)
+        rules = text[text.index('\n## Company rules\n'):]
+        first, second = rules.index('<!-- Source: company/contract/a-first.md -->\n### Fork-wide icons\n\nPrefer the fork icon set'), rules.index('<!-- Source: company/contract/rules.md -->\n### Queue naming\n')
+        self.assertLess(first, second, label + ': file-name order')
+        self.assertIn('[runbook](company/runbooks/queues.md)', rules, label + ': links resolve from VIZ')
+        self.assertLess(text.index('\n## Company rules\n'), text.index('\n## On-demand routes and examples\n'), label)
+        sources = {entry['path']: entry for entry in meta['provenance'] if entry['path'].startswith('company/contract/')}
+        self.assertEqual(sorted(sources), ['company/contract/a-first.md', 'company/contract/rules.md'], label)
+        for path, entry in sources.items():
+            self.assertIsNone(entry['section'], label)
+            self.assertRegex(entry['sha256'], '^[0-9a-f]{64}$', label)
+            self.assertGreater(entry['bytes'], 20, label)
+            self.assertEqual(entry['characters'], len(text.split('<!-- Source: ' + path + ' -->\n', 1)[1].split('\n\n<!-- Source:', 1)[0].split('\n\n## ', 1)[0]), label)
+
+    def test_fork_rules_reach_every_packet_mode_once_in_file_name_order(self):
+        self.fork(self.RULES)
+        for mode in ('new', 'edit'):
+            for panels, features in self.selections():
+                text, meta = packet.generate(panels, features, mode=mode)
+                self.assert_rules(text, meta, mode + ' ' + ','.join(panels + features))
+
+    def test_a_portable_kit_packet_carries_the_same_rules_from_its_contract(self):
+        self.fork(self.RULES)
+        expected = {mode: packet.generate([], [], mode=mode) for mode in ('new', 'edit')}
+        root = self.fork(self.RULES, kit=True)
+        self.assertFalse((root / 'company').exists())
+        for mode in ('new', 'edit'):
+            text, meta = packet.generate([], [], mode=mode)
+            self.assert_rules(text, meta, 'kit ' + mode)
+            self.assertEqual(text, expected[mode][0], 'kit ' + mode)
+
+    def test_a_fragment_panel_section_reaches_the_packet_with_its_panel_only(self):
+        board = ('### panels — company additions\n\n- `ticket-board` — closed tickets out of a fixed total. Declaration:\n'
+                 '  `{"id":"tickets","type":"ticket-board","total":10,"initial":{"done":0}}`.\n\n'
+                 '### Ticket board naming\n\nTitle a ticket board after its epic.\n')
+        self.fork({**self.RULES, 'ticket-board.md': board, 'zz-panel-only.md': '### panels — more additions\n\n- `ticket-gauge` — a gauge of tickets.\n'})
+        for panels in ([], ['ticket-board']):
+            text, meta = packet.generate(panels, [], mode='edit')
+            self.assertEqual(text.count('closed tickets out of a fixed total'), len(panels), panels)
+            self.assertEqual(text.count('Title a ticket board after its epic.'), 1, panels)
+            self.assertIn('<!-- Source: company/contract/ticket-board.md -->\n### Ticket board naming\n', text)
+            self.assertNotIn('company/contract/zz-panel-only.md', text)
+            self.assertNotIn('a gauge of tickets', text)
+            self.assertNotIn('company/contract/zz-panel-only.md', [entry['path'] for entry in meta['provenance']])
+
+    def test_without_fragments_every_packet_is_unchanged(self):
+        upstream = {(mode, tuple(panels), tuple(features)): packet.generate(panels, features, mode=mode)
+                    for mode in ('new', 'edit') for panels, features in self.selections()}
+        for key, (text, meta) in upstream.items():
+            self.assertNotIn('## Company rules', text, key)
+            self.assertFalse(any(entry['path'].startswith('company/') for entry in meta['provenance']), key)
+        self.fork({})
+        for (mode, panels, features), (text, meta) in upstream.items():
+            self.assertEqual(packet.generate(list(panels), list(features), mode=mode), (text, meta), mode)
+
+
 if __name__ == '__main__':
     unittest.main()

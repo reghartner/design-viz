@@ -2116,6 +2116,16 @@ select with one choice (connection, environment, mapping diagram, a single log
 lookup) is not drawn; its value still applies. The help sentence is the Load
 trace summary's tooltip, and **Show on diagram** appears once a trace is shown.
 
+Stage 2 (#1186) finishes the layout. **Show on diagram** (a toggle) and **Open
+trace** are icons at the right end of the request line, outside its summary, with
+those accessible names. The request card also holds **Pin as evidence**, **Source
+and limitations** and **All operation mappings**. A header row, "Spans · 55 · click
+a span to focus it on the diagram", sits above the span list. In a section layout
+tile the list fills the rest of the panel and scrolls inside it, so its length
+never grows the tile. A focused span's detail (duration, service, operation, the
+matched step or the step choices, **Clear trace focus**) opens directly under its
+row, and a span focused from the diagram is scrolled into the list's view.
+
 Each annotated node or uniquely matched edge gets one label from its rows: one row per
 step on the current path whose `traceMatch` names it (#1154). One row shows its time,
 for example `16.1 ms`. When the step's

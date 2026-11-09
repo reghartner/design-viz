@@ -3795,7 +3795,7 @@ test('#1173 one-choice selects are not rendered, the help line moves to the summ
  // The sole choices still apply: Load sends the same request as with the selects.
  api.setDirectTraceField({field:'input',value:COMPACT_ID});assert.ok(await api.loadDirectTrace(false),'the trace loads');
  assert.deepEqual(plain(calls.at(-1)),{trace_id:COMPACT_ID,from:'-2h',environment_slug:'production',team_slug:'example-team',view_mode:'full'});
- h.flush();assert.equal(show().hidden,false,'Show on diagram after a Load');assert.equal(show().disabled,false);
+ h.flush();assert.equal(show().hidden,false,'Show on diagram after a Load');assert.ok(!show().disabled);
  api.destroy();
  // Two options still render a select.
  const two=compactHarness(['prod','stage']);assert.ok(two.m.body.querySelectorAll('select').some(el=>el.getAttribute('aria-label')==='Connection environment'),'two environments keep the select');two.api.destroy();
@@ -3811,8 +3811,9 @@ test('#1173 with a trace shown the search section and the request card are one c
  assert.ok(request().querySelector('.dv-trace-identity'),'expanding shows today\'s details');assert.equal(request().querySelector('.dv-trace-identity').textContent,COMPACT_ID);
  const closed=el=>{for(let n=el.parentElement;n;n=n.parentElement)if(n.tagName==='details' && !n.open && !el.closest('summary'))return true;return false;};
  const span=m.body.querySelector('.dv-trace-span');assert.ok(span && !closed(span),'the span list is not inside a collapsed section');
- const order=m.body.querySelectorAll('details.dv-trace-config,details.dv-trace-request,.dv-trace-focus-summary,.dv-trace-waterfall').map(el=>el.className.split(' ')[0]);
- assert.deepEqual(order,['dv-trace-config','dv-trace-request','dv-trace-focus-summary','dv-trace-waterfall'],'the waterfall comes right after the collapsed lines and the focus box');
+ const order=m.body.querySelectorAll('details.dv-trace-config,details.dv-trace-request,.dv-trace-spans-head,.dv-trace-waterfall').map(el=>el.className.split(' ')[0]);
+ // #1186: the list header replaced the focus box.
+ assert.deepEqual(order,['dv-trace-config','dv-trace-request','dv-trace-spans-head','dv-trace-waterfall'],'the waterfall comes right after the collapsed lines and its header');
  for(const el of [config(),request()])assert.equal(el.children[0].tagName,'summary','each collapsed section shows only its summary line');
  // A section the reader expanded stays expanded across repaints until the shown trace changes.
  request().open=true;config().open=true;api.setTraceShow(false);api.setTraceShow(true);h.flush();
@@ -3997,9 +3998,9 @@ test('#1186 the request line holds Show on diagram and Open trace as icons, outs
  const icons=line.querySelector('.dv-trace-request-icons');assert.ok(icons,'an icon group on the line');
  assert.equal(m.body.querySelectorAll('button.dv-trace-show').length,1,'one Show on diagram control');
  const show=icons.querySelector('button.dv-trace-show');assert.ok(show,'Show on diagram is an icon on the request line');
- assert.equal(show.getAttribute('aria-label'),'Show on diagram');assert.equal(show.getAttribute('aria-pressed'),String(api.snapshot().trace.show));assert.equal(show.textContent.trim(),'','an icon, no text');
+ assert.equal(show.getAttribute('aria-label'),'Show on diagram');assert.equal(show.getAttribute('aria-pressed'),String(api.snapshot().trace.show));assert.equal(textOf(show).trim(),'','an icon, no text');
  const open=icons.querySelector('a.dv-trace-open');assert.ok(open,'Open trace is a link icon next to it');
- assert.equal(open.getAttribute('aria-label'),'Open trace in Honeycomb');assert.match(open.getAttribute('href'),/^https:\/\/ui\.honeycomb\.io\//);assert.equal(open.textContent.trim(),'');
+ assert.equal(open.getAttribute('aria-label'),'Open trace in Honeycomb');assert.match(open.getAttribute('href'),/^https:\/\/ui\.honeycomb\.io\//);assert.equal(textOf(open).trim(),'');
  assert.ok(!request().querySelector('summary').contains(show) && !request().querySelector('summary').contains(open),'the icons are not inside the summary, so clicking them does not toggle the card');
  const before=api.snapshot().trace.show;show.dispatchEvent({type:'click'});h.flush();assert.equal(api.snapshot().trace.show,!before);
  assert.equal(m.body.querySelector('button.dv-trace-show').getAttribute('aria-pressed'),String(!before));

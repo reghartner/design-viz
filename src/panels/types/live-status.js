@@ -312,9 +312,7 @@
       var trace=value.trace,body=el(host,'div','trace-body','dv-live-panel-body dv-live-trace'),controls=el(body,'div','controls','dv-live-controls');
       metricsLine(body,value.metrics || {available:false,enabled:false});
       if(value.actionLabel)button(controls,'action','reader-button',value.actionLabel,'runAction');
-      // #1173: Show on diagram waits for a shown trace.
-      var show=button(controls,'show','reader-button dv-trace-show','Show on diagram','setTraceShow');show._liveArgument=!trace.show;show.setAttribute('aria-pressed',String(trace.show));show.hidden=show.disabled=!trace.selected;
-      controls.hidden=!value.actionLabel && !trace.selected;
+      controls.hidden=!value.actionLabel;
       // Open sections are keyed by the entry key and trace ID. A loaded trace's key carries its load token, so it is 'direct' and a Verify of it keeps them.
       // An example keeps them while its entry key is unchanged; a new selection token expires the selection instead.
       var shownTrace=trace.selected?JSON.stringify([trace.selected.manual?'direct':trace.selected.key,trace.selected.exemplar.traceId]):null;
@@ -340,11 +338,12 @@
           });
         });
       }
-      // Focus that was inside the card when it went away (a Load's gap) returns to the next card's line once.
-      if(!trace.selected){if(host._traceCardHadFocus)host._traceCardFocus=true;host._traceCardHadFocus=false;if(trace.entries.length)returnedTraces(body);return;}
+      // Focus inside the card when it goes away (a Load's gap; it is swept after this render) returns to the next card's line once.
+      if(!trace.selected){var gone=host.querySelector('details.dv-trace-request');if(gone && gone.contains(doc.activeElement))host._traceCardFocus=true;if(trace.entries.length)returnedTraces(body);return;}
       var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
       // #1173: the request card (Returned traces and the selected request's details) is one collapsed line while it is shown.
-      var card=el(detail,'details','request','dv-trace-request'),matchedSteps=model.mapping?model.rows.filter(function(r){return r.status==='matched';}).length:0;
+      // #1186: the card shares its line with Show on diagram and Open trace, which sit outside the summary so they never toggle it.
+      var line=el(detail,'div','request-line','dv-trace-request-line'),card=el(line,'details','request','dv-trace-request'),matchedSteps=model.mapping?model.rows.filter(function(r){return r.status==='matched';}).length:0;
       // #1175: an optional step missing from this trace does not count against coverage; the summary and the coverage line share these counts.
       var optionalAbsent=model.rows.filter(function(r){return r.optional;}).length,stepTotal=model.rows.length-optionalAbsent;
       // The carried focus is used once, and only while nothing else holds focus (the removed card left it on the body).
@@ -352,21 +351,31 @@
       var focusCard=card.contains(active) || carried;traceSection(card,'request',shownTrace);
       var limited=e.warnings.some(function(w){return /200 spans|timeline unavailable/i.test(w);}) || !!model.warning;
       var cardSummary=el(card,'summary','summary','dv-trace-request-summary',[e.traceId.slice(0,12),selected.day?'Started '+selected.day.label+' '+selected.day.time+' local':'',e.spans.length+' spans',model.mapping?matchedSteps+'/'+stepTotal+' steps matched':'',e.completeness==='partial'?'partial':e.completeness!=='complete'?e.completeness+' completeness':'',limited?'limit reached':''].filter(Boolean).join(' · '));
+      cardSummary.setAttribute('title',cardSummary.textContent);
       // Picking a trace from inside the open card collapses it; keep keyboard focus on its line.
       if(focusCard && !card.open && doc.activeElement!==cardSummary)cardSummary.focus({preventScroll:true});
-      host._traceCardHadFocus=card.contains(doc.activeElement);
       el(card,'h3','heading','','Selected request');el(card,'code','identity','dv-trace-identity',e.traceId);if(selected.day)el(card,'p','date','dv-trace-date','Started '+selected.day.label+' '+selected.day.time+' local');if(selected.manual && !selected.hasMappings)el(card,'p','mapping-unavailable','','Diagram mapping is not configured for this section.');
       var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
       el(card,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');
       var limit=e.warnings.filter(function(w){return /200 spans|timeline unavailable/i.test(w);});if(model.warning)limit.push(model.warning);if(limit.length)el(card,'p','limit','dv-trace-limit',Array.from(new Set(limit)).join(' '));
       if(model.mapping)el(card,'p','coverage','dv-trace-coverage',matchedSteps+'/'+stepTotal+' steps matched · '+(optionalAbsent?optionalAbsent+' optional not in this trace · ':'')+model.mapping.unmatched.length+' spans unmatched');
       if(trace.entries.length)returnedTraces(card);
+      if(!selected.manual)button(el(card,'div','actions','dv-live-controls'),'pin','reader-button','Pin as evidence','pinSelectedTrace');
+      var metadata=el(card,'details','metadata','dv-trace-metadata');el(metadata,'summary','summary','','Source and limitations');
+      el(metadata,'p','selection','dv-trace-selection',e.selectionReason);el(metadata,'p','time','dv-trace-age',(time?'Observed '+time:'Trace age unavailable')+' · '+e.range.from+' – '+e.range.to);
+      el(metadata,'p','meaning','','Edge labels show operation duration, not network latency. Unobserved operations are not proof of failure or success.');
+      var warnings=el(metadata,'div','warnings','dv-trace-warnings');e.warnings.concat(model.warning?[model.warning]:[]).forEach(function(w,i){el(warnings,'p',String(i),'tr-notice',w);});
+      var all=el(card,'details','all','dv-trace-all');el(all,'summary','summary','','All operation mappings');var mappings=el(all,'div','mappings','dv-trace-mappings');
+      model.rows.forEach(function(item){var row=el(mappings,'div',item.id,'dv-trace-mapping');row.setAttribute('data-tone',item.tone);el(row,'strong','operation','',item.operation);el(row,'span','duration','',item.label+(item.budget!=null?' / '+item.budget+' ms budget':''));el(row,'small','conditions','',[item.detail].concat(item.conditions.map(function(c){return c.label;})).filter(Boolean).join(' · '));});
+      var icons=el(line,'div','icons','dv-trace-request-icons');
+      var show=button(icons,'show','reader-button dv-trace-icon dv-trace-show',null,'setTraceShow');show._liveArgument=!trace.show;show.setAttribute('aria-pressed',String(trace.show));show.setAttribute('aria-label','Show on diagram');show.setAttribute('title','Show on diagram');traceIcon(show,'show');
+      var url=telemetryTraceUrl(e.url,e.provider),urlLabel='Open trace in '+(e.provider==='tempo'?'Grafana':'Honeycomb');
+      if(url){var open=el(icons,'a','open','dv-trace-icon dv-trace-open');open.setAttribute('href',url);open.setAttribute('target','_blank');open.setAttribute('rel','noopener noreferrer');open.setAttribute('aria-label',urlLabel);open.setAttribute('title',urlLabel);traceIcon(open,'open');}
       var focus=selected.focus,focusedSpan=focus && e.spans.find(function(s){return s.id===focus.spanId;});
-      var focusBox=el(detail,'div','focus','dv-trace-focus-summary');
-      el(focusBox,'span','hint','dv-trace-focus-hint',focusedSpan?'Trace focus · '+focusedSpan.name:'Select a span to focus its operation and pause playback.');
-      if(focusedSpan){
-        var clear=button(focusBox,'clear','reader-button','Clear trace focus','clearTraceFocus');clear._liveArgument={context:selected.context};
-        var operation=el(detail,'div','operation','dv-trace-operation-detail'),matched=focus.choice && focus.choice.row;
+      // #1186: a header row names the list; the focused span's detail opens under its row (spanDetail).
+      var head=el(detail,'div','spans-head','dv-trace-spans-head');el(head,'strong','title','','Spans');el(head,'span','hint','',' · '+e.spans.length+' · click a span to focus it on the diagram');
+      function spanDetail(item){
+        var operation=el(item,'div','detail','dv-trace-span-detail dv-trace-operation-detail'),matched=focus.choice && focus.choice.row;
         el(operation,'strong','name','',focusedSpan.name);var duration=el(operation,'span','duration','dv-trace-duration',telemetryTraceDuration(focusedSpan.ms));duration.setAttribute('role','img');duration.setAttribute('aria-label',focusedSpan.ms+' milliseconds');duration.title=focusedSpan.ms+' ms';if(matched && matched.budget!=null)el(operation,'small','budget','',matched.budget+' ms budget');
         // #1078: the exact strings a step's traceMatch names (serviceName, operation), shown for copying.
         var identity=el(operation,'div','identity','dv-trace-span-identity');
@@ -391,24 +400,28 @@
           var choices=el(operation,'div','choices','dv-trace-step-choices');choices.setAttribute('role','group');choices.setAttribute('aria-label','Choose trace step');
           focus.choices.forEach(function(choice){var pick=button(choices,choice.key,'reader-button dv-trace-step-choice',choice.label,'selectTraceSpan');pick._liveArgument={context:selected.context,spanId:focusedSpan.id,choiceKey:choice.key};});
         }
+        var clear=button(el(operation,'div','clear','dv-trace-detail-actions'),'clear','reader-button','Clear trace focus','clearTraceFocus');clear._liveArgument={context:selected.context};
+        return operation;
       }
-      var waterfall=el(detail,'div','waterfall','dv-trace-waterfall');waterfall.setAttribute('aria-label','Selected trace waterfall');
+      var waterfall=el(detail,'div','waterfall','dv-trace-waterfall'),focusItem=null;waterfall.setAttribute('aria-label','Selected trace waterfall');
       var extent=Math.max.apply(null,e.spans.map(function(s){return s.startMs+s.ms;}).concat([1]));
       e.spans.forEach(function(span){
-        var row=el(waterfall,'button',span.id,'dv-trace-span');row.type='button';row.setAttribute('data-error',String(span.error));row.setAttribute('aria-pressed',String(!!focusedSpan && span.id===focusedSpan.id));row._traceSpan={context:selected.context,spanId:span.id};row.setAttribute('data-span-id',span.id);
+        var item=el(waterfall,'div',span.id,'dv-trace-span-item'),row=el(item,'button','row','dv-trace-span');row.type='button';row.setAttribute('data-error',String(span.error));row.setAttribute('aria-pressed',String(!!focusedSpan && span.id===focusedSpan.id));row._traceSpan={context:selected.context,spanId:span.id};row.setAttribute('data-span-id',span.id);
         if(!row._traceClick){row._traceClick=function(){var owner=host._livePanelApi;if(owner && row.isConnected)owner.selectTraceSpan(row._traceSpan);};row.addEventListener('click',row._traceClick);}
         el(row,'span','name','dv-trace-span-name',span.service+' · '+span.name).title=span.id;
         var track=el(row,'span','track','dv-trace-track'),bar=el(track,'i','bar','dv-trace-bar');bar.style.marginLeft=100*span.startMs/extent+'%';bar.style.width=Math.max(.4,100*span.ms/extent)+'%';
         var duration=el(row,'span','duration','dv-trace-duration',telemetryTraceDuration(span.ms)+(span.error?' · error':''));duration.setAttribute('role','img');duration.setAttribute('aria-label',span.ms+' milliseconds'+(span.error?' · error':''));duration.title=span.ms+' ms';
+        if(focusedSpan && span.id===focusedSpan.id){spanDetail(item);focusItem=item;}
       });
-      var actions=el(detail,'div','actions','dv-live-controls');if(!selected.manual)button(actions,'pin','reader-button','Pin as evidence','pinSelectedTrace');
-      var url=telemetryTraceUrl(e.url,e.provider);if(url)link(actions,'source','Open trace in '+(e.provider==='tempo'?'Grafana':'Honeycomb'),url);
-      var metadata=el(detail,'details','metadata','dv-trace-metadata');el(metadata,'summary','summary','','Source and limitations');
-      el(metadata,'p','selection','dv-trace-selection',e.selectionReason);el(metadata,'p','time','dv-trace-age',(time?'Observed '+time:'Trace age unavailable')+' · '+e.range.from+' – '+e.range.to);
-      el(metadata,'p','meaning','','Edge labels show operation duration, not network latency. Unobserved operations are not proof of failure or success.');
-      var warnings=el(metadata,'div','warnings','dv-trace-warnings');e.warnings.concat(model.warning?[model.warning]:[]).forEach(function(w,i){el(warnings,'p',String(i),'tr-notice',w);});
-      var all=el(detail,'details','all','dv-trace-all');el(all,'summary','summary','','All operation mappings');var mappings=el(all,'div','mappings','dv-trace-mappings');
-      model.rows.forEach(function(item){var row=el(mappings,'div',item.id,'dv-trace-mapping');row.setAttribute('data-tone',item.tone);el(row,'strong','operation','',item.operation);el(row,'span','duration','',item.label+(item.budget!=null?' / '+item.budget+' ms budget':''));el(row,'small','conditions','',[item.detail].concat(item.conditions.map(function(c){return c.label;})).filter(Boolean).join(' · '));});
+      // A newly focused span (from the list or the diagram) is scrolled into the list's view, not the page's.
+      var focusKey=focusedSpan?focusedSpan.id:'';
+      if(focusItem && waterfall._traceFocusShown!==focusKey && waterfall.getClientRects && waterfall.getClientRects().length){var lb=waterfall.getBoundingClientRect(),ib=focusItem.getBoundingClientRect();if(ib.top<lb.top || ib.bottom>lb.bottom)waterfall.scrollTop+=ib.top-lb.top-8;}
+      waterfall._traceFocusShown=focusKey;
+    }
+    function traceIcon(parent,kind){
+      var svg=el(parent,'svg','icon','dv-trace-icon-svg');svg.setAttribute('viewBox','0 0 16 16');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
+      var shapes=kind==='show'?[['circle','ring',{cx:8,cy:8,r:5.5}],['circle','dot',{cx:8,cy:8,r:2.2,'class':'dv-trace-icon-fill'}]]:[['polyline','box',{points:'7,3 3,3 3,13 13,13 13,9'}],['polyline','head',{points:'9.5,3 13,3 13,6.5'}],['line','shaft',{x1:13,y1:3,x2:7.5,y2:8.5}]];
+      shapes.forEach(function(shape){var node=el(svg,shape[0],shape[1],shape[2]['class'] || '');Object.keys(shape[2]).forEach(function(k){if(k!=='class')node.setAttribute(k,String(shape[2][k]));});});
     }
     // The Metrics overlay's connector line, once per view (#1136), below that view's button rows (#1162): it wraps, so its
     // height follows its text and must not move a button (#986). Same markup and dot tokens as the Jira connector, its own
@@ -493,6 +506,8 @@
     }
     function paint(value){
       if(!live)return;epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=doc.activeElement;
+      // #1186: with a trace shown, the Trace body fills the panel's tile and the span list takes the rest (CSS below).
+      if(value && value.mode==='trace' && value.trace && value.trace.selected)host.classList.add('dv-trace-fill');else host.classList.remove('dv-trace-fill');
       sharedHeader(value);
       if(value && value.mode==='trace'){traceBody(value);sweep(host);return;}
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
@@ -656,7 +671,7 @@
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
 .dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}.dv-trace-logs-window{margin:4px 0;color:var(--dfaint)}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}
 .dv-trace-selected{min-width:0}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}
-.dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall{max-height:240px;overflow:auto;margin:12px 0;border:1px solid var(--explore-border);border-radius:6px;padding:8px}
+.dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall{max-height:240px;overflow:auto;margin:0 0 12px;border:1px solid var(--explore-border);border-top:0;border-radius:0 0 6px 6px;padding:0 8px 8px}
 .dv-trace-span{width:100%;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;align-items:center;padding:5px 0;font-size:10px}.dv-trace-span[aria-pressed="true"]{background:color-mix(in srgb,var(--dv-live-active) 10%,transparent)}.dv-trace-span:focus-visible{outline:2px solid var(--dv-live-active)}.dv-trace-operation-detail{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;gap:6px;margin-top:12px;padding:8px;border:1px solid var(--explore-border);border-radius:6px}.dv-trace-operation-detail>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}.dv-trace-operation-detail small{grid-column:1/-1}.dv-trace-duration{font:700 13px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}.dv-trace-span .dv-trace-duration{grid-column:2;grid-row:1;white-space:nowrap}.dv-trace-operation-detail .dv-trace-duration{font-size:20px;line-height:1.4}.dv-trace-span-name{grid-column:1;grid-row:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-track{grid-column:1/-1;grid-row:2;height:10px;background:color-mix(in srgb,var(--dink) 7%,transparent)}.dv-trace-bar{display:block;box-sizing:border-box;max-width:100%;height:10px;background:var(--dv-live-active)}.dv-trace-span[data-error="true"] .dv-trace-bar{background:var(--dv-live-blocked)}
 .dv-trace-mappings{display:grid;gap:5px}.dv-trace-mapping{display:grid;grid-template-columns:1fr auto;gap:2px 8px;border-left:3px solid var(--dfaint);padding:5px 8px}.dv-trace-mapping small{grid-column:1/-1;color:var(--dfaint)}.dv-trace-mapping[data-tone="error"]{border-color:var(--dv-live-blocked)}.dv-trace-mapping[data-tone="warning"]{border-color:#d49620}
 [data-trace-tone="error"]{--dv-trace-color:#d64b68}[data-trace-tone="warning"]{--dv-trace-color:#c88b14}[data-trace-tone="observed"]{--dv-trace-color:#368cc9}[data-trace-tone="unknown"]{--dv-trace-color:#87929e}
@@ -666,8 +681,17 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 .dv-trace-focus-overlay .dv-trace-focus-brackets{fill:none;stroke:#009fc7;stroke-width:3;stroke-linecap:square;stroke-linejoin:round;stroke-dasharray:none;filter:drop-shadow(0 0 2px var(--dbg,#fff))}
 .dv-trace-focus-overlay rect{fill:#007d9c;stroke:var(--dbg,#fff);stroke-width:2}
 .dv-trace-focus-overlay text{fill:#fff;font:700 10px 'IBM Plex Mono',monospace;letter-spacing:.3px}
-.dv-trace-focus-summary{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:10px 12px;border:1px solid color-mix(in srgb,#009fc7 40%,var(--dfaint));border-radius:7px;background:color-mix(in srgb,#009fc7 7%,var(--dbg));font-size:12px}
-.dv-trace-focus-hint{min-width:0;overflow-wrap:anywhere}.dv-trace-focus-summary .reader-button{align-self:flex-start;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+/* #1186 Trace view stage 2: icons on the request line, a list header, the focused span's detail under its row, and in a
+   section layout tile the span list fills the rest of the panel and scrolls inside it (its own size never grows the tile). */
+.dv-trace-request-line{position:relative}.dv-trace-request-line>.dv-trace-request>summary{padding-right:66px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dv-trace-request-icons{position:absolute;top:-3px;right:0;display:flex;gap:6px}.dv-trace-icon{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:28px;height:24px;min-width:0;padding:0;border:1px solid var(--explore-border);border-radius:6px;color:inherit;background:transparent}a.dv-trace-icon:hover,a.dv-trace-icon:focus-visible{border-color:var(--dv-live-active);color:var(--dv-live-active)}
+.dv-trace-icon-svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}.dv-trace-icon-svg .dv-trace-icon-fill{fill:currentColor;stroke:none}
+.dv-trace-spans-head{display:flex;align-items:baseline;gap:0;margin-top:10px;padding:7px 8px 6px;border:1px solid var(--explore-border);border-bottom-color:color-mix(in srgb,var(--explore-border) 60%,transparent);border-radius:6px 6px 0 0;font-size:11px;color:var(--dfaint)}.dv-trace-spans-head strong{color:var(--dink);font-size:12px}.dv-trace-spans-head span{white-space:pre-wrap}
+.dv-trace-span-item{border-bottom:1px solid color-mix(in srgb,var(--explore-border) 50%,transparent)}.dv-trace-span-item:last-child{border-bottom:0}.dv-trace-span-item>.dv-trace-span-detail{margin:2px 0 8px;border-color:color-mix(in srgb,var(--dv-live-active) 40%,var(--explore-border));background:color-mix(in srgb,var(--dv-live-active) 5%,transparent)}.dv-trace-detail-actions{display:flex;flex-wrap:wrap;gap:6px}
+.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>*,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>*,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill .dv-trace-selected>*{flex:none}
+.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-selected{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill .dv-trace-selected>.dv-trace-waterfall{flex:1 1 0;min-height:200px;max-height:none;contain:size;margin-bottom:0}
 .dv-trace-focus-status{color:var(--dtext)}.dv-trace-span-identity{display:grid;gap:3px;min-width:0}.dv-trace-span-field{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px;align-items:baseline;min-width:0;font-size:10px}.dv-trace-span-label{color:var(--dtext)}.dv-trace-span-field code{min-width:0;overflow-wrap:anywhere;user-select:all}.dv-trace-map-guide{justify-self:start;max-width:100%;overflow-wrap:anywhere}.dv-trace-map-step{display:flex;flex-wrap:wrap;gap:7px;min-width:0}.dv-trace-map-select{min-width:0;max-width:100%}.dv-trace-map-apply{min-width:0;max-width:100%;white-space:normal}.dv-trace-map-none{margin:0;color:var(--dtext)}.dv-trace-step-choices{display:flex;flex-wrap:wrap;gap:7px;grid-column:1/-1}.dv-trace-step-choice{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}
 .dv-trace-span:focus-visible,.dv-trace-step-choice:focus-visible{outline:2px solid #009fc7;outline-offset:3px}
 

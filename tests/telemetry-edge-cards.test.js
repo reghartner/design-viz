@@ -96,9 +96,12 @@ test('#1200 card metric state: worst signal decides and Jira state never enters'
  assert.equal(state(mixed,{signals:{rate:{value:100},errors:{value:1},p95:{value:400}}}),'failing','worst decides: one limit not met');
  assert.equal(state(mixed,{signals:{rate:{value:100},errors:{value:1},p95:{value:200}}}),'held','every authored limit holds; an unlimited signal arrives');
  // Hidden (showOnCard:false) signals count, as in the verdict, and the card names them.
- const hidden={...mixed,signals:{...mixed.signals,p95:{unit:'ms',showOnCard:false}}};
- const note=(sample)=>{const result=C.proofVerdicts({carriers:[{id:'a->b',...hidden}],telemetryMap:{'a->b':sample}}).carriers['a->b'];return [C.telemetryCardMetricState(hidden,sample,result),C.telemetryCardContent({from:'a',to:'b'},hidden,sample,result,'24h').hidden];};
- assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1}}}),['waiting','1 hidden signal: no value'],'a hidden signal with no value');
- assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1},p95:{value:400}}}),['failing','1 hidden signal: outside limit'],'a hidden signal that fails');
- assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1},p95:{value:200}}}),['held',''],'a hidden signal that holds adds no line');
+ const hidden={...mixed,signals:{...mixed.signals,p95:{unit:'ms',showOnCard:false},queue:{unit:'msgs',label:'Queue depth',showOnCard:false}},proof:{...mixed.proof,queue:{max:10}}};
+ const note=(sample,pending)=>{const result=C.proofVerdicts({carriers:[{id:'a->b',...hidden}],telemetryMap:sample?{'a->b':sample}:{}}).carriers['a->b'];return [C.telemetryCardMetricState(hidden,sample,result),C.telemetryCardContent({from:'a',to:'b'},hidden,sample,result,'24h',pending).hidden];};
+ assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1},queue:{value:0}}}),['waiting','Hidden p95: no value'],'a hidden signal with no value, named');
+ assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1},p95:{value:400},queue:{value:0}}}),['failing','Hidden p95: outside limit'],'a hidden signal that fails, named');
+ assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1},queue:{value:40}}}),['waiting','Hidden p95: no value · Hidden Queue depth: outside limit'],'several, by label, joined');
+ assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1},p95:{value:200},queue:{value:0}}}),['held',''],'hidden signals that hold add no line');
+ assert.equal(note({signals:{rate:{value:100},errors:{value:1},queue:{value:0}}},{p95:true})[1],'','a pending hidden signal is not "no value"');
+ assert.equal(note(null,{rate:true,errors:true,p95:true,queue:true})[1],'','first load: everything pending, no hidden line');
 });

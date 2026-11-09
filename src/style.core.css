@@ -4216,7 +4216,7 @@ svg path.edge.dv-metrics-ghosted{opacity:.35;}
 .dv-metrics-card-bar{fill:none;stroke:var(--dv-metrics-ghost);stroke-width:4;stroke-linecap:round;}
 /* #1200/#1199: the metric state, one style source for card borders and Proof chips, in every view.
    Never Jira work: held/flowing use the Done green, failing the in-progress style, waiting the to-do style. */
-[data-metric-state="held"]{--dv-metric-line:var(--dv-live-done-border-color,var(--dv-live-done));--dv-metric-width:var(--dv-live-done-border-width,3px);--dv-metric-dash:none;--dv-metric-border:solid;}
+[data-metric-state="held"]{--dv-metric-line:var(--dv-live-done-border-color,var(--dv-live-done));--dv-metric-width:max(var(--dv-live-done-border-width,3px),2px);--dv-metric-dash:none;--dv-metric-border:solid;}
 [data-metric-state="flowing"]{--dv-metric-line:var(--dv-live-done-border-color,var(--dv-live-done));--dv-metric-width:1px;--dv-metric-dash:none;--dv-metric-border:solid;}
 [data-metric-state="failing"]{--dv-metric-line:var(--dv-live-active-border-color,var(--dv-live-active));--dv-metric-width:var(--dv-live-active-border-width,2px);--dv-metric-dash:none;--dv-metric-border:solid;}
 [data-metric-state="error"]{--dv-metric-line:var(--dv-live-blocked-border-color,var(--dv-live-blocked));--dv-metric-width:3px;--dv-metric-dash:none;--dv-metric-border:solid;}

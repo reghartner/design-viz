@@ -161,10 +161,12 @@
       var section=el(config,'section','logs','dv-trace-logs');section.setAttribute('aria-label','Find a trace from a log line');
       el(section,'h4','title','dv-trace-logs-title','Find a trace from a log line');
       if(!logs.available)el(section,'p','unavailable','dv-trace-logs-status',logs.note).setAttribute('role','status');
+      // tag 'checkbox': an input type=checkbox after its label text; it sends node.checked.
       function control(key,label,tag){
-        var wrap=el(section,'label',key+'-label','dv-trace-input-label');el(wrap,'span','label','',label);
-        var node=el(wrap,tag,key,'dv-trace-input');node.setAttribute('aria-label',label);node.disabled=!logs.available;
-        if(!node._logChange){node._logChange=function(){var owner=host._livePanelApi;if(owner)owner.setLogLookupField({field:key,value:node.value});};node.addEventListener(tag==='select'?'change':'input',node._logChange);}
+        var check=tag==='checkbox',wrap=el(section,'label',key+'-label',check?'dv-trace-check-label':'dv-trace-input-label');if(!check)el(wrap,'span','label','',label);
+        var node=el(wrap,check?'input':tag,key,check?'dv-trace-log-'+key:'dv-trace-input');if(check){node.type='checkbox';el(wrap,'span','label','',label);}
+        node.setAttribute('aria-label',label);node.disabled=!logs.available;
+        if(!node._logChange){node._logChange=function(){var owner=host._livePanelApi;if(owner)owner.setLogLookupField({field:key,value:check?node.checked:node.value});};node.addEventListener(tag==='select' || check?'change':'input',node._logChange);}
         return node;
       }
       var choose=control('lookup','Log lookup','select');
@@ -178,6 +180,8 @@
         if(value.value!==logs.form.value)value.value=logs.form.value;
       }
       if(!lookup){var typed=control('logql','LogQL log query','textarea');typed.maxLength=2000;typed.rows=3;typed.spellcheck=false;typed.placeholder='{env="prod"} |= "message" | field="value"';if(typed.value!==logs.form.logql)typed.value=logs.form.logql;}
+      // #1158: checked by default; Find then lists only lines with a trace ID.
+      var traced=control('traced','Only lines with a trace ID','checkbox');if(traced.checked!==logs.form.traced)traced.checked=logs.form.traced;
       // #1141: in Over time Find searches the selected day; name it.
       if(logs.search)el(section,'p','window','dv-trace-logs-window',logs.search);
       var find=button(el(section,'div','actions','dv-live-controls'),'find','reader-button dv-trace-log-find','Find log lines','findLogLines');find.disabled=!logs.available || logs.busy;
@@ -585,7 +589,7 @@
 .dv-status-header>.dv-live-day-row{margin-top:0}
 .pt-live-status .dv-status-modes .tbtn.dv-status-mode[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-candidate[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-show[aria-pressed="true"]{background:var(--dv-live-active);color:#fff;border-color:var(--dv-live-active)}
 .dv-live-trace{font-size:12px}.dv-live-trace p{margin:6px 0;overflow-wrap:anywhere}.dv-trace-mode-status:empty{display:none}
-.dv-trace-direct{border:1px solid var(--explore-border);border-radius:6px;padding:10px;margin:10px 0}.dv-trace-input-label{display:grid;gap:4px;margin:8px 0}.dv-trace-input{box-sizing:border-box;width:100%;min-width:0;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);border-radius:4px;padding:6px}.dv-trace-arguments{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:10px}.dv-trace-direct-report{padding:8px;border:1px solid var(--explore-border);margin-top:8px}
+.dv-trace-direct{border:1px solid var(--explore-border);border-radius:6px;padding:10px;margin:10px 0}.dv-trace-input-label{display:grid;gap:4px;margin:8px 0}.dv-trace-check-label{display:flex;align-items:center;gap:6px;margin:8px 0}.dv-trace-input{box-sizing:border-box;width:100%;min-width:0;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);border-radius:4px;padding:6px}.dv-trace-arguments{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:10px}.dv-trace-direct-report{padding:8px;border:1px solid var(--explore-border);margin-top:8px}
 .dv-trace-config>summary,.dv-trace-time>summary,.dv-trace-diagnostics>summary{cursor:pointer;overflow-wrap:anywhere}.dv-trace-config-action{display:block;margin:3px 0 0 14px;color:var(--dfaint)}.dv-trace-time{margin:10px 0}.dv-trace-diagnostics{margin:6px 0}.dv-trace-report-compact{border:0;padding:0;margin:6px 0}.dv-trace-direct>.dv-live-controls{margin-top:6px}
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
 .dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}.dv-trace-logs-window{margin:4px 0;color:var(--dfaint)}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}

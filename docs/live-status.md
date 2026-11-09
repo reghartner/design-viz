@@ -3011,7 +3011,7 @@ Find makes one `query_loki_logs` call to the Grafana connector that offers that
 tool (the one `loki` signals use, preferring a connector named Grafana):
 
 ```json
-{"datasourceUid": "loki-uid", "logql": "{env=\"stg\"} |= \"Handling camera stats message\" | cameraModel=\"arch\"",
+{"datasourceUid": "loki-uid", "logql": "{env=\"stg\"} |= \"Handling camera stats message\" | cameraModel=\"arch\" | trace_id =~ \"[0-9a-fA-F]{16,32}\"",
  "startRfc3339": "now-2h", "endRfc3339": "now", "limit": 10, "direction": "backward", "queryType": "range"}
 ```
 
@@ -3030,6 +3030,16 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   so it cannot leave the LogQL string it is placed in. The typed box is limited
   to 2000 characters. LogQL cannot write; the call is bounded by the window and
   10 lines. A Find with no answer after 30 seconds stops with a timeout message.
+- **Only lines with a trace ID** (#1158) is checked by default. Find then adds
+  a label filter on the lookup's `fields.traceId` (`trace_id` for a typed
+  query) to the end of the query, `| trace_id =~ "[0-9a-fA-F]{16,32}"`, the
+  16 to 32 hex rule the list applies, so Loki's 10 lines have a trace ID. A
+  metric query, or a field name that is not a LogQL label name, is sent as
+  written. A returned line without a valid trace ID is not listed. An empty
+  result says, for example, "No log lines with a trace ID in the last 2h. Clear
+  "Only lines with a trace ID" to see every line." Unchecked, Find sends the
+  query as written and lists every line. Changing the checkbox clears the
+  results without a call. It is reader state; nothing is written to the board.
 - The result lists up to 10 lines, newest first: time (UTC), the value (or the
   line text for a typed query), and the trace ID. The IDs are read from the
   line's structured metadata, then parsed labels, then stream labels, because

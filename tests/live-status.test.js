@@ -4233,3 +4233,12 @@ test('#1177 a drop on a node writes nodeId when the step names exactly that node
  assert.deepEqual(b.editor.calls.at(-1).match,MAP_MATCH,'a step naming more than that node gets no nodeId');
  b.api.destroy();
 });
+test('#1192 a step that names the node and an edge, or edges, gets no nodeId from a node drop',async()=>{
+ for(const extra of [{edge:'a->b'},{edges:['a->b']}]){
+  const b=mapBoard();const d=b.h.ctl.page.sections[0].diagram;Object.assign(d.steps[1],extra);const s=await b.focus();
+  spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+  const pick=b.m.body.querySelector('button.dv-trace-map-choice');if(pick){pick.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);}
+  assert.ok(b.editor.calls.length,JSON.stringify(extra)+': mapped');assert.equal('nodeId' in b.editor.calls.at(-1).match,false,JSON.stringify(extra)+': no nodeId');
+  b.api.destroy();
+ }
+});

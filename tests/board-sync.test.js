@@ -472,3 +472,14 @@ test('#1177 a board mapping with nodeId reaches the local step with its nodeId',
  const out=S().pull(STEPS,live);assert.equal(out.status,'merged',JSON.stringify(out.conflicts));
  assert.deepEqual(step(out.text,'rates').traceMatch,{...RATES,nodeId:'beta'});
 });
+test('#1192 a node-drop mapping then a replacement keeps nodeId on pull; nodeId reaches a local step with the same span',()=>{
+ const PRICE={serviceName:'checkout',operation:'Price'};
+ const live=stepsLive(s=>{d(s).steps[0].traceMatch={...PRICE,nodeId:'beta'};},[entry('2026-11-09T12:00:00Z','Bo',[{op:'trace-match',path:STEP(0),label:'Resolve rates',step:'rates',traceMatch:{...plain(RATES),nodeId:'beta'}},{op:'trace-match',path:STEP(0),label:'Resolve rates',step:'rates',traceMatch:{...PRICE,nodeId:'beta'},replaces:plain(RATES)}])]);
+ let out=S().pull(STEPS,live);assert.equal(out.status,'merged',JSON.stringify(out.conflicts));assert.deepEqual(step(out.text,'rates').traceMatch,{...PRICE,nodeId:'beta'});
+ // The local step already maps the same span without a nodeId: the board's nodeId is written.
+ const same=STEPS.replace('{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta"}','{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta", "traceMatch": {"serviceName": "currency", "operation": "GetRates"}}');
+ const nodeLive=stepsLive(s=>{d(s).steps[0].traceMatch={...plain(RATES),nodeId:'beta'};},[entry('2026-11-09T12:00:00Z','Bo',[{op:'trace-match',path:STEP(0),label:'Resolve rates',step:'rates',traceMatch:{...plain(RATES),nodeId:'beta'}}])]);
+ out=S().pull(same,nodeLive);assert.equal(out.status,'merged');assert.deepEqual(step(out.text,'rates').traceMatch,{...RATES,nodeId:'beta'});
+ // A different non-empty local nodeId asks.
+ out=S().pull(same.replace('"operation": "GetRates"}','"operation": "GetRates", "nodeId": "gamma"}'),nodeLive);assert.equal(out.status,'conflict');assert.equal(out.conflicts[0].kind,'trace-match-changed');
+});

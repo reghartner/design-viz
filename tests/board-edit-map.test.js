@@ -72,3 +72,12 @@ test('#1177 a node drop mapping writes and records nodeId; a replacement sets it
  b.e.save();await settle();const changes=JSON.parse(b.published[0]).page.editHistory.at(-1).changes;
  assert.deepEqual(changes.map(c=>c.traceMatch),[{...CHARGE,nodeId:'pay'},{...OTHER,nodeId:'web'}],'the change carries nodeId');
 });
+test('#1192 a replacement records the nodeId the step keeps; undo after a node drop restores the step',async()=>{
+ let b=await editor();
+ b.e.mapSpan(CHARGE_REF,{...CHARGE,nodeId:'pay'});b.e.mapSpan(CHARGE_REF,OTHER,CHARGE);
+ assert.deepEqual(b.step('charge').traceMatch,{...OTHER,nodeId:'pay'},'the step keeps its nodeId');
+ b.e.save();await settle();const changes=JSON.parse(b.published[0]).page.editHistory.at(-1).changes;
+ assert.deepEqual(changes[1].traceMatch,{...OTHER,nodeId:'pay'},'the change describes the full mapping that results');
+ b=await editor();b.e.mapSpan(CHARGE_REF,{...CHARGE,nodeId:'pay'});b.e.undoMap();assert.equal(b.e.text(),TEXT,'undo removes the written nodeId');
+ b=await editor();b.e.mapSpan(ACCEPT_REF,{...OTHER,nodeId:'web'},ACCEPT);b.e.mapSpan(CHARGE_REF,CHARGE);b.e.undoMap();b.e.undoMap();assert.deepEqual(b.step('accept').traceMatch,ACCEPT,'undo restores the replaced traceMatch without the nodeId');
+});

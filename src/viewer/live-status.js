@@ -972,7 +972,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function logSearchDay(){var state=over && overTimeState(),day=over && over.days[over.index];return state && state.window?{key:day.key,today:!!state.today,from:state.window.from,to:state.window.to,label:state.window.label,short:day.short || day.label || day.key}:null;}
   /* #1145 (D5): a loaded trace sets the view's day. Its day is the local date of its first span. Loading
      moves the view there (Live for today); a view change to another day clears the trace with one note. */
-  var traceDayNote='',overTarget=null,overParked=null;
+  var traceDayNote='',overTarget=null,overParked=null,traceLoads=0;
   function localDayKey(ms){var d=new Date(ms);return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())).toISOString().slice(0,10);}
   function traceDayOf(e){
     var at=Math.min.apply(null,(e && e.spans || []).map(function(s){return Date.parse(s.time);}).filter(function(t){return isFinite(t);}));if(!isFinite(at))return null;
@@ -1000,6 +1000,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // Every view change ends the last note; one that leaves the trace's day clears the trace and says so.
   // Never "Trace selection expired" for a day change (round 3): example traces are Live-only (D7), so
   // Over time retires one the reader chose with the plain note, and one shown automatically quietly.
+  // A parked history whose Load failed or was cleared: the reader's own Over time click still opens on the
+  // default day; a park a trace started ends, so no later Load reuses an old history.
+  function settleParked(){
+    var parked=overParked;overParked=null;if(!parked || parked.request!==overRequest || !parked.reader)return;
+    overTarget={request:parked.request,reader:true};overLoad(parked.request,parked.result,parked.source);
+  }
   function traceViewChanged(){
     traceDayNote='';traceNotice='';var view=viewDay();
     // An example-trace choice still loading belongs to Live; it must not settle as "expired" (cycle 2).
@@ -1923,8 +1929,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     snapshot:snapshot,
     setStatusMode:function(mode){if(retired || ['jira','trace'].indexOf(mode)<0)return;if(mode!==statusMode)clearTraceFocus();statusMode=mode;statusAuto=false;close(false);paint();notify();},
     setDirectTraceField:function(change){if(!retired && change){traceDayNote='';traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';directTrace.set(change.field,change.value);}},
-    loadDirectTrace:async function(verify,line){if(retired)return;statusAuto=false;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';traceDayNote='';var result=await directTrace.load(!!verify,line);if(result){traceSelection=null;traceInitial=true;if(!retired)traceFollow(result);}paint();notify();return result;},
-    clearDirectTrace:function(){if(retired)return;traceDayNote='';traceNotice='';clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();},
+    loadDirectTrace:async function(verify,line){if(retired)return;statusAuto=false;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';traceDayNote='';var mine=++traceLoads,result=await directTrace.load(!!verify,line);if(result){traceSelection=null;traceInitial=true;if(!retired)traceFollow(result);}else if(!retired && mine===traceLoads)settleParked();paint();notify();return result;},
+    clearDirectTrace:function(){if(retired)return;traceDayNote='';traceNotice='';clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();settleParked();},
     setLogLookupField:function(change){if(!retired && change)logLookup.set(change.field,change.value);},
     findLogLines:function(){return retired?Promise.resolve(null):logLookup.find();},
     // Load the chosen line's trace exactly as a pasted ID, then focus the line's span.

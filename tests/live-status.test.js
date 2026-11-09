@@ -3630,6 +3630,15 @@ test('#1145 a park a trace started ends on Clear trace and is never reused by a 
  assert.equal(b.loads(),2,'C loads the history again, not the old parked one');b.release();await historySettle();
  assert.equal(b.days[b.api.snapshot().overTime.index].key,dayKeyOf(daysBack(3)));assert.ok(b.loaded());b.api.destroy();
 });
+test('#1145 a parked history waits through a Load that replaces the one it parked for',async()=>{
+ const b=dayTraceBoard({at:daysBack(2),deferHistory:true});
+ assert.ok(await b.api.loadDirectTrace(false),'A starts the history load');
+ const open=b.holdCalls(),first=b.api.loadDirectTrace(false);for(let i=0;i<20 && b.calls.length<2;i++)await new Promise(setImmediate);
+ b.release();await historySettle();
+ b.traceAt(daysBack(3));const second=b.api.loadDirectTrace(false);for(let i=0;i<20 && b.calls.length<3;i++)await new Promise(setImmediate);assert.equal(b.calls.length,3,'C replaces B');
+ open();assert.equal(await first,null,'B was replaced');assert.ok(await second,'C loads');await historySettle();
+ assert.equal(b.days[b.api.snapshot().overTime.index].key,dayKeyOf(daysBack(3)),'C gets the parked history');assert.equal(b.loads(),1,'one history load');b.api.destroy();
+});
 test('#1145 a load a trace started stays Live when the reader clears the trace loaded during the wait',async()=>{
  const b=dayTraceBoard({at:daysBack(2),deferHistory:true});
  assert.ok(await b.api.loadDirectTrace(false),'A starts the history load');b.traceAt(daysBack(1));assert.ok(await b.api.loadDirectTrace(false),'B loads during the wait');

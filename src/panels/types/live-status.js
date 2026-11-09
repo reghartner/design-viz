@@ -445,8 +445,10 @@
       sharedHeader(value);
       if(value && value.mode==='trace'){traceBody(value);sweep(host);return;}
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
-      // #986: the first row holds buttons that never move. Everything that changes has a row of its own, whose height depends on the panel's width and never on its text, so it cannot move the buttons or what is below.
-      var controls=el(head,'div','controls','dv-live-controls'),statusRow=el(head,'div','status','dv-live-status'),countRow=el(statusRow,'div','counts','dv-live-counts'),statusLine=el(statusRow,'div','text','dv-live-status-text');
+      // #986/#1162: the first row is the counts strip (fixed height, scrolls sideways), then the provider action, then First blocker
+      // in a fixed slot at its right end, so neither changing counts nor a button appearing can move it. Status text has the row
+      // below and wraps in full.
+      var controls=el(head,'div','controls','dv-live-controls'),countRow=el(controls,'div','counts','dv-live-counts'),statusRow=el(head,'div','status','dv-live-status'),statusLine=el(statusRow,'div','text','dv-live-status-text');
       var available=value && value.available,hasData=available && value.hasData;
       countRow.setAttribute('role','region');countRow.setAttribute('aria-label','Status counts');countRow.setAttribute('tabindex','0');countRow.setAttribute('title','Scroll horizontally to see all counts.');
       // Preserve native count scrolling when the page presenter also owns arrow keys.
@@ -472,9 +474,9 @@
       var first=button(controls,'first','reader-button dv-live-first',value && (value.firstBlocker || (value.blockers || []).length)?'First blocker':'No blockers','firstBlocker');first.hidden=!hasData;first.disabled=!(value && value.firstBlocker);
       var reason=el(statusLine,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
       var editNotice=el(statusLine,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
-      controls.hidden=!actionLabel && !hasData;statusRow.hidden=(!available || !(hasData || value.note.text)) && !reason.textContent && !editNotice.textContent;
+      controls.hidden=!actionLabel && !hasData;statusRow.hidden=(!available || !(hasData || value.note.text)) && !reason.textContent && !editNotice.textContent || connection.hidden && note.hidden && reason.hidden && editNotice.hidden;
       head.hidden=controls.hidden && statusRow.hidden;
-      // Long text is cut off on screen; the tooltip and the status elements keep all of it.
+      // The tooltip repeats the whole status text.
       var statusText=[connection.hidden?'':[connWho,conn.checkedText].filter(Boolean).concat(ghLabel?[ghLabel]:[]).join(', '),note.textContent,reason.textContent,editNotice.textContent].filter(Boolean).join(' · ');
       if(statusText)statusRow.setAttribute('title',statusText);else statusRow.removeAttribute('title');
       if(!available && !proof)el(host,'p','empty','dv-live-empty','This page has no ticket references.');
@@ -578,7 +580,7 @@
 .dv-status-header{display:flex;flex-direction:column;gap:8px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--explore-border)}
 .dv-live-edit-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .dv-status-header>.dv-live-metrics-connection{min-width:0;font:11px/1.5 'IBM Plex Mono',monospace}
-.dv-status-header>.dv-live-metrics-connection>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.dv-status-header>.dv-live-metrics-connection>span{min-width:0;overflow-wrap:anywhere}
 .dv-status-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .dv-status-segmented{display:flex;flex-wrap:wrap;align-items:center;gap:4px}
 .dv-live-environment{display:inline-flex;align-items:center;gap:6px;font:11px/1.5 'IBM Plex Mono',monospace;color:var(--dtext)}
@@ -617,9 +619,10 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 .dv-live-toggle{display:flex;gap:4px;align-items:center;}
 .dv-live-count{border-radius:4px;padding:2px 4px;color:var(--dv-live-on);}
 .dv-live-note{color:var(--dtext);}
-.dv-live-connection,.dv-live-metrics-connection{display:inline-flex;align-items:center;gap:6px;color:var(--dtext);white-space:nowrap;}
+/* #1162: status lines wrap in full; the dot stays beside the first line. */
+.dv-live-connection,.dv-live-metrics-connection{display:inline-flex;align-items:flex-start;gap:6px;color:var(--dtext);}
 .dv-live-connection[hidden],.dv-live-metrics-connection[hidden]{display:none!important;}
-.dv-live-connection-dot,.dv-live-metrics-dot{width:8px;height:8px;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
+.dv-live-connection-dot,.dv-live-metrics-dot{width:8px;height:8px;margin-top:.45em;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
 .dv-live-connection[data-state="connected"] .dv-live-connection-dot,.dv-live-connection[data-state="demo"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="connected"] .dv-live-metrics-dot,.dv-live-metrics-connection[data-state="demo"] .dv-live-metrics-dot{background:var(--dv-live-done);}
 .dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="connecting"] .dv-live-metrics-dot,.dv-live-metrics-connection[data-state="approval"] .dv-live-metrics-dot{background:var(--dv-live-active);}
 .dv-live-connection[data-state="error"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="error"] .dv-live-metrics-dot{background:var(--dv-live-blocked);}
@@ -766,17 +769,18 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 .pt-live-status .pbody{flex:1;min-width:0;min-height:0;overflow:auto;color:var(--dtext);font:13px/1.5 'IBM Plex Sans',sans-serif}
 .dv-live-head{container-type:inline-size;display:flex;flex-direction:column;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--explore-border);font:11px/1.5 'IBM Plex Mono',monospace}
 .dv-live-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
-.dv-live-status{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);align-items:center;gap:0 8px;height:36px;overflow:hidden;white-space:nowrap;}
+.dv-live-head>.dv-live-controls{flex-wrap:nowrap;}
+.dv-live-head>.dv-live-controls>.dv-live-counts{flex:1 1 auto;}
+.dv-live-head>.dv-live-controls>.tbtn{flex:none;}
+.dv-live-status{min-width:0;}
 /* A fixed count row reserves room for the scrollbar; changing counts never moves the header below it. */
 .dv-live-counts{display:flex;align-items:center;gap:8px;min-width:0;height:36px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;}
 .dv-live-counts>.dv-live-count{flex:none;}
 .dv-live-counts:focus-visible{outline:2px solid var(--dv-live-active);outline-offset:-2px;}
-.dv-live-status-text{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden;}
-.dv-live-status-text>*{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;}
-.dv-live-connection>span{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.dv-live-status-text{display:flex;flex-wrap:wrap;align-items:flex-start;gap:2px 8px;min-width:0;}
+.dv-live-status-text>*{flex:0 1 auto;min-width:0;overflow-wrap:anywhere;}
+.dv-live-connection>span{min-width:0;overflow-wrap:anywhere;}
 .dv-live-controls[hidden],.dv-live-status[hidden]{display:none!important;}
-/* A narrow panel gives counts and text a line each: the height follows the panel's width, never its text. */
-@container (max-width:560px){.dv-live-status{grid-template-columns:minmax(0,1fr);grid-template-rows:36px 28px;height:64px;}}
 .pt-live-status [hidden]{display:none!important}
 .dv-live-panel-body{min-width:0;color:var(--dtext)}
 .dv-live-panel-body h3{margin:18px 0 8px;font:600 14px/1.4 'IBM Plex Sans',sans-serif;color:var(--dink)}

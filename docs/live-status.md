@@ -752,17 +752,16 @@ the day row and any Over time error, in both views. A board with no ticket or ep
 references after imports has no Jira view (#1136): the panel opens on Trace with no
 **Jira** | **Trace** switch. If a loaded detail
 brings ticket references, the switch appears and the panel moves to Jira unless the reader
-chose a view or worked on a trace. In the Trace view a metric card opens only its metrics: signal values, window, a metric verdict and query links, with no Jira or proof words and no Since Done line (#1153). The Jira view then has two rows. The first holds only buttons, which keep
-their place: any provider action and, on the far right, **First blocker**. **First blocker** keeps one size; with no blockers it reads
+chose a view or worked on a trace. In the Trace view a metric card opens only its metrics: signal values, window, a metric verdict and query links, with no Jira or proof words and no Since Done line (#1153). The Jira view then has two rows (#1162). The first holds the distinct-ticket counts
+in a fixed-height strip that scrolls sideways, any provider action and, at the right end, **First blocker** in
+a fixed slot, so changing counts or a button appearing cannot move it. **First blocker** keeps one size; with no blockers it reads
 **No blockers** and is greyed out, and with blockers it cannot reach from here it
-stays **First blocker** and is greyed out. The second row holds everything that
-changes. Its height follows the panel's width, one line when the panel is wide and
-two when it is narrow, and never its text, so it cannot move the buttons or what is
-below: distinct-ticket counts, a connector indicator (a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
+stays **First blocker** and is greyed out. The second row holds the status text,
+which wraps so every note shows in full: a connector indicator (a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
 blue (`--dv-live-active`) while connecting or awaiting approval, green when connected or in demo mode,
 red on error, and it pulses while a fetch is in flight; the time is the last successful
-fetch, not a ticket's change time), and the provider note. Text too long for the row
-is cut off and stays available in the row's tooltip and to screen readers. Demo
+fetch, not a ticket's change time), and the provider note. The row's tooltip repeats the
+whole text, and the Metrics connector line in the shared header wraps the same way. Demo
 controls supply **<** and **>** on the day row, below **Live** | **Over time**. The engine's panel title stays above this header.
 
 While it is on, the Metrics overlay draws its cards and cues in both views on every board

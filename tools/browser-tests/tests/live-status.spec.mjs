@@ -269,7 +269,7 @@ test('S1 S2 S3 S4 S5 S6 built demo plays the story through blockers to completio
 | O8 | fallback page without a timeline | Over time offers the four synthesized days | an embedded-timeline-only button |
 | O10 | Day 4 with long header text, each theme | Live and Over time are the two buttons of their own header row (#1131), with nothing between them; the selected one has a fill the other lacks; Over time's fill differs from Live's; the slider row is tinted | Over time wrapping to a new line; a mode only the label reveals |
 | O9 | demo on Over time | `<` and `>` are on the slider's row, step one whole day, move the demo's own day and are disabled at each end | large word buttons elsewhere; a slider-only step that Live forgets |
-| O11 | very long status text, then a blocker (#986) | Live, Over time, the First blocker slot and Next day keep their exact box, and the content below keeps its top | dynamic text or a popping button moving static controls |
+| O11 | very long status text, then a blocker (#986, #1162) | Live, Over time, the First blocker slot and Next day keep their exact box; the long text wraps in full (the content below may move down for it) and the content below returns to its top with short text | dynamic text or a popping button moving static controls; status text cut off |
 */
 test('O1 O2 O3 O4 O5 O6 O7 demo Over time moves through days without changing anything but status',async({page,server})=>{
  const requests=[];page.on('request',request=>{if(['fetch','xhr'].includes(request.resourceType()))requests.push(request.url());});
@@ -343,7 +343,10 @@ test('O11 buttons and the content below them stay in place when status text grow
  const panel=page.locator('#docview .pt-live-status'),live=panel.getByRole('button',{name:'Live',exact:true}),overTime=panel.getByRole('button',{name:'Over time',exact:true}),slot=panel.locator('.dv-live-first'),next=panel.getByRole('button',{name:'Next day',exact:true}),status=panel.locator('.dv-live-status'),epic=panel.locator('.dv-live-epic');
  const places=async()=>{const out={};for(const [name,item] of Object.entries({live,overTime,slot,next})){const box=await item.boundingBox();out[name]=[box.x,box.y,box.width,box.height];}const below=await epic.boundingBox();out.epicTop=below.y;return out;};
  await expect(slot).toHaveText('No blockers');await expect(slot).toBeDisabled();const before=await places();
- await next.click();await expect(status).toHaveAttribute('title',/very long status message/);await expect(status).toHaveCSS('white-space','nowrap');expect(await places(),'long status text').toEqual(before);
+ await next.click();await expect(status).toHaveAttribute('title',/very long status message/);
+ // #1162: long status text wraps in full below the buttons, which keep their place; only the content below moves down.
+ const grown=await places(),{epicTop,...buttons}=grown,{epicTop:epicBefore,...buttonsBefore}=before;expect(buttons,'long status text').toEqual(buttonsBefore);expect(epicTop).toBeGreaterThan(epicBefore);
+ expect(await status.locator('.dv-live-note').evaluate(el=>el.scrollWidth<=el.clientWidth),'the long note is shown in full').toBe(true);
  await next.click();await next.click();await expect(slot).toHaveText('First blocker');await expect(slot).toBeEnabled();expect(await places(),'a blocker appears').toEqual(before);
  // The row is tall enough for what it holds: three count chips are not clipped.
  expect(await status.evaluate(el=>el.scrollHeight<=el.clientHeight),'status row fits its contents').toBe(true);

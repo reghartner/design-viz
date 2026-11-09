@@ -151,11 +151,11 @@ test('M3 desktop Edit mode drags spans onto a step and onto nodes; two candidate
  // Onto a node with exactly one unmapped step: that step is mapped.
  await dragSpan(page,panel,PAYMENT,()=>nodePoint(page,root,'pay'));
  await expect(panel.locator('.dv-trace-map-note-text')).toHaveText('Mapped payment · grpc.msdemo.PaymentService/Charge to step Settle payment.');
- // The step now matches the span. A node lights only through a traceMatch nodeId (#1078: a service name or a
- // title is never a join key; telemetry-step.js), which the mapping does not write, so the status says so.
+ // Chuck 2026-11-09: a drop on a node writes traceMatch.nodeId for it when the step names exactly that node,
+ // so the node lights up at once (a node lights only through nodeId, #1078).
+ await expect(root.locator('g.node[data-dv-node="pay"][data-trace-tone]')).toHaveCount(1);
  await span(panel,PAYMENT).click();await expectMapped(page,panel,PAYMENT,'Settle payment','settle');
- await expect(status(panel)).toContainText('no authored diagram target');
- await expect(root.locator('g.node[data-dv-node="pay"][data-trace-tone]')).toHaveCount(0);
+ await expect(status(panel)).not.toContainText('no authored diagram target');
  // Onto a node with several steps: a chooser lists them, the mapped one marked; Esc cancels, a pick maps.
  await dragSpan(page,panel,CART,()=>nodePoint(page,root,'web'));
  const chooser=panel.locator('.dv-trace-map-chooser');await expect(chooser).toBeVisible();
@@ -172,8 +172,8 @@ test('M3 desktop Edit mode drags spans onto a step and onto nodes; two candidate
  await expect(panel.locator('.dv-trace-map-note-text')).toHaveText('Mapped cart · msdemo.CartService/EmptyCart to step Accept checkout.');
  // Save records each mapping as one trace-match change; the replacement names what it replaced.
  const saved=JSON.parse(await save(page,panel,3)),changes=saved.page.editHistory.at(-1).changes,accept=saved.page.sections[0].diagram.steps.find(s=>s.id==='accept');
- expect(changes.map(c=>[c.op,c.step,c.traceMatch,c.replaces])).toEqual([['trace-match','rates',CURRENCY.match,undefined],['trace-match','settle',PAYMENT.match,undefined],
-  ['trace-match','accept',CART.match,{serviceName:ACCEPT.serviceName,operation:ACCEPT.operation}]]);
+ expect(changes.map(c=>[c.op,c.step,c.traceMatch,c.replaces])).toEqual([['trace-match','rates',CURRENCY.match,undefined],['trace-match','settle',{...PAYMENT.match,nodeId:'pay'},undefined],
+  ['trace-match','accept',{...CART.match,nodeId:'web'},{serviceName:ACCEPT.serviceName,operation:ACCEPT.operation}]]);
  expect(accept.traceMatch).toEqual({...CART.match,nodeId:'web'});
  await expect(root.locator('.dv-edit-first').first()).toHaveText('currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies mapped to step Resolve supported currencies');
  await expect(root.locator('.dv-edit-change').filter({hasText:'(replaced frontend · /cart/checkout)'})).toHaveCount(1);

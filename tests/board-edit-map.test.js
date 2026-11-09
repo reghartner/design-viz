@@ -65,3 +65,10 @@ test('#1180 a replacement records what it replaced, keeps the other fields, and 
  assert.equal(b.e.mapSpan(ACCEPT_REF,OTHER,[ACCEPT,{serviceName:'x',operation:'y'}]),false);assert.equal(b.e.mapSpan(ACCEPT_REF,OTHER,alt.page.sections[0].diagram.steps[0].traceMatch),false);
  assert.equal(b.e.state().pending,0);
 });
+test('#1177 a node drop mapping writes and records nodeId; a replacement sets it the same way',async()=>{
+ let b=await editor();
+ assert.equal(b.e.mapSpan(CHARGE_REF,{...CHARGE,nodeId:'pay'}),true);assert.deepEqual(b.step('charge').traceMatch,{...CHARGE,nodeId:'pay'});
+ assert.equal(b.e.mapSpan(ACCEPT_REF,{...OTHER,nodeId:'web'},ACCEPT),true);assert.deepEqual(b.step('accept').traceMatch,{...OTHER,nodeId:'web'});
+ b.e.save();await settle();const changes=JSON.parse(b.published[0]).page.editHistory.at(-1).changes;
+ assert.deepEqual(changes.map(c=>c.traceMatch),[{...CHARGE,nodeId:'pay'},{...OTHER,nodeId:'web'}],'the change carries nodeId');
+});

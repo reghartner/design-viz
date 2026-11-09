@@ -467,3 +467,8 @@ test('#1180 c2 a local copy that removed the traceMatch while the board replaced
  const out=S().pull(STEPS,live);
  assert.equal(out.status,'conflict');assert.equal(out.conflicts[0].kind,'trace-match-changed');assert.match(out.conflicts[0].message,/your local copy has no traceMatch on it/);
 });
+test('#1177 a board mapping with nodeId reaches the local step with its nodeId',()=>{
+ const live=stepsLive(s=>{d(s).steps[0].traceMatch={...plain(RATES),nodeId:'beta'};},[entry('2026-11-09T12:00:00Z','Bo',[{op:'trace-match',path:STEP(0),label:'Resolve rates',step:'rates',traceMatch:{...plain(RATES),nodeId:'beta'}}])]);
+ const out=S().pull(STEPS,live);assert.equal(out.status,'merged',JSON.stringify(out.conflicts));
+ assert.deepEqual(step(out.text,'rates').traceMatch,{...RATES,nodeId:'beta'});
+});

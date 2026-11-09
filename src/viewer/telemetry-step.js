@@ -51,7 +51,14 @@ function telemetryTraceModel(diagram,pathId,exemplar){
     var duration=match.status==='matched'?Math.max.apply(null,match.spans.map(function(s){return s.durationMs;})):null;
     var kinds=match.conditions.map(function(c){return c.kind;}),tone=match.status!=='matched'?'unknown':kinds.some(function(k){return k==='service-error' || k==='delivery-failed';})?'error':kinds.some(function(k){return ['slow','database-slow','queue-buildup','backpressure'].indexOf(k)>=0;})?'warning':'observed';
     var label=match.status==='matched'?telemetryTraceDuration(duration):match.status==='missing'?'Not observed':match.status==='ambiguous'?'Ambiguous':'Unmapped';
-    var row={id:match.stepId,nodeId:match.nodeId,edgeIndex:exact.length===1?diagram.edges.indexOf(exact[0]):null,status:match.status,tone:tone,duration:duration,budget:selector.maxDurationMs,label:label,operation:selector.operation || step.text || step.id,detail:match.detail,conditions:match.conditions,spanIds:match.spans.map(function(s){return s.id;})};rows.push(row);
+    // The step's other traceMatch alternatives, never the one behind this row. "seen" =
+    // a span with that service and operation is in this trace: an alternative after the
+    // matched one is not tried; one before it was rejected (ambiguous, parent, occurrence).
+    var others=Array.isArray(step.traceMatch)?step.traceMatch.filter(function(a,i){return a && i!==match.alternative;}).map(function(a){
+      return {name:a.serviceName+' '+a.operation,seen:normalized.spans.some(function(s){return s.serviceName===a.serviceName && s.operation===a.operation && (!a.namespace || s.attributes['service.namespace']===a.namespace) && Object.keys(a.attributes || {}).every(function(k){return s.attributes[k]===a.attributes[k];});})};
+    }):[];
+    var row={id:match.stepId,nodeId:match.nodeId,edgeIndex:exact.length===1?diagram.edges.indexOf(exact[0]):null,status:match.status,tone:tone,duration:duration,budget:selector.maxDurationMs,label:label,operation:selector.operation || step.text || step.id,service:selector.serviceName,alternative:match.alternative,otherAlternatives:others,detail:match.detail,conditions:match.conditions,spanIds:match.spans.map(function(s){return s.id;}),
+      intervals:match.spans.map(function(s){return {id:s.id,startMs:s.startMs,durationMs:s.durationMs};})};rows.push(row);
     // Only explicit stable node IDs and a uniquely delivered edge may annotate
     // the canvas. A service name or display title is never a join key.
     if(match.nodeId && diagram.nodes[match.nodeId]){if(!nodes[match.nodeId])nodes[match.nodeId]=[];nodes[match.nodeId].push(row);}
@@ -105,14 +112,40 @@ function telemetryTraceConstrainLabel(text,alternatives){
   var inverse=root.inverse().multiply(local).inverse();
   text.setAttribute('x',Number(original.x)+inverse.a*dx+inverse.c*dy);text.setAttribute('y',Number(original.y)+inverse.b*dx+inverse.d*dy);
 }
+/* Time for one node's or edge's rows: each matched span counts its own start to
+   end (its child spans included); several spans count the union of their
+   intervals, so nested or overlapping spans are counted once. */
+function telemetryTraceSpanTime(rows){
+  var seen=Object.create(null),spans=[];
+  rows.forEach(function(r){if(r.status==='matched')(r.intervals || []).forEach(function(s){if(!seen[s.id] && Number.isFinite(s.startMs) && Number.isFinite(s.durationMs)){seen[s.id]=true;spans.push(s);}});});
+  if(!spans.length)return '';
+  spans.sort(function(a,b){return a.startMs-b.startMs;});
+  var total=0,start=spans[0].startMs,end=start+spans[0].durationMs;
+  spans.slice(1).forEach(function(s){if(s.startMs>end){total+=end-start;start=s.startMs;}end=Math.max(end,s.startMs+s.durationMs);});
+  return telemetryTraceDuration(total+end-start)+(spans.length>1?' across '+spans.length+' spans':'');
+}
+function telemetryTraceLabel(rows){
+  var time=telemetryTraceSpanTime(rows),one=rows.length===1 && rows[0];
+  function count(status,word){var n=rows.filter(function(r){return r.status===status;}).length;return n?n+' '+word:'';}
+  function named(r){return r.alternative!=null && r.status==='matched'?'Matched: '+r.service+' '+r.operation:r.operation;}
+  // On the canvas the service and operation are cut to 40 characters; the title keeps them whole.
+  var name=one && one.service+' '+one.operation,text=one && one.status!=='matched'?one.label:one?[one.alternative!=null?'Matched: '+(name.length>40?name.slice(0,39)+'…':name):'',time || one.label].filter(Boolean).join(' · '):
+    [rows.length+' operations',count('missing','unknown'),count('ambiguous','ambiguous'),time].filter(Boolean).join(' · ');
+  var title=rows.map(function(r){
+    var others=r.otherAlternatives || [],absent=others.filter(function(a){return !a.seen;}),unused=others.filter(function(a){return a.seen;});
+    return [named(r)+': '+(r.duration!=null?r.duration+' ms':r.label)+(r.budget!=null?' / '+r.budget+' ms budget':'')].concat(r.conditions.map(function(c){return c.label;}),
+      absent.length?['not in this trace: '+absent.map(function(a){return a.name;}).join(', ')]:[],unused.length?['in this trace, not matched: '+unused.map(function(a){return a.name;}).join(', ')]:[]).join('; ');
+  }).join(' · ')+(time?' · Time '+time+': each matched span counts start to end, including its child spans; overlapping spans count once.':'');
+  return {text:text,title:title};
+}
 function telemetryPaintTrace(binding,model,focus){
   var scope=binding.el,d=binding.section.diagram;telemetryClearTrace(scope);if(!model)return;
   function mark(target,rows,x,y){
     var ranks={unknown:0,observed:1,warning:2,error:3},tone=rows.reduce(function(a,r){return ranks[r.tone]>ranks[a]?r.tone:a;},'unknown');
     target.setAttribute('data-trace-tone',tone);target.setAttribute('data-trace-status',rows.map(function(r){return r.status;}).join(' '));
     var doc=target.ownerDocument,g=doc.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','dv-trace-overlay');g.setAttribute('data-tone',tone);g.setAttribute('pointer-events','none');
-    var text=doc.createElementNS('http://www.w3.org/2000/svg','text');text.setAttribute('x',x);text.setAttribute('y',y);text.setAttribute('text-anchor','middle');var unknown=rows.filter(function(r){return r.status!=='matched';}).length;var label=rows.length===1?rows[0].label:rows.length+' operations'+(unknown?' · '+unknown+' unknown':' · max '+telemetryTraceDuration(Math.max.apply(null,rows.map(function(r){return r.duration || 0;}))));text.textContent=label+(tone==='error'?' · error':tone==='warning'?' · warning':'');g.appendChild(text);
-    var title=doc.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=rows.map(function(r){return r.operation+': '+(r.duration!=null?r.duration+' ms':r.label)+(r.budget!=null?' / '+r.budget+' ms budget':'')+' '+r.conditions.map(function(c){return c.label;}).join('; ');}).join(' · ');g.appendChild(title);
+    var label=telemetryTraceLabel(rows),text=doc.createElementNS('http://www.w3.org/2000/svg','text');text.setAttribute('x',x);text.setAttribute('y',y);text.setAttribute('text-anchor','middle');text.textContent=label.text+(tone==='error'?' · error':tone==='warning'?' · warning':'');g.appendChild(text);
+    var title=doc.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=label.title;g.appendChild(title);
     if(target.matches('path.edge'))g.setAttribute('data-trace-edge',target.getAttribute('data-dv-edge'));
     var parent=target.matches('g.node')?target:target.parentNode;if(!target.matches('g.node') && target.getAttribute('transform')!=null)g.setAttribute('transform',target.getAttribute('transform'));g.setAttribute('role','img');g.setAttribute('aria-label',title.textContent);parent.appendChild(g);return text;
   }

@@ -4087,6 +4087,9 @@ g.node.dv-edit-target,path.edge.dv-edit-target{cursor:copy;}
    the highlight must not read as a ticket state. */
 .docview g.node.dv-edit-over[data-dv-node] .card{stroke:var(--dink,currentColor)!important;stroke-width:3.5px!important;stroke-dasharray:none!important;filter:drop-shadow(0 0 5px color-mix(in srgb,var(--dink,currentColor) 45%,transparent));}
 .docview path.edge.dv-edit-over[data-dv-edge]{stroke:var(--dink,currentColor)!important;stroke-width:4px!important;stroke-dasharray:none!important;}
+/* #1177: a step button or coin under a dragged trace span. */
+.docview .schip.dv-edit-over[data-step-source]{outline:3px solid var(--dink,currentColor);outline-offset:2px;}
+.docview g.coin.dv-edit-over[data-dv-step] circle{stroke:var(--dink,currentColor)!important;stroke-width:3px!important;}
 .dv-live-popover{inset:auto;margin:0;flex-direction:column;align-items:stretch;padding:12px;font-size:11px;font-weight:400;max-width:min(420px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;}
 .dv-live-popover .node-link-title{padding-right:28px;}
 .dv-live-ticket{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:8px 0;border-bottom:1px solid currentColor;}

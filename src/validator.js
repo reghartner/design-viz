@@ -666,6 +666,9 @@ function editHistoryEntryProblem(entry){
       if(Object.prototype.hasOwnProperty.call(change,'node') || Object.prototype.hasOwnProperty.call(change,'edge'))return at+': a "trace-match" change names a step, not a node or edge';
       if(Object.prototype.hasOwnProperty.call(change,'path') && !Array.isArray(change.path))return at+'.path: must be an array';
       if(Object.prototype.hasOwnProperty.call(change,'label') && typeof change.label!=='string')return at+'.label: must be a string';
+      // #1180: a mapping that replaced a traceMatch names it.
+      var was=change.replaces;
+      if(Object.prototype.hasOwnProperty.call(change,'replaces') && (!specObject(was) || typeof was.serviceName!=='string' || !was.serviceName || typeof was.operation!=='string' || !was.operation))return at+'.replaces: needs "serviceName" and "operation" strings';
       continue;
     }
     // #855: clearing a Missing work marker names only its carrier.

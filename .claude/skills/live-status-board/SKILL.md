@@ -342,7 +342,7 @@ the Workbench and sees no live state there.
 
 A published two-file board changes without you: editors move tickets on it in
 Edit mode (add a ticket to a node or edge, remove one, clear a Missing work
-marker, map a trace span to a step that has no `traceMatch`). Each Save rewrites
+marker, map a trace span to a step or replace its `traceMatch`). Each Save rewrites
 the artifact's `flowspec.json` and appends one `page.editHistory` entry. Those
 are the only edits the board allows, so a local
 spec that lacks them is not broken or out of date in any other way: fold them in

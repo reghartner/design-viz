@@ -286,3 +286,14 @@ test('H10 the live-status example, board skill, docs and contract carry the edit
  const contract=fs.readFileSync('contract/authoring-contract.md','utf8');assert.match(contract,/^- `edit-history` — /m);assert.match(contract,/`editHistory`/);
  const {execFileSync}=require('node:child_process');const doc=execFileSync('python3',['tools/widget_doc.py','edit-history'],{encoding:'utf8'});assert.match(doc,/- `edit-history` — /);
 });
+/* #1180 (Chuck's ruling): a trace-match change that replaced a mapping reads "(replaced <service> · <operation>)". */
+test('#1180 the edit-history line names the traceMatch a mapping replaced',()=>{
+ const d=C.PanelRegistry.get('edit-history'),at='2026-11-09T10:00:00Z',change=(extra)=>({op:'trace-match',step:'rates',label:'Resolve rates',traceMatch:{serviceName:'currency',operation:'GetRates'},...extra});
+ const first=d.render({},{id:'history',type:'edit-history'},{editSample:[{at,changes:[change({})]}]}).html,replaced=d.render({},{id:'history',type:'edit-history'},{editSample:[{at,changes:[change({replaces:{serviceName:'checkout',operation:'Quote'}})]}]}).html;
+ assert.match(first,/currency · GetRates mapped to step Resolve rates</);
+ assert.match(replaced,/currency · GetRates mapped to step Resolve rates \(replaced checkout · Quote\)</);
+ // The validator accepts replaces {serviceName, operation} and warns on any other shape.
+ assert.deepEqual(plain(C.validate(C.normalize(historyFixture([{at,changes:[change({replaces:{serviceName:'checkout',operation:'Quote'}})]}])))).warnings,[]);
+ const bad=plain(C.validate(C.normalize(historyFixture([{at,changes:[change({replaces:'Quote'})]}])))).warnings;
+ assert.equal(bad.length,1);assert.match(bad[0],/changes\[0\]\.replaces: /);
+});

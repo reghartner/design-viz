@@ -1408,6 +1408,14 @@ the slider's day, and Live returns to the day the buttons reached. There the tim
 last day supplies titles and the story list, so the total stays the same. There
 is no button on host-provider pages or in Workbench preview.
 
+**Boards without Jira.** A board with Metrics and no ticket, epic, exclusion or
+missing-work reference, after imports, still shows **Live** and **Over time**. There Over time
+lists the last 7 local days ending today, built with no calls. With the Metrics
+overlay off nothing is fetched; with it on, each day's metrics window is fetched
+when the day is first shown, and a past day already loaded is not fetched again.
+A click on the selected **Live** changes nothing there. If a loaded detail gives the
+board a ticket, Over time ends and the board returns to Live.
+
 The `getJiraIssue` reply shape was checked with one real call on a live Atlassian
 connector: the issue sits in `issues.nodes[0]`, and a plain top-level REST issue is
 also accepted. A ticket with a very long changelog has not been tested. Past-day

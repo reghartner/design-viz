@@ -3235,6 +3235,28 @@ test('#1137 metric cards on a board without tickets get no Jira presentation; ti
 });
 // Chuck 2026-11-08 (D13): the Metrics overlay draws in every view. In the Trace view its cards carry no Jira work colouring,
 // and the Workbench card preview still draws there.
+/* #1153: the Trace view's metrics popup states metric evidence only: signal values, window, verdict and query links,
+   with no Jira state or proof words and no Since Done line. Dates in either popup read in local time, never as ISO. */
+test('#1153 the Trace-view metrics popup shows metric evidence only, and the Jira-view proof line reads its date in local time',async()=>{
+ const DONE='2026-11-05T12:00:00.000Z',ISO=/\d{4}-\d\d-\d\dT\d\d:\d\d/;
+ const readable=at=>{const d=new Date(at);return d.toLocaleDateString([],{month:'short',day:'numeric'})+', '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});};
+ const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',tickets:['EE-1'],telemetry:TCALL()}]}}]}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:{rate:{value:5500},errors:{value:12}}}})}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+ h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+ const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+ for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
+ api.apply({'EE-1':{state:'done',updatedAt:DONE}});h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
+ const card=()=>h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]'),pop=()=>h.view.querySelector('.dv-live-popover'),escape=()=>h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
+ workPresentation(h,card());const jira=textOf(pop());
+ assert.match(jira,/Since Done: Done /,'contrasting precondition: the Jira-view popup keeps its proof line');
+ assert.ok(jira.includes('Done '+readable(DONE)),'its Done date reads in local time: '+jira);assert.doesNotMatch(jira,ISO,'no ISO timestamp in the Jira-view popup');
+ escape();api.setStatusMode('trace');h.flush();workPresentation(h,card());const trace=textOf(pop());
+ assert.match(pop().getAttribute('aria-label'),/^Metrics for /,'the Trace view opens the metrics popup');
+ assert.match(trace,/rate/,'it still shows the signal values');assert.match(trace,/5,500/);
+ for(const word of [/\bDONE\b/,/Since Done/,/\bDone\b/,/proven/i,/IN PROGRESS/i])assert.doesNotMatch(trace,word,'no Jira or proof words in the Trace-view popup: '+word);
+ assert.doesNotMatch(trace,ISO,'no ISO timestamp in the Trace-view popup');
+ api.destroy();
+});
 test('D13 metric cards draw in the Trace view of a board with tickets without Jira work colouring, and the Workbench preview draws there too',async()=>{
  const shim=h=>{const matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
   h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};

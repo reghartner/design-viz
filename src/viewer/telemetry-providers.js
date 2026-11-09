@@ -55,7 +55,7 @@ function createTelemetryProviders(page,win){
       if(range && part.definition.name==='Traces')return {};
       var bound=scoped(bindings,part).map(function(b){var signals={};Object.keys(b.signals).forEach(function(name){var s=b.signals[name];if(s.error)notes.push(b.id+' '+name+': '+s.error);else signals[name]=s;});return Object.assign({},b,{signals:signals});}).filter(function(b){return Object.keys(b.signals).length;});if(!bound.length){if(!range)part.map={};return {};}
       // A missing connector must not prevent its healthy peer from refreshing.
-      if(!part.available){var gone=part.note || (part.definition.name!=='Traces'?part.definition.name+' unavailable.':bound.some(function(b){return Object.keys(b.signals).some(function(n){return b.signals[n].source==='tempo';});})?'Tempo trace search is not connected.':'');if(gone)notes.push(gone);return {};}
+      if(!part.available){var gone=part.note || (part.definition.name!=='Traces'?part.definition.name+' unavailable.':telemetryTraceJobs(bound).some(function(job){return job.signal.source==='tempo';})?'Tempo trace search is not connected.':'');if(gone)notes.push(gone);return {};}
       var fn=range?part.adapter.options.history:part.adapter.options.provider;
       if(!fn){notes.push(part.definition.name+' historical metrics unsupported; samples are unobserved.');return {};}
       try{

@@ -55,10 +55,10 @@ function telemetryTime(value){
   var date=new Date(ms);return isFinite(date.getTime())?date.toISOString():null;
 }
 /* Status notes: one note stays as written; several each end with one full stop
-   and are separated by a space. */
+   and are separated by a space. Duplicates are compared in that ended form. */
 function telemetryNotes(notes){
-  var list=[];(notes || []).forEach(function(n){n=typeof n==='string'?n.trim():'';if(n && list.indexOf(n)<0)list.push(n);});
-  return list.length<2?list.join(''):list.map(function(n){n=n.replace(/[\s;,]+$/,'');return /[.!?…]$/.test(n)?n:n+'.';}).join(' ');
+  var list=[],ended=[];(notes || []).forEach(function(n){n=typeof n==='string'?n.trim():'';var e=n.replace(/[\s;,:]+$/,'');if(e && !/[.!?…]$/.test(e))e+='.';if(e && ended.indexOf(e)<0){list.push(n);ended.push(e);}});
+  return list.length<2?list.join(''):ended.join(' ');
 }
 function telemetryPoint(point){
   return Array.isArray(point) && point.length===2 && (telemetryNumber(point[0]) || typeof point[0]==='string' && isFinite(Date.parse(point[0]))) && telemetryNumber(point[1]);

@@ -1443,7 +1443,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(!paintProduction(active) && hadProduction){close(true);return;}
     pop.querySelectorAll('.dv-live-ticket[data-live-ticket]').forEach(function(row){
       var entry=map[row.getAttribute('data-live-ticket')],pill=row.querySelector('.dv-live-ticket-state');
-      if(pill){pill.textContent=entry?entry.state:'No status';liveStatusClass(pill,entry?entry.state:null);}
+      if(pill){pill.textContent=entry?entry.state:'No status';liveStatusClass(pill,entry?entry.state:null);row.style.setProperty('--dv-live-chip-ch',String(pill.textContent.length));}
     });
     active.setAttribute('aria-expanded','true');
   }
@@ -1506,14 +1506,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
       // status chip at the right. A detail (a blocked reason) takes a second line. The owner is not shown.
       link(row,key,liveStatusTicketURL(ticketSource?ticketSource.tracking:tracking,key,entry,(ticketSource && ticketSource.authoredURL) || trackingTicketURL(value,key) || (availability || []).map(function(cause){return trackingTicketURL(cause.value,key);}).filter(Boolean)[0]));
       if(entry && entry.title)element('span','dv-live-ticket-title',entry.title,row).setAttribute('title',entry.title);
-      // PRs and staleness share one capped slot (staleness first, PR links last), so the chip stays on the line; the slot's
-      // tooltip names what a crowded row clips, and clipped links still take keyboard focus.
-      var stale=entry && liveStatusStale(entry,Date.now(),tracking && tracking.staleDays),meta=entry && (entry.prs || stale)?element('span','dv-live-ticket-meta',null,row):null;
-      if(stale)element('span','dv-live-stale-detail','no activity '+Math.floor((Date.now()-Date.parse(entry.updatedAt))/86400000)+' d',meta);
-      if(entry && entry.prs)element('span','dv-live-ticket-prs','PRs: '+entry.prs.count+' '+entry.prs.state,meta);
-      if(entry && entry.prs && entry.prs.links){var icons=element('span','dv-live-ticket-links',null,meta);entry.prs.links.forEach(function(pr){liveStatusPRDecorate(element('a',null,null,icons),pr);});}
-      if(meta)meta.setAttribute('title',Array.prototype.map.call(meta.querySelectorAll('.dv-live-stale-detail,.dv-live-ticket-prs'),function(node){return node.textContent;}).join(' · '));
-      var pill=element('span','dv-live-ticket-state dv-live-state-pill',entry?entry.state:'No status',row);liveStatusClass(pill,entry?entry.state:null);
+      // Staleness, the PR count and the PR links are never clipped; they wrap onto a second line when the row is full (#1213).
+      if(entry && liveStatusStale(entry,Date.now(),tracking && tracking.staleDays))element('span','dv-live-stale-detail','no activity '+Math.floor((Date.now()-Date.parse(entry.updatedAt))/86400000)+' d',row);
+      if(entry && entry.prs)element('span','dv-live-ticket-prs','PRs: '+entry.prs.count+' '+entry.prs.state,row);
+      if(entry && entry.prs && entry.prs.links){var icons=element('span','dv-live-ticket-links',null,row);entry.prs.links.forEach(function(pr){liveStatusPRDecorate(element('a',null,null,icons),pr);});}
+      var pill=element('span','dv-live-ticket-state dv-live-state-pill',entry?entry.state:'No status',row);liveStatusClass(pill,entry?entry.state:null);row.style.setProperty('--dv-live-chip-ch',String(pill.textContent.length));
       if(entry && entry.detail)element('span','dv-live-ticket-detail',entry.detail,row);
     });
     found.prs.forEach(function(url){link(pop,url,url);});

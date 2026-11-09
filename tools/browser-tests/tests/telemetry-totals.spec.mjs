@@ -17,9 +17,9 @@ test('explicit measured totals retain exact value/unit and Done scope on local/d
  for(const id of ['ingest->app','shared::api','shared::api->shared::store','outer::inner::a->outer::inner::b']){
   await deliver(page,id);await expect(since(root,id)).toContainText('rate total: 1200 events through '+await readable(page,T));const button=await open(root,id);await page.keyboard.press('Escape');await expect(button).toBeFocused();
  }
- const id='ingest->app';for(const value of [0,1200.123456789]){await deliver(page,id,sample(value));await expect(since(root,id)).toContainText('rate total: '+value+' events through '+await readable(page,T));await open(root,id);await page.keyboard.press('Escape');}
+ const id='ingest->app';for(const value of [0,1200.123456789]){await deliver(page,id,sample(value));await expect(since(root,id)).toContainText('rate total: '+value+' events through '+await readable(page,T));}
  const unsafe=sample();unsafe.signals.rate.unit='events <img src=x onerror=alert(1)>';await deliver(page,id,unsafe);await open(root,id);await expect(since(root,id)).toContainText(unsafe.signals.rate.unit);await expect(since(root,id).locator('img')).toHaveCount(0);await expect(production(root).locator('img')).toHaveCount(0);await page.keyboard.press('Escape');
- for(const from of [T-H-1,T-H+1]){await deliver(page,id,sample(1200,from));await expect(since(root,id)).not.toContainText('total:');await open(root,id);await page.keyboard.press('Escape');}
+ for(const from of [T-H-1,T-H+1]){await deliver(page,id,sample(1200,from));await expect(since(root,id)).not.toContainText('total:');}
  await deliver(page,id,sample(1200,T-H,T+1));await expect(since(root,id)).not.toContainText('total:');
  const ordinary=sample();delete ordinary.signals.rate.aggregate;ordinary.signals.rate.series=[[T-H,600],[T,600]];await deliver(page,id,ordinary);await expect(since(root,id)).not.toContainText('total:');
  await deliver(page,id);await expect(since(root,id)).toContainText('total:');await page.evaluate(at=>window.viewer.controller.liveStatus.apply({...window.jira,'LOC-3':{state:'done',updatedAt:at}}),iso(T-H+1));await expect(since(root,id)).not.toContainText('total:');
@@ -33,8 +33,8 @@ test('actual asynchronously selected imports show totals for direct and nested s
  expect(await page.evaluate(()=>[window.calls.live.length,window.calls.detail.length])).toEqual([0,1]);
 });
 test('history never borrows live totals, clear/off/availability/destroy retire totals independently of siblings',async({page,server})=>{
- const root=await setup(page,server,{siblings:true});await metrics(root).click();await deliver(page,'ingest->app');await open(root,'ingest->app');await page.keyboard.press('Escape');
- await over(root).click();const slider=root.getByRole('slider',{name:'Day',exact:true});await slider.focus();await slider.press('Home');await open(root,'ingest->app');await expect(since(root,'ingest->app')).not.toContainText('total:');
+ const root=await setup(page,server,{siblings:true});await metrics(root).click();await deliver(page,'ingest->app');await expect(since(root,'ingest->app')).toContainText('total: 1200 events');
+ await over(root).click();const slider=root.getByRole('slider',{name:'Day',exact:true});await slider.focus();await slider.press('Home');await expect(since(root,'ingest->app')).not.toContainText('total:');
  await slider.focus();await slider.press('End');await live(root).click();await expect(since(root,'ingest->app')).not.toContainText('total:');
  await deliver(page,'ingest->app');await expect(since(root,'ingest->app')).toContainText('total:');await page.evaluate(()=>window.viewer.controller.telemetry.clear());await expect(root.locator('.dv-live-proof')).toHaveCount(0);
  await deliver(page,'ingest->app');await metrics(root).click();await deliver(page,'ingest->app');await expect(root.locator('.dv-live-proof')).toHaveCount(0);await expect(root.locator('[data-activity-type="telemetry"]')).toHaveCount(0);

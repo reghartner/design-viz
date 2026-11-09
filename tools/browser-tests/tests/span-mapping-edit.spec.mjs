@@ -148,10 +148,14 @@ test('M3 desktop Edit mode drags spans onto a step and onto nodes; two candidate
  await expect(panel.locator('.dv-trace-map-note-text')).toHaveText('Mapped currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies to step Resolve supported currencies.');
  await expect(panel.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);
  await span(panel,CURRENCY).click();await expectMapped(page,panel,CURRENCY,'Step 2: Resolve supported currencies','rates');
- // Onto a node with exactly one unmapped step: that step; the node lights up.
+ // Onto a node with exactly one unmapped step: that step is mapped.
  await dragSpan(page,panel,PAYMENT,()=>nodePoint(page,root,'pay'));
  await expect(panel.locator('.dv-trace-map-note-text')).toHaveText('Mapped payment · grpc.msdemo.PaymentService/Charge to step Settle payment.');
- await expect(root.locator('g.node[data-dv-node="pay"][data-trace-tone]')).toHaveCount(1);
+ // The step now matches the span. A node lights only through a traceMatch nodeId (#1078: a service name or a
+ // title is never a join key; telemetry-step.js), which the mapping does not write, so the status says so.
+ await span(panel,PAYMENT).click();await expectMapped(page,panel,PAYMENT,'Settle payment','settle');
+ await expect(status(panel)).toContainText('no authored diagram target');
+ await expect(root.locator('g.node[data-dv-node="pay"][data-trace-tone]')).toHaveCount(0);
  // Onto a node with several steps: a chooser lists them, the mapped one marked; Esc cancels, a pick maps.
  await dragSpan(page,panel,CART,()=>nodePoint(page,root,'web'));
  const chooser=panel.locator('.dv-trace-map-chooser');await expect(chooser).toBeVisible();

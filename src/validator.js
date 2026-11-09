@@ -81,6 +81,41 @@ function deltaWarnings(value, path, warnings){
     });
   }
 }
+// #1215: each tab gets its own panel. A panel declared on two or more tabs with the same
+// type and content is repeated, usually a shared reference table that belongs in the ledger.
+// Content is the declaration (key order ignored; the id is identity, not content) plus the
+// patches the tab's steps make to that panel: a panel each tab's steps fill differently
+// shows different content and is not repeated. Warning only.
+function tabPanelRepeatWarnings(page, warnings){
+  function stable(value){
+    if(Array.isArray(value))return '['+value.map(stable).join(',')+']';
+    if(value && typeof value==='object')return '{'+Object.keys(value).sort().map(function(k){return JSON.stringify(k)+':'+stable(value[k]);}).join(',')+'}';
+    return JSON.stringify(value);
+  }
+  var groups=new Map();
+  sectionRecords(page).forEach(function(record){
+    var d=record.section && record.section.diagram;
+    if(record.tabBlock==null || !specObject(d) || !Array.isArray(d.panels))return;
+    d.panels.forEach(function(panel,index){
+      if(!specObject(panel) || typeof panel.type!=='string')return;
+      var content={};Object.keys(panel).forEach(function(k){if(k!=='id')content[k]=panel[k];});
+      // The engine's own reader (panels, or the legacy patch alias). The patches are compared as a list,
+      // independent of which step applies them.
+      var patches=typeof panel.id!=='string'?[]:(Array.isArray(d.steps)?d.steps:[]).map(function(st){var patch=stepPanelPatch(st);return patch && Object.prototype.hasOwnProperty.call(patch,panel.id)?patch[panel.id]:null;}).filter(function(v){return v!==null;});
+      var key=stable({declaration:content,patches:patches}),group=groups.get(key);
+      if(!group)groups.set(key,group={panel:panel,path:record.path+'.diagram.panels['+index+']',tabs:[],labels:[],paths:[]});
+      var tab=record.tabBlock+'/'+record.tab;
+      if(group.tabs.indexOf(tab)<0){group.tabs.push(tab);group.labels.push(typeof record.tabLabel==='string' && record.tabLabel?record.tabLabel:'Tab '+(record.tab+1));group.paths.push(record.path.replace(/\.sections\[\d+\]$/,''));}
+    });
+  });
+  groups.forEach(function(group){
+    if(group.tabs.length<2)return;
+    var name=typeof group.panel.title==='string' && group.panel.title?group.panel.title:typeof group.panel.id==='string'?group.panel.id:'';
+    // Tabs in different tab blocks can share a label; then each names its tab path too.
+    var tabs=group.labels.map(function(l,i){return JSON.stringify(l)+(group.labels.indexOf(l)!==group.labels.lastIndexOf(l)?' ('+group.paths[i]+')':'');});
+    warnings.push(group.path+': the same '+group.panel.type+' panel'+(name?' "'+name+'"':'')+' is declared on more than one tab ('+tabs.join(', ')+'); give each tab its own panel and keep a shared reference table in the ledger, folding the row a tab needs into that tab\'s panel');
+  });
+}
 // Matching reads traceMatch only from steps (#1096). Imported carriers are
 // skipped: the provider's own build reports them once.
 function carrierTraceMatchWarning(value, d, kind, id, path, warnings){
@@ -771,6 +806,7 @@ function validate(page){
     });
     (d.panels || []).forEach(function(panel,index){if(panel && panel.type==='live-status')statusPanels.push(record.reference+'.diagram.panels['+index+']');});
   });
+  tabPanelRepeatWarnings(page,warnings);
   if((hasTracking || hasTickets || hasTelemetry) && !statusPanels.length)warnings.push('page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup');
   if(!hasTracking && !hasTickets && !hasTelemetry)statusPanels.forEach(function(path){warnings.push(path+': this page has no ticket references — the panel will be empty');});
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));

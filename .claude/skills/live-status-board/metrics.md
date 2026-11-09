@@ -92,8 +92,7 @@ To align existing local or imported nodes with spans, first follow
 do not retrieve data, and ordinary Trace overlays require no reference approval.
 
 Live Honeycomb trace retrieval uses `run_query` followed by `get_trace` for an
-actual returned trace ID. Declare both tools in the artifact's Honeycomb MCP
-capability; the generated scalar declaration lists only `run_query`. Author an
+actual returned trace ID; publishing declares both for this wrapper. Author an
 explicit raw-sample wrapper with `query_spec`, `raw_row_columns` including
 `trace.trace_id` (for example `["trace.trace_id", "error"]`; `timestamp` is
 always returned and must not be requested), and `results_limit` from 1 to 20. These fields belong inside

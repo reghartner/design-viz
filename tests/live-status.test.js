@@ -3807,7 +3807,7 @@ test('#1173 with a trace shown the search section and the request card are one c
  assert.equal(config().open,false,'the search section collapses');
  assert.match(textOf(config().querySelector('summary')).replace(/\s+/g,' ').trim(),/^Fixture Honeycomb · Production · Change trace$/);
  assert.ok(request(),'one request card');assert.equal(request().open,false,'collapsed');
- assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · Started .+ local · \d+ spans · \d+\/\d+ steps matched · partial$/,'a partial trace says so on its one line');
+ assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · partial · [^·]+ \d\d:\d\d · \d+ spans · \d+\/\d+ steps matched$/,'a partial trace says so first (#1186: flags before the date)');
  assert.ok(request().querySelector('.dv-trace-identity'),'expanding shows today\'s details');assert.equal(request().querySelector('.dv-trace-identity').textContent,COMPACT_ID);
  const closed=el=>{for(let n=el.parentElement;n;n=n.parentElement)if(n.tagName==='details' && !n.open && !el.closest('summary'))return true;return false;};
  const span=m.body.querySelector('.dv-trace-span');assert.ok(span && !closed(span),'the span list is not inside a collapsed section');
@@ -3961,7 +3961,7 @@ test('#1173 a trace of unknown completeness says so on the request line',async()
  const {h,api,m}=compactHarness(['prod'],unknown),request=()=>m.body.querySelector('details.dv-trace-request');
  api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();
  assert.equal(api.snapshot().trace.selected.exemplar.completeness,'unknown');
- assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · Started .+ local · \d+ spans · \d+\/\d+ steps matched · unknown completeness$/);
+ assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · unknown completeness · [^·]+ \d\d:\d\d · \d+ spans · \d+\/\d+ steps matched$/);
  api.destroy();
 });
 test('#1173 another trace resets the open sections; a re-poll with the same entry keeps them; focus moves to the card line after a Load',async()=>{
@@ -3996,6 +3996,7 @@ test('#1186 the request line holds Show on diagram and Open trace as icons, outs
  const {h,api,m,request}=await stage2Loaded(),line=m.body.querySelector('.dv-trace-request-line');
  assert.ok(line,'one request line');assert.ok(line.contains(request()),'the card is on the line');
  const icons=line.querySelector('.dv-trace-request-icons');assert.ok(icons,'an icon group on the line');
+ assert.ok(line.children.indexOf(icons)>=0 && line.children.indexOf(icons)<line.children.indexOf(request()),'#1186 c1: the icons come before the card body in tab order');
  assert.equal(m.body.querySelectorAll('button.dv-trace-show').length,1,'one Show on diagram control');
  const show=icons.querySelector('button.dv-trace-show');assert.ok(show,'Show on diagram is an icon on the request line');
  assert.equal(show.getAttribute('aria-label'),'Show on diagram');assert.equal(show.getAttribute('aria-pressed'),String(api.snapshot().trace.show));assert.equal(textOf(show).trim(),'','an icon, no text');
@@ -4046,4 +4047,19 @@ test('#1186 focus that left the card before a Load is not carried to the new car
   assert.ok(request()===null,'the card is gone while loading');await loading;h.flush();
   assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(focused.length,0,'focus stays where the reader left it');
  }finally{Element.prototype.focus=focus;api.destroy();}
+});
+test('#1186 a span focused while the panel is hidden is scrolled into the list\'s view when the panel shows again',async()=>{
+ const {h,api,m}=await stage2Loaded();
+ let hidden=true;const watchers=[];h.C.ResizeObserver=class{constructor(f){this.f=f;this.off=false;watchers.push(this);}observe(t){this.t=t;}disconnect(){this.off=true;}};
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect;
+ proto.getClientRects=function(){return hidden?[]:[1];};
+ proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-waterfall'))return {top:0,bottom:300,left:0,right:100,width:100,height:300};if(this.classList.contains('dv-trace-span-item'))return {top:900,bottom:1100,left:0,right:100,width:100,height:200};return bound.call(this);};
+ try{
+  const t=api.snapshot().trace.selected,span=t.exemplar.spans[41];assert.equal(api.selectTraceSpan({context:t.context,spanId:span.id}),true);h.flush();
+  const list=m.body.querySelector('.dv-trace-waterfall');assert.ok(list.querySelector('.dv-trace-span-detail'),'the detail is open');
+  assert.equal(list.scrollTop,undefined,'nothing is measured or scrolled while the panel is hidden');assert.equal(watchers.length,1,'the list is watched until it has a size');assert.ok(watchers[0].t===list);
+  list.scrollTop=0;hidden=false;watchers[0].f([]);
+  assert.equal(list.scrollTop,892,'shown again: the focused span is scrolled into the list\'s view');assert.equal(watchers[0].off,true,'the watch stops');
+  api.setTraceShow(true);h.flush();assert.equal(list.scrollTop,892,'a repaint of the same focus does not scroll again');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;api.destroy();}
 });

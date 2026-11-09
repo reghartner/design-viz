@@ -343,15 +343,15 @@
       var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
       // #1173: the request card (Returned traces and the selected request's details) is one collapsed line while it is shown.
       // #1186: the card shares its line with Show on diagram and Open trace, which sit outside the summary so they never toggle it.
-      var line=el(detail,'div','request-line','dv-trace-request-line'),card=el(line,'details','request','dv-trace-request'),matchedSteps=model.mapping?model.rows.filter(function(r){return r.status==='matched';}).length:0;
+      // The icons come first in DOM and tab order (positioned at the line's right end), so Tab never passes the card's body first.
+      var line=el(detail,'div','request-line','dv-trace-request-line'),icons=el(line,'div','icons','dv-trace-request-icons'),card=el(line,'details','request','dv-trace-request'),matchedSteps=model.mapping?model.rows.filter(function(r){return r.status==='matched';}).length:0;
       // #1175: an optional step missing from this trace does not count against coverage; the summary and the coverage line share these counts.
       var optionalAbsent=model.rows.filter(function(r){return r.optional;}).length,stepTotal=model.rows.length-optionalAbsent;
       // The carried focus is used once, and only while nothing else holds focus (the removed card left it on the body).
       var active=doc.activeElement,carried=!!host._traceCardFocus && (!active || active===doc.body || active.isConnected===false);host._traceCardFocus=false;
       var focusCard=card.contains(active) || carried;traceSection(card,'request',shownTrace);
       var limited=e.warnings.some(function(w){return /200 spans|timeline unavailable/i.test(w);}) || !!model.warning;
-      var cardSummary=el(card,'summary','summary','dv-trace-request-summary',[e.traceId.slice(0,12),selected.day?'Started '+selected.day.label+' '+selected.day.time+' local':'',e.spans.length+' spans',model.mapping?matchedSteps+'/'+stepTotal+' steps matched':'',e.completeness==='partial'?'partial':e.completeness!=='complete'?e.completeness+' completeness':'',limited?'limit reached':''].filter(Boolean).join(' · '));
-      cardSummary.setAttribute('title',cardSummary.textContent);
+      var cardSummary=el(card,'summary','summary','dv-trace-request-summary',[e.traceId.slice(0,12),e.completeness==='partial'?'partial':e.completeness!=='complete'?e.completeness+' completeness':'',limited?'limit reached':'',selected.day?selected.day.label+' '+selected.day.time:'',e.spans.length+' spans',model.mapping?matchedSteps+'/'+stepTotal+' steps matched':''].filter(Boolean).join(' · '));
       // Picking a trace from inside the open card collapses it; keep keyboard focus on its line.
       if(focusCard && !card.open && doc.activeElement!==cardSummary)cardSummary.focus({preventScroll:true});
       el(card,'h3','heading','','Selected request');el(card,'code','identity','dv-trace-identity',e.traceId);if(selected.day)el(card,'p','date','dv-trace-date','Started '+selected.day.label+' '+selected.day.time+' local');if(selected.manual && !selected.hasMappings)el(card,'p','mapping-unavailable','','Diagram mapping is not configured for this section.');
@@ -367,7 +367,6 @@
       var warnings=el(metadata,'div','warnings','dv-trace-warnings');e.warnings.concat(model.warning?[model.warning]:[]).forEach(function(w,i){el(warnings,'p',String(i),'tr-notice',w);});
       var all=el(card,'details','all','dv-trace-all');el(all,'summary','summary','','All operation mappings');var mappings=el(all,'div','mappings','dv-trace-mappings');
       model.rows.forEach(function(item){var row=el(mappings,'div',item.id,'dv-trace-mapping');row.setAttribute('data-tone',item.tone);el(row,'strong','operation','',item.operation);el(row,'span','duration','',item.label+(item.budget!=null?' / '+item.budget+' ms budget':''));el(row,'small','conditions','',[item.detail].concat(item.conditions.map(function(c){return c.label;})).filter(Boolean).join(' · '));});
-      var icons=el(line,'div','icons','dv-trace-request-icons');
       var show=button(icons,'show','reader-button dv-trace-icon dv-trace-show',null,'setTraceShow');show._liveArgument=!trace.show;show.setAttribute('aria-pressed',String(trace.show));show.setAttribute('aria-label','Show on diagram');show.setAttribute('title','Show on diagram');traceIcon(show,'show');
       var url=telemetryTraceUrl(e.url,e.provider),urlLabel='Open trace in '+(e.provider==='tempo'?'Grafana':'Honeycomb');
       if(url){var open=el(icons,'a','open','dv-trace-icon dv-trace-open');open.setAttribute('href',url);open.setAttribute('target','_blank');open.setAttribute('rel','noopener noreferrer');open.setAttribute('aria-label',urlLabel);open.setAttribute('title',urlLabel);traceIcon(open,'open');}
@@ -413,10 +412,22 @@
         var duration=el(row,'span','duration','dv-trace-duration',telemetryTraceDuration(span.ms)+(span.error?' · error':''));duration.setAttribute('role','img');duration.setAttribute('aria-label',span.ms+' milliseconds'+(span.error?' · error':''));duration.title=span.ms+' ms';
         if(focusedSpan && span.id===focusedSpan.id){spanDetail(item);focusItem=item;}
       });
-      // A newly focused span (from the list or the diagram) is scrolled into the list's view, not the page's.
+      // A newly focused span (from the list or the diagram) is scrolled into the list's view, not the page's, after the sweep
+      // has removed the previous span's detail (revealTraceFocus).
       var focusKey=focusedSpan?focusedSpan.id:'';
-      if(focusItem && waterfall._traceFocusShown!==focusKey && waterfall.getClientRects && waterfall.getClientRects().length){var lb=waterfall.getBoundingClientRect(),ib=focusItem.getBoundingClientRect();if(ib.top<lb.top || ib.bottom>lb.bottom)waterfall.scrollTop+=ib.top-lb.top-8;}
-      waterfall._traceFocusShown=focusKey;
+      if(!focusItem){waterfall._traceFocusShown='';host._traceFocusPending=null;}else if(waterfall._traceFocusShown!==focusKey)host._traceFocusPending={list:waterfall,item:focusItem,key:focusKey};
+    }
+    function stopFocusWatch(){if(host._traceFocusWatch){host._traceFocusWatch.disconnect();host._traceFocusWatch=null;}}
+    function revealTraceFocus(){
+      var pending=host._traceFocusPending,list=pending && pending.list;
+      if(!pending || !pending.item.isConnected || !list.getClientRects){host._traceFocusPending=null;stopFocusWatch();return;}
+      // A hidden panel cannot measure; the span is scrolled into view once the list has a size again.
+      if(!list.getClientRects().length){
+        if(typeof ResizeObserver!=='undefined' && (!host._traceFocusWatch || host._traceFocusWatch._list!==list)){stopFocusWatch();var watch=host._traceFocusWatch=new ResizeObserver(function(){if(live && list.getClientRects().length)revealTraceFocus();});watch._list=list;watch.observe(list);}
+        return;
+      }
+      stopFocusWatch();host._traceFocusPending=null;list._traceFocusShown=pending.key;
+      var lb=list.getBoundingClientRect(),ib=pending.item.getBoundingClientRect();if(ib.top<lb.top || ib.bottom>lb.bottom)list.scrollTop+=ib.top-lb.top-8;
     }
     function traceIcon(parent,kind){
       var svg=el(parent,'svg','icon','dv-trace-icon-svg');svg.setAttribute('viewBox','0 0 16 16');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
@@ -509,7 +520,7 @@
       // #1186: with a trace shown, the Trace body fills the panel's tile and the span list takes the rest (CSS below).
       if(value && value.mode==='trace' && value.trace && value.trace.selected)host.classList.add('dv-trace-fill');else host.classList.remove('dv-trace-fill');
       sharedHeader(value);
-      if(value && value.mode==='trace'){traceBody(value);sweep(host);return;}
+      if(value && value.mode==='trace'){traceBody(value);sweep(host);revealTraceFocus();return;}
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
       // #986/#1162: the first row is the counts, then the provider action, then First blocker in a fixed slot at its top right, so
       // neither changing counts nor a button appearing can move it. The counts wrap onto more lines so every one shows in full;
@@ -638,7 +649,7 @@
       if(typeof liveStatusInk==='function')host.querySelectorAll('.dv-live-state-pill:not([data-live-appearance])').forEach(function(node){liveStatusInk(node,null);});
       if(focused && host.contains(focused) && doc.activeElement!==focused && focused.focus)focused.focus({preventScroll:true});
     }
-    function cleanup(){if(!live)return;live=false;host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();}
+    function cleanup(){if(!live)return;live=false;stopFocusWatch();host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();}
     host._panelMotionCleanup=cleanup;
     function connect(controller){if(!live || api)return;api=controller;host._livePanelApi=api;if(offReady)offReady();paint(api.snapshot());offChange=api.onChange(paint);offDestroy=api.onDestroy(function(){var value=api.snapshot();value.metrics=Object.assign({},value.metrics,{proof:null,available:false,enabled:false});value.trace=Object.assign({},value.trace,{entries:[],selected:null,available:false,enabled:false});paint(value);cleanup();});}
     var controller=typeof liveStatusControllerFor==='function'?liveStatusControllerFor(host):null;
@@ -683,8 +694,8 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 .dv-trace-focus-overlay text{fill:#fff;font:700 10px 'IBM Plex Mono',monospace;letter-spacing:.3px}
 /* #1186 Trace view stage 2: icons on the request line, a list header, the focused span's detail under its row, and in a
    section layout tile the span list fills the rest of the panel and scrolls inside it (its own size never grows the tile). */
-.dv-trace-request-line{position:relative}.dv-trace-request-line>.dv-trace-request>summary{padding-right:66px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dv-trace-request-icons{position:absolute;top:-3px;right:0;display:flex;gap:6px}.dv-trace-icon{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:28px;height:24px;min-width:0;padding:0;border:1px solid var(--explore-border);border-radius:6px;color:inherit;background:transparent}a.dv-trace-icon:hover,a.dv-trace-icon:focus-visible{border-color:var(--dv-live-active);color:var(--dv-live-active)}
+.dv-trace-request-line{position:relative}.dv-trace-request-line>.dv-trace-request>summary{padding-right:66px}
+.dv-trace-request-icons{position:absolute;top:3px;right:0;display:flex;gap:6px}.dv-trace-icon{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:28px;height:24px;min-width:0;padding:0;border:1px solid var(--explore-border);border-radius:6px;color:inherit;background:transparent}a.dv-trace-icon:hover,a.dv-trace-icon:focus-visible{border-color:var(--dv-live-active);color:var(--dv-live-active)}
 .dv-trace-icon-svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}.dv-trace-icon-svg .dv-trace-icon-fill{fill:currentColor;stroke:none}
 .dv-trace-spans-head{display:flex;align-items:baseline;gap:0;margin-top:10px;padding:7px 8px 6px;border:1px solid var(--explore-border);border-bottom-color:color-mix(in srgb,var(--explore-border) 60%,transparent);border-radius:6px 6px 0 0;font-size:11px;color:var(--dfaint)}.dv-trace-spans-head strong{color:var(--dink);font-size:12px}.dv-trace-spans-head span{white-space:pre-wrap}
 .dv-trace-span-item{border-bottom:1px solid color-mix(in srgb,var(--explore-border) 50%,transparent)}.dv-trace-span-item:last-child{border-bottom:0}.dv-trace-span-item>.dv-trace-span-detail{margin:2px 0 8px;border-color:color-mix(in srgb,var(--dv-live-active) 40%,var(--explore-border));background:color-mix(in srgb,var(--dv-live-active) 5%,transparent)}.dv-trace-detail-actions{display:flex;flex-wrap:wrap;gap:6px}

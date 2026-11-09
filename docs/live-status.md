@@ -2109,8 +2109,9 @@ With a trace shown (loaded or picked), the Trace view is compact (#1173), so the
 waterfall sits beside the diagram. The search (Load trace, log search, the load
 report and **Clear loaded trace**) is one line naming the connection and
 environment ("Fixture Honeycomb · Production · Change trace"). The request card
-is one line too: "8413cd87a9f1 · Started Nov 9 07:19 local · 55 spans · 6/7 steps
-matched". It holds Returned traces and the request details. Each line opens with
+is one line too: "8413cd87a9f1 · partial · Nov 9 07:19 · 55 spans · 6/7 steps
+matched". Warning flags (partial, unknown completeness, limit reached) come right after the
+trace ID, and the line wraps rather than clipping (#1186). It holds Returned traces and the request details. Each line opens with
 one click, and an opened section stays open until the shown trace changes. A
 select with one choice (connection, environment, mapping diagram, a single log
 lookup) is not drawn; its value still applies. The help sentence is the Load

@@ -50,6 +50,11 @@ test('#1186 at 1440x900 the span list fills the panel and scrolls itself; a focu
  await panel.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await panel.getByRole('button',{name:'Load trace',exact:true}).click();
  const list=panel.locator('.dv-trace-waterfall');await expect(list.locator('.dv-trace-span').first()).toBeVisible();
  const geometry=async()=>{const card=await panel.boundingBox(),box=await list.boundingBox();const m=await list.evaluate(el=>({scroll:el.scrollHeight,client:el.clientHeight,overflow:getComputedStyle(el).overflowY}));return {card,box,...m};};
+ // #1186 c1: the request line wraps rather than clipping; its flags come first, so a partial trace says so on screen.
+ const summary=panel.locator('details.dv-trace-request > summary');await expect(summary).toContainText('partial');
+ expect(await summary.evaluate(el=>({fits:el.scrollWidth<=el.clientWidth+1,overflow:getComputedStyle(el).textOverflow})),'the summary is not clipped').toEqual({fits:true,overflow:'clip'});
+ const icons=await panel.locator('.dv-trace-request-icons').boundingBox(),line=await summary.boundingBox();
+ expect(Math.abs(icons.y-line.y),'the icons sit at the top of the request line').toBeLessThan(8);expect(icons.x+icons.width,'at its right end').toBeGreaterThan(line.x+line.width-4);
  const g=await geometry();
  expect(g.box.y+g.box.height,'the list ends inside the panel').toBeLessThanOrEqual(g.card.y+g.card.height+1);
  expect(g.card.y+g.card.height-(g.box.y+g.box.height),'the list fills the rest of the panel').toBeLessThan(48);
@@ -60,4 +65,15 @@ test('#1186 at 1440x900 the span list fills the panel and scrolls itself; a focu
  const r=await row.boundingBox(),d=await detail.boundingBox();
  expect(Math.abs(d.y-(r.y+r.height)),'the detail sits directly under its row').toBeLessThan(10);
  await page.screenshot({path:info.outputPath('trace-stage2-1440x900.png')});
+});
+test('#1186 a span focused from the diagram far down the list is scrolled into the list\'s view (no scroll anchoring)',async({page,server})=>{
+ const {panel}=await open(page,server);
+ await panel.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await panel.getByRole('button',{name:'Load trace',exact:true}).click();
+ const list=panel.locator('.dv-trace-waterfall');await expect(list.locator('.dv-trace-span').first()).toBeVisible();
+ await list.evaluate(el=>{el.style.overflowAnchor='none';});
+ // A span near the top first, so its detail is open above the next one when that one is focused.
+ await list.locator('.dv-trace-span').nth(1).click();await expect(list.locator('.dv-trace-span-detail')).toHaveCount(1);
+ const far=await page.evaluate(()=>{const t=window.ctl.liveStatus.snapshot().trace.selected,span=t.exemplar.spans[41];window.ctl.liveStatus.selectTraceSpan({context:t.context,spanId:span.id});return span.id;});
+ const row=list.locator('.dv-trace-span[data-span-id="'+far+'"]');await expect(row).toHaveAttribute('aria-pressed','true');
+ await expect.poll(async()=>{const l=await list.boundingBox(),r=await row.boundingBox();return r.y>=l.y-1 && r.y+r.height<=l.y+l.height+1;},{message:'the focused row is inside the list\'s box'}).toBe(true);
 });

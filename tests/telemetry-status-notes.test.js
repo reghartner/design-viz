@@ -34,3 +34,14 @@ test('three notes join as sentences without ".;"',async t=>{
  assert.doesNotMatch(note,/\.;/);
  assert.equal(note,'Honeycomb unavailable. Tempo trace search is not connected. 1 Grafana query failed: a broken: parse error.');
 });
+test('a carrier whose first trace signal is Honeycomb shows no Tempo note for a later tempo signal',async t=>{
+ const h=await grafanaHost({trace:{honeycomb:rawQuery()},later:{tempo:'{ resource.service.name = "event-ingest" }'}});t.after(()=>h.close());
+ assert.ok(h.api.snapshot().map.a.signals.rate.value>0,JSON.stringify(h.api.status()));
+ assert.equal(h.api.status().note,'');
+});
+test('notes are normalized before duplicates are dropped; a trailing colon is not doubled',()=>{
+ const C=context();
+ assert.equal(C.telemetryNotes(['Grafana unavailable','Grafana unavailable.']),'Grafana unavailable');
+ assert.equal(C.telemetryNotes(['a','a.','b']),'a. b.');
+ assert.equal(C.telemetryNotes(['Error:','b']),'Error. b.');
+});

@@ -3964,3 +3964,42 @@ test('#1175 a drill-down step that is optional and missing reads like a local on
  assert.match(label.title,/optional, not in this trace: refund POST \/refund/);
  api.destroy();
 });
+/* #1180 c3: the carried pick behaves as a live pick on an environment change and on an account change;
+   focus returns to the span row only after a mapping (any path), never after Cancel or a refusal; the
+   "nothing lights" note only for a missing match and only for fields that filter spans; the alternatives
+   title is put back after the drag. */
+test('#1180 c3 the carried pick ends on an environment or account change, as a live pick does',async()=>{
+ const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),spec=structuredClone(f.spec);Object.assign(spec.page.tracking.telemetry,{environment:'prd',environments:{prd:{},stg:{}}});
+ for(const change of ['environment','account']){
+  const editor=mapEditor(),open=()=>{const h=harness(spec,{},{telemetry:{},boardEditor:editor}),m=mountStatus(h);h.ctl.sections[0].stepper={path:()=>'short',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};return {h,m,api:h.ctl.liveStatus};};
+  let x=open();x.h.ctl.telemetry.apply(f.samples);x.api.setStatusMode('trace');const entry=x.api.snapshot().trace.entries[0];await x.api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});x.api.destroy();
+  x=open();x.h.flush();assert.ok(x.api.snapshot().trace.selected,change+': precondition, the pick is carried');
+  if(change==='environment')x.api.setMetricsEnvironment('stg');else{x.h.ctl.telemetry.clear();x.h.ctl.telemetry.setAvailable(false);}
+  const t=x.api.snapshot().trace;assert.equal(t.selected,null,change+': the carried pick ends');assert.equal(t.entries.some(e=>e.key.startsWith('carried/')),false);
+  x.api.destroy();
+ }
+});
+test('#1180 c3 focus returns to the span row after a dropdown or drop mapping, never after Cancel',async()=>{
+ const editor=mapEditor();let b=mapBoard({editor,twoOnB:true});const s=await b.focus();
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ b.m.body.querySelector('button.dv-trace-map-cancel').dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);b.api.destroy();
+ b=mapBoard({editor,twoOnB:true});let row=b.m.body.querySelector('.dv-trace-span[data-span-id="'+MAP_SPAN+'"]'),focused=0;if(row)row.focus=()=>{focused++;};b.h.flush();
+ assert.equal(focused,0,'a cancelled chooser does not steal focus at the next re-render');b.api.destroy();editor.takeTrace();
+ b=mapBoard({editor});await b.focus();const pick=b.m.body.querySelector('select.dv-trace-map-select');pick.value='beta';pick.dispatchEvent({type:'change'});
+ b.m.body.querySelector('button.dv-trace-map-apply').dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);b.api.destroy();
+ b=mapBoard({editor});row=b.m.body.querySelector('.dv-trace-span[data-span-id="'+MAP_SPAN+'"]');focused=0;if(row)row.focus=()=>{focused++;};b.h.flush();
+ assert.equal(focused,1,'a dropdown mapping returns focus to the span row');b.api.destroy();
+});
+test('#1180 c3 the nothing-lights note needs a missing match; an ambiguous one or a nodeId does not trigger it',async()=>{
+ const e=mapEditor(),b=mapBoard({editor:e}),d=b.h.ctl.page.sections[0].diagram;d.steps[0].traceMatch={...MAP_MATCH};d.steps[1].traceMatch={...MAP_MATCH,nodeId:'b'};
+ await b.focus();e.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});b.api.setTraceShow(true);
+ assert.equal(b.m.body.querySelector('.dv-trace-map-note-text').textContent,'Mapped currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies to step Show beta.');
+ b.api.destroy();
+});
+test('#1180 c3 an alternatives step button gets its own title back after the drag',async()=>{
+ const b=mapBoard({twoOnB:true,alternatives:true}),s=await b.focus(),chip=b.h.view.querySelector('button.schip[data-step-source="2"]');chip.setAttribute('title','Shared with Recovery');
+ const data={'application/x-flowview-span':JSON.stringify({context:s.context,spanId:MAP_SPAN})},drag={types:Object.keys(data),getData:t=>data[t]||'',dropEffect:''};
+ b.h.view.dispatchEvent({type:'dragover',target:chip,dataTransfer:drag,preventDefault(){}});assert.equal(chip.getAttribute('title'),'Has alternatives; edit in Inspect');
+ b.h.view.dispatchEvent({type:'dragend',target:chip,dataTransfer:drag});assert.equal(chip.getAttribute('title'),'Shared with Recovery');
+ b.api.destroy();
+});

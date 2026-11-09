@@ -174,7 +174,7 @@ in the house", "holds: resident is not looking at the phone yet").
 ### <step-id>   paths: <path ids>   time: <story time shown>
 Beat: <one sentence: what happens, told to the audience>
 Hops claimed: <for each message clause in the caption: every hop from the originating device to the last receiver, through each relay node (router, bridge)>
-Edges: <every hop above, in firing order, one arrow per call: a->b (request; name its evidenced reply in the caption), b->c, b->d (fan-out) ...>
+Edges: <every hop above, in firing order: a->b (request), b->a (response, ret, only with evidence), b->c, b->d (fan-out) ...>
 Missing hops check: <"none" or the hops you added and why>
 Report?: <"no report", "report at <time> delivered: <device-app fields> update", or "unshown scheduled report at <time>, illus: <fields>"; a reported value changes only for one of these>
 Focus: <which panel carries this beat>
@@ -189,13 +189,13 @@ Evidence: <ledger row numbers; "illus" for illustrative values>
 ```
 
 Edge rules:
-- List every hop the beat uses: each call (its evidenced reply named in the caption), every branch of
+- List every hop the beat uses: the request and its evidenced response, every branch of
   a fan-out, every relay hop (A to broker to B is two hops). If the caption says
   it, an edge must light it in this step, even if the same edge was lit in an
   earlier step; if an edge is lit, the caption or evidence must support it.
 - Common misses: the device's own first hop of a heartbeat or report
   (device -> ingest) when the caption starts at a backend write; the clip or
-  data fetch when a person "opens" something (app -> store; the caption names the reply); a
+  data fetch when a person "opens" something (app -> store and its reply); a
   state write the caption implies (ingest -> shadow when the app value
   changes).
 - Relays: each message follows the route the source gives. When the source
@@ -204,14 +204,14 @@ Edge rules:
   path (cellular, a second radio, an intentional fan-out) is fine when the
   source supports it. Never add a relay hop, or delete a sourced direct path,
   just to make the topology look uniform.
-- Responses: one arrow per call, caller to callee. Name what comes back
-  ("200", "202", "ack", the clip) in the step text or a calls panel, and only
-  when the source or code shows it. Do not add a `ret: true` edge. A read (app
-  opens a clip) has a sourced reply; a fire-and-forget report usually does not.
+- Responses: add a `ret: true` edge ("200", "202", "ack", "clip") only when
+  the source or code evidence shows that response, or write the answer in the
+  step text or a calls panel instead of a second arrow. A read (app opens a clip)
+  has a sourced reply; a fire-and-forget report usually does not.
 - A failure goes on the link that failed: Wi-Fi down means `cam->router` is
   `blocked`, not `cam->ingest`.
-- One edge per ordered node pair. A reply rides in the caption of the step
-  that lights the call. A second different message on the same pair goes in
+- One edge per ordered node pair. A response is a separate `ret: true` edge in
+  the opposite direction. A second different message on the same pair goes in
   the caption or a log panel.
 - Several steps may start with the same edge (a heartbeat every 30 minutes,
   a retry): each step gets its own numbered circle on that edge. Never drop or
@@ -292,7 +292,7 @@ Three to six source-grounded statements you will verify after building, for the
 hardest beats. Include one per operator anchor ("the 5:00 AM step shows 35%"). Examples: "On the offline path the door card never shows
 Closed." "The clock reads 7:10 AM Sat at the last step." "The low-battery icon
 appears at the same step the charge crosses 20." "Every step on the happy path
-lights the request and its caption names the reply."
+lights both the request and its response."
 
 For source-required visible evidence, also declare a companion visibility file
 as described in `docs/visibility-evidence.md`: section, view, path, step, panel,

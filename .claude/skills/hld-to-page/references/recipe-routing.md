@@ -43,17 +43,17 @@ topology, notification or outcome without evidence.
 Import a provider's slice when it already draws the systems your story uses;
 redraw only what no provider exports. Export a slice that other diagrams will
 show: its nodes and the edges between them. Syntax: `docs/shared-topology.md`.
-- When two exports from one provider share a node, draw it once. Exports of the
-  same section merge best: `export:["a","b"]` includes shared nodes once.
-  Otherwise import one of them as a subset (`nodes`/`edges`) without that node
-  and without the edges that touch it.
+- Two exports of one provider section that share a node: use one array import
+  (`export:["a","b"]`), which includes shared nodes once. Exports from different
+  sections cannot be merged, so a node in both is drawn twice unless you import
+  one of them as a subset (`nodes`/`edges`) without that node and its edges.
 - An imported block placed by hand can overlap the story's own floats and raise
   edge-label warnings: check the render after placing one.
 
 ## Presentation defaults
 
-- A landing tab (the first tab) is a diagram of the systems and teams in the
-  story, not a block of text. Gap lists and meeting notes belong in the ledger
+- A landing tab (the first tab a reader sees inside a diagram) is a diagram of
+  the systems and teams in the story, not a block of text. Gap lists and meeting notes belong in the ledger
   or the team's document system.
 - Target desktop and the intended Backstage/Confluence content widths. Test
   phone widths only when asked.

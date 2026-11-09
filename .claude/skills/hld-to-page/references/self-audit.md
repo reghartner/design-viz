@@ -63,8 +63,8 @@ Output lines have three levels:
   "just now" detail that changes on a step that delivers no edge (correct for
   an unshown scheduled report the source says succeeds: label it illustrative
   and name its time); a response edge labeled like an acknowledgement ("200",
-  "202", "ack"): one arrow per call, so drop it and name the reply in the step
-  text.
+  "202", "ack"): keep it only if the source or code shows that response;
+  otherwise name the reply in the step text (or a calls panel).
 - `NOTE` (information): codeRefs on a node but on no step (correct when that
   code never runs in the story); catalog services not bound; more than one
   diagram on the page.
@@ -99,7 +99,7 @@ worksheet, and write down which.
 |---|---|
 | C. Paths | Same path IDs, same step order, same endings. |
 | D. Time table | `storyTime` and battery rates match the header; the walk's clock column matches the Story time column, never backward; no panel `clock`/`date` patches; `detail` freshness text matches the elapsed time and the report cadence; battery `trend`, extra `drain` and `charge` anchors sit at their steps, every rate in the walk's numeric list is within the source's rate, and each reported battery card shows the value the walk printed for the report time; temperatures match; the camera scene / `timeOfDay` match day or night. |
-| E. Edges line | `step.edges` contains exactly the listed hops, one arrow per call (no `ret` edge; an evidenced reply is named in the caption), and every fan-out and relay hop. Failures match. |
+| E. Edges line | `step.edges` contains exactly the listed hops, including every evidenced response (`ret` edge; none without evidence) and every fan-out and relay hop. Failures match. |
 | E. Panel lines | `P` in the walk output exactly where the matrix says `patch:`; `.` exactly where it says `holds:`. Open the patch and confirm the values. |
 | E. Tones | `step.tone` matches, and carried tones are cleared where the source says recovery. |
 | F. Coverage grid | Same P/H pattern as the walk output. |

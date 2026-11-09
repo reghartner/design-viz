@@ -62,9 +62,9 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
    clause, list the hops from the originating device to the last receiver:
    the route the source gives, including each relay the source puts on that
    route (a home router, bridge or gateway), every fan-out branch, an
-   app read's request. Put all of them in that step's `edges`, even if lit
-   before. One arrow per call: a sourced reply ("202", ack) goes in the
-   caption, not a second edge. Put `blocked`/`dropped` on the link
+   app read's request and its reply. Put all of them in that step's `edges`,
+   even if lit before. Add a response edge ("200", "202", ack) only when the
+   source or code shows that response; else name it in the caption. Put `blocked`/`dropped` on the link
    that actually failed (with a router drawn, a Wi-Fi failure is the
    device→router hop). If a hop should not be lit, remove it from the caption.
 7. **Icons follow state.** Values never switch icons automatically. When a
@@ -187,7 +187,7 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     page with tabs, every section goes inside the tabs container: a direct
     section in `blocks` shows on every tab (above the tab bar if it comes
     before the container, below if after). Put intro and
-    "Considered/rejected" content in their own tab.
+    "Considered/rejected" content in their own tab or the first tab's text.
 
 And always: honesty. No invented facts. Unknown is not failed. End each path
 at its last source-backed outcome; do not add a user action (opening the
@@ -347,8 +347,8 @@ preserving an existing diagram; they are not ordinary new-graph defaults.
 Translation is mechanical once the worksheet is done:
 - One continuous timeline is one diagram. Worksheet step IDs become `steps[].id`; paths
   become `diagram.paths`.
-- The edges line becomes `step.edges` in the same order: one arrow per call,
-  its reply named in the step text (no `ret` edge).
+- The edges line becomes `step.edges` in the same order. Each pair of nodes has
+  one edge per direction; a response is its own opposite edge with `ret: true`.
 - The time table header becomes `diagram.storyTime` and the battery rates
   (`drainPerHour`/`chargePerHour` on the panel, or `deviceDefaults.battery`);
   each row's `time` becomes `steps[].time`.

@@ -96,7 +96,7 @@ ledger under "Decisions I made".
 | D3 | `notify` and `app` left unbound | not in the supplied catalog (I5) | blocks[0].diagram.nodes.notify, .app |
 | D4 | the sensor battery drifts by itself at 0.15 %/h (A1): 23 at 6:04 PM, 22 at 9:40 PM, 21 at 7:10 AM; no charge patches | an illustrative estimate; the drift stays above the low threshold (20); the page says the rate is illustrative | blocks[0].diagram.panels[2] |
 | D5 | no edge at `b-offline` | missed heartbeats are an absence, not a message | blocks[0].diagram.steps[4] |
-| D6 | phone app declares one source, `doorsvc` (Door service, `node: "cloud"`, `GET /door`); the door, battery and link cards all name it; the source map stays visible (`showSources` omitted) | A2-A4 and I6: the app learns every card from the door record; the declared route lets the walk prove each card change rides a delivered `app->cloud` step, and the visible map tells support engineers the app shows the service's record, not the door | blocks[0].diagram.panels[1].sources, .fields |
+| D6 | phone app declares one source, `doorsvc` (Door service, `node: "cloud"`, `GET /door`); the door, battery and link cards all name it; the source map stays visible (`showSources` omitted) | A2-A4 and I6: the app learns every card from the door record; the declared route lets the walk prove each card change rides a delivered `app->cloud`/`cloud->app` step, and the visible map tells support engineers the app shows the service's record, not the door | blocks[0].diagram.panels[1].sources, .fields |
 | D7 | the hub lost its link at 9:10 PM (illustrative); `b-offline` is at 9:40 PM | the source gives no time; three missed 10-minute heartbeats after 9:10 is 9:40 (source item 5) | blocks[0].diagram.steps[4].time, .text |
 | D8 | stage the supplied overnight story from 6:04 PM Fri Oct 2, 2026, through 7:30 AM next day; use a 12-hour clock and short dates | illustrative exact times and reasonable cosmetic formatting; the brief requires an overnight span but supplies no anchors or format | blocks[0].diagram.storyTime; blocks[0].text |
 ```
@@ -177,7 +177,7 @@ min; the last one arrives 9:10 PM, and 9:20, 9:30 and 9:40 are missed. The app
 receives nothing on its own: it reads `GET /door` on foreground entry and then
 every 30 seconds while visible (A2-A3), but not in the background (A4). A
 schedule is an opportunity, not evidence: the app column changes only at a
-step that lights `app->cloud` (the read; its reply is named in the caption).
+step that lights `app->cloud` and `cloud->app`.
 
 | Path | Step | `time` | Story time shown | Anchor, source or illus | Battery | Last report the app holds, and freshness | Day or night |
 |---|---|---|---|---|---|---|---|
@@ -232,9 +232,9 @@ Evidence: L3, L9, I9
 
 ### a-close   paths: closed   time: 6:22 PM (`18:22`)
 Beat: The resident taps the reminder; the app reads the door (Open), the resident taps Close, the service accepts it and commands the hub.
-Hops claimed: app -> door service (GET /door, then POST /door/close; replies: door record, then 202, named in the caption); door service -> hub (PUBLISH door/cmd)
-Edges: app->cloud (GET /door · POST /door/close), cloud->hub (PUBLISH door/cmd)
-Missing hops check: one arrow per call; the door record and the 202 (source item 4; A2 and I6 give the read) are named in the caption, not drawn as a second edge
+Hops claimed: app -> door service (GET /door, then POST /door/close); door service -> app (door record, then 202); door service -> hub (PUBLISH door/cmd)
+Edges: app->cloud (GET /door · POST /door/close), cloud->app (door record · 202, ret), cloud->hub (PUBLISH door/cmd)
+Missing hops check: added the response edge (source item 4 says the service replies 202; A2 and I6 give the read); one edge per pair, both messages named in the label and caption
 Report?: report at 6:22 PM delivered by the read: door (6:05 PM report, Open) and battery (23%, 6:05 PM); door then shows Closing from the app's own request
 Focus: phoneapp
 home: holds: the relay has not moved the door yet
@@ -248,8 +248,8 @@ Evidence: L4, A2, I6
 
 ### a-closed   paths: closed   time: 6:23 PM (`+1m`)
 Beat: The hub drives the opener; the limit switch confirms closed; the tilt sensor reports closed and battery; the hub publishes closed and the app's next refresh shows the new report.
-Hops claimed: tilt sensor -> hub (closed, battery); hub -> door service (PUBLISH door/state closed); app -> door service (GET /door, 30 s refresh; reply: door record, named in the caption)
-Edges: sensor->hub (closed report), hub->cloud (PUBLISH door/state), app->cloud (GET /door; the caption names the record it reads)
+Hops claimed: tilt sensor -> hub (closed, battery); hub -> door service (PUBLISH door/state closed); app -> door service (GET /door, 30 s refresh); door service -> app (door record)
+Edges: sensor->hub (closed report), hub->cloud (PUBLISH door/state), app->cloud (GET /door), cloud->app (door record, ret)
 Missing hops check: included sensor->hub because the door changed and I8 says the tilt sensor reports every door-state change; no ack is stated
 Report?: report at 6:23 PM delivered by the refresh: door Closed and battery 23%, both from the sensor's 6:23 PM report
 Focus: home
@@ -280,8 +280,8 @@ Evidence: L5, D7 (9:10 PM illus), D4 illus rate
 
 ### b-morning   paths: offline   time: 7:10 AM, Sat, Oct 3 (`07:10`)
 Beat: The resident opens the app next morning; it reads the service: Open, stale, 13 hours old.
-Hops claimed: app -> door service (GET /door; reply: door record, named in the caption)
-Edges: app->cloud (GET /door; the caption names the record it reads)
+Hops claimed: app -> door service (GET /door); door service -> app (door record)
+Edges: app->cloud (GET /door), cloud->app (door record, ret)
 Missing hops check: none (the service answers from its record; the hub is not asked)
 Report?: report at 7:10 AM delivered by the read: door Open (6:05 PM report), battery 23% (6:05 PM), hub Offline (last heartbeat 9:10 PM)
 Focus: phoneapp
@@ -338,17 +338,17 @@ applies.
 | notify | | | | | not a catalog service (vendor) |
 | hub, sensor | | | | | device, not a catalog service |
 | app | | | | | not in supplied catalog: recorded as gap row (D3) |
-| phoneapp source `doorsvc` (`node: "cloud"`) | through `cloud`: component:default/door-service | `GET /door` (I6) | | a-close, a-closed, b-morning | door, battery and link cards read the door record; each of these steps lights `app->cloud` |
+| phoneapp source `doorsvc` (`node: "cloud"`) | through `cloud`: component:default/door-service | `GET /door` (I6) | | a-close, a-closed, b-morning | door, battery and link cards read the door record; each of these steps lights `app->cloud` and `cloud->app` |
 
 ### I. Checkable expectations
 
 1. On path offline the map door never closes, and the app's door card changes
    only at `b-morning`, to Open (stale).
 2. The last step of path offline reads 7:10 AM, Sat, Oct 3.
-3. `a-close` lights the request; its caption names the 202 reply.
-4. Every app card change sits on a step that lights `app->cloud`, the
-   delivered edge that touches `cloud`, the node of the cards' declared
-   source `doorsvc`.
+3. `a-close` lights the request and its response.
+4. Every app card change sits on a step that lights `app->cloud` and
+   `cloud->app`, the delivered edges that touch `cloud`, the node of the
+   cards' declared source `doorsvc`.
 5. At `a-closed`, `sensor->hub` carries the close report and the refreshed app
    battery card says "Last report 6:23 PM".
 6. No battery icon changes: the charge never reaches the low threshold (20).
@@ -422,6 +422,7 @@ and each `patch:` line is one sparse patch.
             {"from": "cloud", "to": "notify", "kind": "int", "label": "send reminder"},
             {"from": "notify", "to": "app", "kind": "https", "label": "push"},
             {"from": "app", "to": "cloud", "kind": "https", "label": "GET /door · POST /door/close"},
+            {"from": "cloud", "to": "app", "kind": "https", "ret": true, "label": "door record · 202"},
             {"from": "cloud", "to": "hub", "kind": "mqtt", "label": "PUBLISH door/cmd"}
           ],
           "panels": [
@@ -506,14 +507,14 @@ and each `patch:` line is one sparse patch.
               }
             },
             {
-              "id": "a-close", "time": "18:22", "edges": ["app->cloud", "cloud->hub"],
+              "id": "a-close", "time": "18:22", "edges": ["app->cloud", "cloud->app", "cloud->hub"],
               "text": "6:22 PM. The resident taps the reminder. The app reads the door record (**Open**, last report 6:05 PM), the resident taps **Close**, and the app posts the request. The door service replies 202 and publishes a close command to the hub.",
               "panels": {
                 "phoneapp": {"phoneScreen": "app", "clear": true, "door": {"value": "Closing", "status": "loading", "detail": "Close requested 6:22 PM"}, "battery": {"detail": "Last report 6:05 PM"}}
               }
             },
             {
-              "id": "a-closed", "time": "+1m", "edges": ["sensor->hub", "hub->cloud", "app->cloud"],
+              "id": "a-closed", "time": "+1m", "edges": ["sensor->hub", "hub->cloud", "app->cloud", "cloud->app"],
               "text": "6:23 PM. The hub drives the opener relay. The opener's limit switch confirms closed; the tilt sensor reports **closed** with battery; the hub publishes **closed**. The app's next refresh reads the new report.",
               "panels": {
                 "home": {"gdoor": "closed", "hubdev": "tx", "signals": [{"from": "tilt", "to": "hubdev"}]},
@@ -528,7 +529,7 @@ and each `patch:` line is one sparse patch.
               }
             },
             {
-              "id": "b-morning", "time": "07:10", "edges": ["app->cloud"],
+              "id": "b-morning", "time": "07:10", "edges": ["app->cloud", "cloud->app"],
               "text": "7:10 AM next day. The resident opens the app, which reads the door record: **Open**, stale, from the 6:05 PM report. The real door position is unknown to the service.",
               "panels": {
                 "phoneapp": {"phoneScreen": "app", "door": {"value": "Open", "status": "stale", "detail": "Last report 6:05 PM · 13 h ago"}, "battery": {"status": "stale", "detail": "Last report 6:05 PM · 13 h ago"}, "link": {"value": "Offline", "status": "error", "icon": "wifi-off", "detail": "Last heartbeat 9:10 PM"}}
@@ -581,11 +582,11 @@ battery batt: drain 0.15 %/h (panel), charge 20 %/h (built-in placeholder)
       * home     {gdoor:open, tilt:ok, hubdev:idle, car:{x:225, y:165}, signals:[0]}
       * phoneapp {phoneScreen:home, door:{value:Closed, status:ready, detail:Last report 4:05 PM}, battery:{value:23, status:ready, detail:Last report 4:05 PM}, link:{value:Online, status:ready}, notifications:[1], clock:6:20, date:Fri, Oct 2}
       * batt     {charge:22.96, source:cells, trend:draining, note:illustrative drain estimate, log:[0]}
-  a-close        6:22 PM   app->cloud, cloud->hub                       .P.          
+  a-close        6:22 PM   app->cloud, cloud->app, cloud->hub           .P.          
         home     {gdoor:open, tilt:ok, hubdev:idle, car:{x:225, y:165}, signals:[0]}
       * phoneapp {phoneScreen:app, door:{value:Closing, status:loading, detail:Close requested 6:22 PM}, battery:{value:23, status:ready, detail:Last report 6:05 PM}, link:{value:Online, status:ready}, notifications:[0], clock:6:22, date:Fri, Oct 2}
         batt     {charge:22.96, source:cells, trend:draining, note:illustrative drain estimate, log:[0]}
-  a-closed       6:23 PM   sensor->hub, hub->cloud, app->cloud          PP.          
+  a-closed       6:23 PM   sensor->hub, hub->cloud, app->cloud, cloud->app PP.
   EXPECT ok   closed/a-closed:phoneapp.door.value = "Closed"
   EXPECT ok   closed/a-closed:phoneapp.battery.detail = "Last report 6:23 PM"
       * home     {gdoor:closed, tilt:ok, hubdev:tx, car:{x:225, y:165}, signals:[1]}
@@ -610,7 +611,7 @@ battery batt: drain 0.15 %/h (panel), charge 20 %/h (built-in placeholder)
       * home     {gdoor:open, tilt:ok, hubdev:{state:idle, icon:cloud-off}, car:{x:225, y:165}, signals:[0]}
       * phoneapp {phoneScreen:home, door:{value:Closed, status:ready, detail:Last report 4:05 PM}, battery:{value:23, status:ready, detail:Last report 4:05 PM}, link:{value:Online, status:ready}, notifications:[1], clock:9:40, date:Fri, Oct 2}
       * batt     {charge:22.46, source:cells, trend:draining, note:illustrative drain estimate, log:[0]}
-  b-morning      7:10 AM   app->cloud                                   .P.          phoneapp.link.icon=wifi-off
+  b-morning      7:10 AM   app->cloud, cloud->app                       .P.          phoneapp.link.icon=wifi-off
   EXPECT ok   offline/b-morning:phoneapp.door.value = "Open"
   EXPECT ok   offline/b-morning:phoneapp.date = "Sat, Oct 3"
         home     {gdoor:open, tilt:ok, hubdev:{state:idle, icon:cloud-off}, car:{x:225, y:165}, signals:[0]}
@@ -638,8 +639,8 @@ turns `charging`, so the walk asks nothing about it.
 
 No card change is flagged as undelivered: the door, battery and link cards
 name the source `doorsvc`, whose `node` is `cloud`, and every step that
-changes a card (`a-close`, `a-closed`, `b-morning`) lights `app->cloud`.
-Without that declared source the walk cannot tell which edge
+changes a card (`a-close`, `a-closed`, `b-morning`) lights `app->cloud` and
+`cloud->app`. Without that declared source the walk cannot tell which edge
 feeds a card and prints a CHECK ("the spec declares no route for it") at each
 card change. The code reference appears on both `open` (the timer starts) and
 `remind` (the reminder is sent), matching section H.
@@ -649,8 +650,8 @@ step. `home` is starred at `remind` although the step does not patch it (`.`
 in the panels column): the tilt-to-hub signal from `open` is step-local, so it
 clears (`signals:[1]` to `signals:[0]`); `batt` is starred wherever drift
 moved it. Read each starred line against section E: the door stays `open` on
-path offline, and the app cards change only at steps that light `app->cloud`.
-Every other line matches sections D to I. Note what the
+path offline, and the app cards change only at steps that light `app->cloud`
+and `cloud->app`. Every other line matches sections D to I. Note what the
 walk does not flag: the app's battery card reads 23 while the sensor is at 22
 and 21 on the offline path, because each card's detail names the 6:05 PM or
 4:05 PM report it shows. On the closed path, the 6:23 PM sensor report rounds

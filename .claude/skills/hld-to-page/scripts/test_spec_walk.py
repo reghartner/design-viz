@@ -119,12 +119,12 @@ class WalkTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         return Walk(r.stdout)
 
-    # ---- #1214: one arrow per call ----------------------------------------
+    # ---- #1214: replies without a second arrow ----------------------------
 
-    def test_ack_style_response_edge_suggests_one_arrow_not_a_return_edge(self):
-        # #1214 (company round 6): one arrow from caller to callee; what comes back
-        # is named in the step text. The walker must not push authors toward
-        # `ret: true` edges. Existing ret edges still validate cleanly.
+    def test_ack_style_response_edge_offers_the_step_text_alternative(self):
+        # #1214 (company round 6, corrected): a ret edge stays only with evidence;
+        # otherwise the reply is named in the step text or a calls panel. Existing
+        # ret edges still validate cleanly.
         spec = page({"edges": [
             {"from": "cam", "to": "svc", "kind": "https", "label": "report"},
             {"from": "svc", "to": "cam", "kind": "https", "ret": True, "label": "202 accepted"},
@@ -133,10 +133,8 @@ class WalkTest(unittest.TestCase):
         w = self.walk(spec)
         hits = [c for c in w.checks if "svc->cam" in c]
         self.assertEqual(len(hits), 1, w.out)
-        self.assertIn("one arrow per call", hits[0])
-        self.assertIn("drop this edge and name the reply in the step text", hits[0])
-        self.assertNotIn("keep it", hits[0])
-        self.assertNotIn("ret: true", hits[0])
+        self.assertIn("keep it only if the source or code shows this response", hits[0])
+        self.assertIn("otherwise name the reply in the step text (or a calls panel)", hits[0])
         # A plain request edge with an ack-like label is not a response edge.
         spec["page"]["blocks"][0]["diagram"]["edges"][1].pop("ret")
         w = self.walk(spec)

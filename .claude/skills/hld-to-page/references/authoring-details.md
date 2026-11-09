@@ -301,8 +301,8 @@ new arithmetic, no new attributions.
 
 - One addressable edge per `from->to` pair — a second message between the
   same pair in the same direction lives in step text or a log line. A
-  reply is named in the step text, not drawn as a second edge back (one
-  arrow per call; `"ret": true` edges in existing specs still render).
+  return message is its own opposite-direction edge with `"ret": true` when
+  the source shows it; or name the reply in the step text instead.
 - Failed sends use `step.failures:{"from->to":"dropped"|"blocked"}` on an
   existing edge: dropped means attempted but not delivered; blocked means
   not sent. A received error response or timeout alone does not prove loss.

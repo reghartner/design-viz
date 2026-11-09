@@ -458,7 +458,9 @@ diagram in that same section:
             ["broker", ["deviceA", "deviceB", "deviceC"]] ],
   "floats": [ { "id": "auth", "side": "above" } ],
   "edges": [
-    { "from": "console", "to": "api", "kind": "https", "label": "POST /commands" }
+    { "from": "console", "to": "api", "kind": "https", "label": "POST /commands" },
+    { "from": "deviceB", "to": "broker", "kind": "mqtt", "ret": true,
+      "label": "PUBACK" }
   ],
   "steps": [
     { "edge": "console->api", "text": "Operator sends the command",
@@ -938,8 +940,8 @@ Directed arrows between placed nodes:
   edges and row positions retain their normal behavior. Ports fix endpoints,
   not a collision-free route: use `bend` and label offsets for crowded paths.
 - `kind` — the **protocol** of the hop (see "Edge kinds"). Default `int`.
-- `ret` — `true` marks a response edge, drawn as a fine dash. Kept for existing
-  specs; new stories draw one arrow per call and name the reply in step text.
+- `ret` — `true` marks an evidenced response/ack, drawn as a fine dash in the
+  protocol's color; or name the reply in the step text.
 - `label` — optional short text on the edge. Protocol verbs and topics read
   best: `POST /commands`, `PUBLISH cmd/site-4/pump-7`, `verify JWT`. Keep
   under ~28 characters.
@@ -2247,8 +2249,8 @@ only at its own step and is not carried forward.
 An ordered array walking the flow. Each step:
 
 - `edge`: `"from->to"` (matching an edge's `from`/`to` ids exactly), **or**
-  `edges`: an array of such keys for hops that happen together (a fan-out).
-  Multi-edge steps fire their packets in list
+  `edges`: an array of such keys for hops that happen together (a fan-out, a
+  request+response round trip). Multi-edge steps fire their packets in list
   order, staggered — a two-hop delivery reads as two hops.
 - `failures` — optional map of existing edge keys to communication outcomes:
   `{"broker->device":"dropped","api->worker":"blocked"}`. `dropped` means a
@@ -2547,9 +2549,10 @@ contract stays the authority; a recipe shows the working subset for one task.
 1. Components/services → `nodes` (id, short title, sub = role/topic/port,
    closest icon, tint by role). Attach the doc's permalink for each component
    as `link`.
-2. Calls/messages between them → `edges` with the right protocol `kind`, one
-   arrow from caller to callee; name what comes back (202, ack, a record) in the
-   step text or a calls panel, not as a `ret: true` edge.
+2. Calls/messages between them → `edges` with the right protocol `kind`. Add a
+   response/ack `ret: true` edge only when the source or code shows the
+   response, or write the answer in the step text or a calls panel instead of a
+   second arrow.
 3. The main scenario → `steps` in narrative order, captions in plain language,
    permalinks as `link` where the doc has them.
 4. Group into `sections` (one flow per section, accent per topic, `source` =

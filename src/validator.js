@@ -492,7 +492,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (e){
       var ek = e.from + '->' + e.to;
       if (edgeKeys[ek])
-        warnings.push(EP + ': duplicate edge "' + ek + '" — the engine keys edges by from->to, so the second declaration overrides the first\'s animation and coin anchors; merge them into one arrow, or name the reply in the step text');
+        warnings.push(EP + ': duplicate edge "' + ek + '" — the engine keys edges by from->to, so the second declaration overrides the first\'s animation and coin anchors; merge them into one edge or make one a return (swap from/to with ret:true)');
       edgeKeys[ek] = true;
     }
   });

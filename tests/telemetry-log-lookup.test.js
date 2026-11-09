@@ -10,7 +10,7 @@ const TRACE='1e4cef70fde7bde26ca79f1e74c05bcb',SPAN='b4be3d5412c33b2e',OTHER='84
 const QUERY='{env="$env", k8s_namespace_name="${namespace}"} |= "Handling camera stats message" | cameraModel="$value"';
 const EXPANDED='{env="stg", k8s_namespace_name="cameras-stg"} |= "Handling camera stats message" | cameraModel="arch"';
 // #1158: "Only lines with a trace ID" is checked by default and appends this filter.
-const FILTER=' | trace_id =~ "[0-9a-fA-F]{16,32}"';
+const FILTER='\n| trace_id =~ "[0-9a-fA-F]{16,32}"';
 function context(name='standalone',timers={setTimeout,clearTimeout}){const C={URL,AbortController,TextEncoder,TextDecoder,console,setTimeout:timers.setTimeout,clearTimeout:timers.clearTimeout,document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint(name).body,C);return C;}
 function board(lookups={camera:{label:'Camera model',query:QUERY,values:['arch','wren']}}){
  return {tracking:{telemetry:{grafana:{loki:'loki-$env'},environment:'stg',environments:{stg:{variables:{namespace:'cameras-stg'}},prd:{variables:{namespace:'cameras-prd'}}},lookups,traceConnections:{company:clone(fixture)}}},sections:[{id:'one',diagram:{nodes:{a:{}},rows:[['a']]}}]};
@@ -148,8 +148,8 @@ test('#1158 checked by default, Find appends the trace ID label filter: an autho
  const custom=setup({p:board({camera:{label:'Camera model',query:QUERY,values:['arch'],fields:{traceId:'tid',spanId:'sid'}}}),data:[entry({meta:{cameraModel:'arch',tid:TRACE,sid:SPAN}})]});await settle();
  assert.equal(custom.api.snapshot().form.traced,true,'the checkbox starts checked');
  custom.api.set('value','arch');await custom.api.find();
- assert.deepEqual(custom.calls.map(c=>c.args.logql),[EXPANDED+' | tid =~ "[0-9a-fA-F]{16,32}"'],'the filter goes after the $value fill, on the lookup field');
- assert.equal(custom.api.snapshot().result.query,EXPANDED+' | tid =~ "[0-9a-fA-F]{16,32}"');assert.deepEqual(rows(custom.api),[['2026-11-07T09:42:13.123Z','arch',TRACE,SPAN,'']]);
+ assert.deepEqual(custom.calls.map(c=>c.args.logql),[EXPANDED+'\n| tid =~ "[0-9a-fA-F]{16,32}"'],'the filter goes after the $value fill, on the lookup field');
+ assert.equal(custom.api.snapshot().result.query,EXPANDED+'\n| tid =~ "[0-9a-fA-F]{16,32}"');assert.deepEqual(rows(custom.api),[['2026-11-07T09:42:13.123Z','arch',TRACE,SPAN,'']]);
  const typed=setup({p:board({})});await settle();typed.api.set('logql','{env="$env"} |= "Handling camera stats message"');await typed.api.find();
  assert.deepEqual(typed.calls.map(c=>c.args.logql),['{env="stg"} |= "Handling camera stats message"'+FILTER]);
 });

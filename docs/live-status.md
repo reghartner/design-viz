@@ -3011,7 +3011,7 @@ Find makes one `query_loki_logs` call to the Grafana connector that offers that
 tool (the one `loki` signals use, preferring a connector named Grafana):
 
 ```json
-{"datasourceUid": "loki-uid", "logql": "{env=\"stg\"} |= \"Handling camera stats message\" | cameraModel=\"arch\" | trace_id =~ \"[0-9a-fA-F]{16,32}\"",
+{"datasourceUid": "loki-uid", "logql": "{env=\"stg\"} |= \"Handling camera stats message\" | cameraModel=\"arch\"\n| trace_id =~ \"[0-9a-fA-F]{16,32}\"",
  "startRfc3339": "now-2h", "endRfc3339": "now", "limit": 10, "direction": "backward", "queryType": "range"}
 ```
 
@@ -3023,7 +3023,9 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
 - In Over time Find searches the selected day (#1141): the whole local calendar
   day, to now for today (`snapshot().overTime.window`). The section names it,
   for example "Loki · Nov 6 00:00–24:00 local", and an empty result says "No
-  matching log lines on Nov 6." A Trace start or end typed under Lookback still
+  log lines with a trace ID on Nov 6. Clear "Only lines with a trace ID" to see
+  every line." (unchecked: "No matching log lines on Nov 6."). A Trace start or
+  end typed under Lookback still
   wins. Changing the day clears the results without a call; the typed value
   stays. Live is unchanged.
 - A value cannot contain quotes, backticks, backslashes or control characters,
@@ -3032,7 +3034,8 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   10 lines. A Find with no answer after 30 seconds stops with a timeout message.
 - **Only lines with a trace ID** (#1158) is checked by default. Find then adds
   a label filter on the lookup's `fields.traceId` (`trace_id` for a typed
-  query) to the end of the query, `| trace_id =~ "[0-9a-fA-F]{16,32}"`, the
+  query) on a new line at the end of the query, so a trailing `#` comment
+  cannot hide it: `| trace_id =~ "[0-9a-fA-F]{16,32}"`, the
   16 to 32 hex rule the list applies, so Loki's 10 lines have a trace ID. A
   metric query, or a field name that is not a LogQL label name, is sent as
   written. A returned line without a valid trace ID is not listed. An empty
@@ -3043,7 +3046,7 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
 - The result lists up to 10 lines, newest first: time (UTC), the value (or the
   line text for a typed query), and the trace ID. The IDs are read from the
   line's structured metadata, then parsed labels, then stream labels, because
-  Loki before 3.0 reports every label as a stream label. A line without the
+  Loki before 3.0 reports every label as a stream label. Unchecked, a line without the
   trace ID field says "This log line has no trace_id" (with the configured
   field name) and has no Load button. A metric query returns no lines and says so.
 - **Load** on a line loads that trace ID through the selected connection,

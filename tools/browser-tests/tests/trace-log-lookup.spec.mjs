@@ -92,7 +92,7 @@ test('desktop "Only lines with a trace ID": checked by default; unchecked Find s
  expect(h.calls.map(c=>c.args.logql)).toEqual([query]);await expect(rows.nth(1)).toContainText('This log line has no trace_id');
  await traced.check();await expect(rows,'changing the checkbox clears the results').toHaveCount(0);expect(h.calls).toHaveLength(1);
  await find.click();await expect(rows).toHaveCount(1);await expect(rows.nth(0).locator('.dv-trace-log-id')).toHaveText(ID);
- expect(h.calls.map(c=>c.args.logql)).toEqual([query,query+' | trace_id =~ "[0-9a-fA-F]{16,32}"']);
+ expect(h.calls.map(c=>c.args.logql)).toEqual([query,query+'\n| trace_id =~ "[0-9a-fA-F]{16,32}"']);
  await info.attach('log-lookup-traced-only',{body:await h.root.screenshot(),contentType:'image/png'});
 });
 
@@ -120,7 +120,7 @@ test('desktop Over time Find searches the selected day: today to now, then the w
  // #1158: "Only lines with a trace ID" is checked by default, so the line without one is not listed.
  await logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(rows).toHaveCount(1);
  let sent=await calls();expect(sent).toHaveLength(1);expect([sent[0].startRfc3339,sent[0].limit,sent[0].direction]).toEqual([await midnight(0),10,'backward']);
- expect(sent[0].logql).toBe('{env="stg"} |= "Handling camera stats message" | cameraModel="arch" | trace_id =~ "[0-9a-fA-F]{16,32}"');
+ expect(sent[0].logql).toBe('{env="stg"} |= "Handling camera stats message" | cameraModel="arch"\n| trace_id =~ "[0-9a-fA-F]{16,32}"');
  const end=Date.parse(sent[0].endRfc3339);expect(end).toBeGreaterThanOrEqual(before);expect(end).toBeLessThanOrEqual(await page.evaluate(()=>Date.now()));
  await info.attach('log-search-over-time-today',{body:await root.screenshot(),contentType:'image/png'});
  // Previous day clears the results without a call; the typed value stays. Find then searches that whole day.

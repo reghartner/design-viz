@@ -126,10 +126,11 @@ function createTelemetryLogLookup(page,transport,hooks){
       var logql=expand(query,slot),uid=lookup && lookup.datasource?expand(lookup.datasource,false):config.grafana && config.grafana.loki;
       if(missing)fail('Set telemetry variable ${'+missing+'} in the active environment.');
       if(slot)logql=logql.replace(/\$\{value\}|\$value(?![A-Za-z0-9_])/g,function(){return value;});
-      // #1158: ask Loki only for lines whose trace ID field passes telemetryLogLines' hex rule. A metric
-      // query (no leading stream selector) or a field that is not a label name keeps the query as typed.
+      // #1158: ask Loki only for lines whose trace ID field passes telemetryLogLines' hex rule, on a new
+      // line so a trailing # comment cannot swallow it. A metric query (no leading stream selector) or a
+      // field that is not a label name keeps the query as typed.
       var fields=lookup?lookup.fields:{traceId:'trace_id',spanId:'span_id'};
-      if(request.traced && /^\s*\{/.test(logql) && telemetryLogFieldPattern.test(fields.traceId))logql+=' | '+fields.traceId+' =~ "[0-9a-fA-F]{16,32}"';
+      if(request.traced && /^\s*\{/.test(logql) && telemetryLogFieldPattern.test(fields.traceId))logql+='\n| '+fields.traceId+' =~ "[0-9a-fA-F]{16,32}"';
       if(!uid)fail('Set tracking.telemetry.grafana.loki to the Loki datasource UID.');
       var back=typeof hooks.lookback==='function'?hooks.lookback() || {}:{},searched=daySearch(back),range=searched?{startRfc3339:searched.from,endRfc3339:searched.to,lookback:null}:telemetryLogRange(back.start,back.end,back.lookback);
       var args={datasourceUid:uid,logql:logql,startRfc3339:range.startRfc3339,endRfc3339:range.endRfc3339,limit:TELEMETRY_LOG_LIMIT,direction:'backward',queryType:'range'};

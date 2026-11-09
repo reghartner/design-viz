@@ -106,9 +106,10 @@ your-diagram/
 ```
 
 The support directory contains its own `.gitignore` excluding its contents.
-A request's candidate copies are deleted once it is finished (accepted, replied,
-released, withdrawn or expired) or a newer request is published; the current
-request keeps its own, and a name this session never published is left alone (#1223).
+A request's candidate copies are deleted once it is accepted, released, withdrawn
+or expired, or when a newer request is published (a reply may be a question, so its
+copies stay until then); the current request keeps its own, and a name this session
+never published is left alone (#1223).
 Commit the reviewed spec and ledger; connection metadata, copied messages and
 candidate files are not project deliverables. Existing unrelated files, including
 a root README or `.gitignore`, are preserved. Previously created exchange folders

@@ -3362,8 +3362,8 @@ test('#1137 metric cards on a board without tickets get no Jira presentation; ti
 // Chuck 2026-11-08 (D13): the Metrics overlay draws in every view. In the Trace view its cards carry no Jira work colouring,
 // and the Workbench card preview still draws there.
 /* #1153: the Trace view's metrics popup states metric evidence only: signal values, window, verdict and query links,
-   with no Jira state or proof words and no Since Done line. Dates in either popup read in local time, never as ISO. */
-test('#1153 the Trace-view metrics popup shows metric evidence only, and the Jira-view proof line reads its date in local time',async()=>{
+   with no Jira state or proof words and no Since Done line; since #1202 the Jira view's popup evidence does too. No ISO dates. */
+test('#1153 the Trace-view metrics popup shows metric evidence only, and neither popup has a Since Done line or an ISO date (#1202)',async()=>{
  const DONE='2026-11-05T12:00:00.000Z',ISO=/\d{4}-\d\d-\d\dT\d\d:\d\d/;
  const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',tickets:['EE-1'],telemetry:TCALL()}]}}]}};
  const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:{rate:{value:5500},errors:{value:12}}}})}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};

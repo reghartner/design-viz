@@ -314,7 +314,9 @@
       var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
       el(detail,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');
       var limit=e.warnings.filter(function(w){return /200 spans|timeline unavailable/i.test(w);});if(model.warning)limit.push(model.warning);if(limit.length)el(detail,'p','limit','dv-trace-limit',Array.from(new Set(limit)).join(' '));
-      if(model.mapping)el(detail,'p','coverage','dv-trace-coverage',model.rows.filter(function(r){return r.status==='matched';}).length+'/'+model.rows.length+' steps matched · '+model.mapping.unmatched.length+' spans unmatched');
+      // #1175: an optional step missing from this trace does not count against coverage.
+      var optional=model.rows.filter(function(r){return r.optional;}).length;
+      if(model.mapping)el(detail,'p','coverage','dv-trace-coverage',model.rows.filter(function(r){return r.status==='matched';}).length+'/'+(model.rows.length-optional)+' steps matched · '+(optional?optional+' optional not in this trace · ':'')+model.mapping.unmatched.length+' spans unmatched');
       var focus=selected.focus,focusedSpan=focus && e.spans.find(function(s){return s.id===focus.spanId;});
       var focusBox=el(detail,'div','focus','dv-trace-focus-summary');
       el(focusBox,'span','hint','dv-trace-focus-hint',focusedSpan?'Trace focus · '+focusedSpan.name:'Select a span to focus its operation and pause playback.');

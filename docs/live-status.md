@@ -2121,6 +2121,24 @@ count: `16.1 ms across 2 spans`. A board that keeps one step per transport reads
 `2 operations · 1 unknown · 16.1 ms` (the other transport's step is missing); make them one
 step with alternatives.
 
+A step that may be absent from a trace (for example, its operation runs in a different
+trace) can carry `traceMatch.optional: true`; with alternatives, set it on every
+alternative ([canon rules](canon.md#reference-traces-and-incident-alternates)). A step whose
+`parentStepId` names an optional step must be marked optional too, or it reads unknown when
+the parent is absent. When the loaded trace has no span with an optional step's service and
+operation, the label is built from the other rows as if that row were not
+there: a node named by one matched step and one missing optional step reads
+`Matched: … · 16.1 ms`, or only the time for a single selector. The title lists it as
+*optional, not in this trace: service operation*, it never makes the node unknown, and a
+node whose only row is a missing optional step gets no label. The coverage line leaves it
+out and adds the count: `1/3 steps matched · 1 optional not in this trace · 0 spans
+unmatched`. Edge labels and titles carry matched rows only, so a missing step, optional or
+not, never adds to an edge and an edge title does not list a missing optional step. A
+matched optional step reads like any matched step; an ambiguous one still counts as
+ambiguous. Local, imported and drill-down steps follow the same rules. A trace that lacks
+an optional step can still be approved as the reference trace; a missing step without
+`optional` still blocks approval.
+
 With the Metrics overlay on, the trace labels are drawn first and the metric cards are then
 placed clear of them, the same way cards avoid node cards (#1163). The labels never move for
 cards; a card moves farther from its edge instead, and the diagram frame grows to fit it.

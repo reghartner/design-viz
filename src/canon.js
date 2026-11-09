@@ -283,11 +283,14 @@ var FlowCanon = (function(){
             if(m.occurrence!=null && (!Number.isInteger(m.occurrence) || m.occurrence<1))errors.push('traceMatch.occurrence: positive integer required');
             if(m.repeat!=null && m.repeat!=='attempts')errors.push('traceMatch.repeat: expected attempts');
             if(m.repeat && m.occurrence)errors.push('traceMatch: occurrence and repeat cannot be combined');
+            if(m.optional!==undefined && typeof m.optional!=='boolean')errors.push('traceMatch.optional: expected true or false');
             if(m.attributes!=null && (!object(m.attributes) || Object.keys(m.attributes).some(function(k){return !traceAttributes.includes(k) && !Object.prototype.hasOwnProperty.call(listed,k) || !['string','number','boolean'].includes(typeof m.attributes[k]);})))errors.push('traceMatch.attributes: use supported operational attributes only');
           }
         }
         if(many)for(var j=first;j<errors.length;j++)errors[j]=errors[j].replace(/^traceMatch/,'traceMatch['+index+']');
         });
+        // #1175: a step with alternatives is optional only when every alternative says so.
+        if(many && list.some(function(m){return object(m) && m.optional===true;}) && list.some(function(m){return !object(m) || m.optional!==true;}))errors.push('traceMatch: set optional on every alternative or on none');
         if(st.conditions!=null){
           if(!Array.isArray(st.conditions))errors.push('conditions: expected an array');
           else st.conditions.forEach(function(c){

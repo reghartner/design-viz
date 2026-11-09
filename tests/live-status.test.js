@@ -3741,3 +3741,40 @@ test('#1164 example traces are not selected or painted until the reader picks on
   api.destroy();
  }
 });
+/* #1175: a step whose traceMatch is optional and that this trace lacks does not count against
+   the coverage line; the line adds "· K optional not in this trace". A local board and a drill-down. */
+test('#1175 the coverage line leaves out a missing optional step and counts it as optional not in this trace',async()=>{
+ for(const optional of [false,true]){
+  const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),d=f.spec.page.sections[0].diagram;
+  if(optional)d.steps.find(s=>s.id==='push').traceMatch.optional=true;
+  const h=harness(f.spec,{},{telemetry:{}}),api=h.ctl.liveStatus,m=mountStatus(h);
+  h.ctl.sections[0].stepper={path:()=>'event',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+  h.ctl.telemetry.apply(f.samples);api.setStatusMode('trace');h.flush();
+  const entry=api.snapshot().trace.entries[0];await api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});h.flush();
+  // The event path: submit matched, publish and push missing, unbound has no traceMatch.
+  assert.equal(m.body.querySelector('.dv-trace-coverage').textContent,optional?'1/3 steps matched · 1 optional not in this trace · 0 spans unmatched':'1/4 steps matched · 0 spans unmatched');
+  const text=el=>el.children.map(c=>c.textContent || '').join(' | '),row=m.body.querySelectorAll('.dv-trace-mapping').map(text).find(t=>t.startsWith('push notification'));
+  assert.equal(row,optional?'push notification | Not observed | Optional, not in this trace.':'push notification | Not observed | Not observed · outcome unknown','the push step is listed among the mappings');
+  api.destroy();
+ }
+});
+test('#1175 a drill-down step that is optional and missing reads like a local one',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),ID='8413cd87a9f15b6bfe8e1acf5b3346d0';
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const raw={page:{tracking:{telemetry:{traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{domain:{title:'Domain',detail:{spec:'remote',section:'child',mode:'link'}}},rows:[['domain']]}}]}};
+ const remote={page:{sections:[{id:'child',diagram:{nodes:{checkout:{title:'Checkout'}},rows:[['checkout']],steps:[
+  {id:'cart',nodes:['checkout'],text:'Check out the cart',traceMatch:{serviceName:'frontend',operation:'/cart/checkout',nodeId:'checkout'}},
+  {id:'refund',nodes:['checkout'],text:'Refund the order',traceMatch:{serviceName:'refund',operation:'POST /refund',nodeId:'checkout',optional:true}}]}}]}};
+ const options={loadDetail:async()=>remote,telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async()=>({payload:recorded})}}};
+ const h=harness(raw,{},options),api=h.ctl.liveStatus,m=mountStatus(h);
+ await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.flush();api.setStatusMode('trace');
+ const child=api.snapshot().trace.direct.sections.find(s=>/ · child$/.test(s.label));assert.ok(child,'the drill-down is a mapping diagram');
+ api.setDirectTraceField({field:'section',value:child.id});api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:ID});
+ assert.ok(await api.loadDirectTrace(false),'the trace loads against the drill-down diagram');h.flush();
+ const selected=api.snapshot().trace.selected;assert.deepEqual(plain(selected.model.rows.map(r=>[r.id,r.status])),[['cart','matched'],['refund','missing']]);
+ assert.match(m.body.querySelector('.dv-trace-coverage').textContent,/^1\/1 steps matched · 1 optional not in this trace · \d+ spans unmatched$/);
+ const label=h.C.telemetryTraceLabel(selected.model.nodes.checkout);
+ assert.equal(label.text,h.C.telemetryTraceDuration(selected.model.rows[0].duration),'the drill-down node reads its matched step\'s time');
+ assert.match(label.title,/optional, not in this trace: refund POST \/refund/);
+ api.destroy();
+});

@@ -104,4 +104,5 @@ test('#1200 card metric state: worst signal decides and Jira state never enters'
  assert.deepEqual(note({signals:{rate:{value:100},errors:{value:1},p95:{value:200},queue:{value:0}}}),['held',''],'hidden signals that hold add no line');
  assert.equal(note({signals:{rate:{value:100},errors:{value:1},queue:{value:0}}},{p95:true})[1],'','a pending hidden signal is not "no value"');
  assert.equal(note(null,{rate:true,errors:true,p95:true,queue:true})[1],'','first load: everything pending, no hidden line');
+ assert.equal(note({signals:{rate:{value:100},errors:{value:1},p95:{value:400},queue:{value:0}}},{p95:true})[1],'Hidden p95: outside limit','a refresh in flight keeps the line of a hidden signal that still shows a value');
 });

@@ -69,3 +69,29 @@ test('without --resolve-imports preview and reference exit 1 naming the option; 
   assert.equal(provider.status,1);assert.match(provider.stderr,/^--resolve-imports .*missing spec inventory/);
   assert.deepEqual(fs.readFileSync(h.spec),before);h.unchanged();
 });
+
+// #1175: an optional step on imported nodes that this trace lacks previews as
+// optional, not in this trace, with no unknown condition.
+test('preview --resolve-imports shows a missing optional step as optional, not in this trace',t=>{
+  const h=setup(t),submitOnly=h.write('submit-only.json',{spans:[span('submit','platform-api','POST /checkout')]});
+  const optional=structuredClone(h.raw);optional.page.sections[0].diagram.steps.find(s=>s.id==='persist').traceMatch.optional=true;
+  const run=cli('preview','--spec',h.write('optional.spec.json',optional),'--trace',submitOnly,'--resolve-imports',REGISTRY);
+  assert.equal(run.status,0,run.stderr);
+  const persist=JSON.parse(run.stdout).mapping.steps.find(s=>s.stepId==='persist');
+  assert.deepEqual([persist.nodeId,persist.status,persist.optional,persist.detail,persist.conditions],['platform::store','missing',true,'Optional, not in this trace.',[]]);
+  const plainRun=cli('preview','--spec',h.spec,'--trace',submitOnly,'--resolve-imports',REGISTRY);
+  assert.equal(plainRun.status,0,plainRun.stderr);
+  const plainPersist=JSON.parse(plainRun.stdout).mapping.steps.find(s=>s.stepId==='persist');
+  assert.equal(plainPersist.optional,undefined);assert.deepEqual(plainPersist.conditions.map(c=>c.label),['Not observed · outcome unknown'],'without optional the step stays unknown');
+  // Compare: a missing optional step is not a divergence, and an incident step after the fork never claims it was observed.
+  const out=path.join(h.dir,'optional-reference.json');
+  assert.equal(cli('reference','--spec',h.write('optional.spec.json',optional),'--trace',h.happy,'--resolve-imports',REGISTRY,'--reason','Reviewed','--out',out).status,0);
+  const quiet=cli('compare','--spec',out,'--trace',submitOnly,'--resolve-imports',REGISTRY);
+  assert.equal(quiet.status,0,quiet.stderr);assert.equal(JSON.parse(quiet.stderr).firstDivergence,null);
+  const failed=h.write('failed-submit-only.json',{spans:[span('submit','platform-api','POST /checkout',{error:true,statusCode:500})]});
+  const fork=cli('compare','--spec',out,'--trace',failed,'--resolve-imports',REGISTRY);
+  assert.equal(fork.status,0,fork.stderr);assert.equal(JSON.parse(fork.stderr).firstDivergence,'request');
+  const d=JSON.parse(fork.stdout).page.sections[0].diagram,incident=d.steps.find(s=>s.id===d.paths.at(-1).steps.at(-1));
+  assert.equal(incident.text,'Optional, not in this trace: platform-store · INSERT order');assert.equal(incident.evidence.canonicalStepId,'persist');
+  h.unchanged();
+});

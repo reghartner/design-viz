@@ -111,7 +111,7 @@ function paintTraceLabels(d,e){
  const scope={querySelectorAll:sel=>sel==='g.node[data-dv-node]:not(.node-text)'?nodes:sel==='path.edge[data-dv-edge]'?paths:[]};
  C.telemetryPaintTrace({el:scope,section:{diagram:d}},C.telemetryTraceModel(d,undefined,e));
  const read=(parent,pick)=>{const g=parent.children.find(c=>c.attrs.class==='dv-trace-overlay' && pick(c));return g?{text:g.children.find(c=>c.tagName==='text').textContent,title:g.children.find(c=>c.tagName==='title').textContent}:null;};
- return {node:id=>read(nodes.find(n=>n.attrs['data-dv-node']===id),()=>true),edge:i=>read(layer,g=>g.attrs['data-trace-edge']===String(i))};
+ return {node:id=>read(nodes.find(n=>n.attrs['data-dv-node']===id),()=>true),edge:i=>read(layer,g=>g.attrs['data-trace-edge']===String(i)),tone:id=>nodes.find(n=>n.attrs['data-dv-node']===id).attrs['data-trace-tone']};
 }
 test('a node whose traceMatch alternatives matched names the matched alternative and shows its time',()=>{
  let labels=paintTraceLabels(transportBoard(),transportTrace(traceSpan('p1',PULSAR,0,16.1),traceSpan('p-db','INSERT stats',2,9,'p1','stats-store')));
@@ -156,4 +156,46 @@ test('a mapped operation missing from the trace still reads unknown; an ambiguou
  d.steps.push({id:'ack',text:'Acknowledge',traceMatch:{serviceName:'stats-consumer',operation:'ack',nodeId:'consumer'}});
  labels=paintTraceLabels(d,transportTrace(traceSpan('p1',PULSAR,0,16.1),traceSpan('a1','ack',1,1,'p1'),traceSpan('a2','ack',3,1,'p1')));
  assert.equal(labels.node('consumer').text,'3 operations · 1 unknown · 1 ambiguous · 16.1 ms');
+});
+// #1175: traceMatch.optional marks a step that may be absent from a trace. A missing
+// optional step is left out of the label as if it were not there; the title lists it.
+const ARCHIVE={id:'archive',text:'Archive stats',traceMatch:{serviceName:'stats-archive',operation:'archive stats',nodeId:'consumer',optional:true}};
+test('a node named by a matched step and an optional step missing from the trace reads the matched step; without optional it reads 1 unknown',()=>{
+ for(const node of ['consumer','platform::consumer']){
+  // The same rules for a local node and an imported (namespaced) node.
+  const board=()=>{const d=transportBoard();if(node!=='consumer'){d.nodes={broker:d.nodes.broker,[node]:d.nodes.consumer};d.rows=[['broker',node]];d.edges[0].to=node;d.steps[0].edge='broker->'+node;d.steps[0].traceMatch.forEach(m=>m.nodeId=node);}
+   const archive=structuredClone(ARCHIVE);archive.traceMatch.nodeId=node;d.steps.push(archive);return d;};
+  const pulsar=()=>transportTrace(traceSpan('p1',PULSAR,0,16.1));
+  let d=board(),labels=paintTraceLabels(d,pulsar());
+  assert.equal(labels.node(node).text,'Matched: stats-consumer persistent://stats/camer… · 16.1 ms',node+': one matched row reads Matched: … and its time');
+  assert.doesNotMatch(labels.node(node).text,/unknown|operations/);
+  assert.match(labels.node(node).title,/optional, not in this trace: stats-archive archive stats/,node+': the title lists the optional step');
+  assert.doesNotMatch(labels.node(node).title,/archive stats: Not observed/);
+  assert.equal(labels.edge(0).text,'Matched: stats-consumer persistent://stats/camer… · 16.1 ms','the edge follows the same rules');
+  assert.equal(labels.tone(node),'observed','the optional step does not make the node unknown');
+  // The company case with a single traceMatch object: the time alone.
+  d=board();d.steps[0].traceMatch=d.steps[0].traceMatch[1];
+  assert.equal(paintTraceLabels(d,pulsar()).node(node).text,'16.1 ms');
+  // Without optional the missing step still counts.
+  d=board();delete d.steps[1].traceMatch.optional;
+  assert.equal(paintTraceLabels(d,pulsar()).node(node).text,'2 operations · 1 unknown · 16.1 ms');
+  d=board();d.steps[1].traceMatch.optional=false;
+  assert.equal(paintTraceLabels(d,pulsar()).node(node).text,'2 operations · 1 unknown · 16.1 ms','optional:false is the same as no optional');
+ }
+});
+test('an optional step that matches or is ambiguous reads like any other step; a node with only a missing optional step is not labelled',()=>{
+ const d=transportBoard();d.steps.push(structuredClone(ARCHIVE));
+ const plainBoard=transportBoard();plainBoard.steps.push(structuredClone(ARCHIVE));delete plainBoard.steps[1].traceMatch.optional;
+ const matched=transportTrace(traceSpan('p1',PULSAR,0,16.1),traceSpan('a1','archive stats',20,5,null,'stats-archive'));
+ assert.deepEqual(paintTraceLabels(d,matched).node('consumer'),paintTraceLabels(plainBoard,matched).node('consumer'),'a matched optional step reads exactly as a matched step');
+ assert.equal(paintTraceLabels(d,matched).node('consumer').text,'2 operations · 21.1 ms across 2 spans');
+ const ambiguous=transportTrace(traceSpan('p1',PULSAR,0,16.1),traceSpan('a1','archive stats',20,5,null,'stats-archive'),traceSpan('a2','archive stats',30,5,null,'stats-archive'));
+ assert.equal(paintTraceLabels(d,ambiguous).node('consumer').text,'2 operations · 1 ambiguous · 16.1 ms','an ambiguous optional step still counts as ambiguous');
+ // Only the optional step names the archive node; this trace lacks it.
+ const only=transportBoard();only.nodes.archive={title:'Archive'};only.rows[0].push('archive');only.steps.push({...structuredClone(ARCHIVE),traceMatch:{...ARCHIVE.traceMatch,nodeId:'archive'}});
+ const model=C.telemetryTraceModel(only,undefined,transportTrace(traceSpan('p1',PULSAR,0,16.1)));
+ assert.equal(model.nodes.archive.length,1,'the row is kept for the panel');assert.equal(model.nodes.archive[0].optional,true);
+ const painted=paintTraceLabels(only,transportTrace(traceSpan('p1',PULSAR,0,16.1)));
+ assert.equal(painted.node('archive'),null,'no label on a node whose only row is a missing optional step');assert.equal(painted.tone('archive'),undefined,'and no unknown tone');
+ assert.equal(painted.tone('consumer'),'observed');
 });

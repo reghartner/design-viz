@@ -4285,3 +4285,42 @@ test('#1193 steps without a traceMatch leave the step count; the coverage line n
  assert.match(summary,/ · 1\/2 steps matched/,summary);assert.doesNotMatch(summary,/without a trace mapping|optional/,'the one-line summary keeps only the ratio');
  api.destroy();
 });
+
+/* #1198 + #1202 (company round 5, Chuck 2026-11-09): in the Jira view's popup each ticket is one row (key, title, status chip;
+   no owner), and the evidence block reads exactly like the Trace view's: no Jira words, one verdict line, no Since Done. */
+async function roundFivePopup(state='done'){
+ const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',tickets:['EE-1','EE-2','EE-3'],telemetry:TCALL()}]}}]}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:{rate:{value:5500},errors:{value:12}}}})}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+ h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+ const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+ for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
+ const titles={'EE-1':'Place the order through the checkout service with retries and idempotency keys','EE-2':'Charge the card','EE-3':'Send the confirmation email'};
+ api.apply(Object.fromEntries(Object.entries(titles).map(([key,title])=>[key,{state,title,assignee:'Pat Lee',updatedAt:'2026-11-05T12:00:00.000Z'}])));
+ h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
+ const card=()=>h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]'),pop=()=>h.view.querySelector('.dv-live-popover'),escape=()=>h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
+ return {h,api,card,pop,escape,titles};
+}
+test('#1198 the Jira-view popup lists each ticket as one row: key, one-line title with the full title as tooltip, status chip; no owner',async()=>{
+ const {h,api,card,pop,titles}=await roundFivePopup();workPresentation(h,card());
+ const rows=pop().querySelectorAll('.dv-live-ticket');assert.equal(rows.length,3,'three tickets, three rows');
+ for(const row of rows){
+  const key=row.getAttribute('data-live-ticket'),parts=row.children.map(c=>c.className.split(' ')[0] || c.tagName);
+  assert.deepEqual(parts,['nbacklink','dv-live-ticket-title','dv-live-ticket-state'],key+': key, title, chip in one row: '+parts);
+  const title=row.querySelector('.dv-live-ticket-title');assert.equal(title.textContent,titles[key]);assert.equal(title.getAttribute('title'),titles[key],'the full title is the tooltip');
+  assert.equal(row.children.at(-1).textContent,'done','the status chip ends the row');
+ }
+ assert.ok(pop().querySelector('.dv-live-ticket-assignee')===null,'no owner element');assert.doesNotMatch(textOf(pop()),/Pat Lee/,'no owner text');
+ api.destroy();
+});
+test('#1202 the Jira-view popup evidence reads exactly like the Trace view: no DONE, one verdict line, no Since Done',async()=>{
+ const {h,api,card,pop,escape}=await roundFivePopup();
+ workPresentation(h,card());const jira=pop().querySelector('.dv-live-production'),jiraText=textOf(jira);
+ for(const word of [/\bDONE\b/,/Since Done/,/\bDone\b/,/proof/i,/proven/i])assert.doesNotMatch(jiraText,word,'no Jira or proof words in the Jira-view evidence: '+word);
+ assert.equal(jira.querySelectorAll('.dv-live-production-verdict').length,1,'one verdict line');
+ assert.ok(jira.querySelector('.dv-live-production-since')===null,'no Since Done line');
+ assert.equal(jira.getAttribute('data-verdict'),null,'no Jira-derived verdict token');
+ assert.ok(pop().querySelectorAll('.dv-live-ticket').length===3,'the Tickets stay in the Jira-view popup');
+ escape();api.setStatusMode('trace');h.flush();workPresentation(h,card());const trace=textOf(pop().querySelector('.dv-live-production'));
+ assert.equal(jiraText,trace,'the evidence block is the same in both views');
+ api.destroy();
+});

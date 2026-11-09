@@ -114,12 +114,25 @@ test('desktop with no clear spot the label is plated above the connection labels
  const root=await setup(page,server,'local',{skin:'blueprint'});await block(root,'local','all');await load(root);
  const label=await checkoutLabel(root,'local');expect(label.plate,'no clear spot: a plate').toBe(true);
  const after=await labels(root);expect(after.overlaps,'the plated label is drawn on top of the connection labels').toEqual([]);
- const plate=after.plates.find(p=>/ms/.test(p.text));expect(plate.opacity).toBe('1');expect(plate.group).toBe('1');
+ const plate=after.plates.find(p=>/ms/.test(p.text));expect(plate.opacity).toBe('1');
+ // Raised out of g.node, the label keeps its node's step dimming.
+ expect(plate.group,'the plated label keeps its node dimming').toBe(await root.evaluate(host=>getComputedStyle((host.shadowRoot || host).querySelector('g.node[data-dv-node="checkout"]')).opacity));
  expect(plate.fill,'the plate takes the board ground').toBe(plate.ground);expect(plate.fill).not.toBe(plate.ink);
  await info.attach('trace-label-plate-blueprint',{body:await root.screenshot(),contentType:'image/png'});
 });
+// Moves a connection label (one a metric card hides) onto the Shipping service time label's home spot:
+// centred, 22 under the card. Test-only, before the trace loads.
+function moveOntoShippingHome(root,text){
+ return root.evaluate((host,text)=>{
+  const scope=host.shadowRoot || host,node=scope.querySelector('g.node[data-dv-node="shipping"]'),svg=node.closest('svg'),card=node.querySelector('.card');
+  const m=svg.getCTM().inverse().multiply(card.getCTM()),b=card.getBBox(),x=m.a*(b.x+b.width/2)+m.e,y=m.d*(b.y+b.height+22)+m.f;
+  const label=Array.from(scope.querySelectorAll('text.lbl')).find(el=>el.textContent===text),local=svg.getCTM().inverse().multiply(label.getCTM()).inverse();
+  label.setAttribute('text-anchor','middle');label.setAttribute('x',local.a*x+local.c*y+local.e);label.setAttribute('y',local.b*x+local.d*y+local.f);
+ },text);
+}
 test('desktop turning Metrics off shows the card-hidden connection labels without a trace label on them',async({page,server})=>{
- const root=await setup(page,server,'local',{metrics:true});await load(root);
+ // GetCart sits where the Shipping service time label would go; its metric card hides it while Metrics is on.
+ const root=await setup(page,server,'local',{metrics:true});await moveOntoShippingHome(root,'GetCart');await load(root);
  const metric=root.getByRole('switch',{name:'Metrics overlay',exact:true});
  await metric.click();await expect(root.locator('.dv-metrics-card')).toHaveCount(3);
  await metric.click();await expect(root.locator('.dv-metrics-card')).toHaveCount(0);

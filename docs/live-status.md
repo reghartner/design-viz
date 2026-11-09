@@ -2966,6 +2966,24 @@ Status → Trace can load one exact trace ID or a supported provider link using 
 
 Selecting a span in the loaded trace shows its exact **Service** and **Operation** (#1078), the strings a step's `traceMatch.serviceName` and `traceMatch.operation` must match; copy them from there. A span that no step maps says "No authored step maps this span. Add a traceMatch to a step to map this span." and links to [Make an existing diagram Trace-ready](trace-ready-authoring.md). On a shared board in Edit mode, that span also offers **Map this span to a step**, which writes the two values to a step that has no `traceMatch` yet ([Edit mode](#edit-mode-on-the-shared-board-828)); add `nodeId`, `parentStepId` or `attributes` in the Workbench when one span name is not enough.
 
+### A loaded trace sets the day
+
+A loaded trace is one request with its own start time, the earliest span's (#1145, D5). The request card
+says "Started Nov 6 12:00 local". Loading it moves the view to that local day: Over time on that day, or
+Live when it is today, also from Over time on today. Opening Over time for it (on a Jira-free board, the
+local 7-day list) is part of the Load click;
+when the history arrives, the view goes to the day of the trace loaded then, and stays in Live if there is
+none (unless the reader clicked Over time) or it is from today. A history that arrives during a second
+Load waits for it, so it loads once. When the day list has no such day, the view stays and the Load trace section says
+"This trace is from Nov 3, which Over time does not list." A board where Over time cannot open stays in Live.
+The reader moving the view to another day, or back to Live from a past day, clears the trace without a
+call, and the section says "Cleared trace 8413cd87a9f1 (Nov 6): the view moved to Nov 7." until the next
+view change. The reader's own Over time on today keeps a trace from today. The typed trace ID stays, and
+log results stay across a move the loaded trace itself causes. Ticket colours on nodes follow the day
+shown (D14). Opening a drill-down keeps the loaded trace; it is cleared when its mapping diagram goes away.
+Example traces stay Live-only (D7): Over time retires one the reader chose with the same note, and one
+shown automatically without a note. A day change never says "Trace selection expired".
+
 ### Find a trace from a log line
 
 Sometimes the field that tells requests apart is not on any span. A company's
@@ -3027,7 +3045,7 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   every line." (unchecked: "No matching log lines on Nov 6."). A Trace start or
   end typed under Lookback still
   wins. Changing the day clears the results without a call; the typed value
-  stays. Live is unchanged.
+  stays. A move that a loaded trace causes keeps them (#1145). Live is unchanged.
 - A value cannot contain quotes, backticks, backslashes or control characters,
   so it cannot leave the LogQL string it is placed in. The typed box is limited
   to 2000 characters. LogQL cannot write; the call is bounded by the window and
@@ -3049,17 +3067,19 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   Loki before 3.0 reports every label as a stream label. Unchecked, a line without the
   trace ID field says "This log line has no trace_id" (with the configured
   field name) and has no Load button. A metric query returns no lines and says so.
-- **Load** on a line loads that trace ID through the selected connection,
-  exactly as a pasted ID, then focuses the line's span ID in the waterfall and
-  the diagram. A span ID that is not in the trace is reported, and the trace
-  stays loaded.
+- **Load** on a line loads that trace ID through the selected connection and
+  searches the line's time ± 1 h (#1145; see [Honeycomb lookback](provider-traces.md#honeycomb-lookback)),
+  then focuses the line's span ID in the waterfall and the diagram. A span ID
+  that is not in the trace is reported, and the trace stays loaded. The list
+  says "Loading a trace moves the view to its date." when Over time can open.
 - A log line's trace may never have been kept by the provider (sampling)
   (#1124). When it is not found, the report says "Trace not found. The provider
   may not have kept this trace (sampling). Try the next log line." and offers
   **Try the next log line**, which loads the next listed line that has a trace
   ID. The lookback hint ("The log line is older than the last 2h; try a longer
-  lookback under Lookback.") is added, and Lookback opens, only when the line
-  is outside the window. A pasted ID or link keeps the lookback text.
+  lookback under Lookback.") is added, and Lookback opens, only when a typed
+  Trace start or end leaves the line outside the window. A pasted ID or link
+  keeps the lookback text.
 - Lookups need the Grafana connector. When no connector offers
   `query_loki_logs`, or in a host without one (native mounts), the lookup
   controls are disabled with a message and the rest of Load trace is unchanged.

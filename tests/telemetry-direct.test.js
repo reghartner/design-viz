@@ -264,3 +264,51 @@ test('#1142 an Over time day sets the window: shortest lookback or the day bound
   api.set('input',raw.traceId);assert.ok(await api.load(true));assert.equal(calls.length,1);assert.equal(calls[0].start,'2026-11-06T05:00:00.000000000Z');assert.equal(calls[0].end,'2026-11-07T05:00:00.000000000Z');api.destroy();
  }finally{if(zone===undefined)delete process.env.TZ;else process.env.TZ=zone;}
 });
+
+/* #1145 (D9): Load on a found log line searches the line's time ± 1 h. Typed Trace start / end still
+   win; a pasted ID keeps the #1142 rules. Clock fixed at 12:00 local on Nov 8. */
+test('#1145 Load on a log line sends line time ± 1 h, or the lookback that reaches line time − 1 h',async()=>{
+ const zone=process.env.TZ;process.env.TZ='America/New_York';
+ try{
+  const now=new Date(2026,10,8,12).getTime(),H=3600000,iso=ms=>new Date(ms).toISOString().replace(/\.(\d{3})Z$/,'.$1000000Z');
+  const nov6={key:'2026-11-06',today:false,label:'Nov 6',window:{from:new Date(2026,10,6).toISOString(),to:new Date(2026,10,7).toISOString(),label:'Nov 6 00:00–24:00 local'}};
+  const clocked=()=>{const C=context();vm.runInContext('Date.now=function(){return '+now+';};',C);return C;};
+  // Lookback-only: a line 50 h old needs 51 h; the selected day (60 h) does not win over the line.
+  let h=setup({C:clocked(),hooks:{day:()=>nov6}});
+  assert.ok(await h.api.load(false,{at:new Date(now-50*H).toISOString(),next:false}));assert.equal(h.calls.at(-1).args.from,'-51h','the line time − 1 h');
+  assert.ok(await h.api.load(false,{at:new Date(now-30*60000).toISOString(),next:false}));assert.equal(h.calls.at(-1).args.from,'-2h','90 min rounds up to 2 h');
+  assert.ok(await h.api.load(false));assert.equal(h.calls.at(-1).args.from,'-60h','a pasted ID keeps the day window');
+  h.api.set('start','-3h');assert.ok(await h.api.load(false,{at:new Date(now-50*H).toISOString(),next:false}));assert.equal(h.calls.at(-1).args.from,'-3h','a typed Trace start wins');
+  h.api.destroy();
+  // Absolute: line − 1 h to line + 1 h; the end stops at now.
+  const abs=profile();abs.time.encoding='iso8601';abs.arguments.end='to';const t=tool();t.inputSchema.properties.to={type:'string'};
+  h=setup({C:clocked(),p:board(abs)});h.setTools([t]);
+  const line=now-50*H;assert.ok(await h.api.load(false,{at:new Date(line).toISOString(),next:false}));
+  assert.equal(h.calls.at(-1).args.from,iso(line-H));assert.equal(h.calls.at(-1).args.to,iso(line+H));
+  assert.ok(await h.api.load(false,{at:new Date(now-20*60000).toISOString(),next:false}));assert.equal(h.calls.at(-1).args.from,iso(now-80*60000));assert.equal(h.calls.at(-1).args.to,iso(now),'the end stops at now');
+  h.api.destroy();
+  // A not-found line inside its own window gets no lookback hint.
+  h=setup({C:clocked(),result:{payload:'---\nMetadata:\n  environment: production\n  navigation_hints: no spans found\n  total_spans: 0\n  trace_id: '+ID+'\n  view_mode: full\n  visible_spans: 0\n'}});
+  assert.equal(await h.api.load(false,{at:new Date(now-50*H).toISOString(),next:true}),null);
+  assert.equal(h.api.snapshot().report.error,'Trace not found. The provider may not have kept this trace (sampling). Try the next log line.');assert.equal(h.api.snapshot().report.lookbackHint,false);
+  h.api.destroy();
+ }finally{if(zone===undefined)delete process.env.TZ;else process.env.TZ=zone;}
+});
+/* #1145 (D5): the controller moves the view to a loaded trace's day, so a day change or a new mapping
+   diagram (a drill-down) must not drop the loaded trace here. A pending request still ends on a day change. */
+test('#1145 a loaded trace survives day and mapping-diagram changes; a pending one ends on a day change',async()=>{
+ const day=key=>({key,today:false,label:key,window:{from:key+'T05:00:00.000Z',to:key+'T23:00:00.000Z',label:key}});
+ let selected=day('2026-11-06'),list=[{id:'main',label:'Main'}];
+ const h=setup({hooks:{day:()=>selected,sections:()=>list}});
+ assert.ok(await h.api.load());assert.equal(h.api.snapshot().form.section,'main');
+ selected=day('2026-11-05');assert.equal(h.api.snapshot().exemplar && h.api.snapshot().exemplar.traceId,ID,'a day change keeps the loaded trace');
+ selected=null;assert.ok(h.api.snapshot().exemplar,'Live keeps it too');
+ list=[{id:'main',label:'Main'},{id:'detail',label:'Detail'}];assert.ok(h.api.snapshot().exemplar,'a new mapping diagram keeps it');assert.equal(h.api.snapshot().form.section,'main');
+ list=[{id:'detail',label:'Detail'}];assert.equal(h.api.snapshot().exemplar,null,'losing its mapping diagram clears it');
+ h.api.destroy();
+ let release;selected=day('2026-11-06');list=[{id:'main',label:'Main'}];
+ const p=setup({hooks:{day:()=>selected,sections:()=>list},call:async()=>{await new Promise(r=>release=r);return {payload:recorded};}});
+ const pending=p.api.load();for(let i=0;i<10 && !release;i++)await new Promise(setImmediate);assert.ok(release);
+ list=[{id:'main',label:'Main'},{id:'detail',label:'Detail'}];p.api.snapshot();selected=day('2026-11-05');assert.equal(p.api.snapshot().busy,false,'a day change ends the pending request');
+ release();assert.equal(await pending,null);assert.equal(p.api.snapshot().form.input,ID);p.api.destroy();
+});

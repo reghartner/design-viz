@@ -33,6 +33,8 @@ async function open(page,server,{grafana=true,lookups=true,lines=LINES}={}){
  await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
  return {root,logs:root.locator('.dv-trace-logs'),calls};
 }
+// #1145 (D9): the shortest lookback that reaches `from`, as telemetry-direct.js builds it.
+const lookback=from=>{const hours=Math.max(1,Math.ceil((Date.now()-from)/3600000));return '-'+(hours>9999?Math.ceil(hours/24)+'d':hours+'h');};
 // Accessible names of the Load trace controls outside the log lookup section.
 // A Honeycomb get_trace answer for a trace it did not keep.
 const notFound=id=>'---\nMetadata:\n  environment: production\n  navigation_hints: no spans found\n  total_spans: 0\n  trace_id: '+id+'\n  view_mode: full\n  visible_spans: 0\n';
@@ -50,9 +52,12 @@ test('desktop authored log lookup lists the newest matching lines and loads the 
  await expect(lines.nth(0).locator('.dv-trace-log-time')).toHaveText('2026-11-07 09:42:13Z');await expect(lines.nth(0).locator('.dv-trace-log-value')).toHaveText('arch');await expect(lines.nth(0).locator('.dv-trace-log-id')).toHaveText(ID);
  await expect(lines.nth(1)).toContainText('This log line has no trace_id');await expect(lines.nth(1).getByRole('button')).toHaveCount(0);
  await info.attach('log-lookup-results',{body:await h.root.screenshot(),contentType:'image/png'});
+ // #1145 (D9): the load searches back to the line's time − 1 h.
+ const reach=()=>lookback(Date.parse('2026-11-07T09:42:13.123Z')-3600000),before=reach();
  await lines.nth(0).getByRole('button',{name:'Load trace '+ID,exact:true}).click();
  await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);await expect(h.root.locator('.dv-trace-span')).toHaveCount(55);
- expect(h.calls.slice(1)).toEqual([{server:PROFILE.server,tool:'get_trace',args:{view_mode:'full',trace_id:ID,from:'-2h',environment_slug:'production',team_slug:'example-team'}}]);
+ const sent=h.calls.slice(1);expect(sent).toHaveLength(1);expect([before,reach()]).toContain(sent[0].args.from);
+ expect(sent).toEqual([{server:PROFILE.server,tool:'get_trace',args:{view_mode:'full',trace_id:ID,from:sent[0].args.from,environment_slug:'production',team_slug:'example-team'}}]);
  await expect(h.root.locator('.dv-trace-span[data-span-id="'+SPAN+'"]')).toHaveAttribute('aria-pressed','true');await expect(h.root.locator('.dv-trace-span[aria-pressed="true"]')).toHaveCount(1);
  await expect(h.root.locator('.dv-trace-focus-hint')).toHaveText(/^Trace focus · /);
  await info.attach('log-lookup-loaded-focused',{body:await h.root.screenshot(),contentType:'image/png'});
@@ -130,4 +135,37 @@ test('desktop Over time Find searches the selected day: today to now, then the w
  await logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(rows).toHaveCount(1);
  sent=await calls();expect(sent).toHaveLength(2);expect([sent[1].startRfc3339,sent[1].endRfc3339]).toEqual([await midnight(1),await midnight(0)]);
  await info.attach('log-search-over-time-previous-day',{body:await root.screenshot(),contentType:'image/png'});
+});
+
+/* #1145 (D5, D9): Load on a log line whose trace is from two days back moves the view to that day. Setup
+   only: the host transport and a dated day list for the Jira history source; the reader uses real controls. */
+test('desktop Load on a log line from two days back moves the view to that day',async({page,server},info)=>{
+ await page.setViewportSize({width:1500,height:1100});
+ await writeFile(path.join(server.root,'trace-day-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'trace-day.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./trace-day-native.js";window.mount=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/trace-day.html');await page.waitForFunction(()=>!!window.mount);
+ const today=new Date(),at=new Date(today.getFullYear(),today.getMonth(),today.getDate()-2,12).getTime(),delta=BigInt(at)*1000000n-1791779586602194688n;
+ const trace=RECORDED.replace(/\b\d{19}\b/g,n=>String(BigInt(n)+delta)),lines={data:[{timestamp:String(BigInt(at+60000)*1000000n),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:{cameraModel:'arch',trace_id:ID,span_id:SPAN}}]};
+ const spec={page:{title:'Camera stats',tracking:{jira:{site:'https://jira.test'},telemetry:{grafana:{loki:'loki-$env'},environment:'stg',environments:{stg:{},prd:{}},lookups:{camera:{label:'Camera model',query:QUERY,values:['arch','wren']}},traceConnections:{company:PROFILE}}},
+  sections:[{id:'main',diagram:{nodes:{consumer:{title:'Camera stats consumer',tickets:['CAM-1']}},rows:[['consumer']],panels:[PANEL]}}]}};
+ await page.evaluate(({spec,lines,trace,schema})=>{
+  window.traceCalls=[];
+  window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{directTrace:{describe:async()=>schema,call:async(request,args)=>{window.traceCalls.push(args);return {payload:trace};},logsConnector:async()=>'Grafana',queryLogs:async()=>lines}}});
+  const api=window.viewer.controller.liveStatus,pad=n=>String(n).padStart(2,'0'),key=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),now=new Date();
+  const days=[2,1,0].map(back=>{const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-back);return {key:key(d),label:'Day '+key(d),short:'Day '+key(d),states:{'CAM-1':{state:back?'todo':'active'}}};});
+  api.apply({'CAM-1':{state:'active'}});api.setHistory({load:()=>({days})});
+ },{spec,lines,trace,schema:schema()});
+ const root=page.locator('#host'),logs=root.locator('.dv-trace-logs'),label=await page.evaluate(at=>new Date(at).toLocaleDateString([],{month:'short',day:'numeric'}),at);
+ const dayKey=await page.evaluate(at=>{const d=new Date(at),pad=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());},at);
+ await root.getByRole('button',{name:'Trace',exact:true}).click();await expect(root.locator('.dv-live-over-time-day')).toHaveCount(0);
+ await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
+ await logs.getByLabel('Camera model',{exact:true}).fill('arch');await logs.getByRole('button',{name:'Find log lines',exact:true}).click();
+ await expect(logs.locator('.dv-trace-log-row')).toHaveCount(1);await expect(logs.locator('.dv-trace-logs-moves')).toHaveText('Loading a trace moves the view to its date.');
+ await info.attach('trace-day-live-log-line',{body:await root.screenshot(),contentType:'image/png'});
+ const reach=()=>lookback(at+60000-3600000),before=reach();
+ await logs.getByRole('button',{name:'Load trace '+ID,exact:true}).click();
+ await expect(root.locator('.dv-live-over-time-day')).toHaveText('Day '+dayKey);await expect(logs.locator('.dv-trace-log-row'),'the list survives the move').toHaveCount(1);
+ await expect(root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);await expect(root.locator('.dv-trace-date')).toHaveText('Started '+label+' 12:00 local');
+ const sent=await page.evaluate(()=>window.traceCalls);expect(sent).toHaveLength(1);expect([before,reach()]).toContain(sent[0].from);
+ await info.attach('trace-day-moved',{body:await root.screenshot(),contentType:'image/png'});
 });

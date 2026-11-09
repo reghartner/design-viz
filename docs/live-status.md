@@ -2141,8 +2141,8 @@ service and operation are cut to 40 characters on the canvas; the title has the 
 The label's title lists the other alternatives as *not in this trace*, or as *in this trace,
 not matched* when a span with that service and operation is present; they never count as
 unknown. Several rows read `N operations`, then `K unknown` for mapped operations missing
-from the trace, `K ambiguous` for ambiguous mappings, then the time. Time: each matched
-span counts its own start-to-end duration, which includes its child spans. When more than
+from the trace, `K ambiguous` for ambiguous mappings, then the time. Time: the time covers
+each matched span from start to end (overlaps counted once); the title says so. When more than
 one matched span maps to the node or edge, the label shows the wall-clock time they cover
 together (the union of their intervals, so nested or overlapping spans count once) and the
 count: `16.1 ms across 2 spans`. A board that keeps one step per transport reads
@@ -2161,13 +2161,19 @@ there: a node named by one matched step and one missing optional step reads
 `Matched: … · 16.1 ms`, or only the time for a single selector. The title lists it as
 *optional, not in this trace: service operation*, it never makes the node unknown, and a
 node whose only row is a missing optional step gets no label. The coverage line leaves it
-out and adds the count: `1/3 steps matched · 1 optional not in this trace · 0 spans
-unmatched`. Edge labels and titles carry matched rows only, so a missing step, optional or
+out and adds the count: `1/2 steps matched · 1 optional not in this trace · 0 spans
+unmatched` (with any steps without a `traceMatch` also named, below). Edge labels and titles carry matched rows only, so a missing step, optional or
 not, never adds to an edge and an edge title does not list a missing optional step. A
 matched optional step reads like any matched step; an ambiguous one still counts as
 ambiguous. Local, imported and drill-down steps follow the same rules. A trace that lacks
 an optional step can still be approved as the reference trace; a missing step without
 `optional` still blocks approval.
+
+The `N/M steps matched` count, in the request card's one-line summary and in its coverage
+line, counts only steps on the current path that have a `traceMatch`, less optional steps
+missing from the trace (#1193). Steps without a `traceMatch` are not still to match: the
+coverage line names them, `· 4 steps without a trace mapping`, and the summary keeps only
+the ratio.
 
 With the Metrics overlay on, the trace labels are drawn first and the metric cards are then
 placed clear of them, the same way cards avoid node cards (#1163). The labels never move for
@@ -2178,6 +2184,22 @@ a leader line, the board paints again and the cards are placed clear of it.
 A card's leader line has a gap where it would cross a trace label, also while a card is
 dragged in the Workbench.
 A card with an authored `card.position` keeps that position.
+
+Trace highlight levels (#1185) add marks without changing any node or edge colour: corner
+brackets outside a node card or text node, and an outline that follows the edge's own path. With
+a span focused, its step's carriers are *current* (solid brackets with the Trace tag, a wide
+outline, time label 2px larger in a darker ink); carriers of its descendant spans are *below*
+(dotted brackets and outline in the span's colour); carriers of its ancestor spans are *above*
+(dotted brackets and outline in grey); other carriers in the trace get no marks and a smaller,
+fainter time label. With no span focused every carrier in the trace has the dotted *below* marks. An edge whose delivery is
+drawn broken, or a step that delivers on several edges, gets no outline. Mark colours follow each
+span's result: error red, warning amber, observed cyan, unknown grey. When a trace is first shown
+and it has an error span whose step mapping is unique, the earliest such span is focused, as if the
+reader clicked it; a focus the reader cleared stays cleared, also after an edit. An error span with
+several possible steps is not focused and the request summary reads `error in <service>
+<operation>: pick a step to focus it`; when no step maps an error span it reads `error in <service>
+<operation> (not on this diagram)`.
+A loaded trace can grow the diagram frame so node time labels stay below their cards.
 
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
 deduplicated in-memory Jira Activity entry, without posting externally. Trace

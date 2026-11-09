@@ -1526,7 +1526,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     // frame is already intentional. Grow only for the overlay's own controls
     // and coins displaced by a live break, and only if they extend past it.
     var boxes=[],liveBreak=Array.from(svg.querySelectorAll('.dv-live-comm-failure .comm-break')).some(function(el){return !!boardControlBox(el,svg);});
-    svg.querySelectorAll('.dv-metrics-card,.dv-metrics-leader,.dv-jira-cue,.dv-live-comm-failure .comm-break'+(liveBreak || svg.querySelector('.dv-metrics-card')?',.coin':'')).forEach(function(el){
+    svg.querySelectorAll('.dv-metrics-card,.dv-metrics-leader,.dv-jira-cue,.dv-trace-overlay,.dv-live-comm-failure .comm-break'+(liveBreak || svg.querySelector('.dv-metrics-card')?',.coin':'')).forEach(function(el){
       var box=boardControlBox(el,svg);if(box)boxes.push(box);
     });
     if(boxes.length)extendFrame(unionGraphFrame(null,boxes,4));

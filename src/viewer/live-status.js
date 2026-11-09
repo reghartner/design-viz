@@ -1087,10 +1087,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(statusMode!=='trace')return null;
     var selected=traceSelection && traceSources().entries.find(function(e){return e.key===traceSelection.key;}),example=null;
     if(selected && !selected.manual && selected.binding.ordinal!=null)example={key:'carried/'+selected.binding.ordinal+'/'+selected.carrier+'/'+selected.exemplar.selectionToken,environment:telemetry.environment(),ordinal:selected.binding.ordinal,carrier:selected.carrier,exemplar:selected.exemplar,traceId:traceSelection.traceId,chosen:!!traceSelection.chosen};
-    return {direct:directTrace.carry(),example:example,spanId:selected && traceFocus?traceFocus.spanId:null,show:traceShow,returnSpan:traceReturnSpan};
+    return {direct:directTrace.carry(),example:example,spanId:selected && traceFocus?traceFocus.spanId:null,show:traceShow,returnSpan:traceReturnSpan,autoFocused:traceAutoFocused};
   }
   function traceRestore(carried){
-    statusMode='trace';statusAuto=false;traceShow=carried.show!==false;
+    statusMode='trace';statusAuto=false;traceShow=carried.show!==false;traceAutoFocused=carried.autoFocused || '';
     var direct=!!(carried.direct && directTrace.restore(carried.direct));
     // The reader's pick wins: a picked example stays selected beside a loaded trace (#1180).
     if(carried.example){carriedExample=carried.example;traceSelection={key:carried.example.key,traceId:carried.example.traceId,chosen:carried.example.chosen};traceInitial=false;}
@@ -1144,6 +1144,29 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var choice=traceFocus.choiceKey && choices.find(function(c){return c.key===traceFocus.choiceKey;});
     return {spanId:traceFocus.spanId,choices:choices,choice:choice || null,navigable:!!entry.binding.stepper};
   }
+  /* #1185: the trace's error span to focus or name. "mapped": the earliest error span whose step
+     mapping is unique (focused when the trace is first shown, as if the reader clicked it);
+     "pick": the earliest error span with several possible steps; "unmapped": no step maps any
+     error span. Cached per trace, selection and path. The trace ID focused automatically is
+     carried across an edit re-render, so a focus the reader cleared does not come back. */
+  var traceAutoFocused='',traceErrorCache={key:null,value:null};
+  function traceErrorTarget(entry){
+    var d=entry.binding.section.diagram,path=entry.binding.stepper && entry.binding.stepper.path(),key=[entry.key,entry.exemplar.traceId,path].join('|');
+    if(traceErrorCache.key===key && traceErrorCache.diagram===d)return traceErrorCache.value;
+    var errors=entry.exemplar.spans.filter(function(s){return s.error;}).sort(function(a,b){return a.startMs-b.startMs;}),pick=null,value=null;
+    for(var i=0;i<errors.length && !value;i++){
+      var choices=telemetryTraceChoices(d,path,entry.exemplar,errors[i].id);
+      if(choices.length===1 && choices[0].row.status==='matched')value={span:errors[i],kind:'mapped'};
+      else if(choices.length && !pick)pick={span:errors[i],kind:'pick'};
+    }
+    value=value || pick || (errors.length?{span:errors[0],kind:'unmapped'}:null);
+    traceErrorCache={key:key,diagram:d,value:value};return value;
+  }
+  function traceErrorNote(target){
+    if(!target || target.kind==='mapped')return '';
+    var name='error in '+target.span.service+' '+target.span.name;
+    return target.kind==='pick'?name+': pick a step to focus it':name+' (not on this diagram)';
+  }
   /* #1180: the latest pending mapping for its note. When the step keeps a parentStepId, attributes, namespace
      or occurrence that exclude the mapped span, the selected trace shows nothing for it; the note says so. */
   function mappedNote(selected,model){
@@ -1164,9 +1187,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // #1164: only a trace the reader loaded selects itself; an example trace waits for the reader's pick.
     if(!selected && traceInitial && statusMode==='trace' && entries.length && entries[0].manual){selected=entries[0];traceSelection={key:selected.key,traceId:selected.exemplar.traceId};traceInitial=false;}
     var context=selected?traceContext(selected):null,focus=traceFocusSnapshot(selected,context);
+    var errorTarget=selected?traceErrorTarget(selected):null,autoKey=selected?selected.exemplar.traceId:'';
+    if(selected && statusMode==='trace' && traceShow && traceAutoFocused!==autoKey){
+      traceAutoFocused=autoKey;
+      if(!traceFocus && errorTarget && errorTarget.kind==='mapped'){var autoSpan=errorTarget.span.id;requestAnimationFrame(function(){if(!retired && !traceFocus)api.selectTraceSpan({context:context,spanId:autoSpan});});}
+    }
     var model=selected?telemetryTraceModel(selected.binding.section.diagram,selected.binding.stepper && selected.binding.stepper.path(),selected.exemplar):null;
     if(selected)model.mapSteps=traceMapSteps(selected.binding);
-    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,day:traceDayOf(selected.exemplar),context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot(),dayNote:traceDayNote,movesDay:canOpenOver()}),
+    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{errorNote:traceErrorNote(errorTarget),key:selected.key,day:traceDayOf(selected.exemplar),context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot(),dayNote:traceDayNote,movesDay:canOpenOver()}),
       hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,
       // #1177: the step chooser of a span drop, and the latest pending mapping with its Undo.
       mapChooser:traceChooser && selected && traceChooser.context===context?{label:traceChooser.label,span:traceChooser.span,spanId:traceChooser.spanId,drop:traceChooser.drop,steps:traceChooser.steps.map(function(step){return {id:step.id,mapped:step.mapped,disabled:step.alternatives,label:step.caption+(step.alternatives?' · has alternatives; edit in Inspect':step.mapped?' · mapped, replaces':'')};})}:null,

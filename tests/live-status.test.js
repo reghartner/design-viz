@@ -3421,7 +3421,7 @@ function dayTraceBoard({at,loadDetail,lines,deferHistory=false,apply=true}={}){
  const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),calls=[];let payload=dayTraceAt(at);
  const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
  const raw=overFixture();raw.page.tracking.telemetry={traceConnections:{company:profile}};
- let hold=null;const renderOptions={telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async(request,args)=>{calls.push(plain(args));const reply={payload};if(hold)await hold.promise;return reply;}}}};
+ let hold=null;const renderOptions={telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async(request,args)=>{calls.push(plain(args));if(hold)await hold.promise;return {payload};}}}};
  if(lines){Object.assign(raw.page.tracking.telemetry,{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}}});Object.assign(renderOptions.telemetry.directTrace,{logsConnector:async()=>'Grafana',queryLogs:async()=>({data:lines})});}
  if(loadDetail)renderOptions.loadDetail=loadDetail;
  const h=harness(raw,{},renderOptions),api=overReady(h.ctl.liveStatus),m=mountStatus(h),now=Date.now();
@@ -3429,7 +3429,7 @@ function dayTraceBoard({at,loadDetail,lines,deferHistory=false,apply=true}={}){
  const history=historyDays(providerContext(),[historyTicket('AA-1',now-4*86400000,'In Progress',[historyChange(now-86400000,'To Do','In Progress')])],{'AA-1':{state:'done'}},now);
  let release=null,loads=0;api.setHistory({load:()=>{loads++;return deferHistory?new Promise(r=>{release=()=>r(history);}):history;}});
  api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:DAY_TRACE_ID});
- return {h,api,m,calls,renderOptions,days:history.days,traceAt:ms=>{payload=dayTraceAt(ms);},release:()=>{const r=release;release=null;if(r)r();},loads:()=>loads,
+ return {h,api,m,calls,renderOptions,days:history.days,traceAt:ms=>{payload=ms==null?'---\nMetadata:\n  environment: production\n  navigation_hints: no spans found\n  total_spans: 0\n  trace_id: '+DAY_TRACE_ID+'\n  view_mode: full\n  visible_spans: 0\n':dayTraceAt(ms);},release:()=>{const r=release;release=null;if(r)r();},loads:()=>loads,
   holdCalls:()=>{let open;hold={promise:new Promise(r=>open=r)};return ()=>{hold=null;open();};},note:()=>api.snapshot().trace.direct.dayNote,
   loaded:()=>{const t=api.snapshot().trace;return !!(t.direct.exemplar && t.selected && t.selected.manual);}};
 }
@@ -3620,6 +3620,44 @@ test('#1145 a trace loaded while the reader\'s Over time is loading takes the vi
  b=dayTraceBoard({at:daysBack(2),deferHistory:true});
  b.api.overTime();assert.ok(await b.api.loadDirectTrace(false));b.api.clearDirectTrace();b.release();await historySettle();
  assert.equal(b.api.snapshot().overTime.active,true,'the reader asked for Over time');assert.equal(b.api.snapshot().overTime.today,true);b.api.destroy();
+});
+/* #1145 cycle 3: a history parked for a replacement Load is settled when that Load fails or is cleared.
+   The reader's own Over time click still opens; a park that a trace started ends and is never reused. */
+test('#1145 a parked history settles when its Load fails or is cleared',async()=>{
+ const start=async()=>{const b=dayTraceBoard({at:daysBack(2),deferHistory:true});b.api.overTime();assert.ok(await b.api.loadDirectTrace(false),'A loads during the reader\'s Over time');
+  const open=b.holdCalls(),pending=b.api.loadDirectTrace(false);for(let i=0;i<20 && b.calls.length<2;i++)await new Promise(setImmediate);assert.equal(b.calls.length,2,'B is running');
+  b.release();await historySettle();assert.equal(b.api.snapshot().overTime.active,false,'the history waits for B');return {b,open,pending};};
+ // B fails: the reader's click opens Over time on the default day.
+ let {b,open,pending}=await start();b.traceAt(null);open();assert.equal(await pending,null,'B is not found');await historySettle();
+ assert.equal(b.api.snapshot().overTime.active,true,'the reader\'s Over time opens');assert.equal(b.api.snapshot().overTime.today,true);assert.equal(b.loads(),1);b.api.destroy();
+ // B is cleared: the same.
+ ({b,open,pending}=await start());b.api.clearDirectTrace();await historySettle();
+ assert.equal(b.api.snapshot().overTime.active,true,'Clear trace keeps the reader\'s click');assert.equal(b.loads(),1);open();await pending;await historySettle();assert.equal(b.api.snapshot().overTime.active,true);b.api.destroy();
+});
+test('#1145 a park a trace started ends on Clear trace and is never reused by a later Load',async()=>{
+ const b=dayTraceBoard({at:daysBack(2),deferHistory:true});
+ assert.ok(await b.api.loadDirectTrace(false),'A starts the history load');
+ const open=b.holdCalls(),pending=b.api.loadDirectTrace(false);for(let i=0;i<20 && b.calls.length<2;i++)await new Promise(setImmediate);
+ b.release();await historySettle();b.api.clearDirectTrace();open();await pending;await historySettle();
+ assert.equal(b.api.snapshot().overTime.active,false,'no trace, no reader click: Live');
+ b.traceAt(daysBack(3));assert.ok(await b.api.loadDirectTrace(false),'a later, unrelated Load C');
+ assert.equal(b.loads(),2,'C loads the history again, not the old parked one');b.release();await historySettle();
+ assert.equal(b.days[b.api.snapshot().overTime.index].key,dayKeyOf(daysBack(3)));assert.ok(b.loaded());b.api.destroy();
+});
+test('#1145 a parked history waits through a Load that replaces the one it parked for',async()=>{
+ const b=dayTraceBoard({at:daysBack(2),deferHistory:true});
+ assert.ok(await b.api.loadDirectTrace(false),'A starts the history load');
+ const open=b.holdCalls(),first=b.api.loadDirectTrace(false);for(let i=0;i<20 && b.calls.length<2;i++)await new Promise(setImmediate);
+ b.release();await historySettle();
+ b.traceAt(daysBack(3));const second=b.api.loadDirectTrace(false);for(let i=0;i<20 && b.calls.length<3;i++)await new Promise(setImmediate);assert.equal(b.calls.length,3,'C replaces B');
+ open();assert.equal(await first,null,'B was replaced');assert.ok(await second,'C loads');await historySettle();
+ assert.equal(b.days[b.api.snapshot().overTime.index].key,dayKeyOf(daysBack(3)),'C gets the parked history');assert.equal(b.loads(),1,'one history load');b.api.destroy();
+});
+test('#1145 a load a trace started stays Live when the reader clears the trace loaded during the wait',async()=>{
+ const b=dayTraceBoard({at:daysBack(2),deferHistory:true});
+ assert.ok(await b.api.loadDirectTrace(false),'A starts the history load');b.traceAt(daysBack(1));assert.ok(await b.api.loadDirectTrace(false),'B loads during the wait');
+ b.api.clearDirectTrace();b.release();await historySettle();
+ assert.equal(b.api.snapshot().overTime.active,false,'the reader never asked for Over time');b.api.destroy();
 });
 test('#1145 a history that arrives while a replacement Load is running is used once that Load ends',async()=>{
  const b=dayTraceBoard({at:daysBack(2),deferHistory:true});

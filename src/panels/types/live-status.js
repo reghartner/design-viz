@@ -791,7 +791,7 @@ body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-l
 .dv-live-production-kpis{display:grid;grid-template-columns:1fr;gap:6px;}
 .dv-live-metric-link{display:inline-flex;padding:3px;margin-left:4px;vertical-align:middle;}
 .dv-live-metric-label{display:block;}
-.dv-live-metric-sparkline{display:block;width:100%;height:20px;margin-top:3px;overflow:visible;color:var(--dtext);}
+.dv-live-metric-sparkline{display:block;width:100px;height:32px;margin-top:3px;overflow:visible;color:var(--dtext);}
 .dv-live-metric-series{fill:none;stroke:currentColor;stroke-width:1.5;}
 .dv-live-metric-point{fill:currentColor;}
 .dv-live-metric-line{display:block;opacity:.8;margin-top:3px;}

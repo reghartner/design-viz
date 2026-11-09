@@ -3750,8 +3750,8 @@ function compactBoard(envs=['prod']){
   steps:[{id:'accept',nodes:['web'],traceMatch:{serviceName:'frontend',operation:'/cart/checkout',nodeId:'web'}},{id:'place',edge:'web->checkout',traceMatch:{serviceName:'checkout',operation:'msdemo.CheckoutService/PlaceOrder'}},{id:'charge',edge:'checkout->payment',traceMatch:{serviceName:'payment',operation:'grpc.msdemo.PaymentService/Charge'}}],
   panels:[{id:'status',type:'live-status',title:'Status'}]}}]}};
 }
-function compactHarness(envs){
- const recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),calls=[];
+function compactHarness(envs,edit){
+ const recorded=(edit || (t=>t))(fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8')),calls=[];
  const h=harness(compactBoard(envs),{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>compactTool(),call:async(request,args)=>{calls.push(args);return {payload:recorded};},logsConnector:async()=>'Grafana',queryLogs:async()=>({data:[]})}}});
  return {h,api:h.ctl.liveStatus,m:mountStatus(h),calls};
 }
@@ -3926,6 +3926,15 @@ async function compactExamples(){
  h.ctl.telemetry.apply(f.samples);api.setStatusMode('trace');h.flush();
  return {f,h,api,m,request:()=>m.body.querySelector('details.dv-trace-request'),config:()=>m.body.querySelector('details.dv-trace-config')};
 }
+test('#1173 a trace of unknown completeness says so on the request line',async()=>{
+ // Nothing collapsed and every span visible, but the view is not 'full': the provider makes no completeness claim.
+ const unknown=t=>t.replace('collapsed_nodes: 1','collapsed_nodes: 0').replace('total_spans: 77','total_spans: 55').replace(/\| true \|$/m,'| false |');
+ const {h,api,m}=compactHarness(['prod'],unknown),request=()=>m.body.querySelector('details.dv-trace-request');
+ api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();
+ assert.equal(api.snapshot().trace.selected.exemplar.completeness,'unknown');
+ assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · Started .+ local · \d+ spans · \d+\/\d+ steps matched · unknown completeness$/);
+ api.destroy();
+});
 test('#1173 another trace resets the open sections; a re-poll with the same entry keeps them; focus moves to the card line after a Load',async()=>{
  const {f,h,api,m,request,config}=await compactExamples(),example=api.snapshot().trace.entries.find(e=>!e.manual);
  await api.chooseTrace({key:example.key,traceId:example.exemplar.traceId});h.flush();

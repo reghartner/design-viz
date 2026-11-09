@@ -2973,7 +2973,8 @@ says "Started Nov 6 12:00 local". Loading it moves the view to that local day: O
 Live when it is today, also from Over time on today. Opening Over time for it (on a Jira-free board, the
 local 7-day list) is part of the Load click;
 when the history arrives, the view goes to the day of the trace loaded then, and stays in Live if there is
-none or it is from today. When the day list has no such day, the view stays and the Load trace section says
+none (unless the reader clicked Over time) or it is from today. A history that arrives during a second
+Load waits for it, so it loads once. When the day list has no such day, the view stays and the Load trace section says
 "This trace is from Nov 3, which Over time does not list." A board where Over time cannot open stays in Live.
 The reader moving the view to another day, or back to Live from a past day, clears the trace without a
 call, and the section says "Cleared trace 8413cd87a9f1 (Nov 6): the view moved to Nov 7." until the next

@@ -972,7 +972,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function logSearchDay(){var state=over && overTimeState(),day=over && over.days[over.index];return state && state.window?{key:day.key,today:!!state.today,from:state.window.from,to:state.window.to,label:state.window.label,short:day.short || day.label || day.key}:null;}
   /* #1145 (D5): a loaded trace sets the view's day. Its day is the local date of its first span. Loading
      moves the view there (Live for today); a view change to another day clears the trace with one note. */
-  var traceDayNote='',overTarget=null;
+  var traceDayNote='',overTarget=null,overParked=null;
   function localDayKey(ms){var d=new Date(ms);return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())).toISOString().slice(0,10);}
   function traceDayOf(e){
     var at=Math.min.apply(null,(e && e.spans || []).map(function(s){return Date.parse(s.time);}).filter(function(t){return isFinite(t);}));if(!isFinite(at))return null;
@@ -985,8 +985,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function traceMoved(fn){logLookup.hold(true);try{fn();}finally{logLookup.hold(false);}}
   function traceFollow(e){
     var d=traceDayOf(e);if(!d)return;
+    // A history that arrived while this Load ran waits for it (overLoad); use it now.
+    if(overParked && overParked.request===overRequest){var parked=overParked;overParked=null;overTarget={request:parked.request,reader:parked.reader};overLoad(parked.request,parked.result,parked.source);return;}
     // A history load still running moves the view for whichever trace is loaded when it arrives (overLoad).
-    if(overLoading){overTarget={request:overRequest};return;}
+    // An unmarked load is the reader's own Over time click; the mark keeps that, so it can still open.
+    if(overLoading){var own=overTarget && overTarget.request===overRequest;overTarget={request:overRequest,reader:own?!!overTarget.reader:true};return;}
     // D5: Live when the trace is from today, also from Over time on today.
     if(d.key===localDayKey(Date.now())){if(over)traceMoved(overClose);return;}
     if(d.key===viewDay().key)return;
@@ -999,6 +1002,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // Over time retires one the reader chose with the plain note, and one shown automatically quietly.
   function traceViewChanged(){
     traceDayNote='';traceNotice='';var view=viewDay();
+    // An example-trace choice still loading belongs to Live; it must not settle as "expired" (cycle 2).
+    if(over && tracePending){tracePending=null;traceRequest++;}
     if(over && traceSelection && traceSelection.key.indexOf('direct/')!==0){
       var shown=traceSources().entries.find(function(entry){return entry.key===traceSelection.key;}),day=shown && traceDayOf(shown.exemplar);
       if(traceSelection.chosen && day)traceNotice='Cleared trace '+traceSelection.traceId.slice(0,12)+' ('+day.label+'): the view moved to '+view.label+'.';
@@ -1180,7 +1185,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function canOpenOver(){var source=historySource();return !retired && !!source && (source===localHistory || applied && Object.keys(map).length>0) && !editing();}
   function openOver(trace){
     if(retired || overLoading || over || !canOpenOver())return false;
-    var source=historySource(),request=++overRequest;overLoading=true;overError='';overProgress='';overTarget=trace?{request:request}:null;notify();
+    var source=historySource(),request=++overRequest;overLoading=true;overError='';overProgress='';overTarget=trace?{request:request}:null;overParked=null;notify();
     Promise.resolve().then(function(){return source.load(function(done,total){if(!retired && request===overRequest){overProgress=done+' of '+total;notify();}});}).then(function(result){overLoad(request,result,source);},function(){overLoad(request,null,source);});
     return true;
   }
@@ -1217,10 +1222,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var days=result && Array.isArray(result.days)?result.days:[];
     if(!days.length){overError='History could not load. Try Over time again.';notify();return;}
     var index=result.index;if(typeof index!=='number' || index<0 || index>=days.length)index=days.length-1;
-    // #1145: a load a trace started opens on the day of the trace loaded now. With no trace, or one from
-    // today, the view stays in Live; a day the list does not have keeps it there with a note.
-    var byTrace=!!(overTarget && overTarget.request===request),target=byTrace?traceDayOf(directTrace.snapshot().exemplar):null;overTarget=null;
-    if(byTrace && (!target || target.key===localDayKey(Date.now()))){notify();return;}
+    // #1145: a load a trace started or joined opens on the day of the trace loaded now. A replacement Load
+    // still running gets the history when it ends (traceFollow). With no trace the view stays in Live,
+    // unless the reader clicked Over time; a trace from today stays in Live; a day the list does not have
+    // keeps the view with a note.
+    var mark=overTarget && overTarget.request===request?overTarget:null,target=mark?traceDayOf(directTrace.snapshot().exemplar):null;overTarget=null;
+    if(mark && !target && directTrace.snapshot().busy){overParked={request:request,result:result,source:source,reader:!!mark.reader};notify();return;}
+    if(mark && (target?target.key===localDayKey(Date.now()):!mark.reader)){notify();return;}
     if(target){index=days.findIndex(function(day){return day.key===target.key;});if(index<0){traceDayNote=outsideNote(target);notify();return;}}
     var show=function(){over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null,source:source};on=true;availabilityOn=true;traceViewChanged();telemetry.openHistory(days,index);overShow();};
     if(target)traceMoved(show);else show();

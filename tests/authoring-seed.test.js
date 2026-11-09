@@ -1,4 +1,5 @@
 const {readSource} = require('../tools/source-loader.cjs');
+const {withoutLanesNote} = require('./helpers/lanes-note.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -25,8 +26,7 @@ const phoneCount = state => c.phoneModel(state['resident-phone']).notifications.
 test('the two-perspective teaching seed builds a clean shared story', () => {
   const result = c.validate(c.normalize(spec));
   assert.equal(result.errors.length, 0, result.errors.join('\n'));
-  // #1216: this seed keeps routing: "lanes"; only that retirement note is allowed.
-  const warnings = result.warnings.filter(w => !/\.routing: "lanes" is no longer recommended/.test(w));
+  const warnings = withoutLanesNote(result.warnings);
   assert.equal(warnings.length, 0, warnings.join('\n'));
   assert.equal(spec.page.sections.length, 1);
   assert.ok(diagram.layouts.find(v=>v.id===diagram.defaultLayout).sectionLayout.default.some(tile => !tile.panel && !tile.controls));

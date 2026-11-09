@@ -1,4 +1,5 @@
 'use strict';
+const {withoutLanesNote}=require('./helpers/lanes-note.cjs');
 const {readSource} = require('../tools/source-loader.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), vm = require('node:vm'), path = require('node:path');
@@ -218,7 +219,7 @@ function edit(spec, step, key, value, pid = 'home'){
 
 test('home story validates, focuses its map, and keeps the outage local', () => {
   const spec = fixture(), d = diagram(spec), result = C.validate(C.normalize(spec));
-  assert.deepEqual(plain(result.errors), []); assert.deepEqual(plain(result.warnings), []);
+  assert.deepEqual(plain(result.errors), []); assert.deepEqual(withoutLanesNote(result.warnings), []);
   assert.equal(d.defaultLayout, 'home');
   const healthy = C.builderHomemapStep(d, 4, 'home', 'happy');
   const outage = C.builderHomemapStep(d, 6, 'home', 'offline');

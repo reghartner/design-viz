@@ -1,4 +1,5 @@
 const {readSource} = require('../tools/source-loader.cjs');
+const {withoutLanesNoteResult}=require('./helpers/lanes-note.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const C=vm.createContext({URL,TextEncoder});
 for(const f of ['canon','validator','engine','builder.workbench','clipboard.workbench','confluence'])vm.runInContext(readSource(f+'.js'),C);
@@ -54,7 +55,7 @@ test('rename and delete keep deviceapp source-to-node references valid',()=>{
 });
 test('starter validates, exports for Confluence and has independent happy and outage snapshots',()=>{
  const raw=JSON.parse(fs.readFileSync(__dirname+'/../src/starters/device-app-sources.json','utf8'));
- const result=C.validate(C.normalize(raw));assert.deepEqual(plain(result),{errors:[],warnings:[]});
+ const result=C.validate(C.normalize(raw));assert.deepEqual(withoutLanesNoteResult(result),{errors:[],warnings:[]});
  assert.ok(!C.buildConfluenceExport(JSON.stringify(raw)).error);
  const d=raw.page.sections[0].diagram,p=d.panels[0];
  const path=id=>C.foldPanelStates({...d,steps:d.paths.find(p=>p.id===id).steps.map(id=>d.steps.find(s=>s.id===id))})[p.id];

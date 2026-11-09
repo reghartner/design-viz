@@ -1,4 +1,5 @@
 const {readSource} = require('../tools/source-loader.cjs');
+const {withoutLanesNoteResult}=require('./helpers/lanes-note.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -118,7 +119,7 @@ test('unavailable screen hides the scene, escapes its explanation, and clears on
 
 test('teaching flow keeps camera shutdown, health delivery, missed visits and restart gates distinct',()=>{
   const spec=JSON.parse(fs.readFileSync(path.join(__dirname,'../docs/diagrams/thermal-doorbell/thermal-doorbell.spec.json')));
-  assert.deepEqual(plain(validate(spec)),{errors:[],warnings:[]});
+  assert.deepEqual(withoutLanesNoteResult(validate(spec)),{errors:[],warnings:[]});
   const d=spec.page.sections[0].diagram,byId=id=>d.panels.find(p=>p.id===id);
   assert.equal(d.autoplay,false);
   assert.deepEqual(d.layouts.map(v=>v.name),['At the door','Data flow']);

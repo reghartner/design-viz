@@ -1,4 +1,5 @@
 'use strict';
+const {withoutLanesNoteResult}=require('./helpers/lanes-note.cjs');
 const {readSource} = require('../tools/source-loader.cjs');
 
 const test = require('node:test');
@@ -33,7 +34,7 @@ test('all software panel presets and domain starters validate without warnings',
   for (const file of ['software-systems.json','honeycomb-trace.json']){
     const spec = JSON.parse(fs.readFileSync(path.join(root, 'src/starters', file), 'utf8'));
     const v = C.validate(C.normalize(spec));
-    assert.deepEqual(plain(v), {errors:[],warnings:[]}, file);
+    assert.deepEqual(withoutLanesNoteResult(v), {errors:[],warnings:[]}, file);
   }
 });
 

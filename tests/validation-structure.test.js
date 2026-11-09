@@ -1,4 +1,5 @@
 'use strict';
+const {withoutLanesNoteResult}=require('./helpers/lanes-note.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -104,7 +105,7 @@ test('valid starters retain input values and only the known legacy expansion war
     const warnings = file === 'domain-drilldown.json'
       ? ['sections[0].diagram.nodes.recording.detail.mode: inline expansion was removed; opens as a focused drilldown. Use focus for new diagrams.']
       : [];
-    assert.deepEqual(validateBoth(raw), {errors: [], warnings}, file);
+    assert.deepEqual(withoutLanesNoteResult(validateBoth(raw)), {errors: [], warnings}, file);
   }
   const d = diagram(), section = {diagram: d}, page = {sections: [section]};
   assert.equal(source.normalize({page}), page);

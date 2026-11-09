@@ -102,7 +102,8 @@ function block(root,origin,mode){
 // Font-independent geometry, in svg units, for a node's trace label (local board): its home box (centred under
 // the card, baseline 24 below it) from the label's measured size, its box now, its card's centre and width,
 // and whether it is plated. hide: connection labels hidden first, so only test blockers decide.
-function measure(root,id,hide=[]){
+async function measure(root,id,hide=[]){
+ await root.evaluate(()=>document.fonts.ready);
  return root.evaluate((host,{id,hide})=>{
   const scope=host.shadowRoot || host,node=scope.querySelector('g.node[data-dv-node="'+id+'"]'),svg=node.closest('svg'),card=node.querySelector('.card');
   Array.from(scope.querySelectorAll('text.lbl')).filter(l=>hide.includes(l.textContent)).forEach(l=>{l.style.display='none';});
@@ -152,13 +153,15 @@ const checkoutLabel=(root,origin)=>root.evaluate((host,id)=>{
 test('desktop a trace label blocked straight down moves sideways, staying within its card',async({page,server})=>{
  const root=await setup(page,server,'local');await load(root);
  const a=await measure(root,'checkout',['ShipOrder']),half=a.width/2;
- expect(12+half,'room for a 12-unit move within the card').toBeLessThanOrEqual(a.card/2);
- // Covers the left of the home spot only: the first sideways move (right, 12) is clear.
- await reblock(root,[{x0:a.cx-half-120,x1:a.cx-half+5,y0:a.home.y0-2,y1:a.home.y1+40}]);
- const moved=await measure(root,'checkout'),dx=centre(moved.now)-a.cx;expect(dx,'moved sideways').toBeGreaterThan(10);
+ expect(a.width,'the Checkout label must be at most 102 wide for a 24-unit move to stay within its 150 card').toBeLessThanOrEqual(102);
+ // Covers the home spot from the left, every spot straight down, and the move right by 12; the move right
+ // by 24 is the first clear spot (the avoidance keeps 2 units between labels).
+ await reblock(root,[{x0:a.cx-half-120,x1:a.cx-half+22-.5,y0:a.home.y0-2,y1:a.home.y1+40}]);
+ const moved=await measure(root,'checkout'),dx=centre(moved.now)-a.cx;
  expect(moved.plate,'a clear spot exists sideways').toBe(false);
+ expect(dx,'moved right by 24').toBeCloseTo(24,3);
  expect(moved.now.y0,'not moved down').toBeCloseTo(a.home.y0,3);
- expect(Math.abs(dx)+half,'the whole label stays within its card width').toBeLessThanOrEqual(a.card/2+.01);
+ expect(24+half,'the whole label stays within its card width').toBeLessThanOrEqual(a.card/2);
  expect((await labels(root)).overlaps).toEqual([]);
 });
 test('desktop a sideways spot that leaves the card is not used; the label is plated instead',async({page,server})=>{

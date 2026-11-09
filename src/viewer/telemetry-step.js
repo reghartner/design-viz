@@ -147,6 +147,28 @@ function telemetryTraceConstrainLabel(text,alternatives,keepBelow){
   var inverse=root.inverse().multiply(local).inverse();
   text.setAttribute('x',Number(original.x)+inverse.a*dx+inverse.c*dy);text.setAttribute('y',Number(original.y)+inverse.b*dx+inverse.d*dy);
 }
+/* #1195: a trace label never sits on a connection (edge) label. Try moving it down, then sideways,
+   within the frame; with no clear spot, keep it and draw an opaque plate behind it. Connection
+   labels never move. */
+function telemetryTraceAvoidConnections(text){
+  var svg=text.closest('svg');if(!svg || !svg.getCTM || !text.getCTM || !svg.viewBox)return;
+  var connections=Array.from(svg.querySelectorAll('text.lbl')).filter(function(el){return !el.classList.contains('dv-metrics-label-hidden');}).map(function(el){return boardControlBox(el,svg);}).filter(Boolean);
+  var box=boardControlBox(text,svg);if(!box || !connections.length)return;
+  function blocked(b){return connections.some(function(c){return boardBoxesOverlap(b,c,2);});}
+  if(!blocked(box))return;
+  var frame=svg.viewBox.baseVal,root=svg.getCTM(),local=text.getCTM();if(!root || !local)return;
+  var inverse=root.inverse().multiply(local).inverse(),x=Number(text.getAttribute('x')),y=Number(text.getAttribute('y')),moves=[];
+  for(var k=1;k<=8;k++)moves.push({dx:0,dy:k*4});
+  [1,-1].forEach(function(side){for(var k=1;k<=6;k++)moves.push({dx:side*k*12,dy:0});});
+  for(var i=0;i<moves.length;i++){
+    var m=moves[i],next={x:box.x+m.dx,y:box.y+m.dy,w:box.w,h:box.h};
+    if(next.x<frame.x || next.x+next.w>frame.x+frame.width || blocked(next))continue;
+    text.setAttribute('x',x+inverse.a*m.dx+inverse.c*m.dy);text.setAttribute('y',y+inverse.b*m.dx+inverse.d*m.dy);return;
+  }
+  var own=text.getBBox(),doc=text.ownerDocument,plate=doc.createElementNS('http://www.w3.org/2000/svg','rect');
+  plate.setAttribute('class','dv-trace-label-plate');plate.setAttribute('x',own.x-3);plate.setAttribute('y',own.y-1);plate.setAttribute('width',own.width+6);plate.setAttribute('height',own.height+2);plate.setAttribute('rx',3);
+  text.parentNode.insertBefore(plate,text);
+}
 /* Time for one node's or edge's rows: each matched span counts its own start to
    end (its child spans included); several spans count the union of their
    intervals, so nested or overlapping spans are counted once. */
@@ -188,7 +210,7 @@ function telemetryPaintTrace(binding,model,focus){
     if(target.matches('path.edge'))g.setAttribute('data-trace-edge',target.getAttribute('data-dv-edge'));
     var parent=target.matches('g.node')?target:target.parentNode;if(!target.matches('g.node') && target.getAttribute('transform')!=null)g.setAttribute('transform',target.getAttribute('transform'));g.setAttribute('role','img');g.setAttribute('aria-label',title.textContent);parent.appendChild(g);return text;
   }
-  scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !counted(rows).length || !card)return;var box=card.getBBox();var level=levels.nodes[node.getAttribute('data-dv-node')],text=mark(node,rows,box.x+box.width/2,box.y+box.height+24,level);telemetryTraceConstrainLabel(text,null,true);
+  scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !counted(rows).length || !card)return;var box=card.getBBox();var level=levels.nodes[node.getAttribute('data-dv-node')],text=mark(node,rows,box.x+box.width/2,box.y+box.height+24,level);telemetryTraceConstrainLabel(text,null,true);telemetryTraceAvoidConnections(text);
     if(level && (level.level==='below' || level.level==='above'))telemetryPaintTraceBrackets(node,level.level,level.tone);});
   scope.querySelectorAll('g.node.node-text[data-dv-node]').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')];if(!rows || !counted(rows).length)return;node.setAttribute('data-trace-tone','observed');
     var level=levels.nodes[node.getAttribute('data-dv-node')];if(!level)return;node.setAttribute('data-trace-level',level.level);
@@ -201,7 +223,7 @@ function telemetryPaintTrace(binding,model,focus){
     // Opposite the usual protocol label and clear of the step coin. Account for
     // the text's width on vertical/bent edges, retaining the path's transform.
     var baseline=point.y-box.y-box.height/2;text.setAttribute('x',point.x+nx*offset);text.setAttribute('y',point.y+ny*offset+baseline);
-    telemetryTraceConstrainLabel(text,[{x:point.x-nx*(offset+24),y:point.y-ny*(offset+24)+baseline}]);
+    telemetryTraceConstrainLabel(text,[{x:point.x-nx*(offset+24),y:point.y-ny*(offset+24)+baseline}]);telemetryTraceAvoidConnections(text);
     if(level && (level.level==='below' || level.level==='above'))telemetryPaintTraceEdgeFocus(path,level.level,level.tone);
   });
   telemetryPaintTraceFocus(scope,focus);

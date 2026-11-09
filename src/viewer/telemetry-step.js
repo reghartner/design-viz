@@ -206,7 +206,7 @@ function telemetryTraceLabel(listed){
     var others=r.otherAlternatives || [],absent=others.filter(function(a){return !a.seen;}),unused=others.filter(function(a){return a.seen;});
     return [r.optional?'optional, not in this trace: '+r.service+' '+r.operation:named(r)+': '+(r.duration!=null?r.duration+' ms':r.label)+(r.budget!=null?' / '+r.budget+' ms budget':'')].concat(r.conditions.map(function(c){return c.label;}),
       absent.length?['not in this trace: '+absent.map(function(a){return a.name;}).join(', ')]:[],unused.length?['in this trace, not matched: '+unused.map(function(a){return a.name;}).join(', ')]:[]).join('; ');
-  }).join(' · ')+(time?' · Time '+time+': each matched span counts start to end, including its child spans; overlapping spans count once.':'');
+  }).join(' · ')+(time?' · Time '+time+': time covers each matched span from start to end (overlaps counted once).':'');
   return {text:text,title:title};
 }
 function telemetryPaintTrace(binding,model,focus){

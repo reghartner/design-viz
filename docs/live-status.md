@@ -1041,7 +1041,9 @@ While Metrics is available and on, each visible explicitly bound edge gets one
 rounded card connected to the measured route midpoint. Its border shows the
 METRIC state only (#1200), identically in the Jira and Trace views, on boards with
 and without Jira; ticket state never paints a card, and nodes and edges keep their
-own work paint. The worst signal on the card decides:
+own work paint. The worst signal decides, counting every numeric signal of the carrier
+as its verdict does, including `showOnCard: false` ones; when a hidden signal has no
+value or fails, the card adds a line such as "1 hidden signal: no value":
 
 | state | when | border |
 |---|---|---|
@@ -1052,8 +1054,9 @@ own work paint. The worst signal on the card decides:
 
 The card carries the state as `data-metric-state`. The Proof count chips (#1199) use
 the same CSS variables: proven and live early wear `held`, degraded `failing`,
-unproven `waiting`; unclassified and unbound stay neutral. Colours follow the personal
-status colours for Done, In progress and To do. In the Jira view a card still names
+unproven `waiting`; unclassified and unbound stay neutral. The Proof table's verdict
+pills use the same states, and chip text uses the card's neutral ink. Colours follow the personal
+status colours (and border widths) for Done, In progress and To do. In the Jira view a card still names
 its edge's work status and lists its tickets in the popover; on a board with no
 ticket, epic, exclusion or missing-work references (`snapshot().available === false`),
 carriers get no work presentation, even after a status map is applied: no outline

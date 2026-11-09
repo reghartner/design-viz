@@ -750,7 +750,7 @@ an **Env** select when the board names environments, **Edit** (then **Save N cha
 at the right edge. **Live** | **Over time** follows, then the day row and any Over time error,
 in both views. Each view draws the Metrics connector line below its own button rows: the Jira
 view in its status row, under the counts and **First blocker**; the Trace view directly under
-its controls row. The line wraps, so a changing note moves no button or slider (#1162). A board with no ticket or epic
+its controls row. The line wraps, so a changing note moves no button in the header or in the view's button rows (#1162). A board with no ticket or epic
 references after imports has no Jira view (#1136): the panel opens on Trace with no
 **Jira** | **Trace** switch. If a loaded detail
 brings ticket references, the switch appears and the panel moves to Jira unless the reader
@@ -2109,6 +2109,17 @@ explicit `traceMatch`, including imported nodes. No display-name joins are used.
 **Show on diagram** controls runtime annotations; Jira/scalar cues return when
 switching back to Jira. No document layout or authored timing is changed.
 
+With a trace shown (loaded or picked), the Trace view is compact (#1173), so the
+waterfall sits beside the diagram. The search (Load trace, log search, the load
+report and **Clear loaded trace**) is one line naming the connection and
+environment ("Fixture Honeycomb · Production · Change trace"). The request card
+is one line too: "8413cd87a9f1 · Started Nov 9 07:19 local · 55 spans · 6/7 steps
+matched". It holds Returned traces and the request details. Each line opens with
+one click, and an opened section stays open until the shown trace changes. A
+select with one choice (connection, environment, mapping diagram, a single log
+lookup) is not drawn; its value still applies. The help sentence is the Load
+trace summary's tooltip, and **Show on diagram** appears once a trace is shown.
+
 Each annotated node or uniquely matched edge gets one label from its rows: one row per
 step on the current path whose `traceMatch` names it (#1154). One row shows its time,
 for example `16.1 ms`. When the step's
@@ -2130,8 +2141,10 @@ A step that may be absent from a trace (for example, its operation runs in a dif
 trace) can carry `traceMatch.optional: true`; with alternatives, set it on every
 alternative ([canon rules](canon.md#reference-traces-and-incident-alternates)). A step whose
 `parentStepId` names an optional step must be marked optional too, or it reads unknown when
-the parent is absent. When the loaded trace has no span with an optional step's service and
-operation, the label is built from the other rows as if that row were not
+the parent is absent; even then, if its own span is present while the parent's mapping is
+missing or ambiguous, it stays unknown, since the span cannot be attributed. A span is present
+when it matches the selector's service, operation, namespace and attributes. When an optional
+step has no span of its own in the loaded trace, the label is built from the other rows as if that row were not
 there: a node named by one matched step and one missing optional step reads
 `Matched: … · 16.1 ms`, or only the time for a single selector. The title lists it as
 *optional, not in this trace: service operation*, it never makes the node unknown, and a
@@ -2143,6 +2156,16 @@ matched optional step reads like any matched step; an ambiguous one still counts
 ambiguous. Local, imported and drill-down steps follow the same rules. A trace that lacks
 an optional step can still be approved as the reference trace; a missing step without
 `optional` still blocks approval.
+
+With the Metrics overlay on, the trace labels are drawn first and the metric cards are then
+placed clear of them, the same way cards avoid node cards (#1163). The labels never move for
+cards; a card moves farther from its edge instead, and the diagram frame grows to fit it.
+The exception is a label clamped at the frame edge, which moves out once the frame grows.
+Text is laid out again at each board scale. When a scale change leaves a label meeting a card or
+a leader line, the board paints again and the cards are placed clear of it.
+A card's leader line has a gap where it would cross a trace label, also while a card is
+dragged in the Workbench.
+A card with an authored `card.position` keeps that position.
 
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
 deduplicated in-memory Jira Activity entry, without posting externally. Trace

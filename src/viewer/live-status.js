@@ -1178,6 +1178,22 @@ function createLiveStatus(ctl,page,options,renderOptions){
       mapChooser:traceChooser && selected && traceChooser.context===context?{label:traceChooser.label,span:traceChooser.span,spanId:traceChooser.spanId,drop:traceChooser.drop,steps:traceChooser.steps.map(function(step){return {id:step.id,mapped:step.mapped,disabled:step.alternatives,label:step.caption+(step.alternatives?' · has alternatives; edit in Inspect':step.mapped?' · mapped, replaces':'')};})}:null,
       mapped:mappedNote(selected,model),enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
+  /* #1163: metric cards are placed against the trace labels' boxes at paint time. Text is laid
+     out again at each board scale, so a label's box can change without a paint: the Auto view
+     rescales the board after the cards grow its frame (in CI a label widened by about 3%).
+     On a scale change, if a label's box changed and now meets a card or a drawn leader, paint
+     again at once, in the same frame. A scale change during a paint is checked after it. */
+  var traceRecheck=false;
+  function traceLabelSize(text){var box=text.getBBox();return Math.round(box.width*10)+'x'+Math.round(box.height*10);}
+  function recordTraceLabels(){view.querySelectorAll('.dv-trace-overlay text').forEach(function(text){text._dvTraceLabelSize=traceLabelSize(text);});}
+  function traceLabelsResized(){
+    if(retired || !telemetry.enabled() && !metricsPreview)return;
+    if(painting){traceRecheck=true;return;}
+    var changed=Array.prototype.filter.call(view.querySelectorAll('.dv-trace-overlay text'),function(text){var size=traceLabelSize(text),moved=text._dvTraceLabelSize!==size;text._dvTraceLabelSize=size;return moved;});
+    if(changed.length && telemetryTraceLabelsBlocked(changed)){paint();notify();}
+  }
+  view.addEventListener('board-scale-change',traceLabelsResized,true);
+  destroyListeners.push(function(){view.removeEventListener('board-scale-change',traceLabelsResized,true);});
   function paintTrace(){
     var trace=traceSnapshot(),selected=trace.selected,sources=traceSources().entries;
     bindings.forEach(function(binding){telemetryPaintTrace(binding,statusMode==='trace' && traceShow && selected && traceSelection && sources.some(function(e){return e.key===selected.key && e.binding.section===binding.section && e.binding.el===binding.el;})?selected.model:null,selected && selected.focus);});
@@ -1988,7 +2004,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         view.querySelectorAll('.dv-live-halo').forEach(function(el){el.remove();});
         bindings.forEach(paintBinding);
       }
-      bindings.forEach(paintStory);paintLanes();paintMetrics();paintTrace();
+      // Trace labels first: metric cards are then placed clear of them (#1163).
+      bindings.forEach(paintStory);paintLanes();paintTrace();paintMetrics();recordTraceLabels();
       // Paint Jira cues once, after cards and coins reserve their final boxes.
       // Handoffs transfer their ticket target from the card to the cue; a second
       // cue paint would discard that target after its source has been cleared.
@@ -2006,6 +2023,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }finally{
       painting=false;if(!retired)observeBindings();
     }
+    if(traceRecheck){traceRecheck=false;traceLabelsResized();}
     if(!retired && editor)askPending();
   }
   function schedule(){if(retired || painting || frame)return;frame=requestAnimationFrame(function(){frame=0;paint();notify();});}

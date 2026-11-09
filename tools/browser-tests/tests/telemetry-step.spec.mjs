@@ -85,6 +85,8 @@ const traceTab=r=>r.getByRole('button',{name:/^Trace(?: · \d+)?$/});
 const selected=r=>r.locator('.dv-trace-selected');
 // #1136: a board without ticket references opens on Trace and shows no Jira | Trace switch.
 // #1164: example traces are listed, but the reader picks one; the first entry's own trace makes no call.
+// #1173: with a trace shown, Returned traces sit in the collapsed request card; one click on its summary opens it.
+async function expandRequest(root){const card=root.locator('details.dv-trace-request');if(await card.count() && !await card.evaluate(el=>el.open))await card.locator(':scope > summary').click();}
 async function pickExample(root){await expect(root.locator('.dv-trace-candidate').first()).toBeVisible();const id=await root.page().evaluate(()=>window.ctl.liveStatus.snapshot().trace.entries[0].exemplar.traceId);await root.locator('.dv-trace-candidate[data-trace-id="'+id+'"]').first().click();await expect(selected(root)).toBeVisible();}
 async function openTrace(root,{pick=true}={}){if(await root.page().evaluate(()=>window.ctl.liveStatus.snapshot().available))await traceTab(root).click();else{await expect(traceTab(root)).toBeHidden();expect(await root.page().evaluate(()=>window.ctl.liveStatus.snapshot().mode)).toBe('trace');}if(await metric(root).getAttribute('aria-checked')==='false')await metric(root).click();if(pick)await pickExample(root);}
 
@@ -97,7 +99,7 @@ test('Status modes are exclusive; actual request selection paints SVG independen
  await expect(root.locator('.dv-metrics-card').first()).toBeVisible();await expect(root.locator('.dv-metrics-card[data-live-appearance]')).toHaveCount(0);
  const id=f.samples['mcu->ingest'].exemplars[0].traceId,calls=await page.evaluate(()=>({...window.calls}));await capture(page,'status-trace-mode');
  await root.getByRole('button',{name:'Next step',exact:true}).click();await expect(selected(root)).toHaveAttribute('data-trace-id',id);await root.getByRole('button',{name:'Next step',exact:true}).click();await expect(selected(root)).toHaveAttribute('data-trace-id',id);expect(await page.evaluate(()=>window.calls)).toEqual(calls);
- await root.locator('.dv-trace-candidate[data-trace-id="'+f.alternative.traceId+'"]').first().click();await expect(selected(root)).toHaveAttribute('data-trace-id',f.alternative.traceId);await expect(root.locator('g.node[data-dv-node="ingest"]')).toHaveAttribute('data-trace-tone','observed');expect(await page.evaluate(()=>window.calls.choose)).toBe(1);
+ await expandRequest(root);await root.locator('.dv-trace-candidate[data-trace-id="'+f.alternative.traceId+'"]').first().click();await expect(selected(root)).toHaveAttribute('data-trace-id',f.alternative.traceId);await expect(root.locator('g.node[data-dv-node="ingest"]')).toHaveAttribute('data-trace-tone','observed');expect(await page.evaluate(()=>window.calls.choose)).toBe(1);
  await root.getByRole('button',{name:'Show on diagram',exact:true}).click();await expect(root.locator('[data-trace-tone]')).toHaveCount(0);await root.getByRole('button',{name:'Show on diagram',exact:true}).click();await expect(root.locator('[data-trace-tone]')).not.toHaveCount(0);
  await root.getByRole('button',{name:'Jira',exact:true}).click();await expect(root.getByRole('table',{name:'Tickets',exact:true})).toBeVisible();await expect(root.locator('.dv-jira-cue')).not.toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);await traceTab(root).click();await expect(selected(root)).toHaveAttribute('data-trace-id',f.alternative.traceId);
  await expect(root.locator('.dv-metrics-card').first()).toBeVisible();await metric(root).click();await expect(metric(root)).toHaveAttribute('aria-checked','false');await expect(root.locator('.dv-metrics-card')).toHaveCount(0);await unchanged(page);
@@ -114,15 +116,15 @@ for(const disabled of ['page','host'])test(`${disabled} opt-out never enables tr
 
 test('history, off, capability removal and destroy retire selected evidence; native sibling is isolated',async({page,server})=>{
  const {root}=await setup(page,server,{sibling:true});await openTrace(root);await root.getByRole('button',{name:'Pin as evidence',exact:true}).click();await root.getByRole('button',{name:'Jira',exact:true}).click();await expect(root.locator('.dv-live-activity-entry').filter({hasText:'Pinned trace'})).toHaveCount(1);await over(root).click();await traceTab(root).click();await expect(selected(root)).toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);await expect(root.locator('.dv-trace-mode-status')).toContainText('Over time');
- await root.getByRole('button',{name:'Jira',exact:true}).click();await root.getByRole('button',{name:'Live',exact:true}).click();await traceTab(root).click();await root.locator('.dv-trace-candidate').first().click();await expect(selected(root)).toBeVisible();await expect(metric(root)).toHaveAttribute('aria-checked','true');await metric(root).click();await expect(selected(root)).toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);
- await expect(metric(root)).toHaveAttribute('aria-checked','false');await metric(root).click();await root.locator('.dv-trace-candidate').first().click();await page.evaluate(()=>window.ctl.telemetry.retractExemplars());await expect(selected(root)).toHaveCount(0);await expect(page.locator('#sibling [data-trace-tone]')).toHaveCount(0);await page.evaluate(()=>{window.retained=document.querySelector('#host').shadowRoot;window.viewer.destroy();});expect(await page.evaluate(()=>window.retained.querySelectorAll('[data-trace-tone],.dv-trace-overlay').length)).toBe(0);await unchanged(page);
+ await root.getByRole('button',{name:'Jira',exact:true}).click();await root.getByRole('button',{name:'Live',exact:true}).click();await traceTab(root).click();await expandRequest(root);await root.locator('.dv-trace-candidate').first().click();await expect(selected(root)).toBeVisible();await expect(metric(root)).toHaveAttribute('aria-checked','true');await metric(root).click();await expect(selected(root)).toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);
+ await expect(metric(root)).toHaveAttribute('aria-checked','false');await metric(root).click();await expandRequest(root);await root.locator('.dv-trace-candidate').first().click();await page.evaluate(()=>window.ctl.telemetry.retractExemplars());await expect(selected(root)).toHaveCount(0);await expect(page.locator('#sibling [data-trace-tone]')).toHaveCount(0);await page.evaluate(()=>{window.retained=document.querySelector('#host').shadowRoot;window.viewer.destroy();});expect(await page.evaluate(()=>window.retained.querySelectorAll('[data-trace-tone],.dv-trace-overlay').length)).toBe(0);await unchanged(page);
 });
 
 for(const options of [{noTrace:true},{noTimeline:true},{unknown:true},{noHandler:true},{preload:true}])test('honest trace limits and unavailable alternatives '+JSON.stringify(options),async({page,server})=>{
  const {root}=await setup(page,server,options);await traceTab(root).click();if(!options.preload){await expect(metric(root)).toHaveAttribute('aria-checked','false');await metric(root).click();}
  if(options.noTrace){await expect(selected(root)).toHaveCount(0);await expect(root.locator('.dv-trace-mode-status')).toContainText('No trace evidence');return;}
  await pickExample(root);if(options.noTimeline){await expect(root.locator('[data-trace-tone]')).toHaveCount(0);await expect(root.locator('.dv-trace-limit')).toContainText('timeline unavailable');}
- if(options.noHandler)await expect(root.locator('.dv-trace-candidate[aria-pressed="false"]').first()).toBeDisabled();
+ if(options.noHandler){await expandRequest(root);await expect(root.locator('.dv-trace-candidate[aria-pressed="false"]').first()).toBeDisabled();}
  if(options.unknown)await expect(selected(root).getByRole('link')).toHaveCount(0);
  await unchanged(page);
 });
@@ -135,7 +137,7 @@ test('canonical doorbell normal, slow database, service error, partial and backp
  const db=root.locator('g.node[data-dv-node="database"]'),phone=root.locator('g.node[data-dv-node="phone"]'),queue=root.locator('g.node[data-dv-node="queue"]');
  await expect(db).toBeVisible();await expect(db).toHaveAttribute('data-trace-tone','observed');
  for(const [name,node,tone] of [['database-slow',db,'warning'],['service-error',root.locator('g.node[data-dv-node="cloud"]'),'error'],['partial',db,'unknown'],['backpressure',queue,'warning']]){
-  await root.locator('.dv-trace-candidate[data-trace-id="'+f.ids[name]+'"]').click();await expect(selected(root)).toHaveAttribute('data-trace-id',f.ids[name]);await expect(node).toHaveAttribute('data-trace-tone',tone);
+  await expandRequest(root);await root.locator('.dv-trace-candidate[data-trace-id="'+f.ids[name]+'"]').click();await expect(selected(root)).toHaveAttribute('data-trace-id',f.ids[name]);await expect(node).toHaveAttribute('data-trace-tone',tone);
   if(name==='database-slow'){await expect(root.locator('.dv-trace-mappings')).toContainText('900 ms / 150 ms budget');const before=await page.evaluate(()=>({...window.calls}));await root.locator('.dv-trace-span').filter({hasText:'INSERT clip'}).click();await expect(root.locator('.dv-trace-operation-detail .dv-trace-duration')).toHaveText('900 ms');await expect(root.locator('.dv-trace-operation-detail')).toContainText('150 ms budget');expect(await page.evaluate(()=>window.calls)).toEqual(before);await capture(page,'canonical-database-slow');}
  }
  await unchanged(page);
@@ -143,14 +145,14 @@ test('canonical doorbell normal, slow database, service error, partial and backp
 
 
 test('late explicit alternative after off cannot restore trace selection or SVG',async({page,server})=>{
- const {root,f}=await setup(page,server,{holdChoose:true});await openTrace(root);await root.locator('.dv-trace-candidate[data-trace-id="'+f.alternative.traceId+'"]').first().click();await expect(root.locator('.dv-trace-mode-status')).toContainText('Loading selected trace');await expect(metric(root)).toHaveAttribute('aria-checked','true');await metric(root).click();await page.evaluate(()=>window.releaseChoice());await expect(selected(root)).toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.liveStatus.snapshot().trace.selected)).toBeNull();
+ const {root,f}=await setup(page,server,{holdChoose:true});await openTrace(root);await expandRequest(root);await root.locator('.dv-trace-candidate[data-trace-id="'+f.alternative.traceId+'"]').first().click();await expect(root.locator('.dv-trace-mode-status')).toContainText('Loading selected trace');await expect(metric(root)).toHaveAttribute('aria-checked','true');await metric(root).click();await page.evaluate(()=>window.releaseChoice());await expect(selected(root)).toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.liveStatus.snapshot().trace.selected)).toBeNull();
 });
 test('duplicate carrier IDs in distinct sections never borrow another section’s trace',async({page,server})=>{
  const {root}=await setup(page,server,{sameIds:true});const first=root.locator('#section-main');await traceTab(first).click();await expect(metric(first)).toHaveAttribute('aria-checked','false');await metric(first).click();await expect(first.locator('.dv-trace-mode-status')).toContainText('duplicate carrier IDs');await expect(root.locator('[data-trace-tone]')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.liveStatus.snapshot().trace.entries.length)).toBe(0);
 });
 
 test('reused host token cannot silently replace an explicitly selected trace',async({page,server})=>{
- const {root,f}=await setup(page,server);await openTrace(root);await root.locator('.dv-trace-candidate[data-trace-id="'+f.alternative.traceId+'"]').first().click();await expect(selected(root)).toHaveAttribute('data-trace-id',f.alternative.traceId);
+ const {root,f}=await setup(page,server);await openTrace(root);await expandRequest(root);await root.locator('.dv-trace-candidate[data-trace-id="'+f.alternative.traceId+'"]').first().click();await expect(selected(root)).toHaveAttribute('data-trace-id',f.alternative.traceId);
  await page.evaluate(()=>window.ctl.telemetry.retry());await expect(selected(root)).toHaveAttribute('data-trace-id',f.alternative.traceId);
  await page.evaluate(()=>{const samples=structuredClone(window.fixture.samples);samples['mcu->ingest'].exemplars[0].traceId=samples['mcu->ingest'].exemplars[0].candidates.find(c=>c.traceId!==samples['mcu->ingest'].exemplars[0].traceId).traceId;window.ctl.telemetry.apply(samples);});await expect(selected(root)).toHaveCount(0);await expect(root.locator('[data-trace-tone]')).toHaveCount(0);await expect(root.locator('.dv-trace-mode-status')).toContainText('expired');
 });
@@ -162,7 +164,7 @@ for(const noPanel of [false,true])test('desktop trace evidence preserves diagram
  if(noPanel)await expect(root.locator('.pt-live-status')).toHaveCount(0);
  if(!noPanel){await openTrace(root);await expect(root.locator('.pt-live-status .dv-trace-selected')).toHaveCount(1);await expect(root.locator('.dv-trace-waterfall')).toBeVisible();}
  await page.evaluate(()=>{const samples=structuredClone(window.fixture.samples);Object.values(samples).forEach(s=>delete s.exemplars);window.ctl.telemetry.apply(samples);});await expect(selected(root)).toHaveCount(0);const before=await diagram.boundingBox();
- await page.evaluate(()=>window.ctl.telemetry.apply(window.fixture.samples));if(!noPanel){await root.locator('.dv-trace-candidate').first().click();await expect(selected(root)).toBeVisible();}
+ await page.evaluate(()=>window.ctl.telemetry.apply(window.fixture.samples));if(!noPanel){await expandRequest(root);await root.locator('.dv-trace-candidate').first().click();await expect(selected(root)).toBeVisible();}
  await expect(root.locator('.dv-trace-evidence,.dv-trace-rail,.dv-live-trace-slot')).toHaveCount(0);
  const after=await diagram.boundingBox();expect(Math.abs(after.width-before.width)).toBeLessThan(2);expect(Math.abs(after.height-before.height)).toBeLessThan(2);
  await root.getByRole('button',{name:'Next step',exact:true}).click();await expect(root.locator('.dv-trace-evidence,.dv-trace-rail')).toHaveCount(0);await unchanged(page);

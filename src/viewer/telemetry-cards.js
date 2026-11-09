@@ -89,12 +89,45 @@ function telemetryCardPlace(path,w,h,placement,boxes){
   }
   return {box:box,mid:mid,side:side};
 }
+/* The leader from the edge midpoint to its card, with a gap wherever it would
+   cross a trace label (#1163), so the line never strikes through the label. */
+function telemetrySegmentInBox(a,b,r,pad){
+  var dx=b.x-a.x,dy=b.y-a.y,lo=0,hi=1,p=[-dx,dx,-dy,dy],q=[a.x-r.x+pad,r.x+r.w+pad-a.x,a.y-r.y+pad,r.y+r.h+pad-a.y];
+  for(var i=0;i<4;i++){if(!p[i]){if(q[i]<0)return null;continue;}var u=q[i]/p[i];if(p[i]<0)lo=Math.max(lo,u);else hi=Math.min(hi,u);}
+  return lo<hi?[lo,hi]:null;
+}
+function telemetryCardLeader(a,b,labels){
+  var dx=b.x-a.x,dy=b.y-a.y,gaps=[],d='',t=0;
+  (labels || []).forEach(function(r){var gap=telemetrySegmentInBox(a,b,r,3);if(gap)gaps.push(gap);});
+  function at(u){return (a.x+dx*u)+' '+(a.y+dy*u);}
+  gaps.sort(function(g,h){return g[0]-h[0];}).forEach(function(g){if(g[0]>t)d+='M'+at(t)+'L'+at(g[0]);t=Math.max(t,g[1]);});
+  return t<1?d+'M'+at(t)+'L'+at(1):d;
+}
+/* Leader to the nearest point of a card box; shared with the Workbench card drag preview. */
+function telemetryCardLeaderTo(mid,box,labels){
+  return telemetryCardLeader(mid,{x:Math.max(box.x,Math.min(box.x+box.w,mid.x)),y:Math.max(box.y,Math.min(box.y+box.h,mid.y))},labels);
+}
+/* Whether any of these trace labels now meets a metric card or a drawn card leader (#1163). */
+function telemetryTraceLabelsBlocked(texts){
+  return texts.some(function(text){
+    var svg=text.closest('svg'),box=svg && boardControlBox(text,svg);if(!box)return false;
+    return Array.from(svg.querySelectorAll('.dv-metrics-card-box')).some(function(el){var card=boardControlBox(el,svg);return !!card && boardBoxesOverlap(box,card,0);}) ||
+      Array.from(svg.querySelectorAll('.dv-metrics-leader')).some(function(leader){
+        var n=(leader.getAttribute('d') || '').match(/-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi) || [];
+        for(var i=0;i+3<n.length;i+=4)if(telemetrySegmentInBox({x:+n[i],y:+n[i+1]},{x:+n[i+2],y:+n[i+3]},box,0))return true;
+        return false;
+      });
+  });
+}
+function telemetryTraceLabelBoxes(svg){
+  return Array.from(svg.querySelectorAll('.dv-trace-overlay text')).map(function(el){return boardControlBox(el,svg);}).filter(Boolean);
+}
 function telemetryPaintCards(scope,diagram,templates,view,window,activate,config){
   telemetryClearCards(scope);
   if(!view || !diagram)return;
   scope.querySelectorAll('svg').forEach(function(svg){
-    var boxes=[],doc=svg.ownerDocument;
-    svg.querySelectorAll('.node .card,.node .icbg,.node use,.node image,.node text,.handoff-stripe,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff],.dvdelta,.node-review-badge,.comm-break,text.lbl').forEach(function(el){if(el.closest('.coin'))return;var box=boardControlBox(el,svg);if(box)boxes.push(box);});
+    var boxes=[],labels=[],doc=svg.ownerDocument;
+    svg.querySelectorAll('.node .card,.node .icbg,.node use,.node image,.node text,.handoff-stripe,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff],.dvdelta,.node-review-badge,.comm-break,text.lbl,.dv-trace-overlay text').forEach(function(el){if(el.closest('.coin'))return;var box=boardControlBox(el,svg);if(box)boxes.push(box);if(box && el.closest('.dv-trace-overlay'))labels.push(box);});
     Array.from(svg.querySelectorAll('path.edge[data-dv-edge]')).sort(function(a,b){
       function manual(path){var edge=(diagram.edges || [])[Number(path.getAttribute('data-dv-edge'))],binding=edge && carrierTelemetry(edge,templates,null,config);return !!(binding && binding.card && binding.card.position);}
       return Number(manual(b))-Number(manual(a));
@@ -161,8 +194,7 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       var placed=telemetryCardPlace(path,w,height,binding.card || {},boxes),box=placed.box;
       card.setAttribute('data-metrics-anchor-x',placed.mid.x);card.setAttribute('data-metrics-anchor-y',placed.mid.y);
       card.setAttribute('transform','translate('+box.x+' '+box.y+')');card.setAttribute('data-side',placed.side);
-      var end={x:Math.max(box.x,Math.min(box.x+box.w,placed.mid.x)),y:Math.max(box.y,Math.min(box.y+box.h,placed.mid.y))};
-      var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-dv-edge':index,d:'M'+placed.mid.x+' '+placed.mid.y+'L'+end.x+' '+end.y,'pointer-events':'none','aria-hidden':'true'});
+      var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-dv-edge':index,d:telemetryCardLeaderTo(placed.mid,box,labels),'pointer-events':'none','aria-hidden':'true'});
       if(view.preview)leader.setAttribute('data-metrics-preview','true');
       svg.insertBefore(leader,card);boxes.push(box);
       var label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');if(label){label.classList.add('dv-metrics-label-hidden');if(view.preview)label.setAttribute('data-metrics-preview','true');}

@@ -169,15 +169,23 @@
         if(!node._logChange){node._logChange=function(){var owner=host._livePanelApi;if(owner)owner.setLogLookupField({field:key,value:check?node.checked:node.value});};node.addEventListener(tag==='select' || check?'change':'input',node._logChange);}
         return node;
       }
-      var choose=control('lookup','Log lookup','select');
-      logs.lookups.forEach(function(l){el(choose,'option',l.id,'',l.label).value=l.id;});el(choose,'option',logs.typed,'','Type a LogQL query').value=logs.typed;
-      if(choose.value!==logs.form.lookup)choose.value=logs.form.lookup;
+      // #1173: with one authored lookup (or none) there is no select; a text button switches to a typed query and back.
+      if(logs.lookups.length>1){
+        var choose=control('lookup','Log lookup','select');
+        logs.lookups.forEach(function(l){el(choose,'option',l.id,'',l.label).value=l.id;});el(choose,'option',logs.typed,'','Type a LogQL query').value=logs.typed;
+        if(choose.value!==logs.form.lookup)choose.value=logs.form.lookup;
+      }
       var lookup=logs.lookups.find(function(l){return l.id===logs.form.lookup;});
       if(lookup && lookup.slot){
         var value=control('value',lookup.label,'input');value.type='text';value.maxLength=200;value.autocomplete='off';value.spellcheck=false;value.placeholder=lookup.values.length?'Type or pick a value':'Type a value';
         if(lookup.values.length){var list=el(section,'datalist','values','');list.id=host._logValuesId || (host._logValuesId='dv-trace-log-values-'+(++logValueLists));lookup.values.forEach(function(v,i){el(list,'option',String(i),'').value=v;});value.setAttribute('list',list.id);}
         else value.removeAttribute('list');
         if(value.value!==logs.form.value)value.value=logs.form.value;
+      }
+      if(logs.lookups.length===1 && lookup && !lookup.slot)el(section,'p','lookup-name','dv-trace-log-name','Log lookup: '+lookup.label);
+      if(logs.lookups.length===1){
+        var only=logs.lookups[0],mode=el(section,'button','mode','dv-trace-log-mode',lookup?'Type a LogQL query instead':'Use '+only.label+' instead');mode.type='button';mode.disabled=!logs.available;mode._logTo=lookup?logs.typed:only.id;
+        if(!mode._logClick){mode._logClick=function(){var owner=host._livePanelApi;if(owner && !mode.disabled)owner.setLogLookupField({field:'lookup',value:mode._logTo});};mode.addEventListener('click',mode._logClick);}
       }
       if(!lookup){var typed=control('logql','LogQL log query','textarea');typed.maxLength=2000;typed.rows=3;typed.spellcheck=false;typed.placeholder='{env="prod"} |= "message" | field="value"';if(typed.value!==logs.form.logql)typed.value=logs.form.logql;}
       // #1158: checked by default; Find then lists only lines with a trace ID.
@@ -209,17 +217,30 @@
         };load.addEventListener('click',load._logClick);}
       });
     }
-    function directTraceBody(body,direct){
+    // #1173: a section's open state while a trace is shown. It lives on the panel host, keyed by the shown trace
+    // ([key, traceId]), so a repaint, a re-poll or a Jira <-> Trace switch keeps what the reader opened; another trace resets it.
+    // One slot for the shown trace: another trace resets it; the gap while a Load or Verify runs (no token) leaves it alone,
+    // so the same trace coming back keeps the reader's choice. With nothing shown the search is open.
+    function traceSection(details,name,token){
+      var slot=host._traceOpen;if(token && (!slot || slot.token!==token))slot=host._traceOpen={token:token,config:false,request:false};
+      details._traceOpenName=name;var key=token || '';
+      if(details._traceOpenFor!==key){details.open=token?slot[name]:name==='config';details._traceOpenFor=key;}
+      if(!details._traceToggle){details._traceToggle=function(){var st=host._traceOpen;if(st && details._traceOpenFor && st.token===details._traceOpenFor)st[details._traceOpenName]=details.open;};details.addEventListener('toggle',details._traceToggle);}
+    }
+    // #1173: `shown` names the trace on screen (loaded or picked). While one is shown the search is one collapsed line;
+    // a reader's expand stays until the shown trace changes.
+    function directTraceBody(body,direct,shown){
       if(!direct || !direct.profiles.length)return;
-      var box=el(body,'section','direct','dv-trace-direct'),r=direct.report,loaded=!!(direct.exemplar && r && r.stage==='complete');
+      var box=el(body,'section','direct','dv-trace-direct'),r=direct.report,loaded=!!shown;
       var profile=direct.profiles.find(function(p){return p.id===direct.form.connection;}),environment=profile && profile.environments.find(function(e){return e.id===direct.form.environment;});
-      var config=el(box,'details','config','dv-trace-config'),token=loaded?direct.exemplar.selectionToken:null,focusConfig=config.contains(doc.activeElement);
-      if(config._directLoaded!==loaded || config._directToken!==token){config.open=!loaded;config._directLoaded=loaded;config._directToken=token;}
+      var config=el(box,'details','config','dv-trace-config'),token=shown || null,focusConfig=config.contains(doc.activeElement);
+      traceSection(config,'config',token);
       var summary=el(config,'summary','summary','');summary.setAttribute('aria-label',loaded?'Change or load another trace':'Load trace options');
-      el(summary,'strong','title','',loaded?[profile && profile.label,environment && environment.label].filter(Boolean).join(' · '):'Load trace');
-      if(loaded)el(summary,'span','change','dv-trace-config-action','Change / load another trace');
+      summary.setAttribute('title','Load one exact request. This session only; diagram mappings use authored traceMatch steps.');
+      var names=[profile && profile.label,environment && environment.label].filter(Boolean).join(' · ');
+      el(summary,'strong','title','',loaded?names:'Load trace');
+      el(summary,'span','change','dv-trace-config-action',loaded?'· Change trace':names?'· '+names:'').hidden=!loaded && !names;
       if(loaded && !config.open && focusConfig)summary.focus({preventScroll:true});
-      el(config,'p','help','','Load one exact request. This session only; diagram mappings use authored traceMatch steps.');
       function field(parent,key,label,options,placeholder){
         var wrap=el(parent,'label',key+'-label','dv-trace-input-label');el(wrap,'span','label','',label);
         var control=el(wrap,options?'select':'input',key,'dv-trace-input');control.setAttribute('aria-label',label);
@@ -229,9 +250,10 @@
         if(!control._directChange){control._directChange=function(){var owner=host._livePanelApi;if(owner)owner.setDirectTraceField({field:key,value:control.value});};control.addEventListener(options?'change':'input',control._directChange);}
         return control;
       }
-      field(config,'connection','Trace connection',direct.profiles);
-      field(config,'environment','Connection environment',profile?profile.environments:[]);
-      if(direct.sections.length)field(config,'section','Mapping diagram',direct.sections);
+      // #1173: a select with one choice is not drawn; its value still applies and the summary names it.
+      if(direct.profiles.length>1)field(config,'connection','Trace connection',direct.profiles);
+      if(!profile || profile.environments.length>1)field(config,'environment','Connection environment',profile?profile.environments:[]);
+      if(direct.sections.length>1)field(config,'section','Mapping diagram',direct.sections);
       field(config,'input','Trace ID or link',null,'Paste a trace ID or supported Honeycomb link');
       var start=direct.form.start,relative=/^-([1-9][0-9]{0,3}[smhdw])$/.exec(start),bounds=direct.bounds,back=bounds?bounds.lookback:direct.form.end?null:start?relative && relative[1]:profile && profile.lookback;
       // #1142: with no Trace start or end, Over time searches the selected day.
@@ -263,7 +285,9 @@
       // #1145: why a loaded trace left, or why the view did not move to its day.
       if(direct.dayNote)el(box,'p','day-note','dv-trace-day-note',direct.dayNote).setAttribute('role','status');
       if(!direct.available)el(box,'p','unavailable','dv-trace-direct-status','Direct trace retrieval is unavailable in this host or view.').setAttribute('role','status');
-      if(r){var report=el(box,'section','report','dv-trace-direct-report'+(loaded?' dv-trace-report-compact':''));report.setAttribute('aria-label','Trace connection report');
+      // The report and Clear sit inside the search section, so a shown trace keeps them one click away.
+      // A Verify or an error report stays in view; a loaded trace's report sits in the collapsed search.
+      if(r){var report=el(r.mode==='verify' || r.error?box:config,'section','report','dv-trace-direct-report'+(loaded?' dv-trace-report-compact':''));report.setAttribute('aria-label','Trace connection report');
         el(report,'p','stage','dv-trace-direct-status',r.error || (r.stage==='complete'?'Loaded · ID matched · '+r.spanCount+' spans · '+r.completeness+' completeness':r.stage==='schema'?'Checking runtime tool schema…':'Loading exact trace…')).setAttribute('role','status');
         if(r.error)el(report,'p','error-stage','','Stage: '+r.stage);
         // #1124: the provider may not have kept a log line's trace; offer the next line with a trace ID.
@@ -274,7 +298,7 @@
         el(diagnostics,'p','receipt','', 'Stage: '+r.stage+' · request accepted: '+(r.requestAccepted?'yes':'no')+' · ID matched: '+(r.idMatched?'yes':'no'));
         if(r.arguments){el(diagnostics,'p','argument-note','','Resolved arguments (configured literals and context redacted):');el(diagnostics,'pre','arguments','dv-trace-arguments',JSON.stringify(r.arguments,null,2));}
       }
-      if(direct.busy || direct.exemplar || r)button(el(box,'div','actions','dv-live-controls'),'clear','reader-button',direct.busy?'Cancel request':'Clear loaded trace','clearDirectTrace');
+      if(direct.busy || direct.exemplar || r)button(el(config,'div','clear','dv-live-controls'),'clear','reader-button',direct.busy?'Cancel request':'Clear loaded trace','clearDirectTrace');
     }
     // #1078: board Edit mode is reachable from the Trace view too, so a span can be mapped and saved here.
     // Its buttons are in the shared header (#1136); its notice stays in the Trace body.
@@ -288,9 +312,16 @@
       var trace=value.trace,body=el(host,'div','trace-body','dv-live-panel-body dv-live-trace'),controls=el(body,'div','controls','dv-live-controls');
       metricsLine(body,value.metrics || {available:false,enabled:false});
       if(value.actionLabel)button(controls,'action','reader-button',value.actionLabel,'runAction');
-      var show=button(controls,'show','reader-button dv-trace-show','Show on diagram','setTraceShow');show._liveArgument=!trace.show;show.setAttribute('aria-pressed',String(trace.show));show.disabled=!trace.selected;
+      // #1173: Show on diagram waits for a shown trace.
+      var show=button(controls,'show','reader-button dv-trace-show','Show on diagram','setTraceShow');show._liveArgument=!trace.show;show.setAttribute('aria-pressed',String(trace.show));show.hidden=show.disabled=!trace.selected;
+      controls.hidden=!value.actionLabel && !trace.selected;
+      // Open sections are keyed by the entry key and trace ID. A loaded trace's key carries its load token, so it is 'direct' and a Verify of it keeps them.
+      // An example keeps them while its entry key is unchanged; a new selection token expires the selection instead.
+      var shownTrace=trace.selected?JSON.stringify([trace.selected.manual?'direct':trace.selected.key,trace.selected.exemplar.traceId]):null;
+      // Nothing shown and nothing loading (Clear, a day move, an expired selection): the next trace starts collapsed. A Load or Verify gap keeps them.
+      if(!shownTrace && !(trace.direct && trace.direct.busy) && !trace.status.busy)host._traceOpen=null;
       traceEditNotice(body,value.edit);
-      directTraceBody(body,trace.direct);
+      directTraceBody(body,trace.direct,shownTrace);
       var message=trace.direct && trace.direct.profiles.length?(!trace.hasMappings?'Diagram mapping is not configured. Loaded traces still show a waterfall.':''):!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Turn on Metrics overlay to refresh explicit bindings.':'Turn on Metrics overlay to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
       var status=el(body,'p','status','dv-trace-mode-status',[message,trace.hasMappings?trace.status.note:'',trace.hasMappings?trace.notice:''].filter(Boolean).join(' '));status.setAttribute('role','status');
       // #1177: the latest span mapping with its Undo, and the step chooser of a drop on a carrier with several steps.
@@ -310,13 +341,13 @@
         // Each drop moves focus to the chooser, also when it is already open.
         if(chooser._mapDrop!==mc.drop){chooser._mapDrop=mc.drop;var first=chooser.querySelector('button.dv-trace-map-choice:not([disabled])') || chooser.querySelector('button');if(first && first.focus)first.focus({preventScroll:true});}
       }
-      if(trace.entries.length){
-        el(body,'h3','candidates-title','','Returned traces');
+      function returnedTraces(parent){
+        el(parent,'h3','candidates-title','','Returned traces');
         var list;
-        var source=el(body,'select','trace-source','dv-trace-source-select');source.setAttribute('aria-label','Trace source');trace.entries.forEach(function(entry){var option=el(source,'option',entry.key,'',entry.label);option.value=entry.key;});
+        var source=el(parent,'select','trace-source','dv-trace-source-select');source.setAttribute('aria-label','Trace source');trace.entries.forEach(function(entry){var option=el(source,'option',entry.key,'',entry.label);option.value=entry.key;});
         var current=trace.entries.find(function(entry){return trace.selected && entry.key===trace.selected.key;}) || trace.entries[0];source.value=current.key;source._traceEntries=trace.entries;
         if(!source._traceChange){source._traceChange=function(){var entry=source._traceEntries.find(function(e){return e.key===source.value;}),owner=host._livePanelApi;if(entry && owner)owner.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});};source.addEventListener('change',source._traceChange);}
-        list=el(body,'div','candidates','dv-trace-candidates');
+        list=el(parent,'div','candidates','dv-trace-candidates');
         [current].forEach(function(entry){
           var group=el(list,'div',entry.key,'dv-trace-source');
           entry.candidates.forEach(function(candidate){
@@ -326,15 +357,27 @@
           });
         });
       }
-      if(!trace.selected)return;
+      // Focus that was inside the card when it went away (a Load's gap) returns to the next card's line once.
+      if(!trace.selected){if(host._traceCardHadFocus)host._traceCardFocus=true;host._traceCardHadFocus=false;if(trace.entries.length)returnedTraces(body);return;}
       var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
-      el(detail,'h3','heading','','Selected request');el(detail,'code','identity','dv-trace-identity',e.traceId);if(selected.day)el(detail,'p','date','dv-trace-date','Started '+selected.day.label+' '+selected.day.time+' local');if(selected.manual && !selected.hasMappings)el(detail,'p','mapping-unavailable','','Diagram mapping is not configured for this section.');
+      // #1173: the request card (Returned traces and the selected request's details) is one collapsed line while it is shown.
+      var card=el(detail,'details','request','dv-trace-request'),matchedSteps=model.mapping?model.rows.filter(function(r){return r.status==='matched';}).length:0;
+      // #1175: an optional step missing from this trace does not count against coverage; the summary and the coverage line share these counts.
+      var optionalAbsent=model.rows.filter(function(r){return r.optional;}).length,stepTotal=model.rows.length-optionalAbsent;
+      // The carried focus is used once, and only while nothing else holds focus (the removed card left it on the body).
+      var active=doc.activeElement,carried=!!host._traceCardFocus && (!active || active===doc.body || active.isConnected===false);host._traceCardFocus=false;
+      var focusCard=card.contains(active) || carried;traceSection(card,'request',shownTrace);
+      var limited=e.warnings.some(function(w){return /200 spans|timeline unavailable/i.test(w);}) || !!model.warning;
+      var cardSummary=el(card,'summary','summary','dv-trace-request-summary',[e.traceId.slice(0,12),selected.day?'Started '+selected.day.label+' '+selected.day.time+' local':'',e.spans.length+' spans',model.mapping?matchedSteps+'/'+stepTotal+' steps matched':'',e.completeness==='partial'?'partial':e.completeness!=='complete'?e.completeness+' completeness':'',limited?'limit reached':''].filter(Boolean).join(' · '));
+      // Picking a trace from inside the open card collapses it; keep keyboard focus on its line.
+      if(focusCard && !card.open && doc.activeElement!==cardSummary)cardSummary.focus({preventScroll:true});
+      host._traceCardHadFocus=card.contains(doc.activeElement);
+      el(card,'h3','heading','','Selected request');el(card,'code','identity','dv-trace-identity',e.traceId);if(selected.day)el(card,'p','date','dv-trace-date','Started '+selected.day.label+' '+selected.day.time+' local');if(selected.manual && !selected.hasMappings)el(card,'p','mapping-unavailable','','Diagram mapping is not configured for this section.');
       var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
-      el(detail,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');
-      var limit=e.warnings.filter(function(w){return /200 spans|timeline unavailable/i.test(w);});if(model.warning)limit.push(model.warning);if(limit.length)el(detail,'p','limit','dv-trace-limit',Array.from(new Set(limit)).join(' '));
-      // #1175: an optional step missing from this trace does not count against coverage.
-      var optional=model.rows.filter(function(r){return r.optional;}).length;
-      if(model.mapping)el(detail,'p','coverage','dv-trace-coverage',model.rows.filter(function(r){return r.status==='matched';}).length+'/'+(model.rows.length-optional)+' steps matched · '+(optional?optional+' optional not in this trace · ':'')+model.mapping.unmatched.length+' spans unmatched');
+      el(card,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');
+      var limit=e.warnings.filter(function(w){return /200 spans|timeline unavailable/i.test(w);});if(model.warning)limit.push(model.warning);if(limit.length)el(card,'p','limit','dv-trace-limit',Array.from(new Set(limit)).join(' '));
+      if(model.mapping)el(card,'p','coverage','dv-trace-coverage',matchedSteps+'/'+stepTotal+' steps matched · '+(optionalAbsent?optionalAbsent+' optional not in this trace · ':'')+model.mapping.unmatched.length+' spans unmatched');
+      if(trace.entries.length)returnedTraces(card);
       var focus=selected.focus,focusedSpan=focus && e.spans.find(function(s){return s.id===focus.spanId;});
       var focusBox=el(detail,'div','focus','dv-trace-focus-summary');
       el(focusBox,'span','hint','dv-trace-focus-hint',focusedSpan?'Trace focus · '+focusedSpan.name:'Select a span to focus its operation and pause playback.');
@@ -633,7 +676,7 @@
 .pt-live-status .dv-status-modes .tbtn.dv-status-mode[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-candidate[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-show[aria-pressed="true"]{background:var(--dv-live-active);color:#fff;border-color:var(--dv-live-active)}
 .dv-live-trace{font-size:12px}.dv-live-trace p{margin:6px 0;overflow-wrap:anywhere}.dv-trace-mode-status:empty{display:none}
 .dv-trace-direct{border:1px solid var(--explore-border);border-radius:6px;padding:10px;margin:10px 0}.dv-trace-input-label{display:grid;gap:4px;margin:8px 0}.dv-trace-check-label{display:flex;align-items:center;gap:6px;margin:8px 0}.dv-trace-input{box-sizing:border-box;width:100%;min-width:0;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);border-radius:4px;padding:6px}.dv-trace-arguments{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:10px}.dv-trace-direct-report{padding:8px;border:1px solid var(--explore-border);margin-top:8px}
-.dv-trace-config>summary,.dv-trace-time>summary,.dv-trace-diagnostics>summary{cursor:pointer;overflow-wrap:anywhere}.dv-trace-config-action{display:block;margin:3px 0 0 14px;color:var(--dfaint)}.dv-trace-time{margin:10px 0}.dv-trace-diagnostics{margin:6px 0}.dv-trace-report-compact{border:0;padding:0;margin:6px 0}.dv-trace-direct>.dv-live-controls{margin-top:6px}
+.dv-trace-config>summary,.dv-trace-time>summary,.dv-trace-diagnostics>summary{cursor:pointer;overflow-wrap:anywhere}.dv-trace-config-action{margin-left:.4em;color:var(--dfaint)}.dv-trace-request{margin:6px 0}.dv-trace-request>summary{cursor:pointer;overflow-wrap:anywhere;font-weight:600}.dv-trace-log-mode{display:block;margin:2px 0 6px;padding:0;border:0;background:none;color:var(--dv-live-active);font:inherit;text-decoration:underline;cursor:pointer}.dv-trace-log-mode:disabled{color:var(--dfaint);cursor:default}.dv-trace-time{margin:10px 0}.dv-trace-diagnostics{margin:6px 0}.dv-trace-report-compact{border:0;padding:0;margin:6px 0}.dv-trace-direct>.dv-live-controls{margin-top:6px}
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
 .dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}.dv-trace-logs-window{margin:4px 0;color:var(--dfaint)}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}
 .dv-trace-selected{min-width:0}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}

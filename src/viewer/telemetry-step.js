@@ -227,8 +227,9 @@ function telemetryPaintTrace(binding,model,focus){
     var parent=target.matches('g.node')?target:target.parentNode;if(!target.matches('g.node') && target.getAttribute('transform')!=null)g.setAttribute('transform',target.getAttribute('transform'));g.setAttribute('role','img');g.setAttribute('aria-label',title.textContent);parent.appendChild(g);return text;
   }
   scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !counted(rows).length || !card)return;var box=card.getBBox();var level=levels.nodes[node.getAttribute('data-dv-node')],text=mark(node,rows,box.x+box.width/2,box.y+box.height+24,level);telemetryTraceConstrainLabel(text,null,true);var svg=text.closest('svg');
-    // Sideways moves keep the whole label within its card's width; with no legal move it is plated.
-    var half=text.getBBox().width/2;if(svg)telemetryTraceAvoidConnections(text,obstacles(svg),nodeMoves.filter(function(m){return Math.abs(m.dx)+half<=box.width/2;}));
+    // Moves straight down are always allowed; sideways moves keep the whole label within its card's width.
+    // With no legal move left it is plated.
+    var half=text.getBBox().width/2;if(svg)telemetryTraceAvoidConnections(text,obstacles(svg),nodeMoves.filter(function(m){return m.dx===0 || Math.abs(m.dx)+half<=box.width/2;}));
     if(level && (level.level==='below' || level.level==='above'))telemetryPaintTraceBrackets(node,level.level,level.tone);});
   scope.querySelectorAll('g.node.node-text[data-dv-node]').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')];if(!rows || !counted(rows).length)return;node.setAttribute('data-trace-tone','observed');
     var level=levels.nodes[node.getAttribute('data-dv-node')];if(!level)return;node.setAttribute('data-trace-level',level.level);

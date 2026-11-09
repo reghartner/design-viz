@@ -113,6 +113,16 @@ tools: `tools/widget_doc.py`, `tools/authoring-packet.py` and the folder-agent
 kit bundled into the workbench. Relative links in a fragment are rewritten so
 they still resolve from `contract/`.
 
+Every focused packet from `tools/authoring-packet.py` also carries the
+fragments, in file-name order, under one `## Company rules` heading, each after
+a `<!-- Source: company/contract/<file> -->` line. `packet.md.json` lists each
+one in `provenance` (path, no section, and the SHA-256, characters and bytes of
+the text the packet carries). A fragment's `### panels` sections are left out
+there: their bullets reach a packet when that panel is selected, so they never
+appear twice, and a fragment with nothing else is not listed. A portable kit
+reads the fragments from its contract, so its packets carry the same rules.
+Without `company/contract/`, packets are unchanged.
+
 Document a panel under its own `### panels` heading with one bullet per type,
 in the same form the contract uses:
 

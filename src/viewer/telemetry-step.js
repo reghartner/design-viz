@@ -51,9 +51,10 @@ function telemetryTraceModel(diagram,pathId,exemplar){
     var duration=match.status==='matched'?Math.max.apply(null,match.spans.map(function(s){return s.durationMs;})):null;
     var kinds=match.conditions.map(function(c){return c.kind;}),tone=match.status!=='matched'?'unknown':kinds.some(function(k){return k==='service-error' || k==='delivery-failed';})?'error':kinds.some(function(k){return ['slow','database-slow','queue-buildup','backpressure'].indexOf(k)>=0;})?'warning':'observed';
     var label=match.status==='matched'?telemetryTraceDuration(duration):match.status==='missing'?'Not observed':match.status==='ambiguous'?'Ambiguous':'Unmapped';
-    // traceMatch alternatives other than the one that matched; "seen" = a span with
-    // that service and operation is in this trace (first match wins, so it was not used).
-    var others=Array.isArray(step.traceMatch)?step.traceMatch.filter(function(a,i){return a && !(match.status==='matched' && i===match.alternative);}).map(function(a){
+    // The step's other traceMatch alternatives, never the one behind this row. "seen" =
+    // a span with that service and operation is in this trace: an alternative after the
+    // matched one is not tried; one before it was rejected (ambiguous, parent, occurrence).
+    var others=Array.isArray(step.traceMatch)?step.traceMatch.filter(function(a,i){return a && i!==match.alternative;}).map(function(a){
       return {name:a.serviceName+' '+a.operation,seen:normalized.spans.some(function(s){return s.serviceName===a.serviceName && s.operation===a.operation && (!a.namespace || s.attributes['service.namespace']===a.namespace) && Object.keys(a.attributes || {}).every(function(k){return s.attributes[k]===a.attributes[k];});})};
     }):[];
     var row={id:match.stepId,nodeId:match.nodeId,edgeIndex:exact.length===1?diagram.edges.indexOf(exact[0]):null,status:match.status,tone:tone,duration:duration,budget:selector.maxDurationMs,label:label,operation:selector.operation || step.text || step.id,service:selector.serviceName,alternative:match.alternative,otherAlternatives:others,detail:match.detail,conditions:match.conditions,spanIds:match.spans.map(function(s){return s.id;}),
@@ -127,7 +128,8 @@ function telemetryTraceLabel(rows){
   var time=telemetryTraceSpanTime(rows),one=rows.length===1 && rows[0];
   function count(status,word){var n=rows.filter(function(r){return r.status===status;}).length;return n?n+' '+word:'';}
   function named(r){return r.alternative!=null && r.status==='matched'?'Matched: '+r.service+' '+r.operation:r.operation;}
-  var name=one && named(one),text=one && one.status!=='matched'?one.label:one?[one.alternative!=null?(name.length>69?name.slice(0,68)+'…':name):'',time || one.label].filter(Boolean).join(' · '):
+  // On the canvas the service and operation are cut to 40 characters; the title keeps them whole.
+  var name=one && one.service+' '+one.operation,text=one && one.status!=='matched'?one.label:one?[one.alternative!=null?'Matched: '+(name.length>40?name.slice(0,39)+'…':name):'',time || one.label].filter(Boolean).join(' · '):
     [rows.length+' operations',count('missing','unknown'),count('ambiguous','ambiguous'),time].filter(Boolean).join(' · ');
   var title=rows.map(function(r){
     var others=r.otherAlternatives || [],absent=others.filter(function(a){return !a.seen;}),unused=others.filter(function(a){return a.seen;});

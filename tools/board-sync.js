@@ -286,7 +286,7 @@ function pull(localText,liveText,options){
      traceMatch fields), keep a local one naming the same span, and ask on anything else. */
   const stepWrites=[];
   mappings.forEach(({entry,change,step,base},key)=>{
-    const id=step.id,choice=resolve['step:'+id],want={serviceName:change.traceMatch.serviceName,operation:change.traceMatch.operation},mineStep=localSteps.get(key);
+    const id=step.id,choice=resolve['step:'+id],want={serviceName:change.traceMatch.serviceName,operation:change.traceMatch.operation,...(typeof change.traceMatch.nodeId==='string'?{nodeId:change.traceMatch.nodeId}:{})},mineStep=localSteps.get(key);
     const told='step '+id+': on the board '+who(entry)+' mapped '+spanText(want)+' to step '+step.label+' on '+when(entry.at);
     if(choice==='local')return;
     if(!mineStep){conflicts.push({kind:'step-missing',step:id,message:told+', but your local copy no longer has that step. Ask the author, then rerun with --resolve step:'+id+'=local.'});return;}

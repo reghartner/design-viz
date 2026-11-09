@@ -3815,7 +3815,7 @@ test('#1177 dragging a span onto a step or a carrier maps it; two candidate step
  assert.equal(b.m.body.querySelector('.dv-trace-map-chooser'),null,'Esc cancels');assert.equal(b.editor.calls.length,0);
  spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
  b.m.body.querySelectorAll('button.dv-trace-map-choice')[1].dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);
- assert.deepEqual(b.editor.calls.at(-1),{ref:{section:0,kind:'step',id:'beta-again'},match:MAP_MATCH,previous:{serviceName:'x',operation:'y'}},'picking a mapped step replaces the traceMatch it shows');
+ assert.deepEqual(b.editor.calls.at(-1),{ref:{section:0,kind:'step',id:'beta-again'},match:{...MAP_MATCH,nodeId:'b'},previous:{serviceName:'x',operation:'y'}},'picking a mapped step replaces the traceMatch it shows (with nodeId b: dropped on node b, which the step names alone)');
  b.api.destroy();
  // Outside Edit mode a span row does not drag.
  const editor=mapEditor();editor.state=()=>({editable:true,blocked:'',active:false,pending:0,saving:false,readOnly:false,notice:null,mapped:null});

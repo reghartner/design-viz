@@ -197,3 +197,12 @@ test('#1158 changing the checkbox clears the results and makes no call',async()=
  // The checkbox takes booleans only; the text fields still take strings only.
  h.api.set('traced','false');h.api.set('value',false);s=h.api.snapshot();assert.deepEqual([s.form.traced,s.form.value],[true,'arch']);
 });
+
+test('#1158 review: a query whose last line ends with a # comment still gets the filter, on its own line',async()=>{
+ // LogQL reads # to the end of the line as a comment, so a filter on that line would be ignored.
+ const typed=setup({p:board({})});await settle();typed.api.set('logql','{env="$env"} |= "Handling camera stats message" # newest first');await typed.api.find();
+ const sent='{env="stg"} |= "Handling camera stats message" # newest first\n| trace_id =~ "[0-9a-fA-F]{16,32}"';
+ assert.deepEqual(typed.calls.map(c=>c.args.logql),[sent]);assert.equal(typed.api.snapshot().result.query,sent);
+ const authored=setup({p:board({camera:{label:'Camera model',query:QUERY+' # one camera model',values:['arch']}})});await settle();authored.api.set('value','arch');await authored.api.find();
+ assert.deepEqual(authored.calls.map(c=>c.args.logql),[EXPANDED+' # one camera model\n| trace_id =~ "[0-9a-fA-F]{16,32}"']);
+});

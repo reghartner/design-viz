@@ -1603,11 +1603,13 @@ injection (`tools/page_build.py --resolve-imports`) carries those bindings itsel
 The adapter qualifies connectors by the bound signals: `query_prometheus` for
 `grafana`, `query_loki_logs` for `loki`, `query_sql` for `sql`, and `query_cloudwatch` for `cloudwatch` and `query_cloudwatch_logs` for `cloudwatchLogs`, preferring a
 qualifying connector named **Grafana**. Missing required query tools appear as a
-visible diagnostic. `generate_deeplink`, `get_annotations` and
-`search_tempo_traces` are optional; declare these extras only when offered and
-needed. The generated declaration is a minimum; preserve previously verified
-offered optional tools when republishing. The trace adapter independently
-requires its search/detail pair.
+visible diagnostic. `generate_deeplink` and `get_annotations` are optional;
+declare these extras only when offered and needed. The generated declaration is
+a minimum; preserve previously verified offered optional tools when
+republishing. The trace adapter searches only each carrier's first trace signal,
+with its search/detail pair. When that signal is `tempo`, the page also declares
+`search_tempo_traces` and `get_tempo_trace` on Grafana; when it is a Honeycomb
+example-trace wrapper (`query_spec`), `get_trace` follows `run_query` (#1139).
 Discovery uses `claude.use('mcp')` and `listTools()` metadata, without data calls
 or permission prompts. Page/host disable suppresses discovery. Late results after
 retirement are dropped; each refresh rechecks required tools.
@@ -2484,7 +2486,8 @@ metadata discovery and data calls. Metrics starts off, with the default `24h`
 window, independently of Jira Live. Discovery alone never runs a query.
 
 Declare `{"server":"Honeycomb","tools":["run_query"]}` in the existing `mcp`
-capability alongside Grafana if both are bound. Connector names vary per account;
+capability alongside Grafana if both are bound (plus `get_trace` for an
+example-trace wrapper, which `tools/inject.py` adds). Connector names vary per account;
 selection requires offered tools and the runtime `inputSchema`. The supported
 schema declares `environment_slug` as a string and `query_spec` as an object or JSON string.
 `dataset_slug` may be optional and nullable; omit it when no dataset is authored.

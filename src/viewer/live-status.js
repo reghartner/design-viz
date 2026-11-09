@@ -1223,7 +1223,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function traceLabelSize(text){var box=text.getBBox();return Math.round(box.width*10)+'x'+Math.round(box.height*10);}
   function recordTraceLabels(){view.querySelectorAll('.dv-trace-overlay text').forEach(function(text){text._dvTraceLabelSize=traceLabelSize(text);});}
   function traceLabelsResized(){
-    if(retired || !telemetry.enabled() && !metricsPreview)return;
+    // Cards (Metrics on) and connection labels (#1195, any time trace labels show) are rechecked.
+    if(retired || !view.querySelector('.dv-trace-overlay'))return;
     if(painting){traceRecheck=true;return;}
     var changed=Array.prototype.filter.call(view.querySelectorAll('.dv-trace-overlay text'),function(text){var size=traceLabelSize(text),moved=text._dvTraceLabelSize!==size;text._dvTraceLabelSize=size;return moved;});
     if(changed.length && telemetryTraceLabelsBlocked(changed)){paint();notify();}
@@ -2052,6 +2053,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         bindings.forEach(paintBinding);
       }
       // Trace labels first: metric cards are then placed clear of them (#1163).
+      // #1195: show the connection labels metric cards hid, so trace labels avoid them too; paintMetrics hides them again.
+      bindings.forEach(function(binding){telemetryClearCards(binding.el);});
       bindings.forEach(paintStory);paintLanes();paintTrace();paintMetrics();recordTraceLabels();
       // Paint Jira cues once, after cards and coins reserve their final boxes.
       // Handoffs transfer their ticket target from the card to the cue; a second

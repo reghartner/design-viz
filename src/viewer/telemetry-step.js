@@ -147,6 +147,41 @@ function telemetryTraceConstrainLabel(text,alternatives,keepBelow){
   var inverse=root.inverse().multiply(local).inverse();
   text.setAttribute('x',Number(original.x)+inverse.a*dx+inverse.c*dy);text.setAttribute('y',Number(original.y)+inverse.b*dx+inverse.d*dy);
 }
+/* #1195: a trace label never sits on a connection (edge) label. The obstacles are measured once per
+   paint: connection labels (also those a metric card hides, which show again when Metrics turns off),
+   node cards, step coins and the trace labels already placed. A label is moved to the first clear spot
+   among its candidate moves, inside the frame (4-unit pad). With none, it keeps its place, gets an
+   opaque plate in the board ground colour and is raised above the connection labels. Connection
+   labels never move. */
+function telemetryTraceObstacles(svg){
+  var out={connections:[],others:[]};
+  svg.querySelectorAll('text.lbl').forEach(function(el){var b=boardControlBox(el,svg);if(b)out.connections.push(b);});
+  svg.querySelectorAll('.node .card,.node .text-box-hit,g.coin').forEach(function(el){var b=boardControlBox(el,svg);if(b)out.others.push(b);});
+  return out;
+}
+function telemetryTraceAvoidConnections(text,obstacles,moves){
+  var svg=text.closest('svg');if(!svg || !svg.getCTM || !text.getCTM || !svg.viewBox || !obstacles)return;
+  var box=boardControlBox(text,svg);if(!box)return;
+  function onConnection(b){return obstacles.connections.some(function(c){return boardBoxesOverlap(b,c,2);});}
+  if(!onConnection(box)){obstacles.others.push(box);return;}
+  var frame=svg.viewBox.baseVal,pad=4,root=svg.getCTM(),local=text.getCTM();if(!root || !local)return;
+  var inverse=root.inverse().multiply(local).inverse(),x=Number(text.getAttribute('x')),y=Number(text.getAttribute('y'));
+  for(var i=0;i<moves.length;i++){
+    var m=moves[i],next={x:box.x+m.dx,y:box.y+m.dy,w:box.w,h:box.h};
+    if(next.x<frame.x+pad || next.x+next.w>frame.x+frame.width-pad || next.y<frame.y+pad || onConnection(next) || obstacles.others.some(function(o){return boardBoxesOverlap(next,o,2);}))continue;
+    text.setAttribute('x',x+inverse.a*m.dx+inverse.c*m.dy);text.setAttribute('y',y+inverse.b*m.dx+inverse.d*m.dy);obstacles.others.push(next);return;
+  }
+  var group=text.parentNode,own=text.getBBox(),doc=text.ownerDocument,plate=doc.createElementNS('http://www.w3.org/2000/svg','rect');
+  // Padded so text laid out again at another board scale (a few percent wider) stays on it. Plated
+  // labels are not rechecked on a scale change; this padding is their only guard.
+  plate.setAttribute('class','dv-trace-label-plate');plate.setAttribute('x',own.x-6);plate.setAttribute('y',own.y-2);plate.setAttribute('width',own.width+12);plate.setAttribute('height',own.height+4);plate.setAttribute('rx',3);
+  group.insertBefore(plate,text);
+  // Above every connection label: the top of the svg, in the same place.
+  var placed=svg.getCTM().inverse().multiply(group.getCTM());
+  // Out of g.node it keeps the node's step dimming through data-trace-lit (style: .stepmode rule).
+  if(group.parentNode.matches && group.parentNode.matches('g.node')){group.setAttribute('data-trace-node',group.parentNode.getAttribute('data-dv-node'));group.setAttribute('data-trace-lit',String(group.parentNode.classList.contains('lit')));}
+  group.setAttribute('transform','matrix('+[placed.a,placed.b,placed.c,placed.d,placed.e,placed.f].join(' ')+')');svg.appendChild(group);obstacles.others.push(box);
+}
 /* Time for one node's or edge's rows: each matched span counts its own start to
    end (its child spans included); several spans count the union of their
    intervals, so nested or overlapping spans are counted once. */
@@ -176,7 +211,10 @@ function telemetryTraceLabel(listed){
 }
 function telemetryPaintTrace(binding,model,focus){
   var scope=binding.el,d=binding.section.diagram;telemetryClearTrace(scope);if(!model)return;
-  var levels=telemetryTraceLevels(model,focus);
+  var levels=telemetryTraceLevels(model,focus),obstacleSets=[];
+  function obstacles(svg){var hit=obstacleSets.find(function(o){return o.svg===svg;});if(!hit){hit={svg:svg,value:telemetryTraceObstacles(svg)};obstacleSets.push(hit);}return hit.value;}
+  // Node labels: down first (up to 32), then sideways (up to 72 each way).
+  var nodeMoves=[];for(var k=1;k<=8;k++)nodeMoves.push({dx:0,dy:k*4});[1,-1].forEach(function(side){for(var k=1;k<=6;k++)nodeMoves.push({dx:side*k*12,dy:0});});
   function counted(rows){return rows.filter(function(r){return !r.optional;});}
   function mark(target,rows,x,y,level){
     var ranks={unknown:0,observed:1,warning:2,error:3},tone=counted(rows).reduce(function(a,r){return ranks[r.tone]>ranks[a]?r.tone:a;},'unknown');
@@ -188,7 +226,10 @@ function telemetryPaintTrace(binding,model,focus){
     if(target.matches('path.edge'))g.setAttribute('data-trace-edge',target.getAttribute('data-dv-edge'));
     var parent=target.matches('g.node')?target:target.parentNode;if(!target.matches('g.node') && target.getAttribute('transform')!=null)g.setAttribute('transform',target.getAttribute('transform'));g.setAttribute('role','img');g.setAttribute('aria-label',title.textContent);parent.appendChild(g);return text;
   }
-  scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !counted(rows).length || !card)return;var box=card.getBBox();var level=levels.nodes[node.getAttribute('data-dv-node')],text=mark(node,rows,box.x+box.width/2,box.y+box.height+24,level);telemetryTraceConstrainLabel(text,null,true);
+  scope.querySelectorAll('g.node[data-dv-node]:not(.node-text)').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')],card=node.querySelector('.card');if(!rows || !counted(rows).length || !card)return;var box=card.getBBox();var level=levels.nodes[node.getAttribute('data-dv-node')],text=mark(node,rows,box.x+box.width/2,box.y+box.height+24,level);telemetryTraceConstrainLabel(text,null,true);var svg=text.closest('svg');
+    // Moves straight down are always allowed; sideways moves keep the whole label within its card's width.
+    // With no legal move left it is plated.
+    var half=text.getBBox().width/2;if(svg)telemetryTraceAvoidConnections(text,obstacles(svg),nodeMoves.filter(function(m){return m.dx===0 || Math.abs(m.dx)+half<=box.width/2;}));
     if(level && (level.level==='below' || level.level==='above'))telemetryPaintTraceBrackets(node,level.level,level.tone);});
   scope.querySelectorAll('g.node.node-text[data-dv-node]').forEach(function(node){var rows=model.nodes[node.getAttribute('data-dv-node')];if(!rows || !counted(rows).length)return;node.setAttribute('data-trace-tone','observed');
     var level=levels.nodes[node.getAttribute('data-dv-node')];if(!level)return;node.setAttribute('data-trace-level',level.level);
@@ -202,6 +243,11 @@ function telemetryPaintTrace(binding,model,focus){
     // the text's width on vertical/bent edges, retaining the path's transform.
     var baseline=point.y-box.y-box.height/2;text.setAttribute('x',point.x+nx*offset);text.setAttribute('y',point.y+ny*offset+baseline);
     telemetryTraceConstrainLabel(text,[{x:point.x-nx*(offset+24),y:point.y-ny*(offset+24)+baseline}]);
+    // Edge labels stay on their own side, within one label height of their anchor: away from the edge, then along it.
+    var own=text.getBBox(),reach=Math.max(8,Math.ceil(own.height)),edgeMoves=[],svg=path.closest('svg');
+    for(var k=4;k<=reach;k+=4)edgeMoves.push({dx:nx*k,dy:ny*k});
+    for(k=4;k<=reach;k+=4)edgeMoves.push({dx:-ny*k,dy:nx*k},{dx:ny*k,dy:-nx*k});
+    if(svg)telemetryTraceAvoidConnections(text,obstacles(svg),edgeMoves);
     if(level && (level.level==='below' || level.level==='above'))telemetryPaintTraceEdgeFocus(path,level.level,level.tone);
   });
   telemetryPaintTraceFocus(scope,focus);
@@ -219,6 +265,8 @@ function telemetryPaintTraceFocus(scope,focus){
   scope.querySelectorAll('g.node[data-dv-node]').forEach(function(node){
     if(node.getAttribute('data-dv-node')!==row.nodeId)return;
     node.setAttribute('data-trace-focus','true');
+    // A plated label raised out of this node is not dimmed either.
+    scope.querySelectorAll('.dv-trace-overlay[data-trace-node]').forEach(function(g){if(g.getAttribute('data-trace-node')===row.nodeId)g.setAttribute('data-trace-focus','true');});
     var g=telemetryPaintTraceBrackets(node,'current',tone);if(!g)return;
     var x=Number(g.getAttribute('data-x')),y=Number(g.getAttribute('data-y')),doc=node.ownerDocument;
     var tag=doc.createElementNS('http://www.w3.org/2000/svg','rect');tag.setAttribute('x',x+13);tag.setAttribute('y',y-9);tag.setAttribute('width','45');tag.setAttribute('height','18');tag.setAttribute('rx','5');g.appendChild(tag);

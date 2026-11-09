@@ -753,9 +753,9 @@ changing note cannot move a button or the slider (#1162). A board with no ticket
 references after imports has no Jira view (#1136): the panel opens on Trace with no
 **Jira** | **Trace** switch. If a loaded detail
 brings ticket references, the switch appears and the panel moves to Jira unless the reader
-chose a view or worked on a trace. In the Trace view a metric card opens only its metrics: signal values, window, a metric verdict and query links, with no Jira or proof words and no Since Done line (#1153). The Jira view then has two rows (#1162). The first holds the distinct-ticket counts
-in a fixed-height strip that scrolls sideways, any provider action and, at the right end, **First blocker** in
-a fixed slot, so changing counts or a button appearing cannot move it. **First blocker** keeps one size; with no blockers it reads
+chose a view or worked on a trace. In the Trace view a metric card opens only its metrics: signal values, window, a metric verdict and query links, with no Jira or proof words and no Since Done line (#1153). The Jira view then has two rows (#1162). The first holds the distinct-ticket counts,
+which wrap onto more lines so each shows in full, any provider action and, at its top right, **First blocker** in
+a fixed slot, so changing counts or a button appearing cannot move it; wrapping counts move only what is below. **First blocker** keeps one size; with no blockers it reads
 **No blockers** and is greyed out, and with blockers it cannot reach from here it
 stays **First blocker** and is greyed out. The second row holds the status text,
 which wraps so every note shows in full: a connector indicator (a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
@@ -2280,8 +2280,8 @@ missing-work appearance. It counts marked node and connection occurrences across
 local and imported diagrams, nested sections and loaded details; text boxes do
 not count. It appears even without tickets or a connector and hides when no
 markers remain. The count stays separate from the `missing` Jira-ticket total.
-In narrow desktop panels, Missing work appears first; focus **Status counts**
-and use the arrow keys, or scroll horizontally, to reach the other counts.
+Missing work appears first; in narrow desktop panels the counts wrap onto more
+lines, so every count shows in full (#1162).
 Turning Live off or clearing live paint removes its styling along with the
 diagram's styling; the authored marker count remains until the markers are cleared.
 

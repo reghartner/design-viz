@@ -377,13 +377,23 @@ for(const width of [null,480]){
   const {root,panel}=await storyWithCtl(page,server,width),first=panel.locator('.dv-live-first'),counts=panel.getByRole('region',{name:'Status counts',exact:true});
   if(width)expect((await panel.boundingBox()).width).toBeCloseTo(width,0);
   await demoDay(root,4);await expect(first).toHaveText('First blocker');await expect(counts).toBeVisible();
-  const middle=async locator=>{const box=await locator.boundingBox();return box.y+box.height/2;};
+  // Six count pills: every one shows in full (the counts wrap), First blocker keeps the row's top right.
+  await page.evaluate(()=>window.ctl.liveStatus.apply({'HW-123':{state:'todo'},'HW-124':{state:'active'},'FW-45':{state:'testing'},'FW-46':{state:'done'},'BE-67':{state:'blocked'},'BE-68':{state:'missing'}}));
+  await expect(counts.locator('[data-live-count]:visible')).toHaveCount(6);
   const check=async label=>{
-   expect(Math.abs(await middle(first)-await middle(counts)),label+': First blocker shares the counts row').toBeLessThanOrEqual(4);
-   const head=await panel.locator('.dv-live-head').boundingBox(),slot=await first.boundingBox();expect(Math.abs(head.x+head.width-(slot.x+slot.width)),label+': at its right end').toBeLessThanOrEqual(2);
+   const head=await panel.locator('.dv-live-head').boundingBox(),slot=await first.boundingBox(),strip=await counts.boundingBox();
+   expect(Math.abs(slot.y-strip.y),label+': First blocker shares the counts row top').toBeLessThanOrEqual(2);
+   expect(Math.abs(head.x+head.width-(slot.x+slot.width)),label+': at its right end').toBeLessThanOrEqual(2);
+   for(const pill of await counts.locator('[data-live-count]:visible').all()){
+    const b=await pill.boundingBox(),name=label+': '+await pill.textContent();
+    expect(b.x>=strip.x-1 && b.x+b.width<=strip.x+strip.width+1 && b.y>=strip.y-1 && b.y+b.height<=strip.y+strip.height+1,name+' lies inside the counts strip').toBe(true);
+    expect(b.x+b.width<=slot.x,name+' stays left of First blocker').toBe(true);
+   }
+   expect(await counts.evaluate(el=>el.scrollWidth<=el.clientWidth && el.scrollHeight<=el.clientHeight),label+': nothing in the strip is clipped').toBe(true);
   };
-  await check('counts only');
+  await check('counts only');const placed=await first.boundingBox();
   await page.evaluate(()=>window.ctl.liveStatus.action('Allow Jira',()=>{}));await expect(panel.getByRole('button',{name:'Allow Jira',exact:true})).toBeVisible();await check('with an action beside it');
+  expect(await first.boundingBox(),'an action appearing does not move First blocker').toEqual(placed);
  });
  test('#1162 long status notes wrap in full in both status lines'+(width?' in a '+width+' px panel':''),async({page,server})=>{
   const {root,panel}=await storyWithCtl(page,server,width);await demoDay(root,4);

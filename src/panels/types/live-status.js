@@ -447,14 +447,12 @@
       sharedHeader(value);
       if(value && value.mode==='trace'){traceBody(value);sweep(host);return;}
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
-      // #986/#1162: the first row is the counts strip (fixed height, scrolls sideways), then the provider action, then First blocker
-      // in a fixed slot at its right end, so neither changing counts nor a button appearing can move it. Status text has the row
-      // below and wraps in full.
+      // #986/#1162: the first row is the counts, then the provider action, then First blocker in a fixed slot at its top right, so
+      // neither changing counts nor a button appearing can move it. The counts wrap onto more lines so every one shows in full;
+      // that moves only what is below. Status text has the row below and wraps in full.
       var controls=el(head,'div','controls','dv-live-controls'),countRow=el(controls,'div','counts','dv-live-counts'),statusRow=el(head,'div','status','dv-live-status'),statusLine=el(statusRow,'div','text','dv-live-status-text');
       var available=value && value.available,hasData=available && value.hasData;
-      countRow.hidden=!hasData;countRow.setAttribute('role','region');countRow.setAttribute('aria-label','Status counts');countRow.setAttribute('tabindex','0');countRow.setAttribute('title','Scroll horizontally to see all counts.');
-      // Preserve native count scrolling when the page presenter also owns arrow keys.
-      if(!countRow._liveKeys){countRow._liveKeys=function(event){if(event.target===countRow && ['ArrowLeft','ArrowRight','Home','End'].indexOf(event.key)>=0)event.stopPropagation();};countRow.addEventListener('keydown',countRow._liveKeys);}
+      countRow.hidden=!hasData;countRow.setAttribute('role','region');countRow.setAttribute('aria-label','Status counts');
       var missingWork=value && value.missingWork || {count:0,painted:false};
       var missingCount=el(countRow,'span','count-missing-work','dv-live-count'+(hasData && missingWork.count && missingWork.painted?' dv-live-missing':''),'Missing work '+missingWork.count);
       missingCount.setAttribute('data-live-count','missing-work');missingCount.setAttribute('title','Authored nodes and connections marked as missing work; each occurrence counts.');missingCount.hidden=!hasData || !missingWork.count;
@@ -771,14 +769,13 @@ g.node[data-trace-focus="true"]{opacity:1!important}
 .pt-live-status .pbody{flex:1;min-width:0;min-height:0;overflow:auto;color:var(--dtext);font:13px/1.5 'IBM Plex Sans',sans-serif}
 .dv-live-head{display:flex;flex-direction:column;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--explore-border);font:11px/1.5 'IBM Plex Mono',monospace}
 .dv-live-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
-.dv-live-head>.dv-live-controls{flex-wrap:nowrap;}
+.dv-live-head>.dv-live-controls{flex-wrap:nowrap;align-items:flex-start;}
 .dv-live-head>.dv-live-controls>.dv-live-counts{flex:1 1 auto;}
 .dv-live-head>.dv-live-controls>.tbtn{flex:none;}
 .dv-live-status{min-width:0;}
-/* A fixed count row reserves room for the scrollbar; changing counts never moves the header below it. */
-.dv-live-counts{display:flex;align-items:center;gap:8px;min-width:0;height:36px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;}
+/* #1162: the counts wrap onto more lines so each shows in full; a single line sits level with First blocker. */
+.dv-live-counts{display:flex;flex-wrap:wrap;align-items:center;align-content:center;gap:4px 8px;min-width:0;min-height:30px;}
 .dv-live-counts>.dv-live-count{flex:none;}
-.dv-live-counts:focus-visible{outline:2px solid var(--dv-live-active);outline-offset:-2px;}
 .dv-live-status-text{display:flex;flex-wrap:wrap;align-items:flex-start;gap:2px 8px;min-width:0;}
 .dv-live-status-text>*{flex:0 1 auto;min-width:0;overflow-wrap:anywhere;}
 .dv-live-connection>span{min-width:0;overflow-wrap:anywhere;}

@@ -173,7 +173,7 @@ async function expectEdgeOutline(root,index){
   const outline=g.querySelector('.dv-trace-edge-focus[data-trace-level="current"] .dv-trace-edge-outline'),mask=g.querySelector('mask'),strokes=Array.from(mask.querySelectorAll('path')),style=getComputedStyle(outline);
   return {d:outline.getAttribute('d'),mask:outline.getAttribute('mask'),id:mask.id,colors:strokes.map(p=>p.getAttribute('stroke')),widths:strokes.map(p=>Number(p.getAttribute('stroke-width'))),stroke:style.stroke,animation:style.animationName,opacity:getComputedStyle(g).opacity};
  });
- expect(evidence.d).toBe(await edge.getAttribute('d'));expect(evidence.mask).toBe('url(#'+evidence.id+')');expect(evidence.colors).toEqual(['white','black']);expect(evidence.widths[0]-evidence.widths[1]).toBe(4);expect(evidence.widths[1]).toBeGreaterThan(parseFloat((await edgeInk(edge)).width)+6);expect(evidence.stroke).toBe('rgb(0, 159, 199)');expect(evidence.animation).toBe('none');expect(evidence.opacity).toBe('1');
+ expect(evidence.d).toBe(await edge.getAttribute('d'));expect(evidence.mask).toBe('url(#'+evidence.id+')');expect(evidence.colors).toEqual(['white','black']);expect(evidence.widths[0]-evidence.widths[1],'#1185: the current outline is a 4-unit band each side').toBe(8);expect(evidence.widths[1]).toBeGreaterThan(parseFloat((await edgeInk(edge)).width)+6);expect(evidence.stroke).toBe('rgb(0, 159, 199)');expect(evidence.animation).toBe('none');expect(evidence.opacity).toBe('1');
  await expect.poll(()=>focus.evaluate(g=>{
   const box=g.getBoundingClientRect(),board=g.closest('.board'),frame=board.getBoundingClientRect(),toolbar=board.querySelector('.lg').getBoundingClientRect();
   return box.width>0 && box.height>0 && box.left>=frame.left && box.right<=frame.right && box.top>=toolbar.bottom && box.bottom<=frame.bottom;
@@ -225,8 +225,8 @@ test('desktop edge-only mapping follows actual transformed geometry and isolates
 
 for(const mode of ['multiple delivered edges','broken status edge'])test('desktop '+mode+' never receives a misleading continuous selected edge',async({page,server})=>{
  const {root,local,imported}=await setup(page,server,{multiEdge:mode==='multiple delivered edges',brokenEdge:mode==='broken status edge'});
- await row(root,local).click();await expect(root.locator('.dv-trace-edge-focus[data-trace-level="current"]')).toHaveCount(0); // Node-only step.
- await row(root,imported).click();expect(await state(page)).toMatchObject({step:'currency',path:'imported',playing:false});await expect(root.locator('.dv-trace-edge-focus[data-trace-level="current"]')).toHaveCount(0);
+ await row(root,local).click();await expect(root.locator('.dv-trace-edge-focus')).toHaveCount(0); // Node-only step; no outline at any level (#1185).
+ await row(root,imported).click();expect(await state(page)).toMatchObject({step:'currency',path:'imported',playing:false});await expect(root.locator('.dv-trace-edge-focus')).toHaveCount(0);
  if(mode==='broken status edge'){await expect(root.locator('path.edge[data-dv-edge="0"]')).toHaveClass(/dv-live-comm-hidden/);await expect(root.locator('.dv-live-comm-failure')).toHaveCount(1);}
 });
 

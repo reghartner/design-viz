@@ -48,18 +48,18 @@ function surface(d){
  });}
  doc.createElementNS=(ns,tag)=>el(tag);
  const svg=el('svg'),edgesLayer=svg.appendChild(el('g',{class:'edges'}));
- Object.keys(d.nodes).forEach(id=>{const g=svg.appendChild(el('g',{class:'node','data-dv-node':id}));g.appendChild(el('rect',{class:'card',fill:'#fff',stroke:'#123'}));});
+ Object.keys(d.nodes).forEach(id=>{const text=d.nodes[id].type==='text',g=svg.appendChild(el('g',{class:text?'node node-text':'node','data-dv-node':id}));g.appendChild(el('rect',{class:text?'text-box-hit':'card',fill:'#fff',stroke:'#123'}));});
  d.edges.forEach((e,i)=>edgesLayer.appendChild(el('path',{class:'edge','data-dv-edge':String(i),id:'edge-'+i,d:'M0 0C40 80 60 80 100 0',stroke:'#456','stroke-width':'2','marker-end':'url(#arrow)'})));
  const node=id=>svg.querySelector('g.node[data-dv-node="'+id+'"]'),edge=i=>svg.querySelector('path.edge[data-dv-edge="'+i+'"]');
  const level=n=>n.getAttribute('data-trace-level');
  const outline=i=>svg.querySelectorAll('.dv-trace-edge-focus').find(g=>g.parentNode===edgesLayer && edgesLayer.children.indexOf(g)===edgesLayer.children.indexOf(edge(i))-1) || null;
  const brackets=id=>node(id).querySelector('.dv-trace-focus-overlay');
  const label=n=>n.matches('g.node')?n.querySelector('.dv-trace-overlay'):svg.querySelectorAll('.dv-trace-overlay').find(g=>g.getAttribute('data-trace-edge')===n.getAttribute('data-dv-edge')) || null;
- const ink=()=>JSON.stringify(svg.querySelectorAll('rect.card,path.edge').map(n=>['fill','stroke','stroke-width','class','style','marker-end'].map(k=>n.getAttribute(k))));
+ const ink=()=>JSON.stringify(svg.querySelectorAll('rect.card,rect.text-box-hit,path.edge').map(n=>['fill','stroke','stroke-width','class','style','marker-end'].map(k=>n.getAttribute(k))));
  return {scope:svg,node,edge,level,outline,brackets,label,ink};
 }
-async function paint(focusSpan,edit){
- const d=board(),e=await trace();if(edit)edit(e);
+async function paint(focusSpan,edit,editBoard){
+ const d=board(),e=await trace();if(edit)edit(e);if(editBoard)editBoard(d);
  const model=C.telemetryTraceModel(d,undefined,e),s=surface(d),before=s.ink();
  let focus=null;
  if(focusSpan){const choices=C.telemetryTraceChoices(d,undefined,e,focusSpan);assert.equal(choices.length,1,'the focused span maps to one step');focus={spanId:focusSpan,choice:choices[0]};}
@@ -101,5 +101,11 @@ test('with no span focused every carrier in the trace is below, with normal labe
   assert.equal(s.level(n),'below');assert.equal(s.label(n).getAttribute('data-trace-level'),'below');
  }
  assert.equal(s.brackets('web').getAttribute('data-trace-level'),'below');assert.equal(s.outline(0).getAttribute('data-trace-level'),'below');
+ assert.equal(s.ink(),s.before);
+});
+test('text nodes take levels and below/above brackets like card nodes',async()=>{
+ const s=await paint(PLACE,null,d=>{d.nodes.web={type:'text',text:'Checkout frontend'};});
+ assert.equal(s.level(s.node('web')),'above','the root span text node is above');
+ const b=s.brackets('web');assert.ok(b,'the text node has brackets');assert.equal(b.getAttribute('data-trace-level'),'above');
  assert.equal(s.ink(),s.before);
 });

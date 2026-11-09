@@ -133,6 +133,22 @@ test('a missing optional step is marked optional, not in this trace, with no unk
   const off=diagram();off.steps[1].traceMatch.optional=false;
   assert.equal(both(off,trace(span('r1',RABBIT))).steps[1].optional,undefined,'optional:false is not optional');
 });
+test('an optional step whose own span is in the trace but rejected by its parent stays unknown',()=>{
+  const d=diagram();d.steps[1].traceMatch.optional=true;
+  // Parent missing, and parent ambiguous: the INSERT span is present both times.
+  for(const t of [trace(span('r-db','INSERT stats','r1','stats-store')),trace(span('r1',RABBIT),span('r2',RABBIT,null,'stats-consumer',1),span('r-db','INSERT stats','r1','stats-store'))]){
+    const persist=both(d,t).steps[1];
+    assert.equal(persist.status,'missing');assert.equal(persist.optional,undefined,'a present span is not "not in this trace"');
+    assert.deepEqual(persist.conditions.map(c=>c.kind),['unknown']);assert.equal(persist.detail,'Parent mapping is unavailable.');
+  }
+  // Own span and parent both absent: optional, not in this trace.
+  const absent=both(d,trace(span('x','other'))).steps[1];
+  assert.equal(absent.optional,true);assert.equal(absent.detail,'Optional, not in this trace. Parent mapping is unavailable.');
+  // Alternatives: one alternative's span present but rejected is enough to stay unknown.
+  const list=twoPaths();list.steps[2].traceMatch.forEach(m=>m.optional=true);
+  const rejected=both(list,trace(span('p1',PULSAR),span('r-db','INSERT stats','r1','stats-store')),'pulsar').steps.find(s=>s.stepId==='persist');
+  assert.equal(rejected.status,'missing');assert.equal(rejected.optional,undefined);assert.deepEqual(rejected.conditions.map(c=>c.kind),['unknown']);
+});
 test('validation rejects a non-boolean optional and mixed optional values across alternatives',()=>{
   const ok=diagram();ok.steps[1].traceMatch.optional=true;ok.steps[0].traceMatch.forEach(m=>m.optional=true);
   assert.deepEqual(errors(ok).filter(e=>/^traceMatch/.test(e)),[],'optional:true on a single selector and on every alternative is valid');

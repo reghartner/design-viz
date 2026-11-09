@@ -111,7 +111,7 @@ function paintTraceLabels(d,e){
  const scope={querySelectorAll:sel=>sel==='g.node[data-dv-node]:not(.node-text)'?nodes:sel==='path.edge[data-dv-edge]'?paths:[]};
  C.telemetryPaintTrace({el:scope,section:{diagram:d}},C.telemetryTraceModel(d,undefined,e));
  const read=(parent,pick)=>{const g=parent.children.find(c=>c.attrs.class==='dv-trace-overlay' && pick(c));return g?{text:g.children.find(c=>c.tagName==='text').textContent,title:g.children.find(c=>c.tagName==='title').textContent}:null;};
- return {node:id=>read(nodes.find(n=>n.attrs['data-dv-node']===id),()=>true),edge:i=>read(layer,g=>g.attrs['data-trace-edge']===String(i)),tone:id=>nodes.find(n=>n.attrs['data-dv-node']===id).attrs['data-trace-tone']};
+ return {node:id=>read(nodes.find(n=>n.attrs['data-dv-node']===id),()=>true),edge:i=>read(layer,g=>g.attrs['data-trace-edge']===String(i)),tone:id=>nodes.find(n=>n.attrs['data-dv-node']===id).attrs['data-trace-tone'],status:id=>nodes.find(n=>n.attrs['data-dv-node']===id).attrs['data-trace-status']};
 }
 test('a node whose traceMatch alternatives matched names the matched alternative and shows its time',()=>{
  let labels=paintTraceLabels(transportBoard(),transportTrace(traceSpan('p1',PULSAR,0,16.1),traceSpan('p-db','INSERT stats',2,9,'p1','stats-store')));
@@ -173,12 +173,13 @@ test('a node named by a matched step and an optional step missing from the trace
   assert.doesNotMatch(labels.node(node).title,/archive stats: Not observed/);
   assert.equal(labels.edge(0).text,'Matched: stats-consumer persistent://stats/camer… · 16.1 ms','the edge follows the same rules');
   assert.equal(labels.tone(node),'observed','the optional step does not make the node unknown');
+  assert.equal(labels.status(node),'matched','the node status lists only the counted rows');
   // The company case with a single traceMatch object: the time alone.
   d=board();d.steps[0].traceMatch=d.steps[0].traceMatch[0];
   assert.equal(paintTraceLabels(d,pulsar()).node(node).text,'16.1 ms');
   // Without optional the missing step still counts.
   d=board();delete d.steps[1].traceMatch.optional;
-  assert.equal(paintTraceLabels(d,pulsar()).node(node).text,'2 operations · 1 unknown · 16.1 ms');
+  labels=paintTraceLabels(d,pulsar());assert.equal(labels.node(node).text,'2 operations · 1 unknown · 16.1 ms');assert.equal(labels.status(node),'matched missing');
   d=board();d.steps[1].traceMatch.optional=false;
   assert.equal(paintTraceLabels(d,pulsar()).node(node).text,'2 operations · 1 unknown · 16.1 ms','optional:false is the same as no optional');
  }

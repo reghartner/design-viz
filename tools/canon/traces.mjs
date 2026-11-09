@@ -98,7 +98,8 @@ export function compareTrace(spec,raw,{section=0,label='Incident trace'}={}){
     }
     const queue=evidence.conditions.find(c=>c.kind==='queue-buildup'),panelId=selector?.panelId;
     if(queue && panelId && d.panels?.some(p=>p.id===panelId && p.type==='queue'))step.panels={[panelId]:{state:'held',reason:'Last measured · '+queue.label+(evidence.conditions.some(c=>c.kind==='backpressure')?' · backpressure':'')}};
-    if(evidence.nodeId)step.tone={[evidence.nodeId]:evidence.conditions.some(c=>['service-error','delivery-failed'].includes(c.kind))?'alert':evidence.conditions.length?'warn':'ok'};
+    // A missing optional step is not observed: dim, never ok.
+    if(evidence.nodeId)step.tone={[evidence.nodeId]:evidence.optional?'dim':evidence.conditions.some(c=>['service-error','delivery-failed'].includes(c.kind))?'alert':evidence.conditions.length?'warn':'ok'};
     d.steps.push(step);ids.push(id);
   }
   d.paths.push({id:pathId,label:String(label).slice(0,100),color:'#f97316',steps:ids});d.autoplay=false;

@@ -93,6 +93,7 @@ test('preview --resolve-imports shows a missing optional step as optional, not i
   assert.equal(fork.status,0,fork.stderr);assert.equal(JSON.parse(fork.stderr).firstDivergence,'request');
   const d=JSON.parse(fork.stdout).page.sections[0].diagram,incident=d.steps.find(s=>s.id===d.paths.at(-1).steps.at(-1));
   assert.equal(incident.text,'Optional, not in this trace: platform-store · INSERT order');assert.equal(incident.evidence.canonicalStepId,'persist');
+  assert.deepEqual(incident.tone,{'platform::store':'dim'},'a step the trace lacks is never painted as an observed success');
   h.unchanged();
 });
 

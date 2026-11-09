@@ -2121,8 +2121,10 @@ step with alternatives.
 
 A step that may be absent from a trace (for example, its operation runs in a different
 trace) can carry `traceMatch.optional: true`; with alternatives, set it on every
-alternative ([canon rules](canon.md#reference-traces-and-incident-alternates)). When an optional step has no
-match in the loaded trace, the label is built from the other rows as if that row were not
+alternative ([canon rules](canon.md#reference-traces-and-incident-alternates)). A step whose
+`parentStepId` names an optional step must be marked optional too, or it reads unknown when
+the parent is absent. When the loaded trace has no span with an optional step's service and
+operation, the label is built from the other rows as if that row were not
 there: a node named by one matched step and one missing optional step reads
 `Matched: … · 16.1 ms`, or only the time for a single selector. The title lists it as
 *optional, not in this trace: service operation*, it never makes the node unknown, and a

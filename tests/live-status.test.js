@@ -3277,6 +3277,7 @@ test('#1153 the Trace-view metrics popup states each metric state in its own wor
   ['degraded',TCALL(),{rate:{value:5000},errors:{value:900}},/^DEGRADED · Outside limit: errors is /],
   ['silent',TCALL(),{rate:{value:0},errors:{value:0}},/^SILENT · Outside limit: rate is 0 req\/h; limit rate at least 1 req\/h$/],
   ['unmeasured, no limits',P95,{p95:{value:41}},/^OBSERVED · Observed signals; no authored limits\.$/],
+  ['unmeasured, max only',{...P95,proof:{p95:{max:300}}},{p95:{value:41}},/^OBSERVED · Observed signals are within their authored limits; no traffic minimum is authored\.$/],
   ['flowing',TCALL(),{rate:{value:5500},errors:{value:12}},/^OBSERVED · Observed signals are within their authored limits\.$/]];
  for(const state of ['done','active'])for(const [name,telemetry,signals,expected] of cases){
   const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',tickets:['EE-1'],telemetry}]}}]}};

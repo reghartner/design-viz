@@ -81,6 +81,7 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
       if(!aggregate || aggregate.from!==result.since.doneAt)return;
       since.push(name+' total: '+String(entry.value)+(entry.unit?' '+entry.unit:'')+' through '+liveStatusReadableTime(aggregate.to));
     });
+    var limited=telemetryMetricProofNames(binding).some(function(name){var limit=binding.proof[name];return !proofVerdicts.isTraceSignal(binding.signals[name]) && limit && (telemetryNumber(limit.min) || telemetryNumber(limit.max));});
     // No combined verdict while Jira is unknown does not erase measured evidence.
     var label=result.label;
     if(!label){
@@ -97,7 +98,9 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
       // #1153: the Trace view's metrics popup states the metric evidence alone, with no Jira state or proof words.
       metrics:{label:loading && !measured?'Loading…':result.telemetry==='silent'?'SILENT':result.telemetry==='degraded'?'DEGRADED':measured?(result.telemetry==='unobserved'?'OBSERVED · evidence incomplete':'OBSERVED'):'UNOBSERVED',
         explanation:result.failing.length?'Outside limit: '+result.failing.map(function(name){return name+' is '+telemetryCardValue(binding,sample,name,null,window)+'; limit '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
-          result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':'Observed signals are within their authored limits.'},
+          result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':
+          // unmeasured: no observed signal has an authored minimum, so traffic is not judged.
+          result.telemetry==='unmeasured'?(limited?'Observed signals are within their authored limits; no traffic minimum is authored.':'Observed signals; no authored limits.'):'Observed signals are within their authored limits.'},
       chart:{pending:!!waiting[primary],observedAt:measuredAt,points:plotted,line:continuous?plotted.map(function(p){return p.x+','+p.y;}).join(' '):null,
         markers:markers.map(function(m){return {x:2+96*(m.at-start)/span,label:m.label,kind:m.kind};})}};
   });
@@ -1196,7 +1199,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var row=productionRow(trigger),block=pop.querySelector('.dv-live-production'),metricsOnly=!!(trigger && trigger._liveCarrier && trigger._liveCarrier.metricsOnly);
     if(!row){if(block)block.remove();return false;}
     if(!block)block=element('section','dv-live-production',null,pop);
-    block.setAttribute('data-loading',row.initialLoading?'true':'false');block.setAttribute('data-production-carrier',row.id);block.setAttribute('data-verdict',row.verdict || 'unobserved');
+    block.setAttribute('data-loading',row.initialLoading?'true':'false');block.setAttribute('data-production-carrier',row.id);
+    if(metricsOnly){block.removeAttribute('data-verdict');block.setAttribute('data-telemetry',row.telemetry || 'unobserved');}else{block.removeAttribute('data-telemetry');block.setAttribute('data-verdict',row.verdict || 'unobserved');}
     function text(tag,cls,value){var node=block.querySelector('.'+cls);if(!node)node=element(tag,cls,null,block);if(node.textContent!==value)node.textContent=value;return node;}
     var environment=telemetry.environment();
     text('h3','dv-live-production-heading',(environment?environment.toUpperCase()+' ':'')+'Evidence');
@@ -1217,7 +1221,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(kpi.url){var queryLink=link(tile,'',kpi.url);queryLink.className='dv-live-metric-link';queryLink.setAttribute('aria-label','Open '+kpi.label+' source query in a new tab');queryLink.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});}
       if(kpi.scope)element('small','dv-live-metric-scope',kpi.scope,tile);
     });
-    if(!metricsOnly)text('p','dv-live-production-since','Since Done: '+row.since);
+    if(!metricsOnly)text('p','dv-live-production-since','Since Done: '+row.since);else{var since=block.querySelector('.dv-live-production-since');if(since)since.remove();}
     var anchor=block.querySelector('.dv-live-production-link');
     if(row.url){if(!anchor){anchor=link(block,'',row.url);anchor.classList.add('dv-live-production-link');anchor.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});element('span','',null,anchor);}anchor.setAttribute('href',row.url);anchor.querySelector('span').textContent=row.linkLabel;}
     else if(anchor){var root=pop.getRootNode();if(root.activeElement===anchor)pop.querySelector('.node-link-close').focus({preventScroll:true});anchor.remove();}

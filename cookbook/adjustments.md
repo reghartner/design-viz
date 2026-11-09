@@ -37,10 +37,10 @@ of knobs. This file maps the feedback to the knob. Two facts first:
 | "remove the subject names" | omit `homemap.showSubjectLabels` or set it to false | names are hidden by default; `true` opts in; state chips are already omitted |
 | "start recording before the person moves / fire starts" | screen patch `mode:"rec",scenePlayback:"waiting"`, then later `scenePlayback:"playing"` | mode and scene phase inherit separately; see `camera-events.md` |
 | "make the old video scenes color" | rebuild with the current template | all stock clips are color automatically; existing scene tokens still work |
-| "make a dense trace readable / fit the whole diagram" | **Auto / Fit width / Readable** on routed diagrams; `routing:"lanes"` for track routing | no zoom/schema flag; lanes support flat rows of 1–5 cards, no floats or self-loops |
+| "make a dense trace readable / fit the whole diagram" | **Auto / Fit width / Readable** on routed diagrams | no zoom/schema flag; lane routing is no longer offered |
 | "the editor is squeezing the diagram" | drag the workspace divider; use **Expand editor** or **Focus workspace** | editor preferences, not spec fields; panels stack below when section width is at most 1000px |
 | "make the proposal tab stand out" | `tabs[i].highlight`: `true`, an accent name, or `"#RRGGBB"` | |
-| "more space between rows / bigger boxes" | no arbitrary row-gap/card-size field | engine computes sizing; lane routing expands gaps for its reserved tracks; do not invent a pixel-gap field |
+| "more space between rows / bigger boxes" | no arbitrary row-gap/card-size field | engine computes sizing; do not invent a pixel-gap field |
 
 ## Working method for any adjustment
 

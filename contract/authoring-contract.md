@@ -834,21 +834,9 @@ bounding-box rule applies at every level.
 
 ### rows — left-to-right slots (no coordinates)
 
-Diagrams default to **no lanes** (`"curves"` or omitted `routing`), including
-catalog seeds, Honeycomb imports, and new projects from built-in templates.
-In the workbench, select the section heading (or its Outline entry), then use
-**Inspect → Edge routing → No lanes (default) / Lanes**. This diagram-level
-setting applies to every view; step story-lane labels are separate. Existing
-specs retain their explicit routing when opened or rebuilt.
-
-Optional `diagram.routing: "lanes"` routes connectors along reserved tracks
-between rows and channels around cards. It spreads ports and scores crossings
-and coincident segments; dense graphs can still cross, with visual breaks at
-intersections. Supports 1–5 unstacked cards per row and no self-loops;
-stable `noSpread` insertions are the only supported floats.
-Unsupported layouts fall back to curves with a warning. Authored edge bends
-are ignored in lanes mode; label offsets remain available. Omit routing or use
-`"curves"` for curved connectors. Honeycomb imports generate dependency rows
+Connectors are curves: omit `diagram.routing`. Lane routing is no longer offered;
+an older spec with `routing: "lanes"` still draws lanes, with a validator note.
+Honeycomb imports generate dependency rows
 (at most four cards per row), retaining service cycles and all relationships.
 Their row order describes dependencies, not elapsed time.
 
@@ -894,7 +882,7 @@ an existing float so the rows stay in place. New free placements use `below`.
 Pinned nodes do not move when their connections or rows change, and may overlap
 if authored that way. A diagram with every node in floats uses `rows:[[]]`.
 New nodes can use `noSpread:true` to stay out of existing automatic float
-spacing and lane routing. Workbench **Add to diagram → Node** writes it with a
+spacing. Workbench **Add to diagram → Node** writes it with a
 product-chosen pinned position. For a bounded addition to an existing diagram,
 append `{id,side:"below",noSpread:true}` without X/Y; the viewer puts it in a
 deterministic outside band without moving established nodes or routes. An
@@ -936,8 +924,7 @@ Directed arrows between placed nodes:
   0–1 (default 0.5), measured left to right on a horizontal side and top to
   bottom on a vertical side. In the inspector these are **Exit / Entry side**
   and **position (%)**. Remove either field to restore that endpoint's auto
-  choice. A pinned edge uses a curve even with `routing:"lanes"`; other lane
-  edges and row positions retain their normal behavior. Ports fix endpoints,
+  choice. Ports fix endpoints,
   not a collision-free route: use `bend` and label offsets for crowded paths.
 - `kind` — the **protocol** of the hop (see "Edge kinds"). Default `int`.
 - `ret` — `true` marks a response/acknowledgment: drawn as a fine dash in the
@@ -954,7 +941,7 @@ Directed arrows between placed nodes:
   100 units above the midpoint. Multiple points allow S-curves. Moving endpoints
   carries the points proportionally; translating both translates the whole
   curve. Explicit entry/exit ports stay attached. Nonempty points override
-  `bend`, lanes and automatic avoidance for that edge; they do not guarantee
+  `bend` and automatic avoidance for that edge; they do not guarantee
   obstacle clearance. Omitting the field or `[]` restores ordinary routing.
   In the editor, drag an arrow to add a point; drag its handles to reshape;
   double-click or Delete a focused handle to remove it. Reset curve also removes

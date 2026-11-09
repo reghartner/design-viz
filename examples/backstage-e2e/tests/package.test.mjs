@@ -178,6 +178,7 @@ test(
     assert.deepEqual(C.validateSpec(spec), {errors: [], warnings: []});
     const section = spec.page.sections[0], diagram = section.diagram;
     assert.equal(diagram.primaryPanel, undefined);
+    assert.equal(diagram.routing, undefined, 'A newly authored spec never gets lane routing (#1216)');
     assert.equal(spec.page.views.length, 2);
     const presentation = name => {
       const view = spec.page.views.find(view => view.name === name);

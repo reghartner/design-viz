@@ -5,3 +5,7 @@
   `total` is a positive whole number. Step patches set `done` (a whole number
   from 0 to `total`) and may add a `note`. See the
   [ticket board example](../examples/ticket-board/ticket-board.spec.json).
+
+### Ticket board naming
+
+Title a ticket board after the epic it counts, never after a sprint.

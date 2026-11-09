@@ -69,7 +69,7 @@ test('desktop trace levels: the failed span is focused; above, below and other m
  expect(m.nodes.web,'the root span node is above').toBe('above');
  expect(m.edges['1'],'GetCart is another branch: no outline').toBeUndefined();expect(m.nodes.shipping,'the shipping node is another branch: no brackets').toBeUndefined();
  const other=node(root,'shipping').locator('.dv-trace-overlay');await expect(other).toHaveAttribute('data-trace-level','other');
- await expect(other.locator('text')).toHaveCSS('font-size','12px');await expect(other).toHaveCSS('opacity','0.55');
+ await expect(other.locator('text')).toHaveCSS('font-size','12px');await expect(other.locator('text')).toHaveCSS('opacity','0.55');
  await info.attach('trace-levels-failed-charge',{body:await root.screenshot(),contentType:'image/png'});
  // Cleared: every carrier in the trace has the "below" marks, each in its own span's colour.
  await root.getByRole('button',{name:'Clear trace focus',exact:true}).click();

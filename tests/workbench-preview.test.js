@@ -297,3 +297,11 @@ test('preview restores session follow only when the effective authored default i
     assert.deepEqual(values,[false,false],'old snapshots assume the legacy enabled default');
   }
 });
+test('#1216 an older lanes spec reaches the Workbench findings as a note, never a warning',()=>{
+  const h=harness(),spec={page:{sections:[{diagram:{routing:'lanes',nodes:{a:{},b:{}},rows:[['a'],['b']],edges:[{from:'a',to:'b'}]}}]}};
+  assert.equal(h.preview.render(JSON.stringify(spec)).ok,true);
+  assert.deepEqual(h.events.filter(e=>e[0]==='findings').at(-1)[1],{errors:[],warnings:[],
+    notes:['sections[0].diagram.routing: "lanes" is no longer recommended; omit routing to draw curves']});
+  h.preview.render(SOURCE);
+  assert.deepEqual(h.events.filter(e=>e[0]==='findings').at(-1)[1],{errors:[],warnings:[],notes:[]});
+});

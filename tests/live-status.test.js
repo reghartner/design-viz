@@ -4041,7 +4041,7 @@ test('#1173 one-choice selects are not rendered, the help line moves to the summ
  // The sole choices still apply: Load sends the same request as with the selects.
  api.setDirectTraceField({field:'input',value:COMPACT_ID});assert.ok(await api.loadDirectTrace(false),'the trace loads');
  assert.deepEqual(plain(calls.at(-1)),{trace_id:COMPACT_ID,from:'-2h',environment_slug:'production',team_slug:'example-team',view_mode:'full'});
- h.flush();assert.equal(show().hidden,false,'Show on diagram after a Load');assert.equal(show().disabled,false);
+ h.flush();assert.equal(show().hidden,false,'Show on diagram after a Load');assert.ok(!show().disabled);
  api.destroy();
  // Two options still render a select.
  const two=compactHarness(['prod','stage']);assert.ok(two.m.body.querySelectorAll('select').some(el=>el.getAttribute('aria-label')==='Connection environment'),'two environments keep the select');two.api.destroy();
@@ -4053,12 +4053,13 @@ test('#1173 with a trace shown the search section and the request card are one c
  assert.equal(config().open,false,'the search section collapses');
  assert.match(textOf(config().querySelector('summary')).replace(/\s+/g,' ').trim(),/^Fixture Honeycomb · Production · Change trace$/);
  assert.ok(request(),'one request card');assert.equal(request().open,false,'collapsed');
- assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · Started .+ local · \d+ spans · \d+\/\d+ steps matched · partial$/,'a partial trace says so on its one line');
+ assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · partial · [^·]+ \d\d:\d\d · \d+ spans · \d+\/\d+ steps matched$/,'a partial trace says so first (#1186: flags before the date)');
  assert.ok(request().querySelector('.dv-trace-identity'),'expanding shows today\'s details');assert.equal(request().querySelector('.dv-trace-identity').textContent,COMPACT_ID);
  const closed=el=>{for(let n=el.parentElement;n;n=n.parentElement)if(n.tagName==='details' && !n.open && !el.closest('summary'))return true;return false;};
  const span=m.body.querySelector('.dv-trace-span');assert.ok(span && !closed(span),'the span list is not inside a collapsed section');
- const order=m.body.querySelectorAll('details.dv-trace-config,details.dv-trace-request,.dv-trace-focus-summary,.dv-trace-waterfall').map(el=>el.className.split(' ')[0]);
- assert.deepEqual(order,['dv-trace-config','dv-trace-request','dv-trace-focus-summary','dv-trace-waterfall'],'the waterfall comes right after the collapsed lines and the focus box');
+ const order=m.body.querySelectorAll('details.dv-trace-config,details.dv-trace-request,.dv-trace-spans-head,.dv-trace-waterfall').map(el=>el.className.split(' ')[0]);
+ // #1186: the list header replaced the focus box.
+ assert.deepEqual(order,['dv-trace-config','dv-trace-request','dv-trace-spans-head','dv-trace-waterfall'],'the waterfall comes right after the collapsed lines and its header');
  for(const el of [config(),request()])assert.equal(el.children[0].tagName,'summary','each collapsed section shows only its summary line');
  // A section the reader expanded stays expanded across repaints until the shown trace changes.
  request().open=true;config().open=true;api.setTraceShow(false);api.setTraceShow(true);h.flush();
@@ -4245,7 +4246,7 @@ test('#1173 a trace of unknown completeness says so on the request line',async()
  const {h,api,m}=compactHarness(['prod'],unknown),request=()=>m.body.querySelector('details.dv-trace-request');
  api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();
  assert.equal(api.snapshot().trace.selected.exemplar.completeness,'unknown');
- assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · Started .+ local · \d+ spans · \d+\/\d+ steps matched · unknown completeness$/);
+ assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · unknown completeness · [^·]+ \d\d:\d\d · \d+ spans · \d+\/\d+ steps matched$/);
  api.destroy();
 });
 test('#1173 another trace resets the open sections; a re-poll with the same entry keeps them; focus moves to the card line after a Load',async()=>{
@@ -4294,6 +4295,85 @@ test('#1192 a step that names the node and an edge, or edges, gets no nodeId fro
   assert.ok(b.editor.calls.length,JSON.stringify(extra)+': mapped');assert.equal('nodeId' in b.editor.calls.at(-1).match,false,JSON.stringify(extra)+': no nodeId');
   b.api.destroy();
  }
+});
+
+// #1186 (Chuck 2026-11-09, stage-2 mockup): the request line carries Show on diagram and Open trace as icons, a header row
+// replaces the focus hint box, the focused span's detail opens under its row, and the card holds Source and limitations,
+// All operation mappings and Pin as evidence. Desktop only.
+async function stage2Loaded(){
+ const {h,api,m}=compactHarness(['prod']);api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();
+ return {h,api,m,request:()=>m.body.querySelector('details.dv-trace-request')};
+}
+test('#1186 the request line holds Show on diagram and Open trace as icons, outside the summary',async()=>{
+ const {h,api,m,request}=await stage2Loaded(),line=m.body.querySelector('.dv-trace-request-line');
+ assert.ok(line,'one request line');assert.ok(line.contains(request()),'the card is on the line');
+ const icons=line.querySelector('.dv-trace-request-icons');assert.ok(icons,'an icon group on the line');
+ assert.ok(line.children.indexOf(icons)>=0 && line.children.indexOf(icons)<line.children.indexOf(request()),'#1186 c1: the icons come before the card body in tab order');
+ assert.equal(m.body.querySelectorAll('button.dv-trace-show').length,1,'one Show on diagram control');
+ const show=icons.querySelector('button.dv-trace-show');assert.ok(show,'Show on diagram is an icon on the request line');
+ assert.equal(show.getAttribute('aria-label'),'Show on diagram');assert.equal(show.getAttribute('aria-pressed'),String(api.snapshot().trace.show));assert.equal(textOf(show).trim(),'','an icon, no text');
+ const open=icons.querySelector('a.dv-trace-open');assert.ok(open,'Open trace is a link icon next to it');
+ assert.equal(open.getAttribute('aria-label'),'Open trace in Honeycomb');assert.match(open.getAttribute('href'),/^https:\/\/ui\.honeycomb\.io\//);assert.equal(textOf(open).trim(),'');
+ assert.ok(!request().querySelector('summary').contains(show) && !request().querySelector('summary').contains(open),'the icons are not inside the summary, so clicking them does not toggle the card');
+ const before=api.snapshot().trace.show;show.dispatchEvent({type:'click'});h.flush();assert.equal(api.snapshot().trace.show,!before);
+ assert.equal(m.body.querySelector('button.dv-trace-show').getAttribute('aria-pressed'),String(!before));
+ api.destroy();
+});
+test('#1186 no focus hint box: the span list has a header row with the count',async()=>{
+ const {api,m}=await stage2Loaded(),count=api.snapshot().trace.selected.exemplar.spans.length;
+ assert.ok(m.body.querySelector('.dv-trace-focus-summary')===null,'no hint box');assert.ok(m.body.querySelector('.dv-trace-focus-hint')===null);
+ const head=m.body.querySelector('.dv-trace-spans-head'),list=m.body.querySelector('.dv-trace-waterfall');assert.ok(head,'a list header');
+ assert.equal(textOf(head).replace(/\s+/g,' ').trim(),'Spans · '+count+' · click a span to focus it on the diagram');
+ assert.ok(head.parentElement===list.parentElement && head.parentElement.children.indexOf(head)+1===head.parentElement.children.indexOf(list),'the header sits directly above the list');
+ api.destroy();
+});
+test('#1186 the focused span\'s detail opens inline, directly under its row',async()=>{
+ const {h,api,m}=await stage2Loaded(),rows=()=>m.body.querySelectorAll('.dv-trace-span'),span=api.snapshot().trace.selected.exemplar.spans[2];
+ assert.ok(m.body.querySelector('.dv-trace-span-detail')===null,'no detail before a span is focused');
+ rows().find(r=>r.getAttribute('data-span-id')===span.id).dispatchEvent({type:'click'});h.flush();
+ const row=m.body.querySelector('.dv-trace-span[aria-pressed="true"]');assert.ok(row && row.getAttribute('data-span-id')===span.id);
+ const item=row.parentElement,list=m.body.querySelector('.dv-trace-waterfall');assert.ok(item.parentElement===list,'each row sits in a list item');
+ const detail=item.children[item.children.indexOf(row)+1];assert.ok(detail && detail.classList.contains('dv-trace-span-detail'),'the detail follows its row inside the item');
+ assert.equal(m.body.querySelectorAll('.dv-trace-span-detail').length,1);
+ assert.equal(detail.querySelector('.dv-trace-span-service').textContent,span.service);assert.equal(detail.querySelector('.dv-trace-span-operation').textContent,span.name);assert.ok(detail.querySelector('.dv-trace-duration'));
+ const clear=detail.querySelectorAll('button').find(b=>b.textContent==='Clear trace focus');assert.ok(clear,'Clear trace focus is in the detail');
+ clear.dispatchEvent({type:'click'});h.flush();assert.ok(m.body.querySelector('.dv-trace-span-detail')===null,'clearing focus closes the detail');
+ api.destroy();
+});
+test('#1186 Source and limitations, All operation mappings and Pin as evidence sit inside the request card',async()=>{
+ const {h,api,request}=await compactExamples(),example=api.snapshot().trace.entries.find(e=>!e.manual);
+ await api.chooseTrace({key:example.key,traceId:example.exemplar.traceId});h.flush();
+ assert.ok(request().querySelector('details.dv-trace-metadata'),'Source and limitations is in the card');
+ assert.ok(request().querySelector('details.dv-trace-all'),'All operation mappings is in the card');
+ assert.ok(request().querySelectorAll('button').some(b=>b.textContent==='Pin as evidence'),'Pin as evidence is in the card');
+ api.destroy();
+});
+test('#1186 focus that left the card before a Load is not carried to the new card',async()=>{
+ const {h,api,request}=await compactExamples(),example=api.snapshot().trace.entries.find(e=>!e.manual);
+ let focused=[];const focus=Element.prototype.focus;Element.prototype.focus=function(){focused.push(this);};
+ try{
+  await api.chooseTrace({key:example.key,traceId:example.exemplar.traceId});h.flush();
+  // A repaint while focus is on the card line, then the reader clicks the canvas (focus to the body) before starting a Load.
+  h.doc.activeElement=request().querySelector('summary');api.setTraceShow(true);h.flush();h.doc.activeElement=h.doc.body;
+  api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:COMPACT_ID});const loading=api.loadDirectTrace(false);h.flush();
+  assert.ok(request()===null,'the card is gone while loading');await loading;h.flush();
+  assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(focused.length,0,'focus stays where the reader left it');
+ }finally{Element.prototype.focus=focus;api.destroy();}
+});
+test('#1186 a span focused while the panel is hidden is scrolled into the list\'s view when the panel shows again',async()=>{
+ const {h,api,m}=await stage2Loaded();
+ let hidden=true;const watchers=[];h.C.ResizeObserver=class{constructor(f){this.f=f;this.off=false;watchers.push(this);}observe(t){this.t=t;}disconnect(){this.off=true;}};
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect;
+ proto.getClientRects=function(){return hidden?[]:[1];};
+ proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-waterfall'))return {top:0,bottom:300,left:0,right:100,width:100,height:300};if(this.classList.contains('dv-trace-span-item'))return {top:900,bottom:1100,left:0,right:100,width:100,height:200};return bound.call(this);};
+ try{
+  const t=api.snapshot().trace.selected,span=t.exemplar.spans[41];assert.equal(api.selectTraceSpan({context:t.context,spanId:span.id}),true);h.flush();
+  const list=m.body.querySelector('.dv-trace-waterfall');assert.ok(list.querySelector('.dv-trace-span-detail'),'the detail is open');
+  assert.equal(list.scrollTop,undefined,'nothing is measured or scrolled while the panel is hidden');assert.equal(watchers.length,1,'the list is watched until it has a size');assert.ok(watchers[0].t===list);
+  list.scrollTop=0;hidden=false;watchers[0].f([]);
+  assert.equal(list.scrollTop,892,'shown again: the focused span is scrolled into the list\'s view');assert.equal(watchers[0].off,true,'the watch stops');
+  api.setTraceShow(true);h.flush();assert.equal(list.scrollTop,892,'a repaint of the same focus does not scroll again');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;api.destroy();}
 });
 
 /* #1193: "N/M steps matched" counts only steps with a traceMatch, less optional steps this trace lacks. The request

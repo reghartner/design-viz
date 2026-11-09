@@ -2122,12 +2122,23 @@ With a trace shown (loaded or picked), the Trace view is compact (#1173), so the
 waterfall sits beside the diagram. The search (Load trace, log search, the load
 report and **Clear loaded trace**) is one line naming the connection and
 environment ("Fixture Honeycomb · Production · Change trace"). The request card
-is one line too: "8413cd87a9f1 · Started Nov 9 07:19 local · 55 spans · 6/7 steps
-matched". It holds Returned traces and the request details. Each line opens with
+is one line too: "8413cd87a9f1 · partial · Nov 9 07:19 · 55 spans · 6/7 steps
+matched". Warning flags (partial, unknown completeness, limit reached) come right after the
+trace ID, and the line wraps rather than clipping (#1186). It holds Returned traces and the request details. Each line opens with
 one click, and an opened section stays open until the shown trace changes. A
 select with one choice (connection, environment, mapping diagram, a single log
 lookup) is not drawn; its value still applies. The help sentence is the Load
 trace summary's tooltip, and **Show on diagram** appears once a trace is shown.
+
+Stage 2 (#1186) finishes the layout. **Show on diagram** (a toggle) and **Open
+trace** are icons at the right end of the request line, outside its summary, with
+those accessible names. The request card also holds **Pin as evidence**, **Source
+and limitations** and **All operation mappings**. A header row, "Spans · 55 · click
+a span to focus it on the diagram", sits above the span list. In a section layout
+tile the list fills the rest of the panel and scrolls inside it, so its length
+never grows the tile. A focused span's detail (duration, service, operation, the
+matched step or the step choices, **Clear trace focus**) opens directly under its
+row, and a span focused from the diagram is scrolled into the list's view.
 
 Each annotated node or uniquely matched edge gets one label from its rows: one row per
 step on the current path whose `traceMatch` names it (#1154). Connection timing (#1196):
@@ -2199,7 +2210,7 @@ and it has an error span whose step mapping is unique, the earliest such span is
 reader clicked it; a focus the reader cleared stays cleared, also after an edit. An error span with
 several possible steps is not focused and the request summary reads `error in <service>
 <operation>: pick a step to focus it`; when no step maps an error span it reads `error in <service>
-<operation> (not on this diagram)`.
+<operation> (not on this diagram)`. The note follows the warning flags, before the date (#1186).
 A loaded trace can grow the diagram frame so node time labels stay below their cards.
 
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a

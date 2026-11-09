@@ -356,7 +356,7 @@ that one span maps to only one step, so if the chosen alternative's span is also
 claimed by another step, the step becomes ambiguous and later alternatives are
 not tried.
 
-The panel has one bounded waterfall and a **Show on diagram** toggle. All canvas
+The panel has one span list that scrolls inside the panel and a **Show on diagram** icon toggle. All canvas
 annotations are runtime-only, with no layout/spec persistence. Pin stores evidence
 in this session's Jira Activity. Historical Over time, telemetry off, rebinding,
 provider/account/environment changes, closed or replaced async detail, and destroy

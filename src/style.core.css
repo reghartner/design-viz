@@ -4214,11 +4214,15 @@ svg path.edge.dv-metrics-ghosted{opacity:.35;}
 .dv-metrics-card-box{fill:var(--explore-bg,#fff);stroke:var(--dv-metrics-ghost);stroke-width:1.5;}
 .dv-metrics-card[data-state="preview"] .dv-metrics-card-box{stroke-dasharray:4 3;}
 .dv-metrics-card-bar{fill:none;stroke:var(--dv-metrics-ghost);stroke-width:4;stroke-linecap:round;}
-/* Work appearance uses the same tokens and halo as nodes; metric health is local
-   to each numeric row and never turns an unknown/active carrier into Done. */
-.dv-metrics-card[data-live-appearance] .dv-metrics-card-box{fill:color-mix(in srgb,var(--dv-live-color) var(--dv-live-fill),var(--dv-board-ground));stroke:var(--dv-live-line);stroke-width:var(--dv-live-width);stroke-dasharray:var(--dv-live-dash,none);stroke-linecap:round;}
-.dv-metrics-card[data-live-appearance] .dv-metrics-card-bar{display:none;}
-.dv-metrics-card[data-live-appearance] :is(.t1,.t2){fill:var(--dv-live-ink,#000);}
+/* #1200/#1199: the metric state, one style source for card borders and Proof chips, in every view.
+   Never Jira work: held/flowing use the Done green, failing the in-progress style, waiting the to-do style. */
+[data-metric-state="held"]{--dv-metric-line:var(--dv-live-done-border-color,var(--dv-live-done));--dv-metric-width:3px;--dv-metric-dash:none;--dv-metric-border:solid;}
+[data-metric-state="flowing"]{--dv-metric-line:var(--dv-live-done-border-color,var(--dv-live-done));--dv-metric-width:1px;--dv-metric-dash:none;--dv-metric-border:solid;}
+[data-metric-state="failing"]{--dv-metric-line:var(--dv-live-active-border-color,var(--dv-live-active));--dv-metric-width:var(--dv-live-active-border-width,2px);--dv-metric-dash:none;--dv-metric-border:solid;}
+[data-metric-state="waiting"]{--dv-metric-line:var(--dv-live-todo-border-color,var(--dv-live-todo));--dv-metric-width:var(--dv-live-todo-border-width,3px);--dv-metric-dash:1 4;--dv-metric-border:dotted;}
+.dv-metrics-card[data-metric-state] .dv-metrics-card-box{stroke:var(--dv-metric-line);stroke-width:var(--dv-metric-width);stroke-dasharray:var(--dv-metric-dash);stroke-linecap:round;}
+.dv-metrics-card[data-metric-state] .dv-metrics-card-bar{display:none;}
+.dv-live-proof-pill[data-metric-state]{border:var(--dv-metric-width) var(--dv-metric-border) var(--dv-metric-line);}
 .dv-metrics-card .t1{fill:var(--dtext);font-size:11px;font-weight:600;}
 .dv-metrics-card .t2{fill:var(--dtext);font-size:10px;}
 .dv-metrics-card-note{opacity:.7;}

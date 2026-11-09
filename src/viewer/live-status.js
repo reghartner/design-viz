@@ -105,7 +105,7 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
         markers:markers.map(function(m){return {x:2+96*(m.at-start)/span,label:m.label,kind:m.kind};})}};
   });
   var predicates=rows.map(function(row){return row.predicate;}).filter(function(value,i,all){return all.indexOf(value)===i;});
-  return {counts:counts,arcs:arcs,rows:rows,window:window,historical:!!snapshot.historical,
+  return {counts:counts,arcs:arcs,rows:rows,window:window,historical:!!snapshot.historical,states:TELEMETRY_PROOF_BUCKET_STATES,
     sentence:counts.proven+' of '+counts.bound+' bound carriers proven · '+counts.unproven+' Done carriers unproven · '+counts.unbound+' carriers unbound.',
     predicate:predicates.length===1?predicates[0]:'Proof thresholds are shown for each carrier below.'};
 }
@@ -905,17 +905,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
       telemetryPaintCues(scope,d,templates,metricsView,trackingTelemetry(page).window);
       var cardsView=metricsPreview && trackingTelemetry(binding.page).enabled?telemetryCardPreview(d,templates):metricsView;
       telemetryPaintCards(scope,d,templates,cardsView,trackingTelemetry(page).window,function(card,path,edge,index,bound){
-        // The bound carrier owns its work presentation, including all resolved
-        // imported tickets. Telemetry proof and endpoint states cannot override it.
-        // Unticketed metric cards may show no-change without painting ordinary edges,
-        // but only on a board with ticket references (#1137).
+        // #1200: the card border shows the metric state only (data-metric-state), never Jira work paint.
+        // The bound carrier's work state still names the card and fills its popover in the Jira view,
+        // on a board with ticket references (#1137).
         var appearance=!cardsView.preview && workPaint && api.enabled() && availabilityOn && references?liveStatusPresentation(edge,map):null;
-        liveStatusClass(card,appearance);
-        if(!appearance)liveStatusInk(card,null);
-        if(appearance){
-          var halo=card.querySelector('.dv-metrics-card-box').cloneNode(false);
-          halo.setAttribute('class','dv-live-halo');halo.setAttribute('aria-hidden','true');card.insertBefore(halo,card.firstChild);
-        }
+        liveStatusInk(card,null);
         if(authoring){
           if(binding.ordinal!=null){card.setAttribute('data-metrics-section',binding.ordinal);card.setAttribute('tabindex','0');card.setAttribute('role','button');card.setAttribute('aria-label',(bound.card && bound.card.title || edge.label || edge.from+' to '+edge.to)+'. Drag metrics card to move. Arrow keys move 10 units; Shift moves 50.');}
           return;

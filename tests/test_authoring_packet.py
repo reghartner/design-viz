@@ -403,6 +403,15 @@ class CompanyRulesPacketTests(unittest.TestCase):
                     if entry['path'].startswith('company/contract/'):
                         self.assertEqual(entry['sha256'], hashlib.sha256(self.RULES[entry['path'].rsplit('/', 1)[1]].encode()).hexdigest(), 'whole-file hash')
 
+    def test_a_body_line_quoting_two_markers_does_not_split_its_fragment(self):
+        body = '### Marker note\n\n<!-- company/contract/a.md --> and <!-- company/contract/b.md -->\n\nStill the same rule.\n'
+        root = self.fork({'notes.md': body}, kit=True)
+        self.assertIn('<!-- company/contract/a.md --> and <!-- company/contract/b.md -->', (root / packet.CONTRACT).read_text())
+        text, meta = packet.generate([], [], mode='edit')
+        self.assertIn('<!-- Source: company/contract/notes.md -->\n### Marker note\n\n<!-- company/contract/a.md --> and <!-- company/contract/b.md -->\n\nStill the same rule.', text)
+        self.assertEqual([entry['path'] for entry in meta['provenance'] if entry['path'].startswith('company/')], ['company/contract/notes.md'])
+        self.assertEqual(meta['provenance'][-1]['sha256'], hashlib.sha256(body.strip().encode()).hexdigest(), 'kit: hash of the carried excerpt')
+
     def test_a_fragment_file_name_with_spaces_is_carried(self):
         self.fork({'team rules.md': '### Team rule\n\nOne rule from a file name with a space.\n'})
         text, meta = packet.generate([], [], mode='edit')

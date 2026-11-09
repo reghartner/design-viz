@@ -13,8 +13,8 @@ function related(span,parentIds,byId){
   return false;
 }
 function mapTrace(d,trace,pathId){
-  const steps=pathId===undefined?baseSteps(d):(d.paths || []).find(p=>p.id===pathId)?.steps.map(id=>d.steps.find(s=>s.id===id)) || [],results=new Map(),byId=new Map(trace.spans.map(s=>[s.id,s])),visiting=new Set(),offPath=new Set();
-  // Spans with the selector's service, operation, namespace and attributes, before parent and occurrence rules.
+  const steps=pathId===undefined?baseSteps(d):(d.paths || []).find(p=>p.id===pathId)?.steps.map(id=>d.steps.find(s=>s.id===id)) || [],results=new Map(),byId=new Map(trace.spans.map(s=>[s.id,s])),visiting=new Set(),offPath=new Set(),unattributed=new Set();
+  // Spans matching the selector (service, operation, namespace, attributes), before parent and occurrence rules.
   const named=m=>trace.spans.filter(s=>s.serviceName===m.serviceName && s.operation===m.operation &&
     (!m.namespace || s.attributes['service.namespace']===m.namespace) &&
     Object.entries(m.attributes || {}).every(([k,v])=>s.attributes[k]===v));
@@ -27,24 +27,25 @@ function mapTrace(d,trace,pathId){
     // Alternatives are tried in order; the first match wins. Without a match the
     // first ambiguous result is kept (it needs a selector fix), else the last
     // applicable one. An alternative whose parent step is not on this path ranks last.
-    let result=null;
+    let result=null;const tried=[];
     const rank=r=>r.status==='ambiguous'?2:offPath.has(r)?0:1;
-    if(Array.isArray(m))m.some((alternative,i)=>{const r=attempt(step,alternative || {},true);r.alternative=i;if(r.status==='matched' || !result || rank(r)>rank(result) || rank(r)===rank(result) && rank(r)<2)result=r;return r.status==='matched';});
-    else result=attempt(step,m);
+    if(Array.isArray(m))m.some((alternative,i)=>{const r=attempt(step,alternative || {},true);r.alternative=i;tried.push(r);if(r.status==='matched' || !result || rank(r)>rank(result) || rank(r)===rank(result) && rank(r)<2)result=r;return r.status==='matched';});
+    else tried.push(result=attempt(step,m));
     // #1175: an optional step (optional:true on its selector, or on every alternative) may be
-    // absent from a trace. When no span has its service and operation it is not unknown; a span
-    // that is present but rejected (parent, occurrence) stays unknown. Matched or ambiguous is unchanged.
-    if(result.status==='missing' && [].concat(m).every(a=>a && a.optional===true && !named(a).length))Object.assign(result,{detail:'Optional, not in this trace.'+(result.detail?' '+result.detail:''),conditions:[],optional:true});
+    // absent from a trace; missing, it is not unknown. It stays unknown when a span matching an
+    // alternative's selector is present but its parent step's mapping is missing or ambiguous,
+    // since nothing tells whose span it is. Matched or ambiguous is unchanged.
+    if(result.status==='missing' && [].concat(m).every(a=>a && a.optional===true) && !tried.some(r=>unattributed.has(r)))Object.assign(result,{detail:'Optional, not in this trace.'+(result.detail?' '+result.detail:''),conditions:[],optional:true});
     visiting.delete(step.id);results.set(step.id,result);return result;
   }
   function attempt(step,m,alternative){
     let candidates=named(m);
-    let detail='',off=false;
+    let detail='',off=false,unclear=false;
     if(m.parentStepId){
       const parent=steps.find(s=>s.id===m.parentStepId);if(!parent && !alternative)throw new Error('Unknown parent step '+m.parentStepId);
       const mapped=parent && match(parent);
       if(!parent){off=true;candidates=[];detail='Parent step '+m.parentStepId+' is not on this path.';}
-      else if(mapped.status!=='matched'){candidates=[];detail='Parent mapping is unavailable.';}
+      else if(mapped.status!=='matched'){unclear=candidates.length>0;candidates=[];detail='Parent mapping is unavailable.';}
       else candidates=candidates.filter(s=>related(s,mapped.spans.map(p=>p.id),byId));
     }
     if(m.occurrence && candidates.length){
@@ -79,7 +80,7 @@ function mapTrace(d,trace,pathId){
       if(candidates.some(s=>truth(s.attributes['flow.backpressure'])))condition('backpressure','Backpressure reported by service');
       if(retries)condition('retry',candidates.length+' recorded attempts',{attempts:candidates.length});
     }else result.conditions.push({kind:status==='missing'?'unknown':'ambiguous',nodeId:m.nodeId,label:status==='missing'?'Not observed · outcome unknown':'Ambiguous span mapping',spanIds:candidates.map(s=>s.id)});
-    if(off)offPath.add(result);
+    if(off)offPath.add(result);if(unclear)unattributed.add(result);
     return result;
   }
   const mapped=steps.map(match),owners=new Map();

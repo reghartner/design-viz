@@ -165,7 +165,7 @@ for(const shape of ['direct','detail','zero'])test('actual mock measurement cloc
  expect(await page.evaluate(id=>window.ctl.liveStatus.snapshot().metrics.proof.rows.find(r=>r.id===id).chart.observedAt,id)).toBe('2026-11-01T00:00:00.000Z');
  const before=h.bridge.calls.length;
  const trigger=root.locator('[data-live-carrier="'+id+'"][tabindex="0"]:visible');await expect(trigger).toHaveCount(1);await trigger.focus();await trigger.press('Enter');
- const production=page.locator('#docview .dv-live-popover:visible .dv-live-production');await expect(production).toBeVisible();await expect(production.locator('.dv-live-proof-point')).toHaveCount(24);await expect(production).toContainText(shape==='zero'?'rate: 0 req/h':'rate: 645.4 req/h');
+ const production=page.locator('#docview .dv-live-popover:visible .dv-live-production');await expect(production).toBeVisible();await expect(production.locator('.dv-live-proof-point')).toHaveCount(24);await expect(production.locator('.dv-live-production-kpi').filter({has:page.locator('.dv-live-metric-label',{hasText:/^rate$/})}).locator('.dv-live-metric-line')).toContainText(shape==='zero'?'0 req/h':'645.4 req/h');
  await page.keyboard.press('Escape');await expect(trigger).toBeFocused();
  const events=await page.evaluate(id=>window.ctl.liveStatus.snapshot().activity.filter(e=>e.type==='telemetry'&&e.carrier===id),id);
  expect(events.find(e=>e.kind==='first-traffic')?.at).toBe('2026-10-31T00:00:00.000Z');

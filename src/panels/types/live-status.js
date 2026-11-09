@@ -182,6 +182,7 @@
         else value.removeAttribute('list');
         if(value.value!==logs.form.value)value.value=logs.form.value;
       }
+      if(logs.lookups.length===1 && lookup && !lookup.slot)el(section,'p','lookup-name','dv-trace-log-name','Log lookup: '+lookup.label);
       if(logs.lookups.length===1){
         var only=logs.lookups[0],mode=el(section,'button','mode','dv-trace-log-mode',lookup?'Type a LogQL query instead':'Use '+only.label+' instead');mode.type='button';mode.disabled=!logs.available;mode._logTo=lookup?logs.typed:only.id;
         if(!mode._logClick){mode._logClick=function(){var owner=host._livePanelApi;if(owner && !mode.disabled)owner.setLogLookupField({field:'lookup',value:mode._logTo});};mode.addEventListener('click',mode._logClick);}
@@ -216,6 +217,15 @@
         };load.addEventListener('click',load._logClick);}
       });
     }
+    // #1173: a section's open state while a trace is shown. It lives on the panel host, keyed by the shown trace
+    // ([key, traceId]), so a repaint, a re-poll or a Jira <-> Trace switch keeps what the reader opened; another trace resets it.
+    // Kept per shown trace, so a Load or Verify that passes through "no trace" on its way back keeps the reader's choice.
+    function traceSection(details,name,token){
+      var states=host._traceOpenStates || (host._traceOpenStates=Object.create(null)),key=token || '',state=states[key] || (states[key]={config:!token,request:false});
+      details._traceOpenName=name;
+      if(details._traceOpenFor!==key){details.open=state[name];details._traceOpenFor=key;}
+      if(!details._traceToggle){details._traceToggle=function(){var st=host._traceOpenStates && host._traceOpenStates[details._traceOpenFor];if(st)st[details._traceOpenName]=details.open;};details.addEventListener('toggle',details._traceToggle);}
+    }
     // #1173: `shown` names the trace on screen (loaded or picked). While one is shown the search is one collapsed line;
     // a reader's expand stays until the shown trace changes.
     function directTraceBody(body,direct,shown){
@@ -223,7 +233,7 @@
       var box=el(body,'section','direct','dv-trace-direct'),r=direct.report,loaded=!!shown;
       var profile=direct.profiles.find(function(p){return p.id===direct.form.connection;}),environment=profile && profile.environments.find(function(e){return e.id===direct.form.environment;});
       var config=el(box,'details','config','dv-trace-config'),token=shown || null,focusConfig=config.contains(doc.activeElement);
-      if(config._directToken!==token){config.open=!token;config._directToken=token;}
+      traceSection(config,'config',token);
       var summary=el(config,'summary','summary','');summary.setAttribute('aria-label',loaded?'Change or load another trace':'Load trace options');
       summary.setAttribute('title','Load one exact request. This session only; diagram mappings use authored traceMatch steps.');
       var names=[profile && profile.label,environment && environment.label].filter(Boolean).join(' · ');
@@ -275,7 +285,8 @@
       if(direct.dayNote)el(box,'p','day-note','dv-trace-day-note',direct.dayNote).setAttribute('role','status');
       if(!direct.available)el(box,'p','unavailable','dv-trace-direct-status','Direct trace retrieval is unavailable in this host or view.').setAttribute('role','status');
       // The report and Clear sit inside the search section, so a shown trace keeps them one click away.
-      if(r){var report=el(config,'section','report','dv-trace-direct-report'+(loaded?' dv-trace-report-compact':''));report.setAttribute('aria-label','Trace connection report');
+      // A Verify or an error report stays in view; a loaded trace's report sits in the collapsed search.
+      if(r){var report=el(r.mode==='verify' || r.error?box:config,'section','report','dv-trace-direct-report'+(loaded?' dv-trace-report-compact':''));report.setAttribute('aria-label','Trace connection report');
         el(report,'p','stage','dv-trace-direct-status',r.error || (r.stage==='complete'?'Loaded · ID matched · '+r.spanCount+' spans · '+r.completeness+' completeness':r.stage==='schema'?'Checking runtime tool schema…':'Loading exact trace…')).setAttribute('role','status');
         if(r.error)el(report,'p','error-stage','','Stage: '+r.stage);
         // #1124: the provider may not have kept a log line's trace; offer the next line with a trace ID.
@@ -303,7 +314,8 @@
       // #1173: Show on diagram waits for a shown trace.
       var show=button(controls,'show','reader-button dv-trace-show','Show on diagram','setTraceShow');show._liveArgument=!trace.show;show.setAttribute('aria-pressed',String(trace.show));show.hidden=show.disabled=!trace.selected;
       controls.hidden=!value.actionLabel && !trace.selected;
-      var shownTrace=trace.selected?JSON.stringify([trace.selected.key,trace.selected.exemplar.traceId,trace.selected.exemplar.selectionToken || '']):null;
+      // Keyed by the trace, not its selection token: a Verify or a Live re-poll of the same trace keeps open sections.
+      var shownTrace=trace.selected?JSON.stringify([trace.selected.manual?'direct':trace.selected.key,trace.selected.exemplar.traceId]):null;
       traceEditNotice(body,value.edit);
       directTraceBody(body,trace.direct,shownTrace);
       var message=trace.direct && trace.direct.profiles.length?(!trace.hasMappings?'Diagram mapping is not configured. Loaded traces still show a waterfall.':''):!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Turn on Metrics overlay to refresh explicit bindings.':'Turn on Metrics overlay to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
@@ -330,8 +342,11 @@
       var card=el(detail,'details','request','dv-trace-request'),matchedSteps=model.mapping?model.rows.filter(function(r){return r.status==='matched';}).length:0;
       // #1175: an optional step missing from this trace does not count against coverage; the summary and the coverage line share these counts.
       var optionalAbsent=model.rows.filter(function(r){return r.optional;}).length,stepTotal=model.rows.length-optionalAbsent;
-      if(card._traceToken!==shownTrace){card.open=false;card._traceToken=shownTrace;}
-      el(card,'summary','summary','dv-trace-request-summary',[e.traceId.slice(0,12),selected.day?'Started '+selected.day.label+' '+selected.day.time+' local':'',e.spans.length+' spans',model.mapping?matchedSteps+'/'+stepTotal+' steps matched':''].filter(Boolean).join(' · '));
+      var focusCard=card.contains(doc.activeElement);traceSection(card,'request',shownTrace);
+      var limited=e.warnings.some(function(w){return /200 spans|timeline unavailable/i.test(w);}) || !!model.warning;
+      var cardSummary=el(card,'summary','summary','dv-trace-request-summary',[e.traceId.slice(0,12),selected.day?'Started '+selected.day.label+' '+selected.day.time+' local':'',e.spans.length+' spans',model.mapping?matchedSteps+'/'+stepTotal+' steps matched':'',e.completeness!=='complete'?e.completeness:'',limited?'limit reached':''].filter(Boolean).join(' · '));
+      // Picking a trace from inside the open card collapses it; keep keyboard focus on its line.
+      if(focusCard && !card.open)cardSummary.focus({preventScroll:true});
       el(card,'h3','heading','','Selected request');el(card,'code','identity','dv-trace-identity',e.traceId);if(selected.day)el(card,'p','date','dv-trace-date','Started '+selected.day.label+' '+selected.day.time+' local');if(selected.manual && !selected.hasMappings)el(card,'p','mapping-unavailable','','Diagram mapping is not configured for this section.');
       var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
       el(card,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');

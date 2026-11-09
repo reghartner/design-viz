@@ -349,7 +349,7 @@ test('O11 buttons and the content below them stay in place when status text grow
  expect(await status.locator('.dv-live-note').evaluate(el=>el.scrollWidth<=el.clientWidth),'the long note is shown in full').toBe(true);
  await next.click();await next.click();await expect(slot).toHaveText('First blocker');await expect(slot).toBeEnabled();expect(await places(),'a blocker appears').toEqual(before);
  // Every count chip lies inside the counts strip (#1162: the strip wraps, so none is clipped).
- expect(await panel.locator('.dv-live-counts').evaluate(strip=>{const r=strip.getBoundingClientRect();return [...strip.querySelectorAll('[data-live-count]')].filter(el=>el.getClientRects().length).every(el=>{const b=el.getBoundingClientRect();return b.left>=r.left-1 && b.right<=r.right+1 && b.top>=r.top-1 && b.bottom<=r.bottom+1;});}),'every count chip lies inside the counts strip').toBe(true);
+ expect(await panel.locator('.dv-live-counts').evaluate(strip=>{const r=strip.getBoundingClientRect();const chips=[...strip.querySelectorAll('[data-live-count]')].filter(el=>el.getClientRects().length);return chips.length>0 && chips.every(el=>{const b=el.getBoundingClientRect();return b.left>=r.left-1 && b.right<=r.right+1 && b.top>=r.top-1 && b.bottom<=r.bottom+1;});}),'every count chip lies inside the counts strip').toBe(true);
 });
 // #1131: the Status panel header (Jira | Trace, Metrics overlay; Live | Over time; the day row) is shared by both views.
 test('Over time from the Trace view keeps the Trace view and shows the day',async({page,server})=>{

@@ -3780,7 +3780,7 @@ test('#1173 with a trace shown the search section and the request card are one c
  assert.equal(config().open,false,'the search section collapses');
  assert.match(textOf(config().querySelector('summary')).replace(/\s+/g,' ').trim(),/^Fixture Honeycomb · Production · Change trace$/);
  assert.ok(request(),'one request card');assert.equal(request().open,false,'collapsed');
- assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · Started .+ local · \d+ spans · \d+\/\d+ steps matched$/);
+ assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · Started .+ local · \d+ spans · \d+\/\d+ steps matched · partial$/,'a partial trace says so on its one line');
  assert.ok(request().querySelector('.dv-trace-identity'),'expanding shows today\'s details');assert.equal(request().querySelector('.dv-trace-identity').textContent,COMPACT_ID);
  const closed=el=>{for(let n=el.parentElement;n;n=n.parentElement)if(n.tagName==='details' && !n.open && !el.closest('summary'))return true;return false;};
  const span=m.body.querySelector('.dv-trace-span');assert.ok(span && !closed(span),'the span list is not inside a collapsed section');
@@ -3845,4 +3845,41 @@ test('#1173 the request summary and the coverage line agree when an optional ste
   assert.equal(counts(summary),optional?'1/3':'1/4',summary);assert.equal(counts(summary),counts(coverage),'the summary and the coverage line agree');
   api.destroy();
  }
+});
+
+// #1182 review: Verify keeps its report in view and the reader's open search; the open state follows the trace, not its
+// selection token, and survives a Jira <-> Trace switch.
+test('#1173 Verify keeps its report in view, and open sections survive a re-poll token and a view switch',async()=>{
+ const {h,api,m}=compactHarness(['prod']),config=()=>m.body.querySelector('details.dv-trace-config'),request=()=>m.body.querySelector('details.dv-trace-request');
+ api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();assert.equal(config().open,false);
+ config().open=true;config().dispatchEvent({type:'toggle'});request().open=true;request().dispatchEvent({type:'toggle'});
+ await api.loadDirectTrace(true);h.flush();
+ assert.equal(config().open,true,'a Verify of the shown trace keeps the search open');assert.equal(request().open,true);
+ const report=m.body.querySelector('.dv-trace-direct-report');assert.ok(report,'the verify report');assert.equal(report.closest('details.dv-trace-config'),null,'it is outside the collapsible search');
+ assert.equal(m.body.querySelector('.dv-trace-diagnostics').open,true);
+ api.setStatusMode('jira');api.setStatusMode('trace');h.flush();
+ assert.equal(config().open,true,'a view switch keeps the open search');assert.equal(request().open,true,'and the open card');
+ api.destroy();
+});
+test('#1173 a picked example trace collapses the search and the request card',async()=>{
+ const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json')));
+ f.spec.page.tracking.telemetry.traceConnections={company:profile};
+ const h=harness(f.spec,{},{telemetry:{directTrace:{describe:async()=>compactTool(),call:async()=>({payload:''})}}}),api=h.ctl.liveStatus,m=mountStatus(h);
+ h.ctl.sections[0].stepper={path:()=>'event',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+ h.ctl.telemetry.apply(f.samples);api.setStatusMode('trace');h.flush();
+ const config=()=>m.body.querySelector('details.dv-trace-config'),request=()=>m.body.querySelector('details.dv-trace-request');
+ assert.equal(config().open,true,'nothing shown: the search is open');assert.ok(m.body.querySelector('.dv-trace-candidate'),'the examples are listed');
+ const entry=api.snapshot().trace.entries[0];await api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});h.flush();
+ assert.equal(config().open,false,'a picked example collapses the search');assert.ok(request());assert.equal(request().open,false,'and the request card');
+ api.destroy();
+});
+test('#1173 with one authored lookup, the text button switches to a typed LogQL query and back',async()=>{
+ const {h,api,m}=compactHarness(['prod']),mode=()=>m.body.querySelector('button.dv-trace-log-mode');for(let i=0;i<6;i++)await settle();h.flush();
+ assert.equal(mode().textContent,'Type a LogQL query instead');assert.equal(mode().disabled,false,'logs: '+api.snapshot().trace.direct.logs.state);mode().dispatchEvent({type:'click'});h.flush();
+ const typedField=()=>m.body.querySelectorAll('textarea').find(el=>el.getAttribute('aria-label')==='LogQL log query');
+ assert.ok(typedField(),'the typed query field shows');
+ assert.equal(api.snapshot().trace.direct.logs.form.lookup,api.snapshot().trace.direct.logs.typed);
+ assert.equal(mode().textContent,'Use Camera model instead');mode().dispatchEvent({type:'click'});h.flush();
+ assert.equal(api.snapshot().trace.direct.logs.form.lookup,'camera');assert.equal(typedField(),undefined);
+ api.destroy();
 });

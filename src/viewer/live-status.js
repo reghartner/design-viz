@@ -1044,10 +1044,16 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var carried=carriedExample;
     if(carried && (!traceSelection || traceSelection.key!==carried.key)){carriedExample=carried=null;}
     if(carried && !evidence.historical){
-      var live=entries.find(function(e){return e.carrier===carried.carrier && e.binding.ordinal===carried.ordinal && e.exemplar.selectionToken===carried.exemplar.selectionToken;});
+      // Live evidence for the same carrier replaces the carried entry (tokens differ per session); the pick
+      // and its focus move to it only when it shows the same trace (#1180).
+      var live=entries.find(function(e){return e.carrier===carried.carrier && e.binding.ordinal===carried.ordinal;});
       var home=mounted.find(function(b){return b.ordinal===carried.ordinal;});
-      if(live){traceSelection={key:live.key,traceId:traceSelection.traceId,chosen:traceSelection.chosen};carriedExample=null;}
-      else if(home)entries.push({key:carried.key,carrier:carried.carrier,binding:home,exemplar:carried.exemplar,label:(home.section.heading || home.section.id || 'Diagram')+' · '+carried.carrier});
+      if(live){
+        carriedExample=null;
+        if(live.exemplar.traceId===traceSelection.traceId){var was=home && traceContext({key:carried.key,exemplar:carried.exemplar,binding:home});traceSelection={key:live.key,traceId:traceSelection.traceId,chosen:traceSelection.chosen};if(traceFocus && was && traceFocus.context===was)traceFocus.context=traceContext(live);}
+        else{traceSelection=null;traceInitial=false;traceFocus=null;}
+      }
+      else if(home)entries.push({key:carried.key,carrier:carried.carrier,binding:home,exemplar:carried.exemplar,carried:true,label:(home.section.heading || home.section.id || 'Diagram')+' · '+carried.carrier});
     }
     var manual=directTrace.snapshot();
     if(manual.exemplar){var context=directTraceSections().find(function(s){return s.id===manual.section;}),binding=context?context.binding:{section:{diagram:{steps:[]}},page:page,stepper:null,el:null};
@@ -1072,8 +1078,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(!step || typeof step.id!=='string')return null;
       var caption=String(step.text || step.id).replace(/\s+/g,' ').trim();if(caption.length>96)caption=caption.slice(0,95)+'…';
       var holds=function(p){return p.indices.indexOf(i)>=0;},path=paths.find(function(p){return p.id===shown && holds(p);}) || paths.find(holds);
-      var m=step.traceMatch && typeof step.traceMatch==='object'?step.traceMatch:null;
-      return {id:step.id,index:i,caption:caption,label:path?'Step '+(path.indices.indexOf(i)+1)+': '+caption+' · '+path.label:caption,mapped:!!m,traceMatch:m?{serviceName:m.serviceName,operation:m.operation}:null};
+      // An alternatives array (#1100) is edited in Inspect; a mapping never replaces it (#1180).
+      var m=step.traceMatch && typeof step.traceMatch==='object'?step.traceMatch:null,alternatives=Array.isArray(m);
+      return {id:step.id,index:i,caption:caption,label:path?'Step '+(path.indices.indexOf(i)+1)+': '+caption+' · '+path.label:caption,mapped:!!m,alternatives:alternatives,traceMatch:m && !alternatives?{serviceName:m.serviceName,operation:m.operation}:null};
     }).filter(Boolean);
   }
   /* An edit re-renders the page (#828): the next controller reopens this Trace view with the loaded trace
@@ -1087,7 +1094,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function traceRestore(carried){
     statusMode='trace';statusAuto=false;traceShow=carried.show!==false;
     var direct=!!(carried.direct && directTrace.restore(carried.direct));
-    if(!direct && carried.example){carriedExample=carried.example;traceSelection={key:carried.example.key,traceId:carried.example.traceId,chosen:carried.example.chosen};traceInitial=false;}
+    // The reader's pick wins: a picked example stays selected beside a loaded trace (#1180).
+    if(carried.example){carriedExample=carried.example;traceSelection={key:carried.example.key,traceId:carried.example.traceId,chosen:carried.example.chosen};traceInitial=false;}
     if(!(direct || carried.example) || !carried.spanId)return;
     // After the render settles its opening step, so the mapped step it jumps to stays shown.
     requestAnimationFrame(function(){
@@ -1121,7 +1129,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(hit.ref.section!==entry.binding.ordinal)return;
     var named=carrierSteps(entry.binding,hit.ref,steps);
     if(named.length===1 && !named[0].mapped){api.mapTraceSpan({context:payload.context,spanId:payload.spanId,stepId:named[0].id});return;}
-    traceChooser={context:payload.context,spanId:payload.spanId,label:carrierLabel(entry.binding,hit.ref),steps:named};paint();notify();
+    var dragged=entry.exemplar.spans.find(function(item){return item.id===payload.spanId;});
+    traceChooser={context:payload.context,spanId:payload.spanId,span:dragged?dragged.service+' · '+dragged.name:'this span',label:carrierLabel(entry.binding,hit.ref),steps:named,drop:(traceChooser && traceChooser.drop || 0)+1};paint();notify();
   }
   function traceFocusSnapshot(entry,context){
     if(!traceFocus)return null;
@@ -1146,7 +1155,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{key:selected.key,day:traceDayOf(selected.exemplar),context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot(),dayNote:traceDayNote,movesDay:canOpenOver()}),
       hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,
       // #1177: the step chooser of a span drop, and the latest pending mapping with its Undo.
-      mapChooser:traceChooser && selected && traceChooser.context===context?{label:traceChooser.label,steps:traceChooser.steps.map(function(step){return {id:step.id,mapped:step.mapped,label:step.caption+(step.mapped?' · mapped, replaces':'')};})}:null,
+      mapChooser:traceChooser && selected && traceChooser.context===context?{label:traceChooser.label,span:traceChooser.span,spanId:traceChooser.spanId,drop:traceChooser.drop,steps:traceChooser.steps.map(function(step){return {id:step.id,mapped:step.mapped,disabled:step.alternatives,label:step.caption+(step.alternatives?' · has alternatives; edit in Inspect':step.mapped?' · mapped, replaces':'')};})}:null,
       mapped:editing() && editor.state().mapped || null,enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
   function paintTrace(){
@@ -1540,14 +1549,19 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function setDropOver(el){if(dropOver===el)return;if(dropOver)dropOver.classList.remove('dv-edit-over');dropOver=el;if(el)el.classList.add('dv-edit-over');}
   function carriesTicket(ev){return !!(ev.dataTransfer && Array.prototype.indexOf.call(ev.dataTransfer.types || [],EDIT_TICKET_TYPE)>=0);}
   function carriesSpan(ev){return !!(ev.dataTransfer && Array.prototype.indexOf.call(ev.dataTransfer.types || [],EDIT_SPAN_TYPE)>=0) && statusMode==='trace';}
-  function spanHit(target){var step=stepDropRef(target);if(step)return step;var carrier=dropRef(target);return carrier?{el:carrier.el,ref:carrier.ref}:null;}
+  // Only the trace's own section takes a span drop (#1180): its steps are the ones Map span writes.
+  function traceOrdinal(){var selected=traceSelection && traceSources().entries.find(function(e){return e.key===traceSelection.key;});return selected?selected.binding.ordinal:null;}
+  function spanHit(target){
+    var step=stepDropRef(target),carrier=!step && dropRef(target),hit=step || carrier && {el:carrier.el,ref:carrier.ref};if(!hit)return null;
+    var ordinal=traceOrdinal();return ordinal!=null && (step?step.ordinal:carrier.ref.section)===ordinal?hit:null;
+  }
   function dragOver(ev){
     if(carriesSpan(ev)){var over=spanHit(ev.target);setDropOver(over && over.el);if(over){ev.preventDefault();ev.dataTransfer.dropEffect='copy';}return;}
     if(!carriesTicket(ev))return;
     var hit=dropRef(ev.target);setDropOver(hit && hit.el);if(!hit)return;
     ev.preventDefault();ev.dataTransfer.dropEffect='copy';
   }
-  function dragLeave(ev){var hit=dropRef(ev.relatedTarget);if(!hit || hit.el!==dropOver)setDropOver(null);}
+  function dragLeave(ev){var hit=carriesSpan(ev)?spanHit(ev.relatedTarget):dropRef(ev.relatedTarget);if(!hit || hit.el!==dropOver)setDropOver(null);}
   function drop(ev){
     if(carriesSpan(ev)){
       var landed=spanHit(ev.target);setDropOver(null);if(!landed)return;ev.preventDefault();
@@ -2022,7 +2036,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var entry=traceSources().entries.find(function(e){return e.key===selected.key;}),span=entry && entry.exemplar.spans.find(function(s){return s.id===action.spanId;});
       var steps=entry && traceMapSteps(entry.binding),step=steps && steps.find(function(item){return item.id===action.stepId;});
       // #1177: a step that has a traceMatch is replaced only when the reader picked it as such (drop or chooser).
-      if(!span || !span.service || !span.name || !step || step.mapped && action.replace!==true)return false;
+      if(!span || !span.service || !span.name || !step || step.alternatives || step.mapped && action.replace!==true)return false;
       var ref={section:entry.binding.ordinal,kind:'step',id:action.stepId},match={serviceName:span.service,operation:span.name},previous=step.mapped?step.traceMatch:null;
       if(!editor.mapSpan)return false;traceChooser=null;setTimeout(function(){if(!retired)editor.mapSpan(ref,match,previous);},0);return true;
     },

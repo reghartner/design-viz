@@ -13,13 +13,15 @@
    the agent's copy; both commands rewrite it in place and never touch <live.json>.
 
    A two-file board's Edit mode (#828, #855, #1078) can add a ticket to a node or edge, remove
-   one, clear a Missing work marker, and map a trace span to a step that has no traceMatch;
-   each Save appends one page.editHistory entry. `pull` folds the entries the local copy
+   one, clear a Missing work marker, and map a trace span to a step, replacing a single
+   traceMatch (the change then names it as `replaces`, #1180); each Save appends one
+   page.editHistory entry. `pull` folds the entries the local copy
    lacks into it: three-way per ticket, by carrier identity (the same identity chain the
    board uses for its own conflict replay), with the base being the live file with those
    entries' operations undone, so local changes are kept. A step mapping is set on the
-   local step (same chain: section id, step id) when it has none; a different local
-   traceMatch, or a deleted step, is a conflict. Every other line of the local file stays
+   local step (same chain: section id, step id) when it has none, or when it still equals the
+   change's `replaces` (its other traceMatch fields stay); a different local traceMatch, or a
+   deleted step, is a conflict. Every other line of the local file stays
    as written.
 
    `log` appends one agent entry ({source: "agent", summary, changes}) describing the change
@@ -167,7 +169,7 @@ function describe(entry){
     if(!isObject(change))return;
     if(change.op==='clear-missing-work'){lines.push({text:'Missing work cleared from '+changeLabel(change)});return;}
     // #1078: Edit mode mapped a trace span to a step; it moves no ticket.
-    if(change.op==='trace-match'){const m=isObject(change.traceMatch)?change.traceMatch:{};lines.push({text:m.serviceName+' · '+m.operation+' mapped to step '+(typeof change.label==='string' && change.label?change.label:change.step)});return;}
+    if(change.op==='trace-match'){const m=isObject(change.traceMatch)?change.traceMatch:{};lines.push({text:m.serviceName+' · '+m.operation+' mapped to step '+(typeof change.label==='string' && change.label?change.label:change.step)+(isObject(change.replaces)?' (replaced '+spanText(change.replaces)+')':'')});return;}
     if(typeof change.ticket!=='string')return;
     if(!seen.has(change.ticket)){const item={ticket:change.ticket,adds:[],removes:[]};seen.set(change.ticket,item);lines.push(item);}
     seen.get(change.ticket)[change.op==='remove'?'removes':'adds'].push(changeLabel(change));
@@ -278,8 +280,9 @@ function pull(localText,liveText,options){
     l.filter(key=>!o.includes(key)).forEach(key=>queue(adds,key,ticket));
     o.filter(key=>!l.includes(key)).forEach(key=>queue(removes,key,ticket));
   });
-  /* The board maps only a step without a traceMatch, so the base has none: set it where the
-     local step has none, keep a local one naming the same span, and ask on anything else. */
+  /* The base is the change's `replaces` (#1180), else none: set the mapping where the local step
+     still equals the base (keeping its other traceMatch fields), keep a local one naming the same
+     span, and ask on anything else. */
   const stepWrites=[];
   mappings.forEach(({entry,change,step},key)=>{
     const id=step.id,choice=resolve['step:'+id],want={serviceName:change.traceMatch.serviceName,operation:change.traceMatch.operation},mineStep=localSteps.get(key);
@@ -287,6 +290,7 @@ function pull(localText,liveText,options){
     if(choice==='local')return;
     if(!mineStep){conflicts.push({kind:'step-missing',step:id,message:told+', but your local copy no longer has that step. Ask the author, then rerun with --resolve step:'+id+'=local.'});return;}
     if(sameSpan(mineStep.traceMatch,want))return;
+    if(isObject(change.replaces) && sameSpan(mineStep.traceMatch,change.replaces)){stepWrites.push({path:mineStep.path,value:{...mineStep.traceMatch,...want}});return;}
     if(mineStep.traceMatch && choice!=='live'){
       conflicts.push({kind:'trace-match-changed',step:id,message:told+'; your local copy maps '+spanText(mineStep.traceMatch)+' to it. Ask the author which to keep, then rerun with --resolve step:'+id+'=live or --resolve step:'+id+'=local.'});
       return;

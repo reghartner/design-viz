@@ -297,12 +297,17 @@
         el(note,'span','text','dv-trace-map-note-text','Mapped '+trace.mapped.traceMatch.serviceName+' · '+trace.mapped.traceMatch.operation+' to step '+trace.mapped.label+'.');
         button(note,'undo','reader-button dv-trace-map-undo','Undo','undoTraceMap');}
       if(trace.mapChooser){
-        var chooser=el(body,'div','map-chooser','dv-trace-map-chooser');chooser.setAttribute('role','group');chooser.setAttribute('aria-label','Choose the step for '+trace.mapChooser.label);
-        el(chooser,'p','prompt','dv-trace-map-prompt',trace.mapChooser.steps.length?'Map this span to which step of '+trace.mapChooser.label+'?':'No step names '+trace.mapChooser.label+'. Drop the span on a step instead.');
-        trace.mapChooser.steps.forEach(function(step){var choice=button(chooser,'step-'+step.id,'reader-button dv-trace-map-choice',step.label,'chooseTraceMapStep');choice._liveArgument={stepId:step.id};});
-        button(chooser,'cancel','reader-button dv-trace-map-cancel','Cancel','cancelTraceMapChooser');
-        if(!chooser._mapKey){chooser._mapKey=function(ev){if(ev.key!=='Escape')return;ev.preventDefault();ev.stopPropagation();var owner=host._livePanelApi;if(owner)owner.cancelTraceMapChooser();};chooser.addEventListener('keydown',chooser._mapKey);}
-        if(!chooser._mapFocused){chooser._mapFocused=true;var first=chooser.querySelector('button');if(first && first.focus)first.focus({preventScroll:true});}
+        var mc=trace.mapChooser,chooser=el(body,'div','map-chooser','dv-trace-map-chooser');chooser.setAttribute('role','group');chooser.setAttribute('aria-label','Choose the step for '+mc.label);
+        el(chooser,'p','prompt','dv-trace-map-prompt',mc.steps.length?'Map '+mc.span+' to which step of '+mc.label+'?':'No step names '+mc.label+'. Drop '+mc.span+' on a step instead.');
+        // Focus goes back to the dragged span row (else the panel) after a pick, Cancel or Esc (#1180).
+        var back=function(){var row=host.querySelector('.dv-trace-span[data-span-id="'+mc.spanId+'"]');if(row && row.focus)row.focus({preventScroll:true});else if(host.focus)host.focus({preventScroll:true});};
+        mc.steps.forEach(function(step){var choice=button(chooser,'step-'+step.id,'reader-button dv-trace-map-choice',step.label,'chooseTraceMapStep');choice._liveArgument={stepId:step.id};choice.disabled=!!step.disabled;choice._mapBack=back;});
+        var cancel=button(chooser,'cancel','reader-button dv-trace-map-cancel','Cancel','cancelTraceMapChooser');cancel._mapBack=back;
+        chooser._mapBack=back;
+        if(!chooser._mapKey){chooser._mapKey=function(ev){if(ev.key!=='Escape')return;ev.preventDefault();ev.stopPropagation();var owner=host._livePanelApi;if(owner)owner.cancelTraceMapChooser();if(chooser._mapBack)chooser._mapBack();};chooser.addEventListener('keydown',chooser._mapKey);}
+        chooser.querySelectorAll('button').forEach(function(item){if(!item._mapReturn){item._mapReturn=function(){if(item._mapBack)setTimeout(item._mapBack,0);};item.addEventListener('click',item._mapReturn);}});
+        // Each drop moves focus to the chooser, also when it is already open.
+        if(chooser._mapDrop!==mc.drop){chooser._mapDrop=mc.drop;var first=chooser.querySelector('button.dv-trace-map-choice:not([disabled])') || chooser.querySelector('button');if(first && first.focus)first.focus({preventScroll:true});}
       }
       if(trace.entries.length){
         el(body,'h3','candidates-title','','Returned traces');

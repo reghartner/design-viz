@@ -2,7 +2,8 @@
    index.html + flowspec.json lets people with edit access add a ticket to a node
    or edge (drag a Tickets row), remove one authored there, clear a Missing
    work marker set on this board (carrier popover, #855) and map a trace span
-   to a step without a traceMatch (Trace view, #1078), then Save publishes
+   to a step (Trace view, #1078), replacing a single traceMatch the reader saw
+   (#1177; the change records it as `replaces`), then Save publishes
    flowspec.json through the artifact runtime.
 
    The editor outlives every render: it keeps the exact authored text the page
@@ -85,7 +86,7 @@ function createBoardEditor(options){
       var steps=Array.isArray(local.d && local.d.steps)?local.d.steps:[],at=steps.findIndex(function(step){return step && step.id===ref.id;});
       if(at<0)return null;
       out.step=ref.id;out.label=String(steps[at].text || ref.id).replace(/\s+/g,' ').trim();out.path=local.path.concat(['steps',at]);out.local=steps[at];
-      out.previous=steps[at].traceMatch && typeof steps[at].traceMatch==='object'?steps[at].traceMatch:null;
+      out.previous=steps[at].traceMatch && typeof steps[at].traceMatch==='object'?steps[at].traceMatch:null;out.alternatives=Array.isArray(out.previous);
       return out;
     }
     if(ref.kind==='node'){
@@ -129,7 +130,8 @@ function createBoardEditor(options){
   }
   // The new text, or the same text when the operation changes nothing.
   function splice(source,t,op,ticket,match){
-    if(op==='trace-match'){var set=jsonSetField(source,t.path,'traceMatch',JSON.stringify({serviceName:match.serviceName,operation:match.operation}));return set?set.text:null;}
+    // #1180: a replacement swaps serviceName and operation and keeps the step's other traceMatch fields.
+    if(op==='trace-match'){var written=Object.assign({},t.previous || {},{serviceName:match.serviceName,operation:match.operation}),set=jsonSetField(source,t.path,'traceMatch',JSON.stringify(written));return set?set.text:null;}
     if(op==='clear-missing-work'){
       if(t.imported){var cleared=planTopologyTracking(source,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,'missingWork',true,true,context,t.index);return cleared.error?null:cleared.text;}
       var removed=jsonSetField(source,t.path,'missingWork',null);
@@ -150,19 +152,23 @@ function createBoardEditor(options){
   }
   function record(t,op,ticket,match){
     var entry={op:op};if(ticket!=null)entry.ticket=ticket;entry.path=t.path.slice();entry.label=t.label;
-    if(t.kind==='step'){entry.step=t.step;entry.traceMatch={serviceName:match.serviceName,operation:match.operation};}
+    if(t.kind==='step'){entry.step=t.step;entry.traceMatch={serviceName:match.serviceName,operation:match.operation};if(t.previous)entry.replaces={serviceName:t.previous.serviceName,operation:t.previous.operation};}
     else if(t.kind==='node')entry.node=t.node;else entry.edge=t.edge.slice();
     return entry;
   }
-  // #1177: the traceMatch a mapping replaces must be the one the caller saw (serviceName and operation), or none.
-  function sameMatch(a,b){return !a && !b || !!(a && b && a.serviceName===b.serviceName && a.operation===b.operation);}
+  // #1177: the traceMatch a mapping replaces must be the one the caller saw (serviceName and operation), or
+  // none. Alternatives arrays compare structurally (#1180); a mapping never replaces one (apply).
+  function sameMatch(a,b){
+    if(Array.isArray(a) || Array.isArray(b))return Array.isArray(a) && Array.isArray(b) && JSON.stringify(a)===JSON.stringify(b);
+    return !a && !b || !!(a && b && a.serviceName===b.serviceName && a.operation===b.operation);
+  }
   // `ask`: the post-drop question to raise once the change has rendered (#855).
   function apply(op,ref,ticket,ask,match,previous){
     if(!active || saving || readOnly)return false;
     var t=target(text,ref);if(!t)return false;
     if((op==='trace-match')!==(t.kind==='step'))return false;
     if(op==='trace-match' && !(match && typeof match.serviceName==='string' && match.serviceName && typeof match.operation==='string' && match.operation))return false;
-    if(op==='trace-match' && !sameMatch(t.previous,previous))return false;
+    if(op==='trace-match' && (t.alternatives || !sameMatch(t.previous,previous)))return false;
     if(op==='remove' && authoredKeys(t).indexOf(ticket)<0)return false;
     if(op==='clear-missing-work'){var m=marker(t);if(!m || !m.clearable)return false;}
     var next=splice(text,t,op,ticket,match),before=text;
@@ -170,6 +176,8 @@ function createBoardEditor(options){
     if(!render(next))return false;
     var entry=record(t,op,ticket,match),chain=boardEditChain(t.raw,t.path);
     // An operation that undoes a pending one cancels it. A clear or a span mapping has no inverse here.
+    // Coupling (#1180 m8): undoMap restores a mapping's exact `before` text only while this check never
+    // cancels an op after it. It reads o.ticket and o.path on the op wrapper, so today it never matches.
     var inverse=op==='clear-missing-work' || op==='trace-match'?-1:ops.findIndex(function(o){return o.ticket===ticket && o.op!==op && JSON.stringify(o.path)===JSON.stringify(entry.path);});
     if(inverse>=0)ops.splice(inverse,1);
     else ops.push({entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind,previous:op==='trace-match'?t.previous:undefined,before:op==='trace-match'?before:undefined});

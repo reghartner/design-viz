@@ -2689,7 +2689,7 @@ test('#1162 the counts and First blocker share the first row; the status row hol
  // The counts strip stays as an unnamed spacer and First blocker's slot is reserved, unseen and inert, so the action keeps its place when data arrives.
  const row=w.view.querySelector('.dv-live-controls'),strip=row.querySelector('.dv-live-counts'),slot=row.querySelector('.dv-live-first');assert.equal(row.hidden,false);assert.equal(row.querySelector('.dv-live-action').hidden,false);
  assert.equal(strip.hidden,false);assert.equal(strip.getAttribute('role'),null,'an unnamed spacer, not a focusable region');assert.equal(strip.getAttribute('tabindex'),null);
- assert.equal(slot.getAttribute('data-reserved'),'true');assert.equal(slot.getAttribute('aria-hidden'),'true');assert.equal(slot.getAttribute('tabindex'),'-1');assert.equal(slot.disabled,true);
+ assert.equal(slot.hidden,false,'the slot is kept, not removed');assert.equal(slot.getAttribute('data-reserved'),'true');assert.equal(slot.getAttribute('aria-hidden'),'true');assert.equal(slot.getAttribute('tabindex'),'-1');assert.equal(slot.disabled,true);
  w.ctl.liveStatus.apply(overToday());assert.equal(strip.getAttribute('role'),'region');assert.equal(slot.getAttribute('data-reserved'),null);assert.equal(slot.getAttribute('aria-hidden'),null);
  w.ctl.liveStatus.destroy();
 });
@@ -2874,7 +2874,7 @@ test('#1136 a board without ticket references opens on Trace with no Jira | Trac
  assert.equal(namedControls(free.m.body,'Env').length,1,'Env stays');assert.equal(namedControls(free.m.body,'Metrics overlay','switch').length,1,'the Metrics overlay switch stays');
  const edit=namedControls(free.m.body,'Edit');assert.equal(edit.length,1,'an editor sees one Edit');assert.ok(edit[0].closest('.dv-status-header'),'Edit is in the shared header');
  edit[0].dispatchEvent({type:'click'});assert.equal(free.editor.starts,1,'Edit starts board editing');
- // The Metrics overlay's connector line is in the shared header, so the only view shows it.
+ // The Metrics overlay's connector line is drawn by each view below its button rows (#1162), so the Trace view shows it here.
  const metricsLines=b=>b.m.body.querySelectorAll('.dv-live-metrics-connection').filter(el=>shownIn(el,b.m.body));
  assert.equal(metricsLines(free).length,1,'the metrics status line shows on a Jira-free board');assert.ok(metricsLines(free)[0].closest('.dv-live-trace'),'#1162 under the Trace view controls');assert.match(textOf(metricsLines(free)[0]),/Metrics: not connected/);
  free.m.destroy();free.api.destroy();

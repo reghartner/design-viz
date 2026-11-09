@@ -750,7 +750,7 @@ an **Env** select when the board names environments, **Edit** (then **Save N cha
 at the right edge. **Live** | **Over time** follows, then the day row and any Over time error,
 in both views. Each view draws the Metrics connector line below its own button rows: the Jira
 view in its status row, under the counts and **First blocker**; the Trace view directly under
-its controls row. The line wraps, so a changing note moves no button or slider (#1162). A board with no ticket or epic
+its controls row. The line wraps, so a changing note moves no button in the header or in the view's button rows (#1162). A board with no ticket or epic
 references after imports has no Jira view (#1136): the panel opens on Trace with no
 **Jira** | **Trace** switch. If a loaded detail
 brings ticket references, the switch appears and the panel moves to Jira unless the reader
@@ -2102,6 +2102,17 @@ imply failure or success. Canvas node IDs and uniquely mapped edges come from
 explicit `traceMatch`, including imported nodes. No display-name joins are used.
 **Show on diagram** controls runtime annotations; Jira/scalar cues return when
 switching back to Jira. No document layout or authored timing is changed.
+
+With a trace shown (loaded or picked), the Trace view is compact (#1173), so the
+waterfall sits beside the diagram. The search (Load trace, log search, the load
+report and **Clear loaded trace**) is one line naming the connection and
+environment ("Fixture Honeycomb · Production · Change trace"). The request card
+is one line too: "8413cd87a9f1 · Started Nov 9 07:19 local · 55 spans · 6/7 steps
+matched". It holds Returned traces and the request details. Each line opens with
+one click, and an opened section stays open until the shown trace changes. A
+select with one choice (connection, environment, mapping diagram, a single log
+lookup) is not drawn; its value still applies. The help sentence is the Load
+trace summary's tooltip, and **Show on diagram** appears once a trace is shown.
 
 Each annotated node or uniquely matched edge gets one label from its rows: one row per
 step on the current path whose `traceMatch` names it (#1154). One row shows its time,

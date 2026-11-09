@@ -225,6 +225,9 @@ Steps bind evidence with optional `traceMatch`:
 }
 ```
 
+For a step with `edge` or `edges`, `nodeId` names the receiving node: the
+viewer times the step's connection into that node, and the validator warns when
+`nodeId` is not the receiving end of any of the step's edges (#1196).
 Matching uses exact service and operation names. Optional `namespace` and
 `attributes` disambiguate services/calls. `parentStepId` requires an ancestor or
 same-trace span-link relationship, including async consumers. `occurrence:1`

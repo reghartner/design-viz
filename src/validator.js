@@ -527,6 +527,14 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(DP + '.steps[' + ti + '].delta: must be true or false — ignored');
     var keys = stepKeys(st);
     var failures = stepFailures(st);
+    // #1196: a connection gets a trace time only when traceMatch.nodeId is the node it ends at.
+    var ends = keys.filter(function(k){return typeof k === 'string' && k.indexOf('->') > 0;}).map(function(k){var i = k.indexOf('->');return {key:k, from:k.slice(0, i), to:k.slice(i + 2)};});
+    if (st && ends.length) (Array.isArray(st.traceMatch) ? st.traceMatch : [st.traceMatch]).forEach(function(m, mi){
+      if (!m || typeof m !== 'object' || typeof m.nodeId !== 'string' || !m.nodeId || ends.some(function(e){return e.to === m.nodeId;})) return;
+      var at = DP + '.steps[' + ti + '].traceMatch' + (Array.isArray(st.traceMatch) ? '[' + mi + ']' : '') + ".nodeId: '" + m.nodeId + "' is ";
+      var sent = ends.find(function(e){return e.from === m.nodeId;}), to = (sent || ends[0]).to;
+      warnings.push(at + (sent ? 'the sending end of edge ' + sent.key : "not the receiving end of this step's edges (" + ends.map(function(e){return e.key;}).join(', ') + ')') + "; connection times use the receiving node '" + to + "'");
+    });
     if(st && st.coinOffsets!=null){
       var OP=DP+'.steps['+ti+'].coinOffsets';
       if(!specObject(st.coinOffsets))warnings.push(OP+': expected an object mapping edge keys to {dx, dy} — using automatic positions');

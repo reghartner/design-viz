@@ -42,7 +42,8 @@ const formControls=root=>root.locator('.dv-trace-config').evaluate(config=>Array
 
 test('desktop authored log lookup lists the newest matching lines and loads the chosen trace focused on its span',async({page,server},info)=>{
  const h=await open(page,server);
- await expect(h.logs.getByRole('combobox',{name:'Log lookup',exact:true})).toHaveValue('camera');await expect(h.logs.getByRole('button',{name:'Find log lines',exact:true})).toBeEnabled();
+ // #1173: one authored lookup is not a select; its field shows, and a text button switches to a typed query.
+ await expect(h.logs.getByRole('combobox',{name:'Log lookup',exact:true})).toHaveCount(0);await expect(h.logs.getByRole('button',{name:'Type a LogQL query instead',exact:true})).toBeVisible();await expect(h.logs.getByRole('button',{name:'Find log lines',exact:true})).toBeEnabled();
  await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');expect(h.calls).toHaveLength(0);
  // #1158: unchecked, Find sends the query as before and lists every line.
  await h.logs.getByRole('checkbox',{name:'Only lines with a trace ID',exact:true}).uncheck();
@@ -67,7 +68,7 @@ test('desktop without a Grafana connector the log lookup is disabled with a mess
  const plain=await open(await page.context().newPage(),server,{lookups:false});await expect(plain.logs).toHaveCount(0);const expected=await formControls(plain.root);
  const h=await open(page,server,{grafana:false});
  await expect(h.logs.getByRole('status')).toContainText('Log lookups need a Grafana connector with query_loki_logs');
- await expect(h.logs.getByRole('combobox',{name:'Log lookup',exact:true})).toBeDisabled();await expect(h.logs.getByLabel('Camera model',{exact:true})).toBeDisabled();await expect(h.logs.getByRole('button',{name:'Find log lines',exact:true})).toBeDisabled();
+ await expect(h.logs.getByRole('button',{name:'Type a LogQL query instead',exact:true})).toBeDisabled();await expect(h.logs.getByLabel('Camera model',{exact:true})).toBeDisabled();await expect(h.logs.getByRole('button',{name:'Find log lines',exact:true})).toBeDisabled();
  expect(await formControls(h.root)).toEqual(expected);
  await info.attach('log-lookup-no-grafana',{body:await h.root.screenshot(),contentType:'image/png'});
  await h.root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();

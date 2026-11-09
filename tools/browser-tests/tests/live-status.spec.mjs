@@ -348,8 +348,8 @@ test('O11 buttons and the content below them stay in place when status text grow
  const grown=await places(),{epicTop,...buttons}=grown,{epicTop:epicBefore,...buttonsBefore}=before;expect(buttons,'long status text').toEqual(buttonsBefore);expect(epicTop).toBeGreaterThan(epicBefore);
  expect(await status.locator('.dv-live-note').evaluate(el=>el.scrollWidth<=el.clientWidth),'the long note is shown in full').toBe(true);
  await next.click();await next.click();await expect(slot).toHaveText('First blocker');await expect(slot).toBeEnabled();expect(await places(),'a blocker appears').toEqual(before);
- // The counts strip is tall enough for what it holds: three count chips are not clipped.
- expect(await panel.locator('.dv-live-counts').evaluate(el=>el.scrollHeight<=el.clientHeight),'the counts strip fits its contents').toBe(true);
+ // Every count chip lies inside the counts strip (#1162: the strip wraps, so none is clipped).
+ expect(await panel.locator('.dv-live-counts').evaluate(strip=>{const r=strip.getBoundingClientRect();const chips=[...strip.querySelectorAll('[data-live-count]')].filter(el=>el.getClientRects().length);return chips.length>0 && chips.every(el=>{const b=el.getBoundingClientRect();return b.left>=r.left-1 && b.right<=r.right+1 && b.top>=r.top-1 && b.bottom<=r.bottom+1;});}),'every count chip lies inside the counts strip').toBe(true);
 });
 // #1131: the Status panel header (Jira | Trace, Metrics overlay; Live | Over time; the day row) is shared by both views.
 test('Over time from the Trace view keeps the Trace view and shows the day',async({page,server})=>{
@@ -421,7 +421,8 @@ for(const width of [null,480])test('#1162 a changing Metrics note moves no butto
   // The demo's Live day buttons belong to the Jira view; Over time's day row shows in both views.
   if(view==='jira' || mode==='over'){items.previous=button('Previous day');items.next=button('Next day');}
   if(mode==='over')items.slider=panel.getByRole('slider',{name:'Day',exact:true});
-  if(view==='jira')items.first=panel.locator('.dv-live-first');else items.show=button('Show on diagram');
+  // #1173: Show on diagram waits for a shown trace, and this demo shows none, so the Trace controls row holds the action.
+  if(view==='jira')items.first=panel.locator('.dv-live-first');else await expect(button('Show on diagram')).toHaveCount(0);
   const places=async()=>{const out={};for(const [name,item] of Object.entries(items)){await expect(item,view+' '+mode+' '+name).toBeVisible();const box=await item.boundingBox();out[name]=[box.x,box.y,box.width,box.height];}return out;};
   await page.evaluate(value=>window.ctl.telemetry.setAvailable(false,value),notes[0]);await expect(line).toContainText(notes[0]);const before=await places();
   for(const note of notes.slice(1)){

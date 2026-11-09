@@ -2912,9 +2912,10 @@ test('#1136 choosing a trace or focusing a span keeps the Trace view when a load
   h.ctl.sections[0].stepper={path:()=>'short',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
   h.ctl.telemetry.apply(f.samples);
   assert.equal(api.snapshot().available,false);assert.equal(api.snapshot().mode,'trace');
-  const selected=api.snapshot().trace.selected;assert.ok(selected,'contrasting precondition: an example trace is shown');
-  if(work==='choose')await api.chooseTrace({key:selected.key,traceId:selected.exemplar.traceId});
-  if(work==='span')assert.equal(api.selectTraceSpan({context:selected.context,spanId:selected.exemplar.spans[0].id}),true);
+  // #1164: an example trace is listed but selected only when the reader picks it.
+  const entry=api.snapshot().trace.entries[0];assert.ok(entry,'contrasting precondition: an example trace is listed');assert.equal(api.snapshot().trace.selected,null);
+  if(work!=='none')await api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});
+  if(work==='span'){const selected=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:selected.context,spanId:selected.exemplar.spans[0].id}),true);}
   await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.flush();
   assert.equal(api.snapshot().available,true);assert.equal(api.snapshot().mode,work==='none'?'jira':'trace',work==='none'?'an example trace alone is not the reader choosing Trace':work+' keeps the Trace view');
   api.destroy();
@@ -3011,6 +3012,8 @@ test('span focus controller pauses, jumps exact source steps, shares state, and 
  h.ctl.telemetry.apply(f.samples);
  assert.equal(h.ctl.telemetry.snapshot().map['mcu->ingest'].exemplars[0].traceId,exemplar.traceId);
  api.setStatusMode('trace');
+ // #1164: an example trace is selected only when the reader picks it.
+ assert.equal(api.snapshot().trace.selected,null);const first=api.snapshot().trace.entries[0];await api.chooseTrace({key:first.key,traceId:first.exemplar.traceId});
  let selected=api.snapshot().trace.selected;assert.ok(selected);assert.equal(selected.exemplar.traceId,exemplar.traceId);assert.equal(selected.focus,null);
  const edge=h.view.querySelector('path.edge[data-dv-edge="0"]');edge.setAttribute('id','focus-edge');edge.setAttribute('d','M0 0 C30 40 70 40 100 0');edge.setAttribute('transform','translate(5 7)');
  const span=selected.exemplar.spans.find(s=>s.service==='event-ingest' && s.name==='POST /v1/events'),action={context:selected.context,spanId:span.id};
@@ -3544,11 +3547,12 @@ test('#1145 the log list promises a move only when Over time can open',async()=>
 /* #1145 round 3: a day change never says "Trace selection expired". An example trace the reader chose gets
    the plain note; one shown automatically leaves without a note. Leaving Over time or loading clears it. */
 test('#1145 Over time retires example traces without "Trace selection expired"',async()=>{
- for(const work of ['auto','choose']){
+ for(const work of ['unpicked','choose']){
   const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),h=harness(f.spec,{},{telemetry:{}}),api=overReady(h.ctl.liveStatus),m=mountStatus(h);
   h.ctl.sections[0].stepper={path:()=>'short',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
   h.ctl.telemetry.apply(f.samples);api.apply({'TRACE-1':{state:'active'}});api.setStatusMode('trace');
-  const selected=api.snapshot().trace.selected;assert.ok(selected && !selected.manual,work+': an example trace is shown');
+  // #1164: listed, and selected only when the reader picks it.
+  const selected=api.snapshot().trace.entries[0];assert.ok(selected,work+': an example trace is listed');assert.equal(api.snapshot().trace.selected,null);
   if(work==='choose')await api.chooseTrace({key:selected.key,traceId:selected.exemplar.traceId});
   const now=new Date(),key=back=>new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()-back)).toISOString().slice(0,10);
   api.setHistory({load:()=>({days:[2,1,0].map(back=>({key:key(back),label:key(back),short:key(back),states:{'TRACE-1':{state:'active'}}}))})});
@@ -3592,7 +3596,7 @@ test('#1145 a choice still loading when Over time opens never ends in "Trace sel
  const {h,api,status}=await exampleBoard(),t=h.ctl.telemetry,real=t.chooseExemplar;let release;
  t.canChooseExemplar=()=>true;
  t.chooseExemplar=function(...args){return new Promise(r=>release=r).then(()=>{if(t.snapshot().historical)throw new Error('Trace selection expired.');return real.apply(t,args);});};
- const selected=api.snapshot().trace.selected,other=selected.exemplar.candidates.find(c=>c.traceId!==selected.exemplar.traceId);
+ const selected=api.snapshot().trace.entries[0],other=selected.exemplar.candidates.find(c=>c.traceId!==selected.exemplar.traceId);
  const choosing=api.chooseTrace({key:selected.key,traceId:other.traceId});assert.equal(api.snapshot().trace.notice,'Loading selected trace…');
  api.overTime();await historySettle();assert.equal(api.snapshot().overTime.active,true);
  release();await choosing;await historySettle();
@@ -3601,7 +3605,7 @@ test('#1145 a choice still loading when Over time opens never ends in "Trace sel
 });
 test('#1145 the day notes clear on Load, Clear trace and a field edit',async()=>{
  // traceNotice: an example trace the reader chose, retired by Over time.
- const e=await exampleBoard(),chosen=e.api.snapshot().trace.selected;await e.api.chooseTrace({key:chosen.key,traceId:chosen.exemplar.traceId});
+ const e=await exampleBoard(),chosen=e.api.snapshot().trace.entries[0];await e.api.chooseTrace({key:chosen.key,traceId:chosen.exemplar.traceId});
  e.api.overTime();await historySettle();assert.match(e.api.snapshot().trace.notice,/^Cleared trace /);
  e.api.clearDirectTrace();assert.equal(e.api.snapshot().trace.notice,'','Clear trace ends it');e.api.destroy();
  // The Load trace day note: from a day outside the list.

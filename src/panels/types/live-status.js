@@ -219,12 +219,13 @@
     }
     // #1173: a section's open state while a trace is shown. It lives on the panel host, keyed by the shown trace
     // ([key, traceId]), so a repaint, a re-poll or a Jira <-> Trace switch keeps what the reader opened; another trace resets it.
-    // Kept per shown trace, so a Load or Verify that passes through "no trace" on its way back keeps the reader's choice.
+    // One slot for the shown trace: another trace resets it; the gap while a Load or Verify runs (no token) leaves it alone,
+    // so the same trace coming back keeps the reader's choice. With nothing shown the search is open.
     function traceSection(details,name,token){
-      var states=host._traceOpenStates || (host._traceOpenStates=Object.create(null)),key=token || '',state=states[key] || (states[key]={config:!token,request:false});
-      details._traceOpenName=name;
-      if(details._traceOpenFor!==key){details.open=state[name];details._traceOpenFor=key;}
-      if(!details._traceToggle){details._traceToggle=function(){var st=host._traceOpenStates && host._traceOpenStates[details._traceOpenFor];if(st)st[details._traceOpenName]=details.open;};details.addEventListener('toggle',details._traceToggle);}
+      var slot=host._traceOpen;if(token && (!slot || slot.token!==token))slot=host._traceOpen={token:token,config:false,request:false};
+      details._traceOpenName=name;var key=token || '';
+      if(details._traceOpenFor!==key){details.open=token?slot[name]:name==='config';details._traceOpenFor=key;}
+      if(!details._traceToggle){details._traceToggle=function(){var st=host._traceOpen;if(st && details._traceOpenFor && st.token===details._traceOpenFor)st[details._traceOpenName]=details.open;};details.addEventListener('toggle',details._traceToggle);}
     }
     // #1173: `shown` names the trace on screen (loaded or picked). While one is shown the search is one collapsed line;
     // a reader's expand stays until the shown trace changes.
@@ -315,7 +316,9 @@
       var show=button(controls,'show','reader-button dv-trace-show','Show on diagram','setTraceShow');show._liveArgument=!trace.show;show.setAttribute('aria-pressed',String(trace.show));show.hidden=show.disabled=!trace.selected;
       controls.hidden=!value.actionLabel && !trace.selected;
       // Keyed by the trace, not its selection token: a Verify or a Live re-poll of the same trace keeps open sections.
-      var shownTrace=trace.selected?JSON.stringify([trace.selected.manual?'direct':trace.selected.key,trace.selected.exemplar.traceId]):null;
+      var shownKey=function(selected){if(selected.manual)return 'direct';try{var parts=JSON.parse(selected.key);return Array.isArray(parts)?JSON.stringify(parts.slice(0,2)):selected.key;}catch(e){return selected.key;}};
+      // Example keys are [sectionId, carrier, selectionToken]; the token changes on every Live re-poll, so it is left out.
+      var shownTrace=trace.selected?JSON.stringify([shownKey(trace.selected),trace.selected.exemplar.traceId]):null;
       traceEditNotice(body,value.edit);
       directTraceBody(body,trace.direct,shownTrace);
       var message=trace.direct && trace.direct.profiles.length?(!trace.hasMappings?'Diagram mapping is not configured. Loaded traces still show a waterfall.':''):!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Turn on Metrics overlay to refresh explicit bindings.':'Turn on Metrics overlay to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
@@ -342,11 +345,13 @@
       var card=el(detail,'details','request','dv-trace-request'),matchedSteps=model.mapping?model.rows.filter(function(r){return r.status==='matched';}).length:0;
       // #1175: an optional step missing from this trace does not count against coverage; the summary and the coverage line share these counts.
       var optionalAbsent=model.rows.filter(function(r){return r.optional;}).length,stepTotal=model.rows.length-optionalAbsent;
-      var focusCard=card.contains(doc.activeElement);traceSection(card,'request',shownTrace);
+      // Focus inside the card is remembered across a Load's gap, when the card is rebuilt and its old element is gone.
+      var focusCard=card.contains(doc.activeElement) || !!host._traceCardFocus && !host.contains(doc.activeElement);traceSection(card,'request',shownTrace);
       var limited=e.warnings.some(function(w){return /200 spans|timeline unavailable/i.test(w);}) || !!model.warning;
-      var cardSummary=el(card,'summary','summary','dv-trace-request-summary',[e.traceId.slice(0,12),selected.day?'Started '+selected.day.label+' '+selected.day.time+' local':'',e.spans.length+' spans',model.mapping?matchedSteps+'/'+stepTotal+' steps matched':'',e.completeness!=='complete'?e.completeness:'',limited?'limit reached':''].filter(Boolean).join(' · '));
+      var cardSummary=el(card,'summary','summary','dv-trace-request-summary',[e.traceId.slice(0,12),selected.day?'Started '+selected.day.label+' '+selected.day.time+' local':'',e.spans.length+' spans',model.mapping?matchedSteps+'/'+stepTotal+' steps matched':'',e.completeness==='partial'?'partial':e.completeness!=='complete'?e.completeness+' completeness':'',limited?'limit reached':''].filter(Boolean).join(' · '));
       // Picking a trace from inside the open card collapses it; keep keyboard focus on its line.
       if(focusCard && !card.open)cardSummary.focus({preventScroll:true});
+      host._traceCardFocus=card.contains(doc.activeElement);
       el(card,'h3','heading','','Selected request');el(card,'code','identity','dv-trace-identity',e.traceId);if(selected.day)el(card,'p','date','dv-trace-date','Started '+selected.day.label+' '+selected.day.time+' local');if(selected.manual && !selected.hasMappings)el(card,'p','mapping-unavailable','','Diagram mapping is not configured for this section.');
       var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
       el(card,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');

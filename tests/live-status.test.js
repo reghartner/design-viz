@@ -3883,3 +3883,32 @@ test('#1173 with one authored lookup, the text button switches to a typed LogQL 
  assert.equal(api.snapshot().trace.direct.logs.form.lookup,'camera');assert.equal(typedField(),undefined);
  api.destroy();
 });
+// #1182 c2: one open-state slot. Another trace resets it (pick A, open, pick B, back to A: collapsed); a Live re-poll of
+// the same example (new selection token, same trace) keeps it; focus inside a collapsing card moves to its line.
+async function compactExamples(){
+ const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json')));
+ f.spec.page.tracking.telemetry.traceConnections={company:profile};
+ const recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8');
+ const h=harness(f.spec,{},{telemetry:{directTrace:{describe:async()=>compactTool(),call:async()=>({payload:recorded})}}}),api=h.ctl.liveStatus,m=mountStatus(h);
+ h.ctl.sections[0].stepper={path:()=>'event',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+ h.ctl.telemetry.apply(f.samples);api.setStatusMode('trace');h.flush();
+ return {f,h,api,m,request:()=>m.body.querySelector('details.dv-trace-request'),config:()=>m.body.querySelector('details.dv-trace-config')};
+}
+test('#1173 another trace resets the open sections; a re-poll of the same trace keeps them; focus moves to the card line',async()=>{
+ const {f,h,api,m,request,config}=await compactExamples(),example=api.snapshot().trace.entries.find(e=>!e.manual);
+ await api.chooseTrace({key:example.key,traceId:example.exemplar.traceId});h.flush();
+ request().open=true;request().dispatchEvent({type:'toggle'});config().open=true;config().dispatchEvent({type:'toggle'});
+ // Re-poll: same trace, new selection token.
+ const before=api.snapshot().trace.selected.exemplar.selectionToken;h.ctl.telemetry.apply(JSON.parse(JSON.stringify(f.samples)));h.flush();
+ assert.equal(api.snapshot().trace.selected.exemplar.traceId,example.exemplar.traceId);
+ assert.equal(request().open,true,'a re-poll keeps the open card (token '+before+' -> '+api.snapshot().trace.selected.exemplar.selectionToken+')');assert.equal(config().open,true);
+ // B: a loaded trace. Focus sits inside the open card; the card collapses and focus moves to its line.
+ let focused=null;h.doc.activeElement=request().querySelector('.dv-trace-identity');const focus=Element.prototype.focus;Element.prototype.focus=function(){focused=this;};api.setTraceShow(true);h.flush();
+ api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();
+ assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(request().open,false,'another trace collapses the card');assert.equal(config().open,false);Element.prototype.focus=focus;assert.ok(focused && focused===request().querySelector('summary'),'focus moves to the card line');
+ // Back to A: its earlier open state is not restored.
+ const again=api.snapshot().trace.entries.find(e=>e.key===example.key) || api.snapshot().trace.entries.find(e=>!e.manual);
+ await api.chooseTrace({key:again.key,traceId:again.exemplar.traceId});h.flush();
+ assert.equal(api.snapshot().trace.selected.manual,false);assert.equal(request().open,false,'returning to A starts collapsed');assert.equal(config().open,false);
+ api.destroy();
+});

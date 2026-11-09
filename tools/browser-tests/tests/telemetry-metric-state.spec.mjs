@@ -20,7 +20,7 @@ const EDGES={'a->b':'held','b->c':'flowing','c->d':'failing','d->e':'waiting','e
 const SAMPLES={'a->b':{signals:{rate:{value:100},errors:{value:0}}},'b->c':{signals:{rate:{value:100}}},'c->d':{signals:{rate:{value:100},errors:{value:50}}},
  'd->e':{signals:{rate:{value:0,series:[[T1,0],[T2,0]]},errors:{value:0,series:[[T1,0],[T2,0]]}}},'f->g':{signals:{rate:{value:100},errors:{value:0}}}};
 // Done tickets on every carded edge but f->g (active): a card must not turn green from Jira.
-const JIRA={'N-1':{state:'done'},'E-1':{state:'done'},'E-2':{state:'done'},'E-3':{state:'done'},'E-4':{state:'done'},'E-5':{state:'done'},'E-6':{state:'active'}};
+const JIRA={'NODE-1':{state:'done'},'EDGE-1':{state:'done'},'EDGE-2':{state:'done'},'EDGE-3':{state:'done'},'EDGE-4':{state:'done'},'EDGE-5':{state:'done'},'EDGE-6':{state:'active'}};
 const WANT={held:{stroke:'rgb(46, 214, 0)',width:'3px',dotted:false},flowing:{stroke:'rgb(46, 214, 0)',width:'1px',dotted:false},
  failing:{stroke:'rgb(0, 157, 255)',width:'2px',dotted:false},waiting:{stroke:'rgb(143, 180, 255)',width:'3px',dotted:true}};
 const CHIPS={proven:'held',liveEarly:'held',degraded:'failing',unproven:'waiting'};
@@ -28,8 +28,8 @@ const CHIPS={proven:'held',liveEarly:'held',degraded:'failing',unproven:'waiting
 function spec(skin){
  const edge=(from,to,ticket,telemetry)=>({from,to,label:from+' to '+to,tickets:[ticket],telemetry});
  return {page:{title:'Metric state',skin,tracking:{jira:{site:'https://jira.test'}},sections:[{id:'main',diagram:{
-  nodes:{a:{title:'A',tickets:['N-1']},b:{title:'B'},c:{title:'C'},d:{title:'D'},e:{title:'E'},f:{title:'F'},g:{title:'G'}},rows:[['a','b','c','d'],['e','f','g']],
-  edges:[edge('a','b','E-1',LIMITED()),edge('b','c','E-2',OPEN()),edge('c','d','E-3',LIMITED()),edge('d','e','E-4',LIMITED()),edge('e','f','E-5',LIMITED()),edge('f','g','E-6',LIMITED())],
+  nodes:{a:{title:'A',tickets:['NODE-1']},b:{title:'B'},c:{title:'C'},d:{title:'D'},e:{title:'E'},f:{title:'F'},g:{title:'G'}},rows:[['a','b','c','d'],['e','f','g']],
+  edges:[edge('a','b','EDGE-1',LIMITED()),edge('b','c','EDGE-2',OPEN()),edge('c','d','EDGE-3',LIMITED()),edge('d','e','EDGE-4',LIMITED()),edge('e','f','EDGE-5',LIMITED()),edge('f','g','EDGE-6',LIMITED())],
   panels:[{id:'status',type:'live-status',title:'Status'}]}}]}};
 }
 async function mount(page,server,skin){

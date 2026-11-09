@@ -29,13 +29,16 @@ async function openPopup(page,server,map,tickets){
  const pop=root.locator('.dv-live-popover');await expect(pop).toBeVisible();return pop;
 }
 // Row geometry: the chip on the key's line inside the row, and every stale/count/link part fully inside the row and the
-// popover (nothing clipped or scrolled away).
+// popover, not cut by any clipping ancestor up to the popover, and the topmost element at its centre (nothing covers it).
 const geometry=row=>row.evaluate(el=>{
  const box=n=>n.getBoundingClientRect(),r=box(el),pop=box(el.closest('.dv-live-popover')),key=box(el.querySelector('.nbacklink')),chip=box(el.querySelector('.dv-live-ticket-state')),title=el.querySelector('.dv-live-ticket-title');
  const parts=Array.from(el.querySelectorAll('.dv-live-stale-detail,.dv-live-ticket-prs,.dv-live-ticket-links a'));
  const inside=b=>b.width>0 && b.left>=r.left-1 && b.right<=r.right+1 && b.left>=pop.left && b.right<=pop.right && b.top>=r.top-1 && b.bottom<=r.bottom+1;
+ const unclipped=(n,b)=>{for(let a=n.parentElement;a;a=a.parentElement){const cs=getComputedStyle(a);if(cs.overflowX!=='visible' || cs.overflowY!=='visible'){const ab=box(a);if(b.left<ab.left-.5 || b.right>ab.right+.5 || b.top<ab.top-.5 || b.bottom>ab.bottom+.5)return false;}if(a.classList.contains('dv-live-popover'))break;}return true;};
+ const topmost=(n,b)=>{const hit=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);return !!hit && (hit===n || n.contains(hit));};
+ const shown=n=>{const b=box(n);return inside(b) && unclipped(n,b) && topmost(n,b);};
  return {height:r.height,keyTop:key.top,chipTop:chip.top,chipRight:chip.right,right:r.right,titleWidth:title?box(title).width:0,titleClipped:title?title.scrollWidth>title.clientWidth:false,
-  rowFits:el.scrollWidth<=el.clientWidth+1,parts:parts.map(n=>({cls:n.className || n.tagName,inside:inside(box(n)),text:n.textContent})),
+  rowFits:el.scrollWidth<=el.clientWidth+1,parts:parts.map(n=>({cls:n.className || n.tagName,inside:shown(n),width:Math.round(box(n).width),text:n.textContent})),
   textClipped:parts.filter(n=>n.matches('.dv-live-stale-detail,.dv-live-ticket-prs')).some(n=>n.scrollWidth>n.clientWidth+1)};
 });
 test('#1198 at 1440x900 the Jira popup shows each ticket on one line: key, title, status chip, no owner',async({page,server},info)=>{
@@ -63,6 +66,17 @@ test('#1198 a long title with one PR stays on one line and shows its PR count an
  expect(g.parts.every(p=>p.inside),'the count and the link are fully visible: '+JSON.stringify(g.parts)).toBe(true);expect(g.rowFits).toBe(true);expect(g.textClipped).toBe(false);
  expect(Math.abs(g.chipTop-g.keyTop),'the chip is on the key\'s line').toBeLessThan(6);expect(g.chipRight).toBeLessThanOrEqual(g.right+1);
  await row.screenshot({path:info.outputPath('popup-row-one-pr.png')});
+});
+test('#1198 a 3-PR row with an ordinary key (CHECKOUT-1234) stays on one line with every link visible',async({page,server},info)=>{
+ const map={...MAP,'CHECKOUT-1234':{state:'active',title:'Capture the authorised payment',updatedAt:ago(1),prs:{count:3,state:'open',links:prLinks(3)}}};
+ const pop=await openPopup(page,server,map,['EE-1','CHECKOUT-1234']),row=pop.locator('.dv-live-ticket[data-live-ticket="CHECKOUT-1234"]');
+ await expect(row.locator('.dv-live-ticket-prs')).toHaveText('PRs: 3 open');await expect(row.locator('.dv-live-ticket-links a')).toHaveCount(3);
+ const g=await geometry(row);
+ expect(g.height,'one line (a second line would add 28px)').toBeLessThan(46);
+ expect(g.parts.every(p=>p.inside),'the count and all three links are fully visible: '+JSON.stringify(g.parts)).toBe(true);expect(g.rowFits).toBe(true);expect(g.textClipped).toBe(false);
+ expect(g.parts.filter(p=>p.cls.includes('dv-live-pr-link')).every(p=>p.width<=23),'each PR icon is a 22px box').toBe(true);
+ expect(Math.abs(g.chipTop-g.keyTop),'the chip is on the key\'s line').toBeLessThan(6);expect(g.chipRight).toBeLessThanOrEqual(g.right+1);
+ await row.screenshot({path:info.outputPath('popup-row-three-prs.png')});
 });
 test('#1198 a crowded ticket row (eight PR links, PR count, stale marker, long key) shows every part, links wrapping inside the row',async({page,server},info)=>{
  const map={...MAP,'CHECKOUTPLATFORM-12345':{state:'active',title:'Retry the payment capture after a gateway timeout',updatedAt:ago(15),prs:{count:8,state:'open',links:prLinks(8)}}};

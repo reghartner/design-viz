@@ -4102,6 +4102,8 @@ g.node.dv-edit-target,path.edge.dv-edit-target{cursor:copy;}
 .dv-live-ticket>.dv-live-ticket-title{flex:1 1 0;min-width:60px;line-height:28px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .dv-live-ticket>.dv-live-stale-detail,.dv-live-ticket>.dv-live-ticket-prs{flex:none;font-size:11px;line-height:28px;white-space:nowrap;}
 .dv-live-ticket>.dv-live-ticket-links{flex:0 1 auto;min-width:0;}
+.dv-live-popover .dv-live-ticket .nbacklink.dv-live-pr-link{box-sizing:border-box;padding:0;border:0;}
+.dv-live-popover .dv-live-ticket .nbacklink.dv-live-pr-link:focus-visible{outline:2px solid currentColor;outline-offset:1px;}
 .dv-live-ticket>.dv-live-ticket-state{position:absolute;top:8px;right:0;}
 .dv-live-ticket>.dv-live-ticket-detail{flex:1 0 100%;font-size:11px;}
 .dv-live-ticket-links{display:flex;flex-wrap:wrap;gap:2px;}

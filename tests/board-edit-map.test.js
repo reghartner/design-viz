@@ -9,13 +9,13 @@ const ACCEPT={serviceName:'frontend',operation:'/cart/checkout'},CHARGE={service
 const TEXT=JSON.stringify({page:{title:'Checkout',sections:[{id:'main',diagram:{nodes:{web:{title:'Web'},pay:{title:'Pay'}},rows:[['web','pay']],edges:[{from:'web',to:'pay',label:'Charge'}],
  steps:[{id:'accept',text:'Accept checkout',nodes:['web'],traceMatch:ACCEPT},{id:'charge',text:'Charge the card',edge:'web->pay'}]}}]}},null,2);
 const settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
-async function editor(){
+async function editor(text=TEXT){
  const C={console,URL};vm.runInNewContext(entrypoint('standalone').body,C);
  const published=[],renders=[],store=new Map();
  const win={console,location:{pathname:'/board/'},addEventListener(){},removeEventListener(){},
   sessionStorage:{getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},
   claude:{use:async name=>name==='artifact'?{publish:async files=>{published.push(files['flowspec.json'].content);}}:name==='user'?{canEdit:async()=>true,me:async()=>({id:'u1',name:'Reader'})}:null}};
- const e=C.createBoardEditor({win,text:TEXT,specFile:'flowspec.json',render:text=>{renders.push(text);return null;}});
+ const e=C.createBoardEditor({win,text,specFile:'flowspec.json',render:text=>{renders.push(text);return null;}});
  await settle();e.start();assert.equal(e.state().active,true,'Edit mode is on');
  return {e,published,renders,step:id=>JSON.parse(e.text()).page.sections[0].diagram.steps.find(s=>s.id===id)};
 }
@@ -47,4 +47,21 @@ test('#1177 replacing a mapped step names the traceMatch it replaces; undo resto
  assert.equal(b.step('charge').traceMatch,undefined,'undo takes back the latest mapping first');assert.deepEqual(b.step('accept').traceMatch,OTHER);
  b.e.save();await settle();const saved=JSON.parse(b.published[0]);
  assert.deepEqual(saved.page.editHistory.at(-1).changes.map(c=>[c.op,c.step,c.traceMatch]),[['trace-match','accept',OTHER]],'one change for the replacement');
+});
+test('#1180 a replacement records what it replaced, keeps the other fields, and never replaces alternatives',async()=>{
+ let b=await editor();
+ b.e.mapSpan(CHARGE_REF,CHARGE);b.e.mapSpan(ACCEPT_REF,OTHER,ACCEPT);
+ assert.deepEqual(b.step('accept').traceMatch,OTHER,'serviceName and operation swap');
+ b.e.save();await settle();const changes=JSON.parse(b.published[0]).page.editHistory.at(-1).changes;
+ assert.equal('replaces' in changes[0],false,'a first mapping has no replaces');
+ assert.deepEqual(changes[1].replaces,ACCEPT,'the replacement records the replaced value');
+ // The other fields of a single traceMatch object stay.
+ const rich=JSON.parse(TEXT);rich.page.sections[0].diagram.steps[0].traceMatch={...ACCEPT,nodeId:'web',maxDurationMs:300,optional:true};
+ b=await editor(JSON.stringify(rich,null,2));
+ assert.equal(b.e.mapSpan(ACCEPT_REF,OTHER,ACCEPT),true);assert.deepEqual(b.step('accept').traceMatch,{...OTHER,nodeId:'web',maxDurationMs:300,optional:true});
+ // An alternatives array is never replaced, and two different arrays are not the same.
+ const alt=JSON.parse(TEXT);alt.page.sections[0].diagram.steps[0].traceMatch=[ACCEPT,{serviceName:'frontend',operation:'/cart/other'}];
+ b=await editor(JSON.stringify(alt,null,2));
+ assert.equal(b.e.mapSpan(ACCEPT_REF,OTHER,[ACCEPT,{serviceName:'x',operation:'y'}]),false);assert.equal(b.e.mapSpan(ACCEPT_REF,OTHER,alt.page.sections[0].diagram.steps[0].traceMatch),false);
+ assert.equal(b.e.state().pending,0);
 });

@@ -3726,14 +3726,16 @@ function mapEditor(){
 }
 const runTimers=h=>{for(let i=0;i<5 && h.timers.size;i++){const due=[...h.timers];h.timers.clear();due.forEach(([,t])=>t.fn());}};
 const MAP_ID='8413cd87a9f15b6bfe8e1acf5b3346d0',MAP_SPAN='dcce084f04baa9e1',MAP_MATCH={serviceName:'currency',operation:'grpc.msdemo.CurrencyService/GetSupportedCurrencies'};
-function mapBoard({editor=mapEditor(),twoOnB=false}={}){
+function mapBoard({editor=mapEditor(),twoOnB=false,alternatives=false,otherSection=false}={}){
  const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8');
  const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
  const raw=overFixture();raw.page.tracking.telemetry={traceConnections:{company:profile}};const d=raw.page.sections[0].diagram;
- d.steps[0].text='Hop to beta';d.steps[1].text='Show beta';if(twoOnB)d.steps.push({id:'beta-again',text:'Show beta again',nodes:['b'],traceMatch:{serviceName:'x',operation:'y'}},{id:'beta-third',text:'Beta third',nodes:['b']});
+ d.steps[0].text='Hop to beta';d.steps[1].text='Show beta';if(twoOnB)d.steps.push({id:'beta-again',text:'Show beta again',nodes:['b'],traceMatch:alternatives?[{serviceName:'x',operation:'y'},{serviceName:'x',operation:'z'}]:{serviceName:'x',operation:'y'}},{id:'beta-third',text:'Beta third',nodes:['b']});
+ if(otherSection)raw.page.sections.push({id:'other',diagram:{nodes:{z:{title:'Zed'}},rows:[['z']],steps:[{id:'zz',text:'Zed step',nodes:['z']}]}});
  const h=harness(raw,{},{boardEditor:editor,telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async()=>({payload:recorded})}}}),api=h.ctl.liveStatus,m=mountStatus(h);
  h.ctl.sections[0].stepper={path:()=>h.C.diagramPathList(h.ctl.page.sections[0].diagram)[0].id,sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
  api.apply(overToday());api.setStatusMode('trace');api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:MAP_ID});
+ if(otherSection)api.setDirectTraceField({field:'section',value:api.snapshot().trace.direct.sections[0].id});
  return {h,api,m,editor,raw,focus:async()=>{assert.ok(await api.loadDirectTrace(false));const s=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:s.context,spanId:MAP_SPAN}),true);return api.snapshot().trace.selected;}};
 }
 const spanDrop=(h,target,context)=>{const data={'application/x-flowview-span':JSON.stringify({context,spanId:MAP_SPAN})};
@@ -3795,5 +3797,56 @@ test('#1177 an Edit-mode re-render keeps the loaded trace, the picked example, t
  assert.ok(s,'the picked example stays selected');assert.equal(s.manual,false);assert.equal(s.carrier,entry.carrier);assert.equal(s.exemplar.traceId,entry.exemplar.traceId);
  assert.equal(s.focus && s.focus.spanId,spanId,'its focused span stays');assert.ok(x.m.body.querySelector('.dv-trace-selected'));
  assert.ok(x.h.view.querySelectorAll('.dv-trace-overlay,[data-trace-tone]').length>0,'the mapped carriers light up again');
+ // #1180 m1: live evidence for the same carrier replaces the carried entry; the pick and focus stay when its trace is the same.
+ x.h.ctl.telemetry.apply(f.samples);s=x.api.snapshot().trace.selected;
+ assert.equal(plain(x.api.snapshot().trace.entries.filter(e=>e.carrier===entry.carrier)).length,1,'never the stale carried entry beside the fresh one');
+ assert.ok(s && !s.key.startsWith('carried/'),'the live entry is selected');assert.equal(s.exemplar.traceId,entry.exemplar.traceId);assert.equal(s.focus && s.focus.spanId,spanId,'the focus stays');
+ x.api.destroy();editor.takeTrace();
+ x=open();x.h.ctl.telemetry.apply(f.samples);x.api.setStatusMode('trace');await x.api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});x.api.destroy();
+ x=open();x.h.flush();assert.ok(x.api.snapshot().trace.selected);
+ const fresh=structuredClone(f.samples),other=fresh[entry.carrier].exemplars[0].candidates.find(c=>c.traceId!==entry.exemplar.traceId);fresh[entry.carrier].exemplars[0].traceId=other.traceId;
+ x.h.ctl.telemetry.apply(fresh);assert.equal(x.api.snapshot().trace.selected,null,'a different live trace ends the carried pick');
+ assert.equal(plain(x.api.snapshot().trace.entries.filter(e=>e.carrier===entry.carrier)).length,1);
+ x.api.destroy();editor.takeTrace();
+ // #1180 MAJOR 1: with a loaded trace and a picked example, the reader's pick wins after the re-render.
+ const withDirect=structuredClone(f.spec);withDirect.page.tracking.telemetry.traceConnections={company:JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json')))};
+ const recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const both=()=>{const h=harness(withDirect,{},{telemetry:{directTrace:{describe:async()=>tool,call:async()=>({payload:recorded})}},boardEditor:editor}),m=mountStatus(h);
+  h.ctl.sections[0].stepper={path:()=>'short',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};return {h,m,api:h.ctl.liveStatus};};
+ x=both();x.h.ctl.telemetry.apply(f.samples);x.api.setStatusMode('trace');x.api.setDirectTraceField({field:'environment',value:'prod'});x.api.setDirectTraceField({field:'input',value:MAP_ID});
+ assert.ok(await x.api.loadDirectTrace(false));const example=x.api.snapshot().trace.entries.find(e=>!e.key.startsWith('direct/'));
+ await x.api.chooseTrace({key:example.key,traceId:example.exemplar.traceId});s=x.api.snapshot().trace.selected;assert.equal(s.manual,false);
+ assert.equal(x.api.selectTraceSpan({context:s.context,spanId:s.exemplar.spans[0].id}),true);x.api.destroy();
+ x=both();x.h.flush();s=x.api.snapshot().trace.selected;
+ assert.ok(s && !s.manual,'the picked example, not the loaded trace');assert.equal(s.carrier,example.carrier);assert.equal(s.focus && s.focus.spanId,example.exemplar.spans[0].id);
+ assert.ok(x.api.snapshot().trace.direct.exemplar,'the loaded trace stays loaded too');
  x.api.destroy();
+});
+test('#1180 the chooser names the span, refocuses on each drop, returns focus, and cannot replace alternatives',async()=>{
+ const b=mapBoard({twoOnB:true,alternatives:true});const s=await b.focus(),node=b.h.view.querySelector('g.node[data-dv-node="b"]');
+ spanDrop(b.h,node,s.context);runTimers(b.h);
+ const chooser=b.m.body.querySelector('.dv-trace-map-chooser');
+ assert.equal(chooser.querySelector('.dv-trace-map-prompt').textContent,'Map currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies to which step of Beta?','it names the dragged span');
+ const choices=chooser.querySelectorAll('button.dv-trace-map-choice');
+ assert.deepEqual(choices.map(x=>[x.textContent,!!x.disabled]),[['Show beta',false],['Show beta again · has alternatives; edit in Inspect',true],['Beta third',false]]);
+ let focused=0;choices[0].focus=()=>{focused++;};spanDrop(b.h,node,s.context);runTimers(b.h);assert.equal(focused,1,'a second drop moves focus to the chooser again');
+ const row=b.m.body.querySelector('.dv-trace-span[data-span-id="'+MAP_SPAN+'"]');let back=0;row.focus=()=>{back++;};
+ chooser.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});assert.equal(back,1,'Esc returns focus to the dragged row');
+ assert.equal(b.api.mapTraceSpan({context:s.context,spanId:MAP_SPAN,stepId:'beta-again',replace:true}),false,'alternatives are never replaced');
+ b.api.destroy();
+});
+test('#1180 a step or carrier in another section gets no highlight and no drop; the step highlight holds over its children',async()=>{
+ const b=mapBoard({otherSection:true});const s=await b.focus(),other=b.h.ctl.sections[1].sectionEl;
+ const zed=other.querySelector('g.node[data-dv-node="z"]'),zchip=other.querySelector('button.schip[data-step-source="0"]');assert.ok(zed && zchip);
+ const data={'application/x-flowview-span':'{}'},drag={types:Object.keys(data),getData:t=>data[t]||'',dropEffect:''};
+ for(const target of [zed,zchip]){
+  let allowed=false;b.h.view.dispatchEvent({type:'dragover',target,dataTransfer:drag,preventDefault(){allowed=true;}});
+  assert.equal(target.classList.contains('dv-edit-over'),false,'no highlight in another section');assert.equal(allowed,false,'and no drop allowed');
+  spanDrop(b.h,target,s.context);runTimers(b.h);
+ }
+ assert.equal(b.editor.calls.length,0,'nothing maps in another section');assert.equal(b.m.body.querySelector('.dv-trace-map-chooser'),null);
+ const chip=b.h.view.querySelector('button.schip[data-step-source="1"]');
+ b.h.view.dispatchEvent({type:'dragover',target:chip,dataTransfer:drag,preventDefault(){}});assert.ok(chip.classList.contains('dv-edit-over'),'the step button highlights');
+ b.h.view.dispatchEvent({type:'dragleave',target:chip,relatedTarget:chip,dataTransfer:drag});assert.ok(chip.classList.contains('dv-edit-over'),'moving within it keeps the highlight');
+ b.api.destroy();
 });

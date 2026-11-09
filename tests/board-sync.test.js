@@ -430,3 +430,23 @@ test('L13 log counts and guards traceMatch alternatives arrays',()=>{
  const added=stepsPulled(null,[],spec=>{d(spec).steps[0].traceMatch=plain(ALTERNATIVES);});
  assert.equal(S().log(added.local,added.live,{by:'Chuck',now:NOW}).entry.summary,'Added 1 step mapping');
 });
+
+/* #1180 review (Chuck's ruling): the board can replace a step's traceMatch; that trace-match change
+   records the value it replaced as `replaces`. pull accepts the live value where the local step still
+   equals `replaces`, keeping the local step's other traceMatch fields, and asks only when the local
+   copy differs from both. */
+const QUOTE={serviceName:'checkout',operation:'Quote'};
+const BO_REPLACE=at=>entry(at,'Bo',[{op:'trace-match',path:STEP(0),label:'Resolve rates',step:'rates',traceMatch:plain(RATES),replaces:plain(QUOTE)}]);
+const quoted=STEPS.replace('{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta"}','{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta", "traceMatch": {"serviceName": "checkout", "operation": "Quote", "nodeId": "beta"}}');
+test('#1180 a board replacement reaches an unchanged local step and keeps its other fields',()=>{
+ const live=stepsLive(s=>{d(s).steps[0].traceMatch={...plain(RATES),nodeId:'beta'};},[BO_REPLACE('2026-11-09T10:00:00Z')]);
+ const out=S().pull(quoted,live);
+ assert.equal(out.status,'merged',JSON.stringify(out.conflicts));
+ assert.deepEqual(step(out.text,'rates').traceMatch,{serviceName:'currency',operation:'GetRates',nodeId:'beta'});
+ assert.deepEqual(plain(out.edits[0].lines),['currency · GetRates mapped to step Resolve rates (replaced checkout · Quote)']);
+});
+test('#1180 a local step that differs from both the replaced and the new mapping still asks',()=>{
+ const local=STEPS.replace('{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta"}','{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta", "traceMatch": {"serviceName": "other", "operation": "X"}}');
+ const out=S().pull(local,stepsLive(mapped,[BO_REPLACE('2026-11-09T10:00:00Z')]));
+ assert.equal(out.status,'conflict');assert.equal(out.conflicts[0].kind,'trace-match-changed');
+});

@@ -149,9 +149,17 @@ test('M3 desktop Edit mode drags spans onto a step and onto nodes; two candidate
  await dragSpan(page,panel,CART,()=>cardPoint(nodeCard(root,'web')));
  await chooser.getByRole('button',{name:'Review the cart',exact:true}).click();
  await expect(panel.locator('.dv-trace-map-note-text')).toHaveText('Mapped cart · msdemo.CartService/EmptyCart to step Review the cart.');
- // Undo takes back the latest mapping; Save records the other two, each as one trace-match change.
+ // Undo takes back the latest mapping.
  await panel.getByRole('button',{name:'Undo',exact:true}).click();await expect(panel.getByRole('button',{name:'Save 2 changes',exact:true})).toBeVisible();
- const saved=JSON.parse(await save(page,panel,2)),changes=saved.page.editHistory.at(-1).changes;
- expect(changes.map(c=>[c.op,c.step,c.traceMatch])).toEqual([['trace-match','rates',CURRENCY.match],['trace-match','settle',PAYMENT.match]]);
+ // #1180 m3: through the real board-edit, the chooser replaces a mapped step; its other fields stay.
+ await dragSpan(page,panel,CART,()=>cardPoint(nodeCard(root,'web')));
+ await chooser.getByRole('button',{name:'Accept checkout · mapped, replaces',exact:true}).click();
+ await expect(panel.locator('.dv-trace-map-note-text')).toHaveText('Mapped cart · msdemo.CartService/EmptyCart to step Accept checkout.');
+ // Save records each mapping as one trace-match change; the replacement names what it replaced.
+ const saved=JSON.parse(await save(page,panel,3)),changes=saved.page.editHistory.at(-1).changes,accept=saved.page.sections[0].diagram.steps.find(s=>s.id==='accept');
+ expect(changes.map(c=>[c.op,c.step,c.traceMatch,c.replaces])).toEqual([['trace-match','rates',CURRENCY.match,undefined],['trace-match','settle',PAYMENT.match,undefined],
+  ['trace-match','accept',CART.match,{serviceName:ACCEPT.serviceName,operation:ACCEPT.operation}]]);
+ expect(accept.traceMatch).toEqual({...CART.match,nodeId:'web'});
  await expect(root.locator('.dv-edit-first').first()).toHaveText('currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies mapped to step Resolve supported currencies');
+ await expect(root.locator('.dv-edit-change').filter({hasText:'(replaced frontend · /cart/checkout)'})).toHaveCount(1);
 });

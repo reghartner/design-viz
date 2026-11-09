@@ -92,14 +92,15 @@ for(const skin of ['daylight','blueprint'])test('#1200 #1199 metric cards show t
 
 /* #1201: an error signal (`role: "error"`, e.g. a dead-letter queue depth) over its limit turns the card border red,
    and the Proof error chip border and error arc stroke wear the same red. Under its limit the card shows its normal state. */
-const RED={stroke:'rgb(232, 23, 23)',width:'3px',dotted:false};
+// Blocked red; Blueprint uses a lighter red (#ff6b6b) for 3:1 contrast on its dark card fill.
+const RED_BY_SKIN={daylight:{stroke:'rgb(232, 23, 23)',width:'3px',dotted:false},blueprint:{stroke:'rgb(255, 107, 107)',width:'3px',dotted:false}};
 function errorSpec(skin){
  const raw=spec(skin),d=raw.page.sections[0].diagram;
  d.edges[0].telemetry={kind:'queue',signals:{rate:{grafana:'sum(rate(sent_total[5m]))*3600',unit:'req/h'},dlq:{grafana:'max(dlq_depth)',unit:'msgs',role:'error'}},proof:{rate:{min:1},dlq:{max:0}}};
  return raw;
 }
-for(const skin of ['daylight','blueprint'])test('#1201 an error signal over its limit turns the card, its Proof chip and arc red; under its limit the normal state ('+skin+')',async({page,server},testInfo)=>{
- const samples={...SAMPLES,'a->b':{signals:{rate:{value:100},dlq:{value:4}}}};
+for(const skin of ['daylight','blueprint'])test('#1201 an error signal outside its limit turns the card, its Proof chip and arc red; under its limit the normal state ('+skin+')',async({page,server},testInfo)=>{
+ const RED=RED_BY_SKIN[skin],samples={...SAMPLES,'a->b':{signals:{rate:{value:100},dlq:{value:4}}}};
  const root=await mount(page,server,skin,errorSpec(skin),JIRA,samples);
  const border=async()=>{const c=(await cards(page))['a->b'];return {stroke:c.stroke,width:c.width,dotted:c.dotted};};
  await expect.poll(border,'the error card border is red').toEqual(RED);

@@ -49,11 +49,12 @@ function telemetryCardScope(signal){
 }
 function telemetryCountNote(binding){return telemetryMetricNames(binding).some(function(name){var s=binding.signals[name];return s.source==='honeycomb' && Array.isArray(s.query.calculations) && s.query.calculations.some(function(c){return c && c.op==='COUNT';});})?'Honeycomb COUNT counts source rows/events, not automatically requests.':'';}
 /* #1200: the card border shows the metric state only, never Jira work. The worst signal decides:
-   waiting (a signal not arriving, or silent for the whole window) < failing (a limit not met)
+   error (an error signal outside its limit, #1201) < waiting (a signal not arriving, or silent for
+   the whole window) < failing (a limit not met)
    < flowing (values arriving, no limits authored) < held (every authored limit holds).
    Proof chips (#1199) wear the state of the verdict bucket they count. */
 var TELEMETRY_PROOF_BUCKET_STATES={proven:'held',liveEarly:'held',degraded:'failing',error:'error',unproven:'waiting'};
-/* #1201: failing signals the author marked `role: "error"`. Over its limit, an error signal
+/* #1201: failing signals the author marked `role: "error"`. Outside its limit, an error signal
    outranks every other state: the card is `error` (red). */
 function telemetryErrorFailing(binding,result){
   return (result && result.failing || []).filter(function(name){return !!(binding.signals[name] && binding.signals[name].role==='error');});
@@ -72,7 +73,7 @@ function telemetryCardMetricState(binding,sample,result){
 function telemetryCardHiddenNote(binding,sample,result,pending){
   return telemetryMetricNames(binding).filter(function(name){return binding.signals[name].showOnCard===false && !(pending && pending[name] && telemetryReading(sample,name).value===null);}).map(function(name){
     var why=telemetryReading(sample,name).value===null?'no value':result && (result.failing || []).indexOf(name)>=0?'outside limit':'';
-    return why?'Hidden '+(binding.signals[name].label || name)+': '+why:'';
+    return why?'Hidden '+(binding.signals[name].role==='error'?'error signal ':'')+(binding.signals[name].label || name)+': '+why:'';
   }).filter(Boolean).join(' · ');
 }
 function telemetryCardContent(edge,binding,sample,result,window,pending){

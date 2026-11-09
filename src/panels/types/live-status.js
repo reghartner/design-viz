@@ -115,7 +115,7 @@
         var metrics=el(row,'td','signals','dv-live-proof-kpi');
         item.kpis.forEach(function(kpi){var metric=el(metrics,'div',kpi.name,'dv-live-proof-detail');el(metric,'span','value','',kpi.label+': '+kpi.text);if(kpi.url){var source=link(metric,'query',null,kpi.url);source.className='dv-live-metric-link';source.setAttribute('aria-label','Open '+kpi.label+' source query in a new tab');source.innerHTML=FlowIcons.render('external-link',{className:'dv-live-pr-icon',monochrome:true});}});
         el(row,'td','since','dv-live-proof-since',item.since);
-        var verdict=el(row,'td','verdict','');var pill=el(verdict,'span','pill','dv-live-state-pill dv-live-proof-pill',item.label);var bucket=TELEMETRY_SEALS[item.verdict]==='live-early'?'liveEarly':TELEMETRY_SEALS[item.verdict] || 'neutral';if(bucket==='degraded' && item.error)bucket='error';pill.setAttribute('data-proof-bucket',bucket);
+        var verdict=el(row,'td','verdict','');var pill=el(verdict,'span','pill','dv-live-state-pill dv-live-proof-pill',item.label);var bucket=TELEMETRY_SEALS[item.verdict]==='live-early'?'liveEarly':TELEMETRY_SEALS[item.verdict] || 'neutral';if(item.error)bucket='error';pill.setAttribute('data-proof-bucket',bucket);
         // #1199 review: the row pill wears the same metric state as its count chip and card.
         if(proof.states && proof.states[bucket])pill.setAttribute('data-metric-state',proof.states[bucket]);else pill.removeAttribute('data-metric-state');
         el(verdict,'div','evidence','dv-live-proof-detail',(item.initialLoading?'Loading…':item.telemetry)+(item.failing.length?' · failing: '+item.failing.join(', '):''));el(verdict,'div','predicate','dv-live-proof-predicate',item.predicate);

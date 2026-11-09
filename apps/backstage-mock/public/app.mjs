@@ -78,7 +78,7 @@ function showMapping(result){
   if(result.reason)box.append(el('p',result.reason));
   if(Object.hasOwn(result,'firstDivergence'))box.append(el('h3',result.firstDivergence?'First difference: '+result.firstDivergence:'No difference detected in the mapped evidence'));
   const table=el('table'),head=el('tr'),body=el('tbody');for(const title of ['Authored step','Evidence','Span IDs','Duration'])head.append(el('th',title));table.append(head);
-  for(const step of result.mapping.steps){const row=el('tr');for(const value of [step.stepId,step.conditions.length?step.conditions.map(c=>c.label).join('; '):step.status,step.spans.map(s=>s.id).join(', ') || '—',step.spans.map(s=>s.durationMs===null?'unknown':s.durationMs+' ms').join(', ') || '—'])row.append(el('td',value));body.append(row);}table.append(body);box.append(table);
+  for(const step of result.mapping.steps){const row=el('tr');for(const value of [step.stepId,step.conditions.length?step.conditions.map(c=>c.label).join('; '):step.optional?step.detail:step.status,step.spans.map(s=>s.id).join(', ') || '—',step.spans.map(s=>s.durationMs===null?'unknown':s.durationMs+' ms').join(', ') || '—'])row.append(el('td',value));body.append(row);}table.append(body);box.append(table);
   if(result.pathId)box.append(el('p','The shared prefix follows the authored baseline. Uninstrumented actions are not independently verified. After the fork, physical and customer outcomes need review.'));
   for(const warning of result.warnings || result.mapping.warnings || [])box.append(el('p',warning));
   if(result.mapping.unmatched.length){const details=el('details');details.append(el('summary','Unmatched spans ('+result.mapping.unmatched.length+')'),el('pre',JSON.stringify(result.mapping.unmatched,null,2)));box.append(details);}

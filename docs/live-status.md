@@ -1604,11 +1604,13 @@ injection (`tools/page_build.py --resolve-imports`) carries those bindings itsel
 The adapter qualifies connectors by the bound signals: `query_prometheus` for
 `grafana`, `query_loki_logs` for `loki`, `query_sql` for `sql`, and `query_cloudwatch` for `cloudwatch` and `query_cloudwatch_logs` for `cloudwatchLogs`, preferring a
 qualifying connector named **Grafana**. Missing required query tools appear as a
-visible diagnostic. `generate_deeplink`, `get_annotations` and
-`search_tempo_traces` are optional; declare these extras only when offered and
-needed. The generated declaration is a minimum; preserve previously verified
-offered optional tools when republishing. The trace adapter independently
-requires its search/detail pair.
+visible diagnostic. `generate_deeplink` and `get_annotations` are optional;
+declare these extras only when offered and needed. The generated declaration is
+a minimum; preserve previously verified offered optional tools when
+republishing. The trace adapter searches only each carrier's first trace signal,
+with its search/detail pair. When that signal is `tempo`, the page also declares
+`search_tempo_traces` and `get_tempo_trace` on Grafana; when it is a Honeycomb
+example-trace wrapper (`query_spec`), `get_trace` follows `run_query` (#1139).
 Discovery uses `claude.use('mcp')` and `listTools()` metadata, without data calls
 or permission prompts. Page/host disable suppresses discovery. Late results after
 retirement are dropped; each refresh rechecks required tools.
@@ -2131,6 +2133,24 @@ count: `16.1 ms across 2 spans`. A board that keeps one step per transport reads
 `2 operations · 1 unknown · 16.1 ms` (the other transport's step is missing); make them one
 step with alternatives.
 
+A step that may be absent from a trace (for example, its operation runs in a different
+trace) can carry `traceMatch.optional: true`; with alternatives, set it on every
+alternative ([canon rules](canon.md#reference-traces-and-incident-alternates)). A step whose
+`parentStepId` names an optional step must be marked optional too, or it reads unknown when
+the parent is absent. When the loaded trace has no span with an optional step's service and
+operation, the label is built from the other rows as if that row were not
+there: a node named by one matched step and one missing optional step reads
+`Matched: … · 16.1 ms`, or only the time for a single selector. The title lists it as
+*optional, not in this trace: service operation*, it never makes the node unknown, and a
+node whose only row is a missing optional step gets no label. The coverage line leaves it
+out and adds the count: `1/3 steps matched · 1 optional not in this trace · 0 spans
+unmatched`. Edge labels and titles carry matched rows only, so a missing step, optional or
+not, never adds to an edge and an edge title does not list a missing optional step. A
+matched optional step reads like any matched step; an ambiguous one still counts as
+ambiguous. Local, imported and drill-down steps follow the same rules. A trace that lacks
+an optional step can still be approved as the reference trace; a missing step without
+`optional` still blocks approval.
+
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
 deduplicated in-memory Jira Activity entry, without posting externally. Trace
 selection uses the existing cached provider API; rendering and stepping never
@@ -2496,7 +2516,8 @@ metadata discovery and data calls. Metrics starts off, with the default `24h`
 window, independently of Jira Live. Discovery alone never runs a query.
 
 Declare `{"server":"Honeycomb","tools":["run_query"]}` in the existing `mcp`
-capability alongside Grafana if both are bound. Connector names vary per account;
+capability alongside Grafana if both are bound (plus `get_trace` for an
+example-trace wrapper, which `tools/inject.py` adds). Connector names vary per account;
 selection requires offered tools and the runtime `inputSchema`. The supported
 schema declares `environment_slug` as a string and `query_spec` as an object or JSON string.
 `dataset_slug` may be optional and nullable; omit it when no dataset is authored.

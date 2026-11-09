@@ -328,13 +328,15 @@
       var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
       // #1173: the request card (Returned traces and the selected request's details) is one collapsed line while it is shown.
       var card=el(detail,'details','request','dv-trace-request'),matchedSteps=model.mapping?model.rows.filter(function(r){return r.status==='matched';}).length:0;
+      // #1175: an optional step missing from this trace does not count against coverage; the summary and the coverage line share these counts.
+      var optionalAbsent=model.rows.filter(function(r){return r.optional;}).length,stepTotal=model.rows.length-optionalAbsent;
       if(card._traceToken!==shownTrace){card.open=false;card._traceToken=shownTrace;}
-      el(card,'summary','summary','dv-trace-request-summary',[e.traceId.slice(0,12),selected.day?'Started '+selected.day.label+' '+selected.day.time+' local':'',e.spans.length+' spans',model.mapping?matchedSteps+'/'+model.rows.length+' steps matched':''].filter(Boolean).join(' · '));
+      el(card,'summary','summary','dv-trace-request-summary',[e.traceId.slice(0,12),selected.day?'Started '+selected.day.label+' '+selected.day.time+' local':'',e.spans.length+' spans',model.mapping?matchedSteps+'/'+stepTotal+' steps matched':''].filter(Boolean).join(' · '));
       el(card,'h3','heading','','Selected request');el(card,'code','identity','dv-trace-identity',e.traceId);if(selected.day)el(card,'p','date','dv-trace-date','Started '+selected.day.label+' '+selected.day.time+' local');if(selected.manual && !selected.hasMappings)el(card,'p','mapping-unavailable','','Diagram mapping is not configured for this section.');
       var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
       el(card,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');
       var limit=e.warnings.filter(function(w){return /200 spans|timeline unavailable/i.test(w);});if(model.warning)limit.push(model.warning);if(limit.length)el(card,'p','limit','dv-trace-limit',Array.from(new Set(limit)).join(' '));
-      if(model.mapping)el(card,'p','coverage','dv-trace-coverage',matchedSteps+'/'+model.rows.length+' steps matched · '+model.mapping.unmatched.length+' spans unmatched');
+      if(model.mapping)el(card,'p','coverage','dv-trace-coverage',matchedSteps+'/'+stepTotal+' steps matched · '+(optionalAbsent?optionalAbsent+' optional not in this trace · ':'')+model.mapping.unmatched.length+' spans unmatched');
       if(trace.entries.length)returnedTraces(card);
       var focus=selected.focus,focusedSpan=focus && e.spans.find(function(s){return s.id===focus.spanId;});
       var focusBox=el(detail,'div','focus','dv-trace-focus-summary');

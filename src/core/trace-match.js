@@ -14,6 +14,10 @@ function related(span,parentIds,byId){
 }
 function mapTrace(d,trace,pathId){
   const steps=pathId===undefined?baseSteps(d):(d.paths || []).find(p=>p.id===pathId)?.steps.map(id=>d.steps.find(s=>s.id===id)) || [],results=new Map(),byId=new Map(trace.spans.map(s=>[s.id,s])),visiting=new Set(),offPath=new Set();
+  // Spans with the selector's service, operation, namespace and attributes, before parent and occurrence rules.
+  const named=m=>trace.spans.filter(s=>s.serviceName===m.serviceName && s.operation===m.operation &&
+    (!m.namespace || s.attributes['service.namespace']===m.namespace) &&
+    Object.entries(m.attributes || {}).every(([k,v])=>s.attributes[k]===v));
   function match(step){
     if(results.has(step.id))return results.get(step.id);
     if(visiting.has(step.id))throw new Error('Cyclic traceMatch.parentStepId.');
@@ -27,12 +31,14 @@ function mapTrace(d,trace,pathId){
     const rank=r=>r.status==='ambiguous'?2:offPath.has(r)?0:1;
     if(Array.isArray(m))m.some((alternative,i)=>{const r=attempt(step,alternative || {},true);r.alternative=i;if(r.status==='matched' || !result || rank(r)>rank(result) || rank(r)===rank(result) && rank(r)<2)result=r;return r.status==='matched';});
     else result=attempt(step,m);
+    // #1175: an optional step (optional:true on its selector, or on every alternative) may be
+    // absent from a trace. When no span has its service and operation it is not unknown; a span
+    // that is present but rejected (parent, occurrence) stays unknown. Matched or ambiguous is unchanged.
+    if(result.status==='missing' && [].concat(m).every(a=>a && a.optional===true && !named(a).length))Object.assign(result,{detail:'Optional, not in this trace.'+(result.detail?' '+result.detail:''),conditions:[],optional:true});
     visiting.delete(step.id);results.set(step.id,result);return result;
   }
   function attempt(step,m,alternative){
-    let candidates=trace.spans.filter(s=>s.serviceName===m.serviceName && s.operation===m.operation &&
-      (!m.namespace || s.attributes['service.namespace']===m.namespace) &&
-      Object.entries(m.attributes || {}).every(([k,v])=>s.attributes[k]===v));
+    let candidates=named(m);
     let detail='',off=false;
     if(m.parentStepId){
       const parent=steps.find(s=>s.id===m.parentStepId);if(!parent && !alternative)throw new Error('Unknown parent step '+m.parentStepId);

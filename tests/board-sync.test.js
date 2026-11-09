@@ -450,3 +450,20 @@ test('#1180 a local step that differs from both the replaced and the new mapping
  const out=S().pull(local,stepsLive(mapped,[BO_REPLACE('2026-11-09T10:00:00Z')]));
  assert.equal(out.status,'conflict');assert.equal(out.conflicts[0].kind,'trace-match-changed');
 });
+/* #1180 c2: the base of a step is the `replaces` of its OLDEST fresh mapping (none for a first mapping).
+   A chain B replaces A, C replaces B reaches an unchanged local A as C, in one Save or two; a local copy
+   that removed the traceMatch while the board replaced A differs from both and asks. */
+const A=QUOTE,B={serviceName:'checkout',operation:'Price'},Cm=RATES;
+const chained=(...entries)=>stepsLive(s=>{d(s).steps[0].traceMatch={...plain(Cm),nodeId:'beta'};},entries);
+const mapChange=(match,replaces)=>({op:'trace-match',path:STEP(0),label:'Resolve rates',step:'rates',traceMatch:plain(match),replaces:plain(replaces)});
+test('#1180 c2 a chain of replacements reaches an unchanged local step, in one Save or two',()=>{
+ for(const live of [chained(entry('2026-11-09T10:00:00Z','Bo',[mapChange(B,A),mapChange(Cm,B)])),chained(entry('2026-11-09T10:00:00Z','Bo',[mapChange(B,A)]),entry('2026-11-09T11:00:00Z','Al',[mapChange(Cm,B)]))]){
+  const out=S().pull(quoted,live);
+  assert.equal(out.status,'merged',JSON.stringify(out.conflicts));assert.deepEqual(step(out.text,'rates').traceMatch,{serviceName:'currency',operation:'GetRates',nodeId:'beta'});
+ }
+});
+test('#1180 c2 a local copy that removed the traceMatch while the board replaced it asks',()=>{
+ const live=stepsLive(s=>{d(s).steps[0].traceMatch=plain(B);},[entry('2026-11-09T10:00:00Z','Bo',[mapChange(B,A)])]);
+ const out=S().pull(STEPS,live);
+ assert.equal(out.status,'conflict');assert.equal(out.conflicts[0].kind,'trace-match-changed');assert.match(out.conflicts[0].message,/your local copy has no traceMatch on it/);
+});

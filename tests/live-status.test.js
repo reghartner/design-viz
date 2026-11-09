@@ -3805,8 +3805,9 @@ test('#1177 an Edit-mode re-render keeps the loaded trace, the picked example, t
  x=open();x.h.ctl.telemetry.apply(f.samples);x.api.setStatusMode('trace');await x.api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});x.api.destroy();
  x=open();x.h.flush();assert.ok(x.api.snapshot().trace.selected);
  const fresh=structuredClone(f.samples),other=fresh[entry.carrier].exemplars[0].candidates.find(c=>c.traceId!==entry.exemplar.traceId);fresh[entry.carrier].exemplars[0].traceId=other.traceId;
- x.h.ctl.telemetry.apply(fresh);assert.equal(x.api.snapshot().trace.selected,null,'a different live trace ends the carried pick');
- assert.equal(plain(x.api.snapshot().trace.entries.filter(e=>e.carrier===entry.carrier)).length,1);
+ x.h.ctl.telemetry.apply(fresh);s=x.api.snapshot().trace.selected;
+ assert.ok(s && s.exemplar.traceId===entry.exemplar.traceId,'#1180 c2: a different live trace keeps the reader\'s carried pick');
+ assert.equal(plain(x.api.snapshot().trace.entries.filter(e=>e.carrier===entry.carrier)).length,2,'the live entry is listed beside it');
  x.api.destroy();editor.takeTrace();
  // #1180 MAJOR 1: with a loaded trace and a picked example, the reader's pick wins after the re-render.
  const withDirect=structuredClone(f.spec);withDirect.page.tracking.telemetry.traceConnections={company:JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json')))};
@@ -3849,4 +3850,61 @@ test('#1180 a step or carrier in another section gets no highlight and no drop; 
  b.h.view.dispatchEvent({type:'dragover',target:chip,dataTransfer:drag,preventDefault(){}});assert.ok(chip.classList.contains('dv-edit-over'),'the step button highlights');
  b.h.view.dispatchEvent({type:'dragleave',target:chip,relatedTarget:chip,dataTransfer:drag});assert.ok(chip.classList.contains('dv-edit-over'),'moving within it keeps the highlight');
  b.api.destroy();
+});
+/* #1180 c2: through the claude.ai traces adapter (telemetry-traces.js, standalone bundle): the re-render
+   re-attaches the adapter, which invalidates its entries and loads the default candidate again under a new
+   token. A reader's pick of another candidate stays selected with its focus; the live entry is listed beside it. */
+test('#1180 through the claude traces adapter, a re-attach with another default keeps the reader\'s pick',async()=>{
+ const {createMockBridge}=await import('./helpers/honeycomb-bridge.mjs'),bridge=createMockBridge({day:9}),settle=async()=>{for(let i=0;i<30;i++)await new Promise(setImmediate);};
+ const S={URL,AbortController,TextDecoder,TextEncoder,console,setTimeout,clearTimeout};vm.runInNewContext(entrypoint('standalone').body,S);
+ const raw={page:{tracking:{telemetry:{honeycomb:{environment:'flowview-demo',dataset:'doorbell'}}},sections:[{id:'main',diagram:{nodes:{a:{title:'Ingest',telemetry:{kind:'service',signals:{trace:{honeycomb:{query_spec:{filters:[{column:'service.name',op:'=',value:'event-ingest'}]},raw_row_columns:['trace.trace_id','timestamp','error'],results_limit:20}}}}}},rows:[['a']],
+  steps:[{id:'s',text:'Ingest step',nodes:['a']}],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}};
+ const win={claude:{use:async name=>name==='permissions'?{request:async names=>Object.fromEntries(names.map(n=>[n,'granted']))}:bridge}};
+ const adapter=S.createTelemetryTraces(S.normalize(raw),win,()=>Date.parse('2026-10-30T00:00:00Z'));assert.ok(adapter,'the adapter attaches to this board');
+ const editor=mapEditor(),open=async()=>{const h=harness(raw,{},{telemetry:adapter.options,boardEditor:editor}),m=mountStatus(h),api=h.ctl.liveStatus;
+  h.ctl.sections[0].stepper={path:()=>h.C.diagramPathList(h.ctl.page.sections[0].diagram)[0].id,sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+  const handle=adapter.attach({telemetry:h.ctl.telemetry,liveStatus:api},h.ctl.page);await settle();return {h,m,api,handle};};
+ let x=await open();x.api.setStatusMode('trace');x.h.ctl.telemetry.setEnabled(true);for(let i=0;i<4;i++){x.h.flush();await settle();}
+ const entry=x.api.snapshot().trace.entries[0];assert.ok(entry,'the adapter returned an example trace');
+ const other=entry.candidates.find(c=>c.traceId!==entry.exemplar.traceId && c.available);assert.ok(other,'a returned candidate other than the default');
+ await x.api.chooseTrace({key:entry.key,traceId:other.traceId});await settle();let s=x.api.snapshot().trace.selected;assert.equal(s && s.exemplar.traceId,other.traceId,'the reader picked another candidate');
+ const spanId=s.exemplar.spans[0].id;assert.equal(x.api.selectTraceSpan({context:s.context,spanId}),true);x.handle.destroy();x.api.destroy();
+ x=await open();x.h.flush();x.h.ctl.telemetry.setEnabled(true);for(let i=0;i<4;i++){x.h.flush();await settle();}
+ const live=x.api.snapshot().trace.entries.filter(e=>!e.key.startsWith('carried/'));assert.ok(live.length,'the re-attached adapter loaded its default again');
+ assert.notEqual(live[0].exemplar.traceId,other.traceId,'its default is not the reader\'s pick');
+ s=x.api.snapshot().trace.selected;assert.ok(s,'the pick survives the new default');assert.equal(s.exemplar.traceId,other.traceId);assert.equal(s.focus && s.focus.spanId,spanId,'and its focus');
+ x.handle.destroy();x.api.destroy();
+});
+test('#1180 c2 an open chooser survives the carried pick moving to live evidence; an alternatives step takes no drop',async()=>{
+ const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),editor=mapEditor();
+ const open=()=>{const h=harness(f.spec,{},{telemetry:{},boardEditor:editor}),m=mountStatus(h);h.ctl.sections[0].stepper={path:()=>'short',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};return {h,m,api:h.ctl.liveStatus};};
+ let x=open();x.h.ctl.telemetry.apply(f.samples);x.api.setStatusMode('trace');const entry=x.api.snapshot().trace.entries[0];
+ await x.api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});const span=x.api.snapshot().trace.selected.exemplar.spans.find(sp=>sp.service && sp.name);x.api.destroy();
+ x=open();x.h.flush();let s=x.api.snapshot().trace.selected;assert.ok(s && s.key.startsWith('carried/'));
+ // Edge mcu->ingest is named by one mapped step (submit), so a drop there asks.
+ const data={'application/x-flowview-span':JSON.stringify({context:s.context,spanId:span.id})},drag={types:Object.keys(data),getData:t=>data[t]||'',dropEffect:''};
+ x.h.view.dispatchEvent({type:'drop',target:x.h.view.querySelector('path.edge[data-dv-edge="0"]'),dataTransfer:drag,preventDefault(){}});runTimers(x.h);
+ assert.ok(x.api.snapshot().trace.mapChooser,'a chooser is open on the carried pick');
+ x.h.ctl.telemetry.apply(f.samples);assert.ok(!x.api.snapshot().trace.selected.key.startsWith('carried/'),'the pick moved to the live entry');
+ assert.ok(x.api.snapshot().trace.mapChooser,'the chooser stays open');
+ assert.equal(x.api.chooseTraceMapStep({stepId:'submit'}),true,'and still maps');runTimers(x.h);assert.equal(editor.calls.at(-1).ref.id,'submit');
+ x.api.destroy();
+ // A step whose traceMatch is an alternatives array: its button gets no highlight and no drop, and says why.
+ const b=mapBoard({twoOnB:true,alternatives:true}),fs2=await b.focus(),chip=b.h.view.querySelector('button.schip[data-step-source="2"]');
+ const altData={'application/x-flowview-span':JSON.stringify({context:fs2.context,spanId:MAP_SPAN})},altDrag={types:Object.keys(altData),getData:t=>altData[t]||'',dropEffect:''};let allowed=false;
+ b.h.view.dispatchEvent({type:'dragover',target:chip,dataTransfer:altDrag,preventDefault(){allowed=true;}});
+ assert.equal(allowed,false);assert.equal(chip.classList.contains('dv-edit-over'),false);assert.equal(chip.getAttribute('title'),'Has alternatives; edit in Inspect');
+ b.api.destroy();
+});
+test('#1180 c2 after a pick the dragged span row gets focus back; a mapping its kept fields exclude says nothing lights',async()=>{
+ const editor=mapEditor();let b=mapBoard({editor,twoOnB:true});const s=await b.focus();
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ b.m.body.querySelectorAll('button.dv-trace-map-choice')[0].dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});runTimers(b.h);b.api.destroy();
+ b=mapBoard({editor,twoOnB:true});const row=b.m.body.querySelector('.dv-trace-span[data-span-id="'+MAP_SPAN+'"]');let focused=0;if(row)row.focus=()=>{focused++;};b.h.flush();
+ assert.equal(focused,1,'the dragged row has focus after the re-render');b.api.destroy();editor.takeTrace();
+ // The step keeps a nodeId that excludes the span: the note says so.
+ const e2=mapEditor(),c=mapBoard({editor:e2});c.raw.page.sections[0].diagram.steps[1].traceMatch={...MAP_MATCH,nodeId:'a'};c.api.destroy();
+ const d=mapBoard({editor:e2});d.h.ctl.page.sections[0].diagram.steps[1].traceMatch={...MAP_MATCH,nodeId:'a'};await d.focus();e2.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});d.api.setTraceShow(true);
+ assert.equal(d.m.body.querySelector('.dv-trace-map-note-text').textContent,'Mapped currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies to step Show beta; this step\'s node, parent or attributes do not match this span, so nothing lights.');
+ d.api.destroy();
 });

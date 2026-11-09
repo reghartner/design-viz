@@ -498,3 +498,29 @@ test('#1192 c2 a replacement keeps the author\'s local nodeId; a board nodeId ch
  // Both differ from the base and each other: ask.
  out=S().pull(withMatch({...RATES,nodeId:'gamma'}),live);assert.equal(out.status,'conflict');
 });
+/* #1192 c3: resolving a nodeId or span conflict keeps the step's other traceMatch fields; an older-engine
+   change in the chain does not set the nodeId base; a node missing locally is never written. */
+const withRates=m=>STEPS.replace('{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta"}','{"id": "rates", "text": "Resolve rates", "edge": "alpha->beta", "traceMatch": '+JSON.stringify(m)+'}');
+const mapRow=(traceMatch,replaces)=>({op:'trace-match',path:STEP(0),label:'Resolve rates',step:'rates',traceMatch,...(replaces?{replaces}:{})});
+test('#1192 c3 resolving live or local keeps the other traceMatch fields',()=>{
+ const extra={maxDurationMs:5,optional:true,attributes:{'http.route':'/rates'}},A=plain(RATES),Q={serviceName:'checkout',operation:'Quote'},B={serviceName:'checkout',operation:'Price'};
+ // A nodeId conflict on the same span.
+ let local=withRates({...A,nodeId:'gamma',...extra}),live=stepsLive(s=>{d(s).steps[0].traceMatch={...A,nodeId:'beta',...extra};},[entry('2026-11-09T12:00:00Z','Bo',[mapRow({...A,nodeId:'beta'},{...A,nodeId:'alpha'})])]);
+ let out=S().pull(local,live);assert.equal(out.status,'conflict');assert.match(out.conflicts[0].message,/maps currency · GetRates on node gamma/);
+ assert.deepEqual(step(S().pull(local,live,{resolve:{'step:rates':'live'}}).text,'rates').traceMatch,{...A,nodeId:'beta',...extra},'live keeps the fields');
+ assert.deepEqual(step(S().pull(local,live,{resolve:{'step:rates':'local'}}).text,'rates').traceMatch,{...A,nodeId:'gamma',...extra},'local is unchanged');
+ // The span is taken from the board but the nodeId conflicts: the message names the local span.
+ live=stepsLive(s=>{d(s).steps[0].traceMatch={...B,nodeId:'beta',...extra};},[entry('2026-11-09T12:00:00Z','Bo',[mapRow({...B,nodeId:'beta'},{...A,nodeId:'alpha'})])]);
+ out=S().pull(local,live);assert.equal(out.status,'conflict');assert.match(out.conflicts[0].message,/your local copy maps currency · GetRates on node gamma/);
+ assert.deepEqual(step(S().pull(local,live,{resolve:{'step:rates':'live'}}).text,'rates').traceMatch,{...B,nodeId:'beta',...extra});
+ // A span conflict resolved live keeps the fields too.
+ local=withRates({...Q,nodeId:'gamma',...extra});live=stepsLive(s=>{d(s).steps[0].traceMatch={...B,...extra};},[entry('2026-11-09T12:00:00Z','Bo',[mapRow(B,A)])]);
+ assert.equal(S().pull(local,live).status,'conflict');assert.deepEqual(step(S().pull(local,live,{resolve:{'step:rates':'live'}}).text,'rates').traceMatch,{...B,nodeId:'gamma',...extra},'the board kept no nodeId change, so the local nodeId stays');
+});
+test('#1192 c3 an older-engine change does not set the nodeId base; a node missing locally asks',()=>{
+ const A=plain(RATES),B={serviceName:'checkout',operation:'Price'};
+ const live=stepsLive(s=>{d(s).steps[0].traceMatch={...B,nodeId:'beta'};},[entry('2026-11-09T11:00:00Z','Old',[mapRow(B,A)]),entry('2026-11-09T12:00:00Z','Bo',[mapRow({...B,nodeId:'beta'},{...B,nodeId:'alpha'})])]);
+ const out=S().pull(withRates({...A,nodeId:'alpha'}),live);assert.equal(out.status,'merged',JSON.stringify(out.conflicts));assert.deepEqual(step(out.text,'rates').traceMatch,{...B,nodeId:'beta'});
+ const missing=stepsLive(s=>{d(s).nodes.delta={title:'Delta'};d(s).steps[0].traceMatch={...A,nodeId:'delta'};},[entry('2026-11-09T12:00:00Z','Bo',[mapRow({...A,nodeId:'delta'},A)])]);
+ for(const resolve of [{},{'step:rates':'live'}]){const r=S().pull(withRates(A),missing,{resolve});assert.equal(r.status,'conflict',JSON.stringify(resolve));assert.match(r.conflicts[0].message,/node delta no longer exists locally/);}
+});

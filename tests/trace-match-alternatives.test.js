@@ -144,10 +144,41 @@ test('an optional step whose own span is in the trace but rejected by its parent
   // Own span and parent both absent: optional, not in this trace.
   const absent=both(d,trace(span('x','other'))).steps[1];
   assert.equal(absent.optional,true);assert.equal(absent.detail,'Optional, not in this trace. Parent mapping is unavailable.');
-  // Alternatives: one alternative's span present but rejected is enough to stay unknown.
+  // Alternatives with different operations: alternative 0's span is present but its parent mapping is
+  // unavailable, alternative 1's operation is absent. One unattributable span is enough to stay unknown.
+  const mixed=diagram();mixed.steps[1].traceMatch=[{...mixed.steps[1].traceMatch,optional:true},{serviceName:'stats-store',operation:'INSERT legacy',nodeId:'store',parentStepId:'consume',optional:true}];
+  const unclear=both(mixed,trace(span('r-db','INSERT stats','r1','stats-store'))).steps[1];
+  assert.equal(unclear.status,'missing');assert.equal(unclear.optional,undefined);assert.deepEqual(unclear.conditions.map(c=>c.kind),['unknown']);
+});
+// #1175 follow-up: a span is this step's only when it can be attributed to it. A span under another, matched
+// parent, or a call past the occurrence count, is not this step's span: the optional step is not in this trace.
+test('an optional step whose matching span belongs to another parent, or whose occurrence is past the call count, is not in this trace',()=>{
+  const call=(id,operation,parentId=null,serviceName='api',startMs=0)=>({...span(id,operation,parentId,serviceName,startMs),durationMs:2});
+  // P1: audit and persist both name the store INSERT; the only INSERT is under persist's parent.
+  const d={nodes:{api:{},store:{}},rows:[['api','store']],steps:[
+    {id:'request',traceMatch:{serviceName:'api',operation:'POST /orders',nodeId:'api'}},
+    {id:'other',traceMatch:{serviceName:'api',operation:'GET /orders',nodeId:'api'}},
+    {id:'persist',traceMatch:{serviceName:'store',operation:'INSERT order',nodeId:'store',parentStepId:'request'}},
+    {id:'audit',traceMatch:{serviceName:'store',operation:'INSERT order',nodeId:'store',parentStepId:'other',optional:true}}]};
+  const p1=both(d,trace(call('p1','POST /orders'),call('g1','GET /orders',null,'api',5),call('c1','INSERT order','p1','store',1)));
+  assert.equal(p1.steps[2].status,'matched');
+  assert.deepEqual([p1.steps[3].status,p1.steps[3].optional,p1.steps[3].conditions],['missing',true,[]],'P1: the INSERT under another parent is not audit\'s span');
+  // P2: a second serial call that this trace does not make.
+  const o={nodes:{api:{}},rows:[['api']],steps:[
+    {id:'first',traceMatch:{serviceName:'api',operation:'GET /status',nodeId:'api',occurrence:1}},
+    {id:'second',traceMatch:{serviceName:'api',operation:'GET /status',nodeId:'api',occurrence:2,optional:true}}]};
+  const p2=both(o,trace(call('s1','GET /status')));
+  assert.equal(p2.steps[0].status,'matched');
+  assert.deepEqual([p2.steps[1].status,p2.steps[1].optional,p2.steps[1].conditions],['missing',true,[]],'P2: occurrence 2 of one call is not in this trace');
+  // Without optional both stay unknown.
+  delete d.steps[3].traceMatch.optional;delete o.steps[1].traceMatch.optional;
+  assert.deepEqual(both(d,trace(call('p1','POST /orders'),call('g1','GET /orders',null,'api',5),call('c1','INSERT order','p1','store',1))).steps[3].conditions.map(c=>c.kind),['unknown']);
+  assert.deepEqual(both(o,trace(call('s1','GET /status'))).steps[1].conditions.map(c=>c.kind),['unknown']);
+  // A shared child on the pulsar path: the RabbitMQ alternative's parent is not on this path, and the
+  // Pulsar parent matched with no INSERT under it. The INSERT under r1 is not this path's span.
   const list=twoPaths();list.steps[2].traceMatch.forEach(m=>m.optional=true);
-  const rejected=both(list,trace(span('p1',PULSAR),span('r-db','INSERT stats','r1','stats-store')),'pulsar').steps.find(s=>s.stepId==='persist');
-  assert.equal(rejected.status,'missing');assert.equal(rejected.optional,undefined);assert.deepEqual(rejected.conditions.map(c=>c.kind),['unknown']);
+  const shared=both(list,trace(span('p1',PULSAR),span('r-db','INSERT stats','r1','stats-store')),'pulsar').steps.find(s=>s.stepId==='persist');
+  assert.deepEqual([shared.status,shared.optional,shared.conditions,shared.detail],['missing',true,[],'Optional, not in this trace.']);
 });
 test('validation rejects a non-boolean optional and mixed optional values across alternatives',()=>{
   const ok=diagram();ok.steps[1].traceMatch.optional=true;ok.steps[0].traceMatch.forEach(m=>m.optional=true);

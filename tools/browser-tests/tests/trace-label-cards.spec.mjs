@@ -134,7 +134,7 @@ for(const origin of ['local','imported']){
   await metric(root).click();await expect(metric(root)).toHaveAttribute('aria-checked','true');
   await pickExample(root);await expect(root.locator(CARDS)).toHaveCount(3);await expect(root.locator(LABELS)).toHaveCount(6);
   await expect(root.locator(LABELS).filter({hasText:'Matched: database INSERT shipping.quotes'})).toHaveCount(1);
-  expectClear(await stopSampling(root),'at any paint after the trace is picked');await expectSettled(root,'once settled');
+  expectClear(await stopSampling(root),'at any paint from the Metrics click on');await expectSettled(root,'once settled');
  });
  test(`desktop ${origin} trace labels keep their places when the Metrics overlay turns on and off`,async({page,server})=>{
   const root=await setup(page,server,{origin,exemplar:false});
@@ -156,4 +156,21 @@ for(const origin of ['local','imported']){
   // Cards move; labels do not. Edge labels follow font metrics by about a unit between overlay states, as before #1163.
   on.forEach(([text,x,y],i)=>{expect(Math.abs(x-off[i][1]),text+' x').toBeLessThanOrEqual(2);expect(Math.abs(y-off[i][2]),text+' y').toBeLessThanOrEqual(2);});
  });
+ // A label's box can change after the cards were placed: text is laid out again at each board
+ // scale (in CI a label widened by about 3% when the Auto view zoomed out). Grow the labels,
+ // change the scale, and the cards must be placed again clear of them.
+ test(`desktop ${origin} cards are placed again when a trace label grows after they were placed`,async({page,server})=>{
+  const root=await setup(page,server,{origin,exemplar:false});
+  await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
+  await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await root.getByRole('button',{name:'Load trace',exact:true}).click();
+  await expect(root.locator(LABELS)).toHaveCount(6);await metric(root).click();await expect(root.locator(CARDS)).toHaveCount(3);
+  await expectSettled(root,'before the labels grow');
+  const before=await root.evaluate(host=>Array.from((host.shadowRoot || host).querySelectorAll('.dv-metrics-card')).map(card=>card.getAttribute('transform')));
+  await root.evaluate(host=>{const style=document.createElement('style');style.textContent='.dv-trace-overlay text{font-size:18px!important}';(host.shadowRoot || host).appendChild(style);});
+  await root.getByRole('button',{name:'Diagram zoom out',exact:true}).click();
+  await expect.poll(async()=>(await measure(root)).problems.filter(p=>p.startsWith('label ')),{message:'the cards are placed again clear of the grown labels'}).toEqual([]);
+  await expectSettled(root,'after the labels grew');
+  expect(await root.evaluate(host=>Array.from((host.shadowRoot || host).querySelectorAll('.dv-metrics-card')).map(card=>card.getAttribute('transform')))).not.toEqual(before);
+ });
+
 }

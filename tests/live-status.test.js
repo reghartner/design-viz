@@ -3734,3 +3734,62 @@ test('#1164 example traces are not selected or painted until the reader picks on
   api.destroy();
  }
 });
+/* #1173 (epic #1130, Chuck 2026-11-09): the compact Trace view. One-choice selects are not rendered as selects (their value
+   still applies), the help line moves to the Load trace summary's title, Show on diagram waits for a shown trace, and with a
+   trace shown the search section and the request card are each one collapsed line, so the span list comes right after them.
+   Rejects: a select with a single option; a help paragraph in the form; Show on diagram before any trace; a shown trace
+   whose search form or request details push the waterfall down. */
+const compactTool=()=>({name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}});
+const COMPACT_ID='8413cd87a9f15b6bfe8e1acf5b3346d0';
+function compactBoard(envs=['prod']){
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json')));
+ profile.environments=Object.fromEntries(Object.entries(profile.environments).filter(([id])=>envs.includes(id)));
+ return {page:{tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{
+  nodes:{web:{title:'Checkout frontend'},checkout:{title:'Checkout service'},cart:{title:'Cart service'},payment:{title:'Payment service'}},rows:[['web','checkout','payment'],['cart']],
+  edges:[{from:'web',to:'checkout',label:'PlaceOrder'},{from:'checkout',to:'cart',label:'GetCart'},{from:'checkout',to:'payment',label:'Charge'}],
+  steps:[{id:'accept',nodes:['web'],traceMatch:{serviceName:'frontend',operation:'/cart/checkout',nodeId:'web'}},{id:'place',edge:'web->checkout',traceMatch:{serviceName:'checkout',operation:'msdemo.CheckoutService/PlaceOrder'}},{id:'charge',edge:'checkout->payment',traceMatch:{serviceName:'payment',operation:'grpc.msdemo.PaymentService/Charge'}}],
+  panels:[{id:'status',type:'live-status',title:'Status'}]}}]}};
+}
+function compactHarness(envs){
+ const recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),calls=[];
+ const h=harness(compactBoard(envs),{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>compactTool(),call:async(request,args)=>{calls.push(args);return {payload:recorded};},logsConnector:async()=>'Grafana',queryLogs:async()=>({data:[]})}}});
+ return {h,api:h.ctl.liveStatus,m:mountStatus(h),calls};
+}
+test('#1173 one-choice selects are not rendered, the help line moves to the summary title, Show on diagram waits for a trace',async()=>{
+ const {h,api,m,calls}=compactHarness(['prod']);
+ assert.equal(api.snapshot().mode,'trace');
+ const selects=()=>m.body.querySelectorAll('select').map(el=>el.getAttribute('aria-label'));
+ for(const name of ['Trace connection','Connection environment','Mapping diagram','Log lookup'])assert.ok(!selects().includes(name),'no one-choice select named '+name+': '+selects());
+ const config=m.body.querySelector('details.dv-trace-config'),summary=config.querySelector('summary');
+ assert.ok(!textOf(config).includes('Load one exact request.'),'the help line is not in the form');
+ assert.match(summary.getAttribute('title') || '',/^Load one exact request\. This session only; diagram mappings use authored traceMatch steps\.$/,'its text is the summary title');
+ assert.match(textOf(summary),/Fixture Honeycomb · Production/,'the one-choice connection and environment are named in the summary');
+ const show=()=>m.body.querySelector('button.dv-trace-show');assert.ok(!show() || show().hidden,'no Show on diagram before a trace is shown');
+ // The sole choices still apply: Load sends the same request as with the selects.
+ api.setDirectTraceField({field:'input',value:COMPACT_ID});assert.ok(await api.loadDirectTrace(false),'the trace loads');
+ assert.deepEqual(plain(calls.at(-1)),{trace_id:COMPACT_ID,from:'-2h',environment_slug:'production',team_slug:'example-team',view_mode:'full'});
+ h.flush();assert.equal(show().hidden,false,'Show on diagram after a Load');assert.equal(show().disabled,false);
+ api.destroy();
+ // Two options still render a select.
+ const two=compactHarness(['prod','stage']);assert.ok(two.m.body.querySelectorAll('select').some(el=>el.getAttribute('aria-label')==='Connection environment'),'two environments keep the select');two.api.destroy();
+});
+test('#1173 with a trace shown the search section and the request card are one collapsed line each, and the span list follows',async()=>{
+ const {h,api,m}=compactHarness(['prod']),config=()=>m.body.querySelector('details.dv-trace-config'),request=()=>m.body.querySelector('details.dv-trace-request');
+ assert.equal(config().open,true,'with no trace shown the search section is open');assert.equal(request(),null,'no request card yet');
+ api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();
+ assert.equal(config().open,false,'the search section collapses');
+ assert.match(textOf(config().querySelector('summary')).replace(/\s+/g,' ').trim(),/^Fixture Honeycomb · Production · Change trace$/);
+ assert.ok(request(),'one request card');assert.equal(request().open,false,'collapsed');
+ assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · Started .+ local · \d+ spans · \d+\/\d+ steps matched$/);
+ assert.ok(request().querySelector('.dv-trace-identity'),'expanding shows today\'s details');assert.equal(request().querySelector('.dv-trace-identity').textContent,COMPACT_ID);
+ const closed=el=>{for(let n=el.parentElement;n;n=n.parentElement)if(n.tagName==='details' && !n.open && !el.closest('summary'))return true;return false;};
+ const span=m.body.querySelector('.dv-trace-span');assert.ok(span && !closed(span),'the span list is not inside a collapsed section');
+ const order=m.body.querySelectorAll('details.dv-trace-config,details.dv-trace-request,.dv-trace-focus-summary,.dv-trace-waterfall').map(el=>el.className.split(' ')[0]);
+ assert.deepEqual(order,['dv-trace-config','dv-trace-request','dv-trace-focus-summary','dv-trace-waterfall'],'the waterfall comes right after the collapsed lines and the focus box');
+ for(const el of [config(),request()])assert.equal(el.children[0].tagName,'summary','each collapsed section shows only its summary line');
+ // A section the reader expanded stays expanded across repaints until the shown trace changes.
+ request().open=true;config().open=true;api.setTraceShow(false);api.setTraceShow(true);h.flush();
+ assert.equal(request().open,true);assert.equal(config().open,true);
+ api.clearDirectTrace();h.flush();assert.equal(config().open,true);assert.equal(request(),null);
+ api.destroy();
+});

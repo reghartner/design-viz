@@ -1222,3 +1222,106 @@ test('provider snapshot bytes remain bound to the exact refresh envelope through
  h.disk.set('refresh-sources.json',{...h.disk.get('refresh-sources.json'),sources:{...sources,manifest:'swapped'}});release();await polling;
  assert.equal(calls,0);assert.equal(h.disk.get('refresh-sources-result.json').status,'rejected');
 });
+
+/* #1223: a hidden Workbench tab. Chrome's intensive throttling runs a hidden page's chained
+   timers about once a minute; a dedicated worker's timers are not intensively throttled. The
+   heartbeat and the request-poll tick run on a worker-driven background timer, with the page
+   timer as the fallback when Worker is unavailable or cannot start. */
+function hiddenHarness({worker=true,workerFails=null}={}){
+  let clock=100000,pageId=0,source='{"title":"before"}',number=0;
+  const page=new Map(),workers=[],disk=new Map(),copy=v=>v===undefined?undefined:JSON.parse(JSON.stringify(v));
+  // Page timers fire only at minute boundaries (intensive throttling of a hidden tab).
+  const context={TextEncoder,TextDecoder,SyntaxError,setTimeout:(fn,ms)=>{page.set(++pageId,{fn,at:clock+ms});return pageId;},clearTimeout:id=>page.delete(id)};
+  if(worker)Object.assign(context,{
+    Blob:class{constructor(parts){this.text=parts.join('');}},
+    URL:{createObjectURL:blob=>{assert.match(blob.text,/postMessage/);return 'blob:background-timer';},revokeObjectURL(){}},
+    Worker:class{constructor(url){if(workerFails==='constructor')throw Error('Workers blocked');this.url=url;this.timers=new Map();workers.push(this);
+      if(workerFails==='error')Promise.resolve().then(()=>this.onerror && this.onerror({preventDefault(){}}));}
+      postMessage(message){if(message && message.cancel!==undefined)this.timers.delete(message.cancel);else this.timers.set(message.id,clock+message.ms);}
+      terminate(){this.terminated=true;this.timers.clear();}}});
+  vm.createContext(context);
+  for(const file of ['lifetime.js','agent-merge.js','agent-session.js','folder-agent.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/workbench',file),'utf8'),context);
+  const files={async read(name){const value=disk.get(name);return copy(value)||null;},async readText(name){return disk.has(name)?String(disk.get(name)):null;},
+    async write(name,value,guard){if(guard)await guard({name,created:!disk.has(name),phase:'before-write'});disk.set(name,copy(value));},
+    async remove(name){disk.delete(name);}};
+  const client=context.createFolderAgentClient({files,workflow:'external',reviewMode:true,now:()=>clock,uuid:()=>'id-'+(++number),
+    snapshot:()=>({source,ledger:null,project:1,topologyRevision:0,open:true,selection:[],views:[]}),busy:()=>false,apply(text){source=text;return {ok:true,rendered:true};},changed(){}});
+  const settle=async()=>{for(let n=0;n<60;n++)await Promise.resolve();};
+  // One second of wall time: worker timers due now fire; page timers fire only on a minute boundary.
+  async function second(){
+    clock+=1000;
+    for(const w of workers)for(const [id,at] of [...w.timers])if(at<=clock && !w.terminated){w.timers.delete(id);w.onmessage({data:id});}
+    if(clock%60000===0)for(const [id,timer] of [...page])if(timer.at<=clock){page.delete(id);timer.fn();}
+    await settle();
+  }
+  return {context,client,disk,files,workers,page,second,settle,now:()=>clock,envelope:value=>({...client.manifest(),...value})};
+}
+// The helper's rule (tools/folder-agent.py HEARTBEAT_MAX_AGE_MS): a lease older than 15 s is paused.
+const heartbeatAge=h=>h.now()-h.disk.get('editor.json').at;
+test('#1223 a hidden tab keeps its heartbeat fresh: worker-driven ticks while page timers fire once a minute',async()=>{
+  const h=hiddenHarness();await h.client.start();await h.settle();
+  let oldest=0;for(let n=0;n<180;n++){await h.second();oldest=Math.max(oldest,heartbeatAge(h));}
+  assert.ok(oldest<=2000,'the heartbeat never ages past 2 s (oldest '+oldest+' ms); the helper calls 15 s paused');
+  assert.equal(h.workers.length,1,'one background worker per client');
+  h.client.destroy();assert.equal(h.workers[0].terminated,true,'destroy stops the worker');
+});
+test('#1223 without Worker, or when it cannot start, the page timer still drives the heartbeat',async()=>{
+  for(const variant of [{worker:false},{workerFails:'constructor'},{workerFails:'error'}]){
+    const h=hiddenHarness(variant);await h.client.start();await h.settle();
+    for(let n=0;n<120;n++)await h.second();
+    assert.ok(heartbeatAge(h)<60000+2000,JSON.stringify(variant)+': the page timer still renews about once a minute');
+    assert.ok(h.page.size>=1,JSON.stringify(variant)+': the next heartbeat is on a page timer');
+    h.client.destroy();assert.equal(h.page.size,0,JSON.stringify(variant)+': destroy clears the page timer');
+  }
+});
+test('#1223 a request written while the tab is hidden is acknowledged within the helper window with a fresh heartbeat',async()=>{
+  const h=hiddenHarness();await h.client.start();await h.settle();
+  // The Workbench's poll tick (src/workbench/agent-chat.js) runs on the same background timer.
+  const timer=h.context.createWorkbenchBackgroundTimer();let stopped=false;
+  const tick=()=>{if(stopped)return;h.client.poll().catch(()=>{}).finally(()=>{if(!stopped)timer.delay(tick,250);});};timer.delay(tick,250);
+  for(let n=0;n<300;n++)await h.second();// five minutes hidden
+  const written=h.now();h.disk.set('agent-request.json',h.envelope({id:'hidden-1',text:'Edit while hidden',expiresAt:written+120000}));
+  let acknowledged=null;
+  for(let n=0;n<120 && acknowledged===null;n++){await h.second();const t=h.disk.get('transcript.json');if(t && t.messages.some(m=>m.requestId==='hidden-1'))acknowledged=h.now();}
+  assert.ok(acknowledged!==null && acknowledged-written<=5000,'acknowledged within seconds, not minutes ('+(acknowledged && acknowledged-written)+' ms)');
+  assert.ok(heartbeatAge(h)<=15000,'and the heartbeat is fresh when the helper checks it');
+  stopped=true;timer.destroy();h.client.destroy();
+});
+
+/* #1223 housekeeping: a request's candidate-<id> files are deleted once the request is
+   finished (accepted, replied, released, withdrawn or expired) or a newer request is
+   published. The current request's files stay, and files of an attempt that never became a
+   request (a taken or raced name) are never ours to delete. */
+test('#1223 finished requests leave no candidate files behind; the current request keeps its own',async()=>{
+  const names=id=>[`candidate-${id}.spec.json`,`candidate-${id}.ledger.md`],has=(h,id)=>names(id).map(n=>h.disk.has(n));
+  // External: accepted completion.
+  const a=harness({workflow:'external',reviewMode:true});a.files.remove=async name=>a.disk.delete(name);await a.client.start();
+  await externalTurn(a,'accepted');assert.deepEqual(has(a,'accepted'),[true,true],'the current request keeps its files');
+  a.proposal();await a.client.poll();await a.client.acceptReview();assert.equal(a.last.pending,null);
+  assert.deepEqual(has(a,'accepted'),[false,false],'accepted: removed');
+  // External: withdrawn before acknowledgement reached the agent (expired).
+  await externalTurn(a,'withdrawn');a.disk.set('agent-request.json',a.envelope({id:'withdrawn',text:'Update the story',expiresAt:0,withdrawn:true}));await a.client.poll();
+  assert.equal(a.last.pending,null);assert.deepEqual(has(a,'withdrawn'),[false,false],'withdrawn: removed');
+  // Embedded: final reply, and Stop.
+  const e=harness();e.files.remove=async name=>e.disk.delete(name);await e.client.start();
+  await e.client.send('Reply turn');const replied=e.disk.get('request.json').id;e.reply();await e.client.poll();
+  assert.deepEqual(has(e,replied),[false,false],'replied: removed');
+  await e.client.send('Stopped turn');const stopped=e.disk.get('request.json').id;await e.client.cancel();
+  assert.deepEqual(has(e,stopped),[false,false],'released: removed');
+  // A newer request clears an older one still on disk, but never another attempt's taken name.
+  await e.client.send('Older turn');const older=e.disk.get('request.json').id,n=Number(older.slice(3));e.reply({id:'reply-older'});
+  e.files.remove=async()=>{};await e.client.poll();e.files.remove=async name=>e.disk.delete(name);
+  assert.deepEqual(has(e,older),[true,true],'precondition: a removal that did not happen');
+  e.disk.set(`candidate-id-${n+1}.ledger.md`,'someone else’s notes');await assert.rejects(e.client.send('Taken'),/already exists/);
+  await e.client.send('Newest turn');const newest=e.disk.get('request.json').id;
+  assert.deepEqual(has(e,older),[false,false],'a newer publication removes the finished request');
+  assert.deepEqual(has(e,newest),[true,true],'and keeps its own');
+  assert.equal(e.disk.get(`candidate-id-${n+1}.ledger.md`),'someone else’s notes','a name this client never published is left alone');
+});
+test('#1223 the directory adapter removes only candidate and staged snapshot files',async()=>{
+  const h=harness(),removed=[];const directory={async removeEntry(name){removed.push(name);}};
+  const files=h.context.createFolderAgentFiles(directory);
+  await files.remove('candidate-abc.spec.json');await files.remove('candidate-abc.ledger.md');await files.remove('state-xyz.json');
+  for(const name of ['session.json','candidate-../x.spec.json','candidate-abc.json','story.spec.json'])await assert.rejects(files.remove(name),/may be removed/,name);
+  assert.deepEqual(removed,['candidate-abc.spec.json','candidate-abc.ledger.md','state-xyz.json']);
+});

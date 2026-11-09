@@ -1082,6 +1082,37 @@ class FolderAgentTests(unittest.TestCase):
         self.assertEqual(helper.identity(self.folder), self.owner)
         self.assertIn('acknowledgement', errors.getvalue())
 
+    def test_begin_waits_for_a_hidden_tab_across_throttled_minutes_without_asking_for_the_front(self):
+        """#1223: a hidden Workbench tab can be throttled to one wake a minute. With the same identity and a
+        connected lease, a stale heartbeat (30 s, or 100 s: past the old 90 s window) and an acknowledgement
+        that arrives 110 s after registration are waited for. Foregrounding is mentioned only when a wait runs out."""
+        for stale in (30, 100):
+            with self.subTest(stale=stale):
+                self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+                for name in ('request.json', 'transcript.json', 'agent-request.json'):
+                    (self.folder/name).unlink(missing_ok=True)
+                self.put('editor.json', {**self.owner, 'connected': True, 'at': 1000*1000})
+                now, written = [1000.0], [None]
+                def sleep(seconds):
+                    now[0] += seconds
+                    if now[0] >= 1000 + stale:
+                        self.put('editor.json', {**self.owner, 'connected': True, 'at': now[0]*1000})
+                    if (self.folder/'agent-request.json').exists() and written[0] is None:
+                        written[0] = now[0]
+                    if written[0] is not None and now[0] >= written[0] + 110:
+                        request = helper.read(self.folder, 'agent-request.json')
+                        self.put('request.json', {**request, 'revision': 'connection-1'})
+                        self.put('transcript.json', {'sessionId': self.owner['sessionId'], 'messages': [{'role': 'user', 'requestId': request['id'], 'text': request['text']}]})
+                # The heartbeat is fresh at registration only after the stale period; the clock starts past it.
+                now[0] = 1000.0 + 16
+                output, errors = io.StringIO(), io.StringIO()
+                with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Hidden tab']), patch.object(helper.time, 'time', side_effect=lambda: now[0]), patch.object(helper.time, 'monotonic', side_effect=lambda: now[0]), patch.object(helper.time, 'sleep', side_effect=sleep), patch.object(sys, 'stdout', output), patch.object(sys, 'stderr', errors):
+                    helper.main()
+                self.assertEqual(json.loads(output.getvalue())['id'], helper.read(self.folder, 'request.json')['id'])
+                self.assertIn('a hidden tab can be slowed by the browser', errors.getvalue())
+                self.assertNotIn('to the front', errors.getvalue())
+                self.assertEqual(helper.identity(self.folder), self.owner)
+
     def test_watcher_ignores_stale_heartbeat_and_old_connection(self):
         self.put('editor.json', {**self.owner, 'connected': True, 'at': 0})
         self.assertEqual(self.run_helper('watch', '--minutes', '.003', '--interval', '.1').stdout, '')

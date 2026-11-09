@@ -747,22 +747,23 @@ and Export project preserve the panel. There are no authored state or patch fiel
 The Jira and Trace views share one header (#1131). Its top row holds **Jira** | **Trace**,
 an **Env** select when the board names environments, **Edit** (then **Save N changes**,
 **Discard** or **Done**) for anyone who can edit the board, and the **Metrics overlay** switch
-at the right edge. The Metrics connector line follows (#1136), then **Live** | **Over time**,
-the day row and any Over time error, in both views. A board with no ticket or epic
+at the right edge. **Live** | **Over time** follows, then the day row and any Over time error,
+in both views. Each view draws the Metrics connector line below its own button rows: the Jira
+view in its status row, under the counts and **First blocker**; the Trace view directly under
+its controls row. The line wraps, so a changing note moves no button or slider (#1162). A board with no ticket or epic
 references after imports has no Jira view (#1136): the panel opens on Trace with no
 **Jira** | **Trace** switch. If a loaded detail
 brings ticket references, the switch appears and the panel moves to Jira unless the reader
-chose a view or worked on a trace. In the Trace view a metric card opens only its metrics: signal values, window, a metric verdict and query links, with no Jira or proof words and no Since Done line (#1153). The Jira view then has two rows. The first holds only buttons, which keep
-their place: any provider action and, on the far right, **First blocker**. **First blocker** keeps one size; with no blockers it reads
+chose a view or worked on a trace. In the Trace view a metric card opens only its metrics: signal values, window, a metric verdict and query links, with no Jira or proof words and no Since Done line (#1153). The Jira view then has two rows (#1162). The first holds the distinct-ticket counts,
+which wrap onto more lines so each shows in full, any provider action and, at its top right, **First blocker** in
+a fixed slot, so changing counts or a button appearing cannot move it; wrapping counts move only what is below. **First blocker** keeps one size; with no blockers it reads
 **No blockers** and is greyed out, and with blockers it cannot reach from here it
-stays **First blocker** and is greyed out. The second row holds everything that
-changes. Its height follows the panel's width, one line when the panel is wide and
-two when it is narrow, and never its text, so it cannot move the buttons or what is
-below: distinct-ticket counts, a connector indicator (a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
+stays **First blocker** and is greyed out. The second row holds the status text,
+which wraps so every note shows in full: a connector indicator (a dot plus “Jira connected, refreshed 3:42:15 PM” in the viewer's local clock, with the date added when it is not today; the dot is grey when not connected,
 blue (`--dv-live-active`) while connecting or awaiting approval, green when connected or in demo mode,
 red on error, and it pulses while a fetch is in flight; the time is the last successful
-fetch, not a ticket's change time), and the provider note. Text too long for the row
-is cut off and stays available in the row's tooltip and to screen readers. Demo
+fetch, not a ticket's change time), and the provider note. The row's tooltip repeats the
+whole text, and the Metrics connector line in this row wraps the same way. Demo
 controls supply **<** and **>** on the day row, below **Live** | **Over time**. The engine's panel title stays above this header.
 
 While it is on, the Metrics overlay draws its cards and cues in both views on every board
@@ -772,7 +773,7 @@ provider or a demo telemetry source (see [Telemetry provider](#telemetry-provide
 without one it is hidden. It is off on every load and its state is never saved.
 Turning it on calls the telemetry provider at once in Live mode and keeps it refreshing; turning
 it off stops the provider and clears the telemetry map. It never changes Live or the
-Jira paint, and Live never changes it. Its connector line in the shared header uses the
+Jira paint, and Live never changes it. Its connector line (in each view, below the buttons) uses the
 Jira connector's dot colors: “Metrics: not connected” while off, “Metrics:
 connecting” until the first answer, “Metrics: connected, refreshed 3:42:15 PM” (“Metrics:
 demo, …” for a demo source) and “Metrics: did not answer · <message>” after a failed
@@ -2125,6 +2126,24 @@ count: `16.1 ms across 2 spans`. A board that keeps one step per transport reads
 `2 operations · 1 unknown · 16.1 ms` (the other transport's step is missing); make them one
 step with alternatives.
 
+A step that may be absent from a trace (for example, its operation runs in a different
+trace) can carry `traceMatch.optional: true`; with alternatives, set it on every
+alternative ([canon rules](canon.md#reference-traces-and-incident-alternates)). A step whose
+`parentStepId` names an optional step must be marked optional too, or it reads unknown when
+the parent is absent. When the loaded trace has no span with an optional step's service and
+operation, the label is built from the other rows as if that row were not
+there: a node named by one matched step and one missing optional step reads
+`Matched: … · 16.1 ms`, or only the time for a single selector. The title lists it as
+*optional, not in this trace: service operation*, it never makes the node unknown, and a
+node whose only row is a missing optional step gets no label. The coverage line leaves it
+out and adds the count: `1/3 steps matched · 1 optional not in this trace · 0 spans
+unmatched`. Edge labels and titles carry matched rows only, so a missing step, optional or
+not, never adds to an edge and an edge title does not list a missing optional step. A
+matched optional step reads like any matched step; an ambiguous one still counts as
+ambiguous. Local, imported and drill-down steps follow the same rules. A trace that lacks
+an optional step can still be approved as the reference trace; a missing step without
+`optional` still blocks approval.
+
 **Open trace** requires a safe provider UI URL. **Pin as evidence** adds a
 deduplicated in-memory Jira Activity entry, without posting externally. Trace
 selection uses the existing cached provider API; rendering and stepping never
@@ -2286,8 +2305,8 @@ missing-work appearance. It counts marked node and connection occurrences across
 local and imported diagrams, nested sections and loaded details; text boxes do
 not count. It appears even without tickets or a connector and hides when no
 markers remain. The count stays separate from the `missing` Jira-ticket total.
-In narrow desktop panels, Missing work appears first; focus **Status counts**
-and use the arrow keys, or scroll horizontally, to reach the other counts.
+Missing work appears first; in narrow desktop panels the counts wrap onto more
+lines, so every count shows in full (#1162).
 Turning Live off or clearing live paint removes its styling along with the
 diagram's styling; the authored marker count remains until the markers are cleared.
 

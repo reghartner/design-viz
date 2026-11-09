@@ -2044,7 +2044,7 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
  let calls=0,seen=null,fail=false;const sample={a:{signals:{lag:{value:3}}}};
  const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)},{telemetry:{provider:b=>{calls++;seen=b;return fail?Promise.reject(Error('Grafana timeout')):Promise.resolve(sample);}}});
  const panel=mountStatus(h);h.flush();h.flush();await settle();
- const head=h.view.querySelector('.dv-live-head'),header=h.view.querySelector('.dv-status-header'),live=header.querySelector('.dv-live-toggle'),metrics=header.querySelector('button.dv-live-metrics'),conn=header.querySelector('.dv-live-metrics-connection'),jira=head.querySelector('.dv-live-connection');
+ const head=h.view.querySelector('.dv-live-head'),header=h.view.querySelector('.dv-status-header'),live=header.querySelector('.dv-live-toggle'),metrics=header.querySelector('button.dv-live-metrics'),conn=head.querySelector('.dv-live-metrics-connection'),jira=head.querySelector('.dv-live-connection');
  assert.ok(metrics,'M6 Metrics switch in the panel header');assert.equal(metrics.hidden,false);assert.equal(textOf(metrics).trim(),'Metrics overlay');assert.equal(metrics.type,'button');assert.equal(metrics.getAttribute('role'),'switch');
  assert.ok(!metrics.classList.contains('tbtn'),'#1131 a switch, not a button that looks like a third view');
  assert.equal(metrics.getAttribute('aria-checked'),'false','M6 off by default');assert.equal(calls,0,'M6 no provider call while off');
@@ -2053,7 +2053,7 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
  assert.ok(head.children.indexOf(controls)<head.children.indexOf(head.querySelector('.dv-live-status')),'M6 controls precede status text');
  assert.ok(conn,'M6 metrics connector text');assert.ok(!conn.classList.contains('dv-live-connection'),'M6 distinct connector');
  assert.equal(head.querySelectorAll('.dv-live-connection').length,1);
- assert.equal(h.view.querySelectorAll('.dv-live-metrics-connection').length,1,'#1136 one metrics connector line, in the shared header for both views');assert.equal(conn.parentElement,header);
+ assert.equal(h.view.querySelectorAll('.dv-live-metrics-connection').length,1,'#1136 one metrics connector line per view');assert.ok(conn.closest('.dv-live-status'),'#1162 in the Jira status row, below the counts and First blocker');
  const text=()=>conn.querySelectorAll('span')[0].textContent;
  assert.equal(conn.hidden,false);assert.equal(conn.tagName,jira.tagName,'M6 same markup as the Jira connector');assert.equal(conn.getAttribute('role'),'status');assert.ok(conn.querySelector('i.dv-live-metrics-dot'),'M6 its own status dot');
  assert.equal(conn.getAttribute('data-state'),'disconnected');assert.equal(conn.getAttribute('data-busy'),'false');assert.equal(text(),'Metrics: not connected');
@@ -2076,8 +2076,9 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
 
 test('M7 a page with a telemetry provider and no Jira evidence still shows Metrics in the header',()=>{
  const h=harness(telemetryPage(),{},{telemetry:{provider:()=>Promise.resolve({})}});
- const panel=mountStatus(h),header=h.view.querySelector('.dv-status-header'),metrics=header.querySelector('button.dv-live-metrics'),line=header.querySelector('.dv-live-metrics-connection');
- assert.ok(metrics && !metrics.hidden,'M7 Metrics overlay switch');assert.ok(line && !line.hidden,'M7 and its connector line (#1136: in the shared header)');
+ const panel=mountStatus(h),header=h.view.querySelector('.dv-status-header'),metrics=header.querySelector('button.dv-live-metrics'),line=h.view.querySelector('.dv-live-status .dv-live-metrics-connection');
+ assert.ok(metrics && !metrics.hidden,'M7 Metrics overlay switch');assert.ok(line && !line.hidden,'M7 and its connector line (#1162: in the Jira status row)');
+ assert.equal(h.view.querySelector('.dv-live-head').hidden,false);assert.equal(h.view.querySelector('.dv-live-status').hidden,false,'M7 the status row shows for the Metrics line alone');
  assert.equal(h.view.querySelector('.dv-live-toggle').hidden,true,'M7 Live stays hidden without Jira evidence');
  panel.destroy();h.ctl.liveStatus.destroy();
 });
@@ -2369,7 +2370,7 @@ test('M10 the action button shows on a metrics-only page so Allow Grafana reache
 | OT11 | clear() on a past day | mode ends and today's evidence is gone | a past day surviving a permission loss |
 | OT12 | demo timeline with a late ticket, a ticket that later disappears, and one never named | not created yet: no status entry; absent after existing: missing; epic state per day; last day matches the live demo | treating every absent ticket the same |
 | OT13 | provider entry without a state | apply() still drops it | widening the provider contract |
-| OT15 | status row and day buttons (#986) | counts, connection and notes are in `.dv-live-status` with their full text in its title; buttons are in `.dv-live-controls`; a board's `<` and `>` step the slider, are disabled at the ends, and are absent on Live | changing text beside static buttons; step buttons on a board with no slider |
+| OT15 | status row and day buttons (#986, #1162) | connection and notes are in `.dv-live-status`, which wraps, with their full text in its title; the counts strip and the buttons are in `.dv-live-controls`, First blocker last; a board's `<` and `>` step the slider, are disabled at the ends, and are absent on Live | changing text beside static buttons; step buttons on a board with no slider |
 | OT14 | the two mode buttons (Chuck, 2026-11-04) | Live and Over time are the only two buttons of their header row (#1131), exactly one is pressed, the selected Over time click does nothing, Live returns to today without turning colors off, the selected Live click still turns colors off, and Over time turns colors back on | a Back to today button; a past day with colors off |
 | OT17 | days dated two days ago to today, then a history ending before today and one with no dates (#1082) | the Over time row's heading shows the selected day's label large; on a day dated today it reads TODAY with the label beside it; the slider and `<` `>` update it; Live has no heading | a date only in the small note; TODAY on a last day that is not today |
 | OT18 | Metrics off; days from the product builders in America/New_York: a normal day, the 23 h and 25 h DST days, a demo day, today; days with no date key (#1132) | `snapshot().overTime.window` is `{from, to, label}`: from the day key's local midnight to the next local midnight in UTC, today ending now; null in Live and on a day with no key | a UTC-midnight day; a fixed 24 h day; a demo day cut at its UTC `at`; a window that needs Metrics; a today window ending in the future |
@@ -2663,8 +2664,9 @@ test('OT14 Live and Over time are two mode buttons: Live returns to today and th
 });
 test('OT15 changing text has its own row, and a board steps days with < and > only on the slider row',async()=>{
  const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);api.apply(overToday());api.note('A long note about the connector','warn');api.setHistory({load:()=>({days:overDays()})});
- const controls=h.view.querySelector('.dv-live-controls'),status=h.view.querySelector('.dv-live-status');assert.ok(controls,'#986 a row of static buttons');assert.ok(status,'#986 a row of changing text');
- assert.equal(controls.querySelectorAll('.dv-live-count,.dv-live-connection,.dv-live-note').length,0,'no changing text beside the buttons');assert.ok(status.querySelector('.dv-live-note'));assert.ok(status.querySelector('[data-live-count="active"]'));assert.match(status.getAttribute('title'),/A long note about the connector/);
+ const controls=h.view.querySelector('.dv-live-controls'),status=h.view.querySelector('.dv-live-status');assert.ok(controls,'#986 a row of counts and buttons');assert.ok(status,'#986 a row of changing text');
+ // #1162: the counts strip (fixed height) shares the first row with the buttons; status text, which wraps, has the row below.
+ assert.equal(controls.querySelectorAll('.dv-live-connection,.dv-live-note').length,0,'no status text beside the buttons');assert.ok(controls.querySelector('.dv-live-counts [data-live-count="active"]'));assert.ok(status.querySelector('.dv-live-note'));assert.match(status.getAttribute('title'),/A long note about the connector/);
  assert.ok(controls.children.at(-1).classList.contains('dv-live-first'),'First blocker is last, so a button appearing beside it cannot move it');
  assert.equal(h.view.querySelectorAll('.dv-live-step').length,0,'no step buttons on Live');
  overButton(h).dispatchEvent({type:'click'});await historySettle();
@@ -2672,6 +2674,24 @@ test('OT15 changing text has its own row, and a board steps days with < and > on
  const [prev,next]=steps;assert.equal(api.snapshot().overTime.index,2);assert.equal(next.disabled,true);assert.equal(prev.disabled,false);
  prev.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,1);prev.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,0);assert.equal(prev.disabled,true);assert.equal(next.disabled,false);
  next.dispatchEvent({type:'click'});assert.equal(api.snapshot().overTime.index,1);
+});
+// #1162: the counts and First blocker share the first row (First blocker last, in its fixed slot); the status row below
+// holds only text, which wraps. Rejects First blocker alone on a row above the counts.
+test('#1162 the counts and First blocker share the first row; the status row holds only text',()=>{
+ const h=harness(overFixture());mountStatus(h);const api=h.ctl.liveStatus;api.apply(overToday());api.note('A long note about the connector','warn');
+ const controls=h.view.querySelector('.dv-live-controls'),status=h.view.querySelector('.dv-live-status');
+ assert.ok(controls.querySelector('.dv-live-counts[role="region"]'),'the counts are on the first row');
+ assert.ok(controls.children.at(-1).classList.contains('dv-live-first'),'First blocker ends that row, so a button appearing to its left cannot move it');
+ assert.equal(status.querySelector('.dv-live-counts'),null,'the status row holds text only');assert.ok(status.querySelector('.dv-live-note'));assert.match(status.getAttribute('title'),/A long note about the connector/);
+ api.destroy();
+ // Before the first answer an action (Allow Jira) shows alone: no empty, focusable counts region beside it.
+ const w=harness(overFixture());mountStatus(w);w.ctl.liveStatus.action('Allow Jira',()=>{});
+ // The counts strip stays as an unnamed spacer and First blocker's slot is reserved, unseen and inert, so the action keeps its place when data arrives.
+ const row=w.view.querySelector('.dv-live-controls'),strip=row.querySelector('.dv-live-counts'),slot=row.querySelector('.dv-live-first');assert.equal(row.hidden,false);assert.equal(row.querySelector('.dv-live-action').hidden,false);
+ assert.equal(strip.hidden,false);assert.equal(strip.getAttribute('role'),null,'an unnamed spacer, not a focusable region');assert.equal(strip.getAttribute('tabindex'),null);
+ assert.equal(slot.getAttribute('data-reserved'),'true');assert.equal(slot.getAttribute('aria-hidden'),'true');assert.equal(slot.getAttribute('tabindex'),'-1');assert.equal(slot.disabled,true);
+ w.ctl.liveStatus.apply(overToday());assert.equal(strip.getAttribute('role'),'region');assert.equal(slot.getAttribute('data-reserved'),null);assert.equal(slot.getAttribute('aria-hidden'),null);
+ w.ctl.liveStatus.destroy();
 });
 // #1082: a day's key is its calendar date in the viewer's time zone, as liveStatusHistoryDays writes it.
 const overDayKey=offset=>{const now=new Date();return new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()+offset)).toISOString().slice(0,10);};
@@ -2856,7 +2876,7 @@ test('#1136 a board without ticket references opens on Trace with no Jira | Trac
  edit[0].dispatchEvent({type:'click'});assert.equal(free.editor.starts,1,'Edit starts board editing');
  // The Metrics overlay's connector line is in the shared header, so the only view shows it.
  const metricsLines=b=>b.m.body.querySelectorAll('.dv-live-metrics-connection').filter(el=>shownIn(el,b.m.body));
- assert.equal(metricsLines(free).length,1,'the metrics status line shows on a Jira-free board');assert.ok(metricsLines(free)[0].closest('.dv-status-header'));assert.match(textOf(metricsLines(free)[0]),/Metrics: not connected/);
+ assert.equal(metricsLines(free).length,1,'the metrics status line shows on a Jira-free board');assert.ok(metricsLines(free)[0].closest('.dv-live-trace'),'#1162 under the Trace view controls');assert.match(textOf(metricsLines(free)[0]),/Metrics: not connected/);
  free.m.destroy();free.api.destroy();
  // Boards with tickets, local or only through an import, keep the switch and open on Jira; Edit is in the header in both views.
  const seed=harness(),C=seed.C;seed.ctl.liveStatus.destroy();
@@ -3906,4 +3926,41 @@ test('#1180 c2 after a pick the dragged span row gets focus back; a mapping its 
  const e2=mapEditor(),d=mapBoard({editor:e2});d.h.ctl.page.sections[0].diagram.steps[1].traceMatch={...MAP_MATCH,attributes:{'http.route':'/not-this-span'}};await d.focus();e2.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});d.api.setTraceShow(true);
  assert.equal(d.m.body.querySelector('.dv-trace-map-note-text').textContent,'Mapped currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies to step Show beta; this step\'s node, parent or attributes do not match this span, so nothing lights.');
  d.api.destroy();
+});
+/* #1175: a step whose traceMatch is optional and that this trace lacks does not count against
+   the coverage line; the line adds "· K optional not in this trace". A local board and a drill-down. */
+test('#1175 the coverage line leaves out a missing optional step and counts it as optional not in this trace',async()=>{
+ for(const optional of [false,true]){
+  const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),d=f.spec.page.sections[0].diagram;
+  if(optional)d.steps.find(s=>s.id==='push').traceMatch.optional=true;
+  const h=harness(f.spec,{},{telemetry:{}}),api=h.ctl.liveStatus,m=mountStatus(h);
+  h.ctl.sections[0].stepper={path:()=>'event',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
+  h.ctl.telemetry.apply(f.samples);api.setStatusMode('trace');h.flush();
+  const entry=api.snapshot().trace.entries[0];await api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});h.flush();
+  // The event path: submit matched, publish and push missing, unbound has no traceMatch.
+  assert.equal(m.body.querySelector('.dv-trace-coverage').textContent,optional?'1/3 steps matched · 1 optional not in this trace · 0 spans unmatched':'1/4 steps matched · 0 spans unmatched');
+  const text=el=>el.children.map(c=>c.textContent || '').join(' | '),row=m.body.querySelectorAll('.dv-trace-mapping').map(text).find(t=>t.startsWith('push notification'));
+  assert.equal(row,optional?'push notification | Not observed | Optional, not in this trace.':'push notification | Not observed | Not observed · outcome unknown','the push step is listed among the mappings');
+  api.destroy();
+ }
+});
+test('#1175 a drill-down step that is optional and missing reads like a local one',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),ID='8413cd87a9f15b6bfe8e1acf5b3346d0';
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const raw={page:{tracking:{telemetry:{traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{domain:{title:'Domain',detail:{spec:'remote',section:'child',mode:'link'}}},rows:[['domain']]}}]}};
+ const remote={page:{sections:[{id:'child',diagram:{nodes:{checkout:{title:'Checkout'}},rows:[['checkout']],steps:[
+  {id:'cart',nodes:['checkout'],text:'Check out the cart',traceMatch:{serviceName:'frontend',operation:'/cart/checkout',nodeId:'checkout'}},
+  {id:'refund',nodes:['checkout'],text:'Refund the order',traceMatch:{serviceName:'refund',operation:'POST /refund',nodeId:'checkout',optional:true}}]}}]}};
+ const options={loadDetail:async()=>remote,telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async()=>({payload:recorded})}}};
+ const h=harness(raw,{},options),api=h.ctl.liveStatus,m=mountStatus(h);
+ await options.loadDetail({spec:'remote',section:'child'},new AbortController().signal);h.flush();api.setStatusMode('trace');
+ const child=api.snapshot().trace.direct.sections.find(s=>/ · child$/.test(s.label));assert.ok(child,'the drill-down is a mapping diagram');
+ api.setDirectTraceField({field:'section',value:child.id});api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:ID});
+ assert.ok(await api.loadDirectTrace(false),'the trace loads against the drill-down diagram');h.flush();
+ const selected=api.snapshot().trace.selected;assert.deepEqual(plain(selected.model.rows.map(r=>[r.id,r.status])),[['cart','matched'],['refund','missing']]);
+ assert.match(m.body.querySelector('.dv-trace-coverage').textContent,/^1\/1 steps matched · 1 optional not in this trace · \d+ spans unmatched$/);
+ const label=h.C.telemetryTraceLabel(selected.model.nodes.checkout);
+ assert.equal(label.text,h.C.telemetryTraceDuration(selected.model.rows[0].duration),'the drill-down node reads its matched step\'s time');
+ assert.match(label.title,/optional, not in this trace: refund POST \/refund/);
+ api.destroy();
 });

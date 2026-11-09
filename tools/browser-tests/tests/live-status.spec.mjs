@@ -269,7 +269,7 @@ test('S1 S2 S3 S4 S5 S6 built demo plays the story through blockers to completio
 | O8 | fallback page without a timeline | Over time offers the four synthesized days | an embedded-timeline-only button |
 | O10 | Day 4 with long header text, each theme | Live and Over time are the two buttons of their own header row (#1131), with nothing between them; the selected one has a fill the other lacks; Over time's fill differs from Live's; the slider row is tinted | Over time wrapping to a new line; a mode only the label reveals |
 | O9 | demo on Over time | `<` and `>` are on the slider's row, step one whole day, move the demo's own day and are disabled at each end | large word buttons elsewhere; a slider-only step that Live forgets |
-| O11 | very long status text, then a blocker (#986) | Live, Over time, the First blocker slot and Next day keep their exact box, and the content below keeps its top | dynamic text or a popping button moving static controls |
+| O11 | very long status text, then a blocker (#986, #1162) | Live, Over time, the First blocker slot and Next day keep their exact box; the long text wraps in full (the content below may move down for it) and the content below returns to its top with short text | dynamic text or a popping button moving static controls; status text cut off |
 */
 test('O1 O2 O3 O4 O5 O6 O7 demo Over time moves through days without changing anything but status',async({page,server})=>{
  const requests=[];page.on('request',request=>{if(['fetch','xhr'].includes(request.resourceType()))requests.push(request.url());});
@@ -343,10 +343,13 @@ test('O11 buttons and the content below them stay in place when status text grow
  const panel=page.locator('#docview .pt-live-status'),live=panel.getByRole('button',{name:'Live',exact:true}),overTime=panel.getByRole('button',{name:'Over time',exact:true}),slot=panel.locator('.dv-live-first'),next=panel.getByRole('button',{name:'Next day',exact:true}),status=panel.locator('.dv-live-status'),epic=panel.locator('.dv-live-epic');
  const places=async()=>{const out={};for(const [name,item] of Object.entries({live,overTime,slot,next})){const box=await item.boundingBox();out[name]=[box.x,box.y,box.width,box.height];}const below=await epic.boundingBox();out.epicTop=below.y;return out;};
  await expect(slot).toHaveText('No blockers');await expect(slot).toBeDisabled();const before=await places();
- await next.click();await expect(status).toHaveAttribute('title',/very long status message/);await expect(status).toHaveCSS('white-space','nowrap');expect(await places(),'long status text').toEqual(before);
+ await next.click();await expect(status).toHaveAttribute('title',/very long status message/);
+ // #1162: long status text wraps in full below the buttons, which keep their place; only the content below moves down.
+ const grown=await places(),{epicTop,...buttons}=grown,{epicTop:epicBefore,...buttonsBefore}=before;expect(buttons,'long status text').toEqual(buttonsBefore);expect(epicTop).toBeGreaterThan(epicBefore);
+ expect(await status.locator('.dv-live-note').evaluate(el=>el.scrollWidth<=el.clientWidth),'the long note is shown in full').toBe(true);
  await next.click();await next.click();await expect(slot).toHaveText('First blocker');await expect(slot).toBeEnabled();expect(await places(),'a blocker appears').toEqual(before);
- // The row is tall enough for what it holds: three count chips are not clipped.
- expect(await status.evaluate(el=>el.scrollHeight<=el.clientHeight),'status row fits its contents').toBe(true);
+ // The counts strip is tall enough for what it holds: three count chips are not clipped.
+ expect(await panel.locator('.dv-live-counts').evaluate(el=>el.scrollHeight<=el.clientHeight),'the counts strip fits its contents').toBe(true);
 });
 // #1131: the Status panel header (Jira | Trace, Metrics overlay; Live | Over time; the day row) is shared by both views.
 test('Over time from the Trace view keeps the Trace view and shows the day',async({page,server})=>{
@@ -359,6 +362,74 @@ test('Over time from the Trace view keeps the Trace view and shows the day',asyn
  await expect(row).toBeVisible();await expect(slider).toHaveValue('3');await expect(day).toHaveText('Day 4 — signal blocker');
  await row.getByRole('button',{name:'Previous day',exact:true}).click();await expect(slider).toHaveValue('2');await expect(day).toHaveText(/^Day 3 /);await expect(trace).toHaveAttribute('aria-pressed','true');
  await live.click();await expect(row).toHaveCount(0);await expect(live).toHaveAttribute('aria-pressed','true');await expect(trace).toHaveAttribute('aria-pressed','true');await expect(view).toBeVisible();
+});
+// #1162: status notes wrap in full instead of ending in an ellipsis, and First blocker sits at the right end of the counts row.
+// Each runs at the default panel and at the 480 px minimum desktop panel.
+async function storyWithCtl(page,server,width){
+ await page.addInitScript(()=>{window.flowviewBooted=ctl=>{window.ctl=ctl;};});
+ const root=await openStory(page,server),panel=root.locator('.pt-live-status');await page.waitForFunction(()=>!!window.ctl);
+ if(width)await panel.evaluate((el,w)=>{el.style.setProperty('width',w+'px','important');el.style.setProperty('max-width',w+'px','important');el.style.boxSizing='border-box';},width);
+ return {root,panel};
+}
+const LONG_NOTE='Grafana query rate failed: upstream timeout after 30 s on the shared Prometheus data source; retry later or check the connector settings.';
+for(const width of [null,480]){
+ test('#1162 First blocker sits at the right end of the counts row'+(width?' in a '+width+' px panel':''),async({page,server})=>{
+  const {root,panel}=await storyWithCtl(page,server,width),first=panel.locator('.dv-live-first'),counts=panel.getByRole('region',{name:'Status counts',exact:true});
+  if(width)expect((await panel.boundingBox()).width).toBeCloseTo(width,0);
+  await demoDay(root,4);await expect(first).toHaveText('First blocker');await expect(counts).toBeVisible();
+  // Six count pills: every one shows in full (the counts wrap), First blocker keeps the row's top right.
+  await page.evaluate(()=>window.ctl.liveStatus.apply({'HW-123':{state:'todo'},'HW-124':{state:'active'},'FW-45':{state:'testing'},'FW-46':{state:'done'},'BE-67':{state:'blocked'},'BE-68':{state:'missing'}}));
+  await expect(counts.locator('[data-live-count]:visible')).toHaveCount(6);
+  const check=async label=>{
+   const head=await panel.locator('.dv-live-head').boundingBox(),slot=await first.boundingBox(),strip=await counts.boundingBox();
+   expect(Math.abs(slot.y-strip.y),label+': First blocker shares the counts row top').toBeLessThanOrEqual(2);
+   expect(Math.abs(head.x+head.width-(slot.x+slot.width)),label+': at its right end').toBeLessThanOrEqual(2);
+   for(const pill of await counts.locator('[data-live-count]:visible').all()){
+    const b=await pill.boundingBox(),name=label+': '+await pill.textContent();
+    expect(b.x>=strip.x-1 && b.x+b.width<=strip.x+strip.width+1 && b.y>=strip.y-1 && b.y+b.height<=strip.y+strip.height+1,name+' lies inside the counts strip').toBe(true);
+    expect(b.x+b.width<=slot.x,name+' stays left of First blocker').toBe(true);
+   }
+   expect(await counts.evaluate(el=>el.scrollWidth<=el.clientWidth && el.scrollHeight<=el.clientHeight),label+': nothing in the strip is clipped').toBe(true);
+  };
+  await check('counts only');const placed=await first.boundingBox();
+  await page.evaluate(()=>window.ctl.liveStatus.action('Allow Jira',()=>{}));await expect(panel.getByRole('button',{name:'Allow Jira',exact:true})).toBeVisible();await check('with an action beside it');
+  expect(await first.boundingBox(),'an action appearing does not move First blocker').toEqual(placed);
+ });
+ test('#1162 long status notes wrap in full in both status lines'+(width?' in a '+width+' px panel':''),async({page,server})=>{
+  const {root,panel}=await storyWithCtl(page,server,width);await demoDay(root,4);
+  await page.evaluate(note=>{window.ctl.telemetry.setAvailable(false,note+' '+note);window.ctl.liveStatus.note(note+' '+note,'warn');},LONG_NOTE);
+  for(const [name,text] of [['metrics line',panel.locator('.dv-live-status .dv-live-metrics-connection > span')],['Jira status note',panel.locator('.dv-live-status .dv-live-note')]]){
+   await expect(text,name).toContainText('connector settings.');
+   const m=await text.evaluate(el=>({scroll:el.scrollWidth,client:el.clientWidth,height:el.getBoundingClientRect().height}));
+   expect(m.scroll,name+' shows its full text').toBeLessThanOrEqual(m.client);expect(m.height,name+' wraps onto more than one line').toBeGreaterThan(24);
+  }
+ });
+}
+// #1162 / #986: the Metrics line wraps, so each view draws it below its button rows; a changing note moves no button or slider
+// in the header, the Jira counts row (provider action, First blocker) or the Trace controls row (action, Show on diagram).
+for(const width of [null,480])test('#1162 a changing Metrics note moves no button or slider in either view, Live or Over time'+(width?' in a '+width+' px panel':''),async({page,server})=>{
+ const {root,panel}=await storyWithCtl(page,server,width);await demoDay(root,4);
+ await page.evaluate(()=>window.ctl.liveStatus.action('Allow Jira',()=>{}));
+ const button=name=>panel.getByRole('button',{name,exact:true}),jira=button('Jira'),trace=panel.getByRole('button',{name:/^Trace/}),line=panel.locator('.dv-live-metrics-connection');
+ const notes=['Short note.',LONG_NOTE+' '+LONG_NOTE,'',LONG_NOTE];
+ for(const view of ['jira','trace'])for(const mode of ['live','over']){
+  await (view==='jira'?jira:trace).click();
+  // Live from a past day returns to today; Over time opens the day row. A click on the selected Live would turn colors off.
+  if((await button('Over time').getAttribute('aria-pressed')==='true')!==(mode==='over'))await (mode==='live'?button('Live'):button('Over time')).click();
+  await expect(button('Over time')).toHaveAttribute('aria-pressed',String(mode==='over'));
+  const items={live:button('Live'),overTime:button('Over time'),action:button('Allow Jira')};
+  // The demo's Live day buttons belong to the Jira view; Over time's day row shows in both views.
+  if(view==='jira' || mode==='over'){items.previous=button('Previous day');items.next=button('Next day');}
+  if(mode==='over')items.slider=panel.getByRole('slider',{name:'Day',exact:true});
+  if(view==='jira')items.first=panel.locator('.dv-live-first');else items.show=button('Show on diagram');
+  const places=async()=>{const out={};for(const [name,item] of Object.entries(items)){await expect(item,view+' '+mode+' '+name).toBeVisible();const box=await item.boundingBox();out[name]=[box.x,box.y,box.width,box.height];}return out;};
+  await page.evaluate(value=>window.ctl.telemetry.setAvailable(false,value),notes[0]);await expect(line).toContainText(notes[0]);const before=await places();
+  for(const note of notes.slice(1)){
+   await page.evaluate(value=>window.ctl.telemetry.setAvailable(false,value),note);
+   if(note)await expect(line).toContainText(note.slice(0,12));else await expect(line).toBeHidden();
+   expect.soft(await places(),view+' '+mode+', note: '+(note.slice(0,24) || '(none)')).toEqual(before);
+  }
+ }
 });
 test('S4 waiting follows ticket dependencies from the provider and the authored pairs, never the edges',async({page,server})=>{
  await page.addInitScript(()=>{window.flowviewLiveStatus={provider:refs=>Object.fromEntries(refs.tickets.map(key=>[key,Object.assign({state:key==='HW-123'?'blocked':key==='FW-45'?'done':'todo'},key==='FW-46'?{dependsOn:[{key:'HW-123',source:'jira',linkType:'is blocked by'}]}:{})]))};});

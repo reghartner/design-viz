@@ -2987,8 +2987,8 @@ call, and the section says "Cleared trace 8413cd87a9f1 (Nov 6): the view moved t
 view change. The reader's own Over time on today keeps a trace from today. The typed trace ID stays, and
 log results stay across a move the loaded trace itself causes. Ticket colours on nodes follow the day
 shown (D14). Opening a drill-down keeps the loaded trace; it is cleared when its mapping diagram goes away.
-Example traces stay Live-only (D7): Over time retires one the reader chose with the same note, and one
-shown automatically without a note. A day change never says "Trace selection expired".
+Example traces stay Live-only (D7): Over time retires one the reader chose with the same note; one the
+reader never picked is not selected (#1164) and leaves without a note. A day change never says "Trace selection expired".
 
 ### Find a trace from a log line
 

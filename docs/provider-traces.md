@@ -253,8 +253,9 @@ presentation.
 There is no separate Metrics view.
 
 Returned candidates are grouped by source section and carrier. The source selector
-shows one group at a time; the Trace count deduplicates trace IDs across sources. Choosing one is
-an explicit cached-provider action. Step navigation never chooses or fetches a
+shows one group at a time; the Trace count deduplicates trace IDs across sources. None is selected,
+and nothing is drawn on the diagram, until the reader picks one (#1164); a loaded trace is selected
+as soon as it loads. Choosing one is an explicit cached-provider action. Step navigation never chooses or fetches a
 trace. One selected request stays selected as the path is inspected; mapping is
 recomputed only against that exact source section's current path. Duplicate
 carrier IDs across source diagrams are excluded because the telemetry map cannot

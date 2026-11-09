@@ -2121,7 +2121,11 @@ lookup) is not drawn; its value still applies. The help sentence is the Load
 trace summary's tooltip, and **Show on diagram** appears once a trace is shown.
 
 Each annotated node or uniquely matched edge gets one label from its rows: one row per
-step on the current path whose `traceMatch` names it (#1154). One row shows its time,
+step on the current path whose `traceMatch` names it (#1154). Connection timing (#1196):
+for a step with `edge` or `edges`, `traceMatch.nodeId` names the receiving node, and the
+connection timed is the step's one delivered connection into that node. A `nodeId` at the
+sending end times the node but no connection; `node tools/validate.js` warns and names the
+receiving node to use. One row shows its time,
 for example `16.1 ms`. When the step's
 [traceMatch alternatives](provider-traces.md#tracematch-alternatives) matched, the label
 names the alternative: `Matched: stats-consumer persistent://stats/camer… · 16.1 ms` (the

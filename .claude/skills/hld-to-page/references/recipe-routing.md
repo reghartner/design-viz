@@ -43,8 +43,10 @@ topology, notification or outcome without evidence.
 Import a provider's slice when it already draws the systems your story uses;
 redraw only what no provider exports. Export a slice that other diagrams will
 show: its nodes and the edges between them. Syntax: `docs/shared-topology.md`.
-- When two exports from one provider share a node, import one of them as a
-  subset (`nodes`/`edges`) without that node, so it is drawn once.
+- When two exports from one provider share a node, draw it once. Exports of the
+  same section merge best: `export:["a","b"]` includes shared nodes once.
+  Otherwise import one of them as a subset (`nodes`/`edges`) without that node
+  and without the edges that touch it.
 - An imported block placed by hand can overlap the story's own floats and raise
   edge-label warnings: check the render after placing one.
 

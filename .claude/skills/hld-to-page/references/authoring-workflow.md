@@ -187,7 +187,7 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
     page with tabs, every section goes inside the tabs container: a direct
     section in `blocks` shows on every tab (above the tab bar if it comes
     before the container, below if after). Put intro and
-    "Considered/rejected" content in their own tab or the first tab's text.
+    "Considered/rejected" content in their own tab.
 
 And always: honesty. No invented facts. Unknown is not failed. End each path
 at its last source-backed outcome; do not add a user action (opening the

@@ -458,9 +458,7 @@ diagram in that same section:
             ["broker", ["deviceA", "deviceB", "deviceC"]] ],
   "floats": [ { "id": "auth", "side": "above" } ],
   "edges": [
-    { "from": "console", "to": "api", "kind": "https", "label": "POST /commands" },
-    { "from": "deviceB", "to": "broker", "kind": "mqtt", "ret": true,
-      "label": "PUBACK" }
+    { "from": "console", "to": "api", "kind": "https", "label": "POST /commands" }
   ],
   "steps": [
     { "edge": "console->api", "text": "Operator sends the command",
@@ -2249,8 +2247,8 @@ only at its own step and is not carried forward.
 An ordered array walking the flow. Each step:
 
 - `edge`: `"from->to"` (matching an edge's `from`/`to` ids exactly), **or**
-  `edges`: an array of such keys for hops that happen together (a fan-out, a
-  request+response round trip). Multi-edge steps fire their packets in list
+  `edges`: an array of such keys for hops that happen together (a fan-out).
+  Multi-edge steps fire their packets in list
   order, staggered — a two-hop delivery reads as two hops.
 - `failures` — optional map of existing edge keys to communication outcomes:
   `{"broker->device":"dropped","api->worker":"blocked"}`. `dropped` means a
@@ -2637,13 +2635,11 @@ contract stays the authority; a recipe shows the working subset for one task.
                   "edges": [
                     {"from": "web", "to": "api", "kind": "https", "label": "POST /orders"},
                     {"from": "api", "to": "auth", "kind": "int", "label": "verify"},
-                    {"from": "auth", "to": "svc", "kind": "int", "ret": true, "label": "ok"},
                     {"from": "api", "to": "svc", "kind": "int", "label": "create"},
                     {"from": "svc", "to": "db", "kind": "int", "label": "insert"},
                     {"from": "db", "to": "bus", "kind": "mqtt", "label": "PUBLISH orders.created"},
                     {"from": "bus", "to": "pick", "kind": "mqtt", "label": "SUBSCRIBE orders.*"},
-                    {"from": "bus", "to": "invoice", "kind": "mqtt"},
-                    {"from": "pick", "to": "bus", "kind": "mqtt", "ret": true, "label": "ack"}
+                    {"from": "bus", "to": "invoice", "kind": "mqtt"}
                   ],
                   "panels": [
                     {"id": "ord", "type": "state", "title": "Order Svc — order state",
@@ -2655,7 +2651,7 @@ contract stays the authority; a recipe shows the working subset for one task.
                   ],
                   "steps": [
                     {"edge": "web->api", "text": "Customer submits the order"},
-                    {"edges": ["api->auth", "auth->svc"], "text": "Session verified, order accepted",
+                    {"edge": "api->auth", "text": "Session verified: Auth replies ok, order accepted",
                      "panels": {"ord": {"state": "AUTHORIZED"}}},
                     {"edge": "api->svc", "text": "Order handed to the service"},
                     {"edge": "svc->db", "text": "Order persisted",
@@ -2663,10 +2659,8 @@ contract stays the authority; a recipe shows the working subset for one task.
                      "panels": {"ord": {"state": "PERSISTED"}}},
                     {"edge": "db->bus", "text": "Created event published",
                      "panels": {"lag": {"value": 1}}},
-                    {"edges": ["bus->pick", "bus->invoice"], "text": "Fan-out to fulfillment workers",
-                     "panels": {"ord": {"state": "FANNED_OUT"}}},
-                    {"edge": "pick->bus", "text": "Picking acknowledges",
-                     "panels": {"lag": {"value": 0}}}
+                    {"edges": ["bus->pick", "bus->invoice"], "text": "Fan-out to fulfillment workers; Picking acks the message",
+                     "panels": {"ord": {"state": "FANNED_OUT"}, "lag": {"value": 0}}}
                   ]
                 }
               }

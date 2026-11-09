@@ -50,20 +50,6 @@
                       "to": "store",
                       "kind": "int",
                       "label": "atomic insert"
-                    },
-                    {
-                      "from": "store",
-                      "to": "api",
-                      "kind": "int",
-                      "ret": true,
-                      "label": "saved response"
-                    },
-                    {
-                      "from": "api",
-                      "to": "client",
-                      "kind": "https",
-                      "ret": true,
-                      "label": "order result"
                     }
                   ],
                   "panels": [
@@ -218,8 +204,8 @@
                       ]
                     },
                     {
-                      "edge": "store->api",
-                      "text": "The stored response is read; no additional write occurs.",
+                      "nodes": ["store", "api"],
+                      "text": "The store returns the saved response; no additional write occurs.",
                       "panels": {
                         "limits": {
                           "values": {
@@ -230,8 +216,8 @@
                       }
                     },
                     {
-                      "edge": "api->client",
-                      "text": "The caller gets the original response and order version.",
+                      "nodes": ["api", "client"],
+                      "text": "The API replies with the original response and order version.",
                       "panels": {
                         "orders": {
                           "note": "A failed new-key check selected the replay path; it did not create another order."
@@ -290,13 +276,6 @@
                       "to": "device",
                       "kind": "mqtt",
                       "label": "reconcile"
-                    },
-                    {
-                      "from": "device",
-                      "to": "broker",
-                      "kind": "mqtt",
-                      "ret": true,
-                      "label": "reported state"
                     }
                   ],
                   "panels": [
@@ -405,8 +384,8 @@
                       }
                     },
                     {
-                      "edge": "device->broker",
-                      "text": "After applying version 8, the device reports the matching state and releases staging memory.",
+                      "nodes": ["device", "broker"],
+                      "text": "After applying version 8, the device reports the matching state to the broker and releases staging memory.",
                       "panels": {
                         "shadowstate": {
                           "rows": [

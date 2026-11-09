@@ -836,13 +836,6 @@
             },
             {
               "from": "objects",
-              "to": "writer",
-              "kind": "https",
-              "label": "status",
-              "ret": true
-            },
-            {
-              "from": "objects",
               "to": "catalog",
               "kind": "int",
               "label": "index"
@@ -943,7 +936,7 @@
             {
               "id": "rejected",
               "text": "Storage returns HTTP 503 to the writer. No catalog entry or clip-ready event is created; the retained device clip remains available.",
-              "edge": "objects->writer",
+              "edge": "writer->objects",
               "failures": {
                 "catalog->eventout": "blocked"
               },

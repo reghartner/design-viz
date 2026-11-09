@@ -68,20 +68,6 @@
               "to": "camera",
               "kind": "int",
               "label": "voice downlink"
-            },
-            {
-              "from": "camera",
-              "to": "relay",
-              "kind": "int",
-              "ret": true,
-              "label": "microphone uplink"
-            },
-            {
-              "from": "relay",
-              "to": "app",
-              "kind": "int",
-              "ret": true,
-              "label": "remote audio"
             }
           ],
           "panels": [
@@ -343,9 +329,10 @@
                   }
                 }
               },
-              "edges": [
-                "camera->relay",
-                "relay->app"
+              "nodes": [
+                "camera",
+                "relay",
+                "app"
               ]
             },
             {
@@ -718,20 +705,6 @@
               "to": "camera",
               "kind": "int",
               "label": "voice downlink"
-            },
-            {
-              "from": "camera",
-              "to": "relay",
-              "kind": "int",
-              "ret": true,
-              "label": "microphone uplink"
-            },
-            {
-              "from": "relay",
-              "to": "app",
-              "kind": "int",
-              "ret": true,
-              "label": "remote audio"
             }
           ],
           "panels": [
@@ -1025,9 +998,10 @@
                   }
                 }
               },
-              "edges": [
-                "camera->relay",
-                "relay->app"
+              "nodes": [
+                "camera",
+                "relay",
+                "app"
               ]
             },
             {
@@ -1485,20 +1459,6 @@
               "to": "camera",
               "kind": "int",
               "label": "voice downlink"
-            },
-            {
-              "from": "camera",
-              "to": "relay",
-              "kind": "int",
-              "ret": true,
-              "label": "microphone uplink"
-            },
-            {
-              "from": "relay",
-              "to": "app",
-              "kind": "int",
-              "ret": true,
-              "label": "remote audio"
             }
           ],
           "panels": [

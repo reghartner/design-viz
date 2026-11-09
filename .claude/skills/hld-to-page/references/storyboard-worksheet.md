@@ -174,7 +174,7 @@ in the house", "holds: resident is not looking at the phone yet").
 ### <step-id>   paths: <path ids>   time: <story time shown>
 Beat: <one sentence: what happens, told to the audience>
 Hops claimed: <for each message clause in the caption: every hop from the originating device to the last receiver, through each relay node (router, bridge)>
-Edges: <every hop above, in firing order: a->b (request), b->a (response, ret, only with evidence), b->c, b->d (fan-out) ...>
+Edges: <every hop above, in firing order, one arrow per call: a->b (request; name its evidenced reply in the caption), b->c, b->d (fan-out) ...>
 Missing hops check: <"none" or the hops you added and why>
 Report?: <"no report", "report at <time> delivered: <device-app fields> update", or "unshown scheduled report at <time>, illus: <fields>"; a reported value changes only for one of these>
 Focus: <which panel carries this beat>
@@ -189,7 +189,7 @@ Evidence: <ledger row numbers; "illus" for illustrative values>
 ```
 
 Edge rules:
-- List every hop the beat uses: the request and its evidenced response, every branch of
+- List every hop the beat uses: each call (its evidenced reply named in the caption), every branch of
   a fan-out, every relay hop (A to broker to B is two hops). If the caption says
   it, an edge must light it in this step, even if the same edge was lit in an
   earlier step; if an edge is lit, the caption or evidence must support it.
@@ -292,7 +292,7 @@ Three to six source-grounded statements you will verify after building, for the
 hardest beats. Include one per operator anchor ("the 5:00 AM step shows 35%"). Examples: "On the offline path the door card never shows
 Closed." "The clock reads 7:10 AM Sat at the last step." "The low-battery icon
 appears at the same step the charge crosses 20." "Every step on the happy path
-lights both the request and its response."
+lights the request and its caption names the reply."
 
 For source-required visible evidence, also declare a companion visibility file
 as described in `docs/visibility-evidence.md`: section, view, path, step, panel,

@@ -232,7 +232,7 @@ Evidence: L3, L9, I9
 
 ### a-close   paths: closed   time: 6:22 PM (`18:22`)
 Beat: The resident taps the reminder; the app reads the door (Open), the resident taps Close, the service accepts it and commands the hub.
-Hops claimed: app -> door service (GET /door, then POST /door/close); door service -> app (door record, then 202); door service -> hub (PUBLISH door/cmd)
+Hops claimed: app -> door service (GET /door, then POST /door/close; replies: door record, then 202, named in the caption); door service -> hub (PUBLISH door/cmd)
 Edges: app->cloud (GET /door · POST /door/close), cloud->hub (PUBLISH door/cmd)
 Missing hops check: one arrow per call; the door record and the 202 (source item 4; A2 and I6 give the read) are named in the caption, not drawn as a second edge
 Report?: report at 6:22 PM delivered by the read: door (6:05 PM report, Open) and battery (23%, 6:05 PM); door then shows Closing from the app's own request
@@ -248,7 +248,7 @@ Evidence: L4, A2, I6
 
 ### a-closed   paths: closed   time: 6:23 PM (`+1m`)
 Beat: The hub drives the opener; the limit switch confirms closed; the tilt sensor reports closed and battery; the hub publishes closed and the app's next refresh shows the new report.
-Hops claimed: tilt sensor -> hub (closed, battery); hub -> door service (PUBLISH door/state closed); app -> door service (GET /door, 30 s refresh); door service -> app (door record)
+Hops claimed: tilt sensor -> hub (closed, battery); hub -> door service (PUBLISH door/state closed); app -> door service (GET /door, 30 s refresh; reply: door record, named in the caption)
 Edges: sensor->hub (closed report), hub->cloud (PUBLISH door/state), app->cloud (GET /door; the caption names the record it reads)
 Missing hops check: included sensor->hub because the door changed and I8 says the tilt sensor reports every door-state change; no ack is stated
 Report?: report at 6:23 PM delivered by the refresh: door Closed and battery 23%, both from the sensor's 6:23 PM report
@@ -280,7 +280,7 @@ Evidence: L5, D7 (9:10 PM illus), D4 illus rate
 
 ### b-morning   paths: offline   time: 7:10 AM, Sat, Oct 3 (`07:10`)
 Beat: The resident opens the app next morning; it reads the service: Open, stale, 13 hours old.
-Hops claimed: app -> door service (GET /door); door service -> app (door record)
+Hops claimed: app -> door service (GET /door; reply: door record, named in the caption)
 Edges: app->cloud (GET /door; the caption names the record it reads)
 Missing hops check: none (the service answers from its record; the hub is not asked)
 Report?: report at 7:10 AM delivered by the read: door Open (6:05 PM report), battery 23% (6:05 PM), hub Offline (last heartbeat 9:10 PM)

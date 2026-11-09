@@ -20,7 +20,6 @@
           {"from": "operator", "to": "api", "kind": "https", "label": "set flow"},
           {"from": "api", "to": "broker", "kind": "mqtt", "label": "publish command"},
           {"from": "broker", "to": "device", "kind": "mqtt", "label": "radio delivery"},
-          {"from": "device", "to": "api", "kind": "mqtt", "ret": true, "label": "applied ACK"},
           {"from": "api", "to": "audit", "kind": "int", "label": "record outcome"}
         ],
         "panels": [
@@ -34,7 +33,7 @@
           {"id": "publish", "edge": "api->broker", "text": "The broker queues the command. Radio delivery is the next point of failure.", "panels": {"delivery": {"state": "QUEUED"}, "events": {"log": [{"text": "Queued for Pump P-7"}]}}},
           {"id": "receive", "edge": "broker->device", "text": "The command reaches the pump over the radio link.", "panels": {"delivery": {"state": "DELIVERED"}, "checks": {"results": {"received": {"status": "pass"}}}}},
           {"id": "apply", "nodes": ["device"], "tone": {"device": "ok"}, "text": "The device applies the requested flow rate.", "panels": {"delivery": {"state": "APPLIED"}, "checks": {"results": {"received": {"status": "pass"}, "applied": {"status": "pass"}}}, "events": {"log": [{"text": "Pump applied the command"}]}}},
-          {"id": "ack", "edges": ["device->api", "api->audit"], "text": "The acknowledgment is recorded. The happy path ends with confirmed application.", "panels": {"delivery": {"state": "ACKNOWLEDGED"}, "checks": {"results": {"received": {"status": "pass"}, "applied": {"status": "pass"}, "ack": {"status": "pass"}}}, "events": {"log": [{"text": "Application acknowledged and recorded"}]}}},
+          {"id": "ack", "edges": ["api->audit"], "text": "The device's applied ACK reaches the API, which records the acknowledgment. The happy path ends with confirmed application.", "panels": {"delivery": {"state": "ACKNOWLEDGED"}, "checks": {"results": {"received": {"status": "pass"}, "applied": {"status": "pass"}, "ack": {"status": "pass"}}}, "events": {"log": [{"text": "Application acknowledged and recorded"}]}}},
           {"id": "dropped", "failures": {"broker->device": "dropped"}, "nodes": ["broker"], "tone": {"broker": "warn", "device": "dim"}, "text": "The radio signal drops before delivery. This path ends here: the device never receives or applies this command, and no acknowledgment is recorded.", "panels": {"delivery": {"state": "SIGNAL LOST"}, "checks": {"results": {"received": {"status": "fail", "detail": "Signal dropped before delivery"}, "applied": {"status": "skip", "detail": "Command never arrived"}, "ack": {"status": "skip", "detail": "No acknowledgment"}}}, "events": {"log": [{"text": "Radio delivery failed; no application or ACK"}]}}}
         ],
         "paths": [

@@ -104,7 +104,7 @@ function paintTraceLabels(d,e){
  const doc={},el=(tag,attrs={})=>({tagName:tag,attrs:{...attrs},children:[],textContent:'',parentNode:null,ownerDocument:doc,
   setAttribute(k,v){this.attrs[k]=String(v);},getAttribute(k){return k in this.attrs?this.attrs[k]:null;},removeAttribute(k){delete this.attrs[k];},
   appendChild(c){c.parentNode=this;this.children.push(c);return c;},matches(sel){return sel==='g.node'?this.tagName==='g' && this.attrs.class==='node':sel==='path.edge'?this.tagName==='path':false;},
-  closest(){return null;},getBBox(){return {x:0,y:0,width:120,height:40};},querySelector(sel){return sel==='.card'?this.children.find(c=>c.attrs.class==='card') || null:null;}});
+  closest(){return null;},classList:{contains:()=>false},getBBox(){return {x:0,y:0,width:120,height:40};},querySelector(sel){return sel==='.card'?this.children.find(c=>c.attrs.class==='card') || null:null;}});
  doc.createElementNS=(ns,tag)=>el(tag);
  const nodes=Object.keys(d.nodes).map(id=>{const g=el('g',{class:'node','data-dv-node':id});g.appendChild(el('rect',{class:'card'}));return g;});
  const layer=el('g'),paths=d.edges.map((edge,i)=>layer.appendChild(Object.assign(el('path',{class:'edge','data-dv-edge':i}),{getTotalLength:()=>100,getPointAtLength:l=>({x:l,y:0})})));

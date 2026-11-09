@@ -3041,7 +3041,9 @@ test('span focus controller pauses, jumps exact source steps, shares state, and 
  selected=api.snapshot().trace.selected;assert.equal(selected.focus.spanId,span.id);assert.equal(selected.focus.choice.stepId,'submit');
  assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,1);assert.equal(h.view.querySelectorAll('.dv-trace-edge-focus').length,1);assert.equal(h.view.querySelector('.dv-trace-edge-focus').getAttribute('transform'),'translate(5 7)');assert.equal(h.view.querySelector('.dv-trace-edge-outline').getAttribute('d'),edge.getAttribute('d'));
  api.setTraceShow(true);api.setTraceShow(true);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay').length,1);assert.equal(h.view.querySelectorAll('.dv-trace-edge-focus').length,1);assert.equal(h.view.querySelectorAll('mask').length,1);assert.equal(edge.getAttribute('d'),'M0 0 C30 40 70 40 100 0');
- api.clearTraceFocus({context:selected.context});assert.equal(api.snapshot().trace.selected.focus,null);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay,.dv-trace-edge-focus').length,0);assert.equal(h.view.querySelectorAll('mask').length,0);assert.equal(pauses,1);assert.equal(api.selectTraceSpan(action),false);
+ api.clearTraceFocus({context:selected.context});assert.equal(api.snapshot().trace.selected.focus,null);assert.equal(h.view.querySelectorAll('.dv-trace-focus-overlay[data-trace-level="current"],.dv-trace-edge-focus[data-trace-level="current"]').length,0);
+ // #1185: with no span focused the trace's carriers keep their "below" marks, one mask per outline.
+ assert.equal(h.view.querySelectorAll('.dv-trace-edge-focus[data-trace-level="below"]').length,1);assert.equal(h.view.querySelectorAll('mask').length,1);assert.equal(pauses,1);assert.equal(api.selectTraceSpan(action),false);
  const next={context:api.snapshot().trace.selected.context,spanId:span.id};api.destroy();assert.equal(api.selectTraceSpan(next),false);assert.equal(jumps.length,1);
 });
 
@@ -3744,6 +3746,57 @@ test('#1145 opening a drill-down keeps the loaded trace and its selection',async
 /* #1164: example traces (from the metrics fetch) are listed, but none is the selected request and nothing
    paints on the diagram until the reader picks one; a loaded trace still selects itself. Boards with and
    without Jira. */
+/* #1185: a shown trace with an error span whose step mapping is unique focuses the earliest such span,
+   as if the reader clicked it (the stepper pauses and jumps to its step). An error span with several
+   possible steps is not focused and the summary asks for a pick; one that no step maps is named as
+   not on this diagram. A cleared focus does not come back, also after an edit re-render. */
+async function failedTrace(edit,renderOptions={}){
+ const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),failed=f.samples['mcu->ingest'].exemplars[0].spans.find(s=>s.error);
+ assert.ok(failed,'the fixture trace has an error span');if(edit)edit(f,failed);
+ const h=harness(f.spec,{},{telemetry:{},...renderOptions}),api=h.ctl.liveStatus,m=mountStatus(h),jumps=[];
+ h.ctl.sections[0].stepper={path:()=>'event',sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(i,path){jumps.push([i,path]);return true;}};
+ h.ctl.telemetry.apply(f.samples);api.setStatusMode('trace');h.flush();
+ const pick=async()=>{const t=api.snapshot().trace;await api.chooseTrace({key:t.entries[0].key,traceId:t.entries[0].exemplar.traceId});h.flush();h.flush();};
+ await pick();
+ const text=n=>[n.textContent || ''].concat(n.children.map(text)).join(' ');
+ // The collapsed request line (#1182): the error note must stay visible without opening the card.
+ const line=()=>{const el=m.body.querySelector('.dv-trace-request-summary');return el?text(el):'';};
+ return {h,api,m,jumps,failed,pick,summary:()=>text(m.body),line};
+}
+test('#1185 a failed trace focuses its earliest uniquely mapped error span, as a click would',async()=>{
+ const t=await failedTrace();
+ assert.equal(t.api.snapshot().trace.selected.focus && t.api.snapshot().trace.selected.focus.spanId,t.failed.id,'the error span is focused without a click');
+ assert.deepEqual(t.jumps,[[0,'event']],'the stepper jumps to its step, as for a click');
+ t.api.clearTraceFocus({context:t.api.snapshot().trace.selected.context});t.h.flush();t.h.flush();
+ assert.equal(t.api.snapshot().trace.selected.focus,null,'the reader can clear it, and it does not come back');
+ t.api.destroy();
+});
+test('#1185 an error span that no step maps is not focused and is named as not on this diagram',async()=>{
+ const t=await failedTrace((f,failed)=>{failed.service='billing';failed.name='charge card';});
+ assert.equal(t.api.snapshot().trace.selected.focus,null,'an unmapped error span is not focused');
+ assert.match(t.summary(),/error in billing charge card \(not on this diagram\)/,'the request summary names it');
+ assert.match(t.line(),/error in billing charge card \(not on this diagram\)/,'on the collapsed request line');
+ t.api.destroy();
+});
+test('#1185 an error span with several possible steps is not focused; the summary asks for a pick',async()=>{
+ const t=await failedTrace(f=>{const d=f.spec.page.sections[0].diagram;d.steps.push({...structuredClone(d.steps[0]),id:'submit2'});d.paths[0].steps.push('submit2');});
+ assert.equal(t.api.snapshot().trace.selected.focus,null,'an ambiguous error span is not focused');
+ assert.doesNotMatch(t.summary(),/not on this diagram/,'it is on this diagram');
+ assert.match(t.summary(),/error in event-ingest POST \/v1\/events: pick a step to focus it/);
+ assert.match(t.line(),/error in event-ingest POST \/v1\/events: pick a step to focus it/,'on the collapsed request line');
+ t.api.destroy();
+});
+test('#1185 a cleared automatic focus stays cleared after an edit re-render',async()=>{
+ let carried=null;const editor=()=>({...jiraFreeEditor(),rememberTrace(c){carried=c;},takeTrace(){const c=carried;carried=null;return c;}});
+ const first=await failedTrace(null,{boardEditor:editor()});
+ assert.equal(first.api.snapshot().trace.selected.focus.spanId,first.failed.id);
+ first.api.clearTraceFocus({context:first.api.snapshot().trace.selected.context});first.h.flush();first.api.destroy();
+ assert.ok(carried && carried.autoFocused,'the re-render carries the automatically focused trace');
+ const second=await failedTrace(null,{boardEditor:editor()});
+ assert.equal(second.api.snapshot().trace.selected.focus,null,'the same trace is not focused again after the re-render');
+ assert.deepEqual(second.jumps,[],'and the stepper does not jump');
+ second.api.destroy();
+});
 test('#1164 example traces are not selected or painted until the reader picks one',async()=>{
  for(const jira of [true,false]){
   const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),d=f.spec.page.sections[0].diagram;
